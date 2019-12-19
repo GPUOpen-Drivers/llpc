@@ -49,7 +49,7 @@
 namespace Llpc
 {
 
-class Builder;
+class Pipeline;
 
 // Enumerates types of descriptor.
 enum class DescriptorType : uint32_t
@@ -155,9 +155,9 @@ struct ResourceUsage
     bool                       resourceWrite;         // Whether shader does resource-write operations (UAV)
     bool                       resourceRead;          // Whether shader does resource-read operrations (UAV)
     bool                       perShaderTable;        // Whether per shader stage table is used
-    bool                       globalConstant;        // Whether global constant is used
     uint32_t                   numSgprsAvailable;     // Number of available SGPRs
     uint32_t                   numVgprsAvailable;     // Number of available VGPRs
+    bool                       useImages;             // Whether images are used
 
     // Usage of built-ins
     struct
@@ -205,14 +205,8 @@ struct ResourceUsage
                 uint32_t cullDistance         : 4;      // Array size of gl_out[].gl_CullDistance[] (0 means unused)
                 uint32_t tessLevelOuter       : 1;      // Whether gl_TessLevelOuter[] is used
                 uint32_t tessLevelInner       : 1;      // Whether gl_TessLevelInner[] is used
-                // Execution mode (shared with tessellation evaluation shader)
-                uint32_t vertexSpacing        : 2;      // Vertex spacing
-                uint32_t vertexOrder          : 2;      // Vertex ordering
-                uint32_t primitiveMode        : 2;      // Tesselllation primitive mode
-                uint32_t pointMode            : 1;      // Whether point mode is specified
-                uint32_t outputVertices       : 6;      // Number of produced vertices in the output patch
 
-                uint64_t unused               : 26;
+                uint64_t unused               : 39;
             } tcs;
 
             // Tessellation evaluation shader
@@ -236,14 +230,8 @@ struct ResourceUsage
                 uint32_t cullDistance         : 4;      // Array size gl_CullDistance[] (0 means unused)
                 uint32_t viewportIndex        : 1;      // Whether gl_ViewportIndex is used
                 uint32_t layer                : 1;      // Whether gl_Layer is used
-                // Execution mode (shared with tessellation control shader)
-                uint32_t vertexSpacing        : 2;      // Vertex spacing
-                uint32_t vertexOrder          : 2;      // Vertex ordering
-                uint32_t primitiveMode        : 2;      // Tesselllation primitive mode
-                uint32_t pointMode            : 1;      // Whether point mode is specified
-                uint32_t outputVertices       : 6;      // Number of produced vertices in the output patch
 
-                uint64_t unused               : 23;
+                uint64_t unused               : 36;
             } tes;
 
             // Geometry shader
@@ -265,13 +253,8 @@ struct ResourceUsage
                 uint32_t primitiveId          : 1;      // Whether gl_PrimitiveID is used
                 uint32_t viewportIndex        : 1;      // Whether gl_ViewportIndex is used
                 uint32_t layer                : 1;      // Whether gl_Layer is used
-                // Execution mode
-                uint32_t inputPrimitive       : 3;      // Type of input primitive
-                uint32_t outputPrimitive      : 2;      // Type of output primitive
-                uint32_t invocations          : 7;      // Number of times to invoke shader for each input primitive
-                uint32_t outputVertices       : 11;     // Max number of vertices the shader will emit (one invocation)
 
-                uint64_t unused               : 15;
+                uint64_t unused               : 38;
             } gs;
 
             // Fragment shader
@@ -311,26 +294,16 @@ struct ResourceUsage
                 uint32_t fragDepth            : 1;      // Whether gl_FragDepth is used
                 uint32_t sampleMask           : 1;      // Whether gl_SampleMask[] is used
                 uint32_t fragStencilRef       : 1;      // Whether gl_FragStencilRef is used
-                // Execution mode
-                uint32_t originUpperLeft      : 1;      // Whether "origin_upper_left" qualifier is used
-                uint32_t pixelCenterInteger   : 1;      // Whether "pixel_center_integer" qualifier is used
-                uint32_t earlyFragmentTests   : 1;      // Whether "early_fragment_tests" qualifier is used
-                uint32_t depthMode            : 2;      // Mode of gl_FragDepth
-                uint32_t postDepthCoverage    : 1;      // Whether "post_depth_coverage" qualifier is used
                 // Statements
                 uint32_t discard              : 1;      // Whether "discard" statement is used
                 uint32_t runAtSampleRate      : 1;      // Whether fragment shader run at sample rate
 
-                uint64_t unused               : 26;
+                uint64_t unused               : 32;
             } fs;
 
             // Compute shader
             struct
             {
-                // Execution mode
-                uint32_t workgroupSizeX         : 16;     // X value of gl_WorkGroupSize
-                uint32_t workgroupSizeY         : 16;     // Y value of gl_WorkGroupSize
-                uint32_t workgroupSizeZ         : 16;     // Z value of gl_WorkGroupSize
                 // Workgroup layout
                 uint32_t workgroupLayout        : 2;      // The layout of the workgroup
                 // Input
@@ -340,7 +313,7 @@ struct ResourceUsage
                 uint32_t numSubgroups           : 1;      // Whether gl_NumSubgroups is used
                 uint32_t subgroupId             : 1;      // Whether gl_SubgroupID is used
 
-                uint64_t unused                 : 9;
+                uint64_t unused                 : 57;
             } cs;
 
             struct
@@ -362,13 +335,8 @@ struct ResourceUsage
                 uint32_t subgroupLeMask            : 1;  // Whether gl_SubGroupLeMask is used
                 uint32_t subgroupLtMask            : 1;  // Whether gl_SubGroupLtMask is used
                 uint32_t deviceIndex               : 1;  // Whether gl_DeviceIndex is used
-                uint32_t denormPerserve            : 4;  // Bitmask of denormPerserve flags
-                uint32_t denormFlushToZero         : 4;  // Bitmask of denormFlushToZero flags
-                uint32_t signedZeroInfNanPreserve  : 4;  // Bitmask of signedZeroInfNanPreserve flags
-                uint32_t roundingModeRTE           : 4;  // Bitmask of roundingModeRTE flags
-                uint32_t roundingModeRTZ           : 4;  // Bitmask of roundingModeRTZ flags
 
-                uint64_t unused                    : 36;
+                uint64_t unused                    : 56;
             } common;
 
             struct
@@ -696,14 +664,15 @@ struct InterfaceData
     } entryArgIdxs;
 };
 
-#if LLPC_BUILD_GFX10
-// Represents NGG (implicit primitive shader) control settings (valid for GFX10+)
-struct NggControl : NggState
+// Shader FP mode for use by front-end
+struct ShaderFpMode
 {
-    bool                            passthroughMode; // Whether NGG passthrough mode is enabled
-    Util::Abi::PrimShaderCbLayout   primShaderTable; // Primitive shader table (only some registers are used)
+    uint32_t denormPerserve            : 4;  // Bitmask of denormPerserve flags
+    uint32_t denormFlushToZero         : 4;  // Bitmask of denormFlushToZero flags
+    uint32_t signedZeroInfNanPreserve  : 4;  // Bitmask of signedZeroInfNanPreserve flags
+    uint32_t roundingModeRTE           : 4;  // Bitmask of roundingModeRTE flags
+    uint32_t roundingModeRTZ           : 4;  // Bitmask of roundingModeRTZ flags
 };
-#endif
 
 // =====================================================================================================================
 // Represents pipeline-specific context for pipeline compilation, it is a part of LLPC context
@@ -744,28 +713,10 @@ public:
     // Gets the next active shader stage in this pipeline
     virtual ShaderStage GetNextShaderStage(ShaderStage shaderStage) const { return ShaderStageInvalid; }
 
-    // Checks whether tessellation off-chip mode is enabled
-    virtual bool IsTessOffChip() const = 0;
-
-    // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
-    virtual bool CheckGsOnChipValidity() = 0;
-
-    // Checks whether GS on-chip mode is enabled
-    virtual bool IsGsOnChip() const = 0;
-
-    // Enables GS on-chip mode
-    virtual void SetGsOnChip(bool gsOnChip) = 0;
-
     // Does user data node merge for merged shader
     virtual void DoUserDataNodeMerge() = 0;
 
 #if LLPC_BUILD_GFX10
-    // Sets NGG control settings
-    virtual void SetNggControl() = 0;
-
-    // Gets NGG control settings
-    virtual const NggControl* GetNggControl() const = 0;
-
     // Gets WGP mode enablement for the specified shader stage
     virtual bool GetShaderWgpMode(ShaderStage shaderStage) const = 0;
 #endif
@@ -795,12 +746,16 @@ public:
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const = 0;
 
-    // Set pipeline state in Builder
-    void SetBuilderPipelineState(Builder* pBuilder) const;
+    // Set pipeline state in Pipeline object for middle-end
+    void SetPipelineState(Pipeline* pPipeline) const;
 
     static void InitShaderResourceUsage(ShaderStage shaderStage, ResourceUsage* pResUsage);
 
     static void InitShaderInterfaceData(InterfaceData* pIntfData);
+
+    // Get ShaderFpMode struct for the given shader stage
+    ShaderFpMode& GetShaderFpMode(ShaderStage stage) { return m_shaderFpModes[stage]; }
+
 protected:
     // Gets dummy vertex input create info
     virtual VkPipelineVertexInputStateCreateInfo* GetDummyVertexInputInfo() { return nullptr; }
@@ -822,6 +777,10 @@ protected:
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(PipelineContext);
     LLPC_DISALLOW_COPY_AND_ASSIGN(PipelineContext);
+
+    // -----------------------------------------------------------------------------------------------------------------
+
+    ShaderFpMode           m_shaderFpModes[ShaderStageCountInternal] = {};
 };
 
 } // Llpc

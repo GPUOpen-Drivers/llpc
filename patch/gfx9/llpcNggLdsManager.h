@@ -41,7 +41,7 @@ namespace Llpc
 {
 
 class Context;
-class GraphicsContext;
+class PipelineState;
 
 // Enumerates the types of LDS regions used in NGG.
 enum NggLdsRegionType
@@ -94,10 +94,10 @@ static const uint32_t SizeOfDword = sizeof(uint32_t);
 class NggLdsManager
 {
 public:
-    NggLdsManager(llvm::Module* pModule, Context* pContext, llvm::IRBuilder<>* pBuilder);
+    NggLdsManager(llvm::Module* pModule, PipelineState* pPipelineState, llvm::IRBuilder<>* pBuilder);
 
-    static uint32_t CalcEsExtraLdsSize(GraphicsContext* pContext);
-    static uint32_t CalcGsExtraLdsSize(GraphicsContext* pContext);
+    static uint32_t CalcEsExtraLdsSize(PipelineState* pPipelineState);
+    static uint32_t CalcGsExtraLdsSize(PipelineState* pPipelineState);
 
     // Gets the LDS starting offset for the specified region
     uint32_t GetLdsRegionStart(NggLdsRegionType region) const
@@ -121,6 +121,7 @@ private:
     static const uint32_t LdsRegionSizes[LdsRegionCount];  // LDS sizes for all LDS region types (in BYTEs)
     static const char*    LdsRegionNames[LdsRegionCount];  // Name strings for all LDS region types
 
+    PipelineState*  m_pPipelineState; // Pipeline state
     Context*        m_pContext;     // LLPC context
 
     llvm::GlobalValue*  m_pLds;     // Global variable to model NGG LDS

@@ -43,7 +43,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 38
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 //**
 //**********************************************************************************************************************
@@ -51,6 +51,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     38.1 | Added unrollThreshold to PipelineShaderOptions                                                        |
 //* |     38.0 | Removed CreateShaderCache in ICompiler and pShaderCache in pipeline build info                        |
 //* |     37.0 | Removed the -enable-dynamic-loop-unroll option                                                        |
 //* |     36.0 | Add 128 bit hash as clientHash in PipelineShaderOptions                                               |
@@ -66,6 +67,17 @@
 //* |     23.0 | Add flag robustBufferAccess in PipelineOptions to check out of bounds of private array.               |
 //* |     22.0 | Internal revision.                                                                                    |
 //* |     21.0 | Add stage in Pipeline shader info and struct PipelineBuildInfo to simplify pipeline dump interface.   |
+//*
+//* IMPORTANT NOTE: All structures defined in this file that are passed as input into LLPC must be zero-initialized
+//* with code such as the following before filling in the structure's fields:
+//*
+//*   SomeLlpcStructure someLlpcStructure = {};
+//*
+//* It is sufficient to perform this initialization on a containing structure.
+//*
+//* LLPC is free to add new fields to such structures without increasing the client interface major version, as long
+//* as setting the newly added fields to a 0 (or false) value is safe, i.e. it preserves the old behavior.
+//*
 //**/
 
 namespace Llpc
@@ -266,11 +278,22 @@ enum class BinaryType : uint32_t
     Elf,          ///< ELF
 };
 
+/// Represents resource node data
+struct ResourceNodeData
+{
+    ResourceMappingNodeType type;       ///< Type of this resource mapping node
+    uint32_t                set;        ///< ID of descriptor set
+    uint32_t                binding;    ///< ID of descriptor binding
+    uint32_t                arraySize;  ///< Element count for arrayed binding
+};
+
 /// Represents the information of one shader entry in ShaderModuleExtraData
 struct ShaderModuleEntryData
 {
-    ShaderStage stage;              ///< Shader stage
-    void*       pShaderEntry;       ///< Private shader module entry info
+    ShaderStage             stage;              ///< Shader stage
+    void*                   pShaderEntry;       ///< Private shader module entry info
+    uint32_t                resNodeDataCount;  ///< Resource node data count
+    const ResourceNodeData* pResNodeDatas;     ///< Resource node data array
 };
 
 /// Represents usage info of a shader module
@@ -294,12 +317,27 @@ struct ShaderModuleData
     ShaderModuleUsage usage;        ///< Usage info of a shader module
 };
 
+/// Represents fragment shader output info
+struct FsOutInfo
+{
+    uint32_t    location;       ///< Output location in resource layout
+    uint32_t    index;          ///< Output index in resource layout
+    BasicType   basicType;      ///< Output data type
+    uint32_t    componentCount; ///< Count of components of output data
+};
+
 /// Represents extended output of building a shader module (taking extra data info)
 struct ShaderModuleDataEx
 {
-    ShaderModuleData        common;        ///< Shader module common data
+    ShaderModuleData        common;         ///< Shader module common data
+    uint32_t                codeOffset;     ///< Binary offset of binCode in ShaderModuleDataEx
+    uint32_t                entryOffset;    ///< Shader entry offset in ShaderModuleDataEx
+    uint32_t                resNodeOffset;  ///< Resource node offset in ShaderModuleDataEX
+    uint32_t                fsOutInfoOffset;///< FsOutInfo offset in ShaderModuleDataEX
     struct
     {
+        uint32_t              fsOutInfoCount;           ///< Count of fragment shader output
+        const FsOutInfo*      pFsOutInfos;              ///< Fragment output info array
         uint32_t              entryCount;              ///< Shader entry count in the module
         ShaderModuleEntryData entryDatas[1];           ///< Array of all shader entries in this module
     } extra;                              ///< Represents extra part of shader module data
@@ -395,6 +433,8 @@ struct PipelineShaderOptions
     /// Disable the the LLVM backend's LICM pass.
     bool      disableLicm;
 #endif
+    /// Default unroll threshold for LLVM.
+    uint32_t  unrollThreshold;
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to
@@ -438,6 +478,80 @@ struct DescriptorRangeValue
     uint32_t                binding;    ///< ID of descriptor binding
     uint32_t                arraySize;  ///< Element count for arrayed binding
     const uint32_t*         pValue;     ///< Static SRDs
+};
+
+/// Represents YCbCr sampler meta data in resource descriptor
+struct SamplerYCbCrConversionMetaData
+{
+    union
+    {
+        struct
+        {                                            ///< e.g R12X4G12X4_UNORM_2PACK16
+            uint32_t channelBitsR               : 5; ///< channelBitsR = 12
+            uint32_t channelBitsG               : 5; ///< channelBitsG = 12
+            uint32_t channelBitsB               : 5; ///< channelBitsB =  0
+            uint32_t                            :17;
+        } bitDepth;
+        struct
+        {
+            uint32_t                            :15; ///< VkComponentSwizzle, e.g
+            uint32_t swizzleR                   : 3; ///< swizzleR = VK_COMPONENT_SWIZZLE_R(3)
+            uint32_t swizzleG                   : 3; ///< swizzleG = VK_COMPONENT_SWIZZLE_G(4)
+            uint32_t swizzleB                   : 3; ///< swizzleB = VK_COMPONENT_SWIZZLE_B(5)
+            uint32_t swizzleA                   : 3; ///< swizzleA = VK_COMPONENT_SWIZZLE_A(6)
+            uint32_t                            : 5;
+        } componentMapping;
+        struct
+        {
+            uint32_t                            :27;
+            uint32_t yCbCrModel                 : 3; ///< RGB_IDENTITY(0), ycbcr_identity(1),
+                                                     ///  _709(2),_601(3),_2020(4)
+            uint32_t yCbCrRange                 : 1; ///< ITU_FULL(0), ITU_NARROW(0)
+            uint32_t forceExplicitReconstruct   : 1; ///< Disable(0), Enable(1)
+        };
+        uint32_t u32All;
+    } word0;
+
+    union
+    {
+        struct
+        {
+            uint32_t planes                     : 2; ///< Number of planes, normally from 1 to 3
+            uint32_t lumaFilter                 : 1; ///< FILTER_NEAREST(0) or FILTER_LINEAR(1)
+            uint32_t chromaFilter               : 1; ///< FILTER_NEAREST(0) or FILTER_LINEAR(1)
+            uint32_t xChromaOffset              : 1; ///< COSITED_EVEN(0) or MIDPOINT(1)
+            uint32_t yChromaOffset              : 1; ///< COSITED_EVEN(0) or MIDPOINT(1)
+            uint32_t xSubSampled                : 1; ///< true(1) or false(0)
+            uint32_t ySubSampled                : 1; ///< true(1) or false(0)
+            uint32_t tileOptimal                : 1; ///< true(1) or false(0)
+            uint32_t dstSelXYZW                 :12; ///< dst selection Swizzle
+            uint32_t undefined                  :11;
+        };
+        uint32_t u32All;
+    } word1;
+
+    union
+    {
+        /// For YUV formats, bitCount may not equal to bitDepth, where bitCount >= bitDepth
+        struct
+        {
+            uint32_t xBitCount                  : 6; ///< Bit count for x channel
+            uint32_t yBitCount                  : 6; ///< Bit count for y channel
+            uint32_t zBitCount                  : 6; ///< Bit count for z channel
+            uint32_t wBitCount                  : 6; ///< Bit count for w channel
+            uint32_t undefined                  : 8;
+        } bitCounts;
+        uint32_t u32All;
+    } word2;
+
+    union
+    {
+        struct
+        {
+            uint32_t sqImgRsrcWord1             : 32; ///< Reconstructed sqImgRsrcWord1
+        };
+        uint32_t u32All;
+    } word3;
 };
 
 /// Represents info of a shader attached to a to-be-built pipeline.

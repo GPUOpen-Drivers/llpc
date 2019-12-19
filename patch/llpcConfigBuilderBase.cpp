@@ -36,15 +36,18 @@
 
 #include "llpcConfigBuilderBase.h"
 #include "llpcAbiMetadata.h"
+#include "llpcPipelineState.h"
 
 using namespace Llpc;
 using namespace llvm;
 
 // =====================================================================================================================
 ConfigBuilderBase::ConfigBuilderBase(
-    llvm::Module* pModule)  // [in/out] LLVM module
+    llvm::Module*   pModule,        // [in/out] LLVM module
+    PipelineState*  pPipelineState) // [in] Pipeline state
     :
     m_pModule(pModule),
+    m_pPipelineState(pPipelineState),
     m_userDataLimit(0),
     m_spillThreshold(UINT32_MAX)
 {
@@ -75,7 +78,6 @@ ConfigBuilderBase::ConfigBuilderBase(
 // =====================================================================================================================
 ConfigBuilderBase::~ConfigBuilderBase()
 {
-    delete[] m_pConfig;
 }
 
 // =====================================================================================================================
@@ -347,6 +349,47 @@ void ConfigBuilderBase::SetPipelineHash()
 }
 
 // =====================================================================================================================
+/// Append a single entry to the PAL register metadata.
+///
+/// @param [in] key The metadata key (usually a register address).
+/// @param [in] value The metadata value.
+void ConfigBuilderBase::AppendConfig(uint32_t key, uint32_t value)
+{
+    LLPC_ASSERT(key != InvalidMetadataKey);
+
+    Util::Abi::PalMetadataNoteEntry entry;
+    entry.key = key;
+    entry.value = value;
+    m_config.push_back(entry);
+}
+
+// =====================================================================================================================
+/// Append an array of entries to the PAL register metadata. Invalid keys are filtered out.
+///
+/// @param [in] config The array of register metadata entries.
+void ConfigBuilderBase::AppendConfig(llvm::ArrayRef<Util::Abi::PalMetadataNoteEntry> config)
+{
+    uint32_t count = 0;
+
+    for (const auto &entry : config)
+    {
+        if (entry.key != InvalidMetadataKey)
+            ++count;
+    }
+
+    uint32_t idx = m_config.size();
+    m_config.resize(idx + count);
+
+    for (const auto &entry : config)
+    {
+        if (entry.key != InvalidMetadataKey)
+        {
+            m_config[idx++] = entry;
+        }
+    }
+}
+
+// =====================================================================================================================
 // Write the config into PAL metadata in the LLVM IR module
 void ConfigBuilderBase::WritePalMetadata()
 {
@@ -363,22 +406,13 @@ void ConfigBuilderBase::WritePalMetadata()
 
     // Add the register values to the MsgPack document.
     msgpack::MapDocNode registers = m_pipelineNode[".registers"].getMap(true);
-    size_t sizeInDword = m_configSize / sizeof(uint32_t);
-    // Configs are composed of DWORD key/value pair, the size should be even
-    LLPC_ASSERT((sizeInDword % 2) == 0);
-    for (size_t i = 0; i < sizeInDword; i += 2)
+    for (const auto& entry : m_config)
     {
-        auto key   = m_document->getNode((reinterpret_cast<uint32_t*>(m_pConfig))[i]);
-        auto value = m_document->getNode((reinterpret_cast<uint32_t*>(m_pConfig))[i + 1]);
-        // Don't export invalid metadata key and value
-        if (key.getUInt() == InvalidMetadataKey)
-        {
-            LLPC_ASSERT(value.getUInt() == InvalidMetadataValue);
-        }
-        else
-        {
-            registers[key] = value;
-        }
+        LLPC_ASSERT(entry.key != InvalidMetadataKey);
+        auto key   = m_document->getNode(entry.key);
+        auto value = m_document->getNode(entry.value);
+        registers[key] = value;
+
     }
 
     // Add the metadata version number.
@@ -394,5 +428,41 @@ void ConfigBuilderBase::WritePalMetadata()
     auto pAbiMetaNode = MDNode::get(m_pModule->getContext(), pAbiMetaString);
     auto pNamedMeta = m_pModule->getOrInsertNamedMetadata("amdgpu.pal.metadata.msgpack");
     pNamedMeta->addOperand(pAbiMetaNode);
+}
+
+// =====================================================================================================================
+// Sets up floating point mode from the specified floating point control flags.
+uint32_t ConfigBuilderBase::SetupFloatingPointMode(
+    ShaderStage shaderStage)    // Shader stage
+{
+    FloatMode floatMode = {};
+    floatMode.bits.fp16fp64DenormMode = FP_DENORM_FLUSH_NONE;
+    if (shaderStage != ShaderStageCopyShader)
+    {
+        const auto& shaderMode = m_pPipelineState->GetShaderModes()->GetCommonShaderMode(shaderStage);
+
+        // The HW rounding mode values happen to be one less than the FpRoundMode value, other than
+        // FpRoundMode::DontCare, which we map to a default value.
+        floatMode.bits.fp16fp64RoundMode = (shaderMode.fp16RoundMode != FpRoundMode::DontCare) ?
+                                           static_cast<uint32_t>(shaderMode.fp16RoundMode) - 1 :
+                                           (shaderMode.fp64RoundMode != FpRoundMode::DontCare) ?
+                                           static_cast<uint32_t>(shaderMode.fp64RoundMode) - 1 :
+                                           FP_ROUND_TO_NEAREST_EVEN;
+        floatMode.bits.fp32RoundMode = (shaderMode.fp32RoundMode != FpRoundMode::DontCare) ?
+                                       static_cast<uint32_t>(shaderMode.fp32RoundMode) - 1 :
+                                       FP_ROUND_TO_NEAREST_EVEN;
+
+        // The denorm modes happen to be one less than the FpDenormMode value, other than
+        // FpDenormMode::DontCare, which we map to a default value.
+        floatMode.bits.fp16fp64DenormMode = (shaderMode.fp16DenormMode != FpDenormMode::DontCare) ?
+                                            static_cast<uint32_t>(shaderMode.fp16DenormMode) - 1 :
+                                            (shaderMode.fp64DenormMode != FpDenormMode::DontCare) ?
+                                            static_cast<uint32_t>(shaderMode.fp64DenormMode) - 1 :
+                                            FP_DENORM_FLUSH_NONE;
+        floatMode.bits.fp32DenormMode = (shaderMode.fp32DenormMode != FpDenormMode::DontCare) ?
+                                        static_cast<uint32_t>(shaderMode.fp32DenormMode) - 1 :
+                                        FP_DENORM_FLUSH_IN_OUT;
+    }
+    return floatMode.u32All;
 }
 

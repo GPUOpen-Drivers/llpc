@@ -40,13 +40,13 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 
-#include "spirvExt.h"
 #include "llpcCodeGenManager.h"
 #include "llpcContext.h"
 #include "llpcElfReader.h"
 #include "llpcFile.h"
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
+#include "llpcPipelineState.h"
 
 namespace llvm
 {
@@ -144,7 +144,8 @@ Result CodeGenManager::CreateTargetMachine(
 // =====================================================================================================================
 // Setup LLVM target features, target features are set per entry point function.
 void CodeGenManager::SetupTargetFeatures(
-    Module* pModule)  // [in, out] LLVM module
+    PipelineState*      pPipelineState, // [in] Pipeline state
+    Module*             pModule)        // [in, out] LLVM module
 {
     Context* pContext = static_cast<Context*>(&pModule->getContext());
     auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
@@ -194,7 +195,7 @@ void CodeGenManager::SetupTargetFeatures(
             {
                 // NOTE: For NGG primitive shader, enable 128-bit LDS load/store operations to optimize gvec4 data
                 // read/write. This usage must enable the feature of using CI+ additional instructions.
-                const auto pNggControl = pContext->GetNggControl();
+                const auto pNggControl = pPipelineState->GetNggControl();
                 if (pNggControl->enableNgg && (pNggControl->passthroughMode == false))
                 {
                     targetFeatures += ",+ci-insts,+enable-ds128";
@@ -209,7 +210,7 @@ void CodeGenManager::SetupTargetFeatures(
             if (pFunc->getCallingConv() == CallingConv::AMDGPU_CS)
             {
                 // Set the work group size
-                const auto& csBuiltInUsage = pContext->GetShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
+                const auto& csBuiltInUsage = pPipelineState->GetShaderModes()->GetComputeShaderMode();
                 uint32_t flatWorkGroupSize =
                     csBuiltInUsage.workgroupSizeX * csBuiltInUsage.workgroupSizeY * csBuiltInUsage.workgroupSizeZ;
                 auto flatWorkGroupSizeString = std::to_string(flatWorkGroupSize);
@@ -237,26 +238,33 @@ void CodeGenManager::SetupTargetFeatures(
             }
 #endif
 
-            auto fp16Control = pContext->GetShaderFloatControl(shaderStage, 16);
-            auto fp32Control = pContext->GetShaderFloatControl(shaderStage, 32);
-            auto fp64Control = pContext->GetShaderFloatControl(shaderStage, 64);
-
-            if (fp16Control.denormPerserve || fp64Control.denormPerserve)
+            if (shaderStage != ShaderStageCopyShader)
             {
-                targetFeatures += ",+fp64-fp16-denormals";
-            }
-            else if (fp16Control.denormFlushToZero || fp64Control.denormFlushToZero)
-            {
-                targetFeatures += ",-fp64-fp16-denormals";
-            }
-
-            if (fp32Control.denormPerserve)
-            {
-                targetFeatures += ",+fp32-denormals";
-            }
-            else if (fp32Control.denormFlushToZero)
-            {
-                targetFeatures += ",-fp32-denormals";
+                const auto& shaderMode = pPipelineState->GetShaderModes()->GetCommonShaderMode(shaderStage);
+                if ((shaderMode.fp16DenormMode == FpDenormMode::FlushNone) ||
+                    (shaderMode.fp16DenormMode == FpDenormMode::FlushIn) ||
+                    (shaderMode.fp64DenormMode == FpDenormMode::FlushNone) ||
+                    (shaderMode.fp64DenormMode == FpDenormMode::FlushIn))
+                {
+                    targetFeatures += ",+fp64-fp16-denormals";
+                }
+                else if ((shaderMode.fp16DenormMode == FpDenormMode::FlushOut) ||
+                         (shaderMode.fp16DenormMode == FpDenormMode::FlushInOut) ||
+                         (shaderMode.fp64DenormMode == FpDenormMode::FlushOut) ||
+                         (shaderMode.fp64DenormMode == FpDenormMode::FlushInOut))
+                {
+                    targetFeatures += ",-fp64-fp16-denormals";
+                }
+                if ((shaderMode.fp32DenormMode == FpDenormMode::FlushNone) ||
+                    (shaderMode.fp32DenormMode == FpDenormMode::FlushIn))
+                {
+                    targetFeatures += ",+fp32-denormals";
+                }
+                else if ((shaderMode.fp32DenormMode == FpDenormMode::FlushOut) ||
+                         (shaderMode.fp32DenormMode == FpDenormMode::FlushInOut))
+                {
+                    targetFeatures += ",-fp32-denormals";
+                }
             }
 
             builder.addAttribute("target-features", targetFeatures);
@@ -268,14 +276,12 @@ void CodeGenManager::SetupTargetFeatures(
 
 // =====================================================================================================================
 // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
-Result CodeGenManager::AddTargetPasses(
+void CodeGenManager::AddTargetPasses(
     Context*              pContext,      // [in] LLPC context
     PassManager&          passMgr,       // [in/out] pass manager to add passes to
-    llvm::Timer*          pCodeGenTimer, // [in] Timer to time target passes with, nullptr if not timing
+    Timer*                pCodeGenTimer, // [in] Timer to time target passes with, nullptr if not timing
     raw_pwrite_stream&    outStream)     // [out] Output stream
 {
-    Result result = Result::Success;
-
     // Start timer for codegen passes.
     if (pCodeGenTimer != nullptr)
     {
@@ -305,30 +311,16 @@ Result CodeGenManager::AddTargetPasses(
 
     auto pTargetMachine = pContext->GetTargetMachine();
 
-#if LLPC_ENABLE_EXCEPTION
-    try
-#endif
+    if (pTargetMachine->addPassesToEmitFile(passMgr, outStream, nullptr, FileType))
     {
-        if (pTargetMachine->addPassesToEmitFile(passMgr, outStream, nullptr, FileType))
-        {
-            LLPC_ERRS("Target machine cannot emit a file of this type\n");
-            result = Result::ErrorInvalidValue;
-        }
+        report_fatal_error("Target machine cannot emit a file of this type");
     }
-#if LLPC_ENABLE_EXCEPTION
-    catch (const char*)
-    {
-        result = Result::ErrorInvalidValue;
-    }
-#endif
 
     // Stop timer for codegen passes.
     if (pCodeGenTimer != nullptr)
     {
         passMgr.add(CreateStartStopTimer(pCodeGenTimer, false));
     }
-
-    return result;
 }
 
 } // Llpc

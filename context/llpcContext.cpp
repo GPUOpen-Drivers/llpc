@@ -38,7 +38,6 @@
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
@@ -47,6 +46,7 @@
 
 #include "SPIRVInternal.h"
 
+#include "llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcMetroHash.h"
@@ -109,7 +109,20 @@ Context::~Context()
 void Context::Reset()
 {
     m_pPipelineContext = nullptr;
-    m_pResUsage = nullptr;
+    delete m_pBuilder;
+    m_pBuilder = nullptr;
+}
+
+// =====================================================================================================================
+// Get (create if necessary) BuilderContext
+BuilderContext* Context::GetBuilderContext()
+{
+    if (!m_builderContext)
+    {
+        // First time: Create the BuilderContext.
+        m_builderContext.reset(BuilderContext::Create(*this));
+    }
+    return &*m_builderContext;
 }
 
 // =====================================================================================================================
@@ -149,52 +162,6 @@ void Context::SetModuleTargetMachine(
 {
     pModule->setTargetTriple(GetTargetMachine()->getTargetTriple().getTriple());
     pModule->setDataLayout(GetTargetMachine()->createDataLayout());
-}
-
-// =====================================================================================================================
-// Gets float control settings of the specified shader stage for the provide floating-point type.
-FloatControl Context::GetShaderFloatControl(
-    ShaderStage shaderStage,    // Shader stage
-    uint32_t    bitWidth)       // Bit width of the floating-point type
-{
-    if (shaderStage == ShaderStageCopyShader)
-    {
-        // Treat copy shader as part of geometry shader
-        shaderStage = ShaderStageGeometry;
-    }
-
-    FloatControl floatControl = {};
-    const auto& commonUsage = GetShaderResourceUsage(shaderStage)->builtInUsage.common;
-
-    switch (bitWidth)
-    {
-    case 16:
-        floatControl.denormPerserve = ((commonUsage.denormPerserve & SPIRV::SPIRVTW_16Bit) != 0);
-        floatControl.denormFlushToZero = ((commonUsage.denormFlushToZero & SPIRV::SPIRVTW_16Bit) != 0);
-        floatControl.signedZeroInfNanPreserve = ((commonUsage.signedZeroInfNanPreserve & SPIRV::SPIRVTW_16Bit) != 0);
-        floatControl.roundingModeRTE = ((commonUsage.roundingModeRTE & SPIRV::SPIRVTW_16Bit) != 0);
-        floatControl.roundingModeRTZ = ((commonUsage.roundingModeRTZ & SPIRV::SPIRVTW_16Bit) != 0);
-        break;
-    case 32:
-        floatControl.denormPerserve = ((commonUsage.denormPerserve & SPIRV::SPIRVTW_32Bit) != 0);
-        floatControl.denormFlushToZero = ((commonUsage.denormFlushToZero & SPIRV::SPIRVTW_32Bit) != 0);
-        floatControl.signedZeroInfNanPreserve = ((commonUsage.signedZeroInfNanPreserve & SPIRV::SPIRVTW_32Bit) != 0);
-        floatControl.roundingModeRTE = ((commonUsage.roundingModeRTE & SPIRV::SPIRVTW_32Bit) != 0);
-        floatControl.roundingModeRTZ = ((commonUsage.roundingModeRTZ & SPIRV::SPIRVTW_32Bit) != 0);
-        break;
-    case 64:
-        floatControl.denormPerserve = ((commonUsage.denormPerserve & SPIRV::SPIRVTW_64Bit) != 0);
-        floatControl.denormFlushToZero = ((commonUsage.denormFlushToZero & SPIRV::SPIRVTW_64Bit) != 0);
-        floatControl.signedZeroInfNanPreserve = ((commonUsage.signedZeroInfNanPreserve & SPIRV::SPIRVTW_64Bit) != 0);
-        floatControl.roundingModeRTE = ((commonUsage.roundingModeRTE & SPIRV::SPIRVTW_64Bit) != 0);
-        floatControl.roundingModeRTZ = ((commonUsage.roundingModeRTZ & SPIRV::SPIRVTW_64Bit) != 0);
-        break;
-    default:
-        LLPC_NEVER_CALLED();
-        break;
-    }
-
-    return floatControl;
 }
 
 } // Llpc

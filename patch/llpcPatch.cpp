@@ -33,21 +33,21 @@
 #include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/IR/IRPrintingPasses.h"
-#include <llvm/IR/LegacyPassManager.h>
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include <llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h>
+#include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
-#include <llvm/Transforms/IPO/ForceFunctionAttrs.h>
+#include "llvm/Transforms/IPO/ForceFunctionAttrs.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar.h"
-#include <llvm/Transforms/Scalar/GVN.h>
+#include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Scalar/Scalarizer.h"
 #include "llvm/Transforms/Utils.h"
@@ -94,10 +94,10 @@ namespace Llpc
 void Patch::AddPasses(
     Context*              pContext,      // [in] LLPC context
     legacy::PassManager&  passMgr,       // [in/out] Pass manager to add passes to
+    ModulePass*           pReplayerPass, // [in] BuilderReplayer pass, or nullptr if not needed
     llvm::Timer*          pPatchTimer,   // [in] Timer to time patch passes with, nullptr if not timing
     llvm::Timer*          pOptTimer,     // [in] Timer to time LLVM optimization passes with, nullptr if not timing
-    std::function<uint32_t(const Module*, uint32_t, ArrayRef<ArrayRef<uint8_t>>)>
-                          checkShaderCacheFunc)
+    Pipeline::CheckShaderCacheFunc  checkShaderCacheFunc)
                                          // Callback function to check shader cache
 {
     // Start timer for patching passes.
@@ -107,10 +107,9 @@ void Patch::AddPasses(
     }
 
     // If using BuilderRecorder rather than BuilderImpl, replay the Builder calls now
-    auto pBuilderReplayer = pContext->GetBuilder()->CreateBuilderReplayer();
-    if (pBuilderReplayer != nullptr)
+    if (pReplayerPass != nullptr)
     {
-        passMgr.add(pBuilderReplayer);
+        passMgr.add(pReplayerPass);
     }
 
     if (EnableOuts())
@@ -189,7 +188,8 @@ void Patch::AddPasses(
     passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
 
 #if LLPC_BUILD_GFX10
-    if (pContext->IsGraphics() && pContext->GetNggControl()->enableNgg)
+    if (pContext->IsGraphics() && (pContext->GetGfxIpVersion().major >= 10) &&
+        static_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo())->nggState.enableNgg)
     {
         // Stop timer for patching passes and restart timer for optimization passes.
         if (pPatchTimer != nullptr)

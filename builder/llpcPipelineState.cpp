@@ -31,17 +31,248 @@
 #define DEBUG_TYPE "llpc-pipeline-state"
 
 #include "llpc.h"
+#include "llpcBuilderContext.h"
+#include "llpcBuilderRecorder.h"
+#include "llpcCodeGenManager.h"
 #include "llpcInternal.h"
+#include "llpcPassManager.h"
+#include "llpcPatch.h"
 #include "llpcPipelineState.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Linker/Linker.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/Timer.h"
+#include "llvm/Target/TargetMachine.h"
 
 using namespace Llpc;
 using namespace llvm;
 
-// User data nodes metadata name prefix
-static const char* const BuilderUserDataMetadataName = "llpc.user.data.nodes";
+// -enable-tess-offchip: enable tessellation off-chip mode
+static cl::opt<bool> EnableTessOffChip("enable-tess-offchip",
+                                       cl::desc("Enable tessellation off-chip mode"),
+                                       cl::init(false));
+
+// Names for named metadata nodes when storing and reading back pipeline state
+static const char UserDataMetadataName[] = "llpc.user.data.nodes";
+
+// =====================================================================================================================
+// Get LLVMContext
+LLVMContext& Pipeline::GetContext() const
+{
+    return GetBuilderContext()->GetContext();
+}
+
+// =====================================================================================================================
+// Link shader modules into a pipeline module.
+Module* PipelineState::Link(
+    ArrayRef<Module*> modules)               // Array of modules indexed by shader stage, with nullptr entry
+                                             // for any stage not present in the pipeline. Modules are freed.
+{
+    // Processing for each shader module before linking.
+    IRBuilder<> builder(GetContext());
+    uint32_t metaKindId = GetContext().getMDKindID(LlpcName::ShaderStageMetadata);
+    Module* pAnyModule = nullptr;
+    for (uint32_t stage = 0; stage < modules.size(); ++stage)
+    {
+        Module* pModule = modules[stage];
+        if (pModule == nullptr)
+        {
+            continue;
+        }
+        pAnyModule = pModule;
+
+        // If this is a link of shader modules from earlier separate shader compiles, then the modes are
+        // recorded in IR metadata. Read the modes here.
+        GetShaderModes()->ReadModesFromShader(pModule, static_cast<ShaderStage>(stage));
+
+        // Add IR metadata for the shader stage to each function in the shader, and rename the entrypoint to
+        // ensure there is no clash on linking.
+        auto pStageMetaNode = MDNode::get(GetContext(), { ConstantAsMetadata::get(builder.getInt32(stage)) });
+        for (Function& func : *pModule)
+        {
+            if (func.isDeclaration() == false)
+            {
+                func.setMetadata(metaKindId, pStageMetaNode);
+                if (func.getLinkage() != GlobalValue::InternalLinkage)
+                {
+                    func.setName(Twine(LlpcName::EntryPointPrefix) +
+                                 GetShaderStageAbbreviation(static_cast<ShaderStage>(stage), true) +
+                                 "." +
+                                 func.getName());
+                }
+            }
+        }
+    }
+
+    // If the front-end was using a BuilderRecorder, record pipeline state into IR metadata.
+    if (m_noReplayer == false)
+    {
+        Record(pAnyModule);
+    }
+
+    // If there is only one shader, just change the name on its module and return it.
+    Module* pPipelineModule = nullptr;
+    for (auto pModule : modules)
+    {
+        if (pPipelineModule == nullptr)
+        {
+            pPipelineModule = pModule;
+        }
+        else if (pModule != nullptr)
+        {
+            pPipelineModule = nullptr;
+            break;
+        }
+    }
+
+    if (pPipelineModule != nullptr)
+    {
+        pPipelineModule->setModuleIdentifier("llpcPipeline");
+    }
+    else
+    {
+        // Create an empty module then link each shader module into it. We record pipeline state into IR
+        // metadata before the link, to avoid problems with a Constant for an immutable descriptor value
+        // disappearing when modules are deleted.
+        bool result = true;
+        pPipelineModule = new Module("llpcPipeline", GetContext());
+        static_cast<Llpc::Context*>(&GetContext())->SetModuleTargetMachine(pPipelineModule);
+        Linker linker(*pPipelineModule);
+
+        for (uint32_t shaderIndex = 0; shaderIndex < modules.size(); ++shaderIndex)
+        {
+            if (modules[shaderIndex] != nullptr)
+            {
+                // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
+                // linked into pipeline module.
+                if (linker.linkInModule(std::unique_ptr<Module>(modules[shaderIndex])))
+                {
+                    result = false;
+                }
+            }
+        }
+
+        if (result == false)
+        {
+            delete pPipelineModule;
+            pPipelineModule = nullptr;
+        }
+    }
+    return pPipelineModule;
+}
+
+// =====================================================================================================================
+// Generate pipeline module by running patch, middle-end optimization and backend codegen passes.
+// The output is normally ELF, but IR disassembly if an option is used to stop compilation early.
+// Output is written to outStream.
+// Like other Builder methods, on error, this calls report_fatal_error, which you can catch by setting
+// a diagnostic handler with LLVMContext::setDiagnosticHandler.
+void PipelineState::Generate(
+    std::unique_ptr<Module>         pipelineModule,       // IR pipeline module
+    raw_pwrite_stream&              outStream,            // [in/out] Stream to write ELF or IR disassembly output
+    Pipeline::CheckShaderCacheFunc  checkShaderCacheFunc, // Function to check shader cache in graphics pipeline
+    ArrayRef<Timer*>                timers)               // Timers for: patch passes, llvm optimizations, codegen
+{
+    uint32_t passIndex = 1000;
+    Timer* pPatchTimer = (timers.size() >= 1) ? timers[0] : nullptr;
+    Timer* pOptTimer = (timers.size() >= 2) ? timers[1] : nullptr;
+    Timer* pCodeGenTimer = (timers.size() >= 3) ? timers[2] : nullptr;
+
+    // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
+    //
+    // TODO: The "whole pipeline" passes are supposed to include code generation passes. However, there is a CTS issue.
+    // In the case "dEQP-VK.spirv_assembly.instruction.graphics.16bit_storage.struct_mixed_types.uniform_geom", GS gets
+    // unrolled to such a size that backend compilation takes too long. Thus, we put code generation in its own pass
+    // manager.
+    std::unique_ptr<PassManager> patchPassMgr(PassManager::Create());
+    patchPassMgr->SetPassIndex(&passIndex);
+    patchPassMgr->add(createTargetTransformInfoWrapperPass(
+                          GetBuilderContext()->GetTargetMachine()->getTargetIRAnalysis()));
+
+    // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
+    GetBuilderContext()->PreparePassManager(&*patchPassMgr);
+
+    // Manually add a PipelineStateWrapper pass.
+    // If we were not using BuilderRecorder, give our PipelineState to it. (In the BuilderRecorder case,
+    // the first time PipelineStateWrapper is used, it allocates its own PipelineState and populates
+    // it by reading IR metadata.)
+    PipelineStateWrapper* pPipelineStateWrapper = new PipelineStateWrapper(GetBuilderContext());
+    patchPassMgr->add(pPipelineStateWrapper);
+    if (m_noReplayer)
+    {
+        pPipelineStateWrapper->SetPipelineState(this);
+    }
+
+    // Get a BuilderReplayer pass if needed.
+    ModulePass* pReplayerPass = nullptr;
+    if (m_noReplayer == false)
+    {
+        pReplayerPass = CreateBuilderReplayer(this);
+    }
+
+    // Patching.
+    Context* pContext = reinterpret_cast<Context*>(&GetContext());
+    Patch::AddPasses(pContext,
+                     *patchPassMgr,
+                     pReplayerPass,
+                     pPatchTimer,
+                     pOptTimer,
+                     checkShaderCacheFunc);
+
+    // Add pass to clear pipeline state from IR
+    patchPassMgr->add(CreatePipelineStateClearer());
+
+    // Run the "whole pipeline" passes, excluding the target backend.
+    patchPassMgr->run(*pipelineModule);
+    patchPassMgr.reset(nullptr);
+#if LLPC_BUILD_GFX10
+    // NOTE: Ideally, target feature setup should be added to the last pass in patching. But NGG is somewhat
+    // different in that it must involve extra LLVM optimization passes after preparing pipeline ABI. Thus,
+    // we do target feature setup here.
+#endif
+    CodeGenManager::SetupTargetFeatures(this, &*pipelineModule);
+
+    // A separate "whole pipeline" pass manager for code generation.
+    std::unique_ptr<PassManager> codeGenPassMgr(PassManager::Create());
+    codeGenPassMgr->SetPassIndex(&passIndex);
+
+    // Code generation.
+    CodeGenManager::AddTargetPasses(pContext, *codeGenPassMgr, pCodeGenTimer, outStream);
+
+    // Run the target backend codegen passes.
+    codeGenPassMgr->run(*pipelineModule);
+}
+
+// =====================================================================================================================
+// Clear the pipeline state IR metadata.
+void PipelineState::Clear(
+    Module* pModule)    // [in/out] IR module
+{
+    GetShaderModes()->Clear();
+    m_userDataNodes = {};
+    Record(pModule);
+}
+
+// =====================================================================================================================
+// Record pipeline state into IR metadata of specified module.
+void PipelineState::Record(
+    Module* pModule)    // [in/out] Module to record the IR metadata in
+{
+    GetShaderModes()->Record(pModule);
+    RecordUserDataNodes(pModule);
+}
+
+// =====================================================================================================================
+// Set up the pipeline state from the pipeline IR module.
+void PipelineState::ReadState(
+    Module* pModule)    // [in] LLVM module
+{
+    GetShaderModes()->ReadModesFromPipeline(pModule);
+    ReadUserDataNodes(pModule);
+}
 
 // =====================================================================================================================
 // Set the resource mapping nodes for the pipeline.
@@ -128,7 +359,7 @@ void PipelineState::SetUserDataNodesTable(
                     // can assume it is four dwords.
                     auto& immutableNode = *it->second;
 
-                    IRBuilder<> builder(*m_pContext);
+                    IRBuilder<> builder(GetContext());
                     SmallVector<Constant*, 4> values;
 
                     if (immutableNode.arraySize != 0)
@@ -155,19 +386,22 @@ void PipelineState::SetUserDataNodesTable(
 }
 
 // =====================================================================================================================
-// Record the pipeline state to IR metadata
-void PipelineState::RecordState(
+// Record user data nodes into IR metadata.
+// Note that this takes a Module* instead of using m_pModule, because it can be called before pipeline linking.
+void PipelineState::RecordUserDataNodes(
     Module* pModule)    // [in/out] Module to record the IR metadata in
 {
-    RecordUserDataNodes(pModule);
-}
+    if (m_userDataNodes.empty())
+    {
+        if (auto pUserDataMetaNode = pModule->getNamedMetadata(UserDataMetadataName))
+        {
+            pModule->eraseNamedMetadata(pUserDataMetaNode);
+        }
+        return;
+    }
 
-// =====================================================================================================================
-// Record user data nodes into IR metadata.
-void PipelineState::RecordUserDataNodes(
-    Module*   pModule)    // [in/out] Module to write IR metadata to
-{
-    auto pUserDataMetaNode = pModule->getOrInsertNamedMetadata(BuilderUserDataMetadataName);
+    auto pUserDataMetaNode = pModule->getOrInsertNamedMetadata(UserDataMetadataName);
+    pUserDataMetaNode->clearOperands();
     RecordUserDataTable(m_userDataNodes, pUserDataMetaNode);
 }
 
@@ -177,7 +411,7 @@ void PipelineState::RecordUserDataTable(
     ArrayRef<ResourceNode>  nodes,              // Table of user data nodes
     NamedMDNode*            pUserDataMetaNode)  // IR metadata node to record them into
 {
-    IRBuilder<> builder(*m_pContext);
+    IRBuilder<> builder(GetContext());
 
     for (const ResourceNode& node : nodes)
     {
@@ -197,7 +431,7 @@ void PipelineState::RecordUserDataTable(
                 // Operand 3: Node count in sub-table.
                 operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.innerTable.size())));
                 // Create the metadata node here.
-                pUserDataMetaNode->addOperand(MDNode::get(*m_pContext, operands));
+                pUserDataMetaNode->addOperand(MDNode::get(GetContext(), operands));
                 // Create nodes for the sub-table.
                 RecordUserDataTable(node.innerTable, pUserDataMetaNode);
                 continue;
@@ -240,27 +474,21 @@ void PipelineState::RecordUserDataTable(
         }
 
         // Create the metadata node.
-        pUserDataMetaNode->addOperand(MDNode::get(*m_pContext, operands));
+        pUserDataMetaNode->addOperand(MDNode::get(GetContext(), operands));
     }
-}
-
-// =====================================================================================================================
-// Set up the pipeline state from the specified linked IR module.
-void PipelineState::ReadStateFromModule(
-    Module* pModule)  // [in] Module
-{
-    ReadUserDataNodes(pModule);
 }
 
 // =====================================================================================================================
 // Read user data nodes for the pipeline from IR metadata
 void PipelineState::ReadUserDataNodes(
-    Module* pModule)  // [in] Module
+    Module* pModule)  // [in] LLVM module
 {
-    LLPC_ASSERT(m_allocUserDataNodes.get() == nullptr);
-
     // Find the named metadata node.
-    auto pUserDataMetaNode = pModule->getNamedMetadata(BuilderUserDataMetadataName);
+    auto pUserDataMetaNode = pModule->getNamedMetadata(UserDataMetadataName);
+    if (pUserDataMetaNode == nullptr)
+    {
+        return;
+    }
 
     // Prepare to read the resource nodes from the named MD node. We allocate a single buffer, with the
     // outer table at the start, and inner tables allocated from the end backwards.
@@ -389,19 +617,85 @@ ArrayRef<MDString*> PipelineState::GetResourceTypeNames()
         for (uint32_t type = 0; type < static_cast<uint32_t>(ResourceMappingNodeType::Count); ++type)
         {
             m_resourceNodeTypeNames[type] =
-                MDString::get(*m_pContext, GetResourceMappingNodeTypeName(static_cast<ResourceMappingNodeType>(type)));
+               MDString::get(GetContext(), GetResourceMappingNodeTypeName(static_cast<ResourceMappingNodeType>(type)));
         }
     }
     return ArrayRef<MDString*>(m_resourceNodeTypeNames);
 }
 
 // =====================================================================================================================
+// Determine whether to use off-chip tessellation mode
+bool PipelineState::IsTessOffChip()
+{
+    // For GFX9+, always enable tessellation off-chip mode
+    return EnableTessOffChip || (GetBuilderContext()->GetGfxIpVersion().major >= 9);
+}
+
+// =====================================================================================================================
+// Get (create if necessary) the PipelineState from this wrapper pass.
+PipelineState* PipelineStateWrapper::GetPipelineState(
+    Module* pModule)  // [in] IR module
+{
+    if (m_pPipelineState == nullptr)
+    {
+        m_allocatedPipelineState.reset(new PipelineState(m_pBuilderContext));
+        m_pPipelineState = &*m_allocatedPipelineState;
+        m_pPipelineState->ReadState(pModule);
+    }
+    return m_pPipelineState;
+}
+
+// =====================================================================================================================
+// Pass to clear pipeline state out of the IR
+class PipelineStateClearer : public ModulePass
+{
+public:
+    PipelineStateClearer() : ModulePass(ID) {}
+
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineStateWrapper>();
+    }
+
+    bool runOnModule(Module& module) override;
+
+    // -----------------------------------------------------------------------------------------------------------------
+
+    static char ID;   // ID of this pass
+};
+
+char PipelineStateClearer::ID = 0;
+
+// =====================================================================================================================
+// Create pipeline state clearer pass
+ModulePass* Llpc::CreatePipelineStateClearer()
+{
+    return new PipelineStateClearer();
+}
+
+// =====================================================================================================================
+// Run PipelineStateClearer pass to clear the pipeline state out of the IR
+bool PipelineStateClearer::runOnModule(
+    Module& module)   // [in/out] IR module
+{
+    auto pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    pPipelineState->Clear(&module);
+    return true;
+}
+
+// =====================================================================================================================
+// Initialize the pipeline state clearer pass
+INITIALIZE_PASS(PipelineStateClearer, "llpc-pipeline-state-clearer", "LLPC pipeline state clearer", false, true)
+
+// =====================================================================================================================
 char PipelineStateWrapper::ID = 0;
 
 // =====================================================================================================================
-PipelineStateWrapper::PipelineStateWrapper()
+PipelineStateWrapper::PipelineStateWrapper(
+    BuilderContext* pBuilderContext)  // [in] BuilderContext
     :
-    ImmutablePass(ID)
+    ImmutablePass(ID),
+    m_pBuilderContext(pBuilderContext)
 {
     initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
 }
@@ -411,22 +705,7 @@ PipelineStateWrapper::PipelineStateWrapper()
 bool PipelineStateWrapper::doFinalization(
     Module& module)     // [in] Module
 {
-    delete m_pPipelineState;
-    m_pPipelineState = nullptr;
     return false;
-}
-
-// =====================================================================================================================
-// Get the PipelineState from the wrapper pass.
-PipelineState* PipelineStateWrapper::GetPipelineState(
-    Module* pModule)   // [in] Module
-{
-    if (m_pPipelineState == nullptr)
-    {
-        m_pPipelineState = new PipelineState(&pModule->getContext());
-        m_pPipelineState->ReadStateFromModule(pModule);
-    }
-    return m_pPipelineState;
 }
 
 // =====================================================================================================================

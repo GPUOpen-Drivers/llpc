@@ -28,6 +28,7 @@
 * @brief LLPC source file: contains implementation of Llpc::SpirvLowerTranslator
 ***********************************************************************************************************************
 */
+#include "llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerTranslator.h"
@@ -125,6 +126,10 @@ void SpirvLowerTranslator::TranslateSpirvToLlvm(
                            errMsg,
                            false);
     }
+
+    // Ensure the shader modes are recorded in IR metadata in the case that this is a shader compile
+    // rather than a pipeline compile.
+    m_pContext->GetBuilder()->RecordShaderModes(pModule);
 
     ShaderModuleHelper::CleanOptimizedSpirv(&optimizedSpirvBin);
 

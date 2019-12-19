@@ -37,11 +37,6 @@
 using namespace Llpc;
 using namespace llvm;
 
-// Internal built-in IDs
-static const auto BuiltInInterpLinearCenter = static_cast<Builder::BuiltInKind>(spv::BuiltInInterpLinearCenter);
-static const auto BuiltInInterpPullMode = static_cast<Builder::BuiltInKind>(spv::BuiltInInterpPullMode);
-static const auto BuiltInSamplePosOffset = static_cast<Builder::BuiltInKind>(spv::BuiltInSamplePosOffset);
-
 // =====================================================================================================================
 // Create a read of (part of) a generic (user) input value, passed from the previous shader stage.
 // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
@@ -672,7 +667,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
 
 // =====================================================================================================================
 // Create a read of (part of) a built-in input value.
-// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
 // or the element type if pIndex is not nullptr. For ClipDistance or CullDistance when pIndex is nullptr,
 // the array size is determined by inputInfo.GetArraySize().
 Value* BuilderImplInOut::CreateReadBuiltInInput(
@@ -688,7 +683,7 @@ Value* BuilderImplInOut::CreateReadBuiltInInput(
 
 // =====================================================================================================================
 // Create a read of (part of) a built-in output value.
-// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
 // or the element type if pIndex is not nullptr.
 Value* BuilderImplInOut::CreateReadBuiltInOutput(
     BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
@@ -852,7 +847,7 @@ Value* BuilderImplInOut::ReadBuiltIn(
 
 // =====================================================================================================================
 // Create a write of (part of) a built-in output value.
-// The type of the value to write must be the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+// The type of the value to write must be the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
 // or the element type if pIndex is not nullptr.
 Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
     Value*        pValueToWrite,      // [in] Value to write
@@ -955,7 +950,7 @@ StringRef BuilderImplInOut::GetBuiltInName(
     {
 #define BUILTIN(name, number, out, in, type) \
     case BuiltIn ## name: return # name;
-#include "llpcBuilderBuiltIns.h"
+#include "llpcBuilderBuiltInDefs.h"
 #undef BUILTIN
 
     // Internal built-ins.
@@ -1277,7 +1272,7 @@ uint32_t BuilderImplInOut::GetBuiltInValidMask(
     BuiltInKind builtIn,    // Built-in kind, one of the BuiltIn* constants
     bool        isOutput)   // True to get the mask for output rather than input
 {
-    // See llpcBuilderBuiltIns.h for an explanation of the letter codes.
+    // See llpcBuilderBuiltInDefs.h for an explanation of the letter codes.
     enum class StageValidMask: uint32_t
     {
         C = (1 << ShaderStageCompute),
@@ -1309,7 +1304,7 @@ uint32_t BuilderImplInOut::GetBuiltInValidMask(
     case BuiltIn ## name: \
         validMask = static_cast<uint32_t>(StageValidMask::in) | (static_cast<uint32_t>(StageValidMask::out) << 16); \
         break;
-#include "llpcBuilderBuiltIns.h"
+#include "llpcBuilderBuiltInDefs.h"
 #undef BUILTIN
     default:
         LLPC_NEVER_CALLED();

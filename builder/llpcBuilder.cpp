@@ -29,12 +29,10 @@
  ***********************************************************************************************************************
  */
 #include "llpcBuilderImpl.h"
-#include "llpcPipelineState.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
-
-#include "llvm/Linker/Linker.h"
-#include "llvm/Support/CommandLine.h"
+#include "llpcPipelineState.h"
+#include "llpcShaderModes.h"
 
 #include <set>
 
@@ -43,51 +41,60 @@
 using namespace Llpc;
 using namespace llvm;
 
-// -use-builder-recorder
-static cl::opt<uint32_t> UseBuilderRecorder("use-builder-recorder",
-                                            cl::desc("Do lowering via recording and replaying LLPC builder:\n"
-                                                     "0: Generate IR directly; no recording\n"
-                                                     "1: Do lowering via recording and replaying LLPC builder (default)\n"
-                                                     "2: Do lowering via recording; no replaying"),
-                                            cl::init(1));
-
-// =====================================================================================================================
-// Create a Builder object
-// If -use-builder-recorder is 0, this creates a BuilderImpl. Otherwise, it creates a BuilderRecorder.
-Builder* Builder::Create(
-    LLVMContext& context) // [in] LLVM context
-{
-    if (UseBuilderRecorder == 0)
-    {
-        // -use-builder-recorder=0: generate LLVM IR directly without recording
-        return CreateBuilderImpl(context);
-    }
-    // -use-builder-recorder=1: record with BuilderRecorder and replay with BuilderReplayer
-    // -use-builder-recorder=2: record with BuilderRecorder and do not replay
-    return CreateBuilderRecorder(context, UseBuilderRecorder == 1 /*wantReplay*/);
-}
-
-// =====================================================================================================================
-// Create a BuilderImpl object
-Builder* Builder::CreateBuilderImpl(
-    LLVMContext& context) // [in] LLVM context
-{
-    return new BuilderImpl(context);
-}
-
 // =====================================================================================================================
 Builder::Builder(
-    LLVMContext& context) // [in] LLPC context
+    BuilderContext* pBuilderContext) // [in] Builder context
     :
-    IRBuilder<>(context)
+    IRBuilder<>(pBuilderContext->GetContext()),
+    m_pBuilderContext(pBuilderContext)
 {
-    m_pPipelineState = new PipelineState(&context);
 }
 
 // =====================================================================================================================
-Builder::~Builder()
+// Set the common shader mode for the current shader, containing hardware FP round and denorm modes.
+void Builder::SetCommonShaderMode(
+    const CommonShaderMode& commonShaderMode)   // [in] FP round and denorm modes
 {
-    delete m_pPipelineState;
+    GetShaderModes()->SetCommonShaderMode(m_shaderStage, commonShaderMode);
+}
+
+// =====================================================================================================================
+// Get the common shader mode for the current shader.
+const CommonShaderMode& Builder::GetCommonShaderMode()
+{
+    return GetShaderModes()->GetCommonShaderMode(m_shaderStage);
+}
+
+// =====================================================================================================================
+// Set the tessellation mode
+void Builder::SetTessellationMode(
+    const TessellationMode& tessellationMode)   // [in] Tessellation mode
+{
+    GetShaderModes()->SetTessellationMode(tessellationMode);
+}
+
+// =====================================================================================================================
+// Set the geometry shader mode
+void Builder::SetGeometryShaderMode(
+    const GeometryShaderMode& geometryShaderMode)   // [in] Geometry shader mode
+{
+    GetShaderModes()->SetGeometryShaderMode(geometryShaderMode);
+}
+
+// =====================================================================================================================
+// Set the fragment shader mode
+void Builder::SetFragmentShaderMode(
+    const FragmentShaderMode& fragmentShaderMode)   // [in] Fragment shader mode
+{
+    GetShaderModes()->SetFragmentShaderMode(fragmentShaderMode);
+}
+
+// =====================================================================================================================
+// Set the compute shader mode (workgroup size)
+void Builder::SetComputeShaderMode(
+    const ComputeShaderMode& computeShaderMode)   // [in] Compute shader mode
+{
+    GetShaderModes()->SetComputeShaderMode(computeShaderMode);
 }
 
 // =====================================================================================================================
@@ -102,117 +109,6 @@ Type* Builder::GetConditionallyVectorizedTy(
         return VectorType::get(pElementTy, pVecTy->getNumElements());
     }
     return pElementTy;
-}
-
-// =====================================================================================================================
-// Set the resource mapping nodes for the given shader stage.
-// This stores the nodes as IR metadata.
-void Builder::SetUserDataNodes(
-    ArrayRef<ResourceMappingNode>   nodes,            // The resource mapping nodes
-    ArrayRef<DescriptorRangeValue>  rangeValues)      // The descriptor range values
-{
-    m_pPipelineState->SetUserDataNodes(nodes, rangeValues);
-}
-
-// =====================================================================================================================
-// Base implementation of linking shader modules into a pipeline module.
-Module* Builder::Link(
-    ArrayRef<Module*> modules,               // Array of modules indexed by shader stage, with nullptr entry
-                                             // for any stage not present in the pipeline
-    bool              linkNativeStages)      // Whether to link native shader stage modules
-{
-    // Add IR metadata for the shader stage to each function in each shader, and rename the entrypoint to
-    // ensure there is no clash on linking.
-    if (linkNativeStages)
-    {
-        uint32_t metaKindId = getContext().getMDKindID(LlpcName::ShaderStageMetadata);
-        for (uint32_t stage = 0; stage < modules.size(); ++stage)
-        {
-            Module* pModule = modules[stage];
-            if (pModule == nullptr)
-            {
-                continue;
-            }
-
-            auto pStageMetaNode = MDNode::get(getContext(), { ConstantAsMetadata::get(getInt32(stage)) });
-            for (Function& func : *pModule)
-            {
-                if (func.isDeclaration() == false)
-                {
-                    func.setMetadata(metaKindId, pStageMetaNode);
-                    if (func.getLinkage() != GlobalValue::InternalLinkage)
-                    {
-                        func.setName(Twine(LlpcName::EntryPointPrefix) +
-                                     GetShaderStageAbbreviation(static_cast<ShaderStage>(stage), true) +
-                                     "." +
-                                     func.getName());
-                    }
-                }
-            }
-        }
-    }
-
-    // If there is only one shader, just change the name on its module and return it.
-    Module* pPipelineModule = nullptr;
-    for (auto pModule : modules)
-    {
-        if (pPipelineModule == nullptr)
-        {
-            pPipelineModule = pModule;
-        }
-        else if (pModule != nullptr)
-        {
-            pPipelineModule = nullptr;
-            break;
-        }
-    }
-
-    if (pPipelineModule != nullptr)
-    {
-        pPipelineModule->setModuleIdentifier("llpcPipeline");
-
-        // Record pipeline state into IR metadata.
-        if (m_pPipelineState != nullptr)
-        {
-            m_pPipelineState->RecordState(pPipelineModule);
-        }
-    }
-    else
-    {
-        // Create an empty module then link each shader module into it. We record pipeline state into IR
-        // metadata before the link, to avoid problems with a Constant for an immutable descriptor value
-        // disappearing when modules are deleted.
-        bool result = true;
-        pPipelineModule = new Module("llpcPipeline", getContext());
-        static_cast<Llpc::Context*>(&getContext())->SetModuleTargetMachine(pPipelineModule);
-        Linker linker(*pPipelineModule);
-
-        if (m_pPipelineState != nullptr)
-        {
-            m_pPipelineState->RecordState(pPipelineModule);
-        }
-
-        for (int32_t shaderIndex = 0; shaderIndex < modules.size(); ++shaderIndex)
-        {
-            if (modules[shaderIndex] != nullptr)
-            {
-                // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
-                // linked into pipeline module.
-                if (linker.linkInModule(std::unique_ptr<Module>(modules[shaderIndex])))
-                {
-                    result = false;
-                }
-            }
-        }
-
-        if (result == false)
-        {
-            delete pPipelineModule;
-            pPipelineModule = nullptr;
-        }
-    }
-
-    return pPipelineModule;
 }
 
 // =====================================================================================================================
@@ -468,7 +364,7 @@ Type* Builder::GetBuiltInTy(
     case BuiltIn ## name: \
         typeCode = TypeCode:: type; \
         break;
-#include "llpcBuilderBuiltIns.h"
+#include "llpcBuilderBuiltInDefs.h"
 #undef BUILTIN
     default:
         LLPC_NEVER_CALLED();

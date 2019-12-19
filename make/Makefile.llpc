@@ -72,6 +72,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
     # llpc/builder
     CPPFILES +=                             \
         llpcBuilder.cpp                     \
+        llpcBuilderContext.cpp              \
         llpcBuilderImpl.cpp                 \
         llpcBuilderImplArith.cpp            \
         llpcBuilderImplDesc.cpp             \
@@ -82,7 +83,8 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcBuilderImplSubgroup.cpp         \
         llpcBuilderRecorder.cpp             \
         llpcBuilderReplayer.cpp             \
-        llpcPipelineState.cpp
+        llpcPipelineState.cpp               \
+        llpcShaderModes.cpp
 
     # llpc/context
     CPPFILES +=                             \
@@ -164,12 +166,7 @@ endif
         ManglingUtils.cpp                   \
         ParameterType.cpp                   \
         \
-        OCLUtil.cpp                         \
-        SPIRVLowerBool.cpp                  \
-        SPIRVLowerConstExpr.cpp             \
-        SPIRVLowerMemmove.cpp               \
         SPIRVReader.cpp                     \
-        SPIRVRegularizeLLVM.cpp             \
         SPIRVUtil.cpp
 
     # llpc/util

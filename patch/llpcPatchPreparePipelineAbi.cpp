@@ -37,6 +37,7 @@
 #include "llpcGfx9ConfigBuilder.h"
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
+#include "llpcPipelineState.h"
 #include "llpcShaderMerger.h"
 
 #define DEBUG_TYPE "llpc-patch-prepare-pipeline-abi"
@@ -67,6 +68,7 @@ public:
 
     void getAnalysisUsage(AnalysisUsage& analysisUsage) const override
     {
+        analysisUsage.addRequired<PipelineStateWrapper>();
         analysisUsage.addRequired<PipelineShaders>();
     }
 
@@ -90,6 +92,7 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
+    PipelineState*    m_pPipelineState;      // Pipeline state
     PipelineShaders*  m_pPipelineShaders;    // API shaders in the pipeline
 
     bool              m_hasVs;               // Whether the pipeline has vertex shader
@@ -123,6 +126,7 @@ bool PatchPreparePipelineAbi::runOnModule(
 
     Patch::Init(&module);
 
+    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
     m_pPipelineShaders = &getAnalysis<PipelineShaders>();
 
     m_hasVs  = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)) != 0);
@@ -210,9 +214,9 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
 
     if (m_pContext->IsGraphics())
     {
-        ShaderMerger shaderMerger(m_pContext, m_pPipelineShaders);
+        ShaderMerger shaderMerger(m_pPipelineState, m_pPipelineShaders);
 #if LLPC_BUILD_GFX10
-        const bool enableNgg = m_pContext->GetNggControl()->enableNgg;
+        const bool enableNgg = m_pPipelineState->GetNggControl()->enableNgg;
 #endif
 
         if (hasTs && m_hasGs)
@@ -405,12 +409,12 @@ void PatchPreparePipelineAbi::AddAbiMetadata(
 {
     if (m_gfxIp.major <= 8)
     {
-        Gfx6::ConfigBuilder configBuilder(&module);
+        Gfx6::ConfigBuilder configBuilder(&module, m_pPipelineState);
         configBuilder.BuildPalMetadata();
     }
     else
     {
-        Gfx9::ConfigBuilder configBuilder(&module);
+        Gfx9::ConfigBuilder configBuilder(&module, m_pPipelineState);
         configBuilder.BuildPalMetadata();
     }
 }

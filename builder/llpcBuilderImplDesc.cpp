@@ -46,6 +46,7 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
     uint32_t      binding,          // Descriptor binding
     Value*        pDescIndex,       // [in] Descriptor index
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
+    bool          isWritten,        // Whether the buffer is (or might be) written to
     Type* const   pPointeeTy,       // [in] Type that the returned pointer should point to.
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
@@ -53,6 +54,11 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
 
     Instruction* const pInsertPos = &*GetInsertPoint();
     pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
+
+    // Mark the shader as reading and writing (if applicable) a resource.
+    auto pResUsage = getContext().GetShaderResourceUsage(m_shaderStage);
+    pResUsage->resourceRead = true;
+    pResUsage->resourceWrite |= isWritten;
 
     // TODO: This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
@@ -111,6 +117,9 @@ Value* BuilderImplDesc::CreateLoadDescFromPtr(
                                       //    the CreateGet*DescPtr methods
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
+    // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
+    getContext().GetShaderResourceUsage(m_shaderStage)->useImages = true;
+
     std::string name = LlpcName::DescriptorLoadFromPtr;
     AddTypeMangling(pDescPtr->getType(), {}, name);
     auto pDesc = EmitCall(name,
@@ -209,19 +218,23 @@ Value* BuilderImplDesc::CreateGetFmaskDescPtr(
 // =====================================================================================================================
 // Create a load of the push constants table pointer.
 // This returns a pointer to the ResourceMappingNodeType::PushConst resource in the top-level user data table.
+// The type passed must have the correct size for the push constants.
 Value* BuilderImplDesc::CreateLoadPushConstantsPtr(
     Type*         pPushConstantsTy, // [in] Type of the push constants table that the returned pointer will point to
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
+    // Remember the size of push constants.
+    uint32_t pushConstSize = GetInsertPoint()->getModule()->getDataLayout().getTypeStoreSize(pPushConstantsTy);
+    ResourceUsage* pResUsage = getContext().GetShaderResourceUsage(m_shaderStage);
+    LLPC_ASSERT((pResUsage->pushConstSizeInBytes == 0) || (pResUsage->pushConstSizeInBytes == pushConstSize));
+    pResUsage->pushConstSizeInBytes = pushConstSize;
+
     auto pPushConstantsPtrTy = PointerType::get(pPushConstantsTy, ADDR_SPACE_CONST);
     // TODO: This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
     // generate the code directly.
-    Instruction* pInsertPos = &*GetInsertPoint();
-    auto pPushConstantsLoadCall = EmitCall(LlpcName::DescriptorLoadSpillTable,
-                                           pPushConstantsPtrTy,
-                                           {},
-                                           NoAttrib,
-                                           pInsertPos);
+    std::string callName = LlpcName::DescriptorLoadSpillTable;
+    AddTypeMangling(pPushConstantsPtrTy, {}, callName);
+    auto pPushConstantsLoadCall = EmitCall(callName, pPushConstantsPtrTy, {}, NoAttrib, *this);
     pPushConstantsLoadCall->setName(instName);
     return pPushConstantsLoadCall;
 }

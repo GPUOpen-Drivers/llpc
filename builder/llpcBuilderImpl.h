@@ -37,12 +37,14 @@ namespace Llpc
 
 using namespace llvm;
 
+class PipelineState;
+
 // =====================================================================================================================
 // Builder implementation base class
 class BuilderImplBase : public Builder
 {
 public:
-    BuilderImplBase(LLVMContext& context) : Builder(context) {}
+    BuilderImplBase(BuilderContext* pBuilderContext) : Builder(pBuilderContext) {}
 
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
     Llpc::Context& getContext() const;
@@ -53,6 +55,9 @@ public:
                             const Twine& instName = "") override final;
 
 protected:
+    // Get the ShaderModes object.
+    ShaderModes* GetShaderModes() override final;
+
     // Get whether the context we are building in supports DPP operations.
     bool SupportDpp() const;
 
@@ -90,6 +95,8 @@ protected:
                      Value*                                        pValue2,
                      std::function<Value*(Value*, Value*, Value*)> callback);
 
+    PipelineState*  m_pPipelineState = nullptr;   // Pipeline state
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplBase)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplBase)
@@ -100,7 +107,7 @@ private:
 class BuilderImplArith : virtual public BuilderImplBase
 {
 public:
-    BuilderImplArith(LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplArith(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
     // the given cube map texture coordinates.
@@ -264,13 +271,14 @@ private:
 class BuilderImplDesc : virtual public BuilderImplBase
 {
 public:
-    BuilderImplDesc(LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplDesc(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // Create a load of a buffer descriptor.
     Value* CreateLoadBufferDesc(uint32_t      descSet,
                                 uint32_t      binding,
                                 Value*        pDescIndex,
                                 bool          isNonUniform,
+                                bool          isWritten,
                                 Type*         pPointeeTy,
                                 const Twine&  instName) override final;
 
@@ -324,7 +332,7 @@ private:
 class BuilderImplImage : virtual public BuilderImplBase
 {
 public:
-    BuilderImplImage(LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplImage(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // Create an image load.
     Value* CreateImageLoad(Type*             pResultTy,
@@ -496,7 +504,7 @@ private:
 class BuilderImplInOut : virtual public BuilderImplBase
 {
 public:
-    BuilderImplInOut(llvm::LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplInOut(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // Create a read of (part of) a user input value.
     Value* CreateReadGenericInput(Type*         pResultTy,
@@ -557,6 +565,9 @@ public:
                                           Value*        pVertexIndex,
                                           Value*        pIndex) override final;
 
+    // Get name of built-in
+    static StringRef GetBuiltInName(BuiltInKind builtIn);
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplInOut)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplInOut)
@@ -602,9 +613,6 @@ private:
     // Get the type of a built-in. This overrides the one in Builder to additionally recognize the internal built-ins.
     Type* GetBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo);
 
-    // Get name of built-in
-    StringRef GetBuiltInName(BuiltInKind builtIn);
-
     // Mark usage of a built-in input
     void MarkBuiltInInputUsage(BuiltInKind builtIn, uint32_t arraySize);
 
@@ -628,7 +636,7 @@ private:
 class BuilderImplMatrix : virtual public BuilderImplBase
 {
 public:
-    BuilderImplMatrix(LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplMatrix(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // Create a matrix transpose.
     Value* CreateTransposeMatrix(Value* const pMatrix,
@@ -685,7 +693,7 @@ private:
 class BuilderImplMisc : virtual public BuilderImplBase
 {
 public:
-    BuilderImplMisc(LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplMisc(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
     // the current output primitive in the specified output-primitive stream.
@@ -722,7 +730,7 @@ private:
 class BuilderImplSubgroup : virtual public BuilderImplBase
 {
 public:
-    BuilderImplSubgroup(LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplSubgroup(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // Create a get subgroup size query.
     Value* CreateGetSubgroupSize(const Twine& instName) override final;
@@ -953,21 +961,31 @@ class BuilderImpl final : public BuilderImplArith,
                                  BuilderImplMisc,
                                  BuilderImplSubgroup
 {
+    friend BuilderContext;
+
 public:
-    BuilderImpl(LLVMContext& context) : BuilderImplBase(context),
-                                        BuilderImplArith(context),
-                                        BuilderImplDesc(context),
-                                        BuilderImplImage(context),
-                                        BuilderImplInOut(context),
-                                        BuilderImplMatrix(context),
-                                        BuilderImplMisc(context),
-                                        BuilderImplSubgroup(context)
-    {}
     ~BuilderImpl() {}
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImpl)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImpl)
+
+    BuilderImpl(BuilderContext* pBuilderContext, Pipeline* pPipeline);
 };
+
+// Built-ins for fragment input interpolation (I/J)
+static const BuiltInKind BuiltInInterpPerspSample     = static_cast<BuiltInKind>(0x10000000);
+static const BuiltInKind BuiltInInterpPerspCenter     = static_cast<BuiltInKind>(0x10000001);
+static const BuiltInKind BuiltInInterpPerspCentroid   = static_cast<BuiltInKind>(0x10000002);
+static const BuiltInKind BuiltInInterpPullMode        = static_cast<BuiltInKind>(0x10000003);
+static const BuiltInKind BuiltInInterpLinearSample    = static_cast<BuiltInKind>(0x10000004);
+static const BuiltInKind BuiltInInterpLinearCenter    = static_cast<BuiltInKind>(0x10000005);
+static const BuiltInKind BuiltInInterpLinearCentroid  = static_cast<BuiltInKind>(0x10000006);
+
+// Built-ins for sample position emulation
+static const BuiltInKind BuiltInSamplePosOffset       = static_cast<BuiltInKind>(0x10000007);
+static const BuiltInKind BuiltInNumSamples            = static_cast<BuiltInKind>(0x10000008);
+static const BuiltInKind BuiltInSamplePatternIdx      = static_cast<BuiltInKind>(0x10000009);
+static const BuiltInKind BuiltInWaveId                = static_cast<BuiltInKind>(0x1000000A);
 
 } // Llpc

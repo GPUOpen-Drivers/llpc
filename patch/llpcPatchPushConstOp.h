@@ -42,6 +42,8 @@ class CallInst;
 namespace Llpc
 {
 
+class PipelineState;
+
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for push constant operations.
 class PatchPushConstOp:
@@ -65,7 +67,7 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
 
     llvm::SmallVector<llvm::Instruction*, 8> m_instsToRemove;   // List of instructions to remove.
-    PipelineState*  m_pPipelineState = nullptr;                 // PipelineState from PipelineStateWrapper pass
+    PipelineState*  m_pPipelineState = nullptr;                 // Pipeline state from PipelineStateWrapper pass
 };
 
 } // Llpc

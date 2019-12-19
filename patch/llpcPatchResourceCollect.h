@@ -35,9 +35,12 @@
 #include <unordered_set>
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
+#include "llpcPipelineState.h"
 
 namespace Llpc
 {
+
+struct NggControl;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for resource collecting
@@ -50,6 +53,7 @@ public:
 
     void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
     {
+        analysisUsage.addRequired<PipelineStateWrapper>();
         analysisUsage.addRequired<PipelineShaders>();
         analysisUsage.addPreserved<PipelineShaders>();
     }
@@ -64,6 +68,13 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PatchResourceCollect);
 
+    // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
+    bool CheckGsOnChipValidity();
+
+    // Sets NGG control settings
+    void SetNggControl();
+    void BuildNggCullingControlRegister(NggControl& nggControl);
+
     void ProcessShader();
 
     void ClearInactiveInput();
@@ -72,11 +83,12 @@ private:
     void MatchGenericInOut();
     void MapBuiltInToGenericInOut();
 
-    void ReviseTessExecutionMode();
     void MapGsGenericOutput(GsOutLocInfo outLocInfo);
     void MapGsBuiltInOutput(uint32_t builtInId, uint32_t elemCount);
 
     // -----------------------------------------------------------------------------------------------------------------
+
+    PipelineState*                  m_pPipelineState;           // Pipeline state
 
     std::unordered_set<llvm::CallInst*> m_deadCalls;            // Dead calls
 

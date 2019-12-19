@@ -62,12 +62,6 @@ namespace Gfx6
 // Sets register value
 #define SET_REG(_stage, _reg, _val)                (_stage)->_reg##_VAL.u32All = (_val);
 
-// Adds and sets dynamic register value
-#define SET_DYN_REG(_pipeline, _reg, _val) \
-    LLPC_ASSERT((_pipeline)->m_dynRegCount < _pipeline->MaxDynamicRegs); \
-    (_pipeline)->m_dynRegs[(_pipeline)->m_dynRegCount].key = (_reg);     \
-    (_pipeline)->m_dynRegs[(_pipeline)->m_dynRegCount++].value = (_val);
-
 // Gets register field value
 #define GET_REG_FIELD(_stage, _reg, _field)        ((_stage)->_reg##_VAL.bits._field)
 
@@ -116,7 +110,7 @@ struct VsRegConfig
     DEF_REG(VGT_STRMOUT_VTX_STRIDE_2);
     DEF_REG(VGT_STRMOUT_VTX_STRIDE_3);
 
-    void Init();
+    VsRegConfig();
 };
 
 // =====================================================================================================================
@@ -129,7 +123,7 @@ struct HsRegConfig
     DEF_REG(VGT_HOS_MIN_TESS_LEVEL);
     DEF_REG(VGT_HOS_MAX_TESS_LEVEL);
 
-    void Init();
+    HsRegConfig();
 };
 
 // =====================================================================================================================
@@ -140,7 +134,7 @@ struct EsRegConfig
     DEF_REG(SPI_SHADER_PGM_RSRC2_ES);
     DEF_REG(VGT_ESGS_RING_ITEMSIZE);
 
-    void Init();
+    EsRegConfig();
 };
 
 // =====================================================================================================================
@@ -149,7 +143,7 @@ struct LsRegConfig
 {
     DEF_REG(SPI_SHADER_PGM_RSRC1_LS);
     DEF_REG(SPI_SHADER_PGM_RSRC2_LS);
-    void Init();
+    LsRegConfig();
 };
 
 // =====================================================================================================================
@@ -175,7 +169,7 @@ struct GsRegConfig
     DEF_REG(VGT_GSVS_RING_OFFSET_3);
     DEF_REG(VGT_GS_MODE);
 
-    void Init();
+    GsRegConfig();
 };
 
 // =====================================================================================================================
@@ -197,51 +191,29 @@ struct PsRegConfig
 
     static uint32_t GetPsInputCntlStart();
     static uint32_t GetPsUserDataStart();
-    void Init();
 
-};
-
-// =====================================================================================================================
-// Represents the common configuration of registers relevant to all pipeline.
-struct PipelineRegConfig
-{
-    void Init();
+    PsRegConfig();
 };
 
 // =====================================================================================================================
 // Represents configuration of registers relevant to graphics pipeline (VS-FS).
-struct PipelineVsFsRegConfig: public PipelineRegConfig
+struct PipelineVsFsRegConfig
 {
-    static const uint32_t MaxDynamicRegs = 16 + // mmSPI_SHADER_USER_DATA_VS_0~15
-                                           16 + // mmSPI_SHADER_USER_DATA_PS_0~15
-                                           32;  // mmSPI_PS_INPUT_CNTL_0~31
+    static constexpr bool containsPalAbiMetadataOnly = true;
 
     VsRegConfig m_vsRegs;   // VS -> hardware VS
     PsRegConfig m_psRegs;   // FS -> hardware PS
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(IA_MULTI_VGT_PARAM);
 
-    Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
-    uint32_t m_dynRegCount;                                     // Count of dynamic registers
-
-    void Init();
-    // Get total register's count of this pipeline
-    uint32_t GetRegCount() const
-    {
-        return  offsetof(PipelineVsFsRegConfig, m_dynRegs) / sizeof(Util::Abi::PalMetadataNoteEntry) +
-                m_dynRegCount;
-    }
+    PipelineVsFsRegConfig();
 };
 
 // =====================================================================================================================
 // Represents configuration of registers relevant to graphics pipeline (VS-TS-FS).
-struct PipelineVsTsFsRegConfig: public PipelineRegConfig
+struct PipelineVsTsFsRegConfig
 {
-    static const uint32_t MaxDynamicRegs = 16 + // mmSPI_SHADER_USER_DATA_LS_0~15
-                                           16 + // mmSPI_SHADER_USER_DATA_HS_0~15
-                                           16 + // mmSPI_SHADER_USER_DATA_VS_0~15
-                                           16 + // mmSPI_SHADER_USER_DATA_PS_0~15
-                                           32;  // mmSPI_PS_INPUT_CNTL_0~31
+    static constexpr bool containsPalAbiMetadataOnly = true;
 
     LsRegConfig m_lsRegs;   // VS  -> hardware LS
     HsRegConfig m_hsRegs;   // TCS -> hardware HS
@@ -252,27 +224,14 @@ struct PipelineVsTsFsRegConfig: public PipelineRegConfig
     DEF_REG(IA_MULTI_VGT_PARAM);
     DEF_REG(VGT_TF_PARAM);
 
-    Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
-    uint32_t m_dynRegCount;                                     // Count of dynamic registers
-
-    void Init();
-    // Get total register's count of this pipeline
-    uint32_t GetRegCount() const
-    {
-        return  offsetof(PipelineVsTsFsRegConfig, m_dynRegs) / sizeof(Util::Abi::PalMetadataNoteEntry) +
-                m_dynRegCount;
-    }
+    PipelineVsTsFsRegConfig();
 };
 
 // =====================================================================================================================
 // Represents configuration of registers relevant to graphics pipeline (VS-GS-FS).
-struct PipelineVsGsFsRegConfig: public PipelineRegConfig
+struct PipelineVsGsFsRegConfig
 {
-    static const uint32_t MaxDynamicRegs = 16 + // mmSPI_SHADER_USER_DATA_ES_0~15
-                                           16 + // mmSPI_SHADER_USER_DATA_GS_0~15
-                                           16 + // mmSPI_SHADER_USER_DATA_PS_0~15
-                                           16 + // mmSPI_SHADER_USER_DATA_VS_0~15
-                                           32;  // mmSPI_PS_INPUT_CNTL_0~31
+    static constexpr bool containsPalAbiMetadataOnly = true;
 
     EsRegConfig m_esRegs;   // VS -> hardware ES
     GsRegConfig m_gsRegs;   // GS -> hardware GS
@@ -282,29 +241,14 @@ struct PipelineVsGsFsRegConfig: public PipelineRegConfig
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(IA_MULTI_VGT_PARAM);
 
-    Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
-    uint32_t m_dynRegCount;                                     // Count of dynamic registers
-
-    void Init();
-    // Get total register's count of this pipeline
-    uint32_t GetRegCount() const
-    {
-        return  offsetof(PipelineVsGsFsRegConfig, m_dynRegs) / sizeof(Util::Abi::PalMetadataNoteEntry) +
-                m_dynRegCount;
-    }
+    PipelineVsGsFsRegConfig();
 };
 
 // =====================================================================================================================
 // Represents configuration of registers relevant to graphics pipeline (VS-TS-GS-FS).
-struct PipelineVsTsGsFsRegConfig: public PipelineRegConfig
+struct PipelineVsTsGsFsRegConfig
 {
-    static const uint32_t MaxDynamicRegs = 16 + // mmSPI_SHADER_USER_DATA_LS_0~15
-                                           16 + // mmSPI_SHADER_USER_DATA_HS_0~15
-                                           16 + // mmSPI_SHADER_USER_DATA_ES_0~15
-                                           16 + // mmSPI_SHADER_USER_DATA_GS_0~15
-                                           16 + // mmSPI_SHADER_USER_DATA_PS_0~15
-                                           16 + // mmSPI_SHADER_USER_DATA_VS_0~15
-                                           32;  // mmSPI_PS_INPUT_CNTL_0~31
+    static constexpr bool containsPalAbiMetadataOnly = true;
 
     LsRegConfig m_lsRegs;   // VS  -> hardware LS
     HsRegConfig m_hsRegs;   // TCS -> hardware HS
@@ -317,48 +261,22 @@ struct PipelineVsTsGsFsRegConfig: public PipelineRegConfig
     DEF_REG(IA_MULTI_VGT_PARAM);
     DEF_REG(VGT_TF_PARAM);
 
-    Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
-    uint32_t m_dynRegCount;                                     // Count of dynamic registers
-
-    void Init();
-    // Get total register's count of this pipeline
-    uint32_t GetRegCount() const
-    {
-        return  offsetof(PipelineVsTsGsFsRegConfig, m_dynRegs) / sizeof(Util::Abi::PalMetadataNoteEntry) +
-                m_dynRegCount;
-    }
+    PipelineVsTsGsFsRegConfig();
 };
 
 // =====================================================================================================================
 // Represents configuration of registers relevant to compute shader.
 struct CsRegConfig
 {
+    static constexpr bool containsPalAbiMetadataOnly = true;
+
     DEF_REG(COMPUTE_PGM_RSRC1);
     DEF_REG(COMPUTE_PGM_RSRC2);
     DEF_REG(COMPUTE_NUM_THREAD_X);
     DEF_REG(COMPUTE_NUM_THREAD_Y);
     DEF_REG(COMPUTE_NUM_THREAD_Z);
-    void Init();
-};
 
-// =====================================================================================================================
-// Represents configuration of registers relevant to compute pipeline.
-struct PipelineCsRegConfig: public PipelineRegConfig
-{
-    static const uint32_t MaxDynamicRegs = 16;  // mmCOMPUTE_USER_DATA_0~15
-
-    CsRegConfig   m_csRegs;
-
-    Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
-    uint32_t m_dynRegCount;                                     // Count of dynamic registers
-
-    void Init();
-    // Get total register's count of this pipeline
-    uint32_t GetRegCount() const
-    {
-        return  offsetof(PipelineCsRegConfig, m_dynRegs) / sizeof(Util::Abi::PalMetadataNoteEntry) +
-                m_dynRegCount;
-    }
+    CsRegConfig();
 };
 
 // Map from register ID to its name string

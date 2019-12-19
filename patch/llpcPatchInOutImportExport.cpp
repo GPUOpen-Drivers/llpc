@@ -35,7 +35,8 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <unordered_set>
-#include "spirvExt.h"
+#include "llpcBuilderBuiltIns.h"
+#include "llpcBuilderImpl.h"
 #include "llpcContext.h"
 #include "llpcFragColorExport.h"
 #include "llpcGraphicsContext.h"
@@ -119,7 +120,7 @@ bool PatchInOutImportExport::runOnModule(
 
     // Create the global variable that is to model LDS
     // NOTE: ES -> GS ring is always on-chip on GFX9.
-    if (m_hasTs || (m_hasGs && (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))))
+    if (m_hasTs || (m_hasGs && (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9))))
     {
         m_pLds = Patch::GetLdsVariable(m_pModule);
     }
@@ -206,7 +207,7 @@ void PatchInOutImportExport::ProcessShader()
     }
 
     // Thread ID will be used in on-chip GS offset calculation (ES -> GS ring is always on-chip on GFX9)
-    bool useThreadId = (m_hasGs && (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9)));
+    bool useThreadId = (m_hasGs && (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9)));
 
     // Thread ID will also be used for stream-out buffer export
     const bool enableXfb = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
@@ -249,27 +250,26 @@ void PatchInOutImportExport::ProcessShader()
             const auto& tcsInOutUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage;
             const auto& tesInOutUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->inOutUsage;
 
-            const auto& tcsBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
-            const auto& tesBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
-
             const uint32_t inLocCount = std::max(tcsInOutUsage.inputMapLocCount, 1u);
             const uint32_t outLocCount =
                 hasTcs ? std::max(tcsInOutUsage.outputMapLocCount, 1u) : std::max(tesInOutUsage.inputMapLocCount, 1u);
 
             const auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
             const uint32_t inVertexCount  = pPipelineInfo->iaState.patchControlPoints;
-            const uint32_t outVertexCount = hasTcs ? tcsBuiltInUsage.outputVertices : MaxTessPatchVertices;
+            const uint32_t outVertexCount = hasTcs ?
+                                            m_pPipelineState->GetShaderModes()->GetTessellationMode().outputVertices :
+                                            MaxTessPatchVertices;
 
             uint32_t tessFactorStride = 0;
-            switch (tesBuiltInUsage.primitiveMode)
+            switch (m_pPipelineState->GetShaderModes()->GetTessellationMode().primitiveMode)
             {
-            case Triangles:
+            case PrimitiveMode::Triangles:
                 tessFactorStride = 4;
                 break;
-            case Quads:
+            case PrimitiveMode::Quads:
                 tessFactorStride = 6;
                 break;
-            case Isolines:
+            case PrimitiveMode::Isolines:
                 tessFactorStride = 2;
                 break;
             default:
@@ -303,7 +303,7 @@ void PatchInOutImportExport::ProcessShader()
             calcFactor.onChip.outPatchStart = inPatchTotalSize;
             calcFactor.onChip.patchConstStart = inPatchTotalSize + outPatchTotalSize;
 
-            if (m_pContext->IsTessOffChip())
+            if (m_pPipelineState->IsTessOffChip())
             {
                 calcFactor.offChip.outPatchStart = 0;
                 calcFactor.offChip.patchConstStart = outPatchTotalSize;
@@ -331,16 +331,16 @@ void PatchInOutImportExport::ProcessShader()
                       calcFactor.patchConstSize * calcFactor.patchCountPerThreadGroup << "\n");
             LLPC_OUTS("\n");
             LLPC_OUTS("Tessellation factor stride: " << tessFactorStride << " (");
-            switch (tesBuiltInUsage.primitiveMode)
+            switch (m_pPipelineState->GetShaderModes()->GetTessellationMode().primitiveMode)
             {
-            case Triangles:
+            case PrimitiveMode::Triangles:
                 LLPC_OUTS("triangles");
                 break;
-            case Quads:
+            case PrimitiveMode::Quads:
                 LLPC_OUTS("quads");
                 tessFactorStride = 6;
                 break;
-            case Isolines:
+            case PrimitiveMode::Isolines:
                 LLPC_OUTS("isolines");
                 tessFactorStride = 2;
                 break;
@@ -590,8 +590,8 @@ void PatchInOutImportExport::visitCallInst(
                 }
             case ShaderStageFragment:
                 {
-                    uint32_t interpMode = InterpModeSmooth;
-                    uint32_t interpLoc = InterpLocCenter;
+                    uint32_t interpMode = InOutInfo::InterpModeSmooth;
+                    uint32_t interpLoc = InOutInfo::InterpLocCenter;
 
                     Value* pElemIdx = callInst.getOperand(isInterpolantInputImport ? 2 : 1);
                     LLPC_ASSERT(IsDontCareValue(pElemIdx) == false);
@@ -611,7 +611,7 @@ void PatchInOutImportExport::visitCallInst(
                         LLPC_ASSERT(callInst.getNumArgOperands() == 5);
 
                         interpMode = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
-                        interpLoc = InterpLocUnknown;
+                        interpLoc = InOutInfo::InterpLocUnknown;
 
                         pAuxInterpValue = callInst.getOperand(4);
                     }
@@ -1539,7 +1539,7 @@ void PatchInOutImportExport::visitReturnInst(
     else if (m_shaderStage == ShaderStageGeometry)
     {
 #if LLPC_BUILD_GFX10
-        if ((m_pContext->IsGsOnChip() == false) && (m_gfxIp.major >= 10))
+        if ((m_pPipelineState->IsGsOnChip() == false) && (m_gfxIp.major >= 10))
         {
             // NOTE: This is a workaround because backend compiler does not provide s_waitcnt_vscnt intrinsic, so we
             // use fence release to generate s_waitcnt vmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
@@ -1826,8 +1826,8 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
     interpInfo[location] =
     {
         location,
-        (interpMode == InterpModeFlat),
-        (interpMode == InterpModeCustom),
+        (interpMode == InOutInfo::InterpModeFlat),
+        (interpMode == InOutInfo::InterpModeCustom),
         (pInputTy->getScalarSizeInBits() == 16),
     };
 
@@ -1838,8 +1838,8 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
         interpInfo[location + 1] =
         {
             location + 1,
-            (interpMode == InterpModeFlat),
-            (interpMode == InterpModeCustom),
+            (interpMode == InOutInfo::InterpModeFlat),
+            (interpMode == InOutInfo::InterpModeCustom),
             false,
         };
     }
@@ -1850,45 +1850,45 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
     Value* pJ  = nullptr;
 
     // Not "flat" and "custom" interpolation
-    if ((interpMode != InterpModeFlat) && (interpMode != InterpModeCustom))
+    if ((interpMode != InOutInfo::InterpModeFlat) && (interpMode != InOutInfo::InterpModeCustom))
     {
         auto pIJ = pAuxInterpValue;
         if (pIJ == nullptr)
         {
-            if (interpMode == InterpModeSmooth)
+            if (interpMode == InOutInfo::InterpModeSmooth)
             {
-                if (interpLoc == InterpLocCentroid)
+                if (interpLoc == InOutInfo::InterpLocCentroid)
                 {
                     pIJ = AdjustCentroidIJ(GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.centroid),
                                            GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.center),
                                            pInsertPos);
                 }
-                else if (interpLoc == InterpLocSample)
+                else if (interpLoc == InOutInfo::InterpLocSample)
                 {
                     pIJ = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.sample);
                 }
                 else
                 {
-                    LLPC_ASSERT(interpLoc == InterpLocCenter);
+                    LLPC_ASSERT(interpLoc == InOutInfo::InterpLocCenter);
                     pIJ = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.center);
                 }
             }
             else
             {
-                LLPC_ASSERT(interpMode == InterpModeNoPersp);
-                if (interpLoc == InterpLocCentroid)
+                LLPC_ASSERT(interpMode == InOutInfo::InterpModeNoPersp);
+                if (interpLoc == InOutInfo::InterpLocCentroid)
                 {
                     pIJ = AdjustCentroidIJ(GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.centroid),
                                            GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.center),
                                            pInsertPos);
                 }
-                else if (interpLoc == InterpLocSample)
+                else if (interpLoc == InOutInfo::InterpLocSample)
                 {
                     pIJ = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.sample);
                 }
                 else
                 {
-                    LLPC_ASSERT(interpLoc == InterpLocCenter);
+                    LLPC_ASSERT(interpLoc == InOutInfo::InterpLocCenter);
                     pIJ = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.center);
                 }
             }
@@ -1944,7 +1944,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
     {
         Value* pCompValue = nullptr;
 
-        if ((interpMode != InterpModeFlat) && (interpMode != InterpModeCustom))
+        if ((interpMode != InOutInfo::InterpModeFlat) && (interpMode != InOutInfo::InterpModeCustom))
         {
             LLPC_ASSERT((pBasicTy->isHalfTy() || pBasicTy->isFloatTy()) && (numChannels <= 4));
             LLPC_UNUSED(pBasicTy);
@@ -2010,7 +2010,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
         {
             InterpParam interpParam = INTERP_PARAM_P0;
 
-            if (interpMode == InterpModeCustom)
+            if (interpMode == InOutInfo::InterpModeCustom)
             {
                 LLPC_ASSERT(isa<ConstantInt>(pAuxInterpValue));
                 uint32_t vertexNo = cast<ConstantInt>(pAuxInterpValue)->getZExtValue();
@@ -2033,7 +2033,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
             }
             else
             {
-                LLPC_ASSERT(interpMode == InterpModeFlat);
+                LLPC_ASSERT(interpMode == InOutInfo::InterpModeFlat);
             }
 
             Value* args[] = {
@@ -2260,7 +2260,7 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     LLPC_UNUSED(genericOutByteSizes);
 
 #if LLPC_BUILD_GFX10
-    if (m_pContext->GetNggControl()->enableNgg)
+    if (m_pPipelineState->GetNggControl()->enableNgg)
     {
         // NOTE: For NGG, exporting GS output to GS-VS ring is represented by a call and the call is replaced with
         // real instructions when when NGG primitive shader is generated.
@@ -2569,9 +2569,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
             const bool hasTcs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessControl)) != 0);
             if (hasTcs)
             {
-                const auto& tcsBuiltInUsage =
-                    m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
-                patchVertices = tcsBuiltInUsage.outputVertices;
+                patchVertices = m_pPipelineState->GetShaderModes()->GetTessellationMode().outputVertices;
             }
 
             pInput = ConstantInt::get(m_pContext->Int32Ty(), patchVertices);
@@ -2866,8 +2864,8 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
                                                nullptr,
                                                nullptr,
                                                nullptr,
-                                               InterpModeSmooth,
-                                               InterpLocCenter,
+                                               InOutInfo::InterpModeSmooth,
+                                               InOutInfo::InterpLocCenter,
                                                pInsertPos);
             break;
         }
@@ -2924,8 +2922,8 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
                                                nullptr,
                                                nullptr,
                                                nullptr,
-                                               InterpModeFlat,
-                                               InterpLocCenter,
+                                               InOutInfo::InterpModeFlat,
+                                               InOutInfo::InterpLocCenter,
                                                pInsertPos);
             break;
         }
@@ -3056,21 +3054,21 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
         }
     // Handle internal-use built-ins for interpolation functions and AMD extension (AMD_shader_explicit_vertex_parameter)
     case BuiltInInterpPerspSample:
-    case BuiltInBaryCoordSmoothSampleAMD:
+    case BuiltInBaryCoordSmoothSample:
         {
             LLPC_ASSERT(entryArgIdxs.perspInterp.sample != 0);
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.sample);
             break;
         }
     case BuiltInInterpPerspCenter:
-    case BuiltInBaryCoordSmoothAMD:
+    case BuiltInBaryCoordSmooth:
         {
             LLPC_ASSERT(entryArgIdxs.perspInterp.center != 0);
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.center);
             break;
         }
     case BuiltInInterpPerspCentroid:
-    case BuiltInBaryCoordSmoothCentroidAMD:
+    case BuiltInBaryCoordSmoothCentroid:
         {
             LLPC_ASSERT(entryArgIdxs.perspInterp.centroid != 0);
             pInput = AdjustCentroidIJ(GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.centroid),
@@ -3079,28 +3077,28 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             break;
         }
     case BuiltInInterpPullMode:
-    case BuiltInBaryCoordPullModelAMD:
+    case BuiltInBaryCoordPullModel:
         {
             LLPC_ASSERT(entryArgIdxs.perspInterp.pullMode != 0);
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.pullMode);
             break;
         }
     case BuiltInInterpLinearSample:
-    case BuiltInBaryCoordNoPerspSampleAMD:
+    case BuiltInBaryCoordNoPerspSample:
         {
             LLPC_ASSERT(entryArgIdxs.linearInterp.sample != 0);
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.sample);
             break;
         }
     case BuiltInInterpLinearCenter:
-    case BuiltInBaryCoordNoPerspAMD:
+    case BuiltInBaryCoordNoPersp:
         {
             LLPC_ASSERT(entryArgIdxs.linearInterp.center != 0);
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.center);
             break;
         }
     case BuiltInInterpLinearCentroid:
-    case BuiltInBaryCoordNoPerspCentroidAMD:
+    case BuiltInBaryCoordNoPerspCentroid:
         {
             LLPC_ASSERT(entryArgIdxs.linearInterp.centroid != 0);
             pInput = AdjustCentroidIJ(GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.centroid),
@@ -3189,7 +3187,6 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
 
     auto  pIntfData    = m_pContext->GetShaderInterfaceData(ShaderStageCompute);
     auto& entryArgIdxs = pIntfData->entryArgIdxs.cs;
-    auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
 
     switch (builtInId)
     {
@@ -3232,9 +3229,10 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
     case BuiltInNumSubgroups:
         {
             // workgroupSize = gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z
-            const uint32_t workgroupSize = builtInUsage.workgroupSizeX *
-                                           builtInUsage.workgroupSizeY *
-                                           builtInUsage.workgroupSizeZ;
+            auto& mode = m_pPipelineState->GetShaderModes()->GetComputeShaderMode();
+            const uint32_t workgroupSize = mode.workgroupSizeX *
+                                           mode.workgroupSizeY *
+                                           mode.workgroupSizeZ;
 
             // gl_NumSubgroups = (workgroupSize + gl_SubGroupSize - 1) / gl_SubgroupSize
             const uint32_t subgroupSize = m_pContext->GetShaderWaveSize(m_shaderStage);
@@ -3801,18 +3799,16 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
 
                     uint32_t tessFactorCount = 0;
 
-                    uint32_t primitiveMode =
-                        m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes.primitiveMode;
-
+                    auto primitiveMode = m_pPipelineState->GetShaderModes()->GetTessellationMode().primitiveMode;
                     switch (primitiveMode)
                     {
-                    case Isolines:
+                    case PrimitiveMode::Isolines:
                         tessFactorCount = 2;
                         break;
-                    case Triangles:
+                    case PrimitiveMode::Triangles:
                         tessFactorCount = 3;
                         break;
-                    case Quads:
+                    case PrimitiveMode::Quads:
                         tessFactorCount = 4;
                         break;
                     default:
@@ -3826,7 +3822,7 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                         tessFactors.push_back(pElem);
                     }
 
-                    if (primitiveMode == Isolines)
+                    if (primitiveMode == PrimitiveMode::Isolines)
                     {
                         LLPC_ASSERT(tessFactorCount == 2);
                         std::swap(tessFactors[0], tessFactors[1]);
@@ -3876,18 +3872,15 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                 {
                     uint32_t tessFactorCount = 0;
 
-                    uint32_t primitiveMode =
-                        m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes.primitiveMode;
-
-                    switch (primitiveMode)
+                    switch (m_pPipelineState->GetShaderModes()->GetTessellationMode().primitiveMode)
                     {
-                    case Isolines:
+                    case PrimitiveMode::Isolines:
                         tessFactorCount = 0;
                         break;
-                    case Triangles:
+                    case PrimitiveMode::Triangles:
                         tessFactorCount = 1;
                         break;
-                    case Quads:
+                    case PrimitiveMode::Quads:
                         tessFactorCount = 2;
                         break;
                     default:
@@ -4150,7 +4143,7 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
     uint32_t loc = builtInOutLocMap[builtInId];
 
 #if LLPC_BUILD_GFX10
-    if (m_pContext->GetNggControl()->enableNgg)
+    if (m_pPipelineState->GetNggControl()->enableNgg)
     {
         // NOTE: For NGG, exporting GS output to GS-VS ring is represented by a call and the call is replaced with
         // real instructions when when NGG primitive shader is generated.
@@ -4266,7 +4259,7 @@ void PatchInOutImportExport::PatchFsBuiltInOutputExport(
             m_pSampleMask = new BitCastInst(m_pSampleMask, m_pContext->FloatTy(), "", pInsertPos);
             break;
         }
-    case BuiltInFragStencilRefEXT:
+    case BuiltInFragStencilRef:
         {
             m_pFragStencilRef = new BitCastInst(pOutput, m_pContext->FloatTy(), "", pInsertPos);
             break;
@@ -4550,7 +4543,11 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
     {
         // Setup out-of-range value. GPU will drop stream-out buffer writing when the thread is invalid.
         uint32_t outofRangeValue = 0xFFFFFFFF;
-        outofRangeValue /= xfbStride;
+        // Divide outofRangeValue by xfbStride only for GFX8.
+        if (m_gfxIp.major == 8)
+        {
+            outofRangeValue /= xfbStride;
+        }
         outofRangeValue -= (m_pContext->GetShaderWaveSize(m_shaderStage) - 1);
         Value* pOutofRangeValue = ConstantInt::get(m_pContext->Int32Ty(), outofRangeValue);
         pWriteIndex = SelectInst::Create(pThreadValid, pWriteIndex, pOutofRangeValue, "", pEntryBlock);
@@ -5037,7 +5034,7 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
 
         auto pRingOffset = CalcEsGsRingOffsetForOutput(location, compIdx, pEsGsOffset, pInsertPos);
 
-        if (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9+
+        if (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9+
         {
             Value* idxs[] = {
                 ConstantInt::get(m_pContext->Int32Ty(), 0),
@@ -5113,7 +5110,7 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
     else
     {
         Value* pRingOffset = CalcEsGsRingOffsetForInput(location, compIdx, pVertexIdx, pInsertPos);
-        if (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
+        if (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
         {
             Value* idxs[] = {
                 ConstantInt::get(m_pContext->Int32Ty(), 0),
@@ -5233,7 +5230,7 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
 
     auto pRingOffset = CalcGsVsRingOffsetForOutput(location, compIdx, streamId, pEmitCounter, pGsVsOffset, pInsertPos);
 
-    if (m_pContext->IsGsOnChip())
+    if (m_pPipelineState->IsGsOnChip())
     {
         Value* idxs[] = {
             ConstantInt::get(m_pContext->Int32Ty(), 0),
@@ -5301,7 +5298,7 @@ Value* PatchInOutImportExport::CalcEsGsRingOffsetForOutput(
     Instruction*    pInsertPos)  // [in] Where to insert the instruction
 {
     Value* pRingOffset = nullptr;
-    if (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
+    if (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
     {
         // ringOffset = esGsOffset + threadId * esGsRingItemSize + location * 4 + compIdx
 
@@ -5344,7 +5341,7 @@ Value* PatchInOutImportExport::CalcEsGsRingOffsetForInput(
     Value* pRingOffset = nullptr;
     auto pEsGsOffsets = m_pipelineSysValues.Get(m_pEntryPoint)->GetEsGsOffsets();
 
-    if (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
+    if (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
     {
         Value* pVertexOffset = ExtractElementInst::Create(pEsGsOffsets,
                                                           pVertexIdx,
@@ -5401,10 +5398,10 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
     {
         streamBases[i] = streamBase;
         streamBase += ( pResUsage->inOutUsage.gs.outLocCount[i] *
-            pResUsage->builtInUsage.gs.outputVertices * 4);
+            m_pPipelineState->GetShaderModes()->GetGeometryShaderMode().outputVertices * 4);
     }
 
-    if (m_pContext->IsGsOnChip())
+    if (m_pPipelineState->IsGsOnChip())
     {
         // ringOffset = esGsLdsSize +
         //              gsVsOffset +
@@ -5449,7 +5446,7 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
     {
         // ringOffset = ((location * 4 + compIdx) * maxVertices + vertexIdx) * 4 (in bytes);
 
-        uint32_t outputVertices = pResUsage->builtInUsage.gs.outputVertices;
+        uint32_t outputVertices = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode().outputVertices;
 
         pRingOffset = BinaryOperator::CreateAdd(ConstantInt::get(m_pContext->Int32Ty(),
                                                                  (location * 4 + compIdx) * outputVertices),
@@ -5488,7 +5485,7 @@ Value* PatchInOutImportExport::ReadValueFromLds(
     const bool isTcsOutput = (isOutput && (m_shaderStage == ShaderStageTessControl));
     const bool isTesInput = ((isOutput == false) && (m_shaderStage == ShaderStageTessEval));
 
-    if (m_pContext->IsTessOffChip() && (isTcsOutput || isTesInput)) // Read from off-chip LDS buffer
+    if (m_pPipelineState->IsTessOffChip() && (isTcsOutput || isTesInput)) // Read from off-chip LDS buffer
     {
         const auto& offChipLdsBase = (m_shaderStage == ShaderStageTessEval) ?
             m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tes.offChipLdsBase :
@@ -5651,7 +5648,7 @@ void PatchInOutImportExport::WriteValueToLds(
         }
     }
 
-    if (m_pContext->IsTessOffChip() && (m_shaderStage == ShaderStageTessControl))     // Write to off-chip LDS buffer
+    if (m_pPipelineState->IsTessOffChip() && (m_shaderStage == ShaderStageTessControl))     // Write to off-chip LDS buffer
     {
         auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tcs;
 
@@ -5722,21 +5719,20 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
     //      tessFactor[4] = gl_TessLevelInner[0]
     //      tessFactor[5] = gl_TessLevelInner[1]
 
-    uint32_t primitiveMode = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes.primitiveMode;
-
     uint32_t tessFactorCount = 0;
     uint32_t tessFactorStart = 0;
+    auto primitiveMode = m_pPipelineState->GetShaderModes()->GetTessellationMode().primitiveMode;
     switch (primitiveMode)
     {
-    case Isolines:
+    case PrimitiveMode::Isolines:
         tessFactorCount = isOuter ? 2 : 0;
         tessFactorStart = isOuter ? 0 : 2;
         break;
-    case Triangles:
+    case PrimitiveMode::Triangles:
         tessFactorCount = isOuter ? 3 : 1;
         tessFactorStart = isOuter ? 0 : 3;
         break;
-    case Quads:
+    case PrimitiveMode::Quads:
         tessFactorCount = isOuter ? 4 : 2;
         tessFactorStart = isOuter ? 0 : 4;
         break;
@@ -5754,7 +5750,7 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
             uint32_t elemIdx = cast<ConstantInt>(pElemIdx)->getZExtValue();
             if (elemIdx < tessFactorCount)
             {
-                if ((primitiveMode == Isolines) && isOuter)
+                if ((primitiveMode == PrimitiveMode::Isolines) && isOuter)
                 {
                     // NOTE: In case of the isoline,  hardware wants two tessellation factor: the first is detail
                     // TF, the second is density TF. The order is reversed, different from GLSL spec.
@@ -5773,7 +5769,7 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
         else
         {
             // Dynamic element indexing
-            if ((primitiveMode == Isolines) && isOuter)
+            if ((primitiveMode == PrimitiveMode::Isolines) && isOuter)
             {
                 // NOTE: In case of the isoline,  hardware wants two tessellation factor: the first is detail
                 // TF, the second is density TF. The order is reversed, different from GLSL spec.
@@ -5872,7 +5868,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
             if (m_gfxIp.major <= 8)
             {
                 // NOTE: Additional 4-byte offset is required for tessellation off-chip mode (pre-GFX9).
-                tfValueOffset += (m_pContext->IsTessOffChip() ? 1 : 0);
+                tfValueOffset += (m_pPipelineState->IsTessOffChip() ? 1 : 0);
             }
             combineCount = CombineBufferStore(tfValues,
                                               i,
@@ -5894,7 +5890,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
             CreateTessBufferStoreFunction();
         }
 
-        if (m_pContext->IsTessOffChip())
+        if (m_pPipelineState->IsTessOffChip())
         {
             if (m_gfxIp.major <= 8)
             {
@@ -6137,10 +6133,10 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsOutput(
     const auto& inOutUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs;
     const auto& calcFactor = inOutUsage.calcFactor;
 
-    auto outPatchStart = m_pContext->IsTessOffChip() ? calcFactor.offChip.outPatchStart :
+    auto outPatchStart = m_pPipelineState->IsTessOffChip() ? calcFactor.offChip.outPatchStart :
         calcFactor.onChip.outPatchStart;
 
-    auto patchConstStart = m_pContext->IsTessOffChip() ? calcFactor.offChip.patchConstStart :
+    auto patchConstStart = m_pPipelineState->IsTessOffChip() ? calcFactor.offChip.patchConstStart :
         calcFactor.onChip.patchConstStart;
 
     // attribOffset = (location + locOffset) * 4 + compIdx * bitWidth / 32
@@ -6224,10 +6220,10 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTesInput(
 
     const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
 
-    auto outPatchStart = m_pContext->IsTessOffChip() ? calcFactor.offChip.outPatchStart :
+    auto outPatchStart = m_pPipelineState->IsTessOffChip() ? calcFactor.offChip.outPatchStart :
         calcFactor.onChip.outPatchStart;
 
-    auto patchConstStart = m_pContext->IsTessOffChip() ? calcFactor.offChip.patchConstStart :
+    auto patchConstStart = m_pPipelineState->IsTessOffChip() ? calcFactor.offChip.patchConstStart :
         calcFactor.onChip.patchConstStart;
 
     const auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tes;
@@ -6334,7 +6330,7 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
 
     patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, optimalPatchCountPerThreadGroup);
 
-    if (m_pContext->IsTessOffChip())
+    if (m_pPipelineState->IsTessOffChip())
     {
         auto outPatchLdsBufferSize = (outPatchSize + patchConstSize) * 4;
         auto tessOffChipPatchCountPerThreadGroup =
@@ -6359,7 +6355,7 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
 #endif
     patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tfBufferPatchCountLimit);
 
-    if (m_pContext->IsTessOffChip())
+    if (m_pPipelineState->IsTessOffChip())
     {
         // For all-offchip tessellation, we need to write an additional 4-byte TCS control word to the TF buffer whenever
         // the patch-ID is zero.
@@ -6849,6 +6845,62 @@ Value* PatchInOutImportExport::GetSubgroupLocalInvocationId(
 }
 
 // =====================================================================================================================
+// Do automatic workgroup size reconfiguration in a compute shader, to allow ReconfigWorkgroup
+// to apply optimizations.
+WorkgroupLayout PatchInOutImportExport::CalculateWorkgroupLayout()
+{
+    auto& resUsage = *m_pContext->GetShaderResourceUsage(ShaderStageCompute);
+    if (m_shaderStage == ShaderStageCompute)
+    {
+        bool reconfig = false;
+
+        switch (static_cast<WorkgroupLayout>(resUsage.builtInUsage.cs.workgroupLayout))
+        {
+        case WorkgroupLayout::Unknown:
+            // If no configuration has been specified, apply a reconfigure if the compute shader uses images and the
+            // pipeline option was enabled.
+            if (resUsage.useImages)
+            {
+                reconfig = m_pContext->GetPipelineContext()->GetPipelineOptions()->reconfigWorkgroupLayout;
+            }
+            break;
+        case WorkgroupLayout::Linear:
+            // The hardware by default applies the linear rules, so just ban reconfigure and we're done.
+            reconfig = false;
+            break;
+        case WorkgroupLayout::Quads:
+            // 2x2 requested.
+            reconfig = true;
+            break;
+        case WorkgroupLayout::SexagintiQuads:
+            // 8x8 requested.
+            reconfig = true;
+            break;
+        }
+
+        if (reconfig)
+        {
+            auto& mode = m_pPipelineState->GetShaderModes()->GetComputeShaderMode();
+            if (((mode.workgroupSizeX % 2) == 0) && ((mode.workgroupSizeY % 2) == 0))
+            {
+                if (((mode.workgroupSizeX > 8) && (mode.workgroupSizeY >= 8)) ||
+                    ((mode.workgroupSizeX >= 8) && (mode.workgroupSizeY > 8)))
+                {
+                    // If our local size in the X & Y dimensions are greater than 8, we can reconfigure.
+                    resUsage.builtInUsage.cs.workgroupLayout = static_cast<uint32_t>(WorkgroupLayout::SexagintiQuads);
+                }
+                else
+                {
+                    // If our local size in the X & Y dimensions are multiples of 2, we can reconfigure.
+                    resUsage.builtInUsage.cs.workgroupLayout = static_cast<uint32_t>(WorkgroupLayout::Quads);
+                }
+            }
+        }
+    }
+    return static_cast<WorkgroupLayout>(resUsage.builtInUsage.cs.workgroupLayout);
+}
+
+// =====================================================================================================================
 // Reconfigure the workgroup for optimization purposes.
 Value* PatchInOutImportExport::ReconfigWorkgroup(
     Value*       pLocalInvocationId, // [in] The original workgroup ID.
@@ -6856,6 +6908,7 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
 {
     auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
     auto workgroupLayout = static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout);
+    auto& mode = m_pPipelineState->GetShaderModes()->GetComputeShaderMode();
 
     // NOTE: Here, we implement "GDC 2018 Engine Optimization Hot Lap Workgroup Optimization " (slides 40-45, by
     // Timothy Lottes).
@@ -6878,7 +6931,7 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
     Value* pRemappedId = pLocalInvocationId;
 
     // For a reconfigured workgroup, we map Y -> Z
-    if (builtInUsage.workgroupSizeZ > 1)
+    if (mode.workgroupSizeZ > 1)
     {
         Constant* shuffleMask[] = {
             ConstantInt::get(pInt32Ty, 0),
@@ -6926,7 +6979,7 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
     // Check if we are doing 8x8, as we need to calculate an offset and mask out the top bits of X if so.
     if (workgroupLayout == WorkgroupLayout::SexagintiQuads)
     {
-        const uint32_t workgroupSizeYMul8 = builtInUsage.workgroupSizeY * 8;
+        const uint32_t workgroupSizeYMul8 = mode.workgroupSizeY * 8;
         Constant* const pWorkgroupSizeYMul8 = ConstantInt::get(pInt32Ty, workgroupSizeYMul8);
 
         if (IsPowerOfTwo(workgroupSizeYMul8))
@@ -6980,7 +7033,7 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
 
     if (pOffset != nullptr)
     {
-        if (((builtInUsage.workgroupSizeX % 8) == 0) && ((builtInUsage.workgroupSizeY % 8) == 0))
+        if (((mode.workgroupSizeX % 8) == 0) && ((mode.workgroupSizeY % 8) == 0))
         {
             // Divide by 16.
             pDiv = BinaryOperator::CreateLShr(pRemainingBits,
@@ -7008,7 +7061,7 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
                                                                "",
                                                                pInsertPos);
 
-            pDivideBy = BinaryOperator::CreateSub(ConstantInt::get(pInt32Ty, builtInUsage.workgroupSizeX),
+            pDivideBy = BinaryOperator::CreateSub(ConstantInt::get(pInt32Ty, mode.workgroupSizeX),
                                                   pDivideBy,
                                                   "",
                                                   pInsertPos);
@@ -7070,7 +7123,7 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
     }
     else
     {
-        const uint32_t workgroupSizeXMul2 = builtInUsage.workgroupSizeX * 2;
+        const uint32_t workgroupSizeXMul2 = mode.workgroupSizeX * 2;
         Constant* const pWorkgroupSizeXMul2 = ConstantInt::get(pInt32Ty, workgroupSizeXMul2);
 
         if (IsPowerOfTwo(workgroupSizeXMul2))
@@ -7125,7 +7178,7 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
     // If we have an offset, we need to incorporate this into X.
     if (pOffset != nullptr)
     {
-        const uint32_t workgroupSizeYMin8 = std::min(builtInUsage.workgroupSizeY, 8u);
+        const uint32_t workgroupSizeYMin8 = std::min(mode.workgroupSizeY, 8u);
         Constant* const pWorkgroupSizeYMin8 = ConstantInt::get(pInt32Ty, workgroupSizeYMin8);
         Instruction* const pMul = BinaryOperator::CreateMul(pOffset,
                                                             pWorkgroupSizeYMin8,
@@ -7163,7 +7216,7 @@ Value* PatchInOutImportExport::GetWorkgroupSize()
 {
     LLPC_ASSERT(m_shaderStage == ShaderStageCompute);
 
-    auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
+    auto& builtInUsage = m_pPipelineState->GetShaderModes()->GetComputeShaderMode();
     auto pWorkgroupSizeX = ConstantInt::get(m_pContext->Int32Ty(), builtInUsage.workgroupSizeX);
     auto pWorkgroupSizeY = ConstantInt::get(m_pContext->Int32Ty(), builtInUsage.workgroupSizeY);
     auto pWorkgroupSizeZ = ConstantInt::get(m_pContext->Int32Ty(), builtInUsage.workgroupSizeZ);
@@ -7178,11 +7231,11 @@ Value* PatchInOutImportExport::GetInLocalInvocationId(
 {
     LLPC_ASSERT(m_shaderStage == ShaderStageCompute);
 
-    auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
+    auto& builtInUsage = m_pPipelineState->GetShaderModes()->GetComputeShaderMode();
     auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageCompute)->entryArgIdxs.cs;
     Value* pLocaInvocatioId = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.localInvocationId);
 
-    auto workgroupLayout = static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout);
+    WorkgroupLayout workgroupLayout = CalculateWorkgroupLayout();
 
     // If we do not need to configure our workgroup in linear layout and the layout info is not specified, we
     // do the reconfiguration for this workgroup.

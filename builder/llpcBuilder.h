@@ -31,111 +31,104 @@
 #pragma once
 
 #include "llpc.h"
+#include "llpcBuilderBuiltIns.h"
 #include "llpcDebug.h"
 
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/AtomicOrdering.h"
-
-namespace llvm
-{
-
-class ModulePass;
-class PassRegistry;
-
-void initializeBuilderReplayerPass(PassRegistry&);
-
-} // llvm
 
 namespace Llpc
 {
 
 using namespace llvm;
 
+class BuilderContext;
+struct CommonShaderMode;
+struct ComputeShaderMode;
 class Context;
-class PipelineState;
+struct FragmentShaderMode;
+struct GeometryShaderMode;
+class Pipeline;
+class ShaderModes;
+struct TessellationMode;
 
 // =====================================================================================================================
-// Initialize the pass that gets created by a Builder
-inline static void InitializeBuilderPasses(
-    PassRegistry& passRegistry)   // Pass registry
+// Class that represents extra information on an input or output.
+// For an FS input, if HasInterpAux(), then CreateReadInput's pVertexIndex is actually an auxiliary value
+// for interpolation:
+//  - InterpLocCenter: auxiliary value is v2f32 offset from center of pixel
+//  - InterpLocSample: auxiliary value is i32 sample ID
+//  - InterpLocExplicit: auxiliary value is i32 vertex number
+class InOutInfo
 {
-    initializeBuilderReplayerPass(passRegistry);
-}
+public:
+    // Interpolation mode
+    enum
+    {
+        InterpModeSmooth   = 0,   // Smooth (perspective)
+        InterpModeFlat     = 1,   // Flat
+        InterpModeNoPersp  = 2,   // Linear (no perspective)
+        InterpModeCustom   = 3,   // Custom
+    };
+    enum
+    {
+        InterpLocUnknown   = 0,   // Unknown
+        InterpLocCenter    = 1,   // Center
+        InterpLocCentroid  = 2,   // Centroid
+        InterpLocSample    = 3,   // Sample
+        InterpLocExplicit  = 4,   // Mode must be InterpModeCustom
+    };
+
+    InOutInfo() { data.u32All = 0; }
+    InOutInfo(uint32_t data) { this->data.u32All = data; }
+    InOutInfo(const InOutInfo& inOutInfo) { data.u32All = inOutInfo.GetData(); }
+
+    uint32_t GetData() const { return data.u32All; }
+
+    uint32_t GetInterpMode() const { return data.bits.interpMode; }
+    void SetInterpMode(uint32_t mode) { data.bits.interpMode = mode; }
+
+    uint32_t GetInterpLoc() const { return data.bits.interpLoc; }
+    void SetInterpLoc(uint32_t loc) { data.bits.interpLoc = loc; }
+
+    bool HasInterpAux() const { return data.bits.hasInterpAux; }
+    void SetHasInterpAux(bool hasInterpAux = true) { data.bits.hasInterpAux = hasInterpAux; }
+
+    bool HasStreamId() const { return data.bits.hasStreamId; }
+    uint32_t GetStreamId() const { return data.bits.streamId; }
+    void SetStreamId(uint32_t streamId) { data.bits.hasStreamId = true; data.bits.streamId = streamId; }
+
+    bool IsSigned() const { return data.bits.isSigned; }
+    void SetIsSigned(bool isSigned = true) { data.bits.isSigned = isSigned; }
+
+    uint32_t GetArraySize() const { return data.bits.arraySize; }
+    void SetArraySize(uint32_t arraySize) { data.bits.arraySize = arraySize; }
+
+private:
+    union
+    {
+        struct
+        {
+            unsigned interpMode   : 4;  // FS input: interpolation mode
+            unsigned interpLoc    : 3;  // FS input: interpolation location
+            unsigned hasInterpAux : 1;  // FS input: there is an interpolation auxiliary value
+            unsigned streamId     : 2;  // GS output: vertex stream ID (0 if none)
+            unsigned hasStreamId  : 1;  // GS output: true if it has a stream ID
+            unsigned isSigned     : 1;  // FS output: is signed integer. Determines whether i16-component output
+                                        //    is zero- or sign-extended
+            unsigned arraySize    : 4;  // Built-in array input: shader-defined array size. Must be set for
+                                        //    a read or write of ClipDistance or CullDistance that is of the
+                                        //    whole array or of an element with a variable index.
+        }
+        bits;
+        uint32_t  u32All;
+    } data;
+};
 
 // =====================================================================================================================
-// The LLPC Builder interface
-//
-// The Builder interface is used by the frontend to generate IR for LLPC-specific operations. It is
-// a subclass of llvm::IRBuilder, so it uses its concept of an insertion point with debug location,
-// and it exposes all the IRBuilder methods for building IR. However, unlike IRBuilder, LLPC's
-// Builder is designed to have a single instance that contains some other state used during the IR
-// building process.
-//
-// The frontend can use Builder in one of three ways:
-// 1. BuilderImpl-only with full pipeline state
-// 2. BuilderRecorder with full pipeline state
-// 3. Per-shader frontend compilation (This is proposed but currently unsupported and untested.)
-//
-// 1. BuilderImpl-only with full pipeline state
-//
-//    This is used where the frontend has full pipeline state, and it wants to generate IR for LLPC
-//    operations directly, instead of recording it in the frontend and then replaying the recorded
-//    calls at the start of the middle-end.
-//
-//    The frontend does this:
-//
-//    * Create an instance of BuilderImpl.
-//    * Create an IR module per shader stage.
-//    * Give the pipeline state to the Builder (Builder::SetUserDataNodes()).
-//    * Populate the per-shader-stage IR modules, using Builder::Create* calls to generate the IR
-//      for LLPC operations.
-//    * After finishing, call Builder::Link() to link the per-stage IR modules into a single
-//      pipeline module.
-//    * Run middle-end passes on it.
-//
-// 2. BuilderRecorder with full pipeline state
-//
-//    This is also used where the frontend has full pipeline state, but it wants to record its
-//    Builder::Create* calls such that they get replayed (and generated into normal IR) as the first
-//    middle-end pass.
-//
-//    The frontend's actions are pretty much the same as in (1):
-//
-//    * Create an instance of BuilderRecorder.
-//    * Create an IR module per shader stage.
-//    * Give the pipeline state to the Builder (Builder::SetUserDataNodes()).
-//    * Populate the per-shader-stage IR modules, using Builder::Create* calls to generate the IR
-//      for LLPC operations.
-//    * After finishing, call Builder::Link() to link the per-stage IR modules into a single
-//      pipeline module.
-//    * Run middle-end passes on it, starting with BuilderReplayer to replay all the recorded
-//      Builder::Create* calls into its own instance of BuilderImpl (but with a single pipeline IR
-//      module).
-//
-//    With this scheme, the intention is that the whole-pipeline IR module after linking is a
-//    representation of the pipeline. For testing purposes, the IR module could be output to a .ll
-//    file, and later read in and compiled through the middle-end passes and backend to ISA.
-//    However, that is not supported yet, as there is still some outside-IR state at that point.
-//
-// 3. Per-shader frontend compilation (This is proposed but currently unsupported and untested.)
-//
-//    The frontend can compile a single shader with no pipeline state available using
-//    BuilderRecorder, without linking at the end, giving a shader IR module containing recorded
-//    llpc.call.* calls but no pipeline state.
-//
-//    The frontend does this:
-//
-//    * Per shader:
-//      - Create an instance of BuilderRecorder.
-//      - Create an IR module per shader stage.
-//      - Populate the per-shader-stage IR modules, using Builder::Create* calls to generate the IR
-//        for LLPC operations.
-//    * Then, later on, bring the shader IR modules together, and link them with Builder::Link()
-//      into a single pipeline IR module.
-//    * Give the pipeline state to the Builder (Builder::SetUserDataNodes()).
-//    * Run middle-end passes on it, starting with BuilderReplayer to replay all the recorded
-//      Builder::Create* calls into its own instance of BuilderImpl (but with a single pipeline IR
-//      module).
+// Builder is the part of the LLPC middle-end interface used by the front-end to build IR. It is a subclass
+// of llvm::IRBuilder<>, so the front-end can use its methods to create IR instructions at the set insertion
+// point. In addition it has its own Create* methods to create graphics-specific IR constructs.
 //
 class Builder : public IRBuilder<>
 {
@@ -159,21 +152,7 @@ public:
         Xor
     };
 
-    virtual ~Builder();
-
-    // Create the BuilderImpl. In this implementation, each Builder call writes its IR immediately.
-    static Builder* CreateBuilderImpl(LLVMContext& context);
-
-    // Create the BuilderRecorder. In this implementation, each Builder call gets recorded (by inserting
-    // an llpc.call.* call). The user then replays the Builder calls by running the pass created by
-    // CreateBuilderReplayer. Setting wantReplay=false makes CreateBuilderReplayer return nullptr.
-    static Builder* CreateBuilderRecorder(LLVMContext& context, bool wantReplay);
-
-    // Create the BuilderImpl or BuilderRecorder, depending on -use-builder-recorder option
-    static Builder* Create(LLVMContext& context);
-
-    // If this is a BuilderRecorder, create the BuilderReplayer pass, otherwise return nullptr.
-    virtual ModulePass* CreateBuilderReplayer() { return nullptr; }
+    virtual ~Builder() {}
 
     // Get the type pElementTy, turned into a vector of the same vector width as pMaybeVecTy if the latter
     // is a vector type.
@@ -182,32 +161,50 @@ public:
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
     Llpc::Context& getContext() const;
 
-    // Set the resource mapping nodes for the pipeline. "nodes" describes the user data
-    // supplied to the shader as a hierarchical table (max two levels) of descriptors.
-    // "immutableDescs" contains descriptors (currently limited to samplers), whose values are hard
-    // coded by the application. Each one is a duplicate of one in "nodes". A use of one of these immutable
-    // descriptors in the applicable Create* method is converted directly to the constant value.
-    //
-    // If using a BuilderImpl, this method must be called before any Create* methods.
-    // If using a BuilderRecorder, it can be delayed until after linking.
-    void SetUserDataNodes(
-        ArrayRef<ResourceMappingNode>   nodes,            // The resource mapping nodes
-        ArrayRef<DescriptorRangeValue>  rangeValues);     // The descriptor range values
+    // Get the BuilderContext
+    BuilderContext* GetBuilderContext() const { return m_pBuilderContext; }
 
     // Set the current shader stage.
     void SetShaderStage(ShaderStage stage) { m_shaderStage = stage; }
 
-    // Link the individual shader modules into a single pipeline module. The frontend must have
-    // finished calling Builder::Create* methods and finished building the IR. In the case that
-    // there are multiple shader modules, they are all freed by this call, and the linked pipeline
-    // module is returned. If there is a single shader module, this might instead just return that.
-    // Before calling this, each shader module needs to have one global function for the shader
-    // entrypoint, then all other functions with internal linkage.
-    // Returns the pipeline module, or nullptr on link failure.
-    virtual Module* Link(
-        ArrayRef<Module*> modules,   // Array of modules indexed by shader stage, with nullptr entry
-                                     //  for any stage not present in the pipeline
-        bool linkNativeStages);      // Whether to link native shader stage modules
+    // -----------------------------------------------------------------------------------------------------------------
+    // Methods to set shader modes (FP modes, tessellation modes, fragment modes, workgroup size) for the current
+    // shader that come from the input language. The structs passed to the methods are declared in llpcPipeline.h.
+    // For a particular shader stage, these methods must be called before any Builder::Create* calls that
+    // generate IR.
+
+    // Set the common shader mode for the current shader, containing hardware FP round and denorm modes.
+    // The client should always zero-initialize the struct before setting it up, in case future versions
+    // add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetCommonShaderMode(const CommonShaderMode& commonShaderMode);
+
+    // Get the common shader mode for the current shader.
+    const CommonShaderMode& GetCommonShaderMode();
+
+    // Set the tessellation mode. This can be called in multiple shaders, and the values are merged
+    // together -- a zero value in one call is overridden by a non-zero value in another call. LLPC needs
+    // that because SPIR-V allows some of these execution mode items to appear in either the TCS or TES.
+    // The client should always zero-initialize the struct before setting it up, in case future versions
+    // add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetTessellationMode(const TessellationMode& tessellationMode);
+
+    // Set the geometry shader state.
+    // The client should always zero-initialize the struct before setting it up, in case future versions
+    // add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetGeometryShaderMode(const GeometryShaderMode& geometryShaderMode);
+
+    // Set the fragment shader mode.
+    // The client should always zero-initialize the struct before setting it up, in case future versions
+    // add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetFragmentShaderMode(const FragmentShaderMode& fragmentShaderMode);
+
+    // Set the compute shader modes.
+    // The client should always zero-initialize the struct before setting it up, in case future versions
+    // add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetComputeShaderMode(const ComputeShaderMode& computeShaderMode);
+
+    // Record shader modes into IR metadata if this is a shader compile (no PipelineState).
+    virtual void RecordShaderModes(Module* pModule) {}
 
     // -----------------------------------------------------------------------------------------------------------------
     // Base class operations
@@ -598,6 +595,7 @@ public:
         uint32_t      binding,            // Descriptor binding
         Value*        pDescIndex,         // [in] Descriptor index
         bool          isNonUniform,       // Whether the descriptor index is non-uniform
+        bool          isWritten,          // Whether the buffer is (or might be) written to
         Type*         pPointeeTy,         // [in] Type that the returned pointer should point to.
         const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
@@ -943,86 +941,6 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
     // Shader input/output methods
 
-    // Class that represents extra information on an input or output.
-    // For an FS input, if HasInterpAux(), then CreateReadInput's pVertexIndex is actually an auxiliary value
-    // for interpolation:
-    //  - InterpLocCenter: auxiliary value is v2f32 offset from center of pixel
-    //  - InterpLocSample: auxiliary value is i32 sample ID
-    //  - InterpLocExplicit: auxiliary value is i32 vertex number
-    class InOutInfo
-    {
-    public:
-        // Interpolation mode
-        enum
-        {
-            InterpModeSmooth   = 0,   // Smooth (perspective)
-            InterpModeFlat     = 1,   // Flat
-            InterpModeNoPersp  = 2,   // Linear (no perspective)
-            InterpModeCustom   = 3,   // Custom
-        };
-        enum
-        {
-            InterpLocUnknown   = 0,   // Unknown
-            InterpLocCenter    = 1,   // Center
-            InterpLocCentroid  = 2,   // Centroid
-            InterpLocSample    = 3,   // Sample
-            InterpLocExplicit  = 4,   // Mode must be InterpModeCustom
-        };
-
-        InOutInfo() { data.u32All = 0; }
-        InOutInfo(uint32_t data) { this->data.u32All = data; }
-        InOutInfo(const InOutInfo& inOutInfo) { data.u32All = inOutInfo.GetData(); }
-
-        uint32_t GetData() const { return data.u32All; }
-
-        uint32_t GetInterpMode() const { return data.bits.interpMode; }
-        void SetInterpMode(uint32_t mode) { data.bits.interpMode = mode; }
-
-        uint32_t GetInterpLoc() const { return data.bits.interpLoc; }
-        void SetInterpLoc(uint32_t loc) { data.bits.interpLoc = loc; }
-
-        bool HasInterpAux() const { return data.bits.hasInterpAux; }
-        void SetHasInterpAux(bool hasInterpAux = true) { data.bits.hasInterpAux = hasInterpAux; }
-
-        bool HasStreamId() const { return data.bits.hasStreamId; }
-        uint32_t GetStreamId() const { return data.bits.streamId; }
-        void SetStreamId(uint32_t streamId) { data.bits.hasStreamId = true; data.bits.streamId = streamId; }
-
-        bool IsSigned() const { return data.bits.isSigned; }
-        void SetIsSigned(bool isSigned = true) { data.bits.isSigned = isSigned; }
-
-        uint32_t GetArraySize() const { return data.bits.arraySize; }
-        void SetArraySize(uint32_t arraySize) { data.bits.arraySize = arraySize; }
-
-    private:
-        union
-        {
-            struct
-            {
-                unsigned interpMode   : 4;  // FS input: interpolation mode
-                unsigned interpLoc    : 3;  // FS input: interpolation location
-                unsigned hasInterpAux : 1;  // FS input: there is an interpolation auxiliary value
-                unsigned streamId     : 2;  // GS output: vertex stream ID (0 if none)
-                unsigned hasStreamId  : 1;  // GS output: true if it has a stream ID
-                unsigned isSigned     : 1;  // FS output: is signed integer. Determines whether i16-component output
-                                            //    is zero- or sign-extended
-                unsigned arraySize    : 4;  // Built-in array input: shader-defined array size. Must be set for
-                                            //    a read or write of ClipDistance or CullDistance that is of the
-                                            //    whole array or of an element with a variable index.
-            }
-            bits;
-            uint32_t  u32All;
-        } data;
-    };
-
-    // Define built-in kind enum.
-    enum BuiltInKind
-    {
-#define BUILTIN(name, number, out, in, type) BuiltIn ## name = number,
-#include "llpcBuilderBuiltIns.h"
-#undef BUILTIN
-    };
-
     // Create a read of (part of) a generic (user) input value, passed from the previous shader stage.
     // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
     // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
@@ -1104,7 +1022,7 @@ public:
         InOutInfo     inOutInfo);         // Extra input/output info (shader-defined array length)
 
     // Create a read of (part of) a built-in input value.
-    // The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+    // The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
     // or the element type if pIndex is not nullptr. For ClipDistance or CullDistance when pIndex is nullptr,
     // the array size is determined by inputInfo.GetArraySize().
     virtual Value* CreateReadBuiltInInput(
@@ -1115,7 +1033,7 @@ public:
         const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a read of (part of) a built-in output value.
-    // The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+    // The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
     // or the element type if pIndex is not nullptr.
     // This operation is only supported for TCS; other shader stages do not have per-vertex outputs, and
     // the frontend is expected to do its own cacheing of a written output if the shader wants to read it back again.
@@ -1127,7 +1045,7 @@ public:
         const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a write of (part of) a built-in output value.
-    // The type of the value to write must be the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+    // The type of the value to write must be the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
     // or the element type if pIndex is not nullptr.
     virtual Instruction* CreateWriteBuiltInOutput(
         Value*        pValueToWrite,      // [in] Value to write
@@ -1400,15 +1318,18 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
 
 protected:
-    Builder(LLVMContext& context);
+    Builder(BuilderContext* pBuilderContext);
+
+    // Get the ShaderModes object. For a pipeline compilation, it comes from the PipelineState. For a shader
+    // compilation, there is no PipelineState, so BuilderRecorder creates its own ShaderModes.
+    virtual ShaderModes* GetShaderModes() = 0;
 
     // Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
     Constant* GetFpConstant(Type* pTy, APFloat value);
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    ShaderStage     m_shaderStage     = ShaderStageInvalid; // Current shader stage being built.
-    PipelineState*  m_pPipelineState  = nullptr;            // Pipeline state
+    ShaderStage                     m_shaderStage = ShaderStageInvalid; // Current shader stage being built.
 
     Type* GetTransposedMatrixTy(
         Type* const pMatrixType) const; // [in] The matrix type to tranpose
@@ -1425,9 +1346,10 @@ protected:
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Builder)
     LLPC_DISALLOW_COPY_AND_ASSIGN(Builder)
-};
 
-// Create BuilderReplayer pass
-ModulePass* CreateBuilderReplayer(Builder* pBuilder);
+    // -----------------------------------------------------------------------------------------------------------------
+
+    BuilderContext* m_pBuilderContext;      // Builder context
+};
 
 } // Llpc

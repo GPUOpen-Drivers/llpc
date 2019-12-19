@@ -48,78 +48,53 @@ namespace Gfx6
 class ConfigBuilder : public ConfigBuilderBase
 {
 public:
-    ConfigBuilder(llvm::Module* pModule) : ConfigBuilderBase(pModule) {}
+    ConfigBuilder(llvm::Module* pModule, PipelineState* pPipelineState)
+        : ConfigBuilderBase(pModule, pPipelineState) {}
 
     void BuildPalMetadata();
 
-    Result BuildPipelineVsFsRegConfig(Context*            pContext,
-                                      uint8_t**           ppConfig,
-                                      size_t*             pConfigSize);
-
-    Result BuildPipelineVsTsFsRegConfig(Context*            pContext,
-                                        uint8_t**           ppConfig,
-                                        size_t*             pConfigSize);
-
-    Result BuildPipelineVsGsFsRegConfig(Context*            pContext,
-                                        uint8_t**           ppConfig,
-                                        size_t*             pConfigSize);
-
-    Result BuildPipelineVsTsGsFsRegConfig(Context*            pContext,
-                                          uint8_t**           ppConfig,
-                                          size_t*             pConfigSize);
-
-    Result BuildPipelineCsRegConfig(Context*            pContext,
-                                    uint8_t**              ppConfig,
-                                    size_t*             pConfigSize);
+    Result BuildPipelineVsFsRegConfig();
+    Result BuildPipelineVsTsFsRegConfig();
+    Result BuildPipelineVsGsFsRegConfig();
+    Result BuildPipelineVsTsGsFsRegConfig();
+    Result BuildPipelineCsRegConfig();
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(ConfigBuilder);
     LLPC_DISALLOW_COPY_AND_ASSIGN(ConfigBuilder);
 
     template <typename T>
-    Result BuildVsRegConfig(Context*            pContext,
-                            ShaderStage         shaderStage,
+    Result BuildVsRegConfig(ShaderStage         shaderStage,
                             T*                  pConfig);
 
     template <typename T>
-    Result BuildHsRegConfig(Context*            pContext,
-                            ShaderStage         shaderStage,
+    Result BuildHsRegConfig(ShaderStage         shaderStage,
                             T*                  pConfig);
 
     template <typename T>
-    Result BuildEsRegConfig(Context*            pContext,
-                            ShaderStage         shaderStage,
+    Result BuildEsRegConfig(ShaderStage         shaderStage,
                             T*                  pConfig);
 
     template <typename T>
-    Result BuildLsRegConfig(Context*            pContext,
-                            ShaderStage         shaderStage,
+    Result BuildLsRegConfig(ShaderStage         shaderStage,
                             T*                  pConfig);
 
     template <typename T>
-    Result BuildGsRegConfig(Context*            pContext,
-                            ShaderStage         shaderStage,
+    Result BuildGsRegConfig(ShaderStage         shaderStage,
                             T*                  pConfig);
 
     template <typename T>
-    Result BuildPsRegConfig(Context*            pContext,
-                            ShaderStage         shaderStage,
+    Result BuildPsRegConfig(ShaderStage         shaderStage,
                             T*                  pConfig);
 
-    Result BuildCsRegConfig(Context*             pContext,
-                            ShaderStage          shaderStage,
-                            PipelineCsRegConfig* pConfig);
+    Result BuildCsRegConfig(ShaderStage  shaderStage,
+                            CsRegConfig* pConfig);
+
+    Result BuildUserDataConfig(ShaderStage shaderStage,
+                               uint32_t    startUserData);
 
     template <typename T>
-    Result BuildUserDataConfig(Context*    pContext,
-                               ShaderStage shaderStage,
-                               uint32_t    startUserData,
-                               T*          pConfig);
-
-    template <typename T>
-    void SetupVgtTfParam(Context* pContext, T* pConfig);
-
-    static uint32_t SetupFloatingPointMode(Context* pContext, ShaderStage shaderStage);
+    void SetupVgtTfParam(T* pConfig);
 
 };
 

@@ -28,10 +28,13 @@
  * @brief LLPC source file: BuilderRecorder implementation
  ***********************************************************************************************************************
  */
+#include "llpcBuilderContext.h"
 #include "llpcBuilderRecorder.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
+#include "llpcPipelineState.h"
+#include "llpcShaderModes.h"
 
 #define DEBUG_TYPE "llpc-builder-recorder"
 
@@ -301,53 +304,41 @@ BuilderRecorderMetadataKinds::BuilderRecorderMetadataKinds(
 }
 
 // =====================================================================================================================
-// Create a BuilderRecorder
-Builder* Builder::CreateBuilderRecorder(
-    LLVMContext&  context,    // [in] LLVM context
-    bool          wantReplay) // TRUE to make CreateBuilderReplayer return a replayer pass
+BuilderRecorder::BuilderRecorder(
+    BuilderContext* pBuilderContext,// [in] Builder context
+    Pipeline*       pPipeline)      // [in] PipelineState, or nullptr for shader compile
+    : Builder(pBuilderContext),
+      BuilderRecorderMetadataKinds(pBuilderContext->GetContext()),
+      m_pPipelineState(reinterpret_cast<PipelineState*>(pPipeline))
 {
-    return new BuilderRecorder(context, wantReplay);
 }
 
-#ifndef NDEBUG
 // =====================================================================================================================
-// Link the individual shader modules into a single pipeline module.
-// This is overridden by BuilderRecorder only on a debug build so it can check that the frontend
-// set shader stage consistently.
-Module* BuilderRecorder::Link(
-    ArrayRef<Module*> modules,           // Shader stage modules to link
-    bool              linkNativeStages)  // Whether to link native shader stage modules
+// Record shader modes into IR metadata if this is a shader compile (no PipelineState).
+// For a pipeline compile with BuilderRecorder, they get recorded by PipelineState.
+void BuilderRecorder::RecordShaderModes(
+    Module* pModule)    // [in/out] Module to record into
 {
-    if (linkNativeStages)
+    if ((m_pPipelineState == nullptr) && m_shaderModes)
     {
-        for (uint32_t stage = 0; stage != modules.size(); ++stage)
-        {
-            if (Module* pModule = modules[stage])
-            {
-                for (auto& func : *pModule)
-                {
-                    if (func.isDeclaration() == false)
-                    {
-                        CheckFuncShaderStage(&func, static_cast<ShaderStage>(stage));
-                    }
-                }
-            }
-        }
+        m_shaderModes->Record(pModule);
     }
-    return Builder::Link(modules, linkNativeStages);
 }
-#endif
 
 // =====================================================================================================================
-// This is a BuilderRecorder. If it was created with wantReplay=true, create the BuilderReplayer pass.
-ModulePass* BuilderRecorder::CreateBuilderReplayer()
+// Get the ShaderModes object. If this is a pipeline compile, we get the ShaderModes object from the PipelineState.
+// If it is a shader compile, we create our own ShaderModes object.
+ShaderModes* BuilderRecorder::GetShaderModes()
 {
-    if (m_wantReplay)
+    if (m_pPipelineState)
     {
-        // Create a new BuilderImpl to replay the recorded Builder calls in.
-        return ::CreateBuilderReplayer(Builder::CreateBuilderImpl(getContext()));
+        return m_pPipelineState->GetShaderModes();
     }
-    return nullptr;
+    if (!m_shaderModes)
+    {
+        m_shaderModes.reset(new ShaderModes());
+    }
+    return &*m_shaderModes;
 }
 
 // =====================================================================================================================
@@ -1012,6 +1003,7 @@ Value* BuilderRecorder::CreateLoadBufferDesc(
     uint32_t      binding,          // Descriptor binding
     Value*        pDescIndex,       // [in] Descriptor index
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
+    bool          isWritten,        // Whether the buffer is written to
     Type*         pPointeeTy,       // [in] Type that the returned pointer should point to
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
@@ -1022,6 +1014,7 @@ Value* BuilderRecorder::CreateLoadBufferDesc(
                       getInt32(binding),
                       pDescIndex,
                       getInt1(isNonUniform),
+                      getInt1(isWritten),
                   },
                   instName);
 }
@@ -1483,7 +1476,7 @@ Instruction* BuilderRecorder::CreateWriteXfbOutput(
 
 // =====================================================================================================================
 // Create a read of (part of) a built-in input value.
-// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
 // or the element type if pIndex is not nullptr.
 Value* BuilderRecorder::CreateReadBuiltInInput(
     BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
@@ -1518,7 +1511,7 @@ Value* BuilderRecorder::CreateReadBuiltInInput(
 
 // =====================================================================================================================
 // Create a read of (part of) a built-in output value.
-// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
 // or the element type if pIndex is not nullptr.
 Value* BuilderRecorder::CreateReadBuiltInOutput(
     BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
@@ -1896,11 +1889,6 @@ Instruction* BuilderRecorder::Record(
     const Twine&                  instName,     // [in] Name to give instruction
     ArrayRef<Attribute::AttrKind> attribs)      // Attributes to give the function declaration
 {
-#ifndef NDEBUG
-    // In a debug build, check that each enclosing function is consistently in the same shader stage.
-    CheckFuncShaderStage(GetInsertBlock()->getParent(), m_shaderStage);
-#endif
-
     // Create mangled name of builder call. This only needs to be mangled on return type.
     std::string mangledName;
     {
@@ -1941,32 +1929,4 @@ Instruction* BuilderRecorder::Record(
 
     return pCall;
 }
-
-#ifndef NDEBUG
-// =====================================================================================================================
-// Check that the frontend is consistently telling us which shader stage a function is in.
-void BuilderRecorder::CheckFuncShaderStage(
-    Function*   pFunc,        // [in] Function to check
-    ShaderStage shaderStage)  // Shader stage frontend says it is in
-{
-    LLPC_ASSERT(shaderStage < ShaderStageCount);
-    if (pFunc != m_pEnclosingFunc)
-    {
-        // The "function shader stage map" is in fact a vector of pairs of WeakVH (giving the function)
-        // and shader stage. It is done that way because a function can disappear through inlining during the
-        // lifetime of the BuilderRecorder, and then another function could potentially be allocated at the
-        // same address.
-        m_pEnclosingFunc = pFunc;
-        for (const auto& mapEntry : m_funcShaderStageMap)
-        {
-            if (mapEntry.first == pFunc)
-            {
-                LLPC_ASSERT((mapEntry.second == shaderStage) && "Inconsistent use of Builder::SetShaderStage");
-                return;
-            }
-        }
-        m_funcShaderStageMap.push_back({ pFunc, shaderStage });
-    }
-}
-#endif
 

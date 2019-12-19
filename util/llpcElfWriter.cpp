@@ -281,14 +281,13 @@ void ElfWriter<Elf>::MergeMetaNote(
 
     auto gfxIp = pContext->GetGfxIpVersion();
     Gfx6::PsRegConfig gfx6PsConfig;
-    Gfx9::PsRegConfig gfx9PsConfig;
+    Gfx9::PsRegConfig gfx9PsConfig(gfxIp);
     Util::Abi::PalMetadataNoteEntry* pRegEntry = nullptr;
     uint32_t regCount = 0;
     uint32_t psInputCntlBase = 0;
     uint32_t psUserDataBase = 0;
     if (gfxIp.major < 9)
     {
-        gfx6PsConfig.Init();
         pRegEntry = reinterpret_cast<Util::Abi::PalMetadataNoteEntry*>(&gfx6PsConfig);
         psInputCntlBase = gfx6PsConfig.GetPsInputCntlStart();
         psUserDataBase = gfx6PsConfig.GetPsUserDataStart();
@@ -296,7 +295,6 @@ void ElfWriter<Elf>::MergeMetaNote(
     }
     else
     {
-        gfx9PsConfig.Init(gfxIp);
         pRegEntry = reinterpret_cast<Util::Abi::PalMetadataNoteEntry*>(&gfx9PsConfig);
         psInputCntlBase = Gfx9::mmSPI_PS_INPUT_CNTL_0;
         psUserDataBase = Gfx9::mmSPI_SHADER_USER_DATA_PS_0;

@@ -30,8 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-compiler"
 
-#include "llvm/InitializePasses.h"
-#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/IRPrintingPasses.h"
@@ -43,7 +41,6 @@
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Timer.h"
 
 #include "LLVMSPIRVLib.h"
@@ -58,7 +55,6 @@
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcGraphicsContext.h"
-#include "llpcBinaryStream.h"
 #include "llpcShaderModuleHelper.h"
 #include "llpcElfReader.h"
 #include "llpcElfWriter.h"
@@ -68,6 +64,7 @@
 #include "llpcPatch.h"
 #include "llpcPipelineDumper.h"
 #include "llpcSpirvLower.h"
+#include "llpcSpirvLowerResourceCollect.h"
 #include "llpcTimerProfiler.h"
 #include "llpcVertexFetch.h"
 #include <mutex>
@@ -174,6 +171,11 @@ extern opt<std::string> LogFileOuts;
 
 } // llvm
 
+// -use-builder-recorder
+static cl::opt<bool> UseBuilderRecorder("use-builder-recorder",
+                                        cl::desc("Do lowering via recording and replaying LLPC builder"),
+                                        cl::init(true));
+
 namespace Llpc
 {
 
@@ -254,6 +256,10 @@ Result VKAPI_CALL ICompiler::Create(
 
     std::lock_guard<sys::Mutex> lock(*s_compilerMutex);
     MetroHash::Hash optionHash = Compiler::GenerateHashForCompileOptions(optionCount, options);
+
+    // Initialize passes so they can be referenced by -print-after etc.
+    InitializeLowerPasses(*PassRegistry::getPassRegistry());
+    BuilderContext::Initialize();
 
     bool parseCmdOption = true;
     if (Compiler::GetInstanceCount() > 0)
@@ -339,26 +345,6 @@ Compiler::Compiler(
 
     if (m_instanceCount == 0)
     {
-        auto& passRegistry = *PassRegistry::getPassRegistry();
-
-        // Initialize LLVM target: AMDGPU
-        LLVMInitializeAMDGPUTargetInfo();
-        LLVMInitializeAMDGPUTarget();
-        LLVMInitializeAMDGPUTargetMC();
-        LLVMInitializeAMDGPUAsmPrinter();
-        LLVMInitializeAMDGPUAsmParser();
-        LLVMInitializeAMDGPUDisassembler();
-
-        // Initialize special passes which are checked in PassManager
-        initializeJumpThreadingPass(passRegistry);
-        initializePrintModulePassWrapperPass(passRegistry);
-
-        // Initialize passes so they can be referenced by -llpc-stop-before etc.
-        InitializeUtilPasses(passRegistry);
-        InitializeLowerPasses(passRegistry);
-        InitializeBuilderPasses(passRegistry);
-        InitializePatchPasses(passRegistry);
-
         // LLVM fatal error handler only can be installed once.
         install_fatal_error_handler(FatalErrorHandler);
 
@@ -495,6 +481,8 @@ Result Compiler::BuildShaderModule(
     std::vector<ShaderEntryName> entryNames;
     SmallVector<ShaderModuleEntryData, 4> moduleEntryDatas;
     SmallVector<ShaderModuleEntry, 4> moduleEntries;
+    SmallVector<FsOutInfo, 4> fsOutInfos;
+    std::map<uint32_t, std::vector<ResourceNodeData>> entryResourceNodeDatas; // Map entry ID and resourceNodeData
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
     CacheEntryHandle hEntry = nullptr;
@@ -601,15 +589,13 @@ Result Compiler::BuildShaderModule(
                 Context* pContext = AcquireContext();
 
                 pContext->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
-                pContext->SetBuilder(Builder::Create(*pContext));
+                pContext->SetBuilder(pContext->GetBuilderContext()->CreateBuilder(nullptr, true));
                 CodeGenManager::CreateTargetMachine(pContext, pPipelineOptions);
 
                 for (uint32_t i = 0; i < entryNames.size(); ++i)
                 {
                     ShaderModuleEntry moduleEntry = {};
                     ShaderModuleEntryData moduleEntryData = {};
-                    ResourceUsage resUsage;
-                    PipelineContext::InitShaderResourceUsage(entryNames[i].stage, &resUsage);
 
                     moduleEntryData.pShaderEntry = &moduleEntry;
                     moduleEntryData.stage = entryNames[i].stage;
@@ -626,16 +612,16 @@ Result Compiler::BuildShaderModule(
                         *pContext);
 
                     pContext->SetModuleTargetMachine(pModule);
-                    pContext->SetResUsage(&resUsage);
 
                     uint32_t passIndex = 0;
-                    PassManager lowerPassMgr(&passIndex);
+                    std::unique_ptr<PassManager> lowerPassMgr(PassManager::Create());
+                    lowerPassMgr->SetPassIndex(&passIndex);
 
                     // Set the shader stage in the Builder.
                     pContext->GetBuilder()->SetShaderStage(static_cast<ShaderStage>(entryNames[i].stage));
 
                     // Start timer for translate.
-                    timerProfiler.AddTimerStartStopPass(&lowerPassMgr, TimerTranslate, true);
+                    timerProfiler.AddTimerStartStopPass(&*lowerPassMgr, TimerTranslate, true);
 
                     // SPIR-V translation, then dump the result.
                     PipelineShaderInfo shaderInfo = {};
@@ -644,30 +630,33 @@ Result Compiler::BuildShaderModule(
                     shaderInfo.entryStage = entryNames[i].stage;
 #endif
                     shaderInfo.pEntryTarget = entryNames[i].pName;
-                    lowerPassMgr.add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(entryNames[i].stage),
+                    lowerPassMgr->add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(entryNames[i].stage),
                                                                 &shaderInfo));
-                    lowerPassMgr.add(CreateSpirvLowerResourceCollect());
+                    bool collectDetailUsage = (entryNames[i].stage == ShaderStageFragment) ? true : false;
+                    auto pResCollectPass = static_cast<SpirvLowerResourceCollect*>(
+                                           CreateSpirvLowerResourceCollect(collectDetailUsage));
+                    lowerPassMgr->add(pResCollectPass);
                     if (EnableOuts())
                     {
-                        lowerPassMgr.add(createPrintModulePass(outs(), "\n"
+                        lowerPassMgr->add(createPrintModulePass(outs(), "\n"
                             "===============================================================================\n"
                             "// LLPC SPIRV-to-LLVM translation results\n"));
                     }
 
                     // Stop timer for translate.
-                    timerProfiler.AddTimerStartStopPass(&lowerPassMgr, TimerTranslate, false);
+                    timerProfiler.AddTimerStartStopPass(&*lowerPassMgr, TimerTranslate, false);
 
                     // Per-shader SPIR-V lowering passes.
                     SpirvLower::AddPasses(pContext,
                                           static_cast<ShaderStage>(entryNames[i].stage),
-                                          lowerPassMgr,
+                                          *lowerPassMgr,
                                           timerProfiler.GetTimer(TimerLower),
                                           cl::ForceLoopUnrollCount);
 
-                    lowerPassMgr.add(createBitcodeWriterPass(moduleBinaryStream));
+                    lowerPassMgr->add(createBitcodeWriterPass(moduleBinaryStream));
 
                     // Run the passes.
-                    bool success = RunPasses(&lowerPassMgr, pModule);
+                    bool success = RunPasses(&*lowerPassMgr, pModule);
                     if (success == false)
                     {
                         LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
@@ -678,11 +667,27 @@ Result Compiler::BuildShaderModule(
 
                     moduleEntry.entrySize = moduleBinary.size() - moduleEntry.entryOffset;
 
-                    // Serialize resource usage
-                    moduleBinaryStream << *pContext->GetShaderResourceUsage(entryNames[i].stage);
-
-                    moduleEntry.resUsageSize = moduleBinary.size() - moduleEntry.entryOffset - moduleEntry.entrySize;
                     moduleEntry.passIndex = passIndex;
+                    if (pResCollectPass->DetailUsageValid())
+                    {
+                        auto& resNodeDatas = pResCollectPass->GetResourceNodeDatas();
+                        moduleEntryData.resNodeDataCount = resNodeDatas.size();
+                        for (auto resNodeData : resNodeDatas)
+                        {
+                            ResourceNodeData data = {};
+                            data.type = resNodeData.second;
+                            data.set = resNodeData.first.value.set;
+                            data.binding = resNodeData.first.value.binding;
+                            data.arraySize = resNodeData.first.value.arraySize;
+                            entryResourceNodeDatas[i].push_back(data);
+                        }
+
+                        auto& fsOutInfos = pResCollectPass->GetFsOutInfos();
+                        for (auto& fsOutInfo : fsOutInfos)
+                        {
+                            fsOutInfos.push_back(fsOutInfo);
+                        }
+                    }
                     moduleEntries.push_back(moduleEntry);
                     moduleEntryDatas.push_back(moduleEntryData);
                     delete pModule;
@@ -702,15 +707,23 @@ Result Compiler::BuildShaderModule(
     }
 
     // Allocate memory and copy output data
+    uint32_t totalNodeCount = 0;
     if (result == Result::Success)
     {
         if (pShaderInfo->pfnOutputAlloc != nullptr)
         {
             if (cacheEntryState != ShaderEntryState::Ready)
             {
+                for (uint32_t i = 0; i < moduleDataEx.extra.entryCount; ++i)
+                {
+                    totalNodeCount += moduleEntryDatas[i].resNodeDataCount;
+                }
+
                 allocSize = sizeof(ShaderModuleDataEx) +
                     moduleDataEx.common.binCode.codeSize +
-                    (moduleDataEx.extra.entryCount * (sizeof(ShaderModuleEntryData) + sizeof(ShaderModuleEntry)));
+                    (moduleDataEx.extra.entryCount * (sizeof(ShaderModuleEntryData) + sizeof(ShaderModuleEntry))) +
+                    totalNodeCount * sizeof(ResourceNodeData) +
+                    fsOutInfos.size() * sizeof(FsOutInfo);
             }
 
             pAllocBuf = pShaderInfo->pfnOutputAlloc(pShaderInfo->pInstance,
@@ -728,21 +741,44 @@ Result Compiler::BuildShaderModule(
 
     if (result == Result::Success)
     {
-        // Memory layout of pAllocBuf: ShaderModuleDataEx | ShaderModuleEntryData | ShaderModuleEntry | binCode.
+        // Memory layout of pAllocBuf: ShaderModuleDataEx | ShaderModuleEntryData | ShaderModuleEntry | binCode
+        //                             | Resource nodes | FsOutInfo
         ShaderModuleDataEx* pModuleDataEx = reinterpret_cast<ShaderModuleDataEx*>(pAllocBuf);
 
         ShaderModuleEntryData* pEntryData = &pModuleDataEx->extra.entryDatas[0];
-        size_t entryOffset = sizeof(ShaderModuleDataEx) +
-                                 moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntryData);
-        ShaderModuleEntry* pEntry = reinterpret_cast<ShaderModuleEntry*>(VoidPtrInc(pAllocBuf, entryOffset));
-        size_t codeOffset = entryOffset + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntry);
-
         if (cacheEntryState != ShaderEntryState::Ready)
         {
             // Copy module data
             memcpy(pModuleDataEx, &moduleDataEx, sizeof(moduleDataEx));
             pModuleDataEx->common.binCode.pCode = nullptr;
 
+            size_t entryOffset = 0, codeOffset = 0, resNodeOffset = 0, fsOutInfoOffset = 0;
+
+            entryOffset = sizeof(ShaderModuleDataEx) +
+                                 moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntryData);
+            codeOffset = entryOffset + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntry);
+            resNodeOffset = codeOffset + moduleDataEx.common.binCode.codeSize;
+            fsOutInfoOffset = resNodeOffset + totalNodeCount * sizeof(ResourceNodeData);
+            pModuleDataEx->codeOffset = codeOffset;
+            pModuleDataEx->entryOffset = entryOffset;
+            pModuleDataEx->resNodeOffset   = resNodeOffset;
+            pModuleDataEx->fsOutInfoOffset   = fsOutInfoOffset;
+        }
+        else
+        {
+            memcpy(pModuleDataEx, pCacheData, allocSize);
+        }
+
+        ShaderModuleEntry* pEntry = reinterpret_cast<ShaderModuleEntry*>(VoidPtrInc(pAllocBuf,
+                                                                         pModuleDataEx->entryOffset));
+        ResourceNodeData* pResNodeData = reinterpret_cast<ResourceNodeData*>(VoidPtrInc(pAllocBuf,
+                                                                             pModuleDataEx->resNodeOffset));
+        FsOutInfo* pFsOutInfo = reinterpret_cast<FsOutInfo*>(VoidPtrInc(pAllocBuf,
+                                                                        pModuleDataEx->fsOutInfoOffset));
+        void* pCode = VoidPtrInc(pAllocBuf, pModuleDataEx->codeOffset);
+
+        if (cacheEntryState != ShaderEntryState::Ready)
+        {
             // Copy entry info
             for (uint32_t i = 0; i < moduleDataEx.extra.entryCount; ++i)
             {
@@ -751,11 +787,23 @@ Result Compiler::BuildShaderModule(
                 pEntryData[i].pShaderEntry = &pEntry[i];
                 // Copy module entry
                 memcpy(pEntryData[i].pShaderEntry, &moduleEntries[i], sizeof(ShaderModuleEntry));
+                // Copy resourceNodeData and set resource node pointer
+                memcpy(pResNodeData, &entryResourceNodeDatas[i][0],
+                       moduleEntryDatas[i].resNodeDataCount* sizeof(ResourceNodeData));
+                pEntryData[i].pResNodeDatas = pResNodeData;
+                pEntryData[i].resNodeDataCount = moduleEntryDatas[i].resNodeDataCount;
+                pResNodeData += moduleEntryDatas[i].resNodeDataCount;
             }
 
             // Copy binary code
-            void* pCode = VoidPtrInc(pAllocBuf, codeOffset);
             memcpy(pCode, moduleDataEx.common.binCode.pCode, moduleDataEx.common.binCode.codeSize);
+
+            // Copy fragment shader output variables
+            pModuleDataEx->extra.fsOutInfoCount = fsOutInfos.size();
+            if (fsOutInfos.size() > 0)
+            {
+                memcpy(pFsOutInfo, &fsOutInfos[0], fsOutInfos.size() * sizeof(FsOutInfo));
+            }
             if (cacheEntryState == ShaderEntryState::Compiling)
             {
                 if (hEntry != nullptr)
@@ -766,15 +814,16 @@ Result Compiler::BuildShaderModule(
         }
         else
         {
-            memcpy(pModuleDataEx, pCacheData, allocSize);
+            // Update the pointers
+            for (uint32_t i = 0; i < moduleDataEx.extra.entryCount; ++i)
+            {
+                pEntryData[i].pShaderEntry = &pEntry[i];
+                pEntryData[i].pResNodeDatas = pResNodeData;
+                pResNodeData += pEntryData[i].resNodeDataCount;
+            }
         }
-
-        // Update the pointers
-        for (uint32_t i = 0; i < moduleDataEx.extra.entryCount; ++i)
-        {
-            pEntryData[i].pShaderEntry = &pEntry[i];
-        }
-        pModuleDataEx->common.binCode.pCode = VoidPtrInc(pAllocBuf, codeOffset);
+        pModuleDataEx->common.binCode.pCode = pCode;
+        pModuleDataEx->extra.pFsOutInfos = pFsOutInfo;
         pShaderOut->pModuleData = &pModuleDataEx->common;
     }
     else
@@ -803,10 +852,19 @@ Result Compiler::BuildPipelineInternal(
 
     pContext->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
 
+    // Merge user data for shader stages into one.
+    pContext->GetPipelineContext()->DoUserDataNodeMerge();
+
+    // Set up middle-end objects.
+    BuilderContext* pBuilderContext = pContext->GetBuilderContext();
+    std::unique_ptr<Pipeline> pipeline(pBuilderContext->CreatePipeline());
+    pContext->GetPipelineContext()->SetPipelineState(&*pipeline);
+    pContext->SetBuilder(pBuilderContext->CreateBuilder(&*pipeline, UseBuilderRecorder));
+
     // Create the AMDGPU TargetMachine.
     result = CodeGenManager::CreateTargetMachine(pContext, pContext->GetPipelineContext()->GetPipelineOptions());
 
-    Module* pPipelineModule = nullptr;
+    std::unique_ptr<Module> pipelineModule;
 
     // NOTE: If input is LLVM IR, read it now. There is now only ever one IR module representing the
     // whole pipeline.
@@ -818,16 +876,13 @@ Result Compiler::BuildPipelineInternal(
         if ((pModuleData != nullptr) && (pModuleData->binType == BinaryType::LlvmBc))
         {
             IsLlvmBc = true;
-            pPipelineModule = pContext->LoadLibary(&pModuleData->binCode).release();
+            pipelineModule.reset(pContext->LoadLibary(&pModuleData->binCode).release());
         }
     }
 
-    // Merge user data for shader stages into one.
-    pContext->GetPipelineContext()->DoUserDataNodeMerge();
-
     // If not IR input, run the per-shader passes, including SPIR-V translation, and then link the modules
     // into a single pipeline module.
-    if (pPipelineModule == nullptr)
+    if (pipelineModule == nullptr)
     {
         // Create empty modules and set target machine in each.
         std::vector<Module*> modules(shaderInfo.size());
@@ -869,14 +924,6 @@ Result Compiler::BuildPipelineInternal(
                         // LLVM bitcode
                         binCode.codeSize = pShaderEntry->entrySize;
                         binCode.pCode = VoidPtrInc(pModuleDataEx->common.binCode.pCode, pShaderEntry->entryOffset);
-
-                        // Resource usage
-                        const char* pResUsagePtr = reinterpret_cast<const char*>(
-                            VoidPtrInc(pModuleDataEx->common.binCode.pCode,
-                                       pShaderEntry->entryOffset + pShaderEntry->entrySize));
-                        std::string resUsageBuf(pResUsagePtr, pShaderEntry->resUsageSize);
-                        std::istringstream resUsageStrem(resUsageBuf);
-                        resUsageStrem >> *(pContext->GetShaderResourceUsage(static_cast<ShaderStage>(shaderIndex)));
                         break;
                     }
                 }
@@ -906,10 +953,6 @@ Result Compiler::BuildPipelineInternal(
             pContext->SetModuleTargetMachine(pModule);
         }
 
-        // Give the pipeline state to the Builder. (If we know we are using BuilderRecorder, in a future change
-        // we could choose to delay this until after linking into a pipeline module.)
-        pContext->GetPipelineContext()->SetBuilderPipelineState(pContext->GetBuilder());
-
         for (uint32_t shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
         {
             const PipelineShaderInfo* pShaderInfo = shaderInfo[shaderIndex];
@@ -925,31 +968,28 @@ Result Compiler::BuildPipelineInternal(
                 continue;
             }
 
-            PassManager lowerPassMgr(&passIndex);
+            std::unique_ptr<PassManager> lowerPassMgr(PassManager::Create());
+            lowerPassMgr->SetPassIndex(&passIndex);
 
             // Set the shader stage in the Builder.
             pContext->GetBuilder()->SetShaderStage(entryStage);
 
             // Start timer for translate.
-            timerProfiler.AddTimerStartStopPass(&lowerPassMgr, TimerTranslate, true);
+            timerProfiler.AddTimerStartStopPass(&*lowerPassMgr, TimerTranslate, true);
 
             // SPIR-V translation, then dump the result.
-            lowerPassMgr.add(CreateSpirvLowerTranslator(entryStage, pShaderInfo));
+            lowerPassMgr->add(CreateSpirvLowerTranslator(entryStage, pShaderInfo));
             if (EnableOuts())
             {
-                lowerPassMgr.add(createPrintModulePass(outs(), "\n"
+                lowerPassMgr->add(createPrintModulePass(outs(), "\n"
                             "===============================================================================\n"
                             "// LLPC SPIRV-to-LLVM translation results\n"));
             }
-            {
-                lowerPassMgr.add(CreateSpirvLowerResourceCollect());
-            }
-
             // Stop timer for translate.
-            timerProfiler.AddTimerStartStopPass(&lowerPassMgr, TimerTranslate, false);
+            timerProfiler.AddTimerStartStopPass(&*lowerPassMgr, TimerTranslate, false);
 
             // Run the passes.
-            bool success = RunPasses(&lowerPassMgr, modules[shaderIndex]);
+            bool success = RunPasses(&*lowerPassMgr, modules[shaderIndex]);
             if (success == false)
             {
                 LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
@@ -973,15 +1013,16 @@ Result Compiler::BuildPipelineInternal(
             }
 
             pContext->GetBuilder()->SetShaderStage(entryStage);
-            PassManager lowerPassMgr(&passIndex);
+            std::unique_ptr<PassManager> lowerPassMgr(PassManager::Create());
+            lowerPassMgr->SetPassIndex(&passIndex);
 
             SpirvLower::AddPasses(pContext,
                                   entryStage,
-                                  lowerPassMgr,
+                                  *lowerPassMgr,
                                   timerProfiler.GetTimer(TimerLower),
                                   forceLoopUnrollCount);
             // Run the passes.
-            bool success = RunPasses(&lowerPassMgr, modules[shaderIndex]);
+            bool success = RunPasses(&*lowerPassMgr, modules[shaderIndex]);
             if (success == false)
             {
                 LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
@@ -990,8 +1031,8 @@ Result Compiler::BuildPipelineInternal(
         }
 
         // Link the shader modules into a single pipeline module.
-        pPipelineModule = pContext->GetBuilder()->Link(modules, true);
-        if (pPipelineModule == nullptr)
+        pipelineModule.reset(pipeline->Link(modules));
+        if (pipelineModule == nullptr)
         {
             LLPC_ERRS("Failed to link shader modules into pipeline module\n");
             result = Result::ErrorInvalidShader;
@@ -1001,7 +1042,7 @@ Result Compiler::BuildPipelineInternal(
     // Set up function to check shader cache.
     GraphicsShaderCacheChecker graphicsShaderCacheChecker(this, pContext);
 
-    std::function<uint32_t(const Module*, uint32_t, ArrayRef<ArrayRef<uint8_t>>)> checkShaderCacheFunc =
+    Pipeline::CheckShaderCacheFunc checkShaderCacheFunc =
             [&graphicsShaderCacheChecker](
         const Module*               pModule,      // [in] Module
         uint32_t                    stageMask,    // Shader stage mask
@@ -1019,77 +1060,30 @@ Result Compiler::BuildPipelineInternal(
         checkShaderCacheFunc = nullptr;
     }
 
+    // Generate pipeline.
+    raw_svector_ostream elfStream(*pPipelineElf);
+
+    if (result == Result::Success)
     {
-        // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
-        //
-        // TODO: The "whole pipeline" passes are supposed to include code generation passes. However, there is a CTS issue.
-        // In the case "dEQP-VK.spirv_assembly.instruction.graphics.16bit_storage.struct_mixed_types.uniform_geom", GS gets
-        // unrolled to such a size that backend compilation takes too long. Thus, we put code generation in its own pass
-        // manager.
-        PassManager patchPassMgr(&passIndex);
-        patchPassMgr.add(createTargetTransformInfoWrapperPass(pContext->GetTargetMachine()->getTargetIRAnalysis()));
-
-        // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-        AddTargetLibInfo(pContext, &patchPassMgr);
-
-        raw_svector_ostream elfStream(*pPipelineElf);
-
-        if (result == Result::Success)
-        {
-            // Patching.
-            Patch::AddPasses(pContext,
-                             patchPassMgr,
-                             timerProfiler.GetTimer(TimerPatch),
-                             timerProfiler.GetTimer(TimerOpt),
-                             checkShaderCacheFunc);
-        }
-
-        // At this point, we have finished with the Builder. No patch pass should be using Builder.
-        delete pContext->GetBuilder();
-        pContext->SetBuilder(nullptr);
-
-        // Run the "whole pipeline" passes, excluding the target backend.
-        if (result == Result::Success)
-        {
-            bool success = RunPasses(&patchPassMgr, pPipelineModule);
-            if (success)
-            {
-#if LLPC_BUILD_GFX10
-                // NOTE: Ideally, target feature setup should be added to the last pass in patching. But NGG is somewhat
-                // different in that it must involve extra LLVM optimization passes after preparing pipeline ABI. Thus,
-                // we do target feature setup here.
+        result = Result::ErrorInvalidShader;
+#if LLPC_ENABLE_EXCEPTION
+        try
 #endif
-                CodeGenManager::SetupTargetFeatures(pPipelineModule);
-            }
-            else
-            {
-                LLPC_ERRS("Fails to run whole pipeline passes\n");
-                result = Result::ErrorInvalidShader;
-            }
-        }
-
-        // A separate "whole pipeline" pass manager for code generation.
-        PassManager codeGenPassMgr(&passIndex);
-
-        if (result == Result::Success)
         {
-            // Code generation.
-            result = CodeGenManager::AddTargetPasses(pContext,
-                                                     codeGenPassMgr,
-                                                     timerProfiler.GetTimer(TimerCodeGen),
-                                                     elfStream);
-        }
+            Timer* timers[] = {
+                timerProfiler.GetTimer(TimerPatch),
+                timerProfiler.GetTimer(TimerOpt),
+                timerProfiler.GetTimer(TimerCodeGen),
+            };
 
-        // Run the target backend codegen passes.
-        if (result == Result::Success)
-        {
-            bool success = RunPasses(&codeGenPassMgr, pPipelineModule);
-            if (success == false)
-            {
-                LLPC_ERRS("Fails to generate GPU ISA codes\n");
-                result = Result::ErrorInvalidShader;
-            }
+            pipeline->Generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers);
+            result = Result::Success;
         }
+#if LLPC_ENABLE_EXCEPTION
+        catch (const char*)
+        {
+        }
+#endif
     }
 
     if (checkPerStageCache)
@@ -1099,9 +1093,6 @@ Result Compiler::BuildPipelineInternal(
     }
 
     pContext->setDiagnosticHandlerCallBack(nullptr);
-
-    delete pPipelineModule;
-    pPipelineModule = nullptr;
 
     return result;
 }
@@ -1336,12 +1327,8 @@ Result Compiler::BuildGraphicsPipelineInternal(
 {
     Context* pContext = AcquireContext();
     pContext->AttachPipelineContext(pGraphicsContext);
-    pContext->SetBuilder(Builder::Create(*pContext));
 
     Result result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf);
-
-    delete pContext->GetBuilder();
-    pContext->SetBuilder(nullptr);
     ReleaseContext(pContext);
     return result;
 }
@@ -1480,7 +1467,6 @@ Result Compiler::BuildComputePipelineInternal(
 {
     Context* pContext = AcquireContext();
     pContext->AttachPipelineContext(pComputeContext);
-    pContext->SetBuilder(Builder::Create(*pContext));
 
     const PipelineShaderInfo* shaderInfo[ShaderStageNativeStageCount] =
     {
@@ -1493,9 +1479,6 @@ Result Compiler::BuildComputePipelineInternal(
     };
 
     Result result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf);
-
-    delete pContext->GetBuilder();
-    pContext->SetBuilder(nullptr);
     ReleaseContext(pContext);
     return result;
 }

@@ -35,16 +35,28 @@
 #include "llvm/IR/ValueHandle.h"
 #endif
 
+namespace llvm
+{
+
+class ModulePass;
+class PassRegistry;
+
+void initializeBuilderReplayerPass(PassRegistry&);
+
+} // llvm
+
 namespace Llpc
 {
 
 using namespace llvm;
 
+class PipelineState;
+
 // Prefix of all recorded calls.
-static const char* const BuilderCallPrefix = "llpc.call.";
+static const char BuilderCallPrefix[] = "llpc.call.";
 
 // LLPC call opcode metadata name.
-static const char* const BuilderCallOpcodeMetadataName = "llpc.call.opcode";
+static const char BuilderCallOpcodeMetadataName[] = "llpc.call.opcode";
 
 // =====================================================================================================================
 // A class that caches the metadata kind IDs used by BuilderRecorder and BuilderReplayer.
@@ -63,6 +75,8 @@ public:
 // later on.
 class BuilderRecorder final : public Builder, BuilderRecorderMetadataKinds
 {
+    friend BuilderContext;
+
 public:
     // llpc.call.* opcodes
     enum Opcode : uint32_t
@@ -210,21 +224,8 @@ public:
     // Given an opcode, get the call name (without the "llpc.call." prefix)
     static StringRef GetCallName(Opcode opcode);
 
-    BuilderRecorder(LLVMContext& context, bool wantReplay)
-        : Builder(context), BuilderRecorderMetadataKinds(context), m_wantReplay(wantReplay)
-    {}
-
-    ~BuilderRecorder() {}
-
-#ifndef NDEBUG
-    // Link the individual shader modules into a single pipeline module.
-    // This is overridden by BuilderRecorder only on a debug build so it can check that the frontend
-    // set shader stage consistently.
-    Module* Link(ArrayRef<Module*> modules, bool linkNativeStages) override final;
-#endif
-
-    // If this is a BuilderRecorder created with wantReplay=true, create the BuilderReplayer pass.
-    ModulePass* CreateBuilderReplayer() override;
+    // Record shader modes into IR metadata if this is a shader compile (no PipelineState).
+    void RecordShaderModes(Module* pModule) override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Base class operations
@@ -337,6 +338,7 @@ public:
                                 uint32_t      binding,
                                 Value*        pDescIndex,
                                 bool          isNonUniform,
+                                bool          isWritten,
                                 Type*         pPointeeTy,
                                 const Twine&  instName) override final;
 
@@ -650,9 +652,15 @@ public:
     Value* CreateSubgroupMbcnt(Value* const pMask,
                                const Twine& instName ) override final;
 
+protected:
+    // Get the ShaderModes object.
+    ShaderModes* GetShaderModes() override final;
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderRecorder)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderRecorder)
+
+    BuilderRecorder(BuilderContext* pBuilderContext, Pipeline* pPipeline);
 
     // Record one Builder call
     Instruction* Record(Opcode                        opcode,
@@ -661,21 +669,13 @@ private:
                         const Twine&                  instName,
                         ArrayRef<Attribute::AttrKind> attribs = {});
 
-#ifndef NDEBUG
-    // Check that the frontend is consistently telling us which shader stage a function is in.
-    void CheckFuncShaderStage(Function* pFunc, ShaderStage shaderStage);
-#endif
-
     // -----------------------------------------------------------------------------------------------------------------
 
-    bool            m_wantReplay;                             // true to make CreateBuilderReplayer return a replayer
-                                                              //   pass
-#ifndef NDEBUG
-    // Only used in a debug build to ensure SetShaderStage is being used consistently.
-    std::vector<std::pair<WeakVH, ShaderStage>> m_funcShaderStageMap;       // Map from function to shader stage
-    Function*                                   m_pEnclosingFunc = nullptr; // Last function written with current
-                                                                            //   shader stage
-#endif
+    PipelineState*                m_pPipelineState;           // PipelineState; nullptr for shader compile
+    std::unique_ptr<ShaderModes>  m_shaderModes;              // ShaderModes for a shader compile
 };
+
+// Create BuilderReplayer pass
+ModulePass* CreateBuilderReplayer(Pipeline* pPipeline);
 
 } // Llpc

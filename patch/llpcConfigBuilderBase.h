@@ -36,12 +36,14 @@
 namespace Llpc
 {
 
+class PipelineState;
+
 // =====================================================================================================================
 // Register configuration builder base class.
 class ConfigBuilderBase
 {
 public:
-    ConfigBuilderBase(llvm::Module* pModule);
+    ConfigBuilderBase(llvm::Module* pModule, PipelineState* pPipelineState);
     ~ConfigBuilderBase();
 
     void WritePalMetadata();
@@ -67,13 +69,28 @@ protected:
     void SetPipelineType(Util::Abi::PipelineType value);
     void SetLdsSizeByteSize(Util::Abi::HardwareStage hwStage, uint32_t value);
     void SetEsGsLdsSize(uint32_t value);
+    uint32_t SetupFloatingPointMode(ShaderStage shaderStage);
+
+    void AppendConfig(llvm::ArrayRef<Util::Abi::PalMetadataNoteEntry> config);
+    void AppendConfig(uint32_t key, uint32_t value);
+
+    template<typename T>
+    void AppendConfig(const T& config)
+    {
+        static_assert(T::containsPalAbiMetadataOnly,
+                      "may only be used with structs that are fully metadata notes");
+        static_assert(sizeof(T) % sizeof(Util::Abi::PalMetadataNoteEntry) == 0,
+                      "T claims to be isPalAbiMetadataOnly, but sizeof contradicts that");
+
+        AppendConfig({reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(&config),
+                      sizeof(T) / sizeof(Util::Abi::PalMetadataNoteEntry)});
+    }
 
     // -----------------------------------------------------------------------------------------------------------------
 
     llvm::Module*                   m_pModule;            // LLVM module being processed
     Context*                        m_pContext;           // LLPC context
-    uint8_t*                        m_pConfig = nullptr;  // Register/metadata configuration
-    size_t                          m_configSize = 0;     // Size of register/metadata configuration
+    PipelineState*                  m_pPipelineState;     // Pipeline state
     GfxIpVersion                    m_gfxIp;              // Graphics IP version info
 
     bool                            m_hasVs;              // Whether the pipeline has vertex shader
@@ -105,6 +122,8 @@ private:
     llvm::msgpack::MapDocNode                 m_hwShaderNodes[uint32_t(Util::Abi::HardwareStage::Count)];
                                                                 // MsgPack map node for each HW shader's node in
                                                                 //  ".hardware_stages"
+
+    llvm::SmallVector<Util::Abi::PalMetadataNoteEntry, 128> m_config; // Register/metadata configuration
 };
 
 } // Llpc

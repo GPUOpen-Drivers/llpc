@@ -44,7 +44,7 @@ namespace Gfx9
 
 // =====================================================================================================================
 // Initializer
-void VsRegConfig::Init(
+VsRegConfig::VsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_VS);
@@ -75,7 +75,7 @@ void VsRegConfig::Init(
 
 // =====================================================================================================================
 // Initializer
-void LsHsRegConfig::Init(
+LsHsRegConfig::LsHsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_HS);
@@ -96,7 +96,7 @@ void LsHsRegConfig::Init(
 
 // =====================================================================================================================
 // Initializer
-void EsGsRegConfig::Init(
+EsGsRegConfig::EsGsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_GS);
@@ -135,7 +135,7 @@ void EsGsRegConfig::Init(
 #if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Initializer
-void PrimShaderRegConfig::Init(
+PrimShaderRegConfig::PrimShaderRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_GS);
@@ -183,7 +183,7 @@ void PrimShaderRegConfig::Init(
 
 // =====================================================================================================================
 // Initializer
-void PsRegConfig::Init(
+PsRegConfig::PsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_PS);
@@ -216,154 +216,124 @@ void PsRegConfig::Init(
 
 // =====================================================================================================================
 // Initializer
-void PipelineRegConfig::Init()
-{
-}
-
-// =====================================================================================================================
-// Initializer
-void PipelineVsFsRegConfig::Init(
+PipelineVsFsRegConfig::PipelineVsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
+    :
+    m_vsRegs(gfxIp),
+    m_psRegs(gfxIp)
 {
-    m_vsRegs.Init(gfxIp);
-    m_psRegs.Init(gfxIp);
-    PipelineRegConfig::Init();
-
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG(VGT_GS_ONCHIP_CNTL);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
 #if LLPC_BUILD_GFX10
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
 #endif
-
-    m_dynRegCount = 0;
 }
 
 // =====================================================================================================================
 // Initializer
-void PipelineVsTsFsRegConfig::Init(
+PipelineVsTsFsRegConfig::PipelineVsTsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
+    :
+    m_lsHsRegs(gfxIp),
+    m_vsRegs(gfxIp),
+    m_psRegs(gfxIp)
 {
-    m_lsHsRegs.Init(gfxIp);
-    m_vsRegs.Init(gfxIp);
-    m_psRegs.Init(gfxIp);
-    PipelineRegConfig::Init();
-
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
 #if LLPC_BUILD_GFX10
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
     INIT_REG(VGT_GS_ONCHIP_CNTL);
 #endif
-
-    m_dynRegCount = 0;
 }
 
 // =====================================================================================================================
 // Initializer
-void PipelineVsGsFsRegConfig::Init(
+PipelineVsGsFsRegConfig::PipelineVsGsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
+    :
+    m_esGsRegs(gfxIp),
+    m_vsRegs(gfxIp),
+    m_psRegs(gfxIp)
 {
-    m_esGsRegs.Init(gfxIp);
-    m_vsRegs.Init(gfxIp);
-    m_psRegs.Init(gfxIp);
-    PipelineRegConfig::Init();
-
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
 #if LLPC_BUILD_GFX10
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
 #endif
-
-    m_dynRegCount = 0;
 }
 
 // =====================================================================================================================
 // Initializer
-void PipelineVsTsGsFsRegConfig::Init(GfxIpVersion gfxIp)
+PipelineVsTsGsFsRegConfig::PipelineVsTsGsFsRegConfig(GfxIpVersion gfxIp)
+    :
+    m_lsHsRegs(gfxIp),
+    m_esGsRegs(gfxIp),
+    m_vsRegs(gfxIp),
+    m_psRegs(gfxIp)
 {
-    m_lsHsRegs.Init(gfxIp);
-    m_esGsRegs.Init(gfxIp);
-    m_psRegs.Init(gfxIp);
-    m_vsRegs.Init(gfxIp);
-    PipelineRegConfig::Init();
-
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
 #if LLPC_BUILD_GFX10
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
 #endif
-
-    m_dynRegCount = 0;
 }
 
 #if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Initializer
-void PipelineNggVsFsRegConfig::Init(
+PipelineNggVsFsRegConfig::PipelineNggVsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
+    :
+    m_primShaderRegs(gfxIp),
+    m_psRegs(gfxIp)
 {
-    m_primShaderRegs.Init(gfxIp);
-    m_psRegs.Init(gfxIp);
-    PipelineRegConfig::Init();
-
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
-
-    m_dynRegCount = 0;
 }
 
 // =====================================================================================================================
 // Initializer
-void PipelineNggVsTsFsRegConfig::Init(
+PipelineNggVsTsFsRegConfig::PipelineNggVsTsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
+    :
+    m_lsHsRegs(gfxIp),
+    m_primShaderRegs(gfxIp),
+    m_psRegs(gfxIp)
 {
-    m_lsHsRegs.Init(gfxIp);
-    m_primShaderRegs.Init(gfxIp);
-    m_psRegs.Init(gfxIp);
-    PipelineRegConfig::Init();
-
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
-
-    m_dynRegCount = 0;
 }
 
 // =====================================================================================================================
 // Initializer
-void PipelineNggVsGsFsRegConfig::Init(
+PipelineNggVsGsFsRegConfig::PipelineNggVsGsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
+    :
+    m_primShaderRegs(gfxIp),
+    m_psRegs(gfxIp)
 {
-    m_primShaderRegs.Init(gfxIp);
-    m_psRegs.Init(gfxIp);
-    PipelineRegConfig::Init();
-
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
-
-    m_dynRegCount = 0;
 }
 
 // =====================================================================================================================
 // Initializer
-void PipelineNggVsTsGsFsRegConfig::Init(
+PipelineNggVsTsGsFsRegConfig::PipelineNggVsTsGsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
+    :
+    m_lsHsRegs(gfxIp),
+    m_primShaderRegs(gfxIp),
+    m_psRegs(gfxIp)
 {
-    m_lsHsRegs.Init(gfxIp);
-    m_primShaderRegs.Init(gfxIp);
-    m_psRegs.Init(gfxIp);
-    PipelineRegConfig::Init();
-
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
-
-    m_dynRegCount = 0;
 }
 #endif
 
 // =====================================================================================================================
 // Initializer
-void CsRegConfig::Init(
+CsRegConfig::CsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
 {
     INIT_REG(COMPUTE_PGM_RSRC1);
@@ -393,17 +363,6 @@ void CsRegConfig::Init(
         INIT_REG_TO_INVALID(COMPUTE_DISPATCH_INITIATOR);
     }
 
-}
-
-// =====================================================================================================================
-// Initializer
-void PipelineCsRegConfig::Init(
-    GfxIpVersion gfxIp) // Graphics IP version info
-{
-    m_csRegs.Init(gfxIp);
-    PipelineRegConfig::Init();
-
-    m_dynRegCount = 0;
 }
 
 // =====================================================================================================================

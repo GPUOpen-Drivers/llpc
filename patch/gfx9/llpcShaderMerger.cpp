@@ -41,6 +41,7 @@
 #include "llpcPassDeadFuncRemove.h"
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
+#include "llpcPipelineState.h"
 #include "llpcShaderMerger.h"
 
 #define DEBUG_TYPE "llpc-shader-merger"
@@ -50,14 +51,15 @@ using namespace Llpc;
 
 // =====================================================================================================================
 ShaderMerger::ShaderMerger(
-    Context*          pContext,           // [in] LLPC context
-    PipelineShaders*  pPipelineShaders)   // [in] API shaders in the pipeline
+    PipelineState*    pPipelineState,   // [in] Pipeline state
+    PipelineShaders*  pPipelineShaders) // [in] API shaders in the pipeline
     :
-    m_pContext(pContext),
-    m_gfxIp(m_pContext->GetGfxIpVersion()),
+    m_pPipelineState(pPipelineState),
+    m_pContext(static_cast<Context*>(&pPipelineState->GetContext())),
+    m_gfxIp(pPipelineState->GetBuilderContext()->GetGfxIpVersion()),
     m_pPipelineShaders(pPipelineShaders)
 #if LLPC_BUILD_GFX10
-    , m_primShader(pContext)
+    , m_primShader(pPipelineState)
 #endif
 {
     LLPC_ASSERT(m_gfxIp.major >= 9);
@@ -78,7 +80,7 @@ Function* ShaderMerger::BuildPrimShader(
     Function*  pGsEntryPoint,           // [in] Entry-point of hardware geometry shader (GS) (could be null)
     Function*  pCopyShaderEntryPoint)   // [in] Entry-point of hardware vertex shader (VS, copy shader) (could be null)
 {
-    NggPrimShader primShader(m_pContext);
+    NggPrimShader primShader(m_pPipelineState);
     return primShader.Generate(pEsEntryPoint, pGsEntryPoint, pCopyShaderEntryPoint);
 }
 #endif
@@ -484,7 +486,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         }
 
         // Set up system value SGPRs
-        if (m_pContext->IsTessOffChip())
+        if (m_pPipelineState->IsTessOffChip())
         {
             args.push_back(pOffChipLdsBase);
             ++hsArgIdx;
@@ -873,7 +875,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
         if (hasTs)
         {
             // Set up system value SGPRs
-            if (m_pContext->IsTessOffChip())
+            if (m_pPipelineState->IsTessOffChip())
             {
                 args.push_back(pOffChipLdsBase);
                 ++esArgIdx;

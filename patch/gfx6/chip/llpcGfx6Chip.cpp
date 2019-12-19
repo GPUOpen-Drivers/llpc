@@ -43,7 +43,7 @@ namespace Gfx6
 
 // =====================================================================================================================
 // Initializer
-void VsRegConfig::Init()
+VsRegConfig::VsRegConfig()
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_VS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_VS);
@@ -66,7 +66,7 @@ void VsRegConfig::Init()
 
 // =====================================================================================================================
 // Initializer
-void HsRegConfig::Init()
+HsRegConfig::HsRegConfig()
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_HS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_HS);
@@ -77,7 +77,7 @@ void HsRegConfig::Init()
 
 // =====================================================================================================================
 // Initializer
-void EsRegConfig::Init()
+EsRegConfig::EsRegConfig()
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_ES);
     INIT_REG(SPI_SHADER_PGM_RSRC2_ES);
@@ -86,7 +86,7 @@ void EsRegConfig::Init()
 
 // =====================================================================================================================
 // Initializer
-void LsRegConfig::Init()
+LsRegConfig::LsRegConfig()
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_LS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_LS);
@@ -94,7 +94,7 @@ void LsRegConfig::Init()
 
 // =====================================================================================================================
 // Initializer
-void GsRegConfig::Init()
+GsRegConfig::GsRegConfig()
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_GS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_GS);
@@ -118,7 +118,7 @@ void GsRegConfig::Init()
 
 // =====================================================================================================================
 // Initializer
-void PsRegConfig::Init()
+PsRegConfig::PsRegConfig()
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_PS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_PS);
@@ -150,95 +150,47 @@ uint32_t PsRegConfig::GetPsUserDataStart()
 
 // =====================================================================================================================
 // Initializer
-void PipelineRegConfig::Init()
+PipelineVsFsRegConfig::PipelineVsFsRegConfig()
 {
-}
-
-// =====================================================================================================================
-// Initializer
-void PipelineVsFsRegConfig::Init()
-{
-    m_vsRegs.Init();
-    m_psRegs.Init();
-    PipelineRegConfig::Init();
-
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG(IA_MULTI_VGT_PARAM);
-
-    m_dynRegCount = 0;
 }
 
 // =====================================================================================================================
 // Initializer
-void PipelineVsTsFsRegConfig::Init()
+PipelineVsTsFsRegConfig::PipelineVsTsFsRegConfig()
 {
-    m_lsRegs.Init();
-    m_hsRegs.Init();
-    m_vsRegs.Init();
-    m_psRegs.Init();
-    PipelineRegConfig::Init();
-
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG(IA_MULTI_VGT_PARAM);
     INIT_REG(VGT_TF_PARAM);
-
-    m_dynRegCount = 0;
 }
 
 // =====================================================================================================================
 // Initializer
-void PipelineVsGsFsRegConfig::Init()
+PipelineVsGsFsRegConfig::PipelineVsGsFsRegConfig()
 {
-    m_esRegs.Init();
-    m_gsRegs.Init();
-    m_psRegs.Init();
-    m_vsRegs.Init();
-    PipelineRegConfig::Init();
-
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG(IA_MULTI_VGT_PARAM);
-
-    m_dynRegCount = 0;
 }
 
 // =====================================================================================================================
 // Initializer
-void PipelineVsTsGsFsRegConfig::Init()
+PipelineVsTsGsFsRegConfig::PipelineVsTsGsFsRegConfig()
 {
-    m_lsRegs.Init();
-    m_hsRegs.Init();
-    m_esRegs.Init();
-    m_gsRegs.Init();
-    m_psRegs.Init();
-    m_vsRegs.Init();
-    PipelineRegConfig::Init();
-
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG(IA_MULTI_VGT_PARAM);
     INIT_REG(VGT_TF_PARAM);
-
-    m_dynRegCount = 0;
 }
 
 // =====================================================================================================================
 // Initializer
-void CsRegConfig::Init()
+CsRegConfig::CsRegConfig()
 {
     INIT_REG(COMPUTE_PGM_RSRC1);
     INIT_REG(COMPUTE_PGM_RSRC2);
     INIT_REG(COMPUTE_NUM_THREAD_X);
     INIT_REG(COMPUTE_NUM_THREAD_Y);
     INIT_REG(COMPUTE_NUM_THREAD_Z);
-}
-
-// =====================================================================================================================
-// Initializer
-void PipelineCsRegConfig::Init()
-{
-    m_csRegs.Init();
-    PipelineRegConfig::Init();
-
-    m_dynRegCount = 0;
 }
 
 // =====================================================================================================================

@@ -189,13 +189,16 @@ void SpirvLower::AddPasses(
     uint32_t              forceLoopUnrollCount)   // 0 or force loop unroll count
 {
     // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-    AddTargetLibInfo(pContext, &passMgr);
+    pContext->GetBuilderContext()->PreparePassManager(&passMgr);
 
     // Start timer for lowering passes.
     if (pLowerTimer != nullptr)
     {
         passMgr.add(CreateStartStopTimer(pLowerTimer, true));
     }
+
+    // Lower SPIR-V resource collecting
+    passMgr.add(CreateSpirvLowerResourceCollect(false));
 
     // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
     // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.

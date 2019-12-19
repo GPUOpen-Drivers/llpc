@@ -48,98 +48,64 @@ namespace Gfx9
 class ConfigBuilder : public ConfigBuilderBase
 {
 public:
-    ConfigBuilder(llvm::Module* pModule) : ConfigBuilderBase(pModule) {}
+    ConfigBuilder(llvm::Module* pModule, PipelineState* pPipelineState)
+        : ConfigBuilderBase(pModule, pPipelineState) {}
 
     void BuildPalMetadata();
 
-    Result BuildPipelineVsFsRegConfig(Context*            pContext,
-                                      uint8_t**           ppConfig,
-                                      size_t*             pConfigSize);
-
-    Result BuildPipelineVsTsFsRegConfig(Context*            pContext,
-                                        uint8_t**           ppConfig,
-                                        size_t*             pConfigSize);
-
-    Result BuildPipelineVsGsFsRegConfig(Context*            pContext,
-                                        uint8_t**           ppConfig,
-                                        size_t*             pConfigSize);
-
-    Result BuildPipelineVsTsGsFsRegConfig(Context*            pContext,
-                                          uint8_t**           ppConfig,
-                                          size_t*             pConfigSize);
+    Result BuildPipelineVsFsRegConfig();
+    Result BuildPipelineVsTsFsRegConfig();
+    Result BuildPipelineVsGsFsRegConfig();
+    Result BuildPipelineVsTsGsFsRegConfig();
 
 #if LLPC_BUILD_GFX10
-    Result BuildPipelineNggVsFsRegConfig(Context*            pContext,
-                                         uint8_t**           ppConfig,
-                                         size_t*             pConfigSize);
-
-    Result BuildPipelineNggVsTsFsRegConfig(Context*            pContext,
-                                           uint8_t**           ppConfig,
-                                           size_t*             pConfigSize);
-
-    Result BuildPipelineNggVsGsFsRegConfig(Context*            pContext,
-                                           uint8_t**           ppConfig,
-                                           size_t*             pConfigSize);
-
-    Result BuildPipelineNggVsTsGsFsRegConfig(Context*            pContext,
-                                             uint8_t**           ppConfig,
-                                             size_t*             pConfigSize);
+    Result BuildPipelineNggVsFsRegConfig();
+    Result BuildPipelineNggVsTsFsRegConfig();
+    Result BuildPipelineNggVsGsFsRegConfig();
+    Result BuildPipelineNggVsTsGsFsRegConfig();
 #endif
 
-    Result BuildPipelineCsRegConfig(Context*            pContext,
-                                    uint8_t**           ppConfig,
-                                    size_t*             pConfigSize);
+    Result BuildPipelineCsRegConfig();
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(ConfigBuilder);
     LLPC_DISALLOW_COPY_AND_ASSIGN(ConfigBuilder);
 
     template <typename T>
-    Result BuildVsRegConfig(Context*            pContext,
-                            ShaderStage         shaderStage,
+    Result BuildVsRegConfig(ShaderStage         shaderStage,
                             T*                  pConfig);
 
     template <typename T>
-    Result BuildLsHsRegConfig(Context*            pContext,
-                              ShaderStage         shaderStage1,
+    Result BuildLsHsRegConfig(ShaderStage         shaderStage1,
                               ShaderStage         shaderStage2,
                               T*                  pConfig);
 
     template <typename T>
-    Result BuildEsGsRegConfig(Context*            pContext,
-                              ShaderStage         shaderStage1,
+    Result BuildEsGsRegConfig(ShaderStage         shaderStage1,
                               ShaderStage         shaderStage2,
                               T*                  pConfig);
 
 #if LLPC_BUILD_GFX10
     template <typename T>
-    Result BuildPrimShaderRegConfig(Context*            pContext,
-                                    ShaderStage         shaderStage1,
+    Result BuildPrimShaderRegConfig(ShaderStage         shaderStage1,
                                     ShaderStage         shaderStage2,
                                     T*                  pConfig);
 #endif
 
     template <typename T>
-    Result BuildPsRegConfig(Context*            pContext,
-                            ShaderStage         shaderStage,
+    Result BuildPsRegConfig(ShaderStage         shaderStage,
                             T*                  pConfig);
 
-    Result BuildCsRegConfig(Context*             pContext,
-                            ShaderStage          shaderStage,
-                            PipelineCsRegConfig* pConfig);
+    Result BuildCsRegConfig(ShaderStage shaderStage,
+                            CsRegConfig* pConfig);
 
-    template <typename T>
-    Result BuildUserDataConfig(Context*    pContext,
-                               ShaderStage shaderStage1,
+    Result BuildUserDataConfig(ShaderStage shaderStage1,
                                ShaderStage shaderStage2,
-                               uint32_t    startUserData,
-                               T*          pConfig);
+                               uint32_t    startUserData);
 
-    void SetupVgtTfParam(Context* pContext, LsHsRegConfig* pConfig);
-
-    static uint32_t SetupFloatingPointMode(Context* pContext, ShaderStage shaderStage);
+    void SetupVgtTfParam(LsHsRegConfig* pConfig);
 };
 
-} // Gfx6
+} // Gfx9
 
 } // Llpc

@@ -57,11 +57,12 @@ namespace Llpc
 
 // =====================================================================================================================
 NggPrimShader::NggPrimShader(
-    Context* pContext)  // [in] LLPC context
+    PipelineState*  pPipelineState) // [in] Pipeline state
     :
-    m_pContext(pContext),
-    m_gfxIp(m_pContext->GetGfxIpVersion()),
-    m_pNggControl(m_pContext->GetNggControl()),
+    m_pPipelineState(pPipelineState),
+    m_pContext(static_cast<Context*>(&pPipelineState->GetContext())),
+    m_gfxIp(pPipelineState->GetBuilderContext()->GetGfxIpVersion()),
+    m_pNggControl(m_pPipelineState->GetNggControl()),
     m_pLdsManager(nullptr),
     m_pBuilder(new IRBuilder<>(*m_pContext))
 {
@@ -125,7 +126,7 @@ Function* NggPrimShader::Generate(
     // Create NGG LDS manager
     LLPC_ASSERT(pModule != nullptr);
     LLPC_ASSERT(m_pLdsManager == nullptr);
-    m_pLdsManager = new NggLdsManager(pModule, m_pContext, m_pBuilder.get());
+    m_pLdsManager = new NggLdsManager(pModule, m_pPipelineState, m_pBuilder.get());
 
     return GeneratePrimShaderEntryPoint(pModule);
 }
@@ -2223,6 +2224,9 @@ void NggPrimShader::ConstructPrimShaderWithGs(
         pOutVertCountInWavePhi->addIncoming(m_pBuilder->getInt32(0), pEndZeroOutVertCountBlock);
         pOutVertCountInWavePhi->addIncoming(pOutVertCountInWave, pBeginGsBlock);
         pOutVertCountInWave = pOutVertCountInWavePhi;
+        // NOTE: We promote GS output vertex count in wave to SGPR since it is treated as an uniform value. Otherwise,
+        // phi node resolving still treats it as VGPR, not as expected.
+        pOutVertCountInWave = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pOutVertCountInWave);
         pOutVertCountInWave->setName("outVertCountInWave");
 
         m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
@@ -3073,7 +3077,7 @@ void NggPrimShader::RunEsOrEsVariant(
     if (hasTs)
     {
         // Set up system value SGPRs
-        if (m_pContext->IsTessOffChip())
+        if (m_pPipelineState->IsTessOffChip())
         {
             args.push_back(m_hasGs ? pOffChipLdsBase : pIsOffChip);
             args.push_back(m_hasGs ? pIsOffChip : pOffChipLdsBase);
@@ -3347,7 +3351,11 @@ Value* NggPrimShader::RunGsVariant(
     Argument* pArg = pSysValueStart;
 
     Value* pGsVsOffset = UndefValue::get(m_pBuilder->getInt32Ty()); // NOTE: For NGG, GS-VS offset is unused
-    Value* pGsWaveId   = m_nggFactor.pWaveIdInSubgroup;
+
+    // NOTE: This argument is expected to be GS wave ID, not wave ID in sub-group, for normal ES-GS merged shader.
+    // However, in NGG mode, GS wave ID, sent to GS_EMIT and GS_CUT messages, is no longer required because of NGG
+    // handling of such messages. Instead, wave ID in sub-group is required as the substitue.
+    auto pWaveId = m_nggFactor.pWaveIdInSubgroup;
 
     pArg += EsGsSpecialSysValueCount;
 
@@ -3456,7 +3464,7 @@ Value* NggPrimShader::RunGsVariant(
 
     // Set up system value SGPRs
     args.push_back(pGsVsOffset);
-    args.push_back(pGsWaveId);
+    args.push_back(pWaveId);
 
     // Set up system value VGPRs
     args.push_back(pEsGsOffset0);
@@ -3603,8 +3611,8 @@ Function* NggPrimShader::MutateGsToVariant(
                 LLPC_ASSERT(streamId < MaxGsStreams);
                 Value* pOutput = pCall->getOperand(3);
 
-                auto pEmitCounter = m_pBuilder->CreateLoad(emitCounterPtrs[streamId]);
-                ExportGsOutput(pOutput, location, compIdx, streamId, pEmitCounter, pThreadIdInWave);
+                auto pOutVertCounter = m_pBuilder->CreateLoad(outVertCounterPtrs[streamId]);
+                ExportGsOutput(pOutput, location, compIdx, streamId, pThreadIdInWave, pOutVertCounter);
 
                 removeCalls.push_back(pCall);
             }
@@ -3665,14 +3673,19 @@ Function* NggPrimShader::MutateGsToVariant(
     // NOTE: Only return vertex count info for rasterization stream.
     auto rasterStream = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
     auto pOutVertCount = m_pBuilder->CreateLoad(outVertCounterPtrs[rasterStream]);
-    auto pInclusiveOutVertCount = DoSubgroupInclusiveAdd(pOutVertCount);
 
-    auto pOutVertCountInWave = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readlane,
-                                                           {},
-                                                           {
-                                                               pInclusiveOutVertCount,
-                                                               m_pBuilder->getInt32(waveSize - 1)
-                                                           });
+    Value* pOutVertCountInWave = nullptr;
+    auto pInclusiveOutVertCount = DoSubgroupInclusiveAdd(pOutVertCount, &pOutVertCountInWave);
+
+    // NOTE: We use the highest thread (MSB) to get GS output vertex count in this wave (after inclusive-add,
+    // the value of this thread stores this info)
+    pOutVertCountInWave = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readlane,
+                                                      {},
+                                                      {
+                                                          pOutVertCountInWave,
+                                                          m_pBuilder->getInt32(waveSize - 1)
+                                                      });
+
     Value* pResult = UndefValue::get(pResultTy);
     pResult = m_pBuilder->CreateInsertValue(pResult, pOutVertCount, 0);
     pResult = m_pBuilder->CreateInsertValue(pResult, pInclusiveOutVertCount, 1);
@@ -3784,7 +3797,7 @@ void NggPrimShader::ExportGsOutput(
     uint32_t     compIdx,           // Index used for vector element indexing
     uint32_t     streamId,          // ID of output vertex stream
     llvm::Value* pThreadIdInWave,   // [in] Thread ID in wave
-    Value*       pEmitCounter)      // [in] GS emit counter for this stream
+    Value*       pOutVertCounter)   // [in] GS output vertex counter for this stream
 {
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
     if (pResUsage->inOutUsage.gs.rasterStream != streamId)
@@ -3814,13 +3827,13 @@ void NggPrimShader::ExportGsOutput(
     }
 
     // gsVsRingOffset = threadIdInWave * gsVsRingItemSize +
-    //                  emitCounter * vertexSize +
+    //                  outVertcounter * vertexSize +
     //                  location * 4 + compIdx (in DWORDS)
     const uint32_t gsVsRingItemSize = pResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize;
     Value* pGsVsRingOffset = m_pBuilder->CreateMul(pThreadIdInWave, m_pBuilder->getInt32(gsVsRingItemSize));
 
     const uint32_t vertexSize = pResUsage->inOutUsage.gs.outLocCount[streamId] * 4;
-    auto pVertexItemOffset = m_pBuilder->CreateMul(pEmitCounter, m_pBuilder->getInt32(vertexSize));
+    auto pVertexItemOffset = m_pBuilder->CreateMul(pOutVertCounter, m_pBuilder->getInt32(vertexSize));
 
     pGsVsRingOffset = m_pBuilder->CreateAdd(pGsVsRingOffset, pVertexItemOffset);
 
@@ -3991,19 +4004,20 @@ Function* NggPrimShader::CreateGsEmitHandler(
 
     auto savedInsertPoint = m_pBuilder->saveIP();
 
+    const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
     const auto& pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
 
     // Get GS output vertices per output primitive
     uint32_t outVertsPerPrim = 0;
-    switch (pResUsage->builtInUsage.gs.outputPrimitive)
+    switch (geometryMode.outputPrimitive)
     {
-    case OutputPoints:
+    case OutputPrimitives::Points:
         outVertsPerPrim = 1;
         break;
-    case OutputLineStrip:
+    case OutputPrimitives::LineStrip:
         outVertsPerPrim = 2;
         break;
-    case OutputTriangleStrip:
+    case OutputPrimitives::TriangleStrip:
         outVertsPerPrim = 3;
         break;
     default:
@@ -4042,10 +4056,10 @@ Function* NggPrimShader::CreateGsEmitHandler(
         // NOTE: Only calculate GS output primitive data and write it to LDS for rasterization stream.
         if (streamId == pResUsage->inOutUsage.gs.rasterStream)
         {
-            // vertexId = threadIdInSubgroup * outputVertices + emitCounter
+            // vertexId = threadIdInSubgroup * outputVertices + outVertCounter
             auto pvertexId = m_pBuilder->CreateMul(pThreadIdInSubgroup,
-                m_pBuilder->getInt32(pResUsage->builtInUsage.gs.outputVertices));
-            pvertexId = m_pBuilder->CreateAdd(pvertexId, pEmitCounter);
+                m_pBuilder->getInt32(geometryMode.outputVertices));
+            pvertexId = m_pBuilder->CreateAdd(pvertexId, pOutVertCounter);
 
             // vertexId0 = vertexId - outVertsPerPrim
             auto pVertexId0 = m_pBuilder->CreateSub(pvertexId, pOutVertsPerPrim);
@@ -4193,19 +4207,20 @@ Function* NggPrimShader::CreateGsCutHandler(
 
     auto savedInsertPoint = m_pBuilder->saveIP();
 
+    const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
     const auto& pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
 
     // Get GS output vertices per output primitive
     uint32_t outVertsPerPrim = 0;
-    switch (pResUsage->builtInUsage.gs.outputPrimitive)
+    switch (geometryMode.outputPrimitive)
     {
-    case OutputPoints:
+    case OutputPrimitives::Points:
         outVertsPerPrim = 1;
         break;
-    case OutputLineStrip:
+    case OutputPrimitives::LineStrip:
         outVertsPerPrim = 2;
         break;
-    case OutputTriangleStrip:
+    case OutputPrimitives::TriangleStrip:
         outVertsPerPrim = 3;
         break;
     default:
@@ -6326,7 +6341,8 @@ Value* NggPrimShader::DoSubgroupBallot(
 // =====================================================================================================================
 // Output a subgroup inclusive-add (IAdd).
 Value* NggPrimShader::DoSubgroupInclusiveAdd(
-    Value* pValue) // [in] The value to do the exclusive-add on.
+    Value*   pValue,        // [in] The value to do the inclusive-add on
+    Value**  ppWwmResult)   // [out] Result in WWM section (optinal)
 {
     LLPC_ASSERT(pValue->getType()->isIntegerTy(32)); // Should be i32
 
@@ -6418,6 +6434,12 @@ Value* NggPrimShader::DoSubgroupInclusiveAdd(
     if (waveSize == 64)
     {
         pResult = m_pBuilder->CreateAdd(pResult, pMaskedBroadcast);
+    }
+
+    if (ppWwmResult != nullptr)
+    {
+        // Return the result in WWM section (optional)
+        *ppWwmResult = pResult;
     }
 
     // Finish the WWM section

@@ -306,6 +306,7 @@ private:
 
     llvm::Value* GetSubgroupLocalInvocationId(llvm::Instruction* pInsertPos);
 
+    WorkgroupLayout CalculateWorkgroupLayout();
     llvm::Value* ReconfigWorkgroup(llvm::Value* pLocalInvocationId, llvm::Instruction* pInsertPos);
     llvm::Value* GetWorkgroupSize();
     llvm::Value* GetInLocalInvocationId(llvm::Instruction* pInsertPos);
@@ -343,7 +344,7 @@ private:
     std::vector<Value*>     m_expFragColors[MaxColorTargets]; // Exported fragment colors
     std::vector<llvm::CallInst*> m_importCalls; // List of "call" instructions to import inputs
     std::vector<llvm::CallInst*> m_exportCalls; // List of "call" instructions to export outputs
-    PipelineState*          m_pPipelineState = nullptr; // PipelineState from PipelineStateWrapper pass
+    PipelineState*          m_pPipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
 };
 
 } // Llpc

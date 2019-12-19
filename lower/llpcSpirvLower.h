@@ -85,7 +85,7 @@ llvm::ModulePass* CreateSpirvLowerMemoryOp();
 llvm::ModulePass* CreateSpirvLowerGlobal();
 llvm::ModulePass* CreateSpirvLowerInstMetaRemove();
 llvm::ModulePass* CreateSpirvLowerLoopUnrollControl(uint32_t forceLoopUnrollCount);
-llvm::ModulePass* CreateSpirvLowerResourceCollect();
+llvm::ModulePass* CreateSpirvLowerResourceCollect(bool collectDetailUsage);
 llvm::ModulePass* CreateSpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo* pShaderInfo);
 
 // =====================================================================================================================

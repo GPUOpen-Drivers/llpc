@@ -52,9 +52,6 @@ struct ShaderModuleEntry
     uint32_t    entryNameHash[4];   // Hash code of entry name
     uint32_t    entryOffset;        // Byte offset of the entry data in the binCode of ShaderModuleData
     uint32_t    entrySize;          // Byte size of the entry data
-    uint32_t    resUsageSize;       // Byte size of the resource usage
-                                    // NOTE: It should be removed after we move all necessary resUsage info to
-                                    // LLVM module metadata
     uint32_t    passIndex;          // Indices of passes, It is only for internal debug.
 };
 

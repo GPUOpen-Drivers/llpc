@@ -242,6 +242,7 @@ if(ICD_BUILD_LLPC)
 # llpc/builder
     target_sources(llpc PRIVATE
         builder/llpcBuilder.cpp
+        builder/llpcBuilderContext.cpp
         builder/llpcBuilderImpl.cpp
         builder/llpcBuilderImplArith.cpp
         builder/llpcBuilderImplDesc.cpp
@@ -253,6 +254,7 @@ if(ICD_BUILD_LLPC)
         builder/llpcBuilderRecorder.cpp
         builder/llpcBuilderReplayer.cpp
         builder/llpcPipelineState.cpp
+        builder/llpcShaderModes.cpp
     )
 
 # llpc/context
@@ -319,12 +321,7 @@ if(ICD_BUILD_LLPC)
 
 # llpc/translator
     target_sources(llpc PRIVATE
-        translator/lib/SPIRV/OCLUtil.cpp
-        translator/lib/SPIRV/SPIRVLowerBool.cpp
-        translator/lib/SPIRV/SPIRVLowerConstExpr.cpp
-        translator/lib/SPIRV/SPIRVLowerMemmove.cpp
         translator/lib/SPIRV/SPIRVReader.cpp
-        translator/lib/SPIRV/SPIRVRegularizeLLVM.cpp
         translator/lib/SPIRV/SPIRVUtil.cpp
     )
 

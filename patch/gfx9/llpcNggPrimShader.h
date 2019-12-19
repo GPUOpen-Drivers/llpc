@@ -35,12 +35,15 @@
 #include "llpc.h"
 #include "llpcInternal.h"
 #include "llpcNggLdsManager.h"
+#include "llpcPipelineState.h"
 
 namespace Llpc
 {
 
 class Context;
+struct NggControl;
 class NggLdsManager;
+class PipelineState;
 
 // Represents exported data used in "exp" instruction
 struct ExpData
@@ -56,7 +59,7 @@ struct ExpData
 class NggPrimShader
 {
 public:
-    NggPrimShader(Context* pContext);
+    NggPrimShader(PipelineState* pPipelineState);
     ~NggPrimShader();
 
     llvm::Function* Generate(llvm::Function* pEsEntryPoint,
@@ -105,7 +108,7 @@ private:
                         uint32_t     compIdx,
                         uint32_t     streamId,
                         llvm::Value* pThreadIdInWave,
-                        llvm::Value* pEmitCounter);
+                        llvm::Value* pOutVertCounter);
 
     llvm::Value* ImportGsOutput(llvm::Type*  pOutputTy,
                                 uint32_t     location,
@@ -185,7 +188,7 @@ private:
     llvm::Function* CreateFetchCullingRegister(llvm::Module* pModule);
 
     llvm::Value* DoSubgroupBallot(llvm::Value* pValue);
-    llvm::Value* DoSubgroupInclusiveAdd(llvm::Value* pValue);
+    llvm::Value* DoSubgroupInclusiveAdd(llvm::Value* pValue, llvm::Value** ppWwmResult = nullptr);
     llvm::Value* DoDppUpdate(llvm::Value* pOldValue,
                              llvm::Value* pSrcValue,
                              uint32_t     dppCtrl,
@@ -210,8 +213,9 @@ private:
 
     static const uint32_t NullPrim = (1u << 31); // Null primitive data (invalid)
 
-    Context*        m_pContext; // LLPC context
-    GfxIpVersion    m_gfxIp;    // Graphics IP version info
+    PipelineState*  m_pPipelineState; // Pipeline state
+    Context*        m_pContext;       // LLPC context
+    GfxIpVersion    m_gfxIp;          // Graphics IP version info
 
     const NggControl* m_pNggControl;  // NGG control settings
 

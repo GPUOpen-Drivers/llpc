@@ -39,6 +39,7 @@
 #include <unordered_set>
 #include "spirvExt.h"
 
+#include "llpcBuilderContext.h"
 #include "llpcEmuLib.h"
 #include "llpcPipelineContext.h"
 
@@ -73,11 +74,14 @@ public:
         return m_pPipelineContext;
     }
 
-    // Sets LLPC builder
+    // Set LLPC builder
     void SetBuilder(Builder* pBuilder) { m_pBuilder = pBuilder; }
 
-    // Gets LLPC builder
+    // Get LLPC builder
     Builder* GetBuilder() const { return m_pBuilder; }
+
+    // Get (create if necessary) BuilderContext
+    BuilderContext* GetBuilderContext();
 
     // Sets the target machine.
     void SetTargetMachine(llvm::TargetMachine* pTargetMachine, const PipelineOptions* pPipelineOptions)
@@ -131,14 +135,7 @@ public:
     // Wrappers of interfaces of pipeline context
     ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage)
     {
-        if (m_pResUsage != nullptr)
-        {
-            return m_pResUsage;
-        }
-        else
-        {
-            return m_pPipelineContext->GetShaderResourceUsage(shaderStage);
-        }
+        return m_pPipelineContext->GetShaderResourceUsage(shaderStage);
     }
 
     InterfaceData* GetShaderInterfaceData(ShaderStage shaderStage)
@@ -210,53 +207,18 @@ public:
         return m_pEmptyMetaNode;
     }
 
-    bool IsTessOffChip() const
-    {
-        return m_pPipelineContext->IsTessOffChip();
-    }
-
-    bool CheckGsOnChipValidity()
-    {
-        return m_pPipelineContext->CheckGsOnChipValidity();
-    };
-
-    bool IsGsOnChip()
-    {
-        return m_pPipelineContext->IsGsOnChip();
-    }
-
-    void SetGsOnChip(bool gsOnChip)
-    {
-        m_pPipelineContext->SetGsOnChip(gsOnChip);
-    }
-
     void DoUserDataNodeMerge()
     {
         m_pPipelineContext->DoUserDataNodeMerge();
     }
 
 #if LLPC_BUILD_GFX10
-    // Sets NGG control settings
-    void SetNggControl()
-    {
-        return m_pPipelineContext->SetNggControl();
-    }
-
-    // Gets NGG control settings
-    const NggControl* GetNggControl() const
-    {
-        return m_pPipelineContext->GetNggControl();
-    }
-
     // Gets WGP mode enablement for the specified shader stage
     bool GetShaderWgpMode(ShaderStage shaderStage) const
     {
         return m_pPipelineContext->GetShaderWgpMode(shaderStage);
     }
 #endif
-
-    // Gets float control settings of the specified shader stage for the provide floating-point type.
-    FloatControl GetShaderFloatControl(ShaderStage shaderStage, uint32_t bitWidth);
 
     // Gets the count of vertices per primitive
     uint32_t GetVerticesPerPrimitive()
@@ -288,12 +250,6 @@ public:
     // Sets triple and data layout in specified module from the context's target machine.
     void SetModuleTargetMachine(llvm::Module* pModule);
 
-    // Sets external resource usage.
-    void SetResUsage(ResourceUsage* pResUsage)
-    {
-        m_pResUsage = pResUsage;
-    }
-
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Context);
     LLPC_DISALLOW_COPY_AND_ASSIGN(Context);
@@ -305,8 +261,7 @@ private:
     EmuLib                        m_glslEmuLib;        // LLVM library for GLSL emulation
     volatile  bool                m_isInUse;           // Whether this context is in use
     Builder*                      m_pBuilder = nullptr; // LLPC builder object
-
-    ResourceUsage*                m_pResUsage;          // External resource usage
+    std::unique_ptr<BuilderContext> m_builderContext;  // Builder context
 
     std::unique_ptr<llvm::TargetMachine> m_pTargetMachine; // Target machine
     PipelineOptions               m_TargetMachineOptions;  // Pipeline options when create target machine
