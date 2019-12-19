@@ -96,10 +96,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcShaderCache.cpp                 \
         llpcShaderCacheManager.cpp
 
-ifeq ($(VKI_RAY_TRACING), 1)
-    CPPFILES += llpcRayTracingContext.cpp
-endif
-
     # llpc/lower
     CPPFILES +=                                 \
         llpcSpirvLower.cpp                      \
@@ -112,12 +108,6 @@ endif
         llpcSpirvLowerMemoryOp.cpp              \
         llpcSpirvLowerResourceCollect.cpp       \
         llpcSpirvLowerTranslator.cpp
-
-ifeq ($(VKI_RAY_TRACING), 1)
-    CPPFILES +=                                 \
-        llpcSpirvLowerRayTracing.cpp            \
-        llpcSpirvLowerRayTracingBuiltIn.cpp
-endif
 
     # llpc/patch
     CPPFILES +=                             \

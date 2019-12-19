@@ -2922,7 +2922,7 @@ Result ConfigBuilder::BuildCsRegConfig(
 #if LLPC_BUILD_GFX10
     if (m_pContext->GetGpuProperty()->supportSpiPrefPriority)
     {
-        SET_REG_FIELD(pConfig, COMPUTE_USER_ACCUM_0, CONTRIBUTION, 1);
+         SET_REG_FIELD(pConfig, COMPUTE_USER_ACCUM_0, CONTRIBUTION, 1);
         SET_REG_FIELD(pConfig, COMPUTE_USER_ACCUM_1, CONTRIBUTION, 1);
         SET_REG_FIELD(pConfig, COMPUTE_USER_ACCUM_2, CONTRIBUTION, 1);
         SET_REG_FIELD(pConfig, COMPUTE_USER_ACCUM_3, CONTRIBUTION, 1);
