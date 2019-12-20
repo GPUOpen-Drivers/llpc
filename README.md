@@ -6,6 +6,8 @@
 
 * [amdllpc standalone compiler](llpc/docs/amdllpc.md)
 
+* [Coding standard](docs/CodingStandards.md)
+
 ## Third Party Software
 LLPC contains code written by third parties:
 * SPIRV-LLVM translator is distributed under the terms of University of Illinois/NCSA Open Source License. See llpc/translator/LICENSE.TXT.
