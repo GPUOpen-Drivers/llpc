@@ -31,6 +31,7 @@
 #define DEBUG_TYPE "llpc-patch-in-out-import-export"
 
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 

@@ -30,11 +30,12 @@
  */
 #define DEBUG_TYPE "llpc-patch-buffer-op"
 
-#include "llvm/InitializePasses.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Analysis/LegacyDivergenceAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"

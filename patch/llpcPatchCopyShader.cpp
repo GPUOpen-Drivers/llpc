@@ -31,8 +31,9 @@
 #define DEBUG_TYPE "llpc-patch-copy-shader"
 
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 
 #include "SPIRVInternal.h"
 #include "llpcBuilderImpl.h"

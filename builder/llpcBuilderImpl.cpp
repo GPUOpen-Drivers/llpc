@@ -28,6 +28,8 @@
  * @brief LLPC source file: implementation of Llpc::BuilderImpl
  ***********************************************************************************************************************
  */
+#include "llvm/IR/IntrinsicsAMDGPU.h"
+
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
 #include "llpcPipelineState.h"

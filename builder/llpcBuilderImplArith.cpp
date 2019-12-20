@@ -28,6 +28,8 @@
  * @brief LLPC source file: implementation of arithmetic Builder methods
  ***********************************************************************************************************************
  */
+#include "llvm/IR/IntrinsicsAMDGPU.h"
+
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
 #include "llpcPipelineState.h"
