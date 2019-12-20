@@ -17,6 +17,7 @@ jobs:
       - name: Checkout LLPC
         run: |
           git clone https://github.com/${GITHUB_REPOSITORY}.git .
+          git fetch origin +${GITHUB_SHA}:${GITHUB_REF}
           git checkout ${GITHUB_SHA}
       - name: Fetch the latest prebuilt AMDVLK
         run: |
@@ -25,5 +26,6 @@ jobs:
         run: docker build . --file docker/llpc.Dockerfile
                             --build-arg AMDVLK_IMAGE="${{ matrix.base-image }}"
                             --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
+                            --build-arg LLPC_REPO_REF="${GITHUB_REF}"
                             --build-arg LLPC_REPO_SHA="${GITHUB_SHA}"
                             --tag llpc/ci-shaderdb

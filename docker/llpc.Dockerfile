@@ -1,10 +1,11 @@
 #
 # Dockerfile for LLPC Continuous Integration.
 # Sample invocation:
-#    docker build . --file docker/llpc.Dockerfile                        \
-#                   --build-arg AMDVLK_IMAGE=kuhar/amdvlk:nightly        \
-#                   --build-arg LLPC_REPO_NAME=GPUOpen-Drivers/llpc      \
-#                   --build-arg LLPC_REPO_SHA=<GIT_SHA>                  \
+#    docker build . --file docker/llpc.Dockerfile                                             \
+#                   --build-arg AMDVLK_IMAGE=gcr.io/stadia-open-source/amdvlk:nightly         \
+#                   --build-arg LLPC_REPO_NAME=GPUOpen-Drivers/llpc                           \
+#                   --build-arg LLPC_REPO_REF=<GIT_REF>                                       \
+#                   --build-arg LLPC_REPO_SHA=<GIT_SHA>                                       \
 #                   --tag llpc-ci/llpc
 #
 # Required arguments:
@@ -18,6 +19,7 @@ ARG AMDVLK_IMAGE
 FROM "$AMDVLK_IMAGE"
 
 ARG LLPC_REPO_NAME
+ARG LLPC_REPO_REF
 ARG LLPC_REPO_SHA
 
 # Sync the repos. Replace the base LLPC with a freshly checked-out one.
@@ -25,6 +27,7 @@ RUN cat /vulkandriver/build_info.txt \
     && (cd /vulkandriver && repo sync -c --no-clone-bundle -j$(nproc)) \
     && rm -rf /vulkandriver/drivers/llpc \
     && git clone https://github.com/"$LLPC_REPO_NAME".git /vulkandriver/drivers/llpc \
+    && git -C /vulkandriver/drivers/llpc fetch origin +"$LLPC_REPO_SHA":"$LLPC_REPO_REF" \
     && git -C /vulkandriver/drivers/llpc checkout "$LLPC_REPO_SHA"
 
 # Build LLPC.
