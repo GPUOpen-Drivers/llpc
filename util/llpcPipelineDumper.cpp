@@ -473,6 +473,7 @@ void PipelineDumper::DumpResourceMappingNode(
     {
     case ResourceMappingNodeType::DescriptorResource:
     case ResourceMappingNodeType::DescriptorSampler:
+    case ResourceMappingNodeType::DescriptorYCbCrSampler:
     case ResourceMappingNodeType::DescriptorCombinedTexture:
     case ResourceMappingNodeType::DescriptorTexelBuffer:
     case ResourceMappingNodeType::DescriptorBuffer:
@@ -1163,10 +1164,15 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
                 pHasher->Update(pDescriptorRangeValue->arraySize);
 
                 // TODO: We should query descriptor size from patch
-                const uint32_t DescriptorSize = 16;
-                LLPC_ASSERT(pDescriptorRangeValue->type == ResourceMappingNodeType::DescriptorSampler);
+
+                // The second part of DescriptorRangeValue is YCbCrMetaData, which is 4 DWORDS.
+                // The hasher should be updated when the content changes, this is because YCbCrMetaData
+                // is engaged in pipeline compiling.
+                const uint32_t descriptorSize =
+                    (pDescriptorRangeValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler) ? 16 : 32;
+
                 pHasher->Update(reinterpret_cast<const uint8_t*>(pDescriptorRangeValue->pValue),
-                                pDescriptorRangeValue->arraySize * DescriptorSize);
+                                pDescriptorRangeValue->arraySize * descriptorSize);
             }
         }
 
@@ -1234,6 +1240,7 @@ void PipelineDumper::UpdateHashForResourceMappingNode(
     {
     case ResourceMappingNodeType::DescriptorResource:
     case ResourceMappingNodeType::DescriptorSampler:
+    case ResourceMappingNodeType::DescriptorYCbCrSampler:
     case ResourceMappingNodeType::DescriptorCombinedTexture:
     case ResourceMappingNodeType::DescriptorTexelBuffer:
     case ResourceMappingNodeType::DescriptorBuffer:

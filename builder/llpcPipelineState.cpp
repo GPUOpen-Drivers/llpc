@@ -548,22 +548,29 @@ void PipelineState::SetUserDataNodesTable(
                     auto& immutableNode = *it->second;
 
                     IRBuilder<> builder(GetContext());
-                    SmallVector<Constant*, 4> values;
+                    SmallVector<Constant*, 8> values;
 
                     if (immutableNode.arraySize != 0)
                     {
+                        const uint32_t samplerDescriptorSize =
+                            (node.type != ResourceMappingNodeType::DescriptorYCbCrSampler) ? 4 : 8;
+
                         for (uint32_t compIdx = 0; compIdx < immutableNode.arraySize; ++compIdx)
                         {
-                            Constant* compValues[4] =
+                            Constant* compValues[8] = {};
+                            for (uint32_t i = 0; i < samplerDescriptorSize; ++i)
                             {
-                                builder.getInt32(immutableNode.pValue[compIdx * 4]),
-                                builder.getInt32(immutableNode.pValue[compIdx * 4 + 1]),
-                                builder.getInt32(immutableNode.pValue[compIdx * 4 + 2]),
-                                builder.getInt32(immutableNode.pValue[compIdx * 4 + 3])
-                            };
+                                compValues[i] =
+                                    builder.getInt32(immutableNode.pValue[compIdx * samplerDescriptorSize + i]);
+                            }
+                            for (uint32_t i = samplerDescriptorSize; i < 8; ++i)
+                            {
+                                compValues[i] = builder.getInt32(0);
+                            }
                             values.push_back(ConstantVector::get(compValues));
                         }
-                        destNode.pImmutableValue = ConstantArray::get(ArrayType::get(values[0]->getType(), values.size()),
+                        destNode.pImmutableValue = ConstantArray::get(ArrayType::get(values[0]->getType(),
+                                                                                     values.size()),
                                                                       values);
                     }
                 }
@@ -643,8 +650,8 @@ void PipelineState::RecordUserDataTable(
                     // Writing the constant array directly does not seem to work, as it does not survive IR linking.
                     // Maybe it is a problem with the IR linker when metadata contains a non-ConstantData constant.
                     // So we write the individual ConstantInts instead.
-                    // We can assume that the descriptor is <4 x i32> as an immutable descriptor is always a sampler.
-                    static const uint32_t SamplerDescriptorSize = 4;
+                    // We can assume that the descriptor is <8 x i32> as an immutable descriptor is always a sampler.
+                    static const uint32_t SamplerDescriptorSize = 8;
                     uint32_t elemCount = node.pImmutableValue->getType()->getArrayNumElements();
                     for (uint32_t elemIdx = 0; elemIdx != elemCount; ++elemIdx)
                     {
@@ -735,11 +742,11 @@ void PipelineState::ReadUserDataNodes(
                 if (pMetadataNode->getNumOperands() >= 6)
                 {
                     // Operand 5 onward: immutable descriptor constant
-                    static const uint32_t SamplerDescriptorSize = 4;
+                    static const uint32_t SamplerDescriptorSize = 8;
                     static const uint32_t OperandStartIdx = 5;
 
                     uint32_t elemCount = (pMetadataNode->getNumOperands() - OperandStartIdx) / SamplerDescriptorSize;
-                    SmallVector<Constant*, 4> descriptors;
+                    SmallVector<Constant*, 8> descriptors;
                     for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
                     {
                         Constant* compValues[SamplerDescriptorSize];

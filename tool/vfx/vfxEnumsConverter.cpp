@@ -993,6 +993,7 @@ void InitEnumMap()
 
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorResource)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorSampler)
+    ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorYCbCrSampler)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorCombinedTexture)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorTexelBuffer)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorFmask)

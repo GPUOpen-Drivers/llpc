@@ -79,6 +79,10 @@ protected:
                                      ArrayRef<uint32_t> operandIdxs,
                                      const Twine&       instName = "");
 
+    // Find the call with specific call name recursively
+    CallInst* FindCallByName(CallInst* pCall,
+                             StringRef callName);
+
     // Helper method to scalarize a possibly vector unary operation
     Value* Scalarize(Value* pValue, std::function<Value*(Value*)> callback);
 

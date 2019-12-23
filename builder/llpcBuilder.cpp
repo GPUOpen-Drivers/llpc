@@ -297,7 +297,7 @@ VectorType* Builder::GetTexelBufferDescTy()
 // Get the type of a sampler descriptor
 VectorType* Builder::GetSamplerDescTy()
 {
-    return VectorType::get(getInt32Ty(), 4);
+    return VectorType::get(getInt32Ty(), 8);
 }
 
 // =====================================================================================================================

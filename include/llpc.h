@@ -151,6 +151,7 @@ enum class ResourceMappingNodeType : uint32_t
     PushConst,                      ///< Push constant
     DescriptorBufferCompact,        ///< Compact buffer descriptor, only contains the buffer address
     StreamOutTableVaPtr,            ///< Stream-out buffer table VA pointer
+    DescriptorYCbCrSampler,         ///< Generic descriptor: YCbCr sampler
     Count,                          ///< Count of resource mapping node types.
 };
 

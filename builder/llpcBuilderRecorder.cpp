@@ -1037,7 +1037,7 @@ Value* BuilderRecorder::CreateIndexDescPtr(
 
 // =====================================================================================================================
 // Load image/sampler/texelbuffer/F-mask descriptor from pointer.
-// Returns <8 x i32> descriptor for image or F-mask, or <4 x i32> descriptor for sampler or texel buffer.
+// Returns <8 x i32> descriptor for image, sampler or F-mask, or <4 x i32> descriptor for texel buffer.
 Value* BuilderRecorder::CreateLoadDescFromPtr(
     Value*        pDescPtr,           // [in] Descriptor pointer, as returned by CreateIndexDescPtr or one of
                                       //    the CreateGet*DescPtr methods
