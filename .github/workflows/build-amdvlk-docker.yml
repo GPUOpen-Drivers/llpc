@@ -2,16 +2,16 @@ name: Build AMDVLK for LLPC
 
 on:
   schedule:
-    - cron:  "0 */4 * * *"
+    - cron:  "0 */12 * * *"
 
 jobs:
   build-and-push-amdvlk:
-    name: Build AMDVLK branch ${{ matrix.branch }}, base image ${{ matrix.base-image }}, config ${{ matrix.config }}
+    name: Branch ${{ matrix.branch }}, base image ${{ matrix.base-image }}, config ${{ matrix.config }}
     runs-on: ${{ matrix.host-os }}
     strategy:
       matrix:
         host-os:      ["ubuntu-latest"]
-        base-image:   ["gcr.io/stadia-open-source/amdvlk:nightly"]
+        base-image:   ["gcr.io/stadia-open-source/amdvlk_dev_release:nightly"]
         branch:       [dev]
         config:       [Release]
         generator:    [Ninja]
