@@ -27,7 +27,7 @@ RUN cat /vulkandriver/build_info.txt \
     && (cd /vulkandriver && repo sync -c --no-clone-bundle -j$(nproc)) \
     && rm -rf /vulkandriver/drivers/llpc \
     && git clone https://github.com/"$LLPC_REPO_NAME".git /vulkandriver/drivers/llpc \
-    && git -C /vulkandriver/drivers/llpc fetch origin +"$LLPC_REPO_SHA":"$LLPC_REPO_REF" \
+    && git -C /vulkandriver/drivers/llpc fetch origin +"$LLPC_REPO_SHA":"$LLPC_REPO_REF" --update-head-ok \
     && git -C /vulkandriver/drivers/llpc checkout "$LLPC_REPO_SHA"
 
 # Build LLPC.

@@ -1,15 +1,20 @@
 name: LLPC Docker CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - '*'
+      - '!master'
+  pull_request:
 
 jobs:
   build-and-test:
-    name: Test branch ${{ matrix.branch }}, base image ${{ matrix.base-image }}, config ${{ matrix.config }}
+    name: Branch ${{ matrix.branch }}, base image ${{ matrix.base-image }}, config ${{ matrix.config }}
     runs-on: ${{ matrix.host-os }}
     strategy:
       matrix:
         host-os:      ["ubuntu-latest"]
-        base-image:   ["gcr.io/stadia-open-source/amdvlk:nightly"]
+        base-image:   ["gcr.io/stadia-open-source/amdvlk_dev_release:nightly"]
         branch:       [dev]
         config:       [Release]
         generator:    [Ninja]
@@ -17,7 +22,7 @@ jobs:
       - name: Checkout LLPC
         run: |
           git clone https://github.com/${GITHUB_REPOSITORY}.git .
-          git fetch origin +${GITHUB_SHA}:${GITHUB_REF}
+          git fetch origin +${GITHUB_SHA}:${GITHUB_REF} --update-head-ok
           git checkout ${GITHUB_SHA}
       - name: Fetch the latest prebuilt AMDVLK
         run: |
