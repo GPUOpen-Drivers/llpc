@@ -227,6 +227,7 @@ const char* GetResourceMappingNodeTypeName(
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, Unknown)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorResource)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorSampler)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorYCbCrSampler)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorCombinedTexture)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorTexelBuffer)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorFmask)

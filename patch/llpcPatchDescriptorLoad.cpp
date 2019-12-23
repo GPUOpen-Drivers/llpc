@@ -280,7 +280,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
     }
     else if (mangledName == LlpcName::DescriptorGetSamplerPtr)
     {
-        pDescPtrTy = m_pContext->Int32x4Ty()->getPointerTo(ADDR_SPACE_CONST);
+        pDescPtrTy = m_pContext->Int32x8Ty()->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceMappingNodeType::DescriptorSampler;
         nodeType2 = nodeType1;
     }
@@ -329,7 +329,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
     if (pDescRangeValue != nullptr)
     {
         // Descriptor range value (immutable sampler in Vulkan). pDescRangeValue is a constant array of
-        // <4 x i32> descriptors.
+        // <8 x i32> descriptors.
         IRBuilder<> builder(*m_pContext);
         builder.SetInsertPoint(pInsertPoint);
 

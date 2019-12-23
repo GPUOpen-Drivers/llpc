@@ -1203,15 +1203,29 @@ Value* BuilderImplImage::CreateImageSample(
     LLPC_ASSERT((pCoord->getType()->getScalarType()->isFloatTy()) ||
                 (pCoord->getType()->getScalarType()->isHalfTy()));
 
-    return CreateImageSampleGather(pResultTy,
-                                   dim,
-                                   flags,
-                                   pCoord,
-                                   pImageDesc,
-                                   pSamplerDesc,
-                                   address,
-                                   instName,
-                                   true);
+    // Check whether the sampler desc contains with constant value
+    auto pDescWord0 = dyn_cast<ConstantInt>(CreateExtractElement(pSamplerDesc, getInt32(0)));
+
+    if (pDescWord0 != nullptr)
+    {
+        //# TODO: Handle sampler YCbCr conversion
+        return nullptr;
+    }
+    else
+    {
+        // Only the first 4 DWs are sampler desc, we need to extract these values under any condition
+        pSamplerDesc = CreateShuffleVector(pSamplerDesc, pSamplerDesc, { 0, 1, 2, 3 });
+
+        return CreateImageSampleGather(pResultTy,
+                                       dim,
+                                       flags,
+                                       pCoord,
+                                       pImageDesc,
+                                       pSamplerDesc,
+                                       address,
+                                       instName,
+                                       true);
+    }
 }
 
 // =====================================================================================================================
