@@ -556,8 +556,10 @@ Value* BuilderImplInOut::EvalIJOffsetSmooth(
     // Extract <I,J> part of that, and divide by W.
     Value* pIJ = CreateShuffleVector(pAdjusted, pAdjusted, { 0, 1 });
     Value* pRcpW = CreateExtractElement(pAdjusted, 2);
-    pRcpW = CreateVectorSplat(2, pRcpW);
-    return CreateFMul(pIJ, pRcpW);
+    // Get W by making a reciprocal of 1/W
+    Value* pW = CreateFDiv(ConstantFP::get(getFloatTy(), 1.0), pRcpW);
+    pW = CreateVectorSplat(2, pW);
+    return CreateFMul(pIJ, pW);
 }
 
 // =====================================================================================================================
