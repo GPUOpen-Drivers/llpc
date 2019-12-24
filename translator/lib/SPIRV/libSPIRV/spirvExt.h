@@ -40,7 +40,6 @@
 #define SPIRVEXT_H
 
 #include "spirv.hpp"
-#include "OpenCL.std.h"
 #include "GLSL.std.450.h"
 
 namespace spv

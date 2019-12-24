@@ -57,8 +57,6 @@ template <> inline void SPIRVMap<SourceLanguage, std::string>::init() {
   add(SourceLanguageUnknown, "Unknown");
   add(SourceLanguageESSL, "ESSL");
   add(SourceLanguageGLSL, "GLSL");
-  add(SourceLanguageOpenCL_C, "OpenCL_C");
-  add(SourceLanguageOpenCL_CPP, "OpenCL_CPP");
   add(SourceLanguageHLSL, "HLSL");
 }
 SPIRV_DEF_NAMEMAP(SourceLanguage, SPIRVSourceLanguageNameMap)
@@ -83,7 +81,6 @@ SPIRV_DEF_NAMEMAP(AddressingModel, SPIRVAddressingModelNameMap)
 template <> inline void SPIRVMap<MemoryModel, std::string>::init() {
   add(MemoryModelSimple, "Simple");
   add(MemoryModelGLSL450, "GLSL450");
-  add(MemoryModelOpenCL, "OpenCL");
 }
 SPIRV_DEF_NAMEMAP(MemoryModel, SPIRVMemoryModelNameMap)
 

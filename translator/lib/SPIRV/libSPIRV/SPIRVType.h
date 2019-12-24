@@ -88,7 +88,6 @@ public:
   bool isTypeFloat(unsigned Bits = 0) const;
   bool isTypeImage() const;
   bool isTypeSampledImage() const;
-  bool isTypeOCLImage() const;
   bool isTypeInt(unsigned Bits = 0) const;
   bool isTypePointer() const;
   bool isTypeForwardPointer() const;
@@ -437,7 +436,6 @@ inline void SPIRVMap<std::string, SPIRVTypeImageDescriptor>::init() {
   _SPIRV_OP(image3d_t, Dim3D, 0, 0, 0, 0, 0)
 #undef _SPIRV_OP
 }
-typedef SPIRVMap<std::string, SPIRVTypeImageDescriptor> OCLSPIRVImageTypeMap;
 
 // Comparision function required to use the struct as map key.
 inline bool operator<(const SPIRVTypeImageDescriptor &A,
@@ -458,7 +456,6 @@ public:
   }
   SPIRVTypeImage() : SPIRVType(OC), SampledType(SPIRVID_INVALID), Desc() {}
   const SPIRVTypeImageDescriptor &getDescriptor() const { return Desc; }
-  bool isOCLImage() const { return Desc.Sampled == 0 && Desc.Format == 0; }
   SPIRVCapVec getRequiredCapability() const override {
     SPIRVCapVec CV;
     if (Desc.Dim == SPIRVImageDimKind::Dim1D)
@@ -476,7 +473,6 @@ public:
 protected:
   _SPIRV_DEF_DECODE8(Id, SampledType, Desc.Dim, Desc.Depth, Desc.Arrayed,
                      Desc.MS, Desc.Sampled, Desc.Format)
-  // The validation assumes OpenCL image or sampler type.
   void validate() const override {
     assert(OpCode == OC);
     assert(WordCount == FixedWC);

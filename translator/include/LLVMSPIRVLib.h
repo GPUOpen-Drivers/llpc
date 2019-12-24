@@ -114,10 +114,6 @@ bool readSpirv(Llpc::Builder *Builder,
 /// SPIRV.
 bool regularizeLlvmForSpirv(llvm::Module *M, std::string &ErrMsg);
 
-/// \brief Mangle OpenCL builtin function function name.
-void mangleOpenClBuiltin(const std::string &UnmangledName,
-                         ArrayRef<Type*> ArgTypes, std::string &MangledName);
-
 /// Create a pass for lowering cast instructions of i1 type.
 ModulePass *createSPIRVLowerBool();
 

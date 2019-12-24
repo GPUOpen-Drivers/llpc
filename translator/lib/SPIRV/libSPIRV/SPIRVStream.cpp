@@ -70,7 +70,6 @@ template <class T> const SPIRVDecoder &decode(const SPIRVDecoder &I, T &V) {
 SPIRV_DEF_ENCDEC(Op)
 SPIRV_DEF_ENCDEC(Capability)
 SPIRV_DEF_ENCDEC(Decoration)
-SPIRV_DEF_ENCDEC(OCLExtOpKind)
 SPIRV_DEF_ENCDEC(GLSLExtOpKind)
 SPIRV_DEF_ENCDEC(LinkageType)
 
