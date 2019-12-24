@@ -76,11 +76,11 @@ bool SpirvLowerInstMetaRemove::runOnModule(
 
     visit(m_pModule);
 
-    // Remove any named metadata in the module that starts "spirv." or "opencl.".
+    // Remove any named metadata in the module that starts "spirv.".
     SmallVector<NamedMDNode*, 8> nodesToRemove;
     for (auto& namedMdNode : m_pModule->getNamedMDList())
     {
-        if (namedMdNode.getName().startswith(gSPIRVMD::Prefix) || namedMdNode.getName().startswith(kSPIR2MD::Prefix))
+        if (namedMdNode.getName().startswith(gSPIRVMD::Prefix))
         {
             nodesToRemove.push_back(&namedMdNode);
         }

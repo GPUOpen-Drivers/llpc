@@ -197,11 +197,6 @@ bool SPIRVType::isTypeFloat(unsigned Bits) const {
   return isType<SPIRVTypeFloat>(this, Bits);
 }
 
-bool SPIRVType::isTypeOCLImage() const {
-  return isTypeImage() &&
-         static_cast<const SPIRVTypeImage *>(this)->isOCLImage();
-}
-
 bool SPIRVType::isTypeInt(unsigned Bits) const {
   return isType<SPIRVTypeInt>(this, Bits);
 }

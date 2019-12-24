@@ -41,7 +41,6 @@
 #include "SPIRVFunction.h"
 #include "SPIRVInstruction.h"
 #include "SPIRVInternal.h"
-#include "SPIRVMDBuilder.h"
 #include "SPIRVModule.h"
 #include "SPIRVType.h"
 #include "SPIRVUtil.h"
@@ -282,10 +281,8 @@ public:
   std::vector<Value *> transValue(const std::vector<SPIRVValue *> &,
                                   Function *F, BasicBlock *);
   Function *transFunction(SPIRVFunction *F);
-  bool transFPContractMetadata();
   bool transMetadata();
   bool transNonTemporalMetadata(Instruction *I);
-  void transGeneratorMD();
   Value *transConvertInst(SPIRVValue *BV, Function *F, BasicBlock *BB);
   Instruction *transBuiltinFromInst(const std::string &FuncName,
                                     SPIRVInstruction *BI, BasicBlock *BB);
@@ -360,14 +357,6 @@ public:
 
   // Post-process translated LLVM module to undo row major matrices.
   bool postProcessRowMajorMatrix();
-
-  /// \brief Post-process OpGroupAll and OpGroupAny instructions translation.
-  /// i1 func (<n x i1> arg)
-  /// =>
-  /// i32 func (<n x i32> arg)
-  /// \return transformed call instruction.
-  Instruction *postProcessGroupAllAny(CallInst *CI,
-                                      const std::string &DemangledName);
 
   typedef DenseMap<SPIRVType *, Type *> SPIRVToLLVMTypeMap;
   typedef DenseMap<SPIRVValue *, Value *> SPIRVToLLVMValueMap;
@@ -513,7 +502,6 @@ private:
       *Kind = Loc->second;
     return true;
   }
-  // OpenCL function always has NoUnwound attribute.
   // Change this if it is no longer true.
   bool isFuncNoUnwind() const { return true; }
   bool isSPIRVCmpInstTransToLLVMInst(SPIRVInstruction *BI) const;
@@ -540,8 +528,6 @@ private:
   BinaryOperator *transShiftLogicalBitwiseInst(SPIRVValue *BV, BasicBlock *BB,
                                                Function *F);
   Instruction *transCmpInst(SPIRVValue *BV, BasicBlock *BB, Function *F);
-
-  std::string transGLSLImageTypeName(SPIRV::SPIRVTypeImage* ST);
 
   void setName(llvm::Value *V, SPIRVValue *BV);
   void setLLVMLoopMetadata(SPIRVLoopMerge *LM, BranchInst *BI);
@@ -1793,35 +1779,6 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
     }
 
     return changed;
-}
-
-Instruction *
-SPIRVToLLVM::postProcessGroupAllAny(CallInst *CI,
-                                    const std::string &DemangledName) {
-  AttributeList Attrs = CI->getCalledFunction()->getAttributes();
-  return mutateCallInstSPIRV(
-      M, CI,
-      [=](CallInst *, std::vector<Value *> &Args, llvm::Type *&RetTy) {
-        Type *Int32Ty = Type::getInt32Ty(*Context);
-        RetTy = Int32Ty;
-        Args[1] = CastInst::CreateZExtOrBitCast(Args[1], Int32Ty, "", CI);
-        return DemangledName;
-      },
-      [=](CallInst *NewCI) -> Instruction * {
-        Type *RetTy = Type::getInt1Ty(*Context);
-        return CastInst::CreateTruncOrBitCast(NewCI, RetTy, "",
-                                              NewCI->getNextNode());
-      },
-      &Attrs);
-}
-
-void SPIRVToLLVM::transGeneratorMD() {
-  SPIRVMDBuilder B(*M);
-  B.addNamedMD(kSPIRVMD::Generator)
-      .addOp()
-      .addU16(BM->getGeneratorId())
-      .addU16(BM->getGeneratorVer())
-      .done();
 }
 
 /// Construct a DebugLoc for the given SPIRVInstruction.
@@ -3137,7 +3094,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
 
     if (pSpvAccessChain->hasPtrIndex() == false)
     {
-        indices.insert(indices.begin(), getInt32(M, 0));
+        indices.insert(indices.begin(), getBuilder()->getInt32(0));
     }
 
     SPIRVType* const pSpvBaseType = pSpvAccessChain->getBase()->getType();
@@ -4945,7 +4902,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   }
 
   case OpLine:
-  case OpSelectionMerge: // OpenCL Compiler does not use this instruction
+  case OpSelectionMerge:
     return nullptr;
   case OpLoopMerge: {      // Should be translated at OpBranch or OpBranchConditional cases
     SPIRVLoopMerge *LM = static_cast<SPIRVLoopMerge *>(BV);
@@ -7006,9 +6963,6 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
 
   if (!transMetadata())
     return false;
-  if (!transFPContractMetadata())
-    return false;
-  transGeneratorMD();
 
   postProcessRowMajorMatrix();
   if (ModuleUsage->keepUnusedFunctions == false)
@@ -7042,11 +6996,6 @@ bool SPIRVToLLVM::transDecoration(SPIRVValue *BV, Value *V) {
   if (!transShaderDecoration(BV, V))
     return false;
   DbgTran.transDbgInfo(BV, V);
-  return true;
-}
-
-bool SPIRVToLLVM::transFPContractMetadata() {
-  M->getOrInsertNamedMetadata(kSPIR2MD::FPContract);
   return true;
 }
 

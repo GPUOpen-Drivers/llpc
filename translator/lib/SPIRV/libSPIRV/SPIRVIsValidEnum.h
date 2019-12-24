@@ -58,8 +58,6 @@ inline bool isValid(spv::SourceLanguage V) {
   case SourceLanguageUnknown:
   case SourceLanguageESSL:
   case SourceLanguageGLSL:
-  case SourceLanguageOpenCL_C:
-  case SourceLanguageOpenCL_CPP:
   case SourceLanguageHLSL:
     return true;
   default:
@@ -101,7 +99,6 @@ inline bool isValid(spv::MemoryModel V) {
   switch (V) {
   case MemoryModelSimple:
   case MemoryModelGLSL450:
-  case MemoryModelOpenCL:
 #if SPV_VERSION >= 0x10500
   case MemoryModelVulkan:
 #endif

@@ -1676,8 +1676,7 @@ public:
   void setExtSetKindById() {
     assert(Module && "Invalid module");
     ExtSetKind = Module->getBuiltinSet(ExtSetId);
-    assert((ExtSetKind == SPIRVEIS_OpenCL ||
-            ExtSetKind == SPIRVEIS_GLSL ||
+    assert((ExtSetKind == SPIRVEIS_GLSL ||
             ExtSetKind == SPIRVEIS_ShaderBallotAMD ||
             ExtSetKind == SPIRVEIS_ShaderExplicitVertexParameterAMD ||
             ExtSetKind == SPIRVEIS_GcnShaderAMD ||
@@ -1688,9 +1687,6 @@ public:
     getDecoder(I) >> Type >> Id >> ExtSetId;
     setExtSetKindById();
     switch (ExtSetKind) {
-    case SPIRVEIS_OpenCL:
-      getDecoder(I) >> ExtOpOCL;
-      break;
     case SPIRVEIS_GLSL:
       getDecoder(I) >> ExtOpGLSL;
       break;
@@ -1716,29 +1712,12 @@ public:
     SPIRVFunctionCallGeneric::validate();
     validateBuiltin(ExtSetId, ExtOp);
   }
-  bool isOperandLiteral(unsigned Index) const override {
-    assert(ExtSetKind == SPIRVEIS_OpenCL &&
-           "Unsupported extended instruction set");
-    auto EOC = static_cast<OCLExtOpKind>(ExtOp);
-    switch (EOC) {
-    default:
-      return false;
-    case OpenCLLIB::Vloadn:
-    case OpenCLLIB::Vload_halfn:
-    case OpenCLLIB::Vloada_halfn:
-      return Index == 2;
-    case OpenCLLIB::Vstore_half_r:
-    case OpenCLLIB::Vstore_halfn_r:
-    case OpenCLLIB::Vstorea_halfn_r:
-      return Index == 3;
-    }
-  }
+  bool isOperandLiteral(unsigned Index) const override { return false; }
 
 protected:
   SPIRVId ExtSetId;
   union {
     SPIRVWord ExtOp;
-    OCLExtOpKind ExtOpOCL;
     GLSLExtOpKind ExtOpGLSL;
     ShaderBallotAMDExtOpKind ExtOpShaderBallotAMD;
     ShaderExplicitVertexParameterAMDExtOpKind

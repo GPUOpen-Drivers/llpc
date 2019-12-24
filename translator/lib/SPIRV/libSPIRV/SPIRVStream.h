@@ -116,7 +116,6 @@ const SPIRVDecoder &operator>>(const SPIRVDecoder &I, std::vector<T> &V) {
 SPIRV_DEC_ENCDEC(Op)
 SPIRV_DEC_ENCDEC(Capability)
 SPIRV_DEC_ENCDEC(Decoration)
-SPIRV_DEC_ENCDEC(OCLExtOpKind)
 SPIRV_DEC_ENCDEC(GLSLExtOpKind)
 SPIRV_DEC_ENCDEC(LinkageType)
 
