@@ -420,12 +420,6 @@ Compiler::~Compiler()
         ShaderCacheManager::GetShaderCacheManager()->ReleaseShaderCacheObject(m_shaderCache);
     }
 
-    if (m_options[0] == VkIcdName)
-    {
-        // NOTE: Skip subsequent cleanup work for Vulkan ICD. The work will be done by system itself
-        return;
-    }
-
     {
         // s_compilerMutex is managed by ManagedStatic, it can't be accessed after llvm_shutdown
         std::lock_guard<sys::Mutex> lock(*s_compilerMutex);
@@ -464,6 +458,8 @@ Result Compiler::BuildShaderModule(
     const void* pCacheData = nullptr;
     size_t allocSize = 0;
     ShaderModuleDataEx moduleDataEx = {};
+    // For trimming debug info
+    uint8_t* pTrimmedCode = nullptr;
 
     ElfPackage moduleBinary;
     raw_svector_ostream moduleBinaryStream(moduleBinary);
@@ -533,7 +529,7 @@ Result Compiler::BuildShaderModule(
         // Trim debug info
         if (cl::TrimDebugInfo)
         {
-	    uint8_t* pTrimmedCode = new uint8_t[moduleDataEx.common.binCode.codeSize];
+	        pTrimmedCode = new uint8_t[moduleDataEx.common.binCode.codeSize];
             ShaderModuleHelper::TrimSpirvDebugInfo(&pShaderInfo->shaderBin, moduleDataEx.common.binCode.codeSize, pTrimmedCode);
             moduleDataEx.common.binCode.pCode = pTrimmedCode;
         }
@@ -782,6 +778,13 @@ Result Compiler::BuildShaderModule(
 
             // Copy binary code
             memcpy(pCode, moduleDataEx.common.binCode.pCode, moduleDataEx.common.binCode.codeSize);
+            // Destory the temporary module code
+            if(pTrimmedCode != nullptr)
+            {
+                delete[] pTrimmedCode;
+                pTrimmedCode = nullptr;
+                moduleDataEx.common.binCode.pCode = nullptr;
+            }
 
             // Copy fragment shader output variables
             pModuleDataEx->extra.fsOutInfoCount = fsOutInfos.size();
@@ -2039,3 +2042,5 @@ void Compiler::BuildShaderCacheHash(
 }
 
 } // Llpc
+
+
