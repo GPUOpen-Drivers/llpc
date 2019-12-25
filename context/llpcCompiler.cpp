@@ -529,7 +529,7 @@ Result Compiler::BuildShaderModule(
         // Trim debug info
         if (cl::TrimDebugInfo)
         {
-	        pTrimmedCode = new uint8_t[moduleDataEx.common.binCode.codeSize];
+            pTrimmedCode = new uint8_t[moduleDataEx.common.binCode.codeSize];
             ShaderModuleHelper::TrimSpirvDebugInfo(&pShaderInfo->shaderBin, moduleDataEx.common.binCode.codeSize, pTrimmedCode);
             moduleDataEx.common.binCode.pCode = pTrimmedCode;
         }
