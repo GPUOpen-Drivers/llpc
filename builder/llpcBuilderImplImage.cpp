@@ -1213,7 +1213,7 @@ Value* BuilderImplImage::CreateImageSample(
     }
     else
     {
-        // Only the first 4 DWs are sampler desc, we need to extract these values under any condition
+        // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
         pSamplerDesc = CreateShuffleVector(pSamplerDesc, pSamplerDesc, { 0, 1, 2, 3 });
 
         return CreateImageSampleGather(pResultTy,
@@ -1267,6 +1267,9 @@ Value* BuilderImplImage::CreateImageGather(
         // For integer gather on pre-GFX9, patch descriptor or coordinate.
         pNeedDescPatch = PreprocessIntegerImageGather(dim, pImageDesc, pCoord);
     }
+
+    // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
+    pSamplerDesc = CreateShuffleVector(pSamplerDesc, pSamplerDesc, { 0, 1, 2, 3 });
 
     Value* pResult = nullptr;
     Value* pAddrOffset = address[ImageAddressIdxOffset];
@@ -1950,6 +1953,9 @@ Value* BuilderImplImage::CreateImageGetLod(
                             coords,
                             derivatives);
 
+    // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
+    pSamplerDesc = CreateShuffleVector(pSamplerDesc, pSamplerDesc, { 0, 1, 2, 3 });
+
     SmallVector<Value*, 9> args;
     args.push_back(getInt32(3));                    // dmask
     args.insert(args.end(), coords.begin(), coords.end());
@@ -2470,4 +2476,3 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
 
     return pCoord;
 }
-
