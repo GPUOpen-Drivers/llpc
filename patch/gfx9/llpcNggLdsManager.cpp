@@ -161,6 +161,8 @@ NggLdsManager::NggLdsManager(
     LLPC_OUTS("===============================================================================\n");
     LLPC_OUTS("// LLPC NGG LDS region info (in bytes)\n\n");
 
+    const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+
     if (hasGs)
     {
         //
@@ -172,7 +174,7 @@ NggLdsManager::NggLdsManager(
         //              | GS out vertex  offset |
         //              +-----------------------+
         //
-        const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+
         // NOTE: We round ES-GS LDS size to 4-DWORD alignment. This is for later LDS read/write operations of mutilple
         // DWORDs (such as DS128).
         const uint32_t esGsRingLdsSize = RoundUpToMultiple(calcFactor.esGsLdsSize, 4u) * SizeOfDword;
@@ -294,7 +296,8 @@ NggLdsManager::NggLdsManager(
         }
     }
 
-    LLPC_OUTS("\n");
+    LLPC_OUTS(format("%-40s :                  size = 0x%04" PRIX32,
+        static_cast<const char*>("LDS total"), calcFactor.gsOnChipLdsSize * SizeOfDword) << "\n\n");
 }
 
 // =====================================================================================================================

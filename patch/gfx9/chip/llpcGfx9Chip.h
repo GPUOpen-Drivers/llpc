@@ -200,6 +200,7 @@ namespace Llpc
 #if LLPC_BUILD_GFX10
 #define SET_REG_GFX10_FIELD(_stage, _reg, _field, _val)     (_stage)->_reg##_VAL.gfx10._field = (_val);
 #define SET_REG_GFX10_1_FIELD(_stage, _reg, _field, _val)   (_stage)->_reg##_VAL.gfx101._field = (_val);
+#define SET_REG_GFX10_1_PLUS_FIELD(_stage, _reg, _field, _val)  (_stage)->_reg##_VAL.gfx101Plus._field = (_val);
 #endif
 
 // Preferred number of GS primitives per ES thread.
