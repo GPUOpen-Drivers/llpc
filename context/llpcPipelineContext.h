@@ -450,7 +450,8 @@ struct ResourceUsage
                 uint32_t gsOnChipLdsSize;           // Total LDS size for GS on-chip mode.
                 uint32_t inputVertices;             // Number of GS input vertices
 #if LLPC_BUILD_GFX10
-                uint32_t primAmpFactor;             // GS primitive amplification factor
+                uint32_t primAmpFactor;             // GS primitive amplification factor (NGG)
+                bool     enableMaxVertOut;          // Whether to allow each GS instance to emit maximum vertices (NGG)
 #endif
             } calcFactor;
 

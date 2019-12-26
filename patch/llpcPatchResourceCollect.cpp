@@ -651,9 +651,14 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             const uint32_t esExtraLdsSize = NggLdsManager::CalcEsExtraLdsSize(m_pPipelineState) / 4; // In DWORDs
             const uint32_t gsExtraLdsSize = NggLdsManager::CalcGsExtraLdsSize(m_pPipelineState) / 4; // In DWORDs
 
-            // primAmpFactor = outputVertices - (outVertsPerPrim - 1)
-            const uint32_t primAmpFactor =
-                hasGs ? geometryMode.outputVertices - (outVertsPerPrim - 1) : 0;
+            // NOTE: Primitive amplification factor must be at least 1. If the maximum number of GS output vertices
+            // is too small to form a complete primitive, set the factor to 1.
+            uint32_t primAmpFactor = 1;
+            if (hasGs && (geometryMode.outputVertices > (outVertsPerPrim - 1)))
+            {
+                // primAmpFactor = outputVertices - (outVertsPerPrim - 1)
+                primAmpFactor = geometryMode.outputVertices - (outVertsPerPrim - 1);
+            }
 
             const uint32_t vertsPerPrimitive = m_pContext->GetVerticesPerPrimitive();
 
@@ -738,6 +743,9 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 }
             }
 
+            uint32_t gsInstanceCount = std::max(1u, geometryMode.invocations);
+            bool enableMaxVertOut = false;
+
             if (hasGs)
             {
                 // NOTE: If primitive amplification is active and the currently calculated gsPrimsPerSubgroup multipled
@@ -754,17 +762,34 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 }
 
                 // Let's take into consideration instancing:
-                const uint32_t gsInstanceCount = geometryMode.invocations;
                 LLPC_ASSERT(gsInstanceCount >= 1);
-                gsPrimsPerSubgroup /= gsInstanceCount;
+                if (gsPrimsPerSubgroup < gsInstanceCount)
+                {
+                    // NOTE: If supported number of GS primitives within a subgroup is too small to allow GS
+                    // instancing, we enable maximum vertex output per GS instance. This will set the register field
+                    // EN_MAX_VERT_OUT_PER_GS_INSTANCE and turn off vertex reuse, restricting 1 input GS input
+                    // primitive per subgroup and create 1 subgroup per GS instance.
+                    enableMaxVertOut = true;
+                    gsInstanceCount = 1;
+                    gsPrimsPerSubgroup = 1;
+                }
+                else
+                {
+                    gsPrimsPerSubgroup /= gsInstanceCount;
+                }
                 esVertsPerSubgroup = gsPrimsPerSubgroup * maxVertOut;
+            }
+            else
+            {
+                // If GS is not present, instance count must be 1
+                LLPC_ASSERT(gsInstanceCount == 1);
             }
 
             // Make sure that we have at least one primitive
-            gsPrimsPerSubgroup = std::max(1u, gsPrimsPerSubgroup);
+            LLPC_ASSERT(gsPrimsPerSubgroup >= 1);
 
             uint32_t       expectedEsLdsSize = esVertsPerSubgroup * esGsRingItemSize + esExtraLdsSize;
-            const uint32_t expectedGsLdsSize = gsPrimsPerSubgroup * gsVsRingItemSize + gsExtraLdsSize;
+            const uint32_t expectedGsLdsSize = gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize + gsExtraLdsSize;
 
             if (expectedGsLdsSize == 0)
             {
@@ -792,6 +817,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsVsRingItemSize;
 
             pGsResUsage->inOutUsage.gs.calcFactor.primAmpFactor        = primAmpFactor;
+            pGsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut     = enableMaxVertOut;
 
             gsOnChip = true; // In NGG mode, GS is always on-chip since copy shader is not present.
         }
@@ -1041,6 +1067,9 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         {
             LLPC_OUTS("GS primitive amplification factor: "
                       << pGsResUsage->inOutUsage.gs.calcFactor.primAmpFactor
+                      << "\n");
+            LLPC_OUTS("GS enable max output vertices per instance: "
+                      << (pGsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut ? "true" : "false")
                       << "\n");
             LLPC_OUTS("\n");
 

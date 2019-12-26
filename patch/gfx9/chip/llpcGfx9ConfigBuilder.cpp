@@ -2032,7 +2032,8 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
 
     SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
 
-    const auto ldsSizeDwordGranularityShift = m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift;
+    const auto ldsSizeDwordGranularityShift =
+        m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift;
 
     SET_REG_FIELD(&pConfig->m_primShaderRegs,
                   SPI_SHADER_PGM_RSRC2_GS,
@@ -2064,6 +2065,13 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     {
         SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_INSTANCE_CNT, ENABLE, true);
         SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_INSTANCE_CNT, CNT, geometryMode.invocations);
+        if ((gfxIp.major > 10) || ((gfxIp.major == 10) && (gfxIp.minor >= 1)))
+        {
+            SET_REG_GFX10_1_PLUS_FIELD(&pConfig->m_primShaderRegs,
+                                       VGT_GS_INSTANCE_CNT,
+                                       EN_MAX_VERT_OUT_PER_GS_INSTANCE,
+                                       calcFactor.enableMaxVertOut);
+        }
     }
     SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_PER_VS, GS_PER_VS, GsThreadsPerVsThread);
 
@@ -2374,10 +2382,8 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     //
     // Build NGG configuration
     //
-    SET_REG_FIELD(&pConfig->m_primShaderRegs,
-                  GE_NGG_SUBGRP_CNTL,
-                  PRIM_AMP_FACTOR,
-                  std::max(calcFactor.primAmpFactor, 1u));
+    LLPC_ASSERT(calcFactor.primAmpFactor >= 1);
+    SET_REG_FIELD(&pConfig->m_primShaderRegs, GE_NGG_SUBGRP_CNTL, PRIM_AMP_FACTOR, calcFactor.primAmpFactor);
     SET_REG_FIELD(&pConfig->m_primShaderRegs, GE_NGG_SUBGRP_CNTL, THDS_PER_SUBGRP, NggMaxThreadsPerSubgroup);
 
     // TODO: Support PIPELINE_PRIM_ID.
