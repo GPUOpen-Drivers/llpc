@@ -75,10 +75,13 @@ static cl::opt<bool> EnableScalarLoad("enable-load-scalarizer",
                                       cl::desc("Enable the optimization for load scalarizer."),
                                       cl::init(false));
 
+// The max threshold of load scalarizer.
+static const uint32_t MaxScalarThreshold = 0xFFFFFFFF;
+
 // -scalar-threshold: Set the vector size threshold for load scalarizer.
 static cl::opt<unsigned> ScalarThreshold("scalar-threshold",
                                          cl::desc("The threshold for load scalarizer"),
-                                         cl::init(0xFFFFFFFF));
+                                         cl::init(MaxScalarThreshold));
 
 // -enable-si-scheduler: enable target option si-scheduler
 static cl::opt<bool> EnableSiScheduler("enable-si-scheduler",
@@ -416,11 +419,24 @@ void PipelineContext::SetOptionsInPipeline(
             shaderOptions.waveBreakSize = pShaderInfo->options.waveBreakSize;
 #endif
 
-            bool loadScalarizerEnabled = EnableScalarLoad;
+            shaderOptions.loadScalarizerThreshold = 0;
+            if (EnableScalarLoad)
+            {
+                shaderOptions.loadScalarizerThreshold = ScalarThreshold;
+            }
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-            loadScalarizerEnabled |= pShaderInfo->options.enableLoadScalarizer;
+            if (pShaderInfo->options.enableLoadScalarizer)
+            {
+                if (pShaderInfo->options.scalarThreshold != 0)
+                {
+                    shaderOptions.loadScalarizerThreshold = pShaderInfo->options.scalarThreshold;
+                }
+                else
+                {
+                    shaderOptions.loadScalarizerThreshold = MaxScalarThreshold;
+                }
+            }
 #endif
-            shaderOptions.loadScalarizerThreshold = loadScalarizerEnabled ? ScalarThreshold : 0;
 
             shaderOptions.useSiScheduler = EnableSiScheduler;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
