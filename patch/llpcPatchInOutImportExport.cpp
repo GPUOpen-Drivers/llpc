@@ -2861,13 +2861,16 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             interpInfo[loc] = { loc, false, false, false };
 
             // Emulation for "in vec2 gl_PointCoord"
+            const bool perSampleShading = static_cast<const GraphicsPipelineBuildInfo*>(
+                m_pContext->GetPipelineBuildInfo())->rsState.perSampleShading;
             pInput = PatchFsGenericInputImport(pInputTy,
                                                loc,
                                                nullptr,
                                                nullptr,
                                                nullptr,
                                                InOutInfo::InterpModeSmooth,
-                                               InOutInfo::InterpLocCenter,
+                                               perSampleShading ? InOutInfo::InterpLocSample :
+                                                                  InOutInfo::InterpLocCenter,
                                                pInsertPos);
             break;
         }

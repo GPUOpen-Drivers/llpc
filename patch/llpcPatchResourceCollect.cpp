@@ -1119,7 +1119,9 @@ void PatchResourceCollect::ProcessShader()
 
     if (m_shaderStage == ShaderStageFragment)
     {
-        if (m_pResUsage->builtInUsage.fs.fragCoord || m_pResUsage->builtInUsage.fs.sampleMaskIn)
+        if (m_pResUsage->builtInUsage.fs.fragCoord ||
+            m_pResUsage->builtInUsage.fs.pointCoord ||
+            m_pResUsage->builtInUsage.fs.sampleMaskIn)
         {
             const GraphicsPipelineBuildInfo* pPipelineInfo =
                 reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
