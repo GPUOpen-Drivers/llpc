@@ -631,7 +631,8 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     const auto& tesBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
     const auto& gsBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
 
-    if (tcsBuiltInUsage.primitiveId || tesBuiltInUsage.primitiveId || gsBuiltInUsage.primitiveId)
+    // With tessellation, SWITCH_ON_EOI and PARTIAL_ES_WAVE_ON must be set if primitive ID is used by either the TCS, TES, or GS.
+    if (tcsBuiltInUsage.primitiveId || tesBuiltInUsage.primitiveId || gsBuiltInUsage.primitiveIdIn)
     {
         iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
     }
@@ -1078,7 +1079,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
     const auto& tcsBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
     const auto& gsBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
 
-    if (tcsBuiltInUsage.primitiveId || gsBuiltInUsage.primitiveId)
+    if (tcsBuiltInUsage.primitiveId || gsBuiltInUsage.primitiveIdIn)
     {
         iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
     }
@@ -1308,7 +1309,7 @@ Result ConfigBuilder::BuildVsRegConfig(
         LLPC_ASSERT(shaderStage == ShaderStageCopyShader);
 
         usePointSize      = builtInUsage.gs.pointSize;
-        usePrimitiveId    = builtInUsage.gs.primitiveIdIn;
+        usePrimitiveId    = builtInUsage.gs.primitiveId;
         useLayer          = builtInUsage.gs.layer;
         useViewportIndex  = builtInUsage.gs.viewportIndex;
         clipDistanceCount = builtInUsage.gs.clipDistance;
@@ -2237,7 +2238,7 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     if (hasGs)
     {
         usePointSize      = gsBuiltInUsage.pointSize;
-        usePrimitiveId    = gsBuiltInUsage.primitiveIdIn;
+        usePrimitiveId    = gsBuiltInUsage.primitiveId;
         useLayer          = gsBuiltInUsage.layer;
         useViewportIndex  = gsBuiltInUsage.viewportIndex;
         clipDistanceCount = gsBuiltInUsage.clipDistance;

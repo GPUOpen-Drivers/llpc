@@ -366,7 +366,8 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     const auto& tesBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
     const auto& gsBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
 
-    if (tcsBuiltInUsage.primitiveId || tesBuiltInUsage.primitiveId || gsBuiltInUsage.primitiveId)
+    // With tessellation, SWITCH_ON_EOI and PARTIAL_ES_WAVE_ON must be set if primitive ID is used by either the TCS, TES, or GS.
+    if (tcsBuiltInUsage.primitiveId || tesBuiltInUsage.primitiveId || gsBuiltInUsage.primitiveIdIn)
     {
         iaMultiVgtParam.bits.PARTIAL_ES_WAVE_ON = true;
         iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
@@ -567,7 +568,7 @@ Result ConfigBuilder::BuildVsRegConfig(
         LLPC_ASSERT(shaderStage == ShaderStageCopyShader);
 
         usePointSize      = builtInUsage.gs.pointSize;
-        usePrimitiveId    = builtInUsage.gs.primitiveIdIn;
+        usePrimitiveId    = builtInUsage.gs.primitiveId;
         useLayer          = builtInUsage.gs.layer;
         useViewportIndex  = builtInUsage.gs.viewportIndex;
         clipDistanceCount = builtInUsage.gs.clipDistance;
