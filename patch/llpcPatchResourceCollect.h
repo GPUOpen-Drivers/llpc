@@ -79,6 +79,8 @@ private:
 
     void ProcessShader();
 
+    bool IsVertexReuseDisabled();
+
     void ClearInactiveInput();
     void ClearInactiveOutput();
 

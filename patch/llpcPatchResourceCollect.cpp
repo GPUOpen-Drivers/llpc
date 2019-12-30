@@ -536,8 +536,8 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             esMinVertsPerSubgroup >>= 1;
         }
 
-        // There is a hardware requirement for gsPrimsPerSubgroup * gsInstanceCount to be capped by GsOnChipMaxPrimsPerSubgroup
-        // for adjacency primitive or when GS instanceing is used.
+        // There is a hardware requirement for gsPrimsPerSubgroup * gsInstanceCount to be capped by
+        // GsOnChipMaxPrimsPerSubgroup for adjacency primitive or when GS instanceing is used.
         if (useAdjacency || (gsInstanceCount > 1))
         {
             gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, (Gfx6::GsOnChipMaxPrimsPerSubgroup / gsInstanceCount));
@@ -548,11 +548,15 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
         // Compute ES-GS LDS size based on the worst case number of ES vertices needed to create the target number of
         // GS primitives per subgroup.
-        uint32_t esGsLdsSize = esGsRingItemSizeOnChip * esMinVertsPerSubgroup * gsPrimsPerSubgroup;
+        const uint32_t reuseOffMultiplier = IsVertexReuseDisabled() ? gsInstanceCount : 1;
+        uint32_t worstCaseEsVertsPerSubgroup = esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier;
+        uint32_t esGsLdsSize = esGsRingItemSizeOnChip * worstCaseEsVertsPerSubgroup;
 
         // Total LDS use per subgroup aligned to the register granularity
-        uint32_t gsOnChipLdsSize = Pow2Align((esGsLdsSize + gsVsLdsSize),
-                                             static_cast<uint32_t>((1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift)));
+        uint32_t gsOnChipLdsSize =
+            Pow2Align((esGsLdsSize + gsVsLdsSize),
+                      static_cast<uint32_t>((1 << m_pPipelineState->GetTargetInfo().GetGpuProperty()
+                                            .ldsSizeDwordGranularityShift)));
 
         // Use the client-specified amount of LDS space per subgroup. If they specified zero, they want us to choose a
         // reasonable default. The final amount must be 128-DWORD aligned.
@@ -564,7 +568,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         // If total LDS usage is too big, refactor partitions based on ratio of ES-GS and GS-VS item sizes.
         if (gsOnChipLdsSize > maxLdsSize)
         {
-            const uint32_t esGsItemSizePerPrim = esGsRingItemSizeOnChip * esMinVertsPerSubgroup;
+            const uint32_t esGsItemSizePerPrim = esGsRingItemSizeOnChip * esMinVertsPerSubgroup * reuseOffMultiplier;
             const uint32_t itemSizeTotal       = esGsItemSizePerPrim + gsVsRingItemSizeOnChipInstanced;
 
             esGsLdsSize = RoundUpToMultiple((esGsItemSizePerPrim * maxLdsSize) / itemSizeTotal, esGsItemSizePerPrim);
@@ -575,7 +579,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
         // Based on the LDS space, calculate how many GS prims per subgroup and ES vertices per subgroup can be dispatched.
         gsPrimsPerSubgroup          = (gsVsLdsSize / gsVsRingItemSizeOnChipInstanced);
-        uint32_t esVertsPerSubgroup = (esGsLdsSize / esGsRingItemSizeOnChip);
+        uint32_t esVertsPerSubgroup = (esGsLdsSize / (esGsRingItemSizeOnChip * reuseOffMultiplier));
 
         LLPC_ASSERT(esVertsPerSubgroup >= esMinVertsPerSubgroup);
 
@@ -800,7 +804,8 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
             const uint32_t ldsSizeDwords =
                 Pow2Align(expectedEsLdsSize + expectedGsLdsSize,
-                          static_cast<uint32_t>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift));
+                          static_cast<uint32_t>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty()
+                                                .ldsSizeDwordGranularityShift));
 
             // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
             LLPC_ASSERT(ldsSizeDwords <= 16384);
@@ -824,11 +829,13 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         else
 #endif
         {
-            uint32_t ldsSizeDwordGranularity = static_cast<uint32_t>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift);
+            uint32_t ldsSizeDwordGranularity =
+                static_cast<uint32_t>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift);
 
             // gsPrimsPerSubgroup shouldn't be bigger than wave size.
-            uint32_t gsPrimsPerSubgroup = std::min(m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipDefaultPrimsPerSubgroup,
-                                                   m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry));
+            uint32_t gsPrimsPerSubgroup =
+                std::min(m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipDefaultPrimsPerSubgroup,
+                         m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry));
 
             // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
             const uint32_t esGsRingItemSize = (4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount)) | 1;
@@ -865,8 +872,9 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
             gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, maxGsPrimsPerSubgroup);
 
-            uint32_t worstCaseEsVertsPerSubgroup = std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup,
-                                                            maxEsVertsPerSubgroup);
+            const uint32_t reuseOffMultiplier = IsVertexReuseDisabled() ? gsInstanceCount : 1;
+            uint32_t worstCaseEsVertsPerSubgroup =
+                std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier, maxEsVertsPerSubgroup);
 
             uint32_t esGsLdsSize = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
 
@@ -888,7 +896,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 uint32_t availableLdsSize   = maxLdsSize - esGsExtraLdsDwords;
                 gsPrimsPerSubgroup          = std::min((availableLdsSize / (esGsRingItemSize * esMinVertsPerSubgroup)),
                                                        maxGsPrimsPerSubgroup);
-                worstCaseEsVertsPerSubgroup = std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup,
+                worstCaseEsVertsPerSubgroup = std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier,
                                                        maxEsVertsPerSubgroup);
 
                 LLPC_ASSERT(gsPrimsPerSubgroup > 0);
@@ -929,8 +937,9 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
                     if (onchipGsPrimsPerSubgroup > 0)
                     {
-                        worstCaseEsVertsPerSubgroup = std::min(esMinVertsPerSubgroup * onchipGsPrimsPerSubgroup,
-                                                               maxEsVertsPerSubgroup);
+                        worstCaseEsVertsPerSubgroup =
+                            std::min(esMinVertsPerSubgroup * onchipGsPrimsPerSubgroup * reuseOffMultiplier,
+                                     maxEsVertsPerSubgroup);
 
                         // Calculate the LDS sizes required to hit this threshold.
                         onchipEsGsLdsSizeOnchipGsVs = Pow2Align(esGsRingItemSize * worstCaseEsVertsPerSubgroup,
@@ -961,7 +970,8 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 }
             }
 
-            uint32_t esVertsPerSubgroup = std::min(esGsLdsSize / esGsRingItemSize, maxEsVertsPerSubgroup);
+            uint32_t esVertsPerSubgroup =
+                std::min(esGsLdsSize / (esGsRingItemSize * reuseOffMultiplier), maxEsVertsPerSubgroup);
 
             LLPC_ASSERT(esVertsPerSubgroup >= esMinVertsPerSubgroup);
 
@@ -1167,6 +1177,37 @@ void PatchResourceCollect::ProcessShader()
         pCall->eraseFromParent();
     }
     m_deadCalls.clear();
+}
+
+// =====================================================================================================================
+// Check whether vertex reuse should be disabled.
+bool PatchResourceCollect::IsVertexReuseDisabled()
+{
+    const bool hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
+    const bool hasTs = (m_pPipelineState->HasShaderStage(ShaderStageTessControl) ||
+                        m_pPipelineState->HasShaderStage(ShaderStageTessEval));
+    const bool hasVs = m_pPipelineState->HasShaderStage(ShaderStageVertex);
+
+    auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
+    bool disableVertexReuse = pPipelineInfo->iaState.disableVertexReuse;
+
+    bool useViewportIndex = false;
+    if (hasGs)
+    {
+        useViewportIndex = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs.viewportIndex;
+    }
+    else if (hasTs)
+    {
+        useViewportIndex = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes.viewportIndex;
+    }
+    else if (hasVs)
+    {
+        useViewportIndex = m_pContext->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.viewportIndex;
+    }
+
+    disableVertexReuse |= useViewportIndex;
+
+    return disableVertexReuse;
 }
 
 // =====================================================================================================================
