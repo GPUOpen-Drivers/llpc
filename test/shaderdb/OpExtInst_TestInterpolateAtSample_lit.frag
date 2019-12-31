@@ -22,8 +22,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @_Z19interpolateAtSamplePfi(float addrspace(64)* @{{.*}}, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @_Z19interpolateAtSamplePDv4_fi(<4 x float> addrspace(64)* @{{.*}}, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @interpolateAtSample.p64f32.i32(float addrspace(64)* @{{.*}}, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @interpolateAtSample.p64v4f32.i32(<4 x float> addrspace(64)* @{{.*}}, i32 %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST-DAG: = call <2 x float> @llpc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(
 ; SHADERTEST-DAG: = call <3 x float> @llpc.input.import.builtin.InterpPullMode.v3f32.i32(

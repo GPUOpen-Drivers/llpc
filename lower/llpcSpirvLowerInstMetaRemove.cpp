@@ -106,9 +106,7 @@ void SpirvLowerInstMetaRemove::visitCallInst(
     }
 
     auto mangledName = pCallee->getName();
-    LLPC_ASSERT(strlen(gSPIRVMD::NonUniform) == 16);
-    const std::string NonUniformPrefix = std::string("_Z16") + std::string(gSPIRVMD::NonUniform);
-    if (mangledName.startswith(NonUniformPrefix))
+    if (mangledName.startswith(gSPIRVName::NonUniform))
     {
         callInst.dropAllReferences();
         callInst.eraseFromParent();

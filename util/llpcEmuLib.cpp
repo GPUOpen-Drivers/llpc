@@ -38,6 +38,8 @@
 #include "llpcDebug.h"
 #include "llpcEmuLib.h"
 
+#include "SPIRVInternal.h"
+
 #define DEBUG_TYPE "llpc-emu-lib"
 
 using namespace Llpc;
@@ -96,7 +98,7 @@ Function* EmuLib::GetFunction(
         // Find and mark the non-native library functions. A library function is non-native if:
         //   it references llvm.amdgcn.*
         //   it references llpc.* and it isn't implemented in the library
-        //   it is _Z14unpackHalf2x16i*
+        //   it is unpackHalf2x16i*
         std::unordered_set<Function*> nonNativeFuncs;
         std::unordered_map<Function*, std::vector<Function*>> unknownKindFuncs;
         for (auto& libFunc : *libModule)
@@ -127,7 +129,7 @@ Function* EmuLib::GetFunction(
 
             // NOTE: It is to pass CTS floating point control test. If input is constant, LLVM inline pass will do
             // constant folding for this function, and it will causes floating point control doesn't work correctly.
-            if (libFunc.getName().startswith("_Z14unpackHalf2x16i"))
+            if (libFunc.getName().startswith(gSPIRVName::UnpackHalf2x16))
             {
                 nonNativeFuncs.insert(&libFunc);
             }

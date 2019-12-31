@@ -250,8 +250,8 @@ void SpirvLowerGlobal::visitCallInst(
 
     if (m_instVisitFlags.checkEmitCall)
     {
-        if (mangledName.startswith("_Z10EmitVertex") ||
-            mangledName.startswith("_Z16EmitStreamVertex"))
+        if (mangledName.startswith(gSPIRVName::EmitVertex) ||
+            mangledName.startswith(gSPIRVName::EmitStreamVertex))
         {
             m_emitCalls.insert(&callInst);
         }
@@ -260,33 +260,33 @@ void SpirvLowerGlobal::visitCallInst(
     {
         LLPC_ASSERT(m_instVisitFlags.checkInterpCall);
 
-        if (mangledName.startswith("_Z21interpolateAtCentroid") ||
-            mangledName.startswith("_Z19interpolateAtSample") ||
-            mangledName.startswith("_Z19interpolateAtOffset") ||
-            mangledName.startswith("_Z22InterpolateAtVertexAMD"))
+        if (mangledName.startswith(gSPIRVName::InterpolateAtCentroid) ||
+            mangledName.startswith(gSPIRVName::InterpolateAtSample) ||
+            mangledName.startswith(gSPIRVName::InterpolateAtOffset) ||
+            mangledName.startswith(gSPIRVName::InterpolateAtVertexAMD))
         {
             // Translate interpolation functions to LLPC intrinsic calls
             auto pLoadSrc = callInst.getArgOperand(0);
             uint32_t interpLoc = InterpLocUnknown;
             Value* pAuxInterpValue = nullptr;
 
-            if (mangledName.startswith("_Z21interpolateAtCentroid"))
+            if (mangledName.startswith(gSPIRVName::InterpolateAtCentroid))
             {
                 interpLoc = InterpLocCentroid;
             }
-            else if (mangledName.startswith("_Z19interpolateAtSample"))
+            else if (mangledName.startswith(gSPIRVName::InterpolateAtSample))
             {
                 interpLoc = InterpLocSample;
                 pAuxInterpValue = callInst.getArgOperand(1); // Sample ID
             }
-            else if (mangledName.startswith("_Z19interpolateAtOffset"))
+            else if (mangledName.startswith(gSPIRVName::InterpolateAtOffset))
             {
                 interpLoc = InterpLocCenter;
                 pAuxInterpValue = callInst.getArgOperand(1); // Offset from pixel center
             }
             else
             {
-                LLPC_ASSERT(mangledName.startswith("_Z22InterpolateAtVertexAMD"));
+                LLPC_ASSERT(mangledName.startswith(gSPIRVName::InterpolateAtVertexAMD));
                 interpLoc = InterpLocCustom;
                 pAuxInterpValue = callInst.getArgOperand(1); // Vertex no.
             }
@@ -980,13 +980,13 @@ void SpirvLowerGlobal::LowerOutput()
                 uint32_t emitStreamId = 0;
 
                 auto mangledName = pEmitCall->getCalledFunction()->getName();
-                if (mangledName.startswith("_Z16EmitStreamVertex"))
+                if (mangledName.startswith(gSPIRVName::EmitStreamVertex))
                 {
                     emitStreamId = cast<ConstantInt>(pEmitCall->getOperand(0))->getZExtValue();
                 }
                 else
                 {
-                    LLPC_ASSERT(mangledName.startswith("_Z10EmitVertex"));
+                    LLPC_ASSERT(mangledName.startswith(gSPIRVName::EmitVertex));
                 }
 
                 Value* pOutputValue = new LoadInst(pProxy, "", pEmitCall);
@@ -2168,10 +2168,8 @@ void SpirvLowerGlobal::LowerBufferBlock()
                             continue;
                         }
 
-                        const std::string nonUniformPrefix = std::string("_Z16") + std::string(gSPIRVMD::NonUniform);
-
                         // If the call is our non uniform decoration, record we are non uniform.
-                        if (pCall->getCalledFunction()->getName().startswith(nonUniformPrefix))
+                        if (pCall->getCalledFunction()->getName().startswith(gSPIRVName::NonUniform))
                         {
                             isNonUniform = true;
                             break;
