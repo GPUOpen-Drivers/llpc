@@ -228,11 +228,11 @@ private:
                                        llvm::Value*        pVertexIdx,
                                        llvm::Instruction*  pInsertPos);
 
-    void StoreValueToGsVsRingBuffer(llvm::Value*        pStoreValue,
-                                    uint32_t            location,
-                                    uint32_t            compIdx,
-                                    uint32_t            streamId,
-                                    llvm::Instruction*  pInsertPos);
+    void StoreValueToGsVsRing(llvm::Value*        pStoreValue,
+                              uint32_t            location,
+                              uint32_t            compIdx,
+                              uint32_t            streamId,
+                              llvm::Instruction*  pInsertPos);
 
     llvm::Value* CalcEsGsRingOffsetForOutput(uint32_t           location,
                                              uint32_t           compIdx,
