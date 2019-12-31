@@ -969,7 +969,7 @@ void PatchInOutImportExport::visitCallInst(
                 uint32_t loc = builtInOutLocMap[BuiltInViewIndex];
 
                 auto rasterStream = pResUsage->inOutUsage.gs.rasterStream;
-                StoreValueToGsVsRingBuffer(pViewIndex, loc, 0, rasterStream, &callInst);
+                StoreValueToGsVsRing(pViewIndex, loc, 0, rasterStream, &callInst);
             }
 
             uint32_t emitStream = InvalidValue;
@@ -2262,40 +2262,7 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     LLPC_ASSERT(genericOutByteSizes[streamId][location][compIdx] == byteSize);
     LLPC_UNUSED(genericOutByteSizes);
 
-#if LLPC_BUILD_GFX10
-    if (m_pPipelineState->GetNggControl()->enableNgg)
-    {
-        // NOTE: For NGG, exporting GS output to GS-VS ring is represented by a call and the call is replaced with
-        // real instructions when when NGG primitive shader is generated.
-        Value* args[] = {
-            ConstantInt::get(Type::getInt32Ty(*m_pContext), location),
-            ConstantInt::get(Type::getInt32Ty(*m_pContext), compIdx),
-            ConstantInt::get(Type::getInt32Ty(*m_pContext), streamId),
-            pOutput
-        };
-        std::string callName = LlpcName::NggGsOutputExport + GetTypeName(pOutput->getType());
-        EmitCall(callName, Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
-    }
-    else
-#endif
-    {
-        if (compCount == 1)
-        {
-            StoreValueToGsVsRingBuffer(pOutput, location, compIdx, streamId, pInsertPos);
-        }
-        else
-        {
-            for (uint32_t i = 0; i < compCount; ++i)
-            {
-                auto pComp = ExtractElementInst::Create(pOutput,
-                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
-                                                        "",
-                                                        pInsertPos);
-                StoreValueToGsVsRingBuffer(
-                    pComp, location + ((compIdx + i) / 4), (compIdx + i) % 4, streamId, pInsertPos);
-            }
-        }
-    }
+    StoreValueToGsVsRing(pOutput, location, compIdx, streamId, pInsertPos);
 }
 
 // =====================================================================================================================
@@ -2665,7 +2632,6 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
     Value* pInput = nullptr;
 
     auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
-    auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
     auto& inOutUsage   = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
 
     uint32_t loc = inOutUsage.builtInInputLocMap[builtInId];
@@ -2675,36 +2641,10 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
     {
     case BuiltInPosition:
     case BuiltInPointSize:
-        {
-            pInput = LoadValueFromEsGsRing(pInputTy, loc, 0, pVertexIdx, pInsertPos);
-            break;
-        }
     case BuiltInClipDistance:
-        {
-            pInput = UndefValue::get(pInputTy);
-            for (uint32_t i = 0; i < builtInUsage.clipDistanceIn; ++i)
-            {
-                auto pComp = LoadValueFromEsGsRing(pInputTy->getArrayElementType(),
-                                                   loc + i / 4,
-                                                   i % 4,
-                                                   pVertexIdx,
-                                                   pInsertPos);
-                pInput = InsertValueInst::Create(pInput, pComp, { i }, "", pInsertPos);
-            }
-            break;
-        }
     case BuiltInCullDistance:
         {
-            pInput = UndefValue::get(pInputTy);
-            for (uint32_t i = 0; i < builtInUsage.cullDistanceIn; ++i)
-            {
-                auto pComp = LoadValueFromEsGsRing(pInputTy->getArrayElementType(),
-                                                   loc + i / 4,
-                                                   i % 4,
-                                                   pVertexIdx,
-                                                   pInsertPos);
-                pInput = InsertValueInst::Create(pInput, pComp, { i }, "", pInsertPos);
-            }
+            pInput = LoadValueFromEsGsRing(pInputTy, loc, 0, pVertexIdx, pInsertPos);
             break;
         }
     case BuiltInPrimitiveId:
@@ -3575,12 +3515,7 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
                     LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
                     uint32_t loc = builtInOutLocMap[builtInId];
 
-                    pOutputTy = pOutput->getType();
-                    for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
-                    {
-                        auto pElem = ExtractValueInst::Create(pOutput, { i }, "", pInsertPos);
-                        StoreValueToEsGsRing(pElem, loc + i / 4, i % 4, pInsertPos);
-                    }
+                    StoreValueToEsGsRing(pOutput, loc, 0, pInsertPos);
                 }
                 else
                 {
@@ -3631,12 +3566,7 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
                     LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
                     uint32_t loc = builtInOutLocMap[builtInId];
 
-                    pOutputTy = pOutput->getType();
-                    for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
-                    {
-                        auto pElem = ExtractValueInst::Create(pOutput, { i }, "", pInsertPos);
-                        StoreValueToEsGsRing(pElem, loc + i / 4, i % 4, pInsertPos);
-                    }
+                    StoreValueToEsGsRing(pOutput, loc, 0, pInsertPos);
                 }
                 else
                 {
@@ -3943,8 +3873,6 @@ void PatchInOutImportExport::PatchTesBuiltInOutputExport(
     uint32_t     builtInId,     // ID of the built-in variable
     Instruction* pInsertPos)    // [in] Where to insert the patch instruction
 {
-    auto pOutputTy = pOutput->getType();
-
     auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessEval);
     auto& builtInUsage = pResUsage->builtInUsage.tes;
     auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
@@ -4021,11 +3949,7 @@ void PatchInOutImportExport::PatchTesBuiltInOutputExport(
                 LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
                 uint32_t loc = builtInOutLocMap[builtInId];
 
-                for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
-                {
-                    auto pElem = ExtractValueInst::Create(pOutput, { i }, "", pInsertPos);
-                    StoreValueToEsGsRing(pElem, loc + i / 4, i % 4, pInsertPos);
-                }
+                StoreValueToEsGsRing(pOutput, loc, 0, pInsertPos);
             }
             else
             {
@@ -4055,11 +3979,7 @@ void PatchInOutImportExport::PatchTesBuiltInOutputExport(
                 LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
                 uint32_t loc = builtInOutLocMap[builtInId];
 
-                for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
-                {
-                    auto pElem = ExtractValueInst::Create(pOutput, { i }, "", pInsertPos);
-                    StoreValueToEsGsRing(pElem, loc + i / 4, i % 4, pInsertPos);
-                }
+                StoreValueToEsGsRing(pOutput, loc, 0, pInsertPos);
             }
             else
             {
@@ -4140,98 +4060,36 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
     LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
     uint32_t loc = builtInOutLocMap[builtInId];
 
-#if LLPC_BUILD_GFX10
-    if (m_pPipelineState->GetNggControl()->enableNgg)
+    switch (builtInId)
     {
-        // NOTE: For NGG, exporting GS output to GS-VS ring is represented by a call and the call is replaced with
-        // real instructions when when NGG primitive shader is generated.
-        Value* args[] = {
-            ConstantInt::get(Type::getInt32Ty(*m_pContext), loc),
-            ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
-            ConstantInt::get(Type::getInt32Ty(*m_pContext), streamId),
-            pOutput
-        };
-        std::string callName = LlpcName::NggGsOutputExport + GetTypeName(pOutput->getType());
-        EmitCall(callName, Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
+    case BuiltInPosition:
+        LLPC_ASSERT(builtInUsage.position);
+        break;
+    case BuiltInPointSize:
+        LLPC_ASSERT(builtInUsage.pointSize);
+        break;
+    case BuiltInClipDistance:
+        LLPC_ASSERT(builtInUsage.clipDistance);
+        break;
+    case BuiltInCullDistance:
+        LLPC_ASSERT(builtInUsage.cullDistance);
+        break;
+    case BuiltInPrimitiveId:
+        LLPC_ASSERT(builtInUsage.primitiveId);
+        break;
+    case BuiltInLayer:
+        LLPC_ASSERT(builtInUsage.layer);
+        break;
+    case BuiltInViewportIndex:
+        LLPC_ASSERT(builtInUsage.viewportIndex);
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
     }
-    else
-#endif
-    {
-        switch (builtInId)
-        {
-        case BuiltInPosition:
-            {
-                LLPC_ASSERT(builtInUsage.position);
 
-                for (uint32_t i = 0; i < 4; ++i)
-                {
-                    auto pComp = ExtractElementInst::Create(pOutput,
-                                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
-                                                            "",
-                                                            pInsertPos);
-                    StoreValueToGsVsRingBuffer(pComp, loc, i, streamId, pInsertPos);
-                }
-                break;
-            }
-        case BuiltInPointSize:
-            {
-                LLPC_ASSERT(builtInUsage.pointSize);
-
-                StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
-                break;
-            }
-        case BuiltInClipDistance:
-            {
-                LLPC_ASSERT(builtInUsage.clipDistance);
-
-                for (uint32_t i = 0; i < builtInUsage.clipDistance; ++i)
-                {
-                    auto pElem = ExtractValueInst::Create(pOutput, { i }, "", pInsertPos);
-                    StoreValueToGsVsRingBuffer(pElem, loc + i / 4, i % 4, streamId, pInsertPos);
-                }
-
-                break;
-            }
-        case BuiltInCullDistance:
-            {
-                LLPC_ASSERT(builtInUsage.cullDistance);
-
-                for (uint32_t i = 0; i < builtInUsage.cullDistance; ++i)
-                {
-                    auto pElem = ExtractValueInst::Create(pOutput, { i }, "", pInsertPos);
-                    StoreValueToGsVsRingBuffer(pElem, loc + i / 4, i % 4, streamId, pInsertPos);
-                }
-
-                break;
-            }
-        case BuiltInPrimitiveId:
-            {
-                LLPC_ASSERT(builtInUsage.primitiveId);
-
-                StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
-                break;
-            }
-        case BuiltInLayer:
-            {
-                LLPC_ASSERT(builtInUsage.layer);
-
-                StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
-                break;
-            }
-        case BuiltInViewportIndex:
-            {
-                LLPC_ASSERT(builtInUsage.viewportIndex);
-
-                StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
-                break;
-            }
-        default:
-            {
-                LLPC_NEVER_CALLED();
-                break;
-            }
-        }
-    }
+    LLPC_UNUSED(builtInUsage);
+    StoreValueToGsVsRing(pOutput, loc, 0, streamId, pInsertPos);
 }
 
 // =====================================================================================================================
@@ -4968,30 +4826,50 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
 {
     auto pStoreTy = pStoreValue->getType();
 
-    const uint64_t bitWidth = pStoreTy->getScalarSizeInBits();
-    LLPC_ASSERT((pStoreTy->isFPOrFPVectorTy() || pStoreTy->isIntOrIntVectorTy()) &&
-                ((bitWidth == 16) || (bitWidth == 32)));
-
-    if (pStoreTy->isVectorTy())
+    Type* pElemTy = pStoreTy;
+    if (pStoreTy->isArrayTy())
     {
-        const uint32_t compCount = pStoreTy->getVectorNumElements();
+        pElemTy = pStoreTy->getArrayElementType();
+    }
+    else if (pStoreTy->isVectorTy())
+    {
+        pElemTy = pStoreTy->getVectorElementType();
+    }
 
-        for (uint32_t i = 0; i < compCount; ++i)
+    const uint64_t bitWidth = pElemTy->getScalarSizeInBits();
+    LLPC_ASSERT((pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()) &&
+                ((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32)));
+
+    if (pStoreTy->isArrayTy() || pStoreTy->isVectorTy())
+    {
+        const uint32_t elemCount =
+            pStoreTy->isArrayTy() ? pStoreTy->getArrayNumElements() : pStoreTy->getVectorNumElements();
+
+        for (uint32_t i = 0; i < elemCount; ++i)
         {
-            auto pStoreComp = ExtractElementInst::Create(pStoreValue,
-                                                         ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
-                                                         "",
-                                                         pInsertPos);
+            Value* pStoreElem = nullptr;
+            if (pStoreTy->isArrayTy())
+            {
+                pStoreElem = ExtractValueInst::Create(pStoreValue, { i }, "", pInsertPos);
+            }
+            else
+            {
+                pStoreElem = ExtractElementInst::Create(pStoreValue,
+                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
+                                                        "",
+                                                        pInsertPos);
+            }
 
-            StoreValueToEsGsRing(pStoreComp, location + (compIdx + i) / 4, (compIdx + i) % 4, pInsertPos);
+            StoreValueToEsGsRing(pStoreElem, location + (compIdx + i) / 4, (compIdx + i) % 4, pInsertPos);
         }
     }
     else
     {
-        if (bitWidth == 16)
+        if ((bitWidth == 8) || (bitWidth == 16))
         {
             if (pStoreTy->isFloatingPointTy())
             {
+                LLPC_ASSERT(bitWidth == 16);
                 pStoreValue = new BitCastInst(pStoreValue, Type::getInt16Ty(*m_pContext), "", pInsertPos);
             }
 
@@ -5066,32 +4944,47 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
     Value*       pVertexIdx,    // [in] Vertex index
     Instruction* pInsertPos)    // [in] Where to insert the load instruction
 {
-    const uint64_t bitWidth = pLoadTy->getScalarSizeInBits();
-    LLPC_ASSERT((pLoadTy->isFPOrFPVectorTy() || pLoadTy->isIntOrIntVectorTy()) &&
+    Type* pElemTy = pLoadTy;
+    if (pLoadTy->isArrayTy())
+    {
+        pElemTy = pLoadTy->getArrayElementType();
+    }
+    else if (pLoadTy->isVectorTy())
+    {
+        pElemTy = pLoadTy->getVectorElementType();
+    }
+
+    const uint64_t bitWidth = pElemTy->getScalarSizeInBits();
+    LLPC_ASSERT((pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()) &&
                 ((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32)));
 
-    // Get vertex offset
-    Value* pLoadValue = nullptr;
+    Value* pLoadValue = UndefValue::get(pLoadTy);
 
-    if (pLoadTy->isVectorTy())
+    if (pLoadTy->isArrayTy() || pLoadTy->isVectorTy())
     {
-        pLoadValue = UndefValue::get(pLoadTy);
-        auto pCompTy = pLoadTy->getVectorElementType();
-        const uint32_t compCount = pLoadTy->getVectorNumElements();
+        const uint32_t elemCount =
+            pLoadTy->isArrayTy() ? pLoadTy->getArrayNumElements() : pLoadTy->getVectorNumElements();
 
-        for (uint32_t i = 0; i < compCount; ++i)
+        for (uint32_t i = 0; i < elemCount; ++i)
         {
-            auto pLoadComp = LoadValueFromEsGsRing(pCompTy,
+            auto pLoadElem = LoadValueFromEsGsRing(pElemTy,
                                                    location + (compIdx + i) / 4,
                                                    (compIdx + i) % 4,
                                                    pVertexIdx,
                                                    pInsertPos);
 
-            pLoadValue = InsertElementInst::Create(pLoadValue,
-                                                   pLoadComp,
-                                                   ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
-                                                   "",
-                                                   pInsertPos);
+            if (pLoadTy->isArrayTy())
+            {
+                pLoadValue = InsertValueInst::Create(pLoadValue, pLoadElem, { i }, "", pInsertPos);
+            }
+            else
+            {
+                pLoadValue = InsertElementInst::Create(pLoadValue,
+                                                       pLoadElem,
+                                                       ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
+                                                       "",
+                                                       pInsertPos);
+            }
         }
     }
     else
@@ -5172,8 +5065,8 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
 }
 
 // =====================================================================================================================
-// Stores value to GS-VS ring buffer.
-void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
+// Stores value to GS-VS ring (buffer or LDS).
+void PatchInOutImportExport::StoreValueToGsVsRing(
     Value*       pStoreValue,   // [in] Value to store
     uint32_t     location,      // Output location
     uint32_t     compIdx,       // Output component index
@@ -5182,96 +5075,150 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
 {
     auto pStoreTy = pStoreValue->getType();
 
-    const uint32_t bitWidth = pStoreTy->getScalarSizeInBits();
-    LLPC_ASSERT((pStoreTy->isFloatingPointTy() || pStoreTy->isIntegerTy()) &&
+    Type* pElemTy = pStoreTy;
+    if (pStoreTy->isArrayTy())
+    {
+        pElemTy = pStoreTy->getArrayElementType();
+    }
+    else if (pStoreTy->isVectorTy())
+    {
+        pElemTy = pStoreTy->getVectorElementType();
+    }
+
+    const uint32_t bitWidth = pElemTy->getScalarSizeInBits();
+    LLPC_ASSERT((pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()) &&
                 ((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32)));
 
-    if ((bitWidth == 8) || (bitWidth == 16))
-    {
-        // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD to
-        // DWORD. This is because copy shader does not know the actual data type. It only generates output export calls
-        // based on number of DWORDs.
-        if (pStoreTy->isFloatingPointTy())
-        {
-            pStoreValue = new BitCastInst(pStoreValue, Type::getInt16Ty(*m_pContext), "", pInsertPos);
-
-        }
-
-        pStoreValue = new ZExtInst(pStoreValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
-    }
-    else
-    {
-        LLPC_ASSERT(bitWidth == 32);
-        if (pStoreTy->isFloatingPointTy())
-        {
-            pStoreValue = new BitCastInst(pStoreValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
-        }
-    }
-
-    // Call buffer store intrinsic
-    const auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
-    Value* pGsVsOffset = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.gs.gsVsOffset);
-
-    auto pEmitCounterPtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetEmitCounterPtr()[streamId];
-    auto pEmitCounter = new LoadInst(pEmitCounterPtr, "", pInsertPos);
-
-    auto pRingOffset = CalcGsVsRingOffsetForOutput(location, compIdx, streamId, pEmitCounter, pGsVsOffset, pInsertPos);
-
-    if (m_pPipelineState->IsGsOnChip())
-    {
-        Value* idxs[] = {
-            ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
-            pRingOffset
-        };
-        Value* pStorePtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
-        auto pStoreInst = new StoreInst(pStoreValue, pStorePtr, false, pInsertPos);
-        pStoreInst->setAlignment(MaybeAlign(m_pLds->getAlignment()));
-    }
-    else
-    {
-        // NOTE: Here we use tbuffer_store instruction instead of buffer_store because we have to do explicit
-        // control of soffset. This is required by swizzle enabled mode when address range checking should be
-        // complied with.
-        if (m_gfxIp.major <= 9)
-        {
-            CombineFormat combineFormat = {};
-            combineFormat.bits.dfmt = BUF_DATA_FORMAT_32;
-            combineFormat.bits.nfmt = BUF_NUM_FORMAT_UINT;
-            CoherentFlag coherent = {};
-            coherent.bits.glc = true;
-            coherent.bits.slc = true;
-            coherent.bits.swz = true;
-            Value* args[] = {
-                pStoreValue,                                                          // vdata
-                m_pipelineSysValues.Get(m_pEntryPoint)->GetGsVsRingBufDesc(streamId), // rsrc
-                pRingOffset,                                                          // voffset
-                pGsVsOffset,                                                          // soffset
-                ConstantInt::get(Type::getInt32Ty(*m_pContext), combineFormat.u32All),
-                ConstantInt::get(Type::getInt32Ty(*m_pContext), coherent.u32All)      // glc, slc, swz
-            };
-            EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
-        }
 #if LLPC_BUILD_GFX10
-        else if (m_gfxIp.major == 10)
-        {
-            CoherentFlag coherent = {};
-            coherent.bits.glc = true;
-            coherent.bits.slc = true;
-            coherent.bits.swz = true;
-            Value* args[] = {
-                pStoreValue,                                                          // vdata
-                m_pipelineSysValues.Get(m_pEntryPoint)->GetGsVsRingBufDesc(streamId), // rsrc
-                pRingOffset,                                                          // voffset
-                pGsVsOffset,                                                          // soffset
-                ConstantInt::get(Type::getInt32Ty(*m_pContext), BUF_FORMAT_32_UINT),  // format
-                ConstantInt::get(Type::getInt32Ty(*m_pContext), coherent.u32All)      // glc, slc, swz
-            };
-            EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
-        }
+    if (m_pPipelineState->GetNggControl()->enableNgg)
+    {
+        // NOTE: For NGG, exporting GS output to GS-VS ring is represented by a call and the call is replaced with
+        // real instructions when when NGG primitive shader is generated.
+        Value* args[] = {
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), location),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), compIdx),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), streamId),
+            pStoreValue
+        };
+        std::string callName = LlpcName::NggGsOutputExport + GetTypeName(pStoreTy);
+        EmitCall(callName, Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
+        return;
+    }
 #endif
+
+    if (pStoreTy->isArrayTy() || pStoreTy->isVectorTy())
+    {
+        const uint32_t elemCount =
+            pStoreTy->isArrayTy() ? pStoreTy->getArrayNumElements() : pStoreTy->getVectorNumElements();
+
+        for (uint32_t i = 0; i < elemCount; ++i)
+        {
+            Value* pStoreElem = nullptr;
+            if (pStoreTy->isArrayTy())
+            {
+                pStoreElem = ExtractValueInst::Create(pStoreValue, { i }, "", pInsertPos);
+            }
+            else
+            {
+                pStoreElem = ExtractElementInst::Create(pStoreValue,
+                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
+                                                        "",
+                                                        pInsertPos);
+            }
+
+            StoreValueToGsVsRing(pStoreElem, location + (compIdx + i) / 4, (compIdx + i) % 4, streamId, pInsertPos);
+        }
+    }
+    else
+    {
+        if ((bitWidth == 8) || (bitWidth == 16))
+        {
+            // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD
+            // to DWORD. This is because copy shader does not know the actual data type. It only generates output
+            // export calls based on number of DWORDs.
+            if (pStoreTy->isFloatingPointTy())
+            {
+                LLPC_ASSERT(bitWidth == 16);
+                pStoreValue = new BitCastInst(pStoreValue, Type::getInt16Ty(*m_pContext), "", pInsertPos);
+            }
+
+            pStoreValue = new ZExtInst(pStoreValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+        }
         else
         {
-            LLPC_NOT_IMPLEMENTED();
+            LLPC_ASSERT(bitWidth == 32);
+            if (pStoreTy->isFloatingPointTy())
+            {
+                pStoreValue = new BitCastInst(pStoreValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+            }
+        }
+
+        // Call buffer store intrinsic
+        const auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
+        Value* pGsVsOffset = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.gs.gsVsOffset);
+
+        auto pEmitCounterPtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetEmitCounterPtr()[streamId];
+        auto pEmitCounter = new LoadInst(pEmitCounterPtr, "", pInsertPos);
+
+        auto pRingOffset =
+            CalcGsVsRingOffsetForOutput(location, compIdx, streamId, pEmitCounter, pGsVsOffset, pInsertPos);
+
+        if (m_pPipelineState->IsGsOnChip())
+        {
+            Value* idxs[] = {
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+                pRingOffset
+            };
+            Value* pStorePtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
+            auto pStoreInst = new StoreInst(pStoreValue, pStorePtr, false, pInsertPos);
+            pStoreInst->setAlignment(MaybeAlign(m_pLds->getAlignment()));
+        }
+        else
+        {
+            // NOTE: Here we use tbuffer_store instruction instead of buffer_store because we have to do explicit
+            // control of soffset. This is required by swizzle enabled mode when address range checking should be
+            // complied with.
+            if (m_gfxIp.major <= 9)
+            {
+                CombineFormat combineFormat = {};
+                combineFormat.bits.dfmt = BUF_DATA_FORMAT_32;
+                combineFormat.bits.nfmt = BUF_NUM_FORMAT_UINT;
+                CoherentFlag coherent = {};
+                coherent.bits.glc = true;
+                coherent.bits.slc = true;
+                coherent.bits.swz = true;
+                Value* args[] = {
+                    pStoreValue,                                                          // vdata
+                    m_pipelineSysValues.Get(m_pEntryPoint)->GetGsVsRingBufDesc(streamId), // rsrc
+                    pRingOffset,                                                          // voffset
+                    pGsVsOffset,                                                          // soffset
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), combineFormat.u32All),
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), coherent.u32All)      // glc, slc, swz
+                };
+                EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
+            }
+#if LLPC_BUILD_GFX10
+            else if (m_gfxIp.major == 10)
+            {
+                CoherentFlag coherent = {};
+                coherent.bits.glc = true;
+                coherent.bits.slc = true;
+                coherent.bits.swz = true;
+                Value* args[] = {
+                    pStoreValue,                                                          // vdata
+                    m_pipelineSysValues.Get(m_pEntryPoint)->GetGsVsRingBufDesc(streamId), // rsrc
+                    pRingOffset,                                                          // voffset
+                    pGsVsOffset,                                                          // soffset
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), BUF_FORMAT_32_UINT),  // format
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), coherent.u32All)      // glc, slc, swz
+                };
+                EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
+            }
+#endif
+            else
+            {
+                LLPC_NOT_IMPLEMENTED();
+            }
         }
     }
 }
