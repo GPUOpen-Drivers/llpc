@@ -39,7 +39,6 @@
 #ifndef SPIRV_SPIRVINTERNAL_H
 #define SPIRV_SPIRVINTERNAL_H
 
-#include "NameMangleAPI.h"
 #include "libSPIRV/SPIRVEnum.h"
 #include "libSPIRV/SPIRVError.h"
 #include "libSPIRV/SPIRVNameMapEnum.h"
@@ -59,23 +58,9 @@ using namespace llvm;
 
 namespace SPIRV {
 
-/// The LLVM/SPIR-V translator version used to fill the lower 16 bits of the
-/// generator's magic number in the generated SPIR-V module.
-/// This number should be bumped up whenever the generated SPIR-V changes.
-const static unsigned short KTranslatorVer = 14;
-
-#define SPCV_TARGET_LLVM_IMAGE_TYPE_ENCODE_ACCESS_QUAL 0
-
 #ifndef LLVM_DEBUG
 #define LLVM_DEBUG DEBUG
 #endif
-
-class SPIRVOpaqueType;
-typedef SPIRVMap<std::string, Op, SPIRVOpaqueType> SPIRVOpaqueTypeOpCodeMap;
-
-// Ad hoc function used by LLVM/SPIRV converter for type casting
-#define SPCV_CAST "spcv.cast"
-#define LLVM_MEMCPY "llvm.memcpy"
 
 template <> inline void SPIRVMap<unsigned, Op>::init() {
 #define _SPIRV_OP(x, y) add(Instruction::x, Op##y);
@@ -229,29 +214,6 @@ namespace kLLVMTypeName {
 const static char StructPrefix[] = "struct.";
 } // namespace kLLVMTypeName
 
-namespace kSPIRVTypeName {
-const static char Delimiter = '.';
-const static char Image[] = "Image";
-const static char PostfixDelim = '_';
-const static char Prefix[] = "spirv";
-const static char PrefixAndDelim[] = "spirv.";
-const static char SampledImg[] = "SampledImage";
-const static char Sampler[] = "Sampler";
-const static char VariablePtr[] = "VarPtr";
-} // namespace kSPIRVTypeName
-
-namespace kSPIRVName {
-const static char GroupPrefix[] = "group_";
-const static char Prefix[] = "__spirv_";
-const static char Postfix[] = "__";
-const static char ImageQuerySize[] = "ImageQuerySize";
-const static char ImageQuerySizeLod[] = "ImageQuerySizeLod";
-const static char ImageSampleExplicitLod[] = "ImageSampleExplicitLod";
-const static char ReservedPrefix[] = "reserved_";
-const static char SampledImage[] = "SampledImage";
-const static char TempSampledImage[] = "TempSampledImage";
-} // namespace kSPIRVName
-
 namespace gSPIRVMD {
   const static char Prefix[]            = "spirv.";
   const static char InOut[]             = "spirv.InOut";
@@ -266,6 +228,17 @@ namespace gSPIRVMD {
   const static char AccessChain[]       = "spirv.AccessChain";
   const static char StorageBufferCall[] = "spirv.StorageBufferCall";
   const static char NonUniform[]        = "spirv.NonUniform";
+}
+
+namespace gSPIRVName {
+  const static char EmitVertex[] = "EmitVertex";
+  const static char EmitStreamVertex[] = "EmitStreamVertex";
+  const static char InterpolateAtCentroid[] = "interpolateAtCentroid";
+  const static char InterpolateAtSample[] = "interpolateAtSample";
+  const static char InterpolateAtOffset[] = "interpolateAtOffset";
+  const static char InterpolateAtVertexAMD[] = "InterpolateAtVertexAMD";
+  const static char NonUniform[] = "spirv.NonUniform";
+  const static char UnpackHalf2x16[] = "unpackHalf2x16";
 }
 
 enum SPIRVBlockTypeKind {
@@ -435,109 +408,6 @@ inline bool operator<(const SPIRVImageOpInfo &L, const SPIRVImageOpInfo &R) {
   return L.U32All < R.U32All;
 }
 
-/// Additional information for mangling a function argument type.
-struct BuiltinArgTypeMangleInfo {
-  bool IsSigned;
-  bool IsVoidPtr;
-  bool IsEnum;
-  bool IsSampler;
-  bool IsAtomic;
-  bool IsLocalArgBlock;
-  SPIR::TypePrimitiveEnum Enum;
-  unsigned Attr;
-  BuiltinArgTypeMangleInfo()
-      : IsSigned(true), IsVoidPtr(false), IsEnum(false), IsSampler(false),
-        IsAtomic(false), IsLocalArgBlock(false), Enum(SPIR::PRIMITIVE_NONE),
-        Attr(0) {}
-};
-
-/// Information for mangling builtin function.
-class BuiltinFuncMangleInfo {
-public:
-  /// Translate builtin function name and set
-  /// argument attributes and unsigned args.
-  BuiltinFuncMangleInfo(const std::string &UniqName = "")
-      : LocalArgBlockIdx(-1), VarArgIdx(-1) {
-    if (!UniqName.empty())
-      init(UniqName);
-  }
-  virtual ~BuiltinFuncMangleInfo() {}
-  const std::string &getUnmangledName() const { return UnmangledName; }
-  void addUnsignedArg(int Ndx) { UnsignedArgs.insert(Ndx); }
-  void addVoidPtrArg(int Ndx) { VoidPtrArgs.insert(Ndx); }
-  void addSamplerArg(int Ndx) { SamplerArgs.insert(Ndx); }
-  void addAtomicArg(int Ndx) { AtomicArgs.insert(Ndx); }
-  void setLocalArgBlock(int Ndx) {
-    assert(0 <= Ndx && "it is not allowed to set less than zero index");
-    LocalArgBlockIdx = Ndx;
-  }
-  void setEnumArg(int Ndx, SPIR::TypePrimitiveEnum Enum) {
-    EnumArgs[Ndx] = Enum;
-  }
-  void setArgAttr(int Ndx, unsigned Attr) { Attrs[Ndx] = Attr; }
-  void setVarArg(int Ndx) {
-    assert(0 <= Ndx && "it is not allowed to set less than zero index");
-    VarArgIdx = Ndx;
-  }
-  bool isArgUnsigned(int Ndx) {
-    return UnsignedArgs.count(-1) || UnsignedArgs.count(Ndx);
-  }
-  bool isArgVoidPtr(int Ndx) {
-    return VoidPtrArgs.count(-1) || VoidPtrArgs.count(Ndx);
-  }
-  bool isArgSampler(int Ndx) { return SamplerArgs.count(Ndx); }
-  bool isArgAtomic(int Ndx) { return AtomicArgs.count(Ndx); }
-  bool isLocalArgBlock(int Ndx) { return LocalArgBlockIdx == Ndx; }
-  bool isArgEnum(int Ndx, SPIR::TypePrimitiveEnum *Enum = nullptr) {
-    auto Loc = EnumArgs.find(Ndx);
-    if (Loc == EnumArgs.end())
-      Loc = EnumArgs.find(-1);
-    if (Loc == EnumArgs.end())
-      return false;
-    if (Enum)
-      *Enum = Loc->second;
-    return true;
-  }
-  unsigned getArgAttr(int Ndx) {
-    auto Loc = Attrs.find(Ndx);
-    if (Loc == Attrs.end())
-      Loc = Attrs.find(-1);
-    if (Loc == Attrs.end())
-      return 0;
-    return Loc->second;
-  }
-  // get ellipsis index, single ellipsis at the end of the function is possible
-  // only return value < 0 if none
-  int getVarArg() const { return VarArgIdx; }
-  BuiltinArgTypeMangleInfo getTypeMangleInfo(int Ndx) {
-    BuiltinArgTypeMangleInfo Info;
-    Info.IsSigned = !isArgUnsigned(Ndx);
-    Info.IsVoidPtr = isArgVoidPtr(Ndx);
-    Info.IsEnum = isArgEnum(Ndx, &Info.Enum);
-    Info.IsSampler = isArgSampler(Ndx);
-    Info.IsAtomic = isArgAtomic(Ndx);
-    Info.IsLocalArgBlock = isLocalArgBlock(Ndx);
-    Info.Attr = getArgAttr(Ndx);
-    return Info;
-  }
-  virtual void init(const std::string &UniqUnmangledName) {
-    UnmangledName = UniqUnmangledName;
-  }
-
-protected:
-  std::string UnmangledName;
-  std::set<int> UnsignedArgs; // unsigned arguments, or -1 if all are unsigned
-  std::set<int> VoidPtrArgs;  // void pointer arguments, or -1 if all are void
-                              // pointer
-  std::set<int> SamplerArgs;  // sampler arguments
-  std::set<int> AtomicArgs;   // atomic arguments
-  std::map<int, SPIR::TypePrimitiveEnum> EnumArgs; // enum arguments
-  std::map<int, unsigned> Attrs;                   // argument attributes
-  int LocalArgBlockIdx; // index of a block with local arguments, idx < 0 if
-                        // none
-  int VarArgIdx;        // index of ellipsis argument, idx < 0 if none
-};
-
 /// \returns a vector of types for a collection of values.
 template <class T> std::vector<Type *> getTypes(T V) {
   std::vector<Type *> Tys;
@@ -569,12 +439,8 @@ void addFnAttr(LLVMContext *Context, CallInst *Call, Attribute::AttrKind Attr);
 
 Function *getOrCreateFunction(Module *M, Type *RetTy, ArrayRef<Type *> ArgTypes,
                               StringRef Name,
-                              BuiltinFuncMangleInfo *Mangle = nullptr,
                               AttributeList *Attrs = nullptr,
                               bool TakeName = true);
-
-/// Check if a function type is void(void).
-bool isVoidFuncTy(FunctionType *FT);
 
 void dumpUsers(Value *V, StringRef Prompt = "");
 
@@ -584,22 +450,6 @@ bool eraseUselessFunctions(Module *M);
 bool eraseIfNoUse(Function *F);
 
 void eraseIfNoUse(Value *V);
-
-// 4 DWORD size of buffer descriptor
-static const uint32_t DescriptorSizeBuffer = 4;
-
-/// Mangle builtin function name.
-/// \return \param UniqName if \param BtnInfo is null pointer, otherwise
-///    return IA64 mangled name.
-std::string mangleBuiltin(const std::string &UniqName,
-                          ArrayRef<Type *> ArgTypes,
-                          BuiltinFuncMangleInfo *BtnInfo);
-
-template <> inline void SPIRVMap<std::string, Op, SPIRVOpaqueType>::init() {
-  add(kSPIRVTypeName::Image, OpTypeImage);
-  add(kSPIRVTypeName::Sampler, OpTypeSampler);
-  add(kSPIRVTypeName::SampledImg, OpTypeSampledImage);
-}
 
 /// Metadata for shader inputs and outputs, valid for scalar or vector type.
 union ShaderInOutMetadata {

@@ -339,13 +339,6 @@ if(ICD_BUILD_LLPC)
         translator/lib/SPIRV/libSPIRV/SPIRVValue.cpp
     )
 
-    target_sources(llpc PRIVATE
-        translator/lib/SPIRV/Mangler/FunctionDescriptor.cpp
-        translator/lib/SPIRV/Mangler/Mangler.cpp
-        translator/lib/SPIRV/Mangler/ManglingUtils.cpp
-        translator/lib/SPIRV/Mangler/ParameterType.cpp
-    )
-
 # llpc/util
     target_sources(llpc PRIVATE
         util/llpcDebug.cpp

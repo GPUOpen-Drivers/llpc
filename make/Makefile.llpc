@@ -152,11 +152,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         SPIRVType.cpp                       \
         SPIRVValue.cpp                      \
         \
-        FunctionDescriptor.cpp              \
-        Mangler.cpp                         \
-        ManglingUtils.cpp                   \
-        ParameterType.cpp                   \
-        \
         SPIRVReader.cpp                     \
         SPIRVUtil.cpp
 

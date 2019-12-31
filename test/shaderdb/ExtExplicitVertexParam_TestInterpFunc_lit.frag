@@ -18,8 +18,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call {{.*}} <2 x float> @_Z22InterpolateAtVertexAMDPDv2_fi
-; SHADERTEST: call {{.*}} <2 x i32> @_Z22InterpolateAtVertexAMDPDv2_ii
+; SHADERTEST: call {{.*}} <2 x float> @InterpolateAtVertexAMD.p64v2f32.i32
+; SHADERTEST: call {{.*}} <2 x i32> @InterpolateAtVertexAMD.p64v2i32.i32
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call <2 x float> @llpc.input.import.interpolant.v2f32{{.*}}
 ; SHADERTEST: call <2 x i32> @llpc.input.import.interpolant.v2i32{{.*}}

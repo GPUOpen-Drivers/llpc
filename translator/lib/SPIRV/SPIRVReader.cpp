@@ -49,6 +49,7 @@
 #include "llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
+#include "llpcInternal.h"
 #include "llpcPipeline.h"
 
 #include "llvm/ADT/DenseMap.h"
@@ -122,13 +123,6 @@ static void dumpLLVM(Module *M, const std::string &FName) {
     FS << *M;
     FS.close();
   }
-}
-
-static void
-mangleGlslBuiltin(const std::string &UniqName,
-  ArrayRef<Type*> ArgTypes, std::string &MangledName) {
-  BuiltinFuncMangleInfo Info(UniqName);
-  MangledName = SPIRV::mangleBuiltin(UniqName, ArgTypes, &Info);
 }
 
 class SPIRVToLLVMDbgTran {
@@ -5815,7 +5809,6 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *BF) {
 Instruction * SPIRVToLLVM::transBuiltinFromInst(const std::string& FuncName,
                                                 SPIRVInstruction* BI,
                                                 BasicBlock* BB) {
-  std::string MangledName;
   auto Ops = BI->getOperands();
   auto RetBTy = BI->hasType() ? BI->getType() : nullptr;
   // NOTE: When function returns a structure-typed value,
@@ -5836,7 +5829,8 @@ Instruction * SPIRVToLLVM::transBuiltinFromInst(const std::string& FuncName,
       HasFuncPtrArg = true;
     }
   }
-  mangleGlslBuiltin(FuncName, ArgTys, MangledName);
+  std::string MangledName(FuncName);
+  AddTypeMangling(nullptr, Args, MangledName);
   Function* Func = M->getFunction(MangledName);
   FunctionType* FT = FunctionType::get(RetTy, ArgTys, false);
   // ToDo: Some intermediate functions have duplicate names with
@@ -7519,7 +7513,6 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
   } else {
     bool IsNonUniform = BV->hasDecorate(DecorationNonUniformEXT);
     if (IsNonUniform && isa<Instruction>(V)) {
-      std::string  MangledFuncName = "";
       std::vector<Value*> Args;
       Args.push_back(V);
       auto Types = getTypes(Args);
@@ -7529,7 +7522,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       // Per-instruction metadata is not safe, LLVM optimizer may remove them,
       // so we choose to add a dummy instruction and remove them when it isn't
       // needed.
-      mangleGlslBuiltin(gSPIRVMD::NonUniform, Types, MangledFuncName);
+      std::string  MangledFuncName(gSPIRVMD::NonUniform);
+      AddTypeMangling(nullptr, Args, MangledFuncName);
       auto F = getOrCreateFunction(M, VoidTy, Types, MangledFuncName);
       CallInst::Create(F, Args, "", BB);
     }
@@ -8744,10 +8738,7 @@ Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *BC,
 
   SPIRVExtInstSetKind Set = BM->getBuiltinSet(BC->getExtSetId());
   assert((Set == SPIRVEIS_GLSL ||
-          Set == SPIRVEIS_ShaderBallotAMD ||
-          Set == SPIRVEIS_ShaderExplicitVertexParameterAMD ||
-          Set == SPIRVEIS_GcnShaderAMD ||
-          Set == SPIRVEIS_ShaderTrinaryMinMaxAMD)
+          Set == SPIRVEIS_ShaderExplicitVertexParameterAMD)
          && "Not valid extended instruction");
 
   SPIRVWord EntryPoint = BC->getExtOp();
@@ -8757,43 +8748,15 @@ Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *BC,
   if (Set == SPIRVEIS_GLSL)
     UnmangledName =  GLSLExtOpMap::map(
       static_cast<GLSLExtOpKind>(EntryPoint));
-  else if (Set == SPIRVEIS_ShaderBallotAMD)
-    UnmangledName = ShaderBallotAMDExtOpMap::map(
-      static_cast<ShaderBallotAMDExtOpKind>(EntryPoint));
   else if (Set == SPIRVEIS_ShaderExplicitVertexParameterAMD)
     UnmangledName = ShaderExplicitVertexParameterAMDExtOpMap::map(
       static_cast<ShaderExplicitVertexParameterAMDExtOpKind>(EntryPoint));
-  else if (Set == SPIRVEIS_GcnShaderAMD)
-    UnmangledName = GcnShaderAMDExtOpMap::map(
-      static_cast<GcnShaderAMDExtOpKind>(EntryPoint));
-  else if (Set == SPIRVEIS_ShaderTrinaryMinMaxAMD)
-    UnmangledName = ShaderTrinaryMinMaxAMDExtOpMap::map(
-      static_cast<ShaderTrinaryMinMaxAMDExtOpKind>(EntryPoint));
 
-  string MangledName;
-  mangleGlslBuiltin(UnmangledName, ArgTys, MangledName);
-  if (static_cast<GLSLExtOpKind>(EntryPoint) == GLSLstd450FrexpStruct) {
-    // NOTE: For frexp(), the input floating-point value is float16, we have
-    // two overloading versions:
-    //     f16vec frexp(f16vec, ivec)
-    //     f16vec frexp(f16vec, i16vec)
-    //
-    // However, glslang translates "frexp" to "FrexpStruct". We have to check
-    // the result type to revise the mangled name to differentiate such two
-    // variants.
-    assert(BC->getType()->isTypeStruct());
-    auto MantTy = BC->getType()->getStructMemberType(0);
-    auto ExpTy = BC->getType()->getStructMemberType(1);
-    if (MantTy->isTypeVectorOrScalarFloat(16)) {
-      if (ExpTy->isTypeVector()) {
-        auto CompCount = ExpTy->getVectorComponentCount();
-        MangledName += "Dv" + std::to_string(CompCount) + "_";
-      }
-
-      MangledName += ExpTy->isTypeVectorOrScalarInt(16) ? "s" : "i";
-    }
-  }
-
+  string MangledName(UnmangledName);
+  std::vector<Value *> Args = transValue(BC->getArgumentValues(),
+                                         BB->getParent(),
+                                         BB);
+  AddTypeMangling(nullptr, Args, MangledName);
   FunctionType *FuncTy = FunctionType::get(transType(BC->getType()),
                                            ArgTys,
                                            false);
@@ -8807,7 +8770,6 @@ Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *BC,
     if (isFuncNoUnwind())
       Func->addFnAttr(Attribute::NoUnwind);
   }
-  auto Args = transValue(BC->getValues(BArgs), Func, BB);
   CallInst *Call = CallInst::Create(Func,
                                     Args,
                                     BC->getName(),
