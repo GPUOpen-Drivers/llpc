@@ -146,6 +146,9 @@ Value* BuilderImplDesc::CreateLoadDescFromPtr(
                         (innerNode.set == descSet) &&
                         (innerNode.binding == binding))
                     {
+                        pGetSampleDescPtr->replaceAllUsesWith(UndefValue::get(pGetSampleDescPtr->getType()));
+                        pGetSampleDescPtr->dropAllReferences();
+                        pGetSampleDescPtr->eraseFromParent();
                         pImmutableValue = innerNode.pImmutableValue;
                     }
                 }
@@ -154,7 +157,10 @@ Value* BuilderImplDesc::CreateLoadDescFromPtr(
                      (node.set == descSet) &&
                      (node.binding == binding))
                  {
-                     pImmutableValue = node.pImmutableValue;
+                    pGetSampleDescPtr->replaceAllUsesWith(UndefValue::get(pGetSampleDescPtr->getType()));
+                    pGetSampleDescPtr->dropAllReferences();
+                    pGetSampleDescPtr->eraseFromParent();
+                    pImmutableValue = node.pImmutableValue;
                  }
         }
     }
@@ -323,4 +329,3 @@ Value* BuilderImplDesc::CreateGetBufferDescLength(
                     Attribute::ReadNone,
                     pInsertPos);
 }
-

@@ -871,6 +871,19 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
 
                         break;
                     }
+                case ResourceMappingNodeType::DescriptorYCbCrSampler:
+                    {
+                        if ((pNode->set == descSet) &&
+                            (pNode->binding == binding) &&
+                            ((nodeType1 == ResourceMappingNodeType::DescriptorResource) ||
+                            (nodeType1 == ResourceMappingNodeType::DescriptorSampler)))
+                        {
+                            exist = true;
+                            foundNodeType = pNode->type;
+                        }
+
+                        break;
+                    }
                 default:
                     {
                         LLPC_NEVER_CALLED();
