@@ -193,12 +193,6 @@ void PatchResourceCollect::SetNggControl()
         enableNgg = false;
     }
 
-    if (hasGs && ((options.nggFlags & NggFlagEnableGsUse) == 0))
-    {
-        // NOTE: NGG used on GS is disabled by default
-        enableNgg = false;
-    }
-
     if (m_pPipelineState->GetTargetInfo().GetGpuWorkarounds().gfx10.waNggDisabled)
     {
         enableNgg = false;
