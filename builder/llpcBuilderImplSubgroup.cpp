@@ -173,7 +173,7 @@ Value* BuilderImplSubgroup::CreateSubgroupBroadcastFirst(
         return builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, mappedArgs[0]);
     };
 
-    return CreateMapToInt32(pfnMapFunc, pValue, {});
+    return CreateMapToInt32(pfnMapFunc, { CreateInlineAsmSideEffect(pValue) }, {});
 }
 
 // =====================================================================================================================
