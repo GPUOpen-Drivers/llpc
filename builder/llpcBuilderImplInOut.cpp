@@ -552,13 +552,13 @@ Value* BuilderImplInOut::EvalIJOffsetSmooth(
     Value* pPullModel = ReadBuiltIn(false, BuiltInInterpPullMode, {}, nullptr, nullptr, "");
     // Adjust each coefficient by offset.
     Value* pAdjusted = AdjustIJ(pPullModel, pOffset);
-    // Extract <I,J> part of that, and divide by W.
-    Value* pIJ = CreateShuffleVector(pAdjusted, pAdjusted, { 0, 1 });
+    // Extract <I/W, J/W, 1/W> part of that
+    Value* pIJDivW = CreateShuffleVector(pAdjusted, pAdjusted, { 0, 1 });
     Value* pRcpW = CreateExtractElement(pAdjusted, 2);
     // Get W by making a reciprocal of 1/W
     Value* pW = CreateFDiv(ConstantFP::get(getFloatTy(), 1.0), pRcpW);
     pW = CreateVectorSplat(2, pW);
-    return CreateFMul(pIJ, pW);
+    return CreateFMul(pIJDivW, pW);
 }
 
 // =====================================================================================================================
