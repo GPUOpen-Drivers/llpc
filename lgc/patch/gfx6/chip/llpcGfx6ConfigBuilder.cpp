@@ -104,7 +104,6 @@ void ConfigBuilder::BuildPipelineVsFsRegConfig()
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineVsFsRegConfig config;
-    auto* pConfig = &config; // TODO: remove; this was added in refactoring to reduce the size of a diff
 
     AddApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderVs);
     AddApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
@@ -115,7 +114,7 @@ void ConfigBuilder::BuildPipelineVsFsRegConfig()
     {
         BuildVsRegConfig<PipelineVsFsRegConfig>(ShaderStageVertex, &config);
 
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
 
         SetShaderHash(ShaderStageVertex);
     }
@@ -133,7 +132,7 @@ void ConfigBuilder::BuildPipelineVsFsRegConfig()
     const uint32_t primGroupSize = 128;
     iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
 
-    SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
+    SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
 
     AppendConfig(config);
 }
@@ -145,7 +144,6 @@ void ConfigBuilder::BuildPipelineVsTsFsRegConfig()
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineVsTsFsRegConfig config;
-    auto* pConfig = &config; // TODO: remove; this was added in refactoring to reduce the size of a diff
 
     AddApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderLs);
     AddApiHwShaderMapping(ShaderStageTessControl, Util::Abi::HwShaderHs);
@@ -158,7 +156,7 @@ void ConfigBuilder::BuildPipelineVsTsFsRegConfig()
     {
         BuildLsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageVertex, &config);
 
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
 
         SetShaderHash(ShaderStageVertex);
     }
@@ -167,7 +165,7 @@ void ConfigBuilder::BuildPipelineVsTsFsRegConfig()
     {
         BuildHsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageTessControl, &config);
 
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
 
         SetShaderHash(ShaderStageTessControl);
     }
@@ -176,7 +174,7 @@ void ConfigBuilder::BuildPipelineVsTsFsRegConfig()
     {
         BuildVsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageTessEval, &config);
 
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_DS);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_DS);
 
         SetShaderHash(ShaderStageTessEval);
     }
@@ -190,7 +188,7 @@ void ConfigBuilder::BuildPipelineVsTsFsRegConfig()
 
     if (m_pPipelineState->IsTessOffChip())
     {
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, DYNAMIC_HS, true);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, DYNAMIC_HS, true);
     }
 
     // Set up IA_MULTI_VGT_PARAM
@@ -205,7 +203,7 @@ void ConfigBuilder::BuildPipelineVsTsFsRegConfig()
         iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
     }
 
-    SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
+    SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
 
     // Set up VGT_TF_PARAM
     SetupVgtTfParam<PipelineVsTsFsRegConfig>(&config);
@@ -220,7 +218,6 @@ void ConfigBuilder::BuildPipelineVsGsFsRegConfig()
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineVsGsFsRegConfig config;
-    auto* pConfig = &config; // TODO: remove; this was added in refactoring to reduce the size of a diff
 
     AddApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderEs);
     AddApiHwShaderMapping(ShaderStageGeometry, Util::Abi::HwShaderGs | Util::Abi::HwShaderVs);
@@ -232,7 +229,7 @@ void ConfigBuilder::BuildPipelineVsGsFsRegConfig()
     {
         BuildEsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageVertex, &config);
 
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
 
         SetShaderHash(ShaderStageVertex);
     }
@@ -241,7 +238,7 @@ void ConfigBuilder::BuildPipelineVsGsFsRegConfig()
     {
         BuildGsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageGeometry, &config);
 
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
 
         SetShaderHash(ShaderStageGeometry);
     }
@@ -257,7 +254,7 @@ void ConfigBuilder::BuildPipelineVsGsFsRegConfig()
     {
         BuildVsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageCopyShader, &config);
 
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
     }
 
     // Set up IA_MULTI_VGT_PARAM
@@ -266,7 +263,7 @@ void ConfigBuilder::BuildPipelineVsGsFsRegConfig()
     const uint32_t primGroupSize = 128;
     iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
 
-    SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
+    SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
 
     AppendConfig(config);
 }
@@ -278,7 +275,6 @@ void ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineVsTsGsFsRegConfig config;
-    auto* pConfig = &config; // TODO: remove; this was added in refactoring to reduce the size of a diff
 
     AddApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderLs);
     AddApiHwShaderMapping(ShaderStageTessControl, Util::Abi::HwShaderHs);
@@ -292,7 +288,7 @@ void ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     {
         BuildLsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageVertex, &config);
 
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
 
         SetShaderHash(ShaderStageVertex);
     }
@@ -301,7 +297,7 @@ void ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     {
         BuildHsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageTessControl, &config);
 
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
 
         SetShaderHash(ShaderStageTessControl);
     }
@@ -310,7 +306,7 @@ void ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     {
         BuildEsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageTessEval, &config);
 
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
 
         SetShaderHash(ShaderStageTessEval);
     }
@@ -319,7 +315,7 @@ void ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     {
         BuildGsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageGeometry, &config);
 
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
 
         SetShaderHash(ShaderStageGeometry);
     }
@@ -335,12 +331,12 @@ void ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     {
         BuildVsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageCopyShader, &config);
 
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
     }
 
     if (m_pPipelineState->IsTessOffChip())
     {
-        SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, DYNAMIC_HS, true);
+        SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, DYNAMIC_HS, true);
     }
 
     // Set up IA_MULTI_VGT_PARAM
@@ -357,7 +353,7 @@ void ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
         iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
     }
 
-    SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
+    SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
 
     // Set up VGT_TF_PARAM
     SetupVgtTfParam<PipelineVsTsGsFsRegConfig>(&config);
