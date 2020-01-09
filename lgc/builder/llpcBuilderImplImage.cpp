@@ -1575,7 +1575,8 @@ Value* BuilderImplImage::CreateImageSampleGather(
     uint32_t addressMask = 0;
     for (uint32_t i = 0; i != ImageAddressCount; ++i)
     {
-        addressMask |= (address[i] != nullptr) << i;
+        uint32_t addressMaskBit = (address[i] != nullptr) ? 1 : 0;
+        addressMask |= addressMaskBit << i;
     }
     addressMask &= ~(1U << ImageAddressIdxProjective);
     addressMask &= ~(1U << ImageAddressIdxComponent);

@@ -273,7 +273,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
 
     // NOTE: We can't do constant folding for the following floating operations if we have floating-point controls that
     // will flush denormals or preserve NaN.
-    if ((m_fp16DenormFlush || m_fp32DenormFlush || m_fp64DenormFlush) == false)
+    if (!m_fp16DenormFlush && !m_fp32DenormFlush && !m_fp64DenormFlush)
     {
         switch (opCode)
         {

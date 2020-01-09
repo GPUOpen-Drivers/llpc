@@ -412,7 +412,7 @@ Result ShaderCache::BuildFileName(
     assert(pCacheFileExists != nullptr);
     *pCacheFileExists = File::Exists(m_fileFullPath);
     Result result = Result::Success;
-    if ((*pCacheFileExists) == false)
+    if (!*pCacheFileExists)
     {
         length = snprintf(hashedFileName, MaxFilePathLen, "%s%s", pCacheFilePath, CacheFileSubPath);
         std::error_code errCode = sys::fs::create_directories(hashedFileName);
