@@ -80,6 +80,8 @@ public:
     bool DetailUsageValid() { return m_detailUsageValid; }
 
     virtual bool runOnModule(llvm::Module& module);
+    void VisitCalls(Module& module);
+    Value* FindCallAndGetIndexValue(Module& module, CallInst* const pTargetCall);
 
     // -----------------------------------------------------------------------------------------------------------------
 
