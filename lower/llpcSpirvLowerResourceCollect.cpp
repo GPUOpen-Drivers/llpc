@@ -35,6 +35,7 @@
 #include <algorithm>
 #include "SPIRVInternal.h"
 #include "llpcBuilder.h"
+#include "llpcBuilderRecorder.h"
 #include "llpcContext.h"
 #include "llpcShaderModes.h"
 #include "llpcSpirvLowerResourceCollect.h"
@@ -303,6 +304,11 @@ bool SpirvLowerResourceCollect::runOnModule(
             }
         }
     }
+
+    if (m_collectDetailUsage)
+    {
+        VisitCalls(module);
+    }
     if (!m_fsOutInfos.empty() || !m_resNodeDatas.empty())
     {
         m_detailUsageValid = true;
@@ -343,6 +349,145 @@ const Type* SpirvLowerResourceCollect::GetFlattenArrayElementType(
         pArrayTy = dyn_cast<ArrayType>(pElemType);
     }
     return pElemType;
+}
+
+// =====================================================================================================================
+// Find the specified target call and get the index value from corresponding argument
+Value* SpirvLowerResourceCollect::FindCallAndGetIndexValue(
+    Module& module,  // [in] LLVM module to be visited
+    CallInst* const pTargetCall)  // [in] Builder call as search target
+{
+    for (auto& func : module)
+    {
+        // Skip non-declarations that are definitely not LLPC builder calls.
+        if (func.isDeclaration() == false)
+        {
+            continue;
+        }
+
+        const MDNode* const pFuncMeta = func.getMetadata(module.getMDKindID(BuilderCallOpcodeMetadataName));
+
+        // Skip builder calls that do not have the correct metadata to identify the opcode.
+        if (pFuncMeta == nullptr)
+        {
+            // If the function had the LLPC builder call prefix, it means the metadata was not encoded correctly.
+            LLPC_ASSERT(func.getName().startswith(BuilderCallPrefix) == false);
+            continue;
+        }
+
+        const ConstantAsMetadata* const pMetaConst = cast<ConstantAsMetadata>(pFuncMeta->getOperand(0));
+        uint32_t opcode = cast<ConstantInt>(pMetaConst->getValue())->getZExtValue();
+
+        if (opcode == BuilderRecorder::Opcode::IndexDescPtr)
+        {
+            for (auto useIt = func.use_begin(), useItEnd = func.use_end(); useIt != useItEnd; ++useIt)
+            {
+                CallInst* const pCall = dyn_cast<CallInst>(useIt->getUser());
+
+                // Get the args.
+                auto args = ArrayRef<Use>(&pCall->getOperandList()[0], pCall->getNumArgOperands());
+
+                if (args[0] == pTargetCall)
+                {
+                    return args[1];
+                }
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+// =====================================================================================================================
+// Visit all LLPC builder calls in a module
+void SpirvLowerResourceCollect::VisitCalls(
+    Module& module)  // [in] LLVM module to be visited
+{
+    for (auto& func : module)
+    {
+        // Skip non-declarations that are definitely not LLPC builder calls.
+        if (func.isDeclaration() == false)
+        {
+            continue;
+        }
+
+        const MDNode* const pFuncMeta = func.getMetadata(module.getMDKindID(BuilderCallOpcodeMetadataName));
+
+        // Skip builder calls that do not have the correct metadata to identify the opcode.
+        if (pFuncMeta == nullptr)
+        {
+            // If the function had the llpc builder call prefix, it means the metadata was not encoded correctly.
+            LLPC_ASSERT(func.getName().startswith(BuilderCallPrefix) == false);
+            continue;
+        }
+
+        const ConstantAsMetadata* const pMetaConst = cast<ConstantAsMetadata>(pFuncMeta->getOperand(0));
+        uint32_t opcode = cast<ConstantInt>(pMetaConst->getValue())->getZExtValue();
+
+        for (auto useIt = func.use_begin(), useItEnd = func.use_end(); useIt != useItEnd; ++useIt)
+        {
+            CallInst* const pCall = dyn_cast<CallInst>(useIt->getUser());
+
+            // Get the args.
+            auto args = ArrayRef<Use>(&pCall->getOperandList()[0], pCall->getNumArgOperands());
+
+            ResourceMappingNodeType nodeType = ResourceMappingNodeType::Unknown;
+            switch (opcode)
+            {
+            case BuilderRecorder::Opcode::GetSamplerDescPtr:
+                {
+                    nodeType = ResourceMappingNodeType::DescriptorSampler;
+                    break;
+                }
+            case BuilderRecorder::Opcode::GetImageDescPtr:
+                {
+                    nodeType = ResourceMappingNodeType::DescriptorResource;
+                    break;
+                }
+            case BuilderRecorder::Opcode::GetTexelBufferDescPtr:
+                {
+                    nodeType = ResourceMappingNodeType::DescriptorTexelBuffer;
+                    break;
+                }
+            default:
+                {
+                    break;
+                }
+            }
+
+            if (nodeType != ResourceMappingNodeType::Unknown)
+            {
+                ResourceNodeDataKey nodeData = {};
+
+                nodeData.value.set = cast<ConstantInt>(args[0])->getZExtValue();
+                nodeData.value.binding = cast<ConstantInt>(args[1])->getZExtValue();
+                nodeData.value.arraySize = 1;
+                auto pIndex = FindCallAndGetIndexValue(module, pCall);
+                if (pIndex != nullptr)
+                {
+                    nodeData.value.arraySize = cast<ConstantInt>(pIndex)->getZExtValue();
+                }
+
+                auto result = m_resNodeDatas.insert(std::pair<ResourceNodeDataKey, ResourceMappingNodeType>(nodeData, nodeType));
+
+                // Check if the node already had a different pair of node data/type. A DescriptorResource/DescriptorTexelBuffer
+                // and a DescriptorSampler can use the same set/binding, in which case it is
+                // DescriptorCombinedTexture.
+                if (result.second == false)
+                {
+                    LLPC_ASSERT(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
+                                 (nodeType == ResourceMappingNodeType::DescriptorResource) ||
+                                 (nodeType == ResourceMappingNodeType::DescriptorTexelBuffer) ||
+                                 (nodeType == ResourceMappingNodeType::DescriptorSampler)) &&
+                                ((result.first->second == ResourceMappingNodeType::DescriptorCombinedTexture) ||
+                                 (result.first->second == ResourceMappingNodeType::DescriptorResource) ||
+                                 (result.first->second == ResourceMappingNodeType::DescriptorTexelBuffer) ||
+                                 (result.first->second == ResourceMappingNodeType::DescriptorSampler)));
+                    result.first->second = ResourceMappingNodeType::DescriptorCombinedTexture;
+                }
+            }
+        }
+    }
 }
 
 } // Llpc
