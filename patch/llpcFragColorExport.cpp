@@ -52,7 +52,7 @@ FragColorExport::FragColorExport(
     :
     m_pPipelineState(pPipelineState),
     m_pModule(pModule),
-    m_pContext(&pModule->getContext())
+    m_pContext(pModule ? &pModule->getContext() : nullptr)
 {
 }
 
