@@ -7,6 +7,8 @@ on:
 jobs:
   build-and-push-amdvlk:
     name: Branch ${{ matrix.branch }}, base image ${{ matrix.base-image }}, config ${{ matrix.config }}
+    # Don't run on forks.
+    if: ${GITHUB_REPOSITORY} == 'GPUOpen-Drivers/llpc'
     runs-on: ${{ matrix.host-os }}
     strategy:
       matrix:
