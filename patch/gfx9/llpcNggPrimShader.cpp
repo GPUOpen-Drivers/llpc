@@ -2008,7 +2008,8 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     //     %exclusiveOutVertCount = sub i32 %inclusiveOutVertCount, %outVertCount
     //     %vertexIdAdjust = %outVertCountInPrevWaves + %exclusiveOutVertCount
     //
-    //     br label %.reviseOutPrimDataLoop
+    //     %adjustVertexId = icmp ne i32 %vertexIdAdjust, 0
+    //     br i1 %adjustVertexId, label %.reviseOutPrimDataLoop, label %.endReviseOutPrimData
     //
     // .reviseOutPrimDataLoop:
     //     %outPrimId = phi i32 [ 0, %.reviseOutPrimData ],
@@ -2026,7 +2027,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     //     ; Write LDS region (GS output primitive data)
     //
     //     %outPrimId = add i32 %outPrimId, 1
-    //     %reviseContinue = icmp ult %outPrimId, %outPrimCount
+    //     %reviseContinue = icmp ult i32 %outPrimId, %outPrimCount
     //     br i1 %reviseContinue, label %.reviseOutPrimDataLoop, label %.endReviseOutPrimData
     //
     // .endReviseOutPrimData:
@@ -2378,7 +2379,8 @@ void NggPrimShader::ConstructPrimShaderWithGs(
         auto pExclusiveOutVertCount = m_pBuilder->CreateSub(pInclusiveOutVertCount, pOutVertCount);
         pVertexIdAdjust = m_pBuilder->CreateAdd(pOutVertCountInPreWaves, pExclusiveOutVertCount);
 
-        m_pBuilder->CreateBr(pReviseOutPrimDataLoopBlock);
+        auto pAdjustVertexId = m_pBuilder->CreateICmpNE(pVertexIdAdjust, m_pBuilder->getInt32(0));
+        m_pBuilder->CreateCondBr(pAdjustVertexId, pReviseOutPrimDataLoopBlock, pEndReviseOutPrimDataBlock);
     }
 
     // Construct ".reviseOutPrimDataLoop" block
@@ -3468,6 +3470,10 @@ Value* NggPrimShader::RunGsVariant(
     Value* pInvocationId  = (pArg + 3);
     Value* pEsGsOffsets45 = (pArg + 4);
 
+    // NOTE: For NGG, GS invocation ID is stored in lowest 8 bits ([7:0]) and other higher bits are used for other
+    // purposes according to GE-SPI interface.
+    pInvocationId = m_pBuilder->CreateAnd(pInvocationId, m_pBuilder->getInt32(0xFF));
+
     auto pEsGsOffset0 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                                     m_pBuilder->getInt32Ty(),
                                                     {
@@ -3723,7 +3729,7 @@ Function* NggPrimShader::MutateGsToVariant(
                 Value* pOutput = pCall->getOperand(3);
 
                 auto pOutVertCounter = m_pBuilder->CreateLoad(outVertCounterPtrs[streamId]);
-                ExportGsOutput(pOutput, location, compIdx, streamId, pThreadIdInWave, pOutVertCounter);
+                ExportGsOutput(pOutput, location, compIdx, streamId, pThreadIdInSubgroup, pOutVertCounter);
 
                 removeCalls.push_back(pCall);
             }
@@ -3908,12 +3914,12 @@ void NggPrimShader::RunCopyShader(
 // =====================================================================================================================
 // Exports outputs of geometry shader to GS-VS ring.
 void NggPrimShader::ExportGsOutput(
-    Value*       pOutput,           // [in] Output value
-    uint32_t     location,          // Location of the output
-    uint32_t     compIdx,           // Index used for vector element indexing
-    uint32_t     streamId,          // ID of output vertex stream
-    llvm::Value* pThreadIdInWave,   // [in] Thread ID in wave
-    Value*       pOutVertCounter)   // [in] GS output vertex counter for this stream
+    Value*       pOutput,               // [in] Output value
+    uint32_t     location,              // Location of the output
+    uint32_t     compIdx,               // Index used for vector element indexing
+    uint32_t     streamId,              // ID of output vertex stream
+    llvm::Value* pThreadIdInSubgroup,   // [in] Thread ID in sub-group
+    Value*       pOutVertCounter)       // [in] GS output vertex counter for this stream
 {
     auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
     if (pResUsage->inOutUsage.gs.rasterStream != streamId)
@@ -3939,14 +3945,44 @@ void NggPrimShader::ExportGsOutput(
             m_pBuilder->CreateInsertElement(pOutputVec, pOutputElem, i);
         }
 
+        pOutputTy = pOutputVec->getType();
         pOutput = pOutputVec;
     }
 
-    // gsVsRingOffset = threadIdInWave * gsVsRingItemSize +
+    const uint32_t bitWidth = pOutput->getType()->getScalarSizeInBits();
+    if ((bitWidth == 8) || (bitWidth == 16))
+    {
+        // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD
+        // to DWORD. This is because copy shader does not know the actual data type. It only generates output
+        // export calls based on number of DWORDs.
+        if (pOutputTy->isFPOrFPVectorTy())
+        {
+            LLPC_ASSERT(bitWidth == 16);
+            Type* pCastTy = m_pBuilder->getInt16Ty();
+            if (pOutputTy->isVectorTy())
+            {
+                pCastTy = VectorType::get(m_pBuilder->getInt16Ty(), pOutputTy->getVectorNumElements());
+            }
+            pOutput = m_pBuilder->CreateBitCast(pOutput, pCastTy);
+        }
+
+        Type* pExtTy = m_pBuilder->getInt32Ty();
+        if (pOutputTy->isVectorTy())
+        {
+            pExtTy = VectorType::get(m_pBuilder->getInt32Ty(), pOutputTy->getVectorNumElements());
+        }
+        pOutput = m_pBuilder->CreateZExt(pOutput, pExtTy);
+    }
+    else
+    {
+        LLPC_ASSERT((bitWidth == 32) || (bitWidth == 64));
+    }
+
+    // gsVsRingOffset = threadIdInSubgroup * gsVsRingItemSize +
     //                  outVertcounter * vertexSize +
     //                  location * 4 + compIdx (in DWORDS)
     const uint32_t gsVsRingItemSize = pResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize;
-    Value* pGsVsRingOffset = m_pBuilder->CreateMul(pThreadIdInWave, m_pBuilder->getInt32(gsVsRingItemSize));
+    Value* pGsVsRingOffset = m_pBuilder->CreateMul(pThreadIdInSubgroup, m_pBuilder->getInt32(gsVsRingItemSize));
 
     const uint32_t vertexSize = pResUsage->inOutUsage.gs.outLocCount[streamId] * 4;
     auto pVertexItemOffset = m_pBuilder->CreateMul(pOutVertCounter, m_pBuilder->getInt32(vertexSize));
@@ -4227,22 +4263,10 @@ Function* NggPrimShader::CreateGsEmitHandler(
             }
             else if (outVertsPerPrim == 3)
             {
-                // odd = ((vertexId0 & 0x1) == 1)
-                auto pOdd = m_pBuilder->CreateAnd(pVertexId0, m_pBuilder->getInt32(1));
-                pOdd = m_pBuilder->CreateICmpEQ(pOdd, m_pBuilder->getInt32(1));
-
-                // Consider vertex orientation (even: 0 -> 1 -> 2, odd: 0 -> 2 -> 1)
-                auto pPrimDataEven = m_pBuilder->CreateShl(pVertexId2, 10);
-                pPrimDataEven = m_pBuilder->CreateOr(pPrimDataEven, pVertexId1);
-                pPrimDataEven = m_pBuilder->CreateShl(pPrimDataEven, 10);
-                pPrimDataEven = m_pBuilder->CreateOr(pPrimDataEven, pVertexId0);
-
-                auto pPrimDataOdd = m_pBuilder->CreateShl(pVertexId1, 10);
-                pPrimDataOdd = m_pBuilder->CreateOr(pPrimDataOdd, pVertexId2);
-                pPrimDataOdd = m_pBuilder->CreateShl(pPrimDataOdd, 10);
-                pPrimDataOdd = m_pBuilder->CreateOr(pPrimDataOdd, pVertexId0);
-
-                pPrimData = m_pBuilder->CreateSelect(pOdd, pPrimDataOdd, pPrimDataEven);
+                pPrimData = m_pBuilder->CreateShl(pVertexId2, 10);
+                pPrimData = m_pBuilder->CreateOr(pPrimData, pVertexId1);
+                pPrimData = m_pBuilder->CreateShl(pPrimData, 10);
+                pPrimData = m_pBuilder->CreateOr(pPrimData, pVertexId0);
             }
             else
             {
@@ -4554,10 +4578,22 @@ void NggPrimShader::ReviseOutputPrimitiveData(
     }
     else if (outVertsPerPrim == 3)
     {
-        pNewPrimData = m_pBuilder->CreateShl(pVertexId2, 10);
-        pNewPrimData = m_pBuilder->CreateOr(pNewPrimData, pVertexId1);
-        pNewPrimData = m_pBuilder->CreateShl(pNewPrimData, 10);
-        pNewPrimData = m_pBuilder->CreateOr(pNewPrimData, pVertexId0);
+        // odd = ((vertexId0 & 0x1) == 1)
+        auto pOdd = m_pBuilder->CreateAnd(pVertexId0, m_pBuilder->getInt32(1));
+        pOdd = m_pBuilder->CreateICmpEQ(pOdd, m_pBuilder->getInt32(1));
+
+        // Consider vertex orientation (even: 0 -> 1 -> 2, odd: 0 -> 2 -> 1)
+        auto pNewPrimDataEven = m_pBuilder->CreateShl(pVertexId2, 10);
+        pNewPrimDataEven = m_pBuilder->CreateOr(pNewPrimDataEven, pVertexId1);
+        pNewPrimDataEven = m_pBuilder->CreateShl(pNewPrimDataEven, 10);
+        pNewPrimDataEven = m_pBuilder->CreateOr(pNewPrimDataEven, pVertexId0);
+
+        auto pNewPrimDataOdd = m_pBuilder->CreateShl(pVertexId1, 10);
+        pNewPrimDataOdd = m_pBuilder->CreateOr(pNewPrimDataOdd, pVertexId2);
+        pNewPrimDataOdd = m_pBuilder->CreateShl(pNewPrimDataOdd, 10);
+        pNewPrimDataOdd = m_pBuilder->CreateOr(pNewPrimDataOdd, pVertexId0);
+
+        pNewPrimData = m_pBuilder->CreateSelect(pOdd, pNewPrimDataOdd, pNewPrimDataEven);
     }
     else
     {

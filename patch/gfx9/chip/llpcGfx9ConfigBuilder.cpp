@@ -929,7 +929,6 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
         }
 #endif
 #endif
-        // TODO: Set Gfx10::mmGE_NGG_SUBGRP_CNTL and Gfx10::mmGE_MAX_OUTPUT_PER_SUBGROUP
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -1056,8 +1055,6 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
         }
 #endif
 #endif
-
-        // TODO: Set Gfx10::mmGE_NGG_SUBGRP_CNTL and Gfx10::mmGE_MAX_OUTPUT_PER_SUBGROUP
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -2234,11 +2231,14 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     if (hasGs)
     {
         usePointSize      = gsBuiltInUsage.pointSize;
-        usePrimitiveId    = gsBuiltInUsage.primitiveId;
+        usePrimitiveId    = gsBuiltInUsage.primitiveIdIn;
         useLayer          = gsBuiltInUsage.layer;
         useViewportIndex  = gsBuiltInUsage.viewportIndex;
         clipDistanceCount = gsBuiltInUsage.clipDistance;
         cullDistanceCount = gsBuiltInUsage.cullDistance;
+#if VKI_3RD_PARTY_IP_PROPERTY_ID
+        usePropertyId     = gsBuiltInUsage.propertyId;
+#endif
 
         expCount = pGsResUsage->inOutUsage.expCount;
 

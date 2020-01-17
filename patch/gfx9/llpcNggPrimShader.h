@@ -106,7 +106,7 @@ private:
                         uint32_t     location,
                         uint32_t     compIdx,
                         uint32_t     streamId,
-                        llvm::Value* pThreadIdInWave,
+                        llvm::Value* pThreadIdInSubgroup,
                         llvm::Value* pOutVertCounter);
 
     llvm::Value* ImportGsOutput(llvm::Type*  pOutputTy,
