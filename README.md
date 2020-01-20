@@ -2,9 +2,9 @@
 
 ## Documentation
 
-* [LLPC overview](docs/LlpcOverview.md)
+* [LLPC overview](llpc/docs/LlpcOverview.md)
 
-* [amdllpc standalone compiler](docs/amdllpc.md)
+* [amdllpc standalone compiler](llpc/docs/amdllpc.md)
 
 ## Third Party Software
 LLPC contains code written by third parties:
@@ -12,3 +12,4 @@ LLPC contains code written by third parties:
 * SPIRV-Tools is distributed under the terms of Apache License version 2.0. See translator/hex_float.h and bitutils.h.
 * Metrohash is distributed under the terms of MIT License. See imported/metrohash/metrohash-license.
 * CWPack is distributed under the terms of MITLicense. See imported/cwpack/cwpack-license.
+

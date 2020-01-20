@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2017-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2020 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to deal
@@ -23,71 +23,8 @@
  #
  #######################################################################################################################
 
-cmake_minimum_required(VERSION 3.3)
+# This CMakeLists.txt simply forwards to the real one in llpc/test, and is present only
+# to cater for an old build script that still looks for it in the old location.
 
-set(SHADER_TEST_VERSION 0.0.1)
-project(shadertest
-    VERSION
-      ${SHADER_TEST_VERSION}
-    LANGUAGES
-      CXX
-  )
-
-if(DEFINED XGL_LLVM_SRC_PATH)
-  # This is a build where LLPC lit testing is integrated into AMDVLK cmake files.
-  set(AMDLLPC_TEST_DEPS amdllpc spvgen FileCheck count not)
-  set(LLVM_DIR ${XGL_LLVM_SRC_PATH})
-endif()
-
-if(DEFINED LLVM_DIR)
-  set(BUILD_EXTERNAL NO)
-else()
-  set(BUILD_EXTERNAL YES)
-endif()
-
-if (BUILD_EXTERNAL)
-    set(CMAKE_MODULE_PATH
-        ${CMAKE_MODULE_PATH}
-        ${CMAKE_CURRENT_SOURCE_DIR}/litScripts/cmake)
-    set(LLVM_BUILD_MAIN_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/litScripts)
-    set(LLVM_BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/litScripts/bin)
-    set(LLVM_TOOLS_BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/litScripts/bin)
-else()
-    set(CMAKE_MODULE_PATH
-        ${CMAKE_MODULE_PATH}
-        ${LLVM_DIR})
-    include(LLVMConfig)
-endif()
-
-include(AddLLVM)
-
-# required by lit.site.cfg.py.in
-set(AMDLLPC_TEST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-
-# required by configure_lit_site_cfg
-set(LLVM_LIT_OUTPUT_DIR ${LLVM_TOOLS_BINARY_DIR})
-configure_lit_site_cfg(
-  ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
-  ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py
-  MAIN_CONFIG
-    ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
-)
-
-add_lit_testsuite(check-amdllpc "Running the AMDLLPC regression tests"
-  ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS
-    ${AMDLLPC_TEST_DEPS}
-)
-
-# to enable a custom test target on cmake below 3.11
-# starting with 3.11 "test" is only reserved if ENABLE_TESTING(ON)
-cmake_policy(PUSH)
-if(POLICY CMP0037 AND ${CMAKE_VERSION} VERSION_LESS "3.11.0")
-  cmake_policy(SET CMP0037 OLD)
-endif(POLICY CMP0037 AND ${CMAKE_VERSION} VERSION_LESS "3.11.0")
-add_custom_target(test
-  DEPENDS
-    check-amdllpc
-)
-cmake_policy(POP)
+add_subdirectory(../llpc/test ${CMAKE_CURRENT_BINARY_DIR})
 
