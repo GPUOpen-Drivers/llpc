@@ -54,7 +54,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
     LCXXINCS += -I$(LLPC_DEPTH)/patch/generate
     LCXXINCS += -I$(LLPC_DEPTH)/translator/include
     LCXXINCS += -I$(LLPC_DEPTH)/translator/lib/SPIRV
-    LCXXINCS += -I$(LLPC_DEPTH)/translator/lib/SPIRV/Mangler
 
     vpath %.cpp $(LLPC_DEPTH)/builder
     vpath %.cpp $(LLPC_DEPTH)/context
@@ -66,7 +65,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
     vpath %.cpp $(LLPC_DEPTH)/patch/gfx9/chip
     vpath %.cpp $(LLPC_DEPTH)/translator/lib/SPIRV
     vpath %.cpp $(LLPC_DEPTH)/translator/lib/SPIRV/libSPIRV
-    vpath %.cpp $(LLPC_DEPTH)/translator/lib/SPIRV/Mangler
     vpath %.cpp $(LLPC_DEPTH)/util
 
     # llpc/builder

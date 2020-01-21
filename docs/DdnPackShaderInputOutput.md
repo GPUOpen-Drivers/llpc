@@ -1,7 +1,7 @@
 # Detailed Design Note: Pack fragment shader inputs
 **Status:** revised
 ## 1 Instruction
-Hardware allocates parameters in the parameter cache and attributes in LDS for interpolation in a pixel shader in units of vec4, regardless of how many components are used. Currently, the inputs of fragment shaders are treated as individual vec4s. If the input shader does not fully utilize all components – perhaps after dead-code elimination – then parameter and attribute space is wasted. By packing components tightly, we can reduce the cost of parameter cache, LDS and so on, which can benefit the performance.
+Hardware allocates parameters in the parameter cache and attributes in LDS for interpolation in a pixel shader in units of vec4, regardless of how many components are used. Currently, the inputs of fragment shaders are treated as individual vec4s. If the input shader does not fully utilize all components -- perhaps after dead-code elimination -- then parameter and attribute space is wasted. By packing components tightly, we can reduce the cost of parameter cache, LDS and so on, which can benefit the performance.
 This DDN introduces the workflow change of packing in/out in VS/FS pipeline in LLPC.
 ## 2 Background detail
 VS/FS is the most popular pipeline. To reduce risk, we support packing for VS/FS pipeline as the goal of phase 1. Considering component-based interpolation of the input of fragment shader, we adopt the idea of vector scalarization and then re-assembling vectors to achieve the purpose of packing. We use cl::PackInOut as a global switch control.
@@ -13,7 +13,7 @@ In the LLPC middle-end, fragment shader inputs are represented by two kinds of i
 ## 3 Interface change
 No interface change.
 ## 4 Internal change
-The core task of pixel shader input packing is to re-write the location and elemIdx fields of the fragment shader’s input import functions to result in a denser packing.
+The core task of pixel shader input packing is to re-write the location and elemIdx fields of the fragment shader's input import functions to result in a denser packing.
 Additionally:
 - In addition to re-writing the input locations in the fragment shader, also the output locations of the previous shader stage need to be re-written to match.
 - Input import and output export functions must be scalarized to make the packing more effective, for two reasons:
@@ -25,7 +25,7 @@ Additionally:
   - Dynamic indexing into inputs must be considered. The initial version of this feature can simply fall back to not packing anything when dynamic indexing is used.
 ### 4.1 Packing overview
 We will have two core data structures for the packing.
-1. The LocationMap answers the question “given an original (location, elemIdx) pair, what is the re-written (location, elemIdx)”? An instance of this data structure exists once per pipeline throughout the packing process.
+1. The LocationMap answers the question "given an original (location, elemIdx) pair, what is the re-written (location, elemIdx)"? An instance of this data structure exists once per pipeline throughout the packing process.
 2. The LocationSpans answers the question which contiguous sequences of components are used together, and in which interpMode. An instance of this data structure exists temporarily while computing the LocationMap.
 
 With these data structures in place, the packing itself proceeds in three steps:
@@ -58,7 +58,6 @@ With these data structures in place, the packing itself proceeds in three steps:
             export.generic.*.v4f32------->3<-------import.generic.f32.*x4
             export.generic.*.v2f32------->4<-------import.generic.f32.*x2
             export.generic.*.v2f32------->5<-------import.interpolant.f32.*x4
-
 
 ### 4.2 LocationMap
 The LocationMap deals in (location, component, half) tuples:
@@ -171,8 +170,8 @@ Fragment shader input instructions do not benefit from re-vectorization.
 Output instructions of the previous shader stage do benefit from re-vectorization, since export instructions are expensive. In general, we should strive to combine export instructions as much as possible. Furthermore, parameter exports should generally be done at the end of the hardware vertex or primitive shader stage.
 Therefore, this part of the feature changes the PatchInOutImportExport to handle exporting of generic outputs from the last geometry stage differently as follows:
 1. For every generic output component, insert an alloca instruction in the function entry block.
-2. Lower all output.export.generic calls into stores to the corresponding alloca’d variable.
-3. Build export intrinsics for all alloca’d variables before the function’s return statement.
+2. Lower all output.export.generic calls into stores to the corresponding alloca'd variable.
+3. Build export intrinsics for all alloca'd variables before the function's return statement.
 
 Note that:
 - This procedure relies on having a single return statement in the function. This needs to be asserted and/or assured.

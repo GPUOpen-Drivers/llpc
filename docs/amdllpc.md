@@ -3,7 +3,7 @@
 LLPC can be built into a standalone offline compiler (amdllpc). It supports GLSL, SPIR-V binary and SPIR-V assemble file as input and output GPU ISA code and related register settings.
 
 ### Build Instruction
-Please refer to the [Build Instructions](https://github.com/GPUOpen-Drivers/AMDVLK#build-instructions) of amdvlk. By default, amdllpc is built together with Vulkan driver. You can use "make amdllpc" to build amdllpc only. 
+Please refer to the [Build Instructions](https://github.com/GPUOpen-Drivers/AMDVLK#build-instructions) of amdvlk. By default, amdllpc is built together with Vulkan driver. You can use "make amdllpc" to build amdllpc only.
 
 ### Usage
 ```
@@ -38,7 +38,6 @@ amdllpc [<options>...] [<files>...]
 | `-enable-pipeline-dump`          | Enable pipeline info dump	                                       |                               |
 | `-pipeline-dump-dir=<directory>` | Directory where pipeline shader info are dumped	               |                               |
 
-
 * Debug & Performance tunning options
 
 | Option Name                      | Description                                                       | Default Value                 |
@@ -65,7 +64,6 @@ amdllpc [<options>...] [<files>...]
 
 > **Note:** amdllpc overwrites following native options in LLVM:
 >>>> -pragma-unroll-threshold=4096 -unroll-allow-partial -simplifycfg-sink-common=false -amdgpu-vgpr-index-mode -filetype=obj
-
 
 #### File formats
 
@@ -94,7 +92,6 @@ call [spvgen](https://github.com/GPUOpen-Drivers/spvgen). The directory of the s
 needs to be added to the environment variable LD_LIBRARY_PATH. Compiling SPIR-V binary
 or a Pipeline info file that contains or points to SPIR-V binary does not require spvgen.
 
-
 #### Examples
 
 * Compile single fragment shader "a.frag" on Vega10
@@ -106,7 +103,6 @@ amdllpc -auto-layout-desc -gfxip=9.0.0 a.frag
 ```
 amdllpc -gfxip=8.0.3 -o=c.elf b.pipe
 ```
-
 
 ## Test with SHADERDB
 You can use [shaderdb](https://github.com/GPUOpen-Drivers/llpc/tree/master/test) to test llpc with standalone compiler and [spvgen](https://github.com/GPUOpen-Drivers/spvgen):
