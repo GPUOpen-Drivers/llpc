@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2017-2020 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to deal
@@ -224,7 +224,6 @@ target_include_directories(llpc
         ${PROJECT_SOURCE_DIR}/translator/include
         ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
         ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
-        ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/Mangler
         ${PROJECT_SOURCE_DIR}/util
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
@@ -499,7 +498,6 @@ PRIVATE
     ${PROJECT_SOURCE_DIR}/translator/include
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
-    ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/Mangler
     ${PROJECT_SOURCE_DIR}/util
     ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx6/chip
     ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx9/chip

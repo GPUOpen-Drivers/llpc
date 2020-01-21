@@ -635,6 +635,36 @@ private:
   std::vector<SPIRVType *> ParamTypeVec; // Parameter Types
 };
 
+class SPIRVTypeOpaqueGeneric : public SPIRVType {
+public:
+  // Complete constructor
+  SPIRVTypeOpaqueGeneric(Op TheOpCode, SPIRVModule *M, SPIRVId TheId)
+      : SPIRVType(M, 2, TheOpCode, TheId) {
+    validate();
+  }
+
+  // Incomplete constructor
+  SPIRVTypeOpaqueGeneric(Op TheOpCode)
+      : SPIRVType(TheOpCode), Opn(SPIRVID_INVALID) {}
+
+  SPIRVValue *getOperand() { return getValue(Opn); }
+
+protected:
+  _SPIRV_DEF_DECODE1(Id)
+  void validate() const override { SPIRVEntry::validate(); }
+  SPIRVId Opn;
+};
+
+template <Op TheOpCode>
+class SPIRVOpaqueGenericType : public SPIRVTypeOpaqueGeneric {
+public:
+  // Complete constructor
+  SPIRVOpaqueGenericType(SPIRVModule *M, SPIRVId TheId)
+      : SPIRVTypeOpaqueGeneric(TheOpCode, M, TheId) {}
+  // Incomplete constructor
+  SPIRVOpaqueGenericType() : SPIRVTypeOpaqueGeneric(TheOpCode) {}
+};
+
 template <typename T2, typename T1>
 bool isType(const T1 *Ty, unsigned Bits = 0) {
   bool Is = Ty->getOpCode() == T2::OC;

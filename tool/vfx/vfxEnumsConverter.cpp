@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2020 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -967,7 +967,6 @@ void InitEnumMap()
     ADD_ENUM_MAP(VkRayTracingShaderGroupTypeNV, VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV);
     ADD_ENUM_MAP(VkRayTracingShaderGroupTypeNV, VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_NV);
     ADD_ENUM_MAP(VkRayTracingShaderGroupTypeNV, VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_NV);
-
     // Add Vfx enums
     ADD_ENUM_MAP(ResultSource, ResultSourceColor)
     ADD_ENUM_MAP(ResultSource, ResultSourceDepthStencil)
