@@ -181,7 +181,7 @@ Result ElfReader<Elf>::GetSectionData(
 // =====================================================================================================================
 // Gets the count of symbols in the symbol table section.
 template<class Elf>
-uint32_t ElfReader<Elf>::GetSymbolCount()
+uint32_t ElfReader<Elf>::GetSymbolCount() const
 {
     uint32_t symCount = 0;
     if (m_symSecIdx >= 0)
@@ -293,7 +293,8 @@ Result ElfReader<Elf>::GetSectionDataBySortingIndex(
 template<class Elf>
 void ElfReader<Elf>::GetSymbolsBySectionIndex(
     uint32_t                secIdx,         // Section index
-    std::vector<ElfSymbol>& secSymbols)     // [out] ELF symbols
+    std::vector<ElfSymbol>& secSymbols      // [out] ELF symbols
+    ) const
 {
     if ((secIdx < m_sections.size()) && (m_symSecIdx >= 0))
     {
@@ -355,9 +356,10 @@ bool ElfReader<Elf>::IsValidSymbol(
 // Gets note according to note type
 template<class Elf>
 ElfNote ElfReader<Elf>::GetNote(
-    Util::Abi::PipelineAbiNoteType noteType) // Note type
+    Util::Abi::PipelineAbiNoteType noteType // Note type
+    ) const
 {
-    uint32_t noteSecIdx = m_map[NoteName];
+    uint32_t noteSecIdx = m_map.at(NoteName);
     LLPC_ASSERT(noteSecIdx > 0);
 
     auto pNoteSection = m_sections[noteSecIdx];
