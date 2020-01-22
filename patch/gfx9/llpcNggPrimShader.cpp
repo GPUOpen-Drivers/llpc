@@ -1151,6 +1151,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                         m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(SizeOfVec4));
                     pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
 
+                    // Use 128-bit LDS store
                     m_pLdsManager->WriteValueToLds(expData.pExpValue, pLdsOffset, true);
 
                     break;
@@ -1756,10 +1757,11 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                             m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(SizeOfVec4));
                         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
 
-                        auto pExpValue = m_pLdsManager->ReadValueFromLds(VectorType::get(Type::getFloatTy(*m_pContext),
-                                                                                         4),
-                                                                         pLdsOffset,
-                                                                         true);
+                        // Use 128-bit LDS load
+                        auto pExpValue =
+                            m_pLdsManager->ReadValueFromLds(VectorType::get(Type::getFloatTy(*m_pContext), 4),
+                                                            pLdsOffset,
+                                                            true);
                         expData.pExpValue = pExpValue;
 
                         break;
@@ -2689,7 +2691,9 @@ Value* NggPrimShader::DoCulling(
         Value* pLdsOffset = m_pBuilder->CreateMul(vertexId[i], m_pBuilder->getInt32(SizeOfVec4));
         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, pRegionStart);
 
-        vertex[i] = m_pLdsManager->ReadValueFromLds(VectorType::get(Type::getFloatTy(*m_pContext), 4), pLdsOffset, true);
+        // Use 128-bit LDS load
+        vertex[i] = m_pLdsManager->ReadValueFromLds(
+            VectorType::get(Type::getFloatTy(*m_pContext), 4), pLdsOffset, true);
     }
 
     // Handle backface culling
@@ -4033,7 +4037,9 @@ Value* NggPrimShader::ImportGsOutput(
     // ldsOffset = vertexOffset + (location * 4 + compIdx) * 4 (in BYTES)
     const uint32_t attribOffset = (location * 4) + compIdx;
     auto pLdsOffset = m_pBuilder->CreateAdd(pVertexOffset, m_pBuilder->getInt32(attribOffset * 4));
-    auto pOutput = m_pLdsManager->ReadValueFromLds(pOutputTy, pLdsOffset);
+    // Use 128-bit LDS load
+    auto pOutput = m_pLdsManager->ReadValueFromLds(
+        pOutputTy, pLdsOffset, (pOutputTy->getPrimitiveSizeInBits() == 128));
 
     if (pOrigOutputTy != pOutputTy)
     {
