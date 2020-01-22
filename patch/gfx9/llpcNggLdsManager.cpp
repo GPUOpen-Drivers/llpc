@@ -470,27 +470,10 @@ Value* NggLdsManager::ReadValueFromLds(
         Value* pLoadPtr = m_pBuilder->CreateGEP(pLds, pLdsOffset);
         if (bitWidth != 8)
         {
-            if (useDs128 && (bitWidth == 128))
-            {
-                // NOTE: For single 128-bit LDS load, the friendly data type for backend compiler is <4 x i32>.
-                pLoadPtr =
-                    m_pBuilder->CreateBitCast(pLoadPtr, PointerType::get(VectorType::get(Type::getInt32Ty(*m_pContext),
-                                                                                         4),
-                                                                         ADDR_SPACE_LOCAL));
-            }
-            else
-            {
-                pLoadPtr = m_pBuilder->CreateBitCast(pLoadPtr, PointerType::get(pCompTy, ADDR_SPACE_LOCAL));
-            }
+            pLoadPtr = m_pBuilder->CreateBitCast(pLoadPtr, PointerType::get(pCompTy, ADDR_SPACE_LOCAL));
         }
 
-        // NOTE: Use "volatile" for load to prevent optimization.
-        Value* pLoadValue = m_pBuilder->CreateAlignedLoad(pLoadPtr, alignment, true);
-        if (useDs128 && (bitWidth == 128))
-        {
-            // Convert <4 x i32> to i128
-            pLoadValue = m_pBuilder->CreateBitCast(pLoadValue, m_pBuilder->getInt128Ty());
-        }
+        Value* pLoadValue = m_pBuilder->CreateAlignedLoad(pLoadPtr, alignment);
 
         if (compCount > 1)
         {
@@ -582,18 +565,7 @@ void NggLdsManager::WriteValueToLds(
         Value* pStorePtr = m_pBuilder->CreateGEP(pLds, pLdsOffset);
         if (bitWidth != 8)
         {
-            if (useDs128 && (bitWidth == 128))
-            {
-                // NOTE: For single 128-bit LDS store, the friendly data type for backend compiler is <4 x i32>.
-                pStorePtr =
-                    m_pBuilder->CreateBitCast(pStorePtr, PointerType::get(VectorType::get(Type::getInt32Ty(*m_pContext),
-                                                                                          4),
-                                                                          ADDR_SPACE_LOCAL));
-            }
-            else
-            {
-                pStorePtr = m_pBuilder->CreateBitCast(pStorePtr, PointerType::get(pCompTy, ADDR_SPACE_LOCAL));
-            }
+            pStorePtr = m_pBuilder->CreateBitCast(pStorePtr, PointerType::get(pCompTy, ADDR_SPACE_LOCAL));
         }
 
         Value* pStoreValue = nullptr;
@@ -606,14 +578,7 @@ void NggLdsManager::WriteValueToLds(
             pStoreValue = pWriteValue;
         }
 
-        if (useDs128 && (bitWidth == 128))
-        {
-            // Convert i128 to <4 x i32>
-            pStoreValue = m_pBuilder->CreateBitCast(pStoreValue, VectorType::get(Type::getInt32Ty(*m_pContext), 4));
-        }
-
-        // NOTE: Use "volatile" for store to prevent optimization.
-        m_pBuilder->CreateAlignedStore(pStoreValue, pStorePtr, alignment, true);
+        m_pBuilder->CreateAlignedStore(pStoreValue, pStorePtr, alignment);
 
         if (compCount > 1)
         {
