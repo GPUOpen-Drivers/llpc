@@ -630,18 +630,12 @@ void ElfWriter<Elf>::WriteToBuffer(
 }
 
 // =====================================================================================================================
+// Copies ELF content from a ElfReader.
 template<class Elf>
-Result ElfWriter<Elf>::ReadFromBuffer(
-    const void* pBuffer,    // [in] Buffer to read data from
-    size_t      bufSize)    // Size of the buffer
+Result ElfWriter<Elf>::CopyFromReader(
+    const ElfReader<Elf>& reader)   // The ElfReader to copy from.
 {
-    ElfReader<Elf> reader(m_gfxIp);
-    auto result = reader.ReadFromBuffer(pBuffer, &bufSize);
-    if (result != Llpc::Result::Success)
-    {
-        return result;
-    }
-
+    Result result = Result::Success;
     m_header = reader.m_header;
     m_sections.resize(reader.m_sections.size());
     for (size_t i = 0; i < reader.m_sections.size(); ++i)
@@ -712,6 +706,22 @@ Result ElfWriter<Elf>::ReadFromBuffer(
             return (a.secIdx < b.secIdx) || ((a.secIdx == b.secIdx) && (a.value < b.value));
         });
     return result;
+}
+
+// =====================================================================================================================
+// Reads ELF content from a buffer.
+template<class Elf>
+Result ElfWriter<Elf>::ReadFromBuffer(
+    const void* pBuffer,    // [in] Buffer to read data from
+    size_t      bufSize)    // Size of the buffer
+{
+    ElfReader<Elf> reader(m_gfxIp);
+    auto result = reader.ReadFromBuffer(pBuffer, &bufSize);
+    if (result != Llpc::Result::Success)
+    {
+        return result;
+    }
+    return CopyFromReader(reader);
 }
 
 // =====================================================================================================================
@@ -997,7 +1007,7 @@ void ElfWriter<Elf>::Reinitialize()
 // =====================================================================================================================
 // Link the relocatable ELF readers into a pipeline ELF.
 template<class Elf>
-Result ElfWriter<Elf>::LinkRelocatableElf(
+Result ElfWriter<Elf>::LinkGraphicsRelocatableElf(
     const ArrayRef<ElfReader<Elf>*>& relocatableElfs, // An array of relocatable ELF objects
     Context* pContext)                                // [in] Acquired context
 {
@@ -1082,6 +1092,22 @@ Result ElfWriter<Elf>::LinkRelocatableElf(
     MergeMetaNote(pContext, &noteInfo1, &noteInfo2, &m_notes.back());
 
     // Merge other sections.  For now, none of the other sections are important, so we will not do anything.
+
+    return Result::Success;
+}
+
+// =====================================================================================================================
+// Link the compute shader relocatable ELF reader into a pipeline ELF.
+template<class Elf>
+Result ElfWriter<Elf>::LinkComputeRelocatableElf(
+    const ElfReader<Elf>& relocatableElf,   // [in] Relocatable compute shader elf
+    Context* pContext)                      // [in] Acquired context
+{
+    // Currently nothing to do, just copy the elf.
+    CopyFromReader(relocatableElf);
+    
+    // Apply relocations
+    // There are no relocations to apply yet.
 
     return Result::Success;
 }

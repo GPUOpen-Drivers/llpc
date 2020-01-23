@@ -128,6 +128,7 @@ public:
     Result BuildComputePipelineInternal(ComputeContext*                 pComputeContext,
                                         const ComputePipelineBuildInfo* pPipelineInfo,
                                         uint32_t                        forceLoopUnrollCount,
+                                        bool                            buildingRelocatableElf,
                                         ElfPackage*                     pPipelineElf);
 
     Result BuildPipelineWithRelocatableElf(Context*                                   pContext,
@@ -192,6 +193,7 @@ private:
     bool RunPasses(PassManager* pPassMgr, llvm::Module* pModule) const;
     void LinkRelocatableShaderElf(ElfPackage *pShaderElfs, ElfPackage* pPipelineElf, Context* pContext);
     bool CanUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo*>& shaderInfo) const;
+    bool CanUseRelocatableComputeShaderElf(const PipelineShaderInfo* pShaderInfo) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 
