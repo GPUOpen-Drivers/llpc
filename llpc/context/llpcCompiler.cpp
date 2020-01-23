@@ -865,9 +865,26 @@ Result Compiler::BuildPipelineWithRelocatableElf(
         pContext->GetPipelineContext()->SetShaderStageMask(ShaderStageToMask(static_cast<ShaderStage>(stage)));
 
         // Check the cache for the relocatable shader for this stage.
-        auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
         MetroHash::Hash cacheHash = {};
-        cacheHash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, true, stage);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+        IShaderCache* pUserShaderCache = nullptr;
+#endif
+        if (pContext->IsGraphics())
+        {
+            auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
+            cacheHash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, true, stage);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+            pUserShaderCache = pPipelineInfo->pShaderCache;
+#endif
+        }
+        else
+        {
+            auto pPipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
+            cacheHash = PipelineDumper::GenerateHashForComputePipeline(pPipelineInfo, true);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+            pUserShaderCache = pPipelineInfo->pShaderCache;
+#endif
+        }
 
         ShaderEntryState cacheEntryState  = ShaderEntryState::New;
         BinaryData elfBin = {};
@@ -876,7 +893,7 @@ Result Compiler::BuildPipelineWithRelocatableElf(
         constexpr uint32_t ShaderCacheCount = 2;
         ShaderCache*     shaderCache[ShaderCacheCount]  = { nullptr, nullptr };
         CacheEntryHandle hEntry[ShaderCacheCount]        = { nullptr, nullptr };
-        cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &elfBin, shaderCache, hEntry);
+        cacheEntryState = LookUpShaderCaches(pUserShaderCache, &cacheHash, &elfBin, shaderCache, hEntry);
 #else
         CacheEntryHandle hEntry = nullptr;
         cacheEntryState = LookUpShaderCache(&cacheHash, &elfBin, &hEntry);
@@ -954,6 +971,42 @@ bool Compiler::CanUseRelocatableGraphicsShaderElf(
     if (useRelocatableShaderElf && shaderInfo[0] != nullptr)
     {
         const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo[0]->pModuleData);
+        if ((pModuleData != nullptr) && (pModuleData->binType != BinaryType::Spirv))
+        {
+            useRelocatableShaderElf = false;
+        }
+    }
+
+    if (useRelocatableShaderElf && cl::RelocatableShaderElfLimit != -1)
+    {
+        static uint32_t relocatableElfCounter = 0;
+        if (relocatableElfCounter >= cl::RelocatableShaderElfLimit)
+        {
+            useRelocatableShaderElf = false;
+        }
+        else
+        {
+            ++relocatableElfCounter;
+        }
+    }
+    return useRelocatableShaderElf;
+}
+
+// =====================================================================================================================
+// Returns true if a compute pipeline can be built out of the given shader info.
+bool Compiler::CanUseRelocatableComputeShaderElf(
+    const PipelineShaderInfo* pShaderInfo   // Shader info for the pipeline to be built
+    ) const
+{
+    if (!llvm::cl::UseRelocatableShaderElf)
+    {
+        return false;
+    }
+
+    bool useRelocatableShaderElf = true;
+    if (useRelocatableShaderElf && pShaderInfo != nullptr)
+    {
+        const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
         if ((pModuleData != nullptr) && (pModuleData->binType != BinaryType::Spirv))
         {
             useRelocatableShaderElf = false;
@@ -1645,7 +1698,8 @@ Result Compiler::BuildGraphicsPipeline(
 Result Compiler::BuildComputePipelineInternal(
     ComputeContext*                 pComputeContext,                // [in] Compute context this compute pipeline
     const ComputePipelineBuildInfo* pPipelineInfo,                  // [in] Pipeline info of this compute pipeline
-    uint32_t                        forceLoopUnrollCount,           // [in] Force loop unroll count (0 means disable)
+    uint32_t                        forceLoopUnrollCount,           // Force loop unroll count (0 means disable)
+    bool                            buildingRelocatableElf,         // Build the pipeline by linking relocatable elf
     ElfPackage*                     pPipelineElf)                   // [out] Output Elf package
 {
     Context* pContext = AcquireContext();
@@ -1661,7 +1715,15 @@ Result Compiler::BuildComputePipelineInternal(
         &pPipelineInfo->cs,
     };
 
-    Result result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf);
+    Result result;
+    if (buildingRelocatableElf)
+    {
+        result = BuildPipelineWithRelocatableElf(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf);
+    }
+    else
+    {
+        result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf);
+    }
     ReleaseContext(pContext);
     return result;
 }
@@ -1675,6 +1737,8 @@ Result Compiler::BuildComputePipeline(
 {
     BinaryData elfBin = {};
 
+    bool buildingRelocatableElf = CanUseRelocatableComputeShaderElf(&pPipelineInfo->cs);
+    
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 32
     // NOTE: It is to workaround the bug in Device::CreateInternalComputePipeline,
     // we forgot to set the entryStage in it. To keep backward compatibility, set the entryStage within LLPC.
@@ -1717,11 +1781,24 @@ Result Compiler::BuildComputePipeline(
     constexpr uint32_t ShaderCacheCount = 2;
     ShaderCache* pShaderCache[ShaderCacheCount] = { nullptr, nullptr };
     CacheEntryHandle hEntry[ShaderCacheCount] = { nullptr, nullptr };
-
-    cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &elfBin, pShaderCache, hEntry);
+    if (!buildingRelocatableElf)
+    {
+        cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &elfBin, pShaderCache, hEntry);
+    }
+    else
+    {
+        cacheEntryState = ShaderEntryState::Compiling;
+    }
 #else
     CacheEntryHandle hEntry = nullptr;
-    cacheEntryState = LookUpShaderCache(&cacheHash, &elfBin, &hEntry);
+    if (!buildingRelocatableElf)
+    {
+        cacheEntryState = LookUpShaderCache(&cacheHash, &elfBin, &hEntry);
+    }
+    else
+    {
+        cacheEntryState = ShaderEntryState::Compiling;
+    }
 #endif
 
     ElfPackage candidateElf;
@@ -1738,6 +1815,7 @@ Result Compiler::BuildComputePipeline(
         result = BuildComputePipelineInternal(&computeContext,
                                               pPipelineInfo,
                                               forceLoopUnrollCount,
+                                              buildingRelocatableElf,
                                               &candidateElf);
 
         if (result == Result::Success)
@@ -1745,11 +1823,14 @@ Result Compiler::BuildComputePipeline(
             elfBin.codeSize = candidateElf.size();
             elfBin.pCode = candidateElf.data();
         }
+        if (!buildingRelocatableElf)
+        {
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-        UpdateShaderCaches((result == Result::Success), &elfBin, pShaderCache, hEntry, ShaderCacheCount);
+            UpdateShaderCaches((result == Result::Success), &elfBin, pShaderCache, hEntry, ShaderCacheCount);
 #else
-        UpdateShaderCache((result == Result::Success), &elfBin, hEntry);
+            UpdateShaderCache((result == Result::Success), &elfBin, hEntry);
 #endif
+        }
     }
 
     if (result == Result::Success)
@@ -2239,38 +2320,54 @@ void Compiler::LinkRelocatableShaderElf(
     ElfPackage* pPipelineElf,  // [out] Elf package containing the pipeline elf
     Context* pContext)         // [in]  Acquired context
 {
-    LLPC_ASSERT(pShaderElfs[ShaderStageCompute].empty() && "Cannot link compute shaders yet.");
     LLPC_ASSERT(pShaderElfs[ShaderStageTessControl].empty() && "Cannot link tessellation shaders yet.");
     LLPC_ASSERT(pShaderElfs[ShaderStageTessEval].empty() && "Cannot link tessellation shaders yet.");
     LLPC_ASSERT(pShaderElfs[ShaderStageGeometry].empty() && "Cannot link geometry shaders yet.");
 
-    ElfReader<Elf64> vsReader(m_gfxIp);
-    ElfReader<Elf64> fsReader(m_gfxIp);
-    if (!pShaderElfs[ShaderStageVertex].empty())
-    {
-        size_t codeSize = pShaderElfs[ShaderStageVertex].size_in_bytes();
-        Result result = vsReader.ReadFromBuffer(pShaderElfs[ShaderStageVertex].data(), &codeSize);
-        if (result != Result::Success)
-        {
-            return;
-        }
-    }
-
-    if (!pShaderElfs[ShaderStageFragment].empty())
-    {
-        size_t codeSize = pShaderElfs[ShaderStageFragment].size_in_bytes();
-        Result result = fsReader.ReadFromBuffer(pShaderElfs[ShaderStageFragment].data(), &codeSize);
-        if (result != Result::Success)
-        {
-            return;
-        }
-    }
-
+    Result result = Result::Success;
     ElfWriter<Elf64> writer(m_gfxIp);
-    Result result = writer.LinkRelocatableElf({&vsReader, &fsReader}, pContext);
+
+    if (pShaderElfs[ShaderStageCompute].empty())
+    {
+        ElfReader<Elf64> vsReader(m_gfxIp);
+        ElfReader<Elf64> fsReader(m_gfxIp);
+        if (!pShaderElfs[ShaderStageVertex].empty())
+        {
+            size_t codeSize = pShaderElfs[ShaderStageVertex].size_in_bytes();
+            result = vsReader.ReadFromBuffer(pShaderElfs[ShaderStageVertex].data(), &codeSize);
+            if (result != Result::Success)
+            {
+                return;
+            }
+        }
+
+        if (!pShaderElfs[ShaderStageFragment].empty())
+        {
+            size_t codeSize = pShaderElfs[ShaderStageFragment].size_in_bytes();
+            result = fsReader.ReadFromBuffer(pShaderElfs[ShaderStageFragment].data(), &codeSize);
+            if (result != Result::Success)
+            {
+                return;
+            }
+        }
+
+        result = writer.LinkGraphicsRelocatableElf({&vsReader, &fsReader}, pContext);
+    }
+    else
+    {
+        ElfReader<Elf64> csReader(m_gfxIp);
+        size_t codeSize = pShaderElfs[ShaderStageCompute].size_in_bytes();
+        result = csReader.ReadFromBuffer(pShaderElfs[ShaderStageCompute].data(), &codeSize);
+        if (result != Result::Success)
+        {
+            return;
+        }
+        result = writer.LinkComputeRelocatableElf(csReader, pContext);
+    }
+    
     if (result != Result::Success)
     {
-      return;
+        return;
     }
     writer.WriteToBuffer(pPipelineElf);
 }

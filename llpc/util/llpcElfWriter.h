@@ -69,6 +69,7 @@ public:
                               ElfNote*       pNewNote);
 
     Result ReadFromBuffer(const void* pBuffer, size_t bufSize);
+    Result CopyFromReader(const ElfReader<Elf>& reader);
 
     void MergeElfBinary(Context*          pContext,
                         const BinaryData* pFragmentElf,
@@ -95,7 +96,9 @@ public:
 
     void WriteToBuffer(ElfPackage* pElf);
 
-    Result LinkRelocatableElf(const llvm::ArrayRef<ElfReader<Elf>*>& relocatableElfs, Context *pContext);
+    Result LinkGraphicsRelocatableElf(const llvm::ArrayRef<ElfReader<Elf>*>& relocatableElfs, Context *pContext);
+
+    Result LinkComputeRelocatableElf(const ElfReader<Elf>& relocatableElf, Context* pContext);
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(ElfWriter);
 
