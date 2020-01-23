@@ -35,10 +35,10 @@
 ; SHADERTEST: store <4 x float>
 
 ; SHADERTEST-LABEL: {{^// LLPC.*}} patching results
-; SHADERTEST: @llvm.amdgcn.raw.buffer.load.v4f32
-; SHADERTEST: @llvm.amdgcn.raw.buffer.load.v4f32
-; SHADERTEST: @llvm.amdgcn.raw.buffer.load.v4f32
-; SHADERTEST: @llvm.amdgcn.raw.buffer.load.v4f32
+; SHADERTEST: @llvm.amdgcn.raw.buffer.load.v4i32
+; SHADERTEST: @llvm.amdgcn.raw.buffer.load.v4i32
+; SHADERTEST: @llvm.amdgcn.raw.buffer.load.v4i32
+; SHADERTEST: @llvm.amdgcn.raw.buffer.load.v4i32
 ; SHADERTEST: @llvm.amdgcn.raw.buffer.store.v4f32
 ; SHADERTEST: @llvm.amdgcn.raw.buffer.store.v4f32
 ; SHADERTEST: @llvm.amdgcn.raw.buffer.store.v4f32

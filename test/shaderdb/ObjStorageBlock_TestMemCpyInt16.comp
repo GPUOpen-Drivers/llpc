@@ -19,7 +19,7 @@ void main() {
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call float @llvm.amdgcn.buffer.load.ushort(
+; SHADERTEST: call i16 @llvm.amdgcn.raw.buffer.load.i16(
 ; SHADERTEST: call void @llvm.amdgcn.buffer.store.short(
 ; SHADERTEST: AMDLLPC SUCCESS
 */
