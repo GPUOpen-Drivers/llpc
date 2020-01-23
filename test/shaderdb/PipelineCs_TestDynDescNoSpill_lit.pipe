@@ -4,7 +4,7 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: %{{.*}} = call {{.*}} {{.*}}@llpc.call.load.buffer.desc.{{[0-9a-z.]*}}(i32 0, i32 1, i32 0, i1 false,
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call <4 x float> @llvm.amdgcn.raw.buffer.load.v4f32(<4 x i32> %{{.*}}, i32 0, i32 0, i32 0)
+; SHADERTEST: call <4 x i32> @llvm.amdgcn.raw.buffer.load.v4i32(<4 x i32> %{{.*}}, i32 0, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
@@ -39,5 +39,3 @@ userDataNode[1].offsetInDwords = 4
 userDataNode[1].sizeInDwords = 4
 userDataNode[1].set = 0
 userDataNode[1].binding = 1
-
-

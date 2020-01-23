@@ -1533,7 +1533,7 @@ Value* PatchBufferOp::ReplaceLoad(
 
     Type* const pLoadType = pLoadInst->getType();
 
-    const uint32_t bytesToLoad = static_cast<uint32_t>(dataLayout.getTypeSizeInBits(pLoadType) / 8);
+    const uint32_t bytesToLoad = static_cast<uint32_t>(dataLayout.getTypeStoreSize(pLoadType));
 
     uint32_t alignment = pLoadInst->getAlignment();
 
@@ -1595,146 +1595,105 @@ Value* PatchBufferOp::ReplaceLoad(
     }
 
     SmallVector<Value*, 8> partLoads;
+    Type* pSmallestType;
+    uint32_t smallestByteSize = UINT32_MAX;
 
     uint32_t remainingBytes = bytesToLoad;
 
-    // If the alignment is at least 4, we can use the most efficient dword loads.
-    if (alignment >= 4)
+    while (remainingBytes > 0)
     {
-        while (remainingBytes >= 4)
+        const uint32_t offset = bytesToLoad - remainingBytes;
+        Value* pOffset = (offset == 0) ?
+                               pBaseIndex :
+                               m_pBuilder->CreateAdd(pBaseIndex, m_pBuilder->getInt32(offset));
+
+        Type* pIntLoadType = nullptr;
+        uint32_t loadSize = 0;
+
+        // Load the greatest possible size
+        if (alignment >= 4 && remainingBytes >= 4)
         {
-            const uint32_t offset = bytesToLoad - remainingBytes;
-            Value* const pOffset = (offset == 0) ?
-                                   pBaseIndex :
-                                   m_pBuilder->CreateAdd(pBaseIndex, m_pBuilder->getInt32(offset));
-
-            Type* pIntLoadType = nullptr;
-            Type* pFloatLoadType = nullptr;
-
             if (remainingBytes >= 16)
             {
                 pIntLoadType = VectorType::get(Type::getInt32Ty(*m_pContext), 4);
-                pFloatLoadType = VectorType::get(Type::getFloatTy(*m_pContext), 4);
-                remainingBytes -= 16;
+                loadSize = 16;
+            }
+            else if (remainingBytes >= 12 && !isInvariant)
+            {
+                pIntLoadType = VectorType::get(Type::getInt32Ty(*m_pContext), 3);
+                loadSize = 12;
             }
             else if (remainingBytes >= 8)
             {
                 pIntLoadType = VectorType::get(Type::getInt32Ty(*m_pContext), 2);
-                pFloatLoadType = VectorType::get(Type::getFloatTy(*m_pContext), 2);
-                remainingBytes -= 8;
+                loadSize = 8;
             }
-            else if (remainingBytes >= 4)
+            else
             {
+                // remainingBytes >= 4
                 pIntLoadType = Type::getInt32Ty(*m_pContext);
-                pFloatLoadType = Type::getFloatTy(*m_pContext);
-                remainingBytes -= 4;
+                loadSize = 4;
             }
-            else
-            {
-                LLPC_NEVER_CALLED();
-            }
-
-            Value* pPartLoad = nullptr;
-
-            if (isInvariant)
-            {
-                CoherentFlag coherent = {};
-                coherent.bits.glc = isGlc;
-#if LLPC_BUILD_GFX10
-                if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 10)
-                {
-                    coherent.bits.dlc = isDlc;
-                }
-#endif
-                pPartLoad = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load,
-                                                        pIntLoadType,
-                                                        {
-                                                            pBufferDesc,
-                                                            pOffset,
-                                                            m_pBuilder->getInt32(coherent.u32All)
-                                                        });
-            }
-            else
-            {
-                CoherentFlag coherent = {};
-                coherent.bits.glc = isGlc;
-                coherent.bits.slc = isSlc;
-#if LLPC_BUILD_GFX10
-                if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 10)
-                {
-                    coherent.bits.dlc = isDlc;
-                }
-#endif
-                pPartLoad = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load,
-                                                        pFloatLoadType,
-                                                        {
-                                                            pBufferDesc,
-                                                            pOffset,
-                                                            m_pBuilder->getInt32(0),
-                                                            m_pBuilder->getInt32(coherent.u32All)
-                                                        });
-                pPartLoad = m_pBuilder->CreateBitCast(pPartLoad, pIntLoadType);
-            }
-
-            CopyMetadata(pPartLoad, pLoadInst);
-            partLoads.push_back(pPartLoad);
         }
-    }
-
-    // If the alignment is at least 2, we can use ushort loads next.
-    if (alignment >= 2)
-    {
-        for (; remainingBytes >= 2; remainingBytes -= 2)
+        else if (alignment >= 2 && remainingBytes >= 2)
         {
-            const uint32_t offset = bytesToLoad - remainingBytes;
-            Value* const pOffset = (offset == 0) ?
-                                   pBaseIndex :
-                                   m_pBuilder->CreateAdd(pBaseIndex, m_pBuilder->getInt32(offset));
-
-            Value* pPartLoad = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_buffer_load_ushort,
-                                                           {},
-                                                           {
-                                                               pBufferDesc,
-                                                               m_pBuilder->getInt32(0),
-                                                               pOffset,
-                                                               m_pBuilder->getInt1(isGlc),
-                                                               m_pBuilder->getInt1(isSlc)
-                                                           });
-            CopyMetadata(pPartLoad, pLoadInst);
-            pPartLoad = m_pBuilder->CreateBitCast(pPartLoad, VectorType::get(m_pBuilder->getInt16Ty(), 2));
-            CopyMetadata(pPartLoad, pLoadInst);
-            pPartLoad = m_pBuilder->CreateExtractElement(pPartLoad, static_cast<uint64_t>(0));
-            CopyMetadata(pPartLoad, pLoadInst);
-            partLoads.push_back(pPartLoad);
+            pIntLoadType = Type::getInt16Ty(*m_pContext);
+            loadSize = 2;
         }
-    }
+        else
+        {
+            pIntLoadType = Type::getInt8Ty(*m_pContext);
+            loadSize = 1;
+        }
+        LLPC_ASSERT(loadSize != 0);
 
-    for (; remainingBytes >= 1; remainingBytes -= 1)
-    {
-        const uint32_t offset = bytesToLoad - remainingBytes;
-        Value* const pOffset = (offset == 0) ?
-                               pBaseIndex :
-                               m_pBuilder->CreateAdd(pBaseIndex, m_pBuilder->getInt32(offset));
+        Value* pPartLoad = nullptr;
 
-        Value* pPartLoad = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_buffer_load_ubyte,
-                                                       {},
-                                                       {
-                                                           pBufferDesc,
-                                                           m_pBuilder->getInt32(0),
-                                                           pOffset,
-                                                           m_pBuilder->getInt1(isGlc),
-                                                           m_pBuilder->getInt1(isSlc)
-                                                       });
-        CopyMetadata(pPartLoad, pLoadInst);
-        pPartLoad = m_pBuilder->CreateBitCast(pPartLoad, VectorType::get(m_pBuilder->getInt8Ty(), 4));
-        CopyMetadata(pPartLoad, pLoadInst);
-        pPartLoad = m_pBuilder->CreateExtractElement(pPartLoad, static_cast<uint64_t>(0));
+        CoherentFlag coherent = {};
+        coherent.bits.glc = isGlc;
+        if (!isInvariant)
+        {
+            coherent.bits.slc = isSlc;
+        }
+#if LLPC_BUILD_GFX10
+        if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 10)
+        {
+            coherent.bits.dlc = isDlc;
+        }
+#endif
+        if (isInvariant && loadSize >= 4)
+        {
+            pPartLoad = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load,
+                                                    pIntLoadType,
+                                                    {
+                                                        pBufferDesc,
+                                                        pOffset,
+                                                        m_pBuilder->getInt32(coherent.u32All)
+                                                    });
+        }
+        else
+        {
+            pPartLoad = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load,
+                                                    pIntLoadType,
+                                                    {
+                                                        pBufferDesc,
+                                                        pOffset,
+                                                        m_pBuilder->getInt32(0),
+                                                        m_pBuilder->getInt32(coherent.u32All)
+                                                    });
+        }
+
         CopyMetadata(pPartLoad, pLoadInst);
         partLoads.push_back(pPartLoad);
-    }
 
-    // The last element in the array has the smallest type we used to load with, so get that.
-    Type* pSmallestType = partLoads.back()->getType();
+        if (loadSize < smallestByteSize)
+        {
+            pSmallestType = pIntLoadType;
+            smallestByteSize = loadSize;
+        }
+        remainingBytes -= loadSize;
+    }
+    LLPC_ASSERT(smallestByteSize != UINT32_MAX);
 
     // And if the type was a vector, we do our insert elements on the elements of it.
     if (pSmallestType->isVectorTy())
@@ -1743,32 +1702,43 @@ Value* PatchBufferOp::ReplaceLoad(
     }
 
     // Get the byte size of the smallest type.
-    const uint32_t smallestByteSize = static_cast<uint32_t>(dataLayout.getTypeSizeInBits(pSmallestType) / 8);
+    smallestByteSize = static_cast<IntegerType*>(pSmallestType)->getBitWidth() / 8;
 
-    // And create an undef vector whose total size is the number of bytes we loaded.
-    Value* pNewLoad = UndefValue::get(VectorType::get(pSmallestType, bytesToLoad / smallestByteSize));
-
-    uint32_t index = 0;
-
-    for (Value* pPartLoad : partLoads)
+    // This will be either the loaded value or a vector of the loaded values
+    Value* pNewLoad = nullptr;
+    if (partLoads.size() == 1)
     {
-        // Get the byte size of our load part.
-        const uint32_t byteSize = static_cast<uint32_t>(dataLayout.getTypeSizeInBits(pPartLoad->getType()) / 8);
+        // We do not have to create a vector if we did only one load
+        pNewLoad = partLoads.front();
+    }
+    else
+    {
+        // And create an undef vector whose total size is the number of bytes we loaded.
+        pNewLoad = UndefValue::get(VectorType::get(pSmallestType, bytesToLoad / smallestByteSize));
 
-        // Bitcast it to a vector of the smallest load type.
-        VectorType* const pCastType = VectorType::get(pSmallestType, byteSize / smallestByteSize);
-        pPartLoad = m_pBuilder->CreateBitCast(pPartLoad, pCastType);
-        CopyMetadata(pPartLoad, pLoadInst);
+        uint32_t index = 0;
 
-        // Run through our the elements of our bitcasted type and insert them into the main load.
-        for (uint32_t i = 0, compCount = static_cast<uint32_t>(pCastType->getNumElements()); i < compCount; i++)
+        for (Value* pPartLoad : partLoads)
         {
-            Value* const pLoadElem = m_pBuilder->CreateExtractElement(pPartLoad, i);
-            CopyMetadata(pLoadElem, pLoadInst);
-            pNewLoad = m_pBuilder->CreateInsertElement(pNewLoad, pLoadElem, index++);
-            CopyMetadata(pNewLoad, pLoadInst);
+            // Get the byte size of our load part.
+            const uint32_t byteSize = static_cast<uint32_t>(dataLayout.getTypeStoreSize(pPartLoad->getType()));
+
+            // Bitcast it to a vector of the smallest load type.
+            VectorType* const pCastType = VectorType::get(pSmallestType, byteSize / smallestByteSize);
+            pPartLoad = m_pBuilder->CreateBitCast(pPartLoad, pCastType);
+            CopyMetadata(pPartLoad, pLoadInst);
+
+            // Run through the elements of our bitcasted type and insert them into the main load.
+            for (uint32_t i = 0, compCount = static_cast<uint32_t>(pCastType->getNumElements()); i < compCount; i++)
+            {
+                Value* const pLoadElem = m_pBuilder->CreateExtractElement(pPartLoad, i);
+                CopyMetadata(pLoadElem, pLoadInst);
+                pNewLoad = m_pBuilder->CreateInsertElement(pNewLoad, pLoadElem, index++);
+                CopyMetadata(pNewLoad, pLoadInst);
+            }
         }
     }
+    LLPC_ASSERT(pNewLoad != nullptr);
 
     if (pLoadType->isPointerTy())
     {
