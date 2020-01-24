@@ -230,7 +230,7 @@ void SpirvLower::AddPasses(
     passMgr.add(createGlobalDCEPass());
     passMgr.add(createPromoteMemoryToRegisterPass());
     passMgr.add(createAggressiveDCEPass());
-    passMgr.add(createInstructionCombiningPass(false));
+    passMgr.add(createInstructionCombiningPass(false, 3));
     passMgr.add(createCFGSimplificationPass());
     passMgr.add(createSROAPass());
     passMgr.add(createEarlyCSEPass());
