@@ -177,7 +177,7 @@ void Patch::AddPasses(
 
     // Patch buffer operations (must be after optimizations)
     passMgr.add(CreatePatchBufferOp());
-    passMgr.add(createInstructionCombiningPass(false));
+    passMgr.add(createInstructionCombiningPass(false, 2));
 
     // Fully prepare the pipeline ABI (must be after optimizations)
     passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
@@ -257,7 +257,7 @@ void Patch::AddOptimizationPasses(
         passMgr.add(createCalledValuePropagationPass());
         passMgr.add(createGlobalOptimizerPass());
         passMgr.add(createPromoteMemoryToRegisterPass());
-        passMgr.add(createInstructionCombiningPass(expensiveCombines));
+        passMgr.add(createInstructionCombiningPass(expensiveCombines, 5));
         passMgr.add(CreatePatchPeepholeOpt());
         passMgr.add(createInstSimplifyLegacyPass());
         passMgr.add(createCFGSimplificationPass());
@@ -267,7 +267,7 @@ void Patch::AddOptimizationPasses(
         passMgr.add(createCorrelatedValuePropagationPass());
         passMgr.add(createCFGSimplificationPass());
         passMgr.add(createAggressiveInstCombinerPass());
-        passMgr.add(createInstructionCombiningPass(expensiveCombines));
+        passMgr.add(createInstructionCombiningPass(expensiveCombines, 3));
         passMgr.add(CreatePatchPeepholeOpt());
         passMgr.add(createInstSimplifyLegacyPass());
         passMgr.add(createCFGSimplificationPass());
@@ -275,7 +275,7 @@ void Patch::AddOptimizationPasses(
         passMgr.add(createLoopRotatePass());
         passMgr.add(createLICMPass());
         passMgr.add(createCFGSimplificationPass());
-        passMgr.add(createInstructionCombiningPass(expensiveCombines));
+        passMgr.add(createInstructionCombiningPass(expensiveCombines, 2));
         passMgr.add(createIndVarSimplifyPass());
         passMgr.add(createLoopIdiomPass());
         passMgr.add(createLoopDeletionPass());
@@ -288,7 +288,7 @@ void Patch::AddOptimizationPasses(
         passMgr.add(createGVNPass(disableGvnLoadPre));
         passMgr.add(createSCCPPass());
         passMgr.add(createBitTrackingDCEPass());
-        passMgr.add(createInstructionCombiningPass(expensiveCombines));
+        passMgr.add(createInstructionCombiningPass(expensiveCombines, 2));
         passMgr.add(CreatePatchPeepholeOpt());
         passMgr.add(createCorrelatedValuePropagationPass());
         passMgr.add(createAggressiveDCEPass());
@@ -300,7 +300,7 @@ void Patch::AddOptimizationPasses(
         passMgr.add(CreatePatchPeepholeOpt(true));
         passMgr.add(createInstSimplifyLegacyPass());
         passMgr.add(createLoopUnrollPass(optLevel));
-        passMgr.add(createInstructionCombiningPass(expensiveCombines));
+        passMgr.add(createInstructionCombiningPass(expensiveCombines, 2));
         passMgr.add(createLICMPass());
         passMgr.add(createStripDeadPrototypesPass());
         passMgr.add(createGlobalDCEPass());
