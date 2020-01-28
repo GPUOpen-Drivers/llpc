@@ -206,6 +206,11 @@ void PatchEntryPointMutate::ProcessShader()
     {
         builder.addAttribute("amdgpu-unroll-threshold", std::to_string(pShaderOptions->unrollThreshold));
     }
+    else
+    {
+        // use a default unroll threshold of 700
+        builder.addAttribute("amdgpu-unroll-threshold", "700");
+    }
 
     AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
     pEntryPoint->addAttributes(attribIdx, builder);
