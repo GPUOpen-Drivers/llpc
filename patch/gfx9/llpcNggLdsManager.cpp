@@ -578,7 +578,7 @@ void NggLdsManager::WriteValueToLds(
             pStoreValue = pWriteValue;
         }
 
-        m_pBuilder->CreateAlignedStore(pStoreValue, pStorePtr, alignment);
+        m_pBuilder->CreateAlignedStore(pStoreValue, pStorePtr, MaybeAlign(alignment));
 
         if (compCount > 1)
         {

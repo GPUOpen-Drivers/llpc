@@ -177,7 +177,7 @@ void PatchLoadScalarizer::visitLoadInst(
 
             loadComps[i] = m_pBuilder->CreateAlignedLoad(pCompTy,
                                                          pLoadCompPtr,
-                                                         compAlignment,
+                                                         MaybeAlign(compAlignment),
                                                          loadInst.getName() + ".ii" + Twine(i));
 
             for (auto metaNode : allMetaNodes)
