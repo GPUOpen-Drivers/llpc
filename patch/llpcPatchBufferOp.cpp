@@ -754,7 +754,7 @@ void PatchBufferOp::visitMemMoveInst(
     LoadInst* const pSrcLoad = m_pBuilder->CreateAlignedLoad(pCastSrc, srcAlignment);
     CopyMetadata(pSrcLoad, &memMoveInst);
 
-    StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pSrcLoad, pCastDest, destAlignment);
+    StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pSrcLoad, pCastDest, MaybeAlign(destAlignment));
     CopyMetadata(pDestStore, &memMoveInst);
 
     // Record the memmove instruction so we remember to delete it later.
@@ -1193,7 +1193,7 @@ void PatchBufferOp::PostVisitMemCpyInst(
         LoadInst* const pSrcLoad = m_pBuilder->CreateAlignedLoad(pCastSrc, srcAlignment);
         CopyMetadata(pSrcLoad, &memCpyInst);
 
-        StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pSrcLoad, pCastDest, destAlignment);
+        StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pSrcLoad, pCastDest, MaybeAlign(destAlignment));
         CopyMetadata(pDestStore, &memCpyInst);
 
         // Visit the newly added instructions to turn them into fat pointer variants.
@@ -1368,7 +1368,7 @@ void PatchBufferOp::PostVisitMemSetInst(
             visitBitCastInst(*pCast);
         }
 
-        StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pNewValue, pCastDest, destAlignment);
+        StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pNewValue, pCastDest, MaybeAlign(destAlignment));
         CopyMetadata(pDestStore, &memSetInst);
         visitStoreInst(*pDestStore);
     }
