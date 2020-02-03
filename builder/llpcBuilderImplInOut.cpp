@@ -197,7 +197,7 @@ Value* BuilderImplInOut::ReadGenericInputOutput(
         break;
     }
 
-    std::string callName = baseCallName;
+    std::string callName(baseCallName);
     AddTypeMangling(pResultTy, args, callName);
     Value* pResult = EmitCall(callName,
                               pResultTy,

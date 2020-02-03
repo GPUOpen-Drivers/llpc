@@ -56,7 +56,7 @@ void removeFnAttr(LLVMContext *Context, CallInst *Call,
 Function *getOrCreateFunction(Module *M, Type *RetTy, ArrayRef<Type *> ArgTypes,
                               StringRef Name, AttributeList *Attrs,
                               bool TakeName) {
-  std::string MangledName = Name;
+  const std::string MangledName(Name);
   bool IsVarArg = false;
   FunctionType *FT = FunctionType::get(RetTy, ArgTypes, IsVarArg);
   Function *F = M->getFunction(MangledName);

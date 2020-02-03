@@ -100,7 +100,7 @@ void SpirvLowerResourceCollect::CollectResourceNodeData(
             nodeType = ResourceMappingNodeType::DescriptorResource;
             // Image descriptor.
             Type* pImageType = pGlobalTy->getPointerElementType();
-            std::string imageTypeName = pImageType->getStructName();
+            const std::string imageTypeName(pImageType->getStructName());
             // Format of image opaque type: ...[.SampledImage.<date type><dim>]...
             if (imageTypeName.find(".SampledImage") != std::string::npos)
             {
