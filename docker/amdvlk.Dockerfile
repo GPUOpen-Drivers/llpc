@@ -22,12 +22,13 @@ ARG GENERATOR
 
 # Install required packages.
 RUN apt-get update \
-    && apt-get install -yqq \
+    && apt-get install -yqq --no-install-recommends \
     	build-essential cmake gcc g++ ninja-build binutils-gold \
     	python python-distutils-extra python3 python3-distutils \
     	libssl-dev libx11-dev libxcb1-dev x11proto-dri2-dev libxcb-dri3-dev \
     	libxcb-dri2-0-dev libxcb-present-dev libxshmfence-dev libxrandr-dev \
     	git repo curl vim-tiny \
+    && rm -rf /var/lib/apt/lists/* \
     && update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
 
 # Checkout all repositories. Replace llpc with the version in LLPC_SOURCE_DIR.
