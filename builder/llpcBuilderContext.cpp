@@ -119,7 +119,7 @@ BuilderContext* BuilderContext::Create(
 
     // Get the LLVM target and create the target machine. This should not fail, as we determined above
     // that we support the requested target.
-    StringRef triple = "amdgcn--amdpal";
+    const std::string triple = "amdgcn--amdpal";
     std::string errMsg;
     const Target* pTarget = TargetRegistry::lookupTarget(triple, errMsg);
     // Allow no signed zeros - this enables omod modifiers (div:2, mul:2)
