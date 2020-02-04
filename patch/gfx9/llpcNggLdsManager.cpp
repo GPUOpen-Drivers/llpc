@@ -473,7 +473,7 @@ Value* NggLdsManager::ReadValueFromLds(
             pLoadPtr = m_pBuilder->CreateBitCast(pLoadPtr, PointerType::get(pCompTy, ADDR_SPACE_LOCAL));
         }
 
-        Value* pLoadValue = m_pBuilder->CreateAlignedLoad(pLoadPtr, alignment);
+        Value* pLoadValue = m_pBuilder->CreateAlignedLoad(pLoadPtr, MaybeAlign(alignment));
 
         if (compCount > 1)
         {

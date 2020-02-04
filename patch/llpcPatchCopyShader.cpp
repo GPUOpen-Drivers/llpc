@@ -540,7 +540,7 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
         pLoadPtr = builder.CreateBitCast(
             pLoadPtr, PointerType::get(pLoadTy, m_pLds->getType()->getPointerAddressSpace()));
 
-        return builder.CreateAlignedLoad(pLoadPtr, m_pLds->getAlignment());
+        return builder.CreateAlignedLoad(pLoadPtr, MaybeAlign(m_pLds->getAlignment()));
     }
     else
     {
