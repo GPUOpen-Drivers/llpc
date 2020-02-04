@@ -6605,7 +6605,7 @@ Function* NggPrimShader::CreateFetchCullingRegister(
         auto pLoadPtr = m_pBuilder->CreateGEP(pPrimShaderTablePtr, { m_pBuilder->getInt32(0), pRegOffset });
         cast<Instruction>(pLoadPtr)->setMetadata(MetaNameUniform, MDNode::get(m_pBuilder->getContext(), {}));
 
-        auto pRegValue = m_pBuilder->CreateAlignedLoad(pLoadPtr, 4);
+        auto pRegValue = m_pBuilder->CreateAlignedLoad(pLoadPtr, MaybeAlign(4));
         pRegValue->setVolatile(true);
         pRegValue->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_pBuilder->getContext(), {}));
 

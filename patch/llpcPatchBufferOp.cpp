@@ -751,7 +751,7 @@ void PatchBufferOp::visitMemMoveInst(
     Value* const pCastSrc = m_pBuilder->CreateBitCast(pSrc, pCastSrcType);
     CopyMetadata(pCastSrc, &memMoveInst);
 
-    LoadInst* const pSrcLoad = m_pBuilder->CreateAlignedLoad(pCastSrc, srcAlignment);
+    LoadInst* const pSrcLoad = m_pBuilder->CreateAlignedLoad(pCastSrc, MaybeAlign(srcAlignment));
     CopyMetadata(pSrcLoad, &memMoveInst);
 
     StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pSrcLoad, pCastDest, MaybeAlign(destAlignment));
@@ -1190,7 +1190,7 @@ void PatchBufferOp::PostVisitMemCpyInst(
         Value* const pCastSrc = m_pBuilder->CreateBitCast(pSrc, pCastSrcType);
         CopyMetadata(pCastSrc, &memCpyInst);
 
-        LoadInst* const pSrcLoad = m_pBuilder->CreateAlignedLoad(pCastSrc, srcAlignment);
+        LoadInst* const pSrcLoad = m_pBuilder->CreateAlignedLoad(pCastSrc, MaybeAlign(srcAlignment));
         CopyMetadata(pSrcLoad, &memCpyInst);
 
         StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pSrcLoad, pCastDest, MaybeAlign(destAlignment));
@@ -1290,7 +1290,7 @@ void PatchBufferOp::PostVisitMemSetInst(
             Value* const pMemSet = m_pBuilder->CreateMemSet(pCastMemoryPointer,
                                                             pValue,
                                                             stride,
-                                                            Align::None());
+                                                            Align());
             CopyMetadata(pMemSet, &memSetInst);
 
             pNewValue = m_pBuilder->CreateLoad(pMemoryPointer);
@@ -1352,7 +1352,7 @@ void PatchBufferOp::PostVisitMemSetInst(
             Value* const pMemSet = m_pBuilder->CreateMemSet(pCastMemoryPointer,
                                                             pValue,
                                                             pMemoryType->getVectorNumElements(),
-                                                            Align::None());
+                                                            Align());
             CopyMetadata(pMemSet, &memSetInst);
 
             pNewValue = m_pBuilder->CreateLoad(pMemoryPointer);
