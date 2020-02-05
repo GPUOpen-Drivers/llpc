@@ -33,7 +33,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p1(float %{{.*}}, i32 immarg 0, i32 immarg 0, i32 %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p2(float %{{.*}}, float %{{.*}}, i32 immarg 0, i32 immarg 0, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.mov(i32 2, i32 immarg 1, i32 immarg 1, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.mov(i32 {{.*}}2, i32 immarg 1, i32 immarg 1, i32 %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
