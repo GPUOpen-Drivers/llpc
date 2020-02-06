@@ -296,7 +296,7 @@ void Patch::AddOptimizationPasses(
         passMgr.add(createInstSimplifyLegacyPass());
         passMgr.add(createFloat2IntPass());
         passMgr.add(createLoopRotatePass());
-        passMgr.add(createCFGSimplificationPass(1, true, true, false, true));
+        passMgr.add(createCFGSimplificationPass(1, true, true, true, true));
         passMgr.add(CreatePatchPeepholeOpt(true));
         passMgr.add(createInstSimplifyLegacyPass());
         passMgr.add(createLoopUnrollPass(optLevel));
