@@ -31,12 +31,24 @@
 #define DEBUG_TYPE "llpc-shader-cache"
 
 #include <string.h>
+#include <llvm/Support/CommandLine.h>
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/FileSystem.h"
 #include "llpcShaderCache.h"
 #include "llvm/Support/DJB.h"
 
 using namespace llvm;
+
+namespace llvm
+{
+namespace cl
+{
+static opt<std::string> ShaderCacheFilename("shader-cache-filename",
+                                            desc("Filename for the shader cache"),
+                                            value_desc("filename"),
+                                            init(""));
+}
+}
 
 namespace Llpc
 {
@@ -391,17 +403,26 @@ Result ShaderCache::BuildFileName(
     // The file name is constructed by taking the executable file name, appending the client string, device ID and
     // GPU index then hashing the result.
     char hashedFileName[MaxFilePathLen];
-    int32_t length = snprintf(hashedFileName, MaxFilePathLen, "%s.%s.%u.%u.%u", pExecutableName,
-             ClientStr,
-             gfxIp.major,
-             gfxIp.minor,
-             gfxIp.stepping);
+    int32_t length = 0;
+    if (cl::ShaderCacheFilename.empty())
+    {
+        length = snprintf(hashedFileName, MaxFilePathLen, "%s.%s.%u.%u.%u", pExecutableName,
+                                  ClientStr,
+                                  gfxIp.major,
+                                  gfxIp.minor,
+                                  gfxIp.stepping);
 
-    const uint32_t nameHash = djbHash(hashedFileName, 0);
-    length = snprintf(hashedFileName, MaxFilePathLen, "%08x.bin", nameHash);
+        const uint32_t nameHash = djbHash(hashedFileName, 0);
+        length = snprintf(hashedFileName, MaxFilePathLen, "%08x.bin", nameHash);
 
-    // Combine the base path, the sub-path and the file name to get the fully qualified path to the cache file
-    length = snprintf(m_fileFullPath, MaxFilePathLen, "%s%s%s", pCacheFilePath, CacheFileSubPath, hashedFileName);
+        // Combine the base path, the sub-path and the file name to get the fully qualified path to the cache file
+        length = snprintf(m_fileFullPath, MaxFilePathLen, "%s%s%s", pCacheFilePath, CacheFileSubPath, hashedFileName);
+    }
+    else
+    {
+        length = snprintf(m_fileFullPath, MaxFilePathLen, "%s%s%s", pCacheFilePath,
+                CacheFileSubPath, cl::ShaderCacheFilename.c_str());
+    }
 
     LLPC_ASSERT(pCacheFileExists != nullptr);
     *pCacheFileExists = File::Exists(m_fileFullPath);

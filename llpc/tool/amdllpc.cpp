@@ -65,6 +65,7 @@
 
 #include <sstream>
 #include <stdlib.h> // getenv
+#include <llpc.h>
 
 // NOTE: To enable VLD, please add option BUILD_WIN_VLD=1 in build option.To run amdllpc with VLD enabled,
 // please copy vld.ini and all files in.\winVisualMemDetector\bin\Win64 to current directory of amdllpc.
@@ -277,6 +278,7 @@ extern opt<bool> EnablePipelineDump;
 extern opt<std::string> PipelineDumpDir;
 extern opt<bool> DisableNullFragShader;
 extern opt<bool> EnableTimerProfile;
+extern opt<bool> BuildShaderCache;
 
 // -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
 static opt<uint32_t> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
@@ -1765,6 +1767,148 @@ void FindAllMatchFiles(
     return;
 }
 #endif
+
+// =====================================================================================================================
+// Builds necessary variants of the shader inFile.  It must be either spir-v assembly or spir-v binary.
+static Result BuildShaderVariants(
+    ICompiler*            pCompiler,   // [in] LLPC context
+    const std::string& inFile)        // Input filename
+{
+    Result result = Result::Success;
+    CompileInfo compileInfo = {};
+    std::string fileNames;
+    compileInfo.doAutoLayout = true;
+    assert(!CheckAutoLayoutCompatible && "When processing shader variants we do not use the auto layout.");
+    compileInfo.checkAutoLayoutCompatible = false;
+
+    result = InitCompileInfo(&compileInfo);
+
+    //
+    // Translate sources to SPIR-V binary
+    //
+    std::string spvBinFile;
+    assert((IsSpirvTextFile(inFile) || IsSpirvBinaryFile(inFile)) && "We only build shader variants for spir-v files.");
+
+    if (IsSpirvTextFile(inFile))
+    {
+        result = AssembleSpirv(inFile, spvBinFile);
+    }
+    else
+    {
+        spvBinFile = inFile;
+    }
+
+    BinaryData spvBin = {};
+
+    if (result == Result::Success)
+    {
+        result = GetSpirvBinaryFromFile(spvBinFile, &spvBin);
+
+        if (result == Result::Success)
+        {
+            if (InitSpvGen() == false)
+            {
+                LLPC_OUTS("Failed to load SPVGEN -- no SPIR-V disassembler available\n");
+            }
+            else
+            {
+                // Disassemble SPIR-V code
+                uint32_t textSize = spvBin.codeSize * 10 + 1024;
+                char* pSpvText = new char[textSize];
+                LLPC_ASSERT(pSpvText != nullptr);
+                memset(pSpvText, 0, textSize);
+
+                LLPC_OUTS("\nSPIR-V disassembly for " << inFile << "\n");
+                spvDisassembleSpirv(spvBin.codeSize, spvBin.pCode, textSize, pSpvText);
+                LLPC_OUTS(pSpvText << "\n");
+
+                delete[] pSpvText;
+            }
+        }
+    }
+
+    if ((result == Result::Success) && Validate)
+    {
+        char log[1024] = {};
+        if (InitSpvGen() == false)
+        {
+            errs() << "Warning: Failed to load SPVGEN -- cannot validate SPIR-V\n";
+        }
+        else
+        {
+            if (spvValidateSpirv(spvBin.codeSize, spvBin.pCode, sizeof(log), log) == false)
+            {
+                LLPC_ERRS("Fails to validate SPIR-V: \n" << log << "\n");
+                result = Result::ErrorInvalidShader;
+            }
+        }
+    }
+
+    if (result == Result::Success)
+    {
+        // NOTE: If the entry target is not specified, we look for it in the SPIR-V binary.
+        if (EntryTarget.empty())
+        {
+            EntryTarget.setValue(ShaderModuleHelper::GetEntryPointNameFromSpirvBinary(&spvBin));
+        }
+
+        uint32_t stageMask = ShaderModuleHelper::GetStageMaskFromSpirvBinary(&spvBin, EntryTarget.c_str());
+        if (stageMask != 0)
+        {
+            for (uint32_t stage = ShaderStageVertex; stage < ShaderStageCount; ++stage)
+            {
+                if (stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
+                {
+                    if (stage != ShaderStageVertex && stage != ShaderStageFragment) {
+                        LLPC_OUTS("\nNot currently handling shaders that are not vertex for fragment shaders when building variants.");
+                        return Result::Unsupported;
+                    }
+                    ::ShaderModuleData shaderModuleData = {};
+                    shaderModuleData.shaderStage = static_cast<ShaderStage>(stage);
+                    shaderModuleData.spirvBin = spvBin;
+                    compileInfo.shaderModuleDatas.push_back(shaderModuleData);
+                    compileInfo.stageMask |= ShaderStageToMask(static_cast<ShaderStage>(stage));
+                    break;
+                }
+            }
+        }
+        else
+        {
+            LLPC_ERRS(format("Fails to identify shader stages by entry-point \"%s\"\n", EntryTarget.c_str()));
+            result = Result::ErrorUnavailable;
+        }
+    }
+
+    //
+    // Build shader modules
+    //
+    if ((result == Result::Success) && (compileInfo.stageMask != 0))
+    {
+        result = BuildShaderModules(pCompiler, &compileInfo);
+    }
+
+    //
+    // Build reloctable pipeline
+    //
+    if ((result == Result::Success) && ToLink)
+    {
+        compileInfo.pFileNames = fileNames.c_str();
+
+        for(uint32_t alphaToCoverageEnabled = 0; alphaToCoverageEnabled < 2; alphaToCoverageEnabled++) {
+            compileInfo.gfxPipelineInfo.cbState.alphaToCoverageEnable = (alphaToCoverageEnabled != 0);
+            result = BuildPipeline(pCompiler, &compileInfo);
+            // TODO(s-perron): May need to find a good way to output the elf.
+        }
+    }
+
+    //
+    // Clean up
+    //
+    CleanupCompileInfo(&compileInfo);
+
+    return result;
+}
+
 // =====================================================================================================================
 // Main function of LLPC standalone tool, entry-point.
 //
@@ -1803,7 +1947,42 @@ int32_t main(
     }
 #endif
 
-    if (IsPipelineInfoFile(InFiles[0]) || IsLlvmIrFile(InFiles[0]))
+    if (cl::BuildShaderCache)
+    {
+        // Process each InFile individually to create to populate the cache.
+        std::vector<std::string> matchFiles;
+#ifdef WIN_OS
+        if ((InFiles.size() == 1) &&
+            (InFiles[0].find_last_of("*?") != std::string::npos))
+        {
+            FindAllMatchFiles(InFiles[0], &matchFiles);
+        }
+        else
+#endif
+        {
+            for (const auto& inFile : InFiles)
+            {
+#ifdef WIN_OS
+                if (InFiles[0].find_last_of("*?") != std::string::npos)
+                {
+                    LLPC_ERRS("\nCan't use wilecard if multiple filename is set in command\n");
+                    result = Result::ErrorInvalidValue;
+                    break;
+                }
+#endif
+                matchFiles.push_back(inFile);
+            }
+        }
+
+        if (result == Result::Success)
+        {
+            for (const std::string& filename : matchFiles)
+            {
+                result = BuildShaderVariants(pCompiler, filename);
+            }
+        }
+    }
+    else if (IsPipelineInfoFile(InFiles[0]) || IsLlvmIrFile(InFiles[0]))
     {
         uint32_t nextFile = 0;
 

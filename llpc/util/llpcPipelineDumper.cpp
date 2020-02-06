@@ -673,31 +673,38 @@ void PipelineDumper::DumpPipelineBinary(
     GfxIpVersion                     gfxIp,                  // Graphics IP version info
     const BinaryData*                pPipelineBin)           // [in] Pipeline binary (ELF)
 {
-    if (pDumpFile != nullptr)
+    if (pDumpFile == nullptr)
     {
-        ElfReader<Elf64> reader(gfxIp);
-        size_t codeSize = pPipelineBin->codeSize;
-        auto result = reader.ReadFromBuffer(pPipelineBin->pCode, &codeSize);
-        LLPC_ASSERT(result == Result::Success);
-        LLPC_UNUSED(result);
+        return;
+    }
 
-        pDumpFile->dumpFile << "\n[CompileLog]\n";
-        pDumpFile->dumpFile << reader;
+    if (pPipelineBin->pCode == nullptr || pPipelineBin->codeSize == 0)
+    {
+        return;
+    }
 
-        std::string binaryFileName = pDumpFile->binaryFileName;
-        if (pDumpFile->binaryIndex > 0)
-        {
-            char suffixBuffer[32] = {};
-            snprintf(suffixBuffer, sizeof(suffixBuffer), ".%u", pDumpFile->binaryIndex);
-            binaryFileName += suffixBuffer;
-        }
-        pDumpFile->binaryIndex++;
-        pDumpFile->binaryFile.open(binaryFileName.c_str(), std::ostream::out | std::ostream::binary);
-        if (pDumpFile->binaryFile.bad() == false)
-        {
-            pDumpFile->binaryFile.write(reinterpret_cast<const char*>(pPipelineBin->pCode), pPipelineBin->codeSize);
-            pDumpFile->binaryFile.close();
-        }
+    ElfReader<Elf64> reader(gfxIp);
+    size_t codeSize = pPipelineBin->codeSize;
+    auto result = reader.ReadFromBuffer(pPipelineBin->pCode, &codeSize);
+    LLPC_ASSERT(result == Result::Success);
+    LLPC_UNUSED(result);
+
+    pDumpFile->dumpFile << "\n[CompileLog]\n";
+    pDumpFile->dumpFile << reader;
+
+    std::string binaryFileName = pDumpFile->binaryFileName;
+    if (pDumpFile->binaryIndex > 0)
+    {
+        char suffixBuffer[32] = {};
+        snprintf(suffixBuffer, sizeof(suffixBuffer), ".%u", pDumpFile->binaryIndex);
+        binaryFileName += suffixBuffer;
+    }
+    pDumpFile->binaryIndex++;
+    pDumpFile->binaryFile.open(binaryFileName.c_str(), std::ostream::out | std::ostream::binary);
+    if (pDumpFile->binaryFile.bad() == false)
+    {
+        pDumpFile->binaryFile.write(reinterpret_cast<const char*>(pPipelineBin->pCode), pPipelineBin->codeSize);
+        pDumpFile->binaryFile.close();
     }
 }
 

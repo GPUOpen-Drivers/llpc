@@ -117,6 +117,13 @@ opt<int> RelocatableShaderElfLimit("relocatable-shader-elf-limit", cl::desc("Max
                                                                    "relocatable shader ELF.  -1 means unlimited."),
                                    init(-1));
 
+// -build-shader-cache: Populates the cache by building variants of the given shaders.
+opt<bool> BuildShaderCache(
+                "build-shader-cache",
+                cl::desc("[WIP] Populates the cache by building variants of the given shaders."
+                              "  This is still a work in progress and there are no guarantees on how well it works."));
+
+
 // -shader-cache-mode: shader cache mode:
 // 0 - Disable
 // 1 - Runtime cache
@@ -847,10 +854,10 @@ Result Compiler::BuildPipelineWithRelocatableElf(
     uint32_t                            forceLoopUnrollCount,       // Force loop unroll count (0 means disable)
     ElfPackage*                         pPipelineElf)               // [out] Output Elf package
 {
+    LLPC_OUTS("Building pipeline with relocatable shader elf.\n")
     Result result = Result::Success;
 
     // Merge the user data once for all stages.
-    pContext->GetPipelineContext()->DoUserDataNodeMerge();
     uint32_t originalShaderStageMask = pContext->GetPipelineContext()->GetShaderStageMask();
     pContext->GetBuilderContext()->SetBuildRelocatableElf(true);
 
@@ -868,6 +875,7 @@ Result Compiler::BuildPipelineWithRelocatableElf(
         auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
         MetroHash::Hash cacheHash = {};
         cacheHash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, true, stage);
+        LLPC_OUTS("The hash for stage " << stage << " is " << MetroHash::Compact64(&cacheHash) << "\n");
 
         ShaderEntryState cacheEntryState  = ShaderEntryState::New;
         BinaryData elfBin = {};
@@ -883,10 +891,12 @@ Result Compiler::BuildPipelineWithRelocatableElf(
 #endif
 
         if (cacheEntryState == ShaderEntryState::Ready) {
+            LLPC_OUTS("Cache hit for shader stage " << stage << "\n");
             auto pData = reinterpret_cast<const char*>(elfBin.pCode);
             elf[stage].assign(pData, pData + elfBin.codeSize);
             continue;
         }
+        LLPC_OUTS("Cache miss for shader stage " << stage << "\n");
 
         // There was a cache miss, so we need to build the relocatable shader for
         // this stage.
@@ -914,12 +924,17 @@ Result Compiler::BuildPipelineWithRelocatableElf(
 #else
         UpdateShaderCache((result == Result::Success), &elfBin, hEntry);
 #endif
+        LLPC_OUTS("Updating the cache for shader stage " << stage << "\n");
     }
     pContext->GetPipelineContext()->SetShaderStageMask(originalShaderStageMask);
     pContext->GetBuilderContext()->SetBuildRelocatableElf(false);
 
-    // Link the relocatable shaders into a single pipeline elf file.
-    LinkRelocatableShaderElf(elf, pPipelineElf, pContext);
+    if (!cl::BuildShaderCache)
+    {
+        // Link the relocatable shaders into a single pipeline elf file.
+        // Not needed if we are just interested in building the cache.
+        LinkRelocatableShaderElf(elf, pPipelineElf, pContext);
+    }
 
     return result;
 }
@@ -930,7 +945,8 @@ bool Compiler::CanUseRelocatableGraphicsShaderElf(
     const ArrayRef<const PipelineShaderInfo*>& shaderInfo  // Shader info for the pipeline to be built
     ) const
 {
-    if (!cl::UseRelocatableShaderElf) {
+    if (!cl::UseRelocatableShaderElf)
+    {
         return false;
     }
 
@@ -947,7 +963,10 @@ bool Compiler::CanUseRelocatableGraphicsShaderElf(
         else if (shaderInfo[stage] == nullptr || shaderInfo[stage]->pModuleData == nullptr)
         {
             // TODO: Generate pass-through shaders when the fragment or vertex shaders are missing.
-            useRelocatableShaderElf = false;
+            if (!cl::BuildShaderCache)
+            {
+                useRelocatableShaderElf = false;
+            }
         }
     }
 
@@ -1801,13 +1820,21 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
         cl::LogFileOuts.ArgStr,
         cl::EnableShadowDescriptorTable.ArgStr,
         cl::ShadowDescTablePtrHigh.ArgStr,
-        cl::ExecutableName.ArgStr
+        cl::ExecutableName.ArgStr,
+        "o",
+        "build-shader-cache"
     };
 
     std::set<StringRef> effectingOptions;
     // Build effecting options
     for (uint32_t i = 1; i < optionCount; ++i)
     {
+        if (pOptions[i][0] != '-')
+        {
+            // Ignore input file names.
+            continue;
+        }
+
         StringRef option = pOptions[i] + 1;  // Skip '-' in options
         bool ignore = false;
         for (uint32_t j = 0; j < sizeof(IgnoredOptions) / sizeof(IgnoredOptions[0]); ++j)

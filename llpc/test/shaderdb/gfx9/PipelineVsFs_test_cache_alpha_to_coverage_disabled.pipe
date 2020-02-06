@@ -1,0 +1,276 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -auto-layout-desc -spvgen-dir=%spvgendir% -v %gfxip --use-relocatable-shader-elf -shader-cache-mode=2 -shader-cache-filename=cache.bin -build-shader-cache test_cache_vert.spv test_cache_frag.spv
+; RUN: amdllpc -auto-layout-desc-spvgen-dir=%spvgendir% --use-relocatable-shader-elf -shader-cache-filename=cache.bin -shader-cache-mode=4 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: Building pipeline with relocatable shader elf.
+; SHADERTEST: Cache hit for shader stage 0
+; SHADERTEST: Cache hit for shader stage 4
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 38
+
+[VsSpvFile]
+fileName = test_cache_vert.spv
+
+[VsInfo]
+entryPoint = main
+userDataNode[0].type = IndirectUserDataVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].indirectUserDataCount = 256
+userDataNode[1].type = StreamOutTableVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+
+[FsSpvFile]
+fileName = test_cache_frag.spv
+
+[FsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+patchControlPoints = 3
+deviceIndex = 0
+disableVertexReuse = 0
+switchWinding = 0
+enableMultiView = 0
+depthClipEnable = 0
+rasterizerDiscardEnable = 0
+perSampleShading = 0
+numSamples = 0
+samplePatternIdx = 0
+usrClipPlaneMask = 0
+polygonMode = VK_POLYGON_MODE_FILL
+cullMode = VK_CULL_MODE_NONE
+frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE
+depthBiasEnable = 0
+alphaToCoverageEnable = 0
+dualSourceBlendEnable = 0
+colorBuffer[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+colorBuffer[1].format = VK_FORMAT_R32G32B32A32_SFLOAT
+colorBuffer[1].channelWriteMask = 15
+colorBuffer[1].blendEnable = 0
+colorBuffer[1].blendSrcAlphaToColor = 0
+colorBuffer[2].format = VK_FORMAT_R32G32B32A32_SFLOAT
+colorBuffer[2].channelWriteMask = 15
+colorBuffer[2].blendEnable = 0
+colorBuffer[2].blendSrcAlphaToColor = 0
+nggState.enableNgg = 0
+nggState.enableGsUse = 0
+nggState.forceNonPassthrough = 0
+nggState.alwaysUsePrimShaderTable = 0
+nggState.compactMode = NggCompactSubgroup
+nggState.enableFastLaunch = 0
+nggState.enableVertexReuse = 0
+nggState.enableBackfaceCulling = 0
+nggState.enableFrustumCulling = 0
+nggState.enableBoxFilterCulling = 0
+nggState.enableSphereCulling = 0
+nggState.enableSmallPrimFilter = 0
+nggState.enableCullDistanceCulling = 0
+nggState.backfaceExponent = 0
+nggState.subgroupSizing = Auto
+nggState.primsPerSubgroup = 0
+nggState.vertsPerSubgroup = 0
+options.includeDisassembly = 0
+options.scalarBlockLayout = 0
+options.includeIr = 0
+options.robustBufferAccess = 0
+options.reconfigWorkgroupLayout = 0
+
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 16
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+binding[1].binding = 1
+binding[1].stride = 16
+binding[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+binding[2].binding = 2
+binding[2].stride = 16
+binding[2].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+binding[3].binding = 3
+binding[3].stride = 16
+binding[3].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+binding[4].binding = 4
+binding[4].stride = 16
+binding[4].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
+attribute[1].location = 1
+attribute[1].binding = 1
+attribute[1].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[1].offset = 0
+attribute[2].location = 2
+attribute[2].binding = 2
+attribute[2].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[2].offset = 0
+attribute[3].location = 3
+attribute[3].binding = 3
+attribute[3].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[3].offset = 0
+attribute[4].location = 4
+attribute[4].binding = 4
+attribute[4].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[4].offset = 0
+;Compiler Options: /usr/local/google/home/stevenperron/llpc/amdvlk_proper/drivers/xgl/build.debug/llpc/amdllpc -auto-layout-desc -spvgen-dir=/usr/local/google/home/stevenperron/llpc/amdvlk_proper/drivers/xgl/build.debug/spvgen -gfxip=9.0.0 vert.spv frag.spv --enable-pipeline-dump -unroll-max-percent-threshold-boost=1000 -unroll-threshold=700 -unroll-partial-threshold=700 -pragma-unroll-threshold=1000 -unroll-allow-partial -simplifycfg-sink-common=false -amdgpu-vgpr-index-mode -amdgpu-atomic-optimizations -use-gpu-divergence-analysis -filetype=obj -shader-cache-file-dir=/usr/local/google/home/stevenperron/llpc/test/reloc/creator_test 
+[CompileLog]
+(null) (size = 0 bytes)
+
+.AMDGPU.disasm (size = 523 bytes)
+_amdgpu_vs_main:
+BB0_0:
+	v_mov_b32_e32 v0, 1.0         ; 7E0002F2
+	v_mov_b32_e32 v1, 0           ; 7E020280
+	exp pos0 v1, v1, v1, v0 done  ; C40008CF 00010101
+	exp param0 off, off, off, off ; C4000200 00000000
+	s_endpgm                      ; BF810000
+_amdgpu_ps_main:
+BB1_0:
+	v_mov_b32_e32 v0, 0             ; 7E000280
+	exp mrt0 v0, v0, v0, v0 vm      ; C400100F 00000000
+	exp mrt1 v0, v0, v0, v0 vm      ; C400101F 00000000
+	exp mrt2 v0, v0, v0, v0 done vm ; C400182F 00000000
+	s_endpgm                        ; BF810000
+
+
+.note (size = 840 bytes)
+    HsaIsa                       (name = AMD  size = 27)
+        vendorName  = AMD
+        archName    = AMDGPU
+        gfxIp       = 9.0.0
+    IsaVersion                   (name = AMD  size = 22)
+amdgcn--amdpal--gfx900
+    PalMetadata                  (name = AMDGPU  size = 733)
+{
+    amdpal.pipelines: [ {
+        .api: Vulkan
+        .hardware_stages: {
+            .ps: {
+                .entry_point: _amdgpu_ps_main
+                .scratch_memory_size: 0x0000000000000000 
+                .sgpr_count: 0x0000000000000003 
+                .sgpr_limit: 0x0000000000000068 
+                .vgpr_count: 0x0000000000000018 
+                .vgpr_limit: 0x0000000000000100 }
+            .vs: {
+                .entry_point: _amdgpu_vs_main
+                .scratch_memory_size: 0x0000000000000000 
+                .sgpr_count: 0x0000000000000006 
+                .sgpr_limit: 0x0000000000000068 
+                .vgpr_count: 0x0000000000000004 
+                .vgpr_limit: 0x0000000000000100 }}
+        .internal_pipeline_hash: [ 0xEB648701D778CB4A 0x4396EF2BDB536D98 ]
+        .registers: {
+            SPI_SHADER_PGM_RSRC1_PS                       0x00000000002C0005 
+            SPI_SHADER_PGM_RSRC2_PS                       0x0000000000000004 
+            SPI_SHADER_USER_DATA_PS_0                     0x0000000010000000 
+            SPI_SHADER_PGM_RSRC1_VS                       0x00000000002C0000 
+            SPI_SHADER_PGM_RSRC2_VS                       0x000000000000000C 
+            SPI_SHADER_USER_DATA_VS_0                     0x0000000010000000 
+            SPI_SHADER_USER_DATA_VS_3                     0x000000001000000F 
+            SPI_SHADER_USER_DATA_VS_4                     0x0000000010000003 
+            SPI_SHADER_USER_DATA_VS_5                     0x0000000010000004 
+            CB_SHADER_MASK                                0x0000000000000FFF 
+            SPI_PS_INPUT_CNTL_0                           0x0000000000000000 
+            SPI_VS_OUT_CONFIG                             0x0000000000000000 
+            SPI_PS_INPUT_ENA                              0x0000000000000001 
+            SPI_PS_INPUT_ADDR                             0x0000000000000001 
+            SPI_INTERP_CONTROL_0                          0x0000000000000000 
+            SPI_PS_IN_CONTROL                             0x0000000000000000 
+            SPI_BARYC_CNTL                                0x0000000001000000 
+            SPI_SHADER_POS_FORMAT                         0x0000000000000004 
+            SPI_SHADER_Z_FORMAT                           0x0000000000000000 
+            SPI_SHADER_COL_FORMAT                         0x0000000000000999 
+            DB_SHADER_CONTROL                             0x0000000000000810 
+            PA_CL_CLIP_CNTL                               0x000000000D080000 
+            PA_CL_VTE_CNTL                                0x000000000000043F 
+            PA_CL_VS_OUT_CNTL                             0x0000000000000000 
+            VGT_GS_ONCHIP_CNTL                            0x0000000000000000 
+            PA_SC_MODE_CNTL_1                             0x000000000602018C 
+            VGT_PRIMITIVEID_EN                            0x0000000000000000 
+            VGT_REUSE_OFF                                 0x0000000000000000 
+            VGT_STRMOUT_VTX_STRIDE_0                      0x0000000000000000 
+            VGT_STRMOUT_VTX_STRIDE_1                      0x0000000000000000 
+            VGT_STRMOUT_VTX_STRIDE_2                      0x0000000000000000 
+            VGT_STRMOUT_VTX_STRIDE_3                      0x0000000000000000 
+            VGT_SHADER_STAGES_EN                          0x0000000000010000 
+            VGT_STRMOUT_CONFIG                            0x0000000000000000 
+            VGT_STRMOUT_BUFFER_CONFIG                     0x0000000000000000 
+            PA_SC_AA_CONFIG                               0x0000000000000000 
+            PA_SU_VTX_CNTL                                0x000000000000002D 
+            PA_SC_SHADER_CONTROL                          0x0000000000000000 
+            IA_MULTI_VGT_PARAM                            0x000000000000007F }
+        .shaders: {
+            .pixel: {
+                .api_shader_hash: [ 0x49B6C45C95DAC548 0x0000000000000000 ]
+                .hardware_mapping: [ .ps]}
+            .vertex: {
+                .api_shader_hash: [ 0x26F2EE684D26D1C9 0x0000000000000000 ]
+                .hardware_mapping: [ .vs]}}
+        .spill_threshold: 0x00000000FFFFFFFF 
+        .type: VsPs
+        .user_data_limit: 0x0000000000000000 }]
+    amdpal.version: [ 0x0000000000000002 0x0000000000000003 ]}
+
+.note.GNU-stack (size = 0 bytes)
+
+.strtab (size = 92 bytes)
+
+.symtab (size = 72 bytes)
+
+.text (size = 288 bytes)
+    _amdgpu_vs_main (offset = 0  size = 28 hash = 0x079C276BD20C496E)
+          0:7E0002F2 7E020280 C40008CF 00010101 C4000200 00000000 BF810000 BF800000
+         32:BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000
+         64:BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000
+         96:BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000
+        128:BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000
+        160:BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000
+        192:BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000
+        224:BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000 BF800000
+    _amdgpu_ps_main (offset = 256  size = 32 hash = 0xC7441A211129B05C)
+        256:7E000280 C400100F 00000000 C400101F 00000000 C400182F 00000000 BF810000
+
