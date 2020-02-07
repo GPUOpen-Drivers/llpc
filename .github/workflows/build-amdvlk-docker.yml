@@ -21,14 +21,12 @@ jobs:
           git clone https://github.com/${GITHUB_REPOSITORY}.git .
           git checkout ${GITHUB_SHA}
       - name: Setup Google Cloud CLI
-        if: ${GITHUB_REPOSITORY} == 'GPUOpen-Drivers/llpc'
         uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
         with:
           version: '270.0.0'
           service_account_email: ${{ secrets.GCR_USER }}
           service_account_key: ${{ secrets.GCR_KEY }}
       - name: Setup Docker to use the GCR
-        if: ${GITHUB_REPOSITORY} == 'GPUOpen-Drivers/llpc'
         run: |
           gcloud auth configure-docker
       - name: Build and Test AMDVLK with Docker
@@ -38,6 +36,5 @@ jobs:
                             --build-arg GENERATOR="${{ matrix.generator }}"
                             --tag ${{ matrix.base-image }}
       - name: Push the new image
-        if: ${GITHUB_REPOSITORY} == 'GPUOpen-Drivers/llpc'
         run: |
           docker push ${{ matrix.base-image }}
