@@ -22,16 +22,16 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 0x36E7000000000000, <4 x i32> {{%[^,]+}}, i32 28, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 0x36F6800000000000, <4 x i32> {{%[^,]+}}, i32 {{%[^,]+}}, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 2.000000e+00, <4 x i32> {{%[^,]+}}, i32 96, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 2.000000e+00, <4 x i32> {{%[^,]+}}, i32 100, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 2.000000e+00, <4 x i32> {{%[^,]+}}, i32 104, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 2.000000e+00, <4 x i32> {{%[^,]+}}, i32 108, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 3.000000e+00, <4 x i32> {{%[^,]+}}, i32 {{%[^,]+}}, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 3.000000e+00, <4 x i32> {{%[^,]+}}, i32 {{%[^,]+}}, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 3.000000e+00, <4 x i32> {{%[^,]+}}, i32 {{%[^,]+}}, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 3.000000e+00, <4 x i32> {{%[^,]+}}, i32 {{%[^,]+}}, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 23, <4 x i32> {{%[^,]+}}, i32 28, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 45, <4 x i32> {{%[^,]+}}, i32 {{%[^,]+}}, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 1073741824, <4 x i32> {{%[^,]+}}, i32 96, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 1073741824, <4 x i32> {{%[^,]+}}, i32 100, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 1073741824, <4 x i32> {{%[^,]+}}, i32 104, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 1073741824, <4 x i32> {{%[^,]+}}, i32 108, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 1077936128, <4 x i32> {{%[^,]+}}, i32 {{%[^,]+}}, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 1077936128, <4 x i32> {{%[^,]+}}, i32 {{%[^,]+}}, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 1077936128, <4 x i32> {{%[^,]+}}, i32 {{%[^,]+}}, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 1077936128, <4 x i32> {{%[^,]+}}, i32 {{%[^,]+}}, i32 0, i32 0)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

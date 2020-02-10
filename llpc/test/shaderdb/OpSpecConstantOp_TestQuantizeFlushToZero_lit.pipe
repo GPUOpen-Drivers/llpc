@@ -7,7 +7,7 @@
 ; SHADERTEST: store float -0.000000e+00, float addrspace(7)* %{{[0-9]*}}
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32
 
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
@@ -135,5 +135,3 @@ userDataNode[0].next[1].offsetInDwords = 4
 userDataNode[0].next[1].sizeInDwords = 4
 userDataNode[0].next[1].set = 0
 userDataNode[0].next[1].binding = 1
-
-

@@ -683,8 +683,7 @@ void PatchBufferOp::visitLoadInst(
     }
     else if (addrSpace == ADDR_SPACE_BUFFER_FAT_POINTER)
     {
-        Value* const pNewLoad = ReplaceLoad(&loadInst);
-        CopyMetadata(pNewLoad, &loadInst);
+        Value* const pNewLoad = ReplaceLoadStore(loadInst);
 
         // Record the load instruction so we remember to delete it later.
         m_replacementMap[&loadInst] = std::make_pair(nullptr, nullptr);
@@ -994,7 +993,7 @@ void PatchBufferOp::visitStoreInst(
         return;
     }
 
-    ReplaceStore(&storeInst);
+    ReplaceLoadStore(storeInst);
 
     // Record the store instruction so we remember to delete it later.
     m_replacementMap[&storeInst] = std::make_pair(nullptr, nullptr);
@@ -1521,31 +1520,62 @@ bool PatchBufferOp::RemoveUsersForInvariantStarts(
 }
 
 // =====================================================================================================================
-// Replace a fat pointer load with the intrinsics required to do the load.
-Value* PatchBufferOp::ReplaceLoad(
-    LoadInst* const pLoadInst) // [in] The load instruction to replace.
+// Replace a fat pointer load or store with the required intrinsics.
+Value* PatchBufferOp::ReplaceLoadStore(
+    Instruction& pInst) // [in] The instruction to replace.
 {
-    m_pBuilder->SetInsertPoint(pLoadInst);
+    LoadInst* const pLoadInst = dyn_cast<LoadInst>(&pInst);
+    StoreInst* const pStoreInst = dyn_cast<StoreInst>(&pInst);
 
-    Value* const pPointer = GetPointerOperandAsInst(pLoadInst->getPointerOperand());
+    // Either load instruction or store instruction is valid (not both)
+    LLPC_ASSERT((pLoadInst == nullptr) != (pStoreInst == nullptr));
+
+    bool isLoad = pLoadInst != nullptr;
+    Type* pType = nullptr;
+    Value* pPointerOperand = nullptr;
+    AtomicOrdering ordering = AtomicOrdering::NotAtomic;
+    uint32_t alignment = 0;
+    SyncScope::ID syncScopeID = 0;
+
+    if (isLoad)
+    {
+        pType = pLoadInst->getType();
+        pPointerOperand = pLoadInst->getPointerOperand();
+        ordering = pLoadInst->getOrdering();
+        alignment = pLoadInst->getAlignment();
+        syncScopeID = pLoadInst->getSyncScopeID();
+    }
+    else
+    {
+        pType = pStoreInst->getValueOperand()->getType();
+        pPointerOperand = pStoreInst->getPointerOperand();
+        ordering = pStoreInst->getOrdering();
+        alignment = pStoreInst->getAlignment();
+        syncScopeID = pStoreInst->getSyncScopeID();
+    }
+
+    m_pBuilder->SetInsertPoint(&pInst);
+
+    Value* const pPointer = GetPointerOperandAsInst(pPointerOperand);
 
     const DataLayout& dataLayout = m_pBuilder->GetInsertBlock()->getModule()->getDataLayout();
 
-    Type* const pLoadType = pLoadInst->getType();
-
-    const uint32_t bytesToLoad = static_cast<uint32_t>(dataLayout.getTypeStoreSize(pLoadType));
-
-    uint32_t alignment = pLoadInst->getAlignment();
+    const uint32_t bytesToHandle = static_cast<uint32_t>(dataLayout.getTypeStoreSize(pType));
 
     if (alignment == 0)
     {
-        alignment = dataLayout.getABITypeAlignment(pLoadType);
+        alignment = dataLayout.getABITypeAlignment(pType);
     }
 
-    const bool isInvariant = (m_invariantSet.count(m_replacementMap[pPointer].first) > 0) ||
+    bool isInvariant = false;
+    if (isLoad)
+    {
+        isInvariant = (m_invariantSet.count(m_replacementMap[pPointer].first) > 0) ||
                              pLoadInst->getMetadata(LLVMContext::MD_invariant_load);
-    const bool isSlc = pLoadInst->getMetadata(LLVMContext::MD_nontemporal);
-    const bool isGlc = pLoadInst->getOrdering() != AtomicOrdering::NotAtomic;
+    }
+
+    const bool isSlc = pInst.getMetadata(LLVMContext::MD_nontemporal);
+    const bool isGlc = ordering != AtomicOrdering::NotAtomic;
 #if LLPC_BUILD_GFX10
     const bool isDlc = isGlc; // For buffer load on GFX10+, we set DLC = GLC
 #endif
@@ -1564,90 +1594,143 @@ Value* PatchBufferOp::ReplaceLoad(
         Value* const pNewBaseIndex = m_pBuilder->CreateSelect(pInBound, pBaseIndex, m_pBuilder->getInt32(0));
 
         // Add on the index to the address.
-        Value* pLoadPointer = m_pBuilder->CreateGEP(pBaseAddr, pNewBaseIndex);
+        Value* pPointer = m_pBuilder->CreateGEP(pBaseAddr, pNewBaseIndex);
 
-        pLoadPointer = m_pBuilder->CreateBitCast(pLoadPointer, pLoadType->getPointerTo(ADDR_SPACE_GLOBAL));
+        pPointer = m_pBuilder->CreateBitCast(pPointer, pType->getPointerTo(ADDR_SPACE_GLOBAL));
 
-        LoadInst* const pNewLoad = m_pBuilder->CreateLoad(pLoadPointer);
-        pNewLoad->setVolatile(pLoadInst->isVolatile());
-        pNewLoad->setAlignment(MaybeAlign(pLoadInst->getAlignment()));
-        pNewLoad->setOrdering(pLoadInst->getOrdering());
-        pNewLoad->setSyncScopeID(pLoadInst->getSyncScopeID());
-        CopyMetadata(pNewLoad, pLoadInst);
-
-        if (isInvariant)
+        if (isLoad)
         {
-            pNewLoad->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_pContext, None));
-        }
+            LoadInst* const pNewLoad = m_pBuilder->CreateLoad(pPointer);
+            pNewLoad->setVolatile(pLoadInst->isVolatile());
+            pNewLoad->setAlignment(MaybeAlign(alignment));
+            pNewLoad->setOrdering(ordering);
+            pNewLoad->setSyncScopeID(syncScopeID);
+            CopyMetadata(pNewLoad, pLoadInst);
 
-        return pNewLoad;
+            if (isInvariant)
+            {
+                pNewLoad->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_pContext, None));
+            }
+
+            return pNewLoad;
+        }
+        else
+        {
+            StoreInst* const pNewStore = m_pBuilder->CreateStore(pStoreInst->getValueOperand(), pPointer);
+            pNewStore->setVolatile(pStoreInst->isVolatile());
+            pNewStore->setAlignment(MaybeAlign(alignment));
+            pNewStore->setOrdering(ordering);
+            pNewStore->setSyncScopeID(syncScopeID);
+            CopyMetadata(pNewStore, pStoreInst);
+
+            return pNewStore;
+        }
     }
 
-    switch (pLoadInst->getOrdering())
+    switch (ordering)
     {
     case AtomicOrdering::Release:
     case AtomicOrdering::AcquireRelease:
     case AtomicOrdering::SequentiallyConsistent:
-        m_pBuilder->CreateFence(AtomicOrdering::Release, pLoadInst->getSyncScopeID());
+        m_pBuilder->CreateFence(AtomicOrdering::Release, syncScopeID);
         break;
     default:
         break;
     }
 
-    SmallVector<Value*, 8> partLoads;
-    Type* pSmallestType;
-    uint32_t smallestByteSize = UINT32_MAX;
+    SmallVector<Value*, 8> parts;
+    Type* pSmallestType = nullptr;
+    uint32_t smallestByteSize = 4;
 
-    uint32_t remainingBytes = bytesToLoad;
+    if ((alignment < 2) || ((bytesToHandle & 0x1) != 0))
+    {
+        smallestByteSize = 1;
+        pSmallestType = m_pBuilder->getInt8Ty();
+    }
+    else if ((alignment < 4) || ((bytesToHandle & 0x3) != 0))
+    {
+        smallestByteSize = 2;
+        pSmallestType = m_pBuilder->getInt16Ty();
+    }
+    else
+    {
+        smallestByteSize = 4;
+        pSmallestType = m_pBuilder->getInt32Ty();
+    }
 
+    // Load: Create an undef vector whose total size is the number of bytes we
+    // loaded.
+    // Store: Bitcast our value-to-store to a vector of smallest byte size.
+    Type* const pCastType = VectorType::get(pSmallestType, bytesToHandle / smallestByteSize);
+
+    Value* pStoreValue = nullptr;
+    if (!isLoad)
+    {
+        pStoreValue = pStoreInst->getValueOperand();
+
+        if (pStoreValue->getType()->isPointerTy())
+        {
+            pStoreValue = m_pBuilder->CreatePtrToInt(pStoreValue, m_pBuilder->getIntNTy(bytesToHandle * 8));
+            CopyMetadata(pStoreValue, pStoreInst);
+        }
+
+        pStoreValue = m_pBuilder->CreateBitCast(pStoreValue, pCastType);
+        CopyMetadata(pStoreValue, pStoreInst);
+    }
+
+    // The index in pStoreValue which we use next
+    uint32_t storeIndex = 0;
+
+    uint32_t remainingBytes = bytesToHandle;
     while (remainingBytes > 0)
     {
-        const uint32_t offset = bytesToLoad - remainingBytes;
+        const uint32_t offset = bytesToHandle - remainingBytes;
         Value* pOffset = (offset == 0) ?
                                pBaseIndex :
                                m_pBuilder->CreateAdd(pBaseIndex, m_pBuilder->getInt32(offset));
 
-        Type* pIntLoadType = nullptr;
-        uint32_t loadSize = 0;
+        Type* pIntAccessType = nullptr;
+        uint32_t accessSize = 0;
 
-        // Load the greatest possible size
+        // Handle the greatest possible size
         if (alignment >= 4 && remainingBytes >= 4)
         {
             if (remainingBytes >= 16)
             {
-                pIntLoadType = VectorType::get(Type::getInt32Ty(*m_pContext), 4);
-                loadSize = 16;
+                pIntAccessType = VectorType::get(Type::getInt32Ty(*m_pContext), 4);
+                accessSize = 16;
             }
             else if (remainingBytes >= 12 && !isInvariant)
             {
-                pIntLoadType = VectorType::get(Type::getInt32Ty(*m_pContext), 3);
-                loadSize = 12;
+                pIntAccessType = VectorType::get(Type::getInt32Ty(*m_pContext), 3);
+                accessSize = 12;
             }
             else if (remainingBytes >= 8)
             {
-                pIntLoadType = VectorType::get(Type::getInt32Ty(*m_pContext), 2);
-                loadSize = 8;
+                pIntAccessType = VectorType::get(Type::getInt32Ty(*m_pContext), 2);
+                accessSize = 8;
             }
             else
             {
                 // remainingBytes >= 4
-                pIntLoadType = Type::getInt32Ty(*m_pContext);
-                loadSize = 4;
+                pIntAccessType = Type::getInt32Ty(*m_pContext);
+                accessSize = 4;
             }
         }
         else if (alignment >= 2 && remainingBytes >= 2)
         {
-            pIntLoadType = Type::getInt16Ty(*m_pContext);
-            loadSize = 2;
+            pIntAccessType = Type::getInt16Ty(*m_pContext);
+            accessSize = 2;
         }
         else
         {
-            pIntLoadType = Type::getInt8Ty(*m_pContext);
-            loadSize = 1;
+            pIntAccessType = Type::getInt8Ty(*m_pContext);
+            accessSize = 1;
         }
-        LLPC_ASSERT(loadSize != 0);
+        LLPC_ASSERT(pIntAccessType != nullptr);
+        LLPC_ASSERT(accessSize != 0);
 
-        Value* pPartLoad = nullptr;
+        Value* pPart = nullptr;
 
         CoherentFlag coherent = {};
         coherent.bits.glc = isGlc;
@@ -1655,421 +1738,134 @@ Value* PatchBufferOp::ReplaceLoad(
         {
             coherent.bits.slc = isSlc;
         }
+
+        if (isLoad)
+        {
 #if LLPC_BUILD_GFX10
-        if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 10)
-        {
-            coherent.bits.dlc = isDlc;
-        }
+            if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 10)
+            {
+                // TODO For stores?
+                coherent.bits.dlc = isDlc;
+            }
 #endif
-        if (isInvariant && loadSize >= 4)
-        {
-            pPartLoad = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load,
-                                                    pIntLoadType,
+            if (isInvariant && accessSize >= 4)
+            {
+                pPart = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load,
+                                                    pIntAccessType,
                                                     {
                                                         pBufferDesc,
                                                         pOffset,
                                                         m_pBuilder->getInt32(coherent.u32All)
                                                     });
-        }
-        else
-        {
-            pPartLoad = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load,
-                                                    pIntLoadType,
+            }
+            else
+            {
+                pPart = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load,
+                                                    pIntAccessType,
                                                     {
                                                         pBufferDesc,
                                                         pOffset,
                                                         m_pBuilder->getInt32(0),
                                                         m_pBuilder->getInt32(coherent.u32All)
                                                     });
-        }
-
-        CopyMetadata(pPartLoad, pLoadInst);
-        partLoads.push_back(pPartLoad);
-
-        if (loadSize < smallestByteSize)
-        {
-            pSmallestType = pIntLoadType;
-            smallestByteSize = loadSize;
-        }
-        remainingBytes -= loadSize;
-    }
-    LLPC_ASSERT(smallestByteSize != UINT32_MAX);
-
-    // And if the type was a vector, we do our insert elements on the elements of it.
-    if (pSmallestType->isVectorTy())
-    {
-        pSmallestType = pSmallestType->getVectorElementType();
-    }
-
-    // Get the byte size of the smallest type.
-    smallestByteSize = static_cast<IntegerType*>(pSmallestType)->getBitWidth() / 8;
-
-    // This will be either the loaded value or a vector of the loaded values
-    Value* pNewLoad = nullptr;
-    if (partLoads.size() == 1)
-    {
-        // We do not have to create a vector if we did only one load
-        pNewLoad = partLoads.front();
-    }
-    else
-    {
-        // And create an undef vector whose total size is the number of bytes we loaded.
-        pNewLoad = UndefValue::get(VectorType::get(pSmallestType, bytesToLoad / smallestByteSize));
-
-        uint32_t index = 0;
-
-        for (Value* pPartLoad : partLoads)
-        {
-            // Get the byte size of our load part.
-            const uint32_t byteSize = static_cast<uint32_t>(dataLayout.getTypeStoreSize(pPartLoad->getType()));
-
-            // Bitcast it to a vector of the smallest load type.
-            VectorType* const pCastType = VectorType::get(pSmallestType, byteSize / smallestByteSize);
-            pPartLoad = m_pBuilder->CreateBitCast(pPartLoad, pCastType);
-            CopyMetadata(pPartLoad, pLoadInst);
-
-            // Run through the elements of our bitcasted type and insert them into the main load.
-            for (uint32_t i = 0, compCount = static_cast<uint32_t>(pCastType->getNumElements()); i < compCount; i++)
-            {
-                Value* const pLoadElem = m_pBuilder->CreateExtractElement(pPartLoad, i);
-                CopyMetadata(pLoadElem, pLoadInst);
-                pNewLoad = m_pBuilder->CreateInsertElement(pNewLoad, pLoadElem, index++);
-                CopyMetadata(pNewLoad, pLoadInst);
             }
         }
-    }
-    LLPC_ASSERT(pNewLoad != nullptr);
+        else
+        {
+            // Store
+            uint32_t compCount = accessSize / smallestByteSize;
+            pPart = UndefValue::get(VectorType::get(pSmallestType, compCount));
 
-    if (pLoadType->isPointerTy())
-    {
-        pNewLoad = m_pBuilder->CreateBitCast(pNewLoad, m_pBuilder->getIntNTy(bytesToLoad * 8));
-        CopyMetadata(pNewLoad, pLoadInst);
-        pNewLoad = m_pBuilder->CreateIntToPtr(pNewLoad, pLoadType);
-        CopyMetadata(pNewLoad, pLoadInst);
-    }
-    else
-    {
-        pNewLoad = m_pBuilder->CreateBitCast(pNewLoad, pLoadType);
-        CopyMetadata(pNewLoad, pLoadInst);
+            for (uint32_t i = 0; i < compCount; i++)
+            {
+                Value* const pStoreElem = m_pBuilder->CreateExtractElement(pStoreValue, storeIndex++);
+                pPart = m_pBuilder->CreateInsertElement(pPart, pStoreElem, i);
+            }
+            pPart = m_pBuilder->CreateBitCast(pPart, pIntAccessType);
+            CopyMetadata(pPart, &pInst);
+            pPart = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store,
+                                                pIntAccessType,
+                                                {
+                                                    pPart,
+                                                    pBufferDesc,
+                                                    pOffset,
+                                                    m_pBuilder->getInt32(0),
+                                                    m_pBuilder->getInt32(coherent.u32All)
+                                                });
+        }
+
+        CopyMetadata(pPart, &pInst);
+        if (isLoad)
+        {
+            parts.push_back(pPart);
+        }
+
+        remainingBytes -= accessSize;
     }
 
-    switch (pLoadInst->getOrdering())
+    Value* pNewInst = nullptr;
+    if (isLoad)
+    {
+        if (parts.size() == 1)
+        {
+            // We do not have to create a vector if we did only one load
+            pNewInst = parts.front();
+        }
+        else
+        {
+            // And create an undef vector whose total size is the number of bytes we loaded.
+            pNewInst = UndefValue::get(VectorType::get(pSmallestType, bytesToHandle / smallestByteSize));
+
+            uint32_t index = 0;
+
+            for (Value* pPart : parts)
+            {
+                // Get the byte size of our load part.
+                const uint32_t byteSize = static_cast<uint32_t>(dataLayout.getTypeStoreSize(pPart->getType()));
+
+                // Bitcast it to a vector of the smallest load type.
+                VectorType* const pCastType = VectorType::get(pSmallestType, byteSize / smallestByteSize);
+                pPart = m_pBuilder->CreateBitCast(pPart, pCastType);
+                CopyMetadata(pPart, &pInst);
+
+                // Run through the elements of our bitcasted type and insert them into the main load.
+                for (uint32_t i = 0, compCount = static_cast<uint32_t>(pCastType->getNumElements()); i < compCount; i++)
+                {
+                    Value* const pElem = m_pBuilder->CreateExtractElement(pPart, i);
+                    CopyMetadata(pElem, &pInst);
+                    pNewInst = m_pBuilder->CreateInsertElement(pNewInst, pElem, index++);
+                    CopyMetadata(pNewInst, &pInst);
+                }
+            }
+        }
+        LLPC_ASSERT(pNewInst != nullptr);
+
+        if (pType->isPointerTy())
+        {
+            pNewInst = m_pBuilder->CreateBitCast(pNewInst, m_pBuilder->getIntNTy(bytesToHandle * 8));
+            CopyMetadata(pNewInst, &pInst);
+            pNewInst = m_pBuilder->CreateIntToPtr(pNewInst, pType);
+            CopyMetadata(pNewInst, &pInst);
+        }
+        else
+        {
+            pNewInst = m_pBuilder->CreateBitCast(pNewInst, pType);
+            CopyMetadata(pNewInst, &pInst);
+        }
+    }
+
+    switch (ordering)
     {
     case AtomicOrdering::Acquire:
     case AtomicOrdering::AcquireRelease:
     case AtomicOrdering::SequentiallyConsistent:
-        m_pBuilder->CreateFence(AtomicOrdering::Acquire, pLoadInst->getSyncScopeID());
+        m_pBuilder->CreateFence(AtomicOrdering::Acquire, syncScopeID);
         break;
     default:
         break;
     }
 
-    return pNewLoad;
-}
-
-// =====================================================================================================================
-// Replace a fat pointer store with the intrinsics required to do the store.
-void PatchBufferOp::ReplaceStore(
-    StoreInst* const pStoreInst) // [in] The store instruction to replace.
-{
-    m_pBuilder->SetInsertPoint(pStoreInst);
-
-    Value* const pPointer = GetPointerOperandAsInst(pStoreInst->getPointerOperand());
-
-    const DataLayout& dataLayout = m_pBuilder->GetInsertBlock()->getModule()->getDataLayout();
-
-    Type* const pStoreType = pStoreInst->getValueOperand()->getType();
-
-    const uint32_t bytesToStore = static_cast<uint32_t>(dataLayout.getTypeSizeInBits(pStoreType) / 8);
-
-    uint32_t alignment = pStoreInst->getAlignment();
-
-    if (alignment == 0)
-    {
-        alignment = dataLayout.getABITypeAlignment(pStoreType);
-    }
-
-    const bool isSlc = pStoreInst->getMetadata(LLVMContext::MD_nontemporal);
-    const bool isGlc = pStoreInst->getOrdering() != AtomicOrdering::NotAtomic;
-
-    Value* const pBufferDesc = m_replacementMap[pPointer].first;
-    Value* const pBaseIndex = m_pBuilder->CreatePtrToInt(m_replacementMap[pPointer].second, m_pBuilder->getInt32Ty());
-
-    // If our buffer descriptor is divergent, need to handle that differently.
-    if (m_divergenceSet.count(pBufferDesc) > 0)
-    {
-        Value* const pBaseAddr = GetBaseAddressFromBufferDesc(pBufferDesc);
-
-        // The 2nd element in the buffer descriptor is the byte bound, we do this to support robust buffer access.
-        Value* const pBound = m_pBuilder->CreateExtractElement(pBufferDesc, 2);
-        Value* const pInBound = m_pBuilder->CreateICmpULT(pBaseIndex, pBound);
-        Value* const pNewBaseIndex = m_pBuilder->CreateSelect(pInBound, pBaseIndex, m_pBuilder->getInt32(0));
-
-        // Add on the index to the address.
-        Value* pStorePointer = m_pBuilder->CreateGEP(pBaseAddr, pNewBaseIndex);
-
-        pStorePointer = m_pBuilder->CreateBitCast(pStorePointer, pStoreType->getPointerTo(ADDR_SPACE_GLOBAL));
-
-        StoreInst* const pNewStore = m_pBuilder->CreateStore(pStoreInst->getValueOperand(), pStorePointer);
-        pNewStore->setVolatile(pStoreInst->isVolatile());
-        pNewStore->setAlignment(MaybeAlign(pStoreInst->getAlignment()));
-        pNewStore->setOrdering(pStoreInst->getOrdering());
-        pNewStore->setSyncScopeID(pStoreInst->getSyncScopeID());
-        CopyMetadata(pNewStore, pStoreInst);
-    }
-    else
-    {
-        switch (pStoreInst->getOrdering())
-        {
-        case AtomicOrdering::Release:
-        case AtomicOrdering::AcquireRelease:
-        case AtomicOrdering::SequentiallyConsistent:
-            m_pBuilder->CreateFence(AtomicOrdering::Release, pStoreInst->getSyncScopeID());
-            break;
-        default:
-            break;
-        }
-
-        uint32_t smallestByteSize = 4;
-
-        if ((alignment < 2) || ((bytesToStore & 0x1) != 0))
-        {
-            smallestByteSize = 1;
-        }
-        else if ((alignment < 4) || ((bytesToStore & 0x3) != 0))
-        {
-            smallestByteSize = 2;
-        }
-        else
-        {
-            smallestByteSize = 4;
-        }
-
-        Type* pSmallestType = nullptr;
-
-        switch (smallestByteSize)
-        {
-        case 1:
-            pSmallestType = m_pBuilder->getInt8Ty();
-            break;
-        case 2:
-            pSmallestType = m_pBuilder->getInt16Ty();
-            break;
-        case 4:
-            pSmallestType = m_pBuilder->getInt32Ty();
-            break;
-        default:
-            LLPC_NEVER_CALLED();
-            break;
-        }
-
-        // Bitcast our value-to-store to a vector of smallest byte size.
-        Type* const pCastType = VectorType::get(pSmallestType, bytesToStore / smallestByteSize);
-
-        Value* pStoreValue = pStoreInst->getValueOperand();
-
-        if (pStoreValue->getType()->isPointerTy())
-        {
-            pStoreValue = m_pBuilder->CreatePtrToInt(pStoreValue, m_pBuilder->getIntNTy(bytesToStore * 8));
-            CopyMetadata(pStoreValue, pStoreInst);
-        }
-
-        pStoreValue = m_pBuilder->CreateBitCast(pStoreValue, pCastType);
-        CopyMetadata(pStoreValue, pStoreInst);
-
-        uint32_t index = 0;
-
-        SmallVector<Value*, 8> partStores;
-
-        uint32_t remainingBytes = bytesToStore;
-
-        // If the alignment is at least 4, we can use the most efficient dword stores.
-        if (alignment >= 4)
-        {
-            while (remainingBytes >= 4)
-            {
-                uint32_t partStoreWidth = 0;
-
-                if (remainingBytes >= 16)
-                {
-                    partStoreWidth = 16;
-                }
-                else if (remainingBytes >= 8)
-                {
-                    partStoreWidth = 8;
-                }
-                else if (remainingBytes >= 4)
-                {
-                    partStoreWidth = 4;
-                }
-                else
-                {
-                    LLPC_NEVER_CALLED();
-                }
-
-                Value* pPartStore = UndefValue::get(VectorType::get(pSmallestType, partStoreWidth / smallestByteSize));
-
-                for (uint32_t i = 0, compCount = pPartStore->getType()->getVectorNumElements(); i < compCount; i++)
-                {
-                    Value* const pStoreElem = m_pBuilder->CreateExtractElement(pStoreValue, index++);
-                    pPartStore = m_pBuilder->CreateInsertElement(pPartStore, pStoreElem, i);
-                }
-
-                Type* pCastType = nullptr;
-
-                if (remainingBytes >= 16)
-                {
-                    pCastType = VectorType::get(Type::getInt32Ty(*m_pContext), 4);
-                    remainingBytes -= 16;
-                }
-                else if (remainingBytes >= 8)
-                {
-                    pCastType = VectorType::get(Type::getInt32Ty(*m_pContext), 2);
-                    remainingBytes -= 8;
-                }
-                else if (remainingBytes >= 4)
-                {
-                    pCastType = Type::getInt32Ty(*m_pContext);
-                    remainingBytes -= 4;
-                }
-                else
-                {
-                    LLPC_NEVER_CALLED();
-                }
-
-                pPartStore = m_pBuilder->CreateBitCast(pPartStore, pCastType);
-                CopyMetadata(pPartStore, pStoreInst);
-                partStores.push_back(pPartStore);
-            }
-        }
-
-        // If the alignment is at least 2, we can use ushort stores next.
-        if (alignment >= 2)
-        {
-            for (; remainingBytes >= 2; remainingBytes -= 2)
-            {
-                Value* pPartStore = UndefValue::get(VectorType::get(pSmallestType, 2 / smallestByteSize));
-
-                for (uint32_t i = 0, compCount = pPartStore->getType()->getVectorNumElements(); i < compCount; i++)
-                {
-                    Value* const pStoreElem = m_pBuilder->CreateExtractElement(pStoreValue, index++);
-                    pPartStore = m_pBuilder->CreateInsertElement(pPartStore, pStoreElem, i);
-                }
-
-                pPartStore = m_pBuilder->CreateBitCast(pPartStore, m_pBuilder->getInt16Ty());
-                CopyMetadata(pPartStore, pStoreInst);
-                partStores.push_back(pPartStore);
-            }
-        }
-
-        // Otherwise use ubyte stores.
-        for (; remainingBytes >= 1; remainingBytes -= 1)
-        {
-            Value* pPartStore = m_pBuilder->CreateExtractElement(pStoreValue, index++);
-            CopyMetadata(pPartStore, pStoreInst);
-            pPartStore = m_pBuilder->CreateBitCast(pPartStore, m_pBuilder->getInt8Ty());
-            CopyMetadata(pPartStore, pStoreInst);
-            partStores.push_back(pPartStore);
-        }
-
-        uint32_t offset = 0;
-
-        for (Value* pPartStore : partStores)
-        {
-            // Get the byte size of our store part.
-            const uint32_t byteSize = static_cast<uint32_t>(dataLayout.getTypeSizeInBits(pPartStore->getType()) / 8);
-
-            Value* const pOffset = (offset == 0) ?
-                                   pBaseIndex :
-                                   m_pBuilder->CreateAdd(pBaseIndex, m_pBuilder->getInt32(offset));
-
-            if (byteSize >= 4)
-            {
-                const uint32_t elements = byteSize / 4;
-                Type* pCastType = m_pBuilder->getFloatTy();
-                if (elements > 1)
-                {
-                    pCastType = VectorType::get(pCastType, elements);
-                }
-
-                pPartStore = m_pBuilder->CreateBitCast(pPartStore, pCastType);
-                CopyMetadata(pPartStore, pStoreInst);
-
-                CoherentFlag coherent = {};
-                coherent.bits.glc = isGlc;
-                coherent.bits.slc = isSlc;
-
-                Value* const pNewStore = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store,
-                                                                     pCastType,
-                                                                     {
-                                                                         pPartStore,
-                                                                         pBufferDesc,
-                                                                         pOffset,
-                                                                         m_pBuilder->getInt32(0),
-                                                                         m_pBuilder->getInt32(coherent.u32All)
-                                                                     });
-                CopyMetadata(pNewStore, pStoreInst);
-            }
-            else if (byteSize == 2)
-            {
-                pPartStore = m_pBuilder->CreateBitCast(pPartStore, VectorType::get(m_pBuilder->getInt8Ty(), 2));
-                CopyMetadata(pPartStore, pStoreInst);
-
-                UndefValue* const pUndef = UndefValue::get(VectorType::get(m_pBuilder->getInt8Ty(), 2));
-                pPartStore = m_pBuilder->CreateShuffleVector(pPartStore, pUndef, { 0, 1, 2, 2 });
-                CopyMetadata(pPartStore, pStoreInst);
-
-                pPartStore = m_pBuilder->CreateBitCast(pPartStore, Type::getFloatTy(*m_pContext));
-                CopyMetadata(pPartStore, pStoreInst);
-
-                Value* const pNewStore = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_buffer_store_short,
-                                                                     {},
-                                                                     {
-                                                                         pPartStore,
-                                                                         pBufferDesc,
-                                                                         m_pBuilder->getInt32(0),
-                                                                         pOffset,
-                                                                         m_pBuilder->getInt1(isGlc),
-                                                                         m_pBuilder->getInt1(isSlc)
-                                                                     });
-                CopyMetadata(pNewStore, pStoreInst);
-            }
-            else
-            {
-                UndefValue* pUndef = UndefValue::get(VectorType::get(m_pBuilder->getInt8Ty(), 4));
-                pPartStore = m_pBuilder->CreateInsertElement(pUndef, pPartStore, static_cast<uint64_t>(0));
-                CopyMetadata(pPartStore, pStoreInst);
-
-                pPartStore = m_pBuilder->CreateBitCast(pPartStore, Type::getFloatTy(*m_pContext));
-                CopyMetadata(pPartStore, pStoreInst);
-
-                Value* const pNewStore = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_buffer_store_byte,
-                                                                     {},
-                                                                     {
-                                                                         pPartStore,
-                                                                         pBufferDesc,
-                                                                         m_pBuilder->getInt32(0),
-                                                                         pOffset,
-                                                                         m_pBuilder->getInt1(isGlc),
-                                                                         m_pBuilder->getInt1(isSlc)
-                                                                     });
-                CopyMetadata(pNewStore, pStoreInst);
-            }
-
-            offset += byteSize;
-        }
-
-        switch (pStoreInst->getOrdering())
-        {
-        case AtomicOrdering::Acquire:
-        case AtomicOrdering::AcquireRelease:
-        case AtomicOrdering::SequentiallyConsistent:
-            m_pBuilder->CreateFence(AtomicOrdering::Acquire, pStoreInst->getSyncScopeID());
-            break;
-        default:
-            break;
-        }
-    }
+    return pNewInst;
 }
 
 // =====================================================================================================================
