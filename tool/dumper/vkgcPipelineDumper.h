@@ -77,14 +77,16 @@ public:
   static void DumpPipelineExtraInfo(PipelineDumpFile *binaryFile, const std::string *str);
 
   static MetroHash::Hash generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
-                                                         unsigned stage = ShaderStageInvalid);
+                                                        bool isRelocatableShader,
+                                                        unsigned stage = ShaderStageInvalid);
 
-  static MetroHash::Hash generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline, bool isCacheHash);
+  static MetroHash::Hash generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline,
+                                                        bool isRelocatableShader, bool isCacheHash);
 
   static std::string getPipelineInfoFileName(PipelineBuildInfo pipelineInfo, const MetroHash::Hash *hash);
 
   static void updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo, bool isCacheHash,
-                                              MetroHash64 *hasher);
+                                              MetroHash64 *hasher, bool isRelocatableShader);
 
   static void updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo *vertexInput,
                                             MetroHash64 *hasher);
@@ -125,7 +127,7 @@ private:
   static void dumpPipelineOptions(const PipelineOptions *options, std::ostream &dumpFile);
 
   static void updateHashForResourceMappingNode(const ResourceMappingNode *userDataNode, bool isRootNode,
-                                               MetroHash64 *hasher);
+                                               MetroHash64 *hasher, bool isRelocatableShader);
 };
 
 } // namespace Vkgc

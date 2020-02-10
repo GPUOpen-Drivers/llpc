@@ -116,10 +116,10 @@ void *VKAPI_CALL IPipelineDumper::BeginPipelineDump(const PipelineDumpOptions *d
                                                     PipelineBuildInfo pipelineInfo) {
   MetroHash::Hash hash = {};
   if (pipelineInfo.pComputeInfo)
-    hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo.pComputeInfo, false);
+    hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo.pComputeInfo, false, false);
   else {
     assert(pipelineInfo.pGraphicsInfo);
-    hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo.pGraphicsInfo, false);
+    hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo.pGraphicsInfo, false, false);
   }
 
   return PipelineDumper::BeginPipelineDump(dumpOptions, pipelineInfo, &hash);
@@ -167,7 +167,7 @@ uint64_t VKAPI_CALL IPipelineDumper::GetShaderHash(const void *moduleData) {
 //
 // @param pipelineInfo : Info to build this graphics pipeline
 uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(const GraphicsPipelineBuildInfo *pipelineInfo) {
-  auto hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false);
+  auto hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, false);
   return MetroHash::compact64(&hash);
 }
 // =====================================================================================================================
@@ -178,7 +178,7 @@ uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(const GraphicsPipelineBuild
 // @param nameBufSize : Size of the buffer to store pipeline name
 void VKAPI_CALL IPipelineDumper::GetPipelineName(const GraphicsPipelineBuildInfo *graphicsPipelineInfo,
                                                  char *pipeNameOut, const size_t nameBufSize) {
-  auto hash = PipelineDumper::generateHashForGraphicsPipeline(graphicsPipelineInfo, false);
+  auto hash = PipelineDumper::generateHashForGraphicsPipeline(graphicsPipelineInfo, false, false);
   PipelineBuildInfo pipelineInfo = {};
   pipelineInfo.pGraphicsInfo = graphicsPipelineInfo;
   std::string pipeName = PipelineDumper::getPipelineInfoFileName(pipelineInfo, &hash);
@@ -193,7 +193,7 @@ void VKAPI_CALL IPipelineDumper::GetPipelineName(const GraphicsPipelineBuildInfo
 // @param nameBufSize : Size of the buffer to store pipeline name
 void VKAPI_CALL IPipelineDumper::GetPipelineName(const ComputePipelineBuildInfo *computePipelineInfo, char *pipeNameOut,
                                                  const size_t nameBufSize) {
-  auto hash = PipelineDumper::generateHashForComputePipeline(computePipelineInfo, false);
+  auto hash = PipelineDumper::generateHashForComputePipeline(computePipelineInfo, false, false);
   PipelineBuildInfo pipelineInfo = {};
   pipelineInfo.pComputeInfo = computePipelineInfo;
 
@@ -206,7 +206,7 @@ void VKAPI_CALL IPipelineDumper::GetPipelineName(const ComputePipelineBuildInfo 
 //
 // @param pipelineInfo : Info to build this compute pipeline
 uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(const ComputePipelineBuildInfo *pipelineInfo) {
-  auto hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false);
+  auto hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false, false);
   return MetroHash::compact64(&hash);
 }
 
@@ -551,7 +551,7 @@ void PipelineDumper::DumpPipelineBinary(PipelineDumpFile *dumpFile, GfxIpVersion
   if (dumpFile) {
     ElfReader<Elf64> reader(gfxIp);
     size_t codeSize = pipelineBin->codeSize;
-    auto result = reader.ReadFromBuffer(pipelineBin->pCode, &codeSize);
+    auto result = reader.readFromBuffer(pipelineBin->pCode, &codeSize);
     assert(result == Result::Success);
     (void(result)); // unused
 
@@ -765,33 +765,35 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
 //
 // @param pipeline : Info to build a graphics pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
+// @param isRelocatableShader : TRUE if we are building relocatable shader
 // @param stage : The stage for which we are building the hash. ShaderStageInvalid if building for the entire pipeline.
 MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline,
-                                                                bool isCacheHash, unsigned stage) {
+                                                                bool isCacheHash, bool isRelocatableShader,
+                                                                unsigned stage) {
   MetroHash64 hasher;
 
   switch (stage) {
   case ShaderStageVertex:
-    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher, isRelocatableShader);
     break;
   case ShaderStageTessControl:
-    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher, isRelocatableShader);
     break;
   case ShaderStageTessEval:
-    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher, isRelocatableShader);
     break;
   case ShaderStageGeometry:
-    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher, isRelocatableShader);
     break;
   case ShaderStageFragment:
-    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher, isRelocatableShader);
     break;
   case ShaderStageInvalid:
-    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher);
-    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher);
-    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher);
-    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher);
-    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher, isRelocatableShader);
     break;
   default:
     llvm_unreachable("Should never be called!");
@@ -820,10 +822,10 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
 // @param pipeline : Info to build a compute pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
 MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline,
-                                                               bool isCacheHash) {
+                                                               bool isCacheHash, bool isRelocatableShader) {
   MetroHash64 hasher;
 
-  updateHashForPipelineShaderInfo(ShaderStageCompute, &pipeline->cs, isCacheHash, &hasher);
+  updateHashForPipelineShaderInfo(ShaderStageCompute, &pipeline->cs, isCacheHash, &hasher, isRelocatableShader);
   hasher.Update(pipeline->deviceIndex);
   hasher.Update(pipeline->options.includeDisassembly);
   hasher.Update(pipeline->options.scalarBlockLayout);
@@ -967,7 +969,7 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
 // @param isCacheHash : TRUE if the hash is used by shader cache
 // @param [in,out] hasher : Haher to generate hash code
 void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo,
-                                                     bool isCacheHash, MetroHash64 *hasher) {
+                                                     bool isCacheHash, MetroHash64 *hasher, bool isRelocatableShader) {
   if (shaderInfo->pModuleData) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
     hasher->Update(stage);
@@ -1021,7 +1023,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
     if (shaderInfo->userDataNodeCount > 0) {
       for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
         auto userDataNode = &shaderInfo->pUserDataNodes[i];
-        updateHashForResourceMappingNode(userDataNode, true, hasher);
+        updateHashForResourceMappingNode(userDataNode, true, hasher, isRelocatableShader);
       }
     }
 
@@ -1062,11 +1064,12 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
 // @param isRootNode : TRUE if the node is in root level
 // @param [in,out] hasher : Haher to generate hash code
 void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode *userDataNode, bool isRootNode,
-                                                      MetroHash64 *hasher) {
+                                                      MetroHash64 *hasher, bool isRelocatableShader) {
   hasher->Update(userDataNode->type);
-  hasher->Update(userDataNode->sizeInDwords);
-  hasher->Update(userDataNode->offsetInDwords);
-
+  if (!isRelocatableShader) {
+    hasher->Update(userDataNode->sizeInDwords);
+    hasher->Update(userDataNode->offsetInDwords);
+  }
   switch (userDataNode->type) {
   case ResourceMappingNodeType::DescriptorResource:
   case ResourceMappingNodeType::DescriptorSampler:
@@ -1075,14 +1078,13 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
   case ResourceMappingNodeType::DescriptorTexelBuffer:
   case ResourceMappingNodeType::DescriptorBuffer:
   case ResourceMappingNodeType::DescriptorFmask:
-  case ResourceMappingNodeType::DescriptorBufferCompact:
-  {
+  case ResourceMappingNodeType::DescriptorBufferCompact: {
     hasher->Update(userDataNode->srdRange);
     break;
   }
   case ResourceMappingNodeType::DescriptorTableVaPtr: {
     for (unsigned i = 0; i < userDataNode->tablePtr.nodeCount; ++i)
-      updateHashForResourceMappingNode(&userDataNode->tablePtr.pNext[i], false, hasher);
+      updateHashForResourceMappingNode(&userDataNode->tablePtr.pNext[i], false, hasher, isRelocatableShader);
     break;
   }
   case ResourceMappingNodeType::IndirectUserDataVaPtr: {
@@ -1348,7 +1350,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
       out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
 
       std::vector<ElfSymbol> symbols;
-      reader.GetSymbolsBySectionIndex(secIdx, symbols);
+      reader.getSymbolsBySectionIndex(secIdx, symbols);
       unsigned symIdx = 0;
       unsigned startPos = 0;
       unsigned endPos = 0;
@@ -1387,7 +1389,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
         out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
 
         std::vector<ElfSymbol> symbols;
-        reader.GetSymbolsBySectionIndex(secIdx, symbols);
+        reader.getSymbolsBySectionIndex(secIdx, symbols);
         unsigned symIdx = 0;
         unsigned startPos = 0;
         unsigned endPos = 0;
@@ -1426,7 +1428,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
           << " bytes)\n";
 
       std::vector<ElfSymbol> symbols;
-      reader.GetSymbolsBySectionIndex(secIdx, symbols);
+      reader.getSymbolsBySectionIndex(secIdx, symbols);
 
       unsigned symIdx = 0;
       unsigned startPos = 0;

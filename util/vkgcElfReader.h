@@ -149,7 +149,7 @@ static const char ShStrTabName[] = ".shstrtab"; // Name of ".shstrtab" section
 static const char StrTabName[] = ".strtab";     // Name of ".strtab" section
 static const char SymTabName[] = ".symtab";     // Name of ".symtab" section
 static const char NoteName[] = ".note";         // Name of ".note" section
-static const char RelocName[] = ".reloc";       // Name of ".reloc" section
+static const char RelocName[] = ".rel.text";    // Name of ".reloc" section
 static const char CommentName[] = ".comment";   // Name of ".comment" section
 
 static const uint32_t NT_AMD_AMDGPU_ISA = 11; // Note type of AMDGPU ISA version
@@ -355,6 +355,9 @@ struct ElfSymbol {
 struct ElfReloc {
   uint64_t offset; // Location
   uint32_t symIdx; // Index of this symbol in the symbol table
+  uint32_t type; // Type of this relocation
+  bool useExplicitAddend; // Whether an explicit addend is used
+  uint32_t addend; // The value of the explicit addend
 };
 
 // Represents info of ELF note
@@ -405,9 +408,9 @@ public:
   // Gets graphics IP version info (used by ELF dump only)
   GfxIpVersion getGfxIpVersion() const { return m_gfxIp; }
 
-  Result ReadFromBuffer(const void *pBuffer, size_t *bufSize);
+  Result readFromBuffer(const void *buffer, size_t *bufSize);
 
-  Result GetSectionData(const char *name, const void **ppData, size_t *dataLength) const;
+  Result getSectionData(const char *name, const void **ppData, size_t *dataLength) const;
 
   uint32_t getSectionCount();
   Result getSectionDataBySectionIndex(uint32_t secIdx, SectionBuffer **ppSectionData) const;
@@ -420,19 +423,19 @@ public:
   bool isSectionPresent(const char *name) const { return (m_map.find(name) != m_map.end()); }
 
   uint32_t getSymbolCount() const;
-  void getSymbol(uint32_t idx, ElfSymbol *symbol);
+  void getSymbol(uint32_t idx, ElfSymbol *symbol) const;
 
   bool isValidSymbol(const char *symbolName);
 
   ElfNote getNote(Util::Abi::PipelineAbiNoteType noteType) const;
 
-  void GetSymbolsBySectionIndex(uint32_t secIndx, std::vector<ElfSymbol> &secSymbols) const;
+  void getSymbolsBySectionIndex(uint32_t secIndx, std::vector<ElfSymbol> &secSymbols) const;
 
-  uint32_t getRelocationCount();
-  void getRelocation(uint32_t idx, ElfReloc *reloc);
+  uint32_t getRelocationCount() const;
+  void getRelocation(uint32_t idx, ElfReloc *reloc) const;
 
   // Gets the section index for the specified section name.
-  int32_t GetSectionIndex(const char *name) const {
+  int32_t getSectionIndex(const char *name) const {
     auto entry = m_map.find(name);
     return (entry != m_map.end()) ? entry->second : InvalidValue;
   }

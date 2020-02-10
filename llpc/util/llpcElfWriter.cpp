@@ -40,8 +40,22 @@
 using namespace llvm;
 using namespace Vkgc;
 
-namespace Llpc {
+namespace {
 
+static constexpr unsigned R_AMDGPU_ABS32 = 6;
+// Descriptor size
+static constexpr unsigned DescriptorSizeResource = 8 * sizeof(unsigned);
+static constexpr unsigned DescriptorSizeSampler = 4 * sizeof(unsigned);
+
+// Represent a relocation entry. Used internally for pipeline linking.
+struct RelocationEntry {
+  Llpc::ElfReloc reloc; // The relocation entry from the ELF
+  const char *name;     // Name of the symbol associated with the relocation
+};
+
+} // namespace
+
+namespace Llpc {
 // The names of API shader stages used in PAL metadata, in ShaderStage order.
 static const char *const ApiStageNames[] = {".vertex", ".hull", ".domain", ".geometry", ".pixel", ".compute"};
 
@@ -53,8 +67,8 @@ static const char *const HwStageNames[] = {".ls", ".hs", ".es", ".gs", ".vs", ".
 // @param gfxIp : Graphics IP version info
 template <class Elf>
 ElfWriter<Elf>::ElfWriter(GfxIpVersion gfxIp)
-    : m_gfxIp(gfxIp), m_textSecIdx(InvalidValue), m_noteSecIdx(InvalidValue), m_symSecIdx(InvalidValue),
-      m_strtabSecIdx(InvalidValue) {
+    : m_gfxIp(gfxIp), m_textSecIdx(InvalidValue), m_noteSecIdx(InvalidValue), m_relocSecIdx(InvalidValue),
+      m_symSecIdx(InvalidValue), m_strtabSecIdx(InvalidValue) {
 }
 
 // =====================================================================================================================
@@ -578,6 +592,11 @@ template <class Elf> Result ElfWriter<Elf>::copyFromReader(const ElfReader<Elf> 
   assert(m_symSecIdx > 0);
   assert(m_strtabSecIdx > 0);
 
+  auto relocSec = m_map.find(RelocName);
+  if (relocSec != m_map.end()) {
+    m_relocSecIdx = relocSec->second;
+  }
+
   auto noteSection = &m_sections[m_noteSecIdx];
   const unsigned noteHeaderSize = sizeof(NoteHeader) - 8;
   size_t offset = 0;
@@ -626,9 +645,9 @@ template <class Elf> Result ElfWriter<Elf>::copyFromReader(const ElfReader<Elf> 
 //
 // @param pBuffer : Buffer to read data from
 // @param bufSize : Size of the buffer
-template <class Elf> Result ElfWriter<Elf>::ReadFromBuffer(const void *pBuffer, size_t bufSize) {
+template <class Elf> Result ElfWriter<Elf>::readFromBuffer(const void *pBuffer, size_t bufSize) {
   ElfReader<Elf> reader(m_gfxIp);
-  auto result = reader.ReadFromBuffer(pBuffer, &bufSize);
+  auto result = reader.readFromBuffer(pBuffer, &bufSize);
   if (result != Llpc::Result::Success)
     return result;
   return copyFromReader(reader);
@@ -647,6 +666,48 @@ Result ElfWriter<Elf>::getSectionDataBySectionIndex(unsigned secIdx, const Secti
     result = Result::Success;
   }
   return result;
+}
+
+// =====================================================================================================================
+// Gets the count of relocations in the relocation section.
+template <class Elf> unsigned ElfWriter<Elf>::getRelocationCount() {
+  unsigned relocCount = 0;
+  if (m_relocSecIdx >= 0) {
+    auto &section = m_sections[m_relocSecIdx];
+    relocCount = static_cast<unsigned>(section.secHead.sh_size / section.secHead.sh_entsize);
+  }
+  return relocCount;
+}
+
+// =====================================================================================================================
+// Gets info of the relocation in the relocation section according to the specified index.
+//
+// @param idx : Relocation index
+// @param pReloc : [out] Info of the relocation
+template <class Elf> void ElfWriter<Elf>::getRelocation(unsigned idx, ElfReloc *reloc) {
+  auto &section = m_sections[m_relocSecIdx];
+
+  auto relocs = reinterpret_cast<const typename Elf::Reloc *>(section.data);
+  reloc->offset = relocs[idx].r_offset;
+  reloc->symIdx = relocs[idx].r_symbol;
+  reloc->type = relocs[idx].r_type;
+  reloc->addend = 0;
+  reloc->useExplicitAddend = false;
+}
+
+// =====================================================================================================================
+// Gets the count of symbols in the symbol table section.
+template <class Elf> unsigned ElfWriter<Elf>::getSymbolCount() const {
+  return m_symbols.size();
+}
+
+// =====================================================================================================================
+// Gets info of the symbol in the symbol table section according to the specified index.
+//
+// @param idx : Symbol index
+// @param pSymbol : [out] Info of the symbol
+template <class Elf> void ElfWriter<Elf>::getSymbol(unsigned idx, ElfSymbol *symbol) {
+  *symbol = m_symbols[idx];
 }
 
 // =====================================================================================================================
@@ -709,12 +770,32 @@ template <class Elf> void ElfWriter<Elf>::updateMetaNote(Context *pContext, cons
 }
 
 // =====================================================================================================================
+// Retrieves the section data for the specified section name, if it exists.
+//
+// @param pName : [in] Name of the section to look for
+// @param ppData : [out] Pointer to section data
+// @param pDataLength : [out] Size of the section data
+template <class Elf>
+Result ElfWriter<Elf>::getSectionData(const char *pName, const void **ppData, size_t *pDataLength) const {
+  Result result = Result::ErrorInvalidValue;
+
+  auto pEntry = m_map.find(pName);
+  if (pEntry != m_map.end()) {
+    *ppData = m_sections[pEntry->second].data;
+    *pDataLength = static_cast<size_t>(m_sections[pEntry->second].secHead.sh_size);
+    result = Result::Success;
+  }
+
+  return result;
+}
+
+// =====================================================================================================================
 // Gets all associated symbols by section index.
 //
 // @param secIdx : Section index
 // @param [out] secSymbols : ELF symbols
 template <class Elf>
-void ElfWriter<Elf>::GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol *> &secSymbols) {
+void ElfWriter<Elf>::getSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol *> &secSymbols) {
   unsigned symCount = m_symbols.size();
 
   for (unsigned idx = 0; idx < symCount; ++idx) {
@@ -763,7 +844,7 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   ElfReader<Elf64> reader(m_gfxIp);
 
   auto fragmentCodesize = pFragmentElf->codeSize;
-  auto result = reader.ReadFromBuffer(pFragmentElf->pCode, &fragmentCodesize);
+  auto result = reader.readFromBuffer(pFragmentElf->pCode, &fragmentCodesize);
   assert(result == Result::Success);
   (void(result)); // unused
 
@@ -773,13 +854,13 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   std::vector<ElfSymbol> fragmentSymbols;
   std::vector<ElfSymbol *> nonFragmentSymbols;
 
-  auto fragmentTextSecIndex = reader.GetSectionIndex(TextName);
-  auto nonFragmentSecIndex = GetSectionIndex(TextName);
+  auto fragmentTextSecIndex = reader.getSectionIndex(TextName);
+  auto nonFragmentSecIndex = getSectionIndex(TextName);
   reader.getSectionDataBySectionIndex(fragmentTextSecIndex, &fragmentTextSection);
-  reader.GetSymbolsBySectionIndex(fragmentTextSecIndex, fragmentSymbols);
+  reader.getSymbolsBySectionIndex(fragmentTextSecIndex, fragmentSymbols);
 
   getSectionDataBySectionIndex(nonFragmentSecIndex, &nonFragmentTextSection);
-  GetSymbolsBySectionIndex(nonFragmentSecIndex, nonFragmentSymbols);
+  getSymbolsBySectionIndex(nonFragmentSecIndex, nonFragmentSymbols);
   ElfSymbol *fragmentIsaSymbol = nullptr;
   ElfSymbol *nonFragmentIsaSymbol = nullptr;
   std::string firstIsaSymbolName;
@@ -837,8 +918,8 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   (void(fragmentAmdIlSymbolName));       // unused
 
   // Merge ISA disassemble
-  auto fragmentDisassemblySecIndex = reader.GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
-  auto nonFragmentDisassemblySecIndex = GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
+  auto fragmentDisassemblySecIndex = reader.getSectionIndex(Util::Abi::AmdGpuDisassemblyName);
+  auto nonFragmentDisassemblySecIndex = getSectionIndex(Util::Abi::AmdGpuDisassemblyName);
   ElfSectionBuffer<Elf64::SectionHeader> *fragmentDisassemblySection = nullptr;
   const ElfSectionBuffer<Elf64::SectionHeader> *nonFragmentDisassemblySection = nullptr;
   reader.getSectionDataBySectionIndex(fragmentDisassemblySecIndex, &fragmentDisassemblySection);
@@ -877,8 +958,8 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   ElfSectionBuffer<Elf64::SectionHeader> *fragmentLlvmIrSection = nullptr;
   const ElfSectionBuffer<Elf64::SectionHeader> *nonFragmentLlvmIrSection = nullptr;
 
-  auto fragmentLlvmIrSecIndex = reader.GetSectionIndex(llvmIrSectionName.c_str());
-  auto nonFragmentLlvmIrSecIndex = GetSectionIndex(llvmIrSectionName.c_str());
+  auto fragmentLlvmIrSecIndex = reader.getSectionIndex(llvmIrSectionName.c_str());
+  auto nonFragmentLlvmIrSecIndex = getSectionIndex(llvmIrSectionName.c_str());
   reader.getSectionDataBySectionIndex(fragmentLlvmIrSecIndex, &fragmentLlvmIrSection);
   getSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &nonFragmentLlvmIrSection);
 
@@ -949,13 +1030,224 @@ template <class Elf> void ElfWriter<Elf>::reinitialize() {
 }
 
 // =====================================================================================================================
+// Retrieves the actual descriptor offset at the specified binding from UserDataNode.
+//
+// @param descSet : DescriptorSet index of the resource
+// @param binding : Binding slot of the resource
+// @param nodeType : Type of resource requested by the shader
+// @param nodes: The UserDataNode provided at runtime
+// @param nodeCount : Number of resource nodes in UserDataNode
+static unsigned getDescriptorResourceOffset(unsigned descSet, unsigned binding, ResourceMappingNodeType nodeType,
+                                            const ResourceMappingNode *nodes, unsigned nodeCount) {
+  for (unsigned i = 0; i < nodeCount; ++i) {
+    const ResourceMappingNode *resource = nodes + i;
+
+    if (resource->type == ResourceMappingNodeType::DescriptorTableVaPtr) {
+      unsigned offset = getDescriptorResourceOffset(descSet, binding, nodeType, resource->tablePtr.pNext,
+                                                    resource->tablePtr.nodeCount);
+      if (offset != InvalidValue) {
+        return offset;
+      }
+      continue;
+    }
+    if (resource->type > ResourceMappingNodeType::DescriptorBuffer) {
+      continue;
+    }
+    if (resource->srdRange.set != descSet || resource->srdRange.binding != binding) {
+      continue;
+    }
+
+    if (nodeType == ResourceMappingNodeType::DescriptorSampler &&
+        resource->type == ResourceMappingNodeType::DescriptorCombinedTexture) {
+      return (resource->offsetInDwords + 8) * sizeof(unsigned); // Offset by DescriptorSizeResource.
+    } else {
+      return (resource->offsetInDwords) * sizeof(unsigned);
+    }
+  }
+  return InvalidValue;
+}
+
+// =====================================================================================================================
+// Retrieves the actual descriptor stride at the specified binding from UserDataNode.
+//
+// @param descSet : DescriptorSet index of the resource
+// @param binding : Binding slot of the resource
+// @param nodes : The UserDataNode provided at runtime
+// @param nodeCount : Number of resource nodes in UserDataNode
+static unsigned getDescriptorResourceStride(unsigned descSet, unsigned binding, const ResourceMappingNode *nodes,
+                                            unsigned nodeCount) {
+  for (unsigned i = 0; i < nodeCount; ++i) {
+    const ResourceMappingNode *resource = nodes + i;
+
+    if (resource->type == ResourceMappingNodeType::DescriptorTableVaPtr) {
+      unsigned offset =
+          getDescriptorResourceStride(descSet, binding, resource->tablePtr.pNext, resource->tablePtr.nodeCount);
+      if (offset != InvalidValue) {
+        return offset;
+      }
+      continue;
+    }
+    if (resource->type > ResourceMappingNodeType::DescriptorBuffer) {
+      continue;
+    }
+    if (resource->srdRange.set != descSet || resource->srdRange.binding != binding) {
+      continue;
+    }
+
+    switch (resource->type) {
+    case ResourceMappingNodeType::DescriptorSampler:
+      return DescriptorSizeSampler / 4;
+      break;
+    case ResourceMappingNodeType::DescriptorResource:
+    case ResourceMappingNodeType::DescriptorFmask:
+      return DescriptorSizeResource / 4;
+    case ResourceMappingNodeType::DescriptorCombinedTexture:
+      return (DescriptorSizeResource + DescriptorSizeSampler) / 4;
+    default:
+      llvm_unreachable("Unexpected resource node type");
+      break;
+    }
+  }
+  return InvalidValue;
+}
+
+// =====================================================================================================================
+// Get value for a descriptor offset relocation (doff_x_y_t symbol).
+//
+// @param context : [in] Pipeline compilation context
+// @param relocEntry : The relocation entry to fixup
+// @param isGraphicsPipeline : Whether we are processing a compute or graphics pipeline
+// @param value : [out] The value of the relocation
+bool getDescriptorOffsetRelocationValue(Context *context, RelocationEntry relocEntry, bool isGraphicsPipeline,
+                                        unsigned *value) {
+  size_t idx = 0;
+  const char *relocName = relocEntry.name + 5;
+  unsigned descSet = std::stoi(relocName, &idx);
+  relocName += idx + 1;
+  idx = 0;
+  unsigned binding = std::stoi(relocName, &idx);
+  relocName += idx + 1;
+  ResourceMappingNodeType type = ResourceMappingNodeType::Unknown;
+  switch (*relocName) {
+  case 's':
+    type = ResourceMappingNodeType::DescriptorSampler;
+    break;
+  case 'r':
+    type = ResourceMappingNodeType::DescriptorResource;
+    break;
+  case 'b':
+    type = ResourceMappingNodeType::DescriptorBuffer;
+    break;
+  }
+
+  if (isGraphicsPipeline) {
+    auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
+    *value = getDescriptorResourceOffset(descSet, binding, type, pPipelineInfo->vs.pUserDataNodes,
+                                          pPipelineInfo->vs.userDataNodeCount);
+    if (*value == InvalidValue) {
+      *value = getDescriptorResourceOffset(descSet, binding, type, pPipelineInfo->fs.pUserDataNodes,
+                                            pPipelineInfo->fs.userDataNodeCount);
+    }
+  } else {
+    auto pPipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
+    *value = getDescriptorResourceOffset(descSet, binding, type, pPipelineInfo->cs.pUserDataNodes,
+                                          pPipelineInfo->cs.userDataNodeCount);
+  }
+
+  return *value != InvalidValue;
+}
+
+// =====================================================================================================================
+// Get value for a descriptor stride relocation (dstride_x_y symbol).
+//
+// @param context : [in] Pipeline compilation context
+// @param relocEntry : The relocation entry to fixup
+// @param isGraphicsPipeline : Whether we are processing a compute or graphics pipeline
+// @param value : [out] The value of the relocation
+bool getDescriptorStrideRelocationValue(Context *context, RelocationEntry relocEntry, bool isGraphicsPipeline,
+                                        unsigned *value) {
+  size_t idx = 0;
+  const char *relocName = relocEntry.name + 8;
+  unsigned descSet = std::stoi(relocName, &idx);
+  relocName += idx + 1;
+  idx = 0;
+  unsigned binding = std::stoi(relocName, &idx);
+  relocName += idx + 1;
+
+  if (isGraphicsPipeline) {
+    auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
+    *value = getDescriptorResourceStride(descSet, binding, pPipelineInfo->vs.pUserDataNodes,
+                                          pPipelineInfo->vs.userDataNodeCount);
+    if (*value == InvalidValue) {
+      *value = getDescriptorResourceStride(descSet, binding, pPipelineInfo->fs.pUserDataNodes,
+                                            pPipelineInfo->fs.userDataNodeCount);
+    }
+  } else {
+    auto pPipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
+    *value = getDescriptorResourceStride(descSet, binding, pPipelineInfo->cs.pUserDataNodes,
+                                          pPipelineInfo->cs.userDataNodeCount);
+  }
+
+  return *value != InvalidValue;
+}
+
+// =====================================================================================================================
+// Get the value of a relocation symbol. Returns true if success, and false if the symbol is unknown.
+//
+// @param context : [in] Pipeline compilation context
+// @param relocEntry : The relocation entry to fixup
+// @param isGraphicsPipeline : Whether we are processing a compute or graphics pipeline
+// @param value : [out] The value of the relocation
+bool getRelocationSymbolValue(Context *context, RelocationEntry relocEntry, bool isGraphicsPipeline,
+                              unsigned *value) {
+  if (strncmp(relocEntry.name, "doff_", 5) == 0) {
+    return getDescriptorOffsetRelocationValue(context, relocEntry, isGraphicsPipeline, value);
+  } else if (strncmp(relocEntry.name, "dstride_", 8) == 0) {
+    return getDescriptorStrideRelocationValue(context, relocEntry, isGraphicsPipeline, value);
+  }
+  return false;
+}
+
+// =====================================================================================================================
+// Fixup relocations in the ELF with actual values.
+//
+// @param writer : [in,out] Writer to target ELF
+// @param relocations : [in] Relocation entries
+// @param context : [in] Pipeline compilation context
+// @param isGraphicsPipeline : Whether we are processing a compute or graphics pipeline
+template <class Elf>
+void fixUpRelocations(ElfWriter<Elf> *writer, const std::vector<RelocationEntry> &relocations, Context *context,
+                      bool isGraphicsPipeline) {
+  char *data = nullptr;
+  size_t dataLength = 0;
+  writer->getSectionData(TextName, const_cast<const void **>(reinterpret_cast<void **>(&data)), &dataLength);
+
+  for (unsigned i = 0; i < relocations.size(); ++i) {
+    auto &reloc = relocations[i];
+    unsigned relocationValue = 0;
+    if (getRelocationSymbolValue(context, reloc, isGraphicsPipeline, &relocationValue)) {
+      assert(pData != nullptr && dataLength >= reloc.reloc.offset);
+      assert(reloc.reloc.type == R_AMDGPU_ABS32 && "can only handle R_AMDGPU_ABS32 typed relocations.");
+      unsigned *targetDword = reinterpret_cast<unsigned *>(data + reloc.reloc.offset);
+      if (reloc.reloc.useExplicitAddend) {
+        *targetDword = relocationValue + reloc.reloc.addend;
+      } else {
+        *targetDword += relocationValue;
+      }
+    } else {
+      llvm_unreachable("Unknown relocation entry.");
+    }
+  }
+}
+
+// =====================================================================================================================
 // Link the relocatable ELF readers into a pipeline ELF.
 //
 // @param relocatableElfs : An array of relocatable ELF objects
-// @param pContext : Acquired context
+// @param context : Acquired context
 template <class Elf>
 Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> *> &relocatableElfs,
-                                                  Context *pContext) {
+                                                  Context *context) {
   reinitialize();
   assert(relocatableElfs.size() == 2 && "Can only handle VsPs Shaders for now.");
 
@@ -988,11 +1280,19 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> 
 
   // Now get the symbols that belong in the symbol table.
   unsigned offset = 0;
+  std::vector<RelocationEntry> relocations;
+
+  // Insert a dummy symbol. The ELF spec requires the symbol table to begin with a dummy symbol.
+  getSymbol("")->secIdx = 0;
+
   for (const ElfReader<Elf> *elf : relocatableElfs) {
-    unsigned relocElfTextSectionId = elf->GetSectionIndex(TextName);
+    unsigned relocElfTextSectionId = elf->getSectionIndex(TextName);
     std::vector<ElfSymbol> symbols;
-    elf->GetSymbolsBySectionIndex(relocElfTextSectionId, symbols);
+    elf->getSymbolsBySectionIndex(relocElfTextSectionId, symbols);
     for (auto sym : symbols) {
+      if (strncmp(sym.pSymName, "BB", 2) == 0) {
+        continue;
+      }
       // When relocations start being used, we will have to filter out symbols related to relocations.
       // We should be able to filter the BB* symbols as well.
       ElfSymbol *newSym = getSymbol(sym.pSymName);
@@ -1003,6 +1303,20 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> 
       newSym->info = sym.info;
     }
 
+    // Copy and adjust all relocations.
+    auto relocationCount = elf->getRelocationCount();
+    for (unsigned i = 0; i < relocationCount; ++i) {
+      ElfReloc relocation = {};
+      RelocationEntry relocEntry = {};
+      elf->getRelocation(i, &relocation);
+      relocEntry.reloc = relocation;
+      relocEntry.reloc.offset += offset;
+      ElfSymbol symbol = {};
+      elf->getSymbol(relocation.symIdx, &symbol);
+      relocEntry.name = symbol.pSymName;
+      relocations.push_back(relocEntry);
+    }
+
     // Update the offset for the next elf file.
     ElfSectionBuffer<typename Elf::SectionHeader> *textSection = nullptr;
     elf->getSectionDataBySectionIndex(relocElfTextSectionId, &textSection);
@@ -1010,11 +1324,11 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> 
   }
 
   // Apply relocations
-  // There are no relocations to apply yet.
+  fixUpRelocations(this, relocations, context, true);
 
   // Set the .note section header
   ElfSectionBuffer<typename Elf::SectionHeader> *noteSection = nullptr;
-  relocatableElfs[0]->getSectionDataBySectionIndex(relocatableElfs[0]->GetSectionIndex(NoteName), &noteSection);
+  relocatableElfs[0]->getSectionDataBySectionIndex(relocatableElfs[0]->getSectionIndex(NoteName), &noteSection);
   m_sections[m_noteSecIdx].secHead = noteSection->secHead;
 
   // Merge and update the .note data
@@ -1022,7 +1336,7 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> 
   ElfNote noteInfo1 = relocatableElfs[0]->getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
   ElfNote noteInfo2 = relocatableElfs[1]->getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
   m_notes.push_back({});
-  mergeMetaNote(pContext, &noteInfo1, &noteInfo2, &m_notes.back());
+  mergeMetaNote(context, &noteInfo1, &noteInfo2, &m_notes.back());
 
   // Merge other sections.  For now, none of the other sections are important, so we will not do anything.
 
@@ -1040,7 +1354,18 @@ Result ElfWriter<Elf>::linkComputeRelocatableElf(const ElfReader<Elf> &relocatab
   copyFromReader(relocatableElf);
 
   // Apply relocations
-  // There are no relocations to apply yet.
+  std::vector<RelocationEntry> relocations;
+  for (unsigned i = 0; i < relocatableElf.getRelocationCount(); ++i) {
+    ElfReloc relocation = {};
+    relocatableElf.getRelocation(i, &relocation);
+    RelocationEntry relocEntry = {};
+    ElfSymbol symbol = {};
+    relocatableElf.getSymbol(relocation.symIdx, &symbol);
+    relocEntry.name = symbol.pSymName;
+    relocEntry.reloc = relocation;
+    relocations.push_back(relocEntry);
+  }
+  fixUpRelocations(this, relocations, context, false);
 
   return Result::Success;
 }
