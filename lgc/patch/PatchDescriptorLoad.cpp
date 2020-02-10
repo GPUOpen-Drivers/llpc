@@ -29,7 +29,9 @@
  ***********************************************************************************************************************
  */
 #include "PatchDescriptorLoad.h"
+#include "../interface/lgc/LgcContext.h"
 #include "lgc/state/TargetInfo.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -166,8 +168,8 @@ void PatchDescriptorLoad::processDescriptorGetPtr(CallInst *descPtrCall, StringR
 // @param resType : Resource type
 // @param descSet : Descriptor set
 // @param binding : Binding
-// @param topNode : Node in top-level descriptor table (TODO: nullptr for shader compilation)
-// @param node : The descriptor node itself (TODO: nullptr for shader compilation)
+// @param topNode : Node in top-level descriptor table (nullptr for shader compilation)
+// @param node : The descriptor node itself (nullptr for shader compilation)
 // @param shadow : Whether to load from shadow descriptor table
 // @param [in/out] builder : IRBuilder
 Value *PatchDescriptorLoad::getDescPtrAndStride(ResourceNodeType resType, unsigned descSet, unsigned binding,
@@ -198,11 +200,12 @@ Value *PatchDescriptorLoad::getDescPtrAndStride(ResourceNodeType resType, unsign
 
   if (!stride) {
     // Stride is not determinable just from the descriptor type requested by the Builder call.
-    if (!node) {
-      // TODO: Shader compilation: Get byte stride using a reloc.
-      llvm_unreachable("");
+    if (m_pipelineState->getLgcContext()->buildingRelocatableElf()) {
+      // Shader compilation: Get byte stride using a reloc.
+      stride = emitRelocationConstant(&builder, "dstride_" + Twine(descSet) + "_" + Twine(binding));
     } else {
       // Pipeline compilation: Get the stride from the resource type in the node.
+      assert(node && "expected valid user data node to determine descriptor stride.");
       switch (node->type) {
       case ResourceNodeType::DescriptorSampler:
         stride = builder.getInt32(DescriptorSizeSampler / 4);
@@ -261,8 +264,8 @@ Value *PatchDescriptorLoad::getDescPtrAndStride(ResourceNodeType resType, unsign
 // @param resType : Resource type
 // @param descSet : Descriptor set
 // @param binding : Binding
-// @param topNode : Node in top-level descriptor table (TODO: nullptr for shader compilation)
-// @param node : The descriptor node itself (TODO: nullptr for shader compilation)
+// @param topNode : Node in top-level descriptor table (nullptr for shader compilation)
+// @param node : The descriptor node itself (nullptr for shader compilation)
 // @param shadow : Whether to load from shadow descriptor table
 // @param [in/out] builder : IRBuilder
 Value *PatchDescriptorLoad::getDescPtr(ResourceNodeType resType, unsigned descSet, unsigned binding,
@@ -287,11 +290,37 @@ Value *PatchDescriptorLoad::getDescPtr(ResourceNodeType resType, unsigned descSe
 
   // Add on the byte offset of the descriptor.
   Value *offset = nullptr;
-  if (!node) {
-    // TODO: Shader compilation: Get the offset for the descriptor using a reloc. The reloc symbol name
+  bool useRelocationForOffsets = !node || m_pipelineState->getLgcContext()->buildingRelocatableElf();
+  if (useRelocationForOffsets) {
+    // Get the offset for the descriptor using a reloc. The reloc symbol name
     // needs to contain the descriptor set and binding, and, for image, fmask or sampler, whether it is
     // a sampler.
-    llvm_unreachable("");
+    StringRef relocNameSuffix = "";
+    switch (resType) {
+    case ResourceNodeType::DescriptorSampler:
+    case ResourceNodeType::DescriptorYCbCrSampler:
+      relocNameSuffix = "_s";
+      break;
+    case ResourceNodeType::DescriptorResource:
+      relocNameSuffix = "_r";
+      break;
+    case ResourceNodeType::DescriptorBuffer:
+    case ResourceNodeType::DescriptorBufferCompact:
+    case ResourceNodeType::DescriptorTexelBuffer:
+      relocNameSuffix = "_b";
+      break;
+    default:
+      relocNameSuffix = "_x";
+      break;
+    }
+    offset = emitRelocationConstant(&builder, "doff_" + Twine(descSet) + "_" + Twine(binding) + relocNameSuffix);
+    // The LLVM's internal handling of GEP instruction results in a lot of junk code and prevented selection
+    // of the offset-from-register variant of the s_load_dwordx4 instruction. To workaround this issue,
+    // we use integer arithmetic here so the amdgpu backend can pickup the optimal instruction.
+    // When relocation is used, offset is in bytes, not in dwords.
+    descPtr = builder.CreatePtrToInt(descPtr, builder.getInt64Ty());
+    descPtr = builder.CreateAdd(descPtr, builder.CreateZExt(offset, builder.getInt64Ty()));
+    descPtr = builder.CreateIntToPtr(descPtr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
   } else {
     // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
     // add on the size of the first part.
@@ -299,10 +328,9 @@ Value *PatchDescriptorLoad::getDescPtr(ResourceNodeType resType, unsigned descSe
     if (resType == ResourceNodeType::DescriptorSampler && node->type == ResourceNodeType::DescriptorCombinedTexture)
       offsetInDwords += DescriptorSizeResource / 4;
     offset = builder.getInt32(offsetInDwords);
+    descPtr = builder.CreateBitCast(descPtr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
+    descPtr = builder.CreateGEP(builder.getInt32Ty(), descPtr, offset);
   }
-  descPtr = builder.CreateBitCast(descPtr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
-  descPtr = builder.CreateGEP(builder.getInt32Ty(), descPtr, offset);
-
   return descPtr;
 }
 

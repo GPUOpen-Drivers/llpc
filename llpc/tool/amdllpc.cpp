@@ -872,7 +872,7 @@ static Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *c
   // -filetype=asm.
   ElfReader<Elf64> reader(compileInfo->gfxIp);
   size_t readSize = 0;
-  if (reader.ReadFromBuffer(pipelineBin->pCode, &readSize) == Result::Success) {
+  if (reader.readFromBuffer(pipelineBin->pCode, &readSize) == Result::Success) {
     LLPC_OUTS("===============================================================================\n");
     LLPC_OUTS("// LLPC final ELF info\n");
     LLPC_OUTS(reader);

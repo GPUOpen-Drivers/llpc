@@ -74,7 +74,7 @@ public:
 
   static void updateMetaNote(Context *context, const ElfNote *note, ElfNote *newNote);
 
-  Result ReadFromBuffer(const void *buffer, size_t bufSize);
+  Result readFromBuffer(const void *buffer, size_t bufSize);
   Result copyFromReader(const ElfReader<Elf> &reader);
 
   void updateElfBinary(Context *context, ElfPackage *pipelineElf);
@@ -82,7 +82,7 @@ public:
   void mergeElfBinary(Context *context, const BinaryData *fragmentElf, ElfPackage *pipelineElf);
 
   // Gets the section index for the specified section name.
-  int GetSectionIndex(const char *name) const {
+  int getSectionIndex(const char *name) const {
     auto entry = m_map.find(name);
     return entry != m_map.end() ? entry->second : InvalidValue;
   }
@@ -97,9 +97,19 @@ public:
 
   Result getSectionDataBySectionIndex(unsigned secIdx, const SectionBuffer **ppSectionData) const;
 
-  void GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol *> &secSymbols);
+  Result getSectionData(const char* pName, const void** ppData, size_t* pDataLength) const;
+
+  void getSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol *> &secSymbols);
 
   void writeToBuffer(ElfPackage *elf);
+
+  unsigned getSymbolCount() const;
+
+  void getSymbol(unsigned idx, ElfSymbol *symbol);
+
+  unsigned getRelocationCount();
+
+  void getRelocation(unsigned idx, ElfReloc *reloc);
 
   Result linkGraphicsRelocatableElf(const llvm::ArrayRef<ElfReader<Elf> *> &relocatableElfs, Context *context);
 
@@ -133,6 +143,7 @@ private:
 
   int m_textSecIdx;   // Section index of .text section
   int m_noteSecIdx;   // Section index of .note section
+  int m_relocSecIdx;  // Section index of relocation section
   int m_symSecIdx;    // Section index of symbol table section
   int m_strtabSecIdx; // Section index of string table section
 };

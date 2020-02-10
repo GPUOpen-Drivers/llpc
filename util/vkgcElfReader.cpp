@@ -72,7 +72,7 @@ template <class Elf> ElfReader<Elf>::~ElfReader() {
 //
 // @param buffer : Input ELF data buffer
 // @param [out] bufSize : Size of the given read buffer (determined from the ELF header)
-template <class Elf> Result ElfReader<Elf>::ReadFromBuffer(const void *buffer, size_t *bufSize) {
+template <class Elf> Result ElfReader<Elf>::readFromBuffer(const void *buffer, size_t *bufSize) {
   assert(buffer);
 
   Result result = Result::Success;
@@ -134,10 +134,10 @@ template <class Elf> Result ElfReader<Elf>::ReadFromBuffer(const void *buffer, s
   }
 
   // Get section index
-  m_symSecIdx = GetSectionIndex(SymTabName);
-  m_relocSecIdx = GetSectionIndex(RelocName);
-  m_strtabSecIdx = GetSectionIndex(StrTabName);
-  m_textSecIdx = GetSectionIndex(TextName);
+  m_symSecIdx = getSectionIndex(SymTabName);
+  m_relocSecIdx = getSectionIndex(RelocName);
+  m_strtabSecIdx = getSectionIndex(StrTabName);
+  m_textSecIdx = getSectionIndex(TextName);
 
   return result;
 }
@@ -149,7 +149,7 @@ template <class Elf> Result ElfReader<Elf>::ReadFromBuffer(const void *buffer, s
 // @param [out] sectData : Pointer to section data
 // @param [out] dataLength : Size of the section data
 template <class Elf>
-Result ElfReader<Elf>::GetSectionData(const char *name, const void **sectData, size_t *dataLength) const {
+Result ElfReader<Elf>::getSectionData(const char *name, const void **sectData, size_t *dataLength) const {
   Result result = Result::ErrorInvalidValue;
 
   auto entry = m_map.find(name);
@@ -179,7 +179,7 @@ template <class Elf> unsigned ElfReader<Elf>::getSymbolCount() const {
 //
 // @param idx : Symbol index
 // @param [out] symbol : Info of the symbol
-template <class Elf> void ElfReader<Elf>::getSymbol(unsigned idx, ElfSymbol *symbol) {
+template <class Elf> void ElfReader<Elf>::getSymbol(unsigned idx, ElfSymbol *symbol) const {
   auto &section = m_sections[m_symSecIdx];
   const char *strTab = reinterpret_cast<const char *>(m_sections[m_strtabSecIdx]->data);
 
@@ -194,7 +194,7 @@ template <class Elf> void ElfReader<Elf>::getSymbol(unsigned idx, ElfSymbol *sym
 
 // =====================================================================================================================
 // Gets the count of relocations in the relocation section.
-template <class Elf> unsigned ElfReader<Elf>::getRelocationCount() {
+template <class Elf> unsigned ElfReader<Elf>::getRelocationCount() const {
   unsigned relocCount = 0;
   if (m_relocSecIdx >= 0) {
     auto &section = m_sections[m_relocSecIdx];
@@ -208,12 +208,15 @@ template <class Elf> unsigned ElfReader<Elf>::getRelocationCount() {
 //
 // @param idx : Relocation index
 // @param [out] reloc : Info of the relocation
-template <class Elf> void ElfReader<Elf>::getRelocation(unsigned idx, ElfReloc *reloc) {
+template <class Elf> void ElfReader<Elf>::getRelocation(unsigned idx, ElfReloc *reloc) const {
   auto &section = m_sections[m_relocSecIdx];
 
   auto relocs = reinterpret_cast<const typename Elf::Reloc *>(section->data);
   reloc->offset = relocs[idx].r_offset;
   reloc->symIdx = relocs[idx].r_symbol;
+  reloc->type = relocs[idx].r_type;
+  reloc->addend = 0;
+  reloc->useExplicitAddend = false;
 }
 
 // =====================================================================================================================
@@ -264,7 +267,7 @@ Result ElfReader<Elf>::getSectionDataBySortingIndex(unsigned sortIdx, unsigned *
 // @param secIdx : Section index
 // @param [out] secSymbols : ELF symbols
 template <class Elf>
-void ElfReader<Elf>::GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol> &secSymbols) const {
+void ElfReader<Elf>::getSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol> &secSymbols) const {
   if (secIdx < m_sections.size() && m_symSecIdx >= 0) {
     auto &section = m_sections[m_symSecIdx];
     const char *strTab = reinterpret_cast<const char *>(m_sections[m_strtabSecIdx]->data);

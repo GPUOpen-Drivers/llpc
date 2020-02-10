@@ -1,0 +1,66 @@
+
+// This test case checks that two relocation entries are generated for a combined texture sampler descriptor,
+// one for the resource handle offset, and another for the sampler handle offset.
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -use-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+  // Test that correct relocated offsets are in the linked texture fetching code.
+; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_cs_main>:
+  // Matching the relocation entry for the resource descriptor
+; SHADERTEST-DAG: s_mov_b32 s[[RELOREG_RESOURCE:[0-9]+]], 16 //{{.*}}
+  // Matching the relocation entry for the sampler descriptor
+; SHADERTEST-DAG: s_mov_b32 s[[RELOREG_SAMPLER:[0-9]+]], 48 //{{.*}}
+  // Loading the resource descriptor
+; SHADERTEST-DAG: s_load_dwordx8 s[[RESOURCE_REG:\[[0-9]+:[0-9]+\]]], s[{{.*}}:{{.*}}], s[[RELOREG_RESOURCE]] //{{.*}}
+  // Loading the sampler descriptor
+; SHADERTEST-DAG: s_load_dwordx4 s[[SAMPLER_REG:\[[0-9]+:[0-9]+\]]], s[{{.*}}:{{.*}}], s[[RELOREG_SAMPLER]] //{{.*}}
+  // Sampling the texture
+; SHADERTEST: image_sample_lz v[0:3], v0, s[[RESOURCE_REG]], s[[SAMPLER_REG]] {{.*}}
+; END_SHADERTEST
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -use-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
+; SHADERTEST1-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST1-DAG: ![[METADATANODE1:[0-9]+]] = !{!"doff_0_0_r"}
+; SHADERTEST1-DAG: ![[METADATANODE2:[0-9]+]] = !{!"doff_0_0_s"}
+; SHADERTEST1-DAG: %[[RELOCONST1:[0-9]+]] = call i32 @llvm.amdgcn.reloc.constant(metadata ![[METADATANODE1]])
+; SHADERTEST1-DAG: %[[RELOCONST2:[0-9]+]] = call i32 @llvm.amdgcn.reloc.constant(metadata ![[METADATANODE2]])
+; SHADERTEST1: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[CsGlsl]
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+layout(binding = 0) uniform sampler2D texSampler;
+
+layout(set = 1, binding = 0, std430) buffer OUT
+{
+    vec4 o;
+};
+
+layout(local_size_x = 2, local_size_y = 3) in;
+void main() {
+    o = texture(texSampler, vec2(0.0, 0.0));
+}
+
+
+[CsInfo]
+entryPoint = main
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].set = 0
+userDataNode[0].next[0].type = DescriptorCombinedTexture
+userDataNode[0].next[0].offsetInDwords = 4
+userDataNode[0].next[0].sizeInDwords = 12
+userDataNode[0].next[0].set = 0
+userDataNode[0].next[0].binding = 0
+userDataNode[1].type = DescriptorTableVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].set = 1
+userDataNode[1].next[0].type = DescriptorBuffer
+userDataNode[1].next[0].offsetInDwords = 16
+userDataNode[1].next[0].sizeInDwords = 8
+userDataNode[1].next[0].set = 1
+userDataNode[1].next[0].binding = 0
