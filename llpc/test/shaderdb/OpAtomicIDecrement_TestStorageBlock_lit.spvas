@@ -7,7 +7,7 @@
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.sub.i32(i32 1, <4 x i32> %{{[0-9]*}}, i32 24, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
@@ -72,4 +72,3 @@
                OpStore %27 %31
                OpReturn
                OpFunctionEnd
-

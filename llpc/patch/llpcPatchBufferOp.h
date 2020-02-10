@@ -82,8 +82,7 @@ private:
     void CopyMetadata(llvm::Value* const pDest, const llvm::Value* const pSrc) const;
     llvm::PointerType* GetRemappedType(llvm::Type* const pType) const;
     bool RemoveUsersForInvariantStarts(llvm::Value* const pValue);
-    llvm::Value* ReplaceLoad(llvm::LoadInst* const pLoadInst);
-    void ReplaceStore(llvm::StoreInst* const pStoreInst);
+    llvm::Value* ReplaceLoadStore(llvm::Instruction& pLoadInst);
     llvm::Value* ReplaceICmp(llvm::ICmpInst* const pICmpInst);
     llvm::Instruction* MakeLoop(llvm::Value* const       pLoopStart,
                                 llvm::Value* const       pLoopEnd,

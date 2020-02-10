@@ -39,10 +39,10 @@
 ; SHADERTEST: @llvm.amdgcn.raw.buffer.load.v4i32
 ; SHADERTEST: @llvm.amdgcn.raw.buffer.load.v4i32
 ; SHADERTEST: @llvm.amdgcn.raw.buffer.load.v4i32
-; SHADERTEST: @llvm.amdgcn.raw.buffer.store.v4f32
-; SHADERTEST: @llvm.amdgcn.raw.buffer.store.v4f32
-; SHADERTEST: @llvm.amdgcn.raw.buffer.store.v4f32
-; SHADERTEST: @llvm.amdgcn.raw.buffer.store.v4f32
+; SHADERTEST: @llvm.amdgcn.raw.buffer.store.v4i32
+; SHADERTEST: @llvm.amdgcn.raw.buffer.store.v4i32
+; SHADERTEST: @llvm.amdgcn.raw.buffer.store.v4i32
+; SHADERTEST: @llvm.amdgcn.raw.buffer.store.v4i32
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
