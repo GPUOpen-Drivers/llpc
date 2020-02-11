@@ -122,19 +122,24 @@ endif
 ifdef METROHASH_PATH
     LCXXINCS += -I$(METROHASH_DEPTH)/src
     LLLIBS += -Wl,--whole-archive \
-              ../../../../imported/metrohash/$(BUILD_DIR)/icdimportedmetrohash$(LIB_EXT) \
+              ../../../../../imported/metrohash/$(BUILD_DIR)/icdimportedmetrohash$(LIB_EXT) \
               -Wl,--no-whole-archive
 endif
 
-LLLIBS += ../../$(BUILD_DIR)/icdapillpc$(LIB_EXT) \
-          ../../tool/vfx/$(BUILD_DIR)/icdapillpctoolvfx$(LIB_EXT) \
-	      ../../../../imported/llvm/$(BUILD_DIR)/icdimportedllvm$(LIB_EXT)
+LLLIBS += ../../$(BUILD_DIR)/icdapicompilerllpc$(LIB_EXT) \
+          ../../tool/vfx/$(BUILD_DIR)/icdapicompilerllpctoolvfx$(LIB_EXT)
+
+ifeq ($(BUILD_LLVM_SHARED),1)
+    LLOPTS += $(shell cat ../../../../../imported/llvm/$(BUILD_DIR)/link_options)
+else
+    LLLIBS += ../../../../../imported/llvm/$(BUILD_DIR)/icdimportedllvm$(LIB_EXT)
 
 ifneq ($(ICD_PLATFORM), win)
-    LLLIBS += ../../../../imported/llvm/$(BUILD_DIR)/lib/libLLVMAsmParser$(LIB_EXT) \
-              ../../../../imported/llvm/$(BUILD_DIR)/lib/libLLVMSupport$(LIB_EXT)
+    LLLIBS += ../../../../../imported/llvm/$(BUILD_DIR)/lib/libLLVMAsmParser$(LIB_EXT) \
+              ../../../../../imported/llvm/$(BUILD_DIR)/lib/libLLVMSupport$(LIB_EXT)
 else
-    LLLIBS += ../../../../imported/llvm/$(BUILD_DIR)/lib/LLVMAsmParser$(LIB_EXT)
+    LLLIBS += ../../../../../imported/llvm/$(BUILD_DIR)/lib/LLVMAsmParser$(LIB_EXT)
+endif
 endif
 
 ifeq ($(BUILD_WIN_VLD), 1)
