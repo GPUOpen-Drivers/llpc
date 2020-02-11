@@ -85,11 +85,22 @@ void BuilderContext::Initialize()
     LLVMInitializeAMDGPUAsmParser();
     LLVMInitializeAMDGPUDisassembler();
 
-    // Initialize special passes which are checked in PassManager
-    initializeJumpThreadingPass(passRegistry);
-    initializePrintModulePassWrapperPass(passRegistry);
+    // Initialize core LLVM passes so they can be referenced by -stop-before etc.
+    initializeCore(passRegistry);
+    initializeCodeGen(passRegistry);
+    initializeLoopStrengthReducePass(passRegistry);
+    initializeLowerIntrinsicsPass(passRegistry);
+    initializeEntryExitInstrumenterPass(passRegistry);
+    initializePostInlineEntryExitInstrumenterPass(passRegistry);
+    initializeUnreachableBlockElimLegacyPassPass(passRegistry);
+    initializeConstantHoistingLegacyPassPass(passRegistry);
+    initializeScalarOpts(passRegistry);
+    initializeVectorization(passRegistry);
+    initializeScalarizeMaskedMemIntrinPass(passRegistry);
+    initializeExpandReductionsPass(passRegistry);
+    initializeHardwareLoopsPass(passRegistry);
 
-    // Initialize passes so they can be referenced by -llpc-stop-before etc.
+    // Initialize LGC passes so they can be referenced by -stop-before etc.
     InitializeUtilPasses(passRegistry);
     initializeBuilderReplayerPass(passRegistry);
     InitializePatchPasses(passRegistry);
