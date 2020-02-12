@@ -87,18 +87,16 @@ void BuilderContext::Initialize()
 
     // Initialize core LLVM passes so they can be referenced by -stop-before etc.
     initializeCore(passRegistry);
-    initializeCodeGen(passRegistry);
-    initializeLoopStrengthReducePass(passRegistry);
-    initializeLowerIntrinsicsPass(passRegistry);
-    initializeEntryExitInstrumenterPass(passRegistry);
-    initializePostInlineEntryExitInstrumenterPass(passRegistry);
-    initializeUnreachableBlockElimLegacyPassPass(passRegistry);
-    initializeConstantHoistingLegacyPassPass(passRegistry);
+    initializeTransformUtils(passRegistry);
     initializeScalarOpts(passRegistry);
     initializeVectorization(passRegistry);
-    initializeScalarizeMaskedMemIntrinPass(passRegistry);
+    initializeInstCombine(passRegistry);
+    initializeAggressiveInstCombine(passRegistry);
+    initializeIPO(passRegistry);
+    initializeCodeGen(passRegistry);
+    initializeShadowStackGCLoweringPass(passRegistry);
     initializeExpandReductionsPass(passRegistry);
-    initializeHardwareLoopsPass(passRegistry);
+    initializeRewriteSymbolsLegacyPassPass(passRegistry);
 
     // Initialize LGC passes so they can be referenced by -stop-before etc.
     InitializeUtilPasses(passRegistry);
