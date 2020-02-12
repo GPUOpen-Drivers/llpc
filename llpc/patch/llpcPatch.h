@@ -83,6 +83,7 @@ inline static void InitializePatchPasses(
   initializePatchDescriptorLoadPass(passRegistry);
   initializePatchEntryPointMutatePass(passRegistry);
   initializePatchInOutImportExportPass(passRegistry);
+  initializePatchLlvmIrInclusionPass(passRegistry);
   initializePatchLoadScalarizerPass(passRegistry);
   initializePatchNullFragShaderPass(passRegistry);
   initializePatchPeepholeOptPass(passRegistry);
