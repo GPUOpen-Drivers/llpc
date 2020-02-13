@@ -1024,9 +1024,7 @@ static Result CheckAutoLayoutCompatibleFunc(
                 pShaderInfo->pEntryTarget = EntryTarget.c_str();
             }
             pShaderInfo->pModuleData  = pShaderOut->pModuleData;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
             pShaderInfo->entryStage = pCompileInfo->shaderModuleDatas[i].shaderStage;
-#endif
             if (checkAutoLayoutCompatible)
             {
                 PipelineShaderInfo shaderInfo = *pShaderInfo;
@@ -1062,9 +1060,7 @@ static Result CheckAutoLayoutCompatibleFunc(
             // If entry target is not specified, use the one from command line option
             pShaderInfo->pEntryTarget = EntryTarget.c_str();
         }
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
         pShaderInfo->entryStage = ShaderStageCompute;
-#endif
         pShaderInfo->pModuleData  = pShaderOut->pModuleData;
 
         if (pCompileInfo->checkAutoLayoutCompatible)
@@ -1130,9 +1126,7 @@ static Result BuildPipeline(
                 pShaderInfo->pEntryTarget = EntryTarget.c_str();
             }
             pShaderInfo->pModuleData  = pShaderOut->pModuleData;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
             pShaderInfo->entryStage = pCompileInfo->shaderModuleDatas[i].shaderStage;
-#endif
 
             // If not compiling from pipeline, lay out user data now.
             if (pCompileInfo->doAutoLayout)
@@ -1167,14 +1161,10 @@ static Result BuildPipeline(
             dumpOptions.filterPipelineDumpByType = llvm::cl::FilterPipelineDumpByType;
             dumpOptions.filterPipelineDumpByHash = llvm::cl::FilterPipelineDumpByHash;
             dumpOptions.dumpDuplicatePipelines   = llvm::cl::DumpDuplicatePipelines;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+
             PipelineBuildInfo pipelineInfo = {};
             pipelineInfo.pGraphicsInfo = pPipelineInfo;
             pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pipelineInfo);
-#else
-            pPipelineDumpHandle =
-                Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, nullptr, pGraphicsPipelineInfo);
-#endif
         }
 
         if (TimePassesIsEnabled || cl::EnableTimerProfile)
@@ -1219,9 +1209,8 @@ static Result BuildPipeline(
             // If entry target is not specified, use the one from command line option
             pShaderInfo->pEntryTarget = EntryTarget.c_str();
         }
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+
         pShaderInfo->entryStage = ShaderStageCompute;
-#endif
         pShaderInfo->pModuleData  = pShaderOut->pModuleData;
 
         // If not compiling from pipeline, lay out user data now.
@@ -1251,13 +1240,9 @@ static Result BuildPipeline(
             dumpOptions.filterPipelineDumpByType = llvm::cl::FilterPipelineDumpByType;
             dumpOptions.filterPipelineDumpByHash = llvm::cl::FilterPipelineDumpByHash;
             dumpOptions.dumpDuplicatePipelines   = llvm::cl::DumpDuplicatePipelines;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
             PipelineBuildInfo pipelineInfo = {};
             pipelineInfo.pComputeInfo = pPipelineInfo;
             pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pipelineInfo);
-#else
-            pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pComputePipelineInfo, nullptr);
-#endif
         }
 
         if (TimePassesIsEnabled || cl::EnableTimerProfile)

@@ -138,9 +138,7 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
         auto pComputePipelineInfo = &m_pipelineState.compPipelineInfo;
         pComputePipelineInfo->deviceIndex = computeState.deviceIndex;
         pComputePipelineInfo->options     = computeState.options;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
         pComputePipelineInfo->cs.entryStage = Llpc::ShaderStageCompute;
-#endif
     }
 
     // Section "VertexInputState"
@@ -181,9 +179,7 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
             {
                 reinterpret_cast<SectionShaderInfo*>(m_sections[SectionTypeVertexShaderInfo + i][0])->
                     GetSubState(*(shaderInfo[i]));
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
                 shaderInfo[i]->entryStage = m_pipelineState.stages[i].stage;
-#endif
             }
         }
     }
