@@ -9,29 +9,6 @@ SRCPATH    = $(ICD_SRCDIR)
 LLVM_BUILD_DIR = $(ICD_DEPTH)/build/$(ICD_OS_BUILD)/imported/llvm/B_$(BUILD_TYPE)
 LLPC_VULKAN_INCLUDE = $(ICD_DEPTH)/api/include/khronos
 
-ifeq ($(VKI_BUILD_GFX9), 1)
-    ifeq ($(VKI_BUILD_VEGA20), 1)
-        LLPC_BUILD_VEGA20 = 1
-    endif
-    ifeq ($(VKI_BUILD_RAVEN2), 1)
-        LLPC_BUILD_RAVEN2 = 1
-    endif
-endif
-
-#if VKI_BUILD_GFX10
-# GFX10 specific settings
-ifeq ($(VKI_BUILD_GFX10), 1)
-    # GFX10 support relies on GFX9 support
-    LLPC_BUILD_VEGA20 = 1
-    LLPC_BUILD_RAVEN2 = 1
-    LLPC_BUILD_GFX10 = 1
-endif
-#endif
-
-ifeq ($(VKI_BUILD_NAVI14), 1)
-    LLPC_BUILD_NAVI14 = 1
-endif
-
 # Turn on "warnings as errors" if enabled.
 ifeq ($(ICD_PLATFORM), win)
     ifeq ($(ICD_ANALYSIS_WARNINGS_AS_ERRORS), 1)

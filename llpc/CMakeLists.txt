@@ -33,14 +33,7 @@ if(ICD_BUILD_LLPC)
 endif()
 
 ### Cached Project Options #############################################################################################
-option(LLPC_BUILD_VEGA20   "LLPC support for Vega20?"   ON)
-option(LLPC_BUILD_RAVEN2   "LLPC support for Raven2?"   ON)
 option(LLPC_BUILD_LIT      "LLPC build lit test"        OFF)
-#if VKI_BUILD_GFX10
-option(LLPC_BUILD_GFX10   "LLPC support for GFX10?"   OFF)
-option(LLPC_BUILD_NAVI14   "LLPC support for NAVI14?"   OFF)
-#endif
-# None
 
 if(ICD_BUILD_LLPC)
     set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR} )
@@ -142,16 +135,6 @@ elseif(WIN32)
     endif()
 endif()
 
-if (LLPC_BUILD_VEGA20)
-    target_compile_definitions(llpc PRIVATE LLPC_BUILD_VEGA20)
-    target_compile_definitions(llpc PRIVATE CHIP_HDR_VEGA20)
-endif()
-
-if (LLPC_BUILD_RAVEN2)
-    target_compile_definitions(llpc PRIVATE LLPC_BUILD_RAVEN2)
-    target_compile_definitions(llpc PRIVATE CHIP_HDR_RAVEN2)
-endif()
-
 ### Defines/Includes/Sources ###########################################################################################
 if(ICD_BUILD_LLPC)
     set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${XGL_LLVM_BUILD_PATH}/lib/cmake/llvm)
@@ -175,22 +158,11 @@ if(ICD_BUILD_LLPC)
     target_compile_definitions(llpc PRIVATE ICD_BUILD_LLPC)
 endif()
 
-#if VKI_BUILD_GFX10
-if(LLPC_BUILD_GFX10)
-  target_compile_definitions(llpc PRIVATE
-      LLPC_BUILD_GFX10=1
-      CHIP_HDR_GFX10=1
-      PAL_BUILD_GFX9=1
-      PAL_BUILD_GFX10=1
-  )
-  if(LLPC_BUILD_NAVI14)
-    target_compile_definitions(llpc PRIVATE
-        LLPC_BUILD_NAVI14=1
-        CHIP_HDR_NAVI14=1
+target_compile_definitions(llpc PRIVATE
+    PAL_BUILD_GFX9=1
+    PAL_BUILD_GFX10=1
+    CHIP_HDR_GFX10=1
     )
-  endif()
-endif()
-#endif
 
 if(ICD_BUILD_LLPC)
     if(XGL_LLVM_UPSTREAM)
@@ -288,6 +260,8 @@ if(ICD_BUILD_LLPC)
         patch/gfx6/chip/llpcGfx6ConfigBuilder.cpp
         patch/gfx9/chip/llpcGfx9Chip.cpp
         patch/gfx9/chip/llpcGfx9ConfigBuilder.cpp
+        patch/gfx9/llpcNggLdsManager.cpp
+        patch/gfx9/llpcNggPrimShader.cpp
         patch/gfx9/llpcShaderMerger.cpp
         patch/llpcCodeGenManager.cpp
         patch/llpcConfigBuilderBase.cpp
@@ -310,14 +284,6 @@ if(ICD_BUILD_LLPC)
         patch/llpcSystemValues.cpp
         patch/llpcVertexFetch.cpp
     )
-#if VKI_BUILD_GFX10
-    if(LLPC_BUILD_GFX10)
-        target_sources(llpc PRIVATE
-            patch/gfx9/llpcNggLdsManager.cpp
-            patch/gfx9/llpcNggPrimShader.cpp
-        )
-    endif()
-#endif
 
 # llpc/translator
     target_sources(llpc PRIVATE
@@ -421,15 +387,6 @@ target_sources(vfx PRIVATE
     tool/vfx/vfxEnumsConverter.cpp
 )
 
-#if VKI_BUILD_GFX10
-if(LLPC_BUILD_GFX10)
-  target_compile_definitions(vfx PRIVATE
-      VKI_BUILD_GFX10=1
-      LLPC_BUILD_GFX10=1
-  )
-endif()
-#endif
-
 target_include_directories(vfx
 PUBLIC
     ${PROJECT_SOURCE_DIR}/tool/vfx
@@ -505,17 +462,6 @@ PRIVATE
     ${XGL_PAL_PATH}/inc/util
     ${LLVM_INCLUDE_DIRS}
 )
-
-#if VKI_BUILD_GFX10
-if(LLPC_BUILD_GFX10)
-  target_compile_definitions(amdllpc PRIVATE
-      LLPC_BUILD_GFX10=1
-      CHIP_HDR_GFX10=1
-      PAL_BUILD_GFX9=1
-      PAL_BUILD_GFX10=1
-  )
-endif()
-#endif
 
 set(VULKAN_HEADER_PATH ${XGL_ICD_PATH}/api/include/khronos)
 target_include_directories(amdllpc PRIVATE ${VULKAN_HEADER_PATH})

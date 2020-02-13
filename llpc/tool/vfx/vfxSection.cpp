@@ -74,9 +74,7 @@ StrToMemberAddr SectionVersion::m_addrTable[SectionVersion::MemberCount];
 StrToMemberAddr SectionCompileLog::m_addrTable[SectionCompileLog::MemberCount];
 StrToMemberAddr SectionPipelineOption::m_addrTable[SectionPipelineOption::MemberCount];
 StrToMemberAddr SectionShaderOption::m_addrTable[SectionShaderOption::MemberCount];
-#if VKI_BUILD_GFX10
 StrToMemberAddr SectionNggState::m_addrTable[SectionNggState::MemberCount];
-#endif
 
 // =====================================================================================================================
 // Dummy class used to initialize all static variables
@@ -118,10 +116,7 @@ public:
         SectionShaderInfo::InitialAddrTable();
         SectionPipelineOption::InitialAddrTable();
         SectionShaderOption::InitialAddrTable();
-#if VKI_BUILD_GFX10
         SectionNggState::InitialAddrTable();
-#endif
-
     };
 };
 
@@ -716,9 +711,7 @@ bool Section::GetPtrOfSubSection(
     CASE_SUBSECTION(MemberTypeDescriptorRangeValue, SectionDescriptorRangeValueItem)
     CASE_SUBSECTION(MemberTypePipelineOption, SectionPipelineOption)
     CASE_SUBSECTION(MemberTypeShaderOption, SectionShaderOption)
-#if VKI_BUILD_GFX10
     CASE_SUBSECTION(MemberTypeNggState, SectionNggState)
-#endif
         break;
     default:
         VFX_NEVER_CALLED();

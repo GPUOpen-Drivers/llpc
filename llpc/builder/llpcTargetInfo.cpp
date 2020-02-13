@@ -35,11 +35,9 @@
 using namespace Llpc;
 using namespace llvm;
 
-#if LLPC_BUILD_GFX10
 // -native-wave-size: an option to override hardware native wave size, it will allow compiler to choose
 // final wave size base on it. Used in pre-silicon verification.
 static cl::opt<int> NativeWaveSize("native-wave-size", cl::desc("Overrides hardware native wave size"), cl::init(0));
-#endif
 
 // =====================================================================================================================
 // Functions to set up TargetInfo for the various targets
@@ -262,7 +260,6 @@ static void SetGfx900Info(
     pTargetInfo->GetGpuWorkarounds().gfx9.fixLsVgprInput = 1;
 }
 
-#if LLPC_BUILD_GFX10
 // gfx10
 static void SetGfx10Info(
     TargetInfo* pTargetInfo)    // [in/out] Target info
@@ -323,7 +320,6 @@ static void SetGfx1012Info(
     pTargetInfo->GetGpuWorkarounds().gfx10.waNggDisabled              = 1;
 }
 
-#endif
 // =====================================================================================================================
 // Set TargetInfo. Returns false if the GPU name is not found or not supported.
 bool TargetInfo::SetTargetInfo(
@@ -357,10 +353,8 @@ bool TargetInfo::SetTargetInfo(
         { "gfx904",   &SetGfx9Info },     // gfx904, vega12
         { "gfx906",   &SetGfx9Info },     // gfx906, vega20
         { "gfx909",   &SetGfx9Info },     // gfx909, raven2
-#if LLPC_BUILD_GFX10
         { "gfx1010",  &SetGfx1010Info },  // gfx1010
         { "gfx1012",  &SetGfx1012Info },  // gfx1012, navi14
-#endif
     };
 
     void(* pSetTargetInfoFunc)(TargetInfo* pTargetInfo) = nullptr;

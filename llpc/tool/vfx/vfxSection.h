@@ -112,9 +112,7 @@ enum MemberType : uint32_t
     MemberTypeDescriptorRangeValue,          // VFX member type: SectionDescriptorRangeValueItem
     MemberTypePipelineOption,                // VFX member type: SectionPipelineOption
     MemberTypeShaderOption,                  // VFX member type: SectionShaderOption
-#if VKI_BUILD_GFX10
     MemberTypeNggState,                      // VFX member type: SectionNggState
-#endif
 };
 
 // =====================================================================================================================
@@ -1169,11 +1167,9 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, vgprLimit, MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, sgprLimit, MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, maxThreadGroupsPerComputeUnit, MemberTypeInt, false);
-#if VKI_BUILD_GFX10
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, waveSize, MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, wgpMode, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, waveBreakSize, MemberTypeEnum, false);
-#endif
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLoopUnrollCount, MemberTypeInt, false);
@@ -1205,7 +1201,6 @@ private:
     SubState               m_state;
 };
 
-#if VKI_BUILD_GFX10
 // =====================================================================================================================
 // Represents the sub section NGG state
 class SectionNggState : public Section
@@ -1251,7 +1246,6 @@ private:
 
     SubState               m_state;
 };
-#endif
 
 // =====================================================================================================================
 // Represents the section graphics state
@@ -1288,9 +1282,7 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, switchWinding,           MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableMultiView,         MemberTypeInt, false);
         INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, options, MemberTypePipelineOption, true);
-#if VKI_BUILD_GFX10
         INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, nggState, MemberTypeNggState, true);
-#endif
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState,
                                        colorBuffer,
                                        MemberTypeColorBufferItem,
@@ -1306,16 +1298,12 @@ public:
             colorBuffer[i].GetSubState(m_state.colorBuffer[i]);
         }
         options.GetSubState(m_state.options);
-#if VKI_BUILD_GFX10
         nggState.GetSubState(m_state.nggState);
-#endif
         state = m_state;
     };
 
 private:
-#if VKI_BUILD_GFX10
     SectionNggState        nggState;
-#endif
     static const uint32_t  MemberCount = 21;
     static StrToMemberAddr m_addrTable[MemberCount];
     SubState               m_state;

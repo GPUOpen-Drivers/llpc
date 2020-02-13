@@ -444,9 +444,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
     auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
-#if LLPC_BUILD_GFX10
     const bool enableNgg = m_pPipelineState->IsGraphics() ? m_pPipelineState->GetNggControl()->enableNgg : false;
-#endif
 
     switch (m_shaderStage)
     {
@@ -493,11 +491,8 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
             const auto gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
-            if (((gfxIp.major >= 9) && (m_pPipelineState->IsGsOnChip() && cl::InRegEsGsLdsSize))
-#if LLPC_BUILD_GFX10
-                || (enableNgg && (m_hasTs == false))
-#endif
-                )
+            if (((gfxIp.major >= 9) && (m_pPipelineState->IsGsOnChip() && cl::InRegEsGsLdsSize)) ||
+                (enableNgg && (m_hasTs == false)))
             {
                 availUserDataCount -= 1;
                 reserveEsGsLdsSize = true;
@@ -517,7 +512,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 availUserDataCount -= 1;
             }
 
-#if LLPC_BUILD_GFX10
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior (TES is in NGG primitive shader).
             if (enableNgg)
@@ -525,7 +519,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 availUserDataCount -= 1;
                 reserveEsGsLdsSize = true;
             }
-#endif
+
             break;
         }
     case ShaderStageGeometry:
@@ -537,11 +531,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior. i.e. GS is GFX8
-            if ((m_pPipelineState->IsGsOnChip() && cl::InRegEsGsLdsSize)
-#if LLPC_BUILD_GFX10
-                || enableNgg
-#endif
-                )
+            if ((m_pPipelineState->IsGsOnChip() && cl::InRegEsGsLdsSize) || enableNgg)
             {
                 // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
                 // with PAL's GS on-chip behavior.
@@ -829,7 +819,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 ++userDataIdx;
             }
 
-#if LLPC_BUILD_GFX10
             if (reserveEsGsLdsSize)
             {
                 *pInRegMask |= 1ull << argTys.size();
@@ -837,7 +826,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 pIntfData->userDataUsage.tes.esGsLdsSize = userDataIdx;
                 ++userDataIdx;
             }
-#endif
             break;
         }
     case ShaderStageGeometry:

@@ -127,13 +127,11 @@ struct ShaderOptions
     /// disables limiting the number of thread-groups to launch. This field is ignored for graphics shaders.
     uint32_t  maxThreadGroupsPerComputeUnit;
 
-#if LLPC_BUILD_GFX10
     uint32_t      waveSize;       // Control the number of threads per wavefront (GFX10+)
     uint32_t      subgroupSize;   // Override for the wave size when the shader uses gl_SubgroupSize, 0 for no override
     uint32_t      wgpMode;        // Whether to choose WGP mode or CU mode (GFX10+)
     WaveBreakSize waveBreakSize;  // Size of region to force the end of a wavefront (GFX10+).
                                   // Only valid for fragment shaders.
-#endif
 
     // Vector szie threshold for load scalarizer. 0 means do not scalarize loads at all.
     uint32_t  loadScalarizerThreshold;

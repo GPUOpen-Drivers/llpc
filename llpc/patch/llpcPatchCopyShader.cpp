@@ -513,7 +513,6 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
     }
     LLPC_ASSERT(pElemTy->isIntegerTy(32) || pElemTy->isFloatTy()); // Must be 32-bit type
 
-#if LLPC_BUILD_GFX10
     if (m_pPipelineState->GetNggControl()->enableNgg)
     {
         // NOTE: For NGG, importing GS output from GS-VS ring is represented by a call and the call is replaced with
@@ -529,7 +528,6 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
                         NoAttrib,
                         builder);
     }
-#endif
 
     if (m_pPipelineState->IsGsOnChip())
     {

@@ -34,9 +34,7 @@
 #include "llvm/IR/Module.h"
 
 #include "llpcCodeGenManager.h"
-#if LLPC_BUILD_GFX10
 #include "llpcNggPrimShader.h"
-#endif
 #include "llpcPassDeadFuncRemove.h"
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
@@ -57,10 +55,8 @@ ShaderMerger::ShaderMerger(
     m_pPipelineState(pPipelineState),
     m_pContext(&pPipelineState->GetContext()),
     m_gfxIp(pPipelineState->GetTargetInfo().GetGfxIpVersion()),
-    m_pPipelineShaders(pPipelineShaders)
-#if LLPC_BUILD_GFX10
-    , m_primShader(pPipelineState)
-#endif
+    m_pPipelineShaders(pPipelineShaders),
+    m_primShader(pPipelineState)
 {
     LLPC_ASSERT(m_gfxIp.major >= 9);
     LLPC_ASSERT(m_pPipelineState->IsGraphics());
@@ -71,7 +67,6 @@ ShaderMerger::ShaderMerger(
     m_hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
 }
 
-#if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Builds LLVM function for hardware primitive shader (NGG).
 Function* ShaderMerger::BuildPrimShader(
@@ -82,7 +77,6 @@ Function* ShaderMerger::BuildPrimShader(
     NggPrimShader primShader(m_pPipelineState);
     return primShader.Generate(pEsEntryPoint, pGsEntryPoint, pCopyShaderEntryPoint);
 }
-#endif
 
 // =====================================================================================================================
 // Generates the type for the new entry-point of LS-HS merged shader.
@@ -262,10 +256,8 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
 
     auto pThreadId = EmitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
 
-#if LLPC_BUILD_GFX10
     uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageTessControl);
     if (waveSize == 64)
-#endif
     {
         args.clear();
         args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), -1));
@@ -731,10 +723,8 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
 
     auto pThreadId = EmitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
 
-#if LLPC_BUILD_GFX10
     uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     if (waveSize == 64)
-#endif
     {
         args.clear();
         args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), -1));

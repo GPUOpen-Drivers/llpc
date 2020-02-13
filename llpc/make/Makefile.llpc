@@ -14,24 +14,6 @@ LCXXINCS += -I$(LLPC_DEPTH)/patch/gfx9/chip
 LCXXINCS += -I$(LLPC_DEPTH)/util
 LCXXINCS += -I$(LLPC_DEPTH)/translator/lib/SPIRV/libSPIRV
 
-ifeq ($(LLPC_BUILD_VEGA20), 1)
-    LCXXDEFS += -DLLPC_BUILD_VEGA20=1 -DCHIP_HDR_VEGA20=1
-endif
-
-ifeq ($(LLPC_BUILD_RAVEN2), 1)
-    LCXXDEFS += -DLLPC_BUILD_RAVEN2=1 -DCHIP_HDR_RAVEN2=1
-endif
-
-#if LLPC_BUILD_GFX10
-ifeq ($(LLPC_BUILD_GFX10), 1)
-    LCXXDEFS += -DLLPC_BUILD_GFX10=1 -DCHIP_HDR_GFX10=1
-endif
-#endif
-
-ifeq ($(LLPC_BUILD_NAVI14), 1)
-    LCXXDEFS += -DLLPC_BUILD_NAVI14=1 -DCHIP_HDR_NAVI14=1
-endif
-
 ifeq ($(ICD_BUILD_LLPC), 1)
     LCXXINCS += -I$(LLVM_DEPTH)/include
     LCXXINCS += -I$(LLVM_BUILD_DIR)/include
@@ -114,6 +96,8 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcGfx6ConfigBuilder.cpp           \
         llpcGfx9Chip.cpp                    \
         llpcGfx9ConfigBuilder.cpp           \
+        llpcNggLdsManager.cpp               \
+        llpcNggPrimShader.cpp               \
         llpcShaderMerger.cpp                \
         \
         llpcCodeGenManager.cpp              \
@@ -169,15 +153,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcStartStopTimer.cpp              \
         llpcTimerProfiler.cpp               \
         llpcUtil.cpp
-
-    #if LLPC_BUILD_GFX10
-    ifeq ($(LLPC_BUILD_GFX10), 1)
-        # llpc/patch/gfx9
-        CPPFILES +=                         \
-            llpcNggLdsManager.cpp           \
-            llpcNggPrimShader.cpp
-    endif
-    #endif
 
     ifeq ($(LLPC_PLATFORM), win)
         LCXXDEFS += -D_SCL_SECURE_NO_WARNINGS       \

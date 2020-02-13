@@ -99,21 +99,17 @@ bool BuilderImplBase::SupportBPermute() const
 {
     auto gfxIp = GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major;
     auto supportBPermute = (gfxIp == 8) || (gfxIp == 9);
-#if LLPC_BUILD_GFX10
     auto waveSize = GetPipelineState()->GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent()));
     supportBPermute = supportBPermute || ((gfxIp == 10) && (waveSize == 32));
-#endif
     return supportBPermute;
 }
 
-#if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Get whether the context we are building in supports permute lane DPP operations.
 bool BuilderImplBase::SupportPermLaneDpp() const
 {
     return GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major >= 10;
 }
-#endif
 
 // =====================================================================================================================
 // Create an "if..endif" or "if..else..endif" structure. The current basic block becomes the "endif" block, and all

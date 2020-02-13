@@ -405,10 +405,8 @@ struct ResourceUsage
                 uint32_t esGsLdsSize;               // ES -> GS ring LDS size (GS in)
                 uint32_t gsOnChipLdsSize;           // Total LDS size for GS on-chip mode.
                 uint32_t inputVertices;             // Number of GS input vertices
-#if LLPC_BUILD_GFX10
                 uint32_t primAmpFactor;             // GS primitive amplification factor
                 bool     enableMaxVertOut;          // Whether to allow each GS instance to emit maximum vertices (NGG)
-#endif
             } calcFactor;
 
             uint32_t    outLocCount[MaxGsStreams];
@@ -493,9 +491,7 @@ struct InterfaceData
             {
                 uint32_t viewIndex;                 // View Index
                 uint32_t streamOutTablePtr;         // Pointer of stream-out buffer table
-#if LLPC_BUILD_GFX10
                 uint32_t esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode (for NGG)
-#endif
             } tes;
 
             // Geometry shader

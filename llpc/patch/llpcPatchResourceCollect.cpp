@@ -40,9 +40,7 @@
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcIntrinsDefs.h"
-#if LLPC_BUILD_GFX10
 #include "llpcNggLdsManager.h"
-#endif
 #include "llpcPatchResourceCollect.h"
 #include "llpcPipelineShaders.h"
 #include "llpcTargetInfo.h"
@@ -119,18 +117,12 @@ bool PatchResourceCollect::runOnModule(
 
     if (m_pPipelineState->IsGraphics())
     {
-#if LLPC_BUILD_GFX10
         // Set NGG control settings
         SetNggControl();
-#endif
 
         // Determine whether or not GS on-chip mode is valid for this pipeline
         bool hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
-#if LLPC_BUILD_GFX10
         bool checkGsOnChip = hasGs || m_pPipelineState->GetNggControl()->enableNgg;
-#else
-        bool checkGsOnChip = hasGs;
-#endif
 
         if (checkGsOnChip)
         {
@@ -142,7 +134,6 @@ bool PatchResourceCollect::runOnModule(
     return true;
 }
 
-#if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Sets NGG control settings
 void PatchResourceCollect::SetNggControl()
@@ -441,7 +432,6 @@ void PatchResourceCollect::BuildNggCullingControlRegister(
 
     pipelineState.paClVteCntl = paClVteCntl.u32All;
 }
-#endif
 
 // =====================================================================================================================
 // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
@@ -452,9 +442,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
     uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
-#if LLPC_BUILD_GFX10
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
-#endif
 
     const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
     auto pGsResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
@@ -633,7 +621,6 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
     }
     else
     {
-#if LLPC_BUILD_GFX10
         const auto pNggControl = m_pPipelineState->GetNggControl();
 
         if (pNggControl->enableNgg)
@@ -822,7 +809,6 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             gsOnChip = true; // In NGG mode, GS is always on-chip since copy shader is not present.
         }
         else
-#endif
         {
             uint32_t ldsSizeDwordGranularity =
                 static_cast<uint32_t>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift);
@@ -993,7 +979,6 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                                                                          gsVsRingItemSizeOnChip :
                                                                          gsVsRingItemSize;
 
-#if LLPC_BUILD_GFX10
             if ((m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major == 10) && hasTs && (gsOnChip == false))
             {
                 uint32_t esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
@@ -1022,7 +1007,6 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsNum;
                 pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsNum;
             }
-#endif
         }
     }
 
@@ -1067,7 +1051,6 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
     if (gsOnChip || (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 9))
     {
-#if LLPC_BUILD_GFX10
         if (m_pPipelineState->GetNggControl()->enableNgg)
         {
             LLPC_OUTS("GS primitive amplification factor: "
@@ -1081,7 +1064,6 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             LLPC_OUTS("GS is on-chip (NGG)\n");
         }
         else
-#endif
         {
             LLPC_OUTS("GS is " << (gsOnChip ? "on-chip" : "off-chip") << "\n");
         }

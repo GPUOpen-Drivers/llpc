@@ -71,20 +71,16 @@ void ConfigBuilder::BuildPalMetadata()
     else
     {
         const bool hasTs = (m_hasTcs || m_hasTes);
-#if LLPC_BUILD_GFX10
         const bool enableNgg = m_pPipelineState->GetNggControl()->enableNgg;
-#endif
 
         if ((hasTs == false) && (m_hasGs == false))
         {
             // VS-FS pipeline
-#if LLPC_BUILD_GFX10
             if ((m_gfxIp.major >= 10) && enableNgg)
             {
                 result = BuildPipelineNggVsFsRegConfig();
             }
             else
-#endif
             {
                 result = BuildPipelineVsFsRegConfig();
             }
@@ -92,13 +88,11 @@ void ConfigBuilder::BuildPalMetadata()
         else if (hasTs && (m_hasGs == false))
         {
             // VS-TS-FS pipeline
-#if LLPC_BUILD_GFX10
             if ((m_gfxIp.major >= 10) && enableNgg)
             {
                 result = BuildPipelineNggVsTsFsRegConfig();
             }
             else
-#endif
             {
                 result = BuildPipelineVsTsFsRegConfig();
             }
@@ -106,13 +100,11 @@ void ConfigBuilder::BuildPalMetadata()
         else if ((hasTs == false) && m_hasGs)
         {
             // VS-GS-FS pipeline
-#if LLPC_BUILD_GFX10
             if ((m_gfxIp.major >= 10) && enableNgg)
             {
                 result = BuildPipelineNggVsGsFsRegConfig();
             }
             else
-#endif
             {
                 result = BuildPipelineVsGsFsRegConfig();
             }
@@ -120,13 +112,11 @@ void ConfigBuilder::BuildPalMetadata()
         else
         {
             // VS-TS-GS-FS pipeline
-#if LLPC_BUILD_GFX10
             if ((m_gfxIp.major >= 10) && enableNgg)
             {
                 result = BuildPipelineNggVsTsGsFsRegConfig();
             }
             else
-#endif
             {
                 result = BuildPipelineVsTsGsFsRegConfig();
             }
@@ -163,7 +153,6 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of registe
         result = BuildVsRegConfig<PipelineVsFsRegConfig>(ShaderStageVertex, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
-#if LLPC_BUILD_GFX10
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageVertex);
         if ( waveFrontSize == 32)
         {
@@ -176,17 +165,14 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of registe
             SetWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
         }
 #endif
-#endif
 
         uint32_t checksum = SetShaderHash(ShaderStageVertex);
         SET_REG(pConfig, VGT_GS_ONCHIP_CNTL, 0);
 
-#if LLPC_BUILD_GFX10
         if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportShaderPowerProfiling)
         {
             SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_CHKSUM_VS, CHECKSUM, checksum);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -195,12 +181,10 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of registe
 
         uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
-#if LLPC_BUILD_GFX10
         if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportShaderPowerProfiling)
         {
             SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
         }
-#endif
     }
 
     regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
@@ -216,13 +200,11 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of registe
 
     iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
 
-#if LLPC_BUILD_GFX10
     if (gfxIp.major >= 10)
     {
         SET_REG(pConfig, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
     }
     else
-#endif
     {
         SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
     }
@@ -252,11 +234,9 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
     SetPipelineType(Util::Abi::PipelineType::Tess);
 
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
-#if LLPC_BUILD_GFX10
     //  In GEN_TWO the only supported mode is fully distributed tessellation. The programming model is expected
     //  to set VGT_SHADER_STAGES_EN.DYNAMIC_HS=1 and VGT_TF_PARAM.NUM_DS_WAVES_PER_SIMD=0
     SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, DYNAMIC_HS, true);
-#endif
 
     if (stageMask & (ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageTessControl)))
     {
@@ -270,17 +250,14 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
         uint32_t checksum = SetShaderHash(ShaderStageVertex);
         checksum = checksum ^ SetShaderHash(ShaderStageTessControl);
 
-#if LLPC_BUILD_GFX10
         if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportShaderPowerProfiling)
         {
             SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_CHKSUM_HS, CHECKSUM, checksum);
         }
-#endif
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
 
-#if LLPC_BUILD_GFX10
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageTessControl);
         if (waveFrontSize == 32)
         {
@@ -293,7 +270,6 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
             SetWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
         }
 #endif
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageTessEval)))
@@ -302,7 +278,6 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_DS);
 
-#if LLPC_BUILD_GFX10
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageTessEval);
         if (waveFrontSize == 32)
         {
@@ -314,16 +289,13 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
             SetWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
         }
 #endif
-#endif
 
         uint32_t checksum = SetShaderHash(ShaderStageTessEval);
 
-#if LLPC_BUILD_GFX10
         if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportShaderPowerProfiling)
         {
             SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_CHKSUM_VS, CHECKSUM, checksum);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -332,12 +304,10 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
 
         uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
-#if LLPC_BUILD_GFX10
         if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportShaderPowerProfiling)
         {
             SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
         }
-#endif
     }
 
     // Set up IA_MULTI_VGT_PARAM
@@ -352,7 +322,6 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
         iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
     }
 
-#if LLPC_BUILD_GFX10
     if (gfxIp.major >= 10)
     {
         SET_REG(pConfig, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
@@ -362,7 +331,6 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
         SET_REG_FIELD(pConfig, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, GsPrimsOffchipGsOrTess);
     }
     else
-#endif
     {
         SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
     }
@@ -404,17 +372,14 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of regis
         uint32_t checksum = SetShaderHash(ShaderStageVertex);
         checksum = checksum ^ SetShaderHash(ShaderStageGeometry);
 
-#if LLPC_BUILD_GFX10
         if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportShaderPowerProfiling)
         {
             SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
         }
-#endif
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
 
-#if LLPC_BUILD_GFX10
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
         if (waveFrontSize == 32)
         {
@@ -426,7 +391,6 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of regis
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
         }
 #endif
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -435,12 +399,10 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of regis
 
         uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
-#if LLPC_BUILD_GFX10
         if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportShaderPowerProfiling)
         {
             SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageCopyShader)))
@@ -449,7 +411,6 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of regis
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
 
-#if LLPC_BUILD_GFX10
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageCopyShader);
         if (waveFrontSize == 32)
         {
@@ -461,7 +422,6 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of regis
             SetWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
         }
 #endif
-#endif
     }
 
     // Set up IA_MULTI_VGT_PARAM
@@ -470,13 +430,11 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of regis
     const uint32_t primGroupSize = 128;
     iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
 
-#if LLPC_BUILD_GFX10
     if (gfxIp.major >= 10)
     {
         SET_REG(pConfig, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
     }
     else
-#endif
     {
         SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
     }
@@ -520,16 +478,13 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
         uint32_t checksum = SetShaderHash(ShaderStageVertex);
         checksum = checksum ^ SetShaderHash(ShaderStageTessControl);
 
-#if LLPC_BUILD_GFX10
         if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportShaderPowerProfiling)
         {
             SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_CHKSUM_HS, CHECKSUM, checksum);
         }
-#endif
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
-#if LLPC_BUILD_GFX10
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageTessControl);
         if (waveFrontSize == 32)
         {
@@ -545,8 +500,6 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
         //  In GEN_TWO the only supported mode is fully distributed tessellation. The programming model is expected
         //  to set VGT_SHADER_STAGES_EN.DYNAMIC_HS=1 and VGT_TF_PARAM.NUM_DS_WAVES_PER_SIMD=0
         SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, DYNAMIC_HS, true);
-#endif
-
     }
 
     if (stageMask & (ShaderStageToMask(ShaderStageTessEval) | ShaderStageToMask(ShaderStageGeometry)))
@@ -561,17 +514,14 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
         uint32_t checksum = SetShaderHash(ShaderStageTessEval);
         checksum = checksum ^ SetShaderHash(ShaderStageGeometry);
 
-#if LLPC_BUILD_GFX10
         if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportShaderPowerProfiling)
         {
             SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
         }
-#endif
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
 
-#if LLPC_BUILD_GFX10
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
         if (waveFrontSize == 32)
         {
@@ -584,8 +534,6 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
         }
 #endif
-
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -594,12 +542,10 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
 
         uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
-#if LLPC_BUILD_GFX10
         if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportShaderPowerProfiling)
         {
             SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageCopyShader)))
@@ -608,7 +554,6 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
 
-#if LLPC_BUILD_GFX10
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageCopyShader);
         if (waveFrontSize == 32)
         {
@@ -619,7 +564,6 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
         }
-#endif
 #endif
     }
 
@@ -636,13 +580,11 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
         iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
     }
 
-#if LLPC_BUILD_GFX10
     if (gfxIp.major >= 10)
     {
         SET_REG(pConfig, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
     }
     else
-#endif
     {
         SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
     }
@@ -655,7 +597,6 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     return result;
 }
 
-#if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (NGG, VS-FS).
 Result ConfigBuilder::BuildPipelineNggVsFsRegConfig()
@@ -691,7 +632,6 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig()
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
 
-#if LLPC_BUILD_GFX10
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageVertex);
         if (waveFrontSize == 32)
         {
@@ -702,7 +642,6 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig()
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
         }
-#endif
 #endif
 
         uint32_t checksum = SetShaderHash(ShaderStageVertex);
@@ -793,7 +732,6 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
 
-#if LLPC_BUILD_GFX10
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageTessControl);
         if (waveFrontSize == 32)
         {
@@ -805,7 +743,6 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
             SetWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
         }
 #endif
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageTessEval)))
@@ -816,7 +753,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
-#if LLPC_BUILD_GFX10
+
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageTessEval);
         if (waveFrontSize == 32)
         {
@@ -827,7 +764,6 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
         }
-#endif
 #endif
 
         uint32_t checksum = SetShaderHash(ShaderStageTessEval);
@@ -916,7 +852,7 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
-#if LLPC_BUILD_GFX10
+
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
         if (waveFrontSize == 32)
         {
@@ -927,7 +863,6 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
         }
-#endif
 #endif
     }
 
@@ -1006,7 +941,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
-#if LLPC_BUILD_GFX10
+
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageTessControl);
         if (waveFrontSize == 32)
         {
@@ -1017,7 +952,6 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
         }
-#endif
 #endif
     }
 
@@ -1042,7 +976,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
-#if LLPC_BUILD_GFX10
+
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
         if (waveFrontSize == 32)
         {
@@ -1053,7 +987,6 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
         }
-#endif
 #endif
     }
 
@@ -1089,7 +1022,6 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
 
     return result;
 }
-#endif
 
 // =====================================================================================================================
 // Builds register configuration for compute pipeline.
@@ -1110,12 +1042,10 @@ Result ConfigBuilder::BuildPipelineCsRegConfig()
 
     uint32_t checksum = SetShaderHash(ShaderStageCompute);
 
-#if LLPC_BUILD_GFX10
     if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportShaderPowerProfiling)
     {
         SET_REG_FIELD(&config, COMPUTE_SHADER_CHKSUM, CHECKSUM, checksum);
     }
-#endif
 
     AppendConfig(config);
 
@@ -1174,13 +1104,12 @@ Result ConfigBuilder::BuildVsRegConfig(
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, TRAP_PRESENT, shaderOptions.trapPresent);
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, pIntfData->userDataCount);
         const bool userSgprMsb = (pIntfData->userDataCount > 31);
-#if LLPC_BUILD_GFX10
+
         if (gfxIp.major == 10)
         {
             SET_REG_GFX10_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR_MSB, userSgprMsb);
         }
         else
-#endif
         {
             SET_REG_GFX9_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR_MSB, userSgprMsb);
         }
@@ -1212,12 +1141,10 @@ Result ConfigBuilder::BuildVsRegConfig(
     }
     SET_REG(&pConfig->m_vsRegs, VGT_STRMOUT_BUFFER_CONFIG, streamBufferConfig);
 
-#if LLPC_BUILD_GFX10
     if (gfxIp.major == 10)
     {
         SET_REG_GFX10_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, MEM_ORDERED, true);
     }
-#endif
 
     uint8_t usrClipPlaneMask = m_pPipelineState->GetRasterizerState().usrClipPlaneMask;
     bool depthClipDisable = (m_pPipelineState->GetViewportState().depthClipEnable == false);
@@ -1342,13 +1269,11 @@ Result ConfigBuilder::BuildVsRegConfig(
 
     SET_REG_FIELD(&pConfig->m_vsRegs, VGT_PRIMITIVEID_EN, PRIMITIVEID_EN, usePrimitiveId);
 
-#if LLPC_BUILD_GFX10
     if ((gfxIp.major >= 10) && (pResUsage->inOutUsage.expCount == 0))
     {
         SET_REG_GFX10_FIELD(&pConfig->m_vsRegs, SPI_VS_OUT_CONFIG, NO_PC_EXPORT, true);
     }
     else
-#endif
     {
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_VS_OUT_CONFIG, VS_EXPORT_COUNT, pResUsage->inOutUsage.expCount - 1);
     }
@@ -1370,12 +1295,11 @@ Result ConfigBuilder::BuildVsRegConfig(
         SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, VTE_VPORT_PROVOKE_DISABLE, false);
     }
 
-#if LLPC_BUILD_GFX10
     if (m_pPipelineState->GetTargetInfo().GetGpuWorkarounds().gfx10.waTessIncorrectRelativeIndex)
     {
         disableVertexReuse = true;
     }
-#endif
+
     SET_REG_FIELD(&pConfig->m_vsRegs, VGT_REUSE_OFF, REUSE_OFF, disableVertexReuse);
 
     useLayer = useLayer || m_pPipelineState->GetInputAssemblyState().enableMultiView;
@@ -1391,11 +1315,9 @@ Result ConfigBuilder::BuildVsRegConfig(
         if (gfxIp.major == 9)
         {
         }
-#if LLPC_BUILD_GFX10
         else if (gfxIp.major == 10)
         {
         }
-#endif
         else
         {
             LLPC_NOT_IMPLEMENTED();
@@ -1449,7 +1371,6 @@ Result ConfigBuilder::BuildVsRegConfig(
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_POS_FORMAT, POS3_EXPORT_FORMAT, SPI_SHADER_4COMP);
     }
 
-#if LLPC_BUILD_GFX10
     if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportSpiPrefPriority)
     {
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_USER_ACCUM_VS_0, CONTRIBUTION, 1);
@@ -1457,7 +1378,6 @@ Result ConfigBuilder::BuildVsRegConfig(
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_USER_ACCUM_VS_2, CONTRIBUTION, 1);
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_USER_ACCUM_VS_3, CONTRIBUTION, 1);
     }
-#endif
 
     // Set shader user data maping
     if (result == Result::Success)
@@ -1506,7 +1426,6 @@ Result ConfigBuilder::BuildLsHsRegConfig(
     SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, DEBUG_MODE, tcsShaderOptions.debugMode);
 
     const bool userSgprMsb = (userDataCount > 31);
-#if LLPC_BUILD_GFX10
     if (gfxIp.major == 10)
     {
         bool wgpMode = (GetShaderWgpMode(ShaderStageVertex) ||
@@ -1517,7 +1436,6 @@ Result ConfigBuilder::BuildLsHsRegConfig(
         SET_REG_GFX10_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR_MSB, userSgprMsb);
     }
     else
-#endif
     {
         SET_REG_GFX9_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR_MSB, userSgprMsb);
     }
@@ -1542,12 +1460,10 @@ Result ConfigBuilder::BuildLsHsRegConfig(
     {
         SET_REG_GFX9_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
     }
-#if LLPC_BUILD_GFX10
     else if (gfxIp.major == 10)
     {
         SET_REG_GFX10_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
     }
-#endif
     else
     {
         LLPC_NOT_IMPLEMENTED();
@@ -1577,7 +1493,6 @@ Result ConfigBuilder::BuildLsHsRegConfig(
     // Set up VGT_TF_PARAM
     SetupVgtTfParam(&pConfig->m_lsHsRegs);
 
-#if LLPC_BUILD_GFX10
     if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportSpiPrefPriority)
     {
         SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_USER_ACCUM_LSHS_0, CONTRIBUTION, 1);
@@ -1585,7 +1500,6 @@ Result ConfigBuilder::BuildLsHsRegConfig(
         SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_USER_ACCUM_LSHS_2, CONTRIBUTION, 1);
         SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_USER_ACCUM_LSHS_3, CONTRIBUTION, 1);
     }
-#endif
 
     if (gfxIp.major == 9)
     {
@@ -1594,7 +1508,6 @@ Result ConfigBuilder::BuildLsHsRegConfig(
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
                      Gfx09::mmSPI_SHADER_USER_DATA_LS_0);
     }
-#if LLPC_BUILD_GFX10
     else if (gfxIp.major == 10)
     {
         result = BuildUserDataConfig(
@@ -1602,7 +1515,6 @@ Result ConfigBuilder::BuildLsHsRegConfig(
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
                      Gfx10::mmSPI_SHADER_USER_DATA_HS_0);
     }
-#endif
     else
     {
         LLPC_NOT_IMPLEMENTED();
@@ -1674,7 +1586,6 @@ Result ConfigBuilder::BuildEsGsRegConfig(
     SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC1_GS, DEBUG_MODE, gsShaderOptions.debugMode);
 
     const bool userSgprMsb = (userDataCount > 31);
-#if LLPC_BUILD_GFX10
     if (gfxIp.major == 10)
     {
         bool wgpMode = (GetShaderWgpMode(hasTs ? ShaderStageTessEval : ShaderStageVertex) ||
@@ -1685,7 +1596,6 @@ Result ConfigBuilder::BuildEsGsRegConfig(
         SET_REG_GFX10_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR_MSB, userSgprMsb);
     }
     else
-#endif
     {
         SET_REG_GFX9_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR_MSB, userSgprMsb);
     }
@@ -1847,7 +1757,6 @@ Result ConfigBuilder::BuildEsGsRegConfig(
                       MAX_PRIMS_PER_SUBGROUP,
                       maxPrimsPerSubgroup);
     }
-#if LLPC_BUILD_GFX10
     else if (gfxIp.major == 10)
     {
         SET_REG_FIELD(&pConfig->m_esGsRegs,
@@ -1855,7 +1764,6 @@ Result ConfigBuilder::BuildEsGsRegConfig(
                       MAX_VERTS_PER_SUBGROUP,
                       maxPrimsPerSubgroup);
     }
-#endif
     else
     {
         LLPC_NOT_IMPLEMENTED();
@@ -1864,7 +1772,6 @@ Result ConfigBuilder::BuildEsGsRegConfig(
     SetNumAvailSgprs(Util::Abi::HardwareStage::Gs, pGsResUsage->numSgprsAvailable);
     SetNumAvailVgprs(Util::Abi::HardwareStage::Gs, pGsResUsage->numVgprsAvailable);
 
-#if LLPC_BUILD_GFX10
     if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportSpiPrefPriority)
     {
         SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_USER_ACCUM_ESGS_0, CONTRIBUTION, 1);
@@ -1872,7 +1779,6 @@ Result ConfigBuilder::BuildEsGsRegConfig(
         SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_USER_ACCUM_ESGS_2, CONTRIBUTION, 1);
         SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_USER_ACCUM_ESGS_3, CONTRIBUTION, 1);
     }
-#endif
 
     if (gfxIp.major == 9)
     {
@@ -1881,7 +1787,6 @@ Result ConfigBuilder::BuildEsGsRegConfig(
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
                      Gfx09::mmSPI_SHADER_USER_DATA_ES_0);
     }
-#if LLPC_BUILD_GFX10
     else if (gfxIp.major == 10)
     {
         result = BuildUserDataConfig(
@@ -1889,7 +1794,6 @@ Result ConfigBuilder::BuildEsGsRegConfig(
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
                      Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
     }
-#endif
     else
     {
         LLPC_NOT_IMPLEMENTED();
@@ -1898,7 +1802,6 @@ Result ConfigBuilder::BuildEsGsRegConfig(
     return result;
 }
 
-#if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Builds register configuration for hardware primitive shader.
 template <typename T>
@@ -1990,13 +1893,12 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR, userDataCount);
 
     const bool userSgprMsb = (userDataCount > 31);
-#if LLPC_BUILD_GFX10
+
     if (gfxIp.major == 10)
     {
         SET_REG_GFX10_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR_MSB, userSgprMsb);
     }
     else
-#endif
     {
         SET_REG_GFX9_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR_MSB, userSgprMsb);
     }
@@ -2175,7 +2077,6 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
         }
     }
 
-#if LLPC_BUILD_GFX10
     if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportSpiPrefPriority)
     {
         SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_USER_ACCUM_ESGS_0, CONTRIBUTION, 1);
@@ -2183,7 +2084,6 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
         SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_USER_ACCUM_ESGS_2, CONTRIBUTION, 1);
         SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_USER_ACCUM_ESGS_3, CONTRIBUTION, 1);
     }
-#endif
 
     //
     // Build VS specific configuration
@@ -2409,7 +2309,6 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
 
     return result;
 }
-#endif
 
 // =====================================================================================================================
 // Builds register configuration for hardware pixel shader.
@@ -2437,7 +2336,6 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR, pIntfData->userDataCount);
 
     const bool userSgprMsb = (pIntfData->userDataCount > 31);
-#if LLPC_BUILD_GFX10
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
 
     if (gfxIp.major == 10)
@@ -2458,7 +2356,6 @@ Result ConfigBuilder::BuildPsRegConfig(
         SET_REG_GFX10_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR_MSB, userSgprMsb);
     }
     else
-#endif
     {
         SET_REG_GFX9_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR_MSB, userSgprMsb);
     }
@@ -2522,13 +2419,12 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, EXEC_ON_NOOP,
                   (fragmentMode.earlyFragmentTests && pResUsage->resourceWrite));
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, EXEC_ON_HIER_FAIL, execOnHeirFail);
-#if LLPC_BUILD_GFX10
+
     if (gfxIp.major == 10)
     {
         SET_REG_GFX10_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, PRE_SHADER_DEPTH_COVERAGE_ENABLE,
                             fragmentMode.postDepthCoverage);
     }
-#endif
 
     uint32_t depthExpFmt = EXP_FORMAT_ZERO;
     if (builtInUsage.sampleMask)
@@ -2568,7 +2464,7 @@ Result ConfigBuilder::BuildPsRegConfig(
 
     SET_REG(&pConfig->m_psRegs, CB_SHADER_MASK, cbShaderMask);
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, pResUsage->inOutUsage.fs.interpInfo.size());
-#if LLPC_BUILD_GFX10
+
     auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageFragment);
     if (waveFrontSize == 32)
     {
@@ -2580,7 +2476,6 @@ Result ConfigBuilder::BuildPsRegConfig(
     {
         SetWaveFrontSize(Util::Abi::HardwareStage::Ps, waveFrontSize);
     }
-#endif
 #endif
 
     uint32_t pointCoordLoc = InvalidValue;
@@ -2677,7 +2572,6 @@ Result ConfigBuilder::BuildPsRegConfig(
     SetNumAvailSgprs(Util::Abi::HardwareStage::Ps, pResUsage->numSgprsAvailable);
     SetNumAvailVgprs(Util::Abi::HardwareStage::Ps, pResUsage->numVgprsAvailable);
 
-#if LLPC_BUILD_GFX10
     if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportSpiPrefPriority)
     {
         SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_USER_ACCUM_PS_0, CONTRIBUTION, 1);
@@ -2685,7 +2579,6 @@ Result ConfigBuilder::BuildPsRegConfig(
         SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_USER_ACCUM_PS_2, CONTRIBUTION, 1);
         SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_USER_ACCUM_PS_3, CONTRIBUTION, 1);
     }
-#endif
 
     // Set shader user data mapping
     if (result == Result::Success)
@@ -2733,7 +2626,6 @@ Result ConfigBuilder::BuildCsRegConfig(
     SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC1, DX10_CLAMP, true);  // Follow PAL setting
     SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC1, DEBUG_MODE, shaderOptions.debugMode);
 
-#if LLPC_BUILD_GFX10
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
 
     if (gfxIp.major == 10)
@@ -2755,7 +2647,6 @@ Result ConfigBuilder::BuildCsRegConfig(
         SetWaveFrontSize(Util::Abi::HardwareStage::Cs, waveSize);
 #endif
     }
-#endif
 
     // Set registers based on shader interface data
     SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC2, TRAP_PRESENT, shaderOptions.trapPresent);
@@ -2784,7 +2675,6 @@ Result ConfigBuilder::BuildCsRegConfig(
     SetNumAvailSgprs(Util::Abi::HardwareStage::Cs, pResUsage->numSgprsAvailable);
     SetNumAvailVgprs(Util::Abi::HardwareStage::Cs, pResUsage->numVgprsAvailable);
 
-#if LLPC_BUILD_GFX10
     if (m_pPipelineState->GetTargetInfo().GetGpuProperty().supportSpiPrefPriority)
     {
          SET_REG_FIELD(pConfig, COMPUTE_USER_ACCUM_0, CONTRIBUTION, 1);
@@ -2792,7 +2682,6 @@ Result ConfigBuilder::BuildCsRegConfig(
         SET_REG_FIELD(pConfig, COMPUTE_USER_ACCUM_2, CONTRIBUTION, 1);
         SET_REG_FIELD(pConfig, COMPUTE_USER_ACCUM_3, CONTRIBUTION, 1);
     }
-#endif
 
     // Set shader user data mapping
     if (result == Result::Success)
@@ -2831,10 +2720,8 @@ Result ConfigBuilder::BuildUserDataConfig(
         }
     }
 
-#if LLPC_BUILD_GFX10
     const bool enableNgg = m_pPipelineState->IsGraphics() ? m_pPipelineState->GetNggControl()->enableNgg : false;
     LLPC_UNUSED(enableNgg);
-#endif
 
     const auto pIntfData1 = m_pPipelineState->GetShaderInterfaceData(shaderStage1);
     const auto& entryArgIdxs1 = pIntfData1->entryArgIdxs;
@@ -2920,7 +2807,6 @@ Result ConfigBuilder::BuildUserDataConfig(
                              static_cast<uint32_t>(Util::Abi::UserDataMapping::EsGsLdsSize));
             }
         }
-#if LLPC_BUILD_GFX10
         else if (shaderStage2 == ShaderStageInvalid)
         {
             if (pIntfData1->userDataUsage.vs.esGsLdsSize > 0)
@@ -2930,7 +2816,6 @@ Result ConfigBuilder::BuildUserDataConfig(
                              static_cast<uint32_t>(Util::Abi::UserDataMapping::EsGsLdsSize));
             }
         }
-#endif
     }
     else if (shaderStage1 == ShaderStageTessEval)
     {
@@ -2965,14 +2850,12 @@ Result ConfigBuilder::BuildUserDataConfig(
             }
         }
 
-#if LLPC_BUILD_GFX10
         if (pIntfData1->userDataUsage.tes.esGsLdsSize > 0)
         {
             LLPC_ASSERT(enableNgg);
             AppendConfig(startUserData + pIntfData1->userDataUsage.tes.esGsLdsSize,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::EsGsLdsSize));
         }
-#endif
     }
     else if (shaderStage1 == ShaderStageGeometry)
     {
@@ -2985,13 +2868,11 @@ Result ConfigBuilder::BuildUserDataConfig(
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
         }
 
-#if LLPC_BUILD_GFX10
         if (pIntfData1->userDataUsage.gs.esGsLdsSize > 0)
         {
             AppendConfig(startUserData + pIntfData1->userDataUsage.gs.esGsLdsSize,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::EsGsLdsSize));
         }
-#endif
     }
     else if (shaderStage1 == ShaderStageCompute)
     {
@@ -3129,7 +3010,6 @@ void ConfigBuilder::SetupVgtTfParam(
     }
 }
 
-#if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Gets WGP mode enablement for the specified shader stage
 bool ConfigBuilder::GetShaderWgpMode(
@@ -3146,7 +3026,6 @@ bool ConfigBuilder::GetShaderWgpMode(
 
     return m_pPipelineState->GetShaderOptions(shaderStage).wgpMode;
 }
-#endif
 
 } // Gfx9
 

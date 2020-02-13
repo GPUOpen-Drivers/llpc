@@ -1576,9 +1576,7 @@ Value* PatchBufferOp::ReplaceLoadStore(
 
     const bool isSlc = pInst.getMetadata(LLVMContext::MD_nontemporal);
     const bool isGlc = ordering != AtomicOrdering::NotAtomic;
-#if LLPC_BUILD_GFX10
     const bool isDlc = isGlc; // For buffer load on GFX10+, we set DLC = GLC
-#endif
 
     Value* const pBufferDesc = m_replacementMap[pPointer].first;
     Value* const pBaseIndex = m_pBuilder->CreatePtrToInt(m_replacementMap[pPointer].second, m_pBuilder->getInt32Ty());
@@ -1741,13 +1739,11 @@ Value* PatchBufferOp::ReplaceLoadStore(
 
         if (isLoad)
         {
-#if LLPC_BUILD_GFX10
             if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 10)
             {
                 // TODO For stores?
                 coherent.bits.dlc = isDlc;
             }
-#endif
             if (isInvariant && accessSize >= 4)
             {
                 pPart = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load,

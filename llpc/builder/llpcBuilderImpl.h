@@ -63,10 +63,8 @@ protected:
     // Get whether the context we are building in support the bpermute operation.
     bool SupportBPermute() const;
 
-#if LLPC_BUILD_GFX10
     // Get whether the context we are building in supports permute lane DPP operations.
     bool SupportPermLaneDpp() const;
-#endif
 
     // Create an "if..endif" or "if..else..endif" structure.
     BranchInst* CreateIf(Value* pCondition, bool wantElse, const Twine& instName);
@@ -921,7 +919,6 @@ private:
                            uint32_t     bankMask,
                            bool         boundCtrl);
 
-#if LLPC_BUILD_GFX10
     Value* CreatePermLane16(Value* const pOrigValue,
                             Value* const pUpdateValue,
                             uint32_t     selectBitsLow,
@@ -934,7 +931,6 @@ private:
                              uint32_t     selectBitsHigh,
                              bool         fetchInactive,
                              bool         boundCtrl);
-#endif
 
     Value* CreateDsSwizzle(Value* const pValue,
                            uint16_t     dsPattern);

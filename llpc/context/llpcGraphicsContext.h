@@ -76,9 +76,7 @@ private:
 
     llvm::ArrayRef<ResourceMappingNode> MergeUserDataNodeTable(llvm::SmallVectorImpl<ResourceMappingNode>& allNodes);
 
-#if LLPC_BUILD_GFX10
     void BuildNggCullingControlRegister();
-#endif
 
     const GraphicsPipelineBuildInfo*    m_pPipelineInfo; // Info to build a graphics pipeline
 

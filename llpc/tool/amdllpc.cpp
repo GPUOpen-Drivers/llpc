@@ -135,7 +135,6 @@ static cl::opt<std::string> EntryTarget("entry-target",
 static cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
                                                   cl::desc("Ignore color attachment formats"), cl::init(false));
 
-#if LLPC_BUILD_GFX10
 // -enable-ngg: enable NGG mode
 static cl::opt<bool> EnableNgg(
     "enable-ngg",
@@ -254,7 +253,6 @@ static cl::opt<uint32_t> NggVertsPerSubgroup(
     cl::desc("Preferred number of vertices consumed by a primitive shader sub-group (NGG)"),
     cl::value_desc("verts"),
     cl::init(256));
-#endif
 
 // -spvgen-dir: load SPVGEN from specified directory
 static cl::opt<std::string> SpvGenDir("spvgen-dir", cl::desc("Directory to load SPVGEN library from"));
@@ -544,7 +542,6 @@ static Result Init(
 static Result InitCompileInfo(
     CompileInfo* pCompileInfo)  // [out] Compilation info of LLPC standalone tool
 {
-#if LLPC_BUILD_GFX10
     pCompileInfo->gfxIp = ParsedGfxIp;
 
     // Set NGG control settings
@@ -571,7 +568,6 @@ static Result InitCompileInfo(
         nggState.primsPerSubgroup           = NggPrimsPerSubgroup;
         nggState.vertsPerSubgroup           = NggVertsPerSubgroup;
     }
-#endif
 
     return Result::Success;
 }

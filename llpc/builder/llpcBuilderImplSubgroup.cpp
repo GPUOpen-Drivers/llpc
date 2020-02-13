@@ -209,7 +209,6 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotBitExtract(
     Value* const pIndex,   // [in] The bit index to extract. Must be an i32 type.
     const Twine& instName) // [in] Name to give final instruction.
 {
-#if LLPC_BUILD_GFX10
     if (GetShaderSubgroupSize() <= 32)
     {
         Value* const pIndexMask = CreateShl(getInt32(1), pIndex);
@@ -218,7 +217,6 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotBitExtract(
         return CreateICmpNE(pResult, getInt32(0));
     }
     else
-#endif
     {
         Value* pIndexMask = CreateZExtOrTrunc(pIndex, getInt64Ty());
         pIndexMask = CreateShl(getInt64(1), pIndexMask);
@@ -235,13 +233,11 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotBitCount(
     Value* const pValue,   // [in] The ballot value to bit count. Must be an <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
-#if LLPC_BUILD_GFX10
     if (GetShaderSubgroupSize() <= 32)
     {
         return CreateUnaryIntrinsic(Intrinsic::ctpop, CreateExtractElement(pValue, getInt32(0)));
     }
     else
-#endif
     {
         Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
         pResult = CreateBitCast(pResult, getInt64Ty());
@@ -268,13 +264,11 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotExclusiveBitCount(
     Value* const pValue,   // [in] The ballot value to exclusively bit count. Must be an <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
-#if LLPC_BUILD_GFX10
     if (GetShaderSubgroupSize() <= 32)
     {
         return CreateSubgroupMbcnt(CreateExtractElement(pValue, getInt32(0)), "");
     }
     else
-#endif
     {
         Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
         pResult = CreateBitCast(pResult, getInt64Ty());
@@ -288,14 +282,12 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotFindLsb(
     Value* const pValue, // [in] The ballot value to find the least significant bit of. Must be an <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
-#if LLPC_BUILD_GFX10
     if (GetShaderSubgroupSize() <= 32)
     {
         Value* const pResult = CreateExtractElement(pValue, getInt32(0));
         return CreateIntrinsic(Intrinsic::cttz, getInt32Ty(), { pResult, getTrue() });
     }
     else
-#endif
     {
         Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
         pResult = CreateBitCast(pResult, getInt64Ty());
@@ -310,7 +302,6 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotFindMsb(
     Value* const pValue,   // [in] The ballot value to find the most significant bit of. Must be an <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
-#if LLPC_BUILD_GFX10
     if (GetShaderSubgroupSize() <= 32)
     {
         Value* pResult = CreateExtractElement(pValue, getInt32(0));
@@ -318,7 +309,6 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotFindMsb(
         return CreateSub(getInt32(31), pResult);
     }
     else
-#endif
     {
         Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
         pResult = CreateBitCast(pResult, getInt64Ty());
@@ -437,7 +427,6 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredReduction(
             CreateGroupArithmeticOperation(groupArithOp, pResult,
                 CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowMirror, 0xF, 0xF, 0)), pResult);
 
-#if LLPC_BUILD_GFX10
         if (SupportPermLaneDpp())
         {
             // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
@@ -453,7 +442,6 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredReduction(
                 CreateGroupArithmeticOperation(groupArithOp, pBroadcast31, pBroadcast63), pResult);
         }
         else
-#endif
         {
             // Use a row broadcast to move the 15th element in each cluster of 16 to the next cluster. The row mask is
             // set to 0xa (0b1010) so that only the 2nd and 4th clusters of 16 perform the calculation.
@@ -582,7 +570,6 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredInclusive(
             CreateGroupArithmeticOperation(groupArithOp, pResult,
                 CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowSr8, 0xF, 0xC, 0)), pResult);
 
-#if LLPC_BUILD_GFX10
         if (SupportPermLaneDpp())
         {
             Value* const pThreadMask = CreateThreadMask();
@@ -604,7 +591,6 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredInclusive(
                 CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedBroadcast), pResult);
         }
         else
-#endif
         {
             // The DPP operation has a row mask of 0xa (0b1010) so only the 2nd and 4th clusters of 16 perform the
             // operation.
@@ -699,7 +685,6 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredExclusive(
 
         Value* pShiftRight = nullptr;
 
-#if LLPC_BUILD_GFX10
         if (SupportPermLaneDpp())
         {
             Value* const pThreadMask = CreateThreadMask();
@@ -732,7 +717,6 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredExclusive(
                 CreatePermLaneX16(pShiftRight, pShiftRight, 0, UINT32_MAX, true, false), pShiftRight);
         }
         else
-#endif
         {
             // Shift the whole subgroup right by one, using a DPP update operation. This will ensure that the identity
             // value is in the 0th invocation and all other values are shifted up. All rows and banks are active (0xF).
@@ -766,7 +750,6 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredExclusive(
             CreateGroupArithmeticOperation(groupArithOp, pResult,
                 CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowSr8, 0xF, 0xC, 0)), pResult);
 
-#if LLPC_BUILD_GFX10
         if (SupportPermLaneDpp())
         {
             Value* const pThreadMask = CreateThreadMask();
@@ -788,7 +771,6 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredExclusive(
                 CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedBroadcast), pResult);
         }
         else
-#endif
         {
             // The DPP operation has a row mask of 0xa (0b1010) so only the 2nd and 4th clusters of 16 perform the
             // operation.
@@ -1030,13 +1012,11 @@ Value* BuilderImplSubgroup::CreateSubgroupMbcnt(
     Value* const pMaskHigh = CreateExtractElement(pMasks, getInt32(1));
     CallInst* const pMbcntLo = CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, { pMaskLow, getInt32(0) });
 
-#if LLPC_BUILD_GFX10
     if (GetShaderSubgroupSize() <= 32)
     {
         return pMbcntLo;
     }
     else
-#endif
     {
         return CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, { pMaskHigh, pMbcntLo });
     }
@@ -1249,7 +1229,6 @@ Value* BuilderImplSubgroup::CreateDppUpdate(
                           });
 }
 
-#if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Create a call to permute lane.
 Value* BuilderImplSubgroup::CreatePermLane16(
@@ -1351,7 +1330,6 @@ Value* BuilderImplSubgroup::CreatePermLaneX16(
                                 getInt1(boundCtrl)
                           });
 }
-#endif
 
 // =====================================================================================================================
 // Create a call to ds swizzle.
@@ -1431,13 +1409,11 @@ Value* BuilderImplSubgroup::CreateThreadMask()
     Value* pThreadId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
 
     Value* pThreadMask = nullptr;
-#if LLPC_BUILD_GFX10
     if (GetShaderSubgroupSize() <= 32)
     {
         pThreadMask = CreateShl(getInt32(1), pThreadId);
     }
     else
-#endif
     {
         pThreadMask = CreateShl(getInt64(1), CreateZExtOrTrunc(pThreadId, getInt64Ty()));
     }
@@ -1489,12 +1465,11 @@ Value* BuilderImplSubgroup::CreateGroupBallot(
                                           pPredicateNE
                                      });
 
-#if LLPC_BUILD_GFX10
     // If we have a 32-bit subgroup size, we need to turn the 32-bit ballot result into a 64-bit result.
     if (GetShaderSubgroupSize() <= 32)
     {
         pResult = CreateZExt(pResult, getInt64Ty(), "");
     }
-#endif
+
     return pResult;
 }

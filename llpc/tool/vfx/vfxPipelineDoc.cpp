@@ -126,10 +126,7 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
         }
 
         pGfxPipelineInfo->options = graphicState.options;
-
-#if VKI_BUILD_GFX10
         pGfxPipelineInfo->nggState = graphicState.nggState;
-#endif
     }
 
     // Section "ComputePipelineState"

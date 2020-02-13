@@ -89,7 +89,6 @@ struct ResourceNode
     };
 };
 
-#if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Represents NGG (implicit primitive shader) control settings (valid for GFX10+)
 struct NggControl : NggState
@@ -97,7 +96,6 @@ struct NggControl : NggState
     bool                            passthroughMode;      // Whether NGG passthrough mode is enabled
     Util::Abi::PrimShaderCbLayout   primShaderTable;      // Primitive shader table (only some registers are used)
 };
-#endif
 
 // =====================================================================================================================
 // The middle-end implementation of PipelineState, a subclass of Pipeline.
@@ -220,10 +218,8 @@ public:
     // Gets wave size for the specified shader stage
     uint32_t GetShaderWaveSize(ShaderStage stage);
 
-#if LLPC_BUILD_GFX10
     // Get NGG control settings
     NggControl* GetNggControl() { return &m_nggControl; }
-#endif
 
     // Gets resource usage of the specified shader stage
     ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage);
@@ -378,9 +374,7 @@ private:
                                                                         // Cached MDString for each resource node type
 
     bool                            m_gsOnChip = false;                 // Whether to use GS on-chip mode
-#if LLPC_BUILD_GFX10
     NggControl                      m_nggControl = {};                  // NGG control settings
-#endif
     ShaderModes                     m_shaderModes;                      // Shader modes for this pipeline
     uint32_t                        m_deviceIndex = 0;                  // Device index
     std::vector<VertexInputDescription>
