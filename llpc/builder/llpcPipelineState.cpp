@@ -1081,7 +1081,7 @@ uint32_t PipelineState::GetShaderWaveSize(
         }
         else if (HasShaderStage(ShaderStageGeometry))
         {
-            // NOTE: Hardware path for GS wave32 is not tested, use wave64 instead
+            // Legacy (non-NGG) hardware path for GS does not support wave32.
             waveSize = 64;
         }
 
