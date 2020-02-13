@@ -2236,9 +2236,6 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
         useViewportIndex  = gsBuiltInUsage.viewportIndex;
         clipDistanceCount = gsBuiltInUsage.clipDistance;
         cullDistanceCount = gsBuiltInUsage.cullDistance;
-#if VKI_3RD_PARTY_IP_PROPERTY_ID
-        usePropertyId     = gsBuiltInUsage.propertyId;
-#endif
 
         expCount = pGsResUsage->inOutUsage.expCount;
 
