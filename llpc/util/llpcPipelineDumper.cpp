@@ -608,12 +608,8 @@ void PipelineDumper::DumpPipelineShaderInfo(
     dumpFile << "options.wgpMode = " << pShaderInfo->options.wgpMode << "\n";
     dumpFile << "options.waveBreakSize = " << pShaderInfo->options.waveBreakSize << "\n";
     dumpFile << "options.forceLoopUnrollCount = " << pShaderInfo->options.forceLoopUnrollCount << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
     dumpFile << "options.useSiScheduler = " << pShaderInfo->options.useSiScheduler << "\n";
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
     dumpFile << "options.allowVaryWaveSize = " << pShaderInfo->options.allowVaryWaveSize << "\n";
-#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
     dumpFile << "options.enableLoadScalarizer = " << pShaderInfo->options.enableLoadScalarizer << "\n";
 #endif
@@ -721,16 +717,10 @@ void PipelineDumper::DumpPipelineOptions(
     std::ostream&            dumpFile)  // [out] dump file
 {
     dumpFile << "options.includeDisassembly = " << pOptions->includeDisassembly << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-    dumpFile << "options.autoLayoutDesc = " << pOptions->autoLayoutDesc << "\n";
-#endif
     dumpFile << "options.scalarBlockLayout = " << pOptions->scalarBlockLayout << "\n";
     dumpFile << "options.includeIr = " << pOptions->includeIr << "\n";
     dumpFile << "options.robustBufferAccess = " << pOptions->robustBufferAccess << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
     dumpFile << "options.reconfigWorkgroupLayout = " << pOptions->reconfigWorkgroupLayout << "\n";
-#endif
-
 }
 
 // =====================================================================================================================
@@ -950,9 +940,6 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
     UpdateHashForPipelineShaderInfo(ShaderStageCompute, &pPipeline->cs, isCacheHash, &hasher);
     hasher.Update(pPipeline->deviceIndex);
     hasher.Update(pPipeline->options.includeDisassembly);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-    hasher.Update(pPipeline->options.autoLayoutDesc);
-#endif
     hasher.Update(pPipeline->options.scalarBlockLayout);
     hasher.Update(pPipeline->options.includeIr);
     hasher.Update(pPipeline->options.robustBufferAccess);
@@ -1058,15 +1045,10 @@ void PipelineDumper::UpdateHashForNonFragmentState(
         pHasher->Update(pNggState->vertsPerSubgroup);
 
         pHasher->Update(pPipeline->options.includeDisassembly);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-        pHasher->Update(pPipeline->options.autoLayoutDesc);
-#endif
         pHasher->Update(pPipeline->options.scalarBlockLayout);
         pHasher->Update(pPipeline->options.includeIr);
         pHasher->Update(pPipeline->options.robustBufferAccess);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
         pHasher->Update(pPipeline->options.reconfigWorkgroupLayout);
-#endif
     }
 }
 
@@ -1192,12 +1174,8 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
             pHasher->Update(options.wgpMode);
             pHasher->Update(options.waveBreakSize);
             pHasher->Update(options.forceLoopUnrollCount);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
             pHasher->Update(options.useSiScheduler);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
             pHasher->Update(options.allowVaryWaveSize);
-#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
             pHasher->Update(options.enableLoadScalarizer);
 #endif
