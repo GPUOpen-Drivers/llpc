@@ -226,7 +226,6 @@ Value* BuilderImplArith::CreateSMod(
     Value*        pDivisor,   // [in] Divisor value
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
-#if LLPC_BUILD_GFX10
     if (pDivisor->getType()->getScalarType()->isIntegerTy(32) &&
         (GetPipelineState()->GetTargetInfo().GetGpuWorkarounds().gfx10.disableI32ModToI16Mod))
     {
@@ -252,7 +251,6 @@ Value* BuilderImplArith::CreateSMod(
             }
         }
     }
-#endif
 
     Value* pSrem = CreateSRem(pDividend, pDivisor);
     Value* pDivisorPlusSrem = CreateAdd(pDivisor, pSrem);

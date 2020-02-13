@@ -57,12 +57,10 @@ public:
     Result BuildPipelineVsGsFsRegConfig();
     Result BuildPipelineVsTsGsFsRegConfig();
 
-#if LLPC_BUILD_GFX10
     Result BuildPipelineNggVsFsRegConfig();
     Result BuildPipelineNggVsTsFsRegConfig();
     Result BuildPipelineNggVsGsFsRegConfig();
     Result BuildPipelineNggVsTsGsFsRegConfig();
-#endif
 
     Result BuildPipelineCsRegConfig();
 
@@ -84,12 +82,10 @@ private:
                               ShaderStage         shaderStage2,
                               T*                  pConfig);
 
-#if LLPC_BUILD_GFX10
     template <typename T>
     Result BuildPrimShaderRegConfig(ShaderStage         shaderStage1,
                                     ShaderStage         shaderStage2,
                                     T*                  pConfig);
-#endif
 
     template <typename T>
     Result BuildPsRegConfig(ShaderStage         shaderStage,
@@ -104,9 +100,7 @@ private:
 
     void SetupVgtTfParam(LsHsRegConfig* pConfig);
 
-#if LLPC_BUILD_GFX10
     bool GetShaderWgpMode(ShaderStage shaderStage) const;
-#endif
 };
 
 } // Gfx9

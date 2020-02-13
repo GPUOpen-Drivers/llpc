@@ -59,10 +59,8 @@ struct GpuProperty
     uint32_t maxSgprsAvailable;                 // Number of max available SGPRs
     uint32_t maxVgprsAvailable;                 // Number of max available VGPRs
     uint32_t tessFactorBufferSizePerSe;         // Size of the tessellation-factor buffer per SE, in DWORDs.
-#if LLPC_BUILD_GFX10
     bool     supportShaderPowerProfiling;       // Hardware supports Shader Profiling for Power
     bool     supportSpiPrefPriority;            // Hardware supports SPI shader preference priority
-#endif
 };
 
 // Contains flags for all of the hardware workarounds which affect pipeline compilation.
@@ -105,7 +103,6 @@ struct WorkaroundFlags
         uint32_t  u32All;
     } gfx9;
 
-#if LLPC_BUILD_GFX10
     union
     {
         struct
@@ -132,7 +129,6 @@ struct WorkaroundFlags
         };
         uint32_t u32All;
     } gfx10;
-#endif
 };
 
 // =====================================================================================================================

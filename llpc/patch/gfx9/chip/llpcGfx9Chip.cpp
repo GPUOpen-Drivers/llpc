@@ -63,14 +63,12 @@ VsRegConfig::VsRegConfig(
     INIT_REG(VGT_STRMOUT_VTX_STRIDE_1);
     INIT_REG(VGT_STRMOUT_VTX_STRIDE_2);
     INIT_REG(VGT_STRMOUT_VTX_STRIDE_3);
-#if LLPC_BUILD_GFX10
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_VS);
 
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_0);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_1);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_2);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_3);
-#endif
 }
 
 // =====================================================================================================================
@@ -84,14 +82,12 @@ LsHsRegConfig::LsHsRegConfig(
     INIT_REG(VGT_HOS_MIN_TESS_LEVEL);
     INIT_REG(VGT_HOS_MAX_TESS_LEVEL);
     INIT_REG(VGT_TF_PARAM);
-#if LLPC_BUILD_GFX10
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_HS);
 
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_0);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_1);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_2);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_3);
-#endif
 }
 
 // =====================================================================================================================
@@ -118,7 +114,6 @@ EsGsRegConfig::EsGsRegConfig(
     INIT_REG(VGT_GS_MODE);
     INIT_REG(VGT_ESGS_RING_ITEMSIZE);
     INIT_REG_GFX9(gfxIp.major, VGT_GS_MAX_PRIMS_PER_SUBGROUP);
-#if LLPC_BUILD_GFX10
     INIT_REG_GFX10_PLUS(gfxIp.major, GE_MAX_OUTPUT_PER_SUBGROUP);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_GS);
 
@@ -129,10 +124,8 @@ EsGsRegConfig::EsGsRegConfig(
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_1);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_2);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_3);
-#endif
 }
 
-#if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Initializer
 PrimShaderRegConfig::PrimShaderRegConfig(
@@ -179,7 +172,6 @@ PrimShaderRegConfig::PrimShaderRegConfig(
 
     INIT_REG(SPI_SHADER_PGM_LO_GS);
 }
-#endif
 
 // =====================================================================================================================
 // Initializer
@@ -200,7 +192,6 @@ PsRegConfig::PsRegConfig(
     INIT_REG(CB_SHADER_MASK);
     INIT_REG(PA_SC_AA_CONFIG);
     INIT_REG(PA_SC_SHADER_CONTROL);
-#if LLPC_BUILD_GFX10
     INIT_REG_GFX10_PLUS(gfxIp.major, PA_STEREO_CNTL);
     INIT_REG_GFX10_PLUS(gfxIp.major, GE_STEREO_CNTL);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_PS);
@@ -211,7 +202,6 @@ PsRegConfig::PsRegConfig(
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_PS_3);
 
     INIT_REG_GFX10_1_PLUS(gfxIp.major, gfxIp.minor, GE_USER_VGPR_EN);
-#endif
 }
 
 // =====================================================================================================================
@@ -225,9 +215,7 @@ PipelineVsFsRegConfig::PipelineVsFsRegConfig(
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG(VGT_GS_ONCHIP_CNTL);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
-#if LLPC_BUILD_GFX10
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
-#endif
 }
 
 // =====================================================================================================================
@@ -241,10 +229,8 @@ PipelineVsTsFsRegConfig::PipelineVsTsFsRegConfig(
 {
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
-#if LLPC_BUILD_GFX10
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
     INIT_REG(VGT_GS_ONCHIP_CNTL);
-#endif
 }
 
 // =====================================================================================================================
@@ -258,9 +244,7 @@ PipelineVsGsFsRegConfig::PipelineVsGsFsRegConfig(
 {
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
-#if LLPC_BUILD_GFX10
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
-#endif
 }
 
 // =====================================================================================================================
@@ -274,12 +258,9 @@ PipelineVsTsGsFsRegConfig::PipelineVsTsGsFsRegConfig(GfxIpVersion gfxIp)
 {
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
-#if LLPC_BUILD_GFX10
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
-#endif
 }
 
-#if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Initializer
 PipelineNggVsFsRegConfig::PipelineNggVsFsRegConfig(
@@ -329,7 +310,6 @@ PipelineNggVsTsGsFsRegConfig::PipelineNggVsTsGsFsRegConfig(
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
 }
-#endif
 
 // =====================================================================================================================
 // Initializer
@@ -341,7 +321,6 @@ CsRegConfig::CsRegConfig(
     INIT_REG(COMPUTE_NUM_THREAD_X);
     INIT_REG(COMPUTE_NUM_THREAD_Y);
     INIT_REG(COMPUTE_NUM_THREAD_Z);
-#if LLPC_BUILD_GFX10
     INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_SHADER_CHKSUM);
     INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_PGM_RSRC3);
 
@@ -349,16 +328,13 @@ CsRegConfig::CsRegConfig(
     INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_1);
     INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_2);
     INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_3);
-#endif
 
-#if LLPC_BUILD_GFX10
     if (gfxIp.major >= 10)
     {
         // COMPUTE_DISPATCH_INITIATOR is only required for GFX10 pipeline
         INIT_REG(COMPUTE_DISPATCH_INITIATOR);
     }
     else
-#endif
     {
         INIT_REG_TO_INVALID(COMPUTE_DISPATCH_INITIATOR);
     }
@@ -636,7 +612,6 @@ void InitRegisterNameMap(
     }
     else
     {
-#if LLPC_BUILD_GFX10
         // GFX10 specific
         ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_0);
         ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_1);
@@ -751,7 +726,6 @@ void InitRegisterNameMap(
 
             ADD_REG_MAP_GFX10_1_PLUS(GE_USER_VGPR_EN);
         }
-#endif
     }
 }
 
@@ -785,7 +759,6 @@ const char* GetRegisterNameString(
                 pNameString = RegNameMapGfx9[regId];
             }
         }
-#if LLPC_BUILD_GFX10
         else if (gfxIp.major == 10)
         {
             if (RegNameMapGfx10.find(regId) != RegNameMapGfx10.end())
@@ -793,7 +766,6 @@ const char* GetRegisterNameString(
                 pNameString = RegNameMapGfx10[regId];
             }
         }
-#endif
         else
         {
             LLPC_NOT_IMPLEMENTED();

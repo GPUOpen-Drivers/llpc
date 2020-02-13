@@ -225,7 +225,6 @@ void ConfigBuilderBase::SetEsGsLdsByteSize(
     m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = m_document->getNode(value);
 }
 
-#if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Set CALC_WAVE_BREAK_SIZE_AT_DRAW_TIME
 void ConfigBuilderBase::SetCalcWaveBreakSizeAtDrawTime(
@@ -244,8 +243,6 @@ void ConfigBuilderBase::SetWaveFrontSize(
     auto hwShaderNode = GetHwShaderNode(hwStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::WavefrontSize] = m_document->getNode(value);
 }
-
-#endif
 #endif
 
 // =====================================================================================================================

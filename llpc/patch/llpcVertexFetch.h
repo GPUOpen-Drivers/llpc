@@ -119,9 +119,7 @@ private:
     llvm::Value*    m_pInstanceId;      // Instance ID
 
     static const VertexCompFormatInfo   m_vertexCompFormatInfo[];   // Info table of vertex component format
-#if LLPC_BUILD_GFX10
     static const BufFormat              m_vertexFormatMap[];        // Info table of vertex format mapping
-#endif
 
     // Default values for vertex fetch (<4 x i32> or <8 x i32>)
     struct

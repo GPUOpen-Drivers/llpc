@@ -70,11 +70,9 @@ std::ostream& operator<<(std::ostream& out, VkPolygonMode           polygonMode)
 std::ostream& operator<<(std::ostream& out, VkCullModeFlagBits      cullMode);
 std::ostream& operator<<(std::ostream& out, VkFrontFace             frontFace);
 std::ostream& operator<<(std::ostream& out, ResourceMappingNodeType type);
-#if LLPC_BUILD_GFX10
 std::ostream& operator<<(std::ostream& out, NggSubgroupSizingType   subgroupSizing);
 std::ostream& operator<<(std::ostream& out, NggCompactMode          compactMode);
 std::ostream& operator<<(std::ostream& out, WaveBreakSize           waveBreakSize);
-#endif
 
 template std::ostream& operator<<(std::ostream& out, ElfReader<Elf64>& reader);
 template raw_ostream& operator<<(raw_ostream& out, ElfReader<Elf64>& reader);
@@ -621,11 +619,9 @@ void PipelineDumper::DumpPipelineShaderInfo(
     dumpFile << "options.vgprLimit = " << pShaderInfo->options.vgprLimit << "\n";
     dumpFile << "options.sgprLimit = " << pShaderInfo->options.sgprLimit << "\n";
     dumpFile << "options.maxThreadGroupsPerComputeUnit = " << pShaderInfo->options.maxThreadGroupsPerComputeUnit << "\n";
-#if LLPC_BUILD_GFX10
     dumpFile << "options.waveSize = " << pShaderInfo->options.waveSize << "\n";
     dumpFile << "options.wgpMode = " << pShaderInfo->options.wgpMode << "\n";
     dumpFile << "options.waveBreakSize = " << pShaderInfo->options.waveBreakSize << "\n";
-#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
     dumpFile << "options.forceLoopUnrollCount = " << pShaderInfo->options.forceLoopUnrollCount << "\n";
 #endif
@@ -815,7 +811,6 @@ void PipelineDumper::DumpGraphicsStateInfo(
         }
     }
 
-#if LLPC_BUILD_GFX10
     dumpFile << "nggState.enableNgg = " << pPipelineInfo->nggState.enableNgg << "\n";
     dumpFile << "nggState.enableGsUse = " << pPipelineInfo->nggState.enableGsUse << "\n";
     dumpFile << "nggState.forceNonPassthrough = " << pPipelineInfo->nggState.forceNonPassthrough << "\n";
@@ -833,7 +828,7 @@ void PipelineDumper::DumpGraphicsStateInfo(
     dumpFile << "nggState.subgroupSizing = " << pPipelineInfo->nggState.subgroupSizing << "\n";
     dumpFile << "nggState.primsPerSubgroup = " << pPipelineInfo->nggState.primsPerSubgroup << "\n";
     dumpFile << "nggState.vertsPerSubgroup = " << pPipelineInfo->nggState.vertsPerSubgroup << "\n";
-#endif
+
     DumpPipelineOptions(&pPipelineInfo->options, dumpFile);
     dumpFile << "\n\n";
 
@@ -1046,7 +1041,6 @@ void PipelineDumper::UpdateHashForNonFragmentState(
     auto pRsState = &pPipeline->rsState;
     pHasher->Update(pRsState->rasterizerDiscardEnable);
 
-#if LLPC_BUILD_GFX10
     auto pNggState = &pPipeline->nggState;
     bool enableNgg = pNggState->enableNgg;
     bool passthroughMode =
@@ -1057,12 +1051,9 @@ void PipelineDumper::UpdateHashForNonFragmentState(
         (pNggState->enableSphereCulling == false) &&
         (pNggState->enableSmallPrimFilter == false) &&
         (pNggState->enableCullDistanceCulling == false);
-#endif
 
     bool updateHashFromRs = (isCacheHash == false);
-#if LLPC_BUILD_GFX10
     updateHashFromRs |= (enableNgg && (passthroughMode == false));
-#endif
 
     if (updateHashFromRs)
     {
@@ -1075,7 +1066,6 @@ void PipelineDumper::UpdateHashForNonFragmentState(
 
     if (isCacheHash)
     {
-#if LLPC_BUILD_GFX10
         pHasher->Update(pNggState->enableNgg);
         pHasher->Update(pNggState->enableGsUse);
         pHasher->Update(pNggState->forceNonPassthrough);
@@ -1093,7 +1083,6 @@ void PipelineDumper::UpdateHashForNonFragmentState(
         pHasher->Update(pNggState->subgroupSizing);
         pHasher->Update(pNggState->primsPerSubgroup);
         pHasher->Update(pNggState->vertsPerSubgroup);
-#endif
 
         pHasher->Update(pPipeline->options.includeDisassembly);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
@@ -1231,11 +1220,9 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
             pHasher->Update(options.sgprLimit);
             pHasher->Update(options.vgprLimit);
             pHasher->Update(options.maxThreadGroupsPerComputeUnit);
-#if LLPC_BUILD_GFX10
             pHasher->Update(options.waveSize);
             pHasher->Update(options.wgpMode);
             pHasher->Update(options.waveBreakSize);
-#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
             pHasher->Update(options.forceLoopUnrollCount);
 #endif
@@ -1836,7 +1823,6 @@ std::ostream& operator<<(
     return out << GetResourceMappingNodeTypeName(type);
 }
 
-#if LLPC_BUILD_GFX10
 // =====================================================================================================================
 // Translates enum "NggSubgroupSizingType" to string and output to ostream.
 std::ostream& operator<<(
@@ -1905,7 +1891,6 @@ std::ostream& operator<<(
 
     return out << pString;
 }
-#endif
 
 // =====================================================================================================================
 // Translates enum "VkPrimitiveTopology" to string and output to ostream.

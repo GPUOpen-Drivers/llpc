@@ -102,7 +102,6 @@ void CodeGenManager::SetupTargetFeatures(
                 builder.addAttribute("amdgpu-max-memory-clause", "1");
             }
 
-#if LLPC_BUILD_GFX10
             if (pFunc->getCallingConv() == CallingConv::AMDGPU_GS)
             {
                 // NOTE: For NGG primitive shader, enable 128-bit LDS load/store operations to optimize gvec4 data
@@ -113,7 +112,7 @@ void CodeGenManager::SetupTargetFeatures(
                     targetFeatures += ",+ci-insts,+enable-ds128";
                 }
             }
-#endif
+
             if (pFunc->getCallingConv() == CallingConv::AMDGPU_HS)
             {
                 // Force s_barrier to be present (ignore optimization)
@@ -136,7 +135,6 @@ void CodeGenManager::SetupTargetFeatures(
                 targetFeatures += ",+enable-scratch-bounds-checks";
             }
 
-#if LLPC_BUILD_GFX10
             if (gfxIp.major >= 10)
             {
                 // Setup wavefront size per shader stage
@@ -148,7 +146,6 @@ void CodeGenManager::SetupTargetFeatures(
                 // which is then OR'ed with the driver set value
                 targetFeatures += ",+cumode";
             }
-#endif
 
             if (shaderStage != ShaderStageCopyShader)
             {

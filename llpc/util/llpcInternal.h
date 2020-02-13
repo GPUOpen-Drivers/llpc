@@ -127,7 +127,6 @@ namespace LlpcName
     const static char EsGsEntryPoint[]                = "llpc.shader.ESGS.main";
     const static char LsHsEntryPoint[]                = "llpc.shader.LSHS.main";
 
-#if LLPC_BUILD_GFX10
     const static char NggEsEntryPoint[]               = "llpc.ngg.ES.main";
     const static char NggEsEntryVariant[]             = "llpc.ngg.ES.variant";
     const static char NggEsEntryVariantPos[]          = "llpc.ngg.ES.variant.pos";
@@ -150,7 +149,6 @@ namespace LlpcName
     const static char NggCullingSphere[]              = "llpc.ngg.culling.sphere";
     const static char NggCullingSmallPrimFilter[]     = "llpc.ngg.culling.smallprimfilter";
     const static char NggCullingCullDistance[]        = "llpc.ngg.culling.culldistance";
-#endif
 
     const static char EntryPointPrefix[]              = "llpc.shader.";
     const static char CopyShaderEntryPoint[]          = "llpc.shader.COPY.main";

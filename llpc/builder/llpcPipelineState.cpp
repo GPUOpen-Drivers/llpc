@@ -1066,7 +1066,6 @@ uint32_t PipelineState::GetShaderWaveSize(
 
     uint32_t waveSize = GetTargetInfo().GetGpuProperty().waveSize;
 
-#if LLPC_BUILD_GFX10
     if (GetTargetInfo().GetGfxIpVersion().major >= 10)
     {
         // NOTE: GPU property wave size is used in shader, unless:
@@ -1114,7 +1113,7 @@ uint32_t PipelineState::GetShaderWaveSize(
 
         LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
     }
-#endif
+
     return waveSize;
 }
 

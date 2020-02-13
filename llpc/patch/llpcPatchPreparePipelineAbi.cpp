@@ -216,9 +216,7 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
     if (m_pPipelineState->IsGraphics())
     {
         ShaderMerger shaderMerger(m_pPipelineState, m_pPipelineShaders);
-#if LLPC_BUILD_GFX10
         const bool enableNgg = m_pPipelineState->GetNggControl()->enableNgg;
-#endif
 
         if (hasTs && m_hasGs)
         {
@@ -238,7 +236,6 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
             auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageTessEval);
             auto pGsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
 
-#if LLPC_BUILD_GFX10
             if (enableNgg)
             {
                 if (pGsEntryPoint != nullptr)
@@ -250,7 +247,6 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
                 }
             }
             else
-#endif
             {
                 if (pGsEntryPoint != nullptr)
                 {
@@ -276,7 +272,6 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
                 }
             }
 
-#if LLPC_BUILD_GFX10
             if (enableNgg)
             {
                 // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
@@ -289,7 +284,6 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
                 }
             }
             else
-#endif
             {
                 SetCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_VS);
             }
@@ -300,7 +294,6 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
             auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageVertex);
             auto pGsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
 
-#if LLPC_BUILD_GFX10
             if (enableNgg)
             {
                 if (pGsEntryPoint != nullptr)
@@ -312,7 +305,6 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
                 }
             }
             else
-#endif
             {
                 if (pGsEntryPoint != nullptr)
                 {
@@ -326,7 +318,6 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
         else if (m_hasVs)
         {
             // VS_FS pipeline
-#if LLPC_BUILD_GFX10
             if (enableNgg)
             {
                 // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
@@ -338,7 +329,6 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
                 }
             }
             else
-#endif
             {
                 SetCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
             }

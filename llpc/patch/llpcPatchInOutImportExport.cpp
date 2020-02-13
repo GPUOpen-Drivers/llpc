@@ -1514,10 +1514,8 @@ void PatchInOutImportExport::visitReturnInst(
             }
         }
 
-#if LLPC_BUILD_GFX10
         // NOTE: For GFX10+, dummy generic output is no longer needed. Field NO_PC_EXPORT of SPI_VS_OUT_CONFIG
         // will control the behavior.
-#endif
         if (m_gfxIp.major <= 9)
         {
             // NOTE: If no generic outputs is present in this shader, we have to export a dummy one
@@ -1556,14 +1554,13 @@ void PatchInOutImportExport::visitReturnInst(
     }
     else if (m_shaderStage == ShaderStageGeometry)
     {
-#if LLPC_BUILD_GFX10
         if ((m_pPipelineState->IsGsOnChip() == false) && (m_gfxIp.major >= 10))
         {
             // NOTE: This is a workaround because backend compiler does not provide s_waitcnt_vscnt intrinsic, so we
             // use fence release to generate s_waitcnt vmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
             new FenceInst(*m_pContext, AtomicOrdering::Release, SyncScope::System, pInsertPos);
         }
-#endif
+
         auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
         auto pWaveId = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.waveId);
         Value* args[] = {
@@ -1674,13 +1671,9 @@ void PatchInOutImportExport::visitReturnInst(
         // NOTE: If outputs are present in fragment shader, we have to export a dummy one
         auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment);
 
-#if LLPC_BUILD_GFX10
         // NOTE: GFX10 can allow no dummy export when the fragment shader does not have discard operation
         // or ROV (Raster-ordered views)
         pResUsage->inOutUsage.fs.dummyExport = ((m_gfxIp.major < 10) || pResUsage->builtInUsage.fs.discard);
-#else
-        pResUsage->inOutUsage.fs.dummyExport = true;
-#endif
         if ((m_pLastExport == nullptr) && pResUsage->inOutUsage.fs.dummyExport)
         {
             Value* args[] = {
@@ -4474,7 +4467,6 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
 
     format = formatOprd.u32All;
 
-#if LLPC_BUILD_GFX10
     if (m_gfxIp.major >= 10)
     {
         if (compCount == 4)
@@ -4494,7 +4486,6 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
             LLPC_NEVER_CALLED();
         }
     }
-#endif
 
     // byteOffset = streamOffsets[xfbBuffer] * 4 +
     //              (writeIndex + threadId) * bufferStride[bufferId] +
@@ -4540,8 +4531,6 @@ uint32_t PatchInOutImportExport::CombineBufferStore(
             ((BUF_NUM_FORMAT_FLOAT<<4) | (BUF_DATA_FORMAT_32_32_32_32)),
         };
     }
-
- #if LLPC_BUILD_GFX10
     else if (m_gfxIp.major == 10)
     {
         formats =
@@ -4552,7 +4541,6 @@ uint32_t PatchInOutImportExport::CombineBufferStore(
             BUF_FORMAT_32_32_32_32_FLOAT
         };
     }
-#endif
     else
     {
         LLPC_NOT_IMPLEMENTED();
@@ -4644,8 +4632,6 @@ uint32_t PatchInOutImportExport::CombineBufferLoad(
             ((BUF_NUM_FORMAT_FLOAT<<4) | (BUF_DATA_FORMAT_32_32_32_32)),
         };
     }
-
- #if LLPC_BUILD_GFX10
     else if (m_gfxIp.major == 10)
     {
         formats =
@@ -4656,7 +4642,6 @@ uint32_t PatchInOutImportExport::CombineBufferLoad(
             BUF_FORMAT_32_32_32_32_FLOAT
         };
     }
-#endif
     else
     {
         LLPC_NOT_IMPLEMENTED();
@@ -5108,7 +5093,6 @@ void PatchInOutImportExport::StoreValueToGsVsRing(
     LLPC_ASSERT((pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()) &&
                 ((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32)));
 
-#if LLPC_BUILD_GFX10
     if (m_pPipelineState->GetNggControl()->enableNgg)
     {
         // NOTE: For NGG, exporting GS output to GS-VS ring is represented by a call and the call is replaced with
@@ -5123,7 +5107,6 @@ void PatchInOutImportExport::StoreValueToGsVsRing(
         EmitCall(callName, Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
         return;
     }
-#endif
 
     if (pStoreTy->isArrayTy() || pStoreTy->isVectorTy())
     {
@@ -5215,7 +5198,6 @@ void PatchInOutImportExport::StoreValueToGsVsRing(
                 };
                 EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
             }
-#if LLPC_BUILD_GFX10
             else if (m_gfxIp.major == 10)
             {
                 CoherentFlag coherent = {};
@@ -5232,7 +5214,6 @@ void PatchInOutImportExport::StoreValueToGsVsRing(
                 };
                 EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
             }
-#endif
             else
             {
                 LLPC_NOT_IMPLEMENTED();
@@ -5462,14 +5443,11 @@ Value* PatchInOutImportExport::ReadValueFromLds(
         {
             coherent.bits.glc = true;
         }
-
-    #if LLPC_BUILD_GFX10
         else if (m_gfxIp.major == 10)
         {
             coherent.bits.glc = true;
             coherent.bits.dlc = true;
         }
-    #endif
         else
         {
             LLPC_NOT_IMPLEMENTED();
@@ -6308,13 +6286,12 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
                                          m_pPipelineState->GetTargetInfo().GetGpuProperty().tessFactorBufferSizePerSe;
     uint32_t       tfBufferPatchCountLimit = tfBufferSizeInBytes / (tessFactorStride * sizeof(uint32_t));
 
-#if LLPC_BUILD_GFX10
     const auto pWorkarounds = &m_pPipelineState->GetTargetInfo().GetGpuWorkarounds();
     if (pWorkarounds->gfx10.waTessFactorBufferSizeLimitGeUtcl1Underflow)
     {
         tfBufferPatchCountLimit /= 2;
     }
-#endif
+
     patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tfBufferPatchCountLimit);
 
     if (m_pPipelineState->IsTessOffChip())
@@ -6790,10 +6767,8 @@ Value* PatchInOutImportExport::GetSubgroupLocalInvocationId(
                                                  NoAttrib,
                                                  &*pInsertPos);
 
-#if LLPC_BUILD_GFX10
     uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(m_shaderStage);
     if (waveSize == 64)
-#endif
     {
         Value* args[] = {
             ConstantInt::get(Type::getInt32Ty(*m_pContext), -1),

@@ -73,7 +73,6 @@ const VertexCompFormatInfo VertexFetch::m_vertexCompFormatInfo[] =
     { 16, 4, 4, BUF_DATA_FORMAT_32          }, // BUF_DATA_FORMAT_32_32_32_32
 };
 
-#if LLPC_BUILD_GFX10
 const BufFormat VertexFetch::m_vertexFormatMap[] =
 {
     // BUF_DATA_FORMAT
@@ -246,7 +245,6 @@ const BufFormat VertexFetch::m_vertexFormatMap[] =
     BUF_FORMAT_INVALID,
     BUF_FORMAT_INVALID,
 };
-#endif
 
 // =====================================================================================================================
 VertexFetch::VertexFetch(
@@ -813,7 +811,6 @@ uint32_t VertexFetch::MapVertexFormat(
     LLPC_ASSERT(nfmt < 8);
     uint32_t format = 0;
 
-#if LLPC_BUILD_GFX10
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
     if (gfxIp.major >= 10)
     {
@@ -822,7 +819,6 @@ uint32_t VertexFetch::MapVertexFormat(
         format = m_vertexFormatMap[index];
     }
     else
-#endif
     {
         CombineFormat formatOprd = {};
         formatOprd.bits.dfmt = dfmt;

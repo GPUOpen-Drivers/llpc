@@ -182,7 +182,6 @@ void Patch::AddPasses(
     // Fully prepare the pipeline ABI (must be after optimizations)
     passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
 
-#if LLPC_BUILD_GFX10
     if (pPipelineState->IsGraphics() && (pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 10) &&
         ((pPipelineState->GetOptions().nggFlags & NggFlagDisable) == 0))
     {
@@ -209,14 +208,11 @@ void Patch::AddPasses(
             passMgr.add(CreateStartStopTimer(pPatchTimer, true));
         }
     }
-#endif
 
     // Set up target features in shader entry-points.
-#if LLPC_BUILD_GFX10
     // NOTE: Needs to be done after post-NGG function inlining, because LLVM refuses to inline something
     // with conflicting attributes. Attributes could conflict on GFX10 because PatchSetupTargetFeatures
     // adds a target feature to determine wave32 or wave64.
-#endif
     passMgr.add(CreatePatchSetupTargetFeatures());
 
     // Include LLVM IR as a separate section in the ELF binary

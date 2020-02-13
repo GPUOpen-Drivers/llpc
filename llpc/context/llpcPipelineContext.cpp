@@ -88,10 +88,8 @@ static cl::opt<bool> EnableSiScheduler("enable-si-scheduler",
                                        cl::desc("Enable target option si-scheduler"),
                                        cl::init(false));
 
-#if LLPC_BUILD_GFX10
 // -subgroup-size: sub-group size exposed via Vulkan API.
 static cl::opt<int> SubgroupSize("subgroup-size", cl::desc("Sub-group size exposed via Vulkan API"), cl::init(64));
-#endif
 
 namespace Llpc
 {
@@ -248,7 +246,6 @@ void PipelineContext::SetOptionsInPipeline(
 #endif
     options.includeIr = (IncludeLlvmIr || GetPipelineOptions()->includeIr);
 
-#if LLPC_BUILD_GFX10
     if (IsGraphics() && (GetGfxIpVersion().major >= 10))
     {
         // Only set NGG options for a GFX10+ graphics pipeline.
@@ -279,7 +276,6 @@ void PipelineContext::SetOptionsInPipeline(
             options.nggPrimsPerSubgroup = nggState.primsPerSubgroup;
         }
     }
-#endif
 
     pPipeline->SetOptions(options);
 
@@ -333,7 +329,6 @@ void PipelineContext::SetOptionsInPipeline(
                 shaderOptions.maxThreadGroupsPerComputeUnit = WavesPerEu;
             }
 
-#if LLPC_BUILD_GFX10
             shaderOptions.waveSize = pShaderInfo->options.waveSize;
             shaderOptions.wgpMode = pShaderInfo->options.wgpMode;
             if (pShaderInfo->options.allowVaryWaveSize == false)
@@ -343,7 +338,6 @@ void PipelineContext::SetOptionsInPipeline(
                 shaderOptions.subgroupSize = SubgroupSize;
             }
             shaderOptions.waveBreakSize = pShaderInfo->options.waveBreakSize;
-#endif
 
             shaderOptions.loadScalarizerThreshold = 0;
             if (EnableScalarLoad)

@@ -155,7 +155,6 @@ enum class ResourceMappingNodeType : uint32_t
     Count,                          ///< Count of resource mapping node types.
 };
 
-#if LLPC_BUILD_GFX10
 /// Enumerates various sizing options of sub-group size for NGG primitive shader.
 enum class NggSubgroupSizingType : uint32_t
 {
@@ -188,7 +187,6 @@ enum class WaveBreakSize : uint32_t
     _32x32   = 0x3,        ///< Outside a 32x32 pixel region
     DrawTime = 0xF,        ///< Choose wave break size per draw
 };
-#endif
 
 /// Represents graphics IP version info. See https://llvm.org/docs/AMDGPUUsage.html#processors for more
 /// details.
@@ -408,12 +406,10 @@ struct PipelineShaderOptions
     /// disables limiting the number of thread-groups to launch. This field is ignored for graphics shaders.
     uint32_t  maxThreadGroupsPerComputeUnit;
 
-#if LLPC_BUILD_GFX10
     uint32_t      waveSize;      ///< Control the number of threads per wavefront (GFX10+)
     bool          wgpMode;       ///< Whether to choose WGP mode or CU mode (GFX10+)
     WaveBreakSize waveBreakSize; ///< Size of region to force the end of a wavefront (GFX10+).
                                  ///  Only valid for fragment shaders.
-#endif
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
     /// Force loop unroll count. "0" means using default value; "1" means disabling loop unroll.
@@ -589,7 +585,6 @@ struct GraphicsPipelineBuildOut
     BinaryData          pipelineBin;        ///< Output pipeline binary data
 };
 
-#if LLPC_BUILD_GFX10
 /// Represents NGG tuning options
 struct NggState
 {
@@ -622,7 +617,6 @@ struct NggState
 
     uint32_t vertsPerSubgroup;          ///< Preferred number of vertices consumed by a primitive shader sub-group
 };
-#endif
 
 /// Represents color target info
 struct ColorTarget
@@ -694,10 +688,7 @@ struct GraphicsPipelineBuildInfo
         ColorTarget target[MaxColorTargets];    ///< Per-MRT color target info
     } cbState;                                  ///< Color target state
 
-#if LLPC_BUILD_GFX10
     NggState            nggState;           ///< NGG state used for tuning and debugging
-#endif
-
     PipelineOptions     options;            ///< Per pipeline tuning/debugging options
 };
 
