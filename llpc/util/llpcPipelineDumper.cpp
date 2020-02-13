@@ -607,9 +607,7 @@ void PipelineDumper::DumpPipelineShaderInfo(
     dumpFile << "options.waveSize = " << pShaderInfo->options.waveSize << "\n";
     dumpFile << "options.wgpMode = " << pShaderInfo->options.wgpMode << "\n";
     dumpFile << "options.waveBreakSize = " << pShaderInfo->options.waveBreakSize << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
     dumpFile << "options.forceLoopUnrollCount = " << pShaderInfo->options.forceLoopUnrollCount << "\n";
-#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
     dumpFile << "options.useSiScheduler = " << pShaderInfo->options.useSiScheduler << "\n";
 #endif
@@ -728,12 +726,7 @@ void PipelineDumper::DumpPipelineOptions(
 #endif
     dumpFile << "options.scalarBlockLayout = " << pOptions->scalarBlockLayout << "\n";
     dumpFile << "options.includeIr = " << pOptions->includeIr << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
     dumpFile << "options.robustBufferAccess = " << pOptions->robustBufferAccess << "\n";
-#endif
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
-    dumpFile << "options.includeIrBinary = " << pOptions->includeIrBinary << "\n";
-#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
     dumpFile << "options.reconfigWorkgroupLayout = " << pOptions->reconfigWorkgroupLayout << "\n";
 #endif
@@ -962,12 +955,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
 #endif
     hasher.Update(pPipeline->options.scalarBlockLayout);
     hasher.Update(pPipeline->options.includeIr);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
     hasher.Update(pPipeline->options.robustBufferAccess);
-#endif
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
-    hasher.Update(pPipeline->options.includeIrBinary);
-#endif
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
@@ -1075,12 +1063,7 @@ void PipelineDumper::UpdateHashForNonFragmentState(
 #endif
         pHasher->Update(pPipeline->options.scalarBlockLayout);
         pHasher->Update(pPipeline->options.includeIr);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
         pHasher->Update(pPipeline->options.robustBufferAccess);
-#endif
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
-        pHasher->Update(pPipeline->options.includeIrBinary);
-#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
         pHasher->Update(pPipeline->options.reconfigWorkgroupLayout);
 #endif
@@ -1208,9 +1191,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
             pHasher->Update(options.waveSize);
             pHasher->Update(options.wgpMode);
             pHasher->Update(options.waveBreakSize);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
             pHasher->Update(options.forceLoopUnrollCount);
-#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
             pHasher->Update(options.useSiScheduler);
 #endif
@@ -1817,9 +1798,7 @@ std::ostream& operator<<(
     const char* pString = nullptr;
     switch (subgroupSizing)
     {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
     CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, Auto)
-#endif
     CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, MaximumSize)
     CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, HalfSize)
     CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, OptimizeForVerts)

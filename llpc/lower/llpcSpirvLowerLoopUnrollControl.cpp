@@ -100,7 +100,6 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
 
     SpirvLower::Init(&module);
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
     if (m_pContext->GetPipelineContext() != nullptr)
     {
         auto pShaderOptions = &(m_pContext->GetPipelineShaderInfo(m_shaderStage)->options);
@@ -112,7 +111,6 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
         m_disableLicm = pShaderOptions->disableLicm | llvm::cl::DisableLicm;
 #endif
     }
-#endif
 
     if ((m_forceLoopUnrollCount == 0) && (m_disableLicm == false))
     {

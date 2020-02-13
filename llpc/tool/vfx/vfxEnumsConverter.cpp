@@ -1003,9 +1003,7 @@ void InitEnumMap()
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorBufferCompact)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, StreamOutTableVaPtr)
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, Auto)
-#endif
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, MaximumSize)
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, HalfSize)
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, OptimizeForVerts)

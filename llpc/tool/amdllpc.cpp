@@ -234,11 +234,7 @@ static cl::opt<uint32_t> NggSubgroupSizing(
              "4: Sub-group size is optimized for primitive thread utilization\n"
              "5: Sub-group size is allocated based on explicitly-specified vertsPerSubgroup and primsPerSubgroup"),
     cl::value_desc("sizing"),
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
     cl::init(static_cast<uint32_t>(NggSubgroupSizingType::Auto)));
-#else
-    cl::init(static_cast<uint32_t>(NggSubgroupSizingType::OptimizeForPrims)));
-#endif
 
 // -ngg-prims-per-subgroup: preferred numberof GS primitives to pack into a primitive shader sub-group (NGG)
 static cl::opt<uint32_t> NggPrimsPerSubgroup(
@@ -1149,9 +1145,8 @@ static Result BuildPipeline(
         {
             pPipelineInfo->iaState.patchControlPoints = 3;
         }
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
+
         pPipelineInfo->options.robustBufferAccess = RobustBufferAccess;
-#endif
 
         void* pPipelineDumpHandle = nullptr;
         if (llvm::cl::EnablePipelineDump)
@@ -1228,9 +1223,7 @@ static Result BuildPipeline(
         pPipelineInfo->pInstance      = nullptr; // Dummy, unused
         pPipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
         pPipelineInfo->pfnOutputAlloc = AllocateBuffer;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
         pPipelineInfo->options.robustBufferAccess = RobustBufferAccess;
-#endif
 
         void* pPipelineDumpHandle = nullptr;
         if (llvm::cl::EnablePipelineDump)
