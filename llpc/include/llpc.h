@@ -45,7 +45,15 @@
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 1
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27
+#ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
+#if VFX_INSIDE_SPVGEN
+#define LLPC_CLIENT_INTERFACE_MAJOR_VERSION LLPC_INTERFACE_MAJOR_VERSION
+#else
+#error LLPC client version is not defined
+#endif
+#endif
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 32
 #error LLPC client version is too old
 #endif
 
@@ -211,14 +219,8 @@ struct PipelineOptions
 {
     bool includeDisassembly;       ///< If set, the disassembly for all compiled shaders will be included in
                                    ///  the pipeline ELF.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-    bool autoLayoutDesc;           ///< If set, the LLPC standalone compiler is compiling individual shader(s)
-                                   ///  without pipeline info, so LLPC needs to do auto descriptor layout.
-#endif
     bool scalarBlockLayout;        ///< If set, allows scalar block layout of types.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
     bool reconfigWorkgroupLayout;  ///< If set, allows automatic workgroup reconfigure to take place on compute shaders.
-#endif
     bool includeIr;                ///< If set, the IR for all compiled shaders will be included in the pipeline ELF.
     bool robustBufferAccess;       ///< If set, out of bounds accesses to buffer or private array will be handled.
                                    ///  for now this option is used by LLPC shader and affects only the private array,
@@ -242,9 +244,7 @@ struct ShaderModuleBuildInfo
     void*                pUserData;         ///< User data
     OutputAllocFunc      pfnOutputAlloc;    ///< Output buffer allocator
     BinaryData           shaderBin;         ///< Shader binary data (SPIR-V binary)
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 32
     ShaderModuleOptions  options;           ///< Per shader module options
-#endif
 };
 
 /// Represents the base data type
@@ -414,15 +414,9 @@ struct PipelineShaderOptions
     /// Enable LLPC load scalarizer optimization.
     bool enableLoadScalarizer;
 #endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
     bool allowVaryWaveSize;      ///< If set, lets the pipeline vary the wave sizes.
-#elif VKI_EXT_SUBGROUP_SIZE_CONTROL
-    bool allowVaryWaveSize;      ///< If set, lets the pipeline vary the wave sizes.
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
     /// Use the LLVM backend's SI scheduler instead of the default scheduler.
     bool      useSiScheduler;
-#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
     /// Disable the the LLVM backend's LICM pass.
     bool      disableLicm;

@@ -561,9 +561,7 @@ Result Compiler::BuildShaderModule(
 
         // Do SPIR-V translate & lower if possible
         bool enableOpt = cl::EnableShaderModuleOpt;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 32
         enableOpt = enableOpt || pShaderInfo->options.enableOpt;
-#endif
         enableOpt = moduleDataEx.common.usage.useSpecConstant ? false : enableOpt;
 
         if (enableOpt)
@@ -1659,13 +1657,7 @@ Result Compiler::BuildComputePipeline(
     BinaryData elfBin = {};
 
     bool buildingRelocatableElf = CanUseRelocatableComputeShaderElf(&pPipelineInfo->cs);
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 32
-    // NOTE: It is to workaround the bug in Device::CreateInternalComputePipeline,
-    // we forgot to set the entryStage in it. To keep backward compatibility, set the entryStage within LLPC.
-    const_cast<ComputePipelineBuildInfo*>(pPipelineInfo)->cs.entryStage = ShaderStageCompute;
-#endif
-
+    
     Result result = ValidatePipelineShaderInfo(&pPipelineInfo->cs);
 
     MetroHash::Hash cacheHash = {};
@@ -2128,13 +2120,8 @@ void Compiler::BuildShaderCacheHash(
     {
         // Add pipeline options to fragment hash
         fragmentHasher.Update(pPipelineOptions->includeDisassembly);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-        fragmentHasher.Update(pPipelineOptions->autoLayoutDesc);
-#endif
         fragmentHasher.Update(pPipelineOptions->scalarBlockLayout);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
         fragmentHasher.Update(pPipelineOptions->reconfigWorkgroupLayout);
-#endif
         fragmentHasher.Update(pPipelineOptions->includeIr);
         fragmentHasher.Update(pPipelineOptions->robustBufferAccess);
         PipelineDumper::UpdateHashForFragmentState(pPipelineInfo, &fragmentHasher);

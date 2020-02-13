@@ -241,9 +241,7 @@ void PipelineContext::SetOptionsInPipeline(
     options.hash[1] = GetCacheHashCode();
 
     options.includeDisassembly = (cl::EnablePipelineDump || EnableOuts() || GetPipelineOptions()->includeDisassembly);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
     options.reconfigWorkgroupLayout = GetPipelineOptions()->reconfigWorkgroupLayout;
-#endif
     options.includeIr = (IncludeLlvmIr || GetPipelineOptions()->includeIr);
 
     if (IsGraphics() && (GetGfxIpVersion().major >= 10))
@@ -358,11 +356,7 @@ void PipelineContext::SetOptionsInPipeline(
             }
 #endif
 
-            shaderOptions.useSiScheduler = EnableSiScheduler;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-            shaderOptions.useSiScheduler |= pShaderInfo->options.useSiScheduler;
-#endif
-
+            shaderOptions.useSiScheduler = EnableSiScheduler || pShaderInfo->options.useSiScheduler;
             shaderOptions.unrollThreshold = pShaderInfo->options.unrollThreshold;
 
             pPipeline->SetShaderOptions(static_cast<ShaderStage>(stage), shaderOptions);

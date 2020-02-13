@@ -1568,7 +1568,6 @@ static Result ProcessPipeline(
                         }
                     }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 32
                     bool isGraphics = (compileInfo.stageMask & ShaderStageToMask(ShaderStageCompute)) ? false : true;
                     for (uint32_t i = 0; i < compileInfo.shaderModuleDatas.size(); ++i)
                     {
@@ -1576,7 +1575,6 @@ static Result ProcessPipeline(
                                                                             compileInfo.gfxPipelineInfo.options :
                                                                             compileInfo.compPipelineInfo.options;
                     }
-#endif
 
                     fileNames += inFile;
                     fileNames += " ";
