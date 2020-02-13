@@ -1032,9 +1032,7 @@ Result Compiler::BuildPipelineInternal(
     // Set a couple of pipeline options for front-end use.
     // TODO: The front-end should not be using pipeline options.
     pContext->SetScalarBlockLayout(pContext->GetPipelineContext()->GetPipelineOptions()->scalarBlockLayout);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
     pContext->SetRobustBufferAccess(pContext->GetPipelineContext()->GetPipelineOptions()->robustBufferAccess);
-#endif
 
     if (!buildingRelocatableElf)
     {
@@ -2138,12 +2136,7 @@ void Compiler::BuildShaderCacheHash(
         fragmentHasher.Update(pPipelineOptions->reconfigWorkgroupLayout);
 #endif
         fragmentHasher.Update(pPipelineOptions->includeIr);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
         fragmentHasher.Update(pPipelineOptions->robustBufferAccess);
-#endif
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
-        fragmentHasher.Update(pPipelineOptions->includeIrBinary);
-#endif
         PipelineDumper::UpdateHashForFragmentState(pPipelineInfo, &fragmentHasher);
         fragmentHasher.Finalize(pFragmentHash->bytes);
     }

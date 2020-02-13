@@ -314,11 +314,9 @@ void PatchResourceCollect::SetNggControl()
         LLPC_OUTS("SubgroupSizing               = ");
         switch (nggControl.subgroupSizing)
         {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
         case NggSubgroupSizingType::Auto:
             LLPC_OUTS("Auto\n");
             break;
-#endif
         case NggSubgroupSizingType::MaximumSize:
             LLPC_OUTS("MaximumSize\n");
             break;
@@ -678,12 +676,10 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                     gsPrimsPerSubgroup = pNggControl->primsPerSubgroup;
                     break;
                 default:
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
                 case NggSubgroupSizingType::Auto:
                     esVertsPerSubgroup = 126;
                     gsPrimsPerSubgroup = 128;
                     break;
-#endif
                 case NggSubgroupSizingType::MaximumSize:
                     esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
                     gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
@@ -718,9 +714,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                     // fast launch, and as such MaximumSize, HalfSize, or Explicit should be chosen, with Explicit
                     // being optimal for non-point topologies.
                     // Fallthrough intentional.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
                 case NggSubgroupSizingType::Auto:
-#endif
                 case NggSubgroupSizingType::MaximumSize:
                 default:
                     esVertsPerSubgroup = RoundDownToMultiple(Gfx9::NggMaxThreadsPerSubgroup, vertsPerPrimitive);

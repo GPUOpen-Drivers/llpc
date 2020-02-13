@@ -45,7 +45,7 @@
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 1
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 21
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27
 #error LLPC client version is too old
 #endif
 
@@ -162,9 +162,7 @@ enum class ResourceMappingNodeType : uint32_t
 /// Enumerates various sizing options of sub-group size for NGG primitive shader.
 enum class NggSubgroupSizingType : uint32_t
 {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
     Auto,                           ///< Sub-group size is allocated as optimally determined
-#endif
     MaximumSize,                    ///< Sub-group size is allocated to the maximum allowable size by the hardware
     HalfSize,                       ///< Sub-group size is allocated as to allow half of the maximum allowable size
                                     ///  by the hardware
@@ -222,15 +220,9 @@ struct PipelineOptions
     bool reconfigWorkgroupLayout;  ///< If set, allows automatic workgroup reconfigure to take place on compute shaders.
 #endif
     bool includeIr;                ///< If set, the IR for all compiled shaders will be included in the pipeline ELF.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
     bool robustBufferAccess;       ///< If set, out of bounds accesses to buffer or private array will be handled.
                                    ///  for now this option is used by LLPC shader and affects only the private array,
                                    ///  the out of bounds accesses will be skipped with this setting.
-#endif
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
-    bool includeIrBinary;          ///< If set, the IR binary for all compiled shaders will be included in the pipeline
-                                   ///  ELF.
-#endif
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -415,10 +407,8 @@ struct PipelineShaderOptions
     WaveBreakSize waveBreakSize; ///< Size of region to force the end of a wavefront (GFX10+).
                                  ///  Only valid for fragment shaders.
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
     /// Force loop unroll count. "0" means using default value; "1" means disabling loop unroll.
     uint32_t  forceLoopUnrollCount;
-#endif
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
     /// Enable LLPC load scalarizer optimization.

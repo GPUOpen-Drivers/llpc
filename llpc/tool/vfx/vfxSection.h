@@ -1123,12 +1123,7 @@ public:
 #endif
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, scalarBlockLayout, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIr, MemberTypeBool, false);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, robustBufferAccess, MemberTypeBool, false);
-#endif
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIrBinary, MemberTypeBool, false);
-#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, reconfigWorkgroupLayout, MemberTypeBool, false);
 #endif
@@ -1171,9 +1166,7 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, wgpMode, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, waveBreakSize, MemberTypeEnum, false);
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLoopUnrollCount, MemberTypeInt, false);
-#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, useSiScheduler, MemberTypeBool, false);
 #endif
