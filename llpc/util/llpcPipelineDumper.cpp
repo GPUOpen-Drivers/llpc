@@ -140,20 +140,9 @@ void VKAPI_CALL IPipelineDumper::DumpSpirvBinary(
 // Begins to dump graphics/compute pipeline info.
 void* VKAPI_CALL IPipelineDumper::BeginPipelineDump(
     const PipelineDumpOptions*         pDumpOptions,             // [in] Pipeline dump options
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
     PipelineBuildInfo                  pipelineInfo              // Info of the pipeline to be built
-#else
-    const ComputePipelineBuildInfo*    pComputePipelineInfo,     // [in] Info of the compute pipeline to be built
-    const GraphicsPipelineBuildInfo*   pGraphicsPipelineInfo     // [in] Info of the graphics pipeline to be built
-#endif
     )
 {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 21
-    PipelineBuildInfo pipelineInfo = {};
-    pipelineInfo.pComputeInfo = pComputePipelineInfo;
-    pipelineInfo.pGraphicsInfo = pGraphicsPipelineInfo;
-#endif
-
     MetroHash::Hash hash = {};
     if (pipelineInfo.pComputeInfo != nullptr)
     {
@@ -526,11 +515,7 @@ void PipelineDumper::DumpPipelineShaderInfo(
     auto pModuleHash = reinterpret_cast<const MetroHash::Hash*>(&pModuleData->hash[0]);
 
     // Output shader binary file
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
     ShaderStage stage = pShaderInfo->entryStage;
-#else
-    ShaderStage stage = ShaderStageInvalid;
-#endif
 
     dumpFile << "[" << GetShaderStageAbbreviation(stage) << "SpvFile]\n";
     dumpFile << "fileName = " << GetSpirvBinaryFileName(pModuleHash) << "\n\n";

@@ -618,9 +618,7 @@ Result Compiler::BuildShaderModule(
                     // SPIR-V translation, then dump the result.
                     PipelineShaderInfo shaderInfo = {};
                     shaderInfo.pModuleData = &moduleDataEx.common;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
                     shaderInfo.entryStage = entryNames[i].stage;
-#endif
                     shaderInfo.pEntryTarget = entryNames[i].pName;
                     lowerPassMgr->add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(entryNames[i].stage),
                                                                 &shaderInfo));
@@ -1113,10 +1111,7 @@ Result Compiler::BuildPipelineInternal(
                 {
                     auto pEntryData = &pModuleDataEx->extra.entryDatas[i];
                     auto pShaderEntry = reinterpret_cast<ShaderModuleEntry*>(pEntryData->pShaderEntry);
-                    if (
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
-                        (pEntryData->stage == pShaderInfo->entryStage) &&
-#endif
+                    if ((pEntryData->stage == pShaderInfo->entryStage) &&
                         (memcmp(pShaderEntry->entryNameHash, &entryNameHash, sizeof(MetroHash::Hash)) == 0))
                     {
                         // LLVM bitcode
@@ -1141,9 +1136,7 @@ Result Compiler::BuildPipelineInternal(
             else
             {
                 pModule = new Module((Twine("llpc") +
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
                                      GetShaderStageName(pShaderInfo->entryStage)).str() +
-#endif
                                      std::to_string(GetModuleIdByIndex(shaderIndex)), *pContext);
             }
 
@@ -1154,11 +1147,7 @@ Result Compiler::BuildPipelineInternal(
         for (uint32_t shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
         {
             const PipelineShaderInfo* pShaderInfo = shaderInfo[shaderIndex];
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
             ShaderStage entryStage = (pShaderInfo != nullptr) ? pShaderInfo->entryStage : ShaderStageInvalid;
-#else
-            ShaderStage entryStage = ShaderStageInvalid;
-#endif
             if ((pShaderInfo == nullptr) ||
                 (pShaderInfo->pModuleData == nullptr) ||
                 (stageSkipMask & ShaderStageToMask(entryStage)))
@@ -1198,11 +1187,7 @@ Result Compiler::BuildPipelineInternal(
         {
             // Per-shader SPIR-V lowering passes.
             const PipelineShaderInfo* pShaderInfo = shaderInfo[shaderIndex];
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
             ShaderStage entryStage = (pShaderInfo != nullptr) ? pShaderInfo->entryStage : ShaderStageInvalid;
-#else
-            ShaderStage entryStage = ShaderStageInvalid;
-#endif
             if ((pShaderInfo == nullptr) ||
                 (pShaderInfo->pModuleData == nullptr) ||
                 (stageSkipMask & ShaderStageToMask(entryStage)))
@@ -1927,11 +1912,7 @@ Result Compiler::ValidatePipelineShaderInfo(
     ) const
 {
     Result result = Result::Success;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
     ShaderStage shaderStage = (pShaderInfo != nullptr) ? pShaderInfo->entryStage : ShaderStageInvalid;
-#else
-    ShaderStage shaderStage = ShaderStageInvalid;
-#endif
 
     const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
     if (pModuleData != nullptr)

@@ -92,11 +92,7 @@ void SpirvLowerTranslator::TranslateSpirvToLlvm(
     std::istringstream spirvStream(spirvCode);
     std::string errMsg;
     SPIRV::SPIRVSpecConstMap specConstMap;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
     ShaderStage entryStage = pShaderInfo->entryStage;
-#else
-    ShaderStage entryStage = ShaderStageInvalid;
-#endif
     // Build specialization constant map
     if (pShaderInfo->pSpecializationInfo != nullptr)
     {
