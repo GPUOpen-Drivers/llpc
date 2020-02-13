@@ -304,20 +304,6 @@ static void SetGfx1010Info(
     pTargetInfo->GetGpuWorkarounds().gfx10.waSmemFollowedByVopc = 1;
 }
 
-// gfx101F
-static void SetGfx101FInfo(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
-{
-    SetGfx1010Info(pTargetInfo);
-    pTargetInfo->GetGpuProperty().tessFactorBufferSizePerSe = 0x80;
-
-    pTargetInfo->GetGpuWorkarounds().gfx10.waTessFactorBufferSizeLimitGeUtcl1Underflow = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waShaderInstPrefetch123   = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.nggTessDegeneratePrims    = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waThrottleInMultiDwordNsa = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups = 1;
-}
-
 // gfx1012
 static void SetGfx1012Info(
     TargetInfo* pTargetInfo)    // [in/out] Target info
@@ -372,10 +358,7 @@ bool TargetInfo::SetTargetInfo(
         { "gfx906",   &SetGfx9Info },     // gfx906, vega20
         { "gfx909",   &SetGfx9Info },     // gfx909, raven2
 #if LLPC_BUILD_GFX10
-        { "gfx101F",  &SetGfx101FInfo },
-        { "gfx101E",  &SetGfx1010Info },
         { "gfx1010",  &SetGfx1010Info },  // gfx1010
-        { "gfx101D",  &SetGfx1012Info },
         { "gfx1012",  &SetGfx1012Info },  // gfx1012, navi14
 #endif
     };
