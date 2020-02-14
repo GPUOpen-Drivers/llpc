@@ -71,28 +71,17 @@ public:
     void UpdateAndMerge(Result result, ElfPackage* pPipelineElf);
 
 private:
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-    static constexpr uint32_t ShaderCacheCount = 2;
-#endif
     Compiler* m_pCompiler;
     Context*  m_pContext;
 
     ShaderEntryState m_nonFragmentCacheEntryState = ShaderEntryState::New;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-    ShaderCache* m_pNonFragmentShaderCache[ShaderCacheCount] = {};
-    CacheEntryHandle m_hNonFragmentEntry[ShaderCacheCount] = {};
-#else
+    ShaderCache* m_pNonFragmentShaderCache = nullptr;
     CacheEntryHandle m_hNonFragmentEntry = {};
-#endif
     BinaryData m_nonFragmentElf = {};
 
     ShaderEntryState m_fragmentCacheEntryState = ShaderEntryState::New;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-    ShaderCache* m_pFragmentShaderCache[ShaderCacheCount] = {};
-    CacheEntryHandle m_hFragmentEntry[ShaderCacheCount] = {};
-#else
+    ShaderCache* m_pFragmentShaderCache = nullptr;
     CacheEntryHandle m_hFragmentEntry = {};
-#endif
     BinaryData m_fragmentElf = {};
 };
 
@@ -154,27 +143,17 @@ public:
     virtual Result CreateShaderCache(const ShaderCacheCreateInfo* pCreateInfo, IShaderCache** ppShaderCache);
 #endif
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     ShaderEntryState LookUpShaderCaches(IShaderCache*       pAppPipelineCache,
                                         MetroHash::Hash*    pCacheHash,
                                         BinaryData*         pElfBin,
                                         ShaderCache**       ppShaderCache,
                                         CacheEntryHandle*   phEntry);
 
-    static void UpdateShaderCaches(bool                insert,
-                                   const BinaryData*   pElfBin,
-                                   ShaderCache**       ppShaderCache,
-                                   CacheEntryHandle*   phEntry,
-                                   uint32_t            shaderCacheCount);
-#else
-    ShaderEntryState LookUpShaderCache(MetroHash::Hash*    pCacheHash,
-                                       BinaryData*         pElfBin,
-                                       CacheEntryHandle*   phEntry);
-
     void UpdateShaderCache(bool                insert,
                            const BinaryData*   pElfBin,
+                           ShaderCache*        pShaderCache,
                            CacheEntryHandle    phEntry);
-#endif
+
     static void BuildShaderCacheHash(Context*                                 pContext,
                                      uint32_t                                 stageMask,
                                      llvm::ArrayRef<llvm::ArrayRef<uint8_t>>  stageHashes,
