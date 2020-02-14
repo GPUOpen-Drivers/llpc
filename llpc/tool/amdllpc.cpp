@@ -452,54 +452,72 @@ static Result Init(
             }
         }
 
-        // Initialize the path for shader cache
-        constexpr uint32_t MaxFilePathLen = 512;
-        char               shaderCacheFileDirOption[MaxFilePathLen];
-
-        // Initialize the root path of cache files
-        // Steps:
-        //   1. Find AMD_SHADER_DISK_CACHE_PATH to keep backward compatibility.
-        const char* pEnvString = getenv("AMD_SHADER_DISK_CACHE_PATH");
-
-#ifdef WIN_OS
-        //   2. Find LOCALAPPDATA.
-        if (pEnvString == nullptr)
+        const char* pName = "-shader-cache-file-dir";
+        size_t nameLen = strlen(pName);
+        bool found = false;
+        const char* pArg = nullptr;
+        for (int32_t i = 1; i < argc; ++i)
         {
-            pEnvString = getenv("LOCALAPPDATA");
-        }
-#else
-        char shaderCacheFileRootDir[MaxFilePathLen];
-
-        //   2. Find XDG_CACHE_HOME.
-        //   3. If AMD_SHADER_DISK_CACHE_PATH and XDG_CACHE_HOME both not set,
-        //      use "$HOME/.cache".
-        if (pEnvString == nullptr)
-        {
-            pEnvString = getenv("XDG_CACHE_HOME");
-        }
-
-        if (pEnvString == nullptr)
-        {
-            pEnvString = getenv("HOME");
-            if (pEnvString != nullptr)
+            pArg = argv[i];
+            if ((strncmp(pArg, pName, nameLen) == 0) &&
+                ((pArg[nameLen] == '\0') || (pArg[nameLen] == '=')))
             {
-                snprintf(shaderCacheFileRootDir, sizeof(shaderCacheFileRootDir),
-                    "%s/.cache", pEnvString);
-                pEnvString = &shaderCacheFileRootDir[0];
+                found = true;
+                break;
             }
         }
+
+        if (found == false)
+        {
+            // Initialize the path for shader cache
+            constexpr uint32_t MaxFilePathLen = 512;
+            char               shaderCacheFileDirOption[MaxFilePathLen];
+
+            // Initialize the root path of cache files
+            // Steps:
+            //   1. Find AMD_SHADER_DISK_CACHE_PATH to keep backward compatibility.
+            const char* pEnvString = getenv("AMD_SHADER_DISK_CACHE_PATH");
+
+#ifdef WIN_OS
+            //   2. Find LOCALAPPDATA.
+            if (pEnvString == nullptr)
+            {
+                pEnvString = getenv("LOCALAPPDATA");
+            }
+#else
+            char shaderCacheFileRootDir[MaxFilePathLen];
+
+            //   2. Find XDG_CACHE_HOME.
+            //   3. If AMD_SHADER_DISK_CACHE_PATH and XDG_CACHE_HOME both not set,
+            //      use "$HOME/.cache".
+            if (pEnvString == nullptr)
+            {
+                pEnvString = getenv("XDG_CACHE_HOME");
+            }
+
+            if (pEnvString == nullptr)
+            {
+                pEnvString = getenv("HOME");
+                if (pEnvString != nullptr)
+                {
+                    snprintf(shaderCacheFileRootDir, sizeof(shaderCacheFileRootDir),
+                        "%s/.cache", pEnvString);
+                    pEnvString = &shaderCacheFileRootDir[0];
+                }
+            }
 #endif
 
-        if (pEnvString != nullptr)
-        {
-            snprintf(shaderCacheFileDirOption, sizeof(shaderCacheFileDirOption),
-                     "-shader-cache-file-dir=%s", pEnvString);
+            if (pEnvString != nullptr)
+            {
+                snprintf(shaderCacheFileDirOption, sizeof(shaderCacheFileDirOption),
+                         "-shader-cache-file-dir=%s", pEnvString);
+            }
+            else
+            {
+                strncpy(shaderCacheFileDirOption, "-shader-cache-file-dir=.", sizeof(shaderCacheFileDirOption));
+            }
+            newArgs.push_back(shaderCacheFileDirOption);
         }
-        else
-        {
-            strncpy(shaderCacheFileDirOption, "-shader-cache-file-dir=.", sizeof(shaderCacheFileDirOption));
-        }
-        newArgs.push_back(shaderCacheFileDirOption);
 
         // NOTE: We set the option -disable-null-frag-shader to TRUE for standalone compiler as the default.
         // Subsequent command option parse will correct its value if this option is specified externally.
