@@ -377,8 +377,6 @@ static Result Init(
             // Name                                Option
             "-gfxip",                              "-gfxip=8.0.0",
             "-unroll-max-percent-threshold-boost", "-unroll-max-percent-threshold-boost=1000",
-            "-unroll-threshold",                   "-unroll-threshold=700",
-            "-unroll-partial-threshold",           "-unroll-partial-threshold=700",
             "-pragma-unroll-threshold",            "-pragma-unroll-threshold=1000",
             "-unroll-allow-partial",               "-unroll-allow-partial",
             "-simplifycfg-sink-common",            "-simplifycfg-sink-common=false",
