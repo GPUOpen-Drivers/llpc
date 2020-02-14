@@ -110,6 +110,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcPatchDescriptorLoad.cpp         \
         llpcPatchEntryPointMutate.cpp       \
         llpcPatchInOutImportExport.cpp      \
+        llpcPatchIntrinsicSimplify.cpp      \
         llpcPatchLlvmIrInclusion.cpp        \
         llpcPatchLoadScalarizer.cpp         \
         llpcPatchNullFragShader.cpp         \

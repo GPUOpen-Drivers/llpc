@@ -273,6 +273,7 @@ if(ICD_BUILD_LLPC)
         patch/llpcPatchDescriptorLoad.cpp
         patch/llpcPatchEntryPointMutate.cpp
         patch/llpcPatchInOutImportExport.cpp
+        patch/llpcPatchIntrinsicSimplify.cpp
         patch/llpcPatchLlvmIrInclusion.cpp
         patch/llpcPatchLoadScalarizer.cpp
         patch/llpcPatchNullFragShader.cpp

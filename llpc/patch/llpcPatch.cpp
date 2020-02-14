@@ -280,6 +280,7 @@ void Patch::AddOptimizationPasses(
         passMgr.add(createScalarizerPass());
         passMgr.add(CreatePatchLoadScalarizer());
         passMgr.add(createInstSimplifyLegacyPass());
+        passMgr.add(CreatePatchIntrinsicSimplify());
         passMgr.add(createMergedLoadStoreMotionPass());
         passMgr.add(createGVNPass(disableGvnLoadPre));
         passMgr.add(createSCCPPass());
@@ -336,6 +337,9 @@ void Patch::AddOptimizationPasses(
                 // We add an extra inst simplify here to make sure that dead PHI nodes that are easily identified post
                 // running the scalarizer can be folded away before instruction combining tries to re-create them.
                 passMgr.add(createInstSimplifyLegacyPass());
+
+                // After we've finished loop optimizations, we run a pass to optimize our intrinsics.
+                passMgr.add(CreatePatchIntrinsicSimplify());
             });
 
         passBuilder.populateModulePassManager(passMgr);
