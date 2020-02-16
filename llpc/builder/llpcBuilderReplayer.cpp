@@ -482,6 +482,11 @@ Value* BuilderReplayer::ProcessCall(
             return m_pBuilder->CreateFindSMsb(args[0]);
         }
 
+    case BuilderRecorder::Opcode::FMix:
+        {
+            return m_pBuilder->CreateFMix(args[0], args[1], args[2]);
+        }
+
     // Replayer implementations of BuilderImplDesc methods
     case BuilderRecorder::Opcode::LoadBufferDesc:
         {

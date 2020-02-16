@@ -1330,6 +1330,38 @@ Value* BuilderImplArith::CreateFindSMsb(
 }
 
 // =====================================================================================================================
+// Create "fmix" operation, returning ( 1 - A ) * X + A * Y. Result would be FP scalar or vector value.
+// Returns scalar, if and only if "pX", "pY" and "pA" are all scalars.
+// Returns vector, if "pX" and "pY" are vector but "pA" is a scalar, under such condition, "pA" will be splatted.
+// Returns vector, if "pX", "pY" and "pA" are all vectors.
+// Note that when doing vector calculation, it means add/sub are element-wise between vectors, and the product will
+// be Hadamard product.
+Value* BuilderImplArith::CreateFMix(
+    Value*        pX,        // [in] left Value
+    Value*        pY,        // [in] right Value
+    Value*        pA,        // [in] wight Value
+    const Twine& instName)   // [in] Name to give instruction(s)
+{
+    Value* pYSubX = CreateFSub(pY, pX);
+    if (auto pVectorResultTy = dyn_cast<VectorType>(pYSubX->getType()))
+    {
+        // pX, pY => vector, but pA => scalar
+        if (isa<VectorType>(pA->getType()) == false)
+        {
+            pA = CreateVectorSplat(pVectorResultTy->getVectorNumElements(), pA);
+        }
+    }
+
+    FastMathFlags fastMathFlags = getFastMathFlags();
+    fastMathFlags.setNoNaNs();
+    fastMathFlags.setAllowContract();
+    CallInst* pResult = CreateIntrinsic(Intrinsic::fmuladd, pX->getType(), {pYSubX, pA, pX}, nullptr, instName);
+    pResult->setFastMathFlags(fastMathFlags);
+
+    return pResult;
+}
+
+// =====================================================================================================================
 // Ensure result is canonicalized if the shader's FP mode is flush denorms. This is called on an FP result of an
 // instruction that does not honor the hardware's FP mode, such as fmin/fmax/fmed on GFX8 and earlier.
 Value* BuilderImplArith::Canonicalize(

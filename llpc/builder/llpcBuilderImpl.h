@@ -203,6 +203,9 @@ public:
     // Create "find MSB" operation for a (vector of) signed int.
     Value* CreateFindSMsb(Value* pValue, const Twine& instName = "") override final;
 
+    // Create "fmix" operation.
+    Value* CreateFMix(Value* pX, Value* pY, Value* pA, const Twine& instName = "") override final;
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplArith)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplArith)

@@ -143,6 +143,8 @@ StringRef BuilderRecorder::GetCallName(
         return "extract.bit.field";
     case Opcode::FindSMsb:
         return "find.smsb";
+    case Opcode::FMix:
+        return "fmix";
     case Opcode::LoadBufferDesc:
         return "load.buffer.desc";
     case Opcode::IndexDescPtr:
@@ -1699,6 +1701,17 @@ Value* BuilderRecorder::CreateSubgroupBallotFindMsb(
     const Twine& instName) // [in] Name to give instruction(s)
 {
     return Record(Opcode::SubgroupBallotFindMsb, getInt32Ty(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create "fmix" operation, returning ( 1 - A ) * X + A * Y. Result would be FP scalar or vector.
+Value* BuilderRecorder::CreateFMix(
+    Value*        pX,        // [in] left Value
+    Value*        pY,        // [in] right Value
+    Value*        pA,        // [in] wight Value
+    const Twine& instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::FMix, pX->getType(), { pX, pY, pA }, instName);
 }
 
 // =====================================================================================================================

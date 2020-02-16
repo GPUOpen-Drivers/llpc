@@ -579,6 +579,19 @@ public:
         Value*        pValue,               // [in] Input value
         const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
 
+    // Create "fmix" operation, returning ( 1 - A ) * X + A * Y. Result would be FP scalar or vector value.
+    // Returns scalar, if and only if "pX", "pY" and "pA" are all scalars.
+    // Returns vector, if "pX" and "pY" are vector but "pA" is a scalar, under such condition, "pA" will be splatted.
+    // Returns vector, if "pX", "pY" and "pA" are all vectors.
+    //
+    // Note that when doing vector calculation, it means add/sub are element-wise between vectors, and the product will
+    // be Hadamard product.
+    virtual Value* CreateFMix(
+        Value*        pX,                   // [in] left Value
+        Value*        pY,                   // [in] right Value
+        Value*        pA,                   // [in] wight Value
+        const Twine& instName = "") = 0;
+
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations
 
