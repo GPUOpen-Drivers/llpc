@@ -8361,12 +8361,7 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
 
   case GLSLstd450FMix: {
     // Linear blend
-    Value *X = Args[0];
-    Value *Y = Args[1];
-    Value *A = Args[2];
-    Value *Diff = getBuilder()->CreateFSub(Y, X);
-    return getBuilder()->CreateIntrinsic(Intrinsic::fmuladd, X->getType(),
-                                         {Diff, A, X});
+    return getBuilder()->CreateFMix(Args[0], Args[1], Args[2]);
   }
 
   case GLSLstd450Step: {
