@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::PatchBufferOp.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-patch-buffer-op"
-
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Analysis/LegacyDivergenceAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -46,6 +44,8 @@
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
+
+#define DEBUG_TYPE "llpc-patch-buffer-op"
 
 using namespace llvm;
 using namespace Llpc;

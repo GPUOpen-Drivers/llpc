@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::PatchEntryPointMutate.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-patch-entry-point-mutate"
-
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -41,6 +39,8 @@
 #include "llpcPatchEntryPointMutate.h"
 #include "llpcPipelineShaders.h"
 #include "llpcTargetInfo.h"
+
+#define DEBUG_TYPE "llpc-patch-entry-point-mutate"
 
 using namespace llvm;
 using namespace Llpc;

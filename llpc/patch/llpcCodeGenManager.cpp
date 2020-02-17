@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::CodeGenManager.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-code-gen-manager"
-
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Metadata.h"
@@ -44,6 +42,8 @@
 #include "llpcPassManager.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
+
+#define DEBUG_TYPE "llpc-code-gen-manager"
 
 namespace llvm
 {

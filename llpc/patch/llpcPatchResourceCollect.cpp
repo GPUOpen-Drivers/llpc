@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::PatchResourceCollect.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-patch-resource-collect"
-
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -46,6 +44,8 @@
 #include "llpcTargetInfo.h"
 #include <algorithm>
 #include <functional>
+
+#define DEBUG_TYPE "llpc-patch-resource-collect"
 
 using namespace llvm;
 using namespace Llpc;

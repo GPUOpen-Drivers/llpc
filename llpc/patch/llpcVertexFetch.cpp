@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::VertexFetch.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-vertex-fetch"
-
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
@@ -39,6 +37,8 @@
 #include "llpcSystemValues.h"
 #include "llpcTargetInfo.h"
 #include "llpcVertexFetch.h"
+
+#define DEBUG_TYPE "llpc-vertex-fetch"
 
 using namespace llvm;
 

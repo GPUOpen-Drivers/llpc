@@ -28,10 +28,9 @@
  @brief LLPC source file: contains implementation of class Llpc::ShaderCacheManager.
  ***********************************************************************************************************************
 */
+#include "llpcShaderCacheManager.h"
 
 #define DEBUG_TYPE "llpc-shader-cache-manager"
-
-#include "llpcShaderCacheManager.h"
 
 using namespace llvm;
 

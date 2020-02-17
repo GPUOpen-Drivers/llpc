@@ -28,9 +28,9 @@
  * @brief LLPC header file: contains implementations for Gfx6 chips.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-gfx6-chip"
-
 #include "llpcGfx6Chip.h"
+
+#define DEBUG_TYPE "llpc-gfx6-chip"
 
 namespace Llpc
 {

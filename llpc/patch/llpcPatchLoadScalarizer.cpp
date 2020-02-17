@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::PatchLoadScalarizer.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-patch-load-scalarizer"
-
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
@@ -38,6 +36,8 @@
 #include "llpcPatchLoadScalarizer.h"
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
+
+#define DEBUG_TYPE "llpc-patch-load-scalarizer"
 
 using namespace Llpc;
 using namespace llvm;

@@ -28,8 +28,6 @@
  * @breif LLPC source file: contains implementation of LLPC pipline dump utility.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-pipeline-dumper"
-
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -48,6 +46,8 @@
 #include "llpcMetroHash.h"
 #include "llpcPipelineDumper.h"
 #include "llpcUtil.h"
+
+#define DEBUG_TYPE "llpc-pipeline-dumper"
 
 using namespace llvm;
 using namespace MetroHash;

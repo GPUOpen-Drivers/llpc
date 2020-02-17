@@ -28,12 +28,12 @@
  * @brief LLPC source file: contains implementation of class Llpc::PassDeadFuncRemove.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-pass-dead-func-remove"
-
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "llpcPassDeadFuncRemove.h"
+
+#define DEBUG_TYPE "llpc-pass-dead-func-remove"
 
 using namespace llvm;
 using namespace Llpc;

@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::PatchInOutImportExport.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-patch-in-out-import-export"
-
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"
@@ -44,6 +42,8 @@
 #include "llpcPipelineShaders.h"
 #include "llpcTargetInfo.h"
 #include "llpcVertexFetch.h"
+
+#define DEBUG_TYPE "llpc-patch-in-out-import-export"
 
 using namespace llvm;
 using namespace Llpc;

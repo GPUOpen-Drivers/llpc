@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::PipelineContext.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-pipeline-context"
-
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/Support/CommandLine.h"
@@ -39,6 +37,8 @@
 #include "llpcCompiler.h"
 #include "llpcPipelineContext.h"
 #include "llpcPipeline.h"
+
+#define DEBUG_TYPE "llpc-pipeline-context"
 
 namespace llvm
 {

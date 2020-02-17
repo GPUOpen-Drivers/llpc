@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::GraphicsContext.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-graphics-context"
-
 #include "llvm/Support/Format.h"
 
 #include "SPIRVInternal.h"
@@ -39,6 +37,8 @@
 #include "llpcGfx9Chip.h"
 #include "llpcGraphicsContext.h"
 #include "llpcInternal.h"
+
+#define DEBUG_TYPE "llpc-graphics-context"
 
 using namespace llvm;
 using namespace SPIRV;

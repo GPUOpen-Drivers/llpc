@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::PatchPeepholeOpt.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-patch-peephole-opt"
-
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
@@ -40,6 +38,8 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "llpcPatchPeepholeOpt.h"
+
+#define DEBUG_TYPE "llpc-patch-peephole-opt"
 
 using namespace Llpc;
 using namespace llvm;

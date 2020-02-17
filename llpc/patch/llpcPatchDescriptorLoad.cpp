@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::PatchDescriptorLoad.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-patch-descriptor-load"
-
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -37,6 +35,8 @@
 
 #include "llpcPatchDescriptorLoad.h"
 #include "llpcTargetInfo.h"
+
+#define DEBUG_TYPE "llpc-patch-descriptor-load"
 
 using namespace llvm;
 using namespace Llpc;

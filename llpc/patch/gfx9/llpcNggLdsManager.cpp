@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::NggLdsManager.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-ngg-lds-manager"
-
 #include "llvm/Linker/Linker.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
@@ -42,6 +40,8 @@
 #include "llpcPatch.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
+
+#define DEBUG_TYPE "llpc-ngg-lds-manager"
 
 using namespace llvm;
 

@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains declaration and implementation of class Llpc::PatchCopyShader.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-patch-copy-shader"
-
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
@@ -44,6 +42,8 @@
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
+
+#define DEBUG_TYPE "llpc-patch-copy-shader"
 
 using namespace Llpc;
 using namespace llvm;

@@ -28,11 +28,11 @@
  * @brief LLPC source file: contains implementation of class Llpc::ComputeContext.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-compute-context"
-
 #include "llpcComputeContext.h"
 #include "llpcPipeline.h"
 #include "SPIRVInternal.h"
+
+#define DEBUG_TYPE "llpc-compute-context"
 
 using namespace llvm;
 

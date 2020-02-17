@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of LLPC debug utility functions.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-debug"
-
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -45,6 +43,8 @@
 #include "llpcGfx9Chip.h"
 #include "llpcInternal.h"
 #include "llpcMetroHash.h"
+
+#define DEBUG_TYPE "llpc-debug"
 
 namespace llvm
 {

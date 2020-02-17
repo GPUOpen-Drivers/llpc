@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::ConfigBuilderBase.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-config-builder-base"
-
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
@@ -38,6 +36,8 @@
 #include "llpcAbiMetadata.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
+
+#define DEBUG_TYPE "llpc-config-builder-base"
 
 using namespace Llpc;
 using namespace llvm;

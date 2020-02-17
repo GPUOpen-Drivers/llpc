@@ -28,11 +28,11 @@
  * @brief LLPC header file: contains implementations for Gfx9 chips.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-gfx9-chip"
-
 #include <stdio.h>
 
 #include "llpcGfx9Chip.h"
+
+#define DEBUG_TYPE "llpc-gfx9-chip"
 
 namespace Llpc
 {

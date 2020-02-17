@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of LLPC internal-use utility functions.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-internal"
-
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "spirvExt.h"
@@ -50,6 +48,8 @@
 #include "llpcDebug.h"
 #include "llpcElfReader.h"
 #include "llpcInternal.h"
+
+#define DEBUG_TYPE "llpc-internal"
 
 using namespace llvm;
 

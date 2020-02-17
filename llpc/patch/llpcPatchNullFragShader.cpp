@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains declaration and implementation of class Llpc::PatchNullFragShader.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-patch-null-frag-shader"
-
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
@@ -42,6 +40,8 @@
 #include "llpcInternal.h"
 #include "llpcPatch.h"
 #include "llpcPipelineState.h"
+
+#define DEBUG_TYPE "llpc-patch-null-frag-shader"
 
 using namespace Llpc;
 using namespace llvm;

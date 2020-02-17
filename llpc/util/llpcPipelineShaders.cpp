@@ -28,14 +28,14 @@
 * @brief LLPC source file: contains implementation of class Llpc::PipelineShaders
 ***********************************************************************************************************************
 */
-#define DEBUG_TYPE "llpc-pipeline-shaders"
-
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 
 #include "llpcInternal.h"
 #include "llpcPipelineShaders.h"
+
+#define DEBUG_TYPE "llpc-pipeline-shaders"
 
 using namespace llvm;
 using namespace Llpc;

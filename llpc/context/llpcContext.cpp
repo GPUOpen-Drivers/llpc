@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::Context.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-context"
-
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitstream/BitstreamReader.h"
@@ -53,6 +51,8 @@
 #include "llpcPipelineContext.h"
 #include "llpcShaderCache.h"
 #include "llpcShaderCacheManager.h"
+
+#define DEBUG_TYPE "llpc-context"
 
 using namespace llvm;
 
