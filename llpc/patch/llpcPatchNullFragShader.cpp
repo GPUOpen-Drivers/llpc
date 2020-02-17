@@ -191,4 +191,3 @@ bool PatchNullFragShader::runOnModule(
 // =====================================================================================================================
 // Initializes the pass
 INITIALIZE_PASS(PatchNullFragShader, DEBUG_TYPE, "Patch LLVM for null fragment shader generation", false, false)
-

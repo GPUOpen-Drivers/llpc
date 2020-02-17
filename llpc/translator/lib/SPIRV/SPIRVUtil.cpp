@@ -37,7 +37,6 @@
 /// reader/writer.
 ///
 //===----------------------------------------------------------------------===//
-
 #include "SPIRVInternal.h"
 
 #define DEBUG_TYPE "spirv"

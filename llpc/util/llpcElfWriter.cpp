@@ -1105,7 +1105,7 @@ Result ElfWriter<Elf>::LinkComputeRelocatableElf(
 {
     // Currently nothing to do, just copy the elf.
     CopyFromReader(relocatableElf);
-    
+
     // Apply relocations
     // There are no relocations to apply yet.
 
