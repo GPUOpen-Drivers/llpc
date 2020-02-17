@@ -436,6 +436,169 @@ private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplImage)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplImage)
 
+    // Represents the type of sampler filter.
+    enum class SamplerFilter : uint32_t
+    {
+        Nearest = 0,
+        Linear,
+    };
+
+    // Represents the YCbCr conversion model.
+    enum class SamplerYCbCrModelConversion : uint32_t
+    {
+        RgbIdentity = 0,
+        YCbCrIdentity,
+        YCbCr709,
+        YCbCr601,
+        YCbCr2020,
+    };
+
+    // Represents whether color channels are encoded using the full range of numerical
+    // values or whether values are reserved for headroom and foot room.
+    enum class SamplerYCbCrRange : uint32_t
+    {
+        ItuFull = 0,
+        ItuNarrow,
+    };
+
+    // Represents the location of downsampled chroma channel samples relative to the luma samples.
+    enum class ChromaLocation : uint32_t
+    {
+        CositedEven = 0,
+        Midpoint,
+    };
+
+    // Represents the component values placed in each component of the output vector.
+    class ComponentSwizzle
+    {
+    public:
+        enum Value: uint32_t
+        {
+            Identity = 0,
+            Zero,
+            One,
+            R,
+            G,
+            B,
+            A,
+        };
+
+        ComponentSwizzle() = default;
+        ComponentSwizzle(const Value& swizzle) : value(swizzle) {};
+        ComponentSwizzle(const uint32_t swizzle) { value = static_cast<Value>(swizzle); }
+
+        operator Value() const { return value; }
+        ComponentSwizzle& operator=(uint32_t op) { value = static_cast<Value>(op); return *this; }
+        constexpr uint32_t operator-(ComponentSwizzle::Value op) const { return value - op; }
+        constexpr bool operator!=(ComponentSwizzle::Value op) const { return value != op; }
+        constexpr bool operator==(ComponentSwizzle::Value op) const { return value == op; }
+
+    private:
+        Value value;
+    };
+
+    // General YCbCr sample info
+    struct YCbCrSampleInfo
+    {
+        Type*              pResultTy;
+        uint32_t           dim;
+        uint32_t           flags;
+        Value*             pImageDesc;
+        Value*             pSamplerDesc;
+        ArrayRef<Value*>   address;
+        const Twine&       instName;
+        bool               isSample;
+    };
+
+    // YCbCr sample info for downsampled chroma channels in the X dimension
+    struct XChromaSampleInfo
+    {
+        YCbCrSampleInfo*   pYCbCrInfo;
+        Value*             pImageDesc1;
+        Value*             pI;
+        Value*             pJ;
+        Value*             pChromaWidth;
+        Value*             pChromaHeight;
+        ChromaLocation     xChromaOffset;
+    };
+
+    // YCbCr sample info for downsampled chroma channels in both X and Y dimension
+    struct XYChromaSampleInfo : XChromaSampleInfo
+    {
+        Value*             pImageDesc2;
+        uint32_t           planeNum;
+        ChromaLocation     yChromaOffset;
+    };
+
+    // YCbCr wrapped sample info
+    struct YCbCrWrappedSampleInfo : XYChromaSampleInfo
+    {
+        Value*             pImageDesc3;
+        bool               subsampledX;
+        bool               subsampledY;
+    };
+
+    // Replace [beginBit, beginBit + adjustBits) bits with pData in specific pWord
+    Value* ReplaceBitsInWord(Value*   pWord,
+                             uint32_t beginBit,
+                             uint32_t adjustBits,
+                             Value*   pData);
+
+    // Implement transfer from ST coordinates to UV coordiantes operation
+    Value* TransferSTtoUVCoords(Value* pST,
+                                Value* pSize);
+
+    // Implement the adjustment of UV coordiantes when the sample location associated with
+    // downsampled chroma channels in the X/XY dimension occurs
+    Value* YCbCrCalculateImplicitChromaUV(ChromaLocation offset,
+                                          Value*         pUV);
+
+    // Transfer IJ coordinates from UV coordinates
+    Value* TransferUVtoIJCoords(SamplerFilter filter,
+                                Value*        pUV);
+
+    // Calculate UV offset to top-left pixel
+    Value* CalculateUVoffset(Value* pUV);
+
+    // Implement bilinear blending
+    Value* BilinearBlend(Value* pAlpha,
+                         Value* pBeta,
+                         Value* pTL,
+                         Value* pTR,
+                         Value* pBL,
+                         Value* pBR);
+
+    // Implement wrapped YCbCr sample
+    Value* YCbCrWrappedSample(YCbCrWrappedSampleInfo& wrapInfo);
+
+    // Implement reconstructed YCbCr sample operation for downsampled chroma channels in the X dimension
+    Value* YCbCrReconstructLinearXChromaSample(XChromaSampleInfo& xChromaInfo);
+
+    // Implement reconstructed YCbCr sample operation for downsampled chroma channels in both X and Y dimension
+    Value* YCbCrReconstructLinearXYChromaSample(XYChromaSampleInfo& xyChromaInfo);
+
+    // Implement interanl image sample for YCbCr conversion
+    Value* YCbCrCreateImageSampleInternal(SmallVectorImpl<Value*>& coords,
+                                          YCbCrSampleInfo*         pYCbCrInfo);
+
+    // Generate sampler descriptor for YCbCr conversion
+    Value* YCbCrGenerateSamplerDesc(Value*        pSamplerDesc,
+                                    SamplerFilter filter,
+                                    bool          forceExplicitReconstruction);
+
+    // Implement range expanding operation on checking whether the encoding uses full numerical range on chroma channel
+    Value* YCbCrRangeExpand(SamplerYCbCrRange  range,
+                            const uint32_t*    pBits,
+                            Value*             pSample);
+
+    // Implement the color transfer operation for conversion from YCbCr to RGB color model
+    Value* YCbCrConvertColor(Type*                       pResultTy,
+                             SamplerYCbCrModelConversion colorModel,
+                             SamplerYCbCrRange           range,
+                             uint32_t*                   pBits,
+                             Value*                      pImageOp);
+
+
     // Implement pre-GFX9 integer gather workaround to patch descriptor or coordinate before the gather
     Value* PreprocessIntegerImageGather(uint32_t dim, Value*& pImageDesc, Value*& pCoord);
 
@@ -456,6 +619,17 @@ private:
                                    ArrayRef<Value*> address,
                                    const Twine&     instName,
                                    bool             isSample);
+
+    // Common code to create an image YCbCr sample.
+    Value* CreateImageYCbCrSample(Type*            pResultTy,
+                                  uint32_t         dim,
+                                  uint32_t         flags,
+                                  Value*           pCoord,
+                                  Value*           pImageDesc,
+                                  Value*           pSamplerDesc,
+                                  ArrayRef<Value*> address,
+                                  const Twine&     instName,
+                                  bool             isSample);
 
     // Common code for CreateImageAtomic and CreateImageAtomicCompareSwap
     Value* CreateImageAtomicCommon(uint32_t          atomicOp,
