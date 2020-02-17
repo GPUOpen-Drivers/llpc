@@ -571,4 +571,3 @@ if(LLPC_BUILD_LIT)
     add_subdirectory(test)
 endif()
 endif()
-

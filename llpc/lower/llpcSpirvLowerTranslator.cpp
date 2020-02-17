@@ -23,10 +23,10 @@
  *
  **********************************************************************************************************************/
 /**
-***********************************************************************************************************************
-* @file  llpcSpirvLowerTranslator.cpp
-* @brief LLPC source file: contains implementation of Llpc::SpirvLowerTranslator
-***********************************************************************************************************************
+ ***********************************************************************************************************************
+ * @file  llpcSpirvLowerTranslator.cpp
+ * @brief LLPC source file: contains implementation of Llpc::SpirvLowerTranslator
+ ***********************************************************************************************************************
 */
 #include "llpcBuilder.h"
 #include "llpcCompiler.h"
@@ -167,4 +167,3 @@ void SpirvLowerTranslator::TranslateSpirvToLlvm(
 // =====================================================================================================================
 // Initializes the pass
 INITIALIZE_PASS(SpirvLowerTranslator, DEBUG_TYPE, "LLPC translate SPIR-V binary to LLVM IR", false, false)
-

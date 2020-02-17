@@ -1738,7 +1738,7 @@ Result Compiler::BuildComputePipeline(
     BinaryData elfBin = {};
 
     bool buildingRelocatableElf = CanUseRelocatableComputeShaderElf(&pPipelineInfo->cs);
-    
+
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 32
     // NOTE: It is to workaround the bug in Device::CreateInternalComputePipeline,
     // we forgot to set the entryStage in it. To keep backward compatibility, set the entryStage within LLPC.
@@ -2364,7 +2364,7 @@ void Compiler::LinkRelocatableShaderElf(
         }
         result = writer.LinkComputeRelocatableElf(csReader, pContext);
     }
-    
+
     if (result != Result::Success)
     {
         return;
@@ -2373,4 +2373,3 @@ void Compiler::LinkRelocatableShaderElf(
 }
 
 } // Llpc
-

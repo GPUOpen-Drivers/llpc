@@ -1339,4 +1339,3 @@ bool PipelineStateWrapper::doFinalization(
 // =====================================================================================================================
 // Initialize the pipeline state wrapper pass
 INITIALIZE_PASS(PipelineStateWrapper, DEBUG_TYPE, "LLPC pipeline state wrapper", false, true)
-

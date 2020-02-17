@@ -204,4 +204,3 @@ void PatchLoadScalarizer::visitLoadInst(
 // Initializes the pass of LLVM patching operations for load scarlarizer optimization.
 INITIALIZE_PASS(PatchLoadScalarizer, DEBUG_TYPE,
                 "Patch LLVM for load scarlarizer optimization", false, false)
-

@@ -108,4 +108,3 @@ ShaderStage PipelineShaders::GetShaderStage(
 // =====================================================================================================================
 // Initializes the pass
 INITIALIZE_PASS(PipelineShaders, DEBUG_TYPE, "LLVM pass for getting pipeline shaders", false, true)
-
