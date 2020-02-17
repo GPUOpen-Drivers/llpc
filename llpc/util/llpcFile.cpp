@@ -28,11 +28,11 @@
  * @brief LLPC source file: contains implementation of utility collection class Llpc::File.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-file"
-
 #include "llpcFile.h"
 #include <stdarg.h>
 #include <sys/stat.h>
+
+#define DEBUG_TYPE "llpc-file"
 
 namespace Llpc
 {

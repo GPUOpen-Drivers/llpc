@@ -28,12 +28,12 @@
  * @brief LLPC source file: contains implementation of class Llpc::PatchCheckShaderCache.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-patch-check-shader-cache"
-
 #include "llvm/Support/Debug.h"
 
 #include "llpcPatchCheckShaderCache.h"
 #include "llpcPipelineShaders.h"
+
+#define DEBUG_TYPE "llpc-patch-check-shader-cache"
 
 using namespace llvm;
 using namespace Llpc;

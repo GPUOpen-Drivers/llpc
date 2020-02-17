@@ -28,14 +28,14 @@
  * @brief LLPC header file: contains implementation of class Llpc::Gfx6::ConfigBuilder.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-gfx6-config-builder"
-
 #include "llpcAbiMetadata.h"
 #include "llpcCodeGenManager.h"
 #include "llpcGfx6ConfigBuilder.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
 #include "llvm/Support/CommandLine.h"
+
+#define DEBUG_TYPE "llpc-gfx6-config-builder"
 
 namespace llvm
 {

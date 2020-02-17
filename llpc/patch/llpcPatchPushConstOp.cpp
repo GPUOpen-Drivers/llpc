@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::PatchPushConstOp.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-patch-push-const"
-
 #include "llvm/IR/ValueMap.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -39,6 +37,8 @@
 #include "llpcPatchPushConstOp.h"
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
+
+#define DEBUG_TYPE "llpc-patch-push-const"
 
 using namespace llvm;
 using namespace Llpc;

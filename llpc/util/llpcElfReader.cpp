@@ -28,11 +28,11 @@
  * @brief LLPC source file: contains implementation of LLPC ELF reading utilities.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-elf-reader"
-
 #include <algorithm>
 #include <string.h>
 #include "llpcElfReader.h"
+
+#define DEBUG_TYPE "llpc-elf-reader"
 
 using namespace llvm;
 

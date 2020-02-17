@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::PipelineState.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-pipeline-state"
-
 #include "llpc.h"
 #include "llpcBuilderContext.h"
 #include "llpcBuilderRecorder.h"
@@ -48,6 +46,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Target/TargetMachine.h"
+
+#define DEBUG_TYPE "llpc-pipeline-state"
 
 using namespace Llpc;
 using namespace llvm;

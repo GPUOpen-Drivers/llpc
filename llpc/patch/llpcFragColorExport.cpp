@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::FragColorExport.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-frag-color-export"
-
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
@@ -39,6 +37,8 @@
 #include "llpcIntrinsDefs.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
+
+#define DEBUG_TYPE "llpc-frag-color-export"
 
 using namespace llvm;
 

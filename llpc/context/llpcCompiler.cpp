@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::Compiler.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-compiler"
-
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/IRPrintingPasses.h"
@@ -74,6 +72,8 @@
     #define SPVGEN_STATIC_LIB 1
     #include "spvgen.h"
 #endif
+
+#define DEBUG_TYPE "llpc-compiler"
 
 using namespace llvm;
 using namespace MetroHash;

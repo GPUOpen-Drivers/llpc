@@ -28,13 +28,13 @@
  @brief LLPC source file: contains implementation of class Llpc::ShaderCache.
  ***********************************************************************************************************************
 */
-#define DEBUG_TYPE "llpc-shader-cache"
-
 #include <string.h>
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/FileSystem.h"
 #include "llpcShaderCache.h"
 #include "llvm/Support/DJB.h"
+
+#define DEBUG_TYPE "llpc-shader-cache"
 
 using namespace llvm;
 

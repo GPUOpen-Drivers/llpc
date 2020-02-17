@@ -28,7 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerGlobal.
  ***********************************************************************************************************************
  */
-
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Instructions.h"

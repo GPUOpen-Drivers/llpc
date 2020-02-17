@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of LLPC ELF writing utilities.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-elf-writer"
-
 #include <algorithm>
 #include <string.h>
 #include "llvm/ADT/SmallString.h"
@@ -39,6 +37,8 @@
 #include "llpcElfWriter.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
+
+#define DEBUG_TYPE "llpc-elf-writer"
 
 using namespace llvm;
 

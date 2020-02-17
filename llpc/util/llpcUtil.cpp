@@ -29,8 +29,6 @@
  * (independent of LLVM use).
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-util"
-
 #include "llpc.h"
 #include "llpcDebug.h"
 #include "llpcElfReader.h"
@@ -46,6 +44,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #endif
+
+#define DEBUG_TYPE "llpc-util"
 
 namespace Llpc
 {
