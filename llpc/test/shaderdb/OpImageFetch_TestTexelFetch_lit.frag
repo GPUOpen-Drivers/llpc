@@ -44,7 +44,7 @@ void main()
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.2d.v4f32.i32(i32 15, i32 7, i32 7, i32 8,{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i32(i32 15, i32 3, i32 3,{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.struct.buffer.load.format.v4f32({{.*}}, i32 5, i32 0, i32 0, i32 0)
-; SHADERTEST: call float @llvm.amdgcn.image.load.2d.f32.i32(i32 1, i32 6, i32 6, <8 x i32> %{{[-0-9A-Za0z_.]+}}, i32 0, i32 0)
+; SHADERTEST: call i32 @llvm.amdgcn.image.load.2d.i32.i32(i32 1, i32 6, i32 6, <8 x i32> %{{[-0-9A-Za0z_.]+}}, i32 0, i32 0)
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2dmsaa.v4f32.i32(i32 15, i32 6, i32 6,{{.*}},{{.*}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -907,11 +907,19 @@ Value* BuilderImplImage::CreateImageLoad(
     pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
 
     uint32_t dmask = 1;
-    Type* pTexelTy = pResultTy;
+    Type* pOrigTexelTy = pResultTy;
     if (auto pStructResultTy = dyn_cast<StructType>(pResultTy))
     {
-        pTexelTy = pStructResultTy->getElementType(0);
+        pOrigTexelTy = pStructResultTy->getElementType(0);
     }
+
+    Type* pTexelTy = pOrigTexelTy;
+    if (pOrigTexelTy->isIntOrIntVectorTy(64))
+    {
+        // Only load the first component for 64-bit texel, casted to <2 x i32>
+        pTexelTy = VectorType::get(getInt32Ty(), 2);
+    }
+
     if (auto pVectorResultTy = dyn_cast<VectorType>(pTexelTy))
     {
         dmask = (1U << pVectorResultTy->getNumElements()) - 1;
@@ -928,20 +936,19 @@ Value* BuilderImplImage::CreateImageLoad(
                             coords,
                             derivatives);
 
-    // The intrinsics insist on an FP data type, so we need to bitcast if we want an integer data type.
-    Type* pIntrinsicDataTy = pResultTy;
-    if (pTexelTy->isIntOrIntVectorTy())
+    Type* pIntrinsicDataTy = nullptr;
+    if (isa<StructType>(pResultTy))
     {
-        pIntrinsicDataTy = ConvertToFloatingPointType(pTexelTy);
-        if (pTexelTy != pResultTy)
-        {
-            // TFE
-            pIntrinsicDataTy = StructType::get(pTexelTy->getContext(), { pTexelTy, getInt32Ty() });
-        }
+        // TFE
+        pIntrinsicDataTy = StructType::get(pTexelTy->getContext(), { pTexelTy, getInt32Ty() });
+    }
+    else
+    {
+        pIntrinsicDataTy = pTexelTy;
     }
 
     SmallVector<Value*, 16> args;
-    Value *pResult = nullptr;
+    Value* pResult = nullptr;
     uint32_t imageDescArgIndex = 0;
     if (pImageDesc->getType() == GetImageDescTy())
     {
@@ -984,29 +991,47 @@ Value* BuilderImplImage::CreateImageLoad(
                                   instName);
     }
 
-    // Add a waterfall loop if needed.
-    if (flags & ImageFlagNonUniformImage)
+    // For 64-bit texel, only the first component is loaded, other components are filled in with (0, 0, 1). This
+    // operation could be viewed as supplement of the intrinsic call.
+    if (pOrigTexelTy->isIntOrIntVectorTy(64))
     {
-        pResult = CreateWaterfallLoop(cast<Instruction>(pResult), imageDescArgIndex);
-    }
+        Value* pTexel = pResult;
+        if (isa<StructType>(pResultTy))
+        {
+            pTexel = CreateExtractValue(pResult, uint64_t(0));
+        }
+        pTexel = CreateBitCast(pTexel, getInt64Ty()); // Casted to i64
 
-    // If we had to change the result type from int to FP above, bitcast the result.
-    if (pIntrinsicDataTy != pResultTy)
-    {
-        if (isa<StructType>(pIntrinsicDataTy))
+        if (pOrigTexelTy->isVectorTy())
+        {
+            pTexel = CreateInsertElement(UndefValue::get(pOrigTexelTy), pTexel, uint64_t(0));
+
+            SmallVector<Value*, 3> defaults = { getInt64(0), getInt64(0), getInt64(1) };
+            for (uint32_t i = 1; i < pOrigTexelTy->getVectorNumElements(); ++i)
+            {
+                pTexel = CreateInsertElement(pTexel, defaults[i - 1], i);
+            }
+        }
+
+        if (isa<StructType>(pResultTy))
         {
             // TFE
-            pResult = CreateInsertValue(CreateInsertValue(UndefValue::get(pResultTy),
-                                                          CreateBitCast(CreateExtractValue(pResult, uint64_t(0)),
-                                                                        pTexelTy),
-                                                          uint64_t(0)),
+            pIntrinsicDataTy = StructType::get(pOrigTexelTy->getContext(), { pOrigTexelTy, getInt32Ty() });
+            pResult = CreateInsertValue(CreateInsertValue(UndefValue::get(pIntrinsicDataTy), pTexel, uint64_t(0)),
                                         CreateExtractValue(pResult, 1),
                                         1);
         }
         else
         {
-            pResult = CreateBitCast(pResult, pResultTy);
+            pIntrinsicDataTy = pOrigTexelTy;
+            pResult = pTexel;
         }
+    }
+
+    // Add a waterfall loop if needed.
+    if (flags & ImageFlagNonUniformImage)
+    {
+        pResult = CreateWaterfallLoop(cast<Instruction>(pResult), imageDescArgIndex);
     }
 
     return pResult;
@@ -1078,7 +1103,7 @@ Value* BuilderImplImage::CreateImageLoadWithFmask(
 // =====================================================================================================================
 // Create an image store.
 Value* BuilderImplImage::CreateImageStore(
-    Value*            pTexel,             // [in] Texel value to store; v4i16, v4i32, v4f16 or v4f32
+    Value*            pTexel,             // [in] Texel value to store; v4i16, v4i32, v4i64, v4f16 or v4f32
     uint32_t          dim,                // Image dimension
     uint32_t          flags,              // ImageFlag* flags
     Value*            pImageDesc,         // [in] Image descriptor
@@ -1090,6 +1115,16 @@ Value* BuilderImplImage::CreateImageStore(
     LLPC_ASSERT(pCoord->getType()->getScalarType()->isIntegerTy(32));
     pImageDesc = PatchCubeDescriptor(pImageDesc, dim);
     pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
+
+    // For 64-bit texel, only the first component is stored
+    if (pTexel->getType()->isIntOrIntVectorTy(64))
+    {
+        if (pTexel->getType()->isVectorTy())
+        {
+            pTexel = CreateExtractElement(pTexel, uint64_t(0));
+        }
+        pTexel = CreateBitCast(pTexel, VectorType::get(getFloatTy(), 2)); // Casted to <2 x float>
+    }
 
     // The intrinsics insist on an FP data type, so we need to bitcast from an integer data type.
     Type* pIntrinsicDataTy = pTexel->getType();
