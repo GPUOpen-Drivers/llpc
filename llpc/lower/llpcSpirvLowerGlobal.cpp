@@ -123,7 +123,6 @@ SpirvLowerGlobal::SpirvLowerGlobal()
     m_lowerInputInPlace(false),
     m_lowerOutputInPlace(false)
 {
-    initializeSpirvLowerGlobalPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

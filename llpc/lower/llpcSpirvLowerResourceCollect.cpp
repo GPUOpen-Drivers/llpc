@@ -70,7 +70,6 @@ SpirvLowerResourceCollect::SpirvLowerResourceCollect(
     m_pushConstSize(0),
     m_detailUsageValid(false)
 {
-    initializeSpirvLowerResourceCollectPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

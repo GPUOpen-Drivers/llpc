@@ -71,7 +71,6 @@ public:
     static char ID;
     PatchNullFragShader() : Patch(ID)
     {
-        initializePatchNullFragShaderPass(*PassRegistry::getPassRegistry());
     }
 
     void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override

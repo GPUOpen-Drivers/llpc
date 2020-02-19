@@ -43,7 +43,6 @@ public:
     static char ID;
     SpirvLowerTranslator() : SpirvLower(ID)
     {
-        initializeSpirvLowerTranslatorPass(*llvm::PassRegistry::getPassRegistry());
     }
 
     SpirvLowerTranslator(
@@ -51,7 +50,6 @@ public:
         const PipelineShaderInfo*   pShaderInfo)  // [in] Shader info for this shader
         : SpirvLower(ID), m_shaderStage(stage), m_pShaderInfo(pShaderInfo)
     {
-        initializeSpirvLowerTranslatorPass(*llvm::PassRegistry::getPassRegistry());
     }
 
     bool runOnModule(llvm::Module& module) override;

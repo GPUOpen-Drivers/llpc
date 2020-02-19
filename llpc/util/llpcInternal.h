@@ -57,8 +57,9 @@ class PassRegistry;
 class Timer;
 
 void initializePassDeadFuncRemovePass(PassRegistry&);
-void initializePassExternalLibLinkPass(PassRegistry&);
 void initializePipelineShadersPass(PassRegistry&);
+void initializePipelineStateClearerPass(PassRegistry&);
+void initializePipelineStateWrapperPass(PassRegistry&);
 void initializeStartStopTimerPass(PassRegistry&);
 
 } // llvm
@@ -75,6 +76,9 @@ inline static void InitializeUtilPasses(
 {
     initializePassDeadFuncRemovePass(passRegistry);
     initializePipelineShadersPass(passRegistry);
+    initializePipelineStateClearerPass(passRegistry);
+    initializePipelineStateWrapperPass(passRegistry);
+    initializeStartStopTimerPass(passRegistry);
 }
 
 namespace LlpcName

@@ -72,9 +72,6 @@ PatchDescriptorLoad::PatchDescriptorLoad()
     :
     Patch(ID)
 {
-    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
-    initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
-    initializePatchDescriptorLoadPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

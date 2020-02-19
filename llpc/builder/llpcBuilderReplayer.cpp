@@ -96,7 +96,6 @@ BuilderReplayer::BuilderReplayer(
     ModulePass(ID),
     BuilderRecorderMetadataKinds(static_cast<LLVMContext&>(pPipeline->GetContext()))
 {
-    initializeBuilderReplayerPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

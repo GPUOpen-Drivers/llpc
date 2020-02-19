@@ -58,7 +58,6 @@ PatchLlvmIrInclusion::PatchLlvmIrInclusion()
     :
     Patch(ID)
 {
-    initializePatchLlvmIrInclusionPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

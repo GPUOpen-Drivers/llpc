@@ -83,9 +83,6 @@ PatchResourceCollect::PatchResourceCollect()
     m_hasDynIndexedOutput(false),
     m_pResUsage(nullptr)
 {
-    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
-    initializePatchResourceCollectPass(*PassRegistry::getPassRegistry());
-
     m_pLocationMapManager.reset(new InOutLocationMapManager);
 }
 

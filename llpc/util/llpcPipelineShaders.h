@@ -36,13 +36,6 @@
 
 #include "llpc.h"
 
-namespace llvm
-{
-
-void initializePipelineShadersPass(PassRegistry&);
-
-} // llvm
-
 namespace Llpc
 {
 
@@ -54,7 +47,6 @@ public:
     static char ID;
     PipelineShaders() : ModulePass(ID)
     {
-        initializePipelineShadersPass(*llvm::PassRegistry::getPassRegistry());
     }
 
     bool runOnModule(llvm::Module& module) override;

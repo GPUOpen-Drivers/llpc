@@ -61,8 +61,6 @@ public:
         Patch(ID),
         m_onlySetCallingConvs(onlySetCallingConvs)
     {
-        initializePipelineShadersPass(*llvm::PassRegistry::getPassRegistry());
-        initializePatchPreparePipelineAbiPass(*PassRegistry::getPassRegistry());
     }
 
     bool runOnModule(Module& module) override;
