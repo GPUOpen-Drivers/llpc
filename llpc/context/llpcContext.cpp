@@ -93,6 +93,10 @@ BuilderContext* Context::GetBuilderContext()
         std::string gpuName;
         PipelineContext::GetGpuNameString(m_gfxIp, gpuName);
         m_builderContext.reset(BuilderContext::Create(*this, gpuName));
+        if (!m_builderContext)
+        {
+            report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
+        }
     }
     return &*m_builderContext;
 }
