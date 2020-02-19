@@ -1,0 +1,46 @@
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: call void (...) @llpc.call.image.store(<4 x i64>
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: call void @llvm.amdgcn.image.store.2d.v2f32.i32(<2 x float>
+; SHADERTEST: AMDLLPC SUCCESS
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 8
+; Bound: 19
+; Schema: 0
+               OpCapability Shader
+               OpCapability Int64
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %main "main" %u64v4
+               OpSource GLSL 450
+               OpSourceExtension "GL_ARB_gpu_shader_int64"
+               OpName %main "main"
+               OpName %u642D "u642D"
+               OpName %u64v4 "u64v4"
+               OpDecorate %u642D DescriptorSet 0
+               OpDecorate %u642D Binding 0
+               OpDecorate %u64v4 Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %ulong = OpTypeInt 64 0
+          %7 = OpTypeImage %ulong 2D 0 0 0 2 Unknown
+%_ptr_UniformConstant_7 = OpTypePointer UniformConstant %7
+      %u642D = OpVariable %_ptr_UniformConstant_7 UniformConstant
+        %int = OpTypeInt 32 1
+      %v2int = OpTypeVector %int 2
+      %int_3 = OpConstant %int 3
+         %14 = OpConstantComposite %v2int %int_3 %int_3
+    %v4ulong = OpTypeVector %ulong 4
+%_ptr_Input_v4ulong = OpTypePointer Input %v4ulong
+      %u64v4 = OpVariable %_ptr_Input_v4ulong Input
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %10 = OpLoad %7 %u642D
+         %18 = OpLoad %v4ulong %u64v4
+               OpImageWrite %10 %14 %18
+               OpReturn
+               OpFunctionEnd

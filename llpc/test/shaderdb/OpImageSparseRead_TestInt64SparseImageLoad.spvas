@@ -1,0 +1,52 @@
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: call { <4 x i64>, i32 } (...) @"llpc.call.image.load.s[v4i64,i32]"
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: call { <2 x i32>, i32 } @llvm.amdgcn.image.load.2d.sl_v2i32i32s.i32
+; SHADERTEST: AMDLLPC SUCCESS
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 8
+; Bound: 22
+; Schema: 0
+               OpCapability Shader
+               OpCapability Int64
+               OpCapability SparseResidency
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %main "main" %i64v4
+               OpSource GLSL 450
+               OpSourceExtension "GL_ARB_gpu_shader_int64"
+               OpSourceExtension "GL_ARB_sparse_texture2"
+               OpName %main "main"
+               OpName %i642D "i642D"
+               OpName %i64v4 "i64v4"
+               OpName %ResType "ResType"
+               OpDecorate %i642D DescriptorSet 0
+               OpDecorate %i642D Binding 0
+               OpDecorate %i64v4 Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+       %long = OpTypeInt 64 1
+          %7 = OpTypeImage %long 2D 0 0 0 2 Unknown
+%_ptr_UniformConstant_7 = OpTypePointer UniformConstant %7
+      %i642D = OpVariable %_ptr_UniformConstant_7 UniformConstant
+        %int = OpTypeInt 32 1
+      %v2int = OpTypeVector %int 2
+      %int_3 = OpConstant %int 3
+         %14 = OpConstantComposite %v2int %int_3 %int_3
+     %v4long = OpTypeVector %long 4
+%_ptr_Output_v4long = OpTypePointer Output %v4long
+      %i64v4 = OpVariable %_ptr_Output_v4long Output
+    %ResType = OpTypeStruct %int %v4long
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %10 = OpLoad %7 %i642D
+         %19 = OpImageSparseRead %ResType %10 %14
+         %20 = OpCompositeExtract %v4long %19 1
+               OpStore %i64v4 %20
+         %21 = OpCompositeExtract %int %19 0
+               OpReturn
+               OpFunctionEnd
