@@ -61,7 +61,6 @@ PatchLoadScalarizer::PatchLoadScalarizer()
     :
     FunctionPass(ID)
 {
-    initializePatchLoadScalarizerPass(*PassRegistry::getPassRegistry());
     m_scalarThreshold = 0;
 }
 

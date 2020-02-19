@@ -57,7 +57,6 @@ PassDeadFuncRemove::PassDeadFuncRemove()
     :
     llvm::ModulePass(ID)
 {
-    initializePassDeadFuncRemovePass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

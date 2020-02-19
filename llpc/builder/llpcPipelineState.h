@@ -44,11 +44,7 @@ namespace llvm
 
 class MDString;
 class NamedMDNode;
-class PassRegistry;
 class Timer;
-
-void initializePipelineStateWrapperPass(PassRegistry&);
-void initializePipelineStateClearerPass(PassRegistry&);
 
 } // llvm
 

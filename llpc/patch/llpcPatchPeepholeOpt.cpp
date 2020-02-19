@@ -37,6 +37,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "llpcPatch.h"
 #include "llpcPatchPeepholeOpt.h"
 
 #define DEBUG_TYPE "llpc-patch-peephole-opt"
@@ -78,7 +79,6 @@ PatchPeepholeOpt::PatchPeepholeOpt(
     :
     FunctionPass(ID)
 {
-    initializePatchPeepholeOptPass(*PassRegistry::getPassRegistry());
     m_enableDiscardOpt = enableDiscardOpt;
 }
 

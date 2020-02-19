@@ -70,10 +70,6 @@ PatchInOutImportExport::PatchInOutImportExport()
 {
     memset(&m_gfxIp, 0, sizeof(m_gfxIp));
     InitPerShader();
-
-    initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
-    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
-    initializePatchInOutImportExportPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

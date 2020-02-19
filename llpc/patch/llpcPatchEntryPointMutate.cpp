@@ -82,9 +82,6 @@ PatchEntryPointMutate::PatchEntryPointMutate()
     m_hasTs(false),
     m_hasGs(false)
 {
-    initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
-    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
-    initializePatchEntryPointMutatePass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

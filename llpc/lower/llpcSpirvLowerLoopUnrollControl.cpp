@@ -77,7 +77,6 @@ SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl()
     m_forceLoopUnrollCount(0),
     m_disableLicm(false)
 {
-    initializeSpirvLowerLoopUnrollControlPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
@@ -88,7 +87,6 @@ SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl(
     m_forceLoopUnrollCount(forceLoopUnrollCount),
     m_disableLicm(false)
 {
-    initializeSpirvLowerLoopUnrollControlPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

@@ -59,8 +59,6 @@ public:
     static char ID;
     PatchCopyShader() : Patch(ID)
     {
-        initializePipelineShadersPass(*PassRegistry::getPassRegistry());
-        initializePatchCopyShaderPass(*PassRegistry::getPassRegistry());
     }
 
     bool runOnModule(Module& module) override;

@@ -62,7 +62,6 @@ SpirvLowerMemoryOp::SpirvLowerMemoryOp()
     :
     SpirvLower(ID)
 {
-    initializeSpirvLowerMemoryOpPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

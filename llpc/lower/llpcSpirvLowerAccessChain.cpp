@@ -61,7 +61,6 @@ SpirvLowerAccessChain::SpirvLowerAccessChain()
     :
     SpirvLower(ID)
 {
-    initializeSpirvLowerAccessChainPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

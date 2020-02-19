@@ -62,8 +62,6 @@ PatchPushConstOp::PatchPushConstOp()
     :
     Patch(ID)
 {
-    initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
-    initializePatchPushConstOpPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

@@ -61,7 +61,6 @@ SpirvLowerInstMetaRemove::SpirvLowerInstMetaRemove()
     SpirvLower(ID),
     m_changed(false)
 {
-    initializeSpirvLowerInstMetaRemovePass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

@@ -50,7 +50,6 @@ public:
     StartStopTimer() : ModulePass(ID) {}
     StartStopTimer(Timer* pTimer, bool starting) : ModulePass(ID), m_pTimer(pTimer), m_starting(starting)
     {
-        initializeStartStopTimerPass(*llvm::PassRegistry::getPassRegistry());
     }
 
     bool runOnModule(Module& module) override;

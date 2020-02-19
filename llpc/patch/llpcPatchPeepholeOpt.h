@@ -38,14 +38,6 @@
 #include "llpcDebug.h"
 #include "llpcInternal.h"
 
-namespace llvm
-{
-
-class PassRegistry;
-void initializePatchPeepholeOptPass(PassRegistry&);
-
-} // llvm
-
 namespace Llpc
 {
 

@@ -79,8 +79,6 @@ PatchCheckShaderCache::PatchCheckShaderCache()
     :
     Patch(ID)
 {
-    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
-    initializePatchCheckShaderCachePass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

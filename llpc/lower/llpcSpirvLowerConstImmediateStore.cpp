@@ -62,7 +62,6 @@ SpirvLowerConstImmediateStore::SpirvLowerConstImmediateStore()
     :
     SpirvLower(ID)
 {
-    initializeSpirvLowerConstImmediateStorePass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

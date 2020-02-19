@@ -51,7 +51,6 @@ public:
     static char ID;
     PatchSetupTargetFeatures() : Patch(ID)
     {
-        initializePatchSetupTargetFeaturesPass(*PassRegistry::getPassRegistry());
     }
 
     void getAnalysisUsage(AnalysisUsage& analysisUsage) const override

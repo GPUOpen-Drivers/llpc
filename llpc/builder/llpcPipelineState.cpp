@@ -1324,7 +1324,6 @@ PipelineStateWrapper::PipelineStateWrapper(
     ImmutablePass(ID),
     m_pBuilderContext(pBuilderContext)
 {
-    initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================

@@ -76,7 +76,6 @@ SpirvLowerAlgebraTransform::SpirvLowerAlgebraTransform(
     m_enableFloatOpt(enableFloatOpt),
     m_changed(false)
 {
-    initializeSpirvLowerAlgebraTransformPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
