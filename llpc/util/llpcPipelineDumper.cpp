@@ -574,7 +574,7 @@ void PipelineDumper::DumpPipelineShaderInfo(
 
                 for (uint32_t k = 0; k < DescriptorSizeInDw -1; ++k)
                 {
-                     dumpFile << pDescriptorRangeValue->pValue[i] << ", ";
+                     dumpFile << pDescriptorRangeValue->pValue[k] << ", ";
                 }
                 dumpFile << pDescriptorRangeValue->pValue[DescriptorSizeInDw - 1] << "\n";
             }
