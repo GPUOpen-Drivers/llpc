@@ -265,7 +265,10 @@ bool IsNonUniformValue(llvm::Value* pValue, std::unordered_set<llvm::Value*>& ch
 // Checks whether the input data is actually a ELF binary
 bool IsElfBinary(const void* pData, size_t dataSize);
 
-// Checks whether the output data is actually ISA assembler text
+// Checks whether the input data is actually LLVM bitcode
+bool IsLlvmBitcode(const void* pData, size_t dataSize);
+
+// Checks whether the output data is actually ISA assembly text
 bool IsIsaText(const void* pData, size_t dataSize);
 
 } // Llpc

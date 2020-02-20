@@ -38,6 +38,7 @@
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/CommandFlags.inc"
 #include "llvm/InitializePasses.h"
 #include "llvm/IR/IRPrintingPasses.h"
@@ -59,10 +60,15 @@ class PassRegistry;
 static bool Initialized;
 #endif
 
-// -emit-llvm: emit LLVM bitcode instead of ISA
+// -emit-llvm: emit LLVM assembly instead of ISA
 static cl::opt<bool> EmitLlvm("emit-llvm",
-                              cl::desc("Emit LLVM bitcode instead of AMD GPU ISA"),
+                              cl::desc("Emit LLVM assembly instead of AMD GPU ISA"),
                               cl::init(false));
+
+// -emit-llvm-bc: emit LLVM bitcode instead of ISA
+static cl::opt<bool> EmitLlvmBc("emit-llvm-bc",
+                                cl::desc("Emit LLVM bitcode instead of AMD GPU ISA"),
+                                cl::init(false));
 
 // =====================================================================================================================
 // Initialize the middle-end. This must be called before the first BuilderContext::Create, although you are
@@ -229,12 +235,26 @@ void BuilderContext::AddTargetPasses(
                     "// LLPC final pipeline module info\n"));
     }
 
+    if (EmitLlvm && EmitLlvmBc)
+    {
+        report_fatal_error("-emit-llvm conflicts with -emit-llvm-bc");
+    }
+
     if (EmitLlvm)
     {
         // For -emit-llvm, add a pass to output the LLVM IR, then tell the pass manager to stop adding
         // passes. We do it this way to ensure that we still get the immutable passes from
         // TargetMachine::addPassesToEmitFile, as they can affect LLVM middle-end optimizations.
         passMgr.add(createPrintModulePass(outStream));
+        passMgr.stop();
+    }
+
+    if (EmitLlvmBc)
+    {
+        // For -emit-llvm-bc, add a pass to output the LLVM IR, then tell the pass manager to stop adding
+        // passes. We do it this way to ensure that we still get the immutable passes from
+        // TargetMachine::addPassesToEmitFile, as they can affect LLVM middle-end optimizations.
+        passMgr.add(createBitcodeWriterPass(outStream));
         passMgr.stop();
     }
 
