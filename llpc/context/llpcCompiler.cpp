@@ -208,7 +208,7 @@ static void FatalErrorHandler(
     const std::string&  reason,         // Error reason
     bool                gen_crash_diag) // Whether diagnostic should be generated
 {
-    LLPC_ERRS("LLVM FATAL ERROR:" << reason << "\n");
+    LLPC_ERRS("LLVM FATAL ERROR: " << reason << "\n");
 #if LLPC_ENABLE_EXCEPTION
     throw("LLVM fatal error");
 #endif
