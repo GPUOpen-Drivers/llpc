@@ -8779,46 +8779,7 @@ Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *BC,
 Instruction *SPIRVToLLVM::transBarrier(BasicBlock *BB, SPIRVWord ExecScope,
                                           SPIRVWord MemSema,
                                           SPIRVWord MemScope) {
-  AtomicOrdering Ordering = AtomicOrdering::NotAtomic;
-
-  if (MemSema & MemorySemanticsSequentiallyConsistentMask)
-    Ordering = AtomicOrdering::SequentiallyConsistent;
-  else if (MemSema & MemorySemanticsAcquireReleaseMask)
-    Ordering = AtomicOrdering::AcquireRelease;
-  else if (MemSema & MemorySemanticsAcquireMask)
-    Ordering = AtomicOrdering::Acquire;
-  else if (MemSema & MemorySemanticsReleaseMask)
-    Ordering = AtomicOrdering::Release;
-
-  if (Ordering != AtomicOrdering::NotAtomic) {
-    // Upgrade the ordering if we need to make it avaiable or visible
-    if (MemSema & (MemorySemanticsMakeAvailableKHRMask |
-      MemorySemanticsMakeVisibleKHRMask))
-      Ordering = AtomicOrdering::SequentiallyConsistent;
-
-    SyncScope::ID Scope = SyncScope::System;
-
-    switch (MemScope) {
-    case ScopeCrossDevice:
-    case ScopeDevice:
-    case ScopeQueueFamilyKHR:
-      Scope = SyncScope::System;
-      break;
-    case ScopeInvocation:
-      Scope = SyncScope::SingleThread;
-      break;
-    case ScopeWorkgroup:
-      Scope = Context->getOrInsertSyncScopeID("workgroup");
-      break;
-    case ScopeSubgroup:
-      Scope = Context->getOrInsertSyncScopeID("wavefront");
-      break;
-    default:
-      llvm_unreachable("Invalid scope");
-    }
-
-    new FenceInst(*Context, Ordering, Scope, BB);
-  }
+  transMemFence(BB, MemSema, MemScope);
   return getBuilder()->CreateBarrier();
 }
 
@@ -8835,12 +8796,13 @@ Instruction *SPIRVToLLVM::transMemFence(BasicBlock *BB, SPIRVWord MemSema,
   else if (MemSema & MemorySemanticsReleaseMask)
     Ordering = AtomicOrdering::Release;
 
-  if (Ordering != AtomicOrdering::NotAtomic) {
-    // Upgrade the ordering if we need to make it avaiable or visible
-    if (MemSema & (MemorySemanticsMakeAvailableKHRMask |
-      MemorySemanticsMakeVisibleKHRMask))
-      Ordering = AtomicOrdering::SequentiallyConsistent;
-  }
+  if (Ordering == AtomicOrdering::NotAtomic)
+    return nullptr;
+
+  // Upgrade the ordering if we need to make it available or visible
+  if (MemSema & (MemorySemanticsMakeAvailableKHRMask |
+		 MemorySemanticsMakeVisibleKHRMask))
+    Ordering = AtomicOrdering::SequentiallyConsistent;
 
   SyncScope::ID Scope = SyncScope::System;
 
@@ -8895,10 +8857,12 @@ Instruction *SPIRVToLLVM::transBarrierFence(SPIRVInstruction *MB,
     llvm_unreachable("Invalid instruction");
   }
 
-  setName(Barrier, MB);
+  if (Barrier) {
+    setName(Barrier, MB);
 
-  if (CallInst *Call = dyn_cast<CallInst>(Barrier))
-    setAttrByCalledFunc(Call);
+    if (CallInst *Call = dyn_cast<CallInst>(Barrier))
+      setAttrByCalledFunc(Call);
+  }
 
   return Barrier;
 }
