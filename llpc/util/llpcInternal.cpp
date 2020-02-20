@@ -484,13 +484,23 @@ bool IsElfBinary(
 }
 
 // =====================================================================================================================
-// Checks whether the output data is actually ISA assembler text
+// Checks whether the input data is actually LLVM bitcode
+bool IsLlvmBitcode(
+    const void* pData,    // [in] Input data to check
+    size_t      dataSize) // Size of the input data
+{
+    const unsigned char magic[] = { 'B', 'C', 0xC0, 0xDE };
+    return (dataSize >= sizeof magic) && (memcmp(pData, magic, sizeof magic) == 0);
+}
+
+// =====================================================================================================================
+// Checks whether the output data is actually ISA assembly text
 bool IsIsaText(
     const void* pData,    // [in] Input data to check
     size_t      dataSize) // Size of the input data
 {
-    // This is called by amdllpc to help distinguish between its three output types of ELF binary, LLVM IR assembler
-    // and ISA assembler. Here we use the fact that ISA assembler is the only one that starts with a tab character.
+    // This is called by amdllpc to help distinguish between its output types of LLVM IR assembly
+    // and ISA assembly. Here we use the fact that ISA assembly starts with a tab character.
     return (dataSize != 0) && ((reinterpret_cast<const char*>(pData))[0] == '\t');
 }
 

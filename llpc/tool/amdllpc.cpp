@@ -1290,6 +1290,10 @@ static Result OutputElf(
         {
             pExt = ".elf";
         }
+        else if (IsLlvmBitcode(pPipelineBin->pCode, pPipelineBin->codeSize))
+        {
+            pExt = ".bc";
+        }
         else if (IsIsaText(pPipelineBin->pCode, pPipelineBin->codeSize))
         {
             pExt = ".s";
