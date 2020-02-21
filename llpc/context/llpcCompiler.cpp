@@ -40,6 +40,7 @@
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
 
 #include "LLVMSPIRVLib.h"
 #include "spirvExt.h"
@@ -1657,7 +1658,7 @@ Result Compiler::BuildComputePipeline(
     BinaryData elfBin = {};
 
     bool buildingRelocatableElf = CanUseRelocatableComputeShaderElf(&pPipelineInfo->cs);
-    
+
     Result result = ValidatePipelineShaderInfo(&pPipelineInfo->cs);
 
     MetroHash::Hash cacheHash = {};
