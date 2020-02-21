@@ -1,6 +1,5 @@
 # Partial Pipeline Compile
 
-
 # INTRODUCTION
 Per pervious profile result, many Vulkan APPs loading SPIR-V binary is much ahead of create pipeline. And APPs hate the long pipeline creation time, since it will cause the lag in app.
 To reduce the pipeline creation time, one possible idea is shifting the workload from create pipeline to create shader module. But we lack the pipeline states when create shader module, especially, we don’t have the pipeline layout, it is the major interface between shader and driver.
@@ -100,7 +99,7 @@ struct ShaderModuleBuildOut
 ## Auto-layout Pipeline Layout
 Vulkan pipeline layout doesn’t define the physical offset explicitly in the descriptor layout, it gives us a chance generate pipeline layout which compatible with the application’s pipeline layout automatically according to some pre-defined rules.
 
-Because PAL can support user data remapping, we needn’t worry about offset in root level. We only need make layout compatible within the set table. 
+Because PAL can support user data remapping, we needn’t worry about offset in root level. We only need make layout compatible within the set table.
 
 The simplest rule is forcing all descriptor types use same descriptor size. And reserve the space when the binding isn’t continuous, or it is a dynamic buffer descriptor. Then we can calculate the byte offset according to binding.i.e.
 

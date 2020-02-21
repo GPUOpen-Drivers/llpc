@@ -57,7 +57,7 @@ namespace Vfx
 
 // =====================================================================================================================
 // Common definition of VfxParser
-static const uint32_t ShaderStageCount = 6;            // Number of shader stages in Vulkan
+static const uint32_t ShaderStageCount = 6;             // Number of shader stages in Vulkan
 static const uint32_t NativeShaderStageCount = 6;       // Number of native shader stages in Vulkan
 static const uint32_t MaxSectionCount = 16;             // Max section count
 static const uint32_t MaxBindingCount = 16;             // Max binding count
