@@ -116,7 +116,7 @@ SPIRVEntry *SPIRVDecoder::getEntry() {
   SPIRVEntry *Entry = SPIRVEntry::create(OpCode);
   assert(Entry);
   Entry->setModule(&M);
-  if (isModuleScopeAllowedOpCode(OpCode) && !Scope) {
+  if (!Scope && (isModuleScopeAllowedOpCode(OpCode) || OpCode == OpExtInst)) {
   } else
     Entry->setScope(Scope);
   Entry->setWordCount(WordCount);
