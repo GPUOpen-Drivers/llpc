@@ -2,7 +2,7 @@ include $(ICD_DEPTH)/make/icddefs
 
 include $(ICD_DEPTH)/make/Makefile.$(ICD_PLATFORM).icd
 
-LIB_TARGET = icdapillpc
+LIB_TARGET = icdapicompilerllpc
 
 ICD_SRCDIR = $(LLPC_DEPTH)
 SRCPATH    = $(ICD_SRCDIR)

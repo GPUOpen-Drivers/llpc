@@ -1303,7 +1303,7 @@ Result ConfigBuilder::BuildVsRegConfig(
         LLPC_ASSERT(shaderStage == ShaderStageCopyShader);
 
         usePointSize      = builtInUsage.gs.pointSize;
-        usePrimitiveId    = builtInUsage.gs.primitiveId;
+        usePrimitiveId    = builtInUsage.gs.primitiveIdIn;
         useLayer          = builtInUsage.gs.layer;
         useViewportIndex  = builtInUsage.gs.viewportIndex;
         clipDistanceCount = builtInUsage.gs.clipDistance;
@@ -2236,9 +2236,6 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
         useViewportIndex  = gsBuiltInUsage.viewportIndex;
         clipDistanceCount = gsBuiltInUsage.clipDistance;
         cullDistanceCount = gsBuiltInUsage.cullDistance;
-#if VKI_3RD_PARTY_IP_PROPERTY_ID
-        usePropertyId     = gsBuiltInUsage.propertyId;
-#endif
 
         expCount = pGsResUsage->inOutUsage.expCount;
 

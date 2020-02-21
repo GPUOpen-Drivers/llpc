@@ -958,7 +958,6 @@ MetroHash::Hash PipelineDumper::GenerateHashForGraphicsPipeline(
         UpdateHashForFragmentState(pPipeline, &hasher);
     }
 
-
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
 

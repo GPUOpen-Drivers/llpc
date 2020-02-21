@@ -1565,7 +1565,6 @@ Result Compiler::BuildGraphicsPipeline(
     ShaderCache*     pShaderCache[ShaderCacheCount]  = { nullptr, nullptr };
     CacheEntryHandle hEntry[ShaderCacheCount]        = { nullptr, nullptr };
 
-
     if (!buildingRelocatableElf)
     {
         cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &elfBin, pShaderCache, hEntry);
