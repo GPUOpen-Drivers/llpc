@@ -6379,15 +6379,15 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
     break;
   case OpAtomicLoad:
     AtomicOp = Llpc::Builder::ImageAtomicAdd;
-    InputData = getBuilder()->getInt32(0);
+    InputData = getBuilder()->getIntN(BIT->getType()->getBitWidth(), 0);
     break;
   case OpAtomicIIncrement:
     AtomicOp = Llpc::Builder::ImageAtomicAdd;
-    InputData = getBuilder()->getInt32(1);
+    InputData = getBuilder()->getIntN(BIT->getType()->getBitWidth(), 1);
     break;
   case OpAtomicIDecrement:
     AtomicOp = Llpc::Builder::ImageAtomicSub;
-    InputData = getBuilder()->getInt32(1);
+    InputData = getBuilder()->getIntN(BIT->getType()->getBitWidth(), 1);
     break;
   case OpAtomicIAdd:
     AtomicOp = Llpc::Builder::ImageAtomicAdd;

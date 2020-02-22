@@ -1,0 +1,61 @@
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: call i64 (...) @llpc.call.image.atomic.i64(i32 8
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: call i64 @llvm.amdgcn.image.atomic.and.2d.i64.i32
+; SHADERTEST: AMDLLPC SUCCESS
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 8
+; Bound: 28
+; Schema: 0
+               OpCapability Shader
+               OpCapability Int64
+               OpCapability Int64Atomics
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %main "main"
+               OpSource GLSL 450
+               OpSourceExtension "GL_ARB_gpu_shader_int64"
+               OpName %main "main"
+               OpName %Buf "Buf"
+               OpMemberName %Buf 0 "i64"
+               OpName %_ ""
+               OpName %i642D "i642D"
+               OpMemberDecorate %Buf 0 Offset 0
+               OpDecorate %Buf BufferBlock
+               OpDecorate %_ DescriptorSet 0
+               OpDecorate %_ Binding 1
+               OpDecorate %i642D DescriptorSet 0
+               OpDecorate %i642D Binding 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+       %long = OpTypeInt 64 1
+        %Buf = OpTypeStruct %long
+%_ptr_Uniform_Buf = OpTypePointer Uniform %Buf
+          %_ = OpVariable %_ptr_Uniform_Buf Uniform
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+         %12 = OpTypeImage %long 2D 0 0 0 2 Unknown
+%_ptr_UniformConstant_12 = OpTypePointer UniformConstant %12
+      %i642D = OpVariable %_ptr_UniformConstant_12 UniformConstant
+      %v2int = OpTypeVector %int 2
+      %int_3 = OpConstant %int 3
+         %17 = OpConstantComposite %v2int %int_3 %int_3
+%_ptr_Uniform_long = OpTypePointer Uniform %long
+       %uint = OpTypeInt 32 0
+     %uint_0 = OpConstant %uint 0
+%_ptr_Image_long = OpTypePointer Image %long
+     %uint_1 = OpConstant %uint 1
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %19 = OpAccessChain %_ptr_Uniform_long %_ %int_0
+         %20 = OpLoad %long %19
+         %24 = OpImageTexelPointer %_ptr_Image_long %i642D %17 %uint_0
+         %26 = OpAtomicAnd %long %24 %uint_1 %uint_0 %20
+         %27 = OpAccessChain %_ptr_Uniform_long %_ %int_0
+               OpStore %27 %26
+               OpReturn
+               OpFunctionEnd
