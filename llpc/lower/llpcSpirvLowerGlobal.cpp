@@ -2323,7 +2323,8 @@ void SpirvLowerGlobal::LowerPushConsts()
             Type* const pPushConstantsType = ArrayType::get(m_pBuilder->getInt8Ty(), pushConstSize);
             Value* pPushConstants = m_pBuilder->CreateLoadPushConstantsPtr(pPushConstantsType);
 
-            Type* const pCastType = global.getType()->getPointerElementType()->getPointerTo(ADDR_SPACE_CONST);
+            auto addrSpace = pPushConstants->getType()->getPointerAddressSpace();
+            Type* const pCastType = global.getType()->getPointerElementType()->getPointerTo(addrSpace);
             pPushConstants = m_pBuilder->CreateBitCast(pPushConstants, pCastType);
 
             SmallVector<Instruction*, 8> usesToReplace;
