@@ -30,7 +30,6 @@
  */
 #pragma once
 
-#include "llpc.h"
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
 #include <unordered_map>

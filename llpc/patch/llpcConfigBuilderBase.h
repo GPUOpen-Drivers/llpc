@@ -30,9 +30,9 @@
  */
 #pragma once
 
-#include "llpc.h"
 #include "palPipelineAbi.h"
 #include "g_palPipelineAbiMetadata.h"
+#include "lgc/Defs.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 
 namespace llvm

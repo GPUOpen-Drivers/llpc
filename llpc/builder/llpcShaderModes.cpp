@@ -29,8 +29,6 @@
  ***********************************************************************************************************************
  */
 
-#include "llpc.h"
-#include "llpcDebug.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPipelineState.h"
 #include "llpcShaderModes.h"

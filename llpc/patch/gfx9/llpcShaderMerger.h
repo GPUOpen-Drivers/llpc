@@ -32,7 +32,6 @@
 
 #include "llvm/IR/Module.h"
 
-#include "llpc.h"
 #include "llpcInternal.h"
 #include "llpcNggPrimShader.h"
 #include "llpcPipelineShaders.h"

@@ -31,7 +31,6 @@
 #pragma once
 
 #include "palPipelineAbi.h"
-#include "llpc.h"
 
 namespace Llpc
 {

@@ -30,11 +30,10 @@
  */
 #pragma once
 
+#include "lgc/Defs.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
-
-#include "llpc.h"
 
 namespace llvm { class CallInst; }
 namespace Llpc { class Context; }

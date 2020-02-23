@@ -55,23 +55,6 @@ struct ShaderModuleBuildInfo
     ShaderModuleOptions  options;           ///< Per shader module options
 };
 
-/// Represents the base data type
-enum class BasicType : uint32_t
-{
-    Unknown = 0,          ///< Unknown
-    Float,                ///< Float
-    Double,               ///< Double
-    Int,                  ///< Signed integer
-    Uint,                 ///< Unsigned integer
-    Int64,                ///< 64-bit signed integer
-    Uint64,               ///< 64-bit unsigned integer
-    Float16,              ///< 16-bit floating-point
-    Int16,                ///< 16-bit signed integer
-    Uint16,               ///< 16-bit unsigned integer
-    Int8,                 ///< 8-bit signed integer
-    Uint8,                ///< 8-bit unsigned integer
-};
-
 /// Enumerates types of shader binary.
 enum class BinaryType : uint32_t
 {
