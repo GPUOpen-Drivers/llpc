@@ -62,11 +62,9 @@ namespace Gfx6
 // Builds PAL metadata for pipeline.
 void ConfigBuilder::BuildPalMetadata()
 {
-    Result result = Result::Success;
-
     if (m_pPipelineState->IsGraphics() == false)
     {
-        result = BuildPipelineCsRegConfig();
+        BuildPipelineCsRegConfig();
     }
     else
     {
@@ -75,37 +73,32 @@ void ConfigBuilder::BuildPalMetadata()
         if ((hasTs == false) && (m_hasGs == false))
         {
             // VS-FS pipeline
-            result = BuildPipelineVsFsRegConfig();
+            BuildPipelineVsFsRegConfig();
         }
         else if (hasTs && (m_hasGs == false))
         {
             // VS-TS-FS pipeline
-            result = BuildPipelineVsTsFsRegConfig();
+            BuildPipelineVsTsFsRegConfig();
         }
         else if ((hasTs == false) && m_hasGs)
         {
             // VS-GS-FS pipeline
-            result = BuildPipelineVsGsFsRegConfig();
+            BuildPipelineVsGsFsRegConfig();
         }
         else
         {
             // VS-TS-GS-FS pipeline
-            result = BuildPipelineVsTsGsFsRegConfig();
+            BuildPipelineVsTsGsFsRegConfig();
         }
     }
-
-    assert(result == Result::Success);
-    (void(result)); // unused
 
     WritePalMetadata();
 }
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-FS).
-Result ConfigBuilder::BuildPipelineVsFsRegConfig()
+void ConfigBuilder::BuildPipelineVsFsRegConfig()
 {
-    Result result = Result::Success;
-
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineVsFsRegConfig config;
@@ -118,16 +111,16 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig()
 
     if (stageMask & ShaderStageToMask(ShaderStageVertex))
     {
-        result = BuildVsRegConfig<PipelineVsFsRegConfig>(ShaderStageVertex, &config);
+        BuildVsRegConfig<PipelineVsFsRegConfig>(ShaderStageVertex, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
 
         SetShaderHash(ShaderStageVertex);
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
-        result = BuildPsRegConfig<PipelineVsFsRegConfig>(ShaderStageFragment, &config);
+        BuildPsRegConfig<PipelineVsFsRegConfig>(ShaderStageFragment, &config);
 
         SetShaderHash(ShaderStageFragment);
     }
@@ -141,15 +134,12 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig()
     SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-TS-FS).
-Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
+void ConfigBuilder::BuildPipelineVsTsFsRegConfig()
 {
-    Result result = Result::Success;
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineVsTsFsRegConfig config;
@@ -164,34 +154,34 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
 
     if (stageMask & ShaderStageToMask(ShaderStageVertex))
     {
-        result = BuildLsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageVertex, &config);
+        BuildLsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageVertex, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
 
         SetShaderHash(ShaderStageVertex);
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageTessControl)))
+    if (stageMask & ShaderStageToMask(ShaderStageTessControl))
     {
-        result = BuildHsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageTessControl, &config);
+        BuildHsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageTessControl, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
 
         SetShaderHash(ShaderStageTessControl);
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageTessEval)))
+    if (stageMask & ShaderStageToMask(ShaderStageTessEval))
     {
-        result = BuildVsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageTessEval, &config);
+        BuildVsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageTessEval, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_DS);
 
         SetShaderHash(ShaderStageTessEval);
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
-        result = BuildPsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageFragment, &config);
+        BuildPsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageFragment, &config);
 
         SetShaderHash(ShaderStageFragment);
     }
@@ -219,16 +209,12 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
     SetupVgtTfParam<PipelineVsTsFsRegConfig>(&config);
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-GS-FS).
-Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()
+void ConfigBuilder::BuildPipelineVsGsFsRegConfig()
 {
-    Result result = Result::Success;
-
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineVsGsFsRegConfig config;
@@ -242,32 +228,32 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()
 
     if (stageMask & ShaderStageToMask(ShaderStageVertex))
     {
-        result = BuildEsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageVertex, &config);
+        BuildEsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageVertex, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
 
         SetShaderHash(ShaderStageVertex);
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageGeometry)))
+    if (stageMask & ShaderStageToMask(ShaderStageGeometry))
     {
-        result = BuildGsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageGeometry, &config);
+        BuildGsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageGeometry, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
 
         SetShaderHash(ShaderStageGeometry);
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
-        result = BuildPsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageFragment, &config);
+        BuildPsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageFragment, &config);
 
         SetShaderHash(ShaderStageFragment);
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageCopyShader)))
+    if (stageMask & ShaderStageToMask(ShaderStageCopyShader))
     {
-        result = BuildVsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageCopyShader, &config);
+        BuildVsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageCopyShader, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
     }
@@ -281,16 +267,12 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()
     SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-TS-GS-FS).
-Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
+void ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
 {
-    Result result = Result::Success;
-
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineVsTsGsFsRegConfig config;
@@ -306,50 +288,50 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
 
     if (stageMask & ShaderStageToMask(ShaderStageVertex))
     {
-        result = BuildLsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageVertex, &config);
+        BuildLsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageVertex, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
 
         SetShaderHash(ShaderStageVertex);
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageTessControl)))
+    if (stageMask & ShaderStageToMask(ShaderStageTessControl))
     {
-        result = BuildHsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageTessControl, &config);
+        BuildHsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageTessControl, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
 
         SetShaderHash(ShaderStageTessControl);
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageTessEval)))
+    if (stageMask & ShaderStageToMask(ShaderStageTessEval))
     {
-        result = BuildEsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageTessEval, &config);
+        BuildEsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageTessEval, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
 
         SetShaderHash(ShaderStageTessEval);
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageGeometry)))
+    if (stageMask & ShaderStageToMask(ShaderStageGeometry))
     {
-        result = BuildGsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageGeometry, &config);
+        BuildGsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageGeometry, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
 
         SetShaderHash(ShaderStageGeometry);
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
-        result = BuildPsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageFragment, &config);
+        BuildPsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageFragment, &config);
 
         SetShaderHash(ShaderStageFragment);
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageCopyShader)))
+    if (stageMask & ShaderStageToMask(ShaderStageCopyShader))
     {
-        result = BuildVsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageCopyShader, &config);
+        BuildVsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageCopyShader, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
     }
@@ -379,16 +361,12 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     SetupVgtTfParam<PipelineVsTsGsFsRegConfig>(&config);
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for compute pipeline.
-Result ConfigBuilder::BuildPipelineCsRegConfig()
+void ConfigBuilder::BuildPipelineCsRegConfig()
 {
-    Result result = Result::Success;
-
     assert(m_pPipelineState->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
 
     CsRegConfig config;
@@ -397,24 +375,20 @@ Result ConfigBuilder::BuildPipelineCsRegConfig()
 
     SetPipelineType(Util::Abi::PipelineType::Cs);
 
-    result = BuildCsRegConfig(ShaderStageCompute, &config);
+    BuildCsRegConfig(ShaderStageCompute, &config);
 
     SetShaderHash(ShaderStageCompute);
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for hardware vertex shader.
 template <typename T>
-Result ConfigBuilder::BuildVsRegConfig(
+void ConfigBuilder::BuildVsRegConfig(
     ShaderStage         shaderStage,    // Current shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for vertex-shader-specific pipeline
 {
-    Result result = Result::Success;
-
     assert((shaderStage == ShaderStageVertex)   ||
                 (shaderStage == ShaderStageTessEval) ||
                 (shaderStage == ShaderStageCopyShader));
@@ -668,24 +642,17 @@ Result ConfigBuilder::BuildVsRegConfig(
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_POS_FORMAT, POS3_EXPORT_FORMAT, SPI_SHADER_4COMP);
     }
 
-    if (result == Result::Success)
-    {
-        // Set shader user data maping
-        result = BuildUserDataConfig(shaderStage, mmSPI_SHADER_USER_DATA_VS_0);
-    }
-
-    return result;
+    // Set shader user data maping
+    BuildUserDataConfig(shaderStage, mmSPI_SHADER_USER_DATA_VS_0);
 }
 
 // =====================================================================================================================
 // Builds register configuration for hardware hull shader.
 template <typename T>
-Result ConfigBuilder::BuildHsRegConfig(
+void ConfigBuilder::BuildHsRegConfig(
     ShaderStage         shaderStage,    // Current shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for hull-shader-specific pipeline
 {
-    Result result = Result::Success;
-
     assert(shaderStage == ShaderStageTessControl);
 
     const auto& pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
@@ -725,20 +692,16 @@ Result ConfigBuilder::BuildHsRegConfig(
 
     SetNumAvailSgprs(Util::Abi::HardwareStage::Hs, pResUsage->numSgprsAvailable);
     SetNumAvailVgprs(Util::Abi::HardwareStage::Hs, pResUsage->numVgprsAvailable);
-    result = BuildUserDataConfig(shaderStage, mmSPI_SHADER_USER_DATA_HS_0);
-
-    return result;
+    BuildUserDataConfig(shaderStage, mmSPI_SHADER_USER_DATA_HS_0);
 }
 
 // =====================================================================================================================
 // Builds register configuration for hardware export shader.
 template <typename T>
-Result ConfigBuilder::BuildEsRegConfig(
+void ConfigBuilder::BuildEsRegConfig(
     ShaderStage         shaderStage,    // Current shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for export-shader-specific pipeline
 {
-    Result result = Result::Success;
-
     assert((shaderStage == ShaderStageVertex) || (shaderStage == ShaderStageTessEval));
 
     const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
@@ -807,20 +770,16 @@ Result ConfigBuilder::BuildEsRegConfig(
     SetNumAvailVgprs(Util::Abi::HardwareStage::Es, pResUsage->numVgprsAvailable);
 
     // Set shader user data maping
-    result = BuildUserDataConfig(shaderStage, mmSPI_SHADER_USER_DATA_ES_0);
-
-    return result;
+    BuildUserDataConfig(shaderStage, mmSPI_SHADER_USER_DATA_ES_0);
 }
 
 // =====================================================================================================================
 // Builds register configuration for hardware local shader.
 template <typename T>
-Result ConfigBuilder::BuildLsRegConfig(
+void ConfigBuilder::BuildLsRegConfig(
     ShaderStage         shaderStage,    // Current shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for local-shader-specific pipeline
 {
-    Result result = Result::Success;
-
     assert(shaderStage == ShaderStageVertex);
 
     const auto& pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
@@ -896,19 +855,16 @@ Result ConfigBuilder::BuildLsRegConfig(
     SetNumAvailVgprs(Util::Abi::HardwareStage::Ls, pResUsage->numVgprsAvailable);
 
     // Set shader user data maping
-    result = BuildUserDataConfig(shaderStage, mmSPI_SHADER_USER_DATA_LS_0);
-    return result;
+    BuildUserDataConfig(shaderStage, mmSPI_SHADER_USER_DATA_LS_0);
 }
 
 // =====================================================================================================================
 // Builds register configuration for hardware geometry shader.
 template <typename T>
-Result ConfigBuilder::BuildGsRegConfig(
+void ConfigBuilder::BuildGsRegConfig(
     ShaderStage         shaderStage,    // Current shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for geometry-shader-specific pipeline
 {
-    Result result = Result::Success;
-
     assert(shaderStage == ShaderStageGeometry);
 
     const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
@@ -1059,20 +1015,16 @@ Result ConfigBuilder::BuildGsRegConfig(
     SetNumAvailSgprs(Util::Abi::HardwareStage::Gs, pResUsage->numSgprsAvailable);
     SetNumAvailVgprs(Util::Abi::HardwareStage::Gs, pResUsage->numVgprsAvailable);
     // Set shader user data maping
-    result = BuildUserDataConfig(shaderStage, mmSPI_SHADER_USER_DATA_GS_0);
-
-    return result;
+    BuildUserDataConfig(shaderStage, mmSPI_SHADER_USER_DATA_GS_0);
 }
 
 // =====================================================================================================================
 // Builds register configuration for hardware pixel shader.
 template <typename T>
-Result ConfigBuilder::BuildPsRegConfig(
+void ConfigBuilder::BuildPsRegConfig(
     ShaderStage         shaderStage,    // Current shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for pixel-shader-specific pipeline
 {
-    Result result = Result::Success;
-
     assert(shaderStage == ShaderStageFragment);
 
     const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
@@ -1257,23 +1209,16 @@ Result ConfigBuilder::BuildPsRegConfig(
     SetNumAvailSgprs(Util::Abi::HardwareStage::Ps, pResUsage->numSgprsAvailable);
     SetNumAvailVgprs(Util::Abi::HardwareStage::Ps, pResUsage->numVgprsAvailable);
 
-    if (result == Result::Success)
-    {
-        // Set shader user data mapping
-        result = BuildUserDataConfig(shaderStage, mmSPI_SHADER_USER_DATA_PS_0);
-    }
-
-    return result;
+    // Set shader user data mapping
+    BuildUserDataConfig(shaderStage, mmSPI_SHADER_USER_DATA_PS_0);
 }
 
 // =====================================================================================================================
 // Builds register configuration for compute shader.
-Result ConfigBuilder::BuildCsRegConfig(
+void ConfigBuilder::BuildCsRegConfig(
     ShaderStage  shaderStage,   // Current shader stage (from API side)
     CsRegConfig* pConfig)       // [out] Register configuration for compute pipeline
 {
-    Result result = Result::Success;
-
     assert(shaderStage == ShaderStageCompute);
 
     const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
@@ -1331,22 +1276,15 @@ Result ConfigBuilder::BuildCsRegConfig(
     SetNumAvailVgprs(Util::Abi::HardwareStage::Cs, pResUsage->numVgprsAvailable);
 
     // Set shader user data mapping
-    if (result == Result::Success)
-    {
-        result = BuildUserDataConfig(shaderStage, mmCOMPUTE_USER_DATA_0);
-    }
-
-    return result;
+    BuildUserDataConfig(shaderStage, mmCOMPUTE_USER_DATA_0);
 }
 
 // =====================================================================================================================
 // Builds user data configuration for the specified shader stage.
-Result ConfigBuilder::BuildUserDataConfig(
+void ConfigBuilder::BuildUserDataConfig(
     ShaderStage shaderStage,    // Current shader stage (from API side)
     uint32_t    startUserData)  // Starting user data
 {
-    Result result = Result::Success;
-
     bool enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
     const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
@@ -1469,8 +1407,6 @@ Result ConfigBuilder::BuildUserDataConfig(
 
     m_userDataLimit = std::max(m_userDataLimit, userDataLimit);
     m_spillThreshold = std::min(m_spillThreshold, spillThreshold);
-
-    return result;
 }
 
 // =====================================================================================================================
