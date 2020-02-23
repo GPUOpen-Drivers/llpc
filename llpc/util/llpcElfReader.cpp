@@ -84,7 +84,7 @@ Result ElfReader<Elf>::ReadFromBuffer(
     const void* pBuffer,   // [in] Input ELF data buffer
     size_t*     pBufSize)  // [out] Size of the given read buffer (determined from the ELF header)
 {
-    LLPC_ASSERT(pBuffer != nullptr);
+    assert(pBuffer != nullptr);
 
     Result result = Result::Success;
 
@@ -362,7 +362,7 @@ ElfNote ElfReader<Elf>::GetNote(
     ) const
 {
     uint32_t noteSecIdx = m_map.at(NoteName);
-    LLPC_ASSERT(noteSecIdx > 0);
+    assert(noteSecIdx > 0);
 
     auto pNoteSection = m_sections[noteSecIdx];
     ElfNote noteNode = {};
@@ -395,7 +395,7 @@ void ElfReader<Elf>::InitMsgPackDocument(
     m_document.readFromBlob(StringRef(reinterpret_cast<const char*>(pBuffer), sizeInBytes), false);
 
     auto pRoot = &m_document.getRoot();
-    LLPC_ASSERT(pRoot->isMap());
+    assert(pRoot->isMap());
 
     m_iteratorStack.clear();
     MsgPackIterator iter = { };
@@ -430,7 +430,7 @@ bool ElfReader<Elf>::GetNextMsgNode()
     }
     else if (curIter.status == MsgPackIteratorMapPair)
     {
-        LLPC_ASSERT((curIter.mapIt->first.isMap() == false) && (curIter.mapIt->first.isArray() == false));
+        assert((curIter.mapIt->first.isMap() == false) && (curIter.mapIt->first.isArray() == false));
         curIter.status = MsgPackIteratorMapKey;
         m_iteratorStack.push_back(curIter);
     }
@@ -549,7 +549,7 @@ bool ElfReader<Elf>::GetNextMsgNode()
 template<class Elf>
 const llvm::msgpack::DocNode* ElfReader<Elf>::GetMsgNode() const
 {
-    LLPC_ASSERT(m_iteratorStack.size() > 0);
+    assert(m_iteratorStack.size() > 0);
     auto pCurIter = &(m_iteratorStack.back());
     if (pCurIter->status == MsgPackIteratorArrayValue)
     {

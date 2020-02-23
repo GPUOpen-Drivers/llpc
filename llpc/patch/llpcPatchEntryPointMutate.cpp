@@ -318,7 +318,7 @@ bool PatchEntryPointMutate::IsResourceNodeActive(
     }
     else
     {
-        LLPC_ASSERT((pNode->type != ResourceMappingNodeType::DescriptorTableVaPtr) &&
+        assert((pNode->type != ResourceMappingNodeType::DescriptorTableVaPtr) &&
                     (pNode->type != ResourceMappingNodeType::IndirectUserDataVaPtr));
 
         DescriptorPair descPair = {};
@@ -554,7 +554,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -563,7 +563,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     bool needSpill = false;
     if (useFixedLayout)
     {
-        LLPC_ASSERT(m_shaderStage == ShaderStageCompute);
+        assert(m_shaderStage == ShaderStageCompute);
         needSpill = (requiredUserDataCount > InterfaceData::MaxCsUserDataCount);
         availUserDataCount = InterfaceData::MaxCsUserDataCount;
     }
@@ -586,7 +586,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             auto pNode = &userDataNodes[i];
             if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
             {
-                LLPC_ASSERT(pNode->sizeInDwords == 1);
+                assert(pNode->sizeInDwords == 1);
                 switch (m_shaderStage)
                 {
                 case ShaderStageVertex:
@@ -608,7 +608,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     }
                 default:
                     {
-                        LLPC_NEVER_CALLED();
+                        llvm_unreachable("Should never be called!");
                         break;
                     }
                 }
@@ -646,7 +646,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         {
             // NOTE: For fixed user data layout (for compute shader), we could not pack those user data and dummy
             // entry-point arguments are added once DWORD offsets of user data are not continuous.
-           LLPC_ASSERT(m_shaderStage == ShaderStageCompute);
+           assert(m_shaderStage == ShaderStageCompute);
 
             while ((userDataIdx < (pNode->offsetInDwords + InterfaceData::CsStartUserData)) &&
                    (userDataIdx < (availUserDataCount + InterfaceData::CsStartUserData)))
@@ -661,7 +661,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         if (actualAvailUserDataCount + pNode->sizeInDwords <= availUserDataCount)
         {
             // User data isn't spilled
-            LLPC_ASSERT(i < InterfaceData::MaxDescTableCount);
+            assert(i < InterfaceData::MaxDescTableCount);
             pIntfData->entryArgIdxs.resNodeValues[i] = argTys.size();
             *pInRegMask |= 1ull << argTys.size();
             actualAvailUserDataCount += pNode->sizeInDwords;
@@ -671,7 +671,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 {
                     argTys.push_back(Type::getInt32Ty(*m_pContext));
 
-                    LLPC_ASSERT(pNode->sizeInDwords == 1);
+                    assert(pNode->sizeInDwords == 1);
 
                     pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
                     ++userDataIdx;
@@ -696,7 +696,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 }
             default:
                 {
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                     break;
                 }
             }
@@ -711,8 +711,8 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     if (needSpill && useFixedLayout)
     {
         // Add spill table
-        LLPC_ASSERT(pIntfData->spillTable.offsetInDwords != InvalidValue);
-        LLPC_ASSERT(userDataIdx <= (InterfaceData::MaxCsUserDataCount + InterfaceData::CsStartUserData));
+        assert(pIntfData->spillTable.offsetInDwords != InvalidValue);
+        assert(userDataIdx <= (InterfaceData::MaxCsUserDataCount + InterfaceData::CsStartUserData));
         while (userDataIdx <= (InterfaceData::MaxCsUserDataCount + InterfaceData::CsStartUserData))
         {
             *pInRegMask |= 1ull << argTys.size();
@@ -767,7 +767,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 auto pNode = &userDataNodes[i];
                 if (pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr)
                 {
-                    LLPC_ASSERT(pNode->sizeInDwords == 1);
+                    assert(pNode->sizeInDwords == 1);
                     pCurrIntfData->userDataUsage.vs.vbTablePtr = userDataIdx;
                     pCurrIntfData->entryArgIdxs.vs.vbTablePtr = argTys.size();
                     *pInRegMask |= 1ull << argTys.size();
@@ -877,7 +877,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -1140,7 +1140,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }

@@ -156,7 +156,7 @@ ShaderStage ConvertToStageShage(
         }
     }
 
-    LLPC_NEVER_CALLED();
+    llvm_unreachable("Should never be called!");
     return ShaderStageInvalid;
 }
 
@@ -182,7 +182,7 @@ spv::ExecutionModel ConvertToExecModel(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             return static_cast <spv::ExecutionModel>(0);
         }
     }
@@ -193,7 +193,7 @@ spv::ExecutionModel ConvertToExecModel(
 uint32_t ShaderStageToMask(
     ShaderStage stage)  // Shader stage
 {
-    LLPC_ASSERT((stage < ShaderStageCount) || (stage == ShaderStageCopyShader));
+    assert((stage < ShaderStageCount) || (stage == ShaderStageCopyShader));
     return (1 << stage);
 }
 
@@ -239,7 +239,7 @@ const char* GetResourceMappingNodeTypeName(
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, StreamOutTableVaPtr)
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
     return pString;

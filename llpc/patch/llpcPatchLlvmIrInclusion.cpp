@@ -86,7 +86,7 @@ bool PatchLlvmIrInclusion::runOnModule(
                                       nullptr,
                                       GlobalValue::NotThreadLocal,
                                       false);
-    LLPC_ASSERT(pGlobal != nullptr);
+    assert(pGlobal != nullptr);
 
     std::string namePrefix = Util::Abi::AmdGpuCommentName;
     pGlobal->setSection(namePrefix + "llvmir");

@@ -197,7 +197,7 @@ void ElfWriter<Elf>::MergeMapItem(
     auto srcIt = srcMap.find(srcKeyNode);
     if (srcIt != srcMap.end())
     {
-        LLPC_ASSERT(srcIt->first.getUInt() == key);
+        assert(srcIt->first.getUInt() == key);
         destMap[destMap.getDocument()->getNode(key)] = srcIt->second;
     }
     else
@@ -206,7 +206,7 @@ void ElfWriter<Elf>::MergeMapItem(
         auto destIt = destMap.find(destKeyNode);
         if (destIt != destMap.end())
         {
-            LLPC_ASSERT(destIt->first.getUInt() == key);
+            assert(destIt->first.getUInt() == key);
             static_cast<MapDocNode&>(destMap).erase(destIt);
         }
     }
@@ -227,13 +227,13 @@ void ElfWriter<Elf>::MergeMetaNote(
     auto success = destDocument.readFromBlob(StringRef(reinterpret_cast<const char*>(pNote1->pData),
                                                        pNote1->hdr.descSize),
                                              false);
-    LLPC_ASSERT(success);
+    assert(success);
 
     success = srcDocument.readFromBlob(StringRef(reinterpret_cast<const char*>(pNote2->pData),
                                                  pNote2->hdr.descSize),
                                        false);
-    LLPC_ASSERT(success);
-    LLPC_UNUSED(success);
+    assert(success);
+    (void(success)); // unused
 
     auto destPipeline = destDocument.getRoot().
         getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0];
@@ -389,14 +389,14 @@ void ElfWriter<Elf>::SetNote(
     {
         if (note.hdr.type == pNote->hdr.type)
         {
-            LLPC_ASSERT(note.pData != pNote->pData);
+            assert(note.pData != pNote->pData);
             delete[] note.pData;
             note = *pNote;
             return;
         }
     }
 
-    LLPC_NEVER_CALLED();
+    llvm_unreachable("Should never be called!");
 }
 
 // =====================================================================================================================
@@ -406,9 +406,9 @@ void ElfWriter<Elf>::SetSection(
     uint32_t          secIndex,   //  Section index
     SectionBuffer*    pSection)   // [in] Input section
 {
-    LLPC_ASSERT(secIndex < m_sections.size());
-    LLPC_ASSERT(pSection->pName == m_sections[secIndex].pName);
-    LLPC_ASSERT(pSection->pData != m_sections[secIndex].pData);
+    assert(secIndex < m_sections.size());
+    assert(pSection->pName == m_sections[secIndex].pName);
+    assert(pSection->pData != m_sections[secIndex].pData);
 
     delete[] m_sections[secIndex].pData;
     m_sections[secIndex] = *pSection;
@@ -456,7 +456,7 @@ void ElfWriter<Elf>::AssembleNotes()
 
     delete[] pNoteSection->pData;
     uint8_t* pData = new uint8_t[std::max(noteSize, noteHeaderSize)];
-    LLPC_ASSERT(pData != nullptr);
+    assert(pData != nullptr);
     pNoteSection->pData = pData;
     pNoteSection->secHead.sh_size = noteSize;
 
@@ -472,7 +472,7 @@ void ElfWriter<Elf>::AssembleNotes()
         pData += noteDescSize;
     }
 
-    LLPC_ASSERT(pNoteSection->secHead.sh_size == static_cast<uint32_t>(pData - pNoteSection->pData));
+    assert(pNoteSection->secHead.sh_size == static_cast<uint32_t>(pData - pNoteSection->pData));
 }
 
 // =====================================================================================================================
@@ -553,7 +553,7 @@ void ElfWriter<Elf>::AssembleSymbols()
         }
     }
 
-    LLPC_ASSERT(pSymbolSection->secHead.sh_size ==
+    assert(pSymbolSection->secHead.sh_size ==
                 static_cast<uint32_t>(reinterpret_cast<uint8_t*>(pSymbol) - pSymbolSection->pData));
 }
 
@@ -590,7 +590,7 @@ template<class Elf>
 void ElfWriter<Elf>::WriteToBuffer(
     ElfPackage* pElf)   // [in] Output buffer to write ELF data
 {
-    LLPC_ASSERT(pElf != nullptr);
+    assert(pElf != nullptr);
 
     // Update offsets and size values
     AssembleNotes();
@@ -608,7 +608,7 @@ void ElfWriter<Elf>::WriteToBuffer(
     memcpy(pBuffer, &m_header, elfHdrSize);
     pBuffer += elfHdrSize;
 
-    LLPC_ASSERT(m_header.e_phnum == 0);
+    assert(m_header.e_phnum == 0);
 
     // Write each section buffer
     for (auto& section : m_sections)
@@ -626,7 +626,7 @@ void ElfWriter<Elf>::WriteToBuffer(
         pBuffer += secHdrSize;
     }
 
-    LLPC_ASSERT((pBuffer - pData) == reqSize);
+    assert((pBuffer - pData) == reqSize);
 }
 
 // =====================================================================================================================
@@ -650,16 +650,16 @@ Result ElfWriter<Elf>::CopyFromReader(
     }
 
     m_map = reader.m_map;
-    LLPC_ASSERT(m_header.e_phnum == 0);
+    assert(m_header.e_phnum == 0);
 
     m_noteSecIdx = m_map[NoteName];
     m_textSecIdx = m_map[TextName];
     m_symSecIdx = m_map[SymTabName];
     m_strtabSecIdx = m_map[StrTabName];
-    LLPC_ASSERT(m_noteSecIdx > 0);
-    LLPC_ASSERT(m_textSecIdx > 0);
-    LLPC_ASSERT(m_symSecIdx > 0);
-    LLPC_ASSERT(m_strtabSecIdx > 0);
+    assert(m_noteSecIdx > 0);
+    assert(m_textSecIdx > 0);
+    assert(m_symSecIdx > 0);
+    assert(m_strtabSecIdx > 0);
 
     auto pNoteSection = &m_sections[m_noteSecIdx];
     const uint32_t noteHeaderSize = sizeof(NoteHeader) - 8;
@@ -782,8 +782,8 @@ void ElfWriter<Elf>::MergeElfBinary(
 
     auto fragmentCodesize = pFragmentElf->codeSize;
     auto result = reader.ReadFromBuffer(pFragmentElf->pCode, &fragmentCodesize);
-    LLPC_ASSERT(result == Result::Success);
-    LLPC_UNUSED(result);
+    assert(result == Result::Success);
+    (void(result)); // unused
 
     // Merge GPU ISA code
     const ElfSectionBuffer<Elf64::SectionHeader>* pNonFragmentTextSection = nullptr;
@@ -863,14 +863,14 @@ void ElfWriter<Elf>::MergeElfBinary(
     }
 
     // LLPC doesn't use per pipeline internal table, and LLVM backend doesn't add symbols for disassembly info.
-    LLPC_ASSERT((reader.IsValidSymbol(FragmentIntrlTblSymbolName) == false) &&
+    assert((reader.IsValidSymbol(FragmentIntrlTblSymbolName) == false) &&
                 (reader.IsValidSymbol(FragmentDisassemblySymbolName) == false) &&
                 (reader.IsValidSymbol(FragmentIntrlDataSymbolName) == false) &&
                 (reader.IsValidSymbol(FragmentAmdIlSymbolName) == false));
-    LLPC_UNUSED(FragmentIntrlTblSymbolName);
-    LLPC_UNUSED(FragmentDisassemblySymbolName);
-    LLPC_UNUSED(FragmentIntrlDataSymbolName);
-    LLPC_UNUSED(FragmentAmdIlSymbolName);
+    (void(FragmentIntrlTblSymbolName)); // unused
+    (void(FragmentDisassemblySymbolName)); // unused
+    (void(FragmentIntrlDataSymbolName)); // unused
+    (void(FragmentAmdIlSymbolName)); // unused
 
     // Merge ISA disassemble
     auto fragmentDisassemblySecIndex = reader.GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
@@ -881,7 +881,7 @@ void ElfWriter<Elf>::MergeElfBinary(
     GetSectionDataBySectionIndex(nonFragmentDisassemblySecIndex, &pNonFragmentDisassemblySection);
     if (pNonFragmentDisassemblySection != nullptr)
     {
-        LLPC_ASSERT(pFragmentDisassemblySection != nullptr);
+        assert(pFragmentDisassemblySection != nullptr);
         // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
         // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
         // for all section data.
@@ -927,7 +927,7 @@ void ElfWriter<Elf>::MergeElfBinary(
 
     if (pNonFragmentLlvmIrSection != nullptr)
     {
-        LLPC_ASSERT(pFragmentLlvmIrSection != nullptr);
+        assert(pFragmentLlvmIrSection != nullptr);
 
         // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
         // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
@@ -966,7 +966,7 @@ void ElfWriter<Elf>::MergeElfBinary(
     ElfNote nonFragmentMetaNote = {};
     nonFragmentMetaNote = GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
 
-    LLPC_ASSERT(nonFragmentMetaNote.pData != nullptr);
+    assert(nonFragmentMetaNote.pData != nullptr);
     ElfNote fragmentMetaNote = {};
     ElfNote newMetaNote = {};
     fragmentMetaNote = reader.GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
@@ -1012,7 +1012,7 @@ Result ElfWriter<Elf>::LinkGraphicsRelocatableElf(
     Context* pContext)                                // [in] Acquired context
 {
     Reinitialize();
-    LLPC_ASSERT(relocatableElfs.size() == 2 && "Can only handle VsPs Shaders for now.");
+    assert(relocatableElfs.size() == 2 && "Can only handle VsPs Shaders for now.");
 
     // Get the main data for the header, the parts that change will be updated when writing to buffer.
     m_header = relocatableElfs[0]->m_header;

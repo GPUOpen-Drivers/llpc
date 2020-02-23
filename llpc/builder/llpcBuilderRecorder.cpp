@@ -292,7 +292,7 @@ StringRef BuilderRecorder::GetCallName(
     case SubgroupMbcnt:
         return "subgroup.mbcnt";
     }
-    LLPC_NEVER_CALLED();
+    llvm_unreachable("Should never be called!");
     return "";
 }
 
@@ -1029,7 +1029,7 @@ Value* BuilderRecorder::CreateIndexDescPtr(
     bool          isNonUniform,       // Whether the descriptor index is non-uniform
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
-    LLPC_ASSERT((pDescPtr->getType() == GetImageDescPtrTy()) ||
+    assert((pDescPtr->getType() == GetImageDescPtrTy()) ||
                 (pDescPtr->getType() == GetSamplerDescPtrTy()) ||
                 (pDescPtr->getType() == GetFmaskDescPtrTy()) ||
                 (pDescPtr->getType() == GetTexelBufferDescPtrTy()));
@@ -1044,7 +1044,7 @@ Value* BuilderRecorder::CreateLoadDescFromPtr(
                                       //    the CreateGet*DescPtr methods
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
-    LLPC_ASSERT((pDescPtr->getType() == GetImageDescPtrTy()) ||
+    assert((pDescPtr->getType() == GetImageDescPtrTy()) ||
                 (pDescPtr->getType() == GetSamplerDescPtrTy()) ||
                 (pDescPtr->getType() == GetFmaskDescPtrTy()) ||
                 (pDescPtr->getType() == GetTexelBufferDescPtrTy()));

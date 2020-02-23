@@ -73,7 +73,7 @@ Function* GetEntryPoint(
         }
     }
 
-    LLPC_ASSERT(pEntryPoint != nullptr);
+    assert(pEntryPoint != nullptr);
     return pEntryPoint;
 }
 
@@ -167,7 +167,7 @@ void GetTypeName(
     }
     else
     {
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
     }
 }
 
@@ -294,7 +294,7 @@ ShaderStage GetShaderStageFromCallingConv(
         shaderStage = ShaderStageCompute;
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -367,7 +367,7 @@ Value* ToInt32Value(
     Value*       pValue,     // [in] Value to be translated
     Instruction* pInsertPos) // [in] Where to insert the translation instructions
 {
-    LLPC_ASSERT(isa<IntegerType>(pValue->getType()));
+    assert(isa<IntegerType>(pValue->getType()));
     auto pValueTy = cast<IntegerType>(pValue->getType());
 
     const uint32_t bitWidth = pValueTy->getBitWidth();

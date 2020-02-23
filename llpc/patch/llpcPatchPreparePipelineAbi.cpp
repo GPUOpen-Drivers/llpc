@@ -202,7 +202,7 @@ void PatchPreparePipelineAbi::SetCallingConvs(
 void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
     Module& module)   // [in] LLVM module
 {
-    LLPC_ASSERT(m_gfxIp.major >= 9);
+    assert(m_gfxIp.major >= 9);
 
     const bool hasTs = (m_hasTcs || m_hasTes);
 

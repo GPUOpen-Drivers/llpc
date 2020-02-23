@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "llpcFile.h"
+#include <cassert>
 #include <stdarg.h>
 #include <sys/stat.h>
 
@@ -110,7 +111,7 @@ Result File::Open(
             fileMode[2] = 'b';
             break;
         default:
-            LLPC_NEVER_CALLED();
+            assert(0 && "Should never be called!");
             result = Result::ErrorInvalidValue;
             break;
         }
@@ -370,8 +371,8 @@ void File::Seek(
     {
         int32_t ret = fseek(m_pFileHandle, offset, fromOrigin ? SEEK_SET : SEEK_CUR);
 
-        LLPC_ASSERT(ret == 0);
-        LLPC_UNUSED(ret);
+        assert(ret == 0);
+        (void(ret)); // unused
     }
 }
 

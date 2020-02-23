@@ -121,7 +121,7 @@ Value* BuilderImplSubgroup::CreateSubgroupAllEqual(
     }
     else
     {
-        LLPC_ASSERT(pType->isIntOrIntVectorTy());
+        assert(pType->isIntOrIntVectorTy());
         pCompare = CreateICmpEQ(pCompare, pValue);
     }
 
@@ -183,7 +183,7 @@ Value* BuilderImplSubgroup::CreateSubgroupBallot(
     const Twine& instName) // [in] Name to give final instruction.
 {
     // Check the type is definitely an integer.
-    LLPC_ASSERT(pValue->getType()->isIntegerTy());
+    assert(pValue->getType()->isIntegerTy());
 
     Value* pBallot = CreateGroupBallot(pValue);
 
@@ -971,7 +971,7 @@ Value* BuilderImplSubgroup::CreateSubgroupSwizzleMask(
     uint8_t orMask = static_cast<uint8_t>(cast<ConstantInt>(pConstMask->getAggregateElement(1u))->getZExtValue());
     uint8_t xorMask = static_cast<uint8_t>(cast<ConstantInt>(pConstMask->getAggregateElement(2u))->getZExtValue());
 
-    LLPC_ASSERT((andMask <= 31) && (orMask <= 31) && (xorMask <= 31));
+    assert((andMask <= 31) && (orMask <= 31) && (xorMask <= 31));
 
     return CreateDsSwizzle(pValue, GetDsSwizzleBitMode(xorMask, orMask, andMask));
 }
@@ -1005,7 +1005,7 @@ Value* BuilderImplSubgroup::CreateSubgroupMbcnt(
     const Twine& instName) // [in] Name to give instruction(s)
 {
     // Check that the type is definitely an i64.
-    LLPC_ASSERT(pMask->getType()->isIntegerTy(64));
+    assert(pMask->getType()->isIntegerTy(64));
 
     Value* const pMasks = CreateBitCast(pMask, VectorType::get(getInt32Ty(), 2));
     Value* const pMaskLow = CreateExtractElement(pMasks, getInt32(0));
@@ -1057,7 +1057,7 @@ Value* BuilderImplSubgroup::CreateGroupArithmeticIdentity(
         }
         else
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             return nullptr;
         }
     case GroupArithOp::UMin:
@@ -1083,7 +1083,7 @@ Value* BuilderImplSubgroup::CreateGroupArithmeticIdentity(
         }
         else
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             return nullptr;
         }
     case GroupArithOp::UMax:
@@ -1097,7 +1097,7 @@ Value* BuilderImplSubgroup::CreateGroupArithmeticIdentity(
     case GroupArithOp::Xor:
         return ConstantInt::get(pType, 0, false);
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         return nullptr;
     }
 }
@@ -1138,7 +1138,7 @@ Value* BuilderImplSubgroup::CreateGroupArithmeticOperation(
     case GroupArithOp::Xor:
         return CreateXor(pX, pY);
     default:
-        LLPC_NOT_IMPLEMENTED();
+        llvm_unreachable("Not implemented!");
         return nullptr;
     }
 }
@@ -1441,7 +1441,7 @@ Value* BuilderImplSubgroup::CreateGroupBallot(
     Value* const pValue) // [in] The value to contribute to the SGPR, must be an boolean type.
 {
     // Check the type is definitely an boolean.
-    LLPC_ASSERT(pValue->getType()->isIntegerTy(1));
+    assert(pValue->getType()->isIntegerTy(1));
 
     // Turn value into an i32.
     Value* pValueAsInt32 = CreateSelect(pValue, getInt32(1), getInt32(0));

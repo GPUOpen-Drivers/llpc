@@ -386,7 +386,7 @@ void PatchBufferOp::visitAtomicRMWInst(
             intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_umin;
             break;
         default:
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
 
@@ -508,7 +508,7 @@ void PatchBufferOp::visitCallInst(
     }
     else
     {
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
     }
 }
 
@@ -649,8 +649,8 @@ void PatchBufferOp::visitLoadInst(
             return;
         }
 
-        LLPC_ASSERT(loadInst.isVolatile() == false);
-        LLPC_ASSERT(loadInst.getOrdering() == AtomicOrdering::NotAtomic);
+        assert(loadInst.isVolatile() == false);
+        assert(loadInst.getOrdering() == AtomicOrdering::NotAtomic);
 
         Type* const pCastType = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(ADDR_SPACE_CONST);
 
@@ -737,7 +737,7 @@ void PatchBufferOp::visitMemMoveInst(
 
     // We assume LLVM is not introducing variable length mem moves.
     ConstantInt* const pLength = dyn_cast<ConstantInt>(memMoveInst.getArgOperand(2));
-    LLPC_ASSERT(pLength != nullptr);
+    assert(pLength != nullptr);
 
     // Get a vector type that is the length of the memmove.
     VectorType* const pMemoryType = VectorType::get(m_pBuilder->getInt8Ty(), pLength->getZExtValue());
@@ -852,7 +852,7 @@ void PatchBufferOp::visitPHINode(
         for (BasicBlock* const pBlock : phiNode.blocks())
         {
             const int32_t blockIndex = phiNode.getBasicBlockIndex(pBlock);
-            LLPC_ASSERT(blockIndex >= 0);
+            assert(blockIndex >= 0);
 
             Value* const pIncomingBufferDesc = m_replacementMap[incomings[blockIndex]].first;
 
@@ -891,7 +891,7 @@ void PatchBufferOp::visitPHINode(
     for (BasicBlock* const pBlock : phiNode.blocks())
     {
         const int32_t blockIndex = phiNode.getBasicBlockIndex(pBlock);
-        LLPC_ASSERT(blockIndex >= 0);
+        assert(blockIndex >= 0);
 
         Value* pIncomingIndex = m_replacementMap[incomings[blockIndex]].second;
 
@@ -1115,7 +1115,7 @@ void PatchBufferOp::PostVisitMemCpyInst(
         }
         else
         {
-            LLPC_ASSERT(stride < 8);
+            assert(stride < 8);
             pCastDestType = m_pBuilder->getIntNTy(stride * 8)->getPointerTo(destAddrSpace);
             pCastSrcType = m_pBuilder->getIntNTy(stride * 8)->getPointerTo(srcAddrSpace);
         }
@@ -1265,7 +1265,7 @@ void PatchBufferOp::PostVisitMemSetInst(
         }
         else
         {
-            LLPC_ASSERT(stride < 8);
+            assert(stride < 8);
             pCastDestType = m_pBuilder->getIntNTy(stride * 8)->getPointerTo(destAddrSpace);
         }
 
@@ -1396,7 +1396,7 @@ Value* PatchBufferOp::GetPointerOperandAsInst(
     }
 
     ConstantExpr* const pConstExpr = dyn_cast<ConstantExpr>(pValue);
-    LLPC_ASSERT(pConstExpr != nullptr);
+    assert(pConstExpr != nullptr);
 
     Instruction* const pNewInst = m_pBuilder->Insert(pConstExpr->getAsInstruction());
 
@@ -1404,7 +1404,7 @@ Value* PatchBufferOp::GetPointerOperandAsInst(
     visit(pNewInst);
 
     // Check that the new instruction was definitely in the replacement map.
-    LLPC_ASSERT(m_replacementMap.count(pNewInst) > 0);
+    assert(m_replacementMap.count(pNewInst) > 0);
 
     return pNewInst;
 }
@@ -1417,9 +1417,9 @@ Value* PatchBufferOp::GetBaseAddressFromBufferDesc(
 {
     Type* const pDescType = pBufferDesc->getType();
 
-    LLPC_ASSERT(pDescType->isVectorTy());
-    LLPC_ASSERT(pDescType->getVectorNumElements() == 4);
-    LLPC_ASSERT(pDescType->getVectorElementType()->isIntegerTy(32));
+    assert(pDescType->isVectorTy());
+    assert(pDescType->getVectorNumElements() == 4);
+    assert(pDescType->getVectorElementType()->isIntegerTy(32));
 
     // Get the base address of our buffer by extracting the two components with the 48-bit address, and masking.
     Value* pBaseAddr = m_pBuilder->CreateShuffleVector(pBufferDesc, UndefValue::get(pDescType), { 0, 1 });
@@ -1472,7 +1472,7 @@ PointerType* PatchBufferOp::GetRemappedType(
     Type* const pType // [in] The type to remap.
     ) const
 {
-    LLPC_ASSERT(pType->isPointerTy());
+    assert(pType->isPointerTy());
     return pType->getPointerElementType()->getPointerTo(ADDR_SPACE_CONST_32BIT);
 }
 
@@ -1528,7 +1528,7 @@ Value* PatchBufferOp::ReplaceLoadStore(
     StoreInst* const pStoreInst = dyn_cast<StoreInst>(&pInst);
 
     // Either load instruction or store instruction is valid (not both)
-    LLPC_ASSERT((pLoadInst == nullptr) != (pStoreInst == nullptr));
+    assert((pLoadInst == nullptr) != (pStoreInst == nullptr));
 
     bool isLoad = pLoadInst != nullptr;
     Type* pType = nullptr;
@@ -1725,8 +1725,8 @@ Value* PatchBufferOp::ReplaceLoadStore(
             pIntAccessType = Type::getInt8Ty(*m_pContext);
             accessSize = 1;
         }
-        LLPC_ASSERT(pIntAccessType != nullptr);
-        LLPC_ASSERT(accessSize != 0);
+        assert(pIntAccessType != nullptr);
+        assert(accessSize != 0);
 
         Value* pPart = nullptr;
 
@@ -1834,7 +1834,7 @@ Value* PatchBufferOp::ReplaceLoadStore(
                 }
             }
         }
-        LLPC_ASSERT(pNewInst != nullptr);
+        assert(pNewInst != nullptr);
 
         if (pType->isPointerTy())
         {
@@ -1882,11 +1882,11 @@ Value* PatchBufferOp::ReplaceICmp(
 
     Type* const pBufferDescTy = bufferDescs[0]->getType();
 
-    LLPC_ASSERT(pBufferDescTy->isVectorTy());
-    LLPC_ASSERT(pBufferDescTy->getVectorNumElements() == 4);
-    LLPC_ASSERT(pBufferDescTy->getVectorElementType()->isIntegerTy(32));
-    LLPC_UNUSED(pBufferDescTy);
-    LLPC_ASSERT((pICmpInst->getPredicate() == ICmpInst::ICMP_EQ) || (pICmpInst->getPredicate() == ICmpInst::ICMP_NE));
+    assert(pBufferDescTy->isVectorTy());
+    assert(pBufferDescTy->getVectorNumElements() == 4);
+    assert(pBufferDescTy->getVectorElementType()->isIntegerTy(32));
+    (void(pBufferDescTy)); // unused
+    assert((pICmpInst->getPredicate() == ICmpInst::ICMP_EQ) || (pICmpInst->getPredicate() == ICmpInst::ICMP_NE));
 
     Value* pBufferDescICmp = m_pBuilder->getFalse();
     if ((bufferDescs[0] == nullptr) && (bufferDescs[1] == nullptr))

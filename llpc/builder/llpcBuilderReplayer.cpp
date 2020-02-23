@@ -129,7 +129,7 @@ bool BuilderReplayer::runOnModule(
         if (pFuncMeta == nullptr)
         {
             // If the function had the llpc builder call prefix, it means the metadata was not encoded correctly.
-            LLPC_ASSERT(func.getName().startswith(BuilderCallPrefix) == false);
+            assert(func.getName().startswith(BuilderCallPrefix) == false);
             continue;
         }
 
@@ -147,7 +147,7 @@ bool BuilderReplayer::runOnModule(
         }
 
         func.clearMetadata();
-        LLPC_ASSERT(func.user_empty());
+        assert(func.user_empty());
         funcsToRemove.push_back(&func);
     }
 
@@ -234,7 +234,7 @@ Value* BuilderReplayer::ProcessCall(
     case BuilderRecorder::Opcode::Nop:
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             return nullptr;
         }
 

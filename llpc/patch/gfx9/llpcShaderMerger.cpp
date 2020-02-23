@@ -58,8 +58,8 @@ ShaderMerger::ShaderMerger(
     m_pPipelineShaders(pPipelineShaders),
     m_primShader(pPipelineState)
 {
-    LLPC_ASSERT(m_gfxIp.major >= 9);
-    LLPC_ASSERT(m_pPipelineState->IsGraphics());
+    assert(m_gfxIp.major >= 9);
+    assert(m_pPipelineState->IsGraphics());
 
     m_hasVs = m_pPipelineState->HasShaderStage(ShaderStageVertex);
     m_hasTcs = m_pPipelineState->HasShaderStage(ShaderStageTessControl);
@@ -84,7 +84,7 @@ FunctionType* ShaderMerger::GenerateLsHsEntryPointType(
     uint64_t* pInRegMask // [out] "Inreg" bit mask for the arguments
     ) const
 {
-    LLPC_ASSERT(m_hasVs || m_hasTcs);
+    assert(m_hasVs || m_hasTcs);
 
     std::vector<Type*> argTys;
 
@@ -119,11 +119,11 @@ FunctionType* ShaderMerger::GenerateLsHsEntryPointType(
         {
             pVsIntfData->userDataUsage.spillTable = userDataCount;
             ++userDataCount;
-            LLPC_ASSERT(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
+            assert(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
         }
     }
 
-    LLPC_ASSERT(userDataCount > 0);
+    assert(userDataCount > 0);
     argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), userDataCount));
     *pInRegMask |= (1ull << LsHsSpecialSysValueCount);
 
@@ -150,7 +150,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         pLsEntryPoint->addFnAttr(Attribute::AlwaysInline);
     }
 
-    LLPC_ASSERT(pHsEntryPoint != nullptr);
+    assert(pHsEntryPoint != nullptr);
     pHsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
     pHsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
@@ -328,15 +328,15 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         // Set up user data SGPRs
         while (userDataIdx < userDataCount)
         {
-            LLPC_ASSERT(lsArgIdx < lsArgCount);
+            assert(lsArgIdx < lsArgCount);
 
             auto pLsArg = (pLsArgBegin + lsArgIdx);
-            LLPC_ASSERT(pLsArg->hasAttribute(Attribute::InReg));
+            assert(pLsArg->hasAttribute(Attribute::InReg));
 
             auto pLsArgTy = pLsArg->getType();
             if (pLsArgTy->isVectorTy())
             {
-                LLPC_ASSERT(pLsArgTy->getVectorElementType()->isIntegerTy());
+                assert(pLsArgTy->getVectorElementType()->isIntegerTy());
 
                 const uint32_t userDataSize = pLsArgTy->getVectorNumElements();
 
@@ -354,7 +354,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
             }
             else
             {
-                LLPC_ASSERT(pLsArgTy->isIntegerTy());
+                assert(pLsArgTy->isIntegerTy());
 
                 auto pLsUserData = ExtractElementInst::Create(pUserData,
                                                               ConstantInt::get(Type::getInt32Ty(*m_pContext),
@@ -393,7 +393,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
             ++lsArgIdx;
         }
 
-        LLPC_ASSERT(lsArgIdx == lsArgCount); // Must have visit all arguments of LS entry point
+        assert(lsArgIdx == lsArgCount); // Must have visit all arguments of LS entry point
 
         CallInst::Create(pLsEntryPoint, args, "", pBeginLsBlock);
     }
@@ -426,15 +426,15 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         // Set up user data SGPRs
         while (userDataIdx < userDataCount)
         {
-            LLPC_ASSERT(hsArgIdx < pHsEntryPoint->arg_size());
+            assert(hsArgIdx < pHsEntryPoint->arg_size());
 
             auto pHsArg = (pHsArgBegin + hsArgIdx);
-            LLPC_ASSERT(pHsArg->hasAttribute(Attribute::InReg));
+            assert(pHsArg->hasAttribute(Attribute::InReg));
 
             auto pHsArgTy = pHsArg->getType();
             if (pHsArgTy->isVectorTy())
             {
-                LLPC_ASSERT(pHsArgTy->getVectorElementType()->isIntegerTy());
+                assert(pHsArgTy->getVectorElementType()->isIntegerTy());
 
                 const uint32_t userDataSize = pHsArgTy->getVectorNumElements();
 
@@ -452,7 +452,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
             }
             else
             {
-                LLPC_ASSERT(pHsArgTy->isIntegerTy());
+                assert(pHsArgTy->isIntegerTy());
                 uint32_t actualUserDataIdx = userDataIdx;
                 if (pIntfData->spillTable.sizeInDwords > 0)
                 {
@@ -461,7 +461,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
                         if (m_hasVs)
                         {
                             auto pVsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
-                            LLPC_ASSERT(pVsIntfData->userDataUsage.spillTable > 0);
+                            assert(pVsIntfData->userDataUsage.spillTable > 0);
                             actualUserDataIdx = pVsIntfData->userDataUsage.spillTable;
                         }
                     }
@@ -495,7 +495,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         args.push_back(pRelPatchId);
         ++hsArgIdx;
 
-        LLPC_ASSERT(hsArgIdx == pHsEntryPoint->arg_size()); // Must have visit all arguments of HS entry point
+        assert(hsArgIdx == pHsEntryPoint->arg_size()); // Must have visit all arguments of HS entry point
 
         CallInst::Create(pHsEntryPoint, args, "", pBeginHsBlock);
     }
@@ -513,7 +513,7 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
     uint64_t* pInRegMask // [out] "Inreg" bit mask for the arguments
     ) const
 {
-    LLPC_ASSERT(m_hasGs);
+    assert(m_hasGs);
 
     std::vector<Type*> argTys;
 
@@ -552,13 +552,13 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
         if (m_hasTes)
         {
             const auto pTesIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessEval);
-            LLPC_ASSERT(pTesIntfData->userDataUsage.tes.viewIndex == pIntfData->userDataUsage.gs.viewIndex);
+            assert(pTesIntfData->userDataUsage.tes.viewIndex == pIntfData->userDataUsage.gs.viewIndex);
             if ((pIntfData->spillTable.sizeInDwords > 0) &&
                 (pTesIntfData->spillTable.sizeInDwords == 0))
             {
                 pTesIntfData->userDataUsage.spillTable = userDataCount;
                 ++userDataCount;
-                LLPC_ASSERT(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
+                assert(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
             }
         }
     }
@@ -567,18 +567,18 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
         if (m_hasVs)
         {
             const auto pVsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
-            LLPC_ASSERT(pVsIntfData->userDataUsage.vs.viewIndex == pIntfData->userDataUsage.gs.viewIndex);
+            assert(pVsIntfData->userDataUsage.vs.viewIndex == pIntfData->userDataUsage.gs.viewIndex);
             if ((pIntfData->spillTable.sizeInDwords > 0) &&
                 (pVsIntfData->spillTable.sizeInDwords == 0))
             {
                 pVsIntfData->userDataUsage.spillTable = userDataCount;
                 ++userDataCount;
-                LLPC_ASSERT(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
+                assert(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
             }
         }
     }
 
-    LLPC_ASSERT(userDataCount > 0);
+    assert(userDataCount > 0);
     argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), userDataCount));
     *pInRegMask |= (1ull << EsGsSpecialSysValueCount);
 
@@ -619,7 +619,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
         pEsEntryPoint->addFnAttr(Attribute::AlwaysInline);
     }
 
-    LLPC_ASSERT(pGsEntryPoint != nullptr);
+    assert(pGsEntryPoint != nullptr);
     pGsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
     pGsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
@@ -824,15 +824,15 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
         // Set up user data SGPRs
         while (userDataIdx < userDataCount)
         {
-            LLPC_ASSERT(esArgIdx < esArgCount);
+            assert(esArgIdx < esArgCount);
 
             auto pEsArg = (pEsArgBegin + esArgIdx);
-            LLPC_ASSERT(pEsArg->hasAttribute(Attribute::InReg));
+            assert(pEsArg->hasAttribute(Attribute::InReg));
 
             auto pEsArgTy = pEsArg->getType();
             if (pEsArgTy->isVectorTy())
             {
-                LLPC_ASSERT(pEsArgTy->getVectorElementType()->isIntegerTy());
+                assert(pEsArgTy->getVectorElementType()->isIntegerTy());
 
                 const uint32_t userDataSize = pEsArgTy->getVectorNumElements();
 
@@ -850,7 +850,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
             }
             else
             {
-                LLPC_ASSERT(pEsArgTy->isIntegerTy());
+                assert(pEsArgTy->isIntegerTy());
 
                 auto pEsUserData = ExtractElementInst::Create(pUserData,
                                                               ConstantInt::get(Type::getInt32Ty(*m_pContext),
@@ -924,7 +924,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
             }
         }
 
-        LLPC_ASSERT(esArgIdx == esArgCount); // Must have visit all arguments of ES entry point
+        assert(esArgIdx == esArgCount); // Must have visit all arguments of ES entry point
 
         CallInst::Create(pEsEntryPoint, args, "", pBeginEsBlock);
     }
@@ -1007,15 +1007,15 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
         // Set up user data SGPRs
         while (userDataIdx < userDataCount)
         {
-            LLPC_ASSERT(gsArgIdx < pGsEntryPoint->arg_size());
+            assert(gsArgIdx < pGsEntryPoint->arg_size());
 
             auto pGsArg = (pGsArgBegin + gsArgIdx);
-            LLPC_ASSERT(pGsArg->hasAttribute(Attribute::InReg));
+            assert(pGsArg->hasAttribute(Attribute::InReg));
 
             auto pGsArgTy = pGsArg->getType();
             if (pGsArgTy->isVectorTy())
             {
-                LLPC_ASSERT(pGsArgTy->getVectorElementType()->isIntegerTy());
+                assert(pGsArgTy->getVectorElementType()->isIntegerTy());
 
                 const uint32_t userDataSize = pGsArgTy->getVectorNumElements();
 
@@ -1033,7 +1033,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
             }
             else
             {
-                LLPC_ASSERT(pGsArgTy->isIntegerTy());
+                assert(pGsArgTy->isIntegerTy());
                 uint32_t actualUserDataIdx = userDataIdx;
                 if (pIntfData->spillTable.sizeInDwords > 0)
                 {
@@ -1089,7 +1089,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
         args.push_back(pInvocationId);
         ++gsArgIdx;
 
-        LLPC_ASSERT(gsArgIdx == pGsEntryPoint->arg_size()); // Must have visit all arguments of GS entry point
+        assert(gsArgIdx == pGsEntryPoint->arg_size()); // Must have visit all arguments of GS entry point
 
         CallInst::Create(pGsEntryPoint, args, "", pBeginGsBlock);
     }

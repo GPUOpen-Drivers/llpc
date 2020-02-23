@@ -111,8 +111,8 @@ Value* BuilderImplInOut::ReadGenericInputOutput(
                                       //      else nullptr
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
-    LLPC_ASSERT(pResultTy->isAggregateType() == false);
-    LLPC_ASSERT((isOutput == false) || (m_shaderStage == ShaderStageTessControl));
+    assert(pResultTy->isAggregateType() == false);
+    assert((isOutput == false) || (m_shaderStage == ShaderStageTessControl));
 
     // Fold constant pLocationOffset into location. (Currently a variable pLocationOffset is only supported in
     // TCS, TES, and FS custom interpolation.)
@@ -134,7 +134,7 @@ Value* BuilderImplInOut::ReadGenericInputOutput(
     case ShaderStageVertex:
         {
             // VS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx)
-            LLPC_ASSERT(pLocationOffset == getInt32(0));
+            assert(pLocationOffset == getInt32(0));
             args.push_back(getInt32(location));
             args.push_back(pElemIdx);
             break;
@@ -159,7 +159,7 @@ Value* BuilderImplInOut::ReadGenericInputOutput(
     case ShaderStageGeometry:
         {
             // GS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
-            LLPC_ASSERT(pLocationOffset == getInt32(0));
+            assert(pLocationOffset == getInt32(0));
             args.push_back(getInt32(location));
             args.push_back(pElemIdx);
             args.push_back((pVertexIndex != nullptr) ? pVertexIndex : getInt32(InvalidValue));
@@ -184,7 +184,7 @@ Value* BuilderImplInOut::ReadGenericInputOutput(
             }
             else
             {
-                LLPC_ASSERT(pLocationOffset == getInt32(0));
+                assert(pLocationOffset == getInt32(0));
                 args.push_back(getInt32(location));
                 args.push_back(pElemIdx);
                 args.push_back(getInt32(inOutInfo.GetInterpMode()));
@@ -194,7 +194,7 @@ Value* BuilderImplInOut::ReadGenericInputOutput(
         }
 
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -226,7 +226,7 @@ Instruction* BuilderImplInOut::CreateWriteGenericOutput(
     InOutInfo     outputInfo,         // Extra output info (GS stream ID, FS integer signedness)
     Value*        pVertexIndex)       // [in] For TCS per-vertex output: vertex index; else nullptr
 {
-    LLPC_ASSERT(pValueToWrite->getType()->isAggregateType() == false);
+    assert(pValueToWrite->getType()->isAggregateType() == false);
 
     // Fold constant pLocationOffset into location. (Currently a variable pLocationOffset is only supported in
     // TCS.)
@@ -249,7 +249,7 @@ Instruction* BuilderImplInOut::CreateWriteGenericOutput(
         {
             // VS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
             // TES: @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
-            LLPC_ASSERT(pLocationOffset == getInt32(0));
+            assert(pLocationOffset == getInt32(0));
             args.push_back(getInt32(location));
             args.push_back(pElemIdx);
             break;
@@ -270,7 +270,7 @@ Instruction* BuilderImplInOut::CreateWriteGenericOutput(
         {
             // GS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
             uint32_t streamId = outputInfo.HasStreamId() ? outputInfo.GetStreamId() : InvalidValue;
-            LLPC_ASSERT(pLocationOffset == getInt32(0));
+            assert(pLocationOffset == getInt32(0));
             args.push_back(getInt32(location));
             args.push_back(pElemIdx);
             args.push_back(getInt32(streamId));
@@ -283,14 +283,14 @@ Instruction* BuilderImplInOut::CreateWriteGenericOutput(
             MarkFsOutputType(pValueToWrite->getType(), location, outputInfo);
 
             // FS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
-            LLPC_ASSERT(pLocationOffset == getInt32(0));
+            assert(pLocationOffset == getInt32(0));
             args.push_back(getInt32(location));
             args.push_back(pElemIdx);
             break;
         }
 
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
     args.push_back(pValueToWrite);
@@ -392,7 +392,7 @@ void BuilderImplInOut::MarkGenericInputOutputUsage(
 void BuilderImplInOut::MarkInterpolationInfo(
     InOutInfo     interpInfo)   // Interpolation info (location and mode)
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
+    assert(m_shaderStage == ShaderStageFragment);
 
     auto pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
     switch (interpInfo.GetInterpMode())
@@ -409,7 +409,7 @@ void BuilderImplInOut::MarkInterpolationInfo(
         pResUsage->builtInUsage.fs.noperspective = true;
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -438,7 +438,7 @@ void BuilderImplInOut::MarkFsOutputType(
     uint32_t  location,       // Output location
     InOutInfo outputInfo)     // Extra output info (whether the output is signed)
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
+    assert(m_shaderStage == ShaderStageFragment);
 
     // Collect basic types of fragment outputs
     BasicType basicTy = BasicType::Unknown;
@@ -460,7 +460,7 @@ void BuilderImplInOut::MarkFsOutputType(
         }
         else
         {
-            LLPC_ASSERT(bitWidth == 32);
+            assert(bitWidth == 32);
             basicTy = signedness ? BasicType::Int : BasicType::Uint;
         }
     }
@@ -473,13 +473,13 @@ void BuilderImplInOut::MarkFsOutputType(
         }
         else
         {
-            LLPC_ASSERT(bitWidth == 32);
+            assert(bitWidth == 32);
             basicTy = BasicType::Float;
         }
     }
     else
     {
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
     }
 
     auto pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
@@ -543,7 +543,7 @@ Value* BuilderImplInOut::ModifyAuxInterpValue(
     }
     else
     {
-        LLPC_ASSERT(inputInfo.GetInterpMode() == InOutInfo::InterpModeCustom);
+        assert(inputInfo.GetInterpMode() == InOutInfo::InterpModeCustom);
     }
     return pAuxInterpValue;
 }
@@ -623,7 +623,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
     InOutInfo     outputInfo)         // Extra output info (GS stream ID)
 {
     // Can currently only cope with constant pXfbOffset.
-    LLPC_ASSERT(isa<ConstantInt>(pXfbOffset));
+    assert(isa<ConstantInt>(pXfbOffset));
 
     // Ignore if not in last-vertex-stage shader (excluding copy shader).
     auto stagesAfterThisOneMask = -ShaderStageToMask(static_cast<ShaderStage>(m_shaderStage + 1));
@@ -636,8 +636,8 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
     // Mark the usage of the XFB buffer.
     auto pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
     uint32_t streamId = outputInfo.HasStreamId() ? outputInfo.GetStreamId() : 0;
-    LLPC_ASSERT(xfbBuffer < MaxTransformFeedbackBuffers);
-    LLPC_ASSERT(streamId < MaxGsStreams);
+    assert(xfbBuffer < MaxTransformFeedbackBuffers);
+    assert(streamId < MaxGsStreams);
     pResUsage->inOutUsage.xfbStrides[xfbBuffer] = xfbStride;
     pResUsage->inOutUsage.enableXfb = true;
     pResUsage->inOutUsage.streamXfbBuffers[streamId] |= 1 << xfbBuffer;
@@ -693,7 +693,7 @@ Value* BuilderImplInOut::CreateReadBuiltInInput(
     Value*        pIndex,             // [in] Array or vector index to access part of an input, else nullptr
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
-    LLPC_ASSERT(IsBuiltInInput(builtIn));
+    assert(IsBuiltInInput(builtIn));
     return ReadBuiltIn(false, builtIn, inputInfo, pVertexIndex, pIndex, instName);
 }
 
@@ -709,8 +709,8 @@ Value* BuilderImplInOut::CreateReadBuiltInOutput(
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
     // Currently this only copes with reading an output in TCS.
-    LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
-    LLPC_ASSERT(IsBuiltInOutput(builtIn));
+    assert(m_shaderStage == ShaderStageTessControl);
+    assert(IsBuiltInOutput(builtIn));
     return ReadBuiltIn(true, builtIn, outputInfo, pVertexIndex, pIndex, instName);
 }
 
@@ -790,7 +790,7 @@ Value* BuilderImplInOut::ReadBuiltIn(
                                 ConstantInt::get(pLocalInvocationId->getType(), 1));
             break;
         default:
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
         }
         if (GetPipelineState()->GetShaderWaveSize(m_shaderStage) == 64)
         {
@@ -821,7 +821,7 @@ Value* BuilderImplInOut::ReadBuiltIn(
         args.push_back((pVertexIndex != nullptr) ? pVertexIndex : getInt32(InvalidValue));
         break;
     case ShaderStageGeometry:
-        LLPC_ASSERT(pIndex == nullptr);
+        assert(pIndex == nullptr);
         args.push_back((pVertexIndex != nullptr) ? pVertexIndex : getInt32(InvalidValue));
         break;
     case ShaderStageFragment:
@@ -833,10 +833,10 @@ Value* BuilderImplInOut::ReadBuiltIn(
             pVertexIndex = nullptr;
             args.push_back(pSampleNum);
         }
-        LLPC_ASSERT((pIndex == nullptr) && (pVertexIndex == nullptr));
+        assert((pIndex == nullptr) && (pVertexIndex == nullptr));
         break;
     default:
-        LLPC_ASSERT((pIndex == nullptr) && (pVertexIndex == nullptr));
+        assert((pIndex == nullptr) && (pVertexIndex == nullptr));
         break;
     }
 
@@ -895,7 +895,7 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
             pExpectedTy = pExpectedTy->getVectorElementType();
         }
     }
-    LLPC_ASSERT((pExpectedTy == pValueToWrite->getType()) ||
+    assert((pExpectedTy == pValueToWrite->getType()) ||
                 (((builtIn == BuiltInClipDistance) || (builtIn == BuiltInCullDistance)) &&
                  (pValueToWrite->getType()->getArrayElementType() == pExpectedTy->getArrayElementType())));
 #endif // NDEBUG
@@ -920,11 +920,11 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
         args.push_back((pVertexIndex != nullptr) ? pVertexIndex : getInt32(InvalidValue));
         break;
     case ShaderStageGeometry:
-        LLPC_ASSERT((pIndex == nullptr) && (pVertexIndex == nullptr));
+        assert((pIndex == nullptr) && (pVertexIndex == nullptr));
         args.push_back(getInt32(streamId));
         break;
     default:
-        LLPC_ASSERT((pIndex == nullptr) && (pVertexIndex == nullptr));
+        assert((pIndex == nullptr) && (pVertexIndex == nullptr));
         break;
     }
     args.push_back(pValueToWrite);
@@ -978,7 +978,7 @@ StringRef BuilderImplInOut::GetBuiltInName(
         return "InterpPullMode";
 
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         return "unknown";
     }
 }
@@ -991,7 +991,7 @@ void BuilderImplInOut::MarkBuiltInInputUsage(
                               //    this function for this built-in might have different array sizes; we take the max)
 {
     auto& pUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->builtInUsage;
-    LLPC_ASSERT(((builtIn != BuiltInClipDistance) && (builtIn != BuiltInCullDistance)) || (arraySize != 0));
+    assert(((builtIn != BuiltInClipDistance) && (builtIn != BuiltInCullDistance)) || (arraySize != 0));
     switch (m_shaderStage)
     {
     case ShaderStageVertex:
@@ -1186,7 +1186,7 @@ void BuilderImplInOut::MarkBuiltInOutputUsage(
     uint32_t    streamId)     // GS stream ID, or InvalidValue if not known
 {
     auto& pUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->builtInUsage;
-    LLPC_ASSERT(((builtIn != BuiltInClipDistance) && (builtIn != BuiltInCullDistance)) || (arraySize != 0));
+    assert(((builtIn != BuiltInClipDistance) && (builtIn != BuiltInCullDistance)) || (arraySize != 0));
     switch (m_shaderStage)
     {
     case ShaderStageVertex:
@@ -1330,7 +1330,7 @@ uint32_t BuilderImplInOut::GetBuiltInValidMask(
 #include "llpcBuilderBuiltInDefs.h"
 #undef BUILTIN
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
     return isOutput ? (validMask >> 16) : (validMask & 0xFFFF);

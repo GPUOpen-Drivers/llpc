@@ -116,7 +116,7 @@ BuilderContext* BuilderContext::Create(
     LLVMContext&  context,              // [in] LLVM context to give each Builder
     StringRef     gpuName)              // LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
 {
-    LLPC_ASSERT(Initialized && "Must call BuilderContext::Initialize before BuilderContext::Create");
+    assert(Initialized && "Must call BuilderContext::Initialize before BuilderContext::Create");
 
     BuilderContext* pBuilderContext = new BuilderContext(context);
 
@@ -146,7 +146,7 @@ BuilderContext* BuilderContext::Create(
                                                                      "",
                                                                      targetOpts,
                                                                      Optional<Reloc::Model>());
-    LLPC_ASSERT(pBuilderContext->m_pTargetMachine);
+    assert(pBuilderContext->m_pTargetMachine);
     return pBuilderContext;
 }
 
@@ -261,7 +261,7 @@ void BuilderContext::AddTargetPasses(
     // TODO: We should probably be using InitTargetOptionsFromCodeGenFlags() here.
     // Currently we are not, and it would give an "unused function" warning when compiled with
     // CLANG. So we avoid the warning by referencing it here.
-    LLPC_UNUSED(&InitTargetOptionsFromCodeGenFlags);
+    (void(&InitTargetOptionsFromCodeGenFlags)); // unused
 
     if (GetTargetMachine()->addPassesToEmitFile(passMgr, outStream, nullptr, FileType))
     {

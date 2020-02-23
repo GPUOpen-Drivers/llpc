@@ -78,7 +78,7 @@ bool SpirvLowerMemoryOp::runOnModule(
     // Remove those instructions that are replaced by this lower pass
     for (auto pInst : m_preRemoveInsts)
     {
-        LLPC_ASSERT(pInst->user_empty());
+        assert(pInst->user_empty());
         pInst->dropAllReferences();
         pInst->eraseFromParent();
     }
@@ -93,7 +93,7 @@ bool SpirvLowerMemoryOp::runOnModule(
 
     for (auto pInst : m_removeInsts)
     {
-        LLPC_ASSERT(pInst->user_empty());
+        assert(pInst->user_empty());
         pInst->dropAllReferences();
         pInst->eraseFromParent();
     }
@@ -196,7 +196,7 @@ void SpirvLowerMemoryOp::visitGetElementPtrInst(
             }
             else
             {
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
             }
         }
 
@@ -264,13 +264,13 @@ bool SpirvLowerMemoryOp::NeedExpandDynamicIndex(
                     }
                     else
                     {
-                        LLPC_NEVER_CALLED();
+                        llvm_unreachable("Should never be called!");
                         allowExpand = false;
                     }
                 }
                 else
                 {
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                     allowExpand = false;
                 }
             }
@@ -435,7 +435,7 @@ void SpirvLowerMemoryOp::ExpandStoreInst(
 
         pCheckStoreInsertPos->eraseFromParent();
 
-        LLPC_ASSERT(pStoreInst->user_empty());
+        assert(pStoreInst->user_empty());
         pStoreInst->dropAllReferences();
         pStoreInst->eraseFromParent();
     }

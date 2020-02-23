@@ -430,7 +430,7 @@ void DoAutoLayoutDesc(
                             break;
                         }
                     }
-                    LLPC_ASSERT(format != VK_FORMAT_UNDEFINED);
+                    assert(format != VK_FORMAT_UNDEFINED);
 
                     VkVertexInputBindingDescription vertexBinding = {};
                     vertexBinding.binding   = location;
@@ -493,7 +493,7 @@ void DoAutoLayoutDesc(
         }
         else
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
         }
         pPipelineInfo->iaState.topology = topology;
     }
@@ -656,11 +656,11 @@ void DoAutoLayoutDesc(
                 }
             }
 
-            LLPC_ASSERT(elemCount <= 4);
+            assert(elemCount <= 4);
             VkFormat format = pFormatTable[elemCount - 1];
-            LLPC_ASSERT(format != VK_FORMAT_UNDEFINED);
+            assert(format != VK_FORMAT_UNDEFINED);
 
-            LLPC_ASSERT(location < MaxColorTargets);
+            assert(location < MaxColorTargets);
             auto pColorTarget = &pPipelineInfo->cbState.target[location];
             pColorTarget->format = format;
             pColorTarget->channelWriteMask = (1U << elemCount) - 1;
@@ -766,7 +766,7 @@ void DoAutoLayoutDesc(
                     }
                     else if (pNode->type != nodeType)
                     {
-                        LLPC_ASSERT(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
+                        assert(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
                                      (nodeType == ResourceMappingNodeType::DescriptorResource) ||
                                      (nodeType == ResourceMappingNodeType::DescriptorTexelBuffer) ||
                                      (nodeType == ResourceMappingNodeType::DescriptorSampler)) &&
@@ -867,8 +867,8 @@ void DoAutoLayoutDesc(
         ++pResNode;
     }
 
-    LLPC_ASSERT(pResNode - pResNodes <= topLevelCount);
-    LLPC_ASSERT(pNextTable - pResNodes <= resNodeCount);
+    assert(pResNode - pResNodes <= topLevelCount);
+    assert(pNextTable - pResNodes <= resNodeCount);
 
     // Write pointer/size into PipelineShaderInfo.
     pShaderInfo->userDataNodeCount = pResNode - pResNodes;

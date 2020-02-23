@@ -164,13 +164,13 @@ void PatchPushConstOp::visitCallInst(
     CallInst& callInst) // [in] "Call" instruction
 {
     Function* const pCallee = callInst.getCalledFunction();
-    LLPC_ASSERT(pCallee != nullptr);
-    LLPC_ASSERT(pCallee->getName().startswith(LlpcName::DescriptorLoadSpillTable));
-    LLPC_UNUSED(pCallee);
+    assert(pCallee != nullptr);
+    assert(pCallee->getName().startswith(LlpcName::DescriptorLoadSpillTable));
+    (void(pCallee)); // unused
 
     auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
     uint32_t pushConstNodeIdx = pIntfData->pushConst.resNodeIdx;
-    LLPC_ASSERT(pushConstNodeIdx != InvalidValue);
+    assert(pushConstNodeIdx != InvalidValue);
     auto pPushConstNode = &m_pPipelineState->GetUserDataNodes()[pushConstNodeIdx];
 
     if (pPushConstNode->offsetInDwords < pIntfData->spillTable.offsetInDwords)
@@ -214,11 +214,11 @@ void PatchPushConstOp::visitCallInst(
 
             if (BitCastInst* const pBitCast = dyn_cast<BitCastInst>(pInst))
             {
-                LLPC_ASSERT(valueMap.count(pBitCast->getOperand(0)) > 0);
+                assert(valueMap.count(pBitCast->getOperand(0)) > 0);
 
                 Type* const pCastType = pBitCast->getType();
-                LLPC_ASSERT(pCastType->isPointerTy());
-                LLPC_ASSERT(pCastType->getPointerAddressSpace() == ADDR_SPACE_CONST);
+                assert(pCastType->isPointerTy());
+                assert(pCastType->getPointerAddressSpace() == ADDR_SPACE_CONST);
 
                 Type* const pNewType = pCastType->getPointerElementType()->getPointerTo(ADDR_SPACE_PRIVATE);
 
@@ -232,7 +232,7 @@ void PatchPushConstOp::visitCallInst(
             }
             else if (GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pInst))
             {
-                LLPC_ASSERT(valueMap.count(pGetElemPtr->getPointerOperand()) > 0);
+                assert(valueMap.count(pGetElemPtr->getPointerOperand()) > 0);
 
                 SmallVector<Value*, 8> indices;
 
@@ -252,7 +252,7 @@ void PatchPushConstOp::visitCallInst(
             }
             else if (LoadInst* const pLoad = dyn_cast<LoadInst>(pInst))
             {
-                LLPC_ASSERT(valueMap.count(pLoad->getPointerOperand()) > 0);
+                assert(valueMap.count(pLoad->getPointerOperand()) > 0);
 
                 builder.SetInsertPoint(pLoad);
 
@@ -264,7 +264,7 @@ void PatchPushConstOp::visitCallInst(
             }
             else
             {
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
             }
         }
     }

@@ -171,7 +171,7 @@ ShaderHash PipelineContext::GetShaderHashCode(
 ) const
 {
     auto pShaderInfo = GetPipelineShaderInfo(stage);
-    LLPC_ASSERT(pShaderInfo != nullptr);
+    assert(pShaderInfo != nullptr);
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
     if((pShaderInfo->options.clientHash.upper != 0) &&
@@ -454,7 +454,7 @@ void PipelineContext::SetVertexInputDescriptions(
             bindings[idx].inputRate = VertexInputRateInstance;
             break;
         default:
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
         }
     }
 
@@ -765,7 +765,7 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::MapVkFormat(
     BufNumFormat nfmt = BufNumFormatUnorm;
     if (format < ArrayRef<FormatEntry>(formatTable).size())
     {
-        LLPC_ASSERT(format == formatTable[format].format);
+        assert(format == formatTable[format].format);
         if ((isColorExport && formatTable[format].validExportFormat) ||
             ((isColorExport == false) && formatTable[format].validVertexFormat))
         {

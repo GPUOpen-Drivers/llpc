@@ -150,7 +150,7 @@ void* VKAPI_CALL IPipelineDumper::BeginPipelineDump(
     }
     else
     {
-        LLPC_ASSERT(pipelineInfo.pGraphicsInfo != nullptr);
+        assert(pipelineInfo.pGraphicsInfo != nullptr);
         hash = PipelineDumper::GenerateHashForGraphicsPipeline(pipelineInfo.pGraphicsInfo, false);
     }
 
@@ -252,7 +252,7 @@ std::string PipelineDumper::GetSpirvBinaryFileName(
     uint64_t hashCode64 = MetroHash::Compact64(pHash);
     char     fileName[64] = {};
     auto     length = snprintf(fileName, 64, "Shader_0x%016" PRIX64 ".spv", hashCode64);
-    LLPC_UNUSED(length);
+    (void(length)); // unused
     return std::string(fileName);
 }
 
@@ -267,11 +267,11 @@ std::string PipelineDumper::GetPipelineInfoFileName(
     if (pipelineInfo.pComputeInfo != nullptr)
     {
         auto length = snprintf(fileName, 64, "PipelineCs_0x%016" PRIX64, hashCode64);
-        LLPC_UNUSED(length);
+        (void(length)); // unused
     }
     else
     {
-        LLPC_ASSERT(pipelineInfo.pGraphicsInfo != nullptr);
+        assert(pipelineInfo.pGraphicsInfo != nullptr);
         const char* pFileNamePrefix = nullptr;
         if (pipelineInfo.pGraphicsInfo->tes.pModuleData != nullptr &&
             pipelineInfo.pGraphicsInfo->gs.pModuleData != nullptr)
@@ -292,7 +292,7 @@ std::string PipelineDumper::GetPipelineInfoFileName(
         }
 
         auto length = snprintf(fileName, 64, "%s_0x%016" PRIX64, pFileNamePrefix, hashCode64);
-        LLPC_UNUSED(length);
+        (void(length)); // unused
     }
 
     return std::string(fileName);
@@ -499,7 +499,7 @@ void PipelineDumper::DumpResourceMappingNode(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -590,7 +590,7 @@ void PipelineDumper::DumpPipelineShaderInfo(
         {
             auto pUserDataNode = &pShaderInfo->pUserDataNodes[i];
             auto length = snprintf(prefixBuff, 64, "userDataNode[%u]", i);
-            LLPC_UNUSED(length);
+            (void(length)); // unused
             DumpResourceMappingNode(pUserDataNode, prefixBuff, dumpFile);
         }
         dumpFile << "\n";
@@ -653,8 +653,8 @@ void PipelineDumper::DumpPipelineBinary(
         ElfReader<Elf64> reader(gfxIp);
         size_t codeSize = pPipelineBin->codeSize;
         auto result = reader.ReadFromBuffer(pPipelineBin->pCode, &codeSize);
-        LLPC_ASSERT(result == Result::Success);
-        LLPC_UNUSED(result);
+        assert(result == Result::Success);
+        (void(result)); // unused
 
         pDumpFile->dumpFile << "\n[CompileLog]\n";
         pDumpFile->dumpFile << reader;
@@ -904,7 +904,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForGraphicsPipeline(
             UpdateHashForPipelineShaderInfo(ShaderStageFragment, &pPipeline->fs, isCacheHash, &hasher);
             break;
         default:
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
     }
 
@@ -1243,7 +1243,7 @@ void PipelineDumper::UpdateHashForResourceMappingNode(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -1304,7 +1304,7 @@ void OutputBinary(
             out << formatBuf;
         }
         length = snprintf(formatBuf, sizeof(formatBuf), "%08X", pStartPos[i]);
-        LLPC_UNUSED(length);
+        (void(length)); // unused
         out << formatBuf;
 
         if (i % 8 == 7)
@@ -1323,7 +1323,7 @@ void OutputBinary(
         for (int32_t i = padPos; i < endPos; ++i)
         {
             auto length = snprintf(formatBuf, sizeof(formatBuf), "%02X", pData[i]);
-            LLPC_UNUSED(length);
+            (void(length)); // unused
             out << formatBuf;
         }
     }
@@ -1351,8 +1351,8 @@ OStream& operator<<(
         typename ElfReader<Elf>::SectionBuffer* pSection = nullptr;
         uint32_t secIdx = 0;
         Result result = reader.GetSectionDataBySortingIndex(sortIdx, &secIdx, &pSection);
-        LLPC_ASSERT(result == Result::Success);
-        LLPC_UNUSED(result);
+        assert(result == Result::Success);
+        (void(result)); // unused
         if ((strcmp(pSection->pName, ShStrTabName) == 0) ||
             (strcmp(pSection->pName, StrTabName) == 0) ||
             (strcmp(pSection->pName, SymTabName) == 0))
@@ -1432,7 +1432,7 @@ OStream& operator<<(
                                         sizeof(formatBuf),
                                         "%-45s ",
                                         pRegName);
-                                    LLPC_UNUSED(length);
+                                    (void(length)); // unused
                                     out << formatBuf;
                                 }
                                 else
@@ -1441,7 +1441,7 @@ OStream& operator<<(
                                         sizeof(formatBuf),
                                         "0x%016" PRIX64 " ",
                                         pNode->getUInt());
-                                    LLPC_UNUSED(length);
+                                    (void(length)); // unused
                                     out << formatBuf;
                                 }
                                 break;
@@ -1507,7 +1507,7 @@ OStream& operator<<(
                             }
                         default:
                             {
-                                LLPC_NEVER_CALLED();
+                                llvm_unreachable("Should never be called!");
                                 break;
                             }
                         }
@@ -1537,7 +1537,7 @@ OStream& operator<<(
                 }
                 }
                 offset += noteHeaderSize + noteNameSize + alignTo(pNode->descSize, sizeof(uint32_t));
-                LLPC_ASSERT(offset <= pSection->secHead.sh_size);
+                assert(offset <= pSection->secHead.sh_size);
             }
         }
         else if (strcmp(pSection->pName, RelocName) == 0)
@@ -1552,7 +1552,7 @@ OStream& operator<<(
                 ElfSymbol elfSym = {};
                 reader.GetSymbol(reloc.symIdx, &elfSym);
                 auto length = snprintf(formatBuf, sizeof(formatBuf), "    %-35s", elfSym.pSymName);
-                LLPC_UNUSED(length);
+                (void(length)); // unused
                 out << "#" << i << "    " << formatBuf
                     << "    offset = " << reloc.offset << "\n";
             }
@@ -1576,7 +1576,7 @@ OStream& operator<<(
                     pRegName = Gfx9::GetRegisterNameString(gfxIp, pConfig[2 * i]);
                 }
                 auto length = snprintf(formatBuf, sizeof(formatBuf), "        %-45s = 0x%08X\n", pRegName, pConfig[2 * i + 1]);
-                LLPC_UNUSED(length);
+                (void(length)); // unused
                 out << formatBuf;
             }
         }
@@ -1751,7 +1751,7 @@ std::ostream& operator<<(
     CASE_ENUM_TO_STRING(VK_VERTEX_INPUT_RATE_INSTANCE)
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
     return out << pString;
@@ -1783,7 +1783,7 @@ std::ostream& operator<<(
     CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, Explicit)
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -1803,7 +1803,7 @@ std::ostream& operator<<(
     CASE_ENUM_TO_STRING(NggCompactVertices)
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -1826,7 +1826,7 @@ std::ostream& operator<<(
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, DrawTime)
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -1856,7 +1856,7 @@ std::ostream& operator<<(
     CASE_ENUM_TO_STRING(VK_PRIMITIVE_TOPOLOGY_MAX_ENUM)
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -1879,7 +1879,7 @@ std::ostream& operator<<(
     CASE_ENUM_TO_STRING(VK_POLYGON_MODE_MAX_ENUM)
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -1902,7 +1902,7 @@ std::ostream& operator<<(
     CASE_ENUM_TO_STRING(VK_CULL_MODE_FLAG_BITS_MAX_ENUM)
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -1923,7 +1923,7 @@ std::ostream& operator<<(
     CASE_ENUM_TO_STRING(VK_FRONT_FACE_MAX_ENUM)
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -2134,7 +2134,7 @@ std::ostream& operator<<(
     CASE_ENUM_TO_STRING(VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG)
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
     return out << pString;

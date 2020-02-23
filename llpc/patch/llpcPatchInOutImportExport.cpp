@@ -75,8 +75,8 @@ PatchInOutImportExport::PatchInOutImportExport()
 // =====================================================================================================================
 PatchInOutImportExport::~PatchInOutImportExport()
 {
-    LLPC_ASSERT(m_pFragColorExport == nullptr);
-    LLPC_ASSERT(m_pVertexFetch == nullptr);
+    assert(m_pFragColorExport == nullptr);
+    assert(m_pVertexFetch == nullptr);
 }
 
 // =====================================================================================================================
@@ -269,7 +269,7 @@ void PatchInOutImportExport::ProcessShader()
                 tessFactorStride = 2;
                 break;
             default:
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
                 break;
             }
 
@@ -341,7 +341,7 @@ void PatchInOutImportExport::ProcessShader()
                 tessFactorStride = 2;
                 break;
             default:
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
                 break;
             }
             LLPC_OUTS(")\n\n");
@@ -480,14 +480,14 @@ void PatchInOutImportExport::visitCallInst(
                 }
             default:
                 {
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                     break;
                 }
             }
         }
         else
         {
-            LLPC_ASSERT(isGenericInputImport || isInterpolantInputImport);
+            assert(isGenericInputImport || isInterpolantInputImport);
 
             uint32_t loc = InvalidValue;
             Value* pLocOffset = nullptr;
@@ -524,48 +524,48 @@ void PatchInOutImportExport::visitCallInst(
                     }
                     else
                     {
-                        LLPC_ASSERT(pResUsage->inOutUsage.perPatchInputLocMap.find(value) !=
+                        assert(pResUsage->inOutUsage.perPatchInputLocMap.find(value) !=
                                     pResUsage->inOutUsage.perPatchInputLocMap.end());
                         loc = pResUsage->inOutUsage.perPatchInputLocMap[value];
                     }
                 }
                 else
                 {
-                    LLPC_ASSERT(pResUsage->inOutUsage.inputLocMap.find(value) !=
+                    assert(pResUsage->inOutUsage.inputLocMap.find(value) !=
                                 pResUsage->inOutUsage.inputLocMap.end());
                     loc = pResUsage->inOutUsage.inputLocMap[value];
                 }
             }
-            LLPC_ASSERT(loc != InvalidValue);
+            assert(loc != InvalidValue);
 
             switch (m_shaderStage)
             {
             case ShaderStageVertex:
                 {
-                    LLPC_ASSERT(callInst.getNumArgOperands() == 2);
+                    assert(callInst.getNumArgOperands() == 2);
                     const uint32_t compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
                     pInput = PatchVsGenericInputImport(pInputTy, loc, compIdx, &callInst);
                     break;
                 }
             case ShaderStageTessControl:
                 {
-                    LLPC_ASSERT(callInst.getNumArgOperands() == 4);
+                    assert(callInst.getNumArgOperands() == 4);
 
                     auto pElemIdx = callInst.getOperand(2);
-                    LLPC_ASSERT(IsDontCareValue(pElemIdx) == false);
+                    assert(IsDontCareValue(pElemIdx) == false);
 
                     auto pVertexIdx = callInst.getOperand(3);
-                    LLPC_ASSERT(IsDontCareValue(pVertexIdx) == false);
+                    assert(IsDontCareValue(pVertexIdx) == false);
 
                     pInput = PatchTcsGenericInputImport(pInputTy, loc, pLocOffset, pElemIdx, pVertexIdx, &callInst);
                     break;
                 }
             case ShaderStageTessEval:
                 {
-                    LLPC_ASSERT(callInst.getNumArgOperands() == 4);
+                    assert(callInst.getNumArgOperands() == 4);
 
                     auto pElemIdx = callInst.getOperand(2);
-                    LLPC_ASSERT(IsDontCareValue(pElemIdx) == false);
+                    assert(IsDontCareValue(pElemIdx) == false);
 
                     auto pVertexIdx = IsDontCareValue(callInst.getOperand(3)) ? nullptr : callInst.getOperand(3);
 
@@ -574,12 +574,12 @@ void PatchInOutImportExport::visitCallInst(
                 }
             case ShaderStageGeometry:
                 {
-                    LLPC_ASSERT(callInst.getNumArgOperands() == 3);
+                    assert(callInst.getNumArgOperands() == 3);
 
                     const uint32_t compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
 
                     Value* pVertexIdx = callInst.getOperand(2);
-                    LLPC_ASSERT(IsDontCareValue(pVertexIdx) == false);
+                    assert(IsDontCareValue(pVertexIdx) == false);
 
                     pInput = PatchGsGenericInputImport(pInputTy, loc, compIdx, pVertexIdx, &callInst);
                     break;
@@ -590,21 +590,21 @@ void PatchInOutImportExport::visitCallInst(
                     uint32_t interpLoc = InOutInfo::InterpLocCenter;
 
                     Value* pElemIdx = callInst.getOperand(isInterpolantInputImport ? 2 : 1);
-                    LLPC_ASSERT(IsDontCareValue(pElemIdx) == false);
+                    assert(IsDontCareValue(pElemIdx) == false);
 
                     Value* pAuxInterpValue = nullptr;
 
                     if (isGenericInputImport)
                     {
-                        LLPC_ASSERT(callInst.getNumArgOperands() == 4);
+                        assert(callInst.getNumArgOperands() == 4);
 
                         interpMode = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
                         interpLoc = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
                     }
                     else
                     {
-                        LLPC_ASSERT(isInterpolantInputImport);
-                        LLPC_ASSERT(callInst.getNumArgOperands() == 5);
+                        assert(isInterpolantInputImport);
+                        assert(callInst.getNumArgOperands() == 5);
 
                         interpMode = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
                         interpLoc = InOutInfo::InterpLocUnknown;
@@ -624,12 +624,12 @@ void PatchInOutImportExport::visitCallInst(
                 }
             case ShaderStageCompute:
                 {
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                     break;
                 }
             default:
                 {
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                     break;
                 }
             }
@@ -640,7 +640,7 @@ void PatchInOutImportExport::visitCallInst(
     else if (isImport && isOutput)
     {
         // Output imports
-        LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+        assert(m_shaderStage == ShaderStageTessControl);
 
         Value* pOutput = nullptr;
         Type* pOutputTy = callInst.getType();
@@ -657,7 +657,7 @@ void PatchInOutImportExport::visitCallInst(
         {
             const uint32_t builtInId = value;
 
-            LLPC_ASSERT(callInst.getNumArgOperands() == 3);
+            assert(callInst.getNumArgOperands() == 3);
             Value* pElemIdx = IsDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
             Value* pVertexIdx = IsDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
 
@@ -665,7 +665,7 @@ void PatchInOutImportExport::visitCallInst(
         }
         else
         {
-            LLPC_ASSERT(isGenericOutputImport);
+            assert(isGenericOutputImport);
 
             uint32_t loc = InvalidValue;
 
@@ -686,15 +686,15 @@ void PatchInOutImportExport::visitCallInst(
             }
             else
             {
-                LLPC_ASSERT(pResUsage->inOutUsage.perPatchOutputLocMap.find(value) !=
+                assert(pResUsage->inOutUsage.perPatchOutputLocMap.find(value) !=
                             pResUsage->inOutUsage.perPatchOutputLocMap.end());
                 loc = pResUsage->inOutUsage.perPatchOutputLocMap[value];
             }
-            LLPC_ASSERT(loc != InvalidValue);
+            assert(loc != InvalidValue);
 
-            LLPC_ASSERT(callInst.getNumArgOperands() == 4);
+            assert(callInst.getNumArgOperands() == 4);
             auto pElemIdx = callInst.getOperand(2);
-            LLPC_ASSERT(IsDontCareValue(pElemIdx) == false);
+            assert(IsDontCareValue(pElemIdx) == false);
             auto pVertexIdx = IsDontCareValue(callInst.getOperand(3)) ? nullptr : callInst.getOperand(3);
 
             pOutput = PatchTcsGenericOutputImport(pOutputTy, loc, pLocOffset, pElemIdx, pVertexIdx, &callInst);
@@ -706,7 +706,7 @@ void PatchInOutImportExport::visitCallInst(
     else if (isExport)
     {
         // Output exports
-        LLPC_ASSERT(isOutput);
+        assert(isOutput);
 
         Value* pOutput = callInst.getOperand(callInst.getNumArgOperands() - 1); // Last argument
 
@@ -721,7 +721,7 @@ void PatchInOutImportExport::visitCallInst(
         if (isXfbOutputExport)
         {
             uint32_t xfbBuffer = value;
-            LLPC_ASSERT(xfbBuffer < MaxTransformFeedbackBuffers);
+            assert(xfbBuffer < MaxTransformFeedbackBuffers);
 
             uint32_t xfbOffset = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
             uint32_t xfbExtraOffset = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
@@ -760,7 +760,7 @@ void PatchInOutImportExport::visitCallInst(
                 }
             default:
                 {
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                     break;
                 }
             }
@@ -778,7 +778,7 @@ void PatchInOutImportExport::visitCallInst(
                 }
             case ShaderStageTessControl:
                 {
-                    LLPC_ASSERT(callInst.getNumArgOperands() == 4);
+                    assert(callInst.getNumArgOperands() == 4);
                     Value* pElemIdx = IsDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
                     Value* pVertexIdx = IsDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
 
@@ -807,19 +807,19 @@ void PatchInOutImportExport::visitCallInst(
                 }
             case ShaderStageCompute:
                 {
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                     break;
                 }
             default:
                 {
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                     break;
                 }
             }
         }
         else
         {
-            LLPC_ASSERT(isGenericOutputExport);
+            assert(isGenericOutputExport);
 
             bool exist = false;
             uint32_t loc = InvalidValue;
@@ -857,7 +857,7 @@ void PatchInOutImportExport::visitCallInst(
             }
             else if (m_shaderStage == ShaderStageGeometry)
             {
-                LLPC_ASSERT(callInst.getNumArgOperands() == 4);
+                assert(callInst.getNumArgOperands() == 4);
 
                 GsOutLocInfo outLocInfo = {};
                 outLocInfo.location  = value;
@@ -882,23 +882,23 @@ void PatchInOutImportExport::visitCallInst(
             if (exist)
             {
                 // NOTE: Some outputs are not used by next shader stage. They must have been removed already.
-                LLPC_ASSERT(loc != InvalidValue);
+                assert(loc != InvalidValue);
 
                 switch (m_shaderStage)
                 {
                 case ShaderStageVertex:
                     {
-                        LLPC_ASSERT(callInst.getNumArgOperands() == 3);
+                        assert(callInst.getNumArgOperands() == 3);
                         const uint32_t compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
                         PatchVsGenericOutputExport(pOutput, loc, compIdx, &callInst);
                         break;
                     }
                 case ShaderStageTessControl:
                     {
-                        LLPC_ASSERT(callInst.getNumArgOperands() == 5);
+                        assert(callInst.getNumArgOperands() == 5);
 
                         auto pElemIdx = callInst.getOperand(2);
-                        LLPC_ASSERT(IsDontCareValue(pElemIdx) == false);
+                        assert(IsDontCareValue(pElemIdx) == false);
 
                         auto pVertexIdx = IsDontCareValue(callInst.getOperand(3)) ? nullptr : callInst.getOperand(3);
 
@@ -907,14 +907,14 @@ void PatchInOutImportExport::visitCallInst(
                     }
                 case ShaderStageTessEval:
                     {
-                        LLPC_ASSERT(callInst.getNumArgOperands() == 3);
+                        assert(callInst.getNumArgOperands() == 3);
                         const uint32_t compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
                         PatchTesGenericOutputExport(pOutput, loc, compIdx, &callInst);
                         break;
                     }
                 case ShaderStageGeometry:
                     {
-                        LLPC_ASSERT(callInst.getNumArgOperands() == 4);
+                        assert(callInst.getNumArgOperands() == 4);
                         const uint32_t compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
                         const uint32_t streamId = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
                         PatchGsGenericOutputExport(pOutput, loc, compIdx, streamId, &callInst);
@@ -922,7 +922,7 @@ void PatchInOutImportExport::visitCallInst(
                     }
                 case ShaderStageFragment:
                     {
-                        LLPC_ASSERT(callInst.getNumArgOperands() == 3);
+                        assert(callInst.getNumArgOperands() == 3);
                         const uint32_t compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
                         PatchFsGenericOutputExport(pOutput, loc, compIdx, &callInst);
                         break;
@@ -934,12 +934,12 @@ void PatchInOutImportExport::visitCallInst(
                     }
                 case ShaderStageCompute:
                     {
-                        LLPC_NEVER_CALLED();
+                        llvm_unreachable("Should never be called!");
                         break;
                     }
                 default:
                     {
-                        LLPC_NEVER_CALLED();
+                        llvm_unreachable("Should never be called!");
                         break;
                     }
                 }
@@ -954,7 +954,7 @@ void PatchInOutImportExport::visitCallInst(
             // NOTE: Implicitly store the value of gl_ViewIndex to GS-VS ring buffer before emit calls.
             if (m_pPipelineState->GetInputAssemblyState().enableMultiView)
             {
-                LLPC_ASSERT(m_shaderStage == ShaderStageGeometry); // Must be geometry shader
+                assert(m_shaderStage == ShaderStageGeometry); // Must be geometry shader
 
                 auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
                 auto pViewIndex = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.viewIndex);
@@ -962,7 +962,7 @@ void PatchInOutImportExport::visitCallInst(
                 auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
                 auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
 
-                LLPC_ASSERT(builtInOutLocMap.find(BuiltInViewIndex) != builtInOutLocMap.end());
+                assert(builtInOutLocMap.find(BuiltInViewIndex) != builtInOutLocMap.end());
                 uint32_t loc = builtInOutLocMap[BuiltInViewIndex];
 
                 auto rasterStream = pResUsage->inOutUsage.gs.rasterStream;
@@ -1073,7 +1073,7 @@ void PatchInOutImportExport::visitReturnInst(
         }
         else
         {
-            LLPC_ASSERT(m_shaderStage == ShaderStageCopyShader);
+            assert(m_shaderStage == ShaderStageCopyShader);
             auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader)->builtInUsage.gs;
 
             usePosition       = builtInUsage.position;
@@ -1107,10 +1107,10 @@ void PatchInOutImportExport::visitReturnInst(
         // Export gl_ClipDistance[] and gl_CullDistance[] before entry-point returns
         if ((clipDistanceCount > 0) || (cullDistanceCount > 0))
         {
-            LLPC_ASSERT(clipDistanceCount + cullDistanceCount <= MaxClipCullDistanceCount);
+            assert(clipDistanceCount + cullDistanceCount <= MaxClipCullDistanceCount);
 
-            LLPC_ASSERT((clipDistanceCount == 0) || ((clipDistanceCount > 0) && (m_pClipDistance != nullptr)));
-            LLPC_ASSERT((cullDistanceCount == 0) || ((cullDistanceCount > 0) && (m_pCullDistance != nullptr)));
+            assert((clipDistanceCount == 0) || ((clipDistanceCount > 0) && (m_pClipDistance != nullptr)));
+            assert((cullDistanceCount == 0) || ((cullDistanceCount > 0) && (m_pCullDistance != nullptr)));
 
             // Extract elements of gl_ClipDistance[] and gl_CullDistance[]
             std::vector<Value*> clipDistance;
@@ -1191,7 +1191,7 @@ void PatchInOutImportExport::visitReturnInst(
             }
 
             // NOTE: We have to export gl_ClipDistance[] or gl_CullDistancep[] via generic outputs as well.
-            LLPC_ASSERT((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment));
+            assert((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment));
 
             bool hasClipCullExport = true;
             if (nextStage == ShaderStageFragment)
@@ -1254,7 +1254,7 @@ void PatchInOutImportExport::visitReturnInst(
                     }
                     else
                     {
-                        LLPC_ASSERT(inOutUsage.gs.builtInOutLocs.find(BuiltInCullDistance) !=
+                        assert(inOutUsage.gs.builtInOutLocs.find(BuiltInCullDistance) !=
                                     inOutUsage.gs.builtInOutLocs.end());
                         loc = inOutUsage.gs.builtInOutLocs[BuiltInCullDistance];
                     }
@@ -1268,7 +1268,7 @@ void PatchInOutImportExport::visitReturnInst(
                     }
                     else
                     {
-                        LLPC_ASSERT(inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) !=
+                        assert(inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) !=
                             inOutUsage.builtInOutputLocMap.end());
                         loc = inOutUsage.builtInOutputLocMap[BuiltInCullDistance];
                     }
@@ -1329,18 +1329,18 @@ void PatchInOutImportExport::visitReturnInst(
                 uint32_t loc = InvalidValue;
                 if (m_shaderStage == ShaderStageCopyShader)
                 {
-                    LLPC_ASSERT(inOutUsage.gs.builtInOutLocs.find(BuiltInPrimitiveId) !=
+                    assert(inOutUsage.gs.builtInOutLocs.find(BuiltInPrimitiveId) !=
                         inOutUsage.gs.builtInOutLocs.end());
                     loc = inOutUsage.gs.builtInOutLocs[BuiltInPrimitiveId];
                 }
                 else
                 {
-                    LLPC_ASSERT(inOutUsage.builtInOutputLocMap.find(BuiltInPrimitiveId) !=
+                    assert(inOutUsage.builtInOutputLocMap.find(BuiltInPrimitiveId) !=
                         inOutUsage.builtInOutputLocMap.end());
                     loc = inOutUsage.builtInOutputLocMap[BuiltInPrimitiveId];
                 }
 
-                LLPC_ASSERT(m_pPrimitiveId != nullptr);
+                assert(m_pPrimitiveId != nullptr);
                 Value* pPrimitiveId = new BitCastInst(m_pPrimitiveId, Type::getFloatTy(*m_pContext), "", pInsertPos);
 
                 Value* args[] = {
@@ -1360,7 +1360,7 @@ void PatchInOutImportExport::visitReturnInst(
         // NOTE: If multi-view is enabled, always do exporting for gl_Layer.
         if ((m_gfxIp.major <= 8) && enableMultiView)
         {
-            LLPC_ASSERT(m_pLayer != nullptr);
+            assert(m_pLayer != nullptr);
             AddExportInstForBuiltInOutput(m_pLayer, BuiltInLayer, pInsertPos);
         }
 
@@ -1371,7 +1371,7 @@ void PatchInOutImportExport::visitReturnInst(
 
             if (useViewportIndex)
             {
-                LLPC_ASSERT(m_pViewportIndex != nullptr);
+                assert(m_pViewportIndex != nullptr);
                 pViewportIndexAndLayer = BinaryOperator::CreateShl(m_pViewportIndex,
                                                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 16),
                                                                    "",
@@ -1381,7 +1381,7 @@ void PatchInOutImportExport::visitReturnInst(
 
             if (useLayer)
             {
-                LLPC_ASSERT(m_pLayer != nullptr);
+                assert(m_pLayer != nullptr);
                 pViewportIndexAndLayer = BinaryOperator::CreateOr(pViewportIndexAndLayer,
                                                                   m_pLayer,
                                                                   "",
@@ -1425,13 +1425,13 @@ void PatchInOutImportExport::visitReturnInst(
                     uint32_t loc = InvalidValue;
                     if (m_shaderStage == ShaderStageCopyShader)
                     {
-                        LLPC_ASSERT(inOutUsage.gs.builtInOutLocs.find(BuiltInViewportIndex) !=
+                        assert(inOutUsage.gs.builtInOutLocs.find(BuiltInViewportIndex) !=
                                     inOutUsage.gs.builtInOutLocs.end());
                         loc = inOutUsage.gs.builtInOutLocs[BuiltInViewportIndex];
                     }
                     else
                     {
-                        LLPC_ASSERT(inOutUsage.builtInOutputLocMap.find(BuiltInViewportIndex) !=
+                        assert(inOutUsage.builtInOutputLocMap.find(BuiltInViewportIndex) !=
                                     inOutUsage.builtInOutputLocMap.end());
                         loc = inOutUsage.builtInOutputLocMap[BuiltInViewportIndex];
                     }
@@ -1473,7 +1473,7 @@ void PatchInOutImportExport::visitReturnInst(
                     uint32_t loc = InvalidValue;
                     if (m_shaderStage == ShaderStageCopyShader)
                     {
-                        LLPC_ASSERT(inOutUsage.gs.builtInOutLocs.find(BuiltInLayer) !=
+                        assert(inOutUsage.gs.builtInOutLocs.find(BuiltInLayer) !=
                                     inOutUsage.gs.builtInOutLocs.end() ||
                                     inOutUsage.gs.builtInOutLocs.find(BuiltInViewIndex) !=
                                     inOutUsage.gs.builtInOutLocs.end());
@@ -1483,7 +1483,7 @@ void PatchInOutImportExport::visitReturnInst(
                     }
                     else
                     {
-                        LLPC_ASSERT(inOutUsage.builtInOutputLocMap.find(BuiltInLayer) !=
+                        assert(inOutUsage.builtInOutputLocMap.find(BuiltInLayer) !=
                                     inOutUsage.builtInOutputLocMap.end() ||
                                     inOutUsage.builtInOutputLocMap.find(BuiltInViewIndex) !=
                                     inOutUsage.builtInOutputLocMap.end());
@@ -1578,23 +1578,23 @@ void PatchInOutImportExport::visitReturnInst(
             uint32_t channelMask = 0x1; // Always export gl_FragDepth
             if (m_pFragDepth != nullptr)
             {
-                LLPC_ASSERT(builtInUsage.fragDepth);
-                LLPC_UNUSED(builtInUsage);
+                assert(builtInUsage.fragDepth);
+                (void(builtInUsage)); // unused
                 pFragDepth = m_pFragDepth;
             }
 
             if (m_pFragStencilRef != nullptr)
             {
-                LLPC_ASSERT(builtInUsage.fragStencilRef);
-                LLPC_UNUSED(builtInUsage);
+                assert(builtInUsage.fragStencilRef);
+                (void(builtInUsage)); // unused
                 channelMask |= 2;
                 pFragStencilRef = m_pFragStencilRef;
             }
 
             if (m_pSampleMask != nullptr)
             {
-                LLPC_ASSERT(builtInUsage.sampleMask);
-                LLPC_UNUSED(builtInUsage);
+                assert(builtInUsage.sampleMask);
+                (void(builtInUsage)); // unused
                 channelMask |= 4;
                 pSampleMask = m_pSampleMask;
             }
@@ -1621,7 +1621,7 @@ void PatchInOutImportExport::visitReturnInst(
             {
                 Value* pOutput = nullptr;
                 uint32_t compCount = expFragColor.size();
-                LLPC_ASSERT(compCount <= 4);
+                assert(compCount <= 4);
 
                 // Set CB shader mask
                 auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment);
@@ -1646,7 +1646,7 @@ void PatchInOutImportExport::visitReturnInst(
                     pOutput = UndefValue::get(VectorType::get(pCompTy, compCount));
                     for (uint32_t i = 0; i < compCount; ++i)
                     {
-                        LLPC_ASSERT(expFragColor[i]->getType() == pCompTy);
+                        assert(expFragColor[i]->getType() == pCompTy);
                         pOutput = InsertElementInst::Create(pOutput,
                                                             expFragColor[i],
                                                             ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
@@ -1697,7 +1697,7 @@ void PatchInOutImportExport::visitReturnInst(
         }
         else
         {
-            LLPC_ASSERT(exportName == "llvm.amdgcn.exp.compr.v2f16");
+            assert(exportName == "llvm.amdgcn.exp.compr.v2f16");
             m_pLastExport->setOperand(4, ConstantInt::get(Type::getInt1Ty(*m_pContext), true));
         }
     }
@@ -1714,14 +1714,14 @@ Value* PatchInOutImportExport::PatchVsGenericInputImport(
     Value* pInput = UndefValue::get(pInputTy);
 
     // Do vertex fetch operations
-    LLPC_ASSERT(m_pVertexFetch != nullptr);
+    assert(m_pVertexFetch != nullptr);
     auto pVertex = m_pVertexFetch->Run(pInputTy, location, compIdx, pInsertPos);
 
     // Cast vertex fetch results if necessary
     const Type* pVertexTy = pVertex->getType();
     if (pVertexTy != pInputTy)
     {
-        LLPC_ASSERT(CanBitCast(pVertexTy, pInputTy));
+        assert(CanBitCast(pVertexTy, pInputTy));
         pInput = new BitCastInst(pVertex, pInputTy, "", pInsertPos);
     }
     else
@@ -1742,7 +1742,7 @@ Value* PatchInOutImportExport::PatchTcsGenericInputImport(
     Value*       pVertexIdx,      // [in] Input array outermost index used for vertex indexing
     Instruction* pInsertPos)      // [in] Where to insert the patch instruction
 {
-    LLPC_ASSERT((pCompIdx != nullptr) && (pVertexIdx != nullptr));
+    assert((pCompIdx != nullptr) && (pVertexIdx != nullptr));
 
     auto pLdsOffset = CalcLdsOffsetForTcsInput(pInputTy, location, pLocOffset, pCompIdx, pVertexIdx, pInsertPos);
     return ReadValueFromLds(false, pInputTy, pLdsOffset, pInsertPos);
@@ -1758,7 +1758,7 @@ Value* PatchInOutImportExport::PatchTesGenericInputImport(
     Value*       pVertexIdx,      // [in] Input array outermost index used for vertex indexing (could be null)
     Instruction* pInsertPos)      // [in] Where to insert the patch instruction
 {
-    LLPC_ASSERT(pCompIdx != nullptr);
+    assert(pCompIdx != nullptr);
 
     auto pLdsOffset = CalcLdsOffsetForTesInput(pInputTy, location, pLocOffset, pCompIdx, pVertexIdx, pInsertPos);
     return ReadValueFromLds(false, pInputTy, pLdsOffset, pInsertPos);
@@ -1773,7 +1773,7 @@ Value* PatchInOutImportExport::PatchGsGenericInputImport(
     Value*       pVertexIdx,      // [in] Input array outermost index used for vertex indexing
     Instruction* pInsertPos)      // [in] Where to insert the patch instruction
 {
-    LLPC_ASSERT(pVertexIdx != nullptr);
+    assert(pVertexIdx != nullptr);
 
     const uint32_t compCount = pInputTy->isVectorTy() ? pInputTy->getVectorNumElements() : 1;
     const uint32_t bitWidth = pInputTy->getScalarSizeInBits();
@@ -1789,7 +1789,7 @@ Value* PatchInOutImportExport::PatchGsGenericInputImport(
     }
     else
     {
-        LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+        assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
     }
 
     Value* pInput = LoadValueFromEsGsRing(pInputTy, location, compIdx, pVertexIdx, pInsertPos);
@@ -1797,8 +1797,8 @@ Value* PatchInOutImportExport::PatchGsGenericInputImport(
     if (pInputTy != pOrigInputTy)
     {
         // Cast back to oringinal input type
-        LLPC_ASSERT(CanBitCast(pInputTy, pOrigInputTy));
-        LLPC_ASSERT(pInputTy->isVectorTy());
+        assert(CanBitCast(pInputTy, pOrigInputTy));
+        assert(pInputTy->isVectorTy());
 
         pInput = new BitCastInst(pInput, pOrigInputTy, "", pInsertPos);
     }
@@ -1841,7 +1841,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
     if (locCount > 1)
     {
         // The input occupies two consecutive locations
-        LLPC_ASSERT(locCount == 2);
+        assert(locCount == 2);
         interpInfo[location + 1] =
         {
             location + 1,
@@ -1876,13 +1876,13 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
                 }
                 else
                 {
-                    LLPC_ASSERT(interpLoc == InOutInfo::InterpLocCenter);
+                    assert(interpLoc == InOutInfo::InterpLocCenter);
                     pIJ = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.center);
                 }
             }
             else
             {
-                LLPC_ASSERT(interpMode == InOutInfo::InterpModeNoPersp);
+                assert(interpMode == InOutInfo::InterpModeNoPersp);
                 if (interpLoc == InOutInfo::InterpLocCentroid)
                 {
                     pIJ = AdjustCentroidIJ(GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.centroid),
@@ -1895,7 +1895,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
                 }
                 else
                 {
-                    LLPC_ASSERT(interpLoc == InOutInfo::InterpLocCenter);
+                    assert(interpLoc == InOutInfo::InterpLocCenter);
                     pIJ = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.center);
                 }
             }
@@ -1912,14 +1912,14 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
 
     const uint32_t compCout = pInputTy->isVectorTy() ? pInputTy->getVectorNumElements() : 1;
     const uint32_t bitWidth = pInputTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
     const uint32_t numChannels = ((bitWidth == 64) ? 2 : 1) * compCout;
 
     Type* pInterpTy = nullptr;
     if (bitWidth == 8)
     {
-        LLPC_ASSERT(pInputTy->isIntOrIntVectorTy());
+        assert(pInputTy->isIntOrIntVectorTy());
         pInterpTy = Type::getInt8Ty(*m_pContext);
     }
     else if (bitWidth == 16)
@@ -1946,7 +1946,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
     if (pLocOffset != nullptr)
     {
         pLoc = BinaryOperator::CreateAdd(pLoc, pLocOffset, "", pInsertPos);
-        LLPC_ASSERT((startChannel + numChannels) <= 4);
+        assert((startChannel + numChannels) <= 4);
     }
 
     for (uint32_t i = startChannel; i < startChannel + numChannels; ++i)
@@ -1955,8 +1955,8 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
 
         if ((interpMode != InOutInfo::InterpModeFlat) && (interpMode != InOutInfo::InterpModeCustom))
         {
-            LLPC_ASSERT((pBasicTy->isHalfTy() || pBasicTy->isFloatTy()) && (numChannels <= 4));
-            LLPC_UNUSED(pBasicTy);
+            assert((pBasicTy->isHalfTy() || pBasicTy->isFloatTy()) && (numChannels <= 4));
+            (void(pBasicTy)); // unused
 
             if (bitWidth == 16)
             {
@@ -2021,7 +2021,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
 
             if (interpMode == InOutInfo::InterpModeCustom)
             {
-                LLPC_ASSERT(isa<ConstantInt>(pAuxInterpValue));
+                assert(isa<ConstantInt>(pAuxInterpValue));
                 uint32_t vertexNo = cast<ConstantInt>(pAuxInterpValue)->getZExtValue();
 
                 switch (vertexNo)
@@ -2036,13 +2036,13 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
                     interpParam = INTERP_PARAM_P20;
                     break;
                 default:
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                     break;
                 }
             }
             else
             {
-                LLPC_ASSERT(interpMode == InOutInfo::InterpModeFlat);
+                assert(interpMode == InOutInfo::InterpModeFlat);
             }
 
             Value* args[] = {
@@ -2093,7 +2093,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
     }
     else
     {
-        LLPC_ASSERT(CanBitCast(pInterpTy, pInputTy));
+        assert(CanBitCast(pInterpTy, pInputTy));
         pInput = new BitCastInst(pInterp, pInputTy, "", pInsertPos);
     }
 
@@ -2110,7 +2110,7 @@ Value* PatchInOutImportExport::PatchTcsGenericOutputImport(
     Value*       pVertexIdx,      // [in] Input array outermost index used for vertex indexing (could be null)
     Instruction* pInsertPos)      // [in] Where to insert the patch instruction
 {
-    LLPC_ASSERT(pCompIdx != nullptr);
+    assert(pCompIdx != nullptr);
 
     auto pLdsOffset = CalcLdsOffsetForTcsOutput(pOutputTy, location, pLocOffset, pCompIdx, pVertexIdx, pInsertPos);
     return ReadValueFromLds(true, pOutputTy, pLdsOffset, pInsertPos);
@@ -2137,7 +2137,7 @@ void PatchInOutImportExport::PatchVsGenericOutputExport(
     {
         if (m_hasGs)
         {
-            LLPC_ASSERT(pOutputTy->isIntOrIntVectorTy() || pOutputTy->isFPOrFPVectorTy());
+            assert(pOutputTy->isIntOrIntVectorTy() || pOutputTy->isFPOrFPVectorTy());
 
             const uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
             if (bitWidth == 64)
@@ -2152,7 +2152,7 @@ void PatchInOutImportExport::PatchVsGenericOutputExport(
             }
             else
             {
-                LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+                assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
             }
 
             StoreValueToEsGsRing(pOutput, location, compIdx, pInsertPos);
@@ -2174,7 +2174,7 @@ void PatchInOutImportExport::PatchTcsGenericOutputExport(
     Value*       pVertexIdx,     // [in] Input array outermost index used for vertex indexing (could be null)
     Instruction* pInsertPos)     // [in] Where to insert the patch instruction
 {
-    LLPC_ASSERT(pCompIdx != nullptr);
+    assert(pCompIdx != nullptr);
 
     Type* pOutputTy = pOutput->getType();
     auto pLdsOffset = CalcLdsOffsetForTcsOutput(pOutputTy, location, pLocOffset, pCompIdx, pVertexIdx, pInsertPos);
@@ -2192,7 +2192,7 @@ void PatchInOutImportExport::PatchTesGenericOutputExport(
     if (m_hasGs)
     {
         auto pOutputTy = pOutput->getType();
-        LLPC_ASSERT(pOutputTy->isIntOrIntVectorTy() || pOutputTy->isFPOrFPVectorTy());
+        assert(pOutputTy->isIntOrIntVectorTy() || pOutputTy->isFPOrFPVectorTy());
 
         const uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
         if (bitWidth == 64)
@@ -2207,7 +2207,7 @@ void PatchInOutImportExport::PatchTesGenericOutputExport(
         }
         else
         {
-            LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+            assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
         }
 
         StoreValueToEsGsRing(pOutput, location, compIdx, pInsertPos);
@@ -2249,7 +2249,7 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     }
     else
     {
-        LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+        assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
     }
 
     const uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
@@ -2261,14 +2261,14 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
         byteSize *= (32 / bitWidth);
     }
 
-    LLPC_ASSERT(compIdx <= 4);
+    assert(compIdx <= 4);
 
     // Field "genericOutByteSizes" now gets set when generating the copy shader. Just assert that we agree on the
     // byteSize.
     auto& genericOutByteSizes =
         m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.genericOutByteSizes;
-    LLPC_ASSERT(genericOutByteSizes[streamId][location][compIdx] == byteSize);
-    LLPC_UNUSED(genericOutByteSizes);
+    assert(genericOutByteSizes[streamId][location][compIdx] == byteSize);
+    (void(genericOutByteSizes)); // unused
 
     StoreValueToGsVsRing(pOutput, location, compIdx, streamId, pInsertPos);
 }
@@ -2284,8 +2284,8 @@ void PatchInOutImportExport::PatchFsGenericOutputExport(
     Type* pOutputTy = pOutput->getType();
 
     const uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
-    LLPC_UNUSED(bitWidth);
+    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+    (void(bitWidth)); // unused
 
     auto pCompTy = pOutputTy->isVectorTy() ? pOutputTy->getVectorElementType() : pOutputTy;
     uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
@@ -2309,7 +2309,7 @@ void PatchInOutImportExport::PatchFsGenericOutputExport(
         outputComps.push_back(pOutputComp);
     }
 
-    LLPC_ASSERT(location < MaxColorTargets);
+    assert(location < MaxColorTargets);
     auto& expFragColor = m_expFragColors[location];
 
     while (compIdx + compCount > expFragColor.size())
@@ -2353,7 +2353,7 @@ Value* PatchInOutImportExport::PatchVsBuiltInInputImport(
     case BuiltInDeviceIndex:
         return ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetDeviceIndex());
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         return UndefValue::get(pInputTy);
     }
 }
@@ -2377,7 +2377,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
     {
     case BuiltInPosition:
         {
-            LLPC_ASSERT(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
+            assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
             const uint32_t loc = builtInInLocMap[builtInId];
 
             auto pLdsOffset = CalcLdsOffsetForTcsInput(pInputTy, loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
@@ -2387,8 +2387,8 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
         }
     case BuiltInPointSize:
         {
-            LLPC_ASSERT(pElemIdx == nullptr);
-            LLPC_ASSERT(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
+            assert(pElemIdx == nullptr);
+            assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
             const uint32_t loc = builtInInLocMap[builtInId];
 
             auto pLdsOffset = CalcLdsOffsetForTcsInput(pInputTy, loc, nullptr, nullptr, pVertexIdx, pInsertPos);
@@ -2399,13 +2399,13 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
     case BuiltInClipDistance:
     case BuiltInCullDistance:
         {
-            LLPC_ASSERT(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
+            assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
             const uint32_t loc = builtInInLocMap[builtInId];
 
             if (pElemIdx == nullptr)
             {
                 // gl_ClipDistanceIn[]/gl_CullDistanceIn[] is treated as 2 x vec4
-                LLPC_ASSERT(pInputTy->isArrayTy());
+                assert(pInputTy->isArrayTy());
 
                 auto pElemTy = pInputTy->getArrayElementType();
                 for (uint32_t i = 0; i < pInputTy->getArrayNumElements(); ++i)
@@ -2458,7 +2458,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -2488,7 +2488,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
     {
     case BuiltInPosition:
         {
-            LLPC_ASSERT(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
+            assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
             const uint32_t loc = builtInInLocMap[builtInId];
 
             auto pLdsOffset = CalcLdsOffsetForTesInput(pInputTy, loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
@@ -2498,8 +2498,8 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
         }
     case BuiltInPointSize:
         {
-            LLPC_ASSERT(pElemIdx == nullptr);
-            LLPC_ASSERT(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
+            assert(pElemIdx == nullptr);
+            assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
             const uint32_t loc = builtInInLocMap[builtInId];
 
             auto pLdsOffset = CalcLdsOffsetForTesInput(pInputTy, loc, nullptr, nullptr, pVertexIdx, pInsertPos);
@@ -2510,13 +2510,13 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
     case BuiltInClipDistance:
     case BuiltInCullDistance:
         {
-            LLPC_ASSERT(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
+            assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
             const uint32_t loc = builtInInLocMap[builtInId];
 
             if (pElemIdx == nullptr)
             {
                 // gl_ClipDistanceIn[]/gl_CullDistanceIn[] is treated as 2 x vec4
-                LLPC_ASSERT(pInputTy->isArrayTy());
+                assert(pInputTy->isArrayTy());
 
                 auto pElemTy = pInputTy->getArrayElementType();
                 for (uint32_t i = 0; i < pInputTy->getArrayNumElements(); ++i)
@@ -2572,14 +2572,14 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
     case BuiltInTessLevelOuter:
     case BuiltInTessLevelInner:
         {
-            LLPC_ASSERT(perPatchBuiltInInLocMap.find(builtInId) != perPatchBuiltInInLocMap.end());
+            assert(perPatchBuiltInInLocMap.find(builtInId) != perPatchBuiltInInLocMap.end());
             uint32_t loc = perPatchBuiltInInLocMap[builtInId];
 
             if (pElemIdx == nullptr)
             {
                 // gl_TessLevelOuter[4] is treated as vec4
                 // gl_TessLevelInner[2] is treated as vec2
-                LLPC_ASSERT(pInputTy->isArrayTy());
+                assert(pInputTy->isArrayTy());
 
                 auto pElemTy = pInputTy->getArrayElementType();
                 for (uint32_t i = 0; i < pInputTy->getArrayNumElements(); ++i)
@@ -2621,7 +2621,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -2643,7 +2643,7 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
     auto& inOutUsage   = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
 
     uint32_t loc = inOutUsage.builtInInputLocMap[builtInId];
-    LLPC_ASSERT(loc != InvalidValue);
+    assert(loc != InvalidValue);
 
     switch (builtInId)
     {
@@ -2693,7 +2693,7 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -2723,7 +2723,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
     {
     case BuiltInSampleMask:
         {
-            LLPC_ASSERT(pInputTy->isArrayTy());
+            assert(pInputTy->isArrayTy());
 
             auto pSampleCoverage = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.sampleCoverage);
             auto pAncillary = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.ancillary);
@@ -2791,7 +2791,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
         }
     case BuiltInPointCoord:
         {
-            LLPC_ASSERT(inOutUsage.builtInInputLocMap.find(BuiltInPointCoord) != inOutUsage.builtInInputLocMap.end());
+            assert(inOutUsage.builtInInputLocMap.find(BuiltInPointCoord) != inOutUsage.builtInInputLocMap.end());
             const uint32_t loc = inOutUsage.builtInInputLocMap[BuiltInPointCoord];
 
             auto& interpInfo = inOutUsage.fs.interpInfo;
@@ -2830,25 +2830,25 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
 
             if (builtInId == BuiltInPrimitiveId)
             {
-                LLPC_ASSERT(inOutUsage.builtInInputLocMap.find(BuiltInPrimitiveId) !=
+                assert(inOutUsage.builtInInputLocMap.find(BuiltInPrimitiveId) !=
                             inOutUsage.builtInInputLocMap.end());
                 loc = inOutUsage.builtInInputLocMap[BuiltInPrimitiveId];
             }
             else if (builtInId == BuiltInLayer)
             {
-                LLPC_ASSERT(inOutUsage.builtInInputLocMap.find(BuiltInLayer) != inOutUsage.builtInInputLocMap.end());
+                assert(inOutUsage.builtInInputLocMap.find(BuiltInLayer) != inOutUsage.builtInInputLocMap.end());
                 loc = inOutUsage.builtInInputLocMap[BuiltInLayer];
             }
             else if (builtInId == BuiltInViewIndex)
             {
-                LLPC_ASSERT(inOutUsage.builtInInputLocMap.find(BuiltInViewIndex) != inOutUsage.builtInInputLocMap.end());
+                assert(inOutUsage.builtInInputLocMap.find(BuiltInViewIndex) != inOutUsage.builtInInputLocMap.end());
                 loc = inOutUsage.builtInInputLocMap[BuiltInViewIndex];
             }
             else
             {
-                LLPC_ASSERT(builtInId == BuiltInViewportIndex);
+                assert(builtInId == BuiltInViewportIndex);
 
-                LLPC_ASSERT(inOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) !=
+                assert(inOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) !=
                             inOutUsage.builtInInputLocMap.end());
                 loc = inOutUsage.builtInInputLocMap[BuiltInViewportIndex];
             }
@@ -2875,7 +2875,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
     case BuiltInClipDistance:
     case BuiltInCullDistance:
         {
-            LLPC_ASSERT(pInputTy->isArrayTy());
+            assert(pInputTy->isArrayTy());
 
             uint32_t loc = InvalidValue;
             uint32_t locCount = 0;
@@ -2883,7 +2883,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
 
             if (builtInId == BuiltInClipDistance)
             {
-                LLPC_ASSERT(inOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
+                assert(inOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             inOutUsage.builtInInputLocMap.end());
                 loc = inOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 locCount = (builtInUsage.clipDistance > 4) ? 2 : 1;
@@ -2891,9 +2891,9 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             }
             else
             {
-                LLPC_ASSERT(builtInId == BuiltInCullDistance);
+                assert(builtInId == BuiltInCullDistance);
 
-                LLPC_ASSERT(inOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
+                assert(inOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             inOutUsage.builtInInputLocMap.end());
                 loc = inOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 locCount = (builtInUsage.clipDistance + builtInUsage.cullDistance > 4) ? 2 : 1;
@@ -2927,7 +2927,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
                                                  pInsertPos);
 
             const uint32_t elemCount = pInputTy->getArrayNumElements();
-            LLPC_ASSERT(elemCount <= MaxClipCullDistanceCount);
+            assert(elemCount <= MaxClipCullDistanceCount);
 
             for (uint32_t i = 0; i < elemCount; ++i)
             {
@@ -3005,21 +3005,21 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
     case BuiltInInterpPerspSample:
     case BuiltInBaryCoordSmoothSample:
         {
-            LLPC_ASSERT(entryArgIdxs.perspInterp.sample != 0);
+            assert(entryArgIdxs.perspInterp.sample != 0);
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.sample);
             break;
         }
     case BuiltInInterpPerspCenter:
     case BuiltInBaryCoordSmooth:
         {
-            LLPC_ASSERT(entryArgIdxs.perspInterp.center != 0);
+            assert(entryArgIdxs.perspInterp.center != 0);
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.center);
             break;
         }
     case BuiltInInterpPerspCentroid:
     case BuiltInBaryCoordSmoothCentroid:
         {
-            LLPC_ASSERT(entryArgIdxs.perspInterp.centroid != 0);
+            assert(entryArgIdxs.perspInterp.centroid != 0);
             pInput = AdjustCentroidIJ(GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.centroid),
                                       GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.center),
                                       pInsertPos);
@@ -3028,28 +3028,28 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
     case BuiltInInterpPullMode:
     case BuiltInBaryCoordPullModel:
         {
-            LLPC_ASSERT(entryArgIdxs.perspInterp.pullMode != 0);
+            assert(entryArgIdxs.perspInterp.pullMode != 0);
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.pullMode);
             break;
         }
     case BuiltInInterpLinearSample:
     case BuiltInBaryCoordNoPerspSample:
         {
-            LLPC_ASSERT(entryArgIdxs.linearInterp.sample != 0);
+            assert(entryArgIdxs.linearInterp.sample != 0);
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.sample);
             break;
         }
     case BuiltInInterpLinearCenter:
     case BuiltInBaryCoordNoPersp:
         {
-            LLPC_ASSERT(entryArgIdxs.linearInterp.center != 0);
+            assert(entryArgIdxs.linearInterp.center != 0);
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.center);
             break;
         }
     case BuiltInInterpLinearCentroid:
     case BuiltInBaryCoordNoPerspCentroid:
         {
-            LLPC_ASSERT(entryArgIdxs.linearInterp.centroid != 0);
+            assert(entryArgIdxs.linearInterp.centroid != 0);
             pInput = AdjustCentroidIJ(GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.centroid),
                                       GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.center),
                                       pInsertPos);
@@ -3067,7 +3067,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -3206,7 +3206,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -3282,10 +3282,10 @@ Value* PatchInOutImportExport::PatchTcsBuiltInOutputImport(
     {
     case BuiltInPosition:
         {
-            LLPC_ASSERT(builtInUsage.position);
-            LLPC_UNUSED(builtInUsage);
+            assert(builtInUsage.position);
+            (void(builtInUsage)); // unused
 
-            LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+            assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
             uint32_t loc = builtInOutLocMap[builtInId];
 
             auto pLdsOffset = CalcLdsOffsetForTcsOutput(pOutputTy, loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
@@ -3295,11 +3295,11 @@ Value* PatchInOutImportExport::PatchTcsBuiltInOutputImport(
         }
     case BuiltInPointSize:
         {
-            LLPC_ASSERT(builtInUsage.pointSize);
-            LLPC_UNUSED(builtInUsage);
+            assert(builtInUsage.pointSize);
+            (void(builtInUsage)); // unused
 
-            LLPC_ASSERT(pElemIdx == nullptr);
-            LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+            assert(pElemIdx == nullptr);
+            assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
             uint32_t loc = builtInOutLocMap[builtInId];
 
             auto pLdsOffset = CalcLdsOffsetForTcsOutput(pOutputTy, loc, nullptr, nullptr, pVertexIdx, pInsertPos);
@@ -3312,23 +3312,23 @@ Value* PatchInOutImportExport::PatchTcsBuiltInOutputImport(
         {
             if (builtInId == BuiltInClipDistance)
             {
-                LLPC_ASSERT(builtInUsage.clipDistance > 0);
-                LLPC_UNUSED(builtInUsage);
+                assert(builtInUsage.clipDistance > 0);
+                (void(builtInUsage)); // unused
             }
             else
             {
-                LLPC_ASSERT(builtInId == BuiltInCullDistance);
-                LLPC_ASSERT(builtInUsage.cullDistance > 0);
-                LLPC_UNUSED(builtInUsage);
+                assert(builtInId == BuiltInCullDistance);
+                assert(builtInUsage.cullDistance > 0);
+                (void(builtInUsage)); // unused
             }
 
-            LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+            assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
             uint32_t loc = builtInOutLocMap[builtInId];
 
             if (pElemIdx == nullptr)
             {
                 // gl_ClipDistance[]/gl_CullDistance[] is treated as 2 x vec4
-                LLPC_ASSERT(pOutputTy->isArrayTy());
+                assert(pOutputTy->isArrayTy());
 
                 auto pElemTy = pOutputTy->getArrayElementType();
                 for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
@@ -3353,24 +3353,24 @@ Value* PatchInOutImportExport::PatchTcsBuiltInOutputImport(
         {
             if (builtInId == BuiltInTessLevelOuter)
             {
-                LLPC_ASSERT(builtInUsage.tessLevelOuter);
-                LLPC_UNUSED(builtInUsage);
+                assert(builtInUsage.tessLevelOuter);
+                (void(builtInUsage)); // unused
             }
             else
             {
-                LLPC_ASSERT(builtInId == BuiltInTessLevelInner);
-                LLPC_ASSERT(builtInUsage.tessLevelInner);
-                LLPC_UNUSED(builtInUsage);
+                assert(builtInId == BuiltInTessLevelInner);
+                assert(builtInUsage.tessLevelInner);
+                (void(builtInUsage)); // unused
             }
 
-            LLPC_ASSERT(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
+            assert(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
             uint32_t loc = perPatchBuiltInOutLocMap[builtInId];
 
             if (pElemIdx == nullptr)
             {
                 // gl_TessLevelOuter[4] is treated as vec4
                 // gl_TessLevelInner[2] is treated as vec2
-                LLPC_ASSERT(pOutputTy->isArrayTy());
+                assert(pOutputTy->isArrayTy());
 
                 auto pElemTy = pOutputTy->getArrayElementType();
                 for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
@@ -3392,7 +3392,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInOutputImport(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -3432,7 +3432,7 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
             {
                 if (m_hasGs)
                 {
-                    LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+                    assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
                     uint32_t loc = builtInOutLocMap[builtInId];
 
                     StoreValueToEsGsRing(pOutput, loc, 0, pInsertPos);
@@ -3470,7 +3470,7 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
             {
                 if (m_hasGs)
                 {
-                    LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+                    assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
                     uint32_t loc = builtInOutLocMap[builtInId];
 
                     StoreValueToEsGsRing(pOutput, loc, 0, pInsertPos);
@@ -3500,7 +3500,7 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
 
             if (m_hasTs)
             {
-                LLPC_ASSERT(pOutputTy->isArrayTy());
+                assert(pOutputTy->isArrayTy());
 
                 uint32_t loc = builtInOutLocMap[builtInId];
                 auto pLdsOffset = CalcLdsOffsetForVsOutput(pOutputTy->getArrayElementType(), loc, 0, pInsertPos);
@@ -3520,7 +3520,7 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
             {
                 if (m_hasGs)
                 {
-                    LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+                    assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
                     uint32_t loc = builtInOutLocMap[builtInId];
 
                     StoreValueToEsGsRing(pOutput, loc, 0, pInsertPos);
@@ -3551,7 +3551,7 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
 
             if (m_hasTs)
             {
-                LLPC_ASSERT(pOutputTy->isArrayTy());
+                assert(pOutputTy->isArrayTy());
 
                 uint32_t loc = builtInOutLocMap[builtInId];
                 auto pLdsOffset = CalcLdsOffsetForVsOutput(pOutputTy->getArrayElementType(), loc, 0, pInsertPos);
@@ -3571,7 +3571,7 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
             {
                 if (m_hasGs)
                 {
-                    LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+                    assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
                     uint32_t loc = builtInOutLocMap[builtInId];
 
                     StoreValueToEsGsRing(pOutput, loc, 0, pInsertPos);
@@ -3635,7 +3635,7 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -3666,7 +3666,7 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                 return;
             }
 
-            LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+            assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
             uint32_t loc = builtInOutLocMap[builtInId];
 
             auto pLdsOffset = CalcLdsOffsetForTcsOutput(pOutputTy, loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
@@ -3681,8 +3681,8 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                 return;
             }
 
-            LLPC_ASSERT(pElemIdx == nullptr);
-            LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+            assert(pElemIdx == nullptr);
+            assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
             uint32_t loc = builtInOutLocMap[builtInId];
 
             auto pLdsOffset = CalcLdsOffsetForTcsOutput(pOutputTy, loc, nullptr, nullptr, pVertexIdx, pInsertPos);
@@ -3699,13 +3699,13 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                 return;
             }
 
-            LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+            assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
             uint32_t loc = builtInOutLocMap[builtInId];
 
             if (pElemIdx == nullptr)
             {
                 // gl_ClipDistance[]/gl_CullDistance[] is treated as 2 x vec4
-                LLPC_ASSERT(pOutputTy->isArrayTy());
+                assert(pOutputTy->isArrayTy());
 
                 for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
                 {
@@ -3732,7 +3732,7 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                 std::vector<Value*> tessFactors;
                 if (pElemIdx == nullptr)
                 {
-                    LLPC_ASSERT(pOutputTy->isArrayTy());
+                    assert(pOutputTy->isArrayTy());
 
                     uint32_t tessFactorCount = 0;
 
@@ -3749,7 +3749,7 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                         tessFactorCount = 4;
                         break;
                     default:
-                        LLPC_NEVER_CALLED();
+                        llvm_unreachable("Should never be called!");
                         break;
                     }
 
@@ -3761,26 +3761,26 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
 
                     if (primitiveMode == PrimitiveMode::Isolines)
                     {
-                        LLPC_ASSERT(tessFactorCount == 2);
+                        assert(tessFactorCount == 2);
                         std::swap(tessFactors[0], tessFactors[1]);
                     }
                 }
                 else
                 {
-                    LLPC_ASSERT(pOutputTy->isFloatTy());
+                    assert(pOutputTy->isFloatTy());
                     tessFactors.push_back(pOutput);
                 }
 
                 Value* pTessFactorOffset = CalcTessFactorOffset(true, pElemIdx, pInsertPos);
                 StoreTessFactorToBuffer(tessFactors, pTessFactorOffset, pInsertPos);
 
-                LLPC_ASSERT(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
+                assert(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
                 uint32_t loc = perPatchBuiltInOutLocMap[builtInId];
 
                 if (pElemIdx == nullptr)
                 {
                     // gl_TessLevelOuter[4] is treated as vec4
-                    LLPC_ASSERT(pOutputTy->isArrayTy());
+                    assert(pOutputTy->isArrayTy());
 
                     for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
                     {
@@ -3821,7 +3821,7 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                         tessFactorCount = 2;
                         break;
                     default:
-                        LLPC_NEVER_CALLED();
+                        llvm_unreachable("Should never be called!");
                         break;
                     }
 
@@ -3833,20 +3833,20 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                 }
                 else
                 {
-                    LLPC_ASSERT(pOutputTy->isFloatTy());
+                    assert(pOutputTy->isFloatTy());
                     tessFactors.push_back(pOutput);
                 }
 
                 Value* pTessFactorOffset = CalcTessFactorOffset(false, pElemIdx, pInsertPos);
                 StoreTessFactorToBuffer(tessFactors, pTessFactorOffset, pInsertPos);
 
-                LLPC_ASSERT(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
+                assert(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
                 uint32_t loc = perPatchBuiltInOutLocMap[builtInId];
 
                 if (pElemIdx == nullptr)
                 {
                     // gl_TessLevelInner[2] is treated as vec2
-                    LLPC_ASSERT(pOutputTy->isArrayTy());
+                    assert(pOutputTy->isArrayTy());
 
                     for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
                     {
@@ -3868,7 +3868,7 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -3896,7 +3896,7 @@ void PatchInOutImportExport::PatchTesBuiltInOutputExport(
 
             if (m_hasGs)
             {
-                LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+                assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
                 uint32_t loc = builtInOutLocMap[builtInId];
 
                 StoreValueToEsGsRing(pOutput, loc, 0, pInsertPos);
@@ -3925,7 +3925,7 @@ void PatchInOutImportExport::PatchTesBuiltInOutputExport(
 
             if (m_hasGs)
             {
-                LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+                assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
                 uint32_t loc = builtInOutLocMap[builtInId];
 
                 StoreValueToEsGsRing(pOutput, loc, 0, pInsertPos);
@@ -3954,7 +3954,7 @@ void PatchInOutImportExport::PatchTesBuiltInOutputExport(
 
             if (m_hasGs)
             {
-                LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+                assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
                 uint32_t loc = builtInOutLocMap[builtInId];
 
                 StoreValueToEsGsRing(pOutput, loc, 0, pInsertPos);
@@ -3984,7 +3984,7 @@ void PatchInOutImportExport::PatchTesBuiltInOutputExport(
 
             if (m_hasGs)
             {
-                LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+                assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
                 uint32_t loc = builtInOutLocMap[builtInId];
 
                 StoreValueToEsGsRing(pOutput, loc, 0, pInsertPos);
@@ -4047,7 +4047,7 @@ void PatchInOutImportExport::PatchTesBuiltInOutputExport(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -4065,38 +4065,38 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
     auto& builtInUsage = pResUsage->builtInUsage.gs;
     auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
 
-    LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+    assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
     uint32_t loc = builtInOutLocMap[builtInId];
 
     switch (builtInId)
     {
     case BuiltInPosition:
-        LLPC_ASSERT(builtInUsage.position);
+        assert(builtInUsage.position);
         break;
     case BuiltInPointSize:
-        LLPC_ASSERT(builtInUsage.pointSize);
+        assert(builtInUsage.pointSize);
         break;
     case BuiltInClipDistance:
-        LLPC_ASSERT(builtInUsage.clipDistance);
+        assert(builtInUsage.clipDistance);
         break;
     case BuiltInCullDistance:
-        LLPC_ASSERT(builtInUsage.cullDistance);
+        assert(builtInUsage.cullDistance);
         break;
     case BuiltInPrimitiveId:
-        LLPC_ASSERT(builtInUsage.primitiveId);
+        assert(builtInUsage.primitiveId);
         break;
     case BuiltInLayer:
-        LLPC_ASSERT(builtInUsage.layer);
+        assert(builtInUsage.layer);
         break;
     case BuiltInViewportIndex:
-        LLPC_ASSERT(builtInUsage.viewportIndex);
+        assert(builtInUsage.viewportIndex);
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
-    LLPC_UNUSED(builtInUsage);
+    (void(builtInUsage)); // unused
     StoreValueToGsVsRing(pOutput, loc, 0, streamId, pInsertPos);
 }
 
@@ -4116,7 +4116,7 @@ void PatchInOutImportExport::PatchFsBuiltInOutputExport(
         }
     case BuiltInSampleMask:
         {
-            LLPC_ASSERT(pOutput->getType()->isArrayTy());
+            assert(pOutput->getType()->isArrayTy());
 
             // NOTE: Only gl_SampleMask[0] is valid for us.
             m_pSampleMask = ExtractValueInst::Create(pOutput, { 0 }, "", pInsertPos);
@@ -4130,7 +4130,7 @@ void PatchInOutImportExport::PatchFsBuiltInOutputExport(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -4211,7 +4211,7 @@ void PatchInOutImportExport::PatchCopyShaderBuiltInOutputExport(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -4226,7 +4226,7 @@ void PatchInOutImportExport::PatchXfbOutputExport(
     uint32_t      xfbExtraOffset,     // Transform feedback extra offset, passed from aggregate type
     Instruction*  pInsertPos)         // [in] Where to insert the store instruction
 {
-    LLPC_ASSERT((m_shaderStage == ShaderStageVertex) ||
+    assert((m_shaderStage == ShaderStageVertex) ||
                 (m_shaderStage == ShaderStageTessEval) ||
                 (m_shaderStage == ShaderStageCopyShader));
 
@@ -4249,12 +4249,12 @@ void PatchInOutImportExport::PatchXfbOutputExport(
         pOutputTy = VectorType::get(Type::getFloatTy(*m_pContext), compCount);
         pOutput = new BitCastInst(pOutput, pOutputTy, "", pInsertPos);
     }
-    LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32));
+    assert((bitWidth == 16) || (bitWidth == 32));
 
     if (compCount == 8)
     {
         // vec8 -> vec4 + vec4
-        LLPC_ASSERT(bitWidth == 32);
+        assert(bitWidth == 32);
 
         Constant* shuffleMask0123[] = {
             ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
@@ -4280,7 +4280,7 @@ void PatchInOutImportExport::PatchXfbOutputExport(
     else if (compCount == 6)
     {
         // vec6 -> vec4 + vec2
-        LLPC_ASSERT(bitWidth == 32);
+        assert(bitWidth == 32);
 
         // NOTE: This case is generated by copy shader, which casts 64-bit outputs to float.
         Constant* shuffleMask0123[] = {
@@ -4424,10 +4424,10 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
     auto pStoreTy = pStoreValue->getType();
 
     uint32_t compCount = pStoreTy->isVectorTy() ? pStoreTy->getVectorNumElements() : 1;
-    LLPC_ASSERT(compCount <= 4);
+    assert(compCount <= 4);
 
     const uint64_t bitWidth = pStoreTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32));
+    assert((bitWidth == 16) || (bitWidth == 32));
 
     uint32_t format = 0;
     std::string callName = "llvm.amdgcn.struct.tbuffer.store.";
@@ -4456,7 +4456,7 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -4479,7 +4479,7 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
         }
         else
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
         }
     }
 
@@ -4539,7 +4539,7 @@ uint32_t PatchInOutImportExport::CombineBufferStore(
     }
     else
     {
-        LLPC_NOT_IMPLEMENTED();
+        llvm_unreachable("Not implemented!");
     }
 
     Type* storeTys[4] =
@@ -4640,7 +4640,7 @@ uint32_t PatchInOutImportExport::CombineBufferLoad(
     }
     else
     {
-        LLPC_NOT_IMPLEMENTED();
+        llvm_unreachable("Not implemented!");
     }
 
     Type* loadTyps[4] =
@@ -4652,7 +4652,7 @@ uint32_t PatchInOutImportExport::CombineBufferLoad(
     };
 
     std::string funcName = "llvm.amdgcn.raw.tbuffer.load.";
-    LLPC_ASSERT(loadValues.size() > 0);
+    assert(loadValues.size() > 0);
 
     // 4-component combination
     uint32_t compCount = 4;
@@ -4680,7 +4680,7 @@ uint32_t PatchInOutImportExport::CombineBufferLoad(
                 ConstantInt::get(Type::getInt32Ty(*m_pContext), coherent.u32All)          // glc
             };
             pLoadValue = EmitCall(funcName, loadTyps[compCount - 1], args, {}, pInsertPos);
-            LLPC_ASSERT(pLoadValue != nullptr);
+            assert(pLoadValue != nullptr);
             if (compCount > 1)
             {
                 for (uint32_t i = 0; i < compCount; i++)
@@ -4717,10 +4717,10 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
     auto pStoreTy = pStoreValue->getType();
 
     uint32_t compCount = pStoreTy->isVectorTy() ? pStoreTy->getVectorNumElements() : 1;
-    LLPC_ASSERT(compCount <= 4);
+    assert(compCount <= 4);
 
     const uint64_t bitWidth = pStoreTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32));
+    assert((bitWidth == 16) || (bitWidth == 32));
 
     if (pStoreTy->isIntOrIntVectorTy())
     {
@@ -4752,7 +4752,7 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
     }
     else
     {
-        LLPC_ASSERT(m_shaderStage == ShaderStageCopyShader);
+        assert(m_shaderStage == ShaderStageCopyShader);
 
         writeIndex = CopyShaderUserSgprIdxWriteIndex;
         streamInfo = CopyShaderUserSgprIdxStreamInfo;
@@ -4769,8 +4769,8 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
         }
     }
 
-    LLPC_ASSERT(xfbBuffer < MaxTransformFeedbackBuffers);
-    LLPC_ASSERT(streamOffsets[xfbBuffer] != 0);
+    assert(xfbBuffer < MaxTransformFeedbackBuffers);
+    assert(streamOffsets[xfbBuffer] != 0);
 
     auto pStreamOffset = GetFunctionArgument(m_pEntryPoint, streamOffsets[xfbBuffer]);
 
@@ -4837,7 +4837,7 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
     }
 
     const uint64_t bitWidth = pElemTy->getScalarSizeInBits();
-    LLPC_ASSERT((pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()) &&
+    assert((pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()) &&
                 ((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32)));
 
     if (pStoreTy->isArrayTy() || pStoreTy->isVectorTy())
@@ -4869,7 +4869,7 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
         {
             if (pStoreTy->isFloatingPointTy())
             {
-                LLPC_ASSERT(bitWidth == 16);
+                assert(bitWidth == 16);
                 pStoreValue = new BitCastInst(pStoreValue, Type::getInt16Ty(*m_pContext), "", pInsertPos);
             }
 
@@ -4877,7 +4877,7 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
         }
         else
         {
-            LLPC_ASSERT(bitWidth == 32);
+            assert(bitWidth == 32);
             if (pStoreTy->isFloatingPointTy())
             {
                 pStoreValue = new BitCastInst(pStoreValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
@@ -4893,7 +4893,7 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
         }
         else
         {
-            LLPC_ASSERT(m_shaderStage == ShaderStageTessEval);
+            assert(m_shaderStage == ShaderStageTessEval);
             pEsGsOffset = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.tes.esGsOffset);
         }
 
@@ -4955,7 +4955,7 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
     }
 
     const uint64_t bitWidth = pElemTy->getScalarSizeInBits();
-    LLPC_ASSERT((pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()) &&
+    assert((pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()) &&
                 ((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32)));
 
     Value* pLoadValue = UndefValue::get(pLoadTy);
@@ -5035,7 +5035,7 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
 
             if (bitWidth == 8)
             {
-                LLPC_ASSERT(pLoadTy->isIntegerTy());
+                assert(pLoadTy->isIntegerTy());
 
                 pLoadValue = new BitCastInst(pLoadValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
                 pLoadValue = new TruncInst(pLoadValue, Type::getInt8Ty(*m_pContext), "", pInsertPos);
@@ -5052,7 +5052,7 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
             }
             else
             {
-                LLPC_ASSERT(bitWidth == 32);
+                assert(bitWidth == 32);
                 if (pLoadTy->isIntegerTy())
                 {
                     pLoadValue = new BitCastInst(pLoadValue, pLoadTy, "", pInsertPos);
@@ -5086,7 +5086,7 @@ void PatchInOutImportExport::StoreValueToGsVsRing(
     }
 
     const uint32_t bitWidth = pElemTy->getScalarSizeInBits();
-    LLPC_ASSERT((pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()) &&
+    assert((pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()) &&
                 ((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32)));
 
     if (m_pPipelineState->GetNggControl()->enableNgg)
@@ -5136,7 +5136,7 @@ void PatchInOutImportExport::StoreValueToGsVsRing(
             // export calls based on number of DWORDs.
             if (pStoreTy->isFloatingPointTy())
             {
-                LLPC_ASSERT(bitWidth == 16);
+                assert(bitWidth == 16);
                 pStoreValue = new BitCastInst(pStoreValue, Type::getInt16Ty(*m_pContext), "", pInsertPos);
             }
 
@@ -5144,7 +5144,7 @@ void PatchInOutImportExport::StoreValueToGsVsRing(
         }
         else
         {
-            LLPC_ASSERT(bitWidth == 32);
+            assert(bitWidth == 32);
             if (pStoreTy->isFloatingPointTy())
             {
                 pStoreValue = new BitCastInst(pStoreValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
@@ -5212,7 +5212,7 @@ void PatchInOutImportExport::StoreValueToGsVsRing(
             }
             else
             {
-                LLPC_NOT_IMPLEMENTED();
+                llvm_unreachable("Not implemented!");
             }
         }
     }
@@ -5231,7 +5231,7 @@ Value* PatchInOutImportExport::CalcEsGsRingOffsetForOutput(
     {
         // ringOffset = esGsOffset + threadId * esGsRingItemSize + location * 4 + compIdx
 
-        LLPC_ASSERT(m_pPipelineState->HasShaderStage(ShaderStageGeometry));
+        assert(m_pPipelineState->HasShaderStage(ShaderStageGeometry));
         const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->
                                                                     inOutUsage.gs.calcFactor;
 
@@ -5404,13 +5404,13 @@ Value* PatchInOutImportExport::ReadValueFromLds(
     Value*       pLdsOffset,  // [in] Start offset to do LDS read operations
     Instruction* pInsertPos)  // [in] Where to insert read instructions
 {
-    LLPC_ASSERT(m_pLds != nullptr);
-    LLPC_ASSERT(pReadTy->isSingleValueType());
+    assert(m_pLds != nullptr);
+    assert(pReadTy->isSingleValueType());
 
     // Read DWORDs from LDS
     const uint32_t compCount = pReadTy->isVectorTy() ? pReadTy->getVectorNumElements() : 1;
     const uint32_t bitWidth = pReadTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
     const uint32_t numChannels = compCount * ((bitWidth == 64) ? 2 : 1);
 
     std::vector<Value*> loadValues(numChannels);
@@ -5446,7 +5446,7 @@ Value* PatchInOutImportExport::ReadValueFromLds(
         }
         else
         {
-            LLPC_NOT_IMPLEMENTED();
+            llvm_unreachable("Not implemented!");
         }
 
         for (uint32_t i = 0, combineCount = 0; i < numChannels; i += combineCount)
@@ -5536,14 +5536,14 @@ void PatchInOutImportExport::WriteValueToLds(
     Value*        pLdsOffset,    // [in] Start offset to do LDS write operations
     Instruction*  pInsertPos)    // [in] Where to insert write instructions
 {
-    LLPC_ASSERT(m_pLds != nullptr);
+    assert(m_pLds != nullptr);
 
     auto pWriteTy = pWriteValue->getType();
-    LLPC_ASSERT(pWriteTy->isSingleValueType());
+    assert(pWriteTy->isSingleValueType());
 
     const uint32_t compCout = pWriteTy->isVectorTy() ? pWriteTy->getVectorNumElements() : 1;
     const uint32_t bitWidth = pWriteTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
     const uint32_t numChannels = compCout * ((bitWidth == 64) ? 2 : 1);
 
     // Cast write value to <n x i32> vector
@@ -5635,7 +5635,7 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
     Value*       pElemIdx,    // [in] Index used for array element indexing (could be null)
     Instruction* pInsertPos)  // [in] Where to insert store instructions
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+    assert(m_shaderStage == ShaderStageTessControl);
 
     // NOTE: Tessellation factors are from tessellation level array and we have:
     //   (1) Isoline
@@ -5672,7 +5672,7 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
         tessFactorStart = isOuter ? 0 : 4;
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -5689,7 +5689,7 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
                 {
                     // NOTE: In case of the isoline,  hardware wants two tessellation factor: the first is detail
                     // TF, the second is density TF. The order is reversed, different from GLSL spec.
-                    LLPC_ASSERT(tessFactorCount == 2);
+                    assert(tessFactorCount == 2);
                     elemIdx = 1 - elemIdx;
                 }
 
@@ -5708,7 +5708,7 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
             {
                 // NOTE: In case of the isoline,  hardware wants two tessellation factor: the first is detail
                 // TF, the second is density TF. The order is reversed, different from GLSL spec.
-                LLPC_ASSERT(tessFactorCount == 2);
+                assert(tessFactorCount == 2);
 
                 // elemIdx = (elemIdx <= 1) ? 1 - elemIdx : elemIdx
                 auto pCond = new ICmpInst(pInsertPos,
@@ -5755,7 +5755,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
     Value*                     pTessFactorOffset,   // [in] Start offset to store the specified tessellation factors
     Instruction*               pInsertPos)          // [in] Where to insert store instructions
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+    assert(m_shaderStage == ShaderStageTessControl);
 
     if (tessFactors.size() == 0)
     {
@@ -5818,7 +5818,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
     else
     {
         // Must be element indexing of tessellation level array
-        LLPC_ASSERT(tessFactors.size() == 1);
+        assert(tessFactors.size() == 1);
 
         if (m_pModule->getFunction(LlpcName::TfBufferStore) == nullptr)
         {
@@ -5959,13 +5959,13 @@ Value* PatchInOutImportExport::CalcLdsOffsetForVsOutput(
     uint32_t     compIdx,       // Index used for vector element indexing
     Instruction* pInsertPos)    // [in] Where to insert calculation instructions
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageVertex);
+    assert(m_shaderStage == ShaderStageVertex);
 
     // attribOffset = location * 4 + compIdx
     Value* pAttribOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), location * 4);
 
     const uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
     if (bitWidth == 64)
     {
@@ -6001,7 +6001,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsInput(
     Value*       pVertexIdx,    // [in] Vertex indexing
     Instruction* pInsertPos)    // [in] Where to insert calculation instructions
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+    assert(m_shaderStage == ShaderStageTessControl);
 
     const auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs;
     const auto& calcFactor = inOutUsage.calcFactor;
@@ -6022,7 +6022,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsInput(
     if (pCompIdx != nullptr)
     {
         const uint32_t bitWidth = pInputTy->getScalarSizeInBits();
-        LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+        assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
         if (bitWidth == 64)
         {
@@ -6062,7 +6062,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsOutput(
     Value*       pVertexIdx,    // [in] Vertex indexing
     Instruction* pInsertPos)    // [in] Where to insert calculation instructions
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+    assert(m_shaderStage == ShaderStageTessControl);
 
     const auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs;
     const auto& calcFactor = inOutUsage.calcFactor;
@@ -6089,7 +6089,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsOutput(
     if (pCompIdx != nullptr)
     {
         const uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
-        LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+        assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
         if (bitWidth == 64)
         {
@@ -6150,7 +6150,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTesInput(
     Value*       pVertexIdx,    // [in] Vertex indexing
     Instruction* pInsertPos)    // [in] Where to insert calculation instructions
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageTessEval);
+    assert(m_shaderStage == ShaderStageTessEval);
 
     const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
 
@@ -6180,7 +6180,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTesInput(
     if (pCompIdx != nullptr)
     {
         const uint32_t bitWidth = pInputTy->getScalarSizeInBits();
-        LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+        assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
         if (bitWidth == 64)
         {
@@ -6338,8 +6338,8 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
     const bool useExpInst = (((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval) ||
                               (m_shaderStage == ShaderStageCopyShader)) &&
                              ((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment)));
-    LLPC_ASSERT(useExpInst);
-    LLPC_UNUSED(useExpInst);
+    assert(useExpInst);
+    (void(useExpInst)); // unused
 
     auto pOutputTy = pOutput->getType();
 
@@ -6347,7 +6347,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
 
     const uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
     const uint32_t bitWidth  = pOutputTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
     // Convert the output value to floating-point export value
     Value* pExport = nullptr;
@@ -6361,7 +6361,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
         if (bitWidth == 8)
         {
             // NOTE: For 16-bit output export, we have to cast the 8-bit value to 32-bit floating-point value.
-            LLPC_ASSERT(pOutputTy->isIntOrIntVectorTy());
+            assert(pOutputTy->isIntOrIntVectorTy());
             Type* pZExtTy = Type::getInt32Ty(*m_pContext);
             pZExtTy = pOutputTy->isVectorTy() ? cast<Type>(VectorType::get(pZExtTy, compCount)) : pZExtTy;
             pExport = new ZExtInst(pOutput,
@@ -6384,7 +6384,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
             }
             else
             {
-                LLPC_ASSERT(pOutputTy->isIntOrIntVectorTy());
+                assert(pOutputTy->isIntOrIntVectorTy());
                 pExport = pOutput;
             }
 
@@ -6398,7 +6398,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
         }
         else
         {
-            LLPC_ASSERT(CanBitCast(pOutputTy, pExportTy));
+            assert(CanBitCast(pOutputTy, pExportTy));
             pExport = new BitCastInst(pOutput, pExportTy, "", pInsertPos);
         }
     }
@@ -6407,7 +6407,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
         pExport = pOutput;
     }
 
-    LLPC_ASSERT(numChannels <= 8);
+    assert(numChannels <= 8);
     Value* exportValues[8] = { nullptr };
 
     if (numChannels == 1)
@@ -6429,7 +6429,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
 
     if (numChannels <= 4)
     {
-        LLPC_ASSERT(startChannel + numChannels <= 4);
+        assert(startChannel + numChannels <= 4);
         const uint32_t channelMask = ((1 << (startChannel + numChannels)) - 1) - ((1 << startChannel) - 1);
 
         args.clear();
@@ -6463,8 +6463,8 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
     else
     {
         // We have to do exporting twice for this output
-        LLPC_ASSERT(startChannel == 0); // Other values are disallowed according to GLSL spec
-        LLPC_ASSERT((numChannels == 6) || (numChannels == 8));
+        assert(startChannel == 0); // Other values are disallowed according to GLSL spec
+        assert((numChannels == 6) || (numChannels == 8));
 
         // Do the first exporting
         args.clear();
@@ -6522,8 +6522,8 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
     const bool useExpInst = (((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval) ||
                               (m_shaderStage == ShaderStageCopyShader)) &&
                              ((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment)));
-    LLPC_ASSERT(useExpInst);
-    LLPC_UNUSED(useExpInst);
+    assert(useExpInst);
+    (void(useExpInst)); // unused
 
     auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
 
@@ -6578,7 +6578,7 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
         }
     case BuiltInLayer:
         {
-            LLPC_ASSERT(m_gfxIp.major <= 8); // For GFX9, gl_ViewportIndex and gl_Layer are packed
+            assert(m_gfxIp.major <= 8); // For GFX9, gl_ViewportIndex and gl_Layer are packed
 
             const auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
@@ -6613,7 +6613,7 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
                 uint32_t loc = InvalidValue;
                 if (m_shaderStage == ShaderStageCopyShader)
                 {
-                    LLPC_ASSERT(inOutUsage.gs.builtInOutLocs.find(BuiltInLayer) !=
+                    assert(inOutUsage.gs.builtInOutLocs.find(BuiltInLayer) !=
                                 inOutUsage.gs.builtInOutLocs.end() ||
                                 inOutUsage.gs.builtInOutLocs.find(BuiltInViewIndex) !=
                                 inOutUsage.gs.builtInOutLocs.end());
@@ -6622,7 +6622,7 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
                 }
                 else
                 {
-                    LLPC_ASSERT(inOutUsage.builtInOutputLocMap.find(BuiltInLayer) !=
+                    assert(inOutUsage.builtInOutputLocMap.find(BuiltInLayer) !=
                                 inOutUsage.builtInOutputLocMap.end() ||
                                 inOutUsage.builtInOutputLocMap.find(BuiltInViewIndex) !=
                                 inOutUsage.builtInOutputLocMap.end());
@@ -6649,7 +6649,7 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
         }
     case BuiltInViewportIndex:
         {
-            LLPC_ASSERT(m_gfxIp.major <= 8); // For GFX9, gl_ViewportIndex and gl_Layer are packed
+            assert(m_gfxIp.major <= 8); // For GFX9, gl_ViewportIndex and gl_Layer are packed
             Value* pViewportIndex = new BitCastInst(pOutput, Type::getFloatTy(*m_pContext), "", pInsertPos);
 
             Value* args[] = {
@@ -6681,13 +6681,13 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
                 uint32_t loc = InvalidValue;
                 if (m_shaderStage == ShaderStageCopyShader)
                 {
-                    LLPC_ASSERT(inOutUsage.gs.builtInOutLocs.find(BuiltInViewportIndex) !=
+                    assert(inOutUsage.gs.builtInOutLocs.find(BuiltInViewportIndex) !=
                                 inOutUsage.gs.builtInOutLocs.end());
                     loc = inOutUsage.gs.builtInOutLocs[BuiltInViewportIndex];
                 }
                 else
                 {
-                    LLPC_ASSERT(inOutUsage.builtInOutputLocMap.find(BuiltInViewportIndex) !=
+                    assert(inOutUsage.builtInOutputLocMap.find(BuiltInViewportIndex) !=
                                 inOutUsage.builtInOutputLocMap.end());
                     loc = inOutUsage.builtInOutputLocMap[BuiltInViewportIndex];
                 }
@@ -6710,7 +6710,7 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -7150,7 +7150,7 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
 // Get the value of compute shader built-in WorkgroupSize
 Value* PatchInOutImportExport::GetWorkgroupSize()
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageCompute);
+    assert(m_shaderStage == ShaderStageCompute);
 
     auto& builtInUsage = m_pPipelineState->GetShaderModes()->GetComputeShaderMode();
     auto pWorkgroupSizeX = ConstantInt::get(Type::getInt32Ty(*m_pContext), builtInUsage.workgroupSizeX);
@@ -7165,7 +7165,7 @@ Value* PatchInOutImportExport::GetWorkgroupSize()
 Value* PatchInOutImportExport::GetInLocalInvocationId(
     Instruction* pInsertPos) // [in] Where to insert instructions.
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageCompute);
+    assert(m_shaderStage == ShaderStageCompute);
 
     auto& builtInUsage = m_pPipelineState->GetShaderModes()->GetComputeShaderMode();
     auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageCompute)->entryArgIdxs.cs;

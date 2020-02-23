@@ -104,7 +104,7 @@ void SpirvLowerResourceCollect::CollectResourceNodeData(
             if (imageTypeName.find(".SampledImage") != std::string::npos)
             {
                 auto pos = imageTypeName.find("_");
-                LLPC_ASSERT(pos != std::string::npos);
+                assert(pos != std::string::npos);
 
                 ++pos;
                 Dim dim = static_cast<Dim>(imageTypeName[pos] - '0');
@@ -140,7 +140,7 @@ void SpirvLowerResourceCollect::CollectResourceNodeData(
     // DescriptorCombinedTexture.
     if (result.second == false)
     {
-        LLPC_ASSERT(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
+        assert(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
                      (nodeType == ResourceMappingNodeType::DescriptorResource) ||
                      (nodeType == ResourceMappingNodeType::DescriptorTexelBuffer) ||
                      (nodeType == ResourceMappingNodeType::DescriptorSampler)) &&
@@ -258,7 +258,7 @@ bool SpirvLowerResourceCollect::runOnModule(
                     }
                     else
                     {
-                        LLPC_ASSERT(bitWidth == 32);
+                        assert(bitWidth == 32);
                         basicTy = signedness ? BasicType::Int : BasicType::Uint;
                     }
                 }
@@ -271,13 +271,13 @@ bool SpirvLowerResourceCollect::runOnModule(
                     }
                     else
                     {
-                        LLPC_ASSERT(bitWidth == 32);
+                        assert(bitWidth == 32);
                         basicTy = BasicType::Float;
                     }
                 }
                 else
                 {
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                 }
 
                 fsOutInfo.location = location;
@@ -298,7 +298,7 @@ bool SpirvLowerResourceCollect::runOnModule(
             }
         default:
             {
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
                 break;
             }
         }
@@ -370,7 +370,7 @@ Value* SpirvLowerResourceCollect::FindCallAndGetIndexValue(
         if (pFuncMeta == nullptr)
         {
             // If the function had the LLPC builder call prefix, it means the metadata was not encoded correctly.
-            LLPC_ASSERT(func.getName().startswith(BuilderCallPrefix) == false);
+            assert(func.getName().startswith(BuilderCallPrefix) == false);
             continue;
         }
 
@@ -416,7 +416,7 @@ void SpirvLowerResourceCollect::VisitCalls(
         if (pFuncMeta == nullptr)
         {
             // If the function had the llpc builder call prefix, it means the metadata was not encoded correctly.
-            LLPC_ASSERT(func.getName().startswith(BuilderCallPrefix) == false);
+            assert(func.getName().startswith(BuilderCallPrefix) == false);
             continue;
         }
 
@@ -474,7 +474,7 @@ void SpirvLowerResourceCollect::VisitCalls(
                 // DescriptorCombinedTexture.
                 if (result.second == false)
                 {
-                    LLPC_ASSERT(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
+                    assert(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
                                  (nodeType == ResourceMappingNodeType::DescriptorResource) ||
                                  (nodeType == ResourceMappingNodeType::DescriptorTexelBuffer) ||
                                  (nodeType == ResourceMappingNodeType::DescriptorSampler)) &&

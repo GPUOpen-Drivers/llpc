@@ -66,7 +66,7 @@ NggPrimShader::NggPrimShader(
     m_pLdsManager(nullptr),
     m_pBuilder(new IRBuilder<>(*m_pContext))
 {
-    LLPC_ASSERT(m_pPipelineState->IsGraphics());
+    assert(m_pPipelineState->IsGraphics());
 
     memset(&m_nggFactor, 0, sizeof(m_nggFactor));
 
@@ -92,10 +92,10 @@ Function* NggPrimShader::Generate(
     Function*  pGsEntryPoint,           // [in] Entry-point of hardware geometry shader (GS) (could be null)
     Function*  pCopyShaderEntryPoint)   // [in] Entry-point of hardware vertex shader (VS, copy shader) (could be null)
 {
-    LLPC_ASSERT(m_gfxIp.major >= 10);
+    assert(m_gfxIp.major >= 10);
 
     // ES and GS could not be null at the same time
-    LLPC_ASSERT(((pEsEntryPoint == nullptr) && (pGsEntryPoint == nullptr)) == false);
+    assert(((pEsEntryPoint == nullptr) && (pGsEntryPoint == nullptr)) == false);
 
     Module* pModule = nullptr;
     if (pEsEntryPoint != nullptr)
@@ -115,7 +115,7 @@ Function* NggPrimShader::Generate(
         pGsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
         pGsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
-        LLPC_ASSERT(pCopyShaderEntryPoint != nullptr); // Copy shader must be present
+        assert(pCopyShaderEntryPoint != nullptr); // Copy shader must be present
         pCopyShaderEntryPoint->setName(LlpcName::NggCopyShaderEntryPoint);
         pCopyShaderEntryPoint->setCallingConv(CallingConv::C);
         pCopyShaderEntryPoint->setLinkage(GlobalValue::InternalLinkage);
@@ -123,8 +123,8 @@ Function* NggPrimShader::Generate(
     }
 
     // Create NGG LDS manager
-    LLPC_ASSERT(pModule != nullptr);
-    LLPC_ASSERT(m_pLdsManager == nullptr);
+    assert(pModule != nullptr);
+    assert(m_pLdsManager == nullptr);
     m_pLdsManager = new NggLdsManager(pModule, m_pPipelineState, m_pBuilder.get());
 
     return GeneratePrimShaderEntryPoint(pModule);
@@ -164,13 +164,13 @@ FunctionType* NggPrimShader::GeneratePrimShaderEntryPointType(
             {
                 userDataCount = std::max(pTesIntfData->userDataCount, userDataCount);
 
-                LLPC_ASSERT(pTesIntfData->userDataUsage.tes.viewIndex == pGsIntfData->userDataUsage.gs.viewIndex);
+                assert(pTesIntfData->userDataUsage.tes.viewIndex == pGsIntfData->userDataUsage.gs.viewIndex);
                 if ((pGsIntfData->spillTable.sizeInDwords > 0) &&
                     (pTesIntfData->spillTable.sizeInDwords == 0))
                 {
                     pTesIntfData->userDataUsage.spillTable = userDataCount;
                     ++userDataCount;
-                    LLPC_ASSERT(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
+                    assert(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
                 }
             }
         }
@@ -180,7 +180,7 @@ FunctionType* NggPrimShader::GeneratePrimShaderEntryPointType(
             {
                 userDataCount = std::max(pVsIntfData->userDataCount, userDataCount);
 
-                LLPC_ASSERT(pVsIntfData->userDataUsage.vs.viewIndex == pGsIntfData->userDataUsage.gs.viewIndex);
+                assert(pVsIntfData->userDataUsage.vs.viewIndex == pGsIntfData->userDataUsage.gs.viewIndex);
                 if ((pGsIntfData->spillTable.sizeInDwords > 0) &&
                     (pVsIntfData->spillTable.sizeInDwords == 0))
                 {
@@ -209,7 +209,7 @@ FunctionType* NggPrimShader::GeneratePrimShaderEntryPointType(
         }
     }
 
-    LLPC_ASSERT(userDataCount > 0);
+    assert(userDataCount > 0);
     argTys.push_back(VectorType::get(m_pBuilder->getInt32Ty(), userDataCount));
     *pInRegMask |= (1ull << EsGsSpecialSysValueCount);
 
@@ -344,12 +344,12 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
 void NggPrimShader::ConstructPrimShaderWithoutGs(
     Module* pModule) // [in] LLVM module
 {
-    LLPC_ASSERT(m_hasGs == false);
+    assert(m_hasGs == false);
 
     const bool hasTs = (m_hasTcs || m_hasTes);
 
     const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
-    LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
+    assert((waveSize == 32) || (waveSize == 64));
 
     const uint32_t waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
 
@@ -1103,7 +1103,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
 
             if (waveCountInSubgroup == 8)
             {
-                LLPC_ASSERT(waveSize == 32);
+                assert(waveSize == 32);
                 pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(32 * SizeOfDword));
                 m_pLdsManager->WriteValueToLds(pZero, pLdsOffset);
             }
@@ -1145,7 +1145,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                 if (expData.target == EXP_TARGET_POS_0)
                 {
                     const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPosData);
-                    LLPC_ASSERT(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
+                    assert(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
 
                     Value* pLdsOffset =
                         m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(SizeOfVec4));
@@ -1209,7 +1209,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                         }
                     }
                 }
-                LLPC_ASSERT(clipCullDistance.size() < MaxClipCullDistanceCount);
+                assert(clipCullDistance.size() < MaxClipCullDistanceCount);
 
                 for (uint32_t i = clipDistanceCount; i < clipDistanceCount + cullDistanceCount; ++i)
                 {
@@ -1557,7 +1557,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                     // Write primitive ID to LDS
                     if (pResUsage->builtInUsage.vs.primitiveId)
                     {
-                        LLPC_ASSERT(m_nggFactor.pPrimitiveId != nullptr);
+                        assert(m_nggFactor.pPrimitiveId != nullptr);
                         WriteCompactDataToLds(m_nggFactor.pPrimitiveId,
                                               pCompactThreadIdInSubrgoup,
                                               LdsRegionCompactPrimId);
@@ -1751,7 +1751,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                     if (expData.target == EXP_TARGET_POS_0)
                     {
                         const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPosData);
-                        LLPC_ASSERT(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
+                        assert(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
 
                         auto pLdsOffset =
                             m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(SizeOfVec4));
@@ -1877,16 +1877,16 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
 void NggPrimShader::ConstructPrimShaderWithGs(
     Module* pModule) // [in] LLVM module
 {
-    LLPC_ASSERT(m_hasGs);
+    assert(m_hasGs);
 
     const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
-    LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
+    assert((waveSize == 32) || (waveSize == 64));
 
     const uint32_t waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
 
     const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
     const uint32_t rasterStream = pResUsage->inOutUsage.gs.rasterStream;
-    LLPC_ASSERT(rasterStream < MaxGsStreams);
+    assert(rasterStream < MaxGsStreams);
 
     const auto& calcFactor = pResUsage->inOutUsage.gs.calcFactor;
     const uint32_t maxOutPrims = calcFactor.primAmpFactor;
@@ -2240,7 +2240,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
         Value* pOutPrimVertCountInfo = RunGsVariant(pModule, pEntryPoint->arg_begin(), pBeginGsBlock);
 
         // Extract output primitive/vertex count info from the return value
-        LLPC_ASSERT(pOutPrimVertCountInfo->getType()->isStructTy());
+        assert(pOutPrimVertCountInfo->getType()->isStructTy());
         pOutPrimCount = m_pBuilder->CreateExtractValue(pOutPrimVertCountInfo, 0);
         pOutVertCount = m_pBuilder->CreateExtractValue(pOutPrimVertCountInfo, 1);
         pInclusiveOutVertCount = m_pBuilder->CreateExtractValue(pOutPrimVertCountInfo, 2);
@@ -2555,7 +2555,7 @@ void NggPrimShader::InitWaveThreadInfo(
     Value* pMergedWaveInfo)     // [in] Merged wave info
 {
     const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
-    LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
+    assert((waveSize == 32) || (waveSize == 64));
 
     m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, m_pBuilder->getInt64(-1));
 
@@ -2683,7 +2683,7 @@ Value* NggPrimShader::DoCulling(
     Value* vertex[3] = {};
 
     const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPosData);
-    LLPC_ASSERT(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
+    assert(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
     auto pRegionStart = m_pBuilder->getInt32(regionStart);
 
     for (uint32_t i = 0; i < 3; ++i)
@@ -2887,7 +2887,7 @@ void NggPrimShader::DoPrimitiveExport(
 
         if (vertexCompact)
         {
-            LLPC_ASSERT(pCullFlag != nullptr); // Must not be null
+            assert(pCullFlag != nullptr); // Must not be null
             const auto pNullPrim = m_pBuilder->getInt32(NullPrim);
             pPrimData = m_pBuilder->CreateSelect(pCullFlag, pNullPrim, pPrimData);
         }
@@ -2919,7 +2919,7 @@ void NggPrimShader::DoEarlyExit(
 {
     if (fullyCulledThreadCount > 0)
     {
-        LLPC_ASSERT(fullyCulledThreadCount == 1); // Currently, if workarounded, this is set to 1
+        assert(fullyCulledThreadCount == 1); // Currently, if workarounded, this is set to 1
 
         auto pEarlyExitBlock = m_pBuilder->GetInsertBlock();
 
@@ -3015,7 +3015,7 @@ void NggPrimShader::RunEsOrEsVariant(
     Function* pEsEntry = nullptr;
     if (runEsVariant)
     {
-        LLPC_ASSERT(pExpDataSet != nullptr);
+        assert(pExpDataSet != nullptr);
         pEsEntry = MutateEsToVariant(pModule, entryName, *pExpDataSet); // Mutate ES to variant
 
         if (pEsEntry == nullptr)
@@ -3027,7 +3027,7 @@ void NggPrimShader::RunEsOrEsVariant(
     else
     {
         pEsEntry = pModule->getFunction(LlpcName::NggEsEntryPoint);
-        LLPC_ASSERT(pEsEntry != nullptr);
+        assert(pEsEntry != nullptr);
     }
 
     // Call ES entry
@@ -3062,7 +3062,7 @@ void NggPrimShader::RunEsOrEsVariant(
     if (sysValueFromLds)
     {
         // NOTE: For vertex compaction, system values are from LDS compaction data region rather than from VGPRs.
-        LLPC_ASSERT(m_pNggControl->compactMode == NggCompactVertices);
+        assert(m_pNggControl->compactMode == NggCompactVertices);
 
         const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
 
@@ -3143,20 +3143,20 @@ void NggPrimShader::RunEsOrEsVariant(
 
     auto pEsArgBegin = pEsEntry->arg_begin();
     const uint32_t esArgCount = pEsEntry->arg_size();
-    LLPC_UNUSED(esArgCount);
+    (void(esArgCount)); // unused
 
     // Set up user data SGPRs
     while (userDataIdx < userDataCount)
     {
-        LLPC_ASSERT(args.size() < esArgCount);
+        assert(args.size() < esArgCount);
 
         auto pEsArg = (pEsArgBegin + args.size());
-        LLPC_ASSERT(pEsArg->hasAttribute(Attribute::InReg));
+        assert(pEsArg->hasAttribute(Attribute::InReg));
 
         auto pEsArgTy = pEsArg->getType();
         if (pEsArgTy->isVectorTy())
         {
-            LLPC_ASSERT(pEsArgTy->getVectorElementType()->isIntegerTy());
+            assert(pEsArgTy->getVectorElementType()->isIntegerTy());
 
             const uint32_t userDataSize = pEsArgTy->getVectorNumElements();
 
@@ -3173,7 +3173,7 @@ void NggPrimShader::RunEsOrEsVariant(
         }
         else
         {
-            LLPC_ASSERT(pEsArgTy->isIntegerTy());
+            assert(pEsArgTy->isIntegerTy());
 
             auto pEsUserData = m_pBuilder->CreateExtractElement(pUserData, userDataIdx);
             args.push_back(pEsUserData);
@@ -3216,7 +3216,7 @@ void NggPrimShader::RunEsOrEsVariant(
         args.push_back(pInstanceId);
     }
 
-    LLPC_ASSERT(args.size() == esArgCount); // Must have visit all arguments of ES entry point
+    assert(args.size() == esArgCount); // Must have visit all arguments of ES entry point
 
     if (runEsVariant)
     {
@@ -3228,7 +3228,7 @@ void NggPrimShader::RunEsOrEsVariant(
 
         // Re-construct exported data from the return value
         auto pExpDataTy = pExpData->getType();
-        LLPC_ASSERT(pExpDataTy->isArrayTy());
+        assert(pExpDataTy->isArrayTy());
 
         const uint32_t expCount = pExpDataTy->getArrayNumElements();
         for (uint32_t i = 0; i < expCount; ++i)
@@ -3261,11 +3261,11 @@ Function* NggPrimShader::MutateEsToVariant(
     StringRef             entryName,        // ES entry name
     std::vector<ExpData>& expDataSet)       // [out] Set of exported data
 {
-    LLPC_ASSERT(m_hasGs == false); // GS must not be present
-    LLPC_ASSERT(expDataSet.empty());
+    assert(m_hasGs == false); // GS must not be present
+    assert(expDataSet.empty());
 
     const auto pEsEntryPoint = pModule->getFunction(LlpcName::NggEsEntryPoint);
-    LLPC_ASSERT(pEsEntryPoint != nullptr);
+    assert(pEsEntryPoint != nullptr);
 
     const bool doExp      = (entryName == LlpcName::NggEsEntryVariant);
     const bool doPosExp   = (entryName == LlpcName::NggEsEntryVariantPos);
@@ -3281,7 +3281,7 @@ Function* NggPrimShader::MutateEsToVariant(
             for (auto pUser : func.users())
             {
                 CallInst* const pCall = dyn_cast<CallInst>(pUser);
-                LLPC_ASSERT(pCall != nullptr);
+                assert(pCall != nullptr);
 
                 if (pCall->getParent()->getParent() != pEsEntryPoint)
                 {
@@ -3337,7 +3337,7 @@ Function* NggPrimShader::MutateEsToVariant(
     m_pBuilder->SetInsertPoint(pRetBlock);
 
     // Remove old "return" instruction
-    LLPC_ASSERT(isa<ReturnInst>(pRetBlock->getTerminator()));
+    assert(isa<ReturnInst>(pRetBlock->getTerminator()));
     ReturnInst* pRetInst = cast<ReturnInst>(pRetBlock->getTerminator());
 
     pRetInst->dropAllReferences();
@@ -3354,7 +3354,7 @@ Function* NggPrimShader::MutateEsToVariant(
             for (auto pUser : func.users())
             {
                 CallInst* const pCall = dyn_cast<CallInst>(pUser);
-                LLPC_ASSERT(pCall != nullptr);
+                assert(pCall != nullptr);
 
                 if (pCall->getParent()->getParent() != pEsEntryVariant)
                 {
@@ -3362,7 +3362,7 @@ Function* NggPrimShader::MutateEsToVariant(
                     continue;
                 }
 
-                LLPC_ASSERT(pCall->getParent() == pRetBlock); // Must in return block
+                assert(pCall->getParent() == pRetBlock); // Must in return block
 
                 uint8_t expTarget = cast<ConstantInt>(pCall->getArgOperand(0))->getZExtValue();
 
@@ -3409,7 +3409,7 @@ Function* NggPrimShader::MutateEsToVariant(
             }
         }
     }
-    LLPC_ASSERT(expDataSet.size() == expCount);
+    assert(expDataSet.size() == expCount);
 
     // Set "done" flag for last position export
     if (lastExport != InvalidValue)
@@ -3450,7 +3450,7 @@ Value* NggPrimShader::RunGsVariant(
     Argument*       pSysValueStart, // Start of system value
     BasicBlock*     pInsertAtEnd)   // [in] Where to insert instructions
 {
-    LLPC_ASSERT(m_hasGs); // GS must be present
+    assert(m_hasGs); // GS must be present
 
     Function* pGsEntry = MutateGsToVariant(pModule);
 
@@ -3535,20 +3535,20 @@ Value* NggPrimShader::RunGsVariant(
 
     auto pGsArgBegin = pGsEntry->arg_begin();
     const uint32_t gsArgCount = pGsEntry->arg_size();
-    LLPC_UNUSED(gsArgCount);
+    (void(gsArgCount)); // unused
 
     // Set up user data SGPRs
     while (userDataIdx < userDataCount)
     {
-        LLPC_ASSERT(args.size() < gsArgCount);
+        assert(args.size() < gsArgCount);
 
         auto pGsArg = (pGsArgBegin + args.size());
-        LLPC_ASSERT(pGsArg->hasAttribute(Attribute::InReg));
+        assert(pGsArg->hasAttribute(Attribute::InReg));
 
         auto pGsArgTy = pGsArg->getType();
         if (pGsArgTy->isVectorTy())
         {
-            LLPC_ASSERT(pGsArgTy->getVectorElementType()->isIntegerTy());
+            assert(pGsArgTy->getVectorElementType()->isIntegerTy());
 
             const uint32_t userDataSize = pGsArgTy->getVectorNumElements();
 
@@ -3565,7 +3565,7 @@ Value* NggPrimShader::RunGsVariant(
         }
         else
         {
-            LLPC_ASSERT(pGsArgTy->isIntegerTy());
+            assert(pGsArgTy->isIntegerTy());
 
             auto pGsUserData = m_pBuilder->CreateExtractElement(pUserData, userDataIdx);
             args.push_back(pGsUserData);
@@ -3587,7 +3587,7 @@ Value* NggPrimShader::RunGsVariant(
     args.push_back(pEsGsOffset5);
     args.push_back(pInvocationId);
 
-    LLPC_ASSERT(args.size() == gsArgCount); // Must have visit all arguments of ES entry point
+    assert(args.size() == gsArgCount); // Must have visit all arguments of ES entry point
 
     return EmitCall(LlpcName::NggGsEntryVariant,
                     pGsEntry->getReturnType(),
@@ -3606,10 +3606,10 @@ Value* NggPrimShader::RunGsVariant(
 Function* NggPrimShader::MutateGsToVariant(
     Module* pModule)          // [in] LLVM module
 {
-    LLPC_ASSERT(m_hasGs); // GS must be present
+    assert(m_hasGs); // GS must be present
 
     auto pGsEntryPoint = pModule->getFunction(LlpcName::NggGsEntryPoint);
-    LLPC_ASSERT(pGsEntryPoint != nullptr);
+    assert(pGsEntryPoint != nullptr);
 
     // Clone new entry-point
     auto pResultTy = StructType::get(*m_pContext,
@@ -3646,7 +3646,7 @@ Function* NggPrimShader::MutateGsToVariant(
     BasicBlock* pRetBlock = &pGsEntryVariant->back();
 
     // Remove old "return" instruction
-    LLPC_ASSERT(isa<ReturnInst>(pRetBlock->getTerminator()));
+    assert(isa<ReturnInst>(pRetBlock->getTerminator()));
     ReturnInst* pRetInst = cast<ReturnInst>(pRetBlock->getTerminator());
 
     pRetInst->dropAllReferences();
@@ -3694,7 +3694,7 @@ Function* NggPrimShader::MutateGsToVariant(
 
     // Initialize thread ID in wave
     const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
-    LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
+    assert((waveSize == 32) || (waveSize == 64));
 
     auto pThreadIdInWave = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo,
                                                        {},
@@ -3729,14 +3729,14 @@ Function* NggPrimShader::MutateGsToVariant(
             for (auto pUser : func.users())
             {
                 CallInst* const pCall = dyn_cast<CallInst>(pUser);
-                LLPC_ASSERT(pCall != nullptr);
+                assert(pCall != nullptr);
                 m_pBuilder->SetInsertPoint(pCall);
 
-                LLPC_ASSERT(pCall->getNumArgOperands() == 4);
+                assert(pCall->getNumArgOperands() == 4);
                 const uint32_t location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
                 const uint32_t compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
                 const uint32_t streamId = cast<ConstantInt>(pCall->getOperand(2))->getZExtValue();
-                LLPC_ASSERT(streamId < MaxGsStreams);
+                assert(streamId < MaxGsStreams);
                 Value* pOutput = pCall->getOperand(3);
 
                 auto pOutVertCounter = m_pBuilder->CreateLoad(outVertCounterPtrs[streamId]);
@@ -3751,7 +3751,7 @@ Function* NggPrimShader::MutateGsToVariant(
             for (auto pUser : func.users())
             {
                 CallInst* const pCall = dyn_cast<CallInst>(pUser);
-                LLPC_ASSERT(pCall != nullptr);
+                assert(pCall != nullptr);
                 m_pBuilder->SetInsertPoint(pCall);
 
                 uint64_t message = cast<ConstantInt>(pCall->getArgOperand(0))->getZExtValue();
@@ -3760,7 +3760,7 @@ Function* NggPrimShader::MutateGsToVariant(
                 {
                     // Handle GS_EMIT, MSG[9:8] = STREAM_ID
                     uint32_t streamId = (message & GS_EMIT_CUT_STREAM_ID_MASK) >> GS_EMIT_CUT_STREAM_ID_SHIFT;
-                    LLPC_ASSERT(streamId < MaxGsStreams);
+                    assert(streamId < MaxGsStreams);
                     ProcessGsEmit(pModule,
                                  streamId,
                                  pThreadIdInSubgroup,
@@ -3775,7 +3775,7 @@ Function* NggPrimShader::MutateGsToVariant(
                 {
                     // Handle GS_CUT, MSG[9:8] = STREAM_ID
                     uint32_t streamId = (message & GS_EMIT_CUT_STREAM_ID_MASK) >> GS_EMIT_CUT_STREAM_ID_SHIFT;
-                    LLPC_ASSERT(streamId < MaxGsStreams);
+                    assert(streamId < MaxGsStreams);
                     ProcessGsCut(pModule,
                                  streamId,
                                  pThreadIdInSubgroup,
@@ -3792,7 +3792,7 @@ Function* NggPrimShader::MutateGsToVariant(
                 else
                 {
                     // Unexpected GS message
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                 }
 
                 removeCalls.push_back(pCall);
@@ -3846,7 +3846,7 @@ void NggPrimShader::RunCopyShader(
     Module*     pModule,        // [in] LLVM module
     BasicBlock* pInsertAtEnd)   // [in] Where to insert instructions
 {
-    LLPC_ASSERT(m_hasGs); // GS must be present
+    assert(m_hasGs); // GS must be present
 
     auto pCopyShaderEntryPoint = pModule->getFunction(LlpcName::NggCopyShaderEntryPoint);
 
@@ -3866,14 +3866,14 @@ void NggPrimShader::RunCopyShader(
                 for (auto pUser : func.users())
                 {
                     CallInst* const pCall = dyn_cast<CallInst>(pUser);
-                    LLPC_ASSERT(pCall != nullptr);
+                    assert(pCall != nullptr);
                     m_pBuilder->SetInsertPoint(pCall);
 
-                    LLPC_ASSERT(pCall->getNumArgOperands() == 3);
+                    assert(pCall->getNumArgOperands() == 3);
                     const uint32_t location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
                     const uint32_t compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
                     const uint32_t streamId = cast<ConstantInt>(pCall->getOperand(2))->getZExtValue();
-                    LLPC_ASSERT(streamId < MaxGsStreams);
+                    assert(streamId < MaxGsStreams);
 
                     auto pOutput = ImportGsOutput(pCall->getType(), location, compIdx, streamId, pVertexOffset);
 
@@ -3938,7 +3938,7 @@ void NggPrimShader::ExportGsOutput(
     if (pResUsage->inOutUsage.gs.rasterStream != streamId)
     {
         // NOTE: Only export those outputs that belong to the rasterization stream.
-        LLPC_ASSERT(pResUsage->inOutUsage.enableXfb == false); // Transform feedback must be disabled
+        assert(pResUsage->inOutUsage.enableXfb == false); // Transform feedback must be disabled
         return;
     }
 
@@ -3947,7 +3947,7 @@ void NggPrimShader::ExportGsOutput(
     if (pOutputTy->isArrayTy())
     {
         auto pOutputElemTy = pOutputTy->getArrayElementType();
-        LLPC_ASSERT(pOutputElemTy->isSingleValueType());
+        assert(pOutputElemTy->isSingleValueType());
 
         // [n x Ty] -> <n x Ty>
         const uint32_t elemCount = pOutputTy->getArrayNumElements();
@@ -3970,7 +3970,7 @@ void NggPrimShader::ExportGsOutput(
         // export calls based on number of DWORDs.
         if (pOutputTy->isFPOrFPVectorTy())
         {
-            LLPC_ASSERT(bitWidth == 16);
+            assert(bitWidth == 16);
             Type* pCastTy = m_pBuilder->getInt16Ty();
             if (pOutputTy->isVectorTy())
             {
@@ -3988,7 +3988,7 @@ void NggPrimShader::ExportGsOutput(
     }
     else
     {
-        LLPC_ASSERT((bitWidth == 32) || (bitWidth == 64));
+        assert((bitWidth == 32) || (bitWidth == 64));
     }
 
     // gsVsRingOffset = threadIdInSubgroup * gsVsRingItemSize +
@@ -4027,7 +4027,7 @@ Value* NggPrimShader::ImportGsOutput(
     if (pResUsage->inOutUsage.gs.rasterStream != streamId)
     {
         // NOTE: Only import those outputs that belong to the rasterization stream.
-        LLPC_ASSERT(pResUsage->inOutUsage.enableXfb == false); // Transform feedback must be disabled
+        assert(pResUsage->inOutUsage.enableXfb == false); // Transform feedback must be disabled
         return UndefValue::get(pOutputTy);
     }
 
@@ -4036,7 +4036,7 @@ Value* NggPrimShader::ImportGsOutput(
     if (pOutputTy->isArrayTy())
     {
         auto pOutputElemTy = pOutputTy->getArrayElementType();
-        LLPC_ASSERT(pOutputElemTy->isSingleValueType());
+        assert(pOutputElemTy->isSingleValueType());
 
         // [n x Ty] -> <n x Ty>
         const uint32_t elemCount = pOutputTy->getArrayNumElements();
@@ -4052,7 +4052,7 @@ Value* NggPrimShader::ImportGsOutput(
 
     if (pOrigOutputTy != pOutputTy)
     {
-        LLPC_ASSERT(pOrigOutputTy->isArrayTy() && pOutputTy->isVectorTy() &&
+        assert(pOrigOutputTy->isArrayTy() && pOutputTy->isVectorTy() &&
                     (pOrigOutputTy->getArrayNumElements() == pOutputTy->getVectorNumElements()));
 
         // <n x Ty> -> [n x Ty]
@@ -4134,7 +4134,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
     Module*     pModule,    // [in] LLVM module
     uint32_t    streamId)   // ID of output vertex stream
 {
-    LLPC_ASSERT(m_hasGs);
+    assert(m_hasGs);
 
     //
     // The processing is something like this:
@@ -4210,7 +4210,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
         outVertsPerPrim = 3;
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
     auto pOutVertsPerPrim = m_pBuilder->getInt32(outVertsPerPrim);
@@ -4309,7 +4309,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
             }
             else
             {
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
             }
 
             const uint32_t maxOutPrims = pResUsage->inOutUsage.gs.calcFactor.primAmpFactor;
@@ -4375,7 +4375,7 @@ Function* NggPrimShader::CreateGsCutHandler(
     Module*     pModule,    // [in] LLVM module
     uint32_t    streamId)   // ID of output vertex stream
 {
-    LLPC_ASSERT(m_hasGs);
+    assert(m_hasGs);
 
     //
     // The processing is something like this:
@@ -4449,7 +4449,7 @@ Function* NggPrimShader::CreateGsCutHandler(
         outVertsPerPrim = 3;
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
     auto pOutVertsPerPrim = m_pBuilder->getInt32(outVertsPerPrim);
@@ -4582,7 +4582,7 @@ void NggPrimShader::ReviseOutputPrimitiveData(
         outVertsPerPrim = 3;
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -4645,7 +4645,7 @@ void NggPrimShader::ReviseOutputPrimitiveData(
     }
     else
     {
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
     }
 
     auto pIsNullPrim = m_pBuilder->CreateICmpEQ(pPrimData, m_pBuilder->getInt32(NullPrim));
@@ -4714,7 +4714,7 @@ Value* NggPrimShader::DoBackfaceCulling(
     Value*      pVertex1,       // [in] Position data of vertex1
     Value*      pVertex2)       // [in] Position data of vertex2
 {
-    LLPC_ASSERT(m_pNggControl->enableBackfaceCulling);
+    assert(m_pNggControl->enableBackfaceCulling);
 
     auto pBackfaceCuller = pModule->getFunction(LlpcName::NggCullingBackface);
     if (pBackfaceCuller == nullptr)
@@ -4770,7 +4770,7 @@ Value* NggPrimShader::DoFrustumCulling(
     Value*      pVertex1,       // [in] Position data of vertex1
     Value*      pVertex2)       // [in] Position data of vertex2
 {
-    LLPC_ASSERT(m_pNggControl->enableFrustumCulling);
+    assert(m_pNggControl->enableFrustumCulling);
 
     auto pFrustumCuller = pModule->getFunction(LlpcName::NggCullingFrustum);
     if (pFrustumCuller == nullptr)
@@ -4825,7 +4825,7 @@ Value* NggPrimShader::DoBoxFilterCulling(
     Value*      pVertex1,       // [in] Position data of vertex1
     Value*      pVertex2)       // [in] Position data of vertex2
 {
-    LLPC_ASSERT(m_pNggControl->enableBoxFilterCulling);
+    assert(m_pNggControl->enableBoxFilterCulling);
 
     auto pBoxFilterCuller = pModule->getFunction(LlpcName::NggCullingBoxFilter);
     if (pBoxFilterCuller == nullptr)
@@ -4884,7 +4884,7 @@ Value* NggPrimShader::DoSphereCulling(
     Value*      pVertex1,       // [in] Position data of vertex1
     Value*      pVertex2)       // [in] Position data of vertex2
 {
-    LLPC_ASSERT(m_pNggControl->enableSphereCulling);
+    assert(m_pNggControl->enableSphereCulling);
 
     auto pSphereCuller = pModule->getFunction(LlpcName::NggCullingSphere);
     if (pSphereCuller == nullptr)
@@ -4943,7 +4943,7 @@ Value* NggPrimShader::DoSmallPrimFilterCulling(
     Value*      pVertex1,       // [in] Position data of vertex1
     Value*      pVertex2)       // [in] Position data of vertex2
 {
-    LLPC_ASSERT(m_pNggControl->enableSmallPrimFilter);
+    assert(m_pNggControl->enableSmallPrimFilter);
 
     auto pSmallPrimFilterCuller = pModule->getFunction(LlpcName::NggCullingSmallPrimFilter);
     if (pSmallPrimFilterCuller == nullptr)
@@ -4988,7 +4988,7 @@ Value* NggPrimShader::DoCullDistanceCulling(
     Value*      pSignMask1,     // [in] Sign mask of cull distance of vertex1
     Value*      pSignMask2)     // [in] Sign mask of cull distance of vertex2
 {
-    LLPC_ASSERT(m_pNggControl->enableCullDistanceCulling);
+    assert(m_pNggControl->enableCullDistanceCulling);
 
     auto pCullDistanceCuller = pModule->getFunction(LlpcName::NggCullingCullDistance);
     if (pCullDistanceCuller == nullptr)
@@ -6664,10 +6664,10 @@ Function* NggPrimShader::CreateFetchCullingRegister(
 Value* NggPrimShader::DoSubgroupBallot(
     Value* pValue) // [in] The value to do the ballot on.
 {
-    LLPC_ASSERT(pValue->getType()->isIntegerTy(1)); // Should be i1
+    assert(pValue->getType()->isIntegerTy(1)); // Should be i1
 
     const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
-    LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
+    assert((waveSize == 32) || (waveSize == 64));
 
     pValue = m_pBuilder->CreateSelect(pValue, m_pBuilder->getInt32(1), m_pBuilder->getInt32(0));
 
@@ -6701,10 +6701,10 @@ Value* NggPrimShader::DoSubgroupInclusiveAdd(
     Value*   pValue,        // [in] The value to do the inclusive-add on
     Value**  ppWwmResult)   // [out] Result in WWM section (optinal)
 {
-    LLPC_ASSERT(pValue->getType()->isIntegerTy(32)); // Should be i32
+    assert(pValue->getType()->isIntegerTy(32)); // Should be i32
 
     const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
-    LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
+    assert((waveSize == 32) || (waveSize == 64));
 
     auto pInlineAsmTy = FunctionType::get(m_pBuilder->getInt32Ty(), m_pBuilder->getInt32Ty(), false);
     auto pInlineAsm = InlineAsm::get(pInlineAsmTy, "; %1", "=v,0", true);

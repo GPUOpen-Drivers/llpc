@@ -240,7 +240,7 @@ class LlpcDiagnosticHandler : public llvm::DiagnosticHandler
                 outs().flush();
             }
         }
-        LLPC_ASSERT(diagInfo.getSeverity() != DS_Error);
+        assert(diagInfo.getSeverity() != DS_Error);
         return true;
     }
 };
@@ -289,7 +289,7 @@ Result VKAPI_CALL ICompiler::Create(
             {
                 LLPC_ERRS("Incompatible compiler options cross compiler instances!");
                 result = Result::ErrorInvalidValue;
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
             }
         }
     }
@@ -310,7 +310,7 @@ Result VKAPI_CALL ICompiler::Create(
     {
         s_optionHash = optionHash;
         *ppCompiler = new Compiler(gfxIp, optionCount, options, s_optionHash);
-        LLPC_ASSERT(*ppCompiler != nullptr);
+        assert(*ppCompiler != nullptr);
     }
     else
     {
@@ -376,7 +376,7 @@ Compiler::Compiler(
 #ifdef WIN_OS
         auxCreateInfo.pCacheFilePath  = getenv("LOCALAPPDATA");
 #else
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
 #endif
     }
 
@@ -1086,7 +1086,7 @@ Result Compiler::BuildPipelineInternal(
 
                 MetroHash::Hash entryNameHash = {};
 
-                LLPC_ASSERT(pShaderInfo->pEntryTarget != nullptr);
+                assert(pShaderInfo->pEntryTarget != nullptr);
                 MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->pEntryTarget),
                                   strlen(pShaderInfo->pEntryTarget),
                                   entryNameHash.bytes);
@@ -1368,8 +1368,8 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
             ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
             // Load ELF binary
             auto result = writer.ReadFromBuffer(nonFragmentPipelineElf.pCode, nonFragmentPipelineElf.codeSize);
-            LLPC_ASSERT(result == Result::Success);
-            LLPC_UNUSED(result);
+            assert(result == Result::Success);
+            (void(result)); // unused
             writer.MergeElfBinary(m_pContext, &m_fragmentElf, pPipelineElf);
 
             pipelineElf.codeSize = pPipelineElf->size();
@@ -1396,8 +1396,8 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
             ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
             // Load ELF binary
             auto result = writer.ReadFromBuffer(m_nonFragmentElf.pCode, m_nonFragmentElf.codeSize);
-            LLPC_ASSERT(result == Result::Success);
-            LLPC_UNUSED(result);
+            assert(result == Result::Success);
+            (void(result)); // unused
 
             writer.MergeElfBinary(m_pContext, &fragmentPipelineElf, pPipelineElf);
 
@@ -1416,8 +1416,8 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
         ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
         // Load ELF binary
         auto result = writer.ReadFromBuffer(m_nonFragmentElf.pCode, m_nonFragmentElf.codeSize);
-        LLPC_ASSERT(result == Result::Success);
-        LLPC_UNUSED(result);
+        assert(result == Result::Success);
+        (void(result)); // unused
         writer.MergeElfBinary(m_pContext, &m_fragmentElf, pPipelineElf);
     }
 
@@ -1945,7 +1945,7 @@ Context* Compiler::AcquireContext() const
         m_pContextPool->push_back(pFreeContext);
     }
 
-    LLPC_ASSERT(pFreeContext != nullptr);
+    assert(pFreeContext != nullptr);
     return pFreeContext;
 }
 
@@ -2054,7 +2054,7 @@ void Compiler::UpdateShaderCache(
 
     if (insert)
     {
-        LLPC_ASSERT(pElfBin->codeSize > 0);
+        assert(pElfBin->codeSize > 0);
         pShaderCache->InsertShader(hEntry, pElfBin->pCode, pElfBin->codeSize);
     }
     else
@@ -2143,9 +2143,9 @@ void Compiler::LinkRelocatableShaderElf(
     ElfPackage* pPipelineElf,  // [out] Elf package containing the pipeline elf
     Context* pContext)         // [in]  Acquired context
 {
-    LLPC_ASSERT(pShaderElfs[ShaderStageTessControl].empty() && "Cannot link tessellation shaders yet.");
-    LLPC_ASSERT(pShaderElfs[ShaderStageTessEval].empty() && "Cannot link tessellation shaders yet.");
-    LLPC_ASSERT(pShaderElfs[ShaderStageGeometry].empty() && "Cannot link geometry shaders yet.");
+    assert(pShaderElfs[ShaderStageTessControl].empty() && "Cannot link tessellation shaders yet.");
+    assert(pShaderElfs[ShaderStageTessEval].empty() && "Cannot link tessellation shaders yet.");
+    assert(pShaderElfs[ShaderStageGeometry].empty() && "Cannot link geometry shaders yet.");
 
     Result result = Result::Success;
     ElfWriter<Elf64> writer(m_gfxIp);

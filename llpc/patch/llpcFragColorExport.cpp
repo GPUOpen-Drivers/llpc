@@ -195,7 +195,7 @@ Value* FragColorExport::Run(
                 needPack = true;
 
                 // Cast i8 to float16
-                LLPC_ASSERT(pCompTy->isIntegerTy());
+                assert(pCompTy->isIntegerTy());
                 for (uint32_t i = 0; i < compCount; ++i)
                 {
                     if (signedness)
@@ -293,7 +293,7 @@ Value* FragColorExport::Run(
                 comps[i] = ConvertToFloat(comps[i], signedness, pInsertPos);
             }
 
-            LLPC_ASSERT(compCount <= 4);
+            assert(compCount <= 4);
             // Make even number of components;
             if ((compCount % 2) != 0)
             {
@@ -345,7 +345,7 @@ Value* FragColorExport::Run(
                 comps[i] = ConvertToInt(comps[i], signedness, pInsertPos);
             }
 
-            LLPC_ASSERT(compCount <= 4);
+            assert(compCount <= 4);
             // Make even number of components;
             if ((compCount % 2) != 0)
             {
@@ -386,7 +386,7 @@ Value* FragColorExport::Run(
         }
     default:
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
     }
@@ -751,12 +751,12 @@ Value* FragColorExport::ConvertToFloat(
     ) const
 {
     Type* pValueTy = pValue->getType();
-    LLPC_ASSERT(pValueTy->isFloatingPointTy() || pValueTy->isIntegerTy()); // Should be floating-point/integer scalar
+    assert(pValueTy->isFloatingPointTy() || pValueTy->isIntegerTy()); // Should be floating-point/integer scalar
 
     const uint32_t bitWidth = pValueTy->getScalarSizeInBits();
     if (bitWidth == 8)
     {
-        LLPC_ASSERT(pValueTy->isIntegerTy());
+        assert(pValueTy->isIntegerTy());
         if (signedness)
         {
             // %value = sext i8 %value to i32
@@ -797,7 +797,7 @@ Value* FragColorExport::ConvertToFloat(
     }
     else
     {
-        LLPC_ASSERT(bitWidth == 32); // The valid bit width is 16 or 32
+        assert(bitWidth == 32); // The valid bit width is 16 or 32
         if (pValueTy->isIntegerTy())
         {
             // %value = bitcast i32 %value to float
@@ -818,12 +818,12 @@ Value* FragColorExport::ConvertToInt(
     ) const
 {
     Type* pValueTy = pValue->getType();
-    LLPC_ASSERT(pValueTy->isFloatingPointTy() || pValueTy->isIntegerTy()); // Should be floating-point/integer scalar
+    assert(pValueTy->isFloatingPointTy() || pValueTy->isIntegerTy()); // Should be floating-point/integer scalar
 
     const uint32_t bitWidth = pValueTy->getScalarSizeInBits();
     if (bitWidth == 8)
     {
-        LLPC_ASSERT(pValueTy->isIntegerTy());
+        assert(pValueTy->isIntegerTy());
 
         if (signedness)
         {
@@ -857,7 +857,7 @@ Value* FragColorExport::ConvertToInt(
     }
     else
     {
-        LLPC_ASSERT(bitWidth == 32); // The valid bit width is 16 or 32
+        assert(bitWidth == 32); // The valid bit width is 16 or 32
         if (pValueTy->isFloatingPointTy())
         {
             // %value = bitcast float %value to i32

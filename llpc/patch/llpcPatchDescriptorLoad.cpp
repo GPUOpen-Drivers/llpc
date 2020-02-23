@@ -164,7 +164,7 @@ void PatchDescriptorLoad::ProcessLoadDescFromPtr(
         pLoadPtr = cast<CallInst>(pLoadPtr->getOperand(0));
     }
 
-    LLPC_ASSERT(pLoadPtr->getCalledFunction()->getName().startswith(LlpcName::DescriptorGetPtrPrefix));
+    assert(pLoadPtr->getCalledFunction()->getName().startswith(LlpcName::DescriptorGetPtrPrefix));
 
     uint32_t descSet = cast<ConstantInt>(pLoadPtr->getOperand(0))->getZExtValue();
     uint32_t binding = cast<ConstantInt>(pLoadPtr->getOperand(1))->getZExtValue();
@@ -220,7 +220,7 @@ void PatchDescriptorLoad::visitCallInst(
     }
 
     // Descriptor loading should be inlined and stay in shader entry-point
-    LLPC_ASSERT(callInst.getParent()->getParent() == m_pEntryPoint);
+    assert(callInst.getParent()->getParent() == m_pEntryPoint);
 
     m_changed = true;
 
@@ -304,10 +304,10 @@ Value* PatchDescriptorLoad::LoadDescriptor(
     }
     else
     {
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
     }
 
-    LLPC_ASSERT(nodeType1 != ResourceMappingNodeType::Unknown);
+    assert(nodeType1 != ResourceMappingNodeType::Unknown);
 
     // Calculate descriptor offset (in bytes)
     uint32_t descOffset = 0;
@@ -411,7 +411,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
             }
             else
             {
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
             }
         }
         else if (nodeType1 == ResourceMappingNodeType::PushConst)
@@ -464,7 +464,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
                 sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
                 sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
                 sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
-                LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
+                assert(sqBufRsrcWord3.u32All == 0x24FAC);
 
                 Value* pDescElem1 = ExtractElementInst::Create(pDescTableAddr,
                     ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
@@ -553,7 +553,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
 
             if (foundNodeType == ResourceMappingNodeType::DescriptorBufferCompact)
             {
-                LLPC_ASSERT(descSizeInDword == DescriptorSizeBufferCompact / sizeof(uint32_t));
+                assert(descSizeInDword == DescriptorSizeBufferCompact / sizeof(uint32_t));
                 pDesc = BuildBufferCompactDesc(pDesc, pInsertPoint);
             }
         }
@@ -661,7 +661,7 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
         sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
         sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
         sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
-        LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
+        assert(sqBufRsrcWord3.u32All == 0x24FAC);
 
         pBufDesc = InsertElementInst::Create(pBufDesc,
                                             ConstantInt::get(Type::getInt32Ty(*m_pContext), sqBufRsrcWord3.u32All),
@@ -679,7 +679,7 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
         sqBufRsrcWord3.gfx10.FORMAT = BUF_FORMAT_32_UINT;
         sqBufRsrcWord3.gfx10.RESOURCE_LEVEL = 1;
         sqBufRsrcWord3.gfx10.OOB_SELECT = 2;
-        LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x21014FAC);
+        assert(sqBufRsrcWord3.u32All == 0x21014FAC);
 
         pBufDesc = InsertElementInst::Create(pBufDesc,
                                             ConstantInt::get(Type::getInt32Ty(*m_pContext), sqBufRsrcWord3.u32All),
@@ -689,7 +689,7 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
     }
     else
     {
-        LLPC_NOT_IMPLEMENTED();
+        llvm_unreachable("Not implemented!");
     }
 
     return pBufDesc;
@@ -769,7 +769,7 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
                 }
                 else
                 {
-                    LLPC_ASSERT(pSetNode->type == ResourceMappingNodeType::DescriptorBufferCompact);
+                    assert(pSetNode->type == ResourceMappingNodeType::DescriptorBufferCompact);
                     *pSize = DescriptorSizeBufferCompact;
                 }
 
@@ -831,7 +831,7 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
                             }
                             else
                             {
-                                LLPC_ASSERT((pNode->type == ResourceMappingNodeType::DescriptorBuffer) ||
+                                assert((pNode->type == ResourceMappingNodeType::DescriptorBuffer) ||
                                              (pNode->type == ResourceMappingNodeType::DescriptorTexelBuffer));
                                 *pOffset = pNode->offsetInDwords * sizeof(uint32_t);
                                 *pSize = DescriptorSizeBuffer;
@@ -859,7 +859,7 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
                             }
                             else
                             {
-                                LLPC_ASSERT(nodeType1 == ResourceMappingNodeType::DescriptorSampler);
+                                assert(nodeType1 == ResourceMappingNodeType::DescriptorSampler);
                                 *pOffset = pNode->offsetInDwords * sizeof(uint32_t) + DescriptorSizeResource;
                                 *pSize   = DescriptorSizeResource + DescriptorSizeSampler;
                             }
@@ -882,7 +882,7 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
                     }
                 default:
                     {
-                        LLPC_NEVER_CALLED();
+                        llvm_unreachable("Should never be called!");
                         break;
                     }
                 }
@@ -892,7 +892,7 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
 
     // TODO: We haven't removed the dead code, so we might load inactive descriptors sometimes.
     // Currently, disable this assert.
-    //LLPC_ASSERT(exist);
+    //assert(exist);
 
     return foundNodeType;
 }

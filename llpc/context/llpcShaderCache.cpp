@@ -188,7 +188,7 @@ Result ShaderCache::Serialize(
     else
     {
         // Do serialize
-        LLPC_ASSERT(m_shaderDataEnd == m_serializedSize || (m_shaderDataEnd == sizeof(ShaderCacheSerializedHeader)));
+        assert(m_shaderDataEnd == m_serializedSize || (m_shaderDataEnd == sizeof(ShaderCacheSerializedHeader)));
 
         if (m_serializedSize >= sizeof(ShaderCacheSerializedHeader))
         {
@@ -209,7 +209,7 @@ Result ShaderCache::Serialize(
                 // and copy their contents to the blob.
                 for (auto it : m_allocationList)
                 {
-                    LLPC_ASSERT(it.first != nullptr);
+                    assert(it.first != nullptr);
 
                     const size_t copySize = it.second;
                     if (VoidPtrDiff(pDataDst, pBlob) + copySize > (*pSize))
@@ -224,7 +224,7 @@ Result ShaderCache::Serialize(
             }
             else
             {
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
                 result = Result::ErrorUnknown;
             }
         }
@@ -240,7 +240,7 @@ Result ShaderCache::Merge(
     const IShaderCache** ppSrcCaches)    // [in] Input shader caches
 {
     // Merge function is supposed to be called by client created shader caches, which are always runtime mode.
-    LLPC_ASSERT(m_fileFullPath[0] == '\0');
+    assert(m_fileFullPath[0] == '\0');
 
     Result result = Result::Success;
 
@@ -403,7 +403,7 @@ Result ShaderCache::BuildFileName(
     // Combine the base path, the sub-path and the file name to get the fully qualified path to the cache file
     length = snprintf(m_fileFullPath, MaxFilePathLen, "%s%s%s", pCacheFilePath, CacheFileSubPath, hashedFileName);
 
-    LLPC_ASSERT(pCacheFileExists != nullptr);
+    assert(pCacheFileExists != nullptr);
     *pCacheFileExists = File::Exists(m_fileFullPath);
     Result result = Result::Success;
     if ((*pCacheFileExists) == false)
@@ -425,8 +425,8 @@ void ShaderCache::ResetCacheFile()
 {
     m_onDiskFile.Close();
     Result fileResult = m_onDiskFile.Open(m_fileFullPath, (FileAccessRead | FileAccessWrite | FileAccessBinary));
-    LLPC_ASSERT(fileResult == Result::Success);
-    LLPC_UNUSED(fileResult);
+    assert(fileResult == Result::Success);
+    (void(fileResult)); // unused
 
     ShaderCacheSerializedHeader header = {};
     header.headerSize    = sizeof(ShaderCacheSerializedHeader);
@@ -460,7 +460,7 @@ ShaderEntryState ShaderCache::FindShader(
     bool             existed   = false;
     ShaderIndex*     pIndex    = nullptr;
     Result           mapResult = Result::Success;
-    LLPC_ASSERT(phEntry != nullptr);
+    assert(phEntry != nullptr);
 
     bool readOnlyLock = (allocateOnMiss == false);
     LockCacheMap(readOnlyLock);
@@ -506,7 +506,7 @@ ShaderEntryState ShaderCache::FindShader(
                 if (extResult == Result::Success)
                 {
                     // An entry was found matching our hash, we should allocate memory to hold the data and call again
-                    LLPC_ASSERT(pIndex->header.size > 0);
+                    assert(pIndex->header.size > 0);
                     pIndex->pDataBlob = GetCacheSpace(pIndex->header.size);
 
                     if (pIndex->pDataBlob == nullptr)
@@ -526,7 +526,7 @@ ShaderEntryState ShaderCache::FindShader(
                     // ShaderIndex. The first item in the data blob is a ShaderHeader, followed by the serialized
                     // data blob for the shader.
                     const auto*const pHeader = static_cast<const ShaderHeader*>(pIndex->pDataBlob);
-                    LLPC_ASSERT(pIndex->header.size == pHeader->size);
+                    assert(pIndex->header.size == pHeader->size);
 
                     pIndex->header = (*pHeader);
                     pIndex->state  = ShaderEntryState::Ready;
@@ -543,7 +543,7 @@ ShaderEntryState ShaderCache::FindShader(
                 {
                     // extResult should never be ErrorInvalidMemorySize since Cache space is always allocated based
                     // on 1st m_pfnGetValueFunc call.
-                    LLPC_ASSERT(extResult != Result::ErrorOutOfMemory);
+                    assert(extResult != Result::ErrorOutOfMemory);
 
                     // Any other result means we just need to continue with initializing the new index/compiling.
                 }
@@ -579,7 +579,7 @@ ShaderEntryState ShaderCache::FindShader(
         if (pIndex->state == ShaderEntryState::Ready)
         {
             // The shader has been compiled, just verify it has valid data and then return success.
-            LLPC_ASSERT((pIndex->pDataBlob != nullptr) && (pIndex->header.size != 0));
+            assert((pIndex->pDataBlob != nullptr) && (pIndex->header.size != 0));
         }
         else if (pIndex->state == ShaderEntryState::New)
         {
@@ -607,8 +607,8 @@ void ShaderCache::InsertShader(
     size_t                   shaderSize)             // size of shader data in bytes
 {
     auto*const pIndex = static_cast<ShaderIndex*>(hEntry);
-    LLPC_ASSERT(m_disableCache == false);
-    LLPC_ASSERT((pIndex != nullptr) && (pIndex->state == ShaderEntryState::Compiling));
+    assert(m_disableCache == false);
+    assert((pIndex != nullptr) && (pIndex->state == ShaderEntryState::Compiling));
 
     LockCacheMap(false);
 
@@ -694,8 +694,8 @@ void ShaderCache::ResetShader(
     CacheEntryHandle         hEntry)                 // [in] Handle of shader cache entry
 {
     auto*const pIndex = static_cast<ShaderIndex*>(hEntry);
-    LLPC_ASSERT(m_disableCache == false);
-    LLPC_ASSERT((pIndex != nullptr) && (pIndex->state == ShaderEntryState::Compiling));
+    assert(m_disableCache == false);
+    assert((pIndex != nullptr) && (pIndex->state == ShaderEntryState::Compiling));
     LockCacheMap(false);
     pIndex->state       = ShaderEntryState::New;
     pIndex->header.size = 0;
@@ -713,9 +713,9 @@ Result ShaderCache::RetrieveShader(
 {
     const auto*const pIndex = static_cast<ShaderIndex*>(hEntry);
 
-    LLPC_ASSERT(m_disableCache == false);
-    LLPC_ASSERT(pIndex != nullptr);
-    LLPC_ASSERT(pIndex->header.size >= sizeof(ShaderHeader));
+    assert(m_disableCache == false);
+    assert(pIndex != nullptr);
+    assert(pIndex->header.size >= sizeof(ShaderHeader));
 
     LockCacheMap(true);
 
@@ -732,7 +732,7 @@ Result ShaderCache::RetrieveShader(
 void ShaderCache::AddShaderToFile(
     const ShaderIndex* pIndex)    // [in] A new shader
 {
-    LLPC_ASSERT(m_onDiskFile.IsOpen());
+    assert(m_onDiskFile.IsOpen());
 
     // We only need to update the parts of the file that changed, which is the number of shaders, the new data section,
     // and the shaderDataEnd.
@@ -764,7 +764,7 @@ void ShaderCache::AddShaderToFile(
 // file has been successfully opened and the file position is the beginning of the file.
 Result ShaderCache::LoadCacheFromFile()
 {
-    LLPC_ASSERT(m_onDiskFile.IsOpen());
+    assert(m_onDiskFile.IsOpen());
 
     // Read the header from the file and validate it
     ShaderCacheSerializedHeader header = {};
@@ -828,7 +828,7 @@ Result ShaderCache::LoadCacheFromBlob(
     size_t      initialDataSize)    // Size of initial data
 {
     const auto* pHeader = static_cast<const ShaderCacheSerializedHeader*>(pInitialData);
-    LLPC_ASSERT(pInitialData != nullptr);
+    assert(pInitialData != nullptr);
 
     // First verify that the header data is valid
     Result result = ValidateAndLoadHeader(pHeader, initialDataSize);
@@ -871,7 +871,7 @@ Result ShaderCache::PopulateIndexMap(
     for (uint32_t shader = 0; ((shader < m_totalShaders) && (result == Result::Success)); ++shader)
     {
         // Guard against buffer overruns.
-        LLPC_ASSERT(VoidPtrDiff(pHeader, pDataStart) <= dataSize);
+        assert(VoidPtrDiff(pHeader, pDataStart) <= dataSize);
 
         // TODO: Add a static function to RelocatableShader to validate the input data.
 
@@ -929,7 +929,7 @@ Result ShaderCache::ValidateAndLoadHeader(
     const ShaderCacheSerializedHeader* pHeader,            // [in] Cache file header
     size_t                             dataSourceSize)     // Data size in byte
 {
-    LLPC_ASSERT(pHeader != nullptr);
+    assert(pHeader != nullptr);
 
     BuildUniqueId buildId;
     GetBuildTime(&buildId);

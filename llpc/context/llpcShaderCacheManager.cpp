@@ -100,7 +100,7 @@ void ShaderCacheManager::ReleaseShaderCacheObject(
         }
     }
 
-    LLPC_ASSERT(cacheIt != endIt);
+    assert(cacheIt != endIt);
 
     shaderCachePtr.reset();
 }

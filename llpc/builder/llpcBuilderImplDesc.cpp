@@ -51,7 +51,7 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
     Type* const   pPointeeTy,       // [in] Type that the returned pointer should point to.
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    LLPC_ASSERT(pPointeeTy != nullptr);
+    assert(pPointeeTy != nullptr);
 
     Instruction* const pInsertPos = &*GetInsertPoint();
     pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
@@ -280,7 +280,7 @@ Value* BuilderImplDesc::CreateLoadPushConstantsPtr(
     // Remember the size of push constants.
     uint32_t pushConstSize = GetInsertPoint()->getModule()->getDataLayout().getTypeStoreSize(pPushConstantsTy);
     ResourceUsage* pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
-    LLPC_ASSERT((pResUsage->pushConstSizeInBytes == 0) || (pResUsage->pushConstSizeInBytes == pushConstSize));
+    assert((pResUsage->pushConstSizeInBytes == 0) || (pResUsage->pushConstSizeInBytes == pushConstSize));
     pResUsage->pushConstSizeInBytes = pushConstSize;
 
     auto pPushConstantsPtrTy = PointerType::get(pPushConstantsTy, ADDR_SPACE_CONST);
@@ -299,7 +299,7 @@ Value* BuilderImplDesc::ScalarizeIfUniform(
     Value*  pValue,       // [in] 32-bit integer value to scalarize
     bool    isNonUniform) // Whether value is marked as non-uniform
 {
-    LLPC_ASSERT(pValue->getType()->isIntegerTy(32));
+    assert(pValue->getType()->isIntegerTy(32));
     if ((isNonUniform == false) && (isa<Constant>(pValue) == false))
     {
         // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.

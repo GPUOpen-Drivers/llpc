@@ -101,7 +101,7 @@ const PipelineShaderInfo* GraphicsContext::GetPipelineShaderInfo(
         shaderStage = ShaderStageGeometry;
     }
 
-    LLPC_ASSERT(shaderStage < ShaderStageGfxCount);
+    assert(shaderStage < ShaderStageGfxCount);
 
     const PipelineShaderInfo* pShaderInfo = nullptr;
     switch (shaderStage)
@@ -122,7 +122,7 @@ const PipelineShaderInfo* GraphicsContext::GetPipelineShaderInfo(
         pShaderInfo = &m_pPipelineInfo->fs;
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -204,11 +204,11 @@ void GraphicsContext::DoUserDataNodeMerge()
                 {
                     break;
                 }
-                LLPC_ASSERT((rangeValues[0].type == rangeValues[duplicateCount].type) &&
+                assert((rangeValues[0].type == rangeValues[duplicateCount].type) &&
                             "Descriptor range value merge conflict: type");
-                LLPC_ASSERT((rangeValues[0].arraySize == rangeValues[duplicateCount].arraySize) &&
+                assert((rangeValues[0].arraySize == rangeValues[duplicateCount].arraySize) &&
                             "Descriptor range value merge conflict: arraySize");
-                LLPC_ASSERT((memcmp(rangeValues[0].pValue,
+                assert((memcmp(rangeValues[0].pValue,
                                     rangeValues[duplicateCount].pValue,
                                     rangeValues[0].arraySize * sizeof(uint32_t)) == 0) &&
                             "Descriptor range value merge conflict: value");
@@ -265,16 +265,16 @@ ArrayRef<ResourceMappingNode> GraphicsContext::MergeUserDataNodeTable(
             {
                 break;
             }
-            LLPC_ASSERT((nodes[0].type == nodes[duplicatesCount].type) && "User data merge conflict: type");
-            LLPC_ASSERT((nodes[0].sizeInDwords == nodes[duplicatesCount].sizeInDwords) &&
+            assert((nodes[0].type == nodes[duplicatesCount].type) && "User data merge conflict: type");
+            assert((nodes[0].sizeInDwords == nodes[duplicatesCount].sizeInDwords) &&
                         "User data merge conflict: size");
-            LLPC_ASSERT((nodes[0].type != ResourceMappingNodeType::IndirectUserDataVaPtr) &&
+            assert((nodes[0].type != ResourceMappingNodeType::IndirectUserDataVaPtr) &&
                         "User data merge conflict: only one shader stage expected to have vertex buffer");
-            LLPC_ASSERT((nodes[0].type != ResourceMappingNodeType::StreamOutTableVaPtr) &&
+            assert((nodes[0].type != ResourceMappingNodeType::StreamOutTableVaPtr) &&
                         "User data merge conflict: only one shader stage expected to have stream out");
             if (nodes[0].type != ResourceMappingNodeType::DescriptorTableVaPtr)
             {
-                LLPC_ASSERT((nodes[0].srdRange.set == nodes[duplicatesCount].srdRange.set) &&
+                assert((nodes[0].srdRange.set == nodes[duplicatesCount].srdRange.set) &&
                             (nodes[0].srdRange.binding == nodes[duplicatesCount].srdRange.binding) &&
                             "User data merge conflict: set or binding");
             }

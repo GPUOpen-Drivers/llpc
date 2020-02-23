@@ -870,7 +870,7 @@ static const Intrinsic::ID ImageAtomicIntrinsicTable[][8] =
 static Type* ConvertToFloatingPointType(
     Type* pOrigTy)    // Original type
 {
-    LLPC_ASSERT(pOrigTy->isIntOrIntVectorTy());
+    assert(pOrigTy->isIntOrIntVectorTy());
     Type* pNewTy = pOrigTy;
     switch (pNewTy->getScalarType()->getIntegerBitWidth())
     {
@@ -881,7 +881,7 @@ static Type* ConvertToFloatingPointType(
         pNewTy = Type::getFloatTy(pNewTy->getContext());
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
     }
     if (isa<VectorType>(pOrigTy))
     {
@@ -902,7 +902,7 @@ Value* BuilderImplImage::CreateImageLoad(
     const Twine&      instName)           // [in] Name to give instruction(s)
 {
     GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->resourceRead = true;
-    LLPC_ASSERT(pCoord->getType()->getScalarType()->isIntegerTy(32));
+    assert(pCoord->getType()->getScalarType()->isIntegerTy(32));
     pImageDesc = PatchCubeDescriptor(pImageDesc, dim);
     pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
 
@@ -1066,7 +1066,7 @@ Value* BuilderImplImage::CreateImageLoadWithFmask(
         fmaskDim = Dim3D;
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
     Value* pFmaskTexel = CreateImageLoad(VectorType::get(getInt32Ty(), 4),
@@ -1112,7 +1112,7 @@ Value* BuilderImplImage::CreateImageStore(
     const Twine&      instName)           // [in] Name to give instruction(s)
 {
     GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
-    LLPC_ASSERT(pCoord->getType()->getScalarType()->isIntegerTy(32));
+    assert(pCoord->getType()->getScalarType()->isIntegerTy(32));
     pImageDesc = PatchCubeDescriptor(pImageDesc, dim);
     pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
 
@@ -1234,7 +1234,7 @@ Value* BuilderImplImage::CreateImageSample(
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
     Value* pCoord = address[ImageAddressIdxCoordinate];
-    LLPC_ASSERT((pCoord->getType()->getScalarType()->isFloatTy()) ||
+    assert((pCoord->getType()->getScalarType()->isFloatTy()) ||
                 (pCoord->getType()->getScalarType()->isHalfTy()));
 
     // Check whether the sampler desc contains with constant value
@@ -1275,7 +1275,7 @@ Value* BuilderImplImage::CreateImageGather(
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
     Value* pCoord = address[ImageAddressIdxCoordinate];
-    LLPC_ASSERT((pCoord->getType()->getScalarType()->isFloatTy()) ||
+    assert((pCoord->getType()->getScalarType()->isFloatTy()) ||
                 (pCoord->getType()->getScalarType()->isHalfTy()));
 
     // Check whether we are being asked for integer texel component type.
@@ -1652,7 +1652,7 @@ Value* BuilderImplImage::CreateImageSampleGather(
     auto pTable = isSample ? &ImageSampleIntrinsicTable[0] : &ImageGather4IntrinsicTable[0];
     for (;; ++pTable)
     {
-        LLPC_ASSERT((pTable->matchMask != 0) && "Image sample/gather intrinsic ID not found");
+        assert((pTable->matchMask != 0) && "Image sample/gather intrinsic ID not found");
         if (pTable->matchMask == addressMask)
         {
             break;
@@ -1744,7 +1744,7 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
     GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
-    LLPC_ASSERT(pCoord->getType()->getScalarType()->isIntegerTy(32));
+    assert(pCoord->getType()->getScalarType()->isIntegerTy(32));
     pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
 
     switch (ordering)
@@ -1971,7 +1971,7 @@ Value* BuilderImplImage::CreateImageGetLod(
     case Dim2DArray: dim = Dim2D; break;
     case DimCubeArray: dim = DimCube; break;
     default:
-        LLPC_ASSERT(dim <= DimCube);
+        assert(dim <= DimCube);
         break;
     }
 
@@ -2059,12 +2059,12 @@ uint32_t BuilderImplImage::PrepareCoordinate(
     if (pCoordTy == pCoordScalarTy)
     {
         // Push the single component.
-        LLPC_ASSERT(GetImageNumCoords(dim) == 1);
+        assert(GetImageNumCoords(dim) == 1);
         outCoords.push_back(pCoord);
     }
     else
     {
-        LLPC_ASSERT(GetImageNumCoords(dim) == pCoordTy->getVectorNumElements());
+        assert(GetImageNumCoords(dim) == pCoordTy->getVectorNumElements());
 
         // Push the components.
         for (uint32_t i = 0; i != GetImageNumCoords(dim); ++i)
@@ -2111,7 +2111,7 @@ uint32_t BuilderImplImage::PrepareCoordinate(
     if (pCoordScalarTy->isIntegerTy())
     {
         // Integer components (image load/store/atomic).
-        LLPC_ASSERT((pDerivativeX == nullptr) && (pDerivativeY == nullptr));
+        assert((pDerivativeX == nullptr) && (pDerivativeY == nullptr));
 
         if (dim == DimCubeArray)
         {
@@ -2488,7 +2488,7 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
             builtInUsage.fs.viewIndex = true;
             break;
         default:
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
 

@@ -66,8 +66,8 @@ void ShaderSystemValues::Initialize(
         m_pContext = &pEntryPoint->getParent()->getContext();
         m_pPipelineState = pPipelineState;
 
-        LLPC_ASSERT(m_shaderStage != ShaderStageInvalid);
-        LLPC_ASSERT(m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.initialized);
+        assert(m_shaderStage != ShaderStageInvalid);
+        assert(m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.initialized);
     }
 }
 
@@ -88,7 +88,7 @@ Value* ShaderSystemValues::GetEsGsRingBufDesc()
             tableOffset = SI_DRV_TABLE_GS_RING_IN_OFFS;
             break;
         default:
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
 
@@ -108,7 +108,7 @@ Value* ShaderSystemValues::GetEsGsRingBufDesc()
 // Get the descriptor for tessellation factor (TF) buffer (TCS output)
 Value* ShaderSystemValues::GetTessFactorBufDesc()
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+    assert(m_shaderStage == ShaderStageTessControl);
     if (m_pTfBufDesc == nullptr)
     {
         BuilderBase builder(&*m_pEntryPoint->front().getFirstInsertionPt());
@@ -121,7 +121,7 @@ Value* ShaderSystemValues::GetTessFactorBufDesc()
 // Extract value of primitive ID (TCS)
 Value* ShaderSystemValues::GetPrimitiveId()
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+    assert(m_shaderStage == ShaderStageTessControl);
     if (m_pPrimitiveId == nullptr)
     {
         auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
@@ -134,7 +134,7 @@ Value* ShaderSystemValues::GetPrimitiveId()
 // Get invocation ID (TCS)
 Value* ShaderSystemValues::GetInvocationId()
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+    assert(m_shaderStage == ShaderStageTessControl);
     if (m_pInvocationId == nullptr)
     {
         auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
@@ -160,7 +160,7 @@ Value* ShaderSystemValues::GetInvocationId()
 // Get relative patchId (TCS)
 Value* ShaderSystemValues::GetRelativeId()
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+    assert(m_shaderStage == ShaderStageTessControl);
     if (m_pRelativeId == nullptr)
     {
         auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
@@ -180,7 +180,7 @@ Value* ShaderSystemValues::GetRelativeId()
 // Get offchip LDS descriptor (TCS and TES)
 Value* ShaderSystemValues::GetOffChipLdsDesc()
 {
-    LLPC_ASSERT((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval));
+    assert((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval));
     if (m_pOffChipLdsDesc == nullptr)
     {
         BuilderBase builder(&*m_pEntryPoint->front().getFirstInsertionPt());
@@ -193,7 +193,7 @@ Value* ShaderSystemValues::GetOffChipLdsDesc()
 // Get tessellated coordinate (TES)
 Value* ShaderSystemValues::GetTessCoord()
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageTessEval);
+    assert(m_shaderStage == ShaderStageTessEval);
     if (m_pTessCoord == nullptr)
     {
         auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
@@ -236,7 +236,7 @@ Value* ShaderSystemValues::GetTessCoord()
 // Get ES -> GS offsets (GS in)
 Value* ShaderSystemValues::GetEsGsOffsets()
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
+    assert(m_shaderStage == ShaderStageGeometry);
     if (m_pEsGsOffsets == nullptr)
     {
         auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
@@ -263,7 +263,7 @@ Value* ShaderSystemValues::GetEsGsOffsets()
 Value* ShaderSystemValues::GetGsVsRingBufDesc(
     uint32_t streamId)  // Stream ID, always 0 for copy shader
 {
-    LLPC_ASSERT((m_shaderStage == ShaderStageGeometry) || (m_shaderStage == ShaderStageCopyShader));
+    assert((m_shaderStage == ShaderStageGeometry) || (m_shaderStage == ShaderStageCopyShader));
     if (m_gsVsRingBufDescs.size() <= streamId)
     {
         m_gsVsRingBufDescs.resize(streamId + 1);
@@ -325,7 +325,7 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
         else
         {
             // Copy shader, using GS-VS ring for input.
-            LLPC_ASSERT(streamId == 0);
+            assert(streamId == 0);
             m_gsVsRingBufDescs[streamId] = LoadDescFromDriverTable(SI_DRV_TABLE_VS_RING_IN_OFFS, builder);
         }
     }
@@ -336,7 +336,7 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
 // Get pointers to emit counters (GS)
 ArrayRef<Value*> ShaderSystemValues::GetEmitCounterPtr()
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
+    assert(m_shaderStage == ShaderStageGeometry);
     if (m_emitCounterPtrs.empty())
     {
         // TODO: We should only insert those offsets required by the specified input primitive.
@@ -508,8 +508,8 @@ Value* ShaderSystemValues::GetSpilledPushConstTablePtr()
     if (m_pSpilledPushConstTablePtr == nullptr)
     {
         auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
-        LLPC_ASSERT(pIntfData->pushConst.resNodeIdx != InvalidValue);
-        LLPC_ASSERT(pIntfData->entryArgIdxs.spillTable != InvalidValue);
+        assert(pIntfData->pushConst.resNodeIdx != InvalidValue);
+        assert(pIntfData->entryArgIdxs.spillTable != InvalidValue);
 
         Instruction* pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
 
@@ -591,7 +591,7 @@ Value* ShaderSystemValues::GetStreamOutBufDesc(
 // Get stream-out buffer table pointer
 Instruction* ShaderSystemValues::GetStreamOutTablePtr()
 {
-    LLPC_ASSERT((m_shaderStage == ShaderStageVertex) ||
+    assert((m_shaderStage == ShaderStageVertex) ||
                 (m_shaderStage == ShaderStageTessEval) ||
                 (m_shaderStage == ShaderStageCopyShader));
 
@@ -619,7 +619,7 @@ Instruction* ShaderSystemValues::GetStreamOutTablePtr()
                     entryArgIdx = pIntfData->userDataUsage.gs.copyShaderStreamOutTable;
                     break;
                 default:
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                     break;
                 }
             }
@@ -776,7 +776,7 @@ Value* ShaderSystemValues::GetResourceNodeValue(
 
         pResNodeValue = new LoadInst(pResNodePtr, "", pInsertPos);
     }
-    LLPC_ASSERT(pResNodeValue != nullptr);
+    assert(pResNodeValue != nullptr);
     return pResNodeValue;
 }
 

@@ -124,14 +124,14 @@ Value* Builder::CreateMapToInt32(
     ArrayRef<Value*>   passthroughArgs) // The arguments to be passed through as is (no massaging).
 {
     // We must have at least one argument to massage.
-    LLPC_ASSERT(mappedArgs.size() > 0);
+    assert(mappedArgs.size() > 0);
 
     Type* const pType = mappedArgs[0]->getType();
 
     // Check the massage types all match.
     for (uint32_t i = 1; i < mappedArgs.size(); i++)
     {
-        LLPC_ASSERT(mappedArgs[i]->getType() == pType);
+        assert(mappedArgs[i]->getType() == pType);
     }
 
     if (mappedArgs[0]->getType()->isVectorTy())
@@ -235,7 +235,7 @@ Value* Builder::CreateMapToInt32(
     }
     else
     {
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         return nullptr;
     }
 }
@@ -246,10 +246,10 @@ Type* Builder::GetTransposedMatrixTy(
     Type* const pMatrixType // [in] The matrix type to get the transposed type from.
     ) const
 {
-    LLPC_ASSERT(pMatrixType->isArrayTy());
+    assert(pMatrixType->isArrayTy());
 
     Type* const pColumnVectorType = pMatrixType->getArrayElementType();
-    LLPC_ASSERT(pColumnVectorType->isVectorTy());
+    assert(pColumnVectorType->isVectorTy());
 
     const uint32_t columnCount = pMatrixType->getArrayNumElements();
     const uint32_t rowCount = pColumnVectorType->getVectorNumElements();
@@ -362,7 +362,7 @@ Type* Builder::GetBuiltInTy(
 #include "llpcBuilderBuiltInDefs.h"
 #undef BUILTIN
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -385,7 +385,7 @@ Type* Builder::GetBuiltInTy(
     case TypeCode::v4i32: return VectorType::get(getInt32Ty(), 4);
     case TypeCode::a4v3f32: return ArrayType::get(VectorType::get(getFloatTy(), 3), 4);
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         return nullptr;
     }
 }
@@ -455,7 +455,7 @@ Constant* Builder::GetOneOverPower2MinusOne(
         bits = 0x3EF0001000100010;
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
     }
     return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, bits)));
 }
