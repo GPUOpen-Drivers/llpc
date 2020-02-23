@@ -43,7 +43,6 @@
 #include "llpcGfx9Chip.h"
 #include "llpcNggLdsManager.h"
 #include "llpcNggPrimShader.h"
-#include "llpcPassDeadFuncRemove.h"
 #include "llpcPassManager.h"
 #include "llpcShaderMerger.h"
 #include "llpcTargetInfo.h"

@@ -148,7 +148,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcEmuLib.cpp                      \
         llpcFile.cpp                        \
         llpcInternal.cpp                    \
-        llpcPassDeadFuncRemove.cpp          \
         llpcPassManager.cpp                 \
         llpcPipelineDumper.cpp              \
         llpcPipelineShaders.cpp             \

@@ -132,7 +132,7 @@ void Patch::AddPasses(
 
     // Function inlining and remove dead functions after it
     passMgr.add(createAlwaysInlinerLegacyPass());
-    passMgr.add(CreatePassDeadFuncRemove());
+    passMgr.add(createGlobalDCEPass());
 
     // Patch input import and output export operations
     passMgr.add(CreatePatchInOutImportExport());
@@ -142,7 +142,7 @@ void Patch::AddPasses(
 
     // Prior to general optimization, do function inlining and dead function removal once again
     passMgr.add(createAlwaysInlinerLegacyPass());
-    passMgr.add(CreatePassDeadFuncRemove());
+    passMgr.add(createGlobalDCEPass());
 
     // Check shader cache
     auto pCheckShaderCachePass = CreatePatchCheckShaderCache();
@@ -195,7 +195,6 @@ void Patch::AddPasses(
 
         // Extra optimizations after NGG primitive shader creation
         passMgr.add(createAlwaysInlinerLegacyPass());
-        passMgr.add(CreatePassDeadFuncRemove());
         passMgr.add(createGlobalDCEPass());
         passMgr.add(createPromoteMemoryToRegisterPass());
         passMgr.add(createAggressiveDCEPass());
