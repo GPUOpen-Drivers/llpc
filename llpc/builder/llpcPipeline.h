@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "llpc.h"
+#include "lgc/Defs.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"

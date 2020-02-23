@@ -7,6 +7,7 @@ LCXXINCS += -I$(LLPC_VULKAN_INCLUDE)
 LCXXINCS += -I$(LLPC_DEPTH)/imported/chip/gfx6
 LCXXINCS += -I$(LLPC_DEPTH)/imported/chip/gfx9
 LCXXINCS += -I$(LLPC_DEPTH)/include
+LCXXINCS += -I$(LLPC_DEPTH)/../include
 LCXXINCS += -I$(LLPC_DEPTH)/patch
 LCXXINCS += -I$(LLPC_DEPTH)/patch/gfx9
 LCXXINCS += -I$(LLPC_DEPTH)/patch/gfx6/chip

@@ -30,10 +30,10 @@
  */
 #pragma once
 
-#include "llpc.h"
 #include "llpcBuilderBase.h"
 #include "llpcBuilderBuiltIns.h"
 
+#include "lgc/Defs.h"
 #include "llvm/Support/AtomicOrdering.h"
 
 namespace Llpc

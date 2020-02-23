@@ -28,7 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::PipelineState.
  ***********************************************************************************************************************
  */
-#include "llpc.h"
 #include "llpcBuilderContext.h"
 #include "llpcBuilderRecorder.h"
 #include "llpcCodeGenManager.h"

@@ -30,8 +30,6 @@
  */
 #pragma once
 
-#include "llpc.h"
-
 #include "llvm/ADT/StringRef.h"
 
 namespace llvm

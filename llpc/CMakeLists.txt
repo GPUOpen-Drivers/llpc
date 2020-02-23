@@ -181,6 +181,7 @@ endif()
 target_include_directories(llpc
     PUBLIC
         ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/../include
     PRIVATE
         ${PROJECT_SOURCE_DIR}/builder
         ${PROJECT_SOURCE_DIR}/context
