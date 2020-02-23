@@ -86,10 +86,6 @@ private:
 
     void AddAbiMetadata(Module& module);
 
-    Result BuildGraphicsPipelineRegConfig(uint8_t** ppConfig, size_t* pConfigSize);
-
-    Result BuildComputePipelineRegConfig(uint8_t** ppConfig, size_t* pConfigSize);
-
     // -----------------------------------------------------------------------------------------------------------------
 
     PipelineState*    m_pPipelineState;      // Pipeline state

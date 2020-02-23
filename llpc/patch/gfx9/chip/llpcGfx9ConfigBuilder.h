@@ -52,17 +52,17 @@ public:
 
     void BuildPalMetadata();
 
-    Result BuildPipelineVsFsRegConfig();
-    Result BuildPipelineVsTsFsRegConfig();
-    Result BuildPipelineVsGsFsRegConfig();
-    Result BuildPipelineVsTsGsFsRegConfig();
+    void BuildPipelineVsFsRegConfig();
+    void BuildPipelineVsTsFsRegConfig();
+    void BuildPipelineVsGsFsRegConfig();
+    void BuildPipelineVsTsGsFsRegConfig();
 
-    Result BuildPipelineNggVsFsRegConfig();
-    Result BuildPipelineNggVsTsFsRegConfig();
-    Result BuildPipelineNggVsGsFsRegConfig();
-    Result BuildPipelineNggVsTsGsFsRegConfig();
+    void BuildPipelineNggVsFsRegConfig();
+    void BuildPipelineNggVsTsFsRegConfig();
+    void BuildPipelineNggVsGsFsRegConfig();
+    void BuildPipelineNggVsTsGsFsRegConfig();
 
-    Result BuildPipelineCsRegConfig();
+    void BuildPipelineCsRegConfig();
 
 private:
     ConfigBuilder() = delete;
@@ -70,32 +70,32 @@ private:
     ConfigBuilder& operator=(const ConfigBuilder&) = delete;
 
     template <typename T>
-    Result BuildVsRegConfig(ShaderStage         shaderStage,
+    void BuildVsRegConfig(ShaderStage         shaderStage,
                             T*                  pConfig);
 
     template <typename T>
-    Result BuildLsHsRegConfig(ShaderStage         shaderStage1,
-                              ShaderStage         shaderStage2,
-                              T*                  pConfig);
-
-    template <typename T>
-    Result BuildEsGsRegConfig(ShaderStage         shaderStage1,
-                              ShaderStage         shaderStage2,
-                              T*                  pConfig);
-
-    template <typename T>
-    Result BuildPrimShaderRegConfig(ShaderStage         shaderStage1,
-                                    ShaderStage         shaderStage2,
-                                    T*                  pConfig);
-
-    template <typename T>
-    Result BuildPsRegConfig(ShaderStage         shaderStage,
+    void BuildLsHsRegConfig(ShaderStage         shaderStage1,
+                            ShaderStage         shaderStage2,
                             T*                  pConfig);
 
-    Result BuildCsRegConfig(ShaderStage shaderStage,
+    template <typename T>
+    void BuildEsGsRegConfig(ShaderStage         shaderStage1,
+                            ShaderStage         shaderStage2,
+                            T*                  pConfig);
+
+    template <typename T>
+    void BuildPrimShaderRegConfig(ShaderStage         shaderStage1,
+                                  ShaderStage         shaderStage2,
+                                  T*                  pConfig);
+
+    template <typename T>
+    void BuildPsRegConfig(ShaderStage         shaderStage,
+                          T*                  pConfig);
+
+    void BuildCsRegConfig(ShaderStage shaderStage,
                             CsRegConfig* pConfig);
 
-    Result BuildUserDataConfig(ShaderStage shaderStage1,
+    void BuildUserDataConfig(ShaderStage shaderStage1,
                                ShaderStage shaderStage2,
                                uint32_t    startUserData);
 

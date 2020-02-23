@@ -62,11 +62,9 @@ namespace Gfx9
 // Builds PAL metadata for pipeline.
 void ConfigBuilder::BuildPalMetadata()
 {
-    Result result = Result::Success;
-
     if (m_pPipelineState->IsGraphics() == false)
     {
-        result = BuildPipelineCsRegConfig();
+        BuildPipelineCsRegConfig();
     }
     else
     {
@@ -78,11 +76,11 @@ void ConfigBuilder::BuildPalMetadata()
             // VS-FS pipeline
             if ((m_gfxIp.major >= 10) && enableNgg)
             {
-                result = BuildPipelineNggVsFsRegConfig();
+                BuildPipelineNggVsFsRegConfig();
             }
             else
             {
-                result = BuildPipelineVsFsRegConfig();
+                BuildPipelineVsFsRegConfig();
             }
         }
         else if (hasTs && (m_hasGs == false))
@@ -90,11 +88,11 @@ void ConfigBuilder::BuildPalMetadata()
             // VS-TS-FS pipeline
             if ((m_gfxIp.major >= 10) && enableNgg)
             {
-                result = BuildPipelineNggVsTsFsRegConfig();
+                BuildPipelineNggVsTsFsRegConfig();
             }
             else
             {
-                result = BuildPipelineVsTsFsRegConfig();
+                BuildPipelineVsTsFsRegConfig();
             }
         }
         else if ((hasTs == false) && m_hasGs)
@@ -102,11 +100,11 @@ void ConfigBuilder::BuildPalMetadata()
             // VS-GS-FS pipeline
             if ((m_gfxIp.major >= 10) && enableNgg)
             {
-                result = BuildPipelineNggVsGsFsRegConfig();
+                BuildPipelineNggVsGsFsRegConfig();
             }
             else
             {
-                result = BuildPipelineVsGsFsRegConfig();
+                BuildPipelineVsGsFsRegConfig();
             }
         }
         else
@@ -114,26 +112,22 @@ void ConfigBuilder::BuildPalMetadata()
             // VS-TS-GS-FS pipeline
             if ((m_gfxIp.major >= 10) && enableNgg)
             {
-                result = BuildPipelineNggVsTsGsFsRegConfig();
+                BuildPipelineNggVsTsGsFsRegConfig();
             }
             else
             {
-                result = BuildPipelineVsTsGsFsRegConfig();
+                BuildPipelineVsTsGsFsRegConfig();
             }
         }
     }
-
-    assert(result == Result::Success);
-    (void(result)); // unused
 
     WritePalMetadata();
 }
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-FS).
-Result ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of register configuration
+void ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of register configuration
 {
-    Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
 
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
@@ -150,7 +144,7 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of registe
 
     if (stageMask & ShaderStageToMask(ShaderStageVertex))
     {
-        result = BuildVsRegConfig<PipelineVsFsRegConfig>(ShaderStageVertex, &config);
+        BuildVsRegConfig<PipelineVsFsRegConfig>(ShaderStageVertex, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
         auto waveFrontSize = m_pPipelineState->GetShaderWaveSize(ShaderStageVertex);
@@ -175,9 +169,9 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of registe
         }
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
-        result = BuildPsRegConfig<PipelineVsFsRegConfig>(ShaderStageFragment, &config);
+        BuildPsRegConfig<PipelineVsFsRegConfig>(ShaderStageFragment, &config);
 
         uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
@@ -210,15 +204,12 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of registe
     }
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-TS-FS).
-Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
+void ConfigBuilder::BuildPipelineVsTsFsRegConfig()
 {
-    Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
 
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
@@ -243,7 +234,7 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
         const bool hasVs  = ((stageMask & ShaderStageToMask(ShaderStageVertex)) != 0);
         const bool hasTcs = ((stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0);
 
-        result = BuildLsHsRegConfig<PipelineVsTsFsRegConfig>(hasVs ? ShaderStageVertex : ShaderStageInvalid,
+        BuildLsHsRegConfig<PipelineVsTsFsRegConfig>(hasVs ? ShaderStageVertex : ShaderStageInvalid,
                                                              hasTcs ? ShaderStageTessControl : ShaderStageInvalid,
                                                              pConfig);
 
@@ -272,9 +263,9 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
 #endif
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageTessEval)))
+    if (stageMask & ShaderStageToMask(ShaderStageTessEval))
     {
-        result = BuildVsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageTessEval, &config);
+        BuildVsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageTessEval, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_DS);
 
@@ -298,9 +289,9 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
         }
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
-        result = BuildPsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageFragment, &config);
+        BuildPsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageFragment, &config);
 
         uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
@@ -336,15 +327,12 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
     }
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-GS-FS).
-Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of register configuration
+void ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of register configuration
 {
-    Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
 
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
@@ -365,7 +353,7 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of regis
         const bool hasVs = ((stageMask & ShaderStageToMask(ShaderStageVertex)) != 0);
         const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
-        result = BuildEsGsRegConfig<PipelineVsGsFsRegConfig>(hasVs ? ShaderStageVertex : ShaderStageInvalid,
+        BuildEsGsRegConfig<PipelineVsGsFsRegConfig>(hasVs ? ShaderStageVertex : ShaderStageInvalid,
                                                              hasGs ? ShaderStageGeometry : ShaderStageInvalid,
                                                              pConfig);
 
@@ -393,9 +381,9 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of regis
 #endif
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
-        result = BuildPsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageFragment, &config);
+        BuildPsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageFragment, &config);
 
         uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
@@ -405,9 +393,9 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of regis
         }
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageCopyShader)))
+    if (stageMask & ShaderStageToMask(ShaderStageCopyShader))
     {
-        result = BuildVsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageCopyShader, &config);
+        BuildVsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageCopyShader, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
 
@@ -440,15 +428,12 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of regis
     }
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-TS-GS-FS).
-Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
+void ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
 {
-    Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
 
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
@@ -471,7 +456,7 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
         const bool hasVs  = ((stageMask & ShaderStageToMask(ShaderStageVertex)) != 0);
         const bool hasTcs = ((stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0);
 
-        result = BuildLsHsRegConfig<PipelineVsTsGsFsRegConfig>(hasVs ? ShaderStageVertex : ShaderStageInvalid,
+        BuildLsHsRegConfig<PipelineVsTsGsFsRegConfig>(hasVs ? ShaderStageVertex : ShaderStageInvalid,
                                                                hasTcs ? ShaderStageTessControl : ShaderStageInvalid,
                                                                pConfig);
 
@@ -507,7 +492,7 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
         const bool hasTes = ((stageMask & ShaderStageToMask(ShaderStageTessEval)) != 0);
         const bool hasGs  = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
-        result = BuildEsGsRegConfig<PipelineVsTsGsFsRegConfig>(hasTes ? ShaderStageTessEval : ShaderStageInvalid,
+        BuildEsGsRegConfig<PipelineVsTsGsFsRegConfig>(hasTes ? ShaderStageTessEval : ShaderStageInvalid,
                                                                hasGs ? ShaderStageGeometry : ShaderStageInvalid,
                                                                pConfig);
 
@@ -536,9 +521,9 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
 #endif
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
-        result = BuildPsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageFragment, &config);
+        BuildPsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageFragment, &config);
 
         uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
@@ -548,9 +533,9 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
         }
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageCopyShader)))
+    if (stageMask & ShaderStageToMask(ShaderStageCopyShader))
     {
-        result = BuildVsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageCopyShader, &config);
+        BuildVsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageCopyShader, &config);
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
 
@@ -593,15 +578,12 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     SetupVgtTfParam(&pConfig->m_lsHsRegs);
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (NGG, VS-FS).
-Result ConfigBuilder::BuildPipelineNggVsFsRegConfig()
+void ConfigBuilder::BuildPipelineNggVsFsRegConfig()
 {
-    Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
     assert(gfxIp.major >= 10);
 
@@ -625,7 +607,7 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig()
 
     if (stageMask & ShaderStageToMask(ShaderStageVertex))
     {
-        result = BuildPrimShaderRegConfig<PipelineNggVsFsRegConfig>(ShaderStageVertex,
+        BuildPrimShaderRegConfig<PipelineNggVsFsRegConfig>(ShaderStageVertex,
                                                                     ShaderStageInvalid,
                                                                     pConfig);
 
@@ -652,9 +634,9 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig()
         }
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
-        result = BuildPsRegConfig<PipelineNggVsFsRegConfig>(ShaderStageFragment, &config);
+        BuildPsRegConfig<PipelineNggVsFsRegConfig>(ShaderStageFragment, &config);
 
         uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
@@ -680,15 +662,12 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig()
     SET_REG(pConfig, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (NGG, VS-TS-FS).
-Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
+void ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
 {
-    Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
     assert(gfxIp.major >= 10);
 
@@ -717,7 +696,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
         const bool hasVs  = ((stageMask & ShaderStageToMask(ShaderStageVertex)) != 0);
         const bool hasTcs = ((stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0);
 
-        result = BuildLsHsRegConfig<PipelineNggVsTsFsRegConfig>(hasVs ? ShaderStageVertex : ShaderStageInvalid,
+        BuildLsHsRegConfig<PipelineNggVsTsFsRegConfig>(hasVs ? ShaderStageVertex : ShaderStageInvalid,
                                                                 hasTcs ? ShaderStageTessControl : ShaderStageInvalid,
                                                                 pConfig);
 
@@ -745,9 +724,9 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
 #endif
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageTessEval)))
+    if (stageMask & ShaderStageToMask(ShaderStageTessEval))
     {
-        result = BuildPrimShaderRegConfig<PipelineNggVsTsFsRegConfig>(ShaderStageTessEval,
+        BuildPrimShaderRegConfig<PipelineNggVsTsFsRegConfig>(ShaderStageTessEval,
                                                                       ShaderStageInvalid,
                                                                       pConfig);
 
@@ -774,9 +753,9 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
         }
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
-        result = BuildPsRegConfig<PipelineNggVsTsFsRegConfig>(ShaderStageFragment, &config);
+        BuildPsRegConfig<PipelineNggVsTsFsRegConfig>(ShaderStageFragment, &config);
 
         uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
@@ -799,15 +778,12 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
     SET_REG(pConfig, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (NGG, VS-GS-FS).
-Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
+void ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
 {
-    Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
     assert(gfxIp.major >= 10);
 
@@ -837,7 +813,7 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
         const bool hasVs = ((stageMask & ShaderStageToMask(ShaderStageVertex)) != 0);
         const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
-        result = BuildPrimShaderRegConfig<PipelineNggVsGsFsRegConfig>(hasVs ? ShaderStageVertex : ShaderStageInvalid,
+        BuildPrimShaderRegConfig<PipelineNggVsGsFsRegConfig>(hasVs ? ShaderStageVertex : ShaderStageInvalid,
                                                                       hasGs ? ShaderStageGeometry : ShaderStageInvalid,
                                                                       pConfig);
 
@@ -866,9 +842,9 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
 #endif
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
-        result = BuildPsRegConfig<PipelineNggVsGsFsRegConfig>(ShaderStageFragment, &config);
+        BuildPsRegConfig<PipelineNggVsGsFsRegConfig>(ShaderStageFragment, &config);
 
         uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
@@ -887,15 +863,12 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
     SET_REG(pConfig, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (NGG, VS-TS-GS-FS).
-Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
+void ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
 {
-    Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
     assert(gfxIp.major >= 10);
 
@@ -927,7 +900,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
         const bool hasVs  = ((stageMask & ShaderStageToMask(ShaderStageVertex)) != 0);
         const bool hasTcs = ((stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0);
 
-        result = BuildLsHsRegConfig<PipelineNggVsTsGsFsRegConfig>(hasVs ? ShaderStageVertex : ShaderStageInvalid,
+        BuildLsHsRegConfig<PipelineNggVsTsGsFsRegConfig>(hasVs ? ShaderStageVertex : ShaderStageInvalid,
                                                                   hasTcs ? ShaderStageTessControl : ShaderStageInvalid,
                                                                   pConfig);
 
@@ -960,10 +933,9 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
         const bool hasTes = ((stageMask & ShaderStageToMask(ShaderStageTessEval)) != 0);
         const bool hasGs  = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
-        result =
-            BuildPrimShaderRegConfig<PipelineNggVsTsGsFsRegConfig>(hasTes ? ShaderStageTessEval : ShaderStageInvalid,
-                                                                   hasGs ? ShaderStageGeometry : ShaderStageInvalid,
-                                                                   pConfig);
+        BuildPrimShaderRegConfig<PipelineNggVsTsGsFsRegConfig>(hasTes ? ShaderStageTessEval : ShaderStageInvalid,
+                                                               hasGs ? ShaderStageGeometry : ShaderStageInvalid,
+                                                               pConfig);
 
         uint32_t checksum = SetShaderHash(ShaderStageTessEval);
         checksum = checksum ^ SetShaderHash(ShaderStageGeometry);
@@ -990,9 +962,9 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
 #endif
     }
 
-    if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
-        result = BuildPsRegConfig<PipelineNggVsTsGsFsRegConfig>(ShaderStageFragment, &config);
+        BuildPsRegConfig<PipelineNggVsTsGsFsRegConfig>(ShaderStageFragment, &config);
 
         uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
@@ -1019,15 +991,12 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
     SetupVgtTfParam(&pConfig->m_lsHsRegs);
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for compute pipeline.
-Result ConfigBuilder::BuildPipelineCsRegConfig()
+void ConfigBuilder::BuildPipelineCsRegConfig()
 {
-    Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
 
     assert(m_pPipelineState->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
@@ -1038,7 +1007,7 @@ Result ConfigBuilder::BuildPipelineCsRegConfig()
 
     SetPipelineType(Util::Abi::PipelineType::Cs);
 
-    result = BuildCsRegConfig(ShaderStageCompute, &config);
+    BuildCsRegConfig(ShaderStageCompute, &config);
 
     uint32_t checksum = SetShaderHash(ShaderStageCompute);
 
@@ -1048,19 +1017,15 @@ Result ConfigBuilder::BuildPipelineCsRegConfig()
     }
 
     AppendConfig(config);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for hardware vertex shader.
 template <typename T>
-Result ConfigBuilder::BuildVsRegConfig(
+void ConfigBuilder::BuildVsRegConfig(
     ShaderStage         shaderStage,    // Current shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for vertex-shader-specific pipeline
 {
-    Result result = Result::Success;
-
     assert((shaderStage == ShaderStageVertex)   ||
                 (shaderStage == ShaderStageTessEval) ||
                 (shaderStage == ShaderStageCopyShader));
@@ -1380,24 +1345,17 @@ Result ConfigBuilder::BuildVsRegConfig(
     }
 
     // Set shader user data maping
-    if (result == Result::Success)
-    {
-        result = BuildUserDataConfig(shaderStage, ShaderStageInvalid, mmSPI_SHADER_USER_DATA_VS_0);
-    }
-
-    return result;
+    BuildUserDataConfig(shaderStage, ShaderStageInvalid, mmSPI_SHADER_USER_DATA_VS_0);
 }
 
 // =====================================================================================================================
 // Builds register configuration for hardware local-hull merged shader.
 template <typename T>
-Result ConfigBuilder::BuildLsHsRegConfig(
+void ConfigBuilder::BuildLsHsRegConfig(
     ShaderStage         shaderStage1,   // Current first shader stage (from API side)
     ShaderStage         shaderStage2,   // Current second shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for local-hull-shader-specific pipeline
 {
-    Result result = Result::Success;
-
     assert((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageInvalid));
     assert((shaderStage2 == ShaderStageTessControl) || (shaderStage2 == ShaderStageInvalid));
 
@@ -1503,14 +1461,14 @@ Result ConfigBuilder::BuildLsHsRegConfig(
 
     if (gfxIp.major == 9)
     {
-        result = BuildUserDataConfig(
+        BuildUserDataConfig(
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
                      Gfx09::mmSPI_SHADER_USER_DATA_LS_0);
     }
     else if (gfxIp.major == 10)
     {
-        result = BuildUserDataConfig(
+        BuildUserDataConfig(
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
                      Gfx10::mmSPI_SHADER_USER_DATA_HS_0);
@@ -1519,20 +1477,16 @@ Result ConfigBuilder::BuildLsHsRegConfig(
     {
         llvm_unreachable("Not implemented!");
     }
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for hardware export-geometry merged shader.
 template <typename T>
-Result ConfigBuilder::BuildEsGsRegConfig(
+void ConfigBuilder::BuildEsGsRegConfig(
     ShaderStage         shaderStage1,   // Current first shader stage (from API side)
     ShaderStage         shaderStage2,   // Current second shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for export-geometry-shader-specific pipeline
 {
-    Result result = Result::Success;
-
     assert((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageTessEval) ||
                 (shaderStage1 == ShaderStageInvalid));
     assert((shaderStage2 == ShaderStageGeometry) || (shaderStage2 == ShaderStageInvalid));
@@ -1782,14 +1736,14 @@ Result ConfigBuilder::BuildEsGsRegConfig(
 
     if (gfxIp.major == 9)
     {
-        result = BuildUserDataConfig(
+        BuildUserDataConfig(
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
                      Gfx09::mmSPI_SHADER_USER_DATA_ES_0);
     }
     else if (gfxIp.major == 10)
     {
-        result = BuildUserDataConfig(
+        BuildUserDataConfig(
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
                      Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
@@ -1798,20 +1752,16 @@ Result ConfigBuilder::BuildEsGsRegConfig(
     {
         llvm_unreachable("Not implemented!");
     }
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for hardware primitive shader.
 template <typename T>
-Result ConfigBuilder::BuildPrimShaderRegConfig(
+void ConfigBuilder::BuildPrimShaderRegConfig(
     ShaderStage         shaderStage1,   // Current first shader stage (from API side)
     ShaderStage         shaderStage2,   // Current second shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for primitive-shader-specific pipeline
 {
-    Result result = Result::Success;
-
     assert((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageTessEval) ||
                 (shaderStage1 == ShaderStageInvalid));
     assert((shaderStage2 == ShaderStageGeometry) || (shaderStage2 == ShaderStageInvalid));
@@ -2302,23 +2252,19 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     //
     // Build use data configuration
     //
-    result = BuildUserDataConfig(
+    BuildUserDataConfig(
                  (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
                  (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
                  Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
-
-    return result;
 }
 
 // =====================================================================================================================
 // Builds register configuration for hardware pixel shader.
 template <typename T>
-Result ConfigBuilder::BuildPsRegConfig(
+void ConfigBuilder::BuildPsRegConfig(
     ShaderStage         shaderStage,    // Current shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for pixel-shader-specific pipeline
 {
-    Result result = Result::Success;
-
     assert(shaderStage == ShaderStageFragment);
 
     const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
@@ -2581,22 +2527,15 @@ Result ConfigBuilder::BuildPsRegConfig(
     }
 
     // Set shader user data mapping
-    if (result == Result::Success)
-    {
-        result = BuildUserDataConfig(shaderStage, ShaderStageInvalid, mmSPI_SHADER_USER_DATA_PS_0);
-    }
-
-    return result;
+    BuildUserDataConfig(shaderStage, ShaderStageInvalid, mmSPI_SHADER_USER_DATA_PS_0);
 }
 
 // =====================================================================================================================
 // Builds register configuration for compute shader.
-Result ConfigBuilder::BuildCsRegConfig(
+void ConfigBuilder::BuildCsRegConfig(
     ShaderStage          shaderStage,   // Current shader stage (from API side)
     CsRegConfig*         pConfig)       // [out] Register configuration for compute
 {
-    Result result = Result::Success;
-
     assert(shaderStage == ShaderStageCompute);
 
     const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
@@ -2684,23 +2623,16 @@ Result ConfigBuilder::BuildCsRegConfig(
     }
 
     // Set shader user data mapping
-    if (result == Result::Success)
-    {
-        result = BuildUserDataConfig(shaderStage, ShaderStageInvalid, mmCOMPUTE_USER_DATA_0);
-    }
-
-    return result;
+    BuildUserDataConfig(shaderStage, ShaderStageInvalid, mmCOMPUTE_USER_DATA_0);
 }
 
 // =====================================================================================================================
 // Builds user data configuration for the specified shader stage.
-Result ConfigBuilder::BuildUserDataConfig(
+void ConfigBuilder::BuildUserDataConfig(
     ShaderStage shaderStage1,   // Current first shader stage (from API side)
     ShaderStage shaderStage2,   // Current second shader stage (from API side)
     uint32_t    startUserData)  // Starting user data
 {
-    Result result = Result::Success;
-
     assert(shaderStage1 != ShaderStageInvalid); // The first shader stage must be a valid one
 
     // NOTE: For merged shader, the second shader stage should be tessellation control shader (LS-HS) or geometry
@@ -2923,8 +2855,6 @@ Result ConfigBuilder::BuildUserDataConfig(
         m_userDataLimit = std::max(m_userDataLimit, userDataLimit);
         m_spillThreshold = std::min(m_spillThreshold, spillThreshold);
     }
-
-    return result;
 }
 
 // =====================================================================================================================
