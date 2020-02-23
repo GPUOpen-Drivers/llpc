@@ -100,7 +100,7 @@ Value* BuilderImplArith::CreateFpTruncWithRounding(
         return pValue;
     }
 
-    LLPC_ASSERT(pValue->getType()->getScalarType()->isFloatTy() && pDestTy->getScalarType()->isHalfTy());
+    assert(pValue->getType()->getScalarType()->isFloatTy() && pDestTy->getScalarType()->isHalfTy());
 
     // RTZ: Use cvt_pkrtz instruction.
     // TODO: We also use this for RTP and RTN for now.
@@ -199,7 +199,7 @@ Value* BuilderImplArith::CreateQuantizeToFp16(
     Value*        pValue,     // [in] Input value (float or float vector)
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
-    LLPC_ASSERT(pValue->getType()->getScalarType()->isFloatTy());
+    assert(pValue->getType()->getScalarType()->isFloatTy());
 
     Constant* pZero = Constant::getNullValue(pValue->getType());
     // 2^-15 (normalized float16 minimum)
@@ -813,7 +813,7 @@ Value* BuilderImplArith::CreateCrossProduct(
     Value*        pY,         // [in] Input value Y
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
-    LLPC_ASSERT((pX->getType() == pY->getType()) && (pX->getType()->getVectorNumElements() == 3));
+    assert((pX->getType() == pY->getType()) && (pX->getType()->getVectorNumElements() == 3));
 
     Value* pLeft = UndefValue::get(pX->getType());
     Value* pRight = UndefValue::get(pX->getType());
@@ -1312,7 +1312,7 @@ Value* BuilderImplArith::CreateFindSMsb(
     Value*        pValue,     // [in] Input value
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
-    LLPC_ASSERT(pValue->getType()->getScalarType()->isIntegerTy(32));
+    assert(pValue->getType()->getScalarType()->isIntegerTy(32));
 
     Constant* pNegOne = ConstantInt::get(pValue->getType(), -1);
     Value* pLeadingZeroCount = Scalarize(pValue,

@@ -93,7 +93,7 @@ bool ShaderModes::GetAnyUseSubgroupSize()
 void ShaderModes::SetTessellationMode(
     const TessellationMode& inMode)   // [in] Tessellation mode
 {
-    LLPC_ASSERT(inMode.outputVertices <= MaxTessPatchVertices);
+    assert(inMode.outputVertices <= MaxTessPatchVertices);
 
     m_tessellationMode.vertexSpacing = (inMode.vertexSpacing != static_cast<VertexSpacing>(0)) ?
                                         inMode.vertexSpacing : m_tessellationMode.vertexSpacing;
@@ -168,7 +168,7 @@ void ShaderModes::SetComputeShaderMode(
     m_computeShaderMode.workgroupSizeY = std::max(1U, inMode.workgroupSizeY);
     m_computeShaderMode.workgroupSizeZ = std::max(1U, inMode.workgroupSizeZ);
 
-    LLPC_ASSERT((m_computeShaderMode.workgroupSizeX <= MaxComputeWorkgroupSize) &&
+    assert((m_computeShaderMode.workgroupSizeX <= MaxComputeWorkgroupSize) &&
                 (m_computeShaderMode.workgroupSizeY <= MaxComputeWorkgroupSize) &&
                 (m_computeShaderMode.workgroupSizeZ <= MaxComputeWorkgroupSize));
 }

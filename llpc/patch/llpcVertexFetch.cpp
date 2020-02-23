@@ -257,7 +257,7 @@ VertexFetch::VertexFetch(
     m_pShaderSysValues(pShaderSysValues),
     m_pPipelineState(pPipelineState)
 {
-    LLPC_ASSERT(GetShaderStageFromFunction(pEntryPoint) == ShaderStageVertex); // Must be vertex shader
+    assert(GetShaderStageFromFunction(pEntryPoint) == ShaderStageVertex); // Must be vertex shader
 
     auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
     auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
@@ -401,7 +401,7 @@ Value* VertexFetch::Run(
         {
             // NOTE: If we are fetching a swizzled format, we have to add an extra "shufflevector" instruction to
             // get the components in the right order.
-            LLPC_ASSERT(shuffleMask.empty() == false);
+            assert(shuffleMask.empty() == false);
             vertexFetch[0] = new ShuffleVectorInst(vertexFetch[0],
                                                    vertexFetch[0],
                                                    ConstantVector::get(shuffleMask),
@@ -411,7 +411,7 @@ Value* VertexFetch::Run(
 
         if (patchA2S)
         {
-            LLPC_ASSERT(vertexFetch[0]->getType()->getVectorNumElements() == 4);
+            assert(vertexFetch[0]->getType()->getVectorNumElements() == 4);
 
             // Extract alpha channel: %a = extractelement %vf0, 3
             Value* pAlpha = ExtractElementInst::Create(vertexFetch[0],
@@ -501,7 +501,7 @@ Value* VertexFetch::Run(
             }
             else
             {
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
             }
 
             // Insert alpha channel: %vf0 = insertelement %vf0, %a, 3
@@ -543,11 +543,11 @@ Value* VertexFetch::Run(
     {
         // NOTE: If we performs vertex fetch operations twice, we have to coalesce result values of the two
         // fetch operations and generate a combined one.
-        LLPC_ASSERT((vertexFetch[0] != nullptr) && (vertexFetch[1] != nullptr));
-        LLPC_ASSERT(vertexFetch[0]->getType()->getVectorNumElements() == 4);
+        assert((vertexFetch[0] != nullptr) && (vertexFetch[1] != nullptr));
+        assert(vertexFetch[0]->getType()->getVectorNumElements() == 4);
 
         uint32_t compCount = vertexFetch[1]->getType()->getVectorNumElements();
-        LLPC_ASSERT((compCount == 2) || (compCount == 4)); // Should be <2 x i32> or <4 x i32>
+        assert((compCount == 2) || (compCount == 4)); // Should be <2 x i32> or <4 x i32>
 
         if (compCount == 2)
         {
@@ -589,7 +589,7 @@ Value* VertexFetch::Run(
     // Finalize vertex fetch
     Type* pBasicTy = pInputTy->isVectorTy() ? pInputTy->getVectorElementType() : pInputTy;
     const uint32_t bitWidth = pBasicTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
     // Get default fetch values
     Constant* pDefaults = nullptr;
@@ -610,7 +610,7 @@ Value* VertexFetch::Run(
         }
         else
         {
-            LLPC_ASSERT(bitWidth == 64);
+            assert(bitWidth == 64);
             pDefaults = m_fetchDefaults.pInt64;
         }
     }
@@ -626,13 +626,13 @@ Value* VertexFetch::Run(
         }
         else
         {
-            LLPC_ASSERT(bitWidth == 64);
+            assert(bitWidth == 64);
             pDefaults = m_fetchDefaults.pDouble;
         }
     }
     else
     {
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
     }
 
     const uint32_t defaultCompCount = pDefaults->getType()->getVectorNumElements();
@@ -688,7 +688,7 @@ Value* VertexFetch::Run(
         }
         else
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             vertexValues[i] = UndefValue::get(Type::getInt32Ty(*m_pContext));
         }
     }
@@ -716,7 +716,7 @@ Value* VertexFetch::Run(
     {
         // NOTE: The vertex fetch results are represented as <n x i32> now. For 8-bit vertex fetch, we have to
         // convert them to <n x i8> and the 24 high bits is truncated.
-        LLPC_ASSERT(pInputTy->isIntOrIntVectorTy()); // Must be integer type
+        assert(pInputTy->isIntOrIntVectorTy()); // Must be integer type
 
         Type* pVertexTy = pVertex->getType();
         Type* pTruncTy = Type::getInt8Ty(*m_pContext);
@@ -796,7 +796,7 @@ VertexFormatInfo VertexFetch::GetVertexFormatInfo(
 const VertexCompFormatInfo* VertexFetch::GetVertexComponentFormatInfo(
     uint32_t dfmt) // Date format of vertex buffer
 {
-    LLPC_ASSERT(dfmt < sizeof(m_vertexCompFormatInfo) / sizeof(m_vertexCompFormatInfo[0]));
+    assert(dfmt < sizeof(m_vertexCompFormatInfo) / sizeof(m_vertexCompFormatInfo[0]));
     return &m_vertexCompFormatInfo[dfmt];
 }
 
@@ -807,15 +807,15 @@ uint32_t VertexFetch::MapVertexFormat(
     uint32_t nfmt   // Numeric format
     ) const
 {
-    LLPC_ASSERT(dfmt < 16);
-    LLPC_ASSERT(nfmt < 8);
+    assert(dfmt < 16);
+    assert(nfmt < 8);
     uint32_t format = 0;
 
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
     if (gfxIp.major >= 10)
     {
         uint32_t index = (dfmt * 8) + nfmt;
-        LLPC_ASSERT(index < sizeof(m_vertexFormatMap) / sizeof(m_vertexFormatMap[0]));
+        assert(index < sizeof(m_vertexFormatMap) / sizeof(m_vertexFormatMap[0]));
         format = m_vertexFormatMap[index];
     }
     else
@@ -915,7 +915,7 @@ void VertexFetch::AddVertexFetchInst(
                 pFetchTy = VectorType::get(Type::getHalfTy(*m_pContext), 4);
                 break;
             default:
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
                 break;
             }
         }
@@ -937,7 +937,7 @@ void VertexFetch::AddVertexFetchInst(
                 pFetchTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4);
                 break;
             default:
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
                 break;
             }
         }
@@ -987,7 +987,7 @@ void VertexFetch::AddVertexFetchInst(
     {
         // NOTE: Here, we split the vertex into its components and do per-component fetches. The expectation
         // is that the vertex per-component fetches always match the hardware requirements.
-        LLPC_ASSERT(numChannels == pFormatInfo->compCount);
+        assert(numChannels == pFormatInfo->compCount);
 
         Value* compVbIndices[4]  = {};
         uint32_t compOffsets[4] = {};

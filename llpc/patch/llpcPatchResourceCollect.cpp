@@ -248,7 +248,7 @@ void PatchResourceCollect::SetNggControl()
             else if (topology == PrimitiveTopology::PatchList)
             {
                 // NGG runs in pass-through mode for non-triangle tessellation output
-                LLPC_ASSERT(hasTs);
+                assert(hasTs);
 
                 const auto& tessMode = m_pPipelineState->GetShaderModes()->GetTessellationMode();
                 if (tessMode.pointMode || (tessMode.primitiveMode == PrimitiveMode::Isolines))
@@ -330,7 +330,7 @@ void PatchResourceCollect::SetNggControl()
             LLPC_OUTS("Explicit\n");
             break;
         default:
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             break;
         }
         LLPC_OUTS("PrimsPerSubgroup             = " << nggControl.primsPerSubgroup << "\n");
@@ -378,7 +378,7 @@ void PatchResourceCollect::BuildNggCullingControlRegister(
     }
     else
     {
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
     }
 
     paSuScModeCntl.bits.CULL_FRONT = ((rsState.cullMode & CullModeFront) != 0);
@@ -392,7 +392,7 @@ void PatchResourceCollect::BuildNggCullingControlRegister(
     // Program register PA_CL_CLIP_CNTL
     //
     PaClClipCntl paClClipCntl;
-    LLPC_ASSERT((rsState.usrClipPlaneMask & ~0x3F) == 0);
+    assert((rsState.usrClipPlaneMask & ~0x3F) == 0);
     paClClipCntl.u32All = rsState.usrClipPlaneMask;
 
     paClClipCntl.bits.DX_CLIP_SPACE_DEF = true;
@@ -464,7 +464,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         inVertsPerPrim = 6;
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -483,7 +483,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         outVertsPerPrim = 3;
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -559,7 +559,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         gsPrimsPerSubgroup          = (gsVsLdsSize / gsVsRingItemSizeOnChipInstanced);
         uint32_t esVertsPerSubgroup = (esGsLdsSize / (esGsRingItemSizeOnChip * reuseOffMultiplier));
 
-        LLPC_ASSERT(esVertsPerSubgroup >= esMinVertsPerSubgroup);
+        assert(esVertsPerSubgroup >= esMinVertsPerSubgroup);
 
         // Vertices for adjacency primitives are not always reused. According to
         // hardware engineers, we must restore esMinVertsPerSubgroup for ES_VERTS_PER_SUBGRP.
@@ -731,7 +731,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 // over-allocating LDS.
                 uint32_t maxVertOut = hasGs ? geometryMode.outputVertices : 1;
 
-                LLPC_ASSERT(maxVertOut >= primAmpFactor);
+                assert(maxVertOut >= primAmpFactor);
 
                 if ((gsPrimsPerSubgroup * maxVertOut) > Gfx9::NggMaxThreadsPerSubgroup)
                 {
@@ -739,7 +739,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 }
 
                 // Let's take into consideration instancing:
-                LLPC_ASSERT(gsInstanceCount >= 1);
+                assert(gsInstanceCount >= 1);
                 if (gsPrimsPerSubgroup < gsInstanceCount)
                 {
                     // NOTE: If supported number of GS primitives within a subgroup is too small to allow GS
@@ -759,18 +759,18 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             else
             {
                 // If GS is not present, instance count must be 1
-                LLPC_ASSERT(gsInstanceCount == 1);
+                assert(gsInstanceCount == 1);
             }
 
             // Make sure that we have at least one primitive
-            LLPC_ASSERT(gsPrimsPerSubgroup >= 1);
+            assert(gsPrimsPerSubgroup >= 1);
 
             uint32_t       expectedEsLdsSize = esVertsPerSubgroup * esGsRingItemSize + esExtraLdsSize;
             const uint32_t expectedGsLdsSize = gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize + gsExtraLdsSize;
 
             if (expectedGsLdsSize == 0)
             {
-                LLPC_ASSERT(hasGs == false);
+                assert(hasGs == false);
 
                 expectedEsLdsSize = (Gfx9::NggMaxThreadsPerSubgroup * esGsRingItemSize) + esExtraLdsSize;
             }
@@ -781,7 +781,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                                                 .ldsSizeDwordGranularityShift));
 
             // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
-            LLPC_ASSERT(ldsSizeDwords <= 16384);
+            assert(ldsSizeDwords <= 16384);
 
             pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = esVertsPerSubgroup;
             pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = gsPrimsPerSubgroup;
@@ -871,12 +871,12 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 worstCaseEsVertsPerSubgroup = std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier,
                                                        maxEsVertsPerSubgroup);
 
-                LLPC_ASSERT(gsPrimsPerSubgroup > 0);
+                assert(gsPrimsPerSubgroup > 0);
 
                 esGsLdsSize     = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
                 gsOnChipLdsSize = alignTo(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
 
-                LLPC_ASSERT(gsOnChipLdsSize <= maxLdsSize);
+                assert(gsOnChipLdsSize <= maxLdsSize);
             }
 
             if (hasTs || DisableGsOnChip)
@@ -945,7 +945,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             uint32_t esVertsPerSubgroup =
                 std::min(esGsLdsSize / (esGsRingItemSize * reuseOffMultiplier), maxEsVertsPerSubgroup);
 
-            LLPC_ASSERT(esVertsPerSubgroup >= esMinVertsPerSubgroup);
+            assert(esVertsPerSubgroup >= esMinVertsPerSubgroup);
 
             // Vertices for adjacency primitives are not always reused (e.g. in the case of shadow volumes). Acording
             // to hardware engineers, we must restore esMinVertsPerSubgroup for ES_VERTS_PER_SUBGRP.
@@ -1110,7 +1110,7 @@ uint32_t PatchResourceCollect::GetVerticesPerPrimitive() const
         vertsPerPrim = m_pPipelineState->GetInputAssemblyState().patchControlPoints;
         break;
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         break;
     }
 
@@ -1180,7 +1180,7 @@ void PatchResourceCollect::ProcessShader()
     // Remove dead calls
     for (auto pCall : m_deadCalls)
     {
-        LLPC_ASSERT(pCall->user_empty());
+        assert(pCall->user_empty());
         pCall->dropAllReferences();
         pCall->eraseFromParent();
     }
@@ -1274,7 +1274,7 @@ void PatchResourceCollect::visitCallInst(
         else
         {
             auto pInputTy = callInst.getType();
-            LLPC_ASSERT(pInputTy->isSingleValueType());
+            assert(pInputTy->isSingleValueType());
 
             auto loc = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
 
@@ -1314,7 +1314,7 @@ void PatchResourceCollect::visitCallInst(
                     {
                         // NOTE: For non 64-bit vector/scalar, one location is sufficient regardless of vector component
                         // addressing.
-                        LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+                        assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
                         m_activeInputLocs.insert(loc);
                     }
                 }
@@ -1329,7 +1329,7 @@ void PatchResourceCollect::visitCallInst(
                 m_activeInputLocs.insert(loc);
                 if (pInputTy->getPrimitiveSizeInBits() > (8 * SizeOfVec4))
                 {
-                    LLPC_ASSERT(pInputTy->getPrimitiveSizeInBits() <= (8 * 2 * SizeOfVec4));
+                    assert(pInputTy->getPrimitiveSizeInBits() <= (8 * 2 * SizeOfVec4));
                     m_activeInputLocs.insert(loc + 1);
                 }
             }
@@ -1338,7 +1338,7 @@ void PatchResourceCollect::visitCallInst(
     else if (mangledName.startswith(LlpcName::InputImportInterpolant))
     {
         // Interpolant input import
-        LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
+        assert(m_shaderStage == ShaderStageFragment);
 
         if (isDeadCall)
         {
@@ -1346,7 +1346,7 @@ void PatchResourceCollect::visitCallInst(
         }
         else
         {
-            LLPC_ASSERT(callInst.getType()->isSingleValueType());
+            assert(callInst.getType()->isSingleValueType());
 
             auto pLocOffset = callInst.getOperand(1);
             if (isa<ConstantInt>(pLocOffset))
@@ -1356,7 +1356,7 @@ void PatchResourceCollect::visitCallInst(
                 auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
                 loc += locOffset;
 
-                LLPC_ASSERT(callInst.getType()->getPrimitiveSizeInBits() <= (8 * SizeOfVec4));
+                assert(callInst.getType()->getPrimitiveSizeInBits() <= (8 * SizeOfVec4));
                 m_activeInputLocs.insert(loc);
             }
             else
@@ -1382,10 +1382,10 @@ void PatchResourceCollect::visitCallInst(
     else if (mangledName.startswith(LlpcName::OutputImportGeneric))
     {
         // Generic output import
-        LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+        assert(m_shaderStage == ShaderStageTessControl);
 
         auto pOutputTy = callInst.getType();
-        LLPC_ASSERT(pOutputTy->isSingleValueType());
+        assert(pOutputTy->isSingleValueType());
 
         auto loc = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         auto pLocOffset = callInst.getOperand(1);
@@ -1422,7 +1422,7 @@ void PatchResourceCollect::visitCallInst(
             {
                 // NOTE: For non 64-bit vector/scalar, one location is sufficient regardless of vector component
                 // addressing.
-                LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+                assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
                 m_importedOutputLocs.insert(loc);
             }
         }
@@ -1435,7 +1435,7 @@ void PatchResourceCollect::visitCallInst(
     else if (mangledName.startswith(LlpcName::OutputImportBuiltIn))
     {
         // Built-in output import
-        LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+        assert(m_shaderStage == ShaderStageTessControl);
 
         uint32_t builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         m_importedOutputBuiltIns.insert(builtInId);
@@ -1447,7 +1447,7 @@ void PatchResourceCollect::visitCallInst(
         {
             auto pOutput = callInst.getOperand(callInst.getNumArgOperands() - 1);
             auto pOutputTy = pOutput->getType();
-            LLPC_ASSERT(pOutputTy->isSingleValueType());
+            assert(pOutputTy->isSingleValueType());
 
             auto pLocOffset = callInst.getOperand(1);
             auto pCompIdx = callInst.getOperand(2);
@@ -1559,7 +1559,7 @@ void PatchResourceCollect::ClearInactiveInput()
         else
         {
             // For other stages, must be empty
-            LLPC_ASSERT(m_pResUsage->inOutUsage.perPatchInputLocMap.empty());
+            assert(m_pResUsage->inOutUsage.perPatchInputLocMap.empty());
         }
     }
 
@@ -1992,7 +1992,7 @@ void PatchResourceCollect::ClearInactiveOutput()
 // NOTE: This function should be called after the cleanup work of inactive inputs is done.
 void PatchResourceCollect::MatchGenericInOut()
 {
-    LLPC_ASSERT(m_pPipelineState->IsGraphics());
+    assert(m_pPipelineState->IsGraphics());
     auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
 
     auto& inLocMap  = inOutUsage.inputLocMap;
@@ -2034,7 +2034,7 @@ void PatchResourceCollect::MatchGenericInOut()
                         // NOTE: If either dynamic indexing of generic outputs exists or the generic output involve in
                         // output import, we have to mark it as active. The assigned location must not overlap with
                         // those used by inputs of next shader stage.
-                        LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+                        assert(m_shaderStage == ShaderStageTessControl);
                         locMap.second = availInMapLoc++;
                     }
                     else
@@ -2073,7 +2073,7 @@ void PatchResourceCollect::MatchGenericInOut()
                         // those used by inputs of next shader stage.
                         if (m_hasDynIndexedOutput || (m_importedOutputLocs.find(loc) != m_importedOutputLocs.end()))
                         {
-                            LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+                            assert(m_shaderStage == ShaderStageTessControl);
                             locMap.second = availPerPatchInMapLoc++;
                         }
                         else
@@ -2093,7 +2093,7 @@ void PatchResourceCollect::MatchGenericInOut()
         else
         {
             // For other stages, must be empty
-            LLPC_ASSERT(perPatchOutLocMap.empty());
+            assert(perPatchOutLocMap.empty());
         }
     }
 
@@ -2110,10 +2110,10 @@ void PatchResourceCollect::MatchGenericInOut()
     uint32_t nextMapLoc = 0;
     if (inLocMap.empty() == false)
     {
-        LLPC_ASSERT(inOutUsage.inputMapLocCount == 0);
+        assert(inOutUsage.inputMapLocCount == 0);
         for (auto& locMap : inLocMap)
         {
-            LLPC_ASSERT(locMap.second == InvalidValue ||
+            assert(locMap.second == InvalidValue ||
                         m_pPipelineState->GetBuilderContext()->BuildingRelocatableElf());
             // NOTE: For vertex shader, the input location mapping is actually trivial.
             locMap.second = (m_shaderStage == ShaderStageVertex) ? locMap.first : nextMapLoc++;
@@ -2133,7 +2133,7 @@ void PatchResourceCollect::MatchGenericInOut()
         }
 
         nextMapLoc = 0;
-        LLPC_ASSERT(inOutUsage.outputMapLocCount == 0);
+        assert(inOutUsage.outputMapLocCount == 0);
         for (auto locMapIt = outLocMap.begin(); locMapIt != outLocMap.end();)
         {
             auto& locMap = *locMapIt;
@@ -2168,7 +2168,7 @@ void PatchResourceCollect::MatchGenericInOut()
                 }
                 else
                 {
-                    LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+                    assert(m_shaderStage == ShaderStageTessControl);
                 }
                 inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, locMap.second + 1);
                 LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true) << ") Output: loc = "
@@ -2188,10 +2188,10 @@ void PatchResourceCollect::MatchGenericInOut()
     if (perPatchInLocMap.empty() == false)
     {
         nextMapLoc = 0;
-        LLPC_ASSERT(inOutUsage.perPatchInputMapLocCount == 0);
+        assert(inOutUsage.perPatchInputMapLocCount == 0);
         for (auto& locMap : perPatchInLocMap)
         {
-            LLPC_ASSERT(locMap.second == InvalidValue);
+            assert(locMap.second == InvalidValue);
             locMap.second = nextMapLoc++;
             inOutUsage.perPatchInputMapLocCount = std::max(inOutUsage.perPatchInputMapLocCount, locMap.second + 1);
             LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true) << ") Input (per-patch):  loc = "
@@ -2203,7 +2203,7 @@ void PatchResourceCollect::MatchGenericInOut()
     if (perPatchOutLocMap.empty() == false)
     {
         nextMapLoc = 0;
-        LLPC_ASSERT(inOutUsage.perPatchOutputMapLocCount == 0);
+        assert(inOutUsage.perPatchOutputMapLocCount == 0);
         for (auto& locMap : perPatchOutLocMap)
         {
             if (locMap.second == InvalidValue)
@@ -2213,7 +2213,7 @@ void PatchResourceCollect::MatchGenericInOut()
             }
             else
             {
-                LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+                assert(m_shaderStage == ShaderStageTessControl);
             }
             inOutUsage.perPatchOutputMapLocCount = std::max(inOutUsage.perPatchOutputMapLocCount, locMap.second + 1);
             LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true) << ") Output (per-patch): loc = "
@@ -2240,7 +2240,7 @@ void PatchResourceCollect::MatchGenericInOut()
 // NOTE: This function should be called after generic input/output matching is done.
 void PatchResourceCollect::MapBuiltInToGenericInOut()
 {
-    LLPC_ASSERT(m_pPipelineState->IsGraphics());
+    assert(m_pPipelineState->IsGraphics());
 
     const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
 
@@ -2251,8 +2251,8 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
     auto pNextResUsage =
         (nextStage != ShaderStageInvalid) ? m_pPipelineState->GetShaderResourceUsage(nextStage) : nullptr;
 
-    LLPC_ASSERT(inOutUsage.builtInInputLocMap.empty()); // Should be empty
-    LLPC_ASSERT(inOutUsage.builtInOutputLocMap.empty());
+    assert(inOutUsage.builtInInputLocMap.empty()); // Should be empty
+    assert(inOutUsage.builtInOutputLocMap.empty());
 
     // NOTE: The rules of mapping built-ins to generic inputs/outputs are as follow:
     //       (1) For built-in outputs, if next shader stager is valid and has corresponding built-in input used,
@@ -2273,7 +2273,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.clipDistance > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
@@ -2281,7 +2281,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.cullDistance > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
@@ -2292,7 +2292,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
                 // NOTE: The usage flag of gl_PrimitiveID must be set if fragment shader uses it.
                 builtInUsage.vs.primitiveId = true;
 
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInPrimitiveId) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPrimitiveId) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPrimitiveId];
                 inOutUsage.builtInOutputLocMap[BuiltInPrimitiveId] = mapLoc;
@@ -2300,7 +2300,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.layer)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
                 inOutUsage.builtInOutputLocMap[BuiltInLayer] = mapLoc;
@@ -2308,7 +2308,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.viewIndex)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInViewIndex) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewIndex) !=
                     nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewIndex];
                 inOutUsage.builtInOutputLocMap[BuiltInViewIndex] = mapLoc;
@@ -2316,7 +2316,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.viewportIndex)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
                 inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = mapLoc;
@@ -2330,7 +2330,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.positionIn)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInPosition) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPosition) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
                 inOutUsage.builtInOutputLocMap[BuiltInPosition] = mapLoc;
@@ -2343,7 +2343,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.pointSizeIn)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
                 inOutUsage.builtInOutputLocMap[BuiltInPointSize] = mapLoc;
@@ -2356,7 +2356,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.clipDistanceIn > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
@@ -2369,7 +2369,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.cullDistanceIn > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
@@ -2391,7 +2391,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.positionIn)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInPosition) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPosition) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
                 inOutUsage.builtInOutputLocMap[BuiltInPosition] = mapLoc;
@@ -2404,7 +2404,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.pointSizeIn)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
                 inOutUsage.builtInOutputLocMap[BuiltInPointSize] = mapLoc;
@@ -2417,7 +2417,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.clipDistanceIn > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
@@ -2430,7 +2430,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.cullDistanceIn > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
@@ -2452,7 +2452,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
                 uint32_t mapLoc = availOutMapLoc++;
                 if (builtInUsage.vs.clipDistance + builtInUsage.vs.cullDistance > 4)
                 {
-                    LLPC_ASSERT(builtInUsage.vs.clipDistance +
+                    assert(builtInUsage.vs.clipDistance +
                                 builtInUsage.vs.cullDistance <= MaxClipCullDistanceCount);
                     ++availOutMapLoc; // Occupy two locations
                 }
@@ -2538,7 +2538,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             // stage.
             if (nextBuiltInUsage.positionIn)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInPosition) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPosition) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
                 inOutUsage.builtInOutputLocMap[BuiltInPosition] = mapLoc;
@@ -2558,7 +2558,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.pointSizeIn)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
                 inOutUsage.builtInOutputLocMap[BuiltInPointSize] = mapLoc;
@@ -2578,7 +2578,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.clipDistanceIn > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
@@ -2598,7 +2598,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.cullDistanceIn > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
@@ -2618,7 +2618,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.tessLevelOuter)
             {
-                LLPC_ASSERT(nextInOutUsage.perPatchBuiltInInputLocMap.find(BuiltInTessLevelOuter) !=
+                assert(nextInOutUsage.perPatchBuiltInInputLocMap.find(BuiltInTessLevelOuter) !=
                             nextInOutUsage.perPatchBuiltInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelOuter];
                 inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = mapLoc;
@@ -2635,7 +2635,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.tessLevelInner)
             {
-                LLPC_ASSERT(nextInOutUsage.perPatchBuiltInInputLocMap.find(BuiltInTessLevelInner) !=
+                assert(nextInOutUsage.perPatchBuiltInInputLocMap.find(BuiltInTessLevelInner) !=
                             nextInOutUsage.perPatchBuiltInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelInner];
                 inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = mapLoc;
@@ -2812,7 +2812,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.clipDistance > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
@@ -2820,7 +2820,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.cullDistance > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
@@ -2831,7 +2831,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
                 // NOTE: The usage flag of gl_PrimitiveID must be set if fragment shader uses it.
                 builtInUsage.tes.primitiveId = true;
 
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInPrimitiveId) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPrimitiveId) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPrimitiveId];
                 inOutUsage.builtInOutputLocMap[BuiltInPrimitiveId] = mapLoc;
@@ -2839,7 +2839,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.layer)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
                 inOutUsage.builtInOutputLocMap[BuiltInLayer] = mapLoc;
@@ -2847,7 +2847,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.viewIndex)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInViewIndex) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewIndex) !=
                     nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewIndex];
                 inOutUsage.builtInOutputLocMap[BuiltInViewIndex] = mapLoc;
@@ -2855,7 +2855,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.viewportIndex)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
                 inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = mapLoc;
@@ -2869,7 +2869,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.positionIn)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInPosition) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPosition) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
                 inOutUsage.builtInOutputLocMap[BuiltInPosition] = mapLoc;
@@ -2882,7 +2882,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.pointSizeIn)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
                 inOutUsage.builtInOutputLocMap[BuiltInPointSize] = mapLoc;
@@ -2895,7 +2895,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.clipDistanceIn > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
@@ -2908,7 +2908,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.cullDistanceIn > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
@@ -2930,7 +2930,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
                 uint32_t mapLoc = availOutMapLoc++;
                 if (builtInUsage.tes.clipDistance + builtInUsage.tes.cullDistance > 4)
                 {
-                    LLPC_ASSERT(builtInUsage.tes.clipDistance +
+                    assert(builtInUsage.tes.clipDistance +
                                 builtInUsage.tes.cullDistance <= MaxClipCullDistanceCount);
                     ++availOutMapLoc; // Occupy two locations
                 }
@@ -3057,7 +3057,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.clipDistance > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 builtInOutLocs[BuiltInClipDistance] = mapLoc;
@@ -3065,7 +3065,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.cullDistance > 0)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 builtInOutLocs[BuiltInCullDistance] = mapLoc;
@@ -3073,7 +3073,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.primitiveId)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInPrimitiveId) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPrimitiveId) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPrimitiveId];
                 builtInOutLocs[BuiltInPrimitiveId] = mapLoc;
@@ -3081,7 +3081,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.layer)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
                 builtInOutLocs[BuiltInLayer] = mapLoc;
@@ -3089,7 +3089,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.viewIndex)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInViewIndex) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewIndex) !=
                     nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewIndex];
                 builtInOutLocs[BuiltInViewIndex] = mapLoc;
@@ -3097,7 +3097,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (nextBuiltInUsage.viewportIndex)
             {
-                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) !=
+                assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) !=
                             nextInOutUsage.builtInInputLocMap.end());
                 const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
                 builtInOutLocs[BuiltInViewportIndex] = mapLoc;
@@ -3113,7 +3113,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
                 uint32_t mapLoc = availOutMapLoc++;
                 if (builtInUsage.gs.clipDistance + builtInUsage.gs.cullDistance > 4)
                 {
-                    LLPC_ASSERT(builtInUsage.gs.clipDistance +
+                    assert(builtInUsage.gs.clipDistance +
                                 builtInUsage.gs.cullDistance <= MaxClipCullDistanceCount);
                     ++availOutMapLoc; // Occupy two locations
                 }
@@ -3191,7 +3191,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             uint32_t mapLoc = availInMapLoc++;
             if (builtInUsage.fs.clipDistance + builtInUsage.fs.cullDistance > 4)
             {
-                LLPC_ASSERT(builtInUsage.fs.clipDistance +
+                assert(builtInUsage.fs.clipDistance +
                             builtInUsage.fs.cullDistance <= MaxClipCullDistanceCount);
                 ++availInMapLoc; // Occupy two locations
             }
@@ -3299,7 +3299,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 void PatchResourceCollect::MapGsGenericOutput(
     GsOutLocInfo outLocInfo)             // GS output location info
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
+    assert(m_shaderStage == ShaderStageGeometry);
     uint32_t streamId = outLocInfo.streamId;
     auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
     auto& inOutUsage = pResUsage->inOutUsage.gs;
@@ -3326,7 +3326,7 @@ void PatchResourceCollect::MapGsBuiltInOutput(
     uint32_t builtInId,         // Built-in ID
     uint32_t elemCount)         // Element count of this built-in
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
+    assert(m_shaderStage == ShaderStageGeometry);
     auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
     auto& inOutUsage = pResUsage->inOutUsage.gs;
     uint32_t streamId = inOutUsage.rasterStream;
@@ -3381,7 +3381,7 @@ void PatchResourceCollect::PackInOutLocation()
     else
     {
         // TODO: Pack input/output in other stages is not supported
-        LLPC_NOT_IMPLEMENTED();
+        llvm_unreachable("Not implemented!");
     }
 }
 
@@ -3394,7 +3394,7 @@ void PatchResourceCollect::ReviseInputImportCalls()
         return;
     }
 
-    LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
+    assert(m_shaderStage == ShaderStageFragment);
 
     auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
     auto& inputLocMap = inOutUsage.inputLocMap;
@@ -3423,7 +3423,7 @@ void PatchResourceCollect::ReviseInputImportCalls()
         // Get the packed InOutLocation from locationMap
         const InOutLocation* pNewInLoc = nullptr;
         m_pLocationMapManager->FindMap(origInLoc, pNewInLoc);
-        LLPC_ASSERT(m_pLocationMapManager->FindMap(origInLoc, pNewInLoc));
+        assert(m_pLocationMapManager->FindMap(origInLoc, pNewInLoc));
 
         // TODO: inputLocMap can be removed
         inputLocMap[pNewInLoc->locationInfo.location] = InvalidValue;
@@ -3678,7 +3678,7 @@ void PatchResourceCollect::ScalarizeGenericInput(
     if (!isa<VectorType>(pResultTy))
     {
         // Handle the case of splitting a 64 bit scalar in two.
-        LLPC_ASSERT(pResultTy->getPrimitiveSizeInBits() == 64);
+        assert(pResultTy->getPrimitiveSizeInBits() == 64);
         std::string callName = isInterpolant ? LlpcName::InputImportInterpolant : LlpcName::InputImportGeneric;
         AddTypeMangling(builder.getInt32Ty(), args, callName);
         Value* pResult = UndefValue::get(VectorType::get(builder.getInt32Ty(), 2));
@@ -3708,7 +3708,7 @@ void PatchResourceCollect::ScalarizeGenericInput(
     // we can fix this properly by doing the whole of generic input/output assignment later on in
     // the middle-end, somewhere in the LLVM middle-end optimization pass flow.
     static const uint32_t MaxScalarizeBy = 4;
-    LLPC_ASSERT(scalarizeBy <= MaxScalarizeBy);
+    assert(scalarizeBy <= MaxScalarizeBy);
     bool elementUsed[MaxScalarizeBy] = {};
     bool unknownElementsUsed = false;
     for (User* pUser : pCall->users())
@@ -3716,7 +3716,7 @@ void PatchResourceCollect::ScalarizeGenericInput(
         if (auto pExtract = dyn_cast<ExtractElementInst>(pUser))
         {
             uint32_t idx = cast<ConstantInt>(pExtract->getIndexOperand())->getZExtValue();
-            LLPC_ASSERT(idx < scalarizeBy);
+            assert(idx < scalarizeBy);
             elementUsed[idx] = true;
             continue;
         }
@@ -3737,7 +3737,7 @@ void PatchResourceCollect::ScalarizeGenericInput(
                     }
                     else
                     {
-                        LLPC_ASSERT(maskElement < 2 * scalarizeBy);
+                        assert(maskElement < 2 * scalarizeBy);
                         if (pShuffle->getOperand(1) == pCall)
                         {
                             elementUsed[maskElement - scalarizeBy] = true;
@@ -3859,7 +3859,7 @@ bool InOutLocationMapManager::AddSpan(
         span.compatibilityInfo.isCustom =
             (cast<ConstantInt>(pCall->getOperand(2))->getZExtValue() == InOutInfo::InterpModeCustom);
 
-        LLPC_ASSERT(std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end());
+        assert(std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end());
         m_locationSpans.push_back(span);
 
         isInput = true;
@@ -3867,7 +3867,7 @@ bool InOutLocationMapManager::AddSpan(
     if (mangledName.startswith(LlpcName::InputImportInterpolant))
     {
         auto pLocOffset = pCall->getOperand(1);
-        LLPC_ASSERT(isa<ConstantInt>(pLocOffset));
+        assert(isa<ConstantInt>(pLocOffset));
 
         LocationSpan span = {};
 

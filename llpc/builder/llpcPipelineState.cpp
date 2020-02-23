@@ -366,7 +366,7 @@ ShaderStage PipelineState::GetPrevShaderStage(
         shaderStage = ShaderStageGeometry;
     }
 
-    LLPC_ASSERT(shaderStage < ShaderStageGfxCount);
+    assert(shaderStage < ShaderStageGfxCount);
 
     ShaderStage prevStage = ShaderStageInvalid;
 
@@ -399,7 +399,7 @@ ShaderStage PipelineState::GetNextShaderStage(
         shaderStage = ShaderStageGeometry;
     }
 
-    LLPC_ASSERT(shaderStage < ShaderStageGfxCount);
+    assert(shaderStage < ShaderStageGfxCount);
 
     ShaderStage nextStage = ShaderStageInvalid;
 
@@ -511,7 +511,7 @@ void PipelineState::SetUserDataNodes(
             nodeCount += node.tablePtr.nodeCount;
         }
     }
-    LLPC_ASSERT(m_allocUserDataNodes == nullptr);
+    assert(m_allocUserDataNodes == nullptr);
     m_allocUserDataNodes = std::make_unique<ResourceNode[]>(nodeCount);
 
     // Copy nodes in.
@@ -519,7 +519,7 @@ void PipelineState::SetUserDataNodes(
     ResourceNode* pDestInnerTable = pDestTable + nodeCount;
     m_userDataNodes = ArrayRef<ResourceNode>(pDestTable, nodes.size());
     SetUserDataNodesTable(nodes, immutableNodesMap, pDestTable, pDestInnerTable);
-    LLPC_ASSERT(pDestInnerTable == pDestTable + nodes.size());
+    assert(pDestInnerTable == pDestTable + nodes.size());
 }
 
 // =====================================================================================================================
@@ -637,7 +637,7 @@ void PipelineState::RecordUserDataTable(
     for (const ResourceNode& node : nodes)
     {
         SmallVector<Metadata*, 5> operands;
-        LLPC_ASSERT(node.type < ResourceMappingNodeType::Count);
+        assert(node.type < ResourceMappingNodeType::Count);
         // Operand 0: type
         operands.push_back(GetResourceTypeName(node.type));
         // Operand 1: offsetInDwords
@@ -740,7 +740,7 @@ void PipelineState::ReadUserDataNodes(
             uint32_t innerNodeCount =
                   mdconst::dyn_extract<ConstantInt>(pMetadataNode->getOperand(3))->getZExtValue();
             // Go into inner table.
-            LLPC_ASSERT(pEndThisInnerTable == nullptr);
+            assert(pEndThisInnerTable == nullptr);
             pEndThisInnerTable = pEndNextInnerTable;
             pEndNextInnerTable -= innerNodeCount;
             pNextNode = pEndNextInnerTable;
@@ -1062,7 +1062,7 @@ uint32_t PipelineState::GetShaderWaveSize(
        stage = ShaderStageGeometry;
     }
 
-    LLPC_ASSERT(stage <= ShaderStageCompute);
+    assert(stage <= ShaderStageCompute);
 
     uint32_t waveSize = GetTargetInfo().GetGpuProperty().waveSize;
 
@@ -1111,7 +1111,7 @@ uint32_t PipelineState::GetShaderWaveSize(
             }
         }
 
-        LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
+        assert((waveSize == 32) || (waveSize == 64));
     }
 
     return waveSize;

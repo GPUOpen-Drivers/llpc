@@ -586,7 +586,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(
 
     SPIRVWord arrayStride = 0;
     const bool hasArrayStride = pSpvType->hasDecorate(DecorationArrayStride, 0, &arrayStride);
-    LLPC_ASSERT(hasArrayStride ^ (arrayStride == 0));
+    assert(hasArrayStride ^ (arrayStride == 0));
 
     const uint64_t storeSize = getTypeStoreSize(pElementType);
 
@@ -594,7 +594,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(
 
     if (isExplicitlyLaidOut && hasArrayStride)
     {
-        LLPC_ASSERT(arrayStride >= storeSize);
+        assert(arrayStride >= storeSize);
 
         const uint32_t padding = static_cast<uint32_t>(arrayStride - storeSize);
 
@@ -646,7 +646,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(
     const SPIRVStorageClassKind storageClass = pSpvForwardPointerType->getPointerStorageClass();
 
     // Forward pointers must always point to structs.
-    LLPC_ASSERT(pSpvForwardPointerType->getPointerElementType()->isTypeStruct());
+    assert(pSpvForwardPointerType->getPointerElementType()->isTypeStruct());
 
     // We first have to map the pointed-to-struct to an opaque struct so we can have a forward reference to the struct.
     StructType* const pPointeeType = StructType::create(*Context);
@@ -712,7 +712,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
         if ((isColumnMajor == false) && (matrixStride == 0))
         {
             // Targeted for std430 layout
-            LLPC_ASSERT(columnCount == 4);
+            assert(columnCount == 4);
             matrixStride = columnCount * (pElementType->getPrimitiveSizeInBits()/ 8);
         }
     }
@@ -726,7 +726,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
         memberTypes.push_back(pColumnType);
 
         const uint64_t storeSize = getTypeStoreSize(pColumnType);
-        LLPC_ASSERT(matrixStride >= storeSize);
+        assert(matrixStride >= storeSize);
 
         const uint32_t padding = static_cast<uint32_t>(matrixStride - storeSize);
 
@@ -849,8 +849,8 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(
 
     SPIRVWord arrayStride = 0;
     const bool hasArrayStride = pSpvType->hasDecorate(DecorationArrayStride, 0, &arrayStride);
-    LLPC_ASSERT(hasArrayStride ^ (arrayStride == 0));
-    LLPC_UNUSED(hasArrayStride);
+    assert(hasArrayStride ^ (arrayStride == 0));
+    (void(hasArrayStride)); // unused
 
     const uint64_t storeSize = getTypeStoreSize(pElementType);
 
@@ -858,7 +858,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(
 
     if (isExplicitlyLaidOut && hasArrayStride)
     {
-        LLPC_ASSERT(arrayStride >= storeSize);
+        assert(arrayStride >= storeSize);
 
         const uint32_t padding = static_cast<uint32_t>(arrayStride - storeSize);
 
@@ -910,7 +910,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
             const bool nextHasMemberOffset = pSpvStructType->hasMemberDecorate(i, DecorationOffset, 0, &offset);
 
             // If we did not find a member offset, check that we did not see any member offsets on other members.
-            LLPC_ASSERT((hasMemberOffset == false) || nextHasMemberOffset);
+            assert((hasMemberOffset == false) || nextHasMemberOffset);
 
             hasMemberOffset = nextHasMemberOffset;
         }
@@ -998,7 +998,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
         // If our member is a matrix, check that only one of the specifiers is declared.
         if (isExplicitlyLaidOut && (memberMatrixStride > 0))
         {
-            LLPC_ASSERT(memberIsColumnMajor ^ pSpvStructType->hasMemberDecorate(index, DecorationRowMajor));
+            assert(memberIsColumnMajor ^ pSpvStructType->hasMemberDecorate(index, DecorationRowMajor));
         }
 
         Type* const pMemberType = transType(pSpvMemberType,
@@ -1399,14 +1399,14 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
         {
             CallInst* const pCall = dyn_cast<CallInst>(pUser);
 
-            LLPC_ASSERT(pCall != nullptr);
+            assert(pCall != nullptr);
 
             // Remember to remove the call later.
             valuesToRemove.push_back(pCall);
 
             Value* const pMatrix = pCall->getArgOperand(0);
             Type* const pDestType = pCall->getType()->getPointerElementType();
-            LLPC_ASSERT(pDestType->isArrayTy());
+            assert(pDestType->isArrayTy());
 
             const uint32_t columnCount = pDestType->getArrayNumElements();
             const uint32_t rowCount = pDestType->getArrayElementType()->getArrayNumElements();
@@ -1425,7 +1425,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                 Value* const pValue = workList.pop_back_val();
 
                 Instruction* const pInst = dyn_cast<Instruction>(pValue);
-                LLPC_ASSERT(pInst != nullptr);
+                assert(pInst != nullptr);
 
                 getBuilder()->SetInsertPoint(pInst);
 
@@ -1458,7 +1458,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                     //    actually just extracting an element from the vector of GEPs that we created above.
                     // 4. The GEP is pointing at a scalar element of the matrix.
 
-                    LLPC_ASSERT(valueMap.count(pGetElemPtr->getPointerOperand()) > 0);
+                    assert(valueMap.count(pGetElemPtr->getPointerOperand()) > 0);
 
                     Value* const pRemappedValue = valueMap[pGetElemPtr->getPointerOperand()];
 
@@ -1470,9 +1470,9 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                     }
 
                     // Check that the first index is always zero.
-                    LLPC_ASSERT(isa<ConstantInt>(indices[0]) && cast<ConstantInt>(indices[0])->isZero());
+                    assert(isa<ConstantInt>(indices[0]) && cast<ConstantInt>(indices[0])->isZero());
 
-                    LLPC_ASSERT((indices.size() > 0) && (indices.size() < 4));
+                    assert((indices.size() > 0) && (indices.size() < 4));
 
                     // If the GEP is just pointing at the base object, just update the value map.
                     if (indices.size() == 1)
@@ -1513,8 +1513,8 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                     else
                     {
                         // If we get here it means we are doing a subsequent GEP on a matrix row.
-                        LLPC_ASSERT(pRemappedValue->getType()->isVectorTy());
-                        LLPC_ASSERT(pRemappedValue->getType()->getVectorElementType()->isPointerTy());
+                        assert(pRemappedValue->getType()->isVectorTy());
+                        assert(pRemappedValue->getType()->getVectorElementType()->isPointerTy());
                         valueMap[pGetElemPtr] = getBuilder()->CreateExtractElement(pRemappedValue, indices[1]);
                     }
 
@@ -1538,7 +1538,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                     if (pPointer->getType()->isPointerTy() == false)
                     {
                         Type* const pPointerType = pPointer->getType();
-                        LLPC_ASSERT(pPointerType->isVectorTy());
+                        assert(pPointerType->isVectorTy());
 
                         Value* pNewLoad = UndefValue::get(pLoad->getType());
 
@@ -1577,7 +1577,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                                                                         getBuilder()->getInt32(0)
                                                                      });
                             Type* pCastType = pPointerElem->getType()->getPointerElementType();
-                            LLPC_ASSERT(pCastType->isArrayTy());
+                            assert(pCastType->isArrayTy());
                             pCastType = VectorType::get(pCastType->getArrayElementType(),
                                                         pCastType->getArrayNumElements());
                             const uint32_t addrSpace = pPointerElem->getType()->getPointerAddressSpace();
@@ -1629,7 +1629,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                     if (pPointer->getType()->isPointerTy() == false)
                     {
                         Type* const pPointerType = pPointer->getType();
-                        LLPC_ASSERT(pPointerType->isVectorTy());
+                        assert(pPointerType->isVectorTy());
 
                         for (uint32_t i = 0; i < pPointerType->getVectorNumElements(); i++)
                         {
@@ -1704,7 +1704,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                                                                         getBuilder()->getInt32(0)
                                                                      });
                             Type* pCastType = pPointerElem->getType()->getPointerElementType();
-                            LLPC_ASSERT(pCastType->isArrayTy());
+                            assert(pCastType->isArrayTy());
                             pCastType = VectorType::get(pCastType->getArrayElementType(),
                                                         pCastType->getArrayNumElements());
                             const uint32_t addrSpace = pPointerElem->getType()->getPointerAddressSpace();
@@ -1744,7 +1744,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                 }
                 else
                 {
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                 }
             }
         }
@@ -1768,7 +1768,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
         }
         else
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
         }
     }
 
@@ -1800,10 +1800,10 @@ Value* SPIRVToLLVM::createLaunderRowMajorMatrix(
     Type* const pMatrixPointerType = pPointerToMatrix->getType();
 
     Type* const pMatrixType = pMatrixPointerType->getPointerElementType();
-    LLPC_ASSERT(pMatrixType->isArrayTy() && pMatrixType->getArrayElementType()->isStructTy());
+    assert(pMatrixType->isArrayTy() && pMatrixType->getArrayElementType()->isStructTy());
 
     Type* const pColumnVectorType = pMatrixType->getArrayElementType()->getStructElementType(0);
-    LLPC_ASSERT(pColumnVectorType->isArrayTy());
+    assert(pColumnVectorType->isArrayTy());
 
     // Now we need to launder the row major matrix type into a column major one.
     Type* const pNewColumnVectorType = ArrayType::get(pColumnVectorType->getArrayElementType(),
@@ -1833,7 +1833,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
     bool             isCoherent,    // Is the load coherent?
     bool             isNonTemporal) // Is the load non-temporal?
 {
-    LLPC_ASSERT(pLoadPointer->getType()->isPointerTy());
+    assert(pLoadPointer->getType()->isPointerTy());
 
     Type* pLoadType = pLoadPointer->getType()->getPointerElementType();
 
@@ -1986,7 +1986,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
     bool             isCoherent,    // Is the store coherent?
     bool             isNonTemporal) // Is the store non-temporal?
 {
-    LLPC_ASSERT(pStorePointer->getType()->isPointerTy());
+    assert(pStorePointer->getType()->isPointerTy());
 
     Type* pStoreType = pStorePointer->getType()->getPointerElementType();
 
@@ -2134,7 +2134,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
     Type* const      pStorePointerType, // [in] The LLVM pointer to store to.
     Constant*        pConstStoreValue)  // [in] The LLVM constant to store into the pointer.
 {
-    LLPC_ASSERT(pStorePointerType->isPointerTy());
+    assert(pStorePointerType->isPointerTy());
     Type* const pStoreType = pStorePointerType->getPointerElementType();
 
     const uint32_t addrSpace = pStorePointerType->getPointerAddressSpace();
@@ -2220,7 +2220,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
         // If the LLVM type is a not a vector, we need to change the constant into an array.
         if (pSpvType->isTypeVector() && (pStoreType->isVectorTy() == false))
         {
-            LLPC_ASSERT(pStoreType->isArrayTy());
+            assert(pStoreType->isArrayTy());
 
             SmallVector<Constant*, 8> constElements(pStoreType->getArrayNumElements(), nullptr);
 
@@ -2257,7 +2257,7 @@ static SyncScope::ID transScope(
     case ScopeSubgroup:
         return context.getOrInsertSyncScopeID("wavefront");
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         return SyncScope::System;
     }
 }
@@ -2897,7 +2897,7 @@ Value* SPIRVToLLVM::transImagePointer(
     {
         pSpvImageTy = static_cast<SPIRVTypeSampledImage*>(pSpvImageTy)->getImageType();
     }
-    LLPC_ASSERT(pSpvImageTy->getOpCode() == OpTypeImage);
+    assert(pSpvImageTy->getOpCode() == OpTypeImage);
 
     auto pDesc = &static_cast<SPIRVTypeImage*>(pSpvImageTy)->getDescriptor();
     if (pDesc->Dim == DimBuffer)
@@ -3027,10 +3027,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(
 {
     SPIRVArrayLength* const pSpvArrayLength = static_cast<SPIRVArrayLength*>(pSpvValue);
     SPIRVValue* const pSpvStruct = pSpvArrayLength->getStruct();
-    LLPC_ASSERT(pSpvStruct->getType()->isTypePointer());
+    assert(pSpvStruct->getType()->isTypePointer());
 
     Value* const pStruct = transValue(pSpvStruct, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
-    LLPC_ASSERT(pStruct->getType()->isPointerTy() && pStruct->getType()->getPointerElementType()->isStructTy());
+    assert(pStruct->getType()->isPointerTy() && pStruct->getType()->getPointerElementType()->isStructTy());
 
     const uint32_t memberIndex = pSpvArrayLength->getMemberIndex();
     const uint32_t remappedMemberIndex = lookupRemappedTypeElements(pSpvStruct->getType()->getPointerElementType(),
@@ -3126,7 +3126,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
         {
         case OpTypeStruct:
             {
-                LLPC_ASSERT(isa<ConstantInt>(indices[i]));
+                assert(isa<ConstantInt>(indices[i]));
 
                 ConstantInt* const pConstIndex = cast<ConstantInt>(indices[i]);
 
@@ -3180,7 +3180,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
                 Type* const pIndexedType = GetElementPtrInst::getIndexedType(pBasePointeeType, sliceIndices);
 
                 // Matrices are represented as an array of columns.
-                LLPC_ASSERT(pIndexedType && pIndexedType->isArrayTy());
+                assert(pIndexedType && pIndexedType->isArrayTy());
 
                 // If we have a row major matrix, we need to split the access chain here to handle it.
                 if (isBufferBlockPointer && isTypeWithPadRowMajorMatrix(pIndexedType))
@@ -3478,19 +3478,19 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<spv::OpReadClockKHR>(
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(pSpvInst->getOperands()[0]);
     const spv::Scope scope = static_cast<spv::Scope>(pSpvScope->getZExtIntValue());
-    LLPC_ASSERT((scope == spv::ScopeDevice) || (scope == spv::ScopeWorkgroup));
+    assert((scope == spv::ScopeDevice) || (scope == spv::ScopeWorkgroup));
 
     Value* const pReadClock = getBuilder()->CreateReadClock(scope == spv::ScopeDevice);
 
     SPIRVType* const pSpvType = pSpvInst->getType();
     if (pSpvType->isTypeVectorInt(32))
     {
-        LLPC_ASSERT(pSpvType->getVectorComponentCount() == 2); // Must be uvec2
+        assert(pSpvType->getVectorComponentCount() == 2); // Must be uvec2
         return getBuilder()->CreateBitCast(pReadClock, transType(pSpvType)); // uint64 -> uvec2
     }
     else
     {
-        LLPC_ASSERT(pSpvType->isTypeInt(64));
+        assert(pSpvType->isTypeInt(64));
         return pReadClock;
     }
 }
@@ -3502,7 +3502,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupAll>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3517,7 +3517,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupAny>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3532,7 +3532,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupBroadcast>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3620,7 +3620,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3635,7 +3635,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3650,7 +3650,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3665,7 +3665,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcast>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3681,7 +3681,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcastFi
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3696,7 +3696,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallot>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3711,7 +3711,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformInverseBall
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3726,7 +3726,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitEx
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3742,7 +3742,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitCo
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3757,7 +3757,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitCo
     case GroupOperationExclusiveScan:
         return getBuilder()->CreateSubgroupBallotExclusiveBitCount(pValue);
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         return nullptr;
     }
 }
@@ -3769,7 +3769,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindL
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3784,7 +3784,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindM
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3799,7 +3799,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffle>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3815,7 +3815,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleXor>
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3831,7 +3831,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleUp>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3847,7 +3847,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleDown
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3864,7 +3864,7 @@ Value* SPIRVToLLVM::transGroupArithOp(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -3884,7 +3884,7 @@ Value* SPIRVToLLVM::transGroupArithOp(
                                                          pValue,
                                                          transValue(spvOperands[3], pFunc, pBlock));
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         return nullptr;
     }
 }
@@ -4024,7 +4024,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformQuadBroadca
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -4040,7 +4040,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformQuadSwap>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    assert(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
@@ -4055,7 +4055,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformQuadSwap>(
     case 2:
         return getBuilder()->CreateSubgroupQuadSwapDiagonal(pValue);
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         return nullptr;
     }
 }
@@ -4243,7 +4243,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
         case MbcntAMD:
             return getBuilder()->CreateSubgroupMbcnt(transValue(spvArgValues[0], pFunc, pBlock));
         default:
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             return nullptr;
         }
     case SPIRVEIS_GLSL:
@@ -4262,7 +4262,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
         case TimeAMD:
             return getBuilder()->CreateReadClock(false);
         default:
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
             return nullptr;
         }
 
@@ -4270,7 +4270,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
         return transTrinaryMinMaxExtInst(pSpvExtInst, pBlock);
 
     default:
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         return nullptr;
     }
 }
@@ -4294,12 +4294,12 @@ Constant* SPIRVToLLVM::transInitializer(
         SPIRVConstantComposite* const pSpvConstStruct = static_cast<SPIRVConstantComposite*>(pSpvValue);
 
         std::vector<SPIRVValue *> spvMembers(pSpvConstStruct->getElements());
-        LLPC_ASSERT(spvMembers.size() == pSpvType->getStructMemberCount());
+        assert(spvMembers.size() == pSpvType->getStructMemberCount());
 
         // For structs we lookup the mapping of the elements and use it to reverse map the values.
         const bool needsPad = isRemappedTypeElements(pSpvType);
 
-        LLPC_ASSERT((needsPad == false) || isRemappedTypeElements(pSpvType));
+        assert((needsPad == false) || isRemappedTypeElements(pSpvType));
 
         Constant* pStructInitializer = UndefValue::get(pType);
 
@@ -4319,7 +4319,7 @@ Constant* SPIRVToLLVM::transInitializer(
         SPIRVConstantComposite* const pSpvConstArray = static_cast<SPIRVConstantComposite*>(pSpvValue);
 
         std::vector<SPIRVValue *> spvElements(pSpvConstArray->getElements());
-        LLPC_ASSERT(spvElements.size() == pType->getArrayNumElements());
+        assert(spvElements.size() == pType->getArrayNumElements());
 
         // Matrix and arrays both get here. For both we need to turn [<{element-type, pad}>] into [element-type].
         const bool needsPad = isTypeWithPad(pType);
@@ -4352,8 +4352,8 @@ Constant* SPIRVToLLVM::transInitializer(
             // The translated value type is different to the requested type. This can only happen in the
             // case that the SPIR-V value was bool but the requested type was i32 because it is a bool
             // in memory.
-            LLPC_ASSERT(pInitializer->getType()->isIntegerTy(1));
-            LLPC_ASSERT(pType->isIntegerTy(32));
+            assert(pInitializer->getType()->isIntegerTy(1));
+            assert(pType->isIntegerTy(32));
             pInitializer = ConstantExpr::getZExt(pInitializer, pType);
         }
         return pInitializer;
@@ -4407,7 +4407,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
 
     if (storageClass == StorageClassFunction)
     {
-        LLPC_ASSERT(getBuilder()->GetInsertBlock() != nullptr);
+        assert(getBuilder()->GetInsertBlock() != nullptr);
 
         Value* const pVar = getBuilder()->CreateAlloca(pVarType, nullptr, pSpvVar->getName());
 
@@ -4439,7 +4439,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
                 pSpvBlockDecoratedType = pSpvBlockDecoratedType->getArrayElementType();
             }
 
-            LLPC_ASSERT(pSpvBlockDecoratedType->isTypeStruct());
+            assert(pSpvBlockDecoratedType->isTypeStruct());
 
             readOnly = pSpvBlockDecoratedType->hasDecorate(DecorationBlock) &&
                        (storageClass != SPIRVStorageClassKind::StorageClassStorageBuffer);
@@ -5255,7 +5255,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
         RM = 2;
         break;
       default:
-        llvm_unreachable("");
+        llvm_unreachable("Should never be called!");
       }
       return mapValue(BV, getBuilder()->CreateFpTruncWithRounding(Val, DestTy, RM));
     }

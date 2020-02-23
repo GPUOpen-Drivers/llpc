@@ -81,7 +81,7 @@ void SpirvLowerTranslator::TranslateSpirvToLlvm(
 {
     BinaryData  optimizedSpirvBin = {};
     const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
-    LLPC_ASSERT(pModuleData->binType == BinaryType::Spirv);
+    assert(pModuleData->binType == BinaryType::Spirv);
     const BinaryData* pSpirvBin = &pModuleData->binCode;
     if (ShaderModuleHelper::OptimizeSpirv(pSpirvBin, &optimizedSpirvBin) == Result::Success)
     {

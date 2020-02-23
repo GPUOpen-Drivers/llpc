@@ -282,7 +282,7 @@ void PatchPeepholeOpt::visitBitCast(
             }
             else
             {
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
             }
         }
 
@@ -625,7 +625,7 @@ void PatchPeepholeOpt::visitPHINode(
                 }
                 else
                 {
-                    LLPC_NEVER_CALLED();
+                    llvm_unreachable("Should never be called!");
                 }
             }
         }

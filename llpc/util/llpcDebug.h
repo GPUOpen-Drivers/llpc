@@ -32,29 +32,6 @@
 
 #include <stdint.h>
 
-#define LLPC_UNUSED(a) (void(a))
-
-#if PAL_ENABLE_PRINTS_ASSERTS || !defined(NDEBUG)
-#include <cassert>
-
-// Debug assertion: generic
-#define LLPC_ASSERT(...)        assert(__VA_ARGS__)
-// Debug assertion: not implemented
-#define LLPC_NOT_IMPLEMENTED()  assert(0 && "Not implemented!")
-// Debug assertion: should never be called
-#define LLPC_NEVER_CALLED()     assert(0 && "Should never be called!")
-// Debug assertion: not tested
-#define LLPC_NOT_TESTED()       assert(0 && "Not tested!")
-
-#else
-
-#define LLPC_ASSERT(...)              ((void)0)
-#define LLPC_NOT_IMPLEMENTED()        ((void)0)
-#define LLPC_NEVER_CALLED()           ((void)0)
-#define LLPC_NOT_TESTED()             ((void)0)
-
-#endif
-
 // Output error message
 #define LLPC_ERRS(_msg) { if (EnableErrs()) { outs() << "ERROR: " << _msg; outs().flush(); } }
 

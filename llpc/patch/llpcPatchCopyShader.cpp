@@ -312,7 +312,7 @@ void PatchCopyShader::CollectGsGenericOutputInfo(
                     continue;
                 }
 
-                LLPC_ASSERT(pCallInst->getNumArgOperands() == 4);
+                assert(pCallInst->getNumArgOperands() == 4);
                 Value* pOutput = pCallInst->getOperand(pCallInst->getNumArgOperands() - 1); // Last argument
                 auto pOutputTy = pOutput->getType();
 
@@ -348,7 +348,7 @@ void PatchCopyShader::CollectGsGenericOutputInfo(
                 bitWidth = (bitWidth < 32) ? 32 : bitWidth;
                 uint32_t byteSize = bitWidth / 8 * compCount;
 
-                LLPC_ASSERT(compIdx < 4);
+                assert(compIdx < 4);
                 auto& genericOutByteSizes =
                     m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader)->inOutUsage.gs.genericOutByteSizes;
                 genericOutByteSizes[streamId][location].resize(4);
@@ -380,7 +380,7 @@ void PatchCopyShader::ExportOutput(
             byteSize += byteSizeMap.second[i];
         }
 
-        LLPC_ASSERT(byteSize % 4 == 0);
+        assert(byteSize % 4 == 0);
         uint32_t dwordSize = byteSize / 4;
         Value* pOutputValue = LoadValueFromGsVsRing(
             VectorType::get(builder.getFloatTy(), dwordSize), loc, streamId, builder);
@@ -435,7 +435,7 @@ void PatchCopyShader::ExportOutput(
         auto builtInId = builtInPair.first;
         Type* pBuiltInTy = builtInPair.second;
 
-        LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(builtInId) !=
+        assert(pResUsage->inOutUsage.builtInOutputLocMap.find(builtInId) !=
             pResUsage->inOutUsage.builtInOutputLocMap.end());
 
         uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[builtInId];
@@ -508,7 +508,7 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
         elemCount = pLoadTy->getVectorNumElements();
         pElemTy = pLoadTy->getVectorElementType();
     }
-    LLPC_ASSERT(pElemTy->isIntegerTy(32) || pElemTy->isFloatTy()); // Must be 32-bit type
+    assert(pElemTy->isIntegerTy(32) || pElemTy->isFloatTy()); // Must be 32-bit type
 
     if (m_pPipelineState->GetNggControl()->enableNgg)
     {
@@ -527,7 +527,7 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
 
     if (m_pPipelineState->IsGsOnChip())
     {
-        LLPC_ASSERT(m_pLds != nullptr);
+        assert(m_pLds != nullptr);
 
         Value* pRingOffset = CalcGsVsRingOffsetForInput(location, 0, streamId, builder);
         Value* pLoadPtr = builder.CreateGEP(m_pLds, { builder.getInt32(0), pRingOffset });
@@ -538,7 +538,7 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
     }
     else
     {
-        LLPC_ASSERT(m_pGsVsRingBufDesc != nullptr);
+        assert(m_pGsVsRingBufDesc != nullptr);
 
         CoherentFlag coherent = {};
         coherent.bits.glc = true;
@@ -568,7 +568,7 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
             }
             else
             {
-                LLPC_ASSERT(elemCount == 1);
+                assert(elemCount == 1);
                 pLoadValue = pLoadElem;
             }
         }
@@ -632,7 +632,7 @@ void PatchCopyShader::ExportGenericOutput(
             return ((outLoc.second == location) && isStreamId);
         });
 
-        LLPC_ASSERT(locIter != outLocMap.end());
+        assert(locIter != outLocMap.end());
         if (xfbOutsInfo.find(locIter->first) != xfbOutsInfo.end())
         {
             uint32_t xfbOutInfo = xfbOutsInfo[locIter->first];
@@ -644,7 +644,7 @@ void PatchCopyShader::ExportGenericOutput(
                 // buffer. The high WORD is always zero while the low WORD contains the data value. We have to
                 // do some casting operations before store it to transform feedback buffer (tightly packed).
                 auto pOutputTy = pOutputValue->getType();
-                LLPC_ASSERT(pOutputTy->isFPOrFPVectorTy() && (pOutputTy->getScalarSizeInBits() == 32));
+                assert(pOutputTy->isFPOrFPVectorTy() && (pOutputTy->getScalarSizeInBits() == 32));
 
                 const uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
                 if (compCount > 1)
@@ -682,7 +682,7 @@ void PatchCopyShader::ExportGenericOutput(
     if (pResUsage->inOutUsage.gs.rasterStream == streamId)
     {
         auto pOutputTy = pOutputValue->getType();
-        LLPC_ASSERT(pOutputTy->isSingleValueType());
+        assert(pOutputTy->isSingleValueType());
 
         std::string instName(LlpcName::OutputExportGeneric);
         instName += GetTypeName(pOutputTy);

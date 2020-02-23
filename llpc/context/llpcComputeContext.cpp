@@ -57,7 +57,7 @@ const PipelineShaderInfo* ComputeContext::GetPipelineShaderInfo(
     ShaderStage shaderStage // Shader stage
     ) const
 {
-    LLPC_ASSERT(shaderStage == ShaderStageCompute);
+    assert(shaderStage == ShaderStageCompute);
     return &m_pPipelineInfo->cs;
 }
 

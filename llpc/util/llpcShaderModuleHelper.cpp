@@ -77,7 +77,7 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
         {
         case OpCapability:
             {
-                LLPC_ASSERT(wordCount == 2);
+                assert(wordCount == 2);
                 auto capability = static_cast<Capability>(pCodePos[1]);
                 capabilities.insert(capability);
                 break;
@@ -159,14 +159,14 @@ void ShaderModuleHelper::TrimSpirvDebugInfo(
     uint32_t          bufferSize,    // Output buffer size in bytes
     void*             pTrimSpvBin)   // [out] Trimmed SPIR-V binary code
 {
-    LLPC_ASSERT(bufferSize > sizeof(SpirvHeader));
+    assert(bufferSize > sizeof(SpirvHeader));
 
     const uint32_t* pCode = reinterpret_cast<const uint32_t*>(pSpvBin->pCode);
     const uint32_t* pEnd = pCode + pSpvBin->codeSize / sizeof(uint32_t);
     const uint32_t* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(uint32_t);
 
     uint32_t* pTrimEnd = reinterpret_cast<uint32_t*>(VoidPtrInc(pTrimSpvBin, bufferSize));
-    LLPC_UNUSED(pTrimEnd);
+    (void(pTrimEnd)); // unused
     uint32_t* pTrimCodePos = reinterpret_cast<uint32_t*>(VoidPtrInc(pTrimSpvBin, sizeof(SpirvHeader)));
 
     // Copy SPIR-V header
@@ -196,8 +196,8 @@ void ShaderModuleHelper::TrimSpirvDebugInfo(
         default:
             {
                 // Copy other instructions
-                LLPC_ASSERT(pCodePos + wordCount <= pEnd);
-                LLPC_ASSERT(pTrimCodePos + wordCount <= pTrimEnd);
+                assert(pCodePos + wordCount <= pEnd);
+                assert(pTrimCodePos + wordCount <= pTrimEnd);
                 memcpy(pTrimCodePos, pCodePos, wordCount * sizeof(uint32_t));
                 pTrimCodePos += wordCount;
                 break;
@@ -207,7 +207,7 @@ void ShaderModuleHelper::TrimSpirvDebugInfo(
         pCodePos += wordCount;
     }
 
-    LLPC_ASSERT(pTrimCodePos == pTrimEnd);
+    assert(pTrimCodePos == pTrimEnd);
 }
 
 // =====================================================================================================================
@@ -299,7 +299,7 @@ uint32_t ShaderModuleHelper::GetStageMaskFromSpirvBinary(
 
             if (opCode == OpEntryPoint)
             {
-                LLPC_ASSERT(wordCount >= 4);
+                assert(wordCount >= 4);
 
                 // The fourth word is start of the name string of the entry-point
                 const char* pName = reinterpret_cast<const char*>(&pCodePos[3]);
@@ -358,7 +358,7 @@ const char* ShaderModuleHelper::GetEntryPointNameFromSpirvBinary(
 
             if (opCode == OpEntryPoint)
             {
-                LLPC_ASSERT(wordCount >= 4);
+                assert(wordCount >= 4);
 
                 // The fourth word is start of the name string of the entry-point
                 pEntryName = reinterpret_cast<const char*>(&pCodePos[3]);

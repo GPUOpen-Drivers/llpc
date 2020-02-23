@@ -102,7 +102,7 @@ public:
     uint32_t GetLdsRegionStart(NggLdsRegionType region) const
     {
         uint32_t regionStart = m_ldsRegionStart[region];
-        LLPC_ASSERT(regionStart != InvalidValue);
+        assert(regionStart != InvalidValue);
         return regionStart;
     }
 

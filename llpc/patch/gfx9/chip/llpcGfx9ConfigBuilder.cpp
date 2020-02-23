@@ -123,8 +123,8 @@ void ConfigBuilder::BuildPalMetadata()
         }
     }
 
-    LLPC_ASSERT(result == Result::Success);
-    LLPC_UNUSED(result);
+    assert(result == Result::Success);
+    (void(result)); // unused
 
     WritePalMetadata();
 }
@@ -603,10 +603,10 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig()
 {
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
-    LLPC_ASSERT(gfxIp.major >= 10);
+    assert(gfxIp.major >= 10);
 
     const auto pNggControl = m_pPipelineState->GetNggControl();
-    LLPC_ASSERT(pNggControl->enableNgg);
+    assert(pNggControl->enableNgg);
 
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
@@ -690,10 +690,10 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
 {
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
-    LLPC_ASSERT(gfxIp.major >= 10);
+    assert(gfxIp.major >= 10);
 
     const auto pNggControl = m_pPipelineState->GetNggControl();
-    LLPC_ASSERT(pNggControl->enableNgg);
+    assert(pNggControl->enableNgg);
 
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
@@ -809,9 +809,9 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
 {
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
-    LLPC_ASSERT(gfxIp.major >= 10);
+    assert(gfxIp.major >= 10);
 
-    LLPC_ASSERT(m_pPipelineState->GetNggControl()->enableNgg);
+    assert(m_pPipelineState->GetNggControl()->enableNgg);
 
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
@@ -897,9 +897,9 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
 {
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
-    LLPC_ASSERT(gfxIp.major >= 10);
+    assert(gfxIp.major >= 10);
 
-    LLPC_ASSERT(m_pPipelineState->GetNggControl()->enableNgg);
+    assert(m_pPipelineState->GetNggControl()->enableNgg);
 
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
@@ -1030,7 +1030,7 @@ Result ConfigBuilder::BuildPipelineCsRegConfig()
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
 
-    LLPC_ASSERT(m_pPipelineState->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
+    assert(m_pPipelineState->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
 
     CsRegConfig config(gfxIp);
 
@@ -1061,7 +1061,7 @@ Result ConfigBuilder::BuildVsRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT((shaderStage == ShaderStageVertex)   ||
+    assert((shaderStage == ShaderStageVertex)   ||
                 (shaderStage == ShaderStageTessEval) ||
                 (shaderStage == ShaderStageCopyShader));
 
@@ -1227,7 +1227,7 @@ Result ConfigBuilder::BuildVsRegConfig(
     }
     else
     {
-        LLPC_ASSERT(shaderStage == ShaderStageCopyShader);
+        assert(shaderStage == ShaderStageCopyShader);
 
         usePointSize      = builtInUsage.gs.pointSize;
         usePrimitiveId    = builtInUsage.gs.primitiveIdIn;
@@ -1253,7 +1253,7 @@ Result ConfigBuilder::BuildVsRegConfig(
         const auto pGsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry);
         if (m_pPipelineState->IsGsOnChip() && cl::InRegEsGsLdsSize)
         {
-            LLPC_ASSERT(pGsIntfData->userDataUsage.gs.copyShaderEsGsLdsSize != 0);
+            assert(pGsIntfData->userDataUsage.gs.copyShaderEsGsLdsSize != 0);
 
             AppendConfig(mmSPI_SHADER_USER_DATA_VS_0 + pGsIntfData->userDataUsage.gs.copyShaderEsGsLdsSize,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::EsGsLdsSize));
@@ -1261,7 +1261,7 @@ Result ConfigBuilder::BuildVsRegConfig(
 
         if (enableXfb)
         {
-            LLPC_ASSERT(pGsIntfData->userDataUsage.gs.copyShaderStreamOutTable != 0);
+            assert(pGsIntfData->userDataUsage.gs.copyShaderStreamOutTable != 0);
             AppendConfig(mmSPI_SHADER_USER_DATA_VS_0 + pGsIntfData->userDataUsage.gs.copyShaderStreamOutTable,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::StreamOutTable));
         }
@@ -1320,7 +1320,7 @@ Result ConfigBuilder::BuildVsRegConfig(
         }
         else
         {
-            LLPC_NOT_IMPLEMENTED();
+            llvm_unreachable("Not implemented!");
         }
     }
 
@@ -1398,8 +1398,8 @@ Result ConfigBuilder::BuildLsHsRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageInvalid));
-    LLPC_ASSERT((shaderStage2 == ShaderStageTessControl) || (shaderStage2 == ShaderStageInvalid));
+    assert((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageInvalid));
+    assert((shaderStage2 == ShaderStageTessControl) || (shaderStage2 == ShaderStageInvalid));
 
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
 
@@ -1466,7 +1466,7 @@ Result ConfigBuilder::BuildLsHsRegConfig(
     }
     else
     {
-        LLPC_NOT_IMPLEMENTED();
+        llvm_unreachable("Not implemented!");
     }
 
     SetLdsSizeByteSize(Util::Abi::HardwareStage::Hs, ldsSizeInDwords * 4);
@@ -1517,7 +1517,7 @@ Result ConfigBuilder::BuildLsHsRegConfig(
     }
     else
     {
-        LLPC_NOT_IMPLEMENTED();
+        llvm_unreachable("Not implemented!");
     }
 
     return result;
@@ -1533,9 +1533,9 @@ Result ConfigBuilder::BuildEsGsRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageTessEval) ||
+    assert((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageTessEval) ||
                 (shaderStage1 == ShaderStageInvalid));
-    LLPC_ASSERT((shaderStage2 == ShaderStageGeometry) || (shaderStage2 == ShaderStageInvalid));
+    assert((shaderStage2 == ShaderStageGeometry) || (shaderStage2 == ShaderStageInvalid));
 
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
 
@@ -1766,7 +1766,7 @@ Result ConfigBuilder::BuildEsGsRegConfig(
     }
     else
     {
-        LLPC_NOT_IMPLEMENTED();
+        llvm_unreachable("Not implemented!");
     }
 
     SetNumAvailSgprs(Util::Abi::HardwareStage::Gs, pGsResUsage->numSgprsAvailable);
@@ -1796,7 +1796,7 @@ Result ConfigBuilder::BuildEsGsRegConfig(
     }
     else
     {
-        LLPC_NOT_IMPLEMENTED();
+        llvm_unreachable("Not implemented!");
     }
 
     return result;
@@ -1812,15 +1812,15 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageTessEval) ||
+    assert((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageTessEval) ||
                 (shaderStage1 == ShaderStageInvalid));
-    LLPC_ASSERT((shaderStage2 == ShaderStageGeometry) || (shaderStage2 == ShaderStageInvalid));
+    assert((shaderStage2 == ShaderStageGeometry) || (shaderStage2 == ShaderStageInvalid));
 
     const auto gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
-    LLPC_ASSERT(gfxIp.major >= 10);
+    assert(gfxIp.major >= 10);
 
     const auto pNggControl = m_pPipelineState->GetNggControl();
-    LLPC_ASSERT(pNggControl->enableNgg);
+    assert(pNggControl->enableNgg);
 
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
@@ -1996,7 +1996,7 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
         }
         else
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
         }
     }
     else if (hasTs)
@@ -2018,7 +2018,7 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
         }
         else
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
         }
     }
     else
@@ -2046,7 +2046,7 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
         }
         else
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
         }
     }
 
@@ -2276,7 +2276,7 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     //
     // Build NGG configuration
     //
-    LLPC_ASSERT(calcFactor.primAmpFactor >= 1);
+    assert(calcFactor.primAmpFactor >= 1);
     SET_REG_FIELD(&pConfig->m_primShaderRegs, GE_NGG_SUBGRP_CNTL, PRIM_AMP_FACTOR, calcFactor.primAmpFactor);
     SET_REG_FIELD(&pConfig->m_primShaderRegs, GE_NGG_SUBGRP_CNTL, THDS_PER_SUBGRP, NggMaxThreadsPerSubgroup);
 
@@ -2319,7 +2319,7 @@ Result ConfigBuilder::BuildPsRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT(shaderStage == ShaderStageFragment);
+    assert(shaderStage == ShaderStageFragment);
 
     const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
     const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
@@ -2597,7 +2597,7 @@ Result ConfigBuilder::BuildCsRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT(shaderStage == ShaderStageCompute);
+    assert(shaderStage == ShaderStageCompute);
 
     const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
     const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
@@ -2643,7 +2643,7 @@ Result ConfigBuilder::BuildCsRegConfig(
             SET_REG_GFX10_FIELD(pConfig, COMPUTE_DISPATCH_INITIATOR, CS_W32_EN, true);
         }
 #else
-        LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
+        assert((waveSize == 32) || (waveSize == 64));
         SetWaveFrontSize(Util::Abi::HardwareStage::Cs, waveSize);
 #endif
     }
@@ -2701,11 +2701,11 @@ Result ConfigBuilder::BuildUserDataConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT(shaderStage1 != ShaderStageInvalid); // The first shader stage must be a valid one
+    assert(shaderStage1 != ShaderStageInvalid); // The first shader stage must be a valid one
 
     // NOTE: For merged shader, the second shader stage should be tessellation control shader (LS-HS) or geometry
     // shader (ES-GS).
-    LLPC_ASSERT((shaderStage2 == ShaderStageTessControl) || (shaderStage2 == ShaderStageGeometry) ||
+    assert((shaderStage2 == ShaderStageTessControl) || (shaderStage2 == ShaderStageGeometry) ||
                 (shaderStage2 == ShaderStageInvalid));
 
     bool enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
@@ -2721,11 +2721,11 @@ Result ConfigBuilder::BuildUserDataConfig(
     }
 
     const bool enableNgg = m_pPipelineState->IsGraphics() ? m_pPipelineState->GetNggControl()->enableNgg : false;
-    LLPC_UNUSED(enableNgg);
+    (void(enableNgg)); // unused
 
     const auto pIntfData1 = m_pPipelineState->GetShaderInterfaceData(shaderStage1);
     const auto& entryArgIdxs1 = pIntfData1->entryArgIdxs;
-    LLPC_UNUSED(entryArgIdxs1);
+    (void(entryArgIdxs1)); // unused
 
     const auto pResUsage1 = m_pPipelineState->GetShaderResourceUsage(shaderStage1);
     const auto& builtInUsage1 = pResUsage1->builtInUsage;
@@ -2739,25 +2739,25 @@ Result ConfigBuilder::BuildUserDataConfig(
         // TODO: PAL only check BaseVertex now, we need update code once PAL check them separately.
         if (builtInUsage1.vs.baseVertex || builtInUsage1.vs.baseInstance)
         {
-            LLPC_ASSERT(entryArgIdxs1.vs.baseVertex > 0);
+            assert(entryArgIdxs1.vs.baseVertex > 0);
             AppendConfig(startUserData + pIntfData1->userDataUsage.vs.baseVertex,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::BaseVertex));
 
-            LLPC_ASSERT(entryArgIdxs1.vs.baseInstance > 0);
+            assert(entryArgIdxs1.vs.baseInstance > 0);
             AppendConfig(startUserData + pIntfData1->userDataUsage.vs.baseInstance,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::BaseInstance));
         }
 
         if (builtInUsage1.vs.drawIndex)
         {
-            LLPC_ASSERT(entryArgIdxs1.vs.drawIndex > 0);
+            assert(entryArgIdxs1.vs.drawIndex > 0);
             AppendConfig(startUserData + pIntfData1->userDataUsage.vs.drawIndex,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::DrawIndex));
         }
 
         if (pIntfData1->userDataUsage.vs.vbTablePtr > 0)
         {
-            LLPC_ASSERT(pIntfData1->userDataMap[pIntfData1->userDataUsage.vs.vbTablePtr] ==
+            assert(pIntfData1->userDataMap[pIntfData1->userDataUsage.vs.vbTablePtr] ==
                 InterfaceData::UserDataUnmapped);
 
             AppendConfig(startUserData + pIntfData1->userDataUsage.vs.vbTablePtr,
@@ -2766,7 +2766,7 @@ Result ConfigBuilder::BuildUserDataConfig(
 
         if (enableXfb && (pIntfData1->userDataUsage.vs.streamOutTablePtr > 0) && (shaderStage2 == ShaderStageInvalid))
         {
-            LLPC_ASSERT(pIntfData1->userDataMap[pIntfData1->userDataUsage.vs.streamOutTablePtr] ==
+            assert(pIntfData1->userDataMap[pIntfData1->userDataUsage.vs.streamOutTablePtr] ==
                 InterfaceData::UserDataUnmapped);
 
             AppendConfig(startUserData + pIntfData1->userDataUsage.vs.streamOutTablePtr,
@@ -2778,7 +2778,7 @@ Result ConfigBuilder::BuildUserDataConfig(
             if ((shaderStage2 == ShaderStageInvalid) || (shaderStage2 == ShaderStageTessControl))
             {
                 // Act as hardware VS or LS-HS merged shader
-                LLPC_ASSERT(entryArgIdxs1.vs.viewIndex > 0);
+                assert(entryArgIdxs1.vs.viewIndex > 0);
                 AppendConfig(startUserData + pIntfData1->userDataUsage.vs.viewIndex,
                              static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
             }
@@ -2787,15 +2787,15 @@ Result ConfigBuilder::BuildUserDataConfig(
                 // Act as hardware ES-GS merged shader
                 const auto& entryArgIdxs2 = pIntfData2->entryArgIdxs;
 
-                LLPC_ASSERT((entryArgIdxs1.vs.viewIndex > 0) && (entryArgIdxs2.gs.viewIndex > 0));
-                LLPC_UNUSED(entryArgIdxs2);
-                LLPC_ASSERT(pIntfData1->userDataUsage.vs.viewIndex == pIntfData2->userDataUsage.gs.viewIndex);
+                assert((entryArgIdxs1.vs.viewIndex > 0) && (entryArgIdxs2.gs.viewIndex > 0));
+                (void(entryArgIdxs2)); // unused
+                assert(pIntfData1->userDataUsage.vs.viewIndex == pIntfData2->userDataUsage.gs.viewIndex);
                 AppendConfig(startUserData + pIntfData1->userDataUsage.vs.viewIndex,
                              static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
             }
             else
             {
-                LLPC_NEVER_CALLED();
+                llvm_unreachable("Should never be called!");
             }
         }
 
@@ -2811,7 +2811,7 @@ Result ConfigBuilder::BuildUserDataConfig(
         {
             if (pIntfData1->userDataUsage.vs.esGsLdsSize > 0)
             {
-                LLPC_ASSERT(enableNgg);
+                assert(enableNgg);
                 AppendConfig(startUserData + pIntfData1->userDataUsage.vs.esGsLdsSize,
                              static_cast<uint32_t>(Util::Abi::UserDataMapping::EsGsLdsSize));
             }
@@ -2821,7 +2821,7 @@ Result ConfigBuilder::BuildUserDataConfig(
     {
         if (enableXfb && (pIntfData1->userDataUsage.tes.streamOutTablePtr > 0) && (shaderStage2 == ShaderStageInvalid))
         {
-            LLPC_ASSERT(pIntfData1->userDataMap[pIntfData1->userDataUsage.tes.streamOutTablePtr] ==
+            assert(pIntfData1->userDataMap[pIntfData1->userDataUsage.tes.streamOutTablePtr] ==
                 InterfaceData::UserDataUnmapped);
 
             AppendConfig(startUserData + pIntfData1->userDataUsage.tes.streamOutTablePtr,
@@ -2833,7 +2833,7 @@ Result ConfigBuilder::BuildUserDataConfig(
             if (shaderStage2 == ShaderStageInvalid)
             {
                 // Act as hardware VS
-                LLPC_ASSERT(entryArgIdxs1.tes.viewIndex > 0);
+                assert(entryArgIdxs1.tes.viewIndex > 0);
                 AppendConfig(startUserData + pIntfData1->userDataUsage.tes.viewIndex,
                              static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
             }
@@ -2842,9 +2842,9 @@ Result ConfigBuilder::BuildUserDataConfig(
                 // Act as hardware ES-GS merged shader
                 const auto& entryArgIdxs2 = pIntfData2->entryArgIdxs;
 
-                LLPC_ASSERT((entryArgIdxs1.tes.viewIndex > 0) && (entryArgIdxs2.gs.viewIndex > 0));
-                LLPC_UNUSED(entryArgIdxs2);
-                LLPC_ASSERT(pIntfData1->userDataUsage.tes.viewIndex == pIntfData2->userDataUsage.gs.viewIndex);
+                assert((entryArgIdxs1.tes.viewIndex > 0) && (entryArgIdxs2.gs.viewIndex > 0));
+                (void(entryArgIdxs2)); // unused
+                assert(pIntfData1->userDataUsage.tes.viewIndex == pIntfData2->userDataUsage.gs.viewIndex);
                 AppendConfig(startUserData + pIntfData1->userDataUsage.tes.viewIndex,
                              static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
             }
@@ -2852,18 +2852,18 @@ Result ConfigBuilder::BuildUserDataConfig(
 
         if (pIntfData1->userDataUsage.tes.esGsLdsSize > 0)
         {
-            LLPC_ASSERT(enableNgg);
+            assert(enableNgg);
             AppendConfig(startUserData + pIntfData1->userDataUsage.tes.esGsLdsSize,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::EsGsLdsSize));
         }
     }
     else if (shaderStage1 == ShaderStageGeometry)
     {
-        LLPC_ASSERT(shaderStage2 == ShaderStageInvalid);
+        assert(shaderStage2 == ShaderStageInvalid);
 
         if (enableMultiView)
         {
-            LLPC_ASSERT(entryArgIdxs1.gs.viewIndex > 0);
+            assert(entryArgIdxs1.gs.viewIndex > 0);
             AppendConfig(startUserData + pIntfData1->userDataUsage.gs.viewIndex,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
         }
@@ -2876,7 +2876,7 @@ Result ConfigBuilder::BuildUserDataConfig(
     }
     else if (shaderStage1 == ShaderStageCompute)
     {
-        LLPC_ASSERT(shaderStage2 == ShaderStageInvalid);
+        assert(shaderStage2 == ShaderStageInvalid);
 
         if (builtInUsage1.cs.numWorkgroups > 0)
         {
@@ -2938,7 +2938,7 @@ void ConfigBuilder::SetupVgtTfParam(
 
     const auto& tessMode = m_pPipelineState->GetShaderModes()->GetTessellationMode();
 
-    LLPC_ASSERT(tessMode.primitiveMode != PrimitiveMode::Unknown);
+    assert(tessMode.primitiveMode != PrimitiveMode::Unknown);
     if (tessMode.primitiveMode == PrimitiveMode::Isolines)
     {
         primType = TESS_ISOLINE;
@@ -2951,9 +2951,9 @@ void ConfigBuilder::SetupVgtTfParam(
     {
         primType = TESS_QUAD;
     }
-    LLPC_ASSERT(primType != InvalidValue);
+    assert(primType != InvalidValue);
 
-    LLPC_ASSERT(tessMode.vertexSpacing != VertexSpacing::Unknown);
+    assert(tessMode.vertexSpacing != VertexSpacing::Unknown);
     if (tessMode.vertexSpacing == VertexSpacing::Equal)
     {
         partition = PART_INTEGER;
@@ -2966,9 +2966,9 @@ void ConfigBuilder::SetupVgtTfParam(
     {
         partition = PART_FRAC_EVEN;
     }
-    LLPC_ASSERT(partition != InvalidValue);
+    assert(partition != InvalidValue);
 
-    LLPC_ASSERT(tessMode.vertexOrder != VertexOrder::Unknown);
+    assert(tessMode.vertexOrder != VertexOrder::Unknown);
     if (tessMode.pointMode)
     {
         topology = OUTPUT_POINT;
@@ -2998,7 +2998,7 @@ void ConfigBuilder::SetupVgtTfParam(
         }
     }
 
-    LLPC_ASSERT(topology != InvalidValue);
+    assert(topology != InvalidValue);
 
     SET_REG_FIELD(pConfig, VGT_TF_PARAM, TYPE, primType);
     SET_REG_FIELD(pConfig, VGT_TF_PARAM, PARTITIONING, partition);
@@ -3022,7 +3022,7 @@ bool ConfigBuilder::GetShaderWgpMode(
         shaderStage = ShaderStageGeometry;
     }
 
-    LLPC_ASSERT(shaderStage <= ShaderStageCompute);
+    assert(shaderStage <= ShaderStageCompute);
 
     return m_pPipelineState->GetShaderOptions(shaderStage).wgpMode;
 }

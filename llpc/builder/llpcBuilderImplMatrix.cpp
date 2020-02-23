@@ -41,13 +41,13 @@ Value* BuilderImplMatrix::CreateTransposeMatrix(
     Value* const pMatrix,  // [in] Matrix to transpose.
     const Twine& instName) // [in] Name to give final instruction
 {
-    LLPC_ASSERT(pMatrix != nullptr);
+    assert(pMatrix != nullptr);
 
     Type* const pMatrixType = pMatrix->getType();
-    LLPC_ASSERT(pMatrixType->isArrayTy());
+    assert(pMatrixType->isArrayTy());
 
     Type* const pColumnVectorType = pMatrixType->getArrayElementType();
-    LLPC_ASSERT(pColumnVectorType->isVectorTy());
+    assert(pColumnVectorType->isVectorTy());
 
     const uint32_t columnCount = pMatrixType->getArrayNumElements();
     const uint32_t rowCount = pColumnVectorType->getVectorNumElements();
@@ -221,8 +221,8 @@ Value* BuilderImplMatrix::CreateDeterminant(
     const Twine& instName)    // [in] Name to give instruction(s)
 {
     uint32_t order = pMatrix->getType()->getArrayNumElements();
-    LLPC_ASSERT(pMatrix->getType()->getArrayElementType()->getVectorNumElements() == order);
-    LLPC_ASSERT(order >= 2);
+    assert(pMatrix->getType()->getArrayElementType()->getVectorNumElements() == order);
+    assert(order >= 2);
 
     // Extract matrix elements.
     SmallVector<Value*, 16> elements;
@@ -321,8 +321,8 @@ Value* BuilderImplMatrix::CreateMatrixInverse(
     const Twine& instName)    // [in] Name to give instruction(s)
 {
     uint32_t order = pMatrix->getType()->getArrayNumElements();
-    LLPC_ASSERT(pMatrix->getType()->getArrayElementType()->getVectorNumElements() == order);
-    LLPC_ASSERT(order >= 2);
+    assert(pMatrix->getType()->getArrayElementType()->getVectorNumElements() == order);
+    assert(order >= 2);
 
     // Extract matrix elements.
     SmallVector<Value*, 16> elements;

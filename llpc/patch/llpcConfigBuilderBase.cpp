@@ -67,7 +67,7 @@ ConfigBuilderBase::ConfigBuilderBase(
     // problems.
     m_document = std::make_unique<msgpack::Document>();
 #else
-    LLPC_NEVER_CALLED();
+    llvm_unreachable("Should never be called!");
 #endif
 
     m_pipelineNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines]
@@ -348,7 +348,7 @@ void ConfigBuilderBase::SetPipelineHash()
 /// @param [in] value The metadata value.
 void ConfigBuilderBase::AppendConfig(uint32_t key, uint32_t value)
 {
-    LLPC_ASSERT(key != InvalidMetadataKey);
+    assert(key != InvalidMetadataKey);
 
     Util::Abi::PalMetadataNoteEntry entry;
     entry.key = key;
@@ -396,7 +396,7 @@ void ConfigBuilderBase::WritePalMetadata()
     msgpack::MapDocNode registers = m_pipelineNode[".registers"].getMap(true);
     for (const auto& entry : m_config)
     {
-        LLPC_ASSERT(entry.key != InvalidMetadataKey);
+        assert(entry.key != InvalidMetadataKey);
         auto key   = m_document->getNode(entry.key);
         auto value = m_document->getNode(entry.value);
         registers[key] = value;

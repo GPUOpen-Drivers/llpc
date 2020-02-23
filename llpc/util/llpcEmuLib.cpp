@@ -87,7 +87,7 @@ Function* EmuLib::GetFunction(
         }
         // Find the function in the symbol table of the archive.
         auto pChild = cantFail(archive.archive->findSym(funcName), "Failed in archive symbol search");
-        LLPC_ASSERT(pChild.hasValue());
+        assert(pChild.hasValue());
         // Found the symbol. Get the bitcode for its module.
         StringRef child = cantFail(pChild->getBuffer(), "Failed in archive module extraction");
 

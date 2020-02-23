@@ -94,7 +94,7 @@ void SpirvLower::ReplaceConstWithInsts(
     for (Value* const pUser : users)
     {
         Instruction* const pInst = dyn_cast<Instruction>(pUser);
-        LLPC_ASSERT(pInst != nullptr);
+        assert(pInst != nullptr);
 
         // If the instruction is a phi node, we have to insert the new instructions in the correct predecessor.
         if (PHINode* const pPhiNode = dyn_cast<PHINode>(pInst))
@@ -134,7 +134,7 @@ void SpirvLower::ReplaceConstWithInsts(
         }
         else
         {
-            LLPC_NEVER_CALLED();
+            llvm_unreachable("Should never be called!");
         }
     }
 

@@ -44,7 +44,7 @@ using namespace llvm;
 Instruction* BuilderImplMisc::CreateEmitVertex(
     uint32_t                streamId)           // Stream number, 0 if only one stream is present
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
+    assert(m_shaderStage == ShaderStageGeometry);
 
     // Get GsWaveId
     std::string callName = LlpcName::InputImportBuiltIn;
@@ -66,7 +66,7 @@ Instruction* BuilderImplMisc::CreateEmitVertex(
 Instruction* BuilderImplMisc::CreateEndPrimitive(
     uint32_t                streamId)           // Stream number, 0 if only one stream is present
 {
-    LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
+    assert(m_shaderStage == ShaderStageGeometry);
 
     // Get GsWaveId
     std::string callName = LlpcName::InputImportBuiltIn;

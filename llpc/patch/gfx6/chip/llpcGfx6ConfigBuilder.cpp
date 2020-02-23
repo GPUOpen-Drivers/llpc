@@ -93,8 +93,8 @@ void ConfigBuilder::BuildPalMetadata()
         }
     }
 
-    LLPC_ASSERT(result == Result::Success);
-    LLPC_UNUSED(result);
+    assert(result == Result::Success);
+    (void(result)); // unused
 
     WritePalMetadata();
 }
@@ -388,7 +388,7 @@ Result ConfigBuilder::BuildPipelineCsRegConfig()
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT(m_pPipelineState->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
+    assert(m_pPipelineState->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
 
     CsRegConfig config;
 
@@ -414,7 +414,7 @@ Result ConfigBuilder::BuildVsRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT((shaderStage == ShaderStageVertex)   ||
+    assert((shaderStage == ShaderStageVertex)   ||
                 (shaderStage == ShaderStageTessEval) ||
                 (shaderStage == ShaderStageCopyShader));
 
@@ -563,7 +563,7 @@ Result ConfigBuilder::BuildVsRegConfig(
     }
     else
     {
-        LLPC_ASSERT(shaderStage == ShaderStageCopyShader);
+        assert(shaderStage == ShaderStageCopyShader);
 
         usePointSize      = builtInUsage.gs.pointSize;
         usePrimitiveId    = builtInUsage.gs.primitiveIdIn;
@@ -685,7 +685,7 @@ Result ConfigBuilder::BuildHsRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT(shaderStage == ShaderStageTessControl);
+    assert(shaderStage == ShaderStageTessControl);
 
     const auto& pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
     const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(shaderStage);
@@ -738,14 +738,14 @@ Result ConfigBuilder::BuildEsRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT((shaderStage == ShaderStageVertex) || (shaderStage == ShaderStageTessEval));
+    assert((shaderStage == ShaderStageVertex) || (shaderStage == ShaderStageTessEval));
 
     const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
 
     const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage;
 
-    LLPC_ASSERT((m_pPipelineState->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
+    assert((m_pPipelineState->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
     const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
@@ -757,8 +757,8 @@ Result ConfigBuilder::BuildEsRegConfig(
     SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC2_ES, TRAP_PRESENT, shaderOptions.trapPresent);
     if (m_pPipelineState->IsGsOnChip())
     {
-        LLPC_ASSERT(calcFactor.gsOnChipLdsSize <= m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipMaxLdsSize);
-        LLPC_ASSERT((calcFactor.gsOnChipLdsSize %
+        assert(calcFactor.gsOnChipLdsSize <= m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipMaxLdsSize);
+        assert((calcFactor.gsOnChipLdsSize %
                      (1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift)) == 0);
         SET_REG_FIELD(&pConfig->m_esRegs,
                       SPI_SHADER_PGM_RSRC2_ES,
@@ -778,7 +778,7 @@ Result ConfigBuilder::BuildEsRegConfig(
     }
     else
     {
-        LLPC_ASSERT(shaderStage == ShaderStageTessEval);
+        assert(shaderStage == ShaderStageTessEval);
 
         // NOTE: when primitive ID is used, set vgtCompCnt to 3 directly because primitive ID is the last VGPR.
         if (builtInUsage.tes.primitiveId)
@@ -820,7 +820,7 @@ Result ConfigBuilder::BuildLsRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT(shaderStage == ShaderStageVertex);
+    assert(shaderStage == ShaderStageVertex);
 
     const auto& pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
     const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(shaderStage);
@@ -908,7 +908,7 @@ Result ConfigBuilder::BuildGsRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT(shaderStage == ShaderStageGeometry);
+    assert(shaderStage == ShaderStageGeometry);
 
     const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
 
@@ -1072,7 +1072,7 @@ Result ConfigBuilder::BuildPsRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT(shaderStage == ShaderStageFragment);
+    assert(shaderStage == ShaderStageFragment);
 
     const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
     const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
@@ -1202,7 +1202,7 @@ Result ConfigBuilder::BuildPsRegConfig(
     for (uint32_t i = 0; i < pInterpInfo->size(); ++i)
     {
         const auto& interpInfoElem = (*pInterpInfo)[i];
-        LLPC_ASSERT(((interpInfoElem.loc     == InvalidFsInterpInfo.loc) &&
+        assert(((interpInfoElem.loc     == InvalidFsInterpInfo.loc) &&
                      (interpInfoElem.flat    == InvalidFsInterpInfo.flat) &&
                      (interpInfoElem.custom  == InvalidFsInterpInfo.custom) &&
                      (interpInfoElem.is16bit == InvalidFsInterpInfo.is16bit)) == false);
@@ -1273,7 +1273,7 @@ Result ConfigBuilder::BuildCsRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT(shaderStage == ShaderStageCompute);
+    assert(shaderStage == ShaderStageCompute);
 
     const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
     const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
@@ -1358,25 +1358,25 @@ Result ConfigBuilder::BuildUserDataConfig(
         // TODO: PAL only check BaseVertex now, we need update code once PAL check them separately.
         if (builtInUsage.vs.baseVertex || builtInUsage.vs.baseInstance)
         {
-            LLPC_ASSERT(pIntfData->entryArgIdxs.vs.baseVertex > 0);
+            assert(pIntfData->entryArgIdxs.vs.baseVertex > 0);
             AppendConfig(startUserData + pIntfData->userDataUsage.vs.baseVertex,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::BaseVertex));
 
-            LLPC_ASSERT(pIntfData->entryArgIdxs.vs.baseInstance > 0);
+            assert(pIntfData->entryArgIdxs.vs.baseInstance > 0);
             AppendConfig(startUserData + pIntfData->userDataUsage.vs.baseInstance,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::BaseInstance));
         }
 
         if (builtInUsage.vs.drawIndex)
         {
-            LLPC_ASSERT(pIntfData->entryArgIdxs.vs.drawIndex > 0);
+            assert(pIntfData->entryArgIdxs.vs.drawIndex > 0);
             AppendConfig(startUserData + pIntfData->userDataUsage.vs.drawIndex,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::DrawIndex));
         }
 
         if (pIntfData->userDataUsage.vs.vbTablePtr > 0)
         {
-            LLPC_ASSERT(pIntfData->userDataMap[pIntfData->userDataUsage.vs.vbTablePtr] ==
+            assert(pIntfData->userDataMap[pIntfData->userDataUsage.vs.vbTablePtr] ==
                 InterfaceData::UserDataUnmapped);
 
             AppendConfig(startUserData + pIntfData->userDataUsage.vs.vbTablePtr,
@@ -1385,7 +1385,7 @@ Result ConfigBuilder::BuildUserDataConfig(
 
         if (pIntfData->userDataUsage.vs.streamOutTablePtr > 0)
         {
-            LLPC_ASSERT(pIntfData->userDataMap[pIntfData->userDataUsage.vs.streamOutTablePtr] ==
+            assert(pIntfData->userDataMap[pIntfData->userDataUsage.vs.streamOutTablePtr] ==
                 InterfaceData::UserDataUnmapped);
 
             AppendConfig(startUserData + pIntfData->userDataUsage.vs.streamOutTablePtr,
@@ -1394,7 +1394,7 @@ Result ConfigBuilder::BuildUserDataConfig(
 
         if (enableMultiView)
         {
-            LLPC_ASSERT(pIntfData->entryArgIdxs.vs.viewIndex > 0);
+            assert(pIntfData->entryArgIdxs.vs.viewIndex > 0);
             AppendConfig(startUserData + pIntfData->userDataUsage.vs.viewIndex,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
         }
@@ -1403,14 +1403,14 @@ Result ConfigBuilder::BuildUserDataConfig(
     {
         if (enableMultiView)
         {
-            LLPC_ASSERT(pIntfData->entryArgIdxs.tes.viewIndex > 0);
+            assert(pIntfData->entryArgIdxs.tes.viewIndex > 0);
             AppendConfig(startUserData + pIntfData->userDataUsage.tes.viewIndex,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
         }
 
         if (pIntfData->userDataUsage.tes.streamOutTablePtr > 0)
         {
-            LLPC_ASSERT(pIntfData->userDataMap[pIntfData->userDataUsage.tes.streamOutTablePtr] ==
+            assert(pIntfData->userDataMap[pIntfData->userDataUsage.tes.streamOutTablePtr] ==
                 InterfaceData::UserDataUnmapped);
 
             AppendConfig(startUserData + pIntfData->userDataUsage.tes.streamOutTablePtr,
@@ -1421,7 +1421,7 @@ Result ConfigBuilder::BuildUserDataConfig(
     {
         if (builtInUsage.gs.viewIndex)
         {
-            LLPC_ASSERT(pIntfData->entryArgIdxs.gs.viewIndex > 0);
+            assert(pIntfData->entryArgIdxs.gs.viewIndex > 0);
             AppendConfig(startUserData + pIntfData->userDataUsage.gs.viewIndex,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
         }
@@ -1484,7 +1484,7 @@ void ConfigBuilder::SetupVgtTfParam(
 
     const auto& tessMode = m_pPipelineState->GetShaderModes()->GetTessellationMode();
 
-    LLPC_ASSERT(tessMode.primitiveMode != PrimitiveMode::Unknown);
+    assert(tessMode.primitiveMode != PrimitiveMode::Unknown);
     if (tessMode.primitiveMode == PrimitiveMode::Isolines)
     {
         primType = TESS_ISOLINE;
@@ -1497,9 +1497,9 @@ void ConfigBuilder::SetupVgtTfParam(
     {
         primType = TESS_QUAD;
     }
-    LLPC_ASSERT(primType != InvalidValue);
+    assert(primType != InvalidValue);
 
-    LLPC_ASSERT(tessMode.vertexSpacing != VertexSpacing::Unknown);
+    assert(tessMode.vertexSpacing != VertexSpacing::Unknown);
     if (tessMode.vertexSpacing == VertexSpacing::Equal)
     {
         partition = PART_INTEGER;
@@ -1512,9 +1512,9 @@ void ConfigBuilder::SetupVgtTfParam(
     {
         partition = PART_FRAC_EVEN;
     }
-    LLPC_ASSERT(partition != InvalidValue);
+    assert(partition != InvalidValue);
 
-    LLPC_ASSERT(tessMode.vertexOrder != VertexOrder::Unknown);
+    assert(tessMode.vertexOrder != VertexOrder::Unknown);
     if (tessMode.pointMode)
     {
         topology = OUTPUT_POINT;
@@ -1544,7 +1544,7 @@ void ConfigBuilder::SetupVgtTfParam(
         }
     }
 
-    LLPC_ASSERT(topology != InvalidValue);
+    assert(topology != InvalidValue);
 
     SET_REG_FIELD(pConfig, VGT_TF_PARAM, TYPE, primType);
     SET_REG_FIELD(pConfig, VGT_TF_PARAM, PARTITIONING, partition);

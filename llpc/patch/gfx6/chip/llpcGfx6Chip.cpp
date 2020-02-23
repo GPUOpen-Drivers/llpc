@@ -198,7 +198,7 @@ CsRegConfig::CsRegConfig()
 void InitRegisterNameMap(
     GfxIpVersion gfxIp) // Graphics IP version info
 {
-    LLPC_ASSERT(gfxIp.major <= 8);
+    assert(gfxIp.major <= 8);
 
     ADD_REG_MAP(SPI_SHADER_PGM_RSRC1_VS);
     ADD_REG_MAP(SPI_SHADER_PGM_RSRC2_VS);
@@ -436,7 +436,7 @@ const char* GetRegisterNameString(
     GfxIpVersion gfxIp, // Graphics IP version info
     uint32_t     regId) // ID (byte-based) of the register
 {
-    LLPC_ASSERT(gfxIp.major <= 8);
+    assert(gfxIp.major <= 8);
 
     if (RegNameMap.empty())
     {
@@ -460,7 +460,7 @@ const char* GetRegisterNameString(
         {
             static char unknownRegNameBuf[256] = {};
             int32_t length = snprintf(unknownRegNameBuf, 256, "UNKNOWN(0x%08X)", regId);
-            LLPC_UNUSED(length);
+            (void(length)); // unused
             pNameString = unknownRegNameBuf;
         }
     }

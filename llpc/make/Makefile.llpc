@@ -269,16 +269,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
 
 else
 
-    vpath %.cpp $(LLPC_DEPTH)/patch/gfx6
-    vpath %.cpp $(LLPC_DEPTH)/patch/gfx6/chip
-    vpath %.cpp $(LLPC_DEPTH)/patch/gfx9
-    vpath %.cpp $(LLPC_DEPTH)/patch/gfx9/chip
-
-    # llpc/patch
-    CPPFILES +=                             \
-        llpcGfx6Chip.cpp                    \
-        llpcGfx9Chip.cpp
-
     vpath %.cpp $(LLPC_DEPTH)/util
     # llpc/util
     CPPFILES +=                             \

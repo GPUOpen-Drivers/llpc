@@ -732,7 +732,7 @@ public:
         case Dim2DArrayMsaa: return 4;
         case DimCubeArray: return 4;
         }
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         return 0;
     }
 
@@ -752,7 +752,7 @@ public:
         case Dim2DArrayMsaa: return 3;
         case DimCubeArray: return 3;
         }
-        LLPC_NEVER_CALLED();
+        llvm_unreachable("Should never be called!");
         return 0;
     }
 

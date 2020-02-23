@@ -208,7 +208,7 @@ Value* PatchIntrinsicSimplify::ConvertTo16Bit(
         return builder.CreateFPCast(&value, Type::getHalfTy(*m_pContext));
     }
 
-    LLPC_NEVER_CALLED();
+    llvm_unreachable("Should never be called!");
     return nullptr;
 }
 
@@ -236,7 +236,7 @@ Value* PatchIntrinsicSimplify::SimplifyImage(
             return nullptr;
         }
 
-        LLPC_ASSERT(operandIndex == coordOperandIndices[0]
+        assert(operandIndex == coordOperandIndices[0]
             || floatCoord == pCoord->getType()->isFloatingPointTy());
         floatCoord = pCoord->getType()->isFloatingPointTy();
     }
@@ -247,7 +247,7 @@ Value* PatchIntrinsicSimplify::SimplifyImage(
                                                            intrinsicCall.getIntrinsicID(),
                                                            {intrinsicCall.getType(), pCoordType});
 
-    LLPC_ASSERT(pIntrinsic != nullptr);
+    assert(pIntrinsic != nullptr);
 
     SmallVector<Value*, 8> args(intrinsicCall.arg_operands());
 
@@ -347,7 +347,7 @@ Value* PatchIntrinsicSimplify::SimplifyTrigonometric(
                                                            intrinsic,
                                                            {pIntrinsicType, pIntrinsicType});
 
-    LLPC_ASSERT(pIntrinsic != nullptr);
+    assert(pIntrinsic != nullptr);
 
     Value* pLeftOperand = pBinOp->getOperand(0);
 
@@ -357,7 +357,7 @@ Value* PatchIntrinsicSimplify::SimplifyTrigonometric(
         Function* const pFractIntrinsic = Intrinsic::getDeclaration(m_pModule,
                                                            Intrinsic::amdgcn_fract,
                                                            {pIntrinsicType, pIntrinsicType});
-        LLPC_ASSERT(pFractIntrinsic != nullptr);
+        assert(pFractIntrinsic != nullptr);
 
         CallInst* const pFractCall = CallInst::Create(pFractIntrinsic, pLeftOperand, "", &intrinsicCall);
         pLeftOperand = pFractCall;

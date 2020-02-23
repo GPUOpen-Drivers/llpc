@@ -136,10 +136,10 @@ NggLdsManager::NggLdsManager(
     m_waveCountInSubgroup(Gfx9::NggMaxThreadsPerSubgroup / m_pPipelineState->GetTargetInfo().GetGpuProperty().waveSize),
     m_pBuilder(pBuilder)
 {
-    LLPC_ASSERT(pBuilder != nullptr);
+    assert(pBuilder != nullptr);
 
     const auto pNggControl = m_pPipelineState->GetNggControl();
-    LLPC_ASSERT(pNggControl->enableNgg);
+    assert(pNggControl->enableNgg);
 
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasGs = (stageMask & ShaderStageToMask(ShaderStageGeometry));
@@ -210,7 +210,7 @@ NggLdsManager::NggLdsManager(
             }
 
             m_ldsRegionStart[region] = ldsRegionStart;
-            LLPC_ASSERT(ldsRegionSize != InvalidValue);
+            assert(ldsRegionSize != InvalidValue);
             ldsRegionStart += ldsRegionSize;
 
             LLPC_OUTS(format("%-40s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32,
@@ -417,8 +417,8 @@ Value* NggLdsManager::ReadValueFromLds(
     Value*       pLdsOffset,    // [in] Start offset to do LDS read operations
     bool         useDs128)      // Whether to use 128-bit LDS load, 16-byte alignment is guaranteed by caller
 {
-    LLPC_ASSERT(m_pLds != nullptr);
-    LLPC_ASSERT(pReadTy->isIntOrIntVectorTy() || pReadTy->isFPOrFPVectorTy());
+    assert(m_pLds != nullptr);
+    assert(pReadTy->isIntOrIntVectorTy() || pReadTy->isFPOrFPVectorTy());
 
     const uint32_t readBits = pReadTy->getPrimitiveSizeInBits();
 
@@ -453,7 +453,7 @@ Value* NggLdsManager::ReadValueFromLds(
     }
     else
     {
-        LLPC_ASSERT(readBits % 8 == 0);
+        assert(readBits % 8 == 0);
         bitWidth = 8;
         compCount = readBits / 8;
     }
@@ -505,10 +505,10 @@ void NggLdsManager::WriteValueToLds(
     Value*        pLdsOffset,       // [in] Start offset to do LDS write operations
     bool          useDs128)         // Whether to use 128-bit LDS store, 16-byte alignment is guaranteed by caller
 {
-    LLPC_ASSERT(m_pLds != nullptr);
+    assert(m_pLds != nullptr);
 
     auto pWriteTy = pWriteValue->getType();
-    LLPC_ASSERT(pWriteTy->isIntOrIntVectorTy() || pWriteTy->isFPOrFPVectorTy());
+    assert(pWriteTy->isIntOrIntVectorTy() || pWriteTy->isFPOrFPVectorTy());
 
     const uint32_t writeBits = pWriteTy->getPrimitiveSizeInBits();
 
@@ -543,7 +543,7 @@ void NggLdsManager::WriteValueToLds(
     }
     else
     {
-        LLPC_ASSERT(writeBits % 8 == 0);
+        assert(writeBits % 8 == 0);
         bitWidth = 8;
         compCount = writeBits / 8;
     }
@@ -594,7 +594,7 @@ void NggLdsManager::AtomicOpWithLds(
     Value*               pAtomicValue,  // [in] Value to do atomic operation
     Value*               pLdsOffset)    // [in] Start offset to do LDS atomic operations
 {
-    LLPC_ASSERT(pAtomicValue->getType()->isIntegerTy(32));
+    assert(pAtomicValue->getType()->isIntegerTy(32));
 
     // NOTE: LDS variable is defined as a pointer to i32 array. The LDS offset here has to be casted to DWORD offset
     // from BYTE offset.

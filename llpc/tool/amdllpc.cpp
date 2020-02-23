@@ -718,7 +718,7 @@ static Result GetSpirvBinaryFromFile(
         fseek(pBinFile, 0, SEEK_SET);
 
         char* pBin= new char[binSize];
-        LLPC_ASSERT(pBin != nullptr);
+        assert(pBin != nullptr);
         memset(pBin, 0, binSize);
         binSize = fread(pBin, 1, binSize, pBinFile);
 
@@ -782,7 +782,7 @@ static Result CompileGlsl(
         fseek(pInFile, 0, SEEK_SET);
 
         char* pGlslText = new char[textSize + 1];
-        LLPC_ASSERT(pGlslText != nullptr);
+        assert(pGlslText != nullptr);
         memset(pGlslText, 0, textSize + 1);
         auto readSize = fread(pGlslText, 1, textSize, pInFile);
         pGlslText[readSize] = 0;
@@ -823,7 +823,7 @@ static Result CompileGlsl(
 
             textSize = binSize * 10 + 1024;
             char* pSpvText = new char[textSize];
-            LLPC_ASSERT(pSpvText != nullptr);
+            assert(pSpvText != nullptr);
             memset(pSpvText, 0, textSize);
             LLPC_OUTS("\nSPIR-V disassembly: " << outFile << "\n");
             spvDisassembleSpirv(binSize, pSpvBin, textSize, pSpvText);
@@ -886,7 +886,7 @@ static Result AssembleSpirv(
         fseek(pInFile, 0, SEEK_SET);
 
         char* pSpvText = new char[textSize + 1];
-        LLPC_ASSERT(pSpvText != nullptr);
+        assert(pSpvText != nullptr);
         memset(pSpvText, 0, textSize + 1);
 
         size_t realSize = fread(pSpvText, 1, textSize, pInFile);
@@ -894,7 +894,7 @@ static Result AssembleSpirv(
 
         int32_t binSize = realSize * 4 + 1024; // Estimated SPIR-V binary size
         uint32_t* pSpvBin = new uint32_t[binSize / sizeof(uint32_t)];
-        LLPC_ASSERT(pSpvBin != nullptr);
+        assert(pSpvBin != nullptr);
 
         const char* pLog = nullptr;
         binSize = spvAssembleSpirv(pSpvText, binSize, pSpvBin, &pLog);
@@ -1188,8 +1188,8 @@ static Result BuildPipeline(
     else
     {
         // Build compute pipeline
-        LLPC_ASSERT(pCompileInfo->shaderModuleDatas.size() == 1);
-        LLPC_ASSERT(pCompileInfo->shaderModuleDatas[0].shaderStage == ShaderStageCompute);
+        assert(pCompileInfo->shaderModuleDatas.size() == 1);
+        assert(pCompileInfo->shaderModuleDatas[0].shaderStage == ShaderStageCompute);
 
         ComputePipelineBuildInfo* pPipelineInfo = &pCompileInfo->compPipelineInfo;
         ComputePipelineBuildOut*  pPipelineOut  = &pCompileInfo->compPipelineOut;
@@ -1420,7 +1420,7 @@ static Result ProcessPipeline(
                         // Disassemble SPIR-V code
                         uint32_t textSize = spvBin.codeSize * 10 + 1024;
                         char* pSpvText = new char[textSize];
-                        LLPC_ASSERT(pSpvText != nullptr);
+                        assert(pSpvText != nullptr);
                         memset(pSpvText, 0, textSize);
 
                         LLPC_OUTS("\nSPIR-V disassembly for " << inFile << "\n");
@@ -1559,7 +1559,7 @@ static Result ProcessPipeline(
                                 uint32_t binSize =  pPipelineState->stages[stage].dataSize;
                                 uint32_t textSize = binSize * 10 + 1024;
                                 char* pSpvText = new char[textSize];
-                                LLPC_ASSERT(pSpvText != nullptr);
+                                assert(pSpvText != nullptr);
                                 memset(pSpvText, 0, textSize);
                                 LLPC_OUTS("\nSPIR-V disassembly for " <<
                                           GetShaderStageName(pPipelineState->stages[stage].stage) << " shader module:\n");

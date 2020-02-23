@@ -186,7 +186,7 @@ Instruction* BuilderImplBase::CreateWaterfallLoop(
     ArrayRef<uint32_t>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to be uniform
     const Twine&        instName)           // [in] Name to give instruction(s)
 {
-    LLPC_ASSERT(operandIdxs.empty() == false);
+    assert(operandIdxs.empty() == false);
 
     // For each non-uniform input, try and trace back through a descriptor load to find the non-uniform index
     // used in it. If that fails, we just use the operand value as the index.
@@ -221,7 +221,7 @@ Instruction* BuilderImplBase::CreateWaterfallLoop(
     Value* pWaterfallIndex = nonUniformIndices[0];
     if (nonUniformIndices.size() > 1)
     {
-        LLPC_ASSERT(nonUniformIndices.size() == 2);
+        assert(nonUniformIndices.size() == 2);
         SmallVector<Type*, 2> indexTys;
         for (Value* pNonUniformIndex : nonUniformIndices)
         {
@@ -281,7 +281,7 @@ Instruction* BuilderImplBase::CreateWaterfallLoop(
             if (pVecTy->getElementType()->isIntegerTy(8))
             {
                 // ISel does not like waterfall.end with vector of i8 type, so cast if necessary.
-                LLPC_ASSERT((pVecTy->getNumElements() % 4) == 0);
+                assert((pVecTy->getNumElements() % 4) == 0);
                 pWaterfallEndTy = getInt32Ty();
                 if (pVecTy->getNumElements() != 4)
                 {
