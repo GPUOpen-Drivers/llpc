@@ -36,7 +36,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "llpc.h"
-#include "llpcInternal.h"
+#include "llpcBuilderContext.h"
 #include "llpcPassManager.h"
 #include "llpcTimerProfiler.h"
 
@@ -143,7 +143,7 @@ void TimerProfiler::AddTimerStartStopPass(
 {
     if (TimePassesIsEnabled || cl::EnableTimerProfile)
     {
-        pPassMgr->add(CreateStartStopTimer(&m_phaseTimers[timerKind], start));
+        pPassMgr->add(BuilderContext::CreateStartStopTimer(&m_phaseTimers[timerKind], start));
     }
 }
 

@@ -49,6 +49,7 @@
 #include "llvm/Transforms/Vectorize.h"
 
 #include "llpcBuilder.h"
+#include "llpcBuilderContext.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcInternal.h"
@@ -180,7 +181,7 @@ void SpirvLower::AddPasses(
     // Start timer for lowering passes.
     if (pLowerTimer != nullptr)
     {
-        passMgr.add(CreateStartStopTimer(pLowerTimer, true));
+        passMgr.add(BuilderContext::CreateStartStopTimer(pLowerTimer, true));
     }
 
     // Lower SPIR-V resource collecting
@@ -232,7 +233,7 @@ void SpirvLower::AddPasses(
     // Stop timer for lowering passes.
     if (pLowerTimer != nullptr)
     {
-        passMgr.add(CreateStartStopTimer(pLowerTimer, false));
+        passMgr.add(BuilderContext::CreateStartStopTimer(pLowerTimer, false));
     }
 
     // Dump the result

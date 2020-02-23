@@ -66,8 +66,6 @@ void initializeStartStopTimerPass(PassRegistry&);
 namespace Llpc
 {
 
-llvm::ModulePass* CreateStartStopTimer(llvm::Timer* pTimer, bool starting);
-
 // Initialize helper passes
 inline static void InitializeUtilPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
