@@ -288,7 +288,7 @@ Value* BuilderImplDesc::CreateLoadPushConstantsPtr(
     // generate the code directly.
     std::string callName = LlpcName::DescriptorLoadSpillTable;
     AddTypeMangling(pPushConstantsPtrTy, {}, callName);
-    auto pPushConstantsLoadCall = EmitCall(callName, pPushConstantsPtrTy, {}, NoAttrib, *this);
+    auto pPushConstantsLoadCall = CreateNamedCall(callName, pPushConstantsPtrTy, {}, NoAttrib);
     pPushConstantsLoadCall->setName(instName);
     return pPushConstantsLoadCall;
 }

@@ -213,6 +213,7 @@ if(ICD_BUILD_LLPC)
 # llpc/builder
     target_sources(llpc PRIVATE
         builder/llpcBuilder.cpp
+        builder/llpcBuilderBase.cpp
         builder/llpcBuilderContext.cpp
         builder/llpcBuilderImpl.cpp
         builder/llpcBuilderImplArith.cpp

@@ -92,7 +92,7 @@ Value* ShaderSystemValues::GetEsGsRingBufDesc()
             break;
         }
 
-        IRBuilder<> builder(&*m_pEntryPoint->front().getFirstInsertionPt());
+        BuilderBase builder(&*m_pEntryPoint->front().getFirstInsertionPt());
         m_pEsGsRingBufDesc = LoadDescFromDriverTable(tableOffset, builder);
         if ((m_shaderStage != ShaderStageGeometry) && (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 8))
         {
@@ -111,7 +111,7 @@ Value* ShaderSystemValues::GetTessFactorBufDesc()
     LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
     if (m_pTfBufDesc == nullptr)
     {
-        IRBuilder<> builder(&*m_pEntryPoint->front().getFirstInsertionPt());
+        BuilderBase builder(&*m_pEntryPoint->front().getFirstInsertionPt());
         m_pTfBufDesc = LoadDescFromDriverTable(SI_DRV_TABLE_TF_BUFFER_OFFS, builder);
     }
     return m_pTfBufDesc;
@@ -183,7 +183,7 @@ Value* ShaderSystemValues::GetOffChipLdsDesc()
     LLPC_ASSERT((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval));
     if (m_pOffChipLdsDesc == nullptr)
     {
-        IRBuilder<> builder(&*m_pEntryPoint->front().getFirstInsertionPt());
+        BuilderBase builder(&*m_pEntryPoint->front().getFirstInsertionPt());
         m_pOffChipLdsDesc = LoadDescFromDriverTable(SI_DRV_TABLE_HS_BUFFER0_OFFS, builder);
     }
     return m_pOffChipLdsDesc;
@@ -270,7 +270,7 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
     }
     if (m_gsVsRingBufDescs[streamId] == nullptr)
     {
-        IRBuilder<> builder(&*m_pEntryPoint->front().getFirstInsertionPt());
+        BuilderBase builder(&*m_pEntryPoint->front().getFirstInsertionPt());
 
         if (m_shaderStage == ShaderStageGeometry)
         {
@@ -800,7 +800,7 @@ Instruction* ShaderSystemValues::GetSpillTablePtr()
 // Load descriptor from driver table
 Instruction* ShaderSystemValues::LoadDescFromDriverTable(
     uint32_t tableOffset,    // Byte offset in driver table
-    IRBuilder<>& builder)    // Builder to use for insertion
+    BuilderBase& builder)    // Builder to use for insertion
 {
     Value* args[] =
     {
@@ -808,11 +808,10 @@ Instruction* ShaderSystemValues::LoadDescFromDriverTable(
         builder.getInt32(tableOffset),
         builder.getInt32(0),
     };
-    return EmitCall(LlpcName::DescriptorLoadBuffer,
-                    VectorType::get(Type::getInt32Ty(*m_pContext), 4),
-                    args,
-                    NoAttrib,
-                    builder);
+    return builder.CreateNamedCall(LlpcName::DescriptorLoadBuffer,
+                                   VectorType::get(Type::getInt32Ty(*m_pContext), 4),
+                                   args,
+                                   NoAttrib);
 }
 
 // =====================================================================================================================
@@ -820,7 +819,7 @@ Instruction* ShaderSystemValues::LoadDescFromDriverTable(
 Value* ShaderSystemValues::SetRingBufferDataFormat(
     Value*          pBufDesc,       // [in] Buffer Descriptor
     uint32_t        dataFormat,     // Data format
-    IRBuilder<>&    builder         // [in] Builder to use for inserting instructions
+    BuilderBase&    builder         // [in] Builder to use for inserting instructions
     ) const
 {
     Value* pElem3 = builder.CreateExtractElement(pBufDesc, (uint64_t)3);

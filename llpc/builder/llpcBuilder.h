@@ -31,10 +31,10 @@
 #pragma once
 
 #include "llpc.h"
+#include "llpcBuilderBase.h"
 #include "llpcBuilderBuiltIns.h"
 #include "llpcDebug.h"
 
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/AtomicOrdering.h"
 
 namespace Llpc
@@ -129,7 +129,7 @@ private:
 // of llvm::IRBuilder<>, so the front-end can use its methods to create IR instructions at the set insertion
 // point. In addition it has its own Create* methods to create graphics-specific IR constructs.
 //
-class Builder : public IRBuilder<>
+class Builder : public BuilderBase
 {
 public:
     // The group arithmetic operations the builder can consume.

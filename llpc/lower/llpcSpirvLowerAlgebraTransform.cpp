@@ -207,12 +207,9 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
                 (pDestTy->getScalarType()->isDoubleTy() && m_fp64DenormFlush))
             {
                 // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
-                std::string instName = "llvm.canonicalize." + GetTypeName(pDestTy);
-                auto pCanonical = EmitCall(instName,
-                                           pDestTy,
-                                           { UndefValue::get(pDestTy) }, // Will be replaced later
-                                           NoAttrib,
-                                           binaryOp.getNextNode());
+                auto pBuilder = m_pContext->GetBuilder();
+                pBuilder->SetInsertPoint(binaryOp.getNextNode());
+                auto pCanonical = pBuilder->CreateIntrinsic(Intrinsic::canonicalize, pDestTy, UndefValue::get(pDestTy));
 
                 binaryOp.replaceAllUsesWith(pCanonical);
                 pCanonical->setArgOperand(0, &binaryOp);
@@ -229,6 +226,9 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
             // TODO: FREM for float16 type is not well handled by backend compiler. We lower it here:
             // frem(x, y) = x - y * trunc(x/y)
 
+            auto pBuilder = m_pContext->GetBuilder();
+            pBuilder->SetInsertPoint(&binaryOp);
+
             auto pOne = ConstantFP::get(Type::getHalfTy(*m_pContext), 1.0);
             if (pDestTy->isVectorTy())
             {
@@ -238,19 +238,11 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
             // -trunc(x * 1/y)
             Value* pTrunc = BinaryOperator::CreateFDiv(pOne, pSrc2, "", &binaryOp);
             pTrunc = BinaryOperator::CreateFMul(pTrunc, pSrc1, "", &binaryOp);
-            pTrunc = EmitCall("llvm.trunc." + GetTypeName(pDestTy),
-                              pDestTy,
-                              { pTrunc },
-                              NoAttrib,
-                              &binaryOp);
+            pTrunc = pBuilder->CreateIntrinsic(Intrinsic::trunc, pDestTy, pTrunc);
             pTrunc = UnaryOperator::CreateFNeg(pTrunc, "", &binaryOp);
 
             // -trunc(x/y) * y + x
-            auto pFRem = EmitCall("llvm.fmuladd." + GetTypeName(pDestTy),
-                                  pDestTy,
-                                  { pTrunc, pSrc2, pSrc1 },
-                                  NoAttrib,
-                                  &binaryOp);
+            auto pFRem = pBuilder->CreateIntrinsic(Intrinsic::fmuladd, pDestTy, { pTrunc, pSrc2, pSrc1 });
 
             binaryOp.replaceAllUsesWith(pFRem);
             binaryOp.dropAllReferences();
@@ -393,15 +385,11 @@ void SpirvLowerAlgebraTransform::visitCallInst(
             (pDestTy->getScalarType()->isDoubleTy() && m_fp64DenormFlush))
         {
             // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
-            std::string instName = "llvm.canonicalize." + GetTypeName(pDestTy);
-            auto pCanonical = EmitCall(instName,
-                                       pDestTy,
-                                       { UndefValue::get(pDestTy) }, // Will be replaced later
-                                       NoAttrib,
-                                       callInst.getNextNode());
-
-                callInst.replaceAllUsesWith(pCanonical);
-                pCanonical->setArgOperand(0, &callInst);
+            auto pBuilder = m_pContext->GetBuilder();
+            pBuilder->SetInsertPoint(callInst.getNextNode());
+            auto pCanonical = pBuilder->CreateIntrinsic(Intrinsic::canonicalize, pDestTy, UndefValue::get(pDestTy));
+            callInst.replaceAllUsesWith(pCanonical);
+            pCanonical->setArgOperand(0, &callInst);
 
             m_changed = true;
         }

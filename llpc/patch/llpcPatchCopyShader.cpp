@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"
@@ -73,17 +72,17 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PatchCopyShader);
 
-    void ExportOutput(uint32_t streamId, IRBuilder<>& builder);
+    void ExportOutput(uint32_t streamId, BuilderBase& builder);
     void CollectGsGenericOutputInfo(Function* pGsEntryPoint);
 
-    Value* CalcGsVsRingOffsetForInput(uint32_t location, uint32_t compIdx, uint32_t streamId, IRBuilder<>& builder);
+    Value* CalcGsVsRingOffsetForInput(uint32_t location, uint32_t compIdx, uint32_t streamId, BuilderBase& builder);
 
-    Value* LoadValueFromGsVsRing(Type* pLoadTy, uint32_t location, uint32_t streamId, IRBuilder<>& builder);
+    Value* LoadValueFromGsVsRing(Type* pLoadTy, uint32_t location, uint32_t streamId, BuilderBase& builder);
 
-    Value* LoadGsVsRingBufferDescriptor(IRBuilder<>& builder);
+    Value* LoadGsVsRingBufferDescriptor(BuilderBase& builder);
 
-    void ExportGenericOutput(Value* pOutputValue, uint32_t location, uint32_t streamId, IRBuilder<>& builder);
-    void ExportBuiltInOutput(Value* pOutputValue, BuiltInKind builtInId, uint32_t streamId, IRBuilder<>& builder);
+    void ExportGenericOutput(Value* pOutputValue, uint32_t location, uint32_t streamId, BuilderBase& builder);
+    void ExportBuiltInOutput(Value* pOutputValue, BuiltInKind builtInId, uint32_t streamId, BuilderBase& builder);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -139,7 +138,7 @@ bool PatchCopyShader::runOnModule(
     //    i32 inreg,  ; Stream offset2
     //    i32 inreg,  ; Stream offset3
     //    i32
-    IRBuilder<> builder(*m_pContext);
+    BuilderBase builder(*m_pContext);
 
     auto pInt32Ty = Type::getInt32Ty(*m_pContext);
     Type* argTys[] = {  pInt32Ty, pInt32Ty, pInt32Ty, pInt32Ty, pInt32Ty, pInt32Ty,
@@ -363,7 +362,7 @@ void PatchCopyShader::CollectGsGenericOutputInfo(
 // Exports outputs of geometry shader, inserting buffer-load/output-export calls.
 void PatchCopyShader::ExportOutput(
     uint32_t        streamId,     // Export output of this stream
-    IRBuilder<>&    builder)      // [in] IRBuilder to use for instruction constructing
+    BuilderBase&    builder)      // [in] BuilderBase to use for instruction constructing
 {
     auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
     auto& builtInUsage = pResUsage->builtInUsage.gs;
@@ -461,7 +460,7 @@ Value* PatchCopyShader::CalcGsVsRingOffsetForInput(
     uint32_t        location,    // Output location
     uint32_t        compIdx,     // Output component
     uint32_t        streamId,    // Output stream ID
-    IRBuilder<>&    builder)     // [in] IRBuilder to use for instruction constructing
+    BuilderBase&    builder)     // [in] BuilderBase to use for instruction constructing
 {
     auto pEntryPoint = builder.GetInsertBlock()->getParent();
     Value* pVertexOffset = GetFunctionArgument(pEntryPoint, CopyShaderUserSgprIdxVertexOffset);
@@ -494,7 +493,7 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
     Type*           pLoadTy,    // [in] Type of the load value
     uint32_t        location,   // Output location
     uint32_t        streamId,   // Output stream ID
-    IRBuilder<>&    builder)    // [in] IRBuilder to use for instruction constructing
+    BuilderBase&    builder)    // [in] BuilderBase to use for instruction constructing
 {
     uint32_t elemCount = 1;
     Type* pElemTy = pLoadTy;
@@ -517,14 +516,13 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
         // real instructions when when NGG primitive shader is generated.
         std::string callName(LlpcName::NggGsOutputImport);
         callName += GetTypeName(pLoadTy);
-        return EmitCall(callName, pLoadTy,
-                        {
-                            builder.getInt32(location),
-                            builder.getInt32(0),
-                            builder.getInt32(streamId)
-                        },
-                        NoAttrib,
-                        builder);
+        return builder.CreateNamedCall(callName, pLoadTy,
+                                       {
+                                           builder.getInt32(location),
+                                           builder.getInt32(0),
+                                           builder.getInt32(streamId)
+                                       },
+                                       NoAttrib);
     }
 
     if (m_pPipelineState->IsGsOnChip())
@@ -582,7 +580,7 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
 // =====================================================================================================================
 // Load GS-VS ring buffer descriptor.
 Value* PatchCopyShader::LoadGsVsRingBufferDescriptor(
-    IRBuilder<>& builder)       // [in] IRBuilder to use for instruction constructing
+    BuilderBase& builder)       // [in] BuilderBase to use for instruction constructing
 {
     Function* pEntryPoint = builder.GetInsertBlock()->getParent();
     Value* pInternalTablePtrLow = GetFunctionArgument(pEntryPoint, EntryArgIdxInternalTablePtrLow);
@@ -617,7 +615,7 @@ void PatchCopyShader::ExportGenericOutput(
     Value*       pOutputValue,  // [in] Value exported to output
     uint32_t     location,      // Location of the output
     uint32_t     streamId,      // ID of output vertex stream
-    IRBuilder<>& builder)       // [in] IRBuilder to use for instruction constructing
+    BuilderBase& builder)       // [in] BuilderBase to use for instruction constructing
 {
     auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
     if (pResUsage->inOutUsage.enableXfb)
@@ -677,7 +675,7 @@ void PatchCopyShader::ExportGenericOutput(
 
             std::string instName(LlpcName::OutputExportXfb);
             AddTypeMangling(nullptr, args, instName);
-            EmitCall(instName, builder.getVoidTy(), args, NoAttrib, builder);
+            builder.CreateNamedCall(instName, builder.getVoidTy(), args, NoAttrib);
         }
     }
 
@@ -689,7 +687,7 @@ void PatchCopyShader::ExportGenericOutput(
         std::string instName(LlpcName::OutputExportGeneric);
         instName += GetTypeName(pOutputTy);
 
-        EmitCall(instName, builder.getVoidTy(), { builder.getInt32(location), pOutputValue }, NoAttrib, builder);
+        builder.CreateNamedCall(instName, builder.getVoidTy(), { builder.getInt32(location), pOutputValue }, NoAttrib);
     }
 }
 
@@ -699,7 +697,7 @@ void PatchCopyShader::ExportBuiltInOutput(
     Value*       pOutputValue,  // [in] Value exported to output
     BuiltInKind  builtInId,     // ID of the built-in variable
     uint32_t     streamId,      // ID of output vertex stream
-    IRBuilder<>& builder)       // [in] IRBuilder to use for instruction constructing
+    BuilderBase& builder)       // [in] BuilderBase to use for instruction constructing
 {
     auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
 
@@ -726,7 +724,7 @@ void PatchCopyShader::ExportBuiltInOutput(
                 pOutputValue
             };
             AddTypeMangling(nullptr, args, instName);
-            EmitCall(instName, builder.getVoidTy(), args, NoAttrib, builder);
+            builder.CreateNamedCall(instName, builder.getVoidTy(), args, NoAttrib);
         }
     }
 
@@ -736,7 +734,7 @@ void PatchCopyShader::ExportBuiltInOutput(
         callName += BuilderImplInOut::GetBuiltInName(builtInId);
         Value* args[] = { builder.getInt32(builtInId), pOutputValue };
         AddTypeMangling(nullptr, args, callName);
-        EmitCall(callName, builder.getVoidTy(), args, NoAttrib, builder);
+        builder.CreateNamedCall(callName, builder.getVoidTy(), args, NoAttrib);
     }
 }
 
