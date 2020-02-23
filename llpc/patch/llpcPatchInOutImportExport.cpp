@@ -6918,7 +6918,7 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
         const uint32_t workgroupSizeYMul8 = mode.workgroupSizeY * 8;
         Constant* const pWorkgroupSizeYMul8 = ConstantInt::get(pInt32Ty, workgroupSizeYMul8);
 
-        if (IsPowerOfTwo(workgroupSizeYMul8))
+        if (isPowerOf2_32(workgroupSizeYMul8))
         {
             // If we have a power of two, we can use a right shift to compute the division more efficiently.
             pOffset = BinaryOperator::CreateLShr(pX,
@@ -7062,7 +7062,7 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
         const uint32_t workgroupSizeXMul2 = mode.workgroupSizeX * 2;
         Constant* const pWorkgroupSizeXMul2 = ConstantInt::get(pInt32Ty, workgroupSizeXMul2);
 
-        if (IsPowerOfTwo(workgroupSizeXMul2))
+        if (isPowerOf2_32(workgroupSizeXMul2))
         {
             // If we have a power of two, we can use a right shift to compute the division more efficiently.
             pDiv = BinaryOperator::CreateLShr(pMaskedX,

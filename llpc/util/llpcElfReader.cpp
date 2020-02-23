@@ -372,14 +372,14 @@ ElfNote ElfReader<Elf>::GetNote(
     while (offset < pNoteSection->secHead.sh_size)
     {
         const NoteHeader* pNote = reinterpret_cast<const NoteHeader*>(pNoteSection->pData + offset);
-        const uint32_t noteNameSize = Pow2Align(pNote->nameSize, 4);
+        const uint32_t noteNameSize = alignTo(pNote->nameSize, 4);
         if (pNote->type == noteType)
         {
             memcpy(&noteNode.hdr, pNote, sizeof(NoteHeader));
             noteNode.pData = pNoteSection->pData + offset + noteHeaderSize + noteNameSize;
             break;
         }
-        offset += noteHeaderSize + noteNameSize + Pow2Align(pNote->descSize, 4);
+        offset += noteHeaderSize + noteNameSize + alignTo(pNote->descSize, 4);
     }
 
     return noteNode;

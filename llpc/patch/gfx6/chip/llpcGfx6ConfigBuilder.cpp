@@ -886,7 +886,7 @@ Result ConfigBuilder::BuildLsRegConfig(
     // On GFX7+, granularity for the LDS_SIZE field is 128. The range is 0~128 which allocates 0 to 16K DWORDs.
     const uint32_t ldsSizeDwordGranularityShift = m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift;
     const uint32_t ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
-    ldsSize = Pow2Align(ldsSizeInDwords, ldsSizeDwordGranularity) >> ldsSizeDwordGranularityShift;
+    ldsSize = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity) >> ldsSizeDwordGranularityShift;
 
     SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC2_LS, LDS_SIZE, ldsSize);
     SetLdsSizeByteSize(Util::Abi::HardwareStage::Ls, ldsSizeInDwords * 4);
