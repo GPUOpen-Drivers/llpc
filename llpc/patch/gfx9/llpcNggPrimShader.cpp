@@ -3223,7 +3223,7 @@ void NggPrimShader::RunEsOrEsVariant(
         auto pExpData = EmitCall(entryName,
                                  pEsEntry->getReturnType(),
                                  args,
-                                 NoAttrib,
+                                 {},
                                  pInsertAtEnd);
 
         // Re-construct exported data from the return value
@@ -3242,7 +3242,7 @@ void NggPrimShader::RunEsOrEsVariant(
         EmitCall(entryName,
                  pEsEntry->getReturnType(),
                  args,
-                 NoAttrib,
+                 {},
                  pInsertAtEnd);
     }
 }
@@ -3592,7 +3592,7 @@ Value* NggPrimShader::RunGsVariant(
     return EmitCall(LlpcName::NggGsEntryVariant,
                     pGsEntry->getReturnType(),
                     args,
-                    NoAttrib,
+                    {},
                     pInsertAtEnd);
 }
 
@@ -3919,7 +3919,7 @@ void NggPrimShader::RunCopyShader(
         EmitCall(LlpcName::NggCopyShaderEntryPoint,
                  m_pBuilder->getVoidTy(),
                  args,
-                 NoAttrib,
+                 {},
                  pInsertAtEnd);
     }
 }

@@ -52,7 +52,7 @@ Instruction* BuilderImplMisc::CreateEmitVertex(
     Value* pGsWaveId = EmitCall(callName,
                                 getInt32Ty(),
                                 getInt32(spv::BuiltInWaveId),
-                                NoAttrib,
+                                {},
                                 &*GetInsertPoint());
 
     // Do the sendmsg.
@@ -74,7 +74,7 @@ Instruction* BuilderImplMisc::CreateEndPrimitive(
     Value* pGsWaveId = EmitCall(callName,
                                 getInt32Ty(),
                                 getInt32(spv::BuiltInWaveId),
-                                NoAttrib,
+                                {},
                                 &*GetInsertPoint());
 
     // Do the sendmsg.

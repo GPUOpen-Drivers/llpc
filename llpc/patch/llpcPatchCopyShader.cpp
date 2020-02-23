@@ -522,7 +522,7 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
                                            builder.getInt32(0),
                                            builder.getInt32(streamId)
                                        },
-                                       NoAttrib);
+                                       {});
     }
 
     if (m_pPipelineState->IsGsOnChip())
@@ -675,7 +675,7 @@ void PatchCopyShader::ExportGenericOutput(
 
             std::string instName(LlpcName::OutputExportXfb);
             AddTypeMangling(nullptr, args, instName);
-            builder.CreateNamedCall(instName, builder.getVoidTy(), args, NoAttrib);
+            builder.CreateNamedCall(instName, builder.getVoidTy(), args, {});
         }
     }
 
@@ -687,7 +687,7 @@ void PatchCopyShader::ExportGenericOutput(
         std::string instName(LlpcName::OutputExportGeneric);
         instName += GetTypeName(pOutputTy);
 
-        builder.CreateNamedCall(instName, builder.getVoidTy(), { builder.getInt32(location), pOutputValue }, NoAttrib);
+        builder.CreateNamedCall(instName, builder.getVoidTy(), { builder.getInt32(location), pOutputValue }, {});
     }
 }
 
@@ -724,7 +724,7 @@ void PatchCopyShader::ExportBuiltInOutput(
                 pOutputValue
             };
             AddTypeMangling(nullptr, args, instName);
-            builder.CreateNamedCall(instName, builder.getVoidTy(), args, NoAttrib);
+            builder.CreateNamedCall(instName, builder.getVoidTy(), args, {});
         }
     }
 
@@ -734,7 +734,7 @@ void PatchCopyShader::ExportBuiltInOutput(
         callName += BuilderImplInOut::GetBuiltInName(builtInId);
         Value* args[] = { builder.getInt32(builtInId), pOutputValue };
         AddTypeMangling(nullptr, args, callName);
-        builder.CreateNamedCall(callName, builder.getVoidTy(), args, NoAttrib);
+        builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
     }
 }
 

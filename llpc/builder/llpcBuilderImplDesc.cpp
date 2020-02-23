@@ -70,7 +70,7 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
                                          getInt32(binding),
                                          pDescIndex,
                                      },
-                                     NoAttrib,
+                                     {},
                                      pInsertPos);
     pBufDescLoadCall->setName(instName);
 
@@ -103,7 +103,7 @@ Value* BuilderImplDesc::CreateIndexDescPtr(
                                 pDescPtr,
                                 pIndex,
                             },
-                            NoAttrib,
+                            {},
                             &*GetInsertPoint());
         pDescPtr->setName(instName);
     }
@@ -177,7 +177,7 @@ Value* BuilderImplDesc::CreateLoadDescFromPtr(
         pDesc = EmitCall(name,
                          cast<StructType>(pDescPtr->getType())->getElementType(0)->getPointerElementType(),
                          pDescPtr,
-                         NoAttrib,
+                         {},
                          &*GetInsertPoint());
         pDesc->setName(instName);
     }
@@ -200,7 +200,7 @@ Value* BuilderImplDesc::CreateGetSamplerDescPtr(
                                  getInt32(descSet),
                                  getInt32(binding),
                              },
-                             NoAttrib,
+                             {},
                              &*GetInsertPoint());
     pDescPtr->setName(instName);
     return pDescPtr;
@@ -221,7 +221,7 @@ Value* BuilderImplDesc::CreateGetImageDescPtr(
                                  getInt32(descSet),
                                  getInt32(binding),
                              },
-                             NoAttrib,
+                             {},
                              &*GetInsertPoint());
     pDescPtr->setName(instName);
     return pDescPtr;
@@ -242,7 +242,7 @@ Value* BuilderImplDesc::CreateGetTexelBufferDescPtr(
                                  getInt32(descSet),
                                  getInt32(binding),
                              },
-                             NoAttrib,
+                             {},
                              &*GetInsertPoint());
     pDescPtr->setName(instName);
     return pDescPtr;
@@ -263,7 +263,7 @@ Value* BuilderImplDesc::CreateGetFmaskDescPtr(
                                  getInt32(descSet),
                                  getInt32(binding),
                              },
-                             NoAttrib,
+                             {},
                              &*GetInsertPoint());
     pDescPtr->setName(instName);
     return pDescPtr;
@@ -288,7 +288,7 @@ Value* BuilderImplDesc::CreateLoadPushConstantsPtr(
     // generate the code directly.
     std::string callName = LlpcName::DescriptorLoadSpillTable;
     AddTypeMangling(pPushConstantsPtrTy, {}, callName);
-    auto pPushConstantsLoadCall = CreateNamedCall(callName, pPushConstantsPtrTy, {}, NoAttrib);
+    auto pPushConstantsLoadCall = CreateNamedCall(callName, pPushConstantsPtrTy, {}, {});
     pPushConstantsLoadCall->setName(instName);
     return pPushConstantsLoadCall;
 }

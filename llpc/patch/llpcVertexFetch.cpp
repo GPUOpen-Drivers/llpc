@@ -945,7 +945,7 @@ void VertexFetch::AddVertexFetchInst(
         Value* pFetch = EmitCall((Twine("llvm.amdgcn.struct.tbuffer.load") + suffix).str(),
                                  pFetchTy,
                                  args,
-                                 NoAttrib,
+                                 {},
                                  pInsertPos);
 
         if (is16bitFetch)
@@ -1037,7 +1037,7 @@ void VertexFetch::AddVertexFetchInst(
                 pCompFetch = EmitCall("llvm.amdgcn.struct.tbuffer.load.f16",
                                       Type::getHalfTy(*m_pContext),
                                       args,
-                                      NoAttrib,
+                                      {},
                                       pInsertPos);
 
                 pCompFetch = new BitCastInst(pCompFetch, Type::getInt16Ty(*m_pContext), "", pInsertPos);
@@ -1048,7 +1048,7 @@ void VertexFetch::AddVertexFetchInst(
                 pCompFetch = EmitCall("llvm.amdgcn.struct.tbuffer.load.i32",
                                       Type::getInt32Ty(*m_pContext),
                                       args,
-                                      NoAttrib,
+                                      {},
                                       pInsertPos);
             }
 

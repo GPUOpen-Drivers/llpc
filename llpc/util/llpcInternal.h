@@ -198,9 +198,6 @@ static const uint32_t SI_DRV_TABLE_SAMPLEPOS            = 12;
 
 static const uint32_t SI_STREAMOUT_TABLE_OFFS           = 0;
 
-// No attribute
-static const std::vector<llvm::Attribute::AttrKind>   NoAttrib;
-
 // Gets the entry point (valid for AMD GPU) of a LLVM module.
 llvm::Function* GetEntryPoint(llvm::Module* pModule);
 
