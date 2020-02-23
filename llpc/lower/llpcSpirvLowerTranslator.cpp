@@ -28,7 +28,7 @@
  * @brief LLPC source file: contains implementation of Llpc::SpirvLowerTranslator
  ***********************************************************************************************************************
 */
-#include "llpcBuilder.h"
+#include "lgc/llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerTranslator.h"

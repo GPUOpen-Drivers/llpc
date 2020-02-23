@@ -46,7 +46,7 @@
 #include "spirvExt.h"
 #include "SPIRVInternal.h"
 
-#include "llpcBuilder.h"
+#include "lgc/llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcComputeContext.h"
 #include "llpcContext.h"
@@ -56,7 +56,7 @@
 #include "llpcElfReader.h"
 #include "llpcElfWriter.h"
 #include "llpcFile.h"
-#include "llpcPassManager.h"
+#include "lgc/llpcPassManager.h"
 #include "llpcPipelineDumper.h"
 #include "llpcSpirvLower.h"
 #include "llpcSpirvLowerResourceCollect.h"

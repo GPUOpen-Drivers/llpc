@@ -31,7 +31,7 @@
 #include "llvm/Support/Format.h"
 
 #include "SPIRVInternal.h"
-#include "llpcBuilder.h"
+#include "lgc/llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcGraphicsContext.h"
 

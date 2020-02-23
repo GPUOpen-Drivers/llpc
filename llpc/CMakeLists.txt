@@ -29,7 +29,7 @@ project(LLPC C CXX)
 add_library(llpc STATIC "")
 
 if(ICD_BUILD_LLPC)
-    add_dependencies(llpc LLVMCore)
+  add_dependencies(llpc LLVMlgc)
 endif()
 
 ### Cached Project Options #############################################################################################
@@ -157,14 +157,6 @@ endif()
 if(ICD_BUILD_LLPC)
     target_compile_definitions(llpc PRIVATE ICD_BUILD_LLPC)
 endif()
-target_compile_definitions(llpc PRIVATE
-        PAL_BUILD_GFX9
-        PAL_BUILD_GFX10
-        CHIP_HDR_GFX10
-        CHIP_HDR_VEGA20
-        CHIP_HDR_RAVEN2
-        CHIP_HDR_NAVI14
-        )
 
 if(ICD_BUILD_LLPC)
     if(XGL_LLVM_UPSTREAM)
@@ -184,18 +176,11 @@ target_include_directories(llpc
     PUBLIC
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/../include
+        ${PROJECT_SOURCE_DIR}/../lgc/include
     PRIVATE
-        ${PROJECT_SOURCE_DIR}/builder
         ${PROJECT_SOURCE_DIR}/context
-        ${PROJECT_SOURCE_DIR}/imported/chip/gfx6
-        ${PROJECT_SOURCE_DIR}/imported/chip/gfx9
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/lower
-        ${PROJECT_SOURCE_DIR}/patch
-        ${PROJECT_SOURCE_DIR}/patch/gfx6/chip
-        ${PROJECT_SOURCE_DIR}/patch/gfx9/chip
-        ${PROJECT_SOURCE_DIR}/patch/gfx9
-        ${PROJECT_SOURCE_DIR}/patch/generate
         ${PROJECT_SOURCE_DIR}/translator/include
         ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
         ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
@@ -213,26 +198,6 @@ if(WIN32)
 endif()
 
 if(ICD_BUILD_LLPC)
-# llpc/builder
-    target_sources(llpc PRIVATE
-        builder/llpcBuilder.cpp
-        builder/llpcBuilderBase.cpp
-        builder/llpcBuilderContext.cpp
-        builder/llpcBuilderImpl.cpp
-        builder/llpcBuilderImplArith.cpp
-        builder/llpcBuilderImplDesc.cpp
-        builder/llpcBuilderImplImage.cpp
-        builder/llpcBuilderImplInOut.cpp
-        builder/llpcBuilderImplMatrix.cpp
-        builder/llpcBuilderImplMisc.cpp
-        builder/llpcBuilderImplSubgroup.cpp
-        builder/llpcBuilderRecorder.cpp
-        builder/llpcBuilderReplayer.cpp
-        builder/llpcPipelineState.cpp
-        builder/llpcShaderModes.cpp
-        builder/llpcTargetInfo.cpp
-    )
-
 # llpc/context
     target_sources(llpc PRIVATE
         context/llpcCompiler.cpp
@@ -259,38 +224,6 @@ if(ICD_BUILD_LLPC)
         lower/llpcSpirvLowerUtil.cpp
     )
 
-# llpc/patch
-    target_sources(llpc PRIVATE
-        patch/gfx6/chip/llpcGfx6Chip.cpp
-        patch/gfx6/chip/llpcGfx6ConfigBuilder.cpp
-        patch/gfx9/chip/llpcGfx9Chip.cpp
-        patch/gfx9/chip/llpcGfx9ConfigBuilder.cpp
-        patch/gfx9/llpcNggLdsManager.cpp
-        patch/gfx9/llpcNggPrimShader.cpp
-        patch/gfx9/llpcShaderMerger.cpp
-        patch/llpcCodeGenManager.cpp
-        patch/llpcConfigBuilderBase.cpp
-        patch/llpcFragColorExport.cpp
-        patch/llpcPatch.cpp
-        patch/llpcPatchBufferOp.cpp
-        patch/llpcPatchCheckShaderCache.cpp
-        patch/llpcPatchCopyShader.cpp
-        patch/llpcPatchDescriptorLoad.cpp
-        patch/llpcPatchEntryPointMutate.cpp
-        patch/llpcPatchInOutImportExport.cpp
-        patch/llpcPatchIntrinsicSimplify.cpp
-        patch/llpcPatchLlvmIrInclusion.cpp
-        patch/llpcPatchLoadScalarizer.cpp
-        patch/llpcPatchNullFragShader.cpp
-        patch/llpcPatchPeepholeOpt.cpp
-        patch/llpcPatchPreparePipelineAbi.cpp
-        patch/llpcPatchPushConstOp.cpp
-        patch/llpcPatchResourceCollect.cpp
-        patch/llpcPatchSetupTargetFeatures.cpp
-        patch/llpcSystemValues.cpp
-        patch/llpcVertexFetch.cpp
-    )
-
 # llpc/translator
     target_sources(llpc PRIVATE
         translator/lib/SPIRV/SPIRVReader.cpp
@@ -312,21 +245,15 @@ if(ICD_BUILD_LLPC)
 
 # llpc/util
     target_sources(llpc PRIVATE
-        util/llpcBuilderDebug.cpp
         util/llpcDebug.cpp
         util/llpcElfReader.cpp
         util/llpcElfWriter.cpp
         util/llpcEmuLib.cpp
-        util/llpcInternal.cpp
         util/llpcFile.cpp
-        util/llpcPassManager.cpp
         util/llpcPipelineDumper.cpp
         util/llpcPipelineDumperRegs.cpp
-        util/llpcPipelineShaders.cpp
         util/llpcShaderModuleHelper.cpp
-        util/llpcStartStopTimer.cpp
         util/llpcTimerProfiler.cpp
-        util/llpcGfxRegHandler.cpp
         util/llpcUtil.cpp
     )
 else()
@@ -507,7 +434,7 @@ if(UNIX)
 elseif(WIN32)
     target_link_libraries(amdllpc PRIVATE llpc vfx)
 endif()
-    llvm_map_components_to_libnames(llvm_libs amdgpucodegen amdgpuinfo amdgpuasmparser amdgpudisassembler LTO ipo analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils coroutines aggressiveinstcombine)
+llvm_map_components_to_libnames(llvm_libs lgc amdgpucodegen amdgpuinfo amdgpuasmparser amdgpudisassembler LTO ipo analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils coroutines aggressiveinstcombine)
 target_link_libraries(amdllpc PRIVATE ${llvm_libs})
 target_link_libraries(amdllpc PRIVATE cwpack)
 endif()

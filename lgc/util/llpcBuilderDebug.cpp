@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,41 +24,23 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcComputeContext.cpp
- * @brief LLPC source file: contains implementation of class Llpc::ComputeContext.
+ * @file  llpcBuilderDebug.cpp
+ * @brief LLPC header file: middle-end debug functions
  ***********************************************************************************************************************
  */
-#include "llpcComputeContext.h"
-#include "lgc/llpcPipeline.h"
-#include "SPIRVInternal.h"
-
-#define DEBUG_TYPE "llpc-compute-context"
+#include "lgc/llpcBuilderContext.h"
+#include "llpcBuilderDebug.h"
 
 using namespace llvm;
 
-namespace Llpc
+namespace lgc
 {
 
-// =====================================================================================================================
-ComputeContext::ComputeContext(
-    GfxIpVersion                    gfxIp,            // Graphics Ip version info
-    const ComputePipelineBuildInfo* pPipelineInfo,    // [in] Compute pipeline build info
-    MetroHash::Hash*                pPipelineHash,    // [in] Pipeline hash code
-    MetroHash::Hash*                pCacheHash)       // [in] Cache hash code
-    :
-    PipelineContext(gfxIp, pPipelineHash, pCacheHash),
-    m_pPipelineInfo(pPipelineInfo)
+//======================================================================================================================
+// Get pointer to stream for LLPC_OUTS, or nullptr if disabled.
+raw_ostream* GetLgcOuts()
 {
+    return BuilderContext::GetLgcOuts();
 }
 
-// =====================================================================================================================
-// Gets pipeline shader info of the specified shader stage
-const PipelineShaderInfo* ComputeContext::GetPipelineShaderInfo(
-    ShaderStage shaderStage // Shader stage
-    ) const
-{
-    assert(shaderStage == ShaderStageCompute);
-    return &m_pPipelineInfo->cs;
-}
-
-} // Llpc
+} // lgc

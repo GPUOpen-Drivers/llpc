@@ -41,9 +41,9 @@
 #include "llvm/Analysis/ConstantFolding.h"
 
 #include "SPIRVInternal.h"
-#include "llpcBuilder.h"
+#include "lgc/llpcBuilder.h"
 #include "llpcContext.h"
-#include "llpcPipeline.h"
+#include "lgc/llpcPipeline.h"
 #include "llpcSpirvLowerAlgebraTransform.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-algebra-transform"

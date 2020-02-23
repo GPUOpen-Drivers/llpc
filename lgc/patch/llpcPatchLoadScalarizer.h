@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2020 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,41 +24,47 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcComputeContext.cpp
- * @brief LLPC source file: contains implementation of class Llpc::ComputeContext.
+ * @file  llpcPatchLoadScalarizer.h
+ * @brief LLPC header file: contains declaration of class lgc::PatchLoadScalarizer.
  ***********************************************************************************************************************
  */
-#include "llpcComputeContext.h"
-#include "lgc/llpcPipeline.h"
-#include "SPIRVInternal.h"
+#pragma once
 
-#define DEBUG_TYPE "llpc-compute-context"
+#include "llvm/IR/InstVisitor.h"
 
-using namespace llvm;
+#include "lgc/llpcBuilder.h"
+#include "llpcPatch.h"
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
-ComputeContext::ComputeContext(
-    GfxIpVersion                    gfxIp,            // Graphics Ip version info
-    const ComputePipelineBuildInfo* pPipelineInfo,    // [in] Compute pipeline build info
-    MetroHash::Hash*                pPipelineHash,    // [in] Pipeline hash code
-    MetroHash::Hash*                pCacheHash)       // [in] Cache hash code
-    :
-    PipelineContext(gfxIp, pPipelineHash, pCacheHash),
-    m_pPipelineInfo(pPipelineInfo)
+// Represents the pass of LLVM patching operations for scalarize load.
+class PatchLoadScalarizer final:
+    public llvm::FunctionPass,
+    public llvm::InstVisitor<PatchLoadScalarizer>
 {
-}
+public:
+    explicit PatchLoadScalarizer();
 
-// =====================================================================================================================
-// Gets pipeline shader info of the specified shader stage
-const PipelineShaderInfo* ComputeContext::GetPipelineShaderInfo(
-    ShaderStage shaderStage // Shader stage
-    ) const
-{
-    assert(shaderStage == ShaderStageCompute);
-    return &m_pPipelineInfo->cs;
-}
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override;
+    bool runOnFunction(llvm::Function& function) override;
 
-} // Llpc
+    void visitLoadInst(llvm::LoadInst& loadInst);
+
+    // -----------------------------------------------------------------------------------------------------------------
+
+    static char ID;   // ID of this pass
+
+private:
+    PatchLoadScalarizer(const PatchLoadScalarizer&) = delete;
+    PatchLoadScalarizer& operator=(const PatchLoadScalarizer&) = delete;
+
+    // -----------------------------------------------------------------------------------------------------------------
+
+    llvm::SmallVector<llvm::Instruction*, 8>        m_instsToErase;         // Instructions to erase
+    std::unique_ptr<llvm::IRBuilder<>>              m_pBuilder;             // The IRBuilder.
+    uint32_t                                        m_scalarThreshold;      // The threshold for load scalarizer
+};
+
+} // lgc

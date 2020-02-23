@@ -48,11 +48,11 @@
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Vectorize.h"
 
-#include "llpcBuilder.h"
-#include "llpcBuilderContext.h"
+#include "lgc/llpcBuilder.h"
+#include "lgc/llpcBuilderContext.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
-#include "llpcPassManager.h"
+#include "lgc/llpcPassManager.h"
 #include "llpcSpirvLower.h"
 #include "llpcSpirvLowerUtil.h"
 
