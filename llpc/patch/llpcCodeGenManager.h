@@ -79,9 +79,6 @@ class CodeGenManager
 public:
     static void SetupTargetFeatures(PipelineState* pPipelineState, llvm::Module* pModule);
 
-    static Result Run(llvm::Module*               pModule,
-                      llvm::legacy::PassManager&  passMgr);
-
 private:
     CodeGenManager() = delete;
     CodeGenManager(const CodeGenManager&) = delete;

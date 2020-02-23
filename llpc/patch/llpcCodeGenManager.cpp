@@ -36,7 +36,6 @@
 #include "llvm/Support/ErrorHandling.h"
 
 #include "llpcCodeGenManager.h"
-#include "llpcFile.h"
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
 #include "llpcPipelineState.h"

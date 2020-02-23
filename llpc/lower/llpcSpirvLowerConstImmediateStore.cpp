@@ -34,7 +34,6 @@
 #include <vector>
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
-#include "llpcIntrinsDefs.h"
 #include "llpcSpirvLowerConstImmediateStore.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-const-immediate-store"

@@ -30,8 +30,6 @@
  */
 #pragma once
 
-#include <unordered_set>
-
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
