@@ -113,48 +113,6 @@ inline size_t VoidPtrDiff(
 }
 
 // =====================================================================================================================
-// Determines if a value is a power of two.
-inline bool IsPowerOfTwo(
-    uint64_t value)  // Value to check.
-{
-    return (value == 0) ? false : ((value & (value - 1)) == 0);
-}
-
-// =====================================================================================================================
-// Rounds the specified uint "value" up to the nearest value meeting the specified "alignment".  Only power of 2
-// alignments are supported by this function.
-template<typename T>
-inline T Pow2Align(
-    T        value,      // Value to align.
-    uint64_t alignment)  // Desired alignment (must be a power of 2)
-{
-    LLPC_ASSERT(IsPowerOfTwo(alignment));
-    return ((value + static_cast<T>(alignment) - 1) & ~(static_cast<T>(alignment) - 1));
-}
-
-// =====================================================================================================================
-// Rounds up the specified integer to the nearest multiple of the specified alignment value.
-// Returns rounded value.
-template<typename T>
-inline T RoundUpToMultiple(
-    T operand,   //< Value to be aligned.
-    T alignment) //< Alignment desired.
-{
-    return (((operand + (alignment - 1)) / alignment) * alignment);
-}
-
-// =====================================================================================================================
-// Rounds down the specified integer to the nearest multiple of the specified alignment value.
-// Returns rounded value.
-template<typename T>
-inline T RoundDownToMultiple(
-    T operand,    //< Value to be aligned.
-    T alignment)  //< Alignment desired.
-{
-    return ((operand / alignment) * alignment);
-}
-
-// =====================================================================================================================
 // Computes the base-2 logarithm of an unsigned 64-bit integer.
 //
 // If the given integer is not a power of 2, this function will not provide an exact answer.

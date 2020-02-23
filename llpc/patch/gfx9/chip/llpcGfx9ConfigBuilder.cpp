@@ -195,7 +195,7 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of registe
     uint32_t numShaderEngines = m_pPipelineState->GetTargetInfo().GetGpuProperty().numShaderEngines;
     if (numShaderEngines > 2)
     {
-        primGroupSize = Pow2Align(primGroupSize, 2);
+        primGroupSize = alignTo(primGroupSize, 2);
     }
 
     iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
@@ -672,7 +672,7 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig()
     uint32_t numShaderEngines = m_pPipelineState->GetTargetInfo().GetGpuProperty().numShaderEngines;
     if (numShaderEngines > 2)
     {
-        primGroupSize = Pow2Align(primGroupSize, 2);
+        primGroupSize = alignTo(primGroupSize, 2);
     }
 
     iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
@@ -1454,7 +1454,7 @@ Result ConfigBuilder::BuildLsHsRegConfig(
 
     const uint32_t ldsSizeDwordGranularity = 128u;
     const uint32_t ldsSizeDwordGranularityShift = 7u;
-    uint32_t ldsSize = Pow2Align(ldsSizeInDwords, ldsSizeDwordGranularity) >> ldsSizeDwordGranularityShift;
+    uint32_t ldsSize = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity) >> ldsSizeDwordGranularityShift;
 
     if (gfxIp.major == 9)
     {

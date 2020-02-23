@@ -532,7 +532,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
         // Total LDS use per subgroup aligned to the register granularity
         uint32_t gsOnChipLdsSize =
-            Pow2Align((esGsLdsSize + gsVsLdsSize),
+            alignTo((esGsLdsSize + gsVsLdsSize),
                       static_cast<uint32_t>((1 << m_pPipelineState->GetTargetInfo().GetGpuProperty()
                                             .ldsSizeDwordGranularityShift)));
 
@@ -549,8 +549,8 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             const uint32_t esGsItemSizePerPrim = esGsRingItemSizeOnChip * esMinVertsPerSubgroup * reuseOffMultiplier;
             const uint32_t itemSizeTotal       = esGsItemSizePerPrim + gsVsRingItemSizeOnChipInstanced;
 
-            esGsLdsSize = RoundUpToMultiple((esGsItemSizePerPrim * maxLdsSize) / itemSizeTotal, esGsItemSizePerPrim);
-            gsVsLdsSize = RoundDownToMultiple(maxLdsSize - esGsLdsSize, gsVsRingItemSizeOnChipInstanced);
+            esGsLdsSize = alignTo((esGsItemSizePerPrim * maxLdsSize) / itemSizeTotal, esGsItemSizePerPrim);
+            gsVsLdsSize = alignDown(maxLdsSize - esGsLdsSize, gsVsRingItemSizeOnChipInstanced);
 
             gsOnChipLdsSize = maxLdsSize;
         }
@@ -691,14 +691,14 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 switch (pNggControl->subgroupSizing)
                 {
                 case NggSubgroupSizingType::HalfSize:
-                    esVertsPerSubgroup = RoundDownToMultiple((Gfx9::NggMaxThreadsPerSubgroup / 2u), vertsPerPrimitive);
+                    esVertsPerSubgroup = alignDown((Gfx9::NggMaxThreadsPerSubgroup / 2u), vertsPerPrimitive);
                     gsPrimsPerSubgroup = esVertsPerSubgroup / vertsPerPrimitive;
                     break;
                 case NggSubgroupSizingType::OptimizeForVerts:
                     // Currently the programming of OptimizeForVerts is an inverse of MaximumSize. OptimizeForVerts is
                     // not expected to be a performant choice for fast launch, and as such MaximumSize, HalfSize, or
                     // Explicit should be chosen, with Explicit being optimal for non-point topologies.
-                    gsPrimsPerSubgroup = RoundDownToMultiple(Gfx9::NggMaxThreadsPerSubgroup, vertsPerPrimitive);
+                    gsPrimsPerSubgroup = alignDown(Gfx9::NggMaxThreadsPerSubgroup, vertsPerPrimitive);
                     esVertsPerSubgroup = gsPrimsPerSubgroup / vertsPerPrimitive;
                     break;
                 case NggSubgroupSizingType::Explicit:
@@ -714,7 +714,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 case NggSubgroupSizingType::Auto:
                 case NggSubgroupSizingType::MaximumSize:
                 default:
-                    esVertsPerSubgroup = RoundDownToMultiple(Gfx9::NggMaxThreadsPerSubgroup, vertsPerPrimitive);
+                    esVertsPerSubgroup = alignDown(Gfx9::NggMaxThreadsPerSubgroup, vertsPerPrimitive);
                     gsPrimsPerSubgroup = esVertsPerSubgroup / vertsPerPrimitive;
                     break;
                 }
@@ -776,7 +776,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             }
 
             const uint32_t ldsSizeDwords =
-                Pow2Align(expectedEsLdsSize + expectedGsLdsSize,
+                alignTo(expectedEsLdsSize + expectedGsLdsSize,
                           static_cast<uint32_t>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty()
                                                 .ldsSizeDwordGranularityShift));
 
@@ -851,7 +851,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             uint32_t esGsLdsSize = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
 
             // Total LDS use per subgroup aligned to the register granularity.
-            uint32_t gsOnChipLdsSize = RoundUpToMultiple(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
+            uint32_t gsOnChipLdsSize = alignTo(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
 
             // Use the client-specified amount of LDS space per sub-group. If they specified zero, they want us to
             // choose a reasonable default. The final amount must be 128-DWORD aligned.
@@ -874,7 +874,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 LLPC_ASSERT(gsPrimsPerSubgroup > 0);
 
                 esGsLdsSize     = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
-                gsOnChipLdsSize = RoundUpToMultiple(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
+                gsOnChipLdsSize = alignTo(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
 
                 LLPC_ASSERT(gsOnChipLdsSize <= maxLdsSize);
             }
@@ -895,7 +895,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 uint32_t onchipGsPrimsPerSubgroup = gsPrimsPerSubgroup;
 
                 // Total LDS use per subgroup aligned to the register granularity to keep ESGS and GSVS data on chip.
-                uint32_t onchipEsGsVsLdsSize = RoundUpToMultiple(esGsLdsSize + gsVsLdsSize, ldsSizeDwordGranularity);
+                uint32_t onchipEsGsVsLdsSize = alignTo(esGsLdsSize + gsVsLdsSize, ldsSizeDwordGranularity);
                 uint32_t onchipEsGsLdsSizeOnchipGsVs = esGsLdsSize;
 
                 if (onchipEsGsVsLdsSize > maxLdsSize)
@@ -914,7 +914,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                                      maxEsVertsPerSubgroup);
 
                         // Calculate the LDS sizes required to hit this threshold.
-                        onchipEsGsLdsSizeOnchipGsVs = Pow2Align(esGsRingItemSize * worstCaseEsVertsPerSubgroup,
+                        onchipEsGsLdsSizeOnchipGsVs = alignTo(esGsRingItemSize * worstCaseEsVertsPerSubgroup,
                                                                 ldsSizeDwordGranularity);
                         gsVsLdsSize = gsVsItemSize * onchipGsPrimsPerSubgroup;
                         onchipEsGsVsLdsSize = onchipEsGsLdsSizeOnchipGsVs + gsVsLdsSize;
@@ -973,7 +973,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             if ((m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major == 10) && hasTs && (gsOnChip == false))
             {
                 uint32_t esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
-                uint32_t onChipGsLdsMagicSize = Pow2Align((esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
+                uint32_t onChipGsLdsMagicSize = alignTo((esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
                             static_cast<uint32_t>((1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift)));
 
                 // If the new size is greater than the size we previously set

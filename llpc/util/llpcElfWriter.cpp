@@ -427,7 +427,7 @@ size_t ElfWriter<Elf>::GetRequiredBufferSizeBytes()
     // Iterate through the section list
     for (auto& section : m_sections)
     {
-        totalBytes += Pow2Align(section.secHead.sh_size, sizeof(uint32_t));
+        totalBytes += alignTo(section.secHead.sh_size, sizeof(uint32_t));
     }
 
     totalBytes += m_header.e_shentsize * m_header.e_shnum;
@@ -450,8 +450,8 @@ void ElfWriter<Elf>::AssembleNotes()
     uint32_t noteSize = 0;
     for (auto& note : m_notes)
     {
-        const uint32_t noteNameSize = Pow2Align(note.hdr.nameSize, sizeof(uint32_t));
-        noteSize += noteHeaderSize + noteNameSize + Pow2Align(note.hdr.descSize, sizeof(uint32_t));
+        const uint32_t noteNameSize = alignTo(note.hdr.nameSize, sizeof(uint32_t));
+        noteSize += noteHeaderSize + noteNameSize + alignTo(note.hdr.descSize, sizeof(uint32_t));
     }
 
     delete[] pNoteSection->pData;
@@ -464,10 +464,10 @@ void ElfWriter<Elf>::AssembleNotes()
     {
         memcpy(pData, &note.hdr, noteHeaderSize);
         pData += noteHeaderSize;
-        const uint32_t noteNameSize = Pow2Align(note.hdr.nameSize, sizeof(uint32_t));
+        const uint32_t noteNameSize = alignTo(note.hdr.nameSize, sizeof(uint32_t));
         memcpy(pData, &note.hdr.name, noteNameSize);
         pData += noteNameSize;
-        const uint32_t noteDescSize = Pow2Align(note.hdr.descSize, sizeof(uint32_t));
+        const uint32_t noteDescSize = alignTo(note.hdr.descSize, sizeof(uint32_t));
         memcpy(pData, note.pData, noteDescSize);
         pData += noteDescSize;
     }
@@ -573,7 +573,7 @@ void ElfWriter<Elf>::CalcSectionHeaderOffset()
 
     for (auto& section : m_sections)
     {
-        const uint32_t secSzBytes = Pow2Align(section.secHead.sh_size, sizeof(uint32_t));
+        const uint32_t secSzBytes = alignTo(section.secHead.sh_size, sizeof(uint32_t));
         sharedHdrOffset += secSzBytes;
     }
 
@@ -616,7 +616,7 @@ void ElfWriter<Elf>::WriteToBuffer(
         section.secHead.sh_offset = static_cast<uint32_t>(pBuffer - pData);
         const uint32_t sizeBytes = section.secHead.sh_size;
         memcpy(pBuffer, section.pData, sizeBytes);
-        pBuffer += Pow2Align(sizeBytes, sizeof(uint32_t));
+        pBuffer += alignTo(sizeBytes, sizeof(uint32_t));
     }
 
     const uint32_t secHdrSize = sizeof(typename Elf::SectionHeader);
@@ -667,12 +667,12 @@ Result ElfWriter<Elf>::CopyFromReader(
     while (offset < pNoteSection->secHead.sh_size)
     {
         const NoteHeader* pNote = reinterpret_cast<const NoteHeader*>(pNoteSection->pData + offset);
-        const uint32_t noteNameSize = Pow2Align(pNote->nameSize, 4);
+        const uint32_t noteNameSize = alignTo(pNote->nameSize, 4);
         ElfNote noteNode;
         memcpy(&noteNode.hdr, pNote, noteHeaderSize);
         memcpy(noteNode.hdr.name, pNote->name, noteNameSize);
 
-        const uint32_t noteDescSize = Pow2Align(pNote->descSize, 4);
+        const uint32_t noteDescSize = alignTo(pNote->descSize, 4);
         auto pData = new uint8_t[noteDescSize];
         memcpy(pData, pNoteSection->pData + offset + noteHeaderSize + noteNameSize, noteDescSize);
         noteNode.pData = pData;
@@ -829,7 +829,7 @@ void ElfWriter<Elf>::MergeElfBinary(
     }
 
     size_t isaOffset = (pNonFragmentIsaSymbol == nullptr) ?
-                       Pow2Align(pNonFragmentTextSection->secHead.sh_size, 0x100) :
+                       alignTo(pNonFragmentTextSection->secHead.sh_size, 0x100) :
                        pNonFragmentIsaSymbol->value;
     for (auto& fragmentSymbol : fragmentSymbols)
     {
@@ -1039,7 +1039,7 @@ Result ElfWriter<Elf>::LinkGraphicsRelocatableElf(
     relocatableElfs[1]->GetTextSectionData(&pTextSection2);
 
     MergeSection(pTextSection1,
-                 Pow2Align(pTextSection1->secHead.sh_size, 0x100),
+                 alignTo(pTextSection1->secHead.sh_size, 0x100),
                  nullptr,
                  pTextSection2,
                  0,
@@ -1073,7 +1073,7 @@ Result ElfWriter<Elf>::LinkGraphicsRelocatableElf(
         // Update the offset for the next elf file.
         ElfSectionBuffer<typename Elf::SectionHeader>* pTextSection = nullptr;
         pElf->GetSectionDataBySectionIndex(relocElfTextSectionId, &pTextSection);
-        offset += Pow2Align(pTextSection->secHead.sh_size, 0x100);
+        offset += alignTo(pTextSection->secHead.sh_size, 0x100);
     }
 
     // Apply relocations

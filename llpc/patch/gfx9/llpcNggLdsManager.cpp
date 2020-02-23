@@ -176,7 +176,7 @@ NggLdsManager::NggLdsManager(
 
         // NOTE: We round ES-GS LDS size to 4-DWORD alignment. This is for later LDS read/write operations of mutilple
         // DWORDs (such as DS128).
-        const uint32_t esGsRingLdsSize = RoundUpToMultiple(calcFactor.esGsLdsSize, 4u) * SizeOfDword;
+        const uint32_t esGsRingLdsSize = alignTo(calcFactor.esGsLdsSize, 4u) * SizeOfDword;
         const uint32_t gsVsRingLdsSize = calcFactor.gsOnChipLdsSize * SizeOfDword - esGsRingLdsSize -
                                          CalcGsExtraLdsSize(m_pPipelineState);
 

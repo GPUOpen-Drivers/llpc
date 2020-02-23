@@ -1369,7 +1369,7 @@ OStream& operator<<(
             while (offset < pSection->secHead.sh_size)
             {
                 const NoteHeader* pNode = reinterpret_cast<const NoteHeader*>(pSection->pData + offset);
-                const uint32_t noteNameSize = Pow2Align(pNode->nameSize, 4);
+                const uint32_t noteNameSize = alignTo(pNode->nameSize, 4);
                 switch (static_cast<uint32_t>(pNode->type))
                 {
                 case static_cast<uint32_t>(Util::Abi::PipelineAbiNoteType::HsaIsa):
@@ -1536,7 +1536,7 @@ OStream& operator<<(
                     break;
                 }
                 }
-                offset += noteHeaderSize + noteNameSize + Pow2Align(pNode->descSize, sizeof(uint32_t));
+                offset += noteHeaderSize + noteNameSize + alignTo(pNode->descSize, sizeof(uint32_t));
                 LLPC_ASSERT(offset <= pSection->secHead.sh_size);
             }
         }
