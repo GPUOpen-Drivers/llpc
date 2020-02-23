@@ -50,6 +50,7 @@
 
 #include "llpcBuilder.h"
 #include "llpcContext.h"
+#include "llpcDebug.h"
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
 #include "llpcSpirvLower.h"

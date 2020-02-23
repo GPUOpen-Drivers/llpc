@@ -308,6 +308,7 @@ if(ICD_BUILD_LLPC)
 
 # llpc/util
     target_sources(llpc PRIVATE
+        util/llpcBuilderDebug.cpp
         util/llpcDebug.cpp
         util/llpcElfReader.cpp
         util/llpcElfWriter.cpp

@@ -35,7 +35,6 @@
 #include "llvm/Support/Timer.h"
 
 #include "llpc.h"
-#include "llpcDebug.h"
 
 namespace Llpc
 {

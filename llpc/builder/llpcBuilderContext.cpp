@@ -60,6 +60,8 @@ class PassRegistry;
 static bool Initialized;
 #endif
 
+raw_ostream* BuilderContext::m_pLlpcOuts;
+
 // -emit-llvm: emit LLVM assembly instead of ISA
 static cl::opt<bool> EmitLlvm("emit-llvm",
                               cl::desc("Emit LLVM assembly instead of AMD GPU ISA"),
@@ -228,9 +230,9 @@ void BuilderContext::AddTargetPasses(
     }
 
     // Dump the module just before codegen.
-    if (EnableOuts())
+    if (raw_ostream* pOuts = GetLlpcOuts())
     {
-        passMgr.add(createPrintModulePass(outs(),
+        passMgr.add(createPrintModulePass(*pOuts,
                     "===============================================================================\n"
                     "// LLPC final pipeline module info\n"));
     }

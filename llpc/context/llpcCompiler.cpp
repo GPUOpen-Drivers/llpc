@@ -51,6 +51,7 @@
 #include "llpcCompiler.h"
 #include "llpcComputeContext.h"
 #include "llpcContext.h"
+#include "llpcDebug.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcGraphicsContext.h"
@@ -311,6 +312,12 @@ Result VKAPI_CALL ICompiler::Create(
         s_optionHash = optionHash;
         *ppCompiler = new Compiler(gfxIp, optionCount, options, s_optionHash);
         assert(*ppCompiler != nullptr);
+
+        if (EnableOuts())
+        {
+            // LLPC_OUTS is enabled. Ensure it is enabled in LGC (the middle-end) too.
+            BuilderContext::SetLlpcOuts(&outs());
+        }
     }
     else
     {

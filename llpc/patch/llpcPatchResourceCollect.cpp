@@ -34,6 +34,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "llpcBuilderContext.h"
+#include "llpcBuilderDebug.h"
 #include "llpcBuilderImpl.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"

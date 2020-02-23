@@ -46,7 +46,6 @@
 #include "llpcAbiMetadata.h"
 #include "llpcBuilderBase.h"
 #include "llpcContext.h"
-#include "llpcDebug.h"
 #include "llpcElfReader.h"
 #include "llpcInternal.h"
 

@@ -32,7 +32,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/CommandLine.h"
 
-#include "llpcDebug.h"
+#include "llpcBuilderDebug.h"
 #include "llpcPassManager.h"
 
 namespace llvm

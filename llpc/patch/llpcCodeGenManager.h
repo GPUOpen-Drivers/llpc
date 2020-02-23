@@ -35,7 +35,6 @@
 
 #include <string>
 #include "llpc.h"
-#include "llpcDebug.h"
 #include "llpcElfReader.h"
 
 namespace llvm

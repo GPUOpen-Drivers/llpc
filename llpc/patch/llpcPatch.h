@@ -33,7 +33,6 @@
 #include "llvm/Pass.h"
 
 #include "llpc.h"
-#include "llpcDebug.h"
 #include "llpcPipeline.h"
 
 namespace llvm

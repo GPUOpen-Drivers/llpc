@@ -37,7 +37,6 @@
 #include "llvm/Support/Mutex.h"
 
 #include "llpc.h"
-#include "llpcDebug.h"
 #include "llpcFile.h"
 #include "llpcInternal.h"
 #include "llpcMetroHash.h"

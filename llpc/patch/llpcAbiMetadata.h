@@ -32,7 +32,6 @@
 
 #include "palPipelineAbi.h"
 #include "llpc.h"
-#include "llpcDebug.h"
 
 namespace Llpc
 {

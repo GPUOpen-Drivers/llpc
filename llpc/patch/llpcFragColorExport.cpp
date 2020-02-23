@@ -32,7 +32,6 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 
-#include "llpcDebug.h"
 #include "llpcFragColorExport.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPipelineState.h"

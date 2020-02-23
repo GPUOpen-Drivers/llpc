@@ -35,6 +35,7 @@
 #include "SPIRVInternal.h"
 #include "llpcBuilder.h"
 #include "llpcCompiler.h"
+#include "llpcDebug.h"
 #include "llpcPipelineContext.h"
 #include "llpcPipeline.h"
 

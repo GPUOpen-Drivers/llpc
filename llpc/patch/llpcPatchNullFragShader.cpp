@@ -35,7 +35,6 @@
 #include "llvm/Support/Debug.h"
 
 #include "llpcBuilderContext.h"
-#include "llpcDebug.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcInternal.h"
 #include "llpcPatch.h"
