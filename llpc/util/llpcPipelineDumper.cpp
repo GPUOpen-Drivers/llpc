@@ -1397,8 +1397,7 @@ OStream& operator<<(
                     out << "        minor = " << pCodeVersion->minorVersion << "\n";
                     break;
                 }
-                case static_cast<uint32_t>(PalMetadataOld):
-                case static_cast<uint32_t>(PalMetadata):
+                case static_cast<uint32_t>(Util::Abi::PipelineAbiNoteType::PalMetadata):
                 {
                     out << "    PalMetadata                  (name = "
                         << pNode->name << "  size = " << pNode->descSize << ")\n";

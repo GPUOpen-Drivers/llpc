@@ -46,11 +46,6 @@ struct HwReg
 constexpr uint32_t InvalidMetadataKey   = 0xFFFFFFFF;
 constexpr uint32_t InvalidMetadataValue = 0xBAADBEEF;
 
-// The note record types of PAL metadata, for use by the ELF dumper. We have our own definitions
-// here to maintain compatibility with different PAL versions.
-constexpr Util::Abi::PipelineAbiNoteType PalMetadataOld = static_cast<Util::Abi::PipelineAbiNoteType>(13);
-constexpr Util::Abi::PipelineAbiNoteType PalMetadata = static_cast<Util::Abi::PipelineAbiNoteType>(32);
-
 // Defines PAL metadata entries based on the specified name and type of this metadata
 #define DEF_META(_name, _type) \
 typedef HwReg reg##_name;  \
