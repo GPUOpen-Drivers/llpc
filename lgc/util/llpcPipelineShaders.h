@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2020 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,41 +24,51 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcComputeContext.cpp
- * @brief LLPC source file: contains implementation of class Llpc::ComputeContext.
+ * @file  llpcPipelineShaders.h
+ * @brief LLPC header file: contains declaration of class Llpc::PipelineShaders
  ***********************************************************************************************************************
  */
-#include "llpcComputeContext.h"
-#include "lgc/llpcPipeline.h"
-#include "SPIRVInternal.h"
+#pragma once
 
-#define DEBUG_TYPE "llpc-compute-context"
+#include "lgc/llpcBuilderCommon.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/Pass.h"
+#include <map>
 
-using namespace llvm;
-
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
-ComputeContext::ComputeContext(
-    GfxIpVersion                    gfxIp,            // Graphics Ip version info
-    const ComputePipelineBuildInfo* pPipelineInfo,    // [in] Compute pipeline build info
-    MetroHash::Hash*                pPipelineHash,    // [in] Pipeline hash code
-    MetroHash::Hash*                pCacheHash)       // [in] Cache hash code
-    :
-    PipelineContext(gfxIp, pPipelineHash, pCacheHash),
-    m_pPipelineInfo(pPipelineInfo)
+// Simple analysis pass that finds the shaders in the pipeline module
+class PipelineShaders : public llvm::ModulePass
 {
-}
+public:
+    static char ID;
+    PipelineShaders() : ModulePass(ID)
+    {
+    }
 
-// =====================================================================================================================
-// Gets pipeline shader info of the specified shader stage
-const PipelineShaderInfo* ComputeContext::GetPipelineShaderInfo(
-    ShaderStage shaderStage // Shader stage
-    ) const
-{
-    assert(shaderStage == ShaderStageCompute);
-    return &m_pPipelineInfo->cs;
-}
+    bool runOnModule(llvm::Module& module) override;
 
-} // Llpc
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.setPreservesAll();
+    }
+
+    llvm::Function* GetEntryPoint(ShaderStage shaderStage) const;
+
+    ShaderStage GetShaderStage(const llvm::Function* pFunc) const;
+
+private:
+    PipelineShaders(const PipelineShaders&) = delete;
+    PipelineShaders& operator=(const PipelineShaders&) = delete;
+
+    // -----------------------------------------------------------------------------------------------------------------
+
+    llvm::Function* m_entryPoints[ShaderStageCountInternal];      // The entry-point for each shader stage.
+    std::map<const llvm::Function*, ShaderStage> m_entryPointMap; // Map from shader entry-point to shader stage.
+};
+
+llvm::ModulePass* CreatePipelineShaders();
+
+} // lgc

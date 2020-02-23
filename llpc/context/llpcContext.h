@@ -39,7 +39,7 @@
 #include <unordered_set>
 #include "spirvExt.h"
 
-#include "llpcBuilderContext.h"
+#include "lgc/llpcBuilderContext.h"
 #include "llpcEmuLib.h"
 #include "llpcPipelineContext.h"
 

@@ -38,7 +38,7 @@
 
 #include <unordered_set>
 #include "SPIRVInternal.h"
-#include "llpcBuilder.h"
+#include "lgc/llpcBuilder.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcSpirvLowerGlobal.h"

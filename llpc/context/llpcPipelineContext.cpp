@@ -33,11 +33,11 @@
 #include "llvm/Support/CommandLine.h"
 
 #include "SPIRVInternal.h"
-#include "llpcBuilder.h"
+#include "lgc/llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcPipelineContext.h"
-#include "llpcPipeline.h"
+#include "lgc/llpcPipeline.h"
 
 #define DEBUG_TYPE "llpc-pipeline-context"
 

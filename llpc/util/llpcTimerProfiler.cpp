@@ -36,8 +36,8 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "llpc.h"
-#include "llpcBuilderContext.h"
-#include "llpcPassManager.h"
+#include "lgc/llpcBuilderContext.h"
+#include "lgc/llpcPassManager.h"
 #include "llpcTimerProfiler.h"
 
 using namespace llvm;

@@ -36,7 +36,7 @@ pipeline state.
 ### Middle-end (LGC)
 
 See
-[LGC (LLPC middle-end) overview](LgcOverview.md)
+[LGC (LLPC middle-end) overview](../../lgc/docs/LgcOverview.md)
 for more details.
 
 * In BuilderRecorder mode, run the BuilderReplayer pass to lower the `llpc.call.*` calls

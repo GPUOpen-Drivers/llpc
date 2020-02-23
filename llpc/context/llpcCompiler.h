@@ -31,11 +31,11 @@
 #pragma once
 
 #include "llpc.h"
-#include "llpcBuilderCommon.h"
 #include "llpcElfReader.h"
 #include "llpcMetroHash.h"
 #include "llpcShaderCacheManager.h"
 #include "llpcShaderModuleHelper.h"
+#include "lgc/llpcBuilderCommon.h"
 
 namespace llvm
 {

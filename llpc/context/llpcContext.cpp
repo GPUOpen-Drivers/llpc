@@ -44,7 +44,7 @@
 
 #include "SPIRVInternal.h"
 
-#include "llpcBuilder.h"
+#include "lgc/llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"

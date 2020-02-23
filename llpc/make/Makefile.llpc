@@ -5,14 +5,9 @@ endif
 
 LCXXINCS += -I$(LLPC_VULKAN_INCLUDE)
 LCXXINCS += -I$(LLPC_DEPTH)/builder
-LCXXINCS += -I$(LLPC_DEPTH)/imported/chip/gfx6
-LCXXINCS += -I$(LLPC_DEPTH)/imported/chip/gfx9
 LCXXINCS += -I$(LLPC_DEPTH)/include
 LCXXINCS += -I$(LLPC_DEPTH)/../include
-LCXXINCS += -I$(LLPC_DEPTH)/patch
-LCXXINCS += -I$(LLPC_DEPTH)/patch/gfx9
-LCXXINCS += -I$(LLPC_DEPTH)/patch/gfx6/chip
-LCXXINCS += -I$(LLPC_DEPTH)/patch/gfx9/chip
+LCXXINCS += -I$(LLPC_DEPTH)/../lgc/include
 LCXXINCS += -I$(LLPC_DEPTH)/util
 LCXXINCS += -I$(LLPC_DEPTH)/translator/lib/SPIRV/libSPIRV
 
@@ -24,53 +19,22 @@ ifeq ($(ICD_BUILD_LLPC), 1)
 
     LLVM_BIN_DIR = $(LLVM_BUILD_DIR)/bin/
 
-    ifeq ($(XGL_LLVM_UPSTREAM), 1)
-        LCXXDEFS += -DXGL_LLVM_UPSTREAM
-    endif
-
     ifeq ($(LLPC_ENABLE_SPIRV_OPT), 1)
         LCXXDEFS += -DLLPC_ENABLE_SPIRV_OPT
     endif
 
     LCXXINCS += -I$(LLPC_DEPTH)/context
 
-    LCXXINCS += -I$(LLPC_DEPTH)/builder
     LCXXINCS += -I$(LLPC_DEPTH)/imported/spirv
     LCXXINCS += -I$(LLPC_DEPTH)/lower
-    LCXXINCS += -I$(LLPC_DEPTH)/patch/generate
     LCXXINCS += -I$(LLPC_DEPTH)/translator/include
     LCXXINCS += -I$(LLPC_DEPTH)/translator/lib/SPIRV
 
-    vpath %.cpp $(LLPC_DEPTH)/builder
     vpath %.cpp $(LLPC_DEPTH)/context
     vpath %.cpp $(LLPC_DEPTH)/lower
-    vpath %.cpp $(LLPC_DEPTH)/patch
-    vpath %.cpp $(LLPC_DEPTH)/patch/gfx6
-    vpath %.cpp $(LLPC_DEPTH)/patch/gfx6/chip
-    vpath %.cpp $(LLPC_DEPTH)/patch/gfx9
-    vpath %.cpp $(LLPC_DEPTH)/patch/gfx9/chip
     vpath %.cpp $(LLPC_DEPTH)/translator/lib/SPIRV
     vpath %.cpp $(LLPC_DEPTH)/translator/lib/SPIRV/libSPIRV
     vpath %.cpp $(LLPC_DEPTH)/util
-
-    # llpc/builder
-    CPPFILES +=                             \
-        llpcBuilder.cpp                     \
-        llpcBuilderBase.cpp                 \
-        llpcBuilderContext.cpp              \
-        llpcBuilderImpl.cpp                 \
-        llpcBuilderImplArith.cpp            \
-        llpcBuilderImplDesc.cpp             \
-        llpcBuilderImplImage.cpp            \
-        llpcBuilderImplInOut.cpp            \
-        llpcBuilderImplMatrix.cpp           \
-        llpcBuilderImplMisc.cpp             \
-        llpcBuilderImplSubgroup.cpp         \
-        llpcBuilderRecorder.cpp             \
-        llpcBuilderReplayer.cpp             \
-        llpcPipelineState.cpp               \
-        llpcShaderModes.cpp                 \
-        llpcTargetInfo.cpp
 
     # llpc/context
     CPPFILES +=                             \
@@ -96,38 +60,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcSpirvLowerTranslator.cpp            \
         llpcSpirvLowerUtil.cpp
 
-    # llpc/patch
-    CPPFILES +=                             \
-        llpcGfx6Chip.cpp                    \
-        llpcGfx6ConfigBuilder.cpp           \
-        llpcGfx9Chip.cpp                    \
-        llpcGfx9ConfigBuilder.cpp           \
-        llpcNggLdsManager.cpp               \
-        llpcNggPrimShader.cpp               \
-        llpcShaderMerger.cpp                \
-        \
-        llpcCodeGenManager.cpp              \
-        llpcConfigBuilderBase.cpp           \
-        llpcFragColorExport.cpp             \
-        llpcPatch.cpp                       \
-        llpcPatchBufferOp.cpp               \
-        llpcPatchCheckShaderCache.cpp       \
-        llpcPatchCopyShader.cpp             \
-        llpcPatchDescriptorLoad.cpp         \
-        llpcPatchEntryPointMutate.cpp       \
-        llpcPatchInOutImportExport.cpp      \
-        llpcPatchIntrinsicSimplify.cpp      \
-        llpcPatchLlvmIrInclusion.cpp        \
-        llpcPatchLoadScalarizer.cpp         \
-        llpcPatchNullFragShader.cpp         \
-        llpcPatchPeepholeOpt.cpp            \
-        llpcPatchPreparePipelineAbi.cpp     \
-        llpcPatchPushConstOp.cpp            \
-        llpcPatchResourceCollect.cpp        \
-        llpcPatchSetupTargetFeatures.cpp    \
-        llpcSystemValues.cpp                \
-        llpcVertexFetch.cpp
-
     # llpc/translator
     CPPFILES +=                             \
         SPIRVBasicBlock.cpp                 \
@@ -146,21 +78,15 @@ ifeq ($(ICD_BUILD_LLPC), 1)
 
     # llpc/util
     CPPFILES +=                             \
-        llpcBuilderDebug.cpp                \
         llpcDebug.cpp                       \
         llpcElfReader.cpp                   \
         llpcElfWriter.cpp                   \
         llpcEmuLib.cpp                      \
         llpcFile.cpp                        \
-        llpcInternal.cpp                    \
-        llpcPassManager.cpp                 \
         llpcPipelineDumper.cpp              \
         llpcPipelineDumperRegs.cpp          \
-        llpcPipelineShaders.cpp             \
         llpcShaderModuleHelper.cpp          \
-        llpcStartStopTimer.cpp              \
         llpcTimerProfiler.cpp               \
-        llpcGfxRegHandler.cpp               \
         llpcUtil.cpp
 
     ifeq ($(LLPC_PLATFORM), win)

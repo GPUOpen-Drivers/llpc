@@ -46,10 +46,10 @@
 #include "SPIRVUtil.h"
 #include "SPIRVValue.h"
 
-#include "llpcBuilder.h"
+#include "lgc/llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
-#include "llpcPipeline.h"
+#include "lgc/llpcPipeline.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringSwitch.h"
