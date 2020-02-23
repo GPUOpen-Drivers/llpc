@@ -318,6 +318,7 @@ if(ICD_BUILD_LLPC)
         util/llpcFile.cpp
         util/llpcPassManager.cpp
         util/llpcPipelineDumper.cpp
+        util/llpcPipelineDumperRegs.cpp
         util/llpcPipelineShaders.cpp
         util/llpcShaderModuleHelper.cpp
         util/llpcStartStopTimer.cpp
@@ -328,6 +329,7 @@ else()
     target_sources(llpc PRIVATE
         util/llpcElfReader.cpp
         util/llpcPipelineDumper.cpp
+        util/llpcPipelineDumperRegs.cpp
         util/llpcUtil.cpp
         patch/gfx6/chip/llpcGfx6Chip.cpp
         patch/gfx9/chip/llpcGfx9Chip.cpp

@@ -33,9 +33,8 @@
 #include <fstream>
 #include <llpc.h>
 
-#if defined(SINGLE_EXTERNAL_METROHASH)
 #include "llpcMetroHash.h"
-#else
+#if !defined(SINGLE_EXTERNAL_METROHASH)
 namespace MetroHash
 {
     class MetroHash64;
@@ -139,6 +138,9 @@ public:
 #else
         MetroHash::MetroHash64*          pHasher);
 #endif
+
+    // Get name of register, or "" if not known
+    static const char* GetRegisterNameString(uint32_t regNumber);
 
 private:
     static std::string GetSpirvBinaryFileName(const MetroHash::Hash* pHash);
