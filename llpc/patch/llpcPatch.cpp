@@ -52,6 +52,7 @@
 #include "llvm/Transforms/Scalar/Scalarizer.h"
 #include "llvm/Transforms/Utils.h"
 #include "llpcBuilder.h"
+#include "llpcBuilderDebug.h"
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
 #include "llpcPatch.h"
@@ -107,9 +108,9 @@ void Patch::AddPasses(
         passMgr.add(pReplayerPass);
     }
 
-    if (EnableOuts())
+    if (raw_ostream* pOuts = GetLlpcOuts())
     {
-        passMgr.add(createPrintModulePass(outs(),
+        passMgr.add(createPrintModulePass(*pOuts,
                     "===============================================================================\n"
                     "// LLPC pipeline before-patching results\n"));
     }
@@ -228,9 +229,9 @@ void Patch::AddPasses(
     }
 
     // Dump the result
-    if (EnableOuts())
+    if (raw_ostream* pOuts = GetLlpcOuts())
     {
-        passMgr.add(createPrintModulePass(outs(),
+        passMgr.add(createPrintModulePass(*pOuts,
                     "===============================================================================\n"
                     "// LLPC pipeline patching results\n"));
     }

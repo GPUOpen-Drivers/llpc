@@ -33,7 +33,6 @@
 #include "llpc.h"
 #include "llpcBuilderBase.h"
 #include "llpcBuilderBuiltIns.h"
-#include "llpcDebug.h"
 
 #include "llvm/Support/AtomicOrdering.h"
 

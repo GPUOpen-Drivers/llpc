@@ -35,6 +35,7 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "llpcBuilderDebug.h"
 #include "llpcGfx9Chip.h"
 #include "llpcNggLdsManager.h"
 #include "llpcPatch.h"

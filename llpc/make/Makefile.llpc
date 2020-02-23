@@ -141,6 +141,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
 
     # llpc/util
     CPPFILES +=                             \
+        llpcBuilderDebug.cpp                \
         llpcDebug.cpp                       \
         llpcElfReader.cpp                   \
         llpcElfWriter.cpp                   \

@@ -40,6 +40,7 @@
 #include "SPIRVInternal.h"
 #include "llpcBuilder.h"
 #include "llpcContext.h"
+#include "llpcDebug.h"
 #include "llpcSpirvLowerGlobal.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-global"

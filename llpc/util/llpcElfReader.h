@@ -37,7 +37,6 @@
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 
 #include "llpc.h"
-#include "llpcDebug.h"
 #include "llpcUtil.h"
 #include "palPipelineAbi.h"
 #include "g_palPipelineAbiMetadata.h"

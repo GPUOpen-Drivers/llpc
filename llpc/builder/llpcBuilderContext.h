@@ -31,7 +31,6 @@
 #pragma once
 
 #include "llpc.h"
-#include "llpcDebug.h"
 
 #include "llvm/ADT/StringRef.h"
 
@@ -110,6 +109,14 @@ public:
     void SetBuildRelocatableElf(bool buildRelocatableElf) { m_buildRelocatableElf = buildRelocatableElf; }
     bool BuildingRelocatableElf() { return m_buildRelocatableElf; }
 
+    // Set and get a pointer to the stream used for LLPC_OUTS. This is initially nullptr,
+    // signifying no output from LLPC_OUTS. Setting this to a stream means that LLPC_OUTS
+    // statements in the middle-end output to that stream, giving a dump of LLVM IR at a
+    // few strategic places in the pass flow, as well as information such as input/output
+    // mapping.
+    static void SetLlpcOuts(raw_ostream* pStream) { m_pLlpcOuts = pStream; }
+    static raw_ostream* GetLlpcOuts() { return m_pLlpcOuts; }
+
 private:
     BuilderContext() = delete;
     BuilderContext(const BuilderContext&) = delete;
@@ -118,6 +125,7 @@ private:
     BuilderContext(LLVMContext& context);
 
     // -----------------------------------------------------------------------------------------------------------------
+    static raw_ostream*        m_pLlpcOuts;                   // nullptr or stream for LLPC_OUTS
     LLVMContext&               m_context;                     // LLVM context
     TargetMachine*             m_pTargetMachine = nullptr;    // Target machine
     TargetInfo*                m_pTargetInfo = nullptr;       // Target info

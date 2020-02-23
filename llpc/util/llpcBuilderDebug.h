@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,60 +24,23 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- @file llpcShaderCacheManager.h
- @brief LLPC header file: contains declaration of class Llpc::ShaderCacheManager.
+ * @file  llpcBuilderDebug.h
+ * @brief LLPC header file: declaration of LLPC_OUTS for use in the middle-end
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include <list>
-
-#include "llpc.h"
-#include "llpcShaderCache.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace Llpc
 {
 
-typedef std::shared_ptr<ShaderCache> ShaderCachePtr;
+using namespace llvm;
 
-// =====================================================================================================================
-// This class manages shader cache instances for different GFXIP
-class ShaderCacheManager
-{
-public:
-    // Constructor
-    ShaderCacheManager()
-    {
-
-    }
-
-    ~ShaderCacheManager();
-
-    // Get the global ShaderCacheManager object
-    static ShaderCacheManager* GetShaderCacheManager()
-    {
-        if (m_pManager == nullptr)
-        {
-            m_pManager = new ShaderCacheManager();
-        }
-        return m_pManager;
-    }
-
-    static void Shutdown()
-    {
-        delete m_pManager;
-        m_pManager = nullptr;
-    }
-
-    ShaderCachePtr GetShaderCacheObject(const ShaderCacheCreateInfo*    pCreateInfo,
-                                        const ShaderCacheAuxCreateInfo* pAuxCreateInfo);
-
-    void ReleaseShaderCacheObject(ShaderCachePtr& shaderCachePtr);
-
-private:
-    std::list<ShaderCachePtr>  m_shaderCaches;    // ShaderCache instances for all GFXIP
-
-    static ShaderCacheManager* m_pManager;              // Static manager
-};
+// Get pointer to stream for LLPC_OUTS, or nullptr if disabled.
+raw_ostream* GetLlpcOuts();
 
 } // Llpc
+
+// Output general message
+#define LLPC_OUTS(msg) do if (raw_ostream* pStream = GetLlpcOuts()) { *pStream << msg; } while (false)

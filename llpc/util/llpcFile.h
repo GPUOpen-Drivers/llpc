@@ -31,7 +31,6 @@
 #pragma once
 
 #include "llpc.h"
-#include "llpcDebug.h"
 #include <cstdio>
 
 namespace Llpc

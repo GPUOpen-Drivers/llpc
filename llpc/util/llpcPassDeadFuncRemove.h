@@ -35,7 +35,6 @@
 #include "llvm/Pass.h"
 
 #include "llpc.h"
-#include "llpcDebug.h"
 #include "llpcInternal.h"
 
 namespace Llpc
