@@ -3400,7 +3400,7 @@ void PatchResourceCollect::ReviseInputImportCalls()
     auto& inputLocMap = inOutUsage.inputLocMap;
     inputLocMap.clear();
 
-    IRBuilder<> builder(*m_pContext);
+    BuilderBase builder(*m_pContext);
 
     for (auto pCall : m_inOutCalls)
     {
@@ -3519,7 +3519,7 @@ void PatchResourceCollect::ReassembleOutputExportCalls()
     }
 
     // Re-assamble XX' output export calls for each packed location
-    IRBuilder<> builder(*m_pContext);
+    BuilderBase builder(*m_pContext);
     builder.SetInsertPoint(m_inOutCalls.back());
 
     auto& outputLocMap = inOutUsage.outputLocMap;
@@ -3584,7 +3584,7 @@ void PatchResourceCollect::ReassembleOutputExportCalls()
         std::string callName(LlpcName::OutputExportGeneric);
         AddTypeMangling(builder.getVoidTy(), args, callName);
 
-        EmitCall(callName, builder.getVoidTy(), args, NoAttrib, builder);
+        builder.CreateNamedCall(callName, builder.getVoidTy(), args, NoAttrib);
 
         outputLocMap[consectiveLocation] = InvalidValue;
         ++consectiveLocation;
@@ -3658,7 +3658,7 @@ void PatchResourceCollect::ScalarizeForInOutPacking(
 void PatchResourceCollect::ScalarizeGenericInput(
     CallInst* pCall)  // [in] Call that represents importing the generic or interpolant input
 {
-    IRBuilder<> builder(pCall->getContext());
+    BuilderBase builder(pCall->getContext());
     builder.SetInsertPoint(pCall);
 
     // FS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
@@ -3686,11 +3686,10 @@ void PatchResourceCollect::ScalarizeGenericInput(
         {
             args[elemIdxArgIdx] = builder.getInt32(elemIdx * 2 + i);
             pResult = builder.CreateInsertElement(pResult,
-                                                  EmitCall(callName,
-                                                           builder.getInt32Ty(),
-                                                           args,
-                                                           Attribute::ReadOnly,
-                                                           builder),
+                                                  builder.CreateNamedCall(callName,
+                                                                          builder.getInt32Ty(),
+                                                                          args,
+                                                                          Attribute::ReadOnly),
                                                   i);
         }
         pResult = builder.CreateBitCast(pResult, pCall->getType());
@@ -3764,7 +3763,7 @@ void PatchResourceCollect::ScalarizeGenericInput(
         }
         args[elemIdxArgIdx] = builder.getInt32(elemIdx + i);
 
-        CallInst* pElement = EmitCall(callName, pElementTy, args, Attribute::ReadOnly, builder);
+        CallInst* pElement = builder.CreateNamedCall(callName, pElementTy, args, Attribute::ReadOnly);
         pResult = builder.CreateInsertElement(pResult, pElement, i);
         if (pElementTy->getPrimitiveSizeInBits() == 64)
         {
@@ -3783,7 +3782,7 @@ void PatchResourceCollect::ScalarizeGenericInput(
 void PatchResourceCollect::ScalarizeGenericOutput(
     CallInst* pCall)  // [in] Call that represents exporting the generic output
 {
-    IRBuilder<> builder(pCall->getContext());
+    BuilderBase builder(pCall->getContext());
     builder.SetInsertPoint(pCall);
 
     // VS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
@@ -3829,7 +3828,7 @@ void PatchResourceCollect::ScalarizeGenericOutput(
             callName = LlpcName::OutputExportGeneric;
             AddTypeMangling(nullptr, args, callName);
         }
-        EmitCall(callName, builder.getVoidTy(), args, {}, builder);
+        builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
     }
 
     pCall->eraseFromParent();

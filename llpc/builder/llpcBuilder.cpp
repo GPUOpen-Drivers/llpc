@@ -47,7 +47,7 @@ using namespace llvm;
 Builder::Builder(
     BuilderContext* pBuilderContext) // [in] Builder context
     :
-    IRBuilder<>(pBuilderContext->GetContext()),
+    BuilderBase(pBuilderContext->GetContext()),
     m_pBuilderContext(pBuilderContext)
 {
 }

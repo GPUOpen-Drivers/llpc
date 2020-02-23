@@ -32,8 +32,8 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/IR/IRBuilder.h"
 
+#include "llpcBuilderBase.h"
 #include "llpcInternal.h"
 
 #include <map>
@@ -130,12 +130,12 @@ private:
     llvm::Instruction* GetSpillTablePtr();
 
     // Load descriptor from driver table
-    llvm::Instruction* LoadDescFromDriverTable(uint32_t tableOffset, llvm::IRBuilder<>& builder);
+    llvm::Instruction* LoadDescFromDriverTable(uint32_t tableOffset, BuilderBase& builder);
 
     // Explicitly set the DATA_FORMAT of ring buffer descriptor.
     llvm::Value* SetRingBufferDataFormat(llvm::Value*       pBufDesc,
                                          uint32_t           dataFormat,
-                                         llvm::IRBuilder<>& builder) const;
+                                         BuilderBase&       builder) const;
 
     // Find resource node by type
     const ResourceNode* FindResourceNodeByType(ResourceMappingNodeType type);
