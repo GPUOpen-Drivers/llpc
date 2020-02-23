@@ -151,6 +151,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcInternal.cpp                    \
         llpcPassManager.cpp                 \
         llpcPipelineDumper.cpp              \
+        llpcPipelineDumperRegs.cpp          \
         llpcPipelineShaders.cpp             \
         llpcShaderModuleHelper.cpp          \
         llpcStartStopTimer.cpp              \
@@ -274,6 +275,7 @@ else
     # llpc/util
     CPPFILES +=                             \
         llpcPipelineDumper.cpp              \
+        llpcPipelineDumperRegs.cpp          \
         llpcElfReader.cpp                   \
         llpcUtil.cpp
 

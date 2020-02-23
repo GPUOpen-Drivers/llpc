@@ -41,9 +41,6 @@
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcElfReader.h"
-#include "llpcGfx6Chip.h"
-#include "llpcGfx9Chip.h"
-#include "llpcMetroHash.h"
 #include "llpcPipelineDumper.h"
 #include "llpcUtil.h"
 
@@ -1341,8 +1338,6 @@ OStream& operator<<(
     OStream&          out,      // [out] Output stream
     ElfReader<Elf>&   reader)   // [in] ELF object
 {
-    GfxIpVersion gfxIp = reader.GetGfxIpVersion();
-
     uint32_t sectionCount = reader.GetSectionCount();
     char formatBuf[256];
 
@@ -1416,16 +1411,8 @@ OStream& operator<<(
                             {
                                 if (msgIterStatus == MsgPackIteratorMapKey)
                                 {
-                                    const char* pRegName = nullptr;
-                                    uint32_t regId = static_cast<uint32_t>(pNode->getUInt() * 4);
-                                    if (gfxIp.major <= 8)
-                                    {
-                                        pRegName = Gfx6::GetRegisterNameString(gfxIp, regId);
-                                    }
-                                    else
-                                    {
-                                        pRegName = Gfx9::GetRegisterNameString(gfxIp, regId);
-                                    }
+                                    uint32_t regId = static_cast<uint32_t>(pNode->getUInt());
+                                    const char* pRegName = PipelineDumper::GetRegisterNameString(regId);
 
                                     auto length = snprintf(formatBuf,
                                         sizeof(formatBuf),
@@ -1565,15 +1552,7 @@ OStream& operator<<(
 
             for (uint32_t i = 0; i < configCount; ++i)
             {
-                const char* pRegName = nullptr;
-                if (gfxIp.major <= 8)
-                {
-                    pRegName = Gfx6::GetRegisterNameString(gfxIp, pConfig[2 * i]);
-                }
-                else
-                {
-                    pRegName = Gfx9::GetRegisterNameString(gfxIp, pConfig[2 * i]);
-                }
+                const char* pRegName = PipelineDumper::GetRegisterNameString(pConfig[2 * i] / 4);
                 auto length = snprintf(formatBuf, sizeof(formatBuf), "        %-45s = 0x%08X\n", pRegName, pConfig[2 * i + 1]);
                 (void(length)); // unused
                 out << formatBuf;
