@@ -168,8 +168,9 @@ protected:
     MetroHash::Hash        m_cacheHash;     // Cache hash code
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(PipelineContext);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PipelineContext);
+    PipelineContext() = delete;
+    PipelineContext(const PipelineContext&) = delete;
+    PipelineContext& operator=(const PipelineContext&) = delete;
 
     // Give the pipeline options to the middle-end.
     void SetOptionsInPipeline(Pipeline* pPipeline) const;

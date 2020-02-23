@@ -55,7 +55,8 @@ public:
     bool runOnModule(Module& module) override;
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(StartStopTimer);
+    StartStopTimer(const StartStopTimer&) = delete;
+    StartStopTimer& operator =(const StartStopTimer&) = delete;
 
     // -----------------------------------------------------------------------------------------------------------------
 

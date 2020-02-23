@@ -79,7 +79,8 @@ public:
     static const uint32_t ShaderModuleTimerEnableMask = ((1 << TimerTranslate) | (1 << TimerLower));
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(TimerProfiler);
+    TimerProfiler(const TimerProfiler&) = delete;
+    TimerProfiler& operator=(const TimerProfiler&) = delete;
 
     // -----------------------------------------------------------------------------------------------------------------
 

@@ -61,7 +61,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerGlobal);
+    SpirvLowerGlobal(const SpirvLowerGlobal&) = delete;
+    SpirvLowerGlobal& operator=(const SpirvLowerGlobal&) = delete;
 
     void MapGlobalVariableToProxy(llvm::GlobalVariable* pGlobalVar);
     void MapInputToProxy(llvm::GlobalVariable* pInput);

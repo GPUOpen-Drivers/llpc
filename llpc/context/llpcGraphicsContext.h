@@ -71,8 +71,9 @@ public:
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(GraphicsContext);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(GraphicsContext);
+    GraphicsContext() = delete;
+    GraphicsContext(const GraphicsContext&) = delete;
+    GraphicsContext& operator=(const GraphicsContext&) = delete;
 
     llvm::ArrayRef<ResourceMappingNode> MergeUserDataNodeTable(llvm::SmallVectorImpl<ResourceMappingNode>& allNodes);
 

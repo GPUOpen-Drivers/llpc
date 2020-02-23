@@ -49,7 +49,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerConstImmediateStore);
+    SpirvLowerConstImmediateStore(const SpirvLowerConstImmediateStore&) = delete;
+    SpirvLowerConstImmediateStore& operator=(const SpirvLowerConstImmediateStore&) = delete;
 
     void ProcessAllocaInsts(llvm::Function* pFunc);
     llvm::StoreInst* FindSingleStore(llvm::AllocaInst* pAlloca);

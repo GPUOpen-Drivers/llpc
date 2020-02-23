@@ -61,7 +61,8 @@ public:
     ShaderStage GetShaderStage(const llvm::Function* pFunc) const;
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PipelineShaders);
+    PipelineShaders(const PipelineShaders&) = delete;
+    PipelineShaders& operator=(const PipelineShaders&) = delete;
 
     // -----------------------------------------------------------------------------------------------------------------
 

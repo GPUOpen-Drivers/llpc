@@ -59,8 +59,9 @@ public:
     Result BuildPipelineCsRegConfig();
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(ConfigBuilder);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(ConfigBuilder);
+    ConfigBuilder() = delete;
+    ConfigBuilder(const ConfigBuilder&) = delete;
+    ConfigBuilder& operator=(const ConfigBuilder&) = delete;
 
     template <typename T>
     Result BuildVsRegConfig(ShaderStage         shaderStage,

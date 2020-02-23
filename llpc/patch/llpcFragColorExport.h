@@ -63,8 +63,9 @@ public:
     ExportFormat ComputeExportFormat(llvm::Type* pOutputTy, uint32_t location) const;
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(FragColorExport);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(FragColorExport);
+    FragColorExport() = delete;
+    FragColorExport(const FragColorExport&) = delete;
+    FragColorExport& operator =(const FragColorExport&) = delete;
 
     static CompSetting ComputeCompSetting(BufDataFormat dfmt);
     static uint32_t GetNumChannels(BufDataFormat dfmt);
@@ -79,7 +80,6 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
 
     PipelineState*  m_pPipelineState;   // Pipeline state
-    llvm::Module*   m_pModule;          // LLVM module
     llvm::LLVMContext*        m_pContext;         // LLVM context
 };
 

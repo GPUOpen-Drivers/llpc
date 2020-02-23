@@ -75,7 +75,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchBufferOp);
+    PatchBufferOp(const PatchBufferOp&) = delete;
+    PatchBufferOp& operator=(const PatchBufferOp&) = delete;
 
     llvm::Value* GetPointerOperandAsInst(llvm::Value* const pValue);
     llvm::Value* GetBaseAddressFromBufferDesc(llvm::Value* const pBufferDesc) const;

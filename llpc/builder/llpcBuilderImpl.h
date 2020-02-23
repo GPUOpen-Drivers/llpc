@@ -99,8 +99,9 @@ protected:
     PipelineState*  m_pPipelineState = nullptr;   // Pipeline state
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplBase)
-    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplBase)
+    BuilderImplBase() = delete;
+    BuilderImplBase(const BuilderImplBase&) = delete;
+    BuilderImplBase& operator=(const BuilderImplBase&) = delete;
 };
 
 // =====================================================================================================================
@@ -205,8 +206,9 @@ public:
     Value* CreateFMix(Value* pX, Value* pY, Value* pA, const Twine& instName = "") override final;
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplArith)
-    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplArith)
+    BuilderImplArith() = delete;
+    BuilderImplArith(const BuilderImplArith&) = delete;
+    BuilderImplArith& operator=(const BuilderImplArith&) = delete;
 
     // Common code for asin and acos
     Value* ASinACosCommon(Value* pX, Constant* pCoefP0, Constant* pCoefP1);
@@ -325,8 +327,9 @@ public:
                                      const Twine& instName = "") override final;
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplDesc)
-    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplDesc)
+    BuilderImplDesc() = delete;
+    BuilderImplDesc(const BuilderImplDesc&) = delete;
+    BuilderImplDesc& operator=(const BuilderImplDesc&) = delete;
 
     Value* ScalarizeIfUniform(Value* pValue, bool isNonUniform);
 };
@@ -433,8 +436,9 @@ public:
                              const Twine&      instName = "") override final;
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplImage)
-    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplImage)
+    BuilderImplImage() = delete;
+    BuilderImplImage(const BuilderImplImage&) = delete;
+    BuilderImplImage& operator=(const BuilderImplImage&) = delete;
 
     // Implement pre-GFX9 integer gather workaround to patch descriptor or coordinate before the gather
     Value* PreprocessIntegerImageGather(uint32_t dim, Value*& pImageDesc, Value*& pCoord);
@@ -573,8 +577,9 @@ public:
     static StringRef GetBuiltInName(BuiltInKind builtIn);
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplInOut)
-    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplInOut)
+    BuilderImplInOut() = delete;
+    BuilderImplInOut(const BuilderImplInOut&) = delete;
+    BuilderImplInOut& operator=(const BuilderImplInOut&) = delete;
 
     // Read (a part of) a generic (user) input/output value.
     Value* ReadGenericInputOutput(bool          isOutput,
@@ -678,8 +683,9 @@ public:
     Value* CreateMatrixInverse(Value* const pMatrix, const Twine& instName = "") override final;
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplMatrix)
-    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplMatrix)
+    BuilderImplMatrix() = delete;
+    BuilderImplMatrix(const BuilderImplMatrix&) = delete;
+    BuilderImplMatrix& operator=(const BuilderImplMatrix&) = delete;
 
     // Helper function for determinant calculation
     Value* Determinant(ArrayRef<Value*> elements, uint32_t order);
@@ -725,8 +731,9 @@ public:
     Value* CreateIsHelperInvocation(const Twine& instName) override final;
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplMisc)
-    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplMisc)
+    BuilderImplMisc() = delete;
+    BuilderImplMisc(const BuilderImplMisc&) = delete;
+    BuilderImplMisc& operator=(const BuilderImplMisc&) = delete;
 };
 
 // =====================================================================================================================
@@ -875,8 +882,9 @@ public:
                                const Twine& instName) override final;
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplSubgroup)
-    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplSubgroup)
+    BuilderImplSubgroup() = delete;
+    BuilderImplSubgroup(const BuilderImplSubgroup&) = delete;
+    BuilderImplSubgroup& operator=(const BuilderImplSubgroup&) = delete;
 
     enum class DppCtrl : uint32_t
     {
@@ -969,8 +977,9 @@ public:
     ~BuilderImpl() {}
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImpl)
-    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImpl)
+    BuilderImpl() = delete;
+    BuilderImpl(const BuilderImpl&) = delete;
+    BuilderImpl& operator=(const BuilderImpl&) = delete;
 
     BuilderImpl(BuilderContext* pBuilderContext, Pipeline* pPipeline);
 };

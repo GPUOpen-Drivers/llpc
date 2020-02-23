@@ -54,7 +54,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerInstMetaRemove);
+    SpirvLowerInstMetaRemove(const SpirvLowerInstMetaRemove&) = delete;
+    SpirvLowerInstMetaRemove& operator=(const SpirvLowerInstMetaRemove&) = delete;
 
     bool m_changed;  // Whether the module is changed
 };

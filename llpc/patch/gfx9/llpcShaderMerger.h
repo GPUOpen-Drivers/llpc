@@ -91,8 +91,9 @@ public:
                                     llvm::Function* pCopyShaderEntryPoint);
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(ShaderMerger);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(ShaderMerger);
+    ShaderMerger() = delete;
+    ShaderMerger(const ShaderMerger&) = delete;
+    ShaderMerger& operator=(const ShaderMerger&) = delete;
 
     llvm::FunctionType* GenerateLsHsEntryPointType(uint64_t* pInRegMask) const;
     llvm::FunctionType* GenerateEsGsEntryPointType(uint64_t* pInRegMask) const;
@@ -102,7 +103,6 @@ private:
     PipelineState*    m_pPipelineState;     // Pipeline state
     llvm::LLVMContext*m_pContext;           // LLVM context
     GfxIpVersion      m_gfxIp;              // Graphics IP version info
-    PipelineShaders*  m_pPipelineShaders;   // API shaders in the pipeline
 
     NggPrimShader     m_primShader; // Manager of NGG primitive shader
 

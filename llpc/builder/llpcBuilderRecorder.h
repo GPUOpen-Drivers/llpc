@@ -661,8 +661,9 @@ protected:
     ShaderModes* GetShaderModes() override final;
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(BuilderRecorder)
-    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderRecorder)
+    BuilderRecorder() = delete;
+    BuilderRecorder(const BuilderRecorder&) = delete;
+    BuilderRecorder& operator=(const BuilderRecorder&) = delete;
 
     BuilderRecorder(BuilderContext* pBuilderContext, Pipeline* pPipeline);
 

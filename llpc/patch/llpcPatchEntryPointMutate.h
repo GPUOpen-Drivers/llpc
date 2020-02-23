@@ -63,7 +63,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchEntryPointMutate);
+    PatchEntryPointMutate(const PatchEntryPointMutate&) = delete;
+    PatchEntryPointMutate& operator=(const PatchEntryPointMutate&) = delete;
 
     void ProcessShader();
 

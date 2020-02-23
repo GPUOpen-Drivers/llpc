@@ -87,7 +87,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchPeepholeOpt);
+    PatchPeepholeOpt(const PatchPeepholeOpt&) = delete;
+    PatchPeepholeOpt& operator=(const PatchPeepholeOpt&) = delete;
 
     // -----------------------------------------------------------------------------------------------------------------
 

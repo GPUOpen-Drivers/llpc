@@ -1353,8 +1353,9 @@ protected:
         ArrayRef<Value*>    mappedArgs,       // The arguments to massage into an i32 type.
         ArrayRef<Value*>    passthroughArgs); // The arguments to pass-through without massaging.
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(Builder)
-    LLPC_DISALLOW_COPY_AND_ASSIGN(Builder)
+    Builder() = delete;
+    Builder(const Builder&) = delete;
+    Builder& operator=(const Builder&) = delete;
 
     // -----------------------------------------------------------------------------------------------------------------
 

@@ -63,7 +63,8 @@ public:
     static char ID;
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderReplayer);
+    BuilderReplayer(const BuilderReplayer&) = delete;
+    BuilderReplayer& operator=(const BuilderReplayer&) = delete;
 
     void ReplayCall(uint32_t opcode, CallInst* pCall);
 

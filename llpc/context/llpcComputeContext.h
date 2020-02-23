@@ -70,8 +70,9 @@ public:
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(ComputeContext);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(ComputeContext);
+    ComputeContext() = delete;
+    ComputeContext(const ComputeContext&) = delete;
+    ComputeContext& operator=(const ComputeContext&) = delete;
 
     const ComputePipelineBuildInfo*     m_pPipelineInfo; // Info to build a compute pipeline
 };

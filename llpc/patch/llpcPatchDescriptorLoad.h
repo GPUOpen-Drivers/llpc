@@ -65,7 +65,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchDescriptorLoad);
+    PatchDescriptorLoad(const PatchDescriptorLoad&) = delete;
+    PatchDescriptorLoad& operator=(const PatchDescriptorLoad&) = delete;
 
     void ProcessLoadDescFromPtr(llvm::CallInst* pLoadFromPtr);
 

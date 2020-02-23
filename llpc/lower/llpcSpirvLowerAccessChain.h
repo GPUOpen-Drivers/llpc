@@ -54,7 +54,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerAccessChain);
+    SpirvLowerAccessChain(const SpirvLowerAccessChain&) = delete;
+    SpirvLowerAccessChain& operator=(const SpirvLowerAccessChain&) = delete;
 
     llvm::GetElementPtrInst* TryToCoalesceChain(llvm::GetElementPtrInst* pGetElemPtr, uint32_t addrSpace);
 };

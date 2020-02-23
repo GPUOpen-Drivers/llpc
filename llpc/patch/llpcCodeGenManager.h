@@ -85,8 +85,9 @@ public:
                       llvm::legacy::PassManager&  passMgr);
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(CodeGenManager);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(CodeGenManager);
+    CodeGenManager() = delete;
+    CodeGenManager(const CodeGenManager&) = delete;
+    CodeGenManager& operator=(const CodeGenManager&) = delete;
 };
 
 } // Llpc

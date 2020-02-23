@@ -70,7 +70,8 @@ public:
     }
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchCopyShader);
+    PatchCopyShader(const PatchCopyShader&) = delete;
+    PatchCopyShader& operator=(const PatchCopyShader&) = delete;
 
     void ExportOutput(uint32_t streamId, BuilderBase& builder);
     void CollectGsGenericOutputInfo(Function* pGsEntryPoint);

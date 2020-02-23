@@ -72,7 +72,8 @@ public:
     }
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchPreparePipelineAbi);
+    PatchPreparePipelineAbi(const PatchPreparePipelineAbi&) = delete;
+    PatchPreparePipelineAbi& operator=(const PatchPreparePipelineAbi&) = delete;
 
     void SetCallingConvs(Module& module);
 

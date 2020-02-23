@@ -68,7 +68,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchResourceCollect);
+    PatchResourceCollect(const PatchResourceCollect&) = delete;
+    PatchResourceCollect& operator=(const PatchResourceCollect&) = delete;
 
     // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
     bool CheckGsOnChipValidity();
@@ -189,7 +190,8 @@ public:
     };
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(InOutLocationMapManager);
+    InOutLocationMapManager(const InOutLocationMapManager&) = delete;
+    InOutLocationMapManager& operator=(const InOutLocationMapManager&) = delete;
 
     bool isCompatible(const LocationSpan& rSpan, const LocationSpan& lSpan) const
     {

@@ -112,8 +112,9 @@ public:
     void AtomicOpWithLds(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value* pAtomicValue, llvm::Value* pLdsOffset);
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(NggLdsManager);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(NggLdsManager);
+    NggLdsManager() = delete;
+    NggLdsManager(const NggLdsManager&) = delete;
+    NggLdsManager& operator=(const NggLdsManager&) = delete;
 
     // -----------------------------------------------------------------------------------------------------------------
 

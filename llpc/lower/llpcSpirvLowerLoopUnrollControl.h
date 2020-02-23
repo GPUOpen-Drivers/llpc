@@ -50,7 +50,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerLoopUnrollControl);
+    SpirvLowerLoopUnrollControl(const SpirvLowerLoopUnrollControl&) = delete;
+    SpirvLowerLoopUnrollControl& operator=(const SpirvLowerLoopUnrollControl&) = delete;
 
     uint32_t m_forceLoopUnrollCount;  // Forced loop unroll count
     bool m_disableLicm; // Disable LLVM LICM pass

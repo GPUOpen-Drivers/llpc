@@ -60,7 +60,8 @@ public:
     static char ID; // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchPushConstOp);
+    PatchPushConstOp(const PatchPushConstOp&) = delete;
+    PatchPushConstOp& operator=(const PatchPushConstOp&) = delete;
 
     void visitCallInst(llvm::CallInst& callInst);
 

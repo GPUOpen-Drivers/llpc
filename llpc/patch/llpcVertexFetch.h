@@ -79,8 +79,9 @@ public:
     llvm::Value* GetInstanceIndex() { return m_pInstanceIndex; }
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(VertexFetch);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(VertexFetch);
+    VertexFetch() = delete;
+    VertexFetch(const VertexFetch&) = delete;
+    VertexFetch& operator=(const VertexFetch&) = delete;
 
     static const VertexCompFormatInfo* GetVertexComponentFormatInfo(uint32_t dfmt);
 

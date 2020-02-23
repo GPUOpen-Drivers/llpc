@@ -111,8 +111,9 @@ public:
     bool BuildingRelocatableElf() { return m_buildRelocatableElf; }
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(BuilderContext)
-    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderContext)
+    BuilderContext() = delete;
+    BuilderContext(const BuilderContext&) = delete;
+    BuilderContext& operator =(const BuilderContext&) = delete;
 
     BuilderContext(LLVMContext& context);
 

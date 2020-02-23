@@ -159,7 +159,8 @@ public:
     bool IsCompatible(const ShaderCacheCreateInfo* pCreateInfo, const ShaderCacheAuxCreateInfo* pAuxCreateInfo);
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(ShaderCache);
+    ShaderCache(const ShaderCache&) = delete;
+    ShaderCache& operator=(const ShaderCache&) = delete;
 
     Result BuildFileName(const char*  pExecutableName,
                          const char*  pCacheFilePath,

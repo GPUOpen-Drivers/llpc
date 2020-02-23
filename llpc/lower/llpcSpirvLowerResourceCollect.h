@@ -88,7 +88,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerResourceCollect);
+    SpirvLowerResourceCollect(const SpirvLowerResourceCollect&) = delete;
+    SpirvLowerResourceCollect& operator=(const SpirvLowerResourceCollect&) = delete;
 
     uint32_t GetFlattenArrayElementCount(const llvm::Type* pTy) const;
     const llvm::Type* GetFlattenArrayElementType(const llvm::Type* pTy) const;
@@ -96,8 +97,6 @@ private:
     void CollectResourceNodeData(const GlobalVariable* pGlobal);
 
     // -----------------------------------------------------------------------------------------------------------------
-
-    ResourceUsage*  m_pResUsage;    // Resource usage of the shader stage
 
     bool m_collectDetailUsage;      // If enabled, collect detailed usages of resource node datas and FS output infos
     std::map<ResourceNodeDataKey, ResourceMappingNodeType, ResNodeDataSortingComparer> m_resNodeDatas; // Resource
