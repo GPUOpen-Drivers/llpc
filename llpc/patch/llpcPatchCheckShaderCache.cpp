@@ -96,6 +96,35 @@ bool PatchCheckShaderCache::runOnModule(
 
     Patch::Init(&module);
 
+    // NOTE: Global constant are added to the end of pipeline binary. we can't merge ELF binaries if global constant
+    // is used in non-fragment shader stages.
+    for (auto& global : module.globals())
+    {
+        if (auto pGlobalVar = dyn_cast<GlobalVariable>(&global))
+        {
+            if (pGlobalVar->isConstant())
+            {
+                SmallVector<const Value*, 4> vals;
+                vals.push_back(pGlobalVar);
+                for (uint32_t i = 0; i != vals.size(); ++i)
+                {
+                    for (auto pUser : vals[i]->users())
+                    {
+                        if (isa<Constant>(pUser))
+                        {
+                            vals.push_back(pUser);
+                            continue;
+                        }
+                        if (GetShaderStageFromFunction(cast<Instruction>(pUser)->getFunction()) != ShaderStageFragment)
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     std::string inOutUsageStreams[ShaderStageGfxCount];
     ArrayRef<uint8_t> inOutUsageValues[ShaderStageGfxCount];
     PipelineState* pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
