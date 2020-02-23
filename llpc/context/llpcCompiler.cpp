@@ -1287,35 +1287,6 @@ uint32_t GraphicsShaderCacheChecker::Check(
     MetroHash::Hash nonFragmentHash = {};
     Compiler::BuildShaderCacheHash(m_pContext, stageMask, stageHashes, &fragmentHash, &nonFragmentHash);
 
-    // NOTE: Global constant are added to the end of pipeline binary. we can't merge ELF binaries if global constant
-    // is used in non-fragment shader stages.
-    for (auto& global : pModule->globals())
-    {
-        if (auto pGlobalVar = dyn_cast<GlobalVariable>(&global))
-        {
-            if (pGlobalVar->isConstant())
-            {
-                SmallVector<const Value*, 4> vals;
-                vals.push_back(pGlobalVar);
-                for (uint32_t i = 0; i != vals.size(); ++i)
-                {
-                    for (auto pUser : vals[i]->users())
-                    {
-                        if (isa<Constant>(pUser))
-                        {
-                            vals.push_back(pUser);
-                            continue;
-                        }
-                        if (GetShaderStageFromFunction(cast<Instruction>(pUser)->getFunction()) != ShaderStageFragment)
-                        {
-                            return stageMask;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     IShaderCache* pAppCache = nullptr;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
