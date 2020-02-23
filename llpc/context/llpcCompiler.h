@@ -161,8 +161,9 @@ public:
                                      MetroHash::Hash*                         pNonFragmentHash);
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(Compiler);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(Compiler);
+    Compiler() = delete;
+    Compiler(const Compiler&) = delete;
+    Compiler& operator=(const Compiler&) = delete;
 
     Result ValidatePipelineShaderInfo(const PipelineShaderInfo* pShaderInfo) const;
 

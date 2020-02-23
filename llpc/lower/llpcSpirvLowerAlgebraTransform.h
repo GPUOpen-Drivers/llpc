@@ -62,7 +62,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerAlgebraTransform);
+    SpirvLowerAlgebraTransform(const SpirvLowerAlgebraTransform&) = delete;
+    SpirvLowerAlgebraTransform& operator=(const SpirvLowerAlgebraTransform&) = delete;
 
     bool IsOperandNoContract(llvm::Value* pOperand);
     void DisableFastMath(Value* pValue);

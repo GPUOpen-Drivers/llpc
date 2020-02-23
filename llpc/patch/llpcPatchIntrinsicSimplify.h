@@ -69,9 +69,10 @@ public:
 
     static char ID;   // ID of this pass
 
-private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchIntrinsicSimplify);
+    PatchIntrinsicSimplify(const PatchIntrinsicSimplify&) = delete;
+    PatchIntrinsicSimplify& operator=(const PatchIntrinsicSimplify&) = delete;
 
+private:
     bool CanSafelyConvertTo16Bit(llvm::Value& value) const;
     llvm::Value* ConvertTo16Bit(llvm::Value& value, IRBuilder<>& builder) const;
     llvm::Value* SimplifyImage(llvm::IntrinsicInst& intrinsicCall,

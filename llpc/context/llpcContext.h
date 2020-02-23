@@ -165,8 +165,9 @@ public:
     void SetModuleTargetMachine(llvm::Module* pModule);
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(Context);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(Context);
+    Context() = delete;
+    Context(const Context&) = delete;
+    Context& operator=(const Context&) = delete;
 
     // -----------------------------------------------------------------------------------------------------------------
 

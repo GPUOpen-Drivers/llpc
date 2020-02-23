@@ -72,7 +72,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchInOutImportExport);
+    PatchInOutImportExport(const PatchInOutImportExport&) = delete;
+    PatchInOutImportExport& operator=(const PatchInOutImportExport&) = delete;
 
     void InitPerShader();
 

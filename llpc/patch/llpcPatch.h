@@ -151,7 +151,8 @@ protected:
 private:
     static void AddOptimizationPasses(llvm::legacy::PassManager& passMgr);
 
-    LLPC_DISALLOW_DEFAULT_CTOR(Patch);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(Patch);
+    Patch() = delete;
+    Patch(const Patch&) = delete;
+    Patch& operator=(const Patch&) = delete;
 };
 } // Llpc

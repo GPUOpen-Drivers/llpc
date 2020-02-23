@@ -64,7 +64,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerMemoryOp);
+    SpirvLowerMemoryOp(const SpirvLowerMemoryOp&) = delete;
+    SpirvLowerMemoryOp& operator=(const SpirvLowerMemoryOp&) = delete;
 
     bool NeedExpandDynamicIndex(llvm::GetElementPtrInst* pGetElemPtr,
                                 uint32_t*                pOperandIndex,

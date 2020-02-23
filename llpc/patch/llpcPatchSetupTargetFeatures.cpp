@@ -61,7 +61,8 @@ public:
     bool runOnModule(Module& module) override;
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchSetupTargetFeatures);
+    PatchSetupTargetFeatures(const PatchSetupTargetFeatures&) = delete;
+    PatchSetupTargetFeatures& operator=(const PatchSetupTargetFeatures&) = delete;
 };
 
 char PatchSetupTargetFeatures::ID = 0;

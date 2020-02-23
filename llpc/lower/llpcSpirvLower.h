@@ -125,8 +125,9 @@ protected:
     Builder*        m_pBuilder;     // LLPC builder object
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(SpirvLower);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLower);
+    SpirvLower() = delete;
+    SpirvLower(const SpirvLower&) = delete;
+    SpirvLower& operator=(const SpirvLower&) = delete;
 };
 
 } // Llpc

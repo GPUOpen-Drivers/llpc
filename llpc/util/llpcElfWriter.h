@@ -100,7 +100,8 @@ public:
 
     Result LinkComputeRelocatableElf(const ElfReader<Elf>& relocatableElf, Context* pContext);
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(ElfWriter);
+    ElfWriter(const ElfWriter&) = delete;
+    ElfWriter& operator=(const ElfWriter&) = delete;
 
     static void MergeMapItem(llvm::msgpack::MapDocNode& destMap, llvm::msgpack::MapDocNode& srcMap, uint32_t key);
 

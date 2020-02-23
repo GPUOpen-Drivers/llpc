@@ -67,7 +67,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchCheckShaderCache);
+    PatchCheckShaderCache(const PatchCheckShaderCache&) = delete;
+    PatchCheckShaderCache& operator=(const PatchCheckShaderCache&) = delete;
 
     // -----------------------------------------------------------------------------------------------------------------
 

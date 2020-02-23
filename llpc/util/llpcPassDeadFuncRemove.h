@@ -57,7 +57,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PassDeadFuncRemove);
+    PassDeadFuncRemove(const PassDeadFuncRemove&) = delete;
+    PassDeadFuncRemove& operator =(const PassDeadFuncRemove&) = delete;
 
     static const uint32_t MaxIterCountOfDetection = 16; // Maximum iteration count in dead function detection
 };

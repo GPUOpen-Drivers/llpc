@@ -54,7 +54,8 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchLlvmIrInclusion);
+    PatchLlvmIrInclusion(const PatchLlvmIrInclusion&) = delete;
+    PatchLlvmIrInclusion& operator=(const PatchLlvmIrInclusion&) = delete;
 };
 
 } // Llpc

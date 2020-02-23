@@ -55,7 +55,6 @@ ShaderMerger::ShaderMerger(
     m_pPipelineState(pPipelineState),
     m_pContext(&pPipelineState->GetContext()),
     m_gfxIp(pPipelineState->GetTargetInfo().GetGfxIpVersion()),
-    m_pPipelineShaders(pPipelineShaders),
     m_primShader(pPipelineState)
 {
     assert(m_gfxIp.major >= 9);

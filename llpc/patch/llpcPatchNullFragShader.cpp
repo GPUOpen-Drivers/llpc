@@ -81,7 +81,8 @@ public:
     bool runOnModule(Module& module) override;
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchNullFragShader);
+    PatchNullFragShader(const PatchNullFragShader&) = delete;
+    PatchNullFragShader& operator=(const PatchNullFragShader&) = delete;
 };
 
 char PatchNullFragShader::ID = 0;

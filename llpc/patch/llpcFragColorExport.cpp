@@ -51,7 +51,6 @@ FragColorExport::FragColorExport(
     Module*         pModule)        // [in] LLVM module
     :
     m_pPipelineState(pPipelineState),
-    m_pModule(pModule),
     m_pContext(pModule ? &pModule->getContext() : nullptr)
 {
 }

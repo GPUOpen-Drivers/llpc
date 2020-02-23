@@ -499,7 +499,8 @@ public:
     uint32_t GetMsgMapLevel() const;
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(ElfReader);
+    ElfReader(const ElfReader&) = delete;
+    ElfReader& operator=(const ElfReader&) = delete;
 
     // -----------------------------------------------------------------------------------------------------------------
 

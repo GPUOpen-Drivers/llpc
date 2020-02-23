@@ -66,8 +66,9 @@ public:
                              llvm::Function* pCopyShaderEntryPoint);
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(NggPrimShader);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(NggPrimShader);
+    NggPrimShader() = delete;
+    NggPrimShader(const NggPrimShader&) = delete;
+    NggPrimShader& operator=(const NggPrimShader&) = delete;
 
     llvm::FunctionType* GeneratePrimShaderEntryPointType(uint64_t* pInRegMask) const;
     llvm::Function* GeneratePrimShaderEntryPoint(llvm::Module* pModule);
