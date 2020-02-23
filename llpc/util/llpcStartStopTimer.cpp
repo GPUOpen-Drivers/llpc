@@ -28,6 +28,7 @@
 * @brief LLPC source file: pass to start or stop a timer
 ***********************************************************************************************************************
 */
+#include "llpcBuilderContext.h"
 #include "llpcInternal.h"
 
 #include "llvm/Support/Timer.h"
@@ -69,8 +70,9 @@ char StartStopTimer::ID = 0;
 } // Llpc
 
 // =====================================================================================================================
-// Create a start/stop timer pass
-ModulePass* Llpc::CreateStartStopTimer(
+// Create a start/stop timer pass. This is a static method in BuilderContext, so it can be accessed by
+// the front-end to add to its pass manager.
+ModulePass* BuilderContext::CreateStartStopTimer(
     Timer*  pTimer,   // The timer to start or stop when the pass is run
     bool    starting) // True to start the timer, false to stop it
 {

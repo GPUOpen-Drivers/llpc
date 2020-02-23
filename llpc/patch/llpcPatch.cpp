@@ -53,6 +53,7 @@
 #include "llvm/Transforms/Utils.h"
 #include "llpcBuilder.h"
 #include "llpcBuilderDebug.h"
+#include "llpcBuilderContext.h"
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
 #include "llpcPatch.h"
@@ -99,7 +100,7 @@ void Patch::AddPasses(
     // Start timer for patching passes.
     if (pPatchTimer != nullptr)
     {
-        passMgr.add(CreateStartStopTimer(pPatchTimer, true));
+        passMgr.add(BuilderContext::CreateStartStopTimer(pPatchTimer, true));
     }
 
     // If using BuilderRecorder rather than BuilderImpl, replay the Builder calls now
@@ -152,8 +153,8 @@ void Patch::AddPasses(
     // Stop timer for patching passes and start timer for optimization passes.
     if (pPatchTimer != nullptr)
     {
-        passMgr.add(CreateStartStopTimer(pPatchTimer, false));
-        passMgr.add(CreateStartStopTimer(pOptTimer, true));
+        passMgr.add(BuilderContext::CreateStartStopTimer(pPatchTimer, false));
+        passMgr.add(BuilderContext::CreateStartStopTimer(pOptTimer, true));
     }
 
     // Prepare pipeline ABI but only set the calling conventions to AMDGPU ones for now.
@@ -172,8 +173,8 @@ void Patch::AddPasses(
     // Stop timer for optimization passes and restart timer for patching passes.
     if (pPatchTimer != nullptr)
     {
-        passMgr.add(CreateStartStopTimer(pOptTimer, false));
-        passMgr.add(CreateStartStopTimer(pPatchTimer, true));
+        passMgr.add(BuilderContext::CreateStartStopTimer(pOptTimer, false));
+        passMgr.add(BuilderContext::CreateStartStopTimer(pPatchTimer, true));
     }
 
     // Patch buffer operations (must be after optimizations)
@@ -189,8 +190,8 @@ void Patch::AddPasses(
         // Stop timer for patching passes and restart timer for optimization passes.
         if (pPatchTimer != nullptr)
         {
-            passMgr.add(CreateStartStopTimer(pPatchTimer, false));
-            passMgr.add(CreateStartStopTimer(pOptTimer, true));
+            passMgr.add(BuilderContext::CreateStartStopTimer(pPatchTimer, false));
+            passMgr.add(BuilderContext::CreateStartStopTimer(pOptTimer, true));
         }
 
         // Extra optimizations after NGG primitive shader creation
@@ -204,8 +205,8 @@ void Patch::AddPasses(
         // Stop timer for optimization passes and restart timer for patching passes.
         if (pPatchTimer != nullptr)
         {
-            passMgr.add(CreateStartStopTimer(pOptTimer, false));
-            passMgr.add(CreateStartStopTimer(pPatchTimer, true));
+            passMgr.add(BuilderContext::CreateStartStopTimer(pOptTimer, false));
+            passMgr.add(BuilderContext::CreateStartStopTimer(pPatchTimer, true));
         }
     }
 
@@ -224,7 +225,7 @@ void Patch::AddPasses(
     // Stop timer for patching passes.
     if (pPatchTimer != nullptr)
     {
-        passMgr.add(CreateStartStopTimer(pPatchTimer, false));
+        passMgr.add(BuilderContext::CreateStartStopTimer(pPatchTimer, false));
     }
 
     // Dump the result

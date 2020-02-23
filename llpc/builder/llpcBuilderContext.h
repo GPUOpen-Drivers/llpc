@@ -38,6 +38,7 @@ namespace llvm
 {
 
 class LLVMContext;
+class ModulePass;
 class raw_pwrite_stream;
 class TargetMachine;
 class Timer;
@@ -108,6 +109,9 @@ public:
 
     void SetBuildRelocatableElf(bool buildRelocatableElf) { m_buildRelocatableElf = buildRelocatableElf; }
     bool BuildingRelocatableElf() { return m_buildRelocatableElf; }
+
+    // Utility method to create a start/stop timer pass
+    static ModulePass* CreateStartStopTimer(Timer* pTimer, bool starting);
 
     // Set and get a pointer to the stream used for LLPC_OUTS. This is initially nullptr,
     // signifying no output from LLPC_OUTS. Setting this to a stream means that LLPC_OUTS
