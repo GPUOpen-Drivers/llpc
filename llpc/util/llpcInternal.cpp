@@ -42,11 +42,7 @@
     #include <mach/mach_time.h>
 #endif
 
-#include "SPIRVInternal.h"
-#include "llpcAbiMetadata.h"
 #include "llpcBuilderBase.h"
-#include "llpcContext.h"
-#include "llpcElfReader.h"
 #include "llpcInternal.h"
 
 #define DEBUG_TYPE "llpc-internal"
@@ -55,26 +51,6 @@ using namespace llvm;
 
 namespace Llpc
 {
-
-// =====================================================================================================================
-// Gets the entry point (valid for AMD GPU) of a LLVM module.
-Function* GetEntryPoint(
-    Module* pModule) // [in] LLVM module
-{
-    Function* pEntryPoint = nullptr;
-
-    for (auto pFunc = pModule->begin(), pEnd = pModule->end(); pFunc != pEnd; ++pFunc)
-    {
-        if ((pFunc->empty() == false) && (pFunc->getLinkage() == GlobalValue::ExternalLinkage))
-        {
-            pEntryPoint = &*pFunc;
-            break;
-        }
-    }
-
-    assert(pEntryPoint != nullptr);
-    return pEntryPoint;
-}
 
 // =====================================================================================================================
 // Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
@@ -211,49 +187,17 @@ void AddTypeMangling(
 }
 
 // =====================================================================================================================
-// Gets the shader stage from the specified single-shader LLVM module.
-ShaderStage GetShaderStageFromModule(
-    Module* pModule)  // [in] LLVM module
-{
-    return GetShaderStageFromFunction(GetEntryPoint(pModule));
-}
-
-// =====================================================================================================================
 // Gets the shader stage from the specified LLVM function. Returns ShaderStageInvalid if not shader entrypoint.
 ShaderStage GetShaderStageFromFunction(
     const Function* pFunc)  // [in] LLVM function
 {
-    // First check for the metadata that is added by the builder. This works in the patch phase.
+    // Check for the metadata that is added by the builder. This works in the patch phase.
     MDNode* pStageMetaNode = pFunc->getMetadata(LlpcName::ShaderStageMetadata);
     if (pStageMetaNode != nullptr)
     {
         return ShaderStage(mdconst::dyn_extract<ConstantInt>(pStageMetaNode->getOperand(0))->getZExtValue());
     }
-
-    // Then check for the execution model metadata that is added by the SPIR-V reader.
-    MDNode* pExecModelNode = pFunc->getMetadata(gSPIRVMD::ExecutionModel);
-    if (pExecModelNode == nullptr)
-    {
-        return ShaderStageInvalid;
-    }
-    auto execModel = mdconst::dyn_extract<ConstantInt>(pExecModelNode->getOperand(0))->getZExtValue();
-    return ConvertToStageShage(execModel);
-}
-
-// =====================================================================================================================
-// Set the shader stage to the specified LLVM module entry function.
-void SetShaderStageToModule(
-    Module*     pModule,        // [in] LLVM module to set shader stage
-    ShaderStage shaderStage)    // Shader stage
-{
-    LLVMContext& context = pModule->getContext();
-    Function* pFunc = GetEntryPoint(pModule);
-    auto execModel = ConvertToExecModel(shaderStage);
-    Metadata* execModelMeta[] = {
-        ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(context), execModel))
-    };
-    auto pExecModelMetaNode = MDNode::get(context, execModelMeta);
-    pFunc->setMetadata(gSPIRVMD::ExecutionModel, pExecModelMetaNode);
+    return ShaderStageInvalid;
 }
 
 // =====================================================================================================================
@@ -357,105 +301,6 @@ bool IsDontCareValue(
     }
 
     return isDontCare;
-}
-
-// =====================================================================================================================
-// Translates an integer to 32-bit integer regardless of its initial bit width.
-Value* ToInt32Value(
-    Context*     pContext,   // [in] LLPC context
-    Value*       pValue,     // [in] Value to be translated
-    Instruction* pInsertPos) // [in] Where to insert the translation instructions
-{
-    assert(isa<IntegerType>(pValue->getType()));
-    auto pValueTy = cast<IntegerType>(pValue->getType());
-
-    const uint32_t bitWidth = pValueTy->getBitWidth();
-    if (bitWidth > 32)
-    {
-        // Truncated to i32 type
-        pValue = CastInst::CreateTruncOrBitCast(pValue, Type::getInt32Ty(*pContext), "", pInsertPos);
-    }
-    else if (bitWidth < 32)
-    {
-        // Extended to i32 type
-        pValue = CastInst::CreateZExtOrBitCast(pValue, Type::getInt32Ty(*pContext), "", pInsertPos);
-    }
-
-    return pValue;
-}
-
-// =====================================================================================================================
-// Checks whether "pValue" is a non-uniform value. Also, add it to the set of already-checked values.
-bool IsNonUniformValue(
-    Value*                      pValue,        // [in] Pointer to the value need to be checked
-    std::unordered_set<Value*>& checkedValues) // [in,out] Values which are checked
-{
-    if ((pValue != nullptr) && isa<Instruction>(pValue))
-    {
-        // Check value in set checkedValues to avoid infinite recusive
-        if (checkedValues.find(pValue) == checkedValues.end())
-        {
-            checkedValues.insert(pValue);
-
-            // Check metedata in current instructions
-            auto pInst = cast<Instruction>(pValue);
-            if (pInst->getMetadata(gSPIRVMD::NonUniform) != nullptr)
-            {
-                return true;
-            }
-
-            // Check metedata for each operands
-            for (auto& operand : pInst->operands())
-            {
-                if (isa<Instruction>(&operand))
-                {
-                    auto pOperand = cast<Instruction>(&operand);
-                    if ((pOperand != pInst) && IsNonUniformValue(pOperand, checkedValues))
-                    {
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-
-    return false;
-}
-
-// =====================================================================================================================
-// Checks whether the input data is actually a ELF binary
-bool IsElfBinary(
-    const void* pData,    // [in] Input data to check
-    size_t      dataSize) // Size of the input data
-{
-    bool isElfBin = false;
-    if (dataSize >= sizeof(Elf64::FormatHeader))
-    {
-        auto pHeader = reinterpret_cast<const Elf64::FormatHeader*>(pData);
-        isElfBin = pHeader->e_ident32[EI_MAG0] == ElfMagic;
-    }
-    return isElfBin;
-}
-
-// =====================================================================================================================
-// Checks whether the input data is actually LLVM bitcode
-bool IsLlvmBitcode(
-    const void* pData,    // [in] Input data to check
-    size_t      dataSize) // Size of the input data
-{
-    const unsigned char magic[] = { 'B', 'C', 0xC0, 0xDE };
-    return (dataSize >= sizeof magic) && (memcmp(pData, magic, sizeof magic) == 0);
-}
-
-// =====================================================================================================================
-// Checks whether the output data is actually ISA assembly text
-bool IsIsaText(
-    const void* pData,    // [in] Input data to check
-    size_t      dataSize) // Size of the input data
-{
-    // This is called by amdllpc to help distinguish between its output types of LLVM IR assembly
-    // and ISA assembly. Here we use the fact that ISA assembly starts with a tab character.
-    return (dataSize != 0) && ((reinterpret_cast<const char*>(pData))[0] == '\t');
 }
 
 } // Llpc

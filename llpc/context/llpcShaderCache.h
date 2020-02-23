@@ -38,8 +38,8 @@
 
 #include "llpc.h"
 #include "llpcFile.h"
-#include "llpcInternal.h"
 #include "llpcMetroHash.h"
+#include "llpcUtil.h"
 
 namespace Llpc
 {

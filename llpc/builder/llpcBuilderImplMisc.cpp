@@ -51,7 +51,7 @@ Instruction* BuilderImplMisc::CreateEmitVertex(
     callName += "GsWaveId.i32.i32";
     Value* pGsWaveId = EmitCall(callName,
                                 getInt32Ty(),
-                                getInt32(spv::BuiltInWaveId),
+                                getInt32(BuiltInWaveId),
                                 {},
                                 &*GetInsertPoint());
 
@@ -73,7 +73,7 @@ Instruction* BuilderImplMisc::CreateEndPrimitive(
     callName += "GsWaveId.i32.i32";
     Value* pGsWaveId = EmitCall(callName,
                                 getInt32Ty(),
-                                getInt32(spv::BuiltInWaveId),
+                                getInt32(BuiltInWaveId),
                                 {},
                                 &*GetInsertPoint());
 

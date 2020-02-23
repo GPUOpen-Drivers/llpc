@@ -33,10 +33,7 @@
 #include "SPIRVInternal.h"
 #include "llpcBuilder.h"
 #include "llpcCompiler.h"
-#include "llpcGfx6Chip.h"
-#include "llpcGfx9Chip.h"
 #include "llpcGraphicsContext.h"
-#include "llpcInternal.h"
 
 #define DEBUG_TYPE "llpc-graphics-context"
 

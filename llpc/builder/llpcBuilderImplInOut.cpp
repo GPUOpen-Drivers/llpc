@@ -506,14 +506,14 @@ Value* BuilderImplInOut::ModifyAuxInterpValue(
             if (inputInfo.GetInterpMode() == InOutInfo::InterpModeNoPersp)
             {
                 evalInstName += "InterpLinearCentroid";
-                evalArg = getInt32(spv::BuiltInInterpLinearCentroid);
+                evalArg = getInt32(BuiltInInterpLinearCentroid);
                 pResUsage->builtInUsage.fs.noperspective = true;
                 pResUsage->builtInUsage.fs.centroid = true;
             }
             else
             {
                 evalInstName += "InterpPerspCentroid";
-                evalArg = getInt32(spv::BuiltInInterpPerspCentroid);
+                evalArg = getInt32(BuiltInInterpPerspCentroid);
                 pResUsage->builtInUsage.fs.smooth = true;
                 pResUsage->builtInUsage.fs.centroid = true;
             }

@@ -28,8 +28,8 @@
  * @brief LLPC header file: contains implementation of class Llpc::Gfx9::ConfigBuilder.
  ***********************************************************************************************************************
  */
+#include "llpcBuilderBuiltIns.h"
 #include "llpcCodeGenManager.h"
-#include "llpcElfReader.h"
 #include "llpcGfx9ConfigBuilder.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
@@ -2479,11 +2479,11 @@ Result ConfigBuilder::BuildPsRegConfig(
 #endif
 
     uint32_t pointCoordLoc = InvalidValue;
-    if (pResUsage->inOutUsage.builtInInputLocMap.find(spv::BuiltInPointCoord) !=
+    if (pResUsage->inOutUsage.builtInInputLocMap.find(BuiltInPointCoord) !=
         pResUsage->inOutUsage.builtInInputLocMap.end())
     {
         // Get generic input corresponding to gl_PointCoord (to set the field PT_SPRITE_TEX)
-        pointCoordLoc = pResUsage->inOutUsage.builtInInputLocMap[spv::BuiltInPointCoord];
+        pointCoordLoc = pResUsage->inOutUsage.builtInInputLocMap[BuiltInPointCoord];
     }
 
     // NOTE: PAL expects at least one mmSPI_PS_INPUT_CNTL_0 register set, so we always patch it at least one if none

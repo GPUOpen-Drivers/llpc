@@ -52,9 +52,9 @@
 #include "llpcBuilderContext.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
-#include "llpcInternal.h"
 #include "llpcPassManager.h"
 #include "llpcSpirvLower.h"
+#include "llpcSpirvLowerUtil.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower"
 

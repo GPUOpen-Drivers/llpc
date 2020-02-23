@@ -41,8 +41,6 @@
 
 #include "llpc.h"
 #include "llpcCompiler.h"
-#include "llpcInternal.h"
-#include "llpcIntrinsDefs.h"
 #include "llpcMetroHash.h"
 #include "llpcPipeline.h"
 

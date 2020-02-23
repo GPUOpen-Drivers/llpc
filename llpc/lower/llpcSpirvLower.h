@@ -33,10 +33,14 @@
 #include "llvm/Pass.h"
 
 #include "llpc.h"
-#include "llpcInternal.h"
+#include "llpcUtil.h"
 
 namespace llvm
 {
+
+class Constant;
+class GlobalVariable;
+class Timer;
 
 namespace legacy
 {
@@ -75,6 +79,7 @@ inline static void InitializeLowerPasses(
     initializeSpirvLowerTranslatorPass(passRegistry);
 }
 
+class Builder;
 class Context;
 
 llvm::ModulePass* CreateSpirvLowerAccessChain();

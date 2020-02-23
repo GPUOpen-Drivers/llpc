@@ -36,18 +36,10 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 
-#include "spirvExt.h"
 #include "llpc.h"
-#include "llpcUtil.h"
 
 namespace llvm { class CallInst; }
 namespace Llpc { class Context; }
-
-// Internally defined SPIR-V semantics (internal-use)
-namespace spv
-{
-
-} // spv
 
 namespace llvm
 {
@@ -65,6 +57,12 @@ void initializeStartStopTimerPass(PassRegistry&);
 
 namespace Llpc
 {
+
+// Invalid value
+static const uint32_t InvalidValue  = ~0u;
+
+// Size of vec4
+static const uint32_t SizeOfVec4 = sizeof(float) * 4;
 
 // Initialize helper passes
 inline static void InitializeUtilPasses(
@@ -117,10 +115,6 @@ namespace LlpcName
     const static char LaterCallPrefix[]               = "llpc.late.";
     const static char LateLaunderFatPointer[]         = "llpc.late.launder.fat.pointer";
     const static char LateBufferLength[]              = "llpc.late.buffer.desc.length";
-
-    const static char GlobalProxyPrefix[]             = "__llpc_global_proxy_";
-    const static char InputProxyPrefix[]              = "__llpc_input_proxy_";
-    const static char OutputProxyPrefix[]             = "__llpc_output_proxy_";
 
     // Names of entry-points for merged shader
     const static char EsGsEntryPoint[]                = "llpc.shader.ESGS.main";
@@ -193,8 +187,8 @@ static const uint32_t SI_DRV_TABLE_SAMPLEPOS            = 12;
 
 static const uint32_t SI_STREAMOUT_TABLE_OFFS           = 0;
 
-// Gets the entry point (valid for AMD GPU) of a LLVM module.
-llvm::Function* GetEntryPoint(llvm::Module* pModule);
+// Translates shader stage to corresponding stage mask.
+static inline uint32_t ShaderStageToMask(ShaderStage stage) { return 1U << static_cast<uint32_t>(stage); }
 
 // Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
 // and its parameters.
@@ -219,12 +213,6 @@ void AddTypeMangling(llvm::Type* pReturnTy, llvm::ArrayRef<llvm::Value*> args, s
 void GetTypeName(llvm::Type* pTy, llvm::raw_ostream& nameStream);
 std::string GetTypeName(llvm::Type* pTy);
 
-// Gets the shader stage from the specified LLVM module.
-ShaderStage GetShaderStageFromModule(llvm::Module* pModule);
-
-// Set the shader stage to the specified LLVM module.
-void SetShaderStageToModule(llvm::Module* pModule, ShaderStage shaderStage);
-
 // Gets the shader stage from the specified LLVM function.
 ShaderStage GetShaderStageFromFunction(const llvm::Function* pFunc);
 
@@ -239,20 +227,5 @@ bool CanBitCast(const llvm::Type* pTy1, const llvm::Type* pTy2);
 
 // Checks if the specified value actually represents a don't-care value (0xFFFFFFFF).
 bool IsDontCareValue(llvm::Value* pValue);
-
-// Translates an integer to 32-bit integer regardless of its initial bit width.
-llvm::Value* ToInt32Value(Llpc::Context* pContext, llvm::Value* pValue, llvm::Instruction* pInsertPos);
-
-// Checks whether the specified value is a non-uniform value.
-bool IsNonUniformValue(llvm::Value* pValue, std::unordered_set<llvm::Value*>& checkedValues);
-
-// Checks whether the input data is actually a ELF binary
-bool IsElfBinary(const void* pData, size_t dataSize);
-
-// Checks whether the input data is actually LLVM bitcode
-bool IsLlvmBitcode(const void* pData, size_t dataSize);
-
-// Checks whether the output data is actually ISA assembly text
-bool IsIsaText(const void* pData, size_t dataSize);
 
 } // Llpc

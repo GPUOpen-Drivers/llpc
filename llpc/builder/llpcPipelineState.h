@@ -224,6 +224,15 @@ public:
     InterfaceData* GetShaderInterfaceData(ShaderStage shaderStage);
 
     // -----------------------------------------------------------------------------------------------------------------
+    // Utility methods
+
+    // Gets name string of the abbreviation for the specified shader stage
+    static const char* GetShaderStageAbbreviation(ShaderStage shaderStage);
+
+    // Translate enum "ResourceMappingNodeType" to string
+    static const char* GetResourceMappingNodeTypeName(ResourceMappingNodeType type);
+
+    // -----------------------------------------------------------------------------------------------------------------
     // Utility method templates to read and write IR metadata, used by PipelineState and ShaderModes
 
     // Get a metadata node containing an array of i32 values, which can be read from any type.

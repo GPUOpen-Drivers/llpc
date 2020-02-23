@@ -64,8 +64,8 @@
 #include "llpcPipelineDumper.h"
 #include "llpcSpirvLower.h"
 #include "llpcSpirvLowerResourceCollect.h"
+#include "llpcSpirvLowerUtil.h"
 #include "llpcTimerProfiler.h"
-#include "llpcVertexFetch.h"
 #include <mutex>
 #include <set>
 #include <unordered_set>
