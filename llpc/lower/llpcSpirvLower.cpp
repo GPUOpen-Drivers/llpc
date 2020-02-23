@@ -189,7 +189,7 @@ void SpirvLower::AddPasses(
     // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
     // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.
     passMgr.add(createAlwaysInlinerLegacyPass());
-    passMgr.add(CreatePassDeadFuncRemove());
+    passMgr.add(createGlobalDCEPass());
 
     // Control loop unrolling
     passMgr.add(CreateSpirvLowerLoopUnrollControl(forceLoopUnrollCount));

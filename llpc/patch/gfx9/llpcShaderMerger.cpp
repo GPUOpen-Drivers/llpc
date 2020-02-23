@@ -35,7 +35,6 @@
 
 #include "llpcCodeGenManager.h"
 #include "llpcNggPrimShader.h"
-#include "llpcPassDeadFuncRemove.h"
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"

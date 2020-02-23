@@ -56,7 +56,6 @@ class ModulePass;
 class PassRegistry;
 class Timer;
 
-void initializePassDeadFuncRemovePass(PassRegistry&);
 void initializePipelineShadersPass(PassRegistry&);
 void initializePipelineStateClearerPass(PassRegistry&);
 void initializePipelineStateWrapperPass(PassRegistry&);
@@ -67,14 +66,12 @@ void initializeStartStopTimerPass(PassRegistry&);
 namespace Llpc
 {
 
-llvm::ModulePass* CreatePassDeadFuncRemove();
 llvm::ModulePass* CreateStartStopTimer(llvm::Timer* pTimer, bool starting);
 
 // Initialize helper passes
 inline static void InitializeUtilPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
 {
-    initializePassDeadFuncRemovePass(passRegistry);
     initializePipelineShadersPass(passRegistry);
     initializePipelineStateClearerPass(passRegistry);
     initializePipelineStateWrapperPass(passRegistry);
