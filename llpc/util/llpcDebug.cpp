@@ -41,7 +41,6 @@
 #include "llpcElfReader.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
-#include "llpcInternal.h"
 #include "llpcMetroHash.h"
 
 #define DEBUG_TYPE "llpc-debug"

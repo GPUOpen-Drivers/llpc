@@ -116,7 +116,7 @@ Module* PipelineState::Link(
                 if (func.getLinkage() != GlobalValue::InternalLinkage)
                 {
                     func.setName(Twine(LlpcName::EntryPointPrefix) +
-                                 GetShaderStageAbbreviation(static_cast<ShaderStage>(stage), true) +
+                                 GetShaderStageAbbreviation(static_cast<ShaderStage>(stage)) +
                                  "." +
                                  func.getName());
                 }
@@ -463,7 +463,7 @@ void PipelineState::RecordOptions(
     for (uint32_t stage = 0; stage != m_shaderOptions.size(); ++stage)
     {
         std::string metadataName = (Twine(OptionsMetadataName) + "." +
-                                    GetShaderStageAbbreviation(static_cast<ShaderStage>(stage), true)).str();
+                                    GetShaderStageAbbreviation(static_cast<ShaderStage>(stage))).str();
         SetNamedMetadataToArrayOfInt32(pModule, m_shaderOptions[stage], metadataName);
     }
 }
@@ -477,7 +477,7 @@ void PipelineState::ReadOptions(
     for (uint32_t stage = 0; stage != ShaderStageCompute + 1; ++stage)
     {
         std::string metadataName = (Twine(OptionsMetadataName) + "." +
-                                    GetShaderStageAbbreviation(static_cast<ShaderStage>(stage), true)).str();
+                                    GetShaderStageAbbreviation(static_cast<ShaderStage>(stage))).str();
         auto pNamedMetaNode = pModule->getNamedMetadata(metadataName);
         if ((pNamedMetaNode == nullptr) || (pNamedMetaNode->getNumOperands() == 0))
         {
@@ -1256,6 +1256,58 @@ uint32_t PipelineState::ComputeExportFormat(
 {
     std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(this, nullptr));
     return fragColorExport->ComputeExportFormat(pOutputTy, location);
+}
+
+// =====================================================================================================================
+// Gets name string of the abbreviation for the specified shader stage
+const char* PipelineState::GetShaderStageAbbreviation(
+    ShaderStage shaderStage)  // Shader stage
+{
+    if (shaderStage == ShaderStageCopyShader)
+    {
+        return "COPY";
+    }
+    if (shaderStage > ShaderStageCompute)
+    {
+        return "Bad";
+    }
+
+    static const char* ShaderStageAbbrs[] = { "VS", "TCS", "TES", "GS", "FS", "CS" };
+    return ShaderStageAbbrs[static_cast<uint32_t>(shaderStage)];
+}
+
+// =====================================================================================================================
+// Helper macro
+#define CASE_CLASSENUM_TO_STRING(TYPE, ENUM) \
+    case TYPE::ENUM: pString = #ENUM; break;
+
+// =====================================================================================================================
+// Translate enum "ResourceMappingNodeType" to string
+const char* PipelineState::GetResourceMappingNodeTypeName(
+    ResourceMappingNodeType type)  // Resource map node type
+{
+    const char* pString = nullptr;
+    switch (type)
+    {
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, Unknown)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorResource)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorSampler)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorYCbCrSampler)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorCombinedTexture)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorTexelBuffer)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorFmask)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorBuffer)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorTableVaPtr)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, IndirectUserDataVaPtr)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, PushConst)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorBufferCompact)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, StreamOutTableVaPtr)
+        break;
+    default:
+        llvm_unreachable("Should never be called!");
+        break;
+    }
+    return pString;
 }
 
 // =====================================================================================================================

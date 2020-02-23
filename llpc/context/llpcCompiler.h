@@ -32,10 +32,16 @@
 
 #include "llpc.h"
 #include "llpcElfReader.h"
-#include "llpcInternal.h"
 #include "llpcMetroHash.h"
 #include "llpcShaderCacheManager.h"
 #include "llpcShaderModuleHelper.h"
+
+namespace llvm
+{
+
+class Module;
+
+} // llvm
 
 namespace Llpc
 {

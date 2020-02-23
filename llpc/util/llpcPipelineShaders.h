@@ -34,8 +34,6 @@
 #include "llvm/Pass.h"
 #include <map>
 
-#include "llpc.h"
-
 namespace Llpc
 {
 

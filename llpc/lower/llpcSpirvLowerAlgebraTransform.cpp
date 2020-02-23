@@ -359,7 +359,7 @@ void SpirvLowerAlgebraTransform::visitCallInst(
         auto calleeName = pCallee->getName();
         uint32_t builtIn = InvalidValue;
         Value* pValueWritten = nullptr;
-        if (calleeName.startswith(LlpcName::OutputExportBuiltIn))
+        if (calleeName.startswith("llpc.output.export.builtin."))
         {
             builtIn = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
             pValueWritten = callInst.getOperand(callInst.getNumArgOperands() - 1);

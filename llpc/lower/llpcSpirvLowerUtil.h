@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,68 +24,42 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcCodeGenManager.h
- * @brief LLPC header file: contains declaration of class Llpc::CodeGenManager.
+ * @file  llpcSpirvLowerUtil.h
+ * @brief LLPC header file: utilities for use by LLPC front-end
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llvm/IR/Module.h"
-#include "llvm/Support/raw_ostream.h"
-
-#include <string>
 #include "llpc.h"
 
 namespace llvm
 {
 
-namespace legacy
-{
-
-class PassManager;
-
-} // legacy
-
-class Timer;
+class Function;
+class Module;
 
 } // llvm
 
 namespace Llpc
 {
 
-namespace Gfx6
+// Well-known names in the front-end.
+namespace LlpcName
 {
-    struct PipelineVsFsRegConfig;
-    struct PipelineCsRegConfig;
-}
 
-class PassManager;
-class PipelineState;
+const static char GlobalProxyPrefix[]             = "__llpc_global_proxy_";
+const static char InputProxyPrefix[]              = "__llpc_input_proxy_";
+const static char OutputProxyPrefix[]             = "__llpc_output_proxy_";
 
-// Represents data entry in a ELF section, including associated ELF symbols.
-struct ElfDataEntry
-{
-    const void* pData;           // Data in the section
-    uint32_t    offset;          // Offset of the data
-    uint32_t    size;            // Size of the data
-    uint32_t    padSize;         // Padding size of the data
-    const char* pSymName;        // Name of associated ELF symbol
-};
+} // LlpcName
 
-// =====================================================================================================================
-// Represents the manager of GPU ISA code generation.
-class CodeGenManager
-{
-public:
-    static void SetupTargetFeatures(PipelineState* pPipelineState, llvm::Module* pModule);
+// Gets the shader stage from the specified LLVM module.
+ShaderStage GetShaderStageFromModule(llvm::Module* pModule);
 
-    static Result Run(llvm::Module*               pModule,
-                      llvm::legacy::PassManager&  passMgr);
+// Set the shader stage to the specified LLVM module.
+void SetShaderStageToModule(llvm::Module* pModule, ShaderStage shaderStage);
 
-private:
-    CodeGenManager() = delete;
-    CodeGenManager(const CodeGenManager&) = delete;
-    CodeGenManager& operator=(const CodeGenManager&) = delete;
-};
+// Gets the entry point (valid for AMD GPU) of a LLVM module.
+llvm::Function* GetEntryPoint(llvm::Module* pModule);
 
 } // Llpc

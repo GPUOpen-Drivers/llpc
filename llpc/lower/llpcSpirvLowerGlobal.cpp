@@ -42,6 +42,7 @@
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcSpirvLowerGlobal.h"
+#include "llpcSpirvLowerUtil.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-global"
 
@@ -373,7 +374,7 @@ void SpirvLowerGlobal::visitLoadInst(
 
             for (Value* const pIndex : pCurrGetElemPtr->indices())
             {
-                indices.push_back(ToInt32Value(m_pContext, pIndex, &loadInst));
+                indices.push_back(ToInt32Value(pIndex, &loadInst));
             }
 
             indexOperands.insert(indexOperands.begin(), indices.begin(), indices.end());
@@ -571,7 +572,7 @@ void SpirvLowerGlobal::visitStoreInst(
 
             for (Value* const pIndex : pCurrGetElemPtr->indices())
             {
-                indices.push_back(ToInt32Value(m_pContext, pIndex, &storeInst));
+                indices.push_back(ToInt32Value(pIndex, &storeInst));
             }
 
             indexOperands.insert(indexOperands.begin(), indices.begin(), indices.end());
@@ -1529,7 +1530,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                     }
 
                     auto builtInName = getNameMap(static_cast<BuiltIn>(builtInId)).map(static_cast<BuiltIn>(builtInId));
-                    LLPC_OUTS(GetTypeName(pOutputValue->getType()) <<
+                    LLPC_OUTS(*pOutputValue->getType() <<
                               " (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), " <<
                               "xfbBuffer = " << outputMeta.XfbBuffer << ", " <<
                               "xfbStride = " << outputMeta.XfbStride << ", " <<
@@ -1661,7 +1662,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 }
 
                 auto builtInName = getNameMap(static_cast<BuiltIn>(builtInId)).map(static_cast<BuiltIn>(builtInId));
-                LLPC_OUTS(GetTypeName(pOutputValue->getType()) <<
+                LLPC_OUTS(*pOutputValue->getType() <<
                           " (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), " <<
                           "xfbBuffer = " << outputMeta.XfbBuffer << ", " <<
                           "xfbStride = " << outputMeta.XfbStride << ", " <<
@@ -1710,7 +1711,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 enableXfb = true;
             }
 
-            LLPC_OUTS(GetTypeName(pOutputValue->getType()) <<
+            LLPC_OUTS(*pOutputValue->getType() <<
                       " (loc = " << location + cast<ConstantInt>(pLocOffset)->getZExtValue() << "), " <<
                       "xfbBuffer = " << outputMeta.XfbBuffer + xfbBufferAdjust << ", " <<
                       "xfbStride = " << outputMeta.XfbStride << ", " <<
@@ -2397,7 +2398,7 @@ void SpirvLowerGlobal::InterpolateInputElement(
     std::vector<Value*> indexOperands;
     for (uint32_t i = 0, indexOperandCount = pGetElemPtr->getNumIndices(); i < indexOperandCount; ++i)
     {
-        indexOperands.push_back(ToInt32Value(m_pContext, pGetElemPtr->getOperand(1 + i), &callInst));
+        indexOperands.push_back(ToInt32Value(pGetElemPtr->getOperand(1 + i), &callInst));
     }
     uint32_t operandIdx = 0;
 
@@ -2508,6 +2509,30 @@ void SpirvLowerGlobal::InterpolateInputElement(
             callInst.eraseFromParent();
         }
     }
+}
+
+// =====================================================================================================================
+// Translates an integer to 32-bit integer regardless of its initial bit width.
+Value* SpirvLowerGlobal::ToInt32Value(
+    Value*       pValue,     // [in] Value to be translated
+    Instruction* pInsertPos) // [in] Where to insert the translation instructions
+{
+    assert(isa<IntegerType>(pValue->getType()));
+    auto pValueTy = cast<IntegerType>(pValue->getType());
+
+    const uint32_t bitWidth = pValueTy->getBitWidth();
+    if (bitWidth > 32)
+    {
+        // Truncated to i32 type
+        pValue = CastInst::CreateTruncOrBitCast(pValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+    }
+    else if (bitWidth < 32)
+    {
+        // Extended to i32 type
+        pValue = CastInst::CreateZExtOrBitCast(pValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+    }
+
+    return pValue;
 }
 
 } // Llpc

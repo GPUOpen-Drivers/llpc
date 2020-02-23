@@ -253,6 +253,7 @@ if(ICD_BUILD_LLPC)
         lower/llpcSpirvLowerMemoryOp.cpp
         lower/llpcSpirvLowerResourceCollect.cpp
         lower/llpcSpirvLowerTranslator.cpp
+        lower/llpcSpirvLowerUtil.cpp
     )
 
 # llpc/patch

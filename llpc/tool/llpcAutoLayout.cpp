@@ -43,7 +43,7 @@
 #include "vfx.h"
 
 #include "llpcDebug.h"
-#include "llpcInternal.h"
+#include "llpcUtil.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Format.h"

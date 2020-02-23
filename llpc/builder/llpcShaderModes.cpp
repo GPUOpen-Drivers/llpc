@@ -30,10 +30,10 @@
  */
 
 #include "llpc.h"
+#include "llpcDebug.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPipelineState.h"
 #include "llpcShaderModes.h"
-#include "llpcUtil.h"
 
 #define DEBUG_TYPE "llpc-shader-modes"
 
@@ -189,7 +189,7 @@ void ShaderModes::Record(
     for (uint32_t stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage)
     {
         std::string metadataName = std::string(CommonShaderModeMetadataPrefix) +
-                                   GetShaderStageAbbreviation(static_cast<ShaderStage>(stage), true);
+                                   PipelineState::GetShaderStageAbbreviation(static_cast<ShaderStage>(stage));
         PipelineState::SetNamedMetadataToArrayOfInt32(pModule, m_commonShaderModes[stage], metadataName);
     }
 
@@ -216,7 +216,7 @@ void ShaderModes::ReadModesFromShader(
 
     // First the common state.
     std::string metadataName = std::string(CommonShaderModeMetadataPrefix) +
-                               GetShaderStageAbbreviation(static_cast<ShaderStage>(stage), true);
+                               PipelineState::GetShaderStageAbbreviation(static_cast<ShaderStage>(stage));
     PipelineState::ReadNamedMetadataArrayOfInt32(pModule, metadataName, m_commonShaderModes[stage]);
 
     // Then the specific shader modes.
@@ -251,7 +251,7 @@ void ShaderModes::ReadModesFromPipeline(
     for (uint32_t stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage)
     {
         std::string metadataName = std::string(CommonShaderModeMetadataPrefix) +
-                                   GetShaderStageAbbreviation(static_cast<ShaderStage>(stage), true);
+                                   PipelineState::GetShaderStageAbbreviation(static_cast<ShaderStage>(stage));
         PipelineState::ReadNamedMetadataArrayOfInt32(pModule, metadataName, m_commonShaderModes[stage]);
     }
 

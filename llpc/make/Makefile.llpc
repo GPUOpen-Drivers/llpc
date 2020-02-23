@@ -89,7 +89,8 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcSpirvLowerLoopUnrollControl.cpp     \
         llpcSpirvLowerMemoryOp.cpp              \
         llpcSpirvLowerResourceCollect.cpp       \
-        llpcSpirvLowerTranslator.cpp
+        llpcSpirvLowerTranslator.cpp            \
+        llpcSpirvLowerUtil.cpp
 
     # llpc/patch
     CPPFILES +=                             \

@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "llpcAbiMetadata.h"
+#include "llpcBuilderBuiltIns.h"
 #include "llpcCodeGenManager.h"
 #include "llpcGfx6ConfigBuilder.h"
 #include "llpcPipelineState.h"
@@ -1186,11 +1187,11 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, pResUsage->inOutUsage.fs.interpInfo.size());
 
     uint32_t pointCoordLoc = InvalidValue;
-    if (pResUsage->inOutUsage.builtInInputLocMap.find(spv::BuiltInPointCoord) !=
+    if (pResUsage->inOutUsage.builtInInputLocMap.find(BuiltInPointCoord) !=
         pResUsage->inOutUsage.builtInInputLocMap.end())
     {
         // Get generic input corresponding to gl_PointCoord (to set the field PT_SPRITE_TEX)
-        pointCoordLoc = pResUsage->inOutUsage.builtInInputLocMap[spv::BuiltInPointCoord];
+        pointCoordLoc = pResUsage->inOutUsage.builtInInputLocMap[BuiltInPointCoord];
     }
 
     // NOTE: PAL expects at least one mmSPI_PS_INPUT_CNTL_0 register set, so we always patch it at least one if none

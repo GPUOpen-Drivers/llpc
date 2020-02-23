@@ -49,7 +49,6 @@
 #include "llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
-#include "llpcInternal.h"
 #include "llpcPipeline.h"
 
 #include "llvm/ADT/DenseMap.h"
@@ -5816,6 +5815,49 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *BF) {
   return F;
 }
 
+// Prints LLVM-style name for type to raw_ostream
+static void printTypeName(Type *Ty, raw_ostream &NameStream) {
+  if (auto PtrTy = dyn_cast<PointerType>(Ty)) {
+    NameStream << "p";
+    if (PtrTy->getAddressSpace())
+      NameStream << PtrTy->getAddressSpace();
+    Ty = PtrTy->getPointerElementType();
+  }
+  if (auto VecTy = dyn_cast<VectorType>(Ty)) {
+    NameStream << "v" << VecTy->getNumElements();
+    Ty = VecTy->getElementType();
+  }
+  if (Ty->isFloatingPointTy()) {
+    NameStream << "f" << Ty->getScalarSizeInBits();
+    return;
+  }
+  if (Ty->isIntegerTy()) {
+    NameStream << "i" << Ty->getScalarSizeInBits();
+    return;
+  }
+  assert(Ty->isVoidTy());
+  NameStream << "V";
+}
+
+// Adds LLVM-style type mangling suffix for the specified return type and args
+// to the name. This is used when adding a call to an external function that
+// is later lowered in a SPIRVLower* pass.
+//
+// @param RetTy : Return type or nullptr
+// @param Args : Arg values
+// @param [out] Name : String to append the type mangling to
+static void appendTypeMangling(Type *RetTy, ArrayRef<Value *> Args, std::string &Name) {
+  raw_string_ostream NameStream(Name);
+  if (RetTy && !RetTy->isVoidTy()) {
+    NameStream << ".";
+    printTypeName(RetTy, NameStream);
+  }
+  for (auto Arg : Args) {
+    NameStream << ".";
+    printTypeName(Arg->getType(), NameStream);
+  }
+}
+
 Instruction * SPIRVToLLVM::transBuiltinFromInst(const std::string& FuncName,
                                                 SPIRVInstruction* BI,
                                                 BasicBlock* BB) {
@@ -5840,7 +5882,7 @@ Instruction * SPIRVToLLVM::transBuiltinFromInst(const std::string& FuncName,
     }
   }
   std::string MangledName(FuncName);
-  AddTypeMangling(nullptr, Args, MangledName);
+  appendTypeMangling(nullptr, Args, MangledName);
   Function* Func = M->getFunction(MangledName);
   FunctionType* FT = FunctionType::get(RetTy, ArgTys, false);
   // ToDo: Some intermediate functions have duplicate names with
@@ -7533,7 +7575,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       // so we choose to add a dummy instruction and remove them when it isn't
       // needed.
       std::string  MangledFuncName(gSPIRVMD::NonUniform);
-      AddTypeMangling(nullptr, Args, MangledFuncName);
+      appendTypeMangling(nullptr, Args, MangledFuncName);
       auto F = getOrCreateFunction(M, VoidTy, Types, MangledFuncName);
       CallInst::Create(F, Args, "", BB);
     }
@@ -8761,7 +8803,7 @@ Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *BC,
   std::vector<Value *> Args = transValue(BC->getArgumentValues(),
                                          BB->getParent(),
                                          BB);
-  AddTypeMangling(nullptr, Args, MangledName);
+  appendTypeMangling(nullptr, Args, MangledName);
   FunctionType *FuncTy = FunctionType::get(transType(BC->getType()),
                                            ArgTys,
                                            false);

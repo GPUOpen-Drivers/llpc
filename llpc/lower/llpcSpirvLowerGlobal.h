@@ -125,6 +125,8 @@ private:
                                  llvm::Value*       pInterpInfo,
                                  llvm::CallInst&    callInst);
 
+    llvm::Value* ToInt32Value(llvm::Value* pValue, llvm::Instruction* pInsertPos);
+
     // -----------------------------------------------------------------------------------------------------------------
 
     std::unordered_map<llvm::Value*, llvm::Value*>  m_globalVarProxyMap;    // Proxy map for lowering global variables

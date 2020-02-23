@@ -81,8 +81,8 @@
 #include "llpc.h"
 #include "llpcDebug.h"
 #include "llpcElfReader.h"
-#include "llpcInternal.h"
 #include "llpcShaderModuleHelper.h"
+#include "llpcSpirvLowerUtil.h"
 
 #define DEBUG_TYPE "amd-llpc"
 
@@ -340,6 +340,42 @@ struct CompileInfo
     bool                        checkAutoLayoutCompatible;      // Whether to comapre if auto layout descriptors is
                                                                 // same as specified pipeline layout
 };
+
+// =====================================================================================================================
+// Checks whether the input data is actually a ELF binary
+static bool IsElfBinary(
+    const void* pData,    // [in] Input data to check
+    size_t      dataSize) // Size of the input data
+{
+    bool isElfBin = false;
+    if (dataSize >= sizeof(Elf64::FormatHeader))
+    {
+        auto pHeader = reinterpret_cast<const Elf64::FormatHeader*>(pData);
+        isElfBin = pHeader->e_ident32[EI_MAG0] == ElfMagic;
+    }
+    return isElfBin;
+}
+
+// =====================================================================================================================
+// Checks whether the input data is actually LLVM bitcode
+static bool IsLlvmBitcode(
+    const void* pData,    // [in] Input data to check
+    size_t      dataSize) // Size of the input data
+{
+    const unsigned char magic[] = { 'B', 'C', 0xC0, 0xDE };
+    return (dataSize >= sizeof magic) && (memcmp(pData, magic, sizeof magic) == 0);
+}
+
+// =====================================================================================================================
+// Checks whether the output data is actually ISA assembler text
+static bool IsIsaText(
+    const void* pData,    // [in] Input data to check
+    size_t      dataSize) // Size of the input data
+{
+    // This is called by amdllpc to help distinguish between its three output types of ELF binary, LLVM IR assembler
+    // and ISA assembler. Here we use the fact that ISA assembler is the only one that starts with a tab character.
+    return (dataSize != 0) && ((reinterpret_cast<const char*>(pData))[0] == '\t');
+}
 
 // =====================================================================================================================
 // Translates GLSL source language to corresponding shader stage.
@@ -1892,3 +1928,4 @@ int32_t main(
 
     return (result == Result::Success) ? 0 : 1;
 }
+

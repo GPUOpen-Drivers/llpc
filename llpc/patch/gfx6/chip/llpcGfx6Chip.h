@@ -33,7 +33,6 @@
 #include <cstdint>
 #include <unordered_map>
 #include "llpcAbiMetadata.h"
-#include "llpcElfReader.h"
 
 namespace Llpc
 {
