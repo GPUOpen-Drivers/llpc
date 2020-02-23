@@ -35,8 +35,6 @@
 
 #include "llpcContext.h"
 #include "llpcElfWriter.h"
-#include "llpcGfx6Chip.h"
-#include "llpcGfx9Chip.h"
 
 #define DEBUG_TYPE "llpc-elf-writer"
 
@@ -44,6 +42,29 @@ using namespace llvm;
 
 namespace Llpc
 {
+
+// The names of API shader stages used in PAL metadata, in ShaderStage order.
+static const char* const ApiStageNames[] =
+{
+    ".vertex",
+    ".hull",
+    ".domain",
+    ".geometry",
+    ".pixel",
+    ".compute"
+};
+
+// The names of hardware shader stages used in PAL metadata, in Util::Abi::HardwareStage order.
+static const char* const HwStageNames[] =
+{
+    ".ls",
+    ".hs",
+    ".es",
+    ".gs",
+    ".vs",
+    ".ps",
+    ".cs"
+};
 
 // =====================================================================================================================
 template<class Elf>
@@ -275,52 +296,59 @@ void ElfWriter<Elf>::MergeMetaNote(
     pipelineHash[0] = destDocument.getNode(pContext->GetPiplineHashCode());
     pipelineHash[1] = destDocument.getNode(pContext->GetPiplineHashCode());
 
-    // Merge fragment shader related registers
+    // List of fragment shader related registers.
+    static const uint32_t PsRegNumbers[] =
+    {
+        0x2C0A, // mmSPI_SHADER_PGM_RSRC1_PS
+        0x2C0B, // mmSPI_SHADER_PGM_RSRC2_PS
+        0xA1C4, // mmSPI_SHADER_Z_FORMAT
+        0xA1C5, // mmSPI_SHADER_COL_FORMAT
+        0xA1B8, // mmSPI_BARYC_CNTL
+        0xA1B6, // mmSPI_PS_IN_CONTROL
+        0xA1B3, // mmSPI_PS_INPUT_ENA
+        0xA1B4, // mmSPI_PS_INPUT_ADDR
+        0xA1B5, // mmSPI_INTERP_CONTROL_0
+        0xA293, // mmPA_SC_MODE_CNTL_1
+        0xA203, // mmDB_SHADER_CONTROL
+        0xA08F, // mmCB_SHADER_MASK
+        0xA2F8, // mmPA_SC_AA_CONFIG
+        // The following ones are GFX9+ only, but we don't need to handle them specially as those register
+        // numbers are not used at all on earlier chips.
+        0xA310, // mmPA_SC_SHADER_CONTROL
+        0xA210, // mmPA_STEREO_CNTL
+        0xC25F, // mmGE_STEREO_CNTL
+        0xC262, // mmGE_USER_VGPR_EN
+        0x2C06, // mmSPI_SHADER_PGM_CHKSUM_PS
+        0x2C32, // mmSPI_SHADER_USER_ACCUM_PS_0
+        0x2C33, // mmSPI_SHADER_USER_ACCUM_PS_1
+        0x2C34, // mmSPI_SHADER_USER_ACCUM_PS_2
+        0x2C35, // mmSPI_SHADER_USER_ACCUM_PS_3
+    };
+
+    // Merge fragment shader related registers. For each of the registers listed above, plus the input
+    // control registers and the user data registers, copy the value from srcRegisters to destRegisters.
+    // Where the register is set in destRegisters but not srcRegisters, clear it.
     auto destRegisters = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
     auto srcRegisters = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
 
-    auto gfxIp = pContext->GetGfxIpVersion();
-    Gfx6::PsRegConfig gfx6PsConfig;
-    Gfx9::PsRegConfig gfx9PsConfig(gfxIp);
-    Util::Abi::PalMetadataNoteEntry* pRegEntry = nullptr;
-    uint32_t regCount = 0;
-    uint32_t psInputCntlBase = 0;
-    uint32_t psUserDataBase = 0;
-    uint32_t psUserDataCount = 0;
-    if (gfxIp.major < 9)
+    for (uint32_t regNumber : ArrayRef<uint32_t>(PsRegNumbers))
     {
-        pRegEntry = reinterpret_cast<Util::Abi::PalMetadataNoteEntry*>(&gfx6PsConfig);
-        psInputCntlBase = gfx6PsConfig.GetPsInputCntlStart();
-        psUserDataBase = gfx6PsConfig.GetPsUserDataStart();
-        psUserDataCount = 16;
-        regCount = sizeof(gfx6PsConfig) / sizeof(Util::Abi::PalMetadataNoteEntry);
-    }
-    else
-    {
-        pRegEntry = reinterpret_cast<Util::Abi::PalMetadataNoteEntry*>(&gfx9PsConfig);
-        psInputCntlBase = Gfx9::mmSPI_PS_INPUT_CNTL_0;
-        psUserDataBase = Gfx9::mmSPI_SHADER_USER_DATA_PS_0;
-        psUserDataCount = 32;
-        regCount = sizeof(gfx9PsConfig) / sizeof(Util::Abi::PalMetadataNoteEntry);
+        MergeMapItem(destRegisters, srcRegisters, regNumber);
     }
 
-    for (uint32_t i = 0; i < regCount; ++i)
+    const uint32_t mmSPI_PS_INPUT_CNTL_0 = 0xa191;
+    const uint32_t mmSPI_PS_INPUT_CNTL_31 = 0xa1b0;
+    for (uint32_t regNumber = mmSPI_PS_INPUT_CNTL_0; regNumber != mmSPI_PS_INPUT_CNTL_31 + 1; ++regNumber)
     {
-        if (pRegEntry[i].key != InvalidMetadataKey)
-        {
-            MergeMapItem(destRegisters, srcRegisters, pRegEntry[i].key);
-        }
+        MergeMapItem(destRegisters, srcRegisters, regNumber);
     }
 
-    constexpr uint32_t PsInputCntlCount = 32;
-    for (uint32_t i = 0; i < PsInputCntlCount; ++i)
+    const uint32_t mmSPI_SHADER_USER_DATA_PS_0 = 0x2c0c;
+    uint32_t psUserDataCount = (pContext->GetGfxIpVersion().major < 9) ? 16 : 32;
+    for (uint32_t regNumber = mmSPI_SHADER_USER_DATA_PS_0;
+         regNumber != mmSPI_SHADER_USER_DATA_PS_0 + psUserDataCount; ++regNumber)
     {
-        MergeMapItem(destRegisters, srcRegisters, psInputCntlBase + i);
-    }
-
-    for (uint32_t i = 0; i < psUserDataCount; ++i)
-    {
-        MergeMapItem(destRegisters, srcRegisters, psUserDataBase + i);
+        MergeMapItem(destRegisters, srcRegisters, regNumber);
     }
 
     std::string destBlob;
