@@ -675,7 +675,7 @@ Instruction* ShaderSystemValues::MakePointer(
             Value* pPc = EmitCall("llvm.amdgcn.s.getpc",
                                   Type::getInt64Ty(*m_pContext),
                                   ArrayRef<Value*>(),
-                                  NoAttrib,
+                                  {},
                                   pPcInsertPos);
             m_pPc = new BitCastInst(pPc, VectorType::get(Type::getInt32Ty(*m_pContext), 2), "", pInsertPos);
         }
@@ -811,7 +811,7 @@ Instruction* ShaderSystemValues::LoadDescFromDriverTable(
     return builder.CreateNamedCall(LlpcName::DescriptorLoadBuffer,
                                    VectorType::get(Type::getInt32Ty(*m_pContext), 4),
                                    args,
-                                   NoAttrib);
+                                   {});
 }
 
 // =====================================================================================================================

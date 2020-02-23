@@ -309,7 +309,7 @@ Value* FragColorExport::Run(
                 Value* pComps = EmitCall(funcName,
                                          VectorType::get(Type::getInt16Ty(*m_pContext), 2),
                                          { comps[i], comps[i + 1] },
-                                         NoAttrib,
+                                         {},
                                          pInsertPos);
 
                 pComps = new BitCastInst(pComps, VectorType::get(Type::getHalfTy(*m_pContext), 2), "", pInsertPos);
@@ -361,7 +361,7 @@ Value* FragColorExport::Run(
                 Value* pComps = EmitCall(funcName,
                                          VectorType::get(Type::getInt16Ty(*m_pContext), 2),
                                          { comps[i], comps[i + 1] },
-                                         NoAttrib,
+                                         {},
                                          pInsertPos);
 
                 pComps = new BitCastInst(pComps, VectorType::get(Type::getHalfTy(*m_pContext), 2), "", pInsertPos);
@@ -449,7 +449,7 @@ Value* FragColorExport::Run(
             ConstantInt::get(Type::getInt1Ty(*m_pContext), true)                          // vm
         };
 
-        pExport = EmitCall("llvm.amdgcn.exp.compr.v2f16", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
+        pExport = EmitCall("llvm.amdgcn.exp.compr.v2f16", Type::getVoidTy(*m_pContext), args, {}, pInsertPos);
     }
     else
     {
@@ -465,7 +465,7 @@ Value* FragColorExport::Run(
             ConstantInt::get(Type::getInt1Ty(*m_pContext), true)                          // vm
         };
 
-        pExport = EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
+        pExport = EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, {}, pInsertPos);
     }
 
     return pExport;

@@ -3458,7 +3458,7 @@ void PatchResourceCollect::ReviseInputImportCalls()
         Value* pOutValue = EmitCall(callName,
                                     pReturnTy,
                                     args,
-                                    NoAttrib,
+                                    {},
                                     pCall);
 
         // Restore float type to original type
@@ -3584,7 +3584,7 @@ void PatchResourceCollect::ReassembleOutputExportCalls()
         std::string callName(LlpcName::OutputExportGeneric);
         AddTypeMangling(builder.getVoidTy(), args, callName);
 
-        builder.CreateNamedCall(callName, builder.getVoidTy(), args, NoAttrib);
+        builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
 
         outputLocMap[consectiveLocation] = InvalidValue;
         ++consectiveLocation;

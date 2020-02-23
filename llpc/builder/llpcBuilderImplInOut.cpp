@@ -300,7 +300,7 @@ Instruction* BuilderImplInOut::CreateWriteGenericOutput(
     return EmitCall(llpcCallName,
                     getVoidTy(),
                     args,
-                    NoAttrib,
+                    {},
                     &*GetInsertPoint());
 }
 
@@ -677,7 +677,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
     return EmitCall(instName,
                     getVoidTy(),
                     args,
-                    NoAttrib,
+                    {},
                     &*GetInsertPoint());
 }
 
@@ -935,7 +935,7 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
     return cast<Instruction>(EmitCall(callName,
                              getVoidTy(),
                              args,
-                             NoAttrib,
+                             {},
                              &*GetInsertPoint()));
 }
 

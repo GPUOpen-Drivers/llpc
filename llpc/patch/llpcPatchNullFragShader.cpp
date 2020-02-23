@@ -155,13 +155,13 @@ bool PatchNullFragShader::runOnModule(
     auto pInputTy = Type::getFloatTy(*m_pContext);
     std::string importName = LlpcName::InputImportGeneric;
     AddTypeMangling(pInputTy, importArgs, importName);
-    auto pInput = EmitCall(importName, pInputTy, importArgs, NoAttrib, pInsertPos);
+    auto pInput = EmitCall(importName, pInputTy, importArgs, {}, pInsertPos);
 
     // Then the export.
     Value* exportArgs[] = { pZero, pZero, pInput };
     std::string exportName = LlpcName::OutputExportGeneric;
     AddTypeMangling(Type::getVoidTy(*m_pContext), exportArgs, exportName);
-    EmitCall(exportName, Type::getVoidTy(*m_pContext), exportArgs, NoAttrib, pInsertPos);
+    EmitCall(exportName, Type::getVoidTy(*m_pContext), exportArgs, {}, pInsertPos);
 
     // Add execution model metadata to the function.
     auto pExecModelMeta = ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_pContext), ShaderStageFragment));
