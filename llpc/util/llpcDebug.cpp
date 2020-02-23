@@ -35,13 +35,7 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "llpc.h"
-#include "llpcCompiler.h"
 #include "llpcDebug.h"
-#include "llpcElfReader.h"
-#include "llpcGfx6Chip.h"
-#include "llpcGfx9Chip.h"
-#include "llpcMetroHash.h"
 
 #define DEBUG_TYPE "llpc-debug"
 

@@ -37,7 +37,6 @@
 #include "llpcBuilder.h"
 #include "llpcBuilderRecorder.h"
 #include "llpcContext.h"
-#include "llpcShaderModes.h"
 #include "llpcSpirvLowerResourceCollect.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-resource-collect"
