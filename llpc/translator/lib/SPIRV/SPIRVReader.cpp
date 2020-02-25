@@ -4215,6 +4215,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
     SPIRVExtInst* const pSpvExtInst = static_cast<SPIRVExtInst*>(pSpvValue);
+
+    // Just ignore this set of extended instructions
+    if (BM->getBuiltinSet(pSpvExtInst->getExtSetId()) == SPIRVEIS_NonSemanticInfo)
+        return nullptr;
+
     std::vector<SPIRVValue*> spvArgValues = pSpvExtInst->getArgumentValues();
 
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();

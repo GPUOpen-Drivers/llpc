@@ -81,6 +81,7 @@ enum SPIRVExtInstSetKind {
   SPIRVEIS_ShaderExplicitVertexParameterAMD,
   SPIRVEIS_GcnShaderAMD,
   SPIRVEIS_ShaderTrinaryMinMaxAMD,
+  SPIRVEIS_NonSemanticInfo,
   SPIRVEIS_Count,
 };
 
@@ -113,6 +114,7 @@ template <> inline void SPIRVMap<SPIRVExtInstSetKind, std::string>::init() {
     "SPV_AMD_shader_explicit_vertex_parameter");
   add(SPIRVEIS_GcnShaderAMD, "SPV_AMD_gcn_shader");
   add(SPIRVEIS_ShaderTrinaryMinMaxAMD, "SPV_AMD_shader_trinary_minmax");
+  add(SPIRVEIS_NonSemanticInfo, "SPV_KHR_non_semantic_info");
 }
 typedef SPIRVMap<SPIRVExtInstSetKind, std::string> SPIRVBuiltinSetNameMap;
 

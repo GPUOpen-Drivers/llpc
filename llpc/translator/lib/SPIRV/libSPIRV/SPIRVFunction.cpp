@@ -120,8 +120,7 @@ void SPIRVFunction::decodeBB(SPIRVDecoder &Decoder) {
 
     SPIRVInstruction *Inst =
         static_cast<SPIRVInstruction *>(Decoder.getEntry());
-    assert(Inst);
-    if (Inst->getOpCode() != OpUndef)
+    if ((Inst != nullptr) && Inst->getOpCode() != OpUndef)
       BB->addInstruction(Inst);
   }
   Decoder.setScope(this);

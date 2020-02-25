@@ -146,6 +146,7 @@ public:
   unsigned short getGeneratorId() const override { return GeneratorId; }
   unsigned short getGeneratorVer() const override { return GeneratorVer; }
   SPIRVWord getSPIRVVersion() const override { return SPIRVVersion; }
+  bool isNonSemanticInfoInstSet(llvm::StringRef setName) const;
 
   // Module changing functions
   bool importBuiltinSet(const std::string &, SPIRVId *) override;
@@ -633,11 +634,19 @@ bool SPIRVModuleImpl::importBuiltinSet(const std::string &BuiltinSetName,
   return true;
 }
 
+bool SPIRVModuleImpl::isNonSemanticInfoInstSet(llvm::StringRef setName) const {
+  return setName.startswith("NonSemantic.");
+}
+
 bool SPIRVModuleImpl::importBuiltinSetWithId(const std::string &BuiltinSetName,
                                              SPIRVId BuiltinSetId) {
   SPIRVExtInstSetKind BuiltinSet = SPIRVEIS_Count;
-  SPIRVCKRT(SPIRVBuiltinSetNameMap::rfind(BuiltinSetName, &BuiltinSet),
-            InvalidBuiltinSetName, "Actual is " + BuiltinSetName);
+
+  if (isNonSemanticInfoInstSet(BuiltinSetName))
+    BuiltinSet = SPIRVEIS_NonSemanticInfo;
+  else
+    SPIRVCKRT(SPIRVBuiltinSetNameMap::rfind(BuiltinSetName, &BuiltinSet),
+              InvalidBuiltinSetName, "Actual is " + BuiltinSetName);
   IdBuiltinMap[BuiltinSetId] = BuiltinSet;
   return true;
 }
