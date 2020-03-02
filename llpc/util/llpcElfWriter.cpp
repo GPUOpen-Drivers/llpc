@@ -770,6 +770,73 @@ Result ElfWriter<Elf>::GetSectionDataBySectionIndex(
 }
 
 // =====================================================================================================================
+// Update descriptor offset to USER_DATA in metaNote.
+template<class Elf>
+void ElfWriter<Elf>::UpdateMetaNote(
+    Context*       pContext,       // [in] context related to ElfNote
+    const ElfNote* pNote,          // [in] Note section to update
+    ElfNote*       pNewNote)       // [out] new note section
+{
+    msgpack::Document document;
+
+    auto success = document.readFromBlob(StringRef(reinterpret_cast<const char*>(pNote->pData),
+                                              pNote->hdr.descSize),
+                                              false);
+    assert(success);
+    (void(success)); // unused
+
+    auto pipeline = document.getRoot().
+        getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0];
+
+    auto registers = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
+
+    const uint32_t mmSPI_SHADER_USER_DATA_PS_0 = 0x2c0c;
+    uint32_t psUserDataBase = mmSPI_SHADER_USER_DATA_PS_0;
+    uint32_t psUserDataCount = (pContext->GetGfxIpVersion().major < 9) ? 16 : 32;
+    auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
+
+    for (uint32_t i = 0; i < psUserDataCount; ++i)
+    {
+        uint32_t key = psUserDataBase + i;
+        auto keyNode = registers.getDocument()->getNode(key);
+        auto keyIt = registers.find(keyNode);
+        if (keyIt != registers.end())
+        {
+            assert(keyIt->first.getUInt() == key);
+            // Reloc Descriptor user data value is consisted by DescRelocMagic | set.
+            uint32_t regValue = keyIt->second.getUInt();
+            if (DescRelocMagic == (regValue & DescRelocMagicMask))
+            {
+                uint32_t set = regValue & DescSetMask;
+                for (uint32_t j = 0; j < pPipelineInfo->fs.userDataNodeCount; ++j)
+                {
+                    if ((pPipelineInfo->fs.pUserDataNodes[j].type == ResourceMappingNodeType::DescriptorTableVaPtr) &&
+                        (set == pPipelineInfo->fs.pUserDataNodes[j].tablePtr.pNext[0].srdRange.set))
+                    {
+                        // If it's descriptor user data, then update its offset to it.
+                        uint32_t value = pPipelineInfo->fs.pUserDataNodes[j].offsetInDwords;
+                        keyIt->second = registers.getDocument()->getNode(value);
+                        // Update userDataLimit if neccessary
+                        uint32_t userDataLimit = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
+                        pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit] =
+                            document.getNode(std::max(userDataLimit, value + 1));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    std::string blob;
+    document.writeToBlob(blob);
+    *pNewNote = *pNote;
+    auto pData = new uint8_t[blob.size()];
+    memcpy(pData, blob.data(), blob.size());
+    pNewNote->hdr.descSize = blob.size();
+    pNewNote->pData = pData;
+}
+
+// =====================================================================================================================
 // Gets all associated symbols by section index.
 template<class Elf>
 void ElfWriter<Elf>::GetSymbolsBySectionIndex(
@@ -785,6 +852,25 @@ void ElfWriter<Elf>::GetSymbolsBySectionIndex(
             secSymbols.push_back(&m_symbols[idx]);
         }
     }
+}
+
+// =====================================================================================================================
+// Update descriptor root offset in ELF binary
+template<class Elf>
+void ElfWriter<Elf>::UpdateElfBinary(
+    Context*          pContext,        // [in] Pipeline context
+    ElfPackage*       pPipelineElf)    // [out] Final ELF binary
+{
+    // Merge PAL metadata
+    ElfNote metaNote = {};
+    metaNote = GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+
+    assert(metaNote.pData != nullptr);
+    ElfNote newMetaNote = {};
+    UpdateMetaNote(pContext, &metaNote, &newMetaNote);
+    SetNote(&newMetaNote);
+
+    WriteToBuffer(pPipelineElf);
 }
 
 // =====================================================================================================================

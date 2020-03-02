@@ -44,6 +44,11 @@ static const uint32_t InvalidValue  = ~0u;
 // Size of vec4
 static const uint32_t SizeOfVec4 = sizeof(float) * 4;
 
+// Descriptor offset reloc magic number
+static const uint32_t DescRelocMagic        = 0xA5A5A500;
+static const uint32_t DescRelocMagicMask    = 0xFFFFFF00;
+static const uint32_t DescSetMask           = 0x000000FF;
+
 // Gets the name string of shader stage.
 const char* GetShaderStageName(ShaderStage shaderStage);
 

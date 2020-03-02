@@ -1026,6 +1026,7 @@ Result Compiler::BuildPipelineInternal(
 {
     Result          result = Result::Success;
     uint32_t passIndex = 0;
+    const PipelineShaderInfo* pFragmentShaderInfo = nullptr;
     TimerProfiler timerProfiler(pContext->GetPiplineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
     bool buildingRelocatableElf = pContext->GetBuilderContext()->BuildingRelocatableElf();
 
@@ -1136,6 +1137,11 @@ Result Compiler::BuildPipelineInternal(
         {
             const PipelineShaderInfo* pShaderInfo = shaderInfo[shaderIndex];
             ShaderStage entryStage = (pShaderInfo != nullptr) ? pShaderInfo->entryStage : ShaderStageInvalid;
+
+            if (entryStage == ShaderStageFragment)
+            {
+                pFragmentShaderInfo = pShaderInfo;
+            }
             if ((pShaderInfo == nullptr) ||
                 (pShaderInfo->pModuleData == nullptr) ||
                 (stageSkipMask & ShaderStageToMask(entryStage)))
@@ -1264,6 +1270,14 @@ Result Compiler::BuildPipelineInternal(
         graphicsShaderCacheChecker.UpdateAndMerge(result, pPipelineElf);
     }
 
+    if ((result == Result::Success) &&
+        pFragmentShaderInfo &&
+        pFragmentShaderInfo->options.updateDescInElf &&
+        (pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageFragment)))
+    {
+        graphicsShaderCacheChecker.UpdateRootUserDateOffset(pPipelineElf);
+    }
+
     pContext->setDiagnosticHandlerCallBack(nullptr);
 
     return result;
@@ -1318,6 +1332,19 @@ uint32_t GraphicsShaderCacheChecker::Check(
     }
 
     return stageMask;
+}
+
+// =====================================================================================================================
+// Update root level descriptor offset for graphics pipeline.
+void GraphicsShaderCacheChecker::UpdateRootUserDateOffset(
+    ElfPackage*       pPipelineElf)   // [In, Out] ELF that could be from compile or merged
+{
+    ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
+    // Load ELF binary
+    auto result = writer.ReadFromBuffer(pPipelineElf->data(), pPipelineElf->size());
+    assert(result == Result::Success);
+    (void(result)); // unused
+    writer.UpdateElfBinary(m_pContext, pPipelineElf);
 }
 
 // =====================================================================================================================

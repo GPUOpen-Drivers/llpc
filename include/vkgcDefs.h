@@ -239,6 +239,10 @@ struct PipelineShaderOptions
     bool allowVaryWaveSize;      ///< If set, lets the pipeline vary the wave sizes.
     /// Use the LLVM backend's SI scheduler instead of the default scheduler.
     bool      useSiScheduler;
+
+    // Whether update descriptor root offset in ELF
+    bool      updateDescInElf;
+
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
     /// Disable the the LLVM backend's LICM pass.
     bool      disableLicm;

@@ -68,8 +68,14 @@ public:
                               const ElfNote* pNote2,
                               ElfNote*       pNewNote);
 
+    static void UpdateMetaNote(Context*       pContext,
+                               const ElfNote* pNote,
+                               ElfNote*       pNewNote);
+
     Result ReadFromBuffer(const void* pBuffer, size_t bufSize);
     Result CopyFromReader(const ElfReader<Elf>& reader);
+
+    void UpdateElfBinary(Context* pContext, ElfPackage* pPipelineElf);
 
     void MergeElfBinary(Context*          pContext,
                         const BinaryData* pFragmentElf,
