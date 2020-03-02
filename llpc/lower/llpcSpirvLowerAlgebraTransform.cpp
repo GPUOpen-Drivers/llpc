@@ -243,7 +243,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
                               { pTrunc },
                               NoAttrib,
                               &binaryOp);
-            pTrunc = BinaryOperator::CreateFNeg(pTrunc, "", &binaryOp);
+            pTrunc = UnaryOperator::CreateFNeg(pTrunc, "", &binaryOp);
 
             // -trunc(x/y) * y + x
             auto pFRem = EmitCall("llvm.fmuladd." + GetTypeName(pDestTy),
