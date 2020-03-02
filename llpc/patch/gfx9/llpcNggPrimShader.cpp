@@ -3665,6 +3665,9 @@ Function* NggPrimShader::MutateGsToVariant(
     // still do not belong to any already-completed primitives. If GS_CUT is encountered, they are all dropped as
     // invalid vertices.
     Value* outstandingVertCounterPtrs[MaxGsStreams] = {};
+    // NOTE: This group of flags are used to decide vertex ordering of an output triangle strip primitive. We
+    // expect such ordering: 0 -> 1 -> 2, 1 -> 3 -> 2, 2 -> 3 -> 4, ..., N -> N+1 -> N+2 (or N -> N+2 -> N+1).
+    Value* flipVertOrderPtrs[MaxGsStreams] = {};
 
     for (int i = 0; i < MaxGsStreams; ++i)
     {
@@ -3683,6 +3686,10 @@ Function* NggPrimShader::MutateGsToVariant(
         auto pOutstandingVertCounterPtr = m_pBuilder->CreateAlloca(m_pBuilder->getInt32Ty());
         m_pBuilder->CreateStore(m_pBuilder->getInt32(0), pOutstandingVertCounterPtr); // outstandingVertCounter = 0
         outstandingVertCounterPtrs[i] = pOutstandingVertCounterPtr;
+
+        auto pFlipVertOrderPtr = m_pBuilder->CreateAlloca(m_pBuilder->getInt1Ty());
+        m_pBuilder->CreateStore(m_pBuilder->getFalse(), pFlipVertOrderPtr); // flipVertOrder = false
+        flipVertOrderPtrs[i] = pFlipVertOrderPtr;
     }
 
     // Initialize thread ID in wave
@@ -3760,7 +3767,8 @@ Function* NggPrimShader::MutateGsToVariant(
                                  emitCounterPtrs[streamId],
                                  outVertCounterPtrs[streamId],
                                  outPrimCounterPtrs[streamId],
-                                 outstandingVertCounterPtrs[streamId]);
+                                 outstandingVertCounterPtrs[streamId],
+                                 flipVertOrderPtrs[streamId]);
                 }
                 else if ((message == GS_CUT_STREAM0) || (message == GS_CUT_STREAM1) ||
                          (message == GS_CUT_STREAM2) || (message == GS_CUT_STREAM3))
@@ -3774,7 +3782,8 @@ Function* NggPrimShader::MutateGsToVariant(
                                  emitCounterPtrs[streamId],
                                  outVertCounterPtrs[streamId],
                                  outPrimCounterPtrs[streamId],
-                                 outstandingVertCounterPtrs[streamId]);
+                                 outstandingVertCounterPtrs[streamId],
+                                 flipVertOrderPtrs[streamId]);
                 }
                 else if (message == GS_DONE)
                 {
@@ -4070,7 +4079,8 @@ void NggPrimShader::ProcessGsEmit(
     Value*   pEmitCounterPtr,               // [in,out] Pointer to GS emit counter for this stream
     Value*   pOutVertCounterPtr,            // [in,out] Pointer to GS output vertex counter for this stream
     Value*   pOutPrimCounterPtr,            // [in,out] Pointer to GS output primitive counter for this stream
-    Value*   pOutstandingVertCounterPtr)    // [in,out] Pointer to GS outstanding vertex counter for this stream
+    Value*   pOutstandingVertCounterPtr,    // [in,out] Pointer to GS outstanding vertex counter for this stream
+    Value*   pFlipVertOrderPtr)             // [in,out] Pointer to flags indicating whether to flip vertex ordering
 {
     auto pGsEmitHandler = pModule->getFunction(LlpcName::NggGsEmit);
     if (pGsEmitHandler == nullptr)
@@ -4084,7 +4094,8 @@ void NggPrimShader::ProcessGsEmit(
                                pEmitCounterPtr,
                                pOutVertCounterPtr,
                                pOutPrimCounterPtr,
-                               pOutstandingVertCounterPtr
+                               pOutstandingVertCounterPtr,
+                               pFlipVertOrderPtr
                            });
 }
 
@@ -4097,7 +4108,8 @@ void NggPrimShader::ProcessGsCut(
     Value*   pEmitCounterPtr,               // [in,out] Pointer to GS emit counter for this stream
     Value*   pOutVertCounterPtr,            // [in,out] Pointer to GS output vertex counter for this stream
     Value*   pOutPrimCounterPtr,            // [in,out] Pointer to GS output primitive counter for this stream
-    Value*   pOutstandingVertCounterPtr)    // [in,out] Pointer to GS outstanding vertex counter for this stream
+    Value*   pOutstandingVertCounterPtr,    // [in,out] Pointer to GS outstanding vertex counter for this stream
+    Value*   pFlipVertOrderPtr)             // [in,out] Pointer to flags indicating whether to flip vertex ordering
 {
     auto pGsCutHandler = pModule->getFunction(LlpcName::NggGsCut);
     if (pGsCutHandler == nullptr)
@@ -4111,7 +4123,8 @@ void NggPrimShader::ProcessGsCut(
                                pEmitCounterPtr,
                                pOutVertCounterPtr,
                                pOutPrimCounterPtr,
-                               pOutstandingVertCounterPtr
+                               pOutstandingVertCounterPtr,
+                               pFlipVertOrderPtr
                            });
 }
 
@@ -4135,6 +4148,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
     //       outPrimCounter++;
     //       emitCounter--;
     //       outstandingVertCounter = 0;
+    //       flipVertOrder = !flipVertOrder;
     //   }
     //
     const auto addrSpace = pModule->getDataLayout().getAllocaAddrSpace();
@@ -4146,6 +4160,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
                               PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outVertCounterPtr
                               PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outPrimCounterPtr
                               PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outstandingVertCounterPtr
+                              PointerType::get(m_pBuilder->getInt1Ty(),  addrSpace),   // %flipVertOrderPtr
                           },
                           false);
     auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggGsEmit, pModule);
@@ -4168,6 +4183,9 @@ Function* NggPrimShader::CreateGsEmitHandler(
 
     Value* pOutstandingVertCounterPtr = argIt++;
     pOutstandingVertCounterPtr->setName("outstandingVertCounterPtr");
+
+    Value* pFlipVertOrderPtr = argIt++; // Used by triangle strip
+    pFlipVertOrderPtr->setName("flipVertOrderPtr");
 
     auto pEntryBlock = CreateBlock(pFunc, ".entry");
     auto pEmitPrimBlock = CreateBlock(pFunc, ".emitPrim");
@@ -4202,6 +4220,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
     Value* pOutVertCounter = nullptr;
     Value* pOutPrimCounter = nullptr;
     Value* pOutstandingVertCounter = nullptr;
+    Value* pFlipVertOrder = nullptr;
     Value* pPrimComplete = nullptr;
     {
         m_pBuilder->SetInsertPoint(pEntryBlock);
@@ -4210,6 +4229,12 @@ Function* NggPrimShader::CreateGsEmitHandler(
         pOutVertCounter = m_pBuilder->CreateLoad(pOutVertCounterPtr);
         pOutPrimCounter = m_pBuilder->CreateLoad(pOutPrimCounterPtr);
         pOutstandingVertCounter = m_pBuilder->CreateLoad(pOutstandingVertCounterPtr);
+
+        // Flip vertex ordering only for triangle strip
+        if (geometryMode.outputPrimitive == OutputPrimitives::TriangleStrip)
+        {
+            pFlipVertOrder = m_pBuilder->CreateLoad(pFlipVertOrderPtr);
+        }
 
         // emitCounter++
         pEmitCounter = m_pBuilder->CreateAdd(pEmitCounter, m_pBuilder->getInt32(1));
@@ -4269,10 +4294,18 @@ Function* NggPrimShader::CreateGsEmitHandler(
             }
             else if (outVertsPerPrim == 3)
             {
+                // Consider vertex ordering (normal: N -> N+1 -> N+2, flip: N -> N+2 -> N+1)
                 pPrimData = m_pBuilder->CreateShl(pVertexId2, 10);
                 pPrimData = m_pBuilder->CreateOr(pPrimData, pVertexId1);
                 pPrimData = m_pBuilder->CreateShl(pPrimData, 10);
                 pPrimData = m_pBuilder->CreateOr(pPrimData, pVertexId0);
+
+                auto pPrimDataFlip = m_pBuilder->CreateShl(pVertexId1, 10);
+                pPrimDataFlip = m_pBuilder->CreateOr(pPrimDataFlip, pVertexId2);
+                pPrimDataFlip = m_pBuilder->CreateShl(pPrimDataFlip, 10);
+                pPrimDataFlip = m_pBuilder->CreateOr(pPrimDataFlip, pVertexId0);
+
+                pPrimData = m_pBuilder->CreateSelect(pFlipVertOrder, pPrimDataFlip, pPrimData);
             }
             else
             {
@@ -4319,6 +4352,15 @@ Function* NggPrimShader::CreateGsEmitHandler(
         m_pBuilder->CreateStore(pOutPrimCounter, pOutPrimCounterPtr);
         m_pBuilder->CreateStore(pOutstandingVertCounter, pOutstandingVertCounterPtr);
 
+        // Flip vertex ordering only for triangle strip
+        if (geometryMode.outputPrimitive == OutputPrimitives::TriangleStrip)
+        {
+            // if (primComplete) flipVertOrder = !flipVertOrder
+            pFlipVertOrder = m_pBuilder->CreateSelect(
+                pPrimComplete, m_pBuilder->CreateNot(pFlipVertOrder), pFlipVertOrder);
+            m_pBuilder->CreateStore(pFlipVertOrder, pFlipVertOrderPtr);
+        }
+
         m_pBuilder->CreateRetVoid();
     }
 
@@ -4346,6 +4388,7 @@ Function* NggPrimShader::CreateGsCutHandler(
     //   emitCounter = 0;
     //   outVertCounter -= outstandingVertCounter;
     //   outstandingVertCounter = 0;
+    //   flipVertOrder = false;
     //
     const auto addrSpace = pModule->getDataLayout().getAllocaAddrSpace();
     auto pFuncTy =
@@ -4356,6 +4399,7 @@ Function* NggPrimShader::CreateGsCutHandler(
                               PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outVertCounterPtr
                               PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outPrimCounterPtr
                               PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outstandingVertCounterPtr
+                              PointerType::get(m_pBuilder->getInt1Ty(),  addrSpace),   // %flipVertOrderPtr
                           },
                           false);
     auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggGsCut, pModule);
@@ -4378,6 +4422,9 @@ Function* NggPrimShader::CreateGsCutHandler(
 
     Value* pOutstandingVertCounterPtr = argIt++;
     pOutstandingVertCounterPtr->setName("outstandingVertCounterPtr");
+
+    Value* pFlipVertOrderPtr = argIt++; // Used by triangle strip
+    pFlipVertOrderPtr->setName("flipVertOrderPtr");
 
     auto pEntryBlock = CreateBlock(pFunc, ".entry");
     auto pEmitPrimBlock = CreateBlock(pFunc, ".emitPrim");
@@ -4482,6 +4529,13 @@ Function* NggPrimShader::CreateGsCutHandler(
         // Reset outstanding vertex counter
         m_pBuilder->CreateStore(m_pBuilder->getInt32(0), pOutstandingVertCounterPtr);
 
+        // Flip vertex ordering only for triangle strip
+        if (geometryMode.outputPrimitive == OutputPrimitives::TriangleStrip)
+        {
+            // flipVertOrder = false
+            m_pBuilder->CreateStore(m_pBuilder->getFalse(), pFlipVertOrderPtr);
+        }
+
         m_pBuilder->CreateRetVoid();
     }
 
@@ -4584,22 +4638,10 @@ void NggPrimShader::ReviseOutputPrimitiveData(
     }
     else if (outVertsPerPrim == 3)
     {
-        // odd = ((vertexId0 & 0x1) == 1)
-        auto pOdd = m_pBuilder->CreateAnd(pVertexId0, m_pBuilder->getInt32(1));
-        pOdd = m_pBuilder->CreateICmpEQ(pOdd, m_pBuilder->getInt32(1));
-
-        // Consider vertex orientation (even: 0 -> 1 -> 2, odd: 0 -> 2 -> 1)
-        auto pNewPrimDataEven = m_pBuilder->CreateShl(pVertexId2, 10);
-        pNewPrimDataEven = m_pBuilder->CreateOr(pNewPrimDataEven, pVertexId1);
-        pNewPrimDataEven = m_pBuilder->CreateShl(pNewPrimDataEven, 10);
-        pNewPrimDataEven = m_pBuilder->CreateOr(pNewPrimDataEven, pVertexId0);
-
-        auto pNewPrimDataOdd = m_pBuilder->CreateShl(pVertexId1, 10);
-        pNewPrimDataOdd = m_pBuilder->CreateOr(pNewPrimDataOdd, pVertexId2);
-        pNewPrimDataOdd = m_pBuilder->CreateShl(pNewPrimDataOdd, 10);
-        pNewPrimDataOdd = m_pBuilder->CreateOr(pNewPrimDataOdd, pVertexId0);
-
-        pNewPrimData = m_pBuilder->CreateSelect(pOdd, pNewPrimDataOdd, pNewPrimDataEven);
+        pNewPrimData = m_pBuilder->CreateShl(pVertexId2, 10);
+        pNewPrimData = m_pBuilder->CreateOr(pNewPrimData, pVertexId1);
+        pNewPrimData = m_pBuilder->CreateShl(pNewPrimData, 10);
+        pNewPrimData = m_pBuilder->CreateOr(pNewPrimData, pVertexId0);
     }
     else
     {
