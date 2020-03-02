@@ -5214,7 +5214,10 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   }
   case OpFNegate: {
     SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
-    auto FNeg = BinaryOperator::CreateFNeg(transValue(BC->getOperand(0), F, BB),
+    // Implement -x as -0.0 - x.
+    Value *NegZero = ConstantFP::getNegativeZero(transType(BC->getType()));
+    auto FNeg = BinaryOperator::CreateFSub(NegZero,
+                                           transValue(BC->getOperand(0), F, BB),
                                            BV->getName(), BB);
     setFastMathFlags(FNeg);
     return mapValue(BV, FNeg);
