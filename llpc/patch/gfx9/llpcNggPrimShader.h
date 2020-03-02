@@ -121,7 +121,8 @@ private:
                         llvm::Value* pEmitCounterPtr,
                         llvm::Value* pOutVertCounterPtr,
                         llvm::Value* pOutPrimCounterPtr,
-                        llvm::Value* pOutstandingVertCounterPtr);
+                        llvm::Value* pOutstandingVertCounterPtr,
+                        llvm::Value* pFlipVertOrderPtr);
 
     void ProcessGsCut(llvm::Module*  pModule,
                       uint32_t       streamId,
@@ -129,7 +130,8 @@ private:
                       llvm::Value*   pEmitCounterPtr,
                       llvm::Value*   pOutVertCounterPtr,
                       llvm::Value*   pOutPrimCounterPtr,
-                      llvm::Value*   pOutstandingVertCounterPtr);
+                      llvm::Value*   pOutstandingVertCounterPtr,
+                      llvm::Value*   pFlipVertOrderPtr);
 
     llvm::Function* CreateGsEmitHandler(llvm::Module* pModule, uint32_t streamId);
     llvm::Function* CreateGsCutHandler(llvm::Module* pModule, uint32_t streamId);
