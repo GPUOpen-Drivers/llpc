@@ -167,6 +167,11 @@ static_assert(MaxGsStreams == MaxTransformFeedbackBuffers, "Unexpected value!");
 static const uint32_t InternalResourceTable  = 0x10000000;
 static const uint32_t InternalPerShaderTable = 0x10000001;
 
+// Descriptor offset reloc magic number
+static const uint32_t DescRelocMagic        = 0xA5A5A500;
+static const uint32_t DescRelocMagicMask    = 0xFFFFFF00;
+static const uint32_t DescSetMask           = 0x000000FF;
+
 // Internal resource table's virtual bindings
 static const uint32_t SI_DRV_TABLE_SCRATCH_GFX_SRD_OFFS = 0;
 static const uint32_t SI_DRV_TABLE_SCRATCH_CS_SRD_OFFS  = 1;

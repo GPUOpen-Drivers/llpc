@@ -139,6 +139,9 @@ struct ShaderOptions
     // Use the LLVM backend's SI scheduler instead of the default scheduler.
     bool      useSiScheduler;
 
+    // Whether update descriptor root offset in ELF
+    bool      updateDescInElf;
+
     /// Default unroll threshold for LLVM.
     uint32_t  unrollThreshold;
 };

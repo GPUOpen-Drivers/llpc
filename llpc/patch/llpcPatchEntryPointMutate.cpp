@@ -673,7 +673,19 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
                     assert(pNode->sizeInDwords == 1);
 
-                    pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
+                    auto pShaderOptions = &m_pPipelineState->GetShaderOptions(m_shaderStage);
+                    if (pShaderOptions->updateDescInElf && (m_shaderStage == ShaderStageFragment))
+                    {
+                        // Put set number to register first, will update offset after merge ELFs
+                        // For partial pipeline compile, only fragment shader needs to adjust offset of root descriptor
+                        // If there are more individual shader compile in future, we can add more stages here
+                        pIntfData->userDataMap[userDataIdx] = DescRelocMagic | pNode->innerTable[0].set;
+                    }
+                    else
+                    {
+                        pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
+                    }
+
                     ++userDataIdx;
                     break;
                 }

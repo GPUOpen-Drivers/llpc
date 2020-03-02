@@ -606,6 +606,7 @@ void PipelineDumper::DumpPipelineShaderInfo(
     dumpFile << "options.waveBreakSize = " << pShaderInfo->options.waveBreakSize << "\n";
     dumpFile << "options.forceLoopUnrollCount = " << pShaderInfo->options.forceLoopUnrollCount << "\n";
     dumpFile << "options.useSiScheduler = " << pShaderInfo->options.useSiScheduler << "\n";
+    dumpFile << "options.updateDescInElf = " << pShaderInfo->options.updateDescInElf << "\n";
     dumpFile << "options.allowVaryWaveSize = " << pShaderInfo->options.allowVaryWaveSize << "\n";
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
     dumpFile << "options.enableLoadScalarizer = " << pShaderInfo->options.enableLoadScalarizer << "\n";
@@ -1171,6 +1172,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
             pHasher->Update(options.waveBreakSize);
             pHasher->Update(options.forceLoopUnrollCount);
             pHasher->Update(options.useSiScheduler);
+            pHasher->Update(options.updateDescInElf);
             pHasher->Update(options.allowVaryWaveSize);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
             pHasher->Update(options.enableLoadScalarizer);
