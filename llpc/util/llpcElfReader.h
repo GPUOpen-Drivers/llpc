@@ -520,4 +520,10 @@ private:
     friend class ElfWriter<Elf>;
 };
 
+// Dumps ELF package to out stream
+template<class OStream, class Elf>
+OStream& operator<<(
+    OStream&         out,
+    ElfReader<Elf>&  reader);
+
 } // Llpc
