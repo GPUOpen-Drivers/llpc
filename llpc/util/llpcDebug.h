@@ -61,12 +61,6 @@ bool EnableOuts();
 // Gets the value of option "enable-errs"
 bool EnableErrs();
 
-// Dumps ELF package to out stream
-template<class OStream, class Elf>
-OStream& operator<<(
-    OStream&         out,
-    ElfReader<Elf>&  reader);
-
 // Redirects the output of logs, It affects the behavior of llvm::outs(), dbgs() and errs().
 void RedirectLogOutput(
     bool              restoreToDefault,
