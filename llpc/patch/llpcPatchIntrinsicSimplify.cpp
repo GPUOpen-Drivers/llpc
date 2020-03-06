@@ -145,8 +145,8 @@ bool PatchIntrinsicSimplify::runOnFunction(
         changed = true;
 
         pIntrinsicCall->replaceAllUsesWith(pSimplifiedValue);
-        pIntrinsicCall->eraseFromParent();
         m_pScalarEvolution->eraseValueFromMap(pIntrinsicCall);
+        pIntrinsicCall->eraseFromParent();
     }
 
     return changed;
