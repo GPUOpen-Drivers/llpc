@@ -1353,85 +1353,66 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
     Result            result,         // Result of compile
     ElfPackage*       pPipelineElf)   // ELF output of compile, updated to merge ELF from shader cache
 {
-    // Only non-fragment shaders were compiled
-    if ((m_fragmentCacheEntryState == ShaderEntryState::Ready) &&
-        (m_nonFragmentCacheEntryState == ShaderEntryState::Compiling))
-    {
-        ElfPackage partialPipelineElf = *pPipelineElf;
-        pPipelineElf->clear();
-        BinaryData pipelineElf = {};
-        if (result == Result::Success)
-        {
-            BinaryData nonFragmentPipelineElf = {};
-            nonFragmentPipelineElf.pCode = partialPipelineElf.data();
-            nonFragmentPipelineElf.codeSize = partialPipelineElf.size();
-
-            ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
-            // Load ELF binary
-            auto result = writer.ReadFromBuffer(nonFragmentPipelineElf.pCode, nonFragmentPipelineElf.codeSize);
-            assert(result == Result::Success);
-            (void(result)); // unused
-            writer.MergeElfBinary(m_pContext, &m_fragmentElf, pPipelineElf);
-
-            pipelineElf.codeSize = pPipelineElf->size();
-            pipelineElf.pCode = pPipelineElf->data();
-        }
-
-        m_pCompiler->UpdateShaderCache(result == Result::Success, &pipelineElf, m_pNonFragmentShaderCache,
-                                       m_hNonFragmentEntry);
-    }
-
-    // Only fragment shader is compiled
-    else if ((m_nonFragmentCacheEntryState == ShaderEntryState::Ready) &&
-             (m_fragmentCacheEntryState == ShaderEntryState::Compiling))
-    {
-        ElfPackage partialPipelineElf = *pPipelineElf;
-        pPipelineElf->clear();
-        BinaryData pipelineElf = {};
-        if (result == Result::Success)
-        {
-            BinaryData fragmentPipelineElf = {};
-            fragmentPipelineElf.pCode = partialPipelineElf.data();
-            fragmentPipelineElf.codeSize = partialPipelineElf.size();
-
-            ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
-            // Load ELF binary
-            auto result = writer.ReadFromBuffer(m_nonFragmentElf.pCode, m_nonFragmentElf.codeSize);
-            assert(result == Result::Success);
-            (void(result)); // unused
-
-            writer.MergeElfBinary(m_pContext, &fragmentPipelineElf, pPipelineElf);
-
-            pipelineElf.codeSize = pPipelineElf->size();
-            pipelineElf.pCode = pPipelineElf->data();
-        }
-
-        m_pCompiler->UpdateShaderCache(result == Result::Success, &pipelineElf, m_pFragmentShaderCache,
-                                       m_hFragmentEntry);
-    }
-
-    // Both shaders hit the shader cache.
-    else if ((m_fragmentCacheEntryState == ShaderEntryState::Ready) &&
-        (m_nonFragmentCacheEntryState == ShaderEntryState::Ready))
-    {
-        ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
-        // Load ELF binary
-        auto result = writer.ReadFromBuffer(m_nonFragmentElf.pCode, m_nonFragmentElf.codeSize);
-        assert(result == Result::Success);
-        (void(result)); // unused
-        writer.MergeElfBinary(m_pContext, &m_fragmentElf, pPipelineElf);
-    }
-
-    // Whole pipeline is compiled
-    else
+    // Update the shader cache if required, with the compiled pipeline or with a failure state.
+    if (m_fragmentCacheEntryState == ShaderEntryState::Compiling ||
+        m_nonFragmentCacheEntryState == ShaderEntryState::Compiling)
     {
         BinaryData pipelineElf = {};
         pipelineElf.codeSize = pPipelineElf->size();
         pipelineElf.pCode = pPipelineElf->data();
-        m_pCompiler->UpdateShaderCache(result == Result::Success, &pipelineElf, m_pFragmentShaderCache,
-                                       m_hFragmentEntry);
-        m_pCompiler->UpdateShaderCache(result == Result::Success, &pipelineElf, m_pNonFragmentShaderCache,
-                                       m_hNonFragmentEntry);
+
+        if (m_fragmentCacheEntryState == ShaderEntryState::Compiling)
+        {
+            m_pCompiler->UpdateShaderCache(result == Result::Success, &pipelineElf, m_pFragmentShaderCache,
+                                           m_hFragmentEntry);
+        }
+
+        if (m_nonFragmentCacheEntryState == ShaderEntryState::Compiling)
+        {
+            m_pCompiler->UpdateShaderCache(result == Result::Success, &pipelineElf, m_pNonFragmentShaderCache,
+                                           m_hNonFragmentEntry);
+        }
+    }
+
+    // Now merge ELFs if one or both parts are from the cache. Nothing needs to be merged if we just compiled the full
+    // pipeline, as everything is already contained in the single incoming ELF in this case.
+    if (result == Result::Success &&
+        (m_fragmentCacheEntryState == ShaderEntryState::Ready ||
+         m_nonFragmentCacheEntryState == ShaderEntryState::Ready))
+    {
+        // Move the compiled ELF out of the way.
+        ElfPackage compiledPipelineElf = std::move(*pPipelineElf);
+        pPipelineElf->clear();
+
+        // Determine where the fragment / non-fragment parts come from (cache or just-compiled).
+        BinaryData fragmentElf = {};
+        if (m_fragmentCacheEntryState == ShaderEntryState::Ready)
+        {
+            fragmentElf = m_fragmentElf;
+        }
+        else
+        {
+            fragmentElf.pCode = compiledPipelineElf.data();
+            fragmentElf.codeSize = compiledPipelineElf.size();
+        }
+
+        BinaryData nonFragmentElf = {};
+        if (m_nonFragmentCacheEntryState == ShaderEntryState::Ready)
+        {
+            nonFragmentElf = m_nonFragmentElf;
+        }
+        else
+        {
+            nonFragmentElf.pCode = compiledPipelineElf.data();
+            nonFragmentElf.codeSize = compiledPipelineElf.size();
+        }
+
+        // Merge and store the result in pPipelineElf
+        ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
+        auto result = writer.ReadFromBuffer(nonFragmentElf.pCode, nonFragmentElf.codeSize);
+        assert(result == Result::Success);
+        (void(result)); // unused
+        writer.MergeElfBinary(m_pContext, &fragmentElf, pPipelineElf);
     }
 }
 
