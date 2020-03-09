@@ -167,6 +167,7 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   }
 
   // Patch buffer operations (must be after optimizations)
+  passMgr.add(createPatchFatPointerArgs());
   passMgr.add(createPatchBufferOp());
   passMgr.add(createInstructionCombiningPass(false, 2));
 

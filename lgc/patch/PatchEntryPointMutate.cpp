@@ -97,6 +97,12 @@ bool PatchEntryPointMutate::runOnModule(Module &module) {
     }
   }
 
+  if (m_shaderStage == ShaderStageCompute) {
+    // A compute shader is allowed to have subfunctions. Here we need to mutate all the subfunctions
+    // to add on the same args that the shader has, so they are passed around to all code.
+    mutateSubfunctions(m_entryPoint);
+  }
+
   return true;
 }
 
@@ -114,6 +120,7 @@ void PatchEntryPointMutate::processShader() {
   entryPoint->setCallingConv(origEntryPoint->getCallingConv());
   entryPoint->addFnAttr(Attribute::NoUnwind);
   entryPoint->takeName(origEntryPoint);
+  m_entryPoint = entryPoint;
 
   ValueToValueMapTy valueMap;
   SmallVector<ReturnInst *, 8> retInsts;
@@ -987,6 +994,133 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
   }
 
   return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
+}
+
+// =====================================================================================================================
+// A compute shader is allowed to have subfunctions. Here we need to mutate all the subfunctions
+// to add on the same args that the shader has, so they are passed around to all code.
+//
+// @param entryPoint : Shader entry-point function
+void PatchEntryPointMutate::mutateSubfunctions(Function *entryPoint) {
+  // Mutate subfunctions by adding pEntryTy's args to the front.
+  FunctionType *entryTy = entryPoint->getFunctionType();
+  bool haveNonCallUses = false;
+  SmallVector<Function *, 4> oldFuncs;
+  std::map<Function *, Function *> funcMap;
+  std::map<Type *, Type *> typeMap;
+  SmallVector<CallInst *, 8> calls;
+  for (auto &func : *m_module) {
+    if (!func.isDeclaration() && func.getLinkage() == GlobalValue::InternalLinkage)
+      oldFuncs.push_back(&func);
+  }
+  for (Function *oldFunc : oldFuncs) {
+    // Create the new function type.
+    auto oldFuncTy = oldFunc->getFunctionType();
+    SmallVector<Type *, 8> paramTys;
+    paramTys.insert(paramTys.end(), entryTy->params().begin(), entryTy->params().end());
+    paramTys.insert(paramTys.end(), oldFuncTy->params().begin(), oldFuncTy->params().end());
+    auto newFuncTy = FunctionType::get(oldFuncTy->getReturnType(), paramTys, oldFuncTy->isVarArg());
+    // Create the new function.
+    auto newFunc = Function::Create(newFuncTy, GlobalValue::InternalLinkage, oldFunc->getAddressSpace(), "", m_module);
+    newFunc->takeName(oldFunc);
+    funcMap[oldFunc] = newFunc;
+    typeMap[oldFuncTy] = newFuncTy;
+
+    // Transfer the code onto the new function.
+    while (!oldFunc->empty()) {
+      BasicBlock *block = &oldFunc->front();
+      block->removeFromParent();
+      block->insertInto(newFunc);
+    }
+
+    // Copy attributes and shader stage from the old function.
+    newFunc->setAttributes(oldFunc->getAttributes());
+    newFunc->addFnAttr(Attribute::AlwaysInline);
+    setShaderStage(newFunc, getShaderStage(oldFunc));
+
+    // Copy "inreg" arg attributes from the entry-point, to indicate which args are uniform.
+    for (unsigned idx = 0, end = entryPoint->arg_size(); idx != end; ++idx) {
+      if (entryPoint->getArg(idx)->hasInRegAttr())
+        newFunc->getArg(idx)->addAttr(Attribute::InReg);
+    }
+
+    // Transfer uses of old args to new args.
+    for (unsigned idx = 0, end = oldFunc->arg_size(); idx != end; ++idx) {
+      Argument *oldArg = oldFunc->getArg(idx);
+      Argument *newArg = newFunc->getArg(idx + entryTy->params().size());
+      newArg->setName(oldArg->getName());
+      oldArg->replaceAllUsesWith(newArg);
+    }
+
+    // Find uses. Remember direct calls; insert a bitcast for non-call uses (which occur for indirect
+    // calls).
+    SmallVector<Use *, 4> nonCallUses;
+    for (auto &use : oldFunc->uses()) {
+      User *user = use.getUser();
+      if (auto call = dyn_cast<CallInst>(user)) {
+        if (call->isCallee(&use)) {
+          // Use in direct call.
+          calls.push_back(call);
+          continue;
+        }
+      }
+      nonCallUses.push_back(&use);
+    }
+    if (!nonCallUses.empty()) {
+      auto castNewFunc = ConstantExpr::getBitCast(newFunc, oldFunc->getType());
+      haveNonCallUses = true;
+      for (Use *use : nonCallUses)
+        *use = castNewFunc;
+    }
+  }
+
+  if (haveNonCallUses) {
+    // There are some non-call uses of the functions, i.e. some indirect calls. That means we have to
+    // scan the code to find the calls.
+    calls.clear();
+    for (Function &func : *m_module) {
+      for (BasicBlock &block : func) {
+        for (Instruction &inst : block) {
+          if (auto call = dyn_cast<CallInst>(&inst))
+            calls.push_back(call);
+        }
+      }
+    }
+  }
+
+  // Mutate the calls.
+  for (CallInst *call : calls) {
+    // Mutate the call by adding extra args on the front using the enclosing func's corresponding args.
+    IRBuilder<> builder(call);
+    Value *callee = call->getCalledOperand();
+    if (auto calledFunc = dyn_cast<Function>(callee)) {
+      // This is a direct call.
+      auto it = funcMap.find(calledFunc);
+      if (it == funcMap.end()) {
+        // It is a direct call to a function that was not mutated, which must be an external
+        // (e.g. an intrinsic). Do not mutate the call.
+        continue;
+      }
+      callee = it->second;
+    } else {
+      // For an indirect call, the new callee needs to be a bitcast of the old one.
+      callee = builder.CreateBitCast(
+          callee, typeMap[call->getFunctionType()]->getPointerTo(callee->getType()->getPointerAddressSpace()));
+    }
+
+    SmallVector<Value *, 8> args;
+    for (unsigned idx = 0; idx != entryTy->params().size(); ++idx)
+      args.push_back(call->getFunction()->getArg(idx));
+    for (unsigned idx = 0; idx != call->getNumArgOperands(); ++idx)
+      args.push_back(call->getArgOperand(idx));
+    auto newCall = builder.CreateCall(callee, args);
+    call->replaceAllUsesWith(newCall);
+    call->eraseFromParent();
+  }
+
+  // Erase the old functions.
+  for (Function *oldFunc : oldFuncs)
+    oldFunc->eraseFromParent();
 }
 
 } // namespace lgc

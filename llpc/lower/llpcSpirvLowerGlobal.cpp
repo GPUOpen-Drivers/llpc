@@ -613,7 +613,7 @@ void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
   // NOTE: For tessellation shader, we do not map inputs to real proxy variables. Instead, we directly replace
   // "load" instructions with import calls in the lowering operation.
   if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval) {
-    m_inputProxyMap[input] = nullptr;
+    m_inputProxyMap[input][m_entryPoint] = nullptr;
     m_lowerInputInPlace = true;
     return;
   }
@@ -621,20 +621,26 @@ void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
   const auto &dataLayout = m_module->getDataLayout();
   Type *inputTy = input->getType()->getContainedType(0);
   Twine prefix = LlpcName::InputProxyPrefix;
-  auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
 
   MDNode *metaNode = input->getMetadata(gSPIRVMD::InOut);
   assert(metaNode);
-
   auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-  auto proxy = new AllocaInst(inputTy, dataLayout.getAllocaAddrSpace(), prefix + input->getName(), &*insertPos);
 
-  // Import input to proxy variable
-  auto inputValue = addCallInstForInOutImport(inputTy, SPIRAS_Input, meta, nullptr, 0, nullptr, nullptr,
-                                              InterpLocUnknown, nullptr, &*insertPos);
-  new StoreInst(inputValue, proxy, &*insertPos);
+  // Add a proxy variable for this input to each function definition in the shader.
+  // A compute shader can have subfunctions.
+  for (Function &func : *m_module) {
+    if (func.isDeclaration())
+      continue;
+    auto insertPos = func.begin()->getFirstInsertionPt();
+    auto proxy = new AllocaInst(inputTy, dataLayout.getAllocaAddrSpace(), prefix + input->getName(), &*insertPos);
 
-  m_inputProxyMap[input] = proxy;
+    // Import input to proxy variable
+    auto inputValue = addCallInstForInOutImport(inputTy, SPIRAS_Input, meta, nullptr, 0, nullptr, nullptr,
+                                                InterpLocUnknown, nullptr, &*insertPos);
+    new StoreInst(inputValue, proxy, &*insertPos);
+
+    m_inputProxyMap[input][&func] = proxy;
+  }
 }
 
 // =====================================================================================================================
@@ -730,26 +736,37 @@ void SpirvLowerGlobal::lowerInput() {
   }
 
   for (auto inputMap : m_inputProxyMap) {
+    // Gather instruction uses of the input, possibly via constant GEPs, and process them.
+    SmallVector<Use *, 8> uses;
     auto input = cast<GlobalVariable>(inputMap.first);
+    for (Use &use : input->uses())
+      uses.push_back(&use);
 
-    for (auto user = input->user_begin(), end = input->user_end(); user != end; ++user) {
+    for (unsigned idx = 0; idx != uses.size(); ++idx) {
+      Use *use = uses[idx];
+      User *user = use->getUser();
+      auto inst = dyn_cast<Instruction>(user);
+      if (!inst) {
+        // This use is not in an instruction. Find its uses and add to the list.
+        for (Use &useUse : user->uses())
+          uses.push_back(&useUse);
+        continue;
+      }
+
       // NOTE: "Getelementptr" and "bitcast" will propogate the address space of pointer value (input variable)
       // to the element pointer value (destination). We have to clear the address space of this element pointer
       // value. The original pointer value has been lowered and therefore the address space is invalid now.
-      Instruction *inst = dyn_cast<Instruction>(*user);
-      if (inst) {
-        Type *instTy = inst->getType();
-        if (isa<PointerType>(instTy) && instTy->getPointerAddressSpace() == SPIRAS_Input) {
-          assert(isa<GetElementPtrInst>(inst) || isa<BitCastInst>(inst));
-          Type *newInstTy = PointerType::get(instTy->getContainedType(0), SPIRAS_Private);
-          inst->mutateType(newInstTy);
-        }
+      Type *instTy = inst->getType();
+      if (isa<PointerType>(instTy) && instTy->getPointerAddressSpace() == SPIRAS_Input) {
+        assert(isa<GetElementPtrInst>(inst) || isa<BitCastInst>(inst));
+        Type *newInstTy = PointerType::get(instTy->getContainedType(0), SPIRAS_Private);
+        inst->mutateType(newInstTy);
       }
-    }
 
-    auto proxy = inputMap.second;
-    input->mutateType(proxy->getType()); // To clear address space for pointer to make replacement valid
-    input->replaceAllUsesWith(proxy);
+      // Replace the use.
+      auto proxy = inputMap.second[inst->getFunction()];
+      *use = proxy;
+    }
     input->eraseFromParent();
   }
 }

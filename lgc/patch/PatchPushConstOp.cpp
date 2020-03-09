@@ -101,17 +101,11 @@ bool PatchPushConstOp::runOnModule(Module &module) {
 
     for (Function *func : spillTableFuncs) {
       for (User *const user : func->users()) {
-        CallInst *const call = dyn_cast<CallInst>(user);
-
-        // If the user is not a call, bail.
-        if (!call)
-          continue;
-
-        // If the call is not in the entry point, bail.
-        if (call->getFunction() != m_entryPoint)
-          continue;
-
-        visitCallInst(*call);
+        if (CallInst *const call = dyn_cast<CallInst>(user)) {
+          // Only process the call if it is in the shader currently being processed.
+          if (call->getFunction() == m_entryPoint || shaderStage == ShaderStageCompute)
+            visitCallInst(*call);
+        }
       }
     }
   }

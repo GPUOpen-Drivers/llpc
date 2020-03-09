@@ -88,6 +88,7 @@ const static char DescriptorLoadSpillTable[] = "lgc.descriptor.load.spilltable";
 
 const static char LaterCallPrefix[] = "lgc.late.";
 const static char LateLaunderFatPointer[] = "lgc.late.launder.fat.pointer";
+const static char LateUnlaunderFatPointer[] = "lgc.late.unlaunder.fat.pointer";
 const static char LateBufferLength[] = "lgc.late.buffer.desc.length";
 
 // Names of entry-points for merged shader

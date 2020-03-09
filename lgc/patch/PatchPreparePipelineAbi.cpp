@@ -280,8 +280,23 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
 // @param callingConv : Calling convention to set it to
 void PatchPreparePipelineAbi::setCallingConv(ShaderStage shaderStage, CallingConv::ID callingConv) {
   auto entryPoint = m_pipelineShaders->getEntryPoint(shaderStage);
-  if (entryPoint)
-    entryPoint->setCallingConv(callingConv);
+  if (entryPoint) {
+    if (shaderStage == ShaderStageCompute) {
+      // A compute shader can have subfunctions. Mark all defined functions in the module with
+      // the calling convention, so that divergence analysis understands that an inreg argument
+      // is uniform. Also mark all calls to the subfunctions with the calling convention.
+      for (Function &func : *entryPoint->getParent()) {
+        if (!func.isDeclaration()) {
+          func.setCallingConv(callingConv);
+          for (auto user : func.users()) {
+            if (auto call = dyn_cast<CallInst>(user))
+              call->setCallingConv(callingConv);
+          }
+        }
+      }
+    } else
+      entryPoint->setCallingConv(callingConv);
+  }
 }
 
 // =====================================================================================================================

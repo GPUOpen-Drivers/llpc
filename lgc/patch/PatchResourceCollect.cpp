@@ -979,8 +979,12 @@ void PatchResourceCollect::processShader() {
   m_hasDynIndexedOutput = false;
   m_resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
-  // Invoke handling of "call" instruction
-  visit(m_entryPoint);
+  // Invoke handling of "call" instruction. Also handle subfunctions if compute shader.
+  if (m_shaderStage == ShaderStageCompute) {
+    for (Function &func : *m_module)
+      visit(&func);
+  } else
+    visit(m_entryPoint);
 
   // Disable push constant if not used
   if (!m_hasPushConstOp)

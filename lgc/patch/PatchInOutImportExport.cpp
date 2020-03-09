@@ -116,12 +116,22 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
     auto entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
     if (entryPoint) {
       initPerShader();
-      m_entryPoint = entryPoint;
+      m_entryPoint = m_func = entryPoint;
       m_shaderStage = static_cast<ShaderStage>(shaderStage);
       processShader();
 
       // Now process the call and return instructions.
       visit(*m_entryPoint);
+    }
+  }
+
+  // Visit non-shader-entry-point subfunctions in a compute shader.
+  if (m_shaderStage == ShaderStageCompute) {
+    for (Function &func : module) {
+      if (!func.isDeclaration() && func.getLinkage() == GlobalValue::InternalLinkage) {
+        m_func = &func;
+        visit(func);
+      }
     }
   }
 
@@ -835,7 +845,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 // @param retInst : "Ret" instruction
 void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
   // We only handle the "ret" of shader entry point
-  if (m_shaderStage == ShaderStageInvalid)
+  if (m_func != m_entryPoint)
     return;
 
   const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
@@ -2550,11 +2560,11 @@ Value *PatchInOutImportExport::patchCsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInNumWorkgroups: {
-    input = m_pipelineSysValues.get(m_entryPoint)->getNumWorkgroups();
+    input = m_pipelineSysValues.get(m_func)->getNumWorkgroups();
     break;
   }
   case BuiltInWorkgroupId: {
-    input = getFunctionArgument(m_entryPoint, entryArgIdxs.workgroupId);
+    input = getFunctionArgument(m_func, entryArgIdxs.workgroupId);
     break;
   }
   case BuiltInLocalInvocationId: {
@@ -5699,7 +5709,7 @@ Value *PatchInOutImportExport::getInLocalInvocationId(Instruction *insertPos) {
 
   auto &builtInUsage = m_pipelineState->getShaderModes()->getComputeShaderMode();
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageCompute)->entryArgIdxs.cs;
-  Value *locaInvocatioId = getFunctionArgument(m_entryPoint, entryArgIdxs.localInvocationId);
+  Value *locaInvocatioId = getFunctionArgument(m_func, entryArgIdxs.localInvocationId);
 
   WorkgroupLayout workgroupLayout = calculateWorkgroupLayout();
 

@@ -66,6 +66,8 @@ private:
 
   bool isResourceNodeActive(const ResourceNode *node, bool isRootNode) const;
 
+  void mutateSubfunctions(llvm::Function *entryPoint);
+
   // -----------------------------------------------------------------------------------------------------------------
 
   // Reserved argument count for single DWORD descriptor table pointer

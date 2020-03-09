@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "PatchBufferOp.h"
-#include "lgc/Builder.h"
+#include "lgc/BuilderBase.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
@@ -76,8 +76,6 @@ PatchBufferOp::PatchBufferOp() : FunctionPass(ID) {
 void PatchBufferOp::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
   analysisUsage.addRequired<LegacyDivergenceAnalysis>();
   analysisUsage.addRequired<PipelineStateWrapper>();
-  analysisUsage.addRequired<PipelineShaders>();
-  analysisUsage.addPreserved<PipelineShaders>();
   analysisUsage.addRequired<TargetTransformInfoWrapperPass>();
   analysisUsage.addPreserved<TargetTransformInfoWrapperPass>();
 }
@@ -94,12 +92,6 @@ bool PatchBufferOp::runOnFunction(Function &function) {
   m_builder.reset(new IRBuilder<>(*m_context));
 
   // Invoke visitation of the target instructions.
-  auto pipelineShaders = &getAnalysis<PipelineShaders>();
-
-  // If the function is not a valid shader stage, bail.
-  if (pipelineShaders->getShaderStage(&function) == ShaderStageInvalid)
-    return false;
-
   m_divergenceAnalysis = &getAnalysis<LegacyDivergenceAnalysis>();
 
   // To replace the fat pointer uses correctly we need to walk the basic blocks strictly in domination order to avoid
@@ -411,8 +403,8 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
   m_builder->SetInsertPoint(&callInst);
 
   if (callName.equals(lgcName::LateLaunderFatPointer)) {
-    Constant *const nullPointer = ConstantPointerNull::get(getRemappedType(callInst.getType()));
-    m_replacementMap[&callInst] = std::make_pair(callInst.getArgOperand(0), nullPointer);
+    Value *offset = m_builder->CreateIntToPtr(callInst.getArgOperand(1), getRemappedType(callInst.getType()));
+    m_replacementMap[&callInst] = std::make_pair(callInst.getArgOperand(0), offset);
 
     // Check for any invariant starts that use the pointer.
     if (removeUsersForInvariantStarts(&callInst))
@@ -421,6 +413,22 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
     // If the incoming index to the fat pointer launder was divergent, remember it.
     if (m_divergenceAnalysis->isDivergent(callInst.getArgOperand(0)))
       m_divergenceSet.insert(callInst.getArgOperand(0));
+
+  } else if (callName.equals(lgcName::LateUnlaunderFatPointer)) {
+    // This "unlaunder fat pointer" call was inserted by the fat pointer args pass, to convert a fat
+    // pointer back to {desc,offset} just before passing it as an arg or return value.
+    Value *pointer = getPointerOperandAsInst(callInst.getArgOperand(0));
+    Value *desc = m_replacementMap[pointer].first;
+    Value *offset = m_replacementMap[pointer].second;
+    offset = m_builder->CreatePtrToInt(offset, m_builder->getInt32Ty());
+    Value *descOffset = UndefValue::get(callInst.getType());
+    descOffset = m_builder->CreateInsertValue(descOffset, desc, 0);
+    descOffset = m_builder->CreateInsertValue(descOffset, offset, 1);
+    callInst.replaceAllUsesWith(descOffset);
+
+    // Record the call instruction so we remember to delete it later.
+    m_replacementMap[&callInst] = std::make_pair(nullptr, nullptr);
+
   } else if (callName.startswith(lgcName::LateBufferLength)) {
     Value *const pointer = getPointerOperandAsInst(callInst.getArgOperand(0));
 
@@ -1651,6 +1659,5 @@ Instruction *PatchBufferOp::makeLoop(Value *const loopStart, Value *const loopEn
 // Initializes the pass of LLVM patch operations for buffer operations.
 INITIALIZE_PASS_BEGIN(PatchBufferOp, DEBUG_TYPE, "Patch LLVM for buffer operations", false, false)
 INITIALIZE_PASS_DEPENDENCY(LegacyDivergenceAnalysis)
-INITIALIZE_PASS_DEPENDENCY(PipelineShaders)
 INITIALIZE_PASS_DEPENDENCY(TargetTransformInfoWrapperPass)
 INITIALIZE_PASS_END(PatchBufferOp, DEBUG_TYPE, "Patch LLVM for buffer operations", false, false)

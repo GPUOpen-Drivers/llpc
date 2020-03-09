@@ -73,7 +73,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   bufDescLoadCall->setName(instName);
 
   bufDescLoadCall = emitCall(lgcName::LateLaunderFatPointer, getInt8Ty()->getPointerTo(ADDR_SPACE_BUFFER_FAT_POINTER),
-                             bufDescLoadCall, Attribute::ReadNone, insertPos);
+                             {bufDescLoadCall, getInt32(0)}, Attribute::ReadNone, insertPos);
 
   return CreateBitCast(bufDescLoadCall, getBufferDescTy(pointeeTy));
 }

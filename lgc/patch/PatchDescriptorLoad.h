@@ -47,7 +47,6 @@ public:
 
   void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
     analysisUsage.addRequired<PipelineStateWrapper>();
-    analysisUsage.addRequired<PipelineShaders>();
     analysisUsage.addPreserved<PipelineShaders>();
   }
 

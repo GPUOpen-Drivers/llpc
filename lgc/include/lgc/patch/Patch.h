@@ -49,6 +49,7 @@ void initializePatchCheckShaderCachePass(PassRegistry &);
 void initializePatchCopyShaderPass(PassRegistry &);
 void initializePatchDescriptorLoadPass(PassRegistry &);
 void initializePatchEntryPointMutatePass(PassRegistry &);
+void initializePatchFatPointerArgsPass(PassRegistry &);
 void initializePatchInOutImportExportPass(PassRegistry &);
 void initializePatchIntrinsicSimplifyPass(PassRegistry &);
 void initializePatchLlvmIrInclusionPass(PassRegistry &);
@@ -75,6 +76,7 @@ inline static void initializePatchPasses(llvm::PassRegistry &passRegistry) {
   initializePatchCopyShaderPass(passRegistry);
   initializePatchDescriptorLoadPass(passRegistry);
   initializePatchEntryPointMutatePass(passRegistry);
+  initializePatchFatPointerArgsPass(passRegistry);
   initializePatchInOutImportExportPass(passRegistry);
   initializePatchIntrinsicSimplifyPass(passRegistry);
   initializePatchLlvmIrInclusionPass(passRegistry);
@@ -92,6 +94,7 @@ PatchCheckShaderCache *createPatchCheckShaderCache();
 llvm::ModulePass *createPatchCopyShader();
 llvm::ModulePass *createPatchDescriptorLoad();
 llvm::ModulePass *createPatchEntryPointMutate();
+llvm::ModulePass *createPatchFatPointerArgs();
 llvm::ModulePass *createPatchInOutImportExport();
 llvm::FunctionPass *createPatchIntrinsicSimplify();
 llvm::ModulePass *createPatchLlvmIrInclusion();
@@ -111,7 +114,7 @@ class Patch : public llvm::ModulePass {
 public:
   explicit Patch(char &pid)
       : llvm::ModulePass(pid), m_module(nullptr), m_context(nullptr), m_shaderStage(ShaderStageInvalid),
-        m_entryPoint(nullptr) {}
+        m_entryPoint(nullptr), m_func(nullptr) {}
   virtual ~Patch() {}
 
   static void addPasses(PipelineState *pipelineState, llvm::legacy::PassManager &passMgr,
@@ -129,6 +132,7 @@ protected:
   llvm::LLVMContext *m_context; // Associated LLVM context of the LLVM module that passes run on
   ShaderStage m_shaderStage;    // Shader stage
   llvm::Function *m_entryPoint; // Entry-point
+  llvm::Function *m_func;       // Function currently being processed
 
 private:
   static void addOptimizationPasses(llvm::legacy::PassManager &passMgr);

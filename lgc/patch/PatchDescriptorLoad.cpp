@@ -70,14 +70,7 @@ bool PatchDescriptorLoad::runOnModule(Module &module) {
   m_pipelineSysValues.initialize(m_pipelineState);
 
   // Invoke handling of "call" instruction
-  auto pipelineShaders = &getAnalysis<PipelineShaders>();
-  for (unsigned shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage) {
-    m_entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
-    if (m_entryPoint) {
-      m_shaderStage = static_cast<ShaderStage>(shaderStage);
-      visit(*m_entryPoint);
-    }
-  }
+  visit(module);
 
   // Remove unnecessary descriptor load calls
   for (auto callInst : m_descLoadCalls) {
@@ -120,7 +113,6 @@ bool PatchDescriptorLoad::runOnModule(Module &module) {
 // @param descPtrCall : Call to llpc.descriptor.get.*.ptr
 // @param descPtrCallName : Name of that call
 void PatchDescriptorLoad::processDescriptorGetPtr(CallInst *descPtrCall, StringRef descPtrCallName) {
-  m_entryPoint = descPtrCall->getFunction();
   IRBuilder<> builder(*m_context);
   builder.SetInsertPoint(descPtrCall);
 
@@ -134,7 +126,7 @@ void PatchDescriptorLoad::processDescriptorGetPtr(CallInst *descPtrCall, StringR
   else if (descPtrCallName.startswith(lgcName::DescriptorGetSamplerPtr))
     resType = ResourceNodeType::DescriptorSampler;
   else if (descPtrCallName.startswith(lgcName::DescriptorGetFmaskPtr)) {
-    shadow = m_pipelineSysValues.get(m_entryPoint)->isShadowDescTableEnabled();
+    shadow = m_pipelineSysValues.get(descPtrCall->getFunction())->isShadowDescTableEnabled();
     resType = ResourceNodeType::DescriptorFmask;
   }
 
@@ -379,12 +371,10 @@ void PatchDescriptorLoad::visitCallInst(CallInst &callInst) {
   }
 
   if (mangledName.startswith(lgcName::DescriptorLoadSpillTable)) {
-    // Descriptor loading should be inlined and stay in shader entry-point
-    assert(callInst.getParent()->getParent() == m_entryPoint);
     m_changed = true;
 
     if (!callInst.use_empty()) {
-      Value *desc = m_pipelineSysValues.get(m_entryPoint)->getSpilledPushConstTablePtr();
+      Value *desc = m_pipelineSysValues.get(callInst.getFunction())->getSpilledPushConstTablePtr();
       if (desc->getType() != callInst.getType())
         desc = new BitCastInst(desc, callInst.getType(), "", &callInst);
       callInst.replaceAllUsesWith(desc);
@@ -395,8 +385,6 @@ void PatchDescriptorLoad::visitCallInst(CallInst &callInst) {
   }
 
   if (mangledName.startswith(lgcName::DescriptorLoadBuffer)) {
-    // Descriptor loading should be inlined and stay in shader entry-point
-    assert(callInst.getParent()->getParent() == m_entryPoint);
     m_changed = true;
 
     if (!callInst.use_empty()) {
@@ -429,9 +417,9 @@ Value *PatchDescriptorLoad::loadBufferDescriptor(unsigned descSet, unsigned bind
   // Handle the special cases. First get a pointer to the global/per-shader table as pointer to i8.
   Value *descPtr = nullptr;
   if (descSet == InternalResourceTable)
-    descPtr = m_pipelineSysValues.get(m_entryPoint)->getInternalGlobalTablePtr();
+    descPtr = m_pipelineSysValues.get(insertPoint->getFunction())->getInternalGlobalTablePtr();
   else if (descSet == InternalPerShaderTable)
-    descPtr = m_pipelineSysValues.get(m_entryPoint)->getInternalPerShaderTablePtr();
+    descPtr = m_pipelineSysValues.get(insertPoint->getFunction())->getInternalPerShaderTablePtr();
   if (descPtr) {
     // "binding" gives the offset, in units of v4i32 descriptors.
     // Add on the offset, giving pointer to i8.
@@ -460,11 +448,11 @@ Value *PatchDescriptorLoad::loadBufferDescriptor(unsigned descSet, unsigned bind
     // that to use user data SGPRs directly, if PatchEntryPointMutate managed to fit the value into
     // user data SGPRs.
     unsigned resNodeIdx = topNode - m_pipelineState->getUserDataNodes().data();
-    auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+    auto intfData = m_pipelineState->getShaderInterfaceData(getShaderStage(insertPoint->getFunction()));
     unsigned argIdx = intfData->entryArgIdxs.resNodeValues[resNodeIdx];
     if (argIdx > 0) {
       // Resource node isn't spilled. Load its value from function argument.
-      Argument *descArg = m_entryPoint->getArg(argIdx);
+      Argument *descArg = insertPoint->getFunction()->getArg(argIdx);
       descArg->setName(Twine("resNode") + Twine(resNodeIdx));
       // The function argument is a vector of i32. Treat it as an array of <2 x i32> and
       // extract the required array element.

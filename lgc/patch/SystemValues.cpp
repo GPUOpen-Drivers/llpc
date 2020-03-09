@@ -50,15 +50,17 @@ static cl::opt<unsigned> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
 // Initialize this ShaderSystemValues if it was previously uninitialized.
 //
 // @param pipelineState : Pipeline state
-// @param entryPoint : Shader entrypoint
-void ShaderSystemValues::initialize(PipelineState *pipelineState, Function *entryPoint) {
-  if (!m_entryPoint) {
-    m_entryPoint = entryPoint;
-    m_shaderStage = getShaderStage(entryPoint);
-    m_context = &entryPoint->getParent()->getContext();
+// @param func : Function for which this is the ShaderSystemValues
+void ShaderSystemValues::initialize(PipelineState *pipelineState, Function *func) {
+  if (!m_func) {
+    m_func = func;
+    m_context = &func->getParent()->getContext();
     m_pipelineState = pipelineState;
-
-    assert(m_shaderStage != ShaderStageInvalid);
+    m_shaderStage = getShaderStage(func);
+    if (m_shaderStage == ShaderStageInvalid) {
+      // This is a subfunction. Only a compute shader can have a subfunction.
+      m_shaderStage = ShaderStageCompute;
+    }
     assert(m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs.initialized);
 
     // Load shadow descriptor table settings from pipeline options.
@@ -105,7 +107,7 @@ Value *ShaderSystemValues::getEsGsRingBufDesc() {
       break;
     }
 
-    BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+    BuilderBase builder(&*m_func->front().getFirstInsertionPt());
     m_esGsRingBufDesc = loadDescFromDriverTable(tableOffset, builder);
     if (m_shaderStage != ShaderStageGeometry && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 8) {
       // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor for
@@ -121,7 +123,7 @@ Value *ShaderSystemValues::getEsGsRingBufDesc() {
 Value *ShaderSystemValues::getTessFactorBufDesc() {
   assert(m_shaderStage == ShaderStageTessControl);
   if (!m_tfBufDesc) {
-    BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+    BuilderBase builder(&*m_func->front().getFirstInsertionPt());
     m_tfBufDesc = loadDescFromDriverTable(SiDrvTableTfBufferOffs, builder);
   }
   return m_tfBufDesc;
@@ -133,7 +135,7 @@ Value *ShaderSystemValues::getPrimitiveId() {
   assert(m_shaderStage == ShaderStageTessControl);
   if (!m_primitiveId) {
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-    m_primitiveId = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tcs.patchId, "patchId");
+    m_primitiveId = getFunctionArgument(m_func, intfData->entryArgIdxs.tcs.patchId, "patchId");
   }
   return m_primitiveId;
 }
@@ -143,11 +145,11 @@ Value *ShaderSystemValues::getPrimitiveId() {
 Value *ShaderSystemValues::getInvocationId() {
   assert(m_shaderStage == ShaderStageTessControl);
   if (!m_invocationId) {
-    auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    auto insertPos = &*m_func->front().getFirstInsertionPt();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
     // invocationId = relPatchId[12:8]
-    Value *args[] = {getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tcs.relPatchId, "relPatchId"),
+    Value *args[] = {getFunctionArgument(m_func, intfData->entryArgIdxs.tcs.relPatchId, "relPatchId"),
                      ConstantInt::get(Type::getInt32Ty(*m_context), 8),
                      ConstantInt::get(Type::getInt32Ty(*m_context), 5)};
     m_invocationId =
@@ -161,9 +163,9 @@ Value *ShaderSystemValues::getInvocationId() {
 Value *ShaderSystemValues::getRelativeId() {
   assert(m_shaderStage == ShaderStageTessControl);
   if (!m_relativeId) {
-    auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    auto insertPos = &*m_func->front().getFirstInsertionPt();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-    auto relPatchId = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tcs.relPatchId, "relPatchId");
+    auto relPatchId = getFunctionArgument(m_func, intfData->entryArgIdxs.tcs.relPatchId, "relPatchId");
 
     // relativeId = relPatchId[7:0]
     m_relativeId =
@@ -177,7 +179,7 @@ Value *ShaderSystemValues::getRelativeId() {
 Value *ShaderSystemValues::getOffChipLdsDesc() {
   assert(m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval);
   if (!m_offChipLdsDesc) {
-    BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+    BuilderBase builder(&*m_func->front().getFirstInsertionPt());
     m_offChipLdsDesc = loadDescFromDriverTable(SiDrvTableHsBuffeR0Offs, builder);
   }
   return m_offChipLdsDesc;
@@ -188,11 +190,11 @@ Value *ShaderSystemValues::getOffChipLdsDesc() {
 Value *ShaderSystemValues::getTessCoord() {
   assert(m_shaderStage == ShaderStageTessEval);
   if (!m_tessCoord) {
-    auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    auto insertPos = &*m_func->front().getFirstInsertionPt();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
-    Value *tessCoordX = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tes.tessCoordX, "tessCoordX");
-    Value *tessCoordY = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tes.tessCoordY, "tessCoordY");
+    Value *tessCoordX = getFunctionArgument(m_func, intfData->entryArgIdxs.tes.tessCoordX, "tessCoordX");
+    Value *tessCoordY = getFunctionArgument(m_func, intfData->entryArgIdxs.tes.tessCoordY, "tessCoordY");
     Value *tessCoordZ = BinaryOperator::CreateFAdd(tessCoordX, tessCoordY, "", insertPos);
 
     tessCoordZ =
@@ -218,13 +220,13 @@ Value *ShaderSystemValues::getTessCoord() {
 Value *ShaderSystemValues::getEsGsOffsets() {
   assert(m_shaderStage == ShaderStageGeometry);
   if (!m_esGsOffsets) {
-    auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    auto insertPos = &*m_func->front().getFirstInsertionPt();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
     m_esGsOffsets = UndefValue::get(VectorType::get(Type::getInt32Ty(*m_context), 6));
     for (unsigned i = 0; i < InterfaceData::MaxEsGsOffsetCount; ++i) {
       auto esGsOffset =
-          getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.gs.esGsOffsets[i], Twine("esGsOffset") + Twine(i));
+          getFunctionArgument(m_func, intfData->entryArgIdxs.gs.esGsOffsets[i], Twine("esGsOffset") + Twine(i));
       m_esGsOffsets = InsertElementInst::Create(m_esGsOffsets, esGsOffset,
                                                 ConstantInt::get(Type::getInt32Ty(*m_context), i), "", insertPos);
     }
@@ -241,7 +243,7 @@ Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
   if (m_gsVsRingBufDescs.size() <= streamId)
     m_gsVsRingBufDescs.resize(streamId + 1);
   if (!m_gsVsRingBufDescs[streamId]) {
-    BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+    BuilderBase builder(&*m_func->front().getFirstInsertionPt());
 
     if (m_shaderStage == ShaderStageGeometry) {
       const auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
@@ -305,8 +307,8 @@ ArrayRef<Value *> ShaderSystemValues::getEmitCounterPtr() {
     // TODO: We should only insert those offsets required by the specified input primitive.
 
     // Setup GS emit vertex counter
-    auto &dataLayout = m_entryPoint->getParent()->getDataLayout();
-    auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    auto &dataLayout = m_func->getParent()->getDataLayout();
+    auto insertPos = &*m_func->front().getFirstInsertionPt();
     for (int i = 0; i < MaxGsStreams; ++i) {
       auto emitCounterPtr =
           new AllocaInst(Type::getInt32Ty(*m_context), dataLayout.getAllocaAddrSpace(), "", insertPos);
@@ -362,7 +364,7 @@ Value *ShaderSystemValues::getInternalGlobalTablePtr() {
   if (!m_internalGlobalTablePtr) {
     auto ptrTy = Type::getInt8Ty(*m_context)->getPointerTo(ADDR_SPACE_CONST);
     // Global table is always the first function argument
-    m_internalGlobalTablePtr = makePointer(getFunctionArgument(m_entryPoint, 0, "globalTable"), ptrTy, InvalidValue);
+    m_internalGlobalTablePtr = makePointer(getFunctionArgument(m_func, 0, "globalTable"), ptrTy, InvalidValue);
   }
   return m_internalGlobalTablePtr;
 }
@@ -373,8 +375,7 @@ Value *ShaderSystemValues::getInternalPerShaderTablePtr() {
   if (!m_internalPerShaderTablePtr) {
     auto ptrTy = Type::getInt8Ty(*m_context)->getPointerTo(ADDR_SPACE_CONST);
     // Per shader table is always the second function argument
-    m_internalPerShaderTablePtr =
-        makePointer(getFunctionArgument(m_entryPoint, 1, "perShaderTable"), ptrTy, InvalidValue);
+    m_internalPerShaderTablePtr = makePointer(getFunctionArgument(m_func, 1, "perShaderTable"), ptrTy, InvalidValue);
   }
   return m_internalPerShaderTablePtr;
 }
@@ -383,11 +384,10 @@ Value *ShaderSystemValues::getInternalPerShaderTablePtr() {
 // Get number of workgroups value
 Value *ShaderSystemValues::getNumWorkgroups() {
   if (!m_numWorkgroups) {
-    Instruction *insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    Instruction *insertPos = &*m_func->front().getFirstInsertionPt();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
-    auto numWorkgroupPtr =
-        getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.cs.numWorkgroupsPtr, "numWorkgroupsPtr");
+    auto numWorkgroupPtr = getFunctionArgument(m_func, intfData->entryArgIdxs.cs.numWorkgroupsPtr, "numWorkgroupsPtr");
     auto numWorkgroupTy = numWorkgroupPtr->getType()->getPointerElementType();
     auto numWorkgroups = new LoadInst(numWorkgroupTy, numWorkgroupPtr, "", insertPos);
     numWorkgroups->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(insertPos->getContext(), {}));
@@ -404,12 +404,12 @@ Value *ShaderSystemValues::getSpilledPushConstTablePtr() {
     assert(intfData->pushConst.resNodeIdx != InvalidValue);
     assert(intfData->entryArgIdxs.spillTable != InvalidValue);
 
-    Instruction *insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    Instruction *insertPos = &*m_func->front().getFirstInsertionPt();
 
     auto pushConstNode = &m_pipelineState->getUserDataNodes()[intfData->pushConst.resNodeIdx];
     unsigned pushConstOffset = pushConstNode->offsetInDwords * sizeof(unsigned);
 
-    auto spillTablePtrLow = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.spillTable, "spillTable");
+    auto spillTablePtrLow = getFunctionArgument(m_func, intfData->entryArgIdxs.spillTable, "spillTable");
     auto spilledPushConstTablePtrLow = BinaryOperator::CreateAdd(
         spillTablePtrLow, ConstantInt::get(Type::getInt32Ty(*m_context), pushConstOffset), "", insertPos);
     auto ty = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_context), InterfaceData::MaxSpillTableSize),
@@ -428,7 +428,7 @@ Value *ShaderSystemValues::getVertexBufTablePtr() {
     if (vbTableNode) {
       // Get the 64-bit extended node value.
       auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-      auto vbTablePtrLow = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.vs.vbTablePtr, "vbTablePtr");
+      auto vbTablePtrLow = getFunctionArgument(m_func, intfData->entryArgIdxs.vs.vbTablePtr, "vbTablePtr");
       static const unsigned MaxVertexBufferSize = 0x10000000;
       auto vbTablePtrTy = PointerType::get(
           ArrayType::get(VectorType::get(Type::getInt32Ty(*m_context), 4), MaxVertexBufferSize), ADDR_SPACE_CONST);
@@ -502,7 +502,7 @@ Instruction *ShaderSystemValues::getStreamOutTablePtr() {
     }
 
     // Get the 64-bit extended node value.
-    auto streamOutTablePtrLow = getFunctionArgument(m_entryPoint, entryArgIdx, "streamOutTable");
+    auto streamOutTablePtrLow = getFunctionArgument(m_func, entryArgIdx, "streamOutTable");
     auto streamOutTablePtrTy =
         PointerType::get(ArrayType::get(VectorType::get(Type::getInt32Ty(*m_context), 4), MaxTransformFeedbackBuffers),
                          ADDR_SPACE_CONST);
@@ -524,7 +524,7 @@ Instruction *ShaderSystemValues::makePointer(Value *lowValue, Type *ptrTy, unsig
   if (lowValueInst)
     insertPos = lowValueInst->getNextNode();
   else
-    insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    insertPos = &*m_func->front().getFirstInsertionPt();
 
   Value *extendedPtrValue = nullptr;
   if (highValue == InvalidValue) {
@@ -537,7 +537,7 @@ Instruction *ShaderSystemValues::makePointer(Value *lowValue, Type *ptrTy, unsig
       //    and rely on subsequent CSE to common it up.
       // Insert the s_getpc code at the start of the function, so a later call into here knows it can
       // reuse this PC if its pLowValue is an arg rather than an instruction.
-      auto pcInsertPos = &*m_entryPoint->front().getFirstInsertionPt();
+      auto pcInsertPos = &*m_func->front().getFirstInsertionPt();
       Value *pc = emitCall("llvm.amdgcn.s.getpc", Type::getInt64Ty(*m_context), ArrayRef<Value *>(), {}, pcInsertPos);
       m_pc = new BitCastInst(pc, VectorType::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
     } else
@@ -570,7 +570,7 @@ Value *ShaderSystemValues::getExtendedResourceNodeValue(unsigned resNodeIdx, Typ
 //
 // @param resNodeIdx : Resource node index
 Value *ShaderSystemValues::getResourceNodeValue(unsigned resNodeIdx) {
-  auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+  auto insertPos = &*m_func->front().getFirstInsertionPt();
   auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
   auto node = &m_pipelineState->getUserDataNodes()[resNodeIdx];
   Value *resNodeValue = nullptr;
@@ -579,7 +579,7 @@ Value *ShaderSystemValues::getResourceNodeValue(unsigned resNodeIdx) {
     // Do nothing
   } else if (resNodeIdx < InterfaceData::MaxDescTableCount && intfData->entryArgIdxs.resNodeValues[resNodeIdx] > 0) {
     // Resource node isn't spilled, load its value from function argument
-    resNodeValue = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.resNodeValues[resNodeIdx],
+    resNodeValue = getFunctionArgument(m_func, intfData->entryArgIdxs.resNodeValues[resNodeIdx],
                                        Twine("resNode") + Twine(resNodeIdx));
   } else if (node->type != ResourceNodeType::PushConst) {
     // Resource node is spilled, load its value from spill table
@@ -614,7 +614,7 @@ Value *ShaderSystemValues::getResourceNodeValue(unsigned resNodeIdx) {
 Instruction *ShaderSystemValues::getSpillTablePtr() {
   if (!m_spillTablePtr) {
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-    auto spillTablePtrLow = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.spillTable, "spillTable");
+    auto spillTablePtrLow = getFunctionArgument(m_func, intfData->entryArgIdxs.spillTable, "spillTable");
     auto spillTablePtrTy = PointerType::get(
         ArrayType::get(Type::getInt8Ty(*m_context), InterfaceData::MaxSpillTableSize), ADDR_SPACE_CONST);
     m_spillTablePtr = makePointer(spillTablePtrLow, spillTablePtrTy, InvalidValue);

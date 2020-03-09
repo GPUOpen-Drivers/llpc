@@ -200,6 +200,7 @@ target_sources(LLVMlgc PRIVATE
     patch/PatchCopyShader.cpp
     patch/PatchDescriptorLoad.cpp
     patch/PatchEntryPointMutate.cpp
+    patch/PatchFatPointerArgs.cpp
     patch/PatchInOutImportExport.cpp
     patch/PatchIntrinsicSimplify.cpp
     patch/PatchLlvmIrInclusion.cpp

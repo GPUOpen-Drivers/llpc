@@ -45,13 +45,13 @@ struct ResourceNode;
 // =====================================================================================================================
 // "Shader system values" are values set up in a shader entrypoint, such as the ES->GS ring buffer descriptor, or the
 // user descriptor table pointer, that some passes need access to. The ShaderSystemValues class has an instance for each
-// shader in each pass that needs it, and it implements the on-demand emitting of the code to generate such a value, and
-// caches the result for the duration of the pass using it. If multiple passes need the same value, then multiple copies
-// of the generating code will be emitted, but that will be fixed by a later CSE pass.
+// function in each pass that needs it, and it implements the on-demand emitting of the code to generate such a value,
+// and caches the result for the duration of the pass using it. If multiple passes need the same value, then multiple
+// copies of the generating code will be emitted, but that will be fixed by a later CSE pass.
 class ShaderSystemValues {
 public:
   // Initialize this ShaderSystemValues if it was previously uninitialized.
-  void initialize(PipelineState *pipelineState, llvm::Function *entryPoint);
+  void initialize(PipelineState *pipelineState, llvm::Function *func);
 
   // Get ES-GS ring buffer descriptor (for VS/TES output or GS input)
   llvm::Value *getEsGsRingBufDesc();
@@ -140,10 +140,10 @@ private:
 
   // -----------------------------------------------------------------------------------------------------------------
 
-  llvm::Function *m_entryPoint = nullptr; // Shader entrypoint
-  llvm::LLVMContext *m_context;           // LLVM context
-  PipelineState *m_pipelineState;         // Pipeline state
-  ShaderStage m_shaderStage;              // Shader stage
+  llvm::Function *m_func = nullptr; // Function for which this is the ShaderSystemValues
+  llvm::LLVMContext *m_context;     // LLVM context
+  PipelineState *m_pipelineState;   // Pipeline state
+  ShaderStage m_shaderStage;        // Shader stage
 
   llvm::Value *m_esGsRingBufDesc = nullptr; // ES -> GS ring buffer descriptor (VS, TES, and GS)
   llvm::Value *m_tfBufDesc = nullptr;       // Descriptor for tessellation factor (TF) buffer (TCS)
@@ -185,10 +185,11 @@ public:
   // Initialize this PipelineSystemValues.
   void initialize(PipelineState *pipelineState) { m_pipelineState = pipelineState; }
 
-  // Get the ShaderSystemValues object for the given shader entrypoint.
-  ShaderSystemValues *get(llvm::Function *entryPoint) {
-    auto shaderSysValues = &m_shaderSysValuesMap[entryPoint];
-    shaderSysValues->initialize(m_pipelineState, entryPoint);
+  // Get the ShaderSystemValues object for the given function (which might be a subfunction for
+  // a compute pipeline).
+  ShaderSystemValues *get(llvm::Function *func) {
+    auto shaderSysValues = &m_shaderSysValuesMap[func];
+    shaderSysValues->initialize(m_pipelineState, func);
     return shaderSysValues;
   }
 
