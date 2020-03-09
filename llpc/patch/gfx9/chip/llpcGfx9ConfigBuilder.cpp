@@ -2840,7 +2840,7 @@ void ConfigBuilder::BuildUserDataConfig(
             if (pIntfData1->userDataMap[i] != InterfaceData::UserDataUnmapped)
             {
                 AppendConfig(startUserData + i, pIntfData1->userDataMap[i]);
-                if ((pIntfData1->userDataMap[i] & DescRelocMagicMask) != DescRelocMagic)
+                if (pIntfData1->userDataMap[i] < VkDescriptorSetIndexLow)
                 {
                     userDataLimit = std::max(userDataLimit, pIntfData1->userDataMap[i] + 1);
                 }

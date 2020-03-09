@@ -1163,7 +1163,7 @@ public:
 
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLoopUnrollCount, MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, useSiScheduler, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, updateDescInElf, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, emitDescriptorSetIndexInMetadata, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, allowVaryWaveSize, MemberTypeBool, false);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enableLoadScalarizer, MemberTypeBool, false);

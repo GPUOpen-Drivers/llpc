@@ -240,8 +240,9 @@ struct PipelineShaderOptions
     /// Use the LLVM backend's SI scheduler instead of the default scheduler.
     bool      useSiScheduler;
 
-    // Whether update descriptor root offset in ELF
-    bool      updateDescInElf;
+    /// Emit descriptor set indices instead of userdata table indices in the PAL userdata mapping metadata. For use with
+    /// pre-compilation: the userdata mapping must be adjusted later.
+    bool      emitDescriptorSetIndexInMetadata;
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
     /// Disable the the LLVM backend's LICM pass.

@@ -675,15 +675,17 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     assert(pNode->sizeInDwords == 1);
 
                     auto pShaderOptions = &m_pPipelineState->GetShaderOptions(m_shaderStage);
-                    if (pShaderOptions->updateDescInElf && (m_shaderStage == ShaderStageFragment))
+                    if (pShaderOptions->emitDescriptorSetIndexInMetadata && (m_shaderStage == ShaderStageFragment))
                     {
-                        // Put set number to register first, will update offset after merge ELFs
-                        // For partial pipeline compile, only fragment shader needs to adjust offset of root descriptor
-                        // If there are more individual shader compile in future, we can add more stages here
-                        pIntfData->userDataMap[userDataIdx] = DescRelocMagic | pNode->innerTable[0].set;
+                        // Record the descriptor set index into the mapping now instead of. This is used during partial
+                        // pipeline compile, when the final offset of descriptor set VA pointers within the PAL
+                        // userdata table are not yet known.
+                        assert(pNode->innerTable[0].set <= VkDescriptorSetIndexHigh - VkDescriptorSetIndexLow);
+                        pIntfData->userDataMap[userDataIdx] = VkDescriptorSetIndexLow + pNode->innerTable[0].set;
                     }
                     else
                     {
+                        // Record the offset into the PAL userdata table.
                         pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
                     }
 

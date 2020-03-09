@@ -1270,14 +1270,6 @@ Result Compiler::BuildPipelineInternal(
         graphicsShaderCacheChecker.UpdateAndMerge(result, pPipelineElf);
     }
 
-    if ((result == Result::Success) &&
-        pFragmentShaderInfo &&
-        pFragmentShaderInfo->options.updateDescInElf &&
-        (pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageFragment)))
-    {
-        graphicsShaderCacheChecker.UpdateRootUserDateOffset(pPipelineElf);
-    }
-
     pContext->setDiagnosticHandlerCallBack(nullptr);
 
     return result;
@@ -1335,19 +1327,6 @@ uint32_t GraphicsShaderCacheChecker::Check(
 }
 
 // =====================================================================================================================
-// Update root level descriptor offset for graphics pipeline.
-void GraphicsShaderCacheChecker::UpdateRootUserDateOffset(
-    ElfPackage*       pPipelineElf)   // [In, Out] ELF that could be from compile or merged
-{
-    ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
-    // Load ELF binary
-    auto result = writer.ReadFromBuffer(pPipelineElf->data(), pPipelineElf->size());
-    assert(result == Result::Success);
-    (void(result)); // unused
-    writer.UpdateElfBinary(m_pContext, pPipelineElf);
-}
-
-// =====================================================================================================================
 // Update shader caches for graphics pipeline from compile result, and merge ELF outputs if necessary.
 void GraphicsShaderCacheChecker::UpdateAndMerge(
     Result            result,         // Result of compile
@@ -1371,7 +1350,7 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
             auto result = writer.ReadFromBuffer(nonFragmentPipelineElf.pCode, nonFragmentPipelineElf.codeSize);
             assert(result == Result::Success);
             (void(result)); // unused
-            writer.MergeElfBinary(m_pContext, &m_fragmentElf, pPipelineElf);
+            writer.MergeFragmentShader(m_pContext, &m_fragmentElf, pPipelineElf);
 
             pipelineElf.codeSize = pPipelineElf->size();
             pipelineElf.pCode = pPipelineElf->data();
@@ -1400,7 +1379,7 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
             assert(result == Result::Success);
             (void(result)); // unused
 
-            writer.MergeElfBinary(m_pContext, &fragmentPipelineElf, pPipelineElf);
+            writer.MergeFragmentShader(m_pContext, &fragmentPipelineElf, pPipelineElf);
 
             pipelineElf.codeSize = pPipelineElf->size();
             pipelineElf.pCode = pPipelineElf->data();
@@ -1419,7 +1398,7 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
         auto result = writer.ReadFromBuffer(m_nonFragmentElf.pCode, m_nonFragmentElf.codeSize);
         assert(result == Result::Success);
         (void(result)); // unused
-        writer.MergeElfBinary(m_pContext, &m_fragmentElf, pPipelineElf);
+        writer.MergeFragmentShader(m_pContext, &m_fragmentElf, pPipelineElf);
     }
 
     // Whole pipeline is compiled

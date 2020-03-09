@@ -358,7 +358,7 @@ void PipelineContext::SetOptionsInPipeline(
 #endif
 
             shaderOptions.useSiScheduler = EnableSiScheduler || pShaderInfo->options.useSiScheduler;
-            shaderOptions.updateDescInElf = pShaderInfo->options.updateDescInElf;
+            shaderOptions.emitDescriptorSetIndexInMetadata = pShaderInfo->options.emitDescriptorSetIndexInMetadata;
             shaderOptions.unrollThreshold = pShaderInfo->options.unrollThreshold;
 
             pPipeline->SetShaderOptions(static_cast<ShaderStage>(stage), shaderOptions);

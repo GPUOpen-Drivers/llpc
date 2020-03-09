@@ -64,20 +64,14 @@ public:
                              SectionBuffer*       pNewSection);
 
     static void MergeMetaNote(Context*       pContext,
-                              const ElfNote* pNote1,
-                              const ElfNote* pNote2,
+                              const ElfNote* pBaseNote,
+                              const ElfNote* pFragmentNote,
                               ElfNote*       pNewNote);
-
-    static void UpdateMetaNote(Context*       pContext,
-                               const ElfNote* pNote,
-                               ElfNote*       pNewNote);
 
     Result ReadFromBuffer(const void* pBuffer, size_t bufSize);
     Result CopyFromReader(const ElfReader<Elf>& reader);
 
-    void UpdateElfBinary(Context* pContext, ElfPackage* pPipelineElf);
-
-    void MergeElfBinary(Context*          pContext,
+    void MergeFragmentShader(Context*          pContext,
                         const BinaryData* pFragmentElf,
                         ElfPackage*       pPipelineElf);
 
@@ -108,8 +102,6 @@ public:
 private:
     ElfWriter(const ElfWriter&) = delete;
     ElfWriter& operator=(const ElfWriter&) = delete;
-
-    static void MergeMapItem(llvm::msgpack::MapDocNode& destMap, llvm::msgpack::MapDocNode& srcMap, uint32_t key);
 
     size_t GetRequiredBufferSizeBytes();
 

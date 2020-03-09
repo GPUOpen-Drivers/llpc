@@ -207,19 +207,21 @@ public:
 };
 
 // =====================================================================================================================
-// Merges the map item pair from source map to destination map for llvm::msgpack::MapDocNode.
-template<class Elf>
-void ElfWriter<Elf>::MergeMapItem(
+// Erases the entry indicated by key in destMap and replaces it by the one from srcMap, if any, after possibly
+// transforming it via the given filter.
+template<typename FilterT>
+void OverrideMapItem(
     llvm::msgpack::MapDocNode& destMap,    // [in,out] Destination map
     llvm::msgpack::MapDocNode& srcMap,     // [in] Source map
-    uint32_t                    key)       // Key to check in source map
+    uint32_t                   key,        // Key to check in source map
+    const FilterT&             filter)
 {
     auto srcKeyNode = srcMap.getDocument()->getNode(key);
     auto srcIt = srcMap.find(srcKeyNode);
     if (srcIt != srcMap.end())
     {
         assert(srcIt->first.getUInt() == key);
-        destMap[destMap.getDocument()->getNode(key)] = srcIt->second;
+        destMap[destMap.getDocument()->getNode(key)] = filter(srcIt->second);
     }
     else
     {
@@ -234,24 +236,35 @@ void ElfWriter<Elf>::MergeMapItem(
 }
 
 // =====================================================================================================================
-// Merges fragment shader related info for meta notes.
+// Erases the entry indicated by key in destMap and replaces it by the one from srcMap, if any.
+void OverrideMapItem(
+    llvm::msgpack::MapDocNode& destMap,    // [in,out] Destination map
+    llvm::msgpack::MapDocNode& srcMap,     // [in] Source map
+    uint32_t                   key)        // Key to check in source map
+{
+    OverrideMapItem(destMap, srcMap, key, [](const llvm::msgpack::DocNode node) {return node;});
+}
+
+// =====================================================================================================================
+// Merges PAL metadata note sections. All fragment-shader-related settings are taken from pFragmentNode and override
+// what's in pBaseNote. The result is written to pNewNote.
 template<class Elf>
 void ElfWriter<Elf>::MergeMetaNote(
-    Context*       pContext,       // [in] The first note section to merge
-    const ElfNote* pNote1,         // [in] The second note section to merge (contain fragment shader info)
-    const ElfNote* pNote2,         // [in] Note section contains fragment shader info
+    Context*       pContext,       // [in] The context
+    const ElfNote* pBaseNote,      // [in] The base note section
+    const ElfNote* pFragmentNote,  // [in] The note section from which fragment shader info should be taken
     ElfNote*       pNewNote)       // [out] Merged note section
 {
     msgpack::Document destDocument;
     msgpack::Document srcDocument;
 
-    auto success = destDocument.readFromBlob(StringRef(reinterpret_cast<const char*>(pNote1->pData),
-                                                       pNote1->hdr.descSize),
+    auto success = destDocument.readFromBlob(StringRef(reinterpret_cast<const char*>(pBaseNote->pData),
+                                                       pBaseNote->hdr.descSize),
                                              false);
     assert(success);
 
-    success = srcDocument.readFromBlob(StringRef(reinterpret_cast<const char*>(pNote2->pData),
-                                                 pNote2->hdr.descSize),
+    success = srcDocument.readFromBlob(StringRef(reinterpret_cast<const char*>(pFragmentNote->pData),
+                                                 pFragmentNote->hdr.descSize),
                                        false);
     assert(success);
     (void(success)); // unused
@@ -333,27 +346,65 @@ void ElfWriter<Elf>::MergeMetaNote(
 
     for (uint32_t regNumber : ArrayRef<uint32_t>(PsRegNumbers))
     {
-        MergeMapItem(destRegisters, srcRegisters, regNumber);
+        OverrideMapItem(destRegisters, srcRegisters, regNumber);
     }
 
     const uint32_t mmSPI_PS_INPUT_CNTL_0 = 0xa191;
     const uint32_t mmSPI_PS_INPUT_CNTL_31 = 0xa1b0;
     for (uint32_t regNumber = mmSPI_PS_INPUT_CNTL_0; regNumber != mmSPI_PS_INPUT_CNTL_31 + 1; ++regNumber)
     {
-        MergeMapItem(destRegisters, srcRegisters, regNumber);
+        OverrideMapItem(destRegisters, srcRegisters, regNumber);
     }
 
+    // Filter function that maps descriptor set indices in the userdata mapping to the PAL userdata table offset.
+    auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
+    auto filterUserDataMapping = [&](llvm::msgpack::DocNode node) {
+        uint32_t regValue = node.getUInt();
+        if (regValue >= VkDescriptorSetIndexLow && regValue <= VkDescriptorSetIndexHigh)
+        {
+            uint32_t descriptorSet = regValue - VkDescriptorSetIndexLow;
+            const ResourceMappingNode* pNode = nullptr;
+
+            // Find the indicated descriptor set.
+            for (uint32_t j = 0; j < pPipelineInfo->fs.userDataNodeCount; ++j)
+            {
+                if ((pPipelineInfo->fs.pUserDataNodes[j].type == ResourceMappingNodeType::DescriptorTableVaPtr) &&
+                    (descriptorSet == pPipelineInfo->fs.pUserDataNodes[j].tablePtr.pNext[0].srdRange.set))
+                {
+                    pNode = &pPipelineInfo->fs.pUserDataNodes[j];
+                    break;
+                }
+            }
+            assert(pNode);
+
+            uint32_t newValue = pNode->offsetInDwords;
+
+            // Update userDataLimit if neccessary
+            uint32_t userDataLimit = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
+            if (newValue >= userDataLimit)
+            {
+                destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit] =
+                   destDocument.getNode(newValue + 1);
+            }
+
+            return destDocument.getNode(newValue);
+        }
+
+        return node;
+    };
+
+    // Merge fragment shader userdata mapping.
     const uint32_t mmSPI_SHADER_USER_DATA_PS_0 = 0x2c0c;
     uint32_t psUserDataCount = (pContext->GetGfxIpVersion().major < 9) ? 16 : 32;
     for (uint32_t regNumber = mmSPI_SHADER_USER_DATA_PS_0;
          regNumber != mmSPI_SHADER_USER_DATA_PS_0 + psUserDataCount; ++regNumber)
     {
-        MergeMapItem(destRegisters, srcRegisters, regNumber);
+        OverrideMapItem(destRegisters, srcRegisters, regNumber, filterUserDataMapping);
     }
 
     std::string destBlob;
     destDocument.writeToBlob(destBlob);
-    *pNewNote = *pNote1;
+    *pNewNote = *pBaseNote;
     auto pData = new uint8_t[destBlob.size() + 4]; // 4 is for additional alignment spece
     memcpy(pData, destBlob.data(), destBlob.size());
     pNewNote->hdr.descSize = destBlob.size();
@@ -770,73 +821,6 @@ Result ElfWriter<Elf>::GetSectionDataBySectionIndex(
 }
 
 // =====================================================================================================================
-// Update descriptor offset to USER_DATA in metaNote.
-template<class Elf>
-void ElfWriter<Elf>::UpdateMetaNote(
-    Context*       pContext,       // [in] context related to ElfNote
-    const ElfNote* pNote,          // [in] Note section to update
-    ElfNote*       pNewNote)       // [out] new note section
-{
-    msgpack::Document document;
-
-    auto success = document.readFromBlob(StringRef(reinterpret_cast<const char*>(pNote->pData),
-                                              pNote->hdr.descSize),
-                                              false);
-    assert(success);
-    (void(success)); // unused
-
-    auto pipeline = document.getRoot().
-        getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0];
-
-    auto registers = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
-
-    const uint32_t mmSPI_SHADER_USER_DATA_PS_0 = 0x2c0c;
-    uint32_t psUserDataBase = mmSPI_SHADER_USER_DATA_PS_0;
-    uint32_t psUserDataCount = (pContext->GetGfxIpVersion().major < 9) ? 16 : 32;
-    auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
-
-    for (uint32_t i = 0; i < psUserDataCount; ++i)
-    {
-        uint32_t key = psUserDataBase + i;
-        auto keyNode = registers.getDocument()->getNode(key);
-        auto keyIt = registers.find(keyNode);
-        if (keyIt != registers.end())
-        {
-            assert(keyIt->first.getUInt() == key);
-            // Reloc Descriptor user data value is consisted by DescRelocMagic | set.
-            uint32_t regValue = keyIt->second.getUInt();
-            if (DescRelocMagic == (regValue & DescRelocMagicMask))
-            {
-                uint32_t set = regValue & DescSetMask;
-                for (uint32_t j = 0; j < pPipelineInfo->fs.userDataNodeCount; ++j)
-                {
-                    if ((pPipelineInfo->fs.pUserDataNodes[j].type == ResourceMappingNodeType::DescriptorTableVaPtr) &&
-                        (set == pPipelineInfo->fs.pUserDataNodes[j].tablePtr.pNext[0].srdRange.set))
-                    {
-                        // If it's descriptor user data, then update its offset to it.
-                        uint32_t value = pPipelineInfo->fs.pUserDataNodes[j].offsetInDwords;
-                        keyIt->second = registers.getDocument()->getNode(value);
-                        // Update userDataLimit if neccessary
-                        uint32_t userDataLimit = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
-                        pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit] =
-                            document.getNode(std::max(userDataLimit, value + 1));
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    std::string blob;
-    document.writeToBlob(blob);
-    *pNewNote = *pNote;
-    auto pData = new uint8_t[blob.size()];
-    memcpy(pData, blob.data(), blob.size());
-    pNewNote->hdr.descSize = blob.size();
-    pNewNote->pData = pData;
-}
-
-// =====================================================================================================================
 // Gets all associated symbols by section index.
 template<class Elf>
 void ElfWriter<Elf>::GetSymbolsBySectionIndex(
@@ -855,28 +839,9 @@ void ElfWriter<Elf>::GetSymbolsBySectionIndex(
 }
 
 // =====================================================================================================================
-// Update descriptor root offset in ELF binary
+// Merge the fragment shader from pFragmentElf into the currently loaded ELF and write the result out to pPipelineElf.
 template<class Elf>
-void ElfWriter<Elf>::UpdateElfBinary(
-    Context*          pContext,        // [in] Pipeline context
-    ElfPackage*       pPipelineElf)    // [out] Final ELF binary
-{
-    // Merge PAL metadata
-    ElfNote metaNote = {};
-    metaNote = GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
-
-    assert(metaNote.pData != nullptr);
-    ElfNote newMetaNote = {};
-    UpdateMetaNote(pContext, &metaNote, &newMetaNote);
-    SetNote(&newMetaNote);
-
-    WriteToBuffer(pPipelineElf);
-}
-
-// =====================================================================================================================
-// Merge ELF binary of fragment shader and ELF binary of non-fragment shaders into single ELF binary
-template<class Elf>
-void ElfWriter<Elf>::MergeElfBinary(
+void ElfWriter<Elf>::MergeFragmentShader(
     Context*          pContext,        // [in] Pipeline context
     const BinaryData* pFragmentElf,    // [in] ELF binary of fragment shader
     ElfPackage*       pPipelineElf)    // [out] Final ELF binary
