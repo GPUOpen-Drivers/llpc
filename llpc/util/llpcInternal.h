@@ -55,12 +55,6 @@ void initializeStartStopTimerPass(PassRegistry&);
 namespace Llpc
 {
 
-// Invalid value
-static const uint32_t InvalidValue  = ~0u;
-
-// Size of vec4
-static const uint32_t SizeOfVec4 = sizeof(float) * 4;
-
 // Initialize helper passes
 inline static void InitializeUtilPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry

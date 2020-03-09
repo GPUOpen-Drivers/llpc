@@ -88,7 +88,7 @@ struct FsInterpInfo
 };
 
 // Invalid interpolation info
-static const FsInterpInfo InvalidFsInterpInfo = { InvalidValue, false, false, false };
+static const FsInterpInfo InvalidFsInterpInfo = { ~0u, false, false, false };
 
 // Enumerate the workgroup layout options.
 enum class WorkgroupLayout : uint32_t
@@ -453,7 +453,7 @@ struct InterfaceData
     static const uint32_t MaxEsGsOffsetCount = 6;
     static const uint32_t MaxCsUserDataCount = 10;
     static const uint32_t CsStartUserData     = 2;
-    static const uint32_t UserDataUnmapped = InvalidValue;
+    static const uint32_t UserDataUnmapped = ~0u;
 
     uint32_t                    userDataCount;                    // User data count
     uint32_t                    userDataMap[MaxUserDataCount];    // User data map (from SGPR No. to API logical ID)

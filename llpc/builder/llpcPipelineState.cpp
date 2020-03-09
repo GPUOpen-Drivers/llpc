@@ -37,6 +37,7 @@
 #include "llpcPatch.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
+#include "llpcUtil.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"

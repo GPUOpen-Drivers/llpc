@@ -39,6 +39,7 @@
 #include "llpcPatchEntryPointMutate.h"
 #include "llpcPipelineShaders.h"
 #include "llpcTargetInfo.h"
+#include "llpcUtil.h"
 
 #define DEBUG_TYPE "llpc-patch-entry-point-mutate"
 

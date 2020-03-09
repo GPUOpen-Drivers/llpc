@@ -42,6 +42,7 @@
 #include "llpcPatchInOutImportExport.h"
 #include "llpcPipelineShaders.h"
 #include "llpcTargetInfo.h"
+#include "llpcUtil.h"
 #include "llpcVertexFetch.h"
 
 #define DEBUG_TYPE "llpc-patch-in-out-import-export"

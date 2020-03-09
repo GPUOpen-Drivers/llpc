@@ -40,6 +40,7 @@
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
+#include "llpcUtil.h"
 
 #define DEBUG_TYPE "llpc-patch-copy-shader"
 

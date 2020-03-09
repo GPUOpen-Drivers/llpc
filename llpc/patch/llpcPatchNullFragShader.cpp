@@ -39,6 +39,7 @@
 #include "llpcInternal.h"
 #include "llpcPatch.h"
 #include "llpcPipelineState.h"
+#include "llpcUtil.h"
 
 #define DEBUG_TYPE "llpc-patch-null-frag-shader"
 

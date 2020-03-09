@@ -34,6 +34,7 @@
 #include "llpcGfx6ConfigBuilder.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
+#include "llpcUtil.h"
 #include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "llpc-gfx6-config-builder"

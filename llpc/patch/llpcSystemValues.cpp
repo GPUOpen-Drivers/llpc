@@ -35,6 +35,7 @@
 #include "llpcPipelineState.h"
 #include "llpcSystemValues.h"
 #include "llpcTargetInfo.h"
+#include "llpcUtil.h"
 
 #define DEBUG_TYPE "llpc-system-values"
 

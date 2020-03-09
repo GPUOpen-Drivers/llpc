@@ -32,6 +32,7 @@
 #include "llpcBuilderImpl.h"
 #include "llpcInternal.h"
 #include "llpcPipelineState.h"
+#include "llpcUtil.h"
 
 #define DEBUG_TYPE "llpc-builder-impl-inout"
 

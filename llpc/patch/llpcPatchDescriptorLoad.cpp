@@ -35,6 +35,7 @@
 
 #include "llpcPatchDescriptorLoad.h"
 #include "llpcTargetInfo.h"
+#include "llpcUtil.h"
 
 #define DEBUG_TYPE "llpc-patch-descriptor-load"
 

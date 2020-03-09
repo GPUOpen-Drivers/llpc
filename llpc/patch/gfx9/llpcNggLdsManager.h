@@ -35,6 +35,7 @@
 #include "llvm/IR/IRBuilder.h"
 
 #include "llpcInternal.h"
+#include "llpcUtil.h"
 
 namespace Llpc
 {

@@ -33,6 +33,7 @@
 #include "llpcGfx9ConfigBuilder.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
+#include "llpcUtil.h"
 #include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "llpc-gfx9-config-builder"

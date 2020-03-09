@@ -37,6 +37,7 @@
 #include "llpcPatchPushConstOp.h"
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
+#include "llpcUtil.h"
 
 #define DEBUG_TYPE "llpc-patch-push-const"
 

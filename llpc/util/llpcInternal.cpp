@@ -44,6 +44,7 @@
 
 #include "llpcBuilderBase.h"
 #include "llpcInternal.h"
+#include "llpcUtil.h"
 
 #define DEBUG_TYPE "llpc-internal"
 
