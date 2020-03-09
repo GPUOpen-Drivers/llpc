@@ -1180,7 +1180,7 @@ public:
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 17;
+    static const uint32_t  MemberCount = 18;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
