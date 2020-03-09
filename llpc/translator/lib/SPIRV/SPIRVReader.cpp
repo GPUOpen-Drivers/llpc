@@ -7913,7 +7913,7 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       SPIRVWord MemberComponent = SPIRVID_INVALID;
       if (BT->hasMemberDecorate(
             MemberIdx, DecorationComponent, 0, &MemberComponent))
-        MemberDec.Component = Component;
+        MemberDec.Component = MemberComponent;
 
       if (BT->hasMemberDecorate(MemberIdx, DecorationFlat))
         MemberDec.Interp.Mode = InterpModeFlat;
