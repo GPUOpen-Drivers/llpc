@@ -1756,7 +1756,10 @@ Value* PatchBufferOp::ReplaceLoadStore(
             }
             else
             {
-                pPart = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load,
+                uint32_t intrinsicID = Intrinsic::amdgcn_raw_buffer_load;
+                if (ordering != AtomicOrdering::NotAtomic)
+                    intrinsicID = Intrinsic::amdgcn_raw_atomic_buffer_load;
+                pPart = m_pBuilder->CreateIntrinsic(intrinsicID,
                                                     pIntAccessType,
                                                     {
                                                         pBufferDesc,
