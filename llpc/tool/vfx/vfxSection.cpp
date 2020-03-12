@@ -117,6 +117,7 @@ public:
         SectionPipelineOption::InitialAddrTable();
         SectionShaderOption::InitialAddrTable();
         SectionNggState::InitialAddrTable();
+
     };
 };
 

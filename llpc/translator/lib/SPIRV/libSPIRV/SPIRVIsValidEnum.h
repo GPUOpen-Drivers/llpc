@@ -194,7 +194,8 @@ inline bool isValid(spv::Dim V) {
 }
 
 inline bool isValid(spv::ImageFormat V) {
-  switch (V) {
+  uint32_t Format = V;
+  switch (Format) {
   case ImageFormatUnknown:
   case ImageFormatRgba32f:
   case ImageFormatRgba16f:

@@ -197,7 +197,6 @@ SPIRVMap<ShaderTrinaryMinMaxAMDExtOpKind, std::string>::init() {
 SPIRV_DEF_NAMEMAP(ShaderTrinaryMinMaxAMDExtOpKind,
   ShaderTrinaryMinMaxAMDExtOpMap)
 
-
 typedef uint32_t NonSemanticInfoExtOpKind;
 
 }
