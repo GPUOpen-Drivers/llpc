@@ -39,6 +39,7 @@
 
 #include "llvm/InitializePasses.h"
 #include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
@@ -87,7 +88,9 @@ void PatchIntrinsicSimplify::getAnalysisUsage(
 bool PatchIntrinsicSimplify::runOnFunction(
     Function& func) // [in,out] LLVM function to be run on.
 {
+    SmallVector<IntrinsicInst*, 32> candidateCalls;
     bool changed = false;
+
     m_pModule = func.getParent();
 
     m_gfxIp = getAnalysis<PipelineStateWrapper>().GetPipelineState(m_pModule)
@@ -120,20 +123,30 @@ bool PatchIntrinsicSimplify::runOnFunction(
             {
                 continue;
             }
-            Value* const pSimplifiedValue = Simplify(*pIntrinsicCall);
 
-            // We did not simplify the intrinsic call.
-            if (pSimplifiedValue == nullptr)
+            // Record intrinsic only if it can be simplified.
+            if (CanSimplify(*pIntrinsicCall))
             {
-                continue;
+                candidateCalls.push_back(pIntrinsicCall);
             }
-
-            changed = true;
-
-            pIntrinsicCall->replaceAllUsesWith(pSimplifiedValue);
-            pIntrinsicCall->eraseFromParent();
-            m_pScalarEvolution->eraseValueFromMap(pIntrinsicCall);
         }
+    }
+
+    // Process all intrinsics which can be simplified.
+    for (IntrinsicInst* const pIntrinsicCall : candidateCalls) {
+        Value* const pSimplifiedValue = Simplify(*pIntrinsicCall);
+
+        // We did not simplify the intrinsic call.
+        if (pSimplifiedValue == nullptr)
+        {
+            continue;
+        }
+
+        changed = true;
+
+        pIntrinsicCall->replaceAllUsesWith(pSimplifiedValue);
+        pIntrinsicCall->eraseFromParent();
+        m_pScalarEvolution->eraseValueFromMap(pIntrinsicCall);
     }
 
     return changed;
@@ -366,6 +379,31 @@ Value* PatchIntrinsicSimplify::SimplifyTrigonometric(
     CallInst* const pNewCall = CallInst::Create(pIntrinsic, pLeftOperand, "", &intrinsicCall);
 
     return pNewCall;
+}
+
+// =====================================================================================================================
+// Check if an intrinsic can be simplified.
+bool PatchIntrinsicSimplify::CanSimplify(
+    IntrinsicInst& intrinsicCall // [in] The intrinsic call to simplify
+    ) const
+{
+    switch (intrinsicCall.getIntrinsicID())
+    {
+    case Intrinsic::amdgcn_image_load_1d:
+    case Intrinsic::amdgcn_image_load_2d:
+    case Intrinsic::amdgcn_image_load_3d:
+    case Intrinsic::amdgcn_image_sample_1d:
+    case Intrinsic::amdgcn_image_sample_2d:
+    case Intrinsic::amdgcn_image_sample_l_1d:
+    case Intrinsic::amdgcn_image_sample_3d:
+    case Intrinsic::amdgcn_image_sample_l_2d:
+    case Intrinsic::amdgcn_image_sample_l_3d:
+    case Intrinsic::cos:
+    case Intrinsic::sin:
+        return true;
+    default:
+        return false;
+    }
 }
 
 // =====================================================================================================================

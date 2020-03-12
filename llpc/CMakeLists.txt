@@ -157,16 +157,18 @@ endif()
 if(ICD_BUILD_LLPC)
     target_compile_definitions(llpc PRIVATE ICD_BUILD_LLPC)
 endif()
-
 target_compile_definitions(llpc PRIVATE
-    PAL_BUILD_GFX9=1
-    PAL_BUILD_GFX10=1
-    CHIP_HDR_GFX10=1
-    )
+        PAL_BUILD_GFX9
+        PAL_BUILD_GFX10
+        CHIP_HDR_GFX10
+        CHIP_HDR_VEGA20
+        CHIP_HDR_RAVEN2
+        CHIP_HDR_NAVI14
+        )
 
 if(ICD_BUILD_LLPC)
     if(XGL_LLVM_UPSTREAM)
-        target_compile_definitions(llpc PRIVATE XGL_LLVM_UPSTREAM=1)
+        target_compile_definitions(llpc PRIVATE XGL_LLVM_UPSTREAM)
     endif()
 endif()
 

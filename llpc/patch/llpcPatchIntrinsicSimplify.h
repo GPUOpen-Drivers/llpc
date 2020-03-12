@@ -77,6 +77,7 @@ private:
     llvm::Value* SimplifyImage(llvm::IntrinsicInst& intrinsicCall,
                                llvm::ArrayRef<uint32_t> coordOperandIndices) const;
     llvm::Value* SimplifyTrigonometric(llvm::IntrinsicInst& intrinsicCall) const;
+    bool CanSimplify(llvm::IntrinsicInst& intrinsicCall) const;
     llvm::Value* Simplify(llvm::IntrinsicInst& intrinsicCall) const;
 
     // -----------------------------------------------------------------------------------------------------------------
