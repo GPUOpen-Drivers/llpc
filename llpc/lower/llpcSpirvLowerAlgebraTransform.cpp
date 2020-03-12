@@ -166,6 +166,38 @@ bool SpirvLowerAlgebraTransform::runOnModule(
 }
 
 // =====================================================================================================================
+// Checks desired denormal flush behavior and inserts llvm.canonicalize.
+void SpirvLowerAlgebraTransform::flushDenormIfNeeded(
+    Instruction *pInst)  // [in] Instruction to flush denormals if needed
+{
+    auto pDestTy = pInst->getType();
+    if ((pDestTy->getScalarType()->isHalfTy() && m_fp16DenormFlush) ||
+        (pDestTy->getScalarType()->isFloatTy() && m_fp32DenormFlush) ||
+        (pDestTy->getScalarType()->isDoubleTy() && m_fp64DenormFlush))
+    {
+        // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
+        auto pBuilder = m_pContext->GetBuilder();
+        pBuilder->SetInsertPoint(pInst->getNextNode());
+        auto pCanonical = pBuilder->CreateIntrinsic(Intrinsic::canonicalize, pDestTy, UndefValue::get(pDestTy));
+
+        pInst->replaceAllUsesWith(pCanonical);
+        pCanonical->setArgOperand(0, pInst);
+        m_changed = true;
+    }
+}
+
+// =====================================================================================================================
+// Visits unary operator instruction.
+void SpirvLowerAlgebraTransform::visitUnaryOperator(
+    UnaryOperator& unaryOp)  // [in] Unary operator instruction
+{
+    if (unaryOp.getOpcode() == Instruction::FNeg)
+    {
+        flushDenormIfNeeded(&unaryOp);
+    }
+}
+
+// =====================================================================================================================
 // Visits binary operator instruction.
 void SpirvLowerAlgebraTransform::visitBinaryOperator(
     BinaryOperator& binaryOp)  // [in] Binary operator instruction
@@ -201,21 +233,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
         {
             // NOTE: Source1 is constant zero, we might be performing FNEG operation. This will be optimized
             // by backend compiler with sign bit reversed via XOR. Check floating-point controls.
-            auto pDestTy = binaryOp.getType();
-            if ((pDestTy->getScalarType()->isHalfTy() && m_fp16DenormFlush) ||
-                (pDestTy->getScalarType()->isFloatTy() && m_fp32DenormFlush) ||
-                (pDestTy->getScalarType()->isDoubleTy() && m_fp64DenormFlush))
-            {
-                // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
-                auto pBuilder = m_pContext->GetBuilder();
-                pBuilder->SetInsertPoint(binaryOp.getNextNode());
-                auto pCanonical = pBuilder->CreateIntrinsic(Intrinsic::canonicalize, pDestTy, UndefValue::get(pDestTy));
-
-                binaryOp.replaceAllUsesWith(pCanonical);
-                pCanonical->setArgOperand(0, &binaryOp);
-
-                m_changed = true;
-            }
+            flushDenormIfNeeded(&binaryOp);
         }
     }
     else if (opCode == Instruction::FRem)
@@ -344,12 +362,10 @@ void SpirvLowerAlgebraTransform::visitCallInst(
 {
     auto pCallee = callInst.getCalledFunction();
 
-    bool forceFMul = false;
-
     if (pCallee->isIntrinsic() && (pCallee->getIntrinsicID() == Intrinsic::fabs))
     {
         // NOTE: FABS will be optimized by backend compiler with sign bit removed via AND.
-        forceFMul = true;
+        flushDenormIfNeeded(&callInst);
     }
     else
     {
@@ -372,26 +388,6 @@ void SpirvLowerAlgebraTransform::visitCallInst(
         if (builtIn == BuiltInPosition)
         {
             DisableFastMath(pValueWritten);
-        }
-    }
-
-    // TODO: Check floating-point controls and insert a MUL to force denormal flush. This ought to
-    // be done in backend compiler.
-    if (forceFMul)
-    {
-        auto pDestTy = callInst.getType();
-        if ((pDestTy->getScalarType()->isHalfTy() && m_fp16DenormFlush) ||
-            (pDestTy->getScalarType()->isFloatTy() && m_fp32DenormFlush) ||
-            (pDestTy->getScalarType()->isDoubleTy() && m_fp64DenormFlush))
-        {
-            // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
-            auto pBuilder = m_pContext->GetBuilder();
-            pBuilder->SetInsertPoint(callInst.getNextNode());
-            auto pCanonical = pBuilder->CreateIntrinsic(Intrinsic::canonicalize, pDestTy, UndefValue::get(pDestTy));
-            callInst.replaceAllUsesWith(pCanonical);
-            pCanonical->setArgOperand(0, &callInst);
-
-            m_changed = true;
         }
     }
 }
