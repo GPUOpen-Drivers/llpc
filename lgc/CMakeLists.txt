@@ -35,12 +35,12 @@ add_dependencies(LLVMlgc
 option(LLPC_BUILD_RENOIR   "LLPC support for Renoir?"   ON)
 
 ### Compiler Options ###################################################################################################
-if(UNIX)
+function(lgc_set_compiler_options PROJECT_NAME)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         # SEE: https://gcc.gnu.org/onlinedocs/gcc-6.2.0/gcc/Option-Summary.html#Option-Summary
         # for a list of all options and documentation.
-        #target_compile_options(LLVMlgc PRIVATE option)
-        target_compile_options(LLVMlgc PRIVATE
+        #target_compile_options(${PROJECT_NAME} PRIVATE option)
+        target_compile_options(${PROJECT_NAME} PRIVATE
             -Wno-unused-parameter
             -Wno-type-limits
             -Wno-switch
@@ -57,24 +57,22 @@ if(UNIX)
             -Wno-extra
         )
 
-        target_compile_options(LLVMlgc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+        target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -Wno-unused
             -Wno-ignored-qualifiers
             -Wno-missing-field-initializers
             -Wno-invalid-offsetof           # offsetof within non-standard-layout type 'x' is undefined
         >)
 
-        target_compile_options(LLVMlgc PRIVATE -fno-strict-aliasing)
+        target_compile_options(${PROJECT_NAME} PRIVATE -fno-strict-aliasing)
 
-        target_compile_options(LLVMlgc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+        target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -std=c++14
             -fno-rtti
             -fPIC
         >)
-
-        message(STATUS "Configured LLVMlgc compiler options for GCC.")
     elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-        target_compile_options(LLVMlgc PRIVATE
+        target_compile_options(${PROJECT_NAME} PRIVATE
             -fvisibility-inlines-hidden
             -fcolor-diagnostics
             -Wall
@@ -89,20 +87,14 @@ if(UNIX)
             -Wno-sign-compare
             -Wno-gnu-anonymous-struct
         )
-        target_compile_options(LLVMlgc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+        target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -std=c++14
             -fno-rtti
             -fPIC
         >)
-        #message(STATUS "Configured compiler options for Clang.")
-        message(WARNING "Clang is untested.")
-    else()
-        message(FATAL_ERROR "Using unknown compiler.")
-    endif()
-elseif(WIN32)
-    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
         # CMAKE-TODO: These are /W4 (level 4) warnings
-        target_compile_options(LLVMlgc
+        target_compile_options(${PROJECT_NAME}
             PRIVATE # Warnings in interface and src
                 /wd4005 # 'DEBUG' : macro redefinition ??? Defined in toolchain ??? importedllvmincludellvm/Support/Debug.h
                 /wd4018 # '<' : signed/unsigned mismatch
@@ -131,19 +123,13 @@ elseif(WIN32)
                 /wd6323 # Use of arithmetic operator on Boolean type(s)
         )
 
-        target_compile_definitions(LLVMlgc PRIVATE _SCL_SECURE_NO_WARNINGS)
-        target_compile_definitions(LLVMlgc PRIVATE _CRT_SECURE_NO_WARNINGS)
-
-        message(STATUS "Configured LLVMlgc compiler options for MSVC.")
+        target_compile_definitions(${PROJECT_NAME} PRIVATE _SCL_SECURE_NO_WARNINGS)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS)
     else()
         message(FATAL_ERROR "Using unknown compiler")
     endif()
-endif()
-
-if (LLPC_BUILD_RENOIR)
-    target_compile_definitions(LLVMlgc PRIVATE LLPC_BUILD_RENOIR)
-    target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
-endif()
+endfunction()
+lgc_set_compiler_options(LLVMlgc)
 
 ### Defines/Includes/Sources ###########################################################################################
 target_compile_definitions(LLVMlgc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
@@ -246,3 +232,5 @@ target_sources(LLVMlgc PRIVATE
     util/PassManager.cpp
     util/StartStopTimer.cpp
 )
+
+add_subdirectory(tool/lgc)
