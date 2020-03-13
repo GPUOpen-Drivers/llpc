@@ -41,17 +41,10 @@
 using namespace llvm;
 using namespace Llpc;
 
-namespace llvm
-{
-
-namespace cl
-{
-
-extern opt<bool> EnableShadowDescriptorTable;
-
-} // cl
-
-} // llvm
+// -enable-shadow-desc: enable shadow desriptor table
+static cl::opt<bool> EnableShadowDescriptorTable("enable-shadow-desc",
+                                                 cl::desc("Enable shadow descriptor table"),
+                                                 cl::init(true));
 
 namespace Llpc
 {
@@ -533,7 +526,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
             {
                 pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetInternalPerShaderTablePtr();
             }
-            else if ((cl::EnableShadowDescriptorTable) && (nodeType1 == ResourceMappingNodeType::DescriptorFmask))
+            else if ((EnableShadowDescriptorTable) && (nodeType1 == ResourceMappingNodeType::DescriptorFmask))
             {
                 pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetShadowDescTablePtr(descSet);
             }
@@ -726,7 +719,7 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
         exist = true;
     }
 
-    if (cl::EnableShadowDescriptorTable && (nodeType1 == ResourceMappingNodeType::DescriptorFmask))
+    if (EnableShadowDescriptorTable && (nodeType1 == ResourceMappingNodeType::DescriptorFmask))
     {
         // NOTE: When shadow descriptor table is enable, we need get F-Mask descriptor node from
         // associated multi-sampled texture resource node. So we have to change nodeType1 to

@@ -132,14 +132,6 @@ static opt<std::string> ExecutableName("executable-name",
 // -enable-spirv-opt: enable optimization for SPIR-V binary
 opt<bool> EnableSpirvOpt("enable-spirv-opt", desc("Enable optimization for SPIR-V binary"), init(false));
 
-// -enable-shadow-desc: enable shadow desriptor table
-opt<bool> EnableShadowDescriptorTable("enable-shadow-desc", desc("Enable shadow descriptor table"), init(true));
-
-// -shadow-desc-table-ptr-high: high part of VA for shadow descriptor table pointer
-opt<uint32_t> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
-                                     desc("High part of VA for shadow descriptor table pointer"),
-                                     init(2));
-
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 37
 // -enable-dynamic-loop-unroll: Enable dynamic loop unroll. (Deprecated)
 opt<bool> EnableDynamicLoopUnroll("enable-dynamic-loop-unroll", desc("Enable dynamic loop unroll (deprecated)"), init(false));
@@ -1764,8 +1756,6 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
         cl::EnableErrs.ArgStr,
         cl::LogFileDbgs.ArgStr,
         cl::LogFileOuts.ArgStr,
-        cl::EnableShadowDescriptorTable.ArgStr,
-        cl::ShadowDescTablePtrHigh.ArgStr,
         cl::ExecutableName.ArgStr
     };
 

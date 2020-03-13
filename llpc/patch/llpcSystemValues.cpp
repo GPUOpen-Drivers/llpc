@@ -41,17 +41,11 @@
 using namespace Llpc;
 using namespace llvm;
 
-namespace llvm
-{
-
-namespace cl
-{
-
-extern opt<uint32_t> ShadowDescTablePtrHigh;
-
-} // cl
-
-} // llvm
+// -shadow-desc-table-ptr-high: high part of VA for shadow descriptor table pointer
+// The default value 2 is a dummy value for use in offline compiling.
+static cl::opt<uint32_t> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
+                                                cl::desc("High part of VA for shadow descriptor table pointer"),
+                                                cl::init(2));
 
 // =====================================================================================================================
 // Initialize this ShaderSystemValues if it was previously uninitialized.
@@ -405,7 +399,7 @@ Value* ShaderSystemValues::GetShadowDescTablePtr(
                                                     ADDR_SPACE_CONST);
             m_shadowDescTablePtrs[descSet] = GetExtendedResourceNodeValue(resNodeIdx,
                                                                           pDescTablePtrTy,
-                                                                          cl::ShadowDescTablePtrHigh);
+                                                                          ShadowDescTablePtrHigh);
         }
     }
     return m_shadowDescTablePtrs[descSet];
