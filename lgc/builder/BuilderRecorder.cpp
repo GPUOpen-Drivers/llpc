@@ -1867,7 +1867,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
 // @return : Opcode
 BuilderRecorder::Opcode BuilderRecorder::getOpcodeFromName(StringRef name) {
   assert(name.startswith(BuilderCallPrefix));
-  name = name.slice(strlen(BuilderCallPrefix), StringRef::npos);
+  name = name.drop_front(strlen(BuilderCallPrefix));
   unsigned bestOpcode = 0;
   unsigned bestLength = 0;
   for (unsigned opcode = 0; opcode != Opcode::Count; ++opcode) {
