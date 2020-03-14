@@ -30,10 +30,10 @@
  */
 #pragma once
 
+#include "llpcAbi.h"
 #include "llpcPipeline.h"
 #include "llpcResourceUsage.h"
 #include "llpcShaderModes.h"
-#include "palPipelineAbi.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Pass.h"

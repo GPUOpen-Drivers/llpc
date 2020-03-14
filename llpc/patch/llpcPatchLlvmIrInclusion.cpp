@@ -28,11 +28,10 @@
  * @brief LLPC source file: contains implementation of class lgc::PatchLlvmIrInclusion.
  ***********************************************************************************************************************
  */
+#include "llpcAbi.h"
 #include "llvm/IR/Constants.h"
 
 #include "llpcPatchLlvmIrInclusion.h"
-#include "palPipelineAbi.h"
-#include "g_palPipelineAbiMetadata.h"
 
 #define DEBUG_TYPE "llpc-patch-llvm-ir-inclusion"
 

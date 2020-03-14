@@ -351,7 +351,7 @@ void ConfigBuilderBase::AppendConfig(uint32_t key, uint32_t value)
 {
     assert(key != InvalidMetadataKey);
 
-    Util::Abi::PalMetadataNoteEntry entry;
+    PalMetadataNoteEntry entry;
     entry.key = key;
     entry.value = value;
     m_config.push_back(entry);
@@ -361,7 +361,7 @@ void ConfigBuilderBase::AppendConfig(uint32_t key, uint32_t value)
 /// Append an array of entries to the PAL register metadata. Invalid keys are filtered out.
 ///
 /// @param [in] config The array of register metadata entries.
-void ConfigBuilderBase::AppendConfig(llvm::ArrayRef<Util::Abi::PalMetadataNoteEntry> config)
+void ConfigBuilderBase::AppendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config)
 {
     uint32_t count = 0;
 

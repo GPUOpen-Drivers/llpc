@@ -172,23 +172,6 @@ static const uint32_t DescRelocMagic        = 0xA5A5A500;
 static const uint32_t DescRelocMagicMask    = 0xFFFFFF00;
 static const uint32_t DescSetMask           = 0x000000FF;
 
-// Internal resource table's virtual bindings
-static const uint32_t SI_DRV_TABLE_SCRATCH_GFX_SRD_OFFS = 0;
-static const uint32_t SI_DRV_TABLE_SCRATCH_CS_SRD_OFFS  = 1;
-static const uint32_t SI_DRV_TABLE_ES_RING_OUT_OFFS     = 2;
-static const uint32_t SI_DRV_TABLE_GS_RING_IN_OFFS      = 3;
-static const uint32_t SI_DRV_TABLE_GS_RING_OUT0_OFFS    = 4;
-static const uint32_t SI_DRV_TABLE_GS_RING_OUT1_OFFS    = 5;
-static const uint32_t SI_DRV_TABLE_GS_RING_OUT2_OFFS    = 6;
-static const uint32_t SI_DRV_TABLE_GS_RING_OUT3_OFFS    = 7;
-static const uint32_t SI_DRV_TABLE_VS_RING_IN_OFFS      = 8;
-static const uint32_t SI_DRV_TABLE_TF_BUFFER_OFFS       = 9;
-static const uint32_t SI_DRV_TABLE_HS_BUFFER0_OFFS      = 10;
-static const uint32_t SI_DRV_TABLE_OFF_CHIP_PARAM_CACHE = 11;
-static const uint32_t SI_DRV_TABLE_SAMPLEPOS            = 12;
-
-static const uint32_t SI_STREAMOUT_TABLE_OFFS           = 0;
-
 // Translates shader stage to corresponding stage mask.
 static inline uint32_t ShaderStageToMask(ShaderStage stage) { return 1U << static_cast<uint32_t>(stage); }
 
