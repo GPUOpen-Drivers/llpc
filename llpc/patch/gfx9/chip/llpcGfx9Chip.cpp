@@ -728,64 +728,6 @@ void InitRegisterNameMap(
     }
 }
 
-// =====================================================================================================================
-// Gets the name string from byte-based ID of the register
-const char* GetRegisterNameString(
-    GfxIpVersion gfxIp, // Graphics IP version info
-    uint32_t     regId) // ID (byte-based) of the register
-{
-    assert((gfxIp.major == 9) || (gfxIp.major == 10));
-
-    const char* pNameString = nullptr;
-
-    if (RegNameMap.empty())
-    {
-        InitRegisterNameMap(gfxIp);
-    }
-
-    if ((regId / 4 >= Util::Abi::PipelineMetadataBase) &&
-        (regId / 4 <= Util::Abi::PipelineMetadataBase + static_cast<uint32_t>(Util::Abi::PipelineMetadataType::Count)))
-    {
-        pNameString = Util::Abi::PipelineMetadataNameStrings[regId / 4 - Util::Abi::PipelineMetadataBase];
-    }
-    else if (RegNameMap.find(regId) == RegNameMap.end())
-    {
-        // Not found, search the GFX-dependent map table
-        if (gfxIp.major == 9)
-        {
-            if (RegNameMapGfx9.find(regId) != RegNameMapGfx9.end())
-            {
-                pNameString = RegNameMapGfx9[regId];
-            }
-        }
-        else if (gfxIp.major == 10)
-        {
-            if (RegNameMapGfx10.find(regId) != RegNameMapGfx10.end())
-            {
-                pNameString = RegNameMapGfx10[regId];
-            }
-        }
-        else
-        {
-            llvm_unreachable("Not implemented!");
-        }
-    }
-    else
-    {
-        pNameString = RegNameMap[regId];
-    }
-
-    if (pNameString == nullptr)
-    {
-        static char unknownRegNameBuf[256] = {};
-        int32_t length = snprintf(unknownRegNameBuf, 256, "UNKNOWN(0x%08X)", regId);
-        (void(length)); // unused
-        pNameString = unknownRegNameBuf;
-    }
-
-    return pNameString;
-}
-
 } // Gfx9
 
 } // lgc

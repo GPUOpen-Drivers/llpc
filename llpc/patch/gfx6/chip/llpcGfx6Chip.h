@@ -33,6 +33,7 @@
 #include <cstdint>
 #include <unordered_map>
 #include "llpcAbiMetadata.h"
+#include "llpcConfigBuilderBase.h"
 #include "llpcTargetInfo.h"
 
 namespace lgc
@@ -284,9 +285,6 @@ static std::unordered_map<uint32_t, const char*>    RegNameMap;
 
 // Adds entries to register name map.
 void InitRegisterNameMap(GfxIpVersion gfxIp);
-
-// Gets the name string from byte-based ID of the register
-const char* GetRegisterNameString(GfxIpVersion gfxIp, uint32_t regId);
 
 } // Gfx6
 

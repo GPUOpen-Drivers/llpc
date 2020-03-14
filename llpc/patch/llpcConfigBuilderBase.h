@@ -30,8 +30,7 @@
  */
 #pragma once
 
-#include "palPipelineAbi.h"
-#include "g_palPipelineAbiMetadata.h"
+#include "llpcAbiMetadata.h"
 #include "llpcBuilderCommon.h"
 #include "llpcTargetInfo.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
@@ -48,6 +47,16 @@ namespace lgc
 {
 
 class PipelineState;
+
+// Invalid metadata key and value which shouldn't be exported to ELF.
+constexpr uint32_t InvalidMetadataKey   = 0xFFFFFFFF;
+constexpr uint32_t InvalidMetadataValue = 0xBAADBEEF;
+
+struct PalMetadataNoteEntry
+{
+    uint32_t key;
+    uint32_t value;
+};
 
 // =====================================================================================================================
 // Register configuration builder base class.
@@ -78,7 +87,7 @@ protected:
     void SetEsGsLdsSize(uint32_t value);
     uint32_t SetupFloatingPointMode(ShaderStage shaderStage);
 
-    void AppendConfig(llvm::ArrayRef<Util::Abi::PalMetadataNoteEntry> config);
+    void AppendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config);
     void AppendConfig(uint32_t key, uint32_t value);
 
     template<typename T>
@@ -86,11 +95,11 @@ protected:
     {
         static_assert(T::containsPalAbiMetadataOnly,
                       "may only be used with structs that are fully metadata notes");
-        static_assert(sizeof(T) % sizeof(Util::Abi::PalMetadataNoteEntry) == 0,
+        static_assert(sizeof(T) % sizeof(PalMetadataNoteEntry) == 0,
                       "T claims to be isPalAbiMetadataOnly, but sizeof contradicts that");
 
-        AppendConfig({reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(&config),
-                      sizeof(T) / sizeof(Util::Abi::PalMetadataNoteEntry)});
+        AppendConfig({reinterpret_cast<const PalMetadataNoteEntry*>(&config),
+                      sizeof(T) / sizeof(PalMetadataNoteEntry)});
     }
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -130,7 +139,7 @@ private:
                                                                 // MsgPack map node for each HW shader's node in
                                                                 //  ".hardware_stages"
 
-    llvm::SmallVector<Util::Abi::PalMetadataNoteEntry, 128> m_config; // Register/metadata configuration
+    llvm::SmallVector<PalMetadataNoteEntry, 128> m_config; // Register/metadata configuration
 };
 
 } // lgc

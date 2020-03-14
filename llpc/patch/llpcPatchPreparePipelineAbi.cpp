@@ -354,35 +354,34 @@ void PatchPreparePipelineAbi::SetAbiEntryNames(
         if (func.empty() == false)
         {
             auto callingConv = func.getCallingConv();
-            auto entryStage = Util::Abi::PipelineSymbolType::CsMainEntry;
+            const char* pEntryName = nullptr;
 
             switch (callingConv)
             {
             case CallingConv::AMDGPU_CS:
-                entryStage = Util::Abi::PipelineSymbolType::CsMainEntry;
+                pEntryName = Util::Abi::AmdGpuCsEntryName;
                 break;
             case CallingConv::AMDGPU_PS:
-                entryStage = Util::Abi::PipelineSymbolType::PsMainEntry;
+                pEntryName = Util::Abi::AmdGpuPsEntryName;
                 break;
             case CallingConv::AMDGPU_VS:
-                entryStage = Util::Abi::PipelineSymbolType::VsMainEntry;
+                pEntryName = Util::Abi::AmdGpuVsEntryName;
                 break;
             case CallingConv::AMDGPU_GS:
-                entryStage = Util::Abi::PipelineSymbolType::GsMainEntry;
+                pEntryName = Util::Abi::AmdGpuGsEntryName;
                 break;
             case CallingConv::AMDGPU_ES:
-                entryStage = Util::Abi::PipelineSymbolType::EsMainEntry;
+                pEntryName = Util::Abi::AmdGpuEsEntryName;
                 break;
             case CallingConv::AMDGPU_HS:
-                entryStage = Util::Abi::PipelineSymbolType::HsMainEntry;
+                pEntryName = Util::Abi::AmdGpuHsEntryName;
                 break;
             case CallingConv::AMDGPU_LS:
-                entryStage = Util::Abi::PipelineSymbolType::LsMainEntry;
+                pEntryName = Util::Abi::AmdGpuLsEntryName;
                 break;
             default:
                 continue;
             }
-            const char* pEntryName = Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(entryStage)];
             func.setName(pEntryName);
         }
     }
