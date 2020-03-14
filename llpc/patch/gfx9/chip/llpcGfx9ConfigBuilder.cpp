@@ -153,12 +153,10 @@ void ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of register 
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
         }
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
         }
-#endif
 
         uint32_t checksum = SetShaderHash(ShaderStageVertex);
         SET_REG(pConfig, VGT_GS_ONCHIP_CNTL, 0);
@@ -255,12 +253,10 @@ void ConfigBuilder::BuildPipelineVsTsFsRegConfig()
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
         }
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
         }
-#endif
     }
 
     if (stageMask & ShaderStageToMask(ShaderStageTessEval))
@@ -274,12 +270,10 @@ void ConfigBuilder::BuildPipelineVsTsFsRegConfig()
         {
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
         }
-#endif
 
         uint32_t checksum = SetShaderHash(ShaderStageTessEval);
 
@@ -373,12 +367,10 @@ void ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of registe
         {
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
         }
-#endif
     }
 
     if (stageMask & ShaderStageToMask(ShaderStageFragment))
@@ -404,12 +396,10 @@ void ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of registe
         {
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
         }
-#endif
     }
 
     // Set up IA_MULTI_VGT_PARAM
@@ -475,12 +465,10 @@ void ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
         {
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
         }
-#endif
 
         //  In GEN_TWO the only supported mode is fully distributed tessellation. The programming model is expected
         //  to set VGT_SHADER_STAGES_EN.DYNAMIC_HS=1 and VGT_TF_PARAM.NUM_DS_WAVES_PER_SIMD=0
@@ -513,12 +501,10 @@ void ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
         }
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
         }
-#endif
     }
 
     if (stageMask & ShaderStageToMask(ShaderStageFragment))
@@ -544,12 +530,10 @@ void ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
         {
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
         }
-#endif
     }
 
     // Set up IA_MULTI_VGT_PARAM
@@ -619,12 +603,10 @@ void ConfigBuilder::BuildPipelineNggVsFsRegConfig()
         {
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
         }
-#endif
 
         uint32_t checksum = SetShaderHash(ShaderStageVertex);
 
@@ -716,12 +698,10 @@ void ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
         {
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
         }
-#endif
     }
 
     if (stageMask & ShaderStageToMask(ShaderStageTessEval))
@@ -738,12 +718,10 @@ void ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
         {
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
         }
-#endif
 
         uint32_t checksum = SetShaderHash(ShaderStageTessEval);
 
@@ -834,12 +812,10 @@ void ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
         {
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
         }
-#endif
     }
 
     if (stageMask & ShaderStageToMask(ShaderStageFragment))
@@ -920,12 +896,10 @@ void ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
         {
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
         }
-#endif
     }
 
     if (stageMask & (ShaderStageToMask(ShaderStageTessEval) | ShaderStageToMask(ShaderStageGeometry)))
@@ -954,12 +928,10 @@ void ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
         {
             SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
         {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
         }
-#endif
     }
 
     if (stageMask & ShaderStageToMask(ShaderStageFragment))
@@ -2417,12 +2389,10 @@ void ConfigBuilder::BuildPsRegConfig(
         SET_REG_GFX10_FIELD(&pConfig->m_psRegs, SPI_PS_IN_CONTROL, PS_W32_EN, true);
     }
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
     if (gfxIp.major >= 10)
     {
         SetWaveFrontSize(Util::Abi::HardwareStage::Ps, waveFrontSize);
     }
-#endif
 
     uint32_t pointCoordLoc = InvalidValue;
     if (pResUsage->inOutUsage.builtInInputLocMap.find(BuiltInPointCoord) !=
@@ -2490,13 +2460,16 @@ void ConfigBuilder::BuildPsRegConfig(
         SET_REG_FIELD(&pConfig->m_psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_W, SPI_PNT_SPRITE_SEL_1);
     }
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 456
-    SetPsUsesUavs(pResUsage->resourceWrite || pResUsage->resourceRead);
-    SetPsWritesUavs(pResUsage->resourceWrite);
-    SetPsWritesDepth(builtInUsage.fragDepth);
-#else
-    SetPsUsesUavs(static_cast<uint32_t>(pResUsage->resourceWrite));
-#endif
+    if (m_pPipelineState->GetPalAbiVersion() >= 456)
+    {
+        SetPsUsesUavs(pResUsage->resourceWrite || pResUsage->resourceRead);
+        SetPsWritesUavs(pResUsage->resourceWrite);
+        SetPsWritesDepth(builtInUsage.fragDepth);
+    }
+    else
+    {
+        SetPsUsesUavs(static_cast<uint32_t>(pResUsage->resourceWrite));
+    }
 
     if (m_pPipelineState->GetRasterizerState().innerCoverage)
     {
@@ -2574,17 +2547,20 @@ void ConfigBuilder::BuildCsRegConfig(
         SET_REG_GFX10_FIELD(pConfig, COMPUTE_PGM_RSRC1, MEM_ORDERED, true);
         SET_REG_GFX10_FIELD(pConfig, COMPUTE_PGM_RSRC1, WGP_MODE, wgpMode);
         uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageCompute);
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 495
-        if (waveSize == 32)
-        {
-            // For GFX10 pipeline, PAL expects to get CS_W32_EN from pipeline metadata,
-            // other fields of this register are set by PAL.
-            SET_REG_GFX10_FIELD(pConfig, COMPUTE_DISPATCH_INITIATOR, CS_W32_EN, true);
-        }
-#else
         assert((waveSize == 32) || (waveSize == 64));
-        SetWaveFrontSize(Util::Abi::HardwareStage::Cs, waveSize);
-#endif
+        if (m_pPipelineState->GetPalAbiVersion() < 495)
+        {
+            if (waveSize == 32)
+            {
+                // For GFX10 pipeline, PAL expects to get CS_W32_EN from pipeline metadata,
+                // other fields of this register are set by PAL.
+                SET_REG_GFX10_FIELD(pConfig, COMPUTE_DISPATCH_INITIATOR, CS_W32_EN, true);
+            }
+        }
+        else
+        {
+            SetWaveFrontSize(Util::Abi::HardwareStage::Cs, waveSize);
+        }
     }
 
     // Set registers based on shader interface data

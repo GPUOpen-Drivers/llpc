@@ -139,9 +139,6 @@ DEF_META(CS_PERFORMANCE_DATA_BUFFER_SIZE, CsPerformanceDataBufferSize)
 DEF_META(PS_WRITES_UAVS, PsWritesUavs)
 DEF_META(PS_WRITES_DEPTH, PsWritesDepth)
 DEF_META(CALC_WAVE_BREAK_SIZE_AT_DRAW_TIME, CalcWaveBreakSizeAtDrawTime)
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
-DEF_META(CS_WAVE_FRONT_SIZE, CsWaveFrontSize)
-#endif
 
 // The names of API shader stages used in PAL metadata, in ShaderStage order.
 static const char* const ApiStageNames[] =

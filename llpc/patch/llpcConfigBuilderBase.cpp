@@ -61,14 +61,14 @@ ConfigBuilderBase::ConfigBuilderBase(
 
     m_gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 477
     // Only generate MsgPack PAL metadata for PAL client 477 onwards. PAL changed the .note record type
     // from 13 to 32 at that point, and not using MsgPack metadata before that avoids some compatibility
     // problems.
+    if (m_pPipelineState->GetPalAbiVersion() < 477)
+    {
+        report_fatal_error("PAL ABI version less than 477 not supported");
+    }
     m_document = std::make_unique<msgpack::Document>();
-#else
-    llvm_unreachable("Should never be called!");
-#endif
 
     m_pipelineNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines]
                                               .getArray(true)[0].getMap(true);
@@ -233,17 +233,18 @@ void ConfigBuilderBase::SetCalcWaveBreakSizeAtDrawTime(
     m_pipelineNode[Util::Abi::PipelineMetadataKey::CalcWaveBreakSizeAtDrawTime] = m_document->getNode(value);
 }
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
 // =====================================================================================================================
 // Set hardware stage wavefront
 void ConfigBuilderBase::SetWaveFrontSize(
     Util::Abi::HardwareStage hwStage,   // Hardware shader stage
     uint32_t                 value)     // Value to set
 {
-    auto hwShaderNode = GetHwShaderNode(hwStage);
-    hwShaderNode[Util::Abi::HardwareStageMetadataKey::WavefrontSize] = m_document->getNode(value);
+    if (m_pPipelineState->GetPalAbiVersion() >= 495)
+    {
+        auto hwShaderNode = GetHwShaderNode(hwStage);
+        hwShaderNode[Util::Abi::HardwareStageMetadataKey::WavefrontSize] = m_document->getNode(value);
+    }
 }
-#endif
 
 // =====================================================================================================================
 // Set API name

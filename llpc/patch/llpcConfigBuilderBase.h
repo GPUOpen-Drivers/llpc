@@ -71,9 +71,7 @@ protected:
     void SetPsWritesDepth(bool value);
     void SetEsGsLdsByteSize(uint32_t value);
     void SetCalcWaveBreakSizeAtDrawTime(bool value);
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
     void SetWaveFrontSize(Util::Abi::HardwareStage hwStage, uint32_t value);
-#endif
     void SetApiName(const char* pValue);
     void SetPipelineType(Util::Abi::PipelineType value);
     void SetLdsSizeByteSize(Util::Abi::HardwareStage hwStage, uint32_t value);

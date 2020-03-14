@@ -94,7 +94,7 @@ BuilderContext* Context::GetBuilderContext()
         // First time: Create the BuilderContext.
         std::string gpuName;
         PipelineContext::GetGpuNameString(m_gfxIp, gpuName);
-        m_builderContext.reset(BuilderContext::Create(*this, gpuName));
+        m_builderContext.reset(BuilderContext::Create(*this, gpuName, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
         if (!m_builderContext)
         {
             report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
