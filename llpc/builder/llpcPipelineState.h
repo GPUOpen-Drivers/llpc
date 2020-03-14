@@ -164,8 +164,9 @@ public:
     // Get the embedded ShaderModes object
     ShaderModes* GetShaderModes() { return &m_shaderModes; }
 
-    // Accessor for TargetInfo
+    // Accessors for context information
     const TargetInfo& GetTargetInfo() const;
+    uint32_t GetPalAbiVersion() const;
 
     // Clear the pipeline state IR metadata.
     void Clear(Module* pModule);

@@ -82,6 +82,13 @@ const TargetInfo& PipelineState::GetTargetInfo() const
 }
 
 // =====================================================================================================================
+// Get PAL pipeline ABI version
+uint32_t PipelineState::GetPalAbiVersion() const
+{
+    return GetBuilderContext()->GetPalAbiVersion();
+}
+
+// =====================================================================================================================
 // Link shader modules into a pipeline module.
 Module* PipelineState::Link(
     ArrayRef<Module*> modules)               // Array of modules indexed by shader stage, with nullptr entry

@@ -75,7 +75,8 @@ public:
     // Create the BuilderContext. Returns nullptr on failure to recognize the AMDGPU target whose name is specified
     static BuilderContext* Create(
         LLVMContext&  context,               // [in] LLVM context to use on all compiles
-        StringRef     gpuName);              // LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
+        StringRef     gpuName,               // LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
+        uint32_t      palAbiVersion);        // PAL pipeline ABI version to compile for
 
     ~BuilderContext();
 
@@ -87,6 +88,9 @@ public:
 
     // Get targetinfo
     const TargetInfo& GetTargetInfo() const { return *m_pTargetInfo; }
+
+    // Get the PAL pipeline ABI version to compile for
+    uint32_t GetPalAbiVersion() const { return m_palAbiVersion; }
 
     // Create a Pipeline object for a pipeline compile
     Pipeline* CreatePipeline();
@@ -124,7 +128,7 @@ private:
     BuilderContext(const BuilderContext&) = delete;
     BuilderContext& operator =(const BuilderContext&) = delete;
 
-    BuilderContext(LLVMContext& context);
+    BuilderContext(LLVMContext& context, uint32_t palAbiVersion);
 
     // -----------------------------------------------------------------------------------------------------------------
     static raw_ostream*        m_pLlpcOuts;                   // nullptr or stream for LLPC_OUTS
@@ -132,6 +136,7 @@ private:
     TargetMachine*             m_pTargetMachine = nullptr;    // Target machine
     TargetInfo*                m_pTargetInfo = nullptr;       // Target info
     bool                       m_buildRelocatableElf = false; // Flag indicating whether we are building relocatable ELF
+    uint32_t                   m_palAbiVersion = 0xFFFFFFFF;  // PAL pipeline ABI version to compile for
 };
 
 } // lgc

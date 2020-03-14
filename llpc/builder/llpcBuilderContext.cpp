@@ -111,11 +111,12 @@ void BuilderContext::Initialize()
 // Create the BuilderContext. Returns nullptr on failure to recognize the AMDGPU target whose name is specified
 BuilderContext* BuilderContext::Create(
     LLVMContext&  context,              // [in] LLVM context to give each Builder
-    StringRef     gpuName)              // LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
+    StringRef     gpuName,              // LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
+    uint32_t      palAbiVersion)        // PAL pipeline ABI version to compile for
 {
     assert(Initialized && "Must call BuilderContext::Initialize before BuilderContext::Create");
 
-    BuilderContext* pBuilderContext = new BuilderContext(context);
+    BuilderContext* pBuilderContext = new BuilderContext(context, palAbiVersion);
 
     std::string mcpuName = codegen::getMCPU(); // -mcpu setting from llvm/CodeGen/CommandFlags.h
     if (gpuName == "")
@@ -150,7 +151,8 @@ BuilderContext* BuilderContext::Create(
 
 // =====================================================================================================================
 BuilderContext::BuilderContext(
-    LLVMContext&  context)              // [in] LLVM context to give each Builder
+    LLVMContext&  context,              // [in] LLVM context to give each Builder
+    uint32_t      palAbiVersion)        // PAL pipeline ABI version to compile for
     :
     m_context(context)
 {
