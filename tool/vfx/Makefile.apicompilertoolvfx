@@ -3,11 +3,11 @@ include $(ICD_DEPTH)/make/icddefs
 include $(ICD_DEPTH)/make/Makefile.$(ICD_PLATFORM).icd
 
 LCXXINCS += -I$(ICD_DEPTH)/api/include/khronos
-LCXXINCS += -I$(ICD_DEPTH)/api/compiler/llpc/imported/spirv
+LCXXINCS += -I$(ICD_DEPTH)/api/compiler/imported/spirv
 LCXXINCS += -I$(ICD_DEPTH)/api/compiler/llpc/include
-LCXXINCS += -I$(ICD_DEPTH)/api/compiler/llpc/tool/vfx
+LCXXINCS += -I$(ICD_DEPTH)/api/compiler/tool/vfx
 
-vpath %.cpp $(ICD_DEPTH)/api/compiler/llpc/tool/vfx
+vpath %.cpp $(ICD_DEPTH)/api/compiler/tool/vfx
 
 CPPFILES +=              \
     vfxParser.cpp        \
@@ -16,7 +16,7 @@ CPPFILES +=              \
     vfxSection.cpp       \
     vfxEnumsConverter.cpp
 
-LIB_TARGET = icdapicompilerllpctoolvfx
+LIB_TARGET = icdapicompilertoolvfx
 
 ifeq ($(ICD_PLATFORM), win)
     LCXXDEFS += -D_SCL_SECURE_NO_WARNINGS       \
