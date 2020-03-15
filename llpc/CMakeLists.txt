@@ -300,59 +300,9 @@ target_vs_filters(llpc)
 
 ### VFX library for Standalone Compiler ###################################################################################
 if(ICD_BUILD_LLPC)
-add_library(vfx STATIC "")
-
-target_compile_definitions(vfx PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
-
-if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
-    target_compile_definitions(vfx PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
-    target_compile_definitions(vfx PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
+    add_subdirectory(${PROJECT_SOURCE_DIR}/../tool/vfx ${PROJECT_BINARY_DIR}/../vfx)
 endif()
 
-target_sources(vfx PRIVATE
-    ../tool/vfx/vfxParser.cpp
-    ../tool/vfx/vfxPipelineDoc.cpp
-    ../tool/vfx/vfxRenderDoc.cpp
-    ../tool/vfx/vfxSection.cpp
-    ../tool/vfx/vfxEnumsConverter.cpp
-)
-
-target_include_directories(vfx
-PUBLIC
-    ${PROJECT_SOURCE_DIR}/../tool/vfx
-PRIVATE
-    ${PROJECT_SOURCE_DIR}/../imported/spirv
-    ${PROJECT_SOURCE_DIR}/include
-    ${XGL_ICD_PATH}/api/include/khronos
-)
-
-if(UNIX)
-    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-        target_compile_options(vfx PRIVATE -fno-strict-aliasing)
-        target_compile_options(vfx PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++14 -fno-rtti>)
-
-        target_compile_options(vfx PRIVATE -Wno-unused-parameter -Wno-shift-negative-value -Wno-type-limits -Wno-error=switch -Wno-error=sign-compare -Wno-error=parentheses -Wno-error=maybe-uninitialized -Wno-error=delete-non-virtual-dtor -Wno-sign-compare -Wno-error -Wunused-variable -Werror=unused-variable -Wunused-function -Werror=unused-function)
-        target_compile_options(vfx PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused -Wno-unused-parameter -Wno-ignored-qualifiers -Wno-missing-field-initializers>)
-
-        message(STATUS "Configured ${PROJECT_NAME} compiler options for GCC.")
-    elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-        target_compile_options(vfx PRIVATE
-            -fvisibility-inlines-hidden
-            -fcolor-diagnostics
-            -Wall
-            -Werror
-        )
-        target_compile_options(vfx PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
-            -std=c++14
-            -fno-rtti
-        >)
-        #message(STATUS "Configured compiler options for Clang.")
-        message(WARNING "Clang is untested.")
-    else()
-        message(FATAL_ERROR "Using unknown compiler.")
-    endif()
-endif()
-endif()
 ### Create Standalone Compiler ############################################################################################
 if(ICD_BUILD_LLPC)
 add_executable(amdllpc

@@ -21,6 +21,7 @@ LCXXINCS += -I$(LLPC_DEPTH)/include
 LCXXINCS += -I$(LLPC_DEPTH)/lower
 LCXXINCS += -I$(LLPC_DEPTH)/translator/lib/SPIRV/libSPIRV
 LCXXINCS += -I$(LLPC_DEPTH)/util
+LCXXINCS += -I$(VKGC_DEPTH)/include
 LCXXINCS += -I$(VKGC_DEPTH)/util
 LCXXINCS += -I$(VKGC_DEPTH)/tool/pipelineDump
 LCXXINCS += -I$(VKGC_DEPTH)/tool/vfx
