@@ -31,7 +31,7 @@
 #pragma once
 
 #include <fstream>
-#include <llpc.h>
+#include "vkgcDefs.h"
 
 #include "llpcMetroHash.h"
 #if !defined(SINGLE_EXTERNAL_METROHASH)

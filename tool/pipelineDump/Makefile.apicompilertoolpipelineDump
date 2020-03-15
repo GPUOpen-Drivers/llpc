@@ -1,0 +1,163 @@
+include $(ICD_DEPTH)/make/icddefs
+
+include $(ICD_DEPTH)/make/Makefile.$(ICD_PLATFORM).icd
+
+LIB_TARGET = icdapicompilertoolpipelineDump
+
+# MetroHash
+# If define METROHASH_PATH, pipeline dump use the external single Metrohash.
+# Otherwise build the imported Metrohash copy.
+ifdef METROHASH_PATH
+    LCXXINCS += -I$(METROHASH_DEPTH)/src
+    LCXXDEFS += -DSINGLE_EXTERNAL_METROHASH
+else
+    METROHASH_DEPTH = $(VKGC_DEPTH)/imported/metrohash
+    include $(METROHASH_DEPTH)/make/Makefile.metrohash
+endif
+
+
+LCXXINCS += -I$(ICD_DEPTH)/api/include/khronos
+LCXXINCS += -I$(LLVM_DEPTH)/include
+LCXXINCS += -I$(LLVM_BUILD_DIR)/include
+LCXXINCS += -I$(CWPACK_DEPTH)/inc
+LCXXINCS += -I$(ICD_DEPTH)/api/compiler/include
+LCXXINCS += -I$(ICD_DEPTH)/api/compiler/tool/pipelineDump
+LCXXINCS += -I$(ICD_DEPTH)/api/compiler/util
+
+vpath %.cpp $(ICD_DEPTH)/api/compiler/tool/pipelineDump
+vpath %.cpp $(ICD_DEPTH)/api/compiler/util
+
+CPPFILES +=              \
+    llpcPipelineDumper.cpp              \
+    llpcPipelineDumperRegs.cpp          \
+    llpcElfReader.cpp                   \
+    vkgcUtil.cpp
+
+# Turn on "warnings as errors" if enabled.
+ifeq ($(ICD_PLATFORM), win)
+    ifeq ($(ICD_ANALYSIS_WARNINGS_AS_ERRORS), 1)
+        LCXXOPTS += /analyze
+    else
+        LCXXOPTS += /analyze:WX-
+    endif
+    LLPC_PLATFORM = win
+endif
+
+ifeq ($(ICD_PLATFORM), lnx)
+    LLPC_PLATFORM = lnx
+endif
+
+ifeq ($(ICD_BUILD_LLPC), 1)
+    LLVM_BUILD_DIR = $(ICD_DEPTH)/build/$(ICD_OS_BUILD)/imported/llvm/B_$(BUILD_TYPE)
+
+    LCXXINCS += -I$(LLVM_DEPTH)/include
+    LCXXINCS += -I$(LLVM_BUILD_DIR)/include
+
+    ifeq ($(LLPC_PLATFORM), win)
+        LCXXDEFS += -D_SCL_SECURE_NO_WARNINGS       \
+                    -DNOMINMAX                      \
+                    -DUNICODE                       \
+                    -D_UNICODE
+    endif
+
+    LCXXDEFS += -DLITTLEENDIAN_CPU
+
+    ifeq ($(LLPC_PLATFORM), win)
+                LCXXOPTS += /wd4267 \
+                    /wd4800 \
+                    /wd6246 \
+                    /wd4389 \
+                    /wd4141 \
+                    /wd4146 \
+                    /wd4244 \
+                    /wd4245 \
+                    /wd4250 \
+                    /wd4291 \
+                    /wd4296 \
+                    /wd4503 \
+                    /wd4624 \
+                    /wd4706 \
+                    /wd6001 \
+                    /wd6102 \
+                    /wd6239 \
+                    /wd6244 \
+                    /wd6246 \
+                    /wd6269 \
+                    /wd6294 \
+                    /wd6295 \
+                    /wd6297 \
+                    /wd6323 \
+                    /wd6326 \
+                    /wd6330 \
+                    /wd28183 \
+                    /wd28196 \
+                    /bigobj
+
+        # Remove DEBUG macro definition as LLVM header files redefine it for a
+        # different purpose.
+        GCXXDEFS := $(filter-out /DDEBUG,$(GCXXDEFS))
+    endif
+
+        ifneq ($(LLPC_PLATFORM), win)
+        # Non-windows: gcc-style options.
+        # disable link time optimization in LLPC to fix build failure of standalone compiler.
+        LCXXOPTS := $(filter-out -flto,$(LCXXOPTS))
+        LCXXOPTS := $(filter-out -fuse-linker-plugin,$(LCXXOPTS))
+        LCXXOPTS := $(filter-out -Wno-odr,$(LCXXOPTS))
+        LCOPTS   := $(filter-out -flto,$(LCOPTS))
+        LCOPTS   := $(filter-out -fuse-linker-plugin,$(LCOPTS))
+        LCOPTS   := $(filter-out -Wno-odr,$(LCOPTS))
+        # Remove DEBUG macro definition as LLVM header files redefine it for a
+        # different purpose.
+        GCXXDEFS := $(filter-out -DDEBUG,$(GCXXDEFS))
+
+        LCXXOPTS += -Wno-error=switch                  \
+                    -fno-strict-aliasing               \
+                    -Wno-error=sign-compare            \
+                    -Wno-error=parentheses             \
+                    -Wno-delete-non-virtual-dtor       \
+                    -Wno-invalid-offsetof              \
+                    -Wno-sign-compare                  \
+                    -Wno-delete-incomplete             \
+                    -Wunused-function                  \
+                    -Wunused-variable                  \
+                    -Wno-error=deprecated-declarations
+        ifeq ($(USING_CLANG),)
+            LCXXOPTS += -Wno-maybe-uninitialized
+        else
+            LCXXOPTS += -Wno-conditional-uninitialized
+            # Extra warning/error suppression when using clang.
+            LCXXOPTS += -Wno-missing-braces                \
+                        -Wno-parentheses-equality          \
+                        -Wno-pessimizing-move              \
+                        -Wno-inconsistent-missing-override \
+                        -Wno-dynamic-class-memaccess
+        endif
+
+        # LLVM headers require C++14 language features.
+        LCXXOPTS += -std=c++1y
+    endif
+
+    # Replace calling convention /Gr (__fastcall) with /Gd (__cdecl) to link LLVM.
+    ifeq ($(LLPC_PLATFORM), win)
+        LCXXOPTS := $(filter-out /Gr, $(LCXXOPTS))
+        LCXXOPTS += /Gd
+    endif
+
+else
+    ifneq ($(LLPC_PLATFORM), win)
+        # Non-windows: gcc-style options.
+        LCXXOPTS += -fno-strict-aliasing               \
+                    -Wno-invalid-offsetof              \
+                    -Wno-sign-compare
+        ifeq ($(USING_CLANG),)
+            LCXXOPTS += -Wno-maybe-uninitialized
+        else
+            LCXXOPTS += -Wno-conditional-uninitialized
+        endif
+    endif
+endif
+
+
+
+include $(ICD_DEPTH)/make/icdrules

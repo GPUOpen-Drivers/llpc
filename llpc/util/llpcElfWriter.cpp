@@ -664,11 +664,11 @@ Result ElfWriter<Elf>::CopyFromReader(
     const ElfReader<Elf>& reader)   // The ElfReader to copy from.
 {
     Result result = Result::Success;
-    m_header = reader.m_header;
-    m_sections.resize(reader.m_sections.size());
-    for (size_t i = 0; i < reader.m_sections.size(); ++i)
+    m_header = reader.GetHeader();
+    m_sections.resize(reader.GetSections().size());
+    for (size_t i = 0; i < reader.GetSections().size(); ++i)
     {
-        auto pSection = reader.m_sections[i];
+        auto pSection = reader.GetSections()[i];
         m_sections[i].secHead = pSection->secHead;
         m_sections[i].pName = pSection->pName;
         auto pData = new uint8_t[pSection->secHead.sh_size + 1];
@@ -677,7 +677,7 @@ Result ElfWriter<Elf>::CopyFromReader(
         m_sections[i].pData = pData;
     }
 
-    m_map = reader.m_map;
+    m_map = reader.GetMap();
     assert(m_header.e_phnum == 0);
 
     m_noteSecIdx = m_map[NoteName];
@@ -1129,14 +1129,14 @@ Result ElfWriter<Elf>::LinkGraphicsRelocatableElf(
     assert(relocatableElfs.size() == 2 && "Can only handle VsPs Shaders for now.");
 
     // Get the main data for the header, the parts that change will be updated when writing to buffer.
-    m_header = relocatableElfs[0]->m_header;
+    m_header = relocatableElfs[0]->GetHeader();
 
     // Copy the contents of the string table
     ElfSectionBuffer<typename Elf::SectionHeader>* pStringTable1 = nullptr;
-    relocatableElfs[0]->GetSectionDataBySectionIndex(relocatableElfs[0]->m_strtabSecIdx, &pStringTable1);
+    relocatableElfs[0]->GetSectionDataBySectionIndex(relocatableElfs[0]->GetStrtabSecIdx(), &pStringTable1);
 
     ElfSectionBuffer<typename Elf::SectionHeader>* pStringTable2 = nullptr;
-    relocatableElfs[1]->GetSectionDataBySectionIndex(relocatableElfs[1]->m_strtabSecIdx, &pStringTable2);
+    relocatableElfs[1]->GetSectionDataBySectionIndex(relocatableElfs[1]->GetStrtabSecIdx(), &pStringTable2);
 
     MergeSection(pStringTable1,
                  pStringTable1->secHead.sh_size,
@@ -1162,7 +1162,7 @@ Result ElfWriter<Elf>::LinkGraphicsRelocatableElf(
 
     // Build the symbol table.  First set the symbol table section header.
     ElfSectionBuffer<typename Elf::SectionHeader>* pSymbolTableSection = nullptr;
-    relocatableElfs[0]->GetSectionDataBySectionIndex(relocatableElfs[0]->m_symSecIdx, &pSymbolTableSection);
+    relocatableElfs[0]->GetSectionDataBySectionIndex(relocatableElfs[0]->GetSymSecIdx(), &pSymbolTableSection);
     m_sections[m_symSecIdx].secHead = pSymbolTableSection->secHead;
 
     // Now get the symbols that belong in the symbol table.

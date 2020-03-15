@@ -37,12 +37,9 @@
 #include <sys/stat.h>
 #include <unordered_set>
 
-#include "llpc.h"
-#include "llpcCompiler.h"
-#include "llpcDebug.h"
 #include "llpcElfReader.h"
 #include "llpcPipelineDumper.h"
-#include "llpcUtil.h"
+#include "vkgcUtil.h"
 
 #define DEBUG_TYPE "llpc-pipeline-dumper"
 

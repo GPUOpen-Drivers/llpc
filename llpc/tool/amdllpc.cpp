@@ -83,6 +83,7 @@
 #include "llpcElfReader.h"
 #include "llpcShaderModuleHelper.h"
 #include "llpcSpirvLowerUtil.h"
+#include "llpcUtil.h"
 
 #define DEBUG_TYPE "amd-llpc"
 
