@@ -1,0 +1,39 @@
+; Simple test that checks that the lgc command works with multiple modules in
+; the same input file.
+;
+; RUN: lgc - <%s | FileCheck --check-prefixes=ONE,TWO %s
+; RUN: lgc -extract=1 - <%s | FileCheck --check-prefixes=ONE,NOTTWO %s
+; RUN: lgc -extract=2 - <%s | FileCheck --check-prefixes=NOTONE,TWO %s
+
+; NOTONE-NOT: _amdgpu_cs_main:
+; ONE-LABEL: _amdgpu_cs_main:
+; ONE:       s_endpgm
+
+target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-ni:7"
+target triple = "amdgcn--amdpal"
+
+define spir_func void @llpc.shader.CS.main() !lgc.shaderstage !1 {
+.entry:
+  ret void
+}
+
+!lgc.compute.mode = !{!0}
+
+!0 = !{i32 1, i32 1, i32 1}
+!1 = !{i32 5}
+
+; Another module
+
+; NOTTWO-NOT: _amdgpu_ps_main:
+; TWO-LABEL: _amdgpu_ps_main:
+; TWO:       s_endpgm
+
+target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-ni:7"
+target triple = "amdgcn--amdpal"
+
+define spir_func void @llpc.shader.FS.main() !lgc.shaderstage !0 {
+.entry:
+  ret void
+}
+
+!0 = !{i32 4}
