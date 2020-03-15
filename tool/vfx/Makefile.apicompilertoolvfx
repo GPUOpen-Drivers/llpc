@@ -4,7 +4,7 @@ include $(ICD_DEPTH)/make/Makefile.$(ICD_PLATFORM).icd
 
 LCXXINCS += -I$(ICD_DEPTH)/api/include/khronos
 LCXXINCS += -I$(ICD_DEPTH)/api/compiler/imported/spirv
-LCXXINCS += -I$(ICD_DEPTH)/api/compiler/llpc/include
+LCXXINCS += -I$(ICD_DEPTH)/api/compiler/include
 LCXXINCS += -I$(ICD_DEPTH)/api/compiler/tool/vfx
 
 vpath %.cpp $(ICD_DEPTH)/api/compiler/tool/vfx

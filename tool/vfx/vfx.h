@@ -40,7 +40,7 @@
 #define VFX_VERSION 0x10000
 #define VFX_REVISION 1
 
-#include "llpc.h"
+#include "vkgcDefs.h"
 
 #define VFXAPI
 
