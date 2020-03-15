@@ -268,7 +268,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
     }
     else if (mangledName == LlpcName::DescriptorGetSamplerPtr)
     {
-        pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 8)->getPointerTo(ADDR_SPACE_CONST);
+        pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceMappingNodeType::DescriptorSampler;
         nodeType2 = nodeType1;
     }

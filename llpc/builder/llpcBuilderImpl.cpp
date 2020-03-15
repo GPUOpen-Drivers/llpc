@@ -317,56 +317,6 @@ Instruction* BuilderImplBase::CreateWaterfallLoop(
 }
 
 // =====================================================================================================================
-// Find the call with specific call name recursively
-CallInst* BuilderImplBase::FindCallByName(
-    CallInst* pCall,      // [in] Call to start the search
-    StringRef callName)   // Name of the call
-{
-    CallInst* pResult = nullptr;
-    Function* pCallee = nullptr;
-
-    if ((pCall != nullptr) &&
-        (dyn_cast<ConstantInt>(pCall) == nullptr) &&
-        (dyn_cast<PHINode>(pCall) == nullptr) &&
-        (pCall->getFunctionType()->getTypeID() == Type::TypeID::FunctionTyID))
-    {
-        pCallee = pCall->getCalledFunction();
-    }
-
-    if (pCallee != nullptr)
-    {
-        if (pCallee->getName().startswith(callName))
-        {
-            pResult = pCall;
-        }
-        else
-        {
-            uint32_t operandCount = pCall->getNumOperands() - 1;
-            for (uint32_t i = 0; i < operandCount; ++i)
-            {
-                CallInst* pNextFuncPtr = dyn_cast<CallInst>(pCall->getOperand(i));
-
-                if (pNextFuncPtr != nullptr)
-                {
-                    pResult = FindCallByName(pNextFuncPtr, callName);
-
-                    if (pResult != nullptr)
-                    {
-                        break;
-                    }
-                }
-                else
-                {
-                    continue;
-                }
-            }
-        }
-    }
-
-    return pResult;
-}
-
-// =====================================================================================================================
 // Helper method to scalarize a possibly vector unary operation
 Value* BuilderImplBase::Scalarize(
     Value*                        pValue,     // [in] Input value

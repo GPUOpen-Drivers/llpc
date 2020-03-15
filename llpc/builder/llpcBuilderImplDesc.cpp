@@ -121,67 +121,14 @@ Value* BuilderImplDesc::CreateLoadDescFromPtr(
     // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
     GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->useImages = true;
 
+    // Use llpc.descriptor.load.from.ptr.
     std::string name = LlpcName::DescriptorLoadFromPtr;
-
-    CallInst* pGetSampleDescPtr = FindCallByName(cast<CallInst>(pDescPtr),
-                                                 LlpcName::DescriptorGetSamplerPtr);
-    Constant* pImmutableValue = nullptr;
-
-    if (pGetSampleDescPtr != nullptr)
-    {
-        uint32_t descSet = cast<ConstantInt>(pGetSampleDescPtr->getOperand(0))->getZExtValue();
-        uint32_t binding = cast<ConstantInt>(pGetSampleDescPtr->getOperand(1))->getZExtValue();
-        Module* const pModule = GetInsertBlock()->getModule();
-        m_pPipelineState->ReadState(pModule);
-        auto userDataNodes = m_pPipelineState->GetUserDataNodes();
-
-        for (const ResourceNode& node : userDataNodes)
-        {
-            if (node.type == ResourceMappingNodeType::DescriptorTableVaPtr)
-            {
-                for (const ResourceNode& innerNode : node.innerTable)
-                {
-                    if ((innerNode.type == ResourceMappingNodeType::DescriptorYCbCrSampler) &&
-                        (innerNode.set == descSet) &&
-                        (innerNode.binding == binding))
-                    {
-                        pGetSampleDescPtr->replaceAllUsesWith(UndefValue::get(pGetSampleDescPtr->getType()));
-                        pGetSampleDescPtr->dropAllReferences();
-                        pGetSampleDescPtr->eraseFromParent();
-                        pImmutableValue = innerNode.pImmutableValue;
-                    }
-                }
-            }
-            else if ((node.type == ResourceMappingNodeType::DescriptorYCbCrSampler) &&
-                     (node.set == descSet) &&
-                     (node.binding == binding))
-                 {
-                    pGetSampleDescPtr->replaceAllUsesWith(UndefValue::get(pGetSampleDescPtr->getType()));
-                    pGetSampleDescPtr->dropAllReferences();
-                    pGetSampleDescPtr->eraseFromParent();
-                    pImmutableValue = node.pImmutableValue;
-                 }
-        }
-    }
-
-    Value* pDesc = nullptr;
-
-    // Only replace load sampler desc with constant Value when it is DescriptorYCbCrSampler.
-    if (pImmutableValue != nullptr)
-    {
-        pDesc = CreateExtractValue(pImmutableValue, 0);
-    }
-    else
-    {
-        AddTypeMangling(pDescPtr->getType(), {}, name);
-        pDesc = EmitCall(name,
-                         cast<StructType>(pDescPtr->getType())->getElementType(0)->getPointerElementType(),
-                         pDescPtr,
-                         {},
-                         &*GetInsertPoint());
-        pDesc->setName(instName);
-    }
-
+    AddTypeMangling(pDescPtr->getType(), {}, name);
+    auto pDesc = CreateNamedCall(name,
+                                 cast<StructType>(pDescPtr->getType())->getElementType(0)->getPointerElementType(),
+                                 pDescPtr,
+                                 {});
+    pDesc->setName(instName);
     return pDesc;
 }
 

@@ -568,8 +568,8 @@ void PipelineState::SetUserDataNodesTable(
                 auto it = immutableNodesMap.find(std::pair<uint32_t, uint32_t>(destNode.set, destNode.binding));
                 if (it != immutableNodesMap.end())
                 {
-                    // This set/binding is (or contains) an immutable value. The value can only be a sampler, so we
-                    // can assume it is four dwords.
+                    // This set/binding is (or contains) an immutable value. The value is 8 dwords for a converting
+                    // sampler, or 4 dwords for other immutable sampler.
                     auto& immutableNode = *it->second;
 
                     IRBuilder<> builder(GetContext());
@@ -577,8 +577,12 @@ void PipelineState::SetUserDataNodesTable(
 
                     if (immutableNode.arraySize != 0)
                     {
-                        const uint32_t samplerDescriptorSize =
-                            (node.type != ResourceMappingNodeType::DescriptorYCbCrSampler) ? 4 : 8;
+                        uint32_t samplerDescriptorSize = 4;
+                        if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
+                        {
+                            samplerDescriptorSize = 8;
+                            m_haveConvertingSampler = true;
+                        }
 
                         for (uint32_t compIdx = 0; compIdx < immutableNode.arraySize; ++compIdx)
                         {
@@ -675,8 +679,12 @@ void PipelineState::RecordUserDataTable(
                     // Writing the constant array directly does not seem to work, as it does not survive IR linking.
                     // Maybe it is a problem with the IR linker when metadata contains a non-ConstantData constant.
                     // So we write the individual ConstantInts instead.
-                    // We can assume that the descriptor is <8 x i32> as an immutable descriptor is always a sampler.
-                    static const uint32_t SamplerDescriptorSize = 8;
+                    // The descriptor is either a sampler (<4 x i32>) or converting sampler (<8 x i32>).
+                    uint32_t SamplerDescriptorSize = 4;
+                    if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
+                    {
+                        SamplerDescriptorSize = 8;
+                    }
                     uint32_t elemCount = node.pImmutableValue->getType()->getArrayNumElements();
                     for (uint32_t elemIdx = 0; elemIdx != elemCount; ++elemIdx)
                     {
@@ -767,18 +775,25 @@ void PipelineState::ReadUserDataNodes(
                 if (pMetadataNode->getNumOperands() >= 6)
                 {
                     // Operand 5 onward: immutable descriptor constant
-                    static const uint32_t SamplerDescriptorSize = 8;
+                    // The descriptor is either a sampler (<4 x i32>) or converting sampler (<8 x i32>).
                     static const uint32_t OperandStartIdx = 5;
+                    uint32_t SamplerDescriptorSize = 4;
+                    if (pNextNode->type == ResourceMappingNodeType::DescriptorYCbCrSampler)
+                    {
+                        SamplerDescriptorSize = 8;
+                        m_haveConvertingSampler = true;
+                    }
 
                     uint32_t elemCount = (pMetadataNode->getNumOperands() - OperandStartIdx) / SamplerDescriptorSize;
                     SmallVector<Constant*, 8> descriptors;
                     for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
                     {
-                        Constant* compValues[SamplerDescriptorSize];
+                        SmallVector<Constant*, 8> compValues;
                         for (uint32_t compIdx = 0; compIdx < SamplerDescriptorSize; ++compIdx)
                         {
-                            compValues[compIdx] = mdconst::dyn_extract<ConstantInt>(
-                                  pMetadataNode->getOperand(OperandStartIdx + SamplerDescriptorSize * elemIdx + compIdx));
+                            compValues.push_back(mdconst::dyn_extract<ConstantInt>(
+                                  pMetadataNode->getOperand(
+                                        OperandStartIdx + SamplerDescriptorSize * elemIdx + compIdx)));
                         }
                         descriptors.push_back(ConstantVector::get(compValues));
                     }
@@ -802,6 +817,54 @@ void PipelineState::ReadUserDataNodes(
         }
     }
     m_userDataNodes = ArrayRef<ResourceNode>(m_allocUserDataNodes.get(), pNextOuterNode);
+}
+
+// =====================================================================================================================
+// Find the resource node for the given {set,binding}.
+// For nodeType == Unknown, the function finds any node of the given set,binding.
+// For nodeType == Resource, it matches Resource or CombinedTexture.
+// For nodeType == Sampler, it matches Sampler or CombinedTexture.
+// For other nodeType, only a node of the specified type is returned.
+// Returns {topNode, node} where "node" is the found user data node, and "topNode" is the top-level user data
+// node that contains it (or is equal to it).
+std::pair<const ResourceNode*, const ResourceNode*> PipelineState::FindResourceNode(
+    ResourceMappingNodeType   nodeType,   // Type of the resource mapping node
+    uint32_t                  descSet,    // ID of descriptor set
+    uint32_t                  binding     // ID of descriptor binding
+    ) const
+{
+    for (const ResourceNode& node : GetUserDataNodes())
+    {
+        if (node.type == ResourceMappingNodeType::DescriptorTableVaPtr)
+        {
+            for (const ResourceNode& innerNode : node.innerTable)
+            {
+                if ((innerNode.set == descSet) && (innerNode.binding == binding))
+                {
+                    if ((nodeType == ResourceMappingNodeType::Unknown) || (nodeType == innerNode.type) ||
+                        (innerNode.type == ResourceMappingNodeType::DescriptorCombinedTexture &&
+                         (nodeType == ResourceMappingNodeType::DescriptorResource ||
+                          nodeType == ResourceMappingNodeType::DescriptorTexelBuffer ||
+                          nodeType == ResourceMappingNodeType::DescriptorSampler)))
+                    {
+                        return { &node, &innerNode };
+                    }
+                }
+            }
+        }
+        else if ((node.set == descSet) && (node.binding == binding))
+        {
+            if ((nodeType == ResourceMappingNodeType::Unknown) || (nodeType == node.type) ||
+                (node.type == ResourceMappingNodeType::DescriptorCombinedTexture &&
+                 (nodeType == ResourceMappingNodeType::DescriptorResource ||
+                  nodeType == ResourceMappingNodeType::DescriptorTexelBuffer ||
+                  nodeType == ResourceMappingNodeType::DescriptorSampler)))
+            {
+                return { &node, &node };
+            }
+        }
+    }
+    return { nullptr, nullptr };
 }
 
 // =====================================================================================================================

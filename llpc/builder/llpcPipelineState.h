@@ -181,6 +181,14 @@ public:
     // Get user data nodes
     ArrayRef<ResourceNode> GetUserDataNodes() const { return m_userDataNodes; }
 
+    // Find the resource node for the given set,binding
+    std::pair<const ResourceNode*, const ResourceNode*> FindResourceNode(ResourceMappingNodeType  nodeType,
+                                                                         uint32_t                 descSet,
+                                                                         uint32_t                 binding) const;
+
+    // Return whether we have a converting sampler in the user data nodes.
+    bool HaveConvertingSampler() const { return m_haveConvertingSampler; }
+
     // Set "no replayer" flag, saying that this pipeline is being compiled with a BuilderImpl so does not
     // need a BuilderReplayer pass.
     void SetNoReplayer() { m_noReplayer = true; }
@@ -375,6 +383,7 @@ private:
     std::vector<ShaderOptions>      m_shaderOptions;                    // Per-shader options
     std::unique_ptr<ResourceNode[]> m_allocUserDataNodes;               // Allocated buffer for user data
     ArrayRef<ResourceNode>          m_userDataNodes;                    // Top-level user data node table
+    bool                            m_haveConvertingSampler = false;    // Whether we have a converting sampler
     MDString*                       m_resourceNodeTypeNames[uint32_t(ResourceMappingNodeType::Count)] = {};
                                                                         // Cached MDString for each resource node type
 
