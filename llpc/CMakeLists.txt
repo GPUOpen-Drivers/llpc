@@ -185,6 +185,8 @@ target_include_directories(llpc
         ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
         ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
         ${PROJECT_SOURCE_DIR}/util
+        ${PROJECT_SOURCE_DIR}/../util
+        ${PROJECT_SOURCE_DIR}/../tool/pipelineDump
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
         ${LLVM_INCLUDE_DIRS}
@@ -246,33 +248,27 @@ if(ICD_BUILD_LLPC)
 # llpc/util
     target_sources(llpc PRIVATE
         util/llpcDebug.cpp
-        util/llpcElfReader.cpp
+        ../util/llpcElfReader.cpp
         util/llpcElfWriter.cpp
         util/llpcEmuLib.cpp
         util/llpcFile.cpp
-        util/llpcPipelineDumper.cpp
-        util/llpcPipelineDumperRegs.cpp
+        ../tool/pipelineDump/llpcPipelineDumper.cpp
+        ../tool/pipelineDump/llpcPipelineDumperRegs.cpp
         util/llpcShaderModuleHelper.cpp
         util/llpcTimerProfiler.cpp
         util/llpcUtil.cpp
     )
 else()
     target_sources(llpc PRIVATE
-        util/llpcElfReader.cpp
-        util/llpcPipelineDumper.cpp
-        util/llpcPipelineDumperRegs.cpp
+        ../util/llpcElfReader.cpp
+        ../tool/pipelineDump/llpcPipelineDumper.cpp
+        ../tool/pipelineDump/llpcPipelineDumperRegs.cpp
         util/llpcUtil.cpp
     )
 endif()
 
-# llpc/imported/metrohash
-if(NOT TARGET metrohash)
-    add_subdirectory(imported/metrohash)
-    target_link_libraries(llpc PRIVATE llpc_metrohash)
-else()
-    target_link_libraries(llpc PRIVATE metrohash)
-    target_compile_definitions(llpc PRIVATE SINGLE_EXTERNAL_METROHASH)
-endif()
+target_link_libraries(llpc PRIVATE metrohash)
+target_compile_definitions(llpc PRIVATE SINGLE_EXTERNAL_METROHASH)
 
 target_link_libraries(llpc PRIVATE cwpack)
 
@@ -314,18 +310,18 @@ if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
 endif()
 
 target_sources(vfx PRIVATE
-    tool/vfx/vfxParser.cpp
-    tool/vfx/vfxPipelineDoc.cpp
-    tool/vfx/vfxRenderDoc.cpp
-    tool/vfx/vfxSection.cpp
-    tool/vfx/vfxEnumsConverter.cpp
+    ../tool/vfx/vfxParser.cpp
+    ../tool/vfx/vfxPipelineDoc.cpp
+    ../tool/vfx/vfxRenderDoc.cpp
+    ../tool/vfx/vfxSection.cpp
+    ../tool/vfx/vfxEnumsConverter.cpp
 )
 
 target_include_directories(vfx
 PUBLIC
-    ${PROJECT_SOURCE_DIR}/tool/vfx
+    ${PROJECT_SOURCE_DIR}/../tool/vfx
 PRIVATE
-    ${PROJECT_SOURCE_DIR}/imported/spirv
+    ${PROJECT_SOURCE_DIR}/../imported/spirv
     ${PROJECT_SOURCE_DIR}/include
     ${XGL_ICD_PATH}/api/include/khronos
 )
@@ -380,7 +376,7 @@ PUBLIC
 PRIVATE
     ${PROJECT_SOURCE_DIR}/builder
     ${PROJECT_SOURCE_DIR}/context
-    ${PROJECT_SOURCE_DIR}/imported/spirv
+    ${PROJECT_SOURCE_DIR}/../imported/spirv
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/lower
     ${PROJECT_SOURCE_DIR}/patch
@@ -391,6 +387,8 @@ PRIVATE
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
     ${PROJECT_SOURCE_DIR}/util
+    ${PROJECT_SOURCE_DIR}/../util
+    ${PROJECT_SOURCE_DIR}/../tool/pipelineDump
     ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx6/chip
     ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx9/chip
     ${XGL_PAL_PATH}/inc/core

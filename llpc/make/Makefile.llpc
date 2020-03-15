@@ -6,9 +6,11 @@ endif
 LCXXINCS += -I$(LLPC_VULKAN_INCLUDE)
 LCXXINCS += -I$(LLPC_DEPTH)/builder
 LCXXINCS += -I$(LLPC_DEPTH)/include
-LCXXINCS += -I$(LLPC_DEPTH)/../include
+LCXXINCS += -I$(VKGC_DEPTH)/include
 LCXXINCS += -I$(LLPC_DEPTH)/../lgc/include
 LCXXINCS += -I$(LLPC_DEPTH)/util
+LCXXINCS += -I$(VKGC_DEPTH)/util
+LCXXINCS += -I$(VKGC_DEPTH)/tool/pipelineDump
 LCXXINCS += -I$(LLPC_DEPTH)/translator/lib/SPIRV/libSPIRV
 
 LCXXDEFS += -DCHIP_HDR_VEGA20=1 -DCHIP_HDR_RAVEN2=1 -DCHIP_HDR_NAVI14=1 -DCHIP_HDR_GFX10=1
@@ -25,7 +27,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
 
     LCXXINCS += -I$(LLPC_DEPTH)/context
 
-    LCXXINCS += -I$(LLPC_DEPTH)/imported/spirv
+    LCXXINCS += -I$(VKGC_DEPTH)/imported/spirv
     LCXXINCS += -I$(LLPC_DEPTH)/lower
     LCXXINCS += -I$(LLPC_DEPTH)/translator/include
     LCXXINCS += -I$(LLPC_DEPTH)/translator/lib/SPIRV
@@ -35,6 +37,8 @@ ifeq ($(ICD_BUILD_LLPC), 1)
     vpath %.cpp $(LLPC_DEPTH)/translator/lib/SPIRV
     vpath %.cpp $(LLPC_DEPTH)/translator/lib/SPIRV/libSPIRV
     vpath %.cpp $(LLPC_DEPTH)/util
+    vpath %.cpp $(VKGC_DEPTH)/util
+    vpath %.cpp $(VKGC_DEPTH)/tool/pipelineDump
 
     # llpc/context
     CPPFILES +=                             \
@@ -203,6 +207,8 @@ ifeq ($(ICD_BUILD_LLPC), 1)
 else
 
     vpath %.cpp $(LLPC_DEPTH)/util
+    vpath %.cpp $(VKGC_DEPTH)/util
+    vpath %.cpp $(VKGC_DEPTH)/tool/pipelineDump
     # llpc/util
     CPPFILES +=                             \
         llpcPipelineDumper.cpp              \
@@ -231,7 +237,7 @@ ifdef METROHASH_PATH
     LCXXINCS += -I$(METROHASH_DEPTH)/src
     LCXXDEFS += -DSINGLE_EXTERNAL_METROHASH
 else
-    METROHASH_DEPTH = $(LLPC_DEPTH)/imported/metrohash
+    METROHASH_DEPTH = $(VKGC_DEPTH)/imported/metrohash
     include $(METROHASH_DEPTH)/make/Makefile.metrohash
 endif
 
