@@ -37,8 +37,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
     vpath %.cpp $(LLPC_DEPTH)/translator/lib/SPIRV
     vpath %.cpp $(LLPC_DEPTH)/translator/lib/SPIRV/libSPIRV
     vpath %.cpp $(LLPC_DEPTH)/util
-    vpath %.cpp $(VKGC_DEPTH)/util
-    vpath %.cpp $(VKGC_DEPTH)/tool/pipelineDump
 
     # llpc/context
     CPPFILES +=                             \
@@ -83,12 +81,9 @@ ifeq ($(ICD_BUILD_LLPC), 1)
     # llpc/util
     CPPFILES +=                             \
         llpcDebug.cpp                       \
-        llpcElfReader.cpp                   \
         llpcElfWriter.cpp                   \
         llpcEmuLib.cpp                      \
         llpcFile.cpp                        \
-        llpcPipelineDumper.cpp              \
-        llpcPipelineDumperRegs.cpp          \
         llpcShaderModuleHelper.cpp          \
         llpcTimerProfiler.cpp               \
         llpcUtil.cpp
@@ -207,14 +202,8 @@ ifeq ($(ICD_BUILD_LLPC), 1)
 else
 
     vpath %.cpp $(LLPC_DEPTH)/util
-    vpath %.cpp $(VKGC_DEPTH)/util
-    vpath %.cpp $(VKGC_DEPTH)/tool/pipelineDump
     # llpc/util
-    CPPFILES +=                             \
-        llpcPipelineDumper.cpp              \
-        llpcPipelineDumperRegs.cpp          \
-        llpcElfReader.cpp                   \
-        llpcUtil.cpp
+    CPPFILES += llpcUtil.cpp
 
     ifneq ($(LLPC_PLATFORM), win)
         # Non-windows: gcc-style options.
@@ -238,7 +227,7 @@ ifdef METROHASH_PATH
     LCXXDEFS += -DSINGLE_EXTERNAL_METROHASH
 else
     METROHASH_DEPTH = $(VKGC_DEPTH)/imported/metrohash
-    include $(METROHASH_DEPTH)/make/Makefile.metrohash
+    LCXXINCS += -I$(METROHASH_DEPTH)/inc
 endif
 
 .FORCE:

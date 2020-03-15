@@ -175,7 +175,6 @@ endif()
 target_include_directories(llpc
     PUBLIC
         ${PROJECT_SOURCE_DIR}/include
-        ${PROJECT_SOURCE_DIR}/../include
         ${PROJECT_SOURCE_DIR}/../lgc/include
     PRIVATE
         ${PROJECT_SOURCE_DIR}/context
@@ -248,27 +247,21 @@ if(ICD_BUILD_LLPC)
 # llpc/util
     target_sources(llpc PRIVATE
         util/llpcDebug.cpp
-        ../util/llpcElfReader.cpp
         util/llpcElfWriter.cpp
         util/llpcEmuLib.cpp
         util/llpcFile.cpp
-        ../tool/pipelineDump/llpcPipelineDumper.cpp
-        ../tool/pipelineDump/llpcPipelineDumperRegs.cpp
         util/llpcShaderModuleHelper.cpp
         util/llpcTimerProfiler.cpp
         util/llpcUtil.cpp
     )
 else()
     target_sources(llpc PRIVATE
-        ../util/llpcElfReader.cpp
-        ../tool/pipelineDump/llpcPipelineDumper.cpp
-        ../tool/pipelineDump/llpcPipelineDumperRegs.cpp
         util/llpcUtil.cpp
     )
 endif()
 
-target_link_libraries(llpc PRIVATE metrohash)
-target_compile_definitions(llpc PRIVATE SINGLE_EXTERNAL_METROHASH)
+add_subdirectory(../tool/pipelineDump ${PROJECT_BINARY_DIR}/../pipelineDump)
+target_link_libraries(llpc PRIVATE pipelineDump)
 
 target_link_libraries(llpc PRIVATE cwpack)
 
@@ -328,6 +321,7 @@ PRIVATE
     ${PROJECT_SOURCE_DIR}/context
     ${PROJECT_SOURCE_DIR}/../imported/spirv
     ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/../include
     ${PROJECT_SOURCE_DIR}/lower
     ${PROJECT_SOURCE_DIR}/patch
     ${PROJECT_SOURCE_DIR}/patch/gfx6/chip

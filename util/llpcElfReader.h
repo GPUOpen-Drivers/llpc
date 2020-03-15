@@ -36,8 +36,7 @@
 #include <vector>
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 
-#include "llpc.h"
-#include "llpcUtil.h"
+#include "vkgcUtil.h"
 #include "palPipelineAbi.h"
 #include "g_palPipelineAbiMetadata.h"
 
@@ -48,8 +47,6 @@ namespace llvm
 
 namespace Llpc
 {
-
-template<class Elf> class ElfWriter;
 
 // LLVM backend special section name
 static const char   AmdGpuDisasmName[] = ".AMDGPU.disasm"; // Name of ".AMDGPU.disasm" section
@@ -497,6 +494,41 @@ public:
 
     uint32_t GetMsgMapLevel() const;
 
+    const typename Elf::FormatHeader& GetHeader() const
+    {
+        return m_header;
+    }
+
+    const std::map<std::string, uint32_t>& GetMap() const
+    {
+        return m_map;
+    }
+
+    const std::vector<SectionBuffer*>& GetSections() const
+    {
+        return m_sections;
+    }
+
+    int32_t GetSymSecIdx() const
+    {
+        return m_symSecIdx;
+    }
+
+    int32_t GetRelocSecIdx() const
+    {
+        return m_relocSecIdx;
+    }
+
+    int32_t GetStrtabSecIdx() const
+    {
+        return m_strtabSecIdx;
+    }
+
+    int32_t GetTextSecIdx() const
+    {
+        return m_textSecIdx;
+    }
+
 private:
     ElfReader(const ElfReader&) = delete;
     ElfReader& operator=(const ElfReader&) = delete;
@@ -517,7 +549,6 @@ private:
     llvm::msgpack::Document      m_document;         // MsgPack document
     std::vector<MsgPackIterator> m_iteratorStack;    // MsgPack iterator stack
     uint32_t                     m_msgPackMapLevel;  // The map level of current message item
-    friend class ElfWriter<Elf>;
 };
 
 // Dumps ELF package to out stream
