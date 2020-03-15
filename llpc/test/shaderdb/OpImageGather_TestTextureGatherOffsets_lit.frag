@@ -27,13 +27,13 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 ; SHADERTEST: call { <8 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0)
-; SHADERTEST: call { <8 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.sampler.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0)
+; SHADERTEST: call { <4 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.sampler.desc.ptr.s[p4v4i32,i32]"(i32 0, i32 0)
 ; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, {{.*}}, {{.*}}, i32 293, <2 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000>, i32 2, float 0.000000e+00, [4 x <2 x i32>] [<2 x i32> <i32 1, i32 1>, <2 x i32> <i32 2, i32 2>, <2 x i32> <i32 3, i32 3>, <2 x i32> <i32 4, i32 4>])
 ; SHADERTEST: call { <8 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 1, i32 0)
-; SHADERTEST: call { <8 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.sampler.desc.ptr.s[p4v8i32,i32]"(i32 1, i32 0)
+; SHADERTEST: call { <4 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.sampler.desc.ptr.s[p4v4i32,i32]"(i32 1, i32 0)
 ; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, {{.*}}, {{.*}}, i32 293, <3 x float> <float 0x3FC99999A0000000, float 0x3FC99999A0000000, float 0x3FC99999A0000000>, i32 3, float 0.000000e+00, [4 x <2 x i32>] [<2 x i32> <i32 1, i32 1>, <2 x i32> <i32 2, i32 2>, <2 x i32> <i32 3, i32 3>, <2 x i32> <i32 4, i32 4>])
 ; SHADERTEST: call { <8 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 1)
-; SHADERTEST: call { <8 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.sampler.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 1)
+; SHADERTEST: call { <4 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.sampler.desc.ptr.s[p4v4i32,i32]"(i32 0, i32 1)
 ; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, {{.*}}, {{.*}}, i32 293, <2 x float> <float 1.000000e+00, float 1.000000e+00>, i32 0, float 0.000000e+00, [4 x <2 x i32>] [<2 x i32> <i32 1, i32 1>, <2 x i32> <i32 2, i32 2>, <2 x i32> <i32 3, i32 3>, <2 x i32> <i32 4, i32 4>])
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results

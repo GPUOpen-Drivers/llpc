@@ -32,7 +32,7 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-COUNT-2: call {{.*}} <4 x float> @{{.*}}
-; SHADERTEST: define internal {{.*}}<4 x float> @{{.*}}({ { <8 x i32> addrspace(4)*, i32 }, { <8 x i32> addrspace(4)*, i32 } } %0, <2 x float> addrspace(5)* %1)
+; SHADERTEST: define internal {{.*}}<4 x float> @{{.*}}({ { <8 x i32> addrspace(4)*, i32 }, { <4 x i32> addrspace(4)*, i32 } } %0, <2 x float> addrspace(5)* %1)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

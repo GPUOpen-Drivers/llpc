@@ -19,11 +19,11 @@ void main()
 ; SHADERTEST: call {{.*}} @llpc.call.image.sample.f32(i32 3, i32 0, {{.*}}, {{.*}}, i32 513, {{.*}}, {{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0)
-; SHADERTEST: call {{.*}} @llpc.call.image.sample.f32(i32 3, i32 0, {{.*}}, {{.*}}, i32 513, {{.*}}, {{.*}})
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0) 
+; SHADERTEST: call {{.*}} @llpc.call.image.sample.f32(i32 3, i32 0, {{.*}}, {{.*}}, i32 513, {{.*}}, {{.*}}) 
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
+; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
 ; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
 ; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubesc
 ; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubetc

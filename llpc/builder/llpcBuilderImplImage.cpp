@@ -1237,28 +1237,80 @@ Value* BuilderImplImage::CreateImageSample(
     assert((pCoord->getType()->getScalarType()->isFloatTy()) ||
                 (pCoord->getType()->getScalarType()->isHalfTy()));
 
-    // Check whether the sampler desc contains with constant value
-    auto pDescWord0 = dyn_cast<ConstantInt>(CreateExtractElement(pSamplerDesc, getInt32(0)));
-
-    if (pDescWord0 != nullptr)
+    // Find the {set,desc} for the sampler and see if it is a YCbCr converting sampler.
+    // This is a hack to cope with the design of the Vulkan YCbCr conversion extension, in which
+    // you cannot see in the SPIR-V that a sampler is a converting sampler. It does not work
+    // if the sampler pointer is passed through a non-inlined function arg or a phi node.
+    // If using BuilderRecorder, it relies on the order in which recorded builder calls are
+    // processed in BuilderReplayer.
+    if (m_pPipelineState->HaveConvertingSampler())
     {
-        return nullptr;
+        if (auto pLoadFromPtr = dyn_cast<CallInst>(pSamplerDesc))
+        {
+            if (Function* pLoadFromPtrFunc = pLoadFromPtr->getCalledFunction())
+            {
+                if (pLoadFromPtrFunc->getName().startswith(LlpcName::DescriptorLoadFromPtr))
+                {
+                    Value* pDescPtr = pLoadFromPtr->getOperand(0);
+                    if (auto pDescPtrCall = dyn_cast<CallInst>(pDescPtr))
+                    {
+                        if (Function* pDescPtrCallFunc = pDescPtrCall->getCalledFunction())
+                        {
+                            if (pDescPtrCallFunc->getName().startswith(LlpcName::DescriptorGetSamplerPtr))
+                            {
+                                // We have found the call that tells us the descriptor set and binding.
+                                uint32_t descSet = cast<ConstantInt>(pDescPtrCall->getArgOperand(0))->getZExtValue();
+                                uint32_t binding = cast<ConstantInt>(pDescPtrCall->getArgOperand(1))->getZExtValue();
+                                const ResourceNode* pNode = m_pPipelineState->FindResourceNode(
+                                                                      ResourceMappingNodeType::DescriptorYCbCrSampler,
+                                                                      descSet,
+                                                                      binding).second;
+                                if (pNode)
+                                {
+                                    // It is a YCbCr converting sampler. Get the immutable converter and call the
+                                    // appropriate function for a converting image sample.
+                                    return CreateImageSampleConvert(pResultTy,
+                                                                    dim,
+                                                                    flags,
+                                                                    pImageDesc,
+                                                                    pNode->pImmutableValue,
+                                                                    address,
+                                                                    instName);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
-    else
-    {
-        // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
-        pSamplerDesc = CreateShuffleVector(pSamplerDesc, pSamplerDesc, { 0, 1, 2, 3 });
 
-        return CreateImageSampleGather(pResultTy,
-                                       dim,
-                                       flags,
-                                       pCoord,
-                                       pImageDesc,
-                                       pSamplerDesc,
-                                       address,
-                                       instName,
-                                       true);
-    }
+    // Normal image sample.
+    return CreateImageSampleGather(pResultTy,
+                                   dim,
+                                   flags,
+                                   pCoord,
+                                   pImageDesc,
+                                   pSamplerDesc,
+                                   address,
+                                   instName,
+                                   true);
+}
+
+// =====================================================================================================================
+// Create an image sample with a converting sampler.
+// The caller supplies all arguments to the image sample op in "address", in the order specified
+// by the indices defined as ImageIndex* below.
+Value* BuilderImplImage::CreateImageSampleConvert(
+    Type*                   pResultTy,              // [in] Result type
+    uint32_t                dim,                    // Image dimension
+    uint32_t                flags,                  // ImageFlag* flags
+    Value*                  pImageDesc,             // [in] Image descriptor
+    Value*                  pConvertingSamplerDesc, // [in] Converting sampler descriptor (v8i32)
+    ArrayRef<Value*>        address,                // Address and other arguments
+    const Twine&            instName)               // [in] Name to give instruction(s)
+{
+    llvm_unreachable("Not yet implemented");
 }
 
 // =====================================================================================================================

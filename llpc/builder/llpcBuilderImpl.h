@@ -74,10 +74,6 @@ protected:
                                      ArrayRef<uint32_t> operandIdxs,
                                      const Twine&       instName = "");
 
-    // Find the call with specific call name recursively
-    CallInst* FindCallByName(CallInst* pCall,
-                             StringRef callName);
-
     // Helper method to scalarize a possibly vector unary operation
     Value* Scalarize(Value* pValue, std::function<Value*(Value*)> callback);
 
@@ -377,6 +373,17 @@ public:
                              Value*            pSamplerDesc,
                              ArrayRef<Value*>  address,
                              const Twine&      instName = "") override final;
+
+    // Create an image sample with conversion.
+    // This is not yet a Builder API, but it could become one if there was to be a new SPIR-V YCbCr
+    // converting sampler spec that allows the SPIR-V reader to tell that it has a converting sampler.
+    Value* CreateImageSampleConvert(Type*             pResultTy,
+                                    uint32_t          dim,
+                                    uint32_t          flags,
+                                    Value*            pImageDesc,
+                                    Value*            pConvertingSamplerDesc,
+                                    ArrayRef<Value*>  address,
+                                    const Twine&      instName = "");
 
     // Create an image gather
     Value* CreateImageGather(Type*             pResultTy,

@@ -55,52 +55,52 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 69, <2 x {{.*}}, i32 0, {{.*}})
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 69, <2 x {{.*}}, i32 0, {{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 69, <3 x {{.*}}, i32 1, {{.*}})
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 69, <3 x {{.*}}, i32 1, {{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 2
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 2
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 3, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 69, <3 x {{.*}}, i32 2, {{.*}})
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 3, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 69, <3 x {{.*}}, i32 2, {{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 3
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 3
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 8, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 69, <4 x {{.*}}, i32 3, {{.*}})
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 8, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 69, <4 x {{.*}}, i32 3, {{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 325, <2 x {{.*}}, i32 0, {{.*}}, <2 x i32> zeroinitializer)
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 325, <2 x {{.*}}, i32 0, {{.*}}, <2 x i32> zeroinitializer)
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 325, <3 x {{.*}}, i32 1, {{.*}}, <2 x i32> <i32 0, i32 1>)
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 325, <3 x {{.*}}, i32 1, {{.*}}, <2 x i32> <i32 0, i32 1>)
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 325, <2 x {{.*}}, i32 0, {{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>])
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 325, <2 x {{.*}}, i32 0, {{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>])
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 325, <3 x {{.*}}, i32 1, {{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>])
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 325, <3 x {{.*}}, i32 1, {{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>])
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 37, <2 x {{.*}}, i32 0, {{.*}})
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 37, <2 x {{.*}}, i32 0, {{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 37, <3 x {{.*}}, i32 1, {{.*}})
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 37, <3 x {{.*}}, i32 1, {{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 2
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 2
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 3, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 37, <3 x {{.*}}, i32 2, {{.*}})
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 3, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 37, <3 x {{.*}}, i32 2, {{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 3
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 3
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 8, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 37, <4 x {{.*}}, i32 3, {{.*}})
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 8, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 37, <4 x {{.*}}, i32 3, {{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 293, <2 x {{.*}}, i32 0, {{.*}}, <2 x i32> zeroinitializer)
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 293, <2 x {{.*}}, i32 0, {{.*}}, <2 x i32> zeroinitializer)
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 293, <3 x {{.*}}, i32 1, {{.*}}, <2 x i32> <i32 0, i32 1>)
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 293, <3 x {{.*}}, i32 1, {{.*}}, <2 x i32> <i32 0, i32 1>)
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 293, <2 x {{.*}}, i32 0, {{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>])
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 293, <2 x {{.*}}, i32 0, {{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>])
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <8 x {{.*}}, i32 293, <3 x {{.*}}, i32 1, {{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>])
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 293, <3 x {{.*}}, i32 1, {{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>])
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.gather4.b.2d.v4f32.f32.f32(i32 1,{{.*}},{{.*}},{{.*}},{{.*}},{{.*}}, i1 false, i32 0, i32 0)
