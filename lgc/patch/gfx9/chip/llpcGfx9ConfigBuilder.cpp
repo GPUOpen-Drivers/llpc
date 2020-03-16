@@ -2828,9 +2828,23 @@ void ConfigBuilder::BuildUserDataConfig(
         {
             AppendConfig(startUserData + pIntfData1->userDataUsage.spillTable,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::SpillTable));
-            userDataLimit = std::max(userDataLimit,
-                                     pIntfData1->spillTable.offsetInDwords + pIntfData1->spillTable.sizeInDwords);
             spillThreshold = pIntfData1->spillTable.offsetInDwords;
+        }
+
+        // If spill is in use, just say that all of the top-level resource node
+        // table is in use except the vertex buffer table and streamout table.
+        // Also do this if no user data nodes are used; PAL does not like userDataLimit being 0
+        // if there are any user data nodes.
+        if ((pIntfData1->userDataUsage.spillTable > 0) || (userDataLimit == 0))
+        {
+            for (auto& node : m_pPipelineState->GetUserDataNodes())
+            {
+                if ((node.type != ResourceNodeType::IndirectUserDataVaPtr) &&
+                    (node.type != ResourceNodeType::StreamOutTableVaPtr))
+                {
+                    userDataLimit = std::max(userDataLimit, node.offsetInDwords + node.sizeInDwords);
+                }
+            }
         }
 
         m_userDataLimit = std::max(m_userDataLimit, userDataLimit);

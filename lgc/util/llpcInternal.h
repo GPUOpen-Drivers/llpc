@@ -105,7 +105,6 @@ namespace lgcName
     const static char DescriptorGetSamplerPtr[]       = "llpc.descriptor.get.sampler.ptr";
     const static char DescriptorGetFmaskPtr[]         = "llpc.descriptor.get.fmask.ptr";
     const static char DescriptorLoadBuffer[]          = "llpc.descriptor.load.buffer";
-    const static char DescriptorLoadAddress[]         = "llpc.descriptor.load.address";
     const static char DescriptorGetTexelBufferPtr[]   = "llpc.descriptor.get.texelbuffer.ptr";
     const static char DescriptorLoadSpillTable[]      = "llpc.descriptor.load.spilltable";
 

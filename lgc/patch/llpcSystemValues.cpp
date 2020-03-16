@@ -406,53 +406,12 @@ Value* ShaderSystemValues::GetShadowDescTablePtr(
 }
 
 // =====================================================================================================================
-// Get dynamic descriptor
-Value* ShaderSystemValues::GetDynamicDesc(
-    uint32_t        dynDescIdx)     // Dynamic descriptor index
-{
-    if (dynDescIdx >= InterfaceData::MaxDynDescCount)
-    {
-        return nullptr;
-    }
-    if (m_dynDescs.size() <= dynDescIdx)
-    {
-        m_dynDescs.resize(dynDescIdx + 1);
-    }
-    if (m_dynDescs[dynDescIdx] == nullptr)
-    {
-        // Find the node.
-        uint32_t foundDynDescIdx = 0;
-        auto userDataNodes = m_pPipelineState->GetUserDataNodes();
-        for (uint32_t i = 0; i != userDataNodes.size(); ++i)
-        {
-            auto pNode = &userDataNodes[i];
-            if  ((pNode->type == ResourceNodeType::DescriptorResource) ||
-                 (pNode->type == ResourceNodeType::DescriptorSampler) ||
-                 (pNode->type == ResourceNodeType::DescriptorTexelBuffer) ||
-                 (pNode->type == ResourceNodeType::DescriptorFmask) ||
-                 (pNode->type == ResourceNodeType::DescriptorBuffer) ||
-                 (pNode->type == ResourceNodeType::DescriptorBufferCompact))
-            {
-                if (foundDynDescIdx == dynDescIdx)
-                {
-                    // Get the node value.
-                    m_dynDescs[dynDescIdx] = GetResourceNodeValue(i);
-                    break;
-                }
-                ++foundDynDescIdx;
-            }
-        }
-    }
-    return m_dynDescs[dynDescIdx];
-}
-
-// =====================================================================================================================
-// Get internal global table pointer
+// Get internal global table pointer as pointer to i8.
 Value* ShaderSystemValues::GetInternalGlobalTablePtr()
 {
     if (m_pInternalGlobalTablePtr == nullptr)
     {
-        auto pPtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_pContext), UINT32_MAX), ADDR_SPACE_CONST);
+        auto pPtrTy = Type::getInt8Ty(*m_pContext)->getPointerTo(ADDR_SPACE_CONST);
         // Global table is always the first function argument
         m_pInternalGlobalTablePtr = MakePointer(GetFunctionArgument(m_pEntryPoint, 0, "globalTable"),
                                                 pPtrTy,
@@ -462,12 +421,12 @@ Value* ShaderSystemValues::GetInternalGlobalTablePtr()
 }
 
 // =====================================================================================================================
-// Get internal per shader table pointer
+// Get internal per shader table pointer as pointer to i8.
 Value* ShaderSystemValues::GetInternalPerShaderTablePtr()
 {
     if (m_pInternalPerShaderTablePtr == nullptr)
     {
-        auto pPtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_pContext), UINT32_MAX), ADDR_SPACE_CONST);
+        auto pPtrTy = Type::getInt8Ty(*m_pContext)->getPointerTo(ADDR_SPACE_CONST);
         // Per shader table is always the second function argument
         m_pInternalPerShaderTablePtr = MakePointer(GetFunctionArgument(m_pEntryPoint, 1, "perShaderTable"),
                                                    pPtrTy,
