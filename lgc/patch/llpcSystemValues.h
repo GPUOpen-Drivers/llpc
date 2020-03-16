@@ -92,13 +92,10 @@ public:
     // Get shadow descriptor table pointer
     llvm::Value* GetShadowDescTablePtr(uint32_t descSet);
 
-    // Get dynamic descriptor
-    llvm::Value* GetDynamicDesc(uint32_t dynDescIdx);
-
-    // Get global internal table pointer
+    // Get global internal table pointer as pointer to i8.
     llvm::Value* GetInternalGlobalTablePtr();
 
-    // Get internal per shader table pointer
+    // Get internal per shader table pointer as pointer to i8.
     llvm::Value* GetInternalPerShaderTablePtr();
 
     // Get number of workgroups value
@@ -113,6 +110,9 @@ public:
     // Get stream-out buffer descriptor
     llvm::Value* GetStreamOutBufDesc(uint32_t xfbBuffer);
 
+    // Get spill table pointer
+    llvm::Instruction* GetSpillTablePtr();
+
 private:
     // Get stream-out buffer table pointer
     llvm::Instruction* GetStreamOutTablePtr();
@@ -125,9 +125,6 @@ private:
 
     // Get 32 bit resource node value
     llvm::Value* GetResourceNodeValue(uint32_t resNodeIdx);
-
-    // Get spill table pointer
-    llvm::Instruction* GetSpillTablePtr();
 
     // Load descriptor from driver table
     llvm::Instruction* LoadDescFromDriverTable(uint32_t tableOffset, BuilderBase& builder);
@@ -171,8 +168,6 @@ private:
                         m_descTablePtrs;                // Descriptor table pointers
     llvm::SmallVector<llvm::Value*, InterfaceData::MaxDescTableCount>
                         m_shadowDescTablePtrs;          // Shadow descriptor table pointers
-    llvm::SmallVector<llvm::Value*, InterfaceData::MaxDynDescCount>
-                        m_dynDescs;                     // Dynamic descriptors
     llvm::Value*        m_pInternalGlobalTablePtr = nullptr;
                                                         // Internal global table pointer
     llvm::Value*        m_pInternalPerShaderTablePtr = nullptr;

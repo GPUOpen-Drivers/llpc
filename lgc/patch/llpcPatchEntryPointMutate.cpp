@@ -374,6 +374,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     bool reserveVbTable = false;
     bool reserveStreamOutTable = false;
     bool reserveEsGsLdsSize = false;
+    bool needSpill = false;
 
     if (userDataNodes.size() > 0)
     {
@@ -429,9 +430,23 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 continue;
             }
 
-            if (pNode->type == ResourceNodeType::PushConst)
+            switch (pNode->type)
             {
+            case ResourceNodeType::DescriptorBuffer:
+            case ResourceNodeType::DescriptorBufferCompact:
+            case ResourceNodeType::DescriptorResource:
+            case ResourceNodeType::DescriptorSampler:
+            case ResourceNodeType::DescriptorTexelBuffer:
+            case ResourceNodeType::DescriptorFmask:
+                // Where an image or sampler descriptor appears in the top-level table, it is accesssed
+                // via the spill table, rather than directly placed in sgprs.
+                needSpill = true;
+                break;
+            case ResourceNodeType::PushConst:
                 pIntfData->pushConst.resNodeIdx = i;
+                break;
+            default:
+                break;
             }
 
             requiredUserDataCount = std::max(requiredUserDataCount, pNode->offsetInDwords + pNode->sizeInDwords);
@@ -560,16 +575,15 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     }
 
     // NOTE: We have to spill user data to memory when available user data is less than required.
-    bool needSpill = false;
     if (useFixedLayout)
     {
         assert(m_shaderStage == ShaderStageCompute);
-        needSpill = (requiredUserDataCount > InterfaceData::MaxCsUserDataCount);
+        needSpill |= (requiredUserDataCount > InterfaceData::MaxCsUserDataCount);
         availUserDataCount = InterfaceData::MaxCsUserDataCount;
     }
     else
     {
-        needSpill = (requiredRemappedUserDataCount > availUserDataCount);
+        needSpill |= (requiredRemappedUserDataCount > availUserDataCount - needSpill);
         pIntfData->spillTable.offsetInDwords = InvalidValue;
         if (needSpill)
         {
@@ -690,13 +704,22 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     break;
                 }
 
+            case ResourceNodeType::DescriptorBuffer:
+            case ResourceNodeType::DescriptorBufferCompact:
             case ResourceNodeType::DescriptorResource:
             case ResourceNodeType::DescriptorSampler:
             case ResourceNodeType::DescriptorTexelBuffer:
             case ResourceNodeType::DescriptorFmask:
-            case ResourceNodeType::DescriptorBuffer:
+                // Where a descriptor appears in the top-level table, it is accesssed
+                // via the spill table, rather than directly placed in sgprs.
+                assert(needSpill);
+                if (pIntfData->spillTable.offsetInDwords == InvalidValue)
+                {
+                    pIntfData->spillTable.offsetInDwords = pNode->offsetInDwords;
+                }
+                break;
+
             case ResourceNodeType::PushConst:
-            case ResourceNodeType::DescriptorBufferCompact:
                 {
                     argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), pNode->sizeInDwords));
                     for (uint32_t j = 0; j < pNode->sizeInDwords; ++j)

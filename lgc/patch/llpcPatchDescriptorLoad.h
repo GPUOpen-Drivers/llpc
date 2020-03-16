@@ -68,28 +68,30 @@ private:
     PatchDescriptorLoad(const PatchDescriptorLoad&) = delete;
     PatchDescriptorLoad& operator=(const PatchDescriptorLoad&) = delete;
 
+    void ProcessDescriptorGetPtr(llvm::CallInst* pDescPtrCall, llvm::StringRef descPtrCallName);
+    llvm::Value* GetDescPtrAndStride(ResourceNodeType        resType,
+                                     uint32_t                descSet,
+                                     uint32_t                binding,
+                                     const ResourceNode*     pTopNode,
+                                     const ResourceNode*     pNode,
+                                     bool                    shadow,
+                                     llvm::IRBuilder<>&      builder);
+    llvm::Value* GetDescPtr(ResourceNodeType resType,
+                            uint32_t                descSet,
+                            uint32_t                binding,
+                            const ResourceNode*     pTopNode,
+                            const ResourceNode*     pNode,
+                            bool                    shadow,
+                            llvm::IRBuilder<>&      builder);
+
+    void ProcessDescriptorIndex(llvm::CallInst* pCall);
     void ProcessLoadDescFromPtr(llvm::CallInst* pLoadFromPtr);
+    llvm::Value* LoadBufferDescriptor(uint32_t            descSet,
+                                      uint32_t            binding,
+                                      llvm::Value*        pArrayOffset,
+                                      llvm::Instruction*  pInsertPoint);
 
-    llvm::Value* LoadDescriptor(llvm::CallInst&     callInst,
-                                uint32_t            descSet,
-                                uint32_t            binding,
-                                llvm::Value*        pArrayOffset,
-                                llvm::Instruction*  pInsertPoint);
-
-    ResourceNodeType CalcDescriptorOffsetAndSize(ResourceNodeType   nodeType1,
-                                                 ResourceNodeType   nodeType2,
-                                                 uint32_t           descSet,
-                                                 uint32_t           binding,
-                                                 uint32_t*          pOffset,
-                                                 uint32_t*          pStride,
-                                                 uint32_t*          pDynDescIdx) const;
-
-    llvm::Constant* GetDescriptorRangeValue(ResourceNodeType   nodeType,
-                                            uint32_t           descSet,
-                                            uint32_t           binding) const;
-
-    void PatchWaterfallLastUseCalls();
-
+    llvm::Value* BuildInlineBufferDesc(Value* pDescPtr, llvm::IRBuilder<>& builder);
     llvm::Value* BuildBufferCompactDesc(llvm::Value* pDesc, llvm::Instruction* pInsertPoint);
 
     // -----------------------------------------------------------------------------------------------------------------

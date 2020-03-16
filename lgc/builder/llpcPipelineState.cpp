@@ -762,6 +762,7 @@ void PipelineState::ReadUserDataNodes(
 // For nodeType == Unknown, the function finds any node of the given set,binding.
 // For nodeType == Resource, it matches Resource or CombinedTexture.
 // For nodeType == Sampler, it matches Sampler or CombinedTexture.
+// For nodeType == Buffer, it matches Buffer, BufferCompact or PushConst (the latter in an inner table only).
 // For other nodeType, only a node of the specified type is returned.
 // Returns {topNode, node} where "node" is the found user data node, and "topNode" is the top-level user data
 // node that contains it (or is equal to it).
@@ -780,6 +781,9 @@ std::pair<const ResourceNode*, const ResourceNode*> PipelineState::FindResourceN
                 if ((innerNode.set == descSet) && (innerNode.binding == binding))
                 {
                     if ((nodeType == ResourceNodeType::Unknown) || (nodeType == innerNode.type) ||
+                        (nodeType == ResourceNodeType::DescriptorBuffer &&
+                         (innerNode.type == ResourceNodeType::DescriptorBufferCompact ||
+                          innerNode.type == ResourceNodeType::PushConst)) ||
                         (innerNode.type == ResourceNodeType::DescriptorCombinedTexture &&
                          (nodeType == ResourceNodeType::DescriptorResource ||
                           nodeType == ResourceNodeType::DescriptorTexelBuffer ||
@@ -793,6 +797,8 @@ std::pair<const ResourceNode*, const ResourceNode*> PipelineState::FindResourceN
         else if ((node.set == descSet) && (node.binding == binding))
         {
             if ((nodeType == ResourceNodeType::Unknown) || (nodeType == node.type) ||
+                (nodeType == ResourceNodeType::DescriptorBuffer &&
+                 node.type == ResourceNodeType::DescriptorBufferCompact) ||
                 (node.type == ResourceNodeType::DescriptorCombinedTexture &&
                  (nodeType == ResourceNodeType::DescriptorResource ||
                   nodeType == ResourceNodeType::DescriptorTexelBuffer ||

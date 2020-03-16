@@ -593,6 +593,21 @@ public:
 
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations
+    //
+    // The API here has two classes of descriptor, with different ways of handling the two classes:
+    //
+    // 1. A buffer descriptor is loaded in one step given its descriptor set, binding and index.
+    //    It is done this way because the implementation needs to be able to handle normal buffer
+    //    descriptors, compact buffer descriptors and inline buffers, without the input language (SPIR-V)
+    //    telling us which one it is.
+    //
+    // 2. An image/sampler/texelbuffer/F-mask descriptor has a three-step API:
+    //    a. Get a pointer to the descriptor or array of descriptors given the descriptor set and binding.
+    //    b. Zero or more calls to add on an array index.
+    //    c. Load the descriptor from its pointer.
+    //    SPIR-V allows a pointer to an image/sampler to be passed as a function arg (and maybe in other
+    //    ways). This API is formulated to allow the front-end to implement that. Step (c) can be
+    //    performed without needing to see the resource node used in (a).
 
     // Get the type of pointer returned by CreateLoadBufferDesc.
     PointerType* GetBufferDescTy(Type* pPointeeTy);
@@ -636,14 +651,10 @@ public:
 
     // Get the type of pointer to image or F-mask descriptor, as returned by CreateGetImageDescPtr.
     // The type is in fact a struct containing the actual pointer plus a stride in dwords.
-    // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
-    // set up the stride, and CreateIndexDescPtr will use it.
     Type* GetImageDescPtrTy();
 
     // Get the type of pointer to F-mask descriptor, as returned by CreateGetFmaskDescPtr.
     // The type is in fact a struct containing the actual pointer plus a stride in dwords.
-    // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
-    // set up the stride, and CreateIndexDescPtr will use it.
     Type* GetFmaskDescPtrTy();
 
     // Get the type of pointer to texel buffer descriptor, as returned by CreateGetTexelBufferDescPtr.
