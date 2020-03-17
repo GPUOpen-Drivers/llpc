@@ -8845,6 +8845,14 @@ Instruction *SPIRVToLLVM::transMemFence(BasicBlock *BB, SPIRVWord MemSema,
     Ordering = AtomicOrdering::Acquire;
   else if (MemSema & MemorySemanticsReleaseMask)
     Ordering = AtomicOrdering::Release;
+  else if (MemSema != MemorySemanticsMaskNone &&
+           BM->getMemoryModel() != MemoryModelVulkan) {
+    // Some shaders written for pre-Vulkan memory models use e.g.:
+    // OpMemoryBarrier 1, 512 // 512 = CrossWorkgroupMemory
+    // and expect some ordering, even though none of the low 4 (ordering) bits
+    // of the semantics are set, so we set a reasonable default here.
+    Ordering = AtomicOrdering::AcquireRelease;
+  }
 
   if (Ordering == AtomicOrdering::NotAtomic)
     return nullptr;
