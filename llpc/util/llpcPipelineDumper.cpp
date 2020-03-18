@@ -567,7 +567,8 @@ void PipelineDumper::DumpPipelineShaderInfo(
             for (uint32_t j = 0; j < pDescriptorRangeValue->arraySize; ++j)
             {
                 dumpFile << "descriptorRangeValue[" << i << "].uintData = ";
-                const uint32_t DescriptorSizeInDw = 4;
+                const uint32_t DescriptorSizeInDw =
+                    (pDescriptorRangeValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler) ? 8 : 4;
 
                 for (uint32_t k = 0; k < DescriptorSizeInDw -1; ++k)
                 {
