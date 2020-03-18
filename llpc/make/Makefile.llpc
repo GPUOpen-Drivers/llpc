@@ -159,6 +159,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcShaderModuleHelper.cpp          \
         llpcStartStopTimer.cpp              \
         llpcTimerProfiler.cpp               \
+        llpcGfxRegHandler.cpp               \
         llpcUtil.cpp
 
     ifeq ($(LLPC_PLATFORM), win)
@@ -308,4 +309,3 @@ else
 endif
 
 .FORCE:
-
