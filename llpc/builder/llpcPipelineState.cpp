@@ -1301,7 +1301,6 @@ const char* PipelineState::GetResourceMappingNodeTypeName(
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, PushConst)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorBufferCompact)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, StreamOutTableVaPtr)
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorReserved12)
         break;
     default:
         llvm_unreachable("Should never be called!");
