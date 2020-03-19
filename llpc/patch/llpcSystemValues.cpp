@@ -426,12 +426,12 @@ Value* ShaderSystemValues::GetDynamicDesc(
         for (uint32_t i = 0; i != userDataNodes.size(); ++i)
         {
             auto pNode = &userDataNodes[i];
-            if  ((pNode->type == ResourceMappingNodeType::DescriptorResource) ||
-                 (pNode->type == ResourceMappingNodeType::DescriptorSampler) ||
-                 (pNode->type == ResourceMappingNodeType::DescriptorTexelBuffer) ||
-                 (pNode->type == ResourceMappingNodeType::DescriptorFmask) ||
-                 (pNode->type == ResourceMappingNodeType::DescriptorBuffer) ||
-                 (pNode->type == ResourceMappingNodeType::DescriptorBufferCompact))
+            if  ((pNode->type == ResourceNodeType::DescriptorResource) ||
+                 (pNode->type == ResourceNodeType::DescriptorSampler) ||
+                 (pNode->type == ResourceNodeType::DescriptorTexelBuffer) ||
+                 (pNode->type == ResourceNodeType::DescriptorFmask) ||
+                 (pNode->type == ResourceNodeType::DescriptorBuffer) ||
+                 (pNode->type == ResourceNodeType::DescriptorBufferCompact))
             {
                 if (foundDynDescIdx == dynDescIdx)
                 {
@@ -530,7 +530,7 @@ Value* ShaderSystemValues::GetVertexBufTablePtr()
     if (m_pVbTablePtr == nullptr)
     {
         // Find the node.
-        auto pVbTableNode = FindResourceNodeByType(ResourceMappingNodeType::IndirectUserDataVaPtr);
+        auto pVbTableNode = FindResourceNodeByType(ResourceNodeType::IndirectUserDataVaPtr);
         if (pVbTableNode != nullptr)
         {
             // Get the 64-bit extended node value.
@@ -597,7 +597,7 @@ Instruction* ShaderSystemValues::GetStreamOutTablePtr()
         if (m_shaderStage != ShaderStageCopyShader)
         {
             // Find the node.
-            auto pNode = FindResourceNodeByType(ResourceMappingNodeType::StreamOutTableVaPtr);
+            auto pNode = FindResourceNodeByType(ResourceNodeType::StreamOutTableVaPtr);
             if (pNode != nullptr)
             {
                 // Get the SGPR number of the stream-out table pointer.
@@ -722,8 +722,8 @@ Value* ShaderSystemValues::GetResourceNodeValue(
     auto pNode = &m_pPipelineState->GetUserDataNodes()[resNodeIdx];
     Value* pResNodeValue = nullptr;
 
-    if ((pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr) ||
-        (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr))
+    if ((pNode->type == ResourceNodeType::IndirectUserDataVaPtr) ||
+        (pNode->type == ResourceNodeType::StreamOutTableVaPtr))
     {
         // Do nothing
     }
@@ -734,7 +734,7 @@ Value* ShaderSystemValues::GetResourceNodeValue(
                                             pIntfData->entryArgIdxs.resNodeValues[resNodeIdx],
                                             Twine("resNode") + Twine(resNodeIdx));
     }
-    else if (pNode->type != ResourceMappingNodeType::PushConst)
+    else if (pNode->type != ResourceNodeType::PushConst)
     {
         // Resource node is spilled, load its value from spill table
         uint32_t byteOffset = pNode->offsetInDwords * sizeof(uint32_t);
@@ -750,12 +750,12 @@ Value* ShaderSystemValues::GetResourceNodeValue(
 
         Type* pResNodePtrTy = nullptr;
 
-        if  ((pNode->type == ResourceMappingNodeType::DescriptorResource) ||
-             (pNode->type == ResourceMappingNodeType::DescriptorSampler) ||
-             (pNode->type == ResourceMappingNodeType::DescriptorTexelBuffer) ||
-             (pNode->type == ResourceMappingNodeType::DescriptorFmask) ||
-             (pNode->type == ResourceMappingNodeType::DescriptorBuffer) ||
-             (pNode->type == ResourceMappingNodeType::DescriptorBufferCompact))
+        if  ((pNode->type == ResourceNodeType::DescriptorResource) ||
+             (pNode->type == ResourceNodeType::DescriptorSampler) ||
+             (pNode->type == ResourceNodeType::DescriptorTexelBuffer) ||
+             (pNode->type == ResourceNodeType::DescriptorFmask) ||
+             (pNode->type == ResourceNodeType::DescriptorBuffer) ||
+             (pNode->type == ResourceNodeType::DescriptorBufferCompact))
         {
             pResNodePtrTy = VectorType::get(Type::getInt32Ty(*m_pContext),
                                             pNode->sizeInDwords)->getPointerTo(ADDR_SPACE_CONST);
@@ -834,7 +834,7 @@ Value* ShaderSystemValues::SetRingBufferDataFormat(
 // =====================================================================================================================
 // Find resource node by type
 const ResourceNode* ShaderSystemValues::FindResourceNodeByType(
-    ResourceMappingNodeType type)           // Resource node type to find
+    ResourceNodeType type)           // Resource node type to find
 {
     auto userDataNodes = m_pPipelineState->GetUserDataNodes();
     for (uint32_t i = 0; i < userDataNodes.size(); ++i)
@@ -857,7 +857,7 @@ uint32_t ShaderSystemValues::FindResourceNodeByDescSet(
     for (uint32_t i = 0; i < userDataNodes.size(); ++i)
     {
         auto pNode = &userDataNodes[i];
-        if ((pNode->type == ResourceMappingNodeType::DescriptorTableVaPtr) &&
+        if ((pNode->type == ResourceNodeType::DescriptorTableVaPtr) &&
               (pNode->innerTable[0].set == descSet))
         {
             return i;

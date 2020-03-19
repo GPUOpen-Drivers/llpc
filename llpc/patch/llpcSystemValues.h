@@ -138,7 +138,7 @@ private:
                                          BuilderBase&       builder) const;
 
     // Find resource node by type
-    const ResourceNode* FindResourceNodeByType(ResourceMappingNodeType type);
+    const ResourceNode* FindResourceNodeByType(ResourceNodeType type);
 
     // Find resource node by descriptor set ID
     uint32_t FindResourceNodeByDescSet(uint32_t descSet);

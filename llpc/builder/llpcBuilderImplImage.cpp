@@ -1262,7 +1262,7 @@ Value* BuilderImplImage::CreateImageSample(
                                 uint32_t descSet = cast<ConstantInt>(pDescPtrCall->getArgOperand(0))->getZExtValue();
                                 uint32_t binding = cast<ConstantInt>(pDescPtrCall->getArgOperand(1))->getZExtValue();
                                 const ResourceNode* pNode = m_pPipelineState->FindResourceNode(
-                                                                      ResourceMappingNodeType::DescriptorYCbCrSampler,
+                                                                      ResourceNodeType::DescriptorYCbCrSampler,
                                                                       descSet,
                                                                       binding).second;
                                 if (pNode)
