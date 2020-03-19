@@ -312,22 +312,22 @@ void PatchResourceCollect::SetNggControl()
         LLPC_OUTS("SubgroupSizing               = ");
         switch (nggControl.subgroupSizing)
         {
-        case NggSubgroupSizingType::Auto:
+        case NggSubgroupSizing::Auto:
             LLPC_OUTS("Auto\n");
             break;
-        case NggSubgroupSizingType::MaximumSize:
+        case NggSubgroupSizing::MaximumSize:
             LLPC_OUTS("MaximumSize\n");
             break;
-        case NggSubgroupSizingType::HalfSize:
+        case NggSubgroupSizing::HalfSize:
             LLPC_OUTS("HalfSize\n");
             break;
-        case NggSubgroupSizingType::OptimizeForVerts:
+        case NggSubgroupSizing::OptimizeForVerts:
             LLPC_OUTS("OptimizeForVerts\n");
             break;
-        case NggSubgroupSizingType::OptimizeForPrims:
+        case NggSubgroupSizing::OptimizeForPrims:
             LLPC_OUTS("OptimizeForPrims\n");
             break;
-        case NggSubgroupSizingType::Explicit:
+        case NggSubgroupSizing::Explicit:
             LLPC_OUTS("Explicit\n");
             break;
         default:
@@ -657,28 +657,28 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 // The numbers below come from hardware guidance and most likely require further tuning.
                 switch (pNggControl->subgroupSizing)
                 {
-                case NggSubgroupSizingType::HalfSize:
+                case NggSubgroupSizing::HalfSize:
                     esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
                     gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
                     break;
-                case NggSubgroupSizingType::OptimizeForVerts:
+                case NggSubgroupSizing::OptimizeForVerts:
                     esVertsPerSubgroup = (hasTs)             ? 128 : 126;
                     gsPrimsPerSubgroup = (hasTs || needsLds) ? 192 : Gfx9::NggMaxThreadsPerSubgroup;
                     break;
-                case NggSubgroupSizingType::OptimizeForPrims:
+                case NggSubgroupSizing::OptimizeForPrims:
                     esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
                     gsPrimsPerSubgroup = 128;
                     break;
-                case NggSubgroupSizingType::Explicit:
+                case NggSubgroupSizing::Explicit:
                     esVertsPerSubgroup = pNggControl->vertsPerSubgroup;
                     gsPrimsPerSubgroup = pNggControl->primsPerSubgroup;
                     break;
                 default:
-                case NggSubgroupSizingType::Auto:
+                case NggSubgroupSizing::Auto:
                     esVertsPerSubgroup = 126;
                     gsPrimsPerSubgroup = 128;
                     break;
-                case NggSubgroupSizingType::MaximumSize:
+                case NggSubgroupSizing::MaximumSize:
                     esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
                     gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
                     break;
@@ -691,29 +691,29 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 // (and vertsPerPrimitive) to avoid hanging.
                 switch (pNggControl->subgroupSizing)
                 {
-                case NggSubgroupSizingType::HalfSize:
+                case NggSubgroupSizing::HalfSize:
                     esVertsPerSubgroup = alignDown((Gfx9::NggMaxThreadsPerSubgroup / 2u), vertsPerPrimitive);
                     gsPrimsPerSubgroup = esVertsPerSubgroup / vertsPerPrimitive;
                     break;
-                case NggSubgroupSizingType::OptimizeForVerts:
+                case NggSubgroupSizing::OptimizeForVerts:
                     // Currently the programming of OptimizeForVerts is an inverse of MaximumSize. OptimizeForVerts is
                     // not expected to be a performant choice for fast launch, and as such MaximumSize, HalfSize, or
                     // Explicit should be chosen, with Explicit being optimal for non-point topologies.
                     gsPrimsPerSubgroup = alignDown(Gfx9::NggMaxThreadsPerSubgroup, vertsPerPrimitive);
                     esVertsPerSubgroup = gsPrimsPerSubgroup / vertsPerPrimitive;
                     break;
-                case NggSubgroupSizingType::Explicit:
+                case NggSubgroupSizing::Explicit:
                     esVertsPerSubgroup = pNggControl->vertsPerSubgroup;
                     gsPrimsPerSubgroup = pNggControl->primsPerSubgroup;
                     break;
-                case NggSubgroupSizingType::OptimizeForPrims:
+                case NggSubgroupSizing::OptimizeForPrims:
                     // Currently the programming of OptimizeForPrims is the same as MaximumSize, it is possible that
                     // this might change in the future. OptimizeForPrims is not expected to be a performant choice for
                     // fast launch, and as such MaximumSize, HalfSize, or Explicit should be chosen, with Explicit
                     // being optimal for non-point topologies.
                     // Fallthrough intentional.
-                case NggSubgroupSizingType::Auto:
-                case NggSubgroupSizingType::MaximumSize:
+                case NggSubgroupSizing::Auto:
+                case NggSubgroupSizing::MaximumSize:
                 default:
                     esVertsPerSubgroup = alignDown(Gfx9::NggMaxThreadsPerSubgroup, vertsPerPrimitive);
                     gsPrimsPerSubgroup = esVertsPerSubgroup / vertsPerPrimitive;

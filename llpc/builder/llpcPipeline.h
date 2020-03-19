@@ -72,6 +72,31 @@ enum NggFlag : uint32_t
     NggFlagEnableCullDistanceCulling = 0x1000,    // Enable culling when "cull distance" exports are present
 };
 
+// Enumerates various sizing options of sub-group size for NGG primitive shader.
+enum class NggSubgroupSizing : uint32_t
+{
+    Auto,                           ///< Sub-group size is allocated as optimally determined
+    MaximumSize,                    ///< Sub-group size is allocated to the maximum allowable size by the hardware
+    HalfSize,                       ///< Sub-group size is allocated as to allow half of the maximum allowable size
+                                    ///  by the hardware
+    OptimizeForVerts,               ///< Sub-group size is optimized for vertex thread utilization
+    OptimizeForPrims,               ///< Sub-group size is optimized for primitive thread utilization
+    Explicit,                       ///< Sub-group size is allocated based on explicitly-specified vertsPerSubgroup and
+                                    ///  primsPerSubgroup
+};
+
+// If next available quad falls outside tile aligned region of size defined by this enumeration, the compiler
+// will force end of vector in the compiler to shader wavefront.
+// All of these values except DrawTime correspond to settings of WAVE_BREAK_REGION_SIZE in PA_SC_SHADER_CONTROL.
+enum class WaveBreak : uint32_t
+{
+    None     = 0x0,        ///< No wave break by region
+    _8x8     = 0x1,        ///< Outside a 8x8 pixel region
+    _16x16   = 0x2,        ///< Outside a 16x16 pixel region
+    _32x32   = 0x3,        ///< Outside a 32x32 pixel region
+    DrawTime = 0xF,        ///< Choose wave break size per draw
+};
+
 // Middle-end per-pipeline options to pass to SetOptions.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
 // All fields are uint32_t, even those that could be bool, because the way the state is written to and read
@@ -91,7 +116,7 @@ struct Options
                                                    // (10 ^ -(backfaceExponent)) / abs(w0 * w1 * w2)
                                                    //  Only valid if the NGG backface culler is enabled.
                                                    //  A value of 0 will disable the threshold.
-    NggSubgroupSizingType nggSubgroupSizing;       // NGG subgroup sizing type
+    NggSubgroupSizing     nggSubgroupSizing;       // NGG subgroup sizing type
     uint32_t              nggVertsPerSubgroup;     // How to determine NGG verts per subgroup
     uint32_t              nggPrimsPerSubgroup;     // How to determine NGG prims per subgroup
 };
@@ -130,7 +155,7 @@ struct ShaderOptions
     uint32_t      waveSize;       // Control the number of threads per wavefront (GFX10+)
     uint32_t      subgroupSize;   // Override for the wave size when the shader uses gl_SubgroupSize, 0 for no override
     uint32_t      wgpMode;        // Whether to choose WGP mode or CU mode (GFX10+)
-    WaveBreakSize waveBreakSize;  // Size of region to force the end of a wavefront (GFX10+).
+    WaveBreak     waveBreakSize;  // Size of region to force the end of a wavefront (GFX10+).
                                   // Only valid for fragment shaders.
 
     // Vector szie threshold for load scalarizer. 0 means do not scalarize loads at all.
