@@ -34,7 +34,6 @@
 #include "g_palPipelineAbiMetadata.h"
 #include "llpcBuilderCommon.h"
 #include "llpcTargetInfo.h"
-#include "lgc/Defs.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 
 namespace llvm

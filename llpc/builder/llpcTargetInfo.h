@@ -30,7 +30,6 @@
  */
 #pragma once
 
-#include "lgc/Defs.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace lgc

@@ -30,7 +30,6 @@
  */
 #pragma once
 
-#include "lgc/Defs.h"
 #include "llpcBuilderCommon.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
