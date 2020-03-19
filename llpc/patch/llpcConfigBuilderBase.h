@@ -32,6 +32,7 @@
 
 #include "palPipelineAbi.h"
 #include "g_palPipelineAbiMetadata.h"
+#include "llpcTargetInfo.h"
 #include "lgc/Defs.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 

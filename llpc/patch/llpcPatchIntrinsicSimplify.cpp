@@ -45,7 +45,6 @@
 
 #include "llpcPatchIntrinsicSimplify.h"
 #include "llpcPipelineState.h"
-#include "llpcTargetInfo.h"
 
 #define DEBUG_TYPE "llpc-patch-intrinsic-simplify"
 

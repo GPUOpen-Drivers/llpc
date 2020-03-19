@@ -37,6 +37,7 @@
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
 #include "llpcSystemValues.h"
+#include "llpcTargetInfo.h"
 
 #include <set>
 

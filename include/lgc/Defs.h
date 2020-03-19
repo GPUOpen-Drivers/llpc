@@ -37,15 +37,6 @@ namespace Llpc
 
 static const uint32_t  MaxColorTargets = 8;
 
-/// Represents graphics IP version info. See https://llvm.org/docs/AMDGPUUsage.html#processors for more
-/// details.
-struct GfxIpVersion
-{
-    uint32_t        major;              ///< Major version
-    uint32_t        minor;              ///< Minor version
-    uint32_t        stepping;           ///< Stepping info
-};
-
 /// Enumerates LLPC shader stages.
 enum ShaderStage : uint32_t
 {

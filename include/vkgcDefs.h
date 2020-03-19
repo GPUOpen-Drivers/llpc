@@ -127,6 +127,15 @@ enum class Result : int32_t
     ErrorUnknown                    = -(0x00000006),
 };
 
+/// Represents graphics IP version info. See https://llvm.org/docs/AMDGPUUsage.html#processors for more
+/// details.
+struct GfxIpVersion
+{
+    uint32_t        major;              ///< Major version
+    uint32_t        minor;              ///< Minor version
+    uint32_t        stepping;           ///< Stepping info
+};
+
 /// Represents shader binary data.
 struct BinaryData
 {

@@ -39,7 +39,6 @@
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
 #include "llpcShaderMerger.h"
-#include "llpcTargetInfo.h"
 
 #define DEBUG_TYPE "llpc-shader-merger"
 

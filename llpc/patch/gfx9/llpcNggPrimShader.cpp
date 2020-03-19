@@ -45,7 +45,6 @@
 #include "llpcNggPrimShader.h"
 #include "llpcPassManager.h"
 #include "llpcShaderMerger.h"
-#include "llpcTargetInfo.h"
 
 #define DEBUG_TYPE "llpc-ngg-prim-shader"
 

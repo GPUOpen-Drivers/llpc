@@ -38,6 +38,15 @@ namespace Llpc
 
 using namespace llvm;
 
+// Represents graphics IP version info. See https://llvm.org/docs/AMDGPUUsage.html#processors for more
+// details.
+struct GfxIpVersion
+{
+    uint32_t        major;              // Major version
+    uint32_t        minor;              // Minor version
+    uint32_t        stepping;           // Stepping info
+};
+
 // Represents the properties of GPU device.
 struct GpuProperty
 {
