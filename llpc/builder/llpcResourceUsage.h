@@ -40,6 +40,23 @@ namespace Llpc
 
 static const uint32_t  MaxColorTargets = 8;
 
+/// Represents the base data type
+enum class BasicType : uint32_t
+{
+    Unknown = 0,          // Unknown
+    Float,                // Float
+    Double,               // Double
+    Int,                  // Signed integer
+    Uint,                 // Unsigned integer
+    Int64,                // 64-bit signed integer
+    Uint64,               // 64-bit unsigned integer
+    Float16,              // 16-bit floating-point
+    Int16,                // 16-bit signed integer
+    Uint16,               // 16-bit unsigned integer
+    Int8,                 // 8-bit signed integer
+    Uint8,                // 8-bit unsigned integer
+};
+
 // Represents descriptor set/binding pair.
 union DescriptorPair
 {
