@@ -270,7 +270,23 @@ void PipelineContext::SetOptionsInPipeline(
                   (nggState.enableSmallPrimFilter ? NggFlagEnableSmallPrimFilter : 0) |
                   (nggState.enableCullDistanceCulling ? NggFlagEnableCullDistanceCulling : 0);
             options.nggBackfaceExponent = nggState.backfaceExponent;
-            options.nggSubgroupSizing = nggState.subgroupSizing;
+
+            // Use a static cast from Vkgc NggSubgroupSizingType to LGC NggSubgroupSizing, and static assert that
+            // that is valid.
+            static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Auto) ==
+                                                         NggSubgroupSizing::Auto, "mismatch");
+            static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::MaximumSize) ==
+                                                         NggSubgroupSizing::MaximumSize, "mismatch");
+            static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::HalfSize) ==
+                                                         NggSubgroupSizing::HalfSize, "mismatch");
+            static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForVerts) ==
+                                                         NggSubgroupSizing::OptimizeForVerts, "mismatch");
+            static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForPrims) ==
+                                                         NggSubgroupSizing::OptimizeForPrims, "mismatch");
+            static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Explicit) ==
+                                                         NggSubgroupSizing::Explicit, "mismatch");
+            options.nggSubgroupSizing = static_cast<NggSubgroupSizing>(nggState.subgroupSizing);
+
             options.nggVertsPerSubgroup = nggState.vertsPerSubgroup;
             options.nggPrimsPerSubgroup = nggState.primsPerSubgroup;
         }
@@ -336,7 +352,15 @@ void PipelineContext::SetOptionsInPipeline(
                 // size for a shader that uses gl_SubgroupSize.
                 shaderOptions.subgroupSize = SubgroupSize;
             }
-            shaderOptions.waveBreakSize = pShaderInfo->options.waveBreakSize;
+
+            // Use a static cast from Vkgc WaveBreakSize to LGC WaveBreak, and static assert that
+            // that is valid.
+            static_assert(static_cast<WaveBreak>(WaveBreakSize::None) == WaveBreak::None, "mismatch");
+            static_assert(static_cast<WaveBreak>(WaveBreakSize::_8x8) == WaveBreak::_8x8, "mismatch");
+            static_assert(static_cast<WaveBreak>(WaveBreakSize::_16x16) == WaveBreak::_16x16, "mismatch");
+            static_assert(static_cast<WaveBreak>(WaveBreakSize::_32x32) == WaveBreak::_32x32, "mismatch");
+            static_assert(static_cast<WaveBreak>(WaveBreakSize::DrawTime) == WaveBreak::DrawTime, "mismatch");
+            shaderOptions.waveBreakSize = static_cast<WaveBreak>(pShaderInfo->options.waveBreakSize);
 
             shaderOptions.loadScalarizerThreshold = 0;
             if (EnableScalarLoad)

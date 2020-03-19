@@ -2288,7 +2288,7 @@ void ConfigBuilder::BuildPsRegConfig(
     {
         SET_REG_GFX10_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, MEM_ORDERED, true);
 
-        if (shaderOptions.waveBreakSize == Llpc::WaveBreakSize::DrawTime)
+        if (shaderOptions.waveBreakSize == Llpc::WaveBreak::DrawTime)
         {
             SetCalcWaveBreakSizeAtDrawTime(true);
         }

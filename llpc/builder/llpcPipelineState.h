@@ -59,8 +59,46 @@ ModulePass* CreatePipelineStateClearer();
 
 // =====================================================================================================================
 // Represents NGG (implicit primitive shader) control settings (valid for GFX10+)
-struct NggControl : NggState
+
+// Enumerates compaction modes after culling operations for NGG primitive shader.
+enum NggCompactMode : uint32_t
 {
+    NggCompactSubgroup,             // Compaction is based on the whole sub-group
+    NggCompactVertices,             // Compaction is based on vertices
+};
+
+// Represents NGG tuning options
+struct NggControl
+{
+    bool    enableNgg;                  // Enable NGG mode, use an implicit primitive shader
+    bool    enableGsUse;                // Enable NGG use on geometry shader
+    bool    forceNonPassthrough;        // Force NGG to run in non pass-through mode
+    bool    alwaysUsePrimShaderTable;   // Always use primitive shader table to fetch culling-control registers
+    NggCompactMode compactMode;         // Compaction mode after culling operations
+
+    bool    enableFastLaunch;           // Enable the hardware to launch subgroups of work at a faster rate
+    bool    enableVertexReuse;          // Enable optimization to cull duplicate vertices
+    bool    enableBackfaceCulling;      // Enable culling of primitives that don't meet facing criteria
+    bool    enableFrustumCulling;       // Enable discarding of primitives outside of view frustum
+    bool    enableBoxFilterCulling;     // Enable simpler frustum culler that is less accurate
+    bool    enableSphereCulling;        // Enable frustum culling based on a sphere
+    bool    enableSmallPrimFilter;      // Enable trivial sub-sample primitive culling
+    bool    enableCullDistanceCulling;  // Enable culling when "cull distance" exports are present
+
+    /// Following fields are used for NGG tuning
+    uint32_t backfaceExponent;          // Value from 1 to UINT32_MAX that will cause the backface culling
+                                        // algorithm to ignore area calculations that are less than
+                                        // (10 ^ -(backfaceExponent)) / abs(w0 * w1 * w2)
+                                        // Only valid if the NGG backface culler is enabled.
+                                        // A value of 0 will disable the threshold.
+
+    NggSubgroupSizing subgroupSizing;   // NGG sub-group sizing type
+
+    uint32_t primsPerSubgroup;          // Preferred number of GS primitives to pack into a primitive shader
+                                        // sub-group
+
+    uint32_t vertsPerSubgroup;          // Preferred number of vertices consumed by a primitive shader sub-group
+
     bool                            passthroughMode;      // Whether NGG passthrough mode is enabled
     Util::Abi::PrimShaderCbLayout   primShaderTable;      // Primitive shader table (only some registers are used)
 };
