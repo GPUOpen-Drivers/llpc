@@ -39,7 +39,7 @@
 #include "llpcTargetInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
-#include "llvm/CodeGen/CommandFlags.inc"
+#include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -49,12 +49,7 @@
 using namespace Llpc;
 using namespace llvm;
 
-namespace llvm
-{
-
-class PassRegistry;
-
-} // llvm
+static codegen::RegisterCodeGenFlags CGF;
 
 #ifndef NDEBUG
 static bool Initialized;
@@ -122,9 +117,10 @@ BuilderContext* BuilderContext::Create(
 
     BuilderContext* pBuilderContext = new BuilderContext(context);
 
+    std::string mcpuName = codegen::getMCPU(); // -mcpu setting from llvm/CodeGen/CommandFlags.h
     if (gpuName == "")
     {
-        gpuName = MCPU; // -mcpu setting from llvm/CodeGen/CommandFlags.inc
+        gpuName = mcpuName;
     }
 
     pBuilderContext->m_pTargetInfo = new TargetInfo;
@@ -263,9 +259,9 @@ void BuilderContext::AddTargetPasses(
     // TODO: We should probably be using InitTargetOptionsFromCodeGenFlags() here.
     // Currently we are not, and it would give an "unused function" warning when compiled with
     // CLANG. So we avoid the warning by referencing it here.
-    (void(&InitTargetOptionsFromCodeGenFlags)); // unused
+    (void(&codegen::InitTargetOptionsFromCodeGenFlags)); // unused
 
-    if (GetTargetMachine()->addPassesToEmitFile(passMgr, outStream, nullptr, FileType))
+    if (GetTargetMachine()->addPassesToEmitFile(passMgr, outStream, nullptr, codegen::getFileType()))
     {
         report_fatal_error("Target machine cannot emit a file of this type");
     }
