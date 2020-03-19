@@ -38,6 +38,8 @@
 namespace Llpc
 {
 
+static const uint32_t  MaxColorTargets = 8;
+
 // Represents descriptor set/binding pair.
 union DescriptorPair
 {

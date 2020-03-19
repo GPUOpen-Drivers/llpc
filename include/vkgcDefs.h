@@ -100,6 +100,7 @@ namespace Llpc
 
 static const uint32_t  Version = LLPC_INTERFACE_MAJOR_VERSION;
 static const uint32_t  InternalDescriptorSetId = static_cast<uint32_t>(-1);
+static const uint32_t  MaxColorTargets = 8;
 
 // Forward declarations
 class IShaderCache;

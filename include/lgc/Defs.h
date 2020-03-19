@@ -35,8 +35,6 @@
 namespace Llpc
 {
 
-static const uint32_t  MaxColorTargets = 8;
-
 /// Enumerates LLPC shader stages.
 enum ShaderStage : uint32_t
 {
