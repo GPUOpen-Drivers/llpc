@@ -76,17 +76,17 @@ private:
                                 llvm::Value*        pArrayOffset,
                                 llvm::Instruction*  pInsertPoint);
 
-    ResourceMappingNodeType CalcDescriptorOffsetAndSize(ResourceMappingNodeType   nodeType1,
-                                                        ResourceMappingNodeType   nodeType2,
-                                                        uint32_t                  descSet,
-                                                        uint32_t                  binding,
-                                                        uint32_t*                 pOffset,
-                                                        uint32_t*                 pStride,
-                                                        uint32_t*                 pDynDescIdx) const;
+    ResourceNodeType CalcDescriptorOffsetAndSize(ResourceNodeType   nodeType1,
+                                                 ResourceNodeType   nodeType2,
+                                                 uint32_t           descSet,
+                                                 uint32_t           binding,
+                                                 uint32_t*          pOffset,
+                                                 uint32_t*          pStride,
+                                                 uint32_t*          pDynDescIdx) const;
 
-    llvm::Constant* GetDescriptorRangeValue(ResourceMappingNodeType   nodeType,
-                                            uint32_t                  descSet,
-                                            uint32_t                  binding) const;
+    llvm::Constant* GetDescriptorRangeValue(ResourceNodeType   nodeType,
+                                            uint32_t           descSet,
+                                            uint32_t           binding) const;
 
     void PatchWaterfallLastUseCalls();
 
@@ -104,9 +104,6 @@ private:
     PipelineSystemValues                m_pipelineSysValues;  // Cache of ShaderValues object per shader
     std::vector<llvm::CallInst*>        m_descLoadCalls;      // List of instructions to load descriptors
     std::unordered_set<llvm::Function*> m_descLoadFuncs;      // Set of descriptor load functions
-
-    // Map from descriptor range value to global variables modeling related descriptors (act as immediate constants)
-    std::unordered_map<const DescriptorRangeValue*, llvm::GlobalVariable*> m_descs;
 
     PipelineState*                  m_pPipelineState = nullptr;
                                                               // Pipeline state from PipelineStateWrapper pass

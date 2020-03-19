@@ -687,7 +687,7 @@ public:
     ) = 0;
 
     // Create a load of the push constants pointer.
-    // This returns a pointer to the ResourceMappingNodeType::PushConst resource in the top-level user data table.
+    // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.
     virtual Value* CreateLoadPushConstantsPtr(
         Type*         pPushConstantsTy,   // [in] Type that the returned pointer will point to
         const Twine&  instName = "") = 0; // [in] Name to give instruction(s)

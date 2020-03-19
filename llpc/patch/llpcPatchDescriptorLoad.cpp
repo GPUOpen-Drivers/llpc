@@ -256,43 +256,43 @@ Value* PatchDescriptorLoad::LoadDescriptor(
 {
     StringRef mangledName = callInst.getCalledFunction()->getName();
     Type* pDescPtrTy = nullptr;
-    ResourceMappingNodeType nodeType1 = ResourceMappingNodeType::Unknown;
-    ResourceMappingNodeType nodeType2 = ResourceMappingNodeType::Unknown;
+    ResourceNodeType nodeType1 = ResourceNodeType::Unknown;
+    ResourceNodeType nodeType2 = ResourceNodeType::Unknown;
 
     // TODO: The address space ID 2 is a magic number. We have to replace it with defined LLPC address space ID.
     if (mangledName == LlpcName::DescriptorGetResourcePtr)
     {
         pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 8)->getPointerTo(ADDR_SPACE_CONST);
-        nodeType1 = ResourceMappingNodeType::DescriptorResource;
+        nodeType1 = ResourceNodeType::DescriptorResource;
         nodeType2 = nodeType1;
     }
     else if (mangledName == LlpcName::DescriptorGetSamplerPtr)
     {
         pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(ADDR_SPACE_CONST);
-        nodeType1 = ResourceMappingNodeType::DescriptorSampler;
+        nodeType1 = ResourceNodeType::DescriptorSampler;
         nodeType2 = nodeType1;
     }
     else if (mangledName == LlpcName::DescriptorGetFmaskPtr)
     {
         pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 8)->getPointerTo(ADDR_SPACE_CONST);
-        nodeType1 = ResourceMappingNodeType::DescriptorFmask;
+        nodeType1 = ResourceNodeType::DescriptorFmask;
         nodeType2 = nodeType1;
     }
     else if (mangledName == LlpcName::DescriptorLoadBuffer)
     {
         pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(ADDR_SPACE_CONST);
-        nodeType1 = ResourceMappingNodeType::DescriptorBuffer;
-        nodeType2 = ResourceMappingNodeType::PushConst;
+        nodeType1 = ResourceNodeType::DescriptorBuffer;
+        nodeType2 = ResourceNodeType::PushConst;
     }
     else if (mangledName == LlpcName::DescriptorLoadAddress)
     {
-        nodeType1 = ResourceMappingNodeType::PushConst;
+        nodeType1 = ResourceNodeType::PushConst;
         nodeType2 = nodeType1;
     }
     else if (mangledName == LlpcName::DescriptorGetTexelBufferPtr)
     {
         pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(ADDR_SPACE_CONST);
-        nodeType1 = ResourceMappingNodeType::DescriptorTexelBuffer;
+        nodeType1 = ResourceNodeType::DescriptorTexelBuffer;
         nodeType2 = nodeType1;
     }
     else
@@ -300,7 +300,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
         llvm_unreachable("Should never be called!");
     }
 
-    assert(nodeType1 != ResourceMappingNodeType::Unknown);
+    assert(nodeType1 != ResourceNodeType::Unknown);
 
     // Calculate descriptor offset (in bytes)
     uint32_t descOffset = 0;
@@ -309,7 +309,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
     Value*   pDesc = nullptr;
     Constant* pDescRangeValue = nullptr;
 
-    if (nodeType1 == ResourceMappingNodeType::DescriptorSampler)
+    if (nodeType1 == ResourceNodeType::DescriptorSampler)
     {
         pDescRangeValue = GetDescriptorRangeValue(nodeType1, descSet, binding);
     }
@@ -359,7 +359,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
                                                          &descOffset,
                                                          &descSize,
                                                          &dynDescIdx);
-        if (foundNodeType == ResourceMappingNodeType::PushConst)
+        if (foundNodeType == ResourceNodeType::PushConst)
         {
             // Handle the case of an inline const node when we were expecting a buffer descriptor.
             nodeType1 = foundNodeType;
@@ -407,7 +407,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
                 llvm_unreachable("Should never be called!");
             }
         }
-        else if (nodeType1 == ResourceMappingNodeType::PushConst)
+        else if (nodeType1 == ResourceNodeType::PushConst)
         {
             auto pDescTablePtr =
                 m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(descSet);
@@ -526,7 +526,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
             {
                 pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetInternalPerShaderTablePtr();
             }
-            else if ((EnableShadowDescriptorTable) && (nodeType1 == ResourceMappingNodeType::DescriptorFmask))
+            else if ((EnableShadowDescriptorTable) && (nodeType1 == ResourceNodeType::DescriptorFmask))
             {
                 pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetShadowDescTablePtr(descSet);
             }
@@ -544,7 +544,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
             pLoad->setAlignment(MaybeAlign(16));
             pDesc = pLoad;
 
-            if (foundNodeType == ResourceMappingNodeType::DescriptorBufferCompact)
+            if (foundNodeType == ResourceNodeType::DescriptorBufferCompact)
             {
                 assert(descSizeInDword == DescriptorSizeBufferCompact / sizeof(uint32_t));
                 pDesc = BuildBufferCompactDesc(pDesc, pInsertPoint);
@@ -558,7 +558,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
 // =====================================================================================================================
 // Gets the descriptor value of the specified descriptor.
 Constant* PatchDescriptorLoad::GetDescriptorRangeValue(
-    ResourceMappingNodeType   nodeType,   // Type of the resource mapping node
+    ResourceNodeType          nodeType,   // Type of the resource mapping node
     uint32_t                  descSet,    // ID of descriptor set
     uint32_t                  binding     // ID of descriptor binding
     ) const
@@ -566,12 +566,12 @@ Constant* PatchDescriptorLoad::GetDescriptorRangeValue(
     auto userDataNodes = m_pPipelineState->GetUserDataNodes();
     for (const ResourceNode& node : userDataNodes)
     {
-        if (node.type == ResourceMappingNodeType::DescriptorTableVaPtr)
+        if (node.type == ResourceNodeType::DescriptorTableVaPtr)
         {
             for (const ResourceNode& innerNode : node.innerTable)
             {
-                if (((innerNode.type == ResourceMappingNodeType::DescriptorSampler) ||
-                     (innerNode.type == ResourceMappingNodeType::DescriptorCombinedTexture)) &&
+                if (((innerNode.type == ResourceNodeType::DescriptorSampler) ||
+                     (innerNode.type == ResourceNodeType::DescriptorCombinedTexture)) &&
                     (innerNode.set == descSet) &&
                     (innerNode.binding == binding))
                 {
@@ -579,8 +579,8 @@ Constant* PatchDescriptorLoad::GetDescriptorRangeValue(
                 }
             }
         }
-        else if (((node.type == ResourceMappingNodeType::DescriptorSampler) ||
-                  (node.type == ResourceMappingNodeType::DescriptorCombinedTexture)) &&
+        else if (((node.type == ResourceNodeType::DescriptorSampler) ||
+                  (node.type == ResourceNodeType::DescriptorCombinedTexture)) &&
                  (node.set == descSet) &&
                  (node.binding == binding))
         {
@@ -691,10 +691,10 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
 // =====================================================================================================================
 // Calculates the offset and size for the specified descriptor.
 //
-// Returns the type actually found, or ResourceMappingNodeType::Unknown if not found.
-ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
-    ResourceMappingNodeType   nodeType1,      // The first resource node type for calculation
-    ResourceMappingNodeType   nodeType2,      // The second resource node type for calculation (alternative)
+// Returns the type actually found, or ResourceNodeType::Unknown if not found.
+ResourceNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
+    ResourceNodeType          nodeType1,      // The first resource node type for calculation
+    ResourceNodeType          nodeType2,      // The second resource node type for calculation (alternative)
     uint32_t                  descSet,        // ID of descriptor set
     uint32_t                  binding,        // ID of descriptor binding
     uint32_t*                 pOffset,        // [out] Calculated offset of the descriptor
@@ -703,7 +703,7 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
     ) const
 {
     bool exist = false;
-    ResourceMappingNodeType foundNodeType = ResourceMappingNodeType::Unknown;
+    ResourceNodeType foundNodeType = ResourceNodeType::Unknown;
 
     *pDynDescIdx = InvalidValue;
     *pOffset = 0;
@@ -719,50 +719,50 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
         exist = true;
     }
 
-    if (EnableShadowDescriptorTable && (nodeType1 == ResourceMappingNodeType::DescriptorFmask))
+    if (EnableShadowDescriptorTable && (nodeType1 == ResourceNodeType::DescriptorFmask))
     {
         // NOTE: When shadow descriptor table is enable, we need get F-Mask descriptor node from
         // associated multi-sampled texture resource node. So we have to change nodeType1 to
         // DescriptorResource during the search.
-        nodeType1 = ResourceMappingNodeType::DescriptorResource;
+        nodeType1 = ResourceNodeType::DescriptorResource;
     }
 
     auto userDataNodes = m_pPipelineState->GetUserDataNodes();
     for (uint32_t i = 0; (i < userDataNodes.size()) && (exist == false); ++i)
     {
         auto pSetNode = &userDataNodes[i];
-        if  ((pSetNode->type == ResourceMappingNodeType::DescriptorResource) ||
-             (pSetNode->type == ResourceMappingNodeType::DescriptorSampler) ||
-             (pSetNode->type == ResourceMappingNodeType::DescriptorTexelBuffer) ||
-             (pSetNode->type == ResourceMappingNodeType::DescriptorFmask) ||
-             (pSetNode->type == ResourceMappingNodeType::DescriptorBuffer) ||
-             (pSetNode->type == ResourceMappingNodeType::DescriptorBufferCompact))
+        if  ((pSetNode->type == ResourceNodeType::DescriptorResource) ||
+             (pSetNode->type == ResourceNodeType::DescriptorSampler) ||
+             (pSetNode->type == ResourceNodeType::DescriptorTexelBuffer) ||
+             (pSetNode->type == ResourceNodeType::DescriptorFmask) ||
+             (pSetNode->type == ResourceNodeType::DescriptorBuffer) ||
+             (pSetNode->type == ResourceNodeType::DescriptorBufferCompact))
         {
             if ((descSet == pSetNode->set) &&
                 (binding == pSetNode->binding) &&
                 ((nodeType1 == pSetNode->type) ||
                  (nodeType2 == pSetNode->type) ||
-                 ((nodeType1 == ResourceMappingNodeType::DescriptorBuffer) &&
-                 (pSetNode->type == ResourceMappingNodeType::DescriptorBufferCompact))))
+                 ((nodeType1 == ResourceNodeType::DescriptorBuffer) &&
+                 (pSetNode->type == ResourceNodeType::DescriptorBufferCompact))))
             {
                 *pOffset = pSetNode->offsetInDwords;
-                if ((pSetNode->type == ResourceMappingNodeType::DescriptorResource) ||
-                    (pSetNode->type == ResourceMappingNodeType::DescriptorFmask))
+                if ((pSetNode->type == ResourceNodeType::DescriptorResource) ||
+                    (pSetNode->type == ResourceNodeType::DescriptorFmask))
                 {
                     *pSize = DescriptorSizeResource;
                 }
-                else if (pSetNode->type == ResourceMappingNodeType::DescriptorSampler)
+                else if (pSetNode->type == ResourceNodeType::DescriptorSampler)
                 {
                     *pSize = DescriptorSizeSampler;
                 }
-                else if ((pSetNode->type == ResourceMappingNodeType::DescriptorBuffer) ||
-                         (pSetNode->type == ResourceMappingNodeType::DescriptorTexelBuffer))
+                else if ((pSetNode->type == ResourceNodeType::DescriptorBuffer) ||
+                         (pSetNode->type == ResourceNodeType::DescriptorTexelBuffer))
                 {
                     *pSize = DescriptorSizeBuffer;
                 }
                 else
                 {
-                    assert(pSetNode->type == ResourceMappingNodeType::DescriptorBufferCompact);
+                    assert(pSetNode->type == ResourceNodeType::DescriptorBufferCompact);
                     *pSize = DescriptorSizeBufferCompact;
                 }
 
@@ -772,60 +772,60 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
             }
             ++dynDescIdx;
         }
-        else if (pSetNode->type == ResourceMappingNodeType::DescriptorTableVaPtr)
+        else if (pSetNode->type == ResourceNodeType::DescriptorTableVaPtr)
         {
             for (uint32_t j = 0; (j < pSetNode->innerTable.size()) && (exist == false); ++j)
             {
                 auto pNode = &pSetNode->innerTable[j];
                 switch (pNode->type)
                 {
-                case ResourceMappingNodeType::DescriptorResource:
-                case ResourceMappingNodeType::DescriptorSampler:
-                case ResourceMappingNodeType::DescriptorFmask:
-                case ResourceMappingNodeType::DescriptorTexelBuffer:
-                case ResourceMappingNodeType::DescriptorBuffer:
-                case ResourceMappingNodeType::PushConst:
-                case ResourceMappingNodeType::DescriptorBufferCompact:
+                case ResourceNodeType::DescriptorResource:
+                case ResourceNodeType::DescriptorSampler:
+                case ResourceNodeType::DescriptorFmask:
+                case ResourceNodeType::DescriptorTexelBuffer:
+                case ResourceNodeType::DescriptorBuffer:
+                case ResourceNodeType::PushConst:
+                case ResourceNodeType::DescriptorBufferCompact:
                     {
                         if ((pNode->set == descSet) &&
                             (pNode->binding == binding) &&
                             ((nodeType1 == pNode->type) ||
                              (nodeType2 == pNode->type) ||
-                             ((nodeType1 == ResourceMappingNodeType::DescriptorBuffer) &&
-                             (pNode->type == ResourceMappingNodeType::DescriptorBufferCompact))))
+                             ((nodeType1 == ResourceNodeType::DescriptorBuffer) &&
+                             (pNode->type == ResourceNodeType::DescriptorBufferCompact))))
                         {
                             exist = true;
                             foundNodeType = pNode->type;
 
-                            if (pNode->type == ResourceMappingNodeType::DescriptorResource)
+                            if (pNode->type == ResourceNodeType::DescriptorResource)
                             {
                                 *pOffset = pNode->offsetInDwords * sizeof(uint32_t);
                                 *pSize = DescriptorSizeResource;
                             }
-                            else if (pNode->type == ResourceMappingNodeType::DescriptorSampler)
+                            else if (pNode->type == ResourceNodeType::DescriptorSampler)
                             {
                                 *pOffset = pNode->offsetInDwords * sizeof(uint32_t);
                                 *pSize = DescriptorSizeSampler;
                             }
-                            else if (pNode->type == ResourceMappingNodeType::DescriptorFmask)
+                            else if (pNode->type == ResourceNodeType::DescriptorFmask)
                             {
                                 *pOffset = pNode->offsetInDwords * sizeof(uint32_t);
                                 *pSize = DescriptorSizeResource;
                             }
-                            else if (pNode->type == ResourceMappingNodeType::PushConst)
+                            else if (pNode->type == ResourceNodeType::PushConst)
                             {
                                 *pOffset = pNode->offsetInDwords * sizeof(uint32_t);
                                 *pSize = pNode->sizeInDwords * sizeof(uint32_t);
                             }
-                            else if (pNode->type == ResourceMappingNodeType::DescriptorBufferCompact)
+                            else if (pNode->type == ResourceNodeType::DescriptorBufferCompact)
                             {
                                 *pOffset = pNode->offsetInDwords * sizeof(uint32_t);
                                 *pSize = pNode->sizeInDwords * sizeof(uint32_t);
                             }
                             else
                             {
-                                assert((pNode->type == ResourceMappingNodeType::DescriptorBuffer) ||
-                                             (pNode->type == ResourceMappingNodeType::DescriptorTexelBuffer));
+                                assert((pNode->type == ResourceNodeType::DescriptorBuffer) ||
+                                             (pNode->type == ResourceNodeType::DescriptorTexelBuffer));
                                 *pOffset = pNode->offsetInDwords * sizeof(uint32_t);
                                 *pSize = DescriptorSizeBuffer;
                             }
@@ -833,26 +833,26 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
 
                         break;
                     }
-                case ResourceMappingNodeType::DescriptorCombinedTexture:
+                case ResourceNodeType::DescriptorCombinedTexture:
                     {
                         // TODO: Check descriptor binding in Vulkan API call to make sure sampler and texture are
                         // bound in this way.
                         if ((pNode->set == descSet) &&
                             (pNode->binding == binding) &&
-                            ((nodeType1 == ResourceMappingNodeType::DescriptorResource) ||
-                            (nodeType1 == ResourceMappingNodeType::DescriptorSampler)))
+                            ((nodeType1 == ResourceNodeType::DescriptorResource) ||
+                            (nodeType1 == ResourceNodeType::DescriptorSampler)))
                         {
                             exist = true;
                             foundNodeType = pNode->type;
 
-                            if (nodeType1 == ResourceMappingNodeType::DescriptorResource)
+                            if (nodeType1 == ResourceNodeType::DescriptorResource)
                             {
                                 *pOffset = pNode->offsetInDwords * sizeof(uint32_t);
                                 *pSize   = DescriptorSizeResource + DescriptorSizeSampler;
                             }
                             else
                             {
-                                assert(nodeType1 == ResourceMappingNodeType::DescriptorSampler);
+                                assert(nodeType1 == ResourceNodeType::DescriptorSampler);
                                 *pOffset = pNode->offsetInDwords * sizeof(uint32_t) + DescriptorSizeResource;
                                 *pSize   = DescriptorSizeResource + DescriptorSizeSampler;
                             }
@@ -860,12 +860,12 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
 
                         break;
                     }
-                    case ResourceMappingNodeType::DescriptorYCbCrSampler:
+                    case ResourceNodeType::DescriptorYCbCrSampler:
                     {
                         if ((pNode->set == descSet) &&
                             (pNode->binding == binding) &&
-                            ((nodeType1 == ResourceMappingNodeType::DescriptorResource) ||
-                            (nodeType1 == ResourceMappingNodeType::DescriptorSampler)))
+                            ((nodeType1 == ResourceNodeType::DescriptorResource) ||
+                            (nodeType1 == ResourceNodeType::DescriptorSampler)))
                         {
                             exist = true;
                             foundNodeType = pNode->type;

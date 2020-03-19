@@ -218,7 +218,7 @@ Value* BuilderImplDesc::CreateGetFmaskDescPtr(
 
 // =====================================================================================================================
 // Create a load of the push constants table pointer.
-// This returns a pointer to the ResourceMappingNodeType::PushConst resource in the top-level user data table.
+// This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.
 // The type passed must have the correct size for the push constants.
 Value* BuilderImplDesc::CreateLoadPushConstantsPtr(
     Type*         pPushConstantsTy, // [in] Type of the push constants table that the returned pointer will point to

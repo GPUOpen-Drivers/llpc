@@ -58,34 +58,6 @@ class TargetInfo;
 ModulePass* CreatePipelineStateClearer();
 
 // =====================================================================================================================
-// The representation of a user data resource node in PipelineState
-struct ResourceNode
-{
-    ResourceNode() {}
-
-    ResourceMappingNodeType                 type;
-    uint32_t                                sizeInDwords;
-    uint32_t                                offsetInDwords;
-
-    union
-    {
-        // Info for generic descriptor nodes.
-        struct
-        {
-            uint32_t                        set;
-            uint32_t                        binding;
-            Constant*                       pImmutableValue;
-        };
-
-        // Info for DescriptorTableVaPtr
-        ArrayRef<ResourceNode>              innerTable;
-
-        // Info for indirect data nodes (IndirectUserDataVaPtr, StreamOutVaTablePtr)
-        uint32_t                            indirectSizeInDwords;
-    };
-};
-
-// =====================================================================================================================
 // Represents NGG (implicit primitive shader) control settings (valid for GFX10+)
 struct NggControl : NggState
 {
@@ -108,8 +80,7 @@ public:
     // Implementations of Pipeline methods exposed to the front-end
 
     // Set the resource mapping nodes for the pipeline
-    void SetUserDataNodes(ArrayRef<ResourceMappingNode>   nodes,
-                          ArrayRef<DescriptorRangeValue>  rangeValues) override final;
+    void SetUserDataNodes(ArrayRef<ResourceNode> nodes) override final;
 
     // Set shader stage mask
     void SetShaderStageMask(uint32_t mask) override final { m_stageMask = mask; }
@@ -182,9 +153,9 @@ public:
     ArrayRef<ResourceNode> GetUserDataNodes() const { return m_userDataNodes; }
 
     // Find the resource node for the given set,binding
-    std::pair<const ResourceNode*, const ResourceNode*> FindResourceNode(ResourceMappingNodeType  nodeType,
-                                                                         uint32_t                 descSet,
-                                                                         uint32_t                 binding) const;
+    std::pair<const ResourceNode*, const ResourceNode*> FindResourceNode(ResourceNodeType  nodeType,
+                                                                         uint32_t          descSet,
+                                                                         uint32_t          binding) const;
 
     // Return whether we have a converting sampler in the user data nodes.
     bool HaveConvertingSampler() const { return m_haveConvertingSampler; }
@@ -237,8 +208,8 @@ public:
     // Gets name string of the abbreviation for the specified shader stage
     static const char* GetShaderStageAbbreviation(ShaderStage shaderStage);
 
-    // Translate enum "ResourceMappingNodeType" to string
-    static const char* GetResourceMappingNodeTypeName(ResourceMappingNodeType type);
+    // Translate enum "ResourceNodeType" to string
+    static const char* GetResourceNodeTypeName(ResourceNodeType type);
 
     // -----------------------------------------------------------------------------------------------------------------
     // Utility method templates to read and write IR metadata, used by PipelineState and ShaderModes
@@ -334,9 +305,6 @@ public:
     }
 
 private:
-    // Type of immutable nodes map used in SetUserDataNodes
-    typedef std::map<std::pair<uint32_t, uint32_t>, const DescriptorRangeValue*> ImmutableNodesMap;
-
     // Read shaderStageMask from IR
     void ReadShaderStageMask(Module* pModule);
 
@@ -345,16 +313,15 @@ private:
     void ReadOptions(Module* pModule);
 
     // User data nodes handling
-    void SetUserDataNodesTable(ArrayRef<ResourceMappingNode>        nodes,
-                               const ImmutableNodesMap&             immutableNodesMap,
+    void SetUserDataNodesTable(ArrayRef<ResourceNode>               nodes,
                                ResourceNode*                        pDestTable,
                                ResourceNode*&                       pDestInnerTable);
     void RecordUserDataNodes(Module* pModule);
     void RecordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNode* pUserDataMetaNode);
     void ReadUserDataNodes(Module* pModule);
     ArrayRef<MDString*> GetResourceTypeNames();
-    MDString* GetResourceTypeName(ResourceMappingNodeType type);
-    ResourceMappingNodeType GetResourceTypeFromName(MDString* pTypeName);
+    MDString* GetResourceTypeName(ResourceNodeType type);
+    ResourceNodeType GetResourceTypeFromName(MDString* pTypeName);
 
     // Device index handling
     void RecordDeviceIndex(Module* pModule);
@@ -384,7 +351,7 @@ private:
     std::unique_ptr<ResourceNode[]> m_allocUserDataNodes;               // Allocated buffer for user data
     ArrayRef<ResourceNode>          m_userDataNodes;                    // Top-level user data node table
     bool                            m_haveConvertingSampler = false;    // Whether we have a converting sampler
-    MDString*                       m_resourceNodeTypeNames[uint32_t(ResourceMappingNodeType::Count)] = {};
+    MDString*                       m_resourceNodeTypeNames[uint32_t(ResourceNodeType::Count)] = {};
                                                                         // Cached MDString for each resource node type
 
     bool                            m_gsOnChip = false;                 // Whether to use GS on-chip mode

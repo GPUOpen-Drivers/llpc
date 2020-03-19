@@ -378,11 +378,168 @@ void PipelineContext::SetUserDataInPipeline(
     {
         pShaderInfo = GetPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
     }
-    ArrayRef<ResourceMappingNode> userDataNodes(pShaderInfo->pUserDataNodes,
-                                                pShaderInfo->userDataNodeCount);
+
+    // Translate the resource nodes into the LGC format expected by Pipeline::SetUserDataNodes.
+    ArrayRef<ResourceMappingNode> nodes(pShaderInfo->pUserDataNodes, pShaderInfo->userDataNodeCount);
     ArrayRef<DescriptorRangeValue> descriptorRangeValues(pShaderInfo->pDescriptorRangeValues,
                                                          pShaderInfo->descriptorRangeValueCount);
-    pPipeline->SetUserDataNodes(userDataNodes, descriptorRangeValues);
+
+    // First, create a map of immutable nodes.
+    ImmutableNodesMap immutableNodesMap;
+    for (auto& rangeValue : descriptorRangeValues)
+    {
+        immutableNodesMap[{ rangeValue.set, rangeValue.binding }] = &rangeValue;
+    }
+
+    // Count how many user data nodes we have, and allocate the buffer.
+    uint32_t nodeCount = nodes.size();
+    for (auto& node : nodes)
+    {
+        if (node.type == ResourceMappingNodeType::DescriptorTableVaPtr)
+        {
+            nodeCount += node.tablePtr.nodeCount;
+        }
+    }
+    auto allocUserDataNodes = std::make_unique<ResourceNode[]>(nodeCount);
+
+    // Copy nodes in.
+    ResourceNode* pDestTable = allocUserDataNodes.get();
+    ResourceNode* pDestInnerTable = pDestTable + nodeCount;
+    auto userDataNodes = ArrayRef<ResourceNode>(pDestTable, nodes.size());
+    SetUserDataNodesTable(pPipeline->GetContext(), nodes, immutableNodesMap, pDestTable, pDestInnerTable);
+    assert(pDestInnerTable == pDestTable + nodes.size());
+
+    // Give the table to the LGC Pipeline interface.
+    pPipeline->SetUserDataNodes(userDataNodes);
+}
+
+// =====================================================================================================================
+// Set one user data table, and its inner tables. Used by SetUserDataInPipeline above, and recursively calls
+// itself for an inner table. This translates from a Vkgc ResourceMappingNode to an LGC ResourceNode.
+void PipelineContext::SetUserDataNodesTable(
+    LLVMContext&                  context,                // LLVM context
+    ArrayRef<ResourceMappingNode> nodes,                  // The resource mapping nodes
+    const ImmutableNodesMap&      immutableNodesMap,      // [in] Map of immutable nodes
+    ResourceNode*                 pDestTable,             // [out] Where to write nodes
+    ResourceNode*&                pDestInnerTable) const  // [in/out] End of space available for inner tables
+{
+    for (uint32_t idx = 0; idx != nodes.size(); ++idx)
+    {
+        auto& node = nodes[idx];
+        auto& destNode = pDestTable[idx];
+
+        destNode.sizeInDwords = node.sizeInDwords;
+        destNode.offsetInDwords = node.offsetInDwords;
+
+        switch (node.type)
+        {
+        case ResourceMappingNodeType::DescriptorTableVaPtr:
+            {
+                // Process an inner table.
+                destNode.type = ResourceNodeType::DescriptorTableVaPtr;
+                pDestInnerTable -= node.tablePtr.nodeCount;
+                destNode.innerTable = ArrayRef<ResourceNode>(pDestInnerTable, node.tablePtr.nodeCount);
+                SetUserDataNodesTable(context,
+                                      ArrayRef<ResourceMappingNode>(node.tablePtr.pNext, node.tablePtr.nodeCount),
+                                      immutableNodesMap,
+                                      pDestInnerTable,
+                                      pDestInnerTable);
+                break;
+            }
+        case ResourceMappingNodeType::IndirectUserDataVaPtr:
+            {
+                // Process an indirect pointer.
+                destNode.type = ResourceNodeType::IndirectUserDataVaPtr;
+                destNode.indirectSizeInDwords = node.userDataPtr.sizeInDwords;
+                break;
+            }
+        case ResourceMappingNodeType::StreamOutTableVaPtr:
+            {
+                // Process an indirect pointer.
+                destNode.type = ResourceNodeType::StreamOutTableVaPtr;
+                destNode.indirectSizeInDwords = node.userDataPtr.sizeInDwords;
+                break;
+            }
+        default:
+            {
+                // Process an SRD. First check that a static_cast works to convert a Vkgc ResourceMappingNodeType
+                // to an LGC ResourceNodeType (with the exception of DescriptorCombinedBvhBuffer, whose value
+                // accidentally depends on LLPC version).
+                static_assert(ResourceNodeType::DescriptorResource ==
+                              static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorResource),
+                              "mismatch");
+                static_assert(ResourceNodeType::DescriptorSampler ==
+                              static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorSampler),
+                              "mismatch");
+                static_assert(ResourceNodeType::DescriptorCombinedTexture ==
+                              static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorCombinedTexture),
+                              "mismatch");
+                static_assert(ResourceNodeType::DescriptorTexelBuffer ==
+                              static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorTexelBuffer),
+                              "mismatch");
+                static_assert(ResourceNodeType::DescriptorFmask ==
+                              static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorFmask),
+                              "mismatch");
+                static_assert(ResourceNodeType::DescriptorBuffer ==
+                              static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorBuffer),
+                              "mismatch");
+                static_assert(ResourceNodeType::PushConst ==
+                              static_cast<ResourceNodeType>(ResourceMappingNodeType::PushConst),
+                              "mismatch");
+                static_assert(ResourceNodeType::DescriptorBufferCompact ==
+                              static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorBufferCompact),
+                              "mismatch");
+                if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
+                {
+                    destNode.type = ResourceNodeType::DescriptorYCbCrSampler;
+                }
+                else
+                {
+                    destNode.type = static_cast<ResourceNodeType>(node.type);
+                }
+
+                destNode.set = node.srdRange.set;
+                destNode.binding = node.srdRange.binding;
+                destNode.pImmutableValue = nullptr;
+
+                auto it = immutableNodesMap.find(std::pair<uint32_t, uint32_t>(destNode.set, destNode.binding));
+                if (it != immutableNodesMap.end())
+                {
+                    // This set/binding is (or contains) an immutable value. The value can only be a sampler, so we
+                    // can assume it is four dwords.
+                    auto& immutableNode = *it->second;
+
+                    IRBuilder<> builder(context);
+                    SmallVector<Constant*, 8> values;
+
+                    if (immutableNode.arraySize != 0)
+                    {
+                        const uint32_t samplerDescriptorSize =
+                            (node.type != ResourceMappingNodeType::DescriptorYCbCrSampler) ? 4 : 8;
+
+                        for (uint32_t compIdx = 0; compIdx < immutableNode.arraySize; ++compIdx)
+                        {
+                            Constant* compValues[8] = {};
+                            for (uint32_t i = 0; i < samplerDescriptorSize; ++i)
+                            {
+                                compValues[i] =
+                                    builder.getInt32(immutableNode.pValue[compIdx * samplerDescriptorSize + i]);
+                            }
+                            for (uint32_t i = samplerDescriptorSize; i < 8; ++i)
+                            {
+                                compValues[i] = builder.getInt32(0);
+                            }
+                            values.push_back(ConstantVector::get(compValues));
+                        }
+                        destNode.pImmutableValue = ConstantArray::get(ArrayType::get(values[0]->getType(),
+                                                                                     values.size()),
+                                                                      values);
+                    }
+                }
+                break;
+            }
+        }
+    }
 }
 
 // =====================================================================================================================

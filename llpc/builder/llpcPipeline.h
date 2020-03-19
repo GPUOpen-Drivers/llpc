@@ -147,6 +147,68 @@ struct ShaderOptions
 };
 
 // =====================================================================================================================
+// Definitions for user data resource nodes
+
+/// Enumerates the function of a particular node in a shader's resource mapping graph.
+enum class ResourceNodeType : uint32_t
+{
+    Unknown,                        ///< Invalid type
+    DescriptorResource,             ///< Generic descriptor: resource, including texture resource, image, input
+                                    ///  attachment
+    DescriptorSampler,              ///< Generic descriptor: sampler
+    DescriptorCombinedTexture,      ///< Generic descriptor: combined texture, combining resource descriptor with
+                                    ///  sampler descriptor of the same texture, starting with resource descriptor
+    DescriptorTexelBuffer,          ///< Generic descriptor: texel buffer, including texture buffer and image buffer
+    DescriptorFmask,                ///< Generic descriptor: F-mask
+    DescriptorBuffer,               ///< Generic descriptor: buffer, including uniform buffer and shader storage buffer
+    DescriptorTableVaPtr,           ///< Descriptor table VA pointer
+    IndirectUserDataVaPtr,          ///< Indirect user data VA pointer
+    PushConst,                      ///< Push constant
+    DescriptorBufferCompact,        ///< Compact buffer descriptor, only contains the buffer address
+    StreamOutTableVaPtr,            ///< Stream-out buffer table VA pointer
+    DescriptorReserved12,
+    DescriptorYCbCrSampler,         ///< Generic descriptor: YCbCr sampler
+    Count,                          ///< Count of resource mapping node types.
+};
+
+// The representation of a user data resource node
+struct ResourceNode
+{
+    ResourceNode() {}
+
+    ResourceNodeType            type;                 // Type of this node
+    uint32_t                    sizeInDwords;         // Size in dwords
+    uint32_t                    offsetInDwords;       // Offset in dwords
+
+    union
+    {
+        // Info for generic descriptor nodes.
+        struct
+        {
+            uint32_t            set;                  // Descriptor set
+            uint32_t            binding;              // Binding
+            Constant*           pImmutableValue;      // Array of vectors of i32 constants for immutable value
+        };
+
+        // Info for DescriptorTableVaPtr
+        ArrayRef<ResourceNode>  innerTable;
+
+        // Info for indirect data nodes (IndirectUserDataVaPtr, StreamOutVaTablePtr)
+        uint32_t                indirectSizeInDwords;
+    };
+};
+
+/// Represents the info of immutable descriptor.
+struct ImmutableDescriptor
+{
+    ResourceNodeType        type;       ///< Type of this resource node (currently, only sampler is supported)
+    uint32_t                set;        ///< ID of descriptor set
+    uint32_t                binding;    ///< ID of descriptor binding
+    uint32_t                arraySize;  ///< Element count for arrayed binding
+    const uint32_t*         pValue;     ///< Static SRDs
+};
+
+// =====================================================================================================================
 // Structs for setting pipeline state.
 // The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
 // All fields are uint32_t, even those that could be bool, because the way the state is written to and read
@@ -487,8 +549,8 @@ public:
     // If using a BuilderImpl, this method must be called before any Create* methods.
     // If using a BuilderRecorder, it can be delayed until after linking.
     virtual void SetUserDataNodes(
-        ArrayRef<ResourceMappingNode>   nodes,            // The resource mapping nodes
-        ArrayRef<DescriptorRangeValue>  rangeValues) = 0; // The descriptor range values
+        ArrayRef<ResourceNode>          nodes) = 0;       // The resource mapping nodes. Only used for the duration
+                                                          //  of the call; the call copies the nodes.
 
     // Set device index.
     virtual void SetDeviceIndex(uint32_t deviceIndex) = 0;

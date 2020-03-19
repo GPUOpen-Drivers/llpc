@@ -169,11 +169,19 @@ private:
     PipelineContext(const PipelineContext&) = delete;
     PipelineContext& operator=(const PipelineContext&) = delete;
 
+    // Type of immutable nodes map used in SetUserDataNodesTable
+    typedef std::map<std::pair<uint32_t, uint32_t>, const DescriptorRangeValue*> ImmutableNodesMap;
+
     // Give the pipeline options to the middle-end.
     void SetOptionsInPipeline(Pipeline* pPipeline) const;
 
     // Give the user data nodes and descriptor range values to the middle-end.
     void SetUserDataInPipeline(Pipeline* pPipeline) const;
+    void SetUserDataNodesTable(llvm::LLVMContext&                   context,
+                               ArrayRef<ResourceMappingNode>        nodes,
+                               const ImmutableNodesMap&             immutableNodesMap,
+                               ResourceNode*                        pDestTable,
+                               ResourceNode*&                       pDestInnerTable) const;
 
     // Give the graphics pipeline state to the middle-end.
     void SetGraphicsStateInPipeline(Pipeline* pPipeline) const;

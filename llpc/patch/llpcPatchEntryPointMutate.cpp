@@ -287,7 +287,7 @@ bool PatchEntryPointMutate::IsResourceNodeActive(
         }
     }
 
-    if ((pNode->type == ResourceMappingNodeType::PushConst) && isRootNode)
+    if ((pNode->type == ResourceNodeType::PushConst) && isRootNode)
     {
         active = (pResUsage1->pushConstSizeInBytes > 0);
         if ((active == false) && (pResUsage2 != nullptr))
@@ -295,7 +295,7 @@ bool PatchEntryPointMutate::IsResourceNodeActive(
             active = (pResUsage2->pushConstSizeInBytes > 0);
         }
     }
-    else if (pNode->type == ResourceMappingNodeType::DescriptorTableVaPtr)
+    else if (pNode->type == ResourceNodeType::DescriptorTableVaPtr)
     {
         // Check if any contained descriptor node is active
         for (uint32_t i = 0; i < pNode->innerTable.size(); ++i)
@@ -307,19 +307,19 @@ bool PatchEntryPointMutate::IsResourceNodeActive(
             }
         }
     }
-    else if (pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr)
+    else if (pNode->type == ResourceNodeType::IndirectUserDataVaPtr)
     {
         // NOTE: We assume indirect user data is always active.
         active = true;
     }
-    else if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
+    else if (pNode->type == ResourceNodeType::StreamOutTableVaPtr)
     {
         active = true;
     }
     else
     {
-        assert((pNode->type != ResourceMappingNodeType::DescriptorTableVaPtr) &&
-                    (pNode->type != ResourceMappingNodeType::IndirectUserDataVaPtr));
+        assert((pNode->type != ResourceNodeType::DescriptorTableVaPtr) &&
+                    (pNode->type != ResourceNodeType::IndirectUserDataVaPtr));
 
         DescriptorPair descPair = {};
         descPair.descSet = pNode->set;
@@ -382,7 +382,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             auto pNode = &userDataNodes[i];
              // NOTE: Per PAL request, the value of IndirectTableEntry is the node offset + 1.
              // and indirect user data should not be counted in possible spilled user data.
-            if (pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr)
+            if (pNode->type == ResourceNodeType::IndirectUserDataVaPtr)
             {
                 // Only the vertex shader needs a vertex buffer table.
                 if (m_shaderStage == ShaderStageVertex)
@@ -402,7 +402,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 continue;
             }
 
-            if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
+            if (pNode->type == ResourceNodeType::StreamOutTableVaPtr)
             {
                 // Only the last shader stage before fragment (ignoring copy shader) needs a stream out table.
                 if ((m_pPipelineState->GetShaderStageMask() &
@@ -429,7 +429,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 continue;
             }
 
-            if (pNode->type == ResourceMappingNodeType::PushConst)
+            if (pNode->type == ResourceNodeType::PushConst)
             {
                 pIntfData->pushConst.resNodeIdx = i;
             }
@@ -584,7 +584,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         for (uint32_t i = 0; i < userDataNodes.size(); ++i)
         {
             auto pNode = &userDataNodes[i];
-            if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
+            if (pNode->type == ResourceNodeType::StreamOutTableVaPtr)
             {
                 assert(pNode->sizeInDwords == 1);
                 switch (m_shaderStage)
@@ -627,12 +627,12 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         auto pNode = &userDataNodes[i];
 
         // "IndirectUserDataVaPtr" can't be spilled, it is treated as internal user data
-        if (pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr)
+        if (pNode->type == ResourceNodeType::IndirectUserDataVaPtr)
         {
             continue;
         }
 
-        if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
+        if (pNode->type == ResourceNodeType::StreamOutTableVaPtr)
         {
             continue;
         }
@@ -667,7 +667,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             actualAvailUserDataCount += pNode->sizeInDwords;
             switch (pNode->type)
             {
-            case ResourceMappingNodeType::DescriptorTableVaPtr:
+            case ResourceNodeType::DescriptorTableVaPtr:
                 {
                     argTys.push_back(Type::getInt32Ty(*m_pContext));
 
@@ -690,13 +690,13 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     break;
                 }
 
-            case ResourceMappingNodeType::DescriptorResource:
-            case ResourceMappingNodeType::DescriptorSampler:
-            case ResourceMappingNodeType::DescriptorTexelBuffer:
-            case ResourceMappingNodeType::DescriptorFmask:
-            case ResourceMappingNodeType::DescriptorBuffer:
-            case ResourceMappingNodeType::PushConst:
-            case ResourceMappingNodeType::DescriptorBufferCompact:
+            case ResourceNodeType::DescriptorResource:
+            case ResourceNodeType::DescriptorSampler:
+            case ResourceNodeType::DescriptorTexelBuffer:
+            case ResourceNodeType::DescriptorFmask:
+            case ResourceNodeType::DescriptorBuffer:
+            case ResourceNodeType::PushConst:
+            case ResourceNodeType::DescriptorBufferCompact:
                 {
                     argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), pNode->sizeInDwords));
                     for (uint32_t j = 0; j < pNode->sizeInDwords; ++j)
@@ -777,7 +777,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             for (uint32_t i = 0; i < userDataNodes.size(); ++i)
             {
                 auto pNode = &userDataNodes[i];
-                if (pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr)
+                if (pNode->type == ResourceNodeType::IndirectUserDataVaPtr)
                 {
                     assert(pNode->sizeInDwords == 1);
                     pCurrIntfData->userDataUsage.vs.vbTablePtr = userDataIdx;

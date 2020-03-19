@@ -488,26 +488,18 @@ void PipelineState::ReadOptions(
 }
 
 // =====================================================================================================================
-// Set the resource mapping nodes for the pipeline.
-// The table entries are flattened and stored in IR metadata.
+// Set the resource nodes for the pipeline.
 void PipelineState::SetUserDataNodes(
-    ArrayRef<ResourceMappingNode>   nodes,            // The resource mapping nodes
-    ArrayRef<DescriptorRangeValue>  rangeValues)      // The descriptor range values
+    ArrayRef<ResourceNode>   nodes)     // The resource nodes. Copied, so only need to remain valid for the
+                                        // duration of this call.
 {
-    // Create a map of immutable nodes.
-    ImmutableNodesMap immutableNodesMap;
-    for (auto& rangeValue : rangeValues)
-    {
-        immutableNodesMap[{ rangeValue.set, rangeValue.binding }] = &rangeValue;
-    }
-
-    // Count how many user data nodes we have, and allocate the buffer.
+    // Count how many entries in total and allocate the buffer.
     uint32_t nodeCount = nodes.size();
     for (auto& node : nodes)
     {
-        if (node.type == ResourceMappingNodeType::DescriptorTableVaPtr)
+        if (node.type == ResourceNodeType::DescriptorTableVaPtr)
         {
-            nodeCount += node.tablePtr.nodeCount;
+            nodeCount += node.innerTable.size();
         }
     }
     assert(m_allocUserDataNodes == nullptr);
@@ -517,15 +509,14 @@ void PipelineState::SetUserDataNodes(
     ResourceNode* pDestTable = m_allocUserDataNodes.get();
     ResourceNode* pDestInnerTable = pDestTable + nodeCount;
     m_userDataNodes = ArrayRef<ResourceNode>(pDestTable, nodes.size());
-    SetUserDataNodesTable(nodes, immutableNodesMap, pDestTable, pDestInnerTable);
+    SetUserDataNodesTable(nodes, pDestTable, pDestInnerTable);
     assert(pDestInnerTable == pDestTable + nodes.size());
 }
 
 // =====================================================================================================================
 // Set one user data table, and its inner tables.
 void PipelineState::SetUserDataNodesTable(
-    ArrayRef<ResourceMappingNode> nodes,              // The resource mapping nodes
-    const ImmutableNodesMap&      immutableNodesMap,  // [in] Map of immutable nodes
+    ArrayRef<ResourceNode>        nodes,              // The source resource nodes to copy
     ResourceNode*                 pDestTable,         // [out] Where to write nodes
     ResourceNode*&                pDestInnerTable)    // [in/out] End of space available for inner tables
 {
@@ -534,78 +525,18 @@ void PipelineState::SetUserDataNodesTable(
         auto& node = nodes[idx];
         auto& destNode = pDestTable[idx];
 
-        destNode.type = node.type;
-        destNode.sizeInDwords = node.sizeInDwords;
-        destNode.offsetInDwords = node.offsetInDwords;
-
-        switch (node.type)
+        // Copy the node.
+        destNode = node;
+        if (node.type == ResourceNodeType::DescriptorTableVaPtr)
         {
-        case ResourceMappingNodeType::DescriptorTableVaPtr:
-            {
-                // Process an inner table.
-                pDestInnerTable -= node.tablePtr.nodeCount;
-                destNode.innerTable = ArrayRef<ResourceNode>(pDestInnerTable, node.tablePtr.nodeCount);
-                SetUserDataNodesTable(ArrayRef<ResourceMappingNode>(node.tablePtr.pNext, node.tablePtr.nodeCount),
-                                      immutableNodesMap,
-                                      pDestInnerTable,
-                                      pDestInnerTable);
-                break;
-            }
-        case ResourceMappingNodeType::IndirectUserDataVaPtr:
-        case ResourceMappingNodeType::StreamOutTableVaPtr:
-            {
-                // Process an indirect pointer.
-                destNode.indirectSizeInDwords = node.userDataPtr.sizeInDwords;
-                break;
-            }
-        default:
-            {
-                // Process an SRD.
-                destNode.set = node.srdRange.set;
-                destNode.binding = node.srdRange.binding;
-                destNode.pImmutableValue = nullptr;
-
-                auto it = immutableNodesMap.find(std::pair<uint32_t, uint32_t>(destNode.set, destNode.binding));
-                if (it != immutableNodesMap.end())
-                {
-                    // This set/binding is (or contains) an immutable value. The value is 8 dwords for a converting
-                    // sampler, or 4 dwords for other immutable sampler.
-                    auto& immutableNode = *it->second;
-
-                    IRBuilder<> builder(GetContext());
-                    SmallVector<Constant*, 8> values;
-
-                    if (immutableNode.arraySize != 0)
-                    {
-                        uint32_t samplerDescriptorSize = 4;
-                        if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
-                        {
-                            samplerDescriptorSize = 8;
-                            m_haveConvertingSampler = true;
-                        }
-
-                        for (uint32_t compIdx = 0; compIdx < immutableNode.arraySize; ++compIdx)
-                        {
-                            Constant* compValues[8] = {};
-                            for (uint32_t i = 0; i < samplerDescriptorSize; ++i)
-                            {
-                                compValues[i] =
-                                    builder.getInt32(immutableNode.pValue[compIdx * samplerDescriptorSize + i]);
-                            }
-                            for (uint32_t i = samplerDescriptorSize; i < 8; ++i)
-                            {
-                                compValues[i] = builder.getInt32(0);
-                            }
-                            values.push_back(ConstantVector::get(compValues));
-                        }
-                        destNode.pImmutableValue = ConstantArray::get(ArrayType::get(values[0]->getType(),
-                                                                                     values.size()),
-                                                                      values);
-                    }
-                }
-                break;
-            }
+            // Process an inner table.
+            pDestInnerTable -= node.innerTable.size();
+            destNode.innerTable = ArrayRef<ResourceNode>(pDestInnerTable, node.innerTable.size());
+            SetUserDataNodesTable(node.innerTable,
+                                  pDestInnerTable,
+                                  pDestInnerTable);
         }
+        m_haveConvertingSampler |= (node.type == ResourceNodeType::DescriptorYCbCrSampler);
     }
 }
 
@@ -640,7 +571,7 @@ void PipelineState::RecordUserDataTable(
     for (const ResourceNode& node : nodes)
     {
         SmallVector<Metadata*, 5> operands;
-        assert(node.type < ResourceMappingNodeType::Count);
+        assert(node.type < ResourceNodeType::Count);
         // Operand 0: type
         operands.push_back(GetResourceTypeName(node.type));
         // Operand 1: offsetInDwords
@@ -650,7 +581,7 @@ void PipelineState::RecordUserDataTable(
 
         switch (node.type)
         {
-        case ResourceMappingNodeType::DescriptorTableVaPtr:
+        case ResourceNodeType::DescriptorTableVaPtr:
             {
                 // Operand 3: Node count in sub-table.
                 operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.innerTable.size())));
@@ -660,8 +591,8 @@ void PipelineState::RecordUserDataTable(
                 RecordUserDataTable(node.innerTable, pUserDataMetaNode);
                 continue;
             }
-        case ResourceMappingNodeType::IndirectUserDataVaPtr:
-        case ResourceMappingNodeType::StreamOutTableVaPtr:
+        case ResourceNodeType::IndirectUserDataVaPtr:
+        case ResourceNodeType::StreamOutTableVaPtr:
             {
                 // Operand 3: Size of the indirect data in dwords.
                 operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.indirectSizeInDwords)));
@@ -681,7 +612,7 @@ void PipelineState::RecordUserDataTable(
                     // So we write the individual ConstantInts instead.
                     // The descriptor is either a sampler (<4 x i32>) or converting sampler (<8 x i32>).
                     uint32_t SamplerDescriptorSize = 4;
-                    if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
+                    if (node.type == ResourceNodeType::DescriptorYCbCrSampler)
                     {
                         SamplerDescriptorSize = 8;
                     }
@@ -741,7 +672,7 @@ void PipelineState::ReadUserDataNodes(
         pNextNode->sizeInDwords =
               mdconst::dyn_extract<ConstantInt>(pMetadataNode->getOperand(2))->getZExtValue();
 
-        if (pNextNode->type == ResourceMappingNodeType::DescriptorTableVaPtr)
+        if (pNextNode->type == ResourceNodeType::DescriptorTableVaPtr)
         {
             // Operand 3: number of nodes in inner table
             uint32_t innerNodeCount =
@@ -756,8 +687,8 @@ void PipelineState::ReadUserDataNodes(
         }
         else
         {
-            if ((pNextNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr) ||
-                (pNextNode->type == ResourceMappingNodeType::StreamOutTableVaPtr))
+            if ((pNextNode->type == ResourceNodeType::IndirectUserDataVaPtr) ||
+                (pNextNode->type == ResourceNodeType::StreamOutTableVaPtr))
             {
                 // Operand 3: Size of the indirect data in dwords
                 pNextNode->indirectSizeInDwords =
@@ -778,7 +709,7 @@ void PipelineState::ReadUserDataNodes(
                     // The descriptor is either a sampler (<4 x i32>) or converting sampler (<8 x i32>).
                     static const uint32_t OperandStartIdx = 5;
                     uint32_t SamplerDescriptorSize = 4;
-                    if (pNextNode->type == ResourceMappingNodeType::DescriptorYCbCrSampler)
+                    if (pNextNode->type == ResourceNodeType::DescriptorYCbCrSampler)
                     {
                         SamplerDescriptorSize = 8;
                         m_haveConvertingSampler = true;
@@ -828,24 +759,24 @@ void PipelineState::ReadUserDataNodes(
 // Returns {topNode, node} where "node" is the found user data node, and "topNode" is the top-level user data
 // node that contains it (or is equal to it).
 std::pair<const ResourceNode*, const ResourceNode*> PipelineState::FindResourceNode(
-    ResourceMappingNodeType   nodeType,   // Type of the resource mapping node
-    uint32_t                  descSet,    // ID of descriptor set
-    uint32_t                  binding     // ID of descriptor binding
+    ResourceNodeType   nodeType,   // Type of the resource mapping node
+    uint32_t           descSet,    // ID of descriptor set
+    uint32_t           binding     // ID of descriptor binding
     ) const
 {
     for (const ResourceNode& node : GetUserDataNodes())
     {
-        if (node.type == ResourceMappingNodeType::DescriptorTableVaPtr)
+        if (node.type == ResourceNodeType::DescriptorTableVaPtr)
         {
             for (const ResourceNode& innerNode : node.innerTable)
             {
                 if ((innerNode.set == descSet) && (innerNode.binding == binding))
                 {
-                    if ((nodeType == ResourceMappingNodeType::Unknown) || (nodeType == innerNode.type) ||
-                        (innerNode.type == ResourceMappingNodeType::DescriptorCombinedTexture &&
-                         (nodeType == ResourceMappingNodeType::DescriptorResource ||
-                          nodeType == ResourceMappingNodeType::DescriptorTexelBuffer ||
-                          nodeType == ResourceMappingNodeType::DescriptorSampler)))
+                    if ((nodeType == ResourceNodeType::Unknown) || (nodeType == innerNode.type) ||
+                        (innerNode.type == ResourceNodeType::DescriptorCombinedTexture &&
+                         (nodeType == ResourceNodeType::DescriptorResource ||
+                          nodeType == ResourceNodeType::DescriptorTexelBuffer ||
+                          nodeType == ResourceNodeType::DescriptorSampler)))
                     {
                         return { &node, &innerNode };
                     }
@@ -854,11 +785,11 @@ std::pair<const ResourceNode*, const ResourceNode*> PipelineState::FindResourceN
         }
         else if ((node.set == descSet) && (node.binding == binding))
         {
-            if ((nodeType == ResourceMappingNodeType::Unknown) || (nodeType == node.type) ||
-                (node.type == ResourceMappingNodeType::DescriptorCombinedTexture &&
-                 (nodeType == ResourceMappingNodeType::DescriptorResource ||
-                  nodeType == ResourceMappingNodeType::DescriptorTexelBuffer ||
-                  nodeType == ResourceMappingNodeType::DescriptorSampler)))
+            if ((nodeType == ResourceNodeType::Unknown) || (nodeType == node.type) ||
+                (node.type == ResourceNodeType::DescriptorCombinedTexture &&
+                 (nodeType == ResourceNodeType::DescriptorResource ||
+                  nodeType == ResourceNodeType::DescriptorTexelBuffer ||
+                  nodeType == ResourceNodeType::DescriptorSampler)))
             {
                 return { &node, &node };
             }
@@ -870,14 +801,14 @@ std::pair<const ResourceNode*, const ResourceNode*> PipelineState::FindResourceN
 // =====================================================================================================================
 // Get the cached MDString for the name of a resource mapping node type, as used in IR metadata for user data nodes.
 MDString* PipelineState::GetResourceTypeName(
-    ResourceMappingNodeType type)   // Resource mapping node type
+    ResourceNodeType type)   // Resource mapping node type
 {
     return GetResourceTypeNames()[static_cast<uint32_t>(type)];
 }
 
 // =====================================================================================================================
 // Get the resource mapping node type given its MDString name.
-ResourceMappingNodeType PipelineState::GetResourceTypeFromName(
+ResourceNodeType PipelineState::GetResourceTypeFromName(
     MDString* pTypeName)  // [in] Name of resource type as MDString
 {
     auto typeNames = GetResourceTypeNames();
@@ -885,7 +816,7 @@ ResourceMappingNodeType PipelineState::GetResourceTypeFromName(
     {
         if (typeNames[type] == pTypeName)
         {
-            return static_cast<ResourceMappingNodeType>(type);
+            return static_cast<ResourceNodeType>(type);
         }
     }
 }
@@ -897,10 +828,10 @@ ArrayRef<MDString*> PipelineState::GetResourceTypeNames()
 {
     if (m_resourceNodeTypeNames[0] == nullptr)
     {
-        for (uint32_t type = 0; type < static_cast<uint32_t>(ResourceMappingNodeType::Count); ++type)
+        for (uint32_t type = 0; type < static_cast<uint32_t>(ResourceNodeType::Count); ++type)
         {
             m_resourceNodeTypeNames[type] =
-               MDString::get(GetContext(), GetResourceMappingNodeTypeName(static_cast<ResourceMappingNodeType>(type)));
+               MDString::get(GetContext(), GetResourceNodeTypeName(static_cast<ResourceNodeType>(type)));
         }
     }
     return ArrayRef<MDString*>(m_resourceNodeTypeNames);
@@ -1344,26 +1275,27 @@ const char* PipelineState::GetShaderStageAbbreviation(
     case TYPE::ENUM: pString = #ENUM; break;
 
 // =====================================================================================================================
-// Translate enum "ResourceMappingNodeType" to string
-const char* PipelineState::GetResourceMappingNodeTypeName(
-    ResourceMappingNodeType type)  // Resource map node type
+// Translate enum "ResourceNodeType" to string
+const char* PipelineState::GetResourceNodeTypeName(
+    ResourceNodeType type)  // Resource map node type
 {
     const char* pString = nullptr;
     switch (type)
     {
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, Unknown)
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorResource)
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorSampler)
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorYCbCrSampler)
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorCombinedTexture)
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorTexelBuffer)
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorFmask)
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorBuffer)
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorTableVaPtr)
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, IndirectUserDataVaPtr)
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, PushConst)
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorBufferCompact)
-    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, StreamOutTableVaPtr)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, Unknown)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorResource)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorSampler)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorYCbCrSampler)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorCombinedTexture)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorTexelBuffer)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorFmask)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorBuffer)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorTableVaPtr)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, IndirectUserDataVaPtr)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, PushConst)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorBufferCompact)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, StreamOutTableVaPtr)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved12)
         break;
     default:
         llvm_unreachable("Should never be called!");
