@@ -35,6 +35,7 @@
 #include "llpcInternal.h"
 #include "llpcNggPrimShader.h"
 #include "llpcPipelineShaders.h"
+#include "llpcTargetInfo.h"
 
 namespace Llpc
 {

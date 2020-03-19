@@ -35,6 +35,7 @@
 #include "llpcInternal.h"
 #include "llpcNggLdsManager.h"
 #include "llpcPipelineState.h"
+#include "llpcTargetInfo.h"
 
 namespace Llpc
 {

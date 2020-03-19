@@ -34,6 +34,7 @@
 #include "llvm/IR/IRBuilder.h"
 
 #include "llpcPatch.h"
+#include "llpcTargetInfo.h"
 
 namespace llvm
 {
