@@ -34,7 +34,6 @@
 #include "llpcBuilderBuiltIns.h"
 #include "llpcBuilderCommon.h"
 
-#include "lgc/Defs.h"
 #include "llvm/Support/AtomicOrdering.h"
 
 namespace lgc
