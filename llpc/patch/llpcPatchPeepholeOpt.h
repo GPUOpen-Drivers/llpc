@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchPeepholeOpt.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchPeepholeOpt.
+ * @brief LLPC header file: contains declaration of class lgc::PatchPeepholeOpt.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -36,7 +36,7 @@
 
 #include "llpcInternal.h"
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -94,4 +94,4 @@ private:
     bool m_enableDiscardOpt;    // Whether to enable the optimization for "kill" intrinsic
 };
 
-} // Llpc
+} // lgc

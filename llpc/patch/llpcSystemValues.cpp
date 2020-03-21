@@ -38,7 +38,7 @@
 
 #define DEBUG_TYPE "llpc-system-values"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // -shadow-desc-table-ptr-high: high part of VA for shadow descriptor table pointer
@@ -802,7 +802,7 @@ Instruction* ShaderSystemValues::LoadDescFromDriverTable(
         builder.getInt32(tableOffset),
         builder.getInt32(0),
     };
-    return builder.CreateNamedCall(LlpcName::DescriptorLoadBuffer,
+    return builder.CreateNamedCall(lgcName::DescriptorLoadBuffer,
                                    VectorType::get(Type::getInt32Ty(*m_pContext), 4),
                                    args,
                                    {});

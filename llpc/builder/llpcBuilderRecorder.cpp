@@ -37,7 +37,7 @@
 
 #define DEBUG_TYPE "llpc-builder-recorder"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================

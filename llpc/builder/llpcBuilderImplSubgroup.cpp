@@ -38,7 +38,7 @@
 
 #define DEBUG_TYPE "llpc-builder-impl-subgroup"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================

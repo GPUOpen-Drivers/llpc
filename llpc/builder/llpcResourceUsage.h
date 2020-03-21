@@ -35,7 +35,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace Llpc
+namespace lgc
 {
 
 static const uint32_t  MaxColorTargets = 8;
@@ -639,4 +639,4 @@ struct InterfaceData
     } entryArgIdxs;
 };
 
-} // Llpc
+} // lgc

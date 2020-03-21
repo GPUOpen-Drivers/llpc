@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchLlvmIrInclusion.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchLlvmIrInclusion.
+ * @brief LLPC source file: contains implementation of class lgc::PatchLlvmIrInclusion.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/Constants.h"
@@ -37,9 +37,9 @@
 #define DEBUG_TYPE "llpc-patch-llvm-ir-inclusion"
 
 using namespace llvm;
-using namespace Llpc;
+using namespace lgc;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -94,7 +94,7 @@ bool PatchLlvmIrInclusion::runOnModule(
     return true;
 }
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching operations of including LLVM IR as a separate section in the ELF binary.

@@ -55,6 +55,7 @@
 
 #define DEBUG_TYPE "llpc-context"
 
+using namespace lgc;
 using namespace llvm;
 
 namespace Llpc

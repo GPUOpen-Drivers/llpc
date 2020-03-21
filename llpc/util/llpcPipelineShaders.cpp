@@ -37,8 +37,8 @@
 
 #define DEBUG_TYPE "llpc-pipeline-shaders"
 
+using namespace lgc;
 using namespace llvm;
-using namespace Llpc;
 
 char PipelineShaders::ID = 0;
 

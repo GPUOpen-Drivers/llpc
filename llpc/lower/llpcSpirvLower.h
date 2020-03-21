@@ -61,6 +61,13 @@ void initializeSpirvLowerResourceCollectPass(PassRegistry&);
 void initializeSpirvLowerTranslatorPass(PassRegistry&);
 } // llvm
 
+namespace lgc
+{
+
+class Builder;
+
+} // lgc
+
 namespace Llpc
 {
 
@@ -79,7 +86,6 @@ inline static void InitializeLowerPasses(
     initializeSpirvLowerTranslatorPass(passRegistry);
 }
 
-class Builder;
 class Context;
 
 llvm::ModulePass* CreateSpirvLowerAccessChain();
@@ -126,7 +132,7 @@ protected:
     Context*        m_pContext;     // Associated LLPC context of the LLVM module that passes run on
     ShaderStage     m_shaderStage;  // Shader stage
     llvm::Function* m_pEntryPoint;  // Entry point of input module
-    Builder*        m_pBuilder;     // LLPC builder object
+    lgc::Builder*   m_pBuilder;     // LGC builder object
 
 private:
     SpirvLower() = delete;

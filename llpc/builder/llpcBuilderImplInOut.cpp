@@ -35,7 +35,7 @@
 
 #define DEBUG_TYPE "llpc-builder-impl-inout"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
@@ -127,7 +127,7 @@ Value* BuilderImplInOut::ReadGenericInputOutput(
     MarkGenericInputOutputUsage(isOutput, location, locationCount, inOutInfo, pVertexIndex);
 
     // Generate LLPC call for reading the input/output.
-    StringRef baseCallName = LlpcName::InputImportGeneric;
+    StringRef baseCallName = lgcName::InputImportGeneric;
     SmallVector<Value*, 6> args;
     switch (m_shaderStage)
     {
@@ -151,7 +151,7 @@ Value* BuilderImplInOut::ReadGenericInputOutput(
             args.push_back((pVertexIndex != nullptr) ? pVertexIndex : getInt32(InvalidValue));
             if (isOutput)
             {
-                baseCallName = LlpcName::OutputImportGeneric;
+                baseCallName = lgcName::OutputImportGeneric;
             }
             break;
         }
@@ -175,7 +175,7 @@ Value* BuilderImplInOut::ReadGenericInputOutput(
             {
                 // Prepare arguments for import interpolant call
                 Value* pAuxInterpValue = ModifyAuxInterpValue(pVertexIndex, inOutInfo);
-                baseCallName  = LlpcName::InputImportInterpolant;
+                baseCallName  = lgcName::InputImportInterpolant;
                 args.push_back(getInt32(location));
                 args.push_back(pLocationOffset);
                 args.push_back(pElemIdx);
@@ -295,7 +295,7 @@ Instruction* BuilderImplInOut::CreateWriteGenericOutput(
     }
     args.push_back(pValueToWrite);
 
-    std::string llpcCallName = LlpcName::OutputExportGeneric;
+    std::string llpcCallName = lgcName::OutputExportGeneric;
     AddTypeMangling(nullptr, args, llpcCallName);
     return EmitCall(llpcCallName,
                     getVoidTy(),
@@ -502,7 +502,7 @@ Value* BuilderImplInOut::ModifyAuxInterpValue(
         {
             Value* evalArg = nullptr;
 
-            evalInstName = LlpcName::InputImportBuiltIn;
+            evalInstName = lgcName::InputImportBuiltIn;
             if (inputInfo.GetInterpMode() == InOutInfo::InterpModeNoPersp)
             {
                 evalInstName += "InterpLinearCentroid";
@@ -668,7 +668,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
 
     // XFB: @llpc.output.export.xfb.%Type%(i32 xfbBuffer, i32 xfbOffset, i32 xfbExtraOffset, %Type% outputValue)
     SmallVector<Value*, 4> args;
-    std::string instName = LlpcName::OutputExportXfb;
+    std::string instName = lgcName::OutputExportXfb;
     args.push_back(getInt32(xfbBuffer));
     args.push_back(pXfbOffset);
     args.push_back(getInt32(0));
@@ -840,7 +840,7 @@ Value* BuilderImplInOut::ReadBuiltIn(
         break;
     }
 
-    std::string callName = isOutput ? LlpcName::OutputImportBuiltIn : LlpcName::InputImportBuiltIn;
+    std::string callName = isOutput ? lgcName::OutputImportBuiltIn : lgcName::InputImportBuiltIn;
     callName += GetBuiltInName(builtIn);
     AddTypeMangling(pResultTy, args, callName);
     Value* pResult = EmitCall(callName,
@@ -929,7 +929,7 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
     }
     args.push_back(pValueToWrite);
 
-    std::string callName = LlpcName::OutputExportBuiltIn;
+    std::string callName = lgcName::OutputExportBuiltIn;
     callName += GetBuiltInName(builtIn);
     AddTypeMangling(nullptr, args, callName);
     return cast<Instruction>(EmitCall(callName,

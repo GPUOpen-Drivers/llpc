@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchBufferOp.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchBufferOp.
+ * @brief LLPC source file: contains implementation of class lgc::PatchBufferOp.
  ***********************************************************************************************************************
  */
 #include "llvm/ADT/PostOrderIterator.h"
@@ -48,9 +48,9 @@
 #define DEBUG_TYPE "llpc-patch-buffer-op"
 
 using namespace llvm;
-using namespace Llpc;
+using namespace lgc;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -471,14 +471,14 @@ void PatchBufferOp::visitCallInst(
     const StringRef callName(pCalledFunc->getName());
 
     // If the call is not a late intrinsic call we need to replace, bail.
-    if (callName.startswith(LlpcName::LaterCallPrefix) == false)
+    if (callName.startswith(lgcName::LaterCallPrefix) == false)
     {
         return;
     }
 
     m_pBuilder->SetInsertPoint(&callInst);
 
-    if (callName.equals(LlpcName::LateLaunderFatPointer))
+    if (callName.equals(lgcName::LateLaunderFatPointer))
     {
         Constant* const pNullPointer = ConstantPointerNull::get(GetRemappedType(callInst.getType()));
         m_replacementMap[&callInst] = std::make_pair(callInst.getArgOperand(0), pNullPointer);
@@ -495,7 +495,7 @@ void PatchBufferOp::visitCallInst(
             m_divergenceSet.insert(callInst.getArgOperand(0));
         }
     }
-    else if (callName.startswith(LlpcName::LateBufferLength))
+    else if (callName.startswith(lgcName::LateBufferLength))
     {
         Value* const pPointer = GetPointerOperandAsInst(callInst.getArgOperand(0));
 
@@ -1967,7 +1967,7 @@ Instruction* PatchBufferOp::MakeLoop(
     return pLoopCounter;
 }
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patch operations for buffer operations.

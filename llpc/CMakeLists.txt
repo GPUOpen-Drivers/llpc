@@ -450,6 +450,7 @@ target_include_directories(amdllpc
 PUBLIC
     ${PROJECT_SOURCE_DIR}/include
 PRIVATE
+    ${PROJECT_SOURCE_DIR}/builder
     ${PROJECT_SOURCE_DIR}/context
     ${PROJECT_SOURCE_DIR}/imported/spirv
     ${PROJECT_SOURCE_DIR}/include

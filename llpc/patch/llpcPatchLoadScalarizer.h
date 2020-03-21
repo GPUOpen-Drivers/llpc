@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchLoadScalarizer.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchLoadScalarizer.
+ * @brief LLPC header file: contains declaration of class lgc::PatchLoadScalarizer.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -35,7 +35,7 @@
 #include "llpcBuilder.h"
 #include "llpcPatch.h"
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -67,4 +67,4 @@ private:
     uint32_t                                        m_scalarThreshold;      // The threshold for load scalarizer
 };
 
-} // Llpc
+} // lgc

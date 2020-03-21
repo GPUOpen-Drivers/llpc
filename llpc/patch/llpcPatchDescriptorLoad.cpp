@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchDescriptorLoad.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchDescriptorLoad.
+ * @brief LLPC source file: contains implementation of class lgc::PatchDescriptorLoad.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/IRBuilder.h"
@@ -39,14 +39,14 @@
 #define DEBUG_TYPE "llpc-patch-descriptor-load"
 
 using namespace llvm;
-using namespace Llpc;
+using namespace lgc;
 
 // -enable-shadow-desc: enable shadow desriptor table
 static cl::opt<bool> EnableShadowDescriptorTable("enable-shadow-desc",
                                                  cl::desc("Enable shadow descriptor table"),
                                                  cl::init(true));
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -116,8 +116,8 @@ bool PatchDescriptorLoad::runOnModule(
     SmallVector<Function*, 4> deadDescFuncs;
     for (Function& func : *m_pModule)
     {
-        if (func.isDeclaration() && (func.getName().startswith(LlpcName::DescriptorGetPtrPrefix) ||
-                                     func.getName().startswith(LlpcName::DescriptorIndex)))
+        if (func.isDeclaration() && (func.getName().startswith(lgcName::DescriptorGetPtrPrefix) ||
+                                     func.getName().startswith(lgcName::DescriptorIndex)))
         {
             deadDescFuncs.push_back(&func);
         }
@@ -151,13 +151,13 @@ void PatchDescriptorLoad::ProcessLoadDescFromPtr(
     Value* pIndex = builder.getInt32(0);
 
     auto pLoadPtr = cast<CallInst>(pLoadFromPtr->getOperand(0));
-    while (pLoadPtr->getCalledFunction()->getName().startswith(LlpcName::DescriptorIndex))
+    while (pLoadPtr->getCalledFunction()->getName().startswith(lgcName::DescriptorIndex))
     {
         pIndex = builder.CreateAdd(pIndex, pLoadPtr->getOperand(1));
         pLoadPtr = cast<CallInst>(pLoadPtr->getOperand(0));
     }
 
-    assert(pLoadPtr->getCalledFunction()->getName().startswith(LlpcName::DescriptorGetPtrPrefix));
+    assert(pLoadPtr->getCalledFunction()->getName().startswith(lgcName::DescriptorGetPtrPrefix));
 
     uint32_t descSet = cast<ConstantInt>(pLoadPtr->getOperand(0))->getZExtValue();
     uint32_t binding = cast<ConstantInt>(pLoadPtr->getOperand(1))->getZExtValue();
@@ -191,22 +191,21 @@ void PatchDescriptorLoad::visitCallInst(
 
     StringRef mangledName = pCallee->getName();
 
-    std::string descLoadPrefix = LlpcName::DescriptorLoadPrefix;
-    bool isDescLoad = mangledName.startswith(LlpcName::DescriptorLoadPrefix);
+    bool isDescLoad = mangledName.startswith(lgcName::DescriptorLoadPrefix);
     if (isDescLoad == false)
     {
         return; // Not descriptor load
     }
 
-    if (mangledName.startswith(LlpcName::DescriptorGetPtrPrefix) ||
-        mangledName.startswith(LlpcName::DescriptorIndex))
+    if (mangledName.startswith(lgcName::DescriptorGetPtrPrefix) ||
+        mangledName.startswith(lgcName::DescriptorIndex))
     {
         // Ignore llpc.descriptor.point.* calls and llpc.descriptor.index calls, as they
         // get processed at llpc.descriptor.load.from.ptr.
         return;
     }
 
-    if (mangledName.startswith(LlpcName::DescriptorLoadFromPtr))
+    if (mangledName.startswith(lgcName::DescriptorLoadFromPtr))
     {
         ProcessLoadDescFromPtr(&callInst);
         return;
@@ -221,7 +220,7 @@ void PatchDescriptorLoad::visitCallInst(
     if (callInst.use_empty() == false)
     {
         Value* pDesc = nullptr;
-        if (mangledName.startswith(LlpcName::DescriptorLoadSpillTable))
+        if (mangledName.startswith(lgcName::DescriptorLoadSpillTable))
         {
             pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetSpilledPushConstTablePtr();
             if (pDesc->getType() != callInst.getType())
@@ -260,36 +259,36 @@ Value* PatchDescriptorLoad::LoadDescriptor(
     ResourceNodeType nodeType2 = ResourceNodeType::Unknown;
 
     // TODO: The address space ID 2 is a magic number. We have to replace it with defined LLPC address space ID.
-    if (mangledName == LlpcName::DescriptorGetResourcePtr)
+    if (mangledName == lgcName::DescriptorGetResourcePtr)
     {
         pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 8)->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceNodeType::DescriptorResource;
         nodeType2 = nodeType1;
     }
-    else if (mangledName == LlpcName::DescriptorGetSamplerPtr)
+    else if (mangledName == lgcName::DescriptorGetSamplerPtr)
     {
         pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceNodeType::DescriptorSampler;
         nodeType2 = nodeType1;
     }
-    else if (mangledName == LlpcName::DescriptorGetFmaskPtr)
+    else if (mangledName == lgcName::DescriptorGetFmaskPtr)
     {
         pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 8)->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceNodeType::DescriptorFmask;
         nodeType2 = nodeType1;
     }
-    else if (mangledName == LlpcName::DescriptorLoadBuffer)
+    else if (mangledName == lgcName::DescriptorLoadBuffer)
     {
         pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceNodeType::DescriptorBuffer;
         nodeType2 = ResourceNodeType::PushConst;
     }
-    else if (mangledName == LlpcName::DescriptorLoadAddress)
+    else if (mangledName == lgcName::DescriptorLoadAddress)
     {
         nodeType1 = ResourceNodeType::PushConst;
         nodeType2 = nodeType1;
     }
-    else if (mangledName == LlpcName::DescriptorGetTexelBufferPtr)
+    else if (mangledName == lgcName::DescriptorGetTexelBufferPtr)
     {
         pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceNodeType::DescriptorTexelBuffer;
@@ -890,7 +889,7 @@ ResourceNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
     return foundNodeType;
 }
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching opertions for descriptor load.

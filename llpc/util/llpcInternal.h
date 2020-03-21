@@ -31,12 +31,13 @@
 #pragma once
 
 #include "lgc/Defs.h"
+#include "llpcBuilderCommon.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 
 namespace llvm { class CallInst; }
-namespace Llpc { class Context; }
+namespace lgc { class Context; }
 
 namespace llvm
 {
@@ -52,7 +53,7 @@ void initializeStartStopTimerPass(PassRegistry&);
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 // Invalid value
@@ -71,7 +72,7 @@ inline static void InitializeUtilPasses(
     initializeStartStopTimerPass(passRegistry);
 }
 
-namespace LlpcName
+namespace lgcName
 {
     const static char InputCallPrefix[]               = "llpc.input.";
     const static char InputImportGeneric[]            = "llpc.input.import.generic.";
@@ -145,7 +146,7 @@ namespace LlpcName
     const static char NullFsEntryPoint[]              = "llpc.shader.FS.null.main";
 
     const static char ShaderStageMetadata[]           = "llpc.shaderstage";
-} // LlpcName
+} // lgcName
 
 // Well-known metadata names
 const static char MetaNameUniform[] = "amdgpu.uniform";
@@ -230,4 +231,4 @@ bool CanBitCast(const llvm::Type* pTy1, const llvm::Type* pTy2);
 // Checks if the specified value actually represents a don't-care value (0xFFFFFFFF).
 bool IsDontCareValue(llvm::Value* pValue);
 
-} // Llpc
+} // lgc

@@ -33,7 +33,7 @@
 #include "lgc/Defs.h"
 #include "llvm/ADT/StringRef.h"
 
-namespace Llpc
+namespace lgc
 {
 
 using namespace llvm;
@@ -160,4 +160,4 @@ private:
     WorkaroundFlags m_gpuWorkarounds = {}; // GPU workarounds
 };
 
-} // Llpc
+} // lgc

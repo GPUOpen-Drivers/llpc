@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchEntryPointMutate.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchEntryPointMutate.
+ * @brief LLPC source file: contains implementation of class lgc::PatchEntryPointMutate.
  ***********************************************************************************************************************
  */
 #include "llvm/Support/CommandLine.h"
@@ -43,7 +43,7 @@
 #define DEBUG_TYPE "llpc-patch-entry-point-mutate"
 
 using namespace llvm;
-using namespace Llpc;
+using namespace lgc;
 
 namespace llvm
 {
@@ -61,7 +61,7 @@ opt<bool> InRegEsGsLdsSize("inreg-esgs-lds-size",
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -1160,7 +1160,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     return FunctionType::get(Type::getVoidTy(*m_pContext), argTys, false);
 }
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching opertions for entry-point mutation.

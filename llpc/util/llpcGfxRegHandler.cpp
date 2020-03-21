@@ -32,7 +32,7 @@
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llpcTargetInfo.h"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================

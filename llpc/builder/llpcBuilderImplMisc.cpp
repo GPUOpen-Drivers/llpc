@@ -35,7 +35,7 @@
 
 #define DEBUG_TYPE "llpc-builder-impl-misc"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
@@ -47,7 +47,7 @@ Instruction* BuilderImplMisc::CreateEmitVertex(
     assert(m_shaderStage == ShaderStageGeometry);
 
     // Get GsWaveId
-    std::string callName = LlpcName::InputImportBuiltIn;
+    std::string callName = lgcName::InputImportBuiltIn;
     callName += "GsWaveId.i32.i32";
     Value* pGsWaveId = EmitCall(callName,
                                 getInt32Ty(),
@@ -69,7 +69,7 @@ Instruction* BuilderImplMisc::CreateEndPrimitive(
     assert(m_shaderStage == ShaderStageGeometry);
 
     // Get GsWaveId
-    std::string callName = LlpcName::InputImportBuiltIn;
+    std::string callName = lgcName::InputImportBuiltIn;
     callName += "GsWaveId.i32.i32";
     Value* pGsWaveId = EmitCall(callName,
                                 getInt32Ty(),

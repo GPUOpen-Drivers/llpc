@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcCodeGenManager.cpp
- * @brief LLPC source file: contains implementation of class Llpc::CodeGenManager.
+ * @brief LLPC source file: contains implementation of class lgc::CodeGenManager.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/Constants.h"
@@ -60,7 +60,7 @@ static opt<bool> DisableFp32Denormals("disable-fp32-denormals",
 
 using namespace llvm;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -181,4 +181,4 @@ void CodeGenManager::SetupTargetFeatures(
     }
 }
 
-} // Llpc
+} // lgc

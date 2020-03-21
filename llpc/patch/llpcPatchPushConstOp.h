@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchPushConstOp.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchPushConstOp.
+ * @brief LLPC header file: contains declaration of class lgc::PatchPushConstOp.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -39,7 +39,7 @@ class CallInst;
 
 }
 
-namespace Llpc
+namespace lgc
 {
 
 class PipelineState;
@@ -71,4 +71,4 @@ private:
     PipelineState*  m_pPipelineState = nullptr;                 // Pipeline state from PipelineStateWrapper pass
 };
 
-} // Llpc
+} // lgc

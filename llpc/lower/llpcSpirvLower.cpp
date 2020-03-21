@@ -58,6 +58,7 @@
 
 #define DEBUG_TYPE "llpc-spirv-lower"
 
+using namespace lgc;
 using namespace llvm;
 
 namespace Llpc

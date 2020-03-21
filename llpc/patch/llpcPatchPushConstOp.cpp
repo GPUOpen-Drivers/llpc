@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchPushConstOp.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchPushConstOp.
+ * @brief LLPC source file: contains implementation of class lgc::PatchPushConstOp.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/ValueMap.h"
@@ -41,9 +41,9 @@
 #define DEBUG_TYPE "llpc-patch-push-const"
 
 using namespace llvm;
-using namespace Llpc;
+using namespace lgc;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -88,7 +88,7 @@ bool PatchPushConstOp::runOnModule(
     SmallVector<Function*, 4> spillTableFuncs;
     for (auto& func : module)
     {
-        if (func.getName().startswith(LlpcName::DescriptorLoadSpillTable))
+        if (func.getName().startswith(lgcName::DescriptorLoadSpillTable))
         {
             spillTableFuncs.push_back(&func);
         }
@@ -165,7 +165,7 @@ void PatchPushConstOp::visitCallInst(
 {
     Function* const pCallee = callInst.getCalledFunction();
     assert(pCallee != nullptr);
-    assert(pCallee->getName().startswith(LlpcName::DescriptorLoadSpillTable));
+    assert(pCallee->getName().startswith(lgcName::DescriptorLoadSpillTable));
     (void(pCallee)); // unused
 
     auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
@@ -270,7 +270,7 @@ void PatchPushConstOp::visitCallInst(
     }
 }
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patch operations for push constant operations.

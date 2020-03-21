@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcBuilderImpl.cpp
- * @brief LLPC source file: implementation of Llpc::BuilderImpl
+ * @brief LLPC source file: implementation of lgc::BuilderImpl
  ***********************************************************************************************************************
  */
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -34,7 +34,7 @@
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
@@ -198,11 +198,11 @@ Instruction* BuilderImplBase::CreateWaterfallLoop(
         {
             if (auto pCalledFunc = pCall->getCalledFunction())
             {
-                if (pCalledFunc->getName().startswith(LlpcName::DescriptorLoadFromPtr))
+                if (pCalledFunc->getName().startswith(lgcName::DescriptorLoadFromPtr))
                 {
                     pCall = dyn_cast<CallInst>(pCall->getArgOperand(0)); // The descriptor pointer
                     if ((pCall != nullptr) &&
-                        pCall->getCalledFunction()->getName().startswith(LlpcName::DescriptorIndex))
+                        pCall->getCalledFunction()->getName().startswith(lgcName::DescriptorIndex))
                     {
                         pNonUniformVal = pCall->getArgOperand(1); // The index operand
                     }

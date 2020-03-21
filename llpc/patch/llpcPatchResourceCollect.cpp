@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchResourceCollect.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchResourceCollect.
+ * @brief LLPC source file: contains implementation of class lgc::PatchResourceCollect.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/IRBuilder.h"
@@ -49,7 +49,7 @@
 #define DEBUG_TYPE "llpc-patch-resource-collect"
 
 using namespace llvm;
-using namespace Llpc;
+using namespace lgc;
 
 // -disable-gs-onchip: disable geometry shader on-chip mode
 cl::opt<bool> DisableGsOnChip("disable-gs-onchip",
@@ -59,7 +59,7 @@ cl::opt<bool> DisableGsOnChip("disable-gs-onchip",
 // -pack-in-out: pack input/output
 static cl::opt<bool> PackInOut("pack-in-out", cl::desc("Pack input/output"), cl::init(false));
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -1234,8 +1234,8 @@ void PatchResourceCollect::visitCallInst(
 
     auto mangledName = pCallee->getName();
 
-    if (mangledName.startswith(LlpcName::PushConstLoad) ||
-        mangledName.startswith(LlpcName::DescriptorLoadSpillTable))
+    if (mangledName.startswith(lgcName::PushConstLoad) ||
+        mangledName.startswith(lgcName::DescriptorLoadSpillTable))
     {
         // Push constant operations
         if (isDeadCall)
@@ -1247,25 +1247,25 @@ void PatchResourceCollect::visitCallInst(
             m_hasPushConstOp = true;
         }
     }
-    else if (mangledName.startswith(LlpcName::DescriptorLoadBuffer) ||
-             mangledName.startswith(LlpcName::DescriptorGetTexelBufferPtr) ||
-             mangledName.startswith(LlpcName::DescriptorGetResourcePtr) ||
-             mangledName.startswith(LlpcName::DescriptorGetFmaskPtr) ||
-             mangledName.startswith(LlpcName::DescriptorGetSamplerPtr))
+    else if (mangledName.startswith(lgcName::DescriptorLoadBuffer) ||
+             mangledName.startswith(lgcName::DescriptorGetTexelBufferPtr) ||
+             mangledName.startswith(lgcName::DescriptorGetResourcePtr) ||
+             mangledName.startswith(lgcName::DescriptorGetFmaskPtr) ||
+             mangledName.startswith(lgcName::DescriptorGetSamplerPtr))
     {
         uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
         DescriptorPair descPair = { descSet, binding };
         m_pResUsage->descPairs.insert(descPair.u64All);
     }
-    else if (mangledName.startswith(LlpcName::BufferLoad))
+    else if (mangledName.startswith(lgcName::BufferLoad))
     {
         if (isDeadCall)
         {
             m_deadCalls.insert(&callInst);
         }
     }
-    else if (mangledName.startswith(LlpcName::InputImportGeneric))
+    else if (mangledName.startswith(lgcName::InputImportGeneric))
     {
         // Generic input import
         if (isDeadCall)
@@ -1336,7 +1336,7 @@ void PatchResourceCollect::visitCallInst(
             }
         }
     }
-    else if (mangledName.startswith(LlpcName::InputImportInterpolant))
+    else if (mangledName.startswith(lgcName::InputImportInterpolant))
     {
         // Interpolant input import
         assert(m_shaderStage == ShaderStageFragment);
@@ -1367,7 +1367,7 @@ void PatchResourceCollect::visitCallInst(
             }
         }
     }
-    else if (mangledName.startswith(LlpcName::InputImportBuiltIn))
+    else if (mangledName.startswith(lgcName::InputImportBuiltIn))
     {
         // Built-in input import
         if (isDeadCall)
@@ -1380,7 +1380,7 @@ void PatchResourceCollect::visitCallInst(
             m_activeInputBuiltIns.insert(builtInId);
         }
     }
-    else if (mangledName.startswith(LlpcName::OutputImportGeneric))
+    else if (mangledName.startswith(lgcName::OutputImportGeneric))
     {
         // Generic output import
         assert(m_shaderStage == ShaderStageTessControl);
@@ -1433,7 +1433,7 @@ void PatchResourceCollect::visitCallInst(
             m_hasDynIndexedOutput = true;
         }
     }
-    else if (mangledName.startswith(LlpcName::OutputImportBuiltIn))
+    else if (mangledName.startswith(lgcName::OutputImportBuiltIn))
     {
         // Built-in output import
         assert(m_shaderStage == ShaderStageTessControl);
@@ -1441,7 +1441,7 @@ void PatchResourceCollect::visitCallInst(
         uint32_t builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         m_importedOutputBuiltIns.insert(builtInId);
     }
-    else if (mangledName.startswith(LlpcName::OutputExportGeneric))
+    else if (mangledName.startswith(lgcName::OutputExportGeneric))
     {
         // Generic output export
         if (m_shaderStage == ShaderStageTessControl)
@@ -1471,7 +1471,7 @@ void PatchResourceCollect::visitCallInst(
             }
         }
     }
-    else if (mangledName.startswith(LlpcName::OutputExportBuiltIn))
+    else if (mangledName.startswith(lgcName::OutputExportBuiltIn))
     {
         // NOTE: If output value is undefined one, we can safely drop it and remove the output export call.
         // Currently, do this for geometry shader.
@@ -1502,7 +1502,7 @@ void PatchResourceCollect::visitCallInst(
                 m_deadCalls.insert(&callInst);
             }
         }
-        else if ((m_shaderStage == ShaderStageVertex) && mangledName.startswith(LlpcName::OutputExportGeneric))
+        else if ((m_shaderStage == ShaderStageVertex) && mangledName.startswith(lgcName::OutputExportGeneric))
         {
             m_inOutCalls.push_back(&callInst);
             m_deadCalls.insert(&callInst);
@@ -3440,7 +3440,7 @@ void PatchResourceCollect::ReviseInputImportCalls()
             args.push_back(pCall->getOperand(2));
             args.push_back(pCall->getOperand(3));
 
-            callName = LlpcName::InputImportGeneric;
+            callName = lgcName::InputImportGeneric;
         }
         else
         {
@@ -3450,7 +3450,7 @@ void PatchResourceCollect::ReviseInputImportCalls()
             args.push_back(pCall->getOperand(3));
             args.push_back(pCall->getOperand(4));
 
-            callName = LlpcName::InputImportInterpolant;
+            callName = lgcName::InputImportInterpolant;
         }
 
         // Previous stage converts non-float type to float type when outputs
@@ -3582,7 +3582,7 @@ void PatchResourceCollect::ReassembleOutputExportCalls()
         args[1] = builder.getInt32(0);
         args[2] = pOutValue;
 
-        std::string callName(LlpcName::OutputExportGeneric);
+        std::string callName(lgcName::OutputExportGeneric);
         AddTypeMangling(builder.getVoidTy(), args, callName);
 
         builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
@@ -3602,8 +3602,8 @@ void PatchResourceCollect::ScalarizeForInOutPacking(
     SmallVector<CallInst*, 4> fsInputCalls;
     for (Function& func : *pModule)
     {
-        if (func.getName().startswith(LlpcName::InputImportGeneric) ||
-            func.getName().startswith(LlpcName::InputImportInterpolant))
+        if (func.getName().startswith(lgcName::InputImportGeneric) ||
+            func.getName().startswith(lgcName::InputImportInterpolant))
         {
             // This is a generic (possibly interpolated) input. Find its uses in FS.
             for (User* pUser : func.users())
@@ -3620,7 +3620,7 @@ void PatchResourceCollect::ScalarizeForInOutPacking(
                 }
             }
         }
-        else if (func.getName().startswith(LlpcName::OutputExportGeneric))
+        else if (func.getName().startswith(lgcName::OutputExportGeneric))
         {
             // This is a generic output. Find its uses in the last vertex processing stage.
             for (User* pUser : func.users())
@@ -3680,7 +3680,7 @@ void PatchResourceCollect::ScalarizeGenericInput(
     {
         // Handle the case of splitting a 64 bit scalar in two.
         assert(pResultTy->getPrimitiveSizeInBits() == 64);
-        std::string callName = isInterpolant ? LlpcName::InputImportInterpolant : LlpcName::InputImportGeneric;
+        std::string callName = isInterpolant ? lgcName::InputImportInterpolant : lgcName::InputImportGeneric;
         AddTypeMangling(builder.getInt32Ty(), args, callName);
         Value* pResult = UndefValue::get(VectorType::get(builder.getInt32Ty(), 2));
         for (uint32_t i = 0; i != 2; ++i)
@@ -3754,7 +3754,7 @@ void PatchResourceCollect::ScalarizeGenericInput(
 
     // Load the individual elements and insert into a vector.
     Value* pResult = UndefValue::get(pResultTy);
-    std::string callName = isInterpolant ? LlpcName::InputImportInterpolant : LlpcName::InputImportGeneric;
+    std::string callName = isInterpolant ? lgcName::InputImportInterpolant : lgcName::InputImportGeneric;
     AddTypeMangling(pElementTy, args, callName);
     for (uint32_t i = 0; i != scalarizeBy; ++i)
     {
@@ -3826,7 +3826,7 @@ void PatchResourceCollect::ScalarizeGenericOutput(
         args[valArgIdx] = builder.CreateExtractElement(pOutputVal, i);
         if (i == 0)
         {
-            callName = LlpcName::OutputExportGeneric;
+            callName = lgcName::OutputExportGeneric;
             AddTypeMangling(nullptr, args, callName);
         }
         builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
@@ -3843,7 +3843,7 @@ bool InOutLocationMapManager::AddSpan(
     auto pCallee = pCall->getCalledFunction();
     auto mangledName = pCallee->getName();
     bool isInput = false;
-    if (mangledName.startswith(LlpcName::InputImportGeneric))
+    if (mangledName.startswith(lgcName::InputImportGeneric))
     {
         LocationSpan span = {};
 
@@ -3865,7 +3865,7 @@ bool InOutLocationMapManager::AddSpan(
 
         isInput = true;
     }
-    if (mangledName.startswith(LlpcName::InputImportInterpolant))
+    if (mangledName.startswith(lgcName::InputImportInterpolant))
     {
         auto pLocOffset = pCall->getOperand(1);
         assert(isa<ConstantInt>(pLocOffset));
@@ -3960,7 +3960,7 @@ bool InOutLocationMapManager::FindMap(
     return true;
 }
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patch operations for resource collecting.

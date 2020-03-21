@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchCopyShader.cpp
- * @brief LLPC source file: contains declaration and implementation of class Llpc::PatchCopyShader.
+ * @brief LLPC source file: contains declaration and implementation of class lgc::PatchCopyShader.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/Constants.h"
@@ -43,10 +43,10 @@
 
 #define DEBUG_TYPE "llpc-patch-copy-shader"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -96,11 +96,11 @@ private:
 
 char PatchCopyShader::ID = 0;
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Create pass to generate copy shader if required.
-ModulePass* Llpc::CreatePatchCopyShader()
+ModulePass* lgc::CreatePatchCopyShader()
 {
     return new PatchCopyShader();
 }
@@ -148,7 +148,7 @@ bool PatchCopyShader::runOnModule(
     auto pEntryPointTy = FunctionType::get(builder.getVoidTy(), argTys, false);
 
     // Create function for the copy shader entrypoint, and insert it before the FS (if there is one).
-    auto pEntryPoint = Function::Create(pEntryPointTy, GlobalValue::ExternalLinkage, LlpcName::CopyShaderEntryPoint);
+    auto pEntryPoint = Function::Create(pEntryPointTy, GlobalValue::ExternalLinkage, lgcName::CopyShaderEntryPoint);
 
     auto insertPos = module.getFunctionList().end();
     auto pFsEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStageFragment);
@@ -285,7 +285,7 @@ bool PatchCopyShader::runOnModule(
     auto pExecModelMeta = ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_pContext),
                                                   ShaderStageCopyShader));
     auto pExecModelMetaNode = MDNode::get(*m_pContext, pExecModelMeta);
-    pEntryPoint->addMetadata(LlpcName::ShaderStageMetadata, *pExecModelMetaNode);
+    pEntryPoint->addMetadata(lgcName::ShaderStageMetadata, *pExecModelMetaNode);
 
     // Tell pipeline state there is a copy shader.
     m_pPipelineState->SetShaderStageMask(m_pPipelineState->GetShaderStageMask() | (1U << ShaderStageCopyShader));
@@ -302,7 +302,7 @@ void PatchCopyShader::CollectGsGenericOutputInfo(
 
     for (auto& func : *pGsEntryPoint->getParent())
     {
-        if (func.getName().startswith(LlpcName::OutputExportGeneric))
+        if (func.getName().startswith(lgcName::OutputExportGeneric))
         {
             for (auto pUser : func.users())
             {
@@ -514,7 +514,7 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
     {
         // NOTE: For NGG, importing GS output from GS-VS ring is represented by a call and the call is replaced with
         // real instructions when when NGG primitive shader is generated.
-        std::string callName(LlpcName::NggGsOutputImport);
+        std::string callName(lgcName::NggGsOutputImport);
         callName += GetTypeName(pLoadTy);
         return builder.CreateNamedCall(callName, pLoadTy,
                                        {
@@ -673,7 +673,7 @@ void PatchCopyShader::ExportGenericOutput(
                 pOutputValue
             };
 
-            std::string instName(LlpcName::OutputExportXfb);
+            std::string instName(lgcName::OutputExportXfb);
             AddTypeMangling(nullptr, args, instName);
             builder.CreateNamedCall(instName, builder.getVoidTy(), args, {});
         }
@@ -684,7 +684,7 @@ void PatchCopyShader::ExportGenericOutput(
         auto pOutputTy = pOutputValue->getType();
         assert(pOutputTy->isSingleValueType());
 
-        std::string instName(LlpcName::OutputExportGeneric);
+        std::string instName(lgcName::OutputExportGeneric);
         instName += GetTypeName(pOutputTy);
 
         builder.CreateNamedCall(instName, builder.getVoidTy(), { builder.getInt32(location), pOutputValue }, {});
@@ -715,7 +715,7 @@ void PatchCopyShader::ExportBuiltInOutput(
             uint32_t xfbOutInfo = xfbOutsInfo[locIter->first];
             XfbOutInfo* pXfbOutInfo = reinterpret_cast<XfbOutInfo*>(&xfbOutInfo);
 
-            std::string instName(LlpcName::OutputExportXfb);
+            std::string instName(lgcName::OutputExportXfb);
             Value* args[] =
             {
                 builder.getInt32(pXfbOutInfo->xfbBuffer),
@@ -730,7 +730,7 @@ void PatchCopyShader::ExportBuiltInOutput(
 
     if (pResUsage->inOutUsage.gs.rasterStream == streamId)
     {
-        std::string callName = LlpcName::OutputExportBuiltIn;
+        std::string callName = lgcName::OutputExportBuiltIn;
         callName += BuilderImplInOut::GetBuiltInName(builtInId);
         Value* args[] = { builder.getInt32(builtInId), pOutputValue };
         AddTypeMangling(nullptr, args, callName);

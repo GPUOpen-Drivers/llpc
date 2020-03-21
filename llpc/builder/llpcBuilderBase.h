@@ -32,7 +32,7 @@
 
 #include "llvm/IR/IRBuilder.h"
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -57,4 +57,4 @@ public:
         llvm::ArrayRef<llvm::Attribute::AttrKind> attribs); // Function attributes
 };
 
-} // Llpc
+} // lgc

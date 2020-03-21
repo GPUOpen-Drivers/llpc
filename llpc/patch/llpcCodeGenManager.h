@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcCodeGenManager.h
- * @brief LLPC header file: contains declaration of class Llpc::CodeGenManager.
+ * @brief LLPC header file: contains declaration of class lgc::CodeGenManager.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -49,7 +49,7 @@ class Timer;
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 namespace Gfx6
@@ -84,4 +84,4 @@ private:
     CodeGenManager& operator=(const CodeGenManager&) = delete;
 };
 
-} // Llpc
+} // lgc

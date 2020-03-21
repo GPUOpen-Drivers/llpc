@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcFragColorExport.h
- * @brief LLPC header file: contains declaration of class Llpc::FragColorExport.
+ * @brief LLPC header file: contains declaration of class lgc::FragColorExport.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -34,7 +34,7 @@
 #include "llpcIntrinsDefs.h"
 #include "llpcPipeline.h"
 
-namespace Llpc
+namespace lgc
 {
 
 class PipelineState;
@@ -83,4 +83,4 @@ private:
     llvm::LLVMContext*        m_pContext;         // LLVM context
 };
 
-} // Llpc
+} // lgc

@@ -25,14 +25,14 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPipelineState.h
- * @brief LLPC header file: contains declaration of class Llpc::PipelineState
+ * @brief LLPC header file: contains declaration of class lgc::PipelineState
  ***********************************************************************************************************************
  */
 #pragma once
 
 #include "llpcPipeline.h"
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -99,4 +99,4 @@ private:
     ComputeShaderMode   m_computeShaderMode = {};                         // Compute shader mode (workgroup size)
 };
 
-} // Llpc
+} // lgc

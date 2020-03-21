@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchLoadScalarizer.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchLoadScalarizer.
+ * @brief LLPC source file: contains implementation of class lgc::PatchLoadScalarizer.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/Constants.h"
@@ -39,10 +39,10 @@
 
 #define DEBUG_TYPE "llpc-patch-load-scalarizer"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -197,7 +197,7 @@ void PatchLoadScalarizer::visitLoadInst(
     }
 }
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching operations for load scarlarizer optimization.

@@ -25,7 +25,7 @@
 /**
 ***********************************************************************************************************************
 * @file  llpcPatchSetupTargetFeatures.cpp
-* @brief LLPC source file: contains declaration and implementation of class Llpc::PatchSetupTargetFeatures.
+* @brief LLPC source file: contains declaration and implementation of class lgc::PatchSetupTargetFeatures.
 ***********************************************************************************************************************
 */
 #include "llvm/Pass.h"
@@ -38,9 +38,9 @@
 #define DEBUG_TYPE "llpc-patch-setup-target-features"
 
 using namespace llvm;
-using namespace Llpc;
+using namespace lgc;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -67,11 +67,11 @@ private:
 
 char PatchSetupTargetFeatures::ID = 0;
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Create pass to set up target features
-ModulePass* Llpc::CreatePatchSetupTargetFeatures()
+ModulePass* lgc::CreatePatchSetupTargetFeatures()
 {
     return new PatchSetupTargetFeatures();
 }

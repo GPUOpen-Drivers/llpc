@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchResourceCollect.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchResourceCollect.
+ * @brief LLPC header file: contains declaration of class lgc::PatchResourceCollect.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -37,7 +37,7 @@
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
 
-namespace Llpc
+namespace lgc
 {
 
 struct NggControl;
@@ -202,4 +202,4 @@ private:
     std::map<InOutLocation, InOutLocation> m_locationMap; // The map between original location and new location
 };
 
-} // Llpc
+} // lgc

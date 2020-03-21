@@ -35,7 +35,7 @@
 #include "llpcAbiMetadata.h"
 #include "llpcTargetInfo.h"
 
-namespace Llpc
+namespace lgc
 {
 
     namespace Gfx9
@@ -556,4 +556,4 @@ const char* GetRegisterNameString(GfxIpVersion gfxIp, uint32_t regId);
 
 } // Gfx9
 
-} // Llpc
+} // lgc

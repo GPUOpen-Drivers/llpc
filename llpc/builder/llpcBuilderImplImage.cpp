@@ -37,7 +37,7 @@
 
 #define DEBUG_TYPE "llpc-builder-impl-image"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // Intrinsic ID table for getresinfo
@@ -1249,14 +1249,14 @@ Value* BuilderImplImage::CreateImageSample(
         {
             if (Function* pLoadFromPtrFunc = pLoadFromPtr->getCalledFunction())
             {
-                if (pLoadFromPtrFunc->getName().startswith(LlpcName::DescriptorLoadFromPtr))
+                if (pLoadFromPtrFunc->getName().startswith(lgcName::DescriptorLoadFromPtr))
                 {
                     Value* pDescPtr = pLoadFromPtr->getOperand(0);
                     if (auto pDescPtrCall = dyn_cast<CallInst>(pDescPtr))
                     {
                         if (Function* pDescPtrCallFunc = pDescPtrCall->getCalledFunction())
                         {
-                            if (pDescPtrCallFunc->getName().startswith(LlpcName::DescriptorGetSamplerPtr))
+                            if (pDescPtrCallFunc->getName().startswith(lgcName::DescriptorGetSamplerPtr))
                             {
                                 // We have found the call that tells us the descriptor set and binding.
                                 uint32_t descSet = cast<ConstantInt>(pDescPtrCall->getArgOperand(0))->getZExtValue();
@@ -2497,7 +2497,7 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
         GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->builtInUsage.fs.fragCoord = true;
 
         const static uint32_t BuiltInFragCoord = 15;
-        std::string callName = LlpcName::InputImportBuiltIn;
+        std::string callName = lgcName::InputImportBuiltIn;
         Type* pBuiltInTy = VectorType::get(getFloatTy(), 4);
         AddTypeMangling(pBuiltInTy, {}, callName);
         Value *pFragCoord = EmitCall(callName,
@@ -2545,7 +2545,7 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
         }
 
         const static uint32_t BuiltInViewIndex = 4440;
-        std::string callName = LlpcName::InputImportBuiltIn;
+        std::string callName = lgcName::InputImportBuiltIn;
         Type* pBuiltInTy = getInt32Ty();
         AddTypeMangling(pBuiltInTy, {}, callName);
         Value *pViewIndex = EmitCall(callName,

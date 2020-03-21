@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcConfigBuilderBase.cpp
- * @brief LLPC source file: contains implementation of class Llpc::ConfigBuilderBase.
+ * @brief LLPC source file: contains implementation of class lgc::ConfigBuilderBase.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/Constants.h"
@@ -39,7 +39,7 @@
 
 #define DEBUG_TYPE "llpc-config-builder-base"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================

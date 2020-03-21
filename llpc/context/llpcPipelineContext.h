@@ -44,10 +44,15 @@
 #include "llpcMetroHash.h"
 #include "llpcPipeline.h"
 
-namespace Llpc
+namespace lgc
 {
 
 class Pipeline;
+
+} // lgc
+
+namespace Llpc
+{
 
 // Enumerates types of descriptor.
 enum class DescriptorType : uint32_t
@@ -138,15 +143,15 @@ public:
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const = 0;
 
-    // Set pipeline state in Pipeline object for middle-end
-    void SetPipelineState(Pipeline* pPipeline) const;
+    // Set pipeline state in lgc::Pipeline object for middle-end
+    void SetPipelineState(lgc::Pipeline* pPipeline) const;
 
     // Get ShaderFpMode struct for the given shader stage
     ShaderFpMode& GetShaderFpMode(ShaderStage stage) { return m_shaderFpModes[stage]; }
 
     // Map a VkFormat to a {BufDataFormat, BufNumFormat}. Returns BufDataFormatInvalid if the
     // VkFormat is not supported.
-    static std::pair<BufDataFormat, BufNumFormat> MapVkFormat(VkFormat format, bool isColorExport);
+    static std::pair<lgc::BufDataFormat, lgc::BufNumFormat> MapVkFormat(VkFormat format, bool isColorExport);
 
 protected:
     // Gets dummy vertex input create info
@@ -173,24 +178,24 @@ private:
     typedef std::map<std::pair<uint32_t, uint32_t>, const DescriptorRangeValue*> ImmutableNodesMap;
 
     // Give the pipeline options to the middle-end.
-    void SetOptionsInPipeline(Pipeline* pPipeline) const;
+    void SetOptionsInPipeline(lgc::Pipeline* pPipeline) const;
 
     // Give the user data nodes and descriptor range values to the middle-end.
-    void SetUserDataInPipeline(Pipeline* pPipeline) const;
+    void SetUserDataInPipeline(lgc::Pipeline* pPipeline) const;
     void SetUserDataNodesTable(llvm::LLVMContext&                   context,
-                               ArrayRef<ResourceMappingNode>        nodes,
+                               llvm::ArrayRef<ResourceMappingNode>  nodes,
                                const ImmutableNodesMap&             immutableNodesMap,
-                               ResourceNode*                        pDestTable,
-                               ResourceNode*&                       pDestInnerTable) const;
+                               lgc::ResourceNode*                   pDestTable,
+                               lgc::ResourceNode*&                  pDestInnerTable) const;
 
     // Give the graphics pipeline state to the middle-end.
-    void SetGraphicsStateInPipeline(Pipeline* pPipeline) const;
+    void SetGraphicsStateInPipeline(lgc::Pipeline* pPipeline) const;
 
     // Set vertex input descriptions in middle-end Pipeline
-    void SetVertexInputDescriptions(Pipeline* pPipeline) const;
+    void SetVertexInputDescriptions(lgc::Pipeline* pPipeline) const;
 
     // Give the color export state to the middle-end.
-    void SetColorExportState(Pipeline* pPipeline) const;
+    void SetColorExportState(lgc::Pipeline* pPipeline) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 

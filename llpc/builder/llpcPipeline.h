@@ -25,12 +25,13 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPipeline.h
- * @brief LLPC header file: contains declaration of class Llpc::Pipeline
+ * @brief LLPC header file: contains declaration of class lgc::Pipeline
  ***********************************************************************************************************************
  */
 #pragma once
 
 #include "lgc/Defs.h"
+#include "llpcBuilderCommon.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
@@ -42,7 +43,7 @@ class Timer;
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 using namespace llvm;
@@ -643,4 +644,4 @@ private:
     BuilderContext*                 m_pBuilderContext;                  // Builder context
 };
 
-} // Llpc
+} // lgc

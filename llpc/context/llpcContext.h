@@ -75,13 +75,13 @@ public:
     }
 
     // Set LLPC builder
-    void SetBuilder(Builder* pBuilder) { m_pBuilder = pBuilder; }
+    void SetBuilder(lgc::Builder* pBuilder) { m_pBuilder = pBuilder; }
 
     // Get LLPC builder
-    Builder* GetBuilder() const { return m_pBuilder; }
+    lgc::Builder* GetBuilder() const { return m_pBuilder; }
 
     // Get (create if necessary) BuilderContext
-    BuilderContext* GetBuilderContext();
+    lgc::BuilderContext* GetBuilderContext();
 
     // Set value of scalarBlockLayout option. This gets called with the value from PipelineOptions when
     // starting a pipeline compile.
@@ -175,8 +175,8 @@ private:
     PipelineContext*              m_pPipelineContext;  // Pipeline-specific context
     EmuLib                        m_glslEmuLib;        // LLVM library for GLSL emulation
     volatile  bool                m_isInUse;           // Whether this context is in use
-    Builder*                      m_pBuilder = nullptr; // LLPC builder object
-    std::unique_ptr<BuilderContext> m_builderContext;  // Builder context
+    lgc::Builder*                 m_pBuilder = nullptr; // LLPC builder object
+    std::unique_ptr<lgc::BuilderContext> m_builderContext;  // Builder context
 
     std::unique_ptr<llvm::TargetMachine> m_pTargetMachine; // Target machine
     bool                          m_scalarBlockLayout = false;  // scalarBlockLayout option from last pipeline compile

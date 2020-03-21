@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,22 +24,33 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcBuilderBuiltIns.h
- * @brief LLPC header file: declaration of BuiltIns supported by the Builder interface
+ * @file  llpcBuilderCommon.h
+ * @brief LLPC header file: contains common interface types in the LGC interface
  ***********************************************************************************************************************
  */
-
 #pragma once
+
+#include <stdint.h>
 
 namespace lgc
 {
 
-// Define built-in kind enum.
-enum BuiltInKind
+/// Enumerates LGC shader stages.
+enum ShaderStage : uint32_t
 {
-#define BUILTIN(name, number, out, in, type) BuiltIn ## name = number,
-#include "llpcBuilderBuiltInDefs.h"
-#undef BUILTIN
-}; \
+    ShaderStageVertex = 0,                                ///< Vertex shader
+    ShaderStageTessControl,                               ///< Tessellation control shader
+    ShaderStageTessEval,                                  ///< Tessellation evaluation shader
+    ShaderStageGeometry,                                  ///< Geometry shader
+    ShaderStageFragment,                                  ///< Fragment shader
+    ShaderStageCompute,                                   ///< Compute shader
+    ShaderStageCount,                                     ///< Count of shader stages
+    ShaderStageInvalid = ~0u,                             ///< Invalid shader stage
+    ShaderStageNativeStageCount = ShaderStageCompute + 1, ///< Native supported shader stage count
+    ShaderStageGfxCount = ShaderStageFragment + 1,        ///< Count of shader stages for graphics pipeline
+
+    ShaderStageCopyShader = ShaderStageCount,             ///< Copy shader (internal-use)
+    ShaderStageCountInternal,                             ///< Count of shader stages (internal-use)
+};
 
 } // lgc

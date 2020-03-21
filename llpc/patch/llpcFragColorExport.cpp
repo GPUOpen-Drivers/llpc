@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcFragColorExport.cpp
- * @brief LLPC source file: contains implementation of class Llpc::FragColorExport.
+ * @brief LLPC source file: contains implementation of class lgc::FragColorExport.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/Constants.h"
@@ -41,7 +41,7 @@
 
 using namespace llvm;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -866,4 +866,4 @@ Value* FragColorExport::ConvertToInt(
     return pValue;
 }
 
-} // Llpc
+} // lgc

@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchEntryPointMutate.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchEntryPointMutate.
+ * @brief LLPC header file: contains declaration of class lgc::PatchEntryPointMutate.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -35,7 +35,7 @@
 #include "llpcPatch.h"
 #include "llpcPipelineState.h"
 
-namespace Llpc
+namespace lgc
 {
 
 class PipelineShaders;
@@ -83,4 +83,4 @@ private:
                         // Pipeline state from PipelineStateWrapper pass
 };
 
-} // Llpc
+} // lgc

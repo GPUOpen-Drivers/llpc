@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcBuilderContext.cpp
- * @brief LLPC source file: implementation of llpc::BuilderContext class for creating and using Llpc::Builder
+ * @brief LLPC source file: implementation of llpc::BuilderContext class for creating and using lgc::Builder
  ***********************************************************************************************************************
  */
 #include "llpcBuilder.h"
@@ -46,7 +46,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetOptions.h"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 static codegen::RegisterCodeGenFlags CGF;
@@ -215,7 +215,7 @@ void BuilderContext::PreparePassManager(
 // =====================================================================================================================
 // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
 void BuilderContext::AddTargetPasses(
-    Llpc::PassManager&    passMgr,        // [in/out] pass manager to add passes to
+    lgc::PassManager&     passMgr,        // [in/out] pass manager to add passes to
     Timer*                pCodeGenTimer,  // [in] Timer to time target passes with, nullptr if not timing
     raw_pwrite_stream&    outStream)      // [out] Output stream
 {
@@ -226,7 +226,7 @@ void BuilderContext::AddTargetPasses(
     }
 
     // Dump the module just before codegen.
-    if (raw_ostream* pOuts = GetLlpcOuts())
+    if (raw_ostream* pOuts = GetLgcOuts())
     {
         passMgr.add(createPrintModulePass(*pOuts,
                     "===============================================================================\n"

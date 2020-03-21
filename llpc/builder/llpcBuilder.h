@@ -25,18 +25,19 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcBuilder.h
- * @brief LLPC header file: declaration of Llpc::Builder interface
+ * @brief LLPC header file: declaration of lgc::Builder interface
  ***********************************************************************************************************************
  */
 #pragma once
 
 #include "llpcBuilderBase.h"
 #include "llpcBuilderBuiltIns.h"
+#include "llpcBuilderCommon.h"
 
 #include "lgc/Defs.h"
 #include "llvm/Support/AtomicOrdering.h"
 
-namespace Llpc
+namespace lgc
 {
 
 using namespace llvm;
@@ -1361,4 +1362,4 @@ private:
     BuilderContext* m_pBuilderContext;      // Builder context
 };
 
-} // Llpc
+} // lgc

@@ -37,7 +37,7 @@
 
 #define DEBUG_TYPE "llpc-builder-replayer"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 namespace
@@ -83,7 +83,7 @@ char BuilderReplayer::ID = 0;
 
 // =====================================================================================================================
 // Create BuilderReplayer pass
-ModulePass* Llpc::CreateBuilderReplayer(
+ModulePass* lgc::CreateBuilderReplayer(
     Pipeline*  pPipeline)     // [in] Pipeline object
 {
     return new BuilderReplayer(pPipeline);

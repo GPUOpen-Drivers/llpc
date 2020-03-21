@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcNggPrimShader.h
- * @brief LLPC header file: contains declaration of class Llpc::NggPrimShader.
+ * @brief LLPC header file: contains declaration of class lgc::NggPrimShader.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -37,7 +37,7 @@
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
 
-namespace Llpc
+namespace lgc
 {
 
 struct NggControl;
@@ -263,4 +263,4 @@ private:
     std::unique_ptr<llvm::IRBuilder<>>  m_pBuilder; // LLVM IR builder
 };
 
-} // Llpc
+} // lgc

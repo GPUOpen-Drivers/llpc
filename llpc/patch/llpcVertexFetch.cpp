@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcVertexFetch.cpp
- * @brief LLPC source file: contains implementation of class Llpc::VertexFetch.
+ * @brief LLPC source file: contains implementation of class lgc::VertexFetch.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/Constants.h"
@@ -41,7 +41,7 @@
 
 using namespace llvm;
 
-namespace Llpc
+namespace lgc
 {
 
 #define VERTEX_FORMAT_UNDEFINED(_format) \
@@ -1120,4 +1120,4 @@ bool VertexFetch::NeedSecondVertexFetch(
             (pInputDesc->dfmt == BufDataFormat64_64_64_64));
 }
 
-} // Llpc
+} // lgc

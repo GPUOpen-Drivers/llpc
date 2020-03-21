@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchIntrinsicSimplify.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchIntrinsicSimplify.
+ * @brief LLPC header file: contains declaration of class lgc::PatchIntrinsicSimplify.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -49,7 +49,7 @@ class Value;
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 class Context;
@@ -90,4 +90,4 @@ private:
     GfxIpVersion m_gfxIp;
 };
 
-} // Llpc
+} // lgc

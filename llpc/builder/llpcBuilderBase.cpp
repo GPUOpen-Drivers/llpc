@@ -30,7 +30,7 @@
  */
 #include "llpcBuilderBase.h"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================

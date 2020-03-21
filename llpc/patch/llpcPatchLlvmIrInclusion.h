@@ -25,14 +25,14 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchLlvmIrInclusion.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchLlvmIrInclusion.
+ * @brief LLPC header file: contains declaration of class lgc::PatchLlvmIrInclusion.
  ***********************************************************************************************************************
  */
 #pragma once
 
 #include "llpcPatch.h"
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -58,4 +58,4 @@ private:
     PatchLlvmIrInclusion& operator=(const PatchLlvmIrInclusion&) = delete;
 };
 
-} // Llpc
+} // lgc

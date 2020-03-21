@@ -49,7 +49,7 @@
 
 using namespace llvm;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -192,7 +192,7 @@ ShaderStage GetShaderStageFromFunction(
     const Function* pFunc)  // [in] LLVM function
 {
     // Check for the metadata that is added by the builder. This works in the patch phase.
-    MDNode* pStageMetaNode = pFunc->getMetadata(LlpcName::ShaderStageMetadata);
+    MDNode* pStageMetaNode = pFunc->getMetadata(lgcName::ShaderStageMetadata);
     if (pStageMetaNode != nullptr)
     {
         return ShaderStage(mdconst::dyn_extract<ConstantInt>(pStageMetaNode->getOperand(0))->getZExtValue());
@@ -303,4 +303,4 @@ bool IsDontCareValue(
     return isDontCare;
 }
 
-} // Llpc
+} // lgc

@@ -73,6 +73,7 @@
 
 #define DEBUG_TYPE "llpc-compiler"
 
+using namespace lgc;
 using namespace llvm;
 using namespace MetroHash;
 using namespace SPIRV;
@@ -600,11 +601,12 @@ Result Compiler::BuildShaderModule(
                     pContext->SetModuleTargetMachine(pModule);
 
                     uint32_t passIndex = 0;
-                    std::unique_ptr<PassManager> lowerPassMgr(PassManager::Create());
+                    std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
                     lowerPassMgr->SetPassIndex(&passIndex);
 
                     // Set the shader stage in the Builder.
-                    pContext->GetBuilder()->SetShaderStage(static_cast<ShaderStage>(entryNames[i].stage));
+                    pContext->GetBuilder()->SetShaderStage(
+                                              GetLgcShaderStage(static_cast<ShaderStage>(entryNames[i].stage)));
 
                     // Start timer for translate.
                     timerProfiler.AddTimerStartStopPass(&*lowerPassMgr, TimerTranslate, true);
@@ -1141,11 +1143,11 @@ Result Compiler::BuildPipelineInternal(
                 continue;
             }
 
-            std::unique_ptr<PassManager> lowerPassMgr(PassManager::Create());
+            std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
             lowerPassMgr->SetPassIndex(&passIndex);
 
             // Set the shader stage in the Builder.
-            pContext->GetBuilder()->SetShaderStage(entryStage);
+            pContext->GetBuilder()->SetShaderStage(GetLgcShaderStage(entryStage));
 
             // Start timer for translate.
             timerProfiler.AddTimerStartStopPass(&*lowerPassMgr, TimerTranslate, true);
@@ -1181,8 +1183,8 @@ Result Compiler::BuildPipelineInternal(
                 continue;
             }
 
-            pContext->GetBuilder()->SetShaderStage(entryStage);
-            std::unique_ptr<PassManager> lowerPassMgr(PassManager::Create());
+            pContext->GetBuilder()->SetShaderStage(GetLgcShaderStage(entryStage));
+            std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
             lowerPassMgr->SetPassIndex(&passIndex);
 
             SpirvLower::AddPasses(pContext,
@@ -1924,8 +1926,8 @@ Context* Compiler::AcquireContext() const
 // =====================================================================================================================
 // Run a pass manager's passes on a module, catching any LLVM fatal error and returning a success indication
 bool Compiler::RunPasses(
-    PassManager*  pPassMgr, // [in] Pass manager
-    Module*       pModule   // [in/out] Module
+    lgc::PassManager* pPassMgr, // [in] Pass manager
+    Module*           pModule   // [in/out] Module
     ) const
 {
     bool success = false;

@@ -36,7 +36,7 @@
 
 #define DEBUG_TYPE "llpc-builder-impl-arith"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
