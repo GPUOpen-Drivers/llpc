@@ -33,7 +33,7 @@
 #include "llpcBuilderImpl.h"
 #include "llpcPipelineState.h"
 
-namespace Llpc
+namespace lgc
 {
 
 using namespace llvm;
@@ -125,4 +125,4 @@ private:
     uint32_t m_dirtyDwords;
 };
 
-} // Llpc
+} // lgc

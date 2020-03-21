@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchCheckShaderCache.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchCheckShaderCache
+ * @brief LLPC header file: contains declaration of class lgc::PatchCheckShaderCache
  ***********************************************************************************************************************
  */
 #pragma once
@@ -34,7 +34,7 @@
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -75,4 +75,4 @@ private:
     Pipeline::CheckShaderCacheFunc   m_callbackFunc;
 };
 
-} // Llpc
+} // lgc

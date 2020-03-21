@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcBuilderImpl.h
- * @brief LLPC header file: declaration of Llpc::Builder implementation classes
+ * @brief LLPC header file: declaration of lgc::Builder implementation classes
  ***********************************************************************************************************************
  */
 #pragma once
@@ -33,7 +33,7 @@
 #include "llpcBuilder.h"
 #include "llpcPipelineState.h"
 
-namespace Llpc
+namespace lgc
 {
 
 using namespace llvm;
@@ -1006,4 +1006,4 @@ static const BuiltInKind BuiltInNumSamples            = static_cast<BuiltInKind>
 static const BuiltInKind BuiltInSamplePatternIdx      = static_cast<BuiltInKind>(0x10000009);
 static const BuiltInKind BuiltInWaveId                = static_cast<BuiltInKind>(0x1000000A);
 
-} // Llpc
+} // lgc

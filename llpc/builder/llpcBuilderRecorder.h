@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcBuilderRecorder.h
- * @brief LLPC header file: declaration of Llpc::BuilderRecorder
+ * @brief LLPC header file: declaration of lgc::BuilderRecorder
  ***********************************************************************************************************************
  */
 #pragma once
@@ -45,7 +45,7 @@ void initializeBuilderReplayerPass(PassRegistry&);
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 using namespace llvm;
@@ -683,4 +683,4 @@ private:
 // Create BuilderReplayer pass
 ModulePass* CreateBuilderReplayer(Pipeline* pPipeline);
 
-} // Llpc
+} // lgc

@@ -25,7 +25,7 @@
 /**
 ***********************************************************************************************************************
 * @file  llpcPatchPrepareAbi.cpp
-* @brief LLPC source file: contains declaration and implementation of class Llpc::PatchPreparePipelineAbi.
+* @brief LLPC source file: contains declaration and implementation of class lgc::PatchPreparePipelineAbi.
 ***********************************************************************************************************************
 */
 #include "llvm/Pass.h"
@@ -44,9 +44,9 @@
 #define DEBUG_TYPE "llpc-patch-prepare-pipeline-abi"
 
 using namespace llvm;
-using namespace Llpc;
+using namespace lgc;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -103,11 +103,11 @@ private:
 
 char PatchPreparePipelineAbi::ID = 0;
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Create pass to prepare the pipeline ABI
-ModulePass* Llpc::CreatePatchPreparePipelineAbi(
+ModulePass* lgc::CreatePatchPreparePipelineAbi(
     bool     onlySetCallingConvs) // Should we only set the calling conventions, or do the full prepare.
 {
     return new PatchPreparePipelineAbi(onlySetCallingConvs);

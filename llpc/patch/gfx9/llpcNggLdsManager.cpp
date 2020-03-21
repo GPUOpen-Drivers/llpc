@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcNggLdsManager.cpp
- * @brief LLPC source file: contains implementation of class Llpc::NggLdsManager.
+ * @brief LLPC source file: contains implementation of class lgc::NggLdsManager.
  ***********************************************************************************************************************
  */
 #include "llvm/Linker/Linker.h"
@@ -46,7 +46,7 @@
 
 using namespace llvm;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -611,4 +611,4 @@ void NggLdsManager::AtomicOpWithLds(
     pAtomicInst->setVolatile(true);
 }
 
-} // Llpc
+} // lgc

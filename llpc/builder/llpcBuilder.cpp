@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcBuilder.cpp
- * @brief LLPC source file: implementation of Llpc::Builder
+ * @brief LLPC source file: implementation of lgc::Builder
  ***********************************************************************************************************************
  */
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -40,7 +40,7 @@
 
 #define DEBUG_TYPE "llpc-builder"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================

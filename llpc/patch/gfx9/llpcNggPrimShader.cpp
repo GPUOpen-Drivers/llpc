@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcNggPrimShader.cpp
- * @brief LLPC source file: contains implementation of class Llpc::NggPrimShader.
+ * @brief LLPC source file: contains implementation of class lgc::NggPrimShader.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/Constants.h"
@@ -50,7 +50,7 @@
 
 using namespace llvm;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -99,7 +99,7 @@ Function* NggPrimShader::Generate(
     if (pEsEntryPoint != nullptr)
     {
         pModule = pEsEntryPoint->getParent();
-        pEsEntryPoint->setName(LlpcName::NggEsEntryPoint);
+        pEsEntryPoint->setName(lgcName::NggEsEntryPoint);
         pEsEntryPoint->setCallingConv(CallingConv::C);
         pEsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
         pEsEntryPoint->addFnAttr(Attribute::AlwaysInline);
@@ -108,13 +108,13 @@ Function* NggPrimShader::Generate(
     if (pGsEntryPoint != nullptr)
     {
         pModule = pGsEntryPoint->getParent();
-        pGsEntryPoint->setName(LlpcName::NggGsEntryPoint);
+        pGsEntryPoint->setName(lgcName::NggGsEntryPoint);
         pGsEntryPoint->setCallingConv(CallingConv::C);
         pGsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
         pGsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
         assert(pCopyShaderEntryPoint != nullptr); // Copy shader must be present
-        pCopyShaderEntryPoint->setName(LlpcName::NggCopyShaderEntryPoint);
+        pCopyShaderEntryPoint->setName(lgcName::NggCopyShaderEntryPoint);
         pCopyShaderEntryPoint->setCallingConv(CallingConv::C);
         pCopyShaderEntryPoint->setLinkage(GlobalValue::InternalLinkage);
         pCopyShaderEntryPoint->addFnAttr(Attribute::AlwaysInline);
@@ -246,7 +246,7 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
 
     Function* pEntryPoint = Function::Create(pEntryPointTy,
                                              GlobalValue::ExternalLinkage,
-                                             LlpcName::NggPrimShaderEntryPoint);
+                                             lgcName::NggPrimShaderEntryPoint);
 
     pModule->getFunctionList().push_front(pEntryPoint);
 
@@ -351,7 +351,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
 
     const uint32_t waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
 
-    auto pEntryPoint = pModule->getFunction(LlpcName::NggPrimShaderEntryPoint);
+    auto pEntryPoint = pModule->getFunction(lgcName::NggPrimShaderEntryPoint);
 
     auto pArg = pEntryPoint->arg_begin();
 
@@ -641,7 +641,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
             m_pBuilder->SetInsertPoint(pExpVertBlock);
 
             RunEsOrEsVariant(pModule,
-                             LlpcName::NggEsEntryPoint,
+                             lgcName::NggEsEntryPoint,
                              pEntryPoint->arg_begin(),
                              false,
                              nullptr,
@@ -1127,8 +1127,8 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
 
             // NOTE: For vertex compaction, we have to run ES for twice (get vertex position data and
             // get other exported data).
-            const auto entryName = (separateExp || vertexCompact) ? LlpcName::NggEsEntryVariantPos :
-                                                                    LlpcName::NggEsEntryVariant;
+            const auto entryName = (separateExp || vertexCompact) ? lgcName::NggEsEntryVariantPos :
+                                                                    lgcName::NggEsEntryVariant;
 
             RunEsOrEsVariant(pModule,
                              entryName,
@@ -1737,7 +1737,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                 expDataSet.clear();
 
                 RunEsOrEsVariant(pModule,
-                                 LlpcName::NggEsEntryVariant,
+                                 lgcName::NggEsEntryVariant,
                                  pEntryPoint->arg_begin(),
                                  true,
                                  &expDataSet,
@@ -1827,7 +1827,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                     expDataSet.clear();
 
                     RunEsOrEsVariant(pModule,
-                                     LlpcName::NggEsEntryVariantParam,
+                                     lgcName::NggEsEntryVariantParam,
                                      pEntryPoint->arg_begin(),
                                      false,
                                      &expDataSet,
@@ -1889,7 +1889,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     const auto& calcFactor = pResUsage->inOutUsage.gs.calcFactor;
     const uint32_t maxOutPrims = calcFactor.primAmpFactor;
 
-    auto pEntryPoint = pModule->getFunction(LlpcName::NggPrimShaderEntryPoint);
+    auto pEntryPoint = pModule->getFunction(lgcName::NggPrimShaderEntryPoint);
 
     auto pArg = pEntryPoint->arg_begin();
 
@@ -2138,7 +2138,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
         m_pBuilder->SetInsertPoint(pBeginEsBlock);
 
         RunEsOrEsVariant(pModule,
-                         LlpcName::NggEsEntryPoint,
+                         lgcName::NggEsEntryPoint,
                          pEntryPoint->arg_begin(),
                          false,
                          nullptr,
@@ -3008,7 +3008,7 @@ void NggPrimShader::RunEsOrEsVariant(
         return;
     }
 
-    const bool runEsVariant = (entryName != LlpcName::NggEsEntryPoint);
+    const bool runEsVariant = (entryName != lgcName::NggEsEntryPoint);
 
     Function* pEsEntry = nullptr;
     if (runEsVariant)
@@ -3024,7 +3024,7 @@ void NggPrimShader::RunEsOrEsVariant(
     }
     else
     {
-        pEsEntry = pModule->getFunction(LlpcName::NggEsEntryPoint);
+        pEsEntry = pModule->getFunction(lgcName::NggEsEntryPoint);
         assert(pEsEntry != nullptr);
     }
 
@@ -3262,12 +3262,12 @@ Function* NggPrimShader::MutateEsToVariant(
     assert(m_hasGs == false); // GS must not be present
     assert(expDataSet.empty());
 
-    const auto pEsEntryPoint = pModule->getFunction(LlpcName::NggEsEntryPoint);
+    const auto pEsEntryPoint = pModule->getFunction(lgcName::NggEsEntryPoint);
     assert(pEsEntryPoint != nullptr);
 
-    const bool doExp      = (entryName == LlpcName::NggEsEntryVariant);
-    const bool doPosExp   = (entryName == LlpcName::NggEsEntryVariantPos);
-    const bool doParamExp = (entryName == LlpcName::NggEsEntryVariantParam);
+    const bool doExp      = (entryName == lgcName::NggEsEntryVariant);
+    const bool doPosExp   = (entryName == lgcName::NggEsEntryVariantPos);
+    const bool doParamExp = (entryName == lgcName::NggEsEntryVariantParam);
 
     // Calculate export count
     uint32_t expCount = 0;
@@ -3587,7 +3587,7 @@ Value* NggPrimShader::RunGsVariant(
 
     assert(args.size() == gsArgCount); // Must have visit all arguments of ES entry point
 
-    return EmitCall(LlpcName::NggGsEntryVariant,
+    return EmitCall(lgcName::NggGsEntryVariant,
                     pGsEntry->getReturnType(),
                     args,
                     {},
@@ -3606,7 +3606,7 @@ Function* NggPrimShader::MutateGsToVariant(
 {
     assert(m_hasGs); // GS must be present
 
-    auto pGsEntryPoint = pModule->getFunction(LlpcName::NggGsEntryPoint);
+    auto pGsEntryPoint = pModule->getFunction(lgcName::NggGsEntryPoint);
     assert(pGsEntryPoint != nullptr);
 
     // Clone new entry-point
@@ -3632,7 +3632,7 @@ Function* NggPrimShader::MutateGsToVariant(
     SmallVector<ReturnInst*, 8> retInsts;
     CloneFunctionInto(pGsEntryVariant, pGsEntryPoint, valueMap, false, retInsts);
 
-    pGsEntryVariant->setName(LlpcName::NggGsEntryVariant);
+    pGsEntryVariant->setName(lgcName::NggGsEntryVariant);
 
     // Remove original GS entry-point
     pGsEntryPoint->dropAllReferences();
@@ -3721,7 +3721,7 @@ Function* NggPrimShader::MutateGsToVariant(
     // Handle GS message and GS output export
     for (auto& func : pModule->functions())
     {
-        if (func.getName().startswith(LlpcName::NggGsOutputExport))
+        if (func.getName().startswith(lgcName::NggGsOutputExport))
         {
             // Export GS outputs to GS-VS ring
             for (auto pUser : func.users())
@@ -3846,7 +3846,7 @@ void NggPrimShader::RunCopyShader(
 {
     assert(m_hasGs); // GS must be present
 
-    auto pCopyShaderEntryPoint = pModule->getFunction(LlpcName::NggCopyShaderEntryPoint);
+    auto pCopyShaderEntryPoint = pModule->getFunction(lgcName::NggCopyShaderEntryPoint);
 
     // Mutate copy shader entry-point, handle GS output import
     {
@@ -3858,7 +3858,7 @@ void NggPrimShader::RunCopyShader(
 
         for (auto& func : pModule->functions())
         {
-            if (func.getName().startswith(LlpcName::NggGsOutputImport))
+            if (func.getName().startswith(lgcName::NggGsOutputImport))
             {
                 // Import GS outputs from GS-VS ring
                 for (auto pUser : func.users())
@@ -3914,7 +3914,7 @@ void NggPrimShader::RunCopyShader(
             }
         }
 
-        EmitCall(LlpcName::NggCopyShaderEntryPoint,
+        EmitCall(lgcName::NggCopyShaderEntryPoint,
                  m_pBuilder->getVoidTy(),
                  args,
                  {},
@@ -4080,7 +4080,7 @@ void NggPrimShader::ProcessGsEmit(
     Value*   pOutstandingVertCounterPtr,    // [in,out] Pointer to GS outstanding vertex counter for this stream
     Value*   pFlipVertOrderPtr)             // [in,out] Pointer to flags indicating whether to flip vertex ordering
 {
-    auto pGsEmitHandler = pModule->getFunction(LlpcName::NggGsEmit);
+    auto pGsEmitHandler = pModule->getFunction(lgcName::NggGsEmit);
     if (pGsEmitHandler == nullptr)
     {
         pGsEmitHandler = CreateGsEmitHandler(pModule, streamId);
@@ -4109,7 +4109,7 @@ void NggPrimShader::ProcessGsCut(
     Value*   pOutstandingVertCounterPtr,    // [in,out] Pointer to GS outstanding vertex counter for this stream
     Value*   pFlipVertOrderPtr)             // [in,out] Pointer to flags indicating whether to flip vertex ordering
 {
-    auto pGsCutHandler = pModule->getFunction(LlpcName::NggGsCut);
+    auto pGsCutHandler = pModule->getFunction(lgcName::NggGsCut);
     if (pGsCutHandler == nullptr)
     {
         pGsCutHandler = CreateGsCutHandler(pModule, streamId);
@@ -4161,7 +4161,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
                               PointerType::get(m_pBuilder->getInt1Ty(),  addrSpace),   // %flipVertOrderPtr
                           },
                           false);
-    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggGsEmit, pModule);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, lgcName::NggGsEmit, pModule);
 
     pFunc->setCallingConv(CallingConv::C);
     pFunc->addFnAttr(Attribute::AlwaysInline);
@@ -4400,7 +4400,7 @@ Function* NggPrimShader::CreateGsCutHandler(
                               PointerType::get(m_pBuilder->getInt1Ty(),  addrSpace),   // %flipVertOrderPtr
                           },
                           false);
-    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggGsCut, pModule);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, lgcName::NggGsCut, pModule);
 
     pFunc->setCallingConv(CallingConv::C);
     pFunc->addFnAttr(Attribute::AlwaysInline);
@@ -4714,7 +4714,7 @@ Value* NggPrimShader::DoBackfaceCulling(
 {
     assert(m_pNggControl->enableBackfaceCulling);
 
-    auto pBackfaceCuller = pModule->getFunction(LlpcName::NggCullingBackface);
+    auto pBackfaceCuller = pModule->getFunction(lgcName::NggCullingBackface);
     if (pBackfaceCuller == nullptr)
     {
         pBackfaceCuller = CreateBackfaceCuller(pModule);
@@ -4770,7 +4770,7 @@ Value* NggPrimShader::DoFrustumCulling(
 {
     assert(m_pNggControl->enableFrustumCulling);
 
-    auto pFrustumCuller = pModule->getFunction(LlpcName::NggCullingFrustum);
+    auto pFrustumCuller = pModule->getFunction(lgcName::NggCullingFrustum);
     if (pFrustumCuller == nullptr)
     {
         pFrustumCuller = CreateFrustumCuller(pModule);
@@ -4825,7 +4825,7 @@ Value* NggPrimShader::DoBoxFilterCulling(
 {
     assert(m_pNggControl->enableBoxFilterCulling);
 
-    auto pBoxFilterCuller = pModule->getFunction(LlpcName::NggCullingBoxFilter);
+    auto pBoxFilterCuller = pModule->getFunction(lgcName::NggCullingBoxFilter);
     if (pBoxFilterCuller == nullptr)
     {
         pBoxFilterCuller = CreateBoxFilterCuller(pModule);
@@ -4884,7 +4884,7 @@ Value* NggPrimShader::DoSphereCulling(
 {
     assert(m_pNggControl->enableSphereCulling);
 
-    auto pSphereCuller = pModule->getFunction(LlpcName::NggCullingSphere);
+    auto pSphereCuller = pModule->getFunction(lgcName::NggCullingSphere);
     if (pSphereCuller == nullptr)
     {
         pSphereCuller = CreateSphereCuller(pModule);
@@ -4943,7 +4943,7 @@ Value* NggPrimShader::DoSmallPrimFilterCulling(
 {
     assert(m_pNggControl->enableSmallPrimFilter);
 
-    auto pSmallPrimFilterCuller = pModule->getFunction(LlpcName::NggCullingSmallPrimFilter);
+    auto pSmallPrimFilterCuller = pModule->getFunction(lgcName::NggCullingSmallPrimFilter);
     if (pSmallPrimFilterCuller == nullptr)
     {
         pSmallPrimFilterCuller = CreateSmallPrimFilterCuller(pModule);
@@ -4988,7 +4988,7 @@ Value* NggPrimShader::DoCullDistanceCulling(
 {
     assert(m_pNggControl->enableCullDistanceCulling);
 
-    auto pCullDistanceCuller = pModule->getFunction(LlpcName::NggCullingCullDistance);
+    auto pCullDistanceCuller = pModule->getFunction(lgcName::NggCullingCullDistance);
     if (pCullDistanceCuller == nullptr)
     {
         pCullDistanceCuller = CreateCullDistanceCuller(pModule);
@@ -5010,7 +5010,7 @@ Value* NggPrimShader::FetchCullingControlRegister(
     Module*     pModule,        // [in] LLVM module
     uint32_t    regOffset)      // Register offset in the primitive shader table (in BYTEs)
 {
-    auto pFetchCullingRegister = pModule->getFunction(LlpcName::NggCullingFetchReg);
+    auto pFetchCullingRegister = pModule->getFunction(lgcName::NggCullingFetchReg);
     if (pFetchCullingRegister == nullptr)
     {
         pFetchCullingRegister = CreateFetchCullingRegister(pModule);
@@ -5041,7 +5041,7 @@ Function* NggPrimShader::CreateBackfaceCuller(
                                          m_pBuilder->getInt32Ty()                           // %paClVportYscale
                                      },
                                      false);
-    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingBackface, pModule);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, lgcName::NggCullingBackface, pModule);
 
     pFunc->setCallingConv(CallingConv::C);
     pFunc->addFnAttr(Attribute::ReadNone);
@@ -5311,7 +5311,7 @@ Function* NggPrimShader::CreateFrustumCuller(
                                          m_pBuilder->getInt32Ty()                           // %paClGbVertDiscAdj
                                      },
                                      false);
-    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingFrustum, pModule);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, lgcName::NggCullingFrustum, pModule);
 
     pFunc->setCallingConv(CallingConv::C);
     pFunc->addFnAttr(Attribute::ReadNone);
@@ -5576,7 +5576,7 @@ Function* NggPrimShader::CreateBoxFilterCuller(
                                          m_pBuilder->getInt32Ty()                           // %paClGbVertDiscAdj
                                      },
                                      false);
-    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingBoxFilter, pModule);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, lgcName::NggCullingBoxFilter, pModule);
 
     pFunc->setCallingConv(CallingConv::C);
     pFunc->addFnAttr(Attribute::ReadNone);
@@ -5823,7 +5823,7 @@ Function* NggPrimShader::CreateSphereCuller(
                                          m_pBuilder->getInt32Ty()                           // %paClGbVertDiscAdj
                                      },
                                      false);
-    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingSphere, pModule);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, lgcName::NggCullingSphere, pModule);
 
     pFunc->setCallingConv(CallingConv::C);
     pFunc->addFnAttr(Attribute::ReadNone);
@@ -6224,7 +6224,7 @@ Function* NggPrimShader::CreateSmallPrimFilterCuller(
                                          m_pBuilder->getInt32Ty()                           // %paClVportYscale
                                      },
                                      false);
-    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingSmallPrimFilter, pModule);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, lgcName::NggCullingSmallPrimFilter, pModule);
 
     pFunc->setCallingConv(CallingConv::C);
     pFunc->addFnAttr(Attribute::ReadNone);
@@ -6522,7 +6522,7 @@ Function* NggPrimShader::CreateCullDistanceCuller(
                                          m_pBuilder->getInt32Ty()    // %signMask2
                                      },
                                      false);
-    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingCullDistance, pModule);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, lgcName::NggCullingCullDistance, pModule);
 
     pFunc->setCallingConv(CallingConv::C);
     pFunc->addFnAttr(Attribute::ReadNone);
@@ -6602,7 +6602,7 @@ Function* NggPrimShader::CreateFetchCullingRegister(
                                          m_pBuilder->getInt32Ty()   // %regOffset
                                      },
                                      false);
-    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingFetchReg, pModule);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, lgcName::NggCullingFetchReg, pModule);
 
     pFunc->setCallingConv(CallingConv::C);
     pFunc->addFnAttr(Attribute::ReadOnly);
@@ -6832,4 +6832,4 @@ BasicBlock* NggPrimShader::CreateBlock(
     return BasicBlock::Create(*m_pContext, blockName, pParent);
 }
 
-} // Llpc
+} // lgc

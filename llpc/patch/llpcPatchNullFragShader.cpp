@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchNullFragShader.cpp
- * @brief LLPC source file: contains declaration and implementation of class Llpc::PatchNullFragShader.
+ * @brief LLPC source file: contains declaration and implementation of class lgc::PatchNullFragShader.
  ***********************************************************************************************************************
  */
 #include "llvm/ADT/ArrayRef.h"
@@ -42,7 +42,7 @@
 
 #define DEBUG_TYPE "llpc-patch-null-frag-shader"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 namespace llvm
@@ -59,7 +59,7 @@ opt<bool> DisableNullFragShader("disable-null-frag-shader",
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -86,11 +86,11 @@ private:
 
 char PatchNullFragShader::ID = 0;
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Create the pass that generates a null fragment shader if required.
-ModulePass* Llpc::CreatePatchNullFragShader()
+ModulePass* lgc::CreatePatchNullFragShader()
 {
     return new PatchNullFragShader();
 }
@@ -141,7 +141,7 @@ bool PatchNullFragShader::runOnModule(
     // Create function for the null fragment shader entrypoint.
     auto pEntryPoint = Function::Create(pEntryPointTy,
                                         GlobalValue::ExternalLinkage,
-                                        LlpcName::NullFsEntryPoint,
+                                        lgcName::NullFsEntryPoint,
                                         &module);
 
     // Create its basic block, and terminate it with return.
@@ -153,20 +153,20 @@ bool PatchNullFragShader::runOnModule(
     auto pOne = ConstantInt::get(Type::getInt32Ty(*m_pContext), 1);
     Value* importArgs[] = { pZero, pZero, pZero, pOne };
     auto pInputTy = Type::getFloatTy(*m_pContext);
-    std::string importName = LlpcName::InputImportGeneric;
+    std::string importName = lgcName::InputImportGeneric;
     AddTypeMangling(pInputTy, importArgs, importName);
     auto pInput = EmitCall(importName, pInputTy, importArgs, {}, pInsertPos);
 
     // Then the export.
     Value* exportArgs[] = { pZero, pZero, pInput };
-    std::string exportName = LlpcName::OutputExportGeneric;
+    std::string exportName = lgcName::OutputExportGeneric;
     AddTypeMangling(Type::getVoidTy(*m_pContext), exportArgs, exportName);
     EmitCall(exportName, Type::getVoidTy(*m_pContext), exportArgs, {}, pInsertPos);
 
     // Add execution model metadata to the function.
     auto pExecModelMeta = ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_pContext), ShaderStageFragment));
     auto pExecModelMetaNode = MDNode::get(*m_pContext, pExecModelMeta);
-    pEntryPoint->addMetadata(LlpcName::ShaderStageMetadata, *pExecModelMetaNode);
+    pEntryPoint->addMetadata(lgcName::ShaderStageMetadata, *pExecModelMetaNode);
 
     // Initialize shader info.
     auto pResUsage = pPipelineState->GetShaderResourceUsage(ShaderStageFragment);

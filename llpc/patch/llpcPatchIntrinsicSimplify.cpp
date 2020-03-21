@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchIntrinsicSimplify.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchIntrinsicSimplify.
+ * @brief LLPC source file: contains implementation of class lgc::PatchIntrinsicSimplify.
  ***********************************************************************************************************************
  */
 #if defined(_MSC_VER) || defined(__MINGW32__)
@@ -49,7 +49,7 @@
 #define DEBUG_TYPE "llpc-patch-intrinsic-simplify"
 
 using namespace llvm;
-using namespace Llpc;
+using namespace lgc;
 
 // =====================================================================================================================
 // Initializes static members.
@@ -57,7 +57,7 @@ char PatchIntrinsicSimplify::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the LLVM pass intrinsic simplifcations.
-FunctionPass* Llpc::CreatePatchIntrinsicSimplify()
+FunctionPass* lgc::CreatePatchIntrinsicSimplify()
 {
     return new PatchIntrinsicSimplify();
 }

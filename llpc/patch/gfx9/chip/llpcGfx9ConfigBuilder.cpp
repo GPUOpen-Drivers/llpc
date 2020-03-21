@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcGfx9ConfigBuilder.cpp
- * @brief LLPC header file: contains implementation of class Llpc::Gfx9::ConfigBuilder.
+ * @brief LLPC header file: contains implementation of class lgc::Gfx9::ConfigBuilder.
  ***********************************************************************************************************************
  */
 #include "llpcBuilderBuiltIns.h"
@@ -49,7 +49,7 @@ extern opt<bool> InRegEsGsLdsSize;
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 namespace Gfx9
@@ -1046,7 +1046,7 @@ void ConfigBuilder::BuildVsRegConfig(
     if (shaderStage == ShaderStageCopyShader)
     {
         // NOTE: For copy shader, we use fixed number of user data registers.
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, Llpc::CopyShaderUserSgprCount);
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, lgc::CopyShaderUserSgprCount);
         SetNumAvailSgprs(Util::Abi::HardwareStage::Vs, m_pPipelineState->GetTargetInfo().GetGpuProperty().maxSgprsAvailable);
         SetNumAvailVgprs(Util::Abi::HardwareStage::Vs, m_pPipelineState->GetTargetInfo().GetGpuProperty().maxVgprsAvailable);
 
@@ -2288,7 +2288,7 @@ void ConfigBuilder::BuildPsRegConfig(
     {
         SET_REG_GFX10_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, MEM_ORDERED, true);
 
-        if (shaderOptions.waveBreakSize == Llpc::WaveBreak::DrawTime)
+        if (shaderOptions.waveBreakSize == lgc::WaveBreak::DrawTime)
         {
             SetCalcWaveBreakSizeAtDrawTime(true);
         }
@@ -2963,4 +2963,4 @@ bool ConfigBuilder::GetShaderWgpMode(
 
 } // Gfx9
 
-} // Llpc
+} // lgc

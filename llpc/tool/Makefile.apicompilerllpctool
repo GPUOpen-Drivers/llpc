@@ -15,6 +15,7 @@ LCXXINCS += -I$(LLVM_DEPTH)/include
 LCXXINCS += -I$(ICD_DEPTH)/build/$(ICD_OS_BUILD)/imported/llvm/B_$(BUILD_TYPE)/include
 
 LCXXINCS += -I$(ICD_DEPTH)/api/include/khronos
+LCXXINCS += -I$(LLPC_DEPTH)/builder
 LCXXINCS += -I$(LLPC_DEPTH)/imported/spirv
 LCXXINCS += -I$(LLPC_DEPTH)/include
 LCXXINCS += -I$(LLPC_DEPTH)/lower

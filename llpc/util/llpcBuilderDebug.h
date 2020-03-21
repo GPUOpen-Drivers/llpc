@@ -32,15 +32,15 @@
 
 #include "llvm/Support/raw_ostream.h"
 
-namespace Llpc
+namespace lgc
 {
 
 using namespace llvm;
 
 // Get pointer to stream for LLPC_OUTS, or nullptr if disabled.
-raw_ostream* GetLlpcOuts();
+raw_ostream* GetLgcOuts();
 
-} // Llpc
+} // lgc
 
 // Output general message
-#define LLPC_OUTS(msg) do if (raw_ostream* pStream = GetLlpcOuts()) { *pStream << msg; } while (false)
+#define LLPC_OUTS(msg) do if (raw_ostream* pStream = GetLgcOuts()) { *pStream << msg; } while (false)

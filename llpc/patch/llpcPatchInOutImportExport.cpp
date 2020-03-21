@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchInOutImportExport.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchInOutImportExport.
+ * @brief LLPC source file: contains implementation of class lgc::PatchInOutImportExport.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/IRBuilder.h"
@@ -46,9 +46,9 @@
 #define DEBUG_TYPE "llpc-patch-in-out-import-export"
 
 using namespace llvm;
-using namespace Llpc;
+using namespace lgc;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -364,11 +364,11 @@ void PatchInOutImportExport::visitCallInst(
 
     auto mangledName = pCallee->getName();
 
-    auto importGenericInput     = LlpcName::InputImportGeneric;
-    auto importBuiltInInput     = LlpcName::InputImportBuiltIn;
-    auto importInterpolantInput = LlpcName::InputImportInterpolant;
-    auto importGenericOutput    = LlpcName::OutputImportGeneric;
-    auto importBuiltInOutput    = LlpcName::OutputImportBuiltIn;
+    auto importGenericInput     = lgcName::InputImportGeneric;
+    auto importBuiltInInput     = lgcName::InputImportBuiltIn;
+    auto importInterpolantInput = lgcName::InputImportInterpolant;
+    auto importGenericOutput    = lgcName::OutputImportGeneric;
+    auto importBuiltInOutput    = lgcName::OutputImportBuiltIn;
 
     const bool isGenericInputImport     = mangledName.startswith(importGenericInput);
     const bool isBuiltInInputImport     = mangledName.startswith(importBuiltInInput);
@@ -379,9 +379,9 @@ void PatchInOutImportExport::visitCallInst(
     const bool isImport = (isGenericInputImport  || isBuiltInInputImport || isInterpolantInputImport ||
                            isGenericOutputImport || isBuiltInOutputImport);
 
-    auto exportGenericOutput = LlpcName::OutputExportGeneric;
-    auto exportBuiltInOutput = LlpcName::OutputExportBuiltIn;
-    auto exportXfbOutput = LlpcName::OutputExportXfb;
+    auto exportGenericOutput = lgcName::OutputExportGeneric;
+    auto exportBuiltInOutput = lgcName::OutputExportBuiltIn;
+    auto exportXfbOutput = lgcName::OutputExportXfb;
 
     const bool isGenericOutputExport = mangledName.startswith(exportGenericOutput);
     const bool isBuiltInOutputExport = mangledName.startswith(exportBuiltInOutput);
@@ -3092,7 +3092,7 @@ Value* PatchInOutImportExport::GetSamplePosOffset(
     Value* pSampleValid = builder.CreateICmpUGT(pNumSamples, pSampleId);
     Value* pOffset = builder.CreateSelect(pSampleValid, pValidOffset, builder.getInt32(0));
     // Load sample position descriptor.
-    auto pDesc = EmitCall(LlpcName::DescriptorLoadBuffer,
+    auto pDesc = EmitCall(lgcName::DescriptorLoadBuffer,
                           VectorType::get(builder.getInt32Ty(), 4),
                           {
                               builder.getInt32(InternalResourceTable),
@@ -4801,7 +4801,7 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
         pWriteIndex = BinaryOperator::CreateAdd(pWriteIndex, m_pThreadId, "", pInsertPos);
     }
 
-    std::string funcName = LlpcName::StreamOutBufferStore;
+    std::string funcName = lgcName::StreamOutBufferStore;
     CreateStreamOutBufferStoreFunction(pStoreValue, xfbStride, funcName);
 
     Value* args[] = {
@@ -5099,7 +5099,7 @@ void PatchInOutImportExport::StoreValueToGsVsRing(
             ConstantInt::get(Type::getInt32Ty(*m_pContext), streamId),
             pStoreValue
         };
-        std::string callName = LlpcName::NggGsOutputExport + GetTypeName(pStoreTy);
+        std::string callName = lgcName::NggGsOutputExport + GetTypeName(pStoreTy);
         EmitCall(callName, Type::getVoidTy(*m_pContext), args, {}, pInsertPos);
         return;
     }
@@ -5820,7 +5820,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
         // Must be element indexing of tessellation level array
         assert(tessFactors.size() == 1);
 
-        if (m_pModule->getFunction(LlpcName::TfBufferStore) == nullptr)
+        if (m_pModule->getFunction(lgcName::TfBufferStore) == nullptr)
         {
             CreateTessBufferStoreFunction();
         }
@@ -5846,7 +5846,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
             pTessFactorOffset,                                              // tfOffset
             tessFactors[0]                                                  // tfValue
         };
-        EmitCall(LlpcName::TfBufferStore, Type::getVoidTy(*m_pContext), args, {}, pInsertPos);
+        EmitCall(lgcName::TfBufferStore, Type::getVoidTy(*m_pContext), args, {}, pInsertPos);
     }
 }
 
@@ -5883,7 +5883,7 @@ void PatchInOutImportExport::CreateTessBufferStoreFunction()
         Type::getFloatTy(*m_pContext)                       // TF value
     };
     auto pFuncTy = FunctionType::get(Type::getVoidTy(*m_pContext), argTys, false);
-    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::TfBufferStore, m_pModule);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, lgcName::TfBufferStore, m_pModule);
 
     pFunc->setCallingConv(CallingConv::C);
     pFunc->addFnAttr(Attribute::NoUnwind);
@@ -7214,7 +7214,7 @@ Value* PatchInOutImportExport::GetInLocalInvocationId(
     return pLocaInvocatioId;
 }
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching opertions for input import and output export.

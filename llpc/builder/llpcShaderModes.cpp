@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcShaderModes.cpp
- * @brief LLPC source file: contains implementation of class Llpc::ShaderModes
+ * @brief LLPC source file: contains implementation of class lgc::ShaderModes
  ***********************************************************************************************************************
  */
 
@@ -35,7 +35,7 @@
 
 #define DEBUG_TYPE "llpc-shader-modes"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // Names for named metadata nodes when storing and reading back pipeline state

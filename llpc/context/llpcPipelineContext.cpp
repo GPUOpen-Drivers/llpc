@@ -53,6 +53,7 @@ extern opt<bool> EnablePipelineDump;
 
 } // llvm
 
+using namespace lgc;
 using namespace llvm;
 
 // -include-llvm-ir: include LLVM IR as a separate section in the ELF binary
@@ -385,7 +386,7 @@ void PipelineContext::SetOptionsInPipeline(
             shaderOptions.updateDescInElf = pShaderInfo->options.updateDescInElf;
             shaderOptions.unrollThreshold = pShaderInfo->options.unrollThreshold;
 
-            pPipeline->SetShaderOptions(static_cast<ShaderStage>(stage), shaderOptions);
+            pPipeline->SetShaderOptions(GetLgcShaderStage(static_cast<ShaderStage>(stage)), shaderOptions);
         }
     }
 }

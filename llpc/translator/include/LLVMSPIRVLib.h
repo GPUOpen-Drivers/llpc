@@ -87,9 +87,12 @@ bool IsSPIRVBinary(std::string &Img);
 
 } // End namespace SPIRV
 
+namespace lgc {
+class Builder;
+} // namespace lgc
+
 namespace Llpc {
 struct ShaderModuleUsage;
-class Builder;
 } // End namespace Llpc
 
 namespace llvm {
@@ -101,7 +104,7 @@ bool writeSpirv(llvm::Module *M, llvm::raw_ostream &OS, std::string &ErrMsg);
 
 /// \brief Load SPIRV from istream and translate to LLVM module.
 /// \returns true if succeeds.
-bool readSpirv(Llpc::Builder *Builder,
+bool readSpirv(lgc::Builder *Builder,
                const Llpc::ShaderModuleUsage* ModuleData,
                std::istream &IS,
                spv::ExecutionModel EntryExecModel,

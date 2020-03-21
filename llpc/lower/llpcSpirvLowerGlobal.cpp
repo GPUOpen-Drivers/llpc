@@ -55,55 +55,55 @@ namespace Llpc
 
 // The code here relies on the SPIR-V built-in kind being the same as the Builder built-in kind.
 
-static_assert(BuiltInBaryCoordNoPersp          == static_cast<BuiltInKind>(spv::BuiltInBaryCoordNoPerspAMD), "Built-in kind mismatch");
-static_assert(BuiltInBaryCoordNoPerspCentroid  == static_cast<BuiltInKind>(spv::BuiltInBaryCoordNoPerspCentroidAMD), "Built-in kind mismatch");
-static_assert(BuiltInBaryCoordNoPerspSample    == static_cast<BuiltInKind>(spv::BuiltInBaryCoordNoPerspSampleAMD), "Built-in kind mismatch");
-static_assert(BuiltInBaryCoordPullModel        == static_cast<BuiltInKind>(spv::BuiltInBaryCoordPullModelAMD), "Built-in kind mismatch");
-static_assert(BuiltInBaryCoordSmooth           == static_cast<BuiltInKind>(spv::BuiltInBaryCoordSmoothAMD), "Built-in kind mismatch");
-static_assert(BuiltInBaryCoordSmoothCentroid   == static_cast<BuiltInKind>(spv::BuiltInBaryCoordSmoothCentroidAMD), "Built-in kind mismatch");
-static_assert(BuiltInBaryCoordSmoothSample     == static_cast<BuiltInKind>(spv::BuiltInBaryCoordSmoothSampleAMD), "Built-in kind mismatch");
-static_assert(BuiltInBaseInstance              == static_cast<BuiltInKind>(spv::BuiltInBaseInstance), "Built-in kind mismatch");
-static_assert(BuiltInBaseVertex                == static_cast<BuiltInKind>(spv::BuiltInBaseVertex), "Built-in kind mismatch");
-static_assert(BuiltInClipDistance              == static_cast<BuiltInKind>(spv::BuiltInClipDistance), "Built-in kind mismatch");
-static_assert(BuiltInCullDistance              == static_cast<BuiltInKind>(spv::BuiltInCullDistance), "Built-in kind mismatch");
-static_assert(BuiltInDeviceIndex               == static_cast<BuiltInKind>(spv::BuiltInDeviceIndex), "Built-in kind mismatch");
-static_assert(BuiltInDrawIndex                 == static_cast<BuiltInKind>(spv::BuiltInDrawIndex), "Built-in kind mismatch");
-static_assert(BuiltInFragCoord                 == static_cast<BuiltInKind>(spv::BuiltInFragCoord), "Built-in kind mismatch");
-static_assert(BuiltInFragDepth                 == static_cast<BuiltInKind>(spv::BuiltInFragDepth), "Built-in kind mismatch");
-static_assert(BuiltInFragStencilRef            == static_cast<BuiltInKind>(spv::BuiltInFragStencilRefEXT), "Built-in kind mismatch");
-static_assert(BuiltInFrontFacing               == static_cast<BuiltInKind>(spv::BuiltInFrontFacing), "Built-in kind mismatch");
-static_assert(BuiltInGlobalInvocationId        == static_cast<BuiltInKind>(spv::BuiltInGlobalInvocationId), "Built-in kind mismatch");
-static_assert(BuiltInHelperInvocation          == static_cast<BuiltInKind>(spv::BuiltInHelperInvocation), "Built-in kind mismatch");
-static_assert(BuiltInInstanceIndex             == static_cast<BuiltInKind>(spv::BuiltInInstanceIndex), "Built-in kind mismatch");
-static_assert(BuiltInInvocationId              == static_cast<BuiltInKind>(spv::BuiltInInvocationId), "Built-in kind mismatch");
-static_assert(BuiltInLayer                     == static_cast<BuiltInKind>(spv::BuiltInLayer), "Built-in kind mismatch");
-static_assert(BuiltInLocalInvocationId         == static_cast<BuiltInKind>(spv::BuiltInLocalInvocationId), "Built-in kind mismatch");
-static_assert(BuiltInLocalInvocationIndex      == static_cast<BuiltInKind>(spv::BuiltInLocalInvocationIndex), "Built-in kind mismatch");
-static_assert(BuiltInNumSubgroups              == static_cast<BuiltInKind>(spv::BuiltInNumSubgroups), "Built-in kind mismatch");
-static_assert(BuiltInNumWorkgroups             == static_cast<BuiltInKind>(spv::BuiltInNumWorkgroups), "Built-in kind mismatch");
-static_assert(BuiltInPatchVertices             == static_cast<BuiltInKind>(spv::BuiltInPatchVertices), "Built-in kind mismatch");
-static_assert(BuiltInPointCoord                == static_cast<BuiltInKind>(spv::BuiltInPointCoord), "Built-in kind mismatch");
-static_assert(BuiltInPointSize                 == static_cast<BuiltInKind>(spv::BuiltInPointSize), "Built-in kind mismatch");
-static_assert(BuiltInPosition                  == static_cast<BuiltInKind>(spv::BuiltInPosition), "Built-in kind mismatch");
-static_assert(BuiltInPrimitiveId               == static_cast<BuiltInKind>(spv::BuiltInPrimitiveId), "Built-in kind mismatch");
-static_assert(BuiltInSampleId                  == static_cast<BuiltInKind>(spv::BuiltInSampleId), "Built-in kind mismatch");
-static_assert(BuiltInSampleMask                == static_cast<BuiltInKind>(spv::BuiltInSampleMask), "Built-in kind mismatch");
-static_assert(BuiltInSamplePosition            == static_cast<BuiltInKind>(spv::BuiltInSamplePosition), "Built-in kind mismatch");
-static_assert(BuiltInSubgroupEqMask            == static_cast<BuiltInKind>(spv::BuiltInSubgroupEqMask), "Built-in kind mismatch");
-static_assert(BuiltInSubgroupGeMask            == static_cast<BuiltInKind>(spv::BuiltInSubgroupGeMask), "Built-in kind mismatch");
-static_assert(BuiltInSubgroupGtMask            == static_cast<BuiltInKind>(spv::BuiltInSubgroupGtMask), "Built-in kind mismatch");
-static_assert(BuiltInSubgroupId                == static_cast<BuiltInKind>(spv::BuiltInSubgroupId), "Built-in kind mismatch");
-static_assert(BuiltInSubgroupLeMask            == static_cast<BuiltInKind>(spv::BuiltInSubgroupLeMask), "Built-in kind mismatch");
-static_assert(BuiltInSubgroupLocalInvocationId == static_cast<BuiltInKind>(spv::BuiltInSubgroupLocalInvocationId), "Built-in kind mismatch");
-static_assert(BuiltInSubgroupLtMask            == static_cast<BuiltInKind>(spv::BuiltInSubgroupLtMask), "Built-in kind mismatch");
-static_assert(BuiltInSubgroupSize              == static_cast<BuiltInKind>(spv::BuiltInSubgroupSize), "Built-in kind mismatch");
-static_assert(BuiltInTessCoord                 == static_cast<BuiltInKind>(spv::BuiltInTessCoord), "Built-in kind mismatch");
-static_assert(BuiltInTessLevelInner            == static_cast<BuiltInKind>(spv::BuiltInTessLevelInner), "Built-in kind mismatch");
-static_assert(BuiltInTessLevelOuter            == static_cast<BuiltInKind>(spv::BuiltInTessLevelOuter), "Built-in kind mismatch");
-static_assert(BuiltInVertexIndex               == static_cast<BuiltInKind>(spv::BuiltInVertexIndex), "Built-in kind mismatch");
-static_assert(BuiltInViewIndex                 == static_cast<BuiltInKind>(spv::BuiltInViewIndex), "Built-in kind mismatch");
-static_assert(BuiltInViewportIndex             == static_cast<BuiltInKind>(spv::BuiltInViewportIndex), "Built-in kind mismatch");
-static_assert(BuiltInWorkgroupId               == static_cast<BuiltInKind>(spv::BuiltInWorkgroupId), "Built-in kind mismatch");
+static_assert(lgc::BuiltInBaryCoordNoPersp          == static_cast<lgc::BuiltInKind>(spv::BuiltInBaryCoordNoPerspAMD), "Built-in kind mismatch");
+static_assert(lgc::BuiltInBaryCoordNoPerspCentroid  == static_cast<lgc::BuiltInKind>(spv::BuiltInBaryCoordNoPerspCentroidAMD), "Built-in kind mismatch");
+static_assert(lgc::BuiltInBaryCoordNoPerspSample    == static_cast<lgc::BuiltInKind>(spv::BuiltInBaryCoordNoPerspSampleAMD), "Built-in kind mismatch");
+static_assert(lgc::BuiltInBaryCoordPullModel        == static_cast<lgc::BuiltInKind>(spv::BuiltInBaryCoordPullModelAMD), "Built-in kind mismatch");
+static_assert(lgc::BuiltInBaryCoordSmooth           == static_cast<lgc::BuiltInKind>(spv::BuiltInBaryCoordSmoothAMD), "Built-in kind mismatch");
+static_assert(lgc::BuiltInBaryCoordSmoothCentroid   == static_cast<lgc::BuiltInKind>(spv::BuiltInBaryCoordSmoothCentroidAMD), "Built-in kind mismatch");
+static_assert(lgc::BuiltInBaryCoordSmoothSample     == static_cast<lgc::BuiltInKind>(spv::BuiltInBaryCoordSmoothSampleAMD), "Built-in kind mismatch");
+static_assert(lgc::BuiltInBaseInstance              == static_cast<lgc::BuiltInKind>(spv::BuiltInBaseInstance), "Built-in kind mismatch");
+static_assert(lgc::BuiltInBaseVertex                == static_cast<lgc::BuiltInKind>(spv::BuiltInBaseVertex), "Built-in kind mismatch");
+static_assert(lgc::BuiltInClipDistance              == static_cast<lgc::BuiltInKind>(spv::BuiltInClipDistance), "Built-in kind mismatch");
+static_assert(lgc::BuiltInCullDistance              == static_cast<lgc::BuiltInKind>(spv::BuiltInCullDistance), "Built-in kind mismatch");
+static_assert(lgc::BuiltInDeviceIndex               == static_cast<lgc::BuiltInKind>(spv::BuiltInDeviceIndex), "Built-in kind mismatch");
+static_assert(lgc::BuiltInDrawIndex                 == static_cast<lgc::BuiltInKind>(spv::BuiltInDrawIndex), "Built-in kind mismatch");
+static_assert(lgc::BuiltInFragCoord                 == static_cast<lgc::BuiltInKind>(spv::BuiltInFragCoord), "Built-in kind mismatch");
+static_assert(lgc::BuiltInFragDepth                 == static_cast<lgc::BuiltInKind>(spv::BuiltInFragDepth), "Built-in kind mismatch");
+static_assert(lgc::BuiltInFragStencilRef            == static_cast<lgc::BuiltInKind>(spv::BuiltInFragStencilRefEXT), "Built-in kind mismatch");
+static_assert(lgc::BuiltInFrontFacing               == static_cast<lgc::BuiltInKind>(spv::BuiltInFrontFacing), "Built-in kind mismatch");
+static_assert(lgc::BuiltInGlobalInvocationId        == static_cast<lgc::BuiltInKind>(spv::BuiltInGlobalInvocationId), "Built-in kind mismatch");
+static_assert(lgc::BuiltInHelperInvocation          == static_cast<lgc::BuiltInKind>(spv::BuiltInHelperInvocation), "Built-in kind mismatch");
+static_assert(lgc::BuiltInInstanceIndex             == static_cast<lgc::BuiltInKind>(spv::BuiltInInstanceIndex), "Built-in kind mismatch");
+static_assert(lgc::BuiltInInvocationId              == static_cast<lgc::BuiltInKind>(spv::BuiltInInvocationId), "Built-in kind mismatch");
+static_assert(lgc::BuiltInLayer                     == static_cast<lgc::BuiltInKind>(spv::BuiltInLayer), "Built-in kind mismatch");
+static_assert(lgc::BuiltInLocalInvocationId         == static_cast<lgc::BuiltInKind>(spv::BuiltInLocalInvocationId), "Built-in kind mismatch");
+static_assert(lgc::BuiltInLocalInvocationIndex      == static_cast<lgc::BuiltInKind>(spv::BuiltInLocalInvocationIndex), "Built-in kind mismatch");
+static_assert(lgc::BuiltInNumSubgroups              == static_cast<lgc::BuiltInKind>(spv::BuiltInNumSubgroups), "Built-in kind mismatch");
+static_assert(lgc::BuiltInNumWorkgroups             == static_cast<lgc::BuiltInKind>(spv::BuiltInNumWorkgroups), "Built-in kind mismatch");
+static_assert(lgc::BuiltInPatchVertices             == static_cast<lgc::BuiltInKind>(spv::BuiltInPatchVertices), "Built-in kind mismatch");
+static_assert(lgc::BuiltInPointCoord                == static_cast<lgc::BuiltInKind>(spv::BuiltInPointCoord), "Built-in kind mismatch");
+static_assert(lgc::BuiltInPointSize                 == static_cast<lgc::BuiltInKind>(spv::BuiltInPointSize), "Built-in kind mismatch");
+static_assert(lgc::BuiltInPosition                  == static_cast<lgc::BuiltInKind>(spv::BuiltInPosition), "Built-in kind mismatch");
+static_assert(lgc::BuiltInPrimitiveId               == static_cast<lgc::BuiltInKind>(spv::BuiltInPrimitiveId), "Built-in kind mismatch");
+static_assert(lgc::BuiltInSampleId                  == static_cast<lgc::BuiltInKind>(spv::BuiltInSampleId), "Built-in kind mismatch");
+static_assert(lgc::BuiltInSampleMask                == static_cast<lgc::BuiltInKind>(spv::BuiltInSampleMask), "Built-in kind mismatch");
+static_assert(lgc::BuiltInSamplePosition            == static_cast<lgc::BuiltInKind>(spv::BuiltInSamplePosition), "Built-in kind mismatch");
+static_assert(lgc::BuiltInSubgroupEqMask            == static_cast<lgc::BuiltInKind>(spv::BuiltInSubgroupEqMask), "Built-in kind mismatch");
+static_assert(lgc::BuiltInSubgroupGeMask            == static_cast<lgc::BuiltInKind>(spv::BuiltInSubgroupGeMask), "Built-in kind mismatch");
+static_assert(lgc::BuiltInSubgroupGtMask            == static_cast<lgc::BuiltInKind>(spv::BuiltInSubgroupGtMask), "Built-in kind mismatch");
+static_assert(lgc::BuiltInSubgroupId                == static_cast<lgc::BuiltInKind>(spv::BuiltInSubgroupId), "Built-in kind mismatch");
+static_assert(lgc::BuiltInSubgroupLeMask            == static_cast<lgc::BuiltInKind>(spv::BuiltInSubgroupLeMask), "Built-in kind mismatch");
+static_assert(lgc::BuiltInSubgroupLocalInvocationId == static_cast<lgc::BuiltInKind>(spv::BuiltInSubgroupLocalInvocationId), "Built-in kind mismatch");
+static_assert(lgc::BuiltInSubgroupLtMask            == static_cast<lgc::BuiltInKind>(spv::BuiltInSubgroupLtMask), "Built-in kind mismatch");
+static_assert(lgc::BuiltInSubgroupSize              == static_cast<lgc::BuiltInKind>(spv::BuiltInSubgroupSize), "Built-in kind mismatch");
+static_assert(lgc::BuiltInTessCoord                 == static_cast<lgc::BuiltInKind>(spv::BuiltInTessCoord), "Built-in kind mismatch");
+static_assert(lgc::BuiltInTessLevelInner            == static_cast<lgc::BuiltInKind>(spv::BuiltInTessLevelInner), "Built-in kind mismatch");
+static_assert(lgc::BuiltInTessLevelOuter            == static_cast<lgc::BuiltInKind>(spv::BuiltInTessLevelOuter), "Built-in kind mismatch");
+static_assert(lgc::BuiltInVertexIndex               == static_cast<lgc::BuiltInKind>(spv::BuiltInVertexIndex), "Built-in kind mismatch");
+static_assert(lgc::BuiltInViewIndex                 == static_cast<lgc::BuiltInKind>(spv::BuiltInViewIndex), "Built-in kind mismatch");
+static_assert(lgc::BuiltInViewportIndex             == static_cast<lgc::BuiltInKind>(spv::BuiltInViewportIndex), "Built-in kind mismatch");
+static_assert(lgc::BuiltInWorkgroupId               == static_cast<lgc::BuiltInKind>(spv::BuiltInWorkgroupId), "Built-in kind mismatch");
 
 // =====================================================================================================================
 // Initializes static members.
@@ -409,11 +409,11 @@ void SpirvLowerGlobal::visitLoadInst(
             if (inOutMeta.IsBuiltIn)
             {
                 uint32_t builtInId = inOutMeta.Value;
-                isVertexIdx = ((builtInId == BuiltInPerVertex)    || // GLSL style per-vertex data
-                               (builtInId == BuiltInPosition)     || // HLSL style per-vertex data
-                               (builtInId == BuiltInPointSize)    ||
-                               (builtInId == BuiltInClipDistance) ||
-                               (builtInId == BuiltInCullDistance));
+                isVertexIdx = ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
+                               (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
+                               (builtInId == spv::BuiltInPointSize)    ||
+                               (builtInId == spv::BuiltInClipDistance) ||
+                               (builtInId == spv::BuiltInCullDistance));
             }
             else
             {
@@ -471,11 +471,11 @@ void SpirvLowerGlobal::visitLoadInst(
             if (inOutMeta.IsBuiltIn)
             {
                 uint32_t builtInId = inOutMeta.Value;
-                hasVertexIdx = ((builtInId == BuiltInPerVertex)    || // GLSL style per-vertex data
-                                (builtInId == BuiltInPosition)     || // HLSL style per-vertex data
-                                (builtInId == BuiltInPointSize)    ||
-                                (builtInId == BuiltInClipDistance) ||
-                                (builtInId == BuiltInCullDistance));
+                hasVertexIdx = ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
+                                (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
+                                (builtInId == spv::BuiltInPointSize)    ||
+                                (builtInId == spv::BuiltInClipDistance) ||
+                                (builtInId == spv::BuiltInCullDistance));
             }
             else
             {
@@ -603,11 +603,11 @@ void SpirvLowerGlobal::visitStoreInst(
             if (outputMeta.IsBuiltIn)
             {
                 uint32_t builtInId = outputMeta.Value;
-                isVertexIdx = ((builtInId == BuiltInPerVertex)    || // GLSL style per-vertex data
-                               (builtInId == BuiltInPosition)     || // HLSL style per-vertex data
-                               (builtInId == BuiltInPointSize)    ||
-                               (builtInId == BuiltInClipDistance) ||
-                               (builtInId == BuiltInCullDistance));
+                isVertexIdx = ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
+                               (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
+                               (builtInId == spv::BuiltInPointSize)    ||
+                               (builtInId == spv::BuiltInClipDistance) ||
+                               (builtInId == spv::BuiltInCullDistance));
             }
             else
             {
@@ -660,11 +660,11 @@ void SpirvLowerGlobal::visitStoreInst(
             if (outputMeta.IsBuiltIn)
             {
                 uint32_t builtInId = outputMeta.Value;
-                hasVertexIdx = ((builtInId == BuiltInPerVertex)    || // GLSL style per-vertex data
-                                (builtInId == BuiltInPosition)     || // HLSL style per-vertex data
-                                (builtInId == BuiltInPointSize)    ||
-                                (builtInId == BuiltInClipDistance) ||
-                                (builtInId == BuiltInCullDistance));
+                hasVertexIdx = ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
+                                (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
+                                (builtInId == spv::BuiltInPointSize)    ||
+                                (builtInId == spv::BuiltInClipDistance) ||
+                                (builtInId == spv::BuiltInCullDistance));
             }
             else
             {
@@ -1184,11 +1184,11 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
             uint32_t builtInId = inOutMeta.Value;
 
             if ((pVertexIdx == nullptr) && (m_shaderStage == ShaderStageGeometry) &&
-                ((builtInId == BuiltInPerVertex)    || // GLSL style per-vertex data
-                 (builtInId == BuiltInPosition)     || // HLSL style per-vertex data
-                 (builtInId == BuiltInPointSize)    ||
-                 (builtInId == BuiltInClipDistance) ||
-                 (builtInId == BuiltInCullDistance)))
+                ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
+                 (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
+                 (builtInId == spv::BuiltInPointSize)    ||
+                 (builtInId == spv::BuiltInClipDistance) ||
+                 (builtInId == spv::BuiltInCullDistance)))
             {
                 // NOTE: We are handling vertex indexing of built-in inputs of geometry shader. For tessellation
                 // shader, vertex indexing is handled by "load"/"store" instruction lowering.
@@ -1222,13 +1222,13 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
             else
             {
                 // Array built-in without vertex indexing (ClipDistance/CullDistance).
-                InOutInfo inOutInfo;
+                lgc::InOutInfo inOutInfo;
                 inOutInfo.SetArraySize(pInOutTy->getArrayNumElements());
                 m_pBuilder->SetInsertPoint(pInsertPos);
                 if (addrSpace == SPIRAS_Input)
                 {
                     pInOutValue =  m_pBuilder->CreateReadBuiltInInput(
-                                      static_cast<BuiltInKind>(inOutMeta.Value),
+                                      static_cast<lgc::BuiltInKind>(inOutMeta.Value),
                                       inOutInfo,
                                       pVertexIdx,
                                       nullptr);
@@ -1236,7 +1236,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                 else
                 {
                     pInOutValue =  m_pBuilder->CreateReadBuiltInOutput(
-                                      static_cast<BuiltInKind>(inOutMeta.Value),
+                                      static_cast<lgc::BuiltInKind>(inOutMeta.Value),
                                       inOutInfo,
                                       pVertexIdx,
                                       nullptr);
@@ -1342,11 +1342,11 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         m_pBuilder->SetInsertPoint(pInsertPos);
         if (inOutMeta.IsBuiltIn)
         {
-            auto builtIn = static_cast<BuiltInKind>(inOutMeta.Value);
+            auto builtIn = static_cast<lgc::BuiltInKind>(inOutMeta.Value);
             pElemIdx = (pElemIdx == m_pBuilder->getInt32(InvalidValue)) ? nullptr : pElemIdx;
             pVertexIdx = (pVertexIdx == m_pBuilder->getInt32(InvalidValue)) ? nullptr : pVertexIdx;
 
-            InOutInfo inOutInfo;
+            lgc::InOutInfo inOutInfo;
             inOutInfo.SetArraySize(maxLocOffset);
             if (addrSpace == SPIRAS_Input)
             {
@@ -1357,11 +1357,11 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                 pInOutValue = m_pBuilder->CreateReadBuiltInOutput(builtIn, inOutInfo, pVertexIdx, pElemIdx);
             }
 
-            if (((builtIn == BuiltInSubgroupEqMask)     ||
-                 (builtIn == BuiltInSubgroupGeMask)     ||
-                 (builtIn == BuiltInSubgroupGtMask)     ||
-                 (builtIn == BuiltInSubgroupLeMask)     ||
-                 (builtIn == BuiltInSubgroupLtMask)) &&
+            if (((builtIn == lgc::BuiltInSubgroupEqMask)     ||
+                 (builtIn == lgc::BuiltInSubgroupGeMask)     ||
+                 (builtIn == lgc::BuiltInSubgroupGtMask)     ||
+                 (builtIn == lgc::BuiltInSubgroupLeMask)     ||
+                 (builtIn == lgc::BuiltInSubgroupLtMask)) &&
                 pInOutTy->isIntegerTy(64))
             {
                 // NOTE: Glslang has a bug. For gl_SubGroupXXXMaskARB, they are implemented as "uint64_t" while
@@ -1388,7 +1388,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
             pElemIdx = (pElemIdx == nullptr) ? m_pBuilder->getInt32(elemIdx) :
                                                m_pBuilder->CreateAdd(pElemIdx, m_pBuilder->getInt32(elemIdx));
 
-            InOutInfo inOutInfo;
+            lgc::InOutInfo inOutInfo;
             if (pLocOffset == nullptr)
             {
                 pLocOffset = m_pBuilder->getInt32(0);
@@ -1483,8 +1483,8 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             // NOTE: For geometry shader, we add stream ID for outputs.
             assert((m_shaderStage != ShaderStageGeometry) || (emitStreamId == outputMeta.StreamId));
 
-            auto builtInId = static_cast<BuiltInKind>(outputMeta.Value);
-            InOutInfo outputInfo;
+            auto builtInId = static_cast<lgc::BuiltInKind>(outputMeta.Value);
+            lgc::InOutInfo outputInfo;
             if (emitStreamId != InvalidValue)
             {
                 outputInfo.SetStreamId(emitStreamId);
@@ -1628,7 +1628,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
 
         assert(outputMeta.IsLoc || outputMeta.IsBuiltIn);
 
-        InOutInfo outputInfo;
+        lgc::InOutInfo outputInfo;
         if (emitStreamId != InvalidValue)
         {
             outputInfo.SetStreamId(emitStreamId);
@@ -1637,7 +1637,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
 
         if (outputMeta.IsBuiltIn)
         {
-            auto builtInId = static_cast<BuiltInKind>(outputMeta.Value);
+            auto builtInId = static_cast<lgc::BuiltInKind>(outputMeta.Value);
             outputInfo.SetArraySize(maxLocOffset);
             if (outputMeta.IsXfb)
             {

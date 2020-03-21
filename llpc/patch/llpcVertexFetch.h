@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcVertexFetch.h
- * @brief LLPC header file: contains declaration of class Llpc::VertexFetch.
+ * @brief LLPC header file: contains declaration of class lgc::VertexFetch.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -34,7 +34,7 @@
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
 
-namespace Llpc
+namespace lgc
 {
 
 class PipelineState;
@@ -135,4 +135,4 @@ private:
     } m_fetchDefaults;
 };
 
-} // Llpc
+} // lgc

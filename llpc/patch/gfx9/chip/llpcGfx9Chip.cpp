@@ -33,7 +33,7 @@
 
 #define DEBUG_TYPE "llpc-gfx9-chip"
 
-namespace Llpc
+namespace lgc
 {
 
 namespace Gfx9
@@ -788,4 +788,4 @@ const char* GetRegisterNameString(
 
 } // Gfx9
 
-} // Llpc
+} // lgc

@@ -25,13 +25,14 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcConfigBuilderBase.h
- * @brief LLPC header file: contains declaration of class Llpc::ConfigBuilderBase.
+ * @brief LLPC header file: contains declaration of class lgc::ConfigBuilderBase.
  ***********************************************************************************************************************
  */
 #pragma once
 
 #include "palPipelineAbi.h"
 #include "g_palPipelineAbiMetadata.h"
+#include "llpcBuilderCommon.h"
 #include "llpcTargetInfo.h"
 #include "lgc/Defs.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
@@ -44,7 +45,7 @@ class Module;
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 class PipelineState;
@@ -135,4 +136,4 @@ private:
     llvm::SmallVector<Util::Abi::PalMetadataNoteEntry, 128> m_config; // Register/metadata configuration
 };
 
-} // Llpc
+} // lgc

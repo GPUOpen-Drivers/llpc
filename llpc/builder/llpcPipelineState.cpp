@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPipelineState.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PipelineState.
+ * @brief LLPC source file: contains implementation of class lgc::PipelineState.
  ***********************************************************************************************************************
  */
 #include "llpcBuilderContext.h"
@@ -48,7 +48,7 @@
 
 #define DEBUG_TYPE "llpc-pipeline-state"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // -enable-tess-offchip: enable tessellation off-chip mode
@@ -89,7 +89,7 @@ Module* PipelineState::Link(
 {
     // Processing for each shader module before linking.
     IRBuilder<> builder(GetContext());
-    uint32_t metaKindId = GetContext().getMDKindID(LlpcName::ShaderStageMetadata);
+    uint32_t metaKindId = GetContext().getMDKindID(lgcName::ShaderStageMetadata);
     Module* pAnyModule = nullptr;
     for (uint32_t stage = 0; stage < modules.size(); ++stage)
     {
@@ -114,7 +114,7 @@ Module* PipelineState::Link(
                 func.setMetadata(metaKindId, pStageMetaNode);
                 if (func.getLinkage() != GlobalValue::InternalLinkage)
                 {
-                    func.setName(Twine(LlpcName::EntryPointPrefix) +
+                    func.setName(Twine(lgcName::EntryPointPrefix) +
                                  GetShaderStageAbbreviation(static_cast<ShaderStage>(stage)) +
                                  "." +
                                  func.getName());
@@ -1341,7 +1341,7 @@ char PipelineStateClearer::ID = 0;
 
 // =====================================================================================================================
 // Create pipeline state clearer pass
-ModulePass* Llpc::CreatePipelineStateClearer()
+ModulePass* lgc::CreatePipelineStateClearer()
 {
     return new PipelineStateClearer();
 }

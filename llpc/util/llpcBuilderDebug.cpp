@@ -33,14 +33,14 @@
 
 using namespace llvm;
 
-namespace Llpc
+namespace lgc
 {
 
 //======================================================================================================================
 // Get pointer to stream for LLPC_OUTS, or nullptr if disabled.
-raw_ostream* GetLlpcOuts()
+raw_ostream* GetLgcOuts()
 {
-    return BuilderContext::GetLlpcOuts();
+    return BuilderContext::GetLgcOuts();
 }
 
-} // Llpc
+} // lgc

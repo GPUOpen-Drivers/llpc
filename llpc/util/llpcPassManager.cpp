@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPassManager.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PassManagerImpl.
+ * @brief LLPC source file: contains implementation of class lgc::PassManagerImpl.
  ***********************************************************************************************************************
  */
 #include "llvm/Analysis/CFGPrinter.h"
@@ -60,7 +60,7 @@ static cl::list<uint32_t> DisablePassIndices("disable-pass-indices", cl::ZeroOrM
 
 } // llvm
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 namespace
@@ -70,7 +70,7 @@ namespace
 // LLPC's legacy::PassManager override.
 // This is the implementation subclass of the PassManager class declared in llpcPassManager.h
 class PassManagerImpl final :
-    public Llpc::PassManager
+    public lgc::PassManager
 {
 public:
     PassManagerImpl();
@@ -121,7 +121,7 @@ static AnalysisID GetPassIdFromName(
 
 // =====================================================================================================================
 // Create a PassManagerImpl
-Llpc::PassManager* Llpc::PassManager::Create()
+lgc::PassManager* lgc::PassManager::Create()
 {
     return new PassManagerImpl;
 }

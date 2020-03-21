@@ -32,7 +32,7 @@
 
 #include <stdint.h>
 
-namespace Llpc
+namespace lgc
 {
 
 // Limits
@@ -632,4 +632,4 @@ static const uint32_t CopyShaderUserSgprIdxStreamOffset = 6;
 // Start offset of currently-processed vertex in GS-VS ring buffer
 static const uint32_t CopyShaderUserSgprIdxVertexOffset = 10;
 
-} // Llpc
+} // lgc

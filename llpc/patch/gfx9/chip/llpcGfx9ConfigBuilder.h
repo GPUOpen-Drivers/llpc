@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcGfx9ConfigBuilder.h
- * @brief LLPC header file: contains declaration of class Llpc::Gfx9::ConfigBuilder.
+ * @brief LLPC header file: contains declaration of class lgc::Gfx9::ConfigBuilder.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -33,7 +33,7 @@
 #include "llpcConfigBuilderBase.h"
 #include "llpcGfx9Chip.h"
 
-namespace Llpc
+namespace lgc
 {
 
 struct ElfDataEntry;
@@ -106,4 +106,4 @@ private:
 
 } // Gfx9
 
-} // Llpc
+} // lgc

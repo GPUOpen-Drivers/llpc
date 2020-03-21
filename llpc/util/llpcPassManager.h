@@ -25,14 +25,14 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPassManager.h
- * @brief LLPC header file: contains declaration of class Llpc::PassManager.
+ * @brief LLPC header file: contains declaration of class lgc::PassManager.
  ***********************************************************************************************************************
  */
 #pragma once
 
 #include "llvm/IR/LegacyPassManager.h"
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -46,4 +46,4 @@ public:
     virtual void SetPassIndex(uint32_t* pPassIndex) = 0;
 };
 
-} // Llpc
+} // lgc

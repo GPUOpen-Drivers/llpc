@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcShaderMerger.h
- * @brief LLPC header file: contains declaration of class Llpc::ShaderMerger.
+ * @brief LLPC header file: contains declaration of class lgc::ShaderMerger.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -37,7 +37,7 @@
 #include "llpcPipelineShaders.h"
 #include "llpcTargetInfo.h"
 
-namespace Llpc
+namespace lgc
 {
 
 class PipelineState;
@@ -112,4 +112,4 @@ private:
     bool        m_hasGs;        // Whether the pipeline has geometry shader
 };
 
-} // Llpc
+} // lgc

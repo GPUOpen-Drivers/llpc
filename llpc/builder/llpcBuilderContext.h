@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcBuilderContext.h
- * @brief LLPC header file: declaration of llpc::BuilderContext class for creating and using Llpc::Builder
+ * @brief LLPC header file: declaration of llpc::BuilderContext class for creating and using lgc::Builder
  ***********************************************************************************************************************
  */
 #pragma once
@@ -50,7 +50,7 @@ class PassManager;
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 using namespace llvm;
@@ -103,7 +103,7 @@ public:
         legacy::PassManager*  pPassMgr);  // [in/out] Pass manager
 
     // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
-    void AddTargetPasses(Llpc::PassManager& passMgr, Timer* pCodeGenTimer, raw_pwrite_stream& outStream);
+    void AddTargetPasses(lgc::PassManager& passMgr, Timer* pCodeGenTimer, raw_pwrite_stream& outStream);
 
     void SetBuildRelocatableElf(bool buildRelocatableElf) { m_buildRelocatableElf = buildRelocatableElf; }
     bool BuildingRelocatableElf() { return m_buildRelocatableElf; }
@@ -117,7 +117,7 @@ public:
     // few strategic places in the pass flow, as well as information such as input/output
     // mapping.
     static void SetLlpcOuts(raw_ostream* pStream) { m_pLlpcOuts = pStream; }
-    static raw_ostream* GetLlpcOuts() { return m_pLlpcOuts; }
+    static raw_ostream* GetLgcOuts() { return m_pLlpcOuts; }
 
 private:
     BuilderContext() = delete;
@@ -134,4 +134,4 @@ private:
     bool                       m_buildRelocatableElf = false; // Flag indicating whether we are building relocatable ELF
 };
 
-} // Llpc
+} // lgc

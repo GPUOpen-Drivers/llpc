@@ -32,7 +32,7 @@
 
 #define DEBUG_TYPE "llpc-builder-impl-matrix"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================

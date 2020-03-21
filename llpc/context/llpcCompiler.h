@@ -43,16 +43,21 @@ class Module;
 
 } // llvm
 
+namespace lgc
+{
+
+class PassManager;
+
+} // lgc
+
 namespace Llpc
 {
 
 // Forward declaration
-class Builder;
 class Compiler;
 class ComputeContext;
 class Context;
 class GraphicsContext;
-class PassManager;
 
 // =====================================================================================================================
 // Object to manage checking and updating shader cache for graphics pipeline.
@@ -176,7 +181,7 @@ private:
     Context* AcquireContext() const;
     void ReleaseContext(Context* pContext) const;
 
-    bool RunPasses(PassManager* pPassMgr, llvm::Module* pModule) const;
+    bool RunPasses(lgc::PassManager* pPassMgr, llvm::Module* pModule) const;
     void LinkRelocatableShaderElf(ElfPackage *pShaderElfs, ElfPackage* pPipelineElf, Context* pContext);
     bool CanUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo*>& shaderInfo) const;
     bool CanUseRelocatableComputeShaderElf(const PipelineShaderInfo* pShaderInfo) const;

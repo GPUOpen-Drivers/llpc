@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchCheckShaderCache.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchCheckShaderCache.
+ * @brief LLPC source file: contains implementation of class lgc::PatchCheckShaderCache.
  ***********************************************************************************************************************
  */
 #include "llvm/Support/Debug.h"
@@ -36,13 +36,13 @@
 #define DEBUG_TYPE "llpc-patch-check-shader-cache"
 
 using namespace llvm;
-using namespace Llpc;
+using namespace lgc;
 
 // =====================================================================================================================
 // Initializes static members.
 char PatchCheckShaderCache::ID = 0;
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -52,7 +52,7 @@ PatchCheckShaderCache* CreatePatchCheckShaderCache()
     return new PatchCheckShaderCache();
 }
 
-} // Llpc
+} // lgc
 
 namespace
 {

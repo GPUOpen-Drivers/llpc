@@ -38,7 +38,7 @@
 
 #include <map>
 
-namespace Llpc
+namespace lgc
 {
 
 class PipelineState;
@@ -212,4 +212,4 @@ private:
     std::map<llvm::Function*, ShaderSystemValues> m_shaderSysValuesMap;
 };
 
-} // Llpc
+} // lgc

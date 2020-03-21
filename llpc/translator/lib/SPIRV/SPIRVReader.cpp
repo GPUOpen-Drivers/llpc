@@ -86,6 +86,7 @@
 #define DEBUG_TYPE "spirv"
 
 using namespace std;
+using namespace lgc;
 using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
@@ -259,7 +260,7 @@ public:
   Value *transOpAccessChainForImage(SPIRVAccessChainBase* SpvAccessChain);
   Value *indexDescPtr(Value *Base, Value *Index, bool IsNonUniform,
                       SPIRVType *SpvElementType);
-  Value* transGroupArithOp(Builder::GroupArithOp, SPIRVValue*);
+  Value* transGroupArithOp(lgc::Builder::GroupArithOp, SPIRVValue*);
 
   bool transDecoration(SPIRVValue *, Value *);
   bool transShaderDecoration(SPIRVValue *, Value *);
@@ -286,8 +287,8 @@ public:
   struct ExtractedImageInfo {
     BasicBlock *BB;
     const SPIRVTypeImageDescriptor *Desc;
-    unsigned Dim;   // Llpc::Builder dimension
-    unsigned Flags; // Llpc::Builder image call flags
+    unsigned Dim;   // lgc::Builder dimension
+    unsigned Flags; // lgc::Builder image call flags
     Value *ImageDesc;
     Value *FmaskDesc;
     Value *SamplerDesc;
@@ -367,7 +368,7 @@ private:
   Module *M;
   BuiltinVarMap BuiltinGVMap;
   LLVMContext *Context;
-  Builder *m_pBuilder;
+  lgc::Builder *m_pBuilder;
   SPIRVModule *BM;
   bool EnableXfb;
   bool EnableGatherLodNz;
@@ -388,7 +389,7 @@ private:
   DenseMap<std::pair<BasicBlock*, BasicBlock*>, unsigned> BlockPredecessorToCount;
   const ShaderModuleUsage* ModuleUsage;
 
-  Llpc::Builder *getBuilder() const { return m_pBuilder; }
+  lgc::Builder *getBuilder() const { return m_pBuilder; }
 
   Type *mapType(SPIRVType *BT, Type *T) {
     TypeMap[BT] = T;
@@ -5373,7 +5374,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     Value *Val0 = transValue(BC->getOperand(0), F, BB);
     Value *Val1 = transValue(BC->getOperand(1), F, BB);
     Type *InTy = Val0->getType();
-    Type *ExtendedTy = Llpc::Builder::GetConditionallyVectorizedTy(
+    Type *ExtendedTy = lgc::Builder::GetConditionallyVectorizedTy(
         getBuilder()->getInt64Ty(), Val0->getType());
     if (OC == OpUMulExtended) {
       Val0 = getBuilder()->CreateZExt(Val0, ExtendedTy);
@@ -5908,40 +5909,40 @@ Instruction * SPIRVToLLVM::transBuiltinFromInst(const std::string& FuncName,
 static unsigned convertDimension(const SPIRVTypeImageDescriptor *Desc) {
   if (Desc->MS) {
     assert(Desc->Dim == Dim2D || Desc->Dim == DimSubpassData);
-    return !Desc->Arrayed ? Llpc::Builder::Dim2DMsaa
-                          : Llpc::Builder::Dim2DArrayMsaa;
+    return !Desc->Arrayed ? lgc::Builder::Dim2DMsaa
+                          : lgc::Builder::Dim2DArrayMsaa;
   }
   if (!Desc->Arrayed) {
     switch (static_cast<uint32_t>(Desc->Dim)) {
     case Dim1D:
-      return Llpc::Builder::Dim1D;
+      return lgc::Builder::Dim1D;
     case DimBuffer:
-      return Llpc::Builder::Dim1D;
+      return lgc::Builder::Dim1D;
     case Dim2D:
-      return Llpc::Builder::Dim2D;
+      return lgc::Builder::Dim2D;
     case DimRect:
-      return Llpc::Builder::Dim2D;
+      return lgc::Builder::Dim2D;
     case DimCube:
-      return Llpc::Builder::DimCube;
+      return lgc::Builder::DimCube;
     case Dim3D:
-      return Llpc::Builder::Dim3D;
+      return lgc::Builder::Dim3D;
     case DimSubpassData:
-      return Llpc::Builder::Dim2D;
+      return lgc::Builder::Dim2D;
     default:
       break;
     }
   } else {
     switch (static_cast<uint32_t>(Desc->Dim)) {
     case Dim1D:
-      return Llpc::Builder::Dim1DArray;
+      return lgc::Builder::Dim1DArray;
     case DimBuffer:
-      return Llpc::Builder::Dim1DArray;
+      return lgc::Builder::Dim1DArray;
     case Dim2D:
-      return Llpc::Builder::Dim2DArray;
+      return lgc::Builder::Dim2DArray;
     case DimRect:
-      return Llpc::Builder::Dim2DArray;
+      return lgc::Builder::Dim2DArray;
     case DimCube:
-      return Llpc::Builder::DimCubeArray;
+      return lgc::Builder::DimCubeArray;
     default:
       break;
     }
@@ -5956,7 +5957,7 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *Desc) {
 void SPIRVToLLVM::getImageDesc(SPIRVValue *BImageInst,
                                ExtractedImageInfo *Info) {
   if (BImageInst->hasDecorate(DecorationNonUniformEXT))
-    Info->Flags |= Llpc::Builder::ImageFlagNonUniformImage;
+    Info->Flags |= lgc::Builder::ImageFlagNonUniformImage;
 
   if (BImageInst->getOpCode() == OpImageTexelPointer) {
     // We are looking at the OpImageTexelPointer for an image atomic. Load the
@@ -5981,16 +5982,16 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *BImageInst,
           static_cast<SPIRVInstTemplateBase *>(BImagePtr)->getOperands();
       for (SPIRVValue *Operand : Operands) {
         if (Operand->hasDecorate(DecorationNonUniformEXT))
-          Info->Flags |= Llpc::Builder::ImageFlagNonUniformImage;
+          Info->Flags |= lgc::Builder::ImageFlagNonUniformImage;
       }
       BImagePtr = Operands[0];
     }
     assert(BImagePtr->getOpCode() == OpVariable ||
            BImagePtr->getOpCode() == OpFunctionParameter);
     if (BImageInst->hasDecorate(DecorationCoherent))
-      Info->Flags |= Llpc::Builder::ImageFlagCoherent;
+      Info->Flags |= lgc::Builder::ImageFlagCoherent;
     if (BImageInst->hasDecorate(DecorationVolatile))
-      Info->Flags |= Llpc::Builder::ImageFlagVolatile;
+      Info->Flags |= lgc::Builder::ImageFlagVolatile;
     return;
   }
 
@@ -6003,12 +6004,12 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *BImageInst,
       auto Sampler =
           static_cast<SPIRVInstTemplateBase *>(ScanBackInst)->getOpValue(1);
       if (Sampler->hasDecorate(DecorationNonUniformEXT))
-        Info->Flags |= Llpc::Builder::ImageFlagNonUniformSampler;
+        Info->Flags |= lgc::Builder::ImageFlagNonUniformSampler;
     }
     ScanBackInst =
         static_cast<SPIRVInstTemplateBase *>(ScanBackInst)->getOpValue(0);
     if (ScanBackInst->hasDecorate(DecorationNonUniformEXT))
-      Info->Flags |= Llpc::Builder::ImageFlagNonUniformImage;
+      Info->Flags |= lgc::Builder::ImageFlagNonUniformImage;
   }
 
   // Get the IR value for the image/sampledimage.
@@ -6058,18 +6059,18 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *BI,
 
   // SPIR-V allows the coordinate vector to be too wide; chop it down here.
   // Also handle the extra projective component if any.
-  Value *Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
+  Value *Coord = Addr[lgc::Builder::ImageAddressIdxCoordinate];
   if (auto CoordVecTy = dyn_cast<VectorType>(Coord->getType())) {
     unsigned NumCoords = getBuilder()->GetImageNumCoords(ImageInfo->Dim);
     if (HasProj) {
-      Addr[Llpc::Builder::ImageAddressIdxProjective] =
+      Addr[lgc::Builder::ImageAddressIdxProjective] =
           getBuilder()->CreateExtractElement(Coord, NumCoords);
     }
     if (NumCoords < CoordVecTy->getNumElements()) {
       static const unsigned Indexes[] = {0, 1, 2, 3};
       Coord = getBuilder()->CreateShuffleVector(
           Coord, Coord, ArrayRef<unsigned>(Indexes).slice(0, NumCoords));
-      Addr[Llpc::Builder::ImageAddressIdxCoordinate] = Coord;
+      Addr[lgc::Builder::ImageAddressIdxCoordinate] = Coord;
     }
   }
 
@@ -6087,7 +6088,7 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *BI,
     // Bias (0x1)
     if (Mask & ImageOperandsBiasMask) {
       Mask &= ~ImageOperandsBiasMask;
-      Addr[Llpc::Builder::ImageAddressIdxLodBias] =
+      Addr[lgc::Builder::ImageAddressIdxLodBias] =
           transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
       ImageOpnds = ImageOpnds.slice(1);
     }
@@ -6095,7 +6096,7 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *BI,
     // Lod (0x2)
     if (Mask & ImageOperandsLodMask) {
       Mask &= ~ImageOperandsLodMask;
-      Addr[Llpc::Builder::ImageAddressIdxLod] =
+      Addr[lgc::Builder::ImageAddressIdxLod] =
           transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
       ImageOpnds = ImageOpnds.slice(1);
     }
@@ -6103,9 +6104,9 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *BI,
     // Grad (0x4)
     if (Mask & ImageOperandsGradMask) {
       Mask &= ~ImageOperandsGradMask;
-      Addr[Llpc::Builder::ImageAddressIdxDerivativeX] =
+      Addr[lgc::Builder::ImageAddressIdxDerivativeX] =
           transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
-      Addr[Llpc::Builder::ImageAddressIdxDerivativeY] =
+      Addr[lgc::Builder::ImageAddressIdxDerivativeY] =
           transValue(BM->getValue(ImageOpnds[1]), BB->getParent(), BB);
       ImageOpnds = ImageOpnds.slice(2);
     }
@@ -6113,7 +6114,7 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *BI,
     // ConstOffset (0x8)
     if (Mask & ImageOperandsConstOffsetMask) {
       Mask &= ~ImageOperandsConstOffsetMask;
-      Addr[Llpc::Builder::ImageAddressIdxOffset] =
+      Addr[lgc::Builder::ImageAddressIdxOffset] =
           transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
       ImageOpnds = ImageOpnds.slice(1);
     }
@@ -6121,8 +6122,8 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *BI,
     // Offset (0x10)
     if (Mask & ImageOperandsOffsetMask) {
       Mask &= ~ImageOperandsOffsetMask;
-      assert(!Addr[Llpc::Builder::ImageAddressIdxOffset]);
-      Addr[Llpc::Builder::ImageAddressIdxOffset] =
+      assert(!Addr[lgc::Builder::ImageAddressIdxOffset]);
+      Addr[lgc::Builder::ImageAddressIdxOffset] =
           transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
       ImageOpnds = ImageOpnds.slice(1);
     }
@@ -6130,8 +6131,8 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *BI,
     // ConstOffsets (0x20)
     if (Mask & ImageOperandsConstOffsetsMask) {
       Mask &= ~ImageOperandsConstOffsetsMask;
-      assert(!Addr[Llpc::Builder::ImageAddressIdxOffset]);
-      Addr[Llpc::Builder::ImageAddressIdxOffset] =
+      assert(!Addr[lgc::Builder::ImageAddressIdxOffset]);
+      Addr[lgc::Builder::ImageAddressIdxOffset] =
           transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
       ImageOpnds = ImageOpnds.slice(1);
     }
@@ -6149,7 +6150,7 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *BI,
     // MinLod (0x80)
     if (Mask & ImageOperandsMinLodMask) {
       Mask &= ~ImageOperandsMinLodMask;
-      Addr[Llpc::Builder::ImageAddressIdxLodClamp] =
+      Addr[lgc::Builder::ImageAddressIdxLodClamp] =
           transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
       ImageOpnds = ImageOpnds.slice(1);
     }
@@ -6157,13 +6158,13 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *BI,
     // MakeTexelAvailableKHR (0x100)
     if (Mask & ImageOperandsMakeTexelAvailableKHRMask) {
       Mask &= ~ImageOperandsMakeTexelAvailableKHRMask;
-      ImageInfo->Flags |= Llpc::Builder::ImageFlagCoherent;
+      ImageInfo->Flags |= lgc::Builder::ImageFlagCoherent;
     }
 
     // MakeTexelVisibleKHR (0x200)
     if (Mask & ImageOperandsMakeTexelVisibleKHRMask) {
       Mask &= ~ImageOperandsMakeTexelVisibleKHRMask;
-      ImageInfo->Flags |= Llpc::Builder::ImageFlagCoherent;
+      ImageInfo->Flags |= lgc::Builder::ImageFlagCoherent;
     }
 
     // NonPrivateTexelKHR (0x400)
@@ -6174,14 +6175,14 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *BI,
     // VolatileTexelKHR (0x800)
     if (Mask & ImageOperandsVolatileTexelKHRMask) {
       Mask &= ~ImageOperandsVolatileTexelKHRMask;
-      ImageInfo->Flags |= Llpc::Builder::ImageFlagVolatile;
+      ImageInfo->Flags |= lgc::Builder::ImageFlagVolatile;
     }
 
 #if SPV_VERSION >= 0x10400
     // SignExtend (0x1000)
     if (Mask & ImageOperandsSignExtendMask) {
       Mask &= ~ImageOperandsSignExtendMask;
-      ImageInfo->Flags |= Llpc::Builder::ImageFlagSignedResult;
+      ImageInfo->Flags |= lgc::Builder::ImageFlagSignedResult;
     }
 
     // ZeroExtend (0x2000)
@@ -6208,8 +6209,8 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *BI,
 
   // Add the offset (if any) onto the coordinate. The offset might be narrower
   // than the coordinate.
-  Value *Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
-  if (auto Offset = Addr[Llpc::Builder::ImageAddressIdxOffset]) {
+  Value *Coord = Addr[lgc::Builder::ImageAddressIdxCoordinate];
+  if (auto Offset = Addr[lgc::Builder::ImageAddressIdxOffset]) {
     if (isa<VectorType>(Coord->getType())) {
       if (!isa<VectorType>(Offset->getType())) {
         Offset = getBuilder()->CreateInsertElement(
@@ -6230,17 +6231,17 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *BI,
     if (!EnableMultiView) {
       // Subpass data without multiview: Add the x,y dimensions (converted to
       // signed int) of the fragment coordinate on to the texel coordate.
-      ImageInfo->Flags |= Llpc::Builder::ImageFlagAddFragCoord;
+      ImageInfo->Flags |= lgc::Builder::ImageFlagAddFragCoord;
     } else {
       // Subpass data with multiview: Use the fragment coordinate as x,y, and
       // use ViewIndex as z. We need to pass in a (0,0,0) coordinate.
-      ImageInfo->Flags |= Llpc::Builder::ImageFlagAddFragCoord |
-                          Llpc::Builder::ImageFlagCheckMultiView;
+      ImageInfo->Flags |= lgc::Builder::ImageFlagAddFragCoord |
+                          lgc::Builder::ImageFlagCheckMultiView;
     }
   }
 
   // For a cube array, separate the layer and face.
-  if (ImageInfo->Dim == Llpc::Builder::DimCubeArray) {
+  if (ImageInfo->Dim == lgc::Builder::DimCubeArray) {
     SmallVector<Value *, 4> Components;
     for (unsigned I = 0; I != 3; ++I)
       Components.push_back(getBuilder()->CreateExtractElement(Coord, I));
@@ -6253,7 +6254,7 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *BI,
       Coord = getBuilder()->CreateInsertElement(Coord, Components[I], I);
   }
 
-  Addr[Llpc::Builder::ImageAddressIdxCoordinate] = Coord;
+  Addr[lgc::Builder::ImageAddressIdxCoordinate] = Coord;
   return;
 }
 
@@ -6268,19 +6269,19 @@ Value *SPIRVToLLVM::transSPIRVFragmentFetchFromInst(SPIRVInstruction *BI,
   getImageDesc(BII->getOpValue(0), &ImageInfo);
 
   assert(ImageInfo.Desc->Dim == Dim2D || ImageInfo.Desc->Dim == DimSubpassData);
-  ImageInfo.Dim = !ImageInfo.Desc->Arrayed ? Llpc::Builder::Dim2DMsaa
-                                           : Llpc::Builder::Dim2DArrayMsaa;
+  ImageInfo.Dim = !ImageInfo.Desc->Arrayed ? lgc::Builder::Dim2DMsaa
+                                           : lgc::Builder::Dim2DArrayMsaa;
 
   // Set up address arguments.
   Value *Coord = transValue(BII->getOpValue(1), BB->getParent(), BB);
 
   // Handle fetch/read/write/atomic aspects of coordinate. (This converts to
   // signed i32 and adds on the FragCoord if DimSubpassData.)
-  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
-  Addr[Llpc::Builder::ImageAddressIdxCoordinate] = Coord;
+  Value *Addr[lgc::Builder::ImageAddressCount] = {};
+  Addr[lgc::Builder::ImageAddressIdxCoordinate] = Coord;
   handleImageFetchReadWriteCoord(BI, &ImageInfo, Addr,
                                  /*EnableMultiView=*/false);
-  Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
+  Coord = Addr[lgc::Builder::ImageAddressIdxCoordinate];
 
   // For a fragment fetch, there is an extra operand for the fragment id, which
   // we must supply as an extra coordinate.
@@ -6314,18 +6315,18 @@ Value *SPIRVToLLVM::transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *BI,
 
   assert(ImageInfo.Desc->Dim == Dim2D || ImageInfo.Desc->Dim == DimSubpassData);
   ImageInfo.Dim =
-      !ImageInfo.Desc->Arrayed ? Llpc::Builder::Dim2D : Llpc::Builder::Dim3D;
+      !ImageInfo.Desc->Arrayed ? lgc::Builder::Dim2D : lgc::Builder::Dim3D;
 
   // Set up address arguments.
   Value *Coord = transValue(BII->getOpValue(1), BB->getParent(), BB);
 
   // Handle fetch/read/write/atomic aspects of coordinate. (This converts to
   // signed i32 and adds on the FragCoord if DimSubpassData.)
-  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
-  Addr[Llpc::Builder::ImageAddressIdxCoordinate] = Coord;
+  Value *Addr[lgc::Builder::ImageAddressCount] = {};
+  Addr[lgc::Builder::ImageAddressIdxCoordinate] = Coord;
   handleImageFetchReadWriteCoord(BI, &ImageInfo, Addr,
                                  /*EnableMultiView=*/false);
-  Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
+  Coord = Addr[lgc::Builder::ImageAddressIdxCoordinate];
 
   // Get the return type for the Builder method. It returns v4f32, then we
   // extract just the R channel.
@@ -6388,10 +6389,10 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
 
   // Handle fetch/read/write/atomic aspects of coordinate. (This separates the
   // cube face and ID.)
-  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
-  Addr[Llpc::Builder::ImageAddressIdxCoordinate] = Coord;
+  Value *Addr[lgc::Builder::ImageAddressCount] = {};
+  Addr[lgc::Builder::ImageAddressIdxCoordinate] = Coord;
   handleImageFetchReadWriteCoord(BI, &ImageInfo, Addr);
-  Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
+  Coord = Addr[lgc::Builder::ImageAddressIdxCoordinate];
 
   // Determine the atomic ordering.
   AtomicOrdering Ordering = AtomicOrdering::NotAtomic;
@@ -6425,46 +6426,46 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
 
   case OpAtomicStore:
   case OpAtomicExchange:
-    AtomicOp = Llpc::Builder::ImageAtomicSwap;
+    AtomicOp = lgc::Builder::ImageAtomicSwap;
     break;
   case OpAtomicLoad:
-    AtomicOp = Llpc::Builder::ImageAtomicAdd;
+    AtomicOp = lgc::Builder::ImageAtomicAdd;
     InputData = getBuilder()->getIntN(BIT->getType()->getBitWidth(), 0);
     break;
   case OpAtomicIIncrement:
-    AtomicOp = Llpc::Builder::ImageAtomicAdd;
+    AtomicOp = lgc::Builder::ImageAtomicAdd;
     InputData = getBuilder()->getIntN(BIT->getType()->getBitWidth(), 1);
     break;
   case OpAtomicIDecrement:
-    AtomicOp = Llpc::Builder::ImageAtomicSub;
+    AtomicOp = lgc::Builder::ImageAtomicSub;
     InputData = getBuilder()->getIntN(BIT->getType()->getBitWidth(), 1);
     break;
   case OpAtomicIAdd:
-    AtomicOp = Llpc::Builder::ImageAtomicAdd;
+    AtomicOp = lgc::Builder::ImageAtomicAdd;
     break;
   case OpAtomicISub:
-    AtomicOp = Llpc::Builder::ImageAtomicSub;
+    AtomicOp = lgc::Builder::ImageAtomicSub;
     break;
   case OpAtomicSMin:
-    AtomicOp = Llpc::Builder::ImageAtomicSMin;
+    AtomicOp = lgc::Builder::ImageAtomicSMin;
     break;
   case OpAtomicUMin:
-    AtomicOp = Llpc::Builder::ImageAtomicUMin;
+    AtomicOp = lgc::Builder::ImageAtomicUMin;
     break;
   case OpAtomicSMax:
-    AtomicOp = Llpc::Builder::ImageAtomicSMax;
+    AtomicOp = lgc::Builder::ImageAtomicSMax;
     break;
   case OpAtomicUMax:
-    AtomicOp = Llpc::Builder::ImageAtomicUMax;
+    AtomicOp = lgc::Builder::ImageAtomicUMax;
     break;
   case OpAtomicAnd:
-    AtomicOp = Llpc::Builder::ImageAtomicAnd;
+    AtomicOp = lgc::Builder::ImageAtomicAnd;
     break;
   case OpAtomicOr:
-    AtomicOp = Llpc::Builder::ImageAtomicOr;
+    AtomicOp = lgc::Builder::ImageAtomicOr;
     break;
   case OpAtomicXor:
-    AtomicOp = Llpc::Builder::ImageAtomicXor;
+    AtomicOp = lgc::Builder::ImageAtomicXor;
     break;
 
   default:
@@ -6502,8 +6503,8 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *BI,
 
   // Set up address arguments.
   unsigned OpndIdx = 1;
-  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
-  Addr[Llpc::Builder::ImageAddressIdxCoordinate] =
+  Value *Addr[lgc::Builder::ImageAddressCount] = {};
+  Addr[lgc::Builder::ImageAddressIdxCoordinate] =
       transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
 
   switch (unsigned(BII->getOpCode())) {
@@ -6516,7 +6517,7 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *BI,
   case OpImageSparseSampleProjDrefImplicitLod:
   case OpImageSparseSampleProjDrefExplicitLod:
     // This instruction has a dref operand.
-    Addr[Llpc::Builder::ImageAddressIdxZCompare] =
+    Addr[lgc::Builder::ImageAddressIdxZCompare] =
         transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
     break;
   default:
@@ -6575,7 +6576,7 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *BI,
   if (BIITy->isTypeVector())
     BIITy = static_cast<SPIRVTypeVector *>(BIITy)->getComponentType();
   if (BIITy->isTypeInt() && static_cast<SPIRVTypeInt *>(BIITy)->isSigned())
-    ImageInfo.Flags |= Llpc::Builder::ImageFlagSignedResult;
+    ImageInfo.Flags |= lgc::Builder::ImageFlagSignedResult;
 
   // Determine the return type we want from the builder call. For a sparse
   // sample/gather, the struct is {texel,TFE} in the builder call (to reflect
@@ -6590,21 +6591,21 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *BI,
 
   // Set up address arguments.
   unsigned OpndIdx = 1;
-  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
-  Addr[Llpc::Builder::ImageAddressIdxCoordinate] =
+  Value *Addr[lgc::Builder::ImageAddressCount] = {};
+  Addr[lgc::Builder::ImageAddressIdxCoordinate] =
       transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
 
   switch (unsigned(BII->getOpCode())) {
   case OpImageGather:
   case OpImageSparseGather:
     // Component for OpImageGather
-    Addr[Llpc::Builder::ImageAddressIdxComponent] =
+    Addr[lgc::Builder::ImageAddressIdxComponent] =
         transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
     break;
   case OpImageDrefGather:
   case OpImageSparseDrefGather:
     // This instruction has a dref operand.
-    Addr[Llpc::Builder::ImageAddressIdxZCompare] =
+    Addr[lgc::Builder::ImageAddressIdxZCompare] =
         transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
     break;
   default:
@@ -6615,16 +6616,16 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *BI,
   setupImageAddressOperands(BII, OpndIdx, /*HasProj=*/false, Addr, &ImageInfo,
                             nullptr);
 
-  if (!Addr[Llpc::Builder::ImageAddressIdxLod] &&
-      !Addr[Llpc::Builder::ImageAddressIdxLodBias] &&
-      !Addr[Llpc::Builder::ImageAddressIdxDerivativeX]) {
+  if (!Addr[lgc::Builder::ImageAddressIdxLod] &&
+      !Addr[lgc::Builder::ImageAddressIdxLodBias] &&
+      !Addr[lgc::Builder::ImageAddressIdxDerivativeX]) {
     // A gather with no lod, bias or derivatives is done with lod 0, not
     // implicit lod. Except that does not happen if there is no lod clamp, and
     // this is a fragment shader, and CapabilityImageGatherBiasLodAMD was
     // declared.
-    if (Addr[Llpc::Builder::ImageAddressIdxLodClamp] ||
+    if (Addr[lgc::Builder::ImageAddressIdxLodClamp] ||
         !EnableGatherLodNz) {
-      Addr[Llpc::Builder::ImageAddressIdxLod] =
+      Addr[lgc::Builder::ImageAddressIdxLod] =
           Constant::getNullValue(getBuilder()->getFloatTy());
     }
   }
@@ -6638,7 +6639,7 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *BI,
     if (ResultTy != OrigResultTy)
       Result = UndefValue::get(cast<StructType>(ResultTy)->getElementType(0));
     for (int Idx = 3; Idx >= 0; --Idx) {
-      Addr[Llpc::Builder::ImageAddressIdxOffset] =
+      Addr[lgc::Builder::ImageAddressIdxOffset] =
           getBuilder()->CreateExtractValue(ConstOffsets, Idx);
       Value *SingleResult = getBuilder()->CreateImageGather(
           ResultTy, ImageInfo.Dim, ImageInfo.Flags, ImageInfo.ImageDesc,
@@ -6698,9 +6699,9 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *BI,
   }
 
   // Set up address arguments.
-  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
+  Value *Addr[lgc::Builder::ImageAddressCount] = {};
   unsigned OpndIdx = 1;
-  Addr[Llpc::Builder::ImageAddressIdxCoordinate] =
+  Addr[lgc::Builder::ImageAddressIdxCoordinate] =
       transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
 
   Value *SampleNum = nullptr;
@@ -6711,7 +6712,7 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *BI,
   handleImageFetchReadWriteCoord(BI, &ImageInfo, Addr);
 
   Value *Result = nullptr;
-  Value *Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
+  Value *Coord = Addr[lgc::Builder::ImageAddressIdxCoordinate];
   if (SampleNum) {
     if (BI->getOpCode() == OpImageFetch ||
         BI->getOpCode() == OpImageSparseFetch ||
@@ -6725,8 +6726,8 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *BI,
     } else {
       // This is an OpImageRead with sample but not subpass data dimension.
       // Append the sample onto the coordinate.
-      assert(ImageInfo.Dim == Llpc::Builder::Dim2DMsaa ||
-             ImageInfo.Dim == Llpc::Builder::Dim2DArrayMsaa);
+      assert(ImageInfo.Dim == lgc::Builder::Dim2DMsaa ||
+             ImageInfo.Dim == lgc::Builder::Dim2DArrayMsaa);
       SampleNum = getBuilder()->CreateInsertElement(
           UndefValue::get(Coord->getType()), SampleNum, uint64_t(0));
       Coord = getBuilder()->CreateShuffleVector(
@@ -6739,7 +6740,7 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *BI,
 
   if (!Result) {
     // We did not do the "load with fmask" above. Do the normal image load now.
-    Value *Lod = Addr[Llpc::Builder::ImageAddressIdxLod];
+    Value *Lod = Addr[lgc::Builder::ImageAddressIdxLod];
     Result =
         getBuilder()->CreateImageLoad(ResultTy, ImageInfo.Dim, ImageInfo.Flags,
                                     ImageInfo.ImageDesc, Coord, Lod);
@@ -6767,9 +6768,9 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *BI,
   getImageDesc(BII->getOpValue(0), &ImageInfo);
 
   // Set up address arguments and get the texel.
-  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
+  Value *Addr[lgc::Builder::ImageAddressCount] = {};
   unsigned OpndIdx = 1;
-  Addr[Llpc::Builder::ImageAddressIdxCoordinate] =
+  Addr[lgc::Builder::ImageAddressIdxCoordinate] =
       transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
   Value *Texel = transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
 
@@ -6780,11 +6781,11 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *BI,
   // Handle fetch/read/write aspects of coordinate.
   handleImageFetchReadWriteCoord(BII, &ImageInfo, Addr);
 
-  Value *Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
+  Value *Coord = Addr[lgc::Builder::ImageAddressIdxCoordinate];
   if (SampleNum) {
     // Append the sample onto the coordinate.
-    assert(ImageInfo.Dim == Llpc::Builder::Dim2DMsaa ||
-           ImageInfo.Dim == Llpc::Builder::Dim2DArrayMsaa);
+    assert(ImageInfo.Dim == lgc::Builder::Dim2DMsaa ||
+           ImageInfo.Dim == lgc::Builder::Dim2DArrayMsaa);
     SampleNum = getBuilder()->CreateInsertElement(
         UndefValue::get(Coord->getType()), SampleNum, uint64_t(0));
     Coord = getBuilder()->CreateShuffleVector(
@@ -6795,7 +6796,7 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *BI,
   }
 
   // Do the image store.
-  Value *Lod = Addr[Llpc::Builder::ImageAddressIdxLod];
+  Value *Lod = Addr[lgc::Builder::ImageAddressIdxLod];
   return getBuilder()->CreateImageStore(Texel, ImageInfo.Dim, ImageInfo.Flags,
                                       ImageInfo.ImageDesc, Coord, Lod);
 }

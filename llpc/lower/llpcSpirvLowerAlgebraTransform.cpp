@@ -48,6 +48,7 @@
 
 #define DEBUG_TYPE "llpc-spirv-lower-algebra-transform"
 
+using namespace lgc;
 using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
@@ -385,7 +386,7 @@ void SpirvLowerAlgebraTransform::visitCallInst(
             builtIn = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
             pValueWritten = callInst.getOperand(0);
         }
-        if (builtIn == BuiltInPosition)
+        if (builtIn == lgc::BuiltInPosition)
         {
             DisableFastMath(pValueWritten);
         }

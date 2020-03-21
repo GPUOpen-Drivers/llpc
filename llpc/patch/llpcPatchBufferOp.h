@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchBufferOp.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchBufferOp.
+ * @brief LLPC header file: contains declaration of class lgc::PatchBufferOp.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -35,7 +35,7 @@
 
 #include "llpcPatch.h"
 
-namespace Llpc
+namespace lgc
 {
 
 class PipelineState;
@@ -107,4 +107,4 @@ private:
     static constexpr uint32_t MinMemOpLoopBytes = 256;
 };
 
-} // Llpc
+} // lgc

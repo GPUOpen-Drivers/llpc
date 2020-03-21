@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatch.cpp
- * @brief LLPC source file: contains implementation of class Llpc::Patch.
+ * @brief LLPC source file: contains implementation of class lgc::Patch.
  ***********************************************************************************************************************
  */
 #include "llvm/Bitcode/BitcodeReader.h"
@@ -83,7 +83,7 @@ opt<bool> UseLlvmOpt("use-llvm-opt",
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -109,7 +109,7 @@ void Patch::AddPasses(
         passMgr.add(pReplayerPass);
     }
 
-    if (raw_ostream* pOuts = GetLlpcOuts())
+    if (raw_ostream* pOuts = GetLgcOuts())
     {
         passMgr.add(createPrintModulePass(*pOuts,
                     "===============================================================================\n"
@@ -229,7 +229,7 @@ void Patch::AddPasses(
     }
 
     // Dump the result
-    if (raw_ostream* pOuts = GetLlpcOuts())
+    if (raw_ostream* pOuts = GetLgcOuts())
     {
         passMgr.add(createPrintModulePass(*pOuts,
                     "===============================================================================\n"
@@ -393,4 +393,4 @@ GlobalVariable* Patch::GetLdsVariable(
     return pLds;
 }
 
-} // Llpc
+} // lgc

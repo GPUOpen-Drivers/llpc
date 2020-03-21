@@ -32,7 +32,7 @@
 
 #define DEBUG_TYPE "llpc-gfx6-chip"
 
-namespace Llpc
+namespace lgc
 {
 
 namespace Gfx6
@@ -470,4 +470,4 @@ const char* GetRegisterNameString(
 
 } // Gfx6
 
-} // Llpc
+} // lgc

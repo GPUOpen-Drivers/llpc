@@ -37,7 +37,7 @@
 #define DEBUG_TYPE "llpc-start-stop-timer"
 
 using namespace llvm;
-using namespace Llpc;
+using namespace lgc;
 
 namespace
 {
@@ -67,7 +67,7 @@ private:
 
 char StartStopTimer::ID = 0;
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Create a start/stop timer pass. This is a static method in BuilderContext, so it can be accessed by

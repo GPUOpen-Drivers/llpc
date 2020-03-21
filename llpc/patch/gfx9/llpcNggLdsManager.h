@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcNggLdsManager.h
- * @brief LLPC header file: contains declaration of class Llpc::NggLdsManager.
+ * @brief LLPC header file: contains declaration of class lgc::NggLdsManager.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -36,7 +36,7 @@
 
 #include "llpcInternal.h"
 
-namespace Llpc
+namespace lgc
 {
 
 class PipelineState;
@@ -132,4 +132,4 @@ private:
     llvm::IRBuilder<>*  m_pBuilder; // LLVM IR builder
 };
 
-} // Llpc
+} // lgc

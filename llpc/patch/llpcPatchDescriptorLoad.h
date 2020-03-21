@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchDescriptorLoad.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchDescriptorLoad.
+ * @brief LLPC header file: contains declaration of class lgc::PatchDescriptorLoad.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -38,7 +38,7 @@
 #include "llpcPipelineState.h"
 #include "llpcSystemValues.h"
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -109,4 +109,4 @@ private:
                                                               // Pipeline state from PipelineStateWrapper pass
 };
 
-} // Llpc
+} // lgc

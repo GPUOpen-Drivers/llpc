@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcGfx6ConfigBuilder.cpp
- * @brief LLPC header file: contains implementation of class Llpc::Gfx6::ConfigBuilder.
+ * @brief LLPC header file: contains implementation of class lgc::Gfx6::ConfigBuilder.
  ***********************************************************************************************************************
  */
 #include "llpcAbiMetadata.h"
@@ -49,7 +49,7 @@ extern opt<bool> InRegEsGsLdsSize;
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 namespace Gfx6
@@ -407,7 +407,7 @@ void ConfigBuilder::BuildVsRegConfig(
 
     if (shaderStage == ShaderStageCopyShader)
     {
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, Llpc::CopyShaderUserSgprCount);
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, lgc::CopyShaderUserSgprCount);
         SetNumAvailSgprs(Util::Abi::HardwareStage::Vs, m_pPipelineState->GetTargetInfo().GetGpuProperty().maxSgprsAvailable);
         SetNumAvailVgprs(Util::Abi::HardwareStage::Vs, m_pPipelineState->GetTargetInfo().GetGpuProperty().maxVgprsAvailable);
 
@@ -1493,4 +1493,4 @@ void ConfigBuilder::SetupVgtTfParam(
 
 } // Gfx6
 
-} // Llpc
+} // lgc

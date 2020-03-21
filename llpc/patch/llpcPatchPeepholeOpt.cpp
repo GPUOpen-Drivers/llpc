@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchPeepholeOpt.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchPeepholeOpt.
+ * @brief LLPC source file: contains implementation of class lgc::PatchPeepholeOpt.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/CFG.h"
@@ -42,7 +42,7 @@
 
 #define DEBUG_TYPE "llpc-patch-peephole-opt"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 namespace llvm
@@ -58,7 +58,7 @@ static opt<bool> EnableDiscardOpt("enable-discard-opt",
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -989,7 +989,7 @@ void PatchPeepholeOpt::insertAfter(
     }
 }
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching operations for peephole optimizations.

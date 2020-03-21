@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcShaderMerger.cpp
- * @brief LLPC source file: contains implementation of class Llpc::ShaderMerger.
+ * @brief LLPC source file: contains implementation of class lgc::ShaderMerger.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/Constants.h"
@@ -43,7 +43,7 @@
 #define DEBUG_TYPE "llpc-shader-merger"
 
 using namespace llvm;
-using namespace Llpc;
+using namespace lgc;
 
 // =====================================================================================================================
 ShaderMerger::ShaderMerger(
@@ -157,7 +157,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
     // Create the entrypoint for the merged shader, and insert it just before the old HS.
     Function* pEntryPoint = Function::Create(pEntryPointTy,
                                              GlobalValue::ExternalLinkage,
-                                             LlpcName::LsHsEntryPoint);
+                                             lgcName::LsHsEntryPoint);
     auto pModule = pHsEntryPoint->getParent();
     pModule->getFunctionList().insert(pHsEntryPoint->getIterator(), pEntryPoint);
 
@@ -629,7 +629,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
     // Create the entrypoint for the merged shader, and insert it just before the old GS.
     Function* pEntryPoint = Function::Create(pEntryPointTy,
                                              GlobalValue::ExternalLinkage,
-                                             LlpcName::EsGsEntryPoint);
+                                             lgcName::EsGsEntryPoint);
     pModule->getFunctionList().insert(pGsEntryPoint->getIterator(), pEntryPoint);
 
     pEntryPoint->addFnAttr("amdgpu-flat-work-group-size", "128,128"); // Force s_barrier to be present (ignore optimization)

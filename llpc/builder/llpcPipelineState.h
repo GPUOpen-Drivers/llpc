@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPipelineState.h
- * @brief LLPC header file: contains declaration of class Llpc::PipelineState
+ * @brief LLPC header file: contains declaration of class lgc::PipelineState
  ***********************************************************************************************************************
  */
 #pragma once
@@ -48,7 +48,7 @@ class Timer;
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 using namespace llvm;
@@ -433,4 +433,4 @@ private:
     std::unique_ptr<PipelineState>  m_allocatedPipelineState;     // Pipeline state allocated by this pass
 };
 
-} // Llpc
+} // lgc

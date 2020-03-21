@@ -198,6 +198,29 @@ uint32_t ShaderStageToMask(
 }
 
 // =====================================================================================================================
+// Convert front-end LLPC shader stage to middle-end LGC shader type
+lgc::ShaderStage GetLgcShaderStage(Llpc::ShaderStage stage)
+{
+    switch (stage)
+    {
+    case ShaderStageCompute:
+        return lgc::ShaderStageCompute;
+    case ShaderStageVertex:
+        return lgc::ShaderStageVertex;
+    case ShaderStageTessControl:
+        return lgc::ShaderStageTessControl;
+    case ShaderStageTessEval:
+        return lgc::ShaderStageTessEval;
+    case ShaderStageGeometry:
+        return lgc::ShaderStageGeometry;
+    case ShaderStageFragment:
+        return lgc::ShaderStageFragment;
+    default:
+        llvm_unreachable("");
+    }
+}
+
+// =====================================================================================================================
 // Create directory.
 bool CreateDirectory(
     const char* pDir)  // [in] the path of directory

@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchInOutImportExport.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchInOutImportExport.
+ * @brief LLPC header file: contains declaration of class lgc::PatchInOutImportExport.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -41,7 +41,7 @@
 
 #include <set>
 
-namespace Llpc
+namespace lgc
 {
 
 class FragColorExport;
@@ -352,4 +352,4 @@ private:
     std::set<uint32_t>       m_expLocs; // The locations that already have an export instruction for the vertex shader.
 };
 
-} // Llpc
+} // lgc

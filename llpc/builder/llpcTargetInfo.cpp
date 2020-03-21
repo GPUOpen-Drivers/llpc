@@ -32,7 +32,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/CommandLine.h"
 
-using namespace Llpc;
+using namespace lgc;
 using namespace llvm;
 
 // -native-wave-size: an option to override hardware native wave size, it will allow compiler to choose

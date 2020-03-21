@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatch.h
- * @brief LLPC header file: contains declaration of class Llpc::Patch.
+ * @brief LLPC header file: contains declaration of class lgc::Patch.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -65,7 +65,7 @@ void initializePatchSetupTargetFeaturesPass(PassRegistry&);
 
 } // llvm
 
-namespace Llpc
+namespace lgc
 {
 
 using namespace llvm;
@@ -153,4 +153,4 @@ private:
     Patch(const Patch&) = delete;
     Patch& operator=(const Patch&) = delete;
 };
-} // Llpc
+} // lgc

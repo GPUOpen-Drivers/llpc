@@ -36,10 +36,15 @@
 
 #include "llpc.h"
 
-namespace Llpc
+namespace lgc
 {
 
 class PassManager;
+
+} // lgc
+
+namespace Llpc
+{
 
 // =====================================================================================================================
 // Enumerates the kinds of timer used to do profiling for LLPC compilation phases.
@@ -64,7 +69,7 @@ public:
 
     ~TimerProfiler();
 
-    void AddTimerStartStopPass(PassManager* pPassMgr, TimerKind timerKind, bool start);
+    void AddTimerStartStopPass(lgc::PassManager* pPassMgr, TimerKind timerKind, bool start);
 
     void StartStopTimer(TimerKind name, bool start);
 

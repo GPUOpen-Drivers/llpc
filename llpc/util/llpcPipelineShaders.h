@@ -30,11 +30,12 @@
  */
 #pragma once
 
+#include "llpcBuilderCommon.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Pass.h"
 #include <map>
 
-namespace Llpc
+namespace lgc
 {
 
 // =====================================================================================================================
@@ -70,4 +71,4 @@ private:
 
 llvm::ModulePass* CreatePipelineShaders();
 
-} // Llpc
+} // lgc

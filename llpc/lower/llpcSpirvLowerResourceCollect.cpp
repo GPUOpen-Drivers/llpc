@@ -41,6 +41,7 @@
 
 #define DEBUG_TYPE "llpc-spirv-lower-resource-collect"
 
+using namespace lgc;
 using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;

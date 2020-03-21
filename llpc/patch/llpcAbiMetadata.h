@@ -32,7 +32,7 @@
 
 #include "palPipelineAbi.h"
 
-namespace Llpc
+namespace lgc
 {
 
 // Represents pseudo hardware registers.
@@ -166,4 +166,4 @@ static const char* const HwStageNames[] =
     ".cs"
 };
 
-} // Llpc
+} // lgc
