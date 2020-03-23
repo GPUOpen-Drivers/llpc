@@ -48,12 +48,12 @@ enum NggLdsRegionType
     LdsRegionDistribPrimId = 0,         // Distributed primitive ID (a special region, overlapped with the region of
                                         //   position data in NGG non pass-through mode)
     LdsRegionPosData,                   // Position data to export
-    LdsRegionDrawFlag,                  // Draw flag indicating whether the primitive survives
+    LdsRegionDrawFlag,                  // Draw flag indicating whether the vertex survives
     LdsRegionPrimCountInWaves,          // Primitive count accumulated per wave (8 potential waves) and per sub-group
     LdsRegionVertCountInWaves,          // Vertex count accumulated per wave (8 potential waves) and per sub-group
     LdsRegionCullDistance,              // Aggregated sign value of cull distance (bitmask)
     // Below regions are for vertex compaction
-    LdsRegionCompactThreadIdInSubgroup, // Thread ID in sub-group to export primitive data
+    LdsRegionVertThreadIdMap,           // Vertex thread ID map (uncompacted -> compacted)
     LdsRegionCompactVertexId,           // Vertex ID (VS only)
     LdsRegionCompactInstanceId,         // Instance ID (VS only)
     LdsRegionCompactPrimId,             // Primitive ID (VS only)
@@ -62,7 +62,7 @@ enum NggLdsRegionType
     LdsRegionCompactPatchId,            // Patch ID (TES only)
     LdsRegionCompactRelPatchId,         // Relative patch ID (TES only)
 
-    LdsRegionCompactBeginRange = LdsRegionCompactThreadIdInSubgroup,
+    LdsRegionCompactBeginRange = LdsRegionVertThreadIdMap,
     LdsRegionCompactEndRange = LdsRegionCompactRelPatchId,
 
     LdsRegionEsBeginRange = LdsRegionDistribPrimId,

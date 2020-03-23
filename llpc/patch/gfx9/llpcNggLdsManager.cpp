@@ -68,7 +68,7 @@ const uint32_t NggLdsManager::LdsRegionSizes[LdsRegionCount] =
     // 1 DWORD (uint32_t) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionCullDistance
     // 1 BYTE (uint8_t) per thread
-    Gfx9::NggMaxThreadsPerSubgroup,                                   // LdsRegionCompactThreadIdInSubgroup
+    Gfx9::NggMaxThreadsPerSubgroup,                                   // LdsRegionVertThreadIdMap
     // 1 DWORD (uint32_t) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionCompactVertexId
     // 1 DWORD (uint32_t) per thread
@@ -109,7 +109,7 @@ const char* NggLdsManager::LdsRegionNames[LdsRegionCount] =
     "Primitive count in waves",             // LdsRegionPrimCountInWaves
     "Vertex count in waves",                // LdsRegionVertCountInWaves
     "Cull distance",                        // LdsRegionCullDistance
-    "Compacted thread ID in sub-group",     // LdsRegionCompactThreadIdInSubgroup
+    "Vertex thread ID map",                 // LdsRegionVertThreadIdMap
     "Compacted vertex ID (VS)",             // LdsRegionCompactVertexId
     "Compacted instance ID (VS)",           // LdsRegionCompactInstanceId
     "Compacted primitive ID (VS)",          // LdsRegionCompactPrimId
@@ -120,9 +120,9 @@ const char* NggLdsManager::LdsRegionNames[LdsRegionCount] =
 
     // LDS region name for ES-GS
     "ES-GS ring",                           // LdsRegionEsGsRing
-    "GS output primitive data",             // LdsRegionOutPrimData
-    "GS output vertex count in waves",      // LdsRegionOutVertCountInWaves
-    "GS output vertex offset",              // LdsRegionOutVertOffset
+    "GS out primitive data",                // LdsRegionOutPrimData
+    "GS out vertex count in waves",         // LdsRegionOutVertCountInWaves
+    "GS out vertex offset",                 // LdsRegionOutVertOffset
     "GS-VS ring",                           // LdsRegionGsVsRing
 };
 
@@ -238,12 +238,12 @@ NggLdsManager::NggLdsManager(
             // | Distributed primitive ID |           | Primitive count (in waves) |
             // +--------------------------+           +----------------------------+
             //
-            //     | =============== Compacted data region (for vertex compaction) ================ |
-            //     +------------------+-------------+-------------+-------------+
-            // >>> | Vertex thread ID | Vertex ID   | Instance ID | Primtive ID |                     (VS)
-            //     +------------------+-------------+-------------+-------------+-------------------+
-            //                        | Tesscoord X | Tesscoord Y | Patch ID    | Relative patch ID | (TES)
-            //                        +-------------+-------------+-------------+-------------------+
+            //                            | ====== Compacted data region (for vertex compaction) ====== |
+            //     +----------------------+-------------+-------------+-------------+
+            // >>> | Vertex thread ID map | Vertex ID   | Instance ID | Primtive ID |                     (VS)
+            //     +----------------------+-------------+-------------+-------------+-------------------+
+            //                            | Tesscoord X | Tesscoord Y | Patch ID    | Relative patch ID | (TES)
+            //                            +-------------+-------------+-------------+-------------------+
             //
             uint32_t ldsRegionStart = 0;
             for (uint32_t region = LdsRegionEsBeginRange; region <= LdsRegionEsEndRange; ++region)
