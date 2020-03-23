@@ -190,7 +190,8 @@ Value* BuilderImplSubgroup::CreateSubgroupBallot(
     // Ballot expects a <4 x i32> return, so we need to turn the i64 into that.
     pBallot = CreateBitCast(pBallot, VectorType::get(getInt32Ty(), 2));
 
-    return CreateShuffleVector(pBallot, ConstantVector::getSplat(2, getInt32(0)), { 0, 1, 2, 3 });
+    ElementCount elementCount = pBallot->getType()->getVectorElementCount();
+    return CreateShuffleVector(pBallot, ConstantVector::getSplat(elementCount, getInt32(0)), { 0, 1, 2, 3 });
 }
 
 // =====================================================================================================================

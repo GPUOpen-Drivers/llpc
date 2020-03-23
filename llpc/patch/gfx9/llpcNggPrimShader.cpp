@@ -1065,7 +1065,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
             auto pZero = m_pBuilder->getInt32(0);
 
             // Zero per-wave primitive/vertex count
-            auto pZeros = ConstantVector::getSplat(Gfx9::NggMaxWavesPerSubgroup, pZero);
+            auto pZeros = ConstantVector::getSplat({Gfx9::NggMaxWavesPerSubgroup, false}, pZero);
 
             auto pLdsOffset = m_pBuilder->getInt32(regionStart);
             m_pLdsManager->WriteValueToLds(pZeros, pLdsOffset);
@@ -2187,7 +2187,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
             if (i == rasterStream)
             {
                 // Zero per-wave GS output vertex count
-                auto pZeros = ConstantVector::getSplat(Gfx9::NggMaxWavesPerSubgroup, pZero);
+                auto pZeros = ConstantVector::getSplat({Gfx9::NggMaxWavesPerSubgroup, false}, pZero);
 
                 auto pLdsOffset =
                     m_pBuilder->getInt32(regionStart + i * SizeOfDword * (Gfx9::NggMaxWavesPerSubgroup + 1));
