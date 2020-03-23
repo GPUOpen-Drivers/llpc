@@ -1503,35 +1503,24 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                 // Write thread ID in sub-group to LDS
                 Value* pCompactThreadId =
                     m_pBuilder->CreateTrunc(pCompactThreadIdInSubrgoup, m_pBuilder->getInt8Ty());
-                WriteCompactDataToLds(pCompactThreadId,
-                                      m_nggFactor.pThreadIdInSubgroup,
-                                      LdsRegionCompactThreadIdInSubgroup);
+                WritePerThreadDataToLds(pCompactThreadId, m_nggFactor.pThreadIdInSubgroup, LdsRegionVertThreadIdMap);
 
                 if (hasTs)
                 {
                     // Write X/Y of tessCoord (U/V) to LDS
                     if (pResUsage->builtInUsage.tes.tessCoord)
                     {
-                        WriteCompactDataToLds(pTessCoordX,
-                                              pCompactThreadIdInSubrgoup,
-                                              LdsRegionCompactTessCoordX);
-
-                        WriteCompactDataToLds(pTessCoordY,
-                                              pCompactThreadIdInSubrgoup,
-                                              LdsRegionCompactTessCoordY);
+                        WritePerThreadDataToLds(pTessCoordX, pCompactThreadIdInSubrgoup, LdsRegionCompactTessCoordX);
+                        WritePerThreadDataToLds(pTessCoordY, pCompactThreadIdInSubrgoup, LdsRegionCompactTessCoordY);
                     }
 
                     // Write relative patch ID to LDS
-                    WriteCompactDataToLds(pRelPatchId,
-                                          pCompactThreadIdInSubrgoup,
-                                          LdsRegionCompactRelPatchId);
+                    WritePerThreadDataToLds(pRelPatchId, pCompactThreadIdInSubrgoup, LdsRegionCompactRelPatchId);
 
                     // Write patch ID to LDS
                     if (pResUsage->builtInUsage.tes.primitiveId)
                     {
-                        WriteCompactDataToLds(pPatchId,
-                                              pCompactThreadIdInSubrgoup,
-                                              LdsRegionCompactPatchId);
+                        WritePerThreadDataToLds(pPatchId, pCompactThreadIdInSubrgoup, LdsRegionCompactPatchId);
                     }
                 }
                 else
@@ -1539,26 +1528,22 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                     // Write vertex ID to LDS
                     if (pResUsage->builtInUsage.vs.vertexIndex)
                     {
-                        WriteCompactDataToLds(pVertexId,
-                                              pCompactThreadIdInSubrgoup,
-                                              LdsRegionCompactVertexId);
+                        WritePerThreadDataToLds(pVertexId, pCompactThreadIdInSubrgoup, LdsRegionCompactVertexId);
                     }
 
                     // Write instance ID to LDS
                     if (pResUsage->builtInUsage.vs.instanceIndex)
                     {
-                        WriteCompactDataToLds(pInstanceId,
-                                              pCompactThreadIdInSubrgoup,
-                                              LdsRegionCompactInstanceId);
+                        WritePerThreadDataToLds(pInstanceId, pCompactThreadIdInSubrgoup, LdsRegionCompactInstanceId);
                     }
 
                     // Write primitive ID to LDS
                     if (pResUsage->builtInUsage.vs.primitiveId)
                     {
                         assert(m_nggFactor.pPrimitiveId != nullptr);
-                        WriteCompactDataToLds(m_nggFactor.pPrimitiveId,
-                                              pCompactThreadIdInSubrgoup,
-                                              LdsRegionCompactPrimId);
+                        WritePerThreadDataToLds(m_nggFactor.pPrimitiveId,
+                                                pCompactThreadIdInSubrgoup,
+                                                LdsRegionCompactPrimId);
                     }
                 }
 
@@ -2837,19 +2822,19 @@ void NggPrimShader::DoPrimitiveExport(
             {
                 m_pBuilder->SetInsertPoint(pReadCompactIdBlock);
 
-                pCompactVertexId0 = ReadCompactDataFromLds(m_pBuilder->getInt8Ty(),
-                                                           pVertexId0,
-                                                           LdsRegionCompactThreadIdInSubgroup);
+                pCompactVertexId0 = ReadPerThreadDataFromLds(m_pBuilder->getInt8Ty(),
+                                                             pVertexId0,
+                                                             LdsRegionVertThreadIdMap);
                 pCompactVertexId0 = m_pBuilder->CreateZExt(pCompactVertexId0, m_pBuilder->getInt32Ty());
 
-                pCompactVertexId1 = ReadCompactDataFromLds(m_pBuilder->getInt8Ty(),
-                                                           pVertexId1,
-                                                           LdsRegionCompactThreadIdInSubgroup);
+                pCompactVertexId1 = ReadPerThreadDataFromLds(m_pBuilder->getInt8Ty(),
+                                                             pVertexId1,
+                                                             LdsRegionVertThreadIdMap);
                 pCompactVertexId1 = m_pBuilder->CreateZExt(pCompactVertexId1, m_pBuilder->getInt32Ty());
 
-                pCompactVertexId2 = ReadCompactDataFromLds(m_pBuilder->getInt8Ty(),
-                                                           pVertexId2,
-                                                           LdsRegionCompactThreadIdInSubgroup);
+                pCompactVertexId2 = ReadPerThreadDataFromLds(m_pBuilder->getInt8Ty(),
+                                                             pVertexId2,
+                                                             LdsRegionVertThreadIdMap);
                 pCompactVertexId2 = m_pBuilder->CreateZExt(pCompactVertexId2, m_pBuilder->getInt32Ty());
 
                 m_pBuilder->CreateBr(pExpPrimContBlock);
@@ -3068,49 +3053,49 @@ void NggPrimShader::RunEsOrEsVariant(
         {
             if (pResUsage->builtInUsage.tes.tessCoord)
             {
-                pTessCoordX = ReadCompactDataFromLds(m_pBuilder->getFloatTy(),
-                                                     m_nggFactor.pThreadIdInSubgroup,
-                                                     LdsRegionCompactTessCoordX);
+                pTessCoordX = ReadPerThreadDataFromLds(m_pBuilder->getFloatTy(),
+                                                       m_nggFactor.pThreadIdInSubgroup,
+                                                       LdsRegionCompactTessCoordX);
 
-                pTessCoordY = ReadCompactDataFromLds(m_pBuilder->getFloatTy(),
-                                                     m_nggFactor.pThreadIdInSubgroup,
-                                                     LdsRegionCompactTessCoordY);
+                pTessCoordY = ReadPerThreadDataFromLds(m_pBuilder->getFloatTy(),
+                                                       m_nggFactor.pThreadIdInSubgroup,
+                                                       LdsRegionCompactTessCoordY);
             }
 
-            pRelPatchId = ReadCompactDataFromLds(m_pBuilder->getInt32Ty(),
-                                                 m_nggFactor.pThreadIdInSubgroup,
-                                                 LdsRegionCompactRelPatchId);
+            pRelPatchId = ReadPerThreadDataFromLds(m_pBuilder->getInt32Ty(),
+                                                   m_nggFactor.pThreadIdInSubgroup,
+                                                   LdsRegionCompactRelPatchId);
 
             if (pResUsage->builtInUsage.tes.primitiveId)
             {
-                pPatchId = ReadCompactDataFromLds(m_pBuilder->getInt32Ty(),
-                                                  m_nggFactor.pThreadIdInSubgroup,
-                                                  LdsRegionCompactPatchId);
+                pPatchId = ReadPerThreadDataFromLds(m_pBuilder->getInt32Ty(),
+                                                    m_nggFactor.pThreadIdInSubgroup,
+                                                    LdsRegionCompactPatchId);
             }
         }
         else
         {
             if (pResUsage->builtInUsage.vs.vertexIndex)
             {
-                pVertexId = ReadCompactDataFromLds(m_pBuilder->getInt32Ty(),
-                                                   m_nggFactor.pThreadIdInSubgroup,
-                                                   LdsRegionCompactVertexId);
+                pVertexId = ReadPerThreadDataFromLds(m_pBuilder->getInt32Ty(),
+                                                     m_nggFactor.pThreadIdInSubgroup,
+                                                     LdsRegionCompactVertexId);
             }
 
             // NOTE: Relative vertex ID Will not be used when VS is merged to GS.
 
             if (pResUsage->builtInUsage.vs.primitiveId)
             {
-                pVsPrimitiveId = ReadCompactDataFromLds(m_pBuilder->getInt32Ty(),
-                                                        m_nggFactor.pThreadIdInSubgroup,
-                                                        LdsRegionCompactPrimId);
+                pVsPrimitiveId = ReadPerThreadDataFromLds(m_pBuilder->getInt32Ty(),
+                                                          m_nggFactor.pThreadIdInSubgroup,
+                                                          LdsRegionCompactPrimId);
             }
 
             if (pResUsage->builtInUsage.vs.instanceIndex)
             {
-                pInstanceId = ReadCompactDataFromLds(m_pBuilder->getInt32Ty(),
-                                                     m_nggFactor.pThreadIdInSubgroup,
-                                                     LdsRegionCompactInstanceId);
+                pInstanceId = ReadPerThreadDataFromLds(m_pBuilder->getInt32Ty(),
+                                                       m_nggFactor.pThreadIdInSubgroup,
+                                                       LdsRegionCompactInstanceId);
             }
         }
     }
@@ -4653,11 +4638,11 @@ void NggPrimShader::ReviseOutputPrimitiveData(
 }
 
 // =====================================================================================================================
-// Reads the specified data from NGG compaction data region in LDS.
-Value* NggPrimShader::ReadCompactDataFromLds(
+// Reads per-thread data from the specified NGG region in LDS.
+Value* NggPrimShader::ReadPerThreadDataFromLds(
     Type*             pReadDataTy,  // [in] Data written to LDS
     Value*            pThreadId,    // [in] Thread ID in sub-group to calculate LDS offset
-    NggLdsRegionType  region)       // NGG compaction data region
+    NggLdsRegionType  region)       // NGG LDS region
 {
     auto sizeInBytes = pReadDataTy->getPrimitiveSizeInBits() / 8;
 
@@ -4678,11 +4663,11 @@ Value* NggPrimShader::ReadCompactDataFromLds(
 }
 
 // =====================================================================================================================
-// Writes the specified data to NGG compaction data region in LDS.
-void NggPrimShader::WriteCompactDataToLds(
+// Writes the per-thread data to the specified NGG region in LDS.
+void NggPrimShader::WritePerThreadDataToLds(
     Value*           pWriteData,        // [in] Data written to LDS
     Value*           pThreadId,         // [in] Thread ID in sub-group to calculate LDS offset
-    NggLdsRegionType region)            // NGG compaction data region
+    NggLdsRegionType region)            // NGG LDS region
 {
     auto pWriteDataTy = pWriteData->getType();
     auto sizeInBytes = pWriteDataTy->getPrimitiveSizeInBits() / 8;

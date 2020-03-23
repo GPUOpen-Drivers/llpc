@@ -139,13 +139,13 @@ private:
 
     void ReviseOutputPrimitiveData(llvm::Value* pOutPrimId, llvm::Value* pVertexIdAdjust);
 
-    llvm::Value* ReadCompactDataFromLds(llvm::Type*       pReadDataTy,
-                                        llvm::Value*      pThreadId,
-                                        NggLdsRegionType  region);
+    llvm::Value* ReadPerThreadDataFromLds(llvm::Type*       pReadDataTy,
+                                          llvm::Value*      pThreadId,
+                                          NggLdsRegionType  region);
 
-    void WriteCompactDataToLds(llvm::Value*      pWriteData,
-                               llvm::Value*      pThreadId,
-                               NggLdsRegionType  region);
+    void WritePerThreadDataToLds(llvm::Value*      pWriteData,
+                                 llvm::Value*      pThreadId,
+                                 NggLdsRegionType  region);
 
     llvm::Value* DoBackfaceCulling(llvm::Module*     pModule,
                                    llvm::Value*      pCullFlag,
