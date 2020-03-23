@@ -248,9 +248,9 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
             pBuilder->SetInsertPoint(&binaryOp);
 
             auto pOne = ConstantFP::get(Type::getHalfTy(*m_pContext), 1.0);
-            if (pDestTy->isVectorTy())
+            if (auto pVecTy = dyn_cast<VectorType>(pDestTy))
             {
-                pOne = ConstantVector::getSplat(pDestTy->getVectorNumElements(), pOne);
+                pOne = ConstantVector::getSplat(pVecTy->getElementCount(), pOne);
             }
 
             // -trunc(x * 1/y)
