@@ -55,63 +55,6 @@ struct ShaderModuleBuildInfo
     ShaderModuleOptions  options;           ///< Per shader module options
 };
 
-/// Enumerates types of shader binary.
-enum class BinaryType : uint32_t
-{
-    Unknown = 0,  ///< Invalid type
-    Spirv,        ///< SPIR-V binary
-    LlvmBc,       ///< LLVM bitcode
-    MultiLlvmBc,  ///< Multiple LLVM bitcode
-    Elf,          ///< ELF
-};
-
-/// Represents usage info of a shader module
-struct ShaderModuleUsage
-{
-    bool                  enableVarPtrStorageBuf;  ///< Whether to enable "VariablePointerStorageBuffer" capability
-    bool                  enableVarPtr;            ///< Whether to enable "VariablePointer" capability
-    bool                  useSubgroupSize;         ///< Whether gl_SubgroupSize is used
-    bool                  useHelpInvocation;       ///< Whether fragment shader has helper-invocation for subgroup
-    bool                  useSpecConstant;         ///< Whether specializaton constant is used
-    bool                  keepUnusedFunctions;     ///< Whether to keep unused function
-};
-
-/// Represents common part of shader module data
-struct ShaderModuleData
-{
-    uint32_t         hash[4];       ///< Shader hash code
-    BinaryType       binType;       ///< Shader binary type
-    BinaryData       binCode;       ///< Shader binary data
-    uint32_t         cacheHash[4];  ///< Hash code for calculate pipeline cache key
-    ShaderModuleUsage usage;        ///< Usage info of a shader module
-};
-
-/// Represents fragment shader output info
-struct FsOutInfo
-{
-    uint32_t    location;       ///< Output location in resource layout
-    uint32_t    index;          ///< Output index in resource layout
-    BasicType   basicType;      ///< Output data type
-    uint32_t    componentCount; ///< Count of components of output data
-};
-
-/// Represents extended output of building a shader module (taking extra data info)
-struct ShaderModuleDataEx
-{
-    ShaderModuleData        common;         ///< Shader module common data
-    uint32_t                codeOffset;     ///< Binary offset of binCode in ShaderModuleDataEx
-    uint32_t                entryOffset;    ///< Shader entry offset in ShaderModuleDataEx
-    uint32_t                resNodeOffset;  ///< Resource node offset in ShaderModuleDataEX
-    uint32_t                fsOutInfoOffset;///< FsOutInfo offset in ShaderModuleDataEX
-    struct
-    {
-        uint32_t              fsOutInfoCount;           ///< Count of fragment shader output
-        const FsOutInfo*      pFsOutInfos;              ///< Fragment output info array
-        uint32_t              entryCount;              ///< Shader entry count in the module
-        ShaderModuleEntryData entryDatas[1];           ///< Array of all shader entries in this module
-    } extra;                              ///< Represents extra part of shader module data
-};
-
 /// Represents output of building a shader module.
 struct ShaderModuleBuildOut
 {
