@@ -34,7 +34,6 @@
 #include "spirv.hpp"
 
 #include "llpc.h"
-#include "llpcBuilderCommon.h"
 
 namespace Llpc
 {
@@ -64,9 +63,6 @@ spv::ExecutionModel ConvertToExecModel(ShaderStage shaderStage);
 
 // Convert SPIR-V execution model to the shader stage
 ShaderStage ConvertToStageShage(uint32_t execModel);
-
-// Convert front-end LLPC shader stage to middle-end LGC shader stage
-lgc::ShaderStage GetLgcShaderStage(ShaderStage stage);
 
 // =====================================================================================================================
 // Gets module ID according to the index
