@@ -31,6 +31,7 @@
 #pragma once
 
 #include "llpc.h"
+#include "llpcBuilderCommon.h"
 #include "llpcElfReader.h"
 #include "llpcMetroHash.h"
 #include "llpcShaderCacheManager.h"
@@ -197,5 +198,8 @@ private:
     static llvm::sys::Mutex       m_contextPoolMutex; // Mutex for context pool access
     static std::vector<Context*>* m_pContextPool;      // Context pool
 };
+
+// Convert front-end LLPC shader stage to middle-end LGC shader stage
+lgc::ShaderStage GetLgcShaderStage(ShaderStage stage);
 
 } // Llpc
