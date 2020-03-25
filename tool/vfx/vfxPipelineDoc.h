@@ -62,7 +62,7 @@ private:
     VfxPipelineState m_pipelineState;                         // Contants the render state
     VkPipelineVertexInputStateCreateInfo m_vertexInputState;
     std::vector<Vfx::ShaderSource> m_shaderSources;
-    std::vector<PipelineShaderInfo> m_shaderInfos;
+    std::vector<Vkgc::PipelineShaderInfo> m_shaderInfos;
 };
 
 }

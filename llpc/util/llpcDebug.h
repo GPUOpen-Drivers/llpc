@@ -46,15 +46,6 @@ namespace MetroHash { struct Hash; };
 namespace Llpc
 {
 
-struct ComputePipelineBuildInfo;
-struct GraphicsPipelineBuildInfo;
-struct BinaryData;
-struct Elf64;
-struct Elf32;
-struct GfxIpVersion;
-
-template<class Elf> class ElfReader;
-
 // Gets the value of option "enable-outs"
 bool EnableOuts();
 

@@ -83,7 +83,7 @@ inline uint32_t Compact32(uint64_t hash)
 // Takes input parameter ShaderHash, which is a struct consisting of 2 quad words to be compacted.
 //
 // Returns 32-bit hash value based on the input 128-bit hash.
-inline uint32_t Compact32(Llpc::ShaderHash hash)
+inline uint32_t Compact32(Vkgc::ShaderHash hash)
 {
     return (static_cast<uint32_t>(hash.lower) ^ static_cast<uint32_t>(hash.lower >> 32)
         ^ static_cast<uint32_t>(hash.upper) ^ static_cast<uint32_t>(hash.upper >> 32));

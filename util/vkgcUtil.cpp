@@ -36,7 +36,7 @@
 
 #define DEBUG_TYPE "vkgc-util"
 
-namespace Llpc
+namespace Vkgc
 {
 
 // =====================================================================================================================
@@ -133,4 +133,4 @@ const char* GetResourceMappingNodeTypeName(
     return pString;
 }
 
-} // Llpc
+} // Vkgc

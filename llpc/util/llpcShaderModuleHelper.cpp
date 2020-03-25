@@ -32,7 +32,6 @@
 #include "llpcDebug.h"
 #include "llpcUtil.h"
 #include "spirvExt.h"
-#include "vkgcUtil.h"
 #include <unordered_set>
 #include <set>
 

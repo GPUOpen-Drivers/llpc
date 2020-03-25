@@ -30,7 +30,7 @@
  */
 #include "llpcPipelineDumper.h"
 
-namespace Llpc
+namespace Vkgc
 {
 
 // A single register in the pipelineDumperRegs table
@@ -437,4 +437,4 @@ const char* PipelineDumper::GetRegisterNameString(
     return "";
 }
 
-} // Llpc
+} // Vkgc

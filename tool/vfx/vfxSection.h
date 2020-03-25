@@ -1102,7 +1102,7 @@ private:
 class SectionPipelineOption : public Section
 {
 public:
-    typedef Llpc::PipelineOptions SubState;
+    typedef Vkgc::PipelineOptions SubState;
 
     SectionPipelineOption() :
         Section(m_addrTable, MemberCount, SectionTypeUnset, "options")
@@ -1135,7 +1135,7 @@ private:
 class SectionShaderOption : public Section
 {
 public:
-    typedef Llpc::PipelineShaderOptions SubState;
+    typedef Vkgc::PipelineShaderOptions SubState;
 
     SectionShaderOption() :
         Section(m_addrTable, MemberCount, SectionTypeUnset, "options")
@@ -1187,7 +1187,7 @@ private:
 class SectionNggState : public Section
 {
 public:
-    typedef Llpc::NggState SubState;
+    typedef Vkgc::NggState SubState;
 
     SectionNggState() :
         Section(m_addrTable, MemberCount, SectionTypeUnset, "nggState")
@@ -1267,14 +1267,14 @@ public:
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState,
                                        colorBuffer,
                                        MemberTypeColorBufferItem,
-                                       MaxColorTargets,
+                                       Vkgc::MaxColorTargets,
                                        true);
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(const std::string& docFilename, SubState& state, std::string* pErrorMsg)
     {
-        for (uint32_t i = 0; i < MaxColorTargets; ++i)
+        for (uint32_t i = 0; i < Vkgc::MaxColorTargets; ++i)
         {
             colorBuffer[i].GetSubState(m_state.colorBuffer[i]);
         }
@@ -1288,7 +1288,7 @@ private:
     static const uint32_t  MemberCount = 22;
     static StrToMemberAddr m_addrTable[MemberCount];
     SubState               m_state;
-    SectionColorBuffer     colorBuffer[MaxColorTargets]; // Color buffer
+    SectionColorBuffer     colorBuffer[Vkgc::MaxColorTargets]; // Color buffer
     SectionPipelineOption  options;
 };
 
@@ -1595,7 +1595,7 @@ private:
 class SectionDescriptorRangeValueItem : public Section
 {
 public:
-    typedef DescriptorRangeValue SubState;
+    typedef Vkgc::DescriptorRangeValue SubState;
 
     SectionDescriptorRangeValueItem() :
         Section(m_addrTable, MemberCount, SectionTypeUnset, "descriptorRangeValue")
@@ -1637,7 +1637,7 @@ private:
 class SectionResourceMappingNode : public Section
 {
 public:
-    typedef ResourceMappingNode SubState;
+    typedef Vkgc::ResourceMappingNode SubState;
     SectionResourceMappingNode() :
         Section(m_addrTable, MemberCount, SectionTypeUnset, "userDataNode")
     {
@@ -1674,7 +1674,7 @@ public:
 
     void GetSubState(SubState& state)
     {
-        if (m_state.type == ResourceMappingNodeType::DescriptorTableVaPtr)
+        if (m_state.type == Vkgc::ResourceMappingNodeType::DescriptorTableVaPtr)
         {
             m_nextNodeBuf.resize(next.size());
             for (uint32_t i = 0; i < next.size(); ++i)
@@ -1701,7 +1701,7 @@ private:
 class SectionShaderInfo : public Section
 {
 public:
-    typedef PipelineShaderInfo SubState;
+    typedef Vkgc::PipelineShaderInfo SubState;
     SectionShaderInfo(SectionType sectionType) :
         Section(m_addrTable, MemberCount, sectionType, nullptr)
     {
@@ -1765,8 +1765,8 @@ private:
     std::vector<SectionResourceMappingNode>      userDataNode;            // Contains user data node
 
     VkSpecializationInfo                         m_specializationInfo;
-    std::vector<DescriptorRangeValue>            m_descriptorRangeValues;
-    std::vector<ResourceMappingNode>             m_userDataNodes;
+    std::vector<Vkgc::DescriptorRangeValue>      m_descriptorRangeValues;
+    std::vector<Vkgc::ResourceMappingNode>       m_userDataNodes;
 };
 
 }

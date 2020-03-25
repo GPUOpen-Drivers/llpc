@@ -59,6 +59,10 @@
 #error LLPC client version is too old
 #endif
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 39
+#define Vkgc Llpc
+#endif
+
 //**
 //**********************************************************************************************************************
 //* @page VersionHistory
@@ -66,6 +70,7 @@
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
 //* |     40.0 | Added DescriptorReserved12, which moves DescriptorYCbCrSampler down to 13                             |
+//* |     39.0 | Non-LLPC-specific XGL code should #include vkcgDefs.h instead of llpc.h                               |
 //* |     38.2 | Added scalarThreshold to PipelineShaderOptions                                                        |
 //* |     38.1 | Added unrollThreshold to PipelineShaderOptions                                                        |
 //* |     38.0 | Removed CreateShaderCache in ICompiler and pShaderCache in pipeline build info                        |
@@ -96,7 +101,7 @@
 //*
 //**/
 
-namespace Llpc
+namespace Vkgc
 {
 
 static const uint32_t  Version = LLPC_INTERFACE_MAJOR_VERSION;
@@ -763,4 +768,4 @@ public:
 
 };
 
-} // Llpc
+} // Vkgc

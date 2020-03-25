@@ -38,6 +38,12 @@ namespace llvm { namespace msgpack { class MapDocNode; } }
 namespace Llpc
 {
 
+using Vkgc::ElfNote;
+using Vkgc::ElfSymbol;
+using Vkgc::ElfPackage;
+using Vkgc::ElfReader;
+using Vkgc::ElfSectionBuffer;
+
 // Forward declaration
 class Context;
 

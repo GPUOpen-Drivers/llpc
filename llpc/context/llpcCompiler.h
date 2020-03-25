@@ -54,6 +54,9 @@ class PassManager;
 namespace Llpc
 {
 
+using Vkgc::ElfPackage;
+using Vkgc::FindVkStructInChain;
+
 // Forward declaration
 class Compiler;
 class ComputeContext;

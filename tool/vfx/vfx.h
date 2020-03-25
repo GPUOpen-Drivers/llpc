@@ -44,8 +44,6 @@
 
 #define VFXAPI
 
-using namespace Llpc;
-
 extern int Snprintf(char* pOutput, size_t bufSize, const char* pFormat, ...);
 
 namespace Vfx
@@ -339,7 +337,7 @@ typedef struct IUFValue_
 // Represents the shader binary data
 struct ShaderSource
 {
-    Llpc::ShaderStage     stage;      // Shader stage
+    Vkgc::ShaderStage     stage;      // Shader stage
     uint32_t              dataSize;   // Size of the shader binary data
     uint8_t*              pData;      // Shader binary data
 };
@@ -577,11 +575,11 @@ struct GraphicsPipelineState
     uint32_t    dualSourceBlendEnable;        // Blend state bound at draw time will use a dual source blend mode
     uint32_t    switchWinding;                // reverse the TCS declared output primitive vertex order
     uint32_t    enableMultiView;              // Whether to enable multi-view support
-    Llpc::PipelineOptions options;            // Pipeline options
+    Vkgc::PipelineOptions options;            // Pipeline options
 
-    Llpc::NggState nggState;                  // NGG state
+    Vkgc::NggState nggState;                  // NGG state
 
-    ColorBuffer colorBuffer[MaxColorTargets]; // Color target state.
+    ColorBuffer colorBuffer[Vkgc::MaxColorTargets]; // Color target state.
 };
 
 // =====================================================================================================================
@@ -589,7 +587,7 @@ struct GraphicsPipelineState
 struct ComputePipelineState
 {
     uint32_t              deviceIndex;        // Device index for device group
-    Llpc::PipelineOptions options;            // Pipeline options
+    Vkgc::PipelineOptions options;            // Pipeline options
 };
 
 };
@@ -622,8 +620,8 @@ struct VfxPipelineState
 {
     uint32_t                    version;                          // Pipeline state version
     VfxPipelineType             pipelineType;                     // Pipeline type
-    GraphicsPipelineBuildInfo   gfxPipelineInfo;                  // LLPC graphics pipeline build info
-    ComputePipelineBuildInfo    compPipelineInfo;                 // LLPC compute pipeline build info
+    Vkgc::GraphicsPipelineBuildInfo   gfxPipelineInfo;            // Vkgc graphics pipeline build info
+    Vkgc::ComputePipelineBuildInfo    compPipelineInfo;           // Vkgc compute pipeline build info
     uint32_t                    numStages;                        // Number of shader source sections
     Vfx::ShaderSource*          stages;                           // Shader source sections
 };

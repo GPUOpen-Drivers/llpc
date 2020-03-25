@@ -34,9 +34,13 @@
 #include "spirv.hpp"
 
 #include "llpc.h"
+#include "vkgcUtil.h"
 
 namespace Llpc
 {
+
+using Vkgc::InvalidValue;
+using Vkgc::VoidPtrInc;
 
 // Size of vec4
 static const uint32_t SizeOfVec4 = sizeof(float) * 4;

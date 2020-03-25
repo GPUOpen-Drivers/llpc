@@ -79,6 +79,7 @@ using namespace MetroHash;
 using namespace SPIRV;
 using namespace spv;
 using namespace Util;
+using namespace Vkgc;
 
 namespace llvm
 {

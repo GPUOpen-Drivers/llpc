@@ -89,6 +89,7 @@
 
 using namespace llvm;
 using namespace Llpc;
+using namespace Vkgc;
 
 // Represents options of LLPC standalone tool.
 
@@ -1043,7 +1044,7 @@ static Result CheckAutoLayoutCompatibleFunc(
             PipelineShaderInfo*         pShaderInfo = shaderInfo[pCompileInfo->shaderModuleDatas[i].shaderStage];
             bool                        checkAutoLayoutCompatible = pCompileInfo->checkAutoLayoutCompatible;
 
-            if (pCompileInfo->shaderModuleDatas[i].shaderStage != Llpc::ShaderStageFragment)
+            if (pCompileInfo->shaderModuleDatas[i].shaderStage != Vkgc::ShaderStageFragment)
             {
                 checkAutoLayoutCompatible = false;
             }
@@ -1194,12 +1195,12 @@ static Result BuildPipeline(
 
             PipelineBuildInfo pipelineInfo = {};
             pipelineInfo.pGraphicsInfo = pPipelineInfo;
-            pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pipelineInfo);
+            pPipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pipelineInfo);
         }
 
         if (TimePassesIsEnabled || cl::EnableTimerProfile)
         {
-            auto hash = Llpc::IPipelineDumper::GetPipelineHash(pPipelineInfo);
+            auto hash = Vkgc::IPipelineDumper::GetPipelineHash(pPipelineInfo);
             outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash)
                    << " Files: " << pCompileInfo->pFileNames << "\n";
             outs().flush();
@@ -1211,12 +1212,12 @@ static Result BuildPipeline(
         {
             if (llvm::cl::EnablePipelineDump)
             {
-                Llpc::BinaryData pipelineBinary = {};
+                Vkgc::BinaryData pipelineBinary = {};
                 pipelineBinary.codeSize = pPipelineOut->pipelineBin.codeSize;
                 pipelineBinary.pCode = pPipelineOut->pipelineBin.pCode;
-                Llpc::IPipelineDumper::DumpPipelineBinary(pPipelineDumpHandle, ParsedGfxIp, &pipelineBinary);
+                Vkgc::IPipelineDumper::DumpPipelineBinary(pPipelineDumpHandle, ParsedGfxIp, &pipelineBinary);
 
-                Llpc::IPipelineDumper::EndPipelineDump(pPipelineDumpHandle);
+                Vkgc::IPipelineDumper::EndPipelineDump(pPipelineDumpHandle);
             }
 
             result = DecodePipelineBinary(&pPipelineOut->pipelineBin, pCompileInfo, true);
@@ -1270,12 +1271,12 @@ static Result BuildPipeline(
             dumpOptions.dumpDuplicatePipelines   = llvm::cl::DumpDuplicatePipelines;
             PipelineBuildInfo pipelineInfo = {};
             pipelineInfo.pComputeInfo = pPipelineInfo;
-            pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pipelineInfo);
+            pPipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pipelineInfo);
         }
 
         if (TimePassesIsEnabled || cl::EnableTimerProfile)
         {
-            auto hash = Llpc::IPipelineDumper::GetPipelineHash(pPipelineInfo);
+            auto hash = Vkgc::IPipelineDumper::GetPipelineHash(pPipelineInfo);
             outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash)
                    << " Files: " << pCompileInfo->pFileNames << "\n";
             outs().flush();
@@ -1287,12 +1288,12 @@ static Result BuildPipeline(
         {
             if (llvm::cl::EnablePipelineDump)
             {
-                Llpc::BinaryData pipelineBinary = {};
+                Vkgc::BinaryData pipelineBinary = {};
                 pipelineBinary.codeSize = pPipelineOut->pipelineBin.codeSize;
                 pipelineBinary.pCode = pPipelineOut->pipelineBin.pCode;
-                Llpc::IPipelineDumper::DumpPipelineBinary(pPipelineDumpHandle, ParsedGfxIp, &pipelineBinary);
+                Vkgc::IPipelineDumper::DumpPipelineBinary(pPipelineDumpHandle, ParsedGfxIp, &pipelineBinary);
 
-                Llpc::IPipelineDumper::EndPipelineDump(pPipelineDumpHandle);
+                Vkgc::IPipelineDumper::EndPipelineDump(pPipelineDumpHandle);
             }
 
             result = DecodePipelineBinary(&pPipelineOut->pipelineBin, pCompileInfo, false);
@@ -1541,10 +1542,10 @@ static Result ProcessPipeline(
                 VfxPipelineStatePtr pPipelineState = nullptr;
                 Vfx::vfxGetPipelineDoc(compileInfo.pPipelineInfoFile, &pPipelineState);
 
-                if (pPipelineState->version != Llpc::Version)
+                if (pPipelineState->version != Vkgc::Version)
                 {
                     LLPC_ERRS("Version incompatible, SPVGEN::Version = " << pPipelineState->version <<
-                              " AMDLLPC::Version = " << Llpc::Version << "\n");
+                              " AMDLLPC::Version = " << Vkgc::Version << "\n");
                     result = Result::ErrorInvalidShader;
                 }
                 else
