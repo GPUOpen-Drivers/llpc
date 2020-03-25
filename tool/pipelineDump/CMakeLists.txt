@@ -155,7 +155,7 @@ target_include_directories(pipelineDump
 
 target_sources(pipelineDump PRIVATE
     ../../util/vkgcUtil.cpp
-    ../../util/llpcElfReader.cpp
-    llpcPipelineDumper.cpp
-    llpcPipelineDumperRegs.cpp
+    ../../util/vkgcElfReader.cpp
+    vkgcPipelineDumper.cpp
+    vkgcPipelineDumperRegs.cpp
 )

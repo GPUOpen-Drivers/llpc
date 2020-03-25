@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "llpcElfReader.h"
+#include "vkgcElfReader.h"
 
  // Forward declaration
 namespace llvm { namespace msgpack { class MapDocNode; } }

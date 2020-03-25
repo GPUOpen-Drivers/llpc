@@ -41,7 +41,7 @@
 
 #include "llpc.h"
 #include "llpcCompiler.h"
-#include "llpcMetroHash.h"
+#include "vkgcMetroHash.h"
 #include "lgc/llpcPipeline.h"
 
 namespace lgc

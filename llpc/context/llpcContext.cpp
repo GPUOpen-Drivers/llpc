@@ -48,7 +48,7 @@
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
-#include "llpcMetroHash.h"
+#include "vkgcMetroHash.h"
 #include "llpcPipelineContext.h"
 #include "llpcShaderCache.h"
 #include "llpcShaderCacheManager.h"

@@ -28,9 +28,9 @@ vpath %.cpp $(ICD_DEPTH)/api/compiler/tool/pipelineDump
 vpath %.cpp $(ICD_DEPTH)/api/compiler/util
 
 CPPFILES +=              \
-    llpcPipelineDumper.cpp              \
-    llpcPipelineDumperRegs.cpp          \
-    llpcElfReader.cpp                   \
+    vkgcPipelineDumper.cpp              \
+    vkgcPipelineDumperRegs.cpp          \
+    vkgcElfReader.cpp                   \
     vkgcUtil.cpp
 
 # Turn on "warnings as errors" if enabled.

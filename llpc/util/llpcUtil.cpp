@@ -31,7 +31,7 @@
  */
 #include "llpc.h"
 #include "llpcDebug.h"
-#include "llpcElfReader.h"
+#include "vkgcElfReader.h"
 #include "llpcUtil.h"
 
 #include "spirvExt.h"
@@ -137,8 +137,6 @@ uint32_t ShaderStageToMask(
 {
     assert((stage < ShaderStageCount) || (stage == ShaderStageCopyShader));
     return (1 << stage);
-}
-
 }
 
 } // Llpc
