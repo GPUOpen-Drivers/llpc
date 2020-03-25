@@ -80,7 +80,7 @@
 
 #include "llpc.h"
 #include "llpcDebug.h"
-#include "llpcElfReader.h"
+#include "vkgcElfReader.h"
 #include "llpcShaderModuleHelper.h"
 #include "llpcSpirvLowerUtil.h"
 #include "llpcUtil.h"

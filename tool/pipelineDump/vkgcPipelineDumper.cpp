@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
  /**
  ***********************************************************************************************************************
- * @file  llpcPipelineDumper.cpp
- * @breif LLPC source file: contains implementation of LLPC pipline dump utility.
+ * @file  vkgcPipelineDumper.cpp
+ * @breif VKGC source file: contains implementation of VKGC pipline dump utility.
  ***********************************************************************************************************************
  */
 #include "llvm/Support/Mutex.h"
@@ -37,11 +37,11 @@
 #include <sys/stat.h>
 #include <unordered_set>
 
-#include "llpcElfReader.h"
-#include "llpcPipelineDumper.h"
+#include "vkgcElfReader.h"
+#include "vkgcPipelineDumper.h"
 #include "vkgcUtil.h"
 
-#define DEBUG_TYPE "llpc-pipeline-dumper"
+#define DEBUG_TYPE "vkgc-pipeline-dumper"
 
 using namespace llvm;
 using namespace MetroHash;

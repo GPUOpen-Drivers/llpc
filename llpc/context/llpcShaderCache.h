@@ -38,7 +38,7 @@
 
 #include "llpc.h"
 #include "llpcFile.h"
-#include "llpcMetroHash.h"
+#include "vkgcMetroHash.h"
 #include "llpcUtil.h"
 
 namespace Llpc

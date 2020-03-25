@@ -31,8 +31,8 @@
 #pragma once
 
 #include "llpc.h"
-#include "llpcElfReader.h"
-#include "llpcMetroHash.h"
+#include "vkgcElfReader.h"
+#include "vkgcMetroHash.h"
 #include "llpcShaderCacheManager.h"
 #include "llpcShaderModuleHelper.h"
 #include "lgc/llpcBuilderCommon.h"

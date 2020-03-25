@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPipelineDumper.h
- * @brief LLPC header file: contains definitions of LLPC pipline dump utility
+ * @file  vkgcPipelineDumper.h
+ * @brief VKGC header file: contains definitions of VKGC pipline dump utility
  ***********************************************************************************************************************
  */
 #pragma once
@@ -33,7 +33,7 @@
 #include <fstream>
 #include "vkgcDefs.h"
 
-#include "llpcMetroHash.h"
+#include "vkgcMetroHash.h"
 #if !defined(SINGLE_EXTERNAL_METROHASH)
 namespace MetroHash
 {

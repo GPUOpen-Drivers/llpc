@@ -24,15 +24,15 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcElfReader.cpp
- * @brief LLPC source file: contains implementation of LLPC ELF reading utilities.
+ * @file  vkgcElfReader.cpp
+ * @brief VKGC source file: contains implementation of VKGC ELF reading utilities.
  ***********************************************************************************************************************
  */
 #include <algorithm>
 #include <string.h>
-#include "llpcElfReader.h"
+#include "vkgcElfReader.h"
 
-#define DEBUG_TYPE "llpc-elf-reader"
+#define DEBUG_TYPE "vkgc-elf-reader"
 
 using namespace llvm;
 

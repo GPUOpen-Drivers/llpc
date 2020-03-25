@@ -24,11 +24,11 @@
  **********************************************************************************************************************/
  /**
  ***********************************************************************************************************************
- * @file  llpcPipelineDumperRegs.cpp
- * @breif LLPC source file: register names for LLPC pipline dump utility.
+ * @file  vkgcPipelineDumperRegs.cpp
+ * @breif VKGC source file: register names for VKGC pipline dump utility.
  ***********************************************************************************************************************
  */
-#include "llpcPipelineDumper.h"
+#include "vkgcPipelineDumper.h"
 
 namespace Vkgc
 {

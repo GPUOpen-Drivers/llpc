@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcElfReader.h
- * @brief LLPC header file: contains declaration of LLPC ELF reading utilities.
+ * @file  vkgcElfReader.h
+ * @brief VKGC header file: contains declaration of VKGC ELF reading utilities.
  ***********************************************************************************************************************
  */
 #pragma once
