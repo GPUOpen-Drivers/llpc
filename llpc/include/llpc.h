@@ -35,6 +35,44 @@
 namespace Llpc
 {
 
+using Vkgc::Result;
+using Vkgc::BasicType;
+using Vkgc::GfxIpVersion;
+using Vkgc::BinaryData;
+using Vkgc::PipelineOptions;
+using Vkgc::OutputAllocFunc;
+using Vkgc::BinaryType;
+using Vkgc::ShaderModuleData;
+using Vkgc::ShaderModuleEntryData;
+using Vkgc::ColorTarget;
+using Vkgc::GraphicsPipelineBuildInfo;
+using Vkgc::ComputePipelineBuildInfo;
+using Vkgc::ShaderStage;
+using Vkgc::PipelineShaderInfo;
+using Vkgc::ShaderHash;
+using Vkgc::DescriptorRangeValue;
+using Vkgc::ResourceMappingNode;
+using Vkgc::MaxColorTargets;
+using Vkgc::ResourceMappingNodeType;
+using Vkgc::ShaderModuleUsage;
+using Vkgc::NggCompactSubgroup;
+using Vkgc::NggSubgroupSizingType;
+using Vkgc::ShaderStageVertex;
+using Vkgc::ShaderStageTessControl;
+using Vkgc::ShaderStageTessEval;
+using Vkgc::ShaderStageGeometry;
+using Vkgc::ShaderStageFragment;
+using Vkgc::ShaderStageCompute;
+using Vkgc::ShaderStageCount;
+using Vkgc::ShaderStageInvalid;
+using Vkgc::ShaderStageNativeStageCount;
+using Vkgc::ShaderStageGfxCount;
+using Vkgc::ShaderStageCopyShader;
+using Vkgc::ShaderStageCountInternal;
+using Vkgc::WaveBreakSize;
+using Vkgc::ResourceNodeData;
+using Vkgc::FsOutInfo;
+
 static const uint32_t  MaxViewports = 16;
 static const char      VkIcdName[]     = "amdvlk";
 

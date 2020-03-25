@@ -34,8 +34,6 @@
 #include "llpcShaderCache.h"
 #include "llvm/Support/DJB.h"
 
-#include "vkgcUtil.h"
-
 #define DEBUG_TYPE "llpc-shader-cache"
 
 using namespace llvm;

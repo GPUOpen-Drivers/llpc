@@ -963,26 +963,26 @@ void SectionShader::GetSubState(SectionShader::SubState& state)
     switch (m_sectionType)
     {
     case SectionTypeVertexShader:
-        state.stage = Llpc::ShaderStageVertex;
+        state.stage = Vkgc::ShaderStageVertex;
         break;
     case SectionTypeTessControlShader:
-        state.stage = Llpc::ShaderStageTessControl;
+        state.stage = Vkgc::ShaderStageTessControl;
         break;
     case SectionTypeTessEvalShader:
-        state.stage = Llpc::ShaderStageTessEval;
+        state.stage = Vkgc::ShaderStageTessEval;
         break;
     case SectionTypeGeometryShader:
-        state.stage = Llpc::ShaderStageGeometry;
+        state.stage = Vkgc::ShaderStageGeometry;
         break;
     case SectionTypeFragmentShader:
-        state.stage = Llpc::ShaderStageFragment;
+        state.stage = Vkgc::ShaderStageFragment;
         break;
     case SectionTypeComputeShader:
-        state.stage = Llpc::ShaderStageCompute;
+        state.stage = Vkgc::ShaderStageCompute;
         break;
     default:
         VFX_NEVER_CALLED();
-        state.stage = Llpc::ShaderStageInvalid;
+        state.stage = Vkgc::ShaderStageInvalid;
         break;
     }
 }

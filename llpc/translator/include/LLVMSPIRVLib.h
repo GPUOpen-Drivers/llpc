@@ -45,6 +45,10 @@
 #include <iostream>
 #include "spirvExt.h"
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 39
+#define Vkgc Llpc
+#endif
+
 namespace llvm {
 // Pass initialization functions need to be declared before inclusion of
 // PassSupport.h.
@@ -91,9 +95,9 @@ namespace lgc {
 class Builder;
 } // namespace lgc
 
-namespace Llpc {
+namespace Vkgc {
 struct ShaderModuleUsage;
-} // End namespace Llpc
+} // End namespace Vkgc
 
 namespace llvm {
 
@@ -105,7 +109,7 @@ bool writeSpirv(llvm::Module *M, llvm::raw_ostream &OS, std::string &ErrMsg);
 /// \brief Load SPIRV from istream and translate to LLVM module.
 /// \returns true if succeeds.
 bool readSpirv(lgc::Builder *Builder,
-               const Llpc::ShaderModuleUsage* ModuleData,
+               const Vkgc::ShaderModuleUsage* ModuleData,
                std::istream &IS,
                spv::ExecutionModel EntryExecModel,
                const char *EntryName,

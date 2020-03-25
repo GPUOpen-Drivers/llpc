@@ -32,7 +32,7 @@
 
 #include "vkgcDefs.h"
 
-namespace Llpc
+namespace Vkgc
 {
 
 // Invalid value
@@ -88,4 +88,4 @@ inline const T* FindVkStructInChain(
     return reinterpret_cast<const T*>(pStructHeader);
 }
 
-} // Llpc
+} // Vkgc

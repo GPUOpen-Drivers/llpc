@@ -45,7 +45,7 @@ namespace llvm
    template<unsigned InternalLen> class SmallString;
 } // llvm
 
-namespace Llpc
+namespace Vkgc
 {
 
 // LLVM backend special section name
@@ -557,4 +557,4 @@ OStream& operator<<(
     OStream&         out,
     ElfReader<Elf>&  reader);
 
-} // Llpc
+} // Vkgc

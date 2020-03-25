@@ -39,6 +39,7 @@
 #define DEBUG_TYPE "llpc-elf-writer"
 
 using namespace llvm;
+using namespace Vkgc;
 
 namespace Llpc
 {

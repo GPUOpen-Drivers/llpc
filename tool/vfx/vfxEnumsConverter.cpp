@@ -36,6 +36,8 @@
 #include "vfx.h"
 #include "vfxEnumsConverter.h"
 
+using namespace Vkgc;
+
 namespace Vfx
 {
 

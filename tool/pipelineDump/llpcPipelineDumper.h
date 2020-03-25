@@ -42,7 +42,7 @@ namespace MetroHash
 };
 #endif
 
-namespace Llpc
+namespace Vkgc
 {
 
 struct ComputePipelineBuildInfo;
@@ -176,4 +176,4 @@ private:
 #endif
 };
 
-} // Llpc
+} // Vkgc

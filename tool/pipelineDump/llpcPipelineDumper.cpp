@@ -49,7 +49,7 @@ using namespace Util;
 
     #define FILE_STAT stat
 
-namespace Llpc
+namespace Vkgc
 {
 
 // Forward declaration
@@ -2119,4 +2119,4 @@ std::ostream& operator<<(
     return out << pString;
 }
 
-} // Llpc
+} // Vkgc

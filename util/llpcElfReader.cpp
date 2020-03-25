@@ -36,7 +36,7 @@
 
 using namespace llvm;
 
-namespace Llpc
+namespace Vkgc
 {
 
 // =====================================================================================================================
@@ -588,4 +588,4 @@ MsgPackIteratorStatus ElfReader<Elf>::GetMsgIteratorStatus() const
 // Explicit instantiations for ELF utilities
 template class ElfReader<Elf64>;
 
-} // Llpc
+} // Vkgc

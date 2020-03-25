@@ -34,6 +34,8 @@
 #endif
 #include "spvgen.h"
 
+using namespace Vkgc;
+
 namespace Vfx
 {
 // =====================================================================================================================
@@ -140,7 +142,7 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
         auto pComputePipelineInfo = &m_pipelineState.compPipelineInfo;
         pComputePipelineInfo->deviceIndex = computeState.deviceIndex;
         pComputePipelineInfo->options     = computeState.options;
-        pComputePipelineInfo->cs.entryStage = Llpc::ShaderStageCompute;
+        pComputePipelineInfo->cs.entryStage = Vkgc::ShaderStageCompute;
     }
 
     // Section "VertexInputState"
