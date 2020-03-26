@@ -34,11 +34,13 @@
 #include "vulkan.h"
 
 // Confliction of Xlib and LLVM headers
+#if defined(__unix__)
 #undef True
 #undef False
 #undef DestroyAll
 #undef Status
 #undef Bool
+#endif
 
 /// LLPC major interface version.
 #define LLPC_INTERFACE_MAJOR_VERSION 38

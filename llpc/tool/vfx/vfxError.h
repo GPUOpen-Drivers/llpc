@@ -36,11 +36,7 @@
 
 #include "vfx.h"
 
-#if defined(_WIN32)
-#define vfxSnprintf(buf, len, ...) _snprintf_s((buf), (len), _TRUNCATE, __VA_ARGS__)
-#else
 #define vfxSnprintf(buf, len, ...) snprintf((buf), (len), __VA_ARGS__)
-#endif
 
 #define PARSE_ERROR(errorMsg, lineNum, ...) { \
     char errorBuf[4096]; \
