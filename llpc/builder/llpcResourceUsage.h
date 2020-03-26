@@ -156,8 +156,9 @@ struct ResourceUsage
                 uint32_t cullDistance         : 4;      // Array size of gl_CullDistance[] (0 means unused)
                 uint32_t viewportIndex        : 1;      // Whether gl_ViewportIndex is used
                 uint32_t layer                : 1;      // Whether gl_Layer is used
+                uint32_t reserved20           : 1;
 
-                uint64_t unused               : 45;
+                uint64_t unused               : 44;
             } vs;
 
             // Tessellation control shader
@@ -203,8 +204,9 @@ struct ResourceUsage
                 uint32_t cullDistance         : 4;      // Array size gl_CullDistance[] (0 means unused)
                 uint32_t viewportIndex        : 1;      // Whether gl_ViewportIndex is used
                 uint32_t layer                : 1;      // Whether gl_Layer is used
+                uint32_t reserved28           : 1;
 
-                uint64_t unused               : 36;
+                uint64_t unused               : 35;
             } tes;
 
             // Geometry shader
@@ -226,8 +228,9 @@ struct ResourceUsage
                 uint32_t primitiveId          : 1;      // Whether gl_PrimitiveID is used
                 uint32_t viewportIndex        : 1;      // Whether gl_ViewportIndex is used
                 uint32_t layer                : 1;      // Whether gl_Layer is used
+                uint32_t reserved26           : 1;
 
-                uint64_t unused               : 38;
+                uint64_t unused               : 37;
             } gs;
 
             // Fragment shader

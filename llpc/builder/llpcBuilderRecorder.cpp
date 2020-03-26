@@ -312,6 +312,7 @@ BuilderRecorder::BuilderRecorder(
       BuilderRecorderMetadataKinds(pBuilderContext->GetContext()),
       m_pPipelineState(reinterpret_cast<PipelineState*>(pPipeline))
 {
+    m_isBuilderRecorder = true;
 }
 
 // =====================================================================================================================

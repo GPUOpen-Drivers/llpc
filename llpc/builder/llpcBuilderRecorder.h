@@ -159,6 +159,7 @@ public:
         ImageQuerySamples,
         ImageQuerySize,
         ImageGetLod,
+        Reserved1,
 
         // Input/output
         ReadGenericInput,

@@ -1337,6 +1337,7 @@ protected:
 
     // -----------------------------------------------------------------------------------------------------------------
 
+    bool                            m_isBuilderRecorder = false;        // Whether this is a BuilderRecorder
     ShaderStage                     m_shaderStage = ShaderStageInvalid; // Current shader stage being built.
 
     Type* GetTransposedMatrixTy(
