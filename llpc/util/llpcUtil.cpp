@@ -38,12 +38,8 @@
 
 #include "palPipelineAbi.h"
 
-#if defined(_WIN32)
-#include <direct.h>
-#else
 #include <sys/types.h>
 #include <sys/stat.h>
-#endif
 
 #define DEBUG_TYPE "llpc-util"
 
@@ -225,13 +221,8 @@ lgc::ShaderStage GetLgcShaderStage(Llpc::ShaderStage stage)
 bool CreateDirectory(
     const char* pDir)  // [in] the path of directory
 {
-#if defined(_WIN32)
-    int result = _mkdir(pDir);
-    return (result == 0);
-#else
     int result = mkdir(pDir, S_IRWXU);
     return (result == 0);
-#endif
 }
 
 // =====================================================================================================================

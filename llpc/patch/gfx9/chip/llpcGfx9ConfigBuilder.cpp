@@ -2607,6 +2607,7 @@ void ConfigBuilder::BuildCsRegConfig(
     }
     SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC2, TIDIG_COMP_CNT, tidigCompCnt);
 
+
     SET_REG_FIELD(pConfig, COMPUTE_NUM_THREAD_X, NUM_THREAD_FULL, workgroupSizes[0]);
     SET_REG_FIELD(pConfig, COMPUTE_NUM_THREAD_Y, NUM_THREAD_FULL, workgroupSizes[1]);
     SET_REG_FIELD(pConfig, COMPUTE_NUM_THREAD_Z, NUM_THREAD_FULL, workgroupSizes[2]);

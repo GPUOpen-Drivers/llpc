@@ -41,7 +41,11 @@ using namespace llvm;
 namespace Llpc
 {
 
+#if defined(__unix__)
 static const char CacheFileSubPath[] = "/AMD/LlpcCache/";
+#else
+static const char CacheFileSubPath[] = "\\AMD\\LlpcCache\\";
+#endif
 
 static const char ClientStr[] = "LLPC";
 

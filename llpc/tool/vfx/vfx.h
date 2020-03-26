@@ -42,11 +42,7 @@
 
 #include "llpc.h"
 
-#ifdef _WIN32
-#define VFXAPI __cdecl
-#else
 #define VFXAPI
-#endif
 
 using namespace Llpc;
 

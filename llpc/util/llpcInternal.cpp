@@ -32,11 +32,9 @@
 #include "llvm/Support/raw_os_ostream.h"
 #include "spirvExt.h"
 
-#if !defined(_WIN32)
     #include <sys/stat.h>
     #include <time.h>
     #include <unistd.h>
-#endif
 
 #if __APPLE__ && __MACH__
     #include <mach/mach_time.h>

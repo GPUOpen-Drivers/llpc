@@ -161,6 +161,9 @@ target_compile_definitions(llpc PRIVATE
         PAL_BUILD_GFX9
         PAL_BUILD_GFX10
         CHIP_HDR_GFX10
+        CHIP_HDR_VEGA20
+        CHIP_HDR_RAVEN2
+        CHIP_HDR_NAVI14
         )
 
 if(ICD_BUILD_LLPC)
@@ -332,8 +335,6 @@ else()
         util/llpcPipelineDumper.cpp
         util/llpcPipelineDumperRegs.cpp
         util/llpcUtil.cpp
-        patch/gfx6/chip/llpcGfx6Chip.cpp
-        patch/gfx9/chip/llpcGfx9Chip.cpp
     )
 endif()
 

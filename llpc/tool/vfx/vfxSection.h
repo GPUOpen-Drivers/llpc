@@ -130,12 +130,8 @@ enum ShaderType
 
 // =====================================================================================================================
 // Gets offset of the member
-#ifdef _WIN32
-    #define OFFSETOF(T, name) offsetof(T, name)
-#else
     // Clang has a warning for using offsetof for non-POD type
     #define OFFSETOF(T, name) ((size_t)(&((T*)(0))->name))
-#endif
 
 // =====================================================================================================================
 // Initiates a member to address table

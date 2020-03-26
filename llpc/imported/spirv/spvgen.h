@@ -36,22 +36,10 @@
 #define SPVGEN_MAJOR_VERSION(version)  (version >> 16)
 #define SPVGEN_MINOR_VERSION(version)  (version & 0xFFFF)
 
-#ifdef _WIN32
-    #define SPVAPI __cdecl
-#else
     #define SPVAPI
-#endif
 
 #ifndef SH_IMPORT_EXPORT
-    #ifdef _WIN32
-        #ifdef SH_EXPORTING
-            #define SH_IMPORT_EXPORT __declspec(dllexport)
-        #else
-            #define SH_IMPORT_EXPORT __declspec(dllimport)
-        #endif
-    #else
         #define SH_IMPORT_EXPORT
-    #endif
 #endif
 
 #include "vfx.h"
@@ -372,23 +360,6 @@ DEFI_EXPORT_FUNC(vfxGetPipelineDoc);
 DEFI_EXPORT_FUNC(vfxPrintDoc);
 
 // SPIR-V generator Windows implementation
-#ifdef _WIN32
-
-#include <windows.h>
-// SPIR-V generator Windows DLL name
-static const char* SpvGeneratorName = "spvgen.dll";
-
-#define INITFUNC(func) \
-  g_pfn##func = reinterpret_cast<PFN_##func>(GetProcAddress(hModule, #func));\
-  if (g_pfn##func == NULL)\
-  {\
-      success = false;\
-  }
-
-#define INIT_OPT_FUNC(func) \
-  g_pfn##func = reinterpret_cast<PFN_##func>(GetProcAddress(hModule, #func));
-
-#else
 
 #include <dlfcn.h>
 #include <stdio.h>
@@ -407,8 +378,6 @@ static const char* SpvGeneratorName = "spvgen.so";
 
 #define INIT_OPT_FUNC(func) \
   g_pfn##func = reinterpret_cast<PFN_##func>(dlsym(hModule, #func));
-
-#endif // _WIN32
 
 #define DEINITFUNC(func) g_pfn##func = nullptr;
 
@@ -434,11 +403,7 @@ bool SPVAPI InitSpvGen(
         libNameBuffer += pLibName;
         pLibName = libNameBuffer.c_str();
     }
-#ifdef _WIN32
-    HMODULE hModule = LoadLibraryA(pLibName);
-#else
     void* hModule = dlopen(pLibName, RTLD_GLOBAL | RTLD_NOW);
-#endif
 
     if (hModule != NULL)
     {

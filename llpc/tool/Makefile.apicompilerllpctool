@@ -149,10 +149,20 @@ endif
 
 ifneq ($(ICD_PLATFORM), win)
     # Non-windows: gcc-style options.
-    LLOPTS += -lstdc++  \
-              -lm       \
+    LLOPTS += -lm       \
               -lpthread \
               -ldl
+
+    ifeq ($(USE_DISTRO_CLANG),1)
+        LLOPTS += -flto=thin              \
+                  -stdlib=libc++          \
+                  -lc++                   \
+                  -lc++abi                \
+                  -lgcc_s                 \
+                  -lsupc++
+    else
+        LLOPTS += -lstdc++
+    endif
 endif
 
 include $(ICD_DEPTH)/make/icdrules

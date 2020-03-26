@@ -50,11 +50,7 @@ using namespace llvm;
 using namespace MetroHash;
 using namespace Util;
 
-#if defined(_WIN32)
-    #define FILE_STAT _stat
-#else
     #define FILE_STAT stat
-#endif
 
 namespace Llpc
 {
