@@ -32,6 +32,7 @@
 
 #include "llpcBuilderContext.h"
 #include "llpcBuilderImpl.h"
+#include "llpcBuilderRecorder.h"
 #include "llpcInternal.h"
 #include "llpcPipelineState.h"
 #include "llpcShaderModes.h"
@@ -524,3 +525,4 @@ CallInst* Builder::CreateIntrinsic(
     }
     return pResult;
 }
+
