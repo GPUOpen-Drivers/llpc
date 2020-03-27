@@ -191,6 +191,7 @@ target_sources(LLVMlgc PRIVATE
     builder/llpcBuilderReplayer.cpp
     builder/llpcPipelineState.cpp
     builder/llpcShaderModes.cpp
+    builder/llpcYCbCrAddressHandler.cpp
     builder/llpcTargetInfo.cpp
 )
 
