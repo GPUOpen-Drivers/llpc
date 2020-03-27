@@ -146,8 +146,10 @@ private:
     static std::string GetSpirvBinaryFileName(const MetroHash::Hash* pHash);
 
     static void DumpComputePipelineInfo(std::ostream*                   pDumpFile,
-                                       const ComputePipelineBuildInfo* pPipelineInfo);
+                                        const char*                     pDumpDir,
+                                        const ComputePipelineBuildInfo* pPipelineInfo);
     static void DumpGraphicsPipelineInfo(std::ostream*                    pDumpFile,
+                                         const char*                      pDumpDir,
                                          const GraphicsPipelineBuildInfo* pPipelineInfo);
 
     static void DumpVersionInfo(std::ostream&                  dumpFile);
@@ -157,8 +159,10 @@ private:
                                         const char*                pPrefix,
                                         std::ostream&              dumpFile);
     static void DumpComputeStateInfo(const ComputePipelineBuildInfo* pPipelineInfo,
+                                     const char*                     pDumpDir,
                                      std::ostream&                   dumpFile);
     static void DumpGraphicsStateInfo(const GraphicsPipelineBuildInfo* pPipelineInfo,
+                                      const char*                      pDumpDir,
                                       std::ostream&                    dumpFile);
     static void DumpPipelineOptions(const PipelineOptions*   pOptions,
                                     std::ostream&            dumpFile);

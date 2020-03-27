@@ -416,12 +416,12 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
         {
             if (pipelineInfo.pComputeInfo)
             {
-                DumpComputePipelineInfo(&pDumpFile->dumpFile, pipelineInfo.pComputeInfo);
+                DumpComputePipelineInfo(&pDumpFile->dumpFile, pDumpOptions->pDumpDir, pipelineInfo.pComputeInfo);
             }
 
             if (pipelineInfo.pGraphicsInfo)
             {
-                DumpGraphicsPipelineInfo(&pDumpFile->dumpFile, pipelineInfo.pGraphicsInfo);
+                DumpGraphicsPipelineInfo(&pDumpFile->dumpFile, pDumpOptions->pDumpDir, pipelineInfo.pGraphicsInfo);
             }
 
         }
@@ -696,6 +696,7 @@ void PipelineDumper::DumpVersionInfo(
 // Dumps compute pipeline state info to file.
 void PipelineDumper::DumpComputeStateInfo(
     const ComputePipelineBuildInfo* pPipelineInfo,  // [in] Info of the graphics pipeline to be built
+    const char*                     pDumpDir,       // [in] Directory of pipeline dump
     std::ostream&                   dumpFile)      // [out] dump file
 {
     dumpFile << "[ComputePipelineState]\n";
@@ -722,13 +723,14 @@ void PipelineDumper::DumpPipelineOptions(
 // Dumps compute pipeline information to file.
 void PipelineDumper::DumpComputePipelineInfo(
     std::ostream*                   pDumpFile,         // [in] Pipeline dump file
+    const char*                     pDumpDir,          // [in] Directory of pipeline dump
     const ComputePipelineBuildInfo* pPipelineInfo)     // [in] Info of the compute pipeline to be built
 {
     DumpVersionInfo(*pDumpFile);
 
     // Output shader info
     DumpPipelineShaderInfo(&pPipelineInfo->cs, *pDumpFile);
-    DumpComputeStateInfo(pPipelineInfo, *pDumpFile);
+    DumpComputeStateInfo(pPipelineInfo, pDumpDir, *pDumpFile);
 
     pDumpFile->flush();
 }
@@ -737,6 +739,7 @@ void PipelineDumper::DumpComputePipelineInfo(
 // Dumps graphics pipeline state info to file.
 void PipelineDumper::DumpGraphicsStateInfo(
     const GraphicsPipelineBuildInfo* pPipelineInfo, // [in] Info of the graphics pipeline to be built
+    const char*                      pDumpDir,      // [in] Directory of pipeline dump
     std::ostream&                    dumpFile)      // [out] dump file
 {
     dumpFile << "[GraphicsPipelineState]\n";
@@ -834,6 +837,7 @@ void PipelineDumper::DumpGraphicsStateInfo(
 // Dumps graphics pipeline build info to file.
 void PipelineDumper::DumpGraphicsPipelineInfo(
     std::ostream*                    pDumpFile,       // [in] Pipeline dump file
+    const char*                      pDumpDir,        // [in] Directory of pipeline dump
     const GraphicsPipelineBuildInfo* pPipelineInfo)   // [in] Info of the graphics pipeline to be built
 {
     DumpVersionInfo(*pDumpFile);
@@ -857,7 +861,7 @@ void PipelineDumper::DumpGraphicsPipelineInfo(
         DumpPipelineShaderInfo(pShaderInfo, *pDumpFile);
     }
 
-    DumpGraphicsStateInfo(pPipelineInfo, *pDumpFile);
+    DumpGraphicsStateInfo(pPipelineInfo, pDumpDir, *pDumpFile);
 
     pDumpFile->flush();
 }
