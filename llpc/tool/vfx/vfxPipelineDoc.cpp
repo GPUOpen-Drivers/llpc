@@ -94,7 +94,8 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
     {
         GraphicsPipelineState graphicState;
         m_pipelineState.pipelineType = VfxPipelineTypeGraphics;
-        reinterpret_cast<SectionGraphicsState*>(m_sections[SectionTypeGraphicsState][0])->GetSubState(graphicState);
+        reinterpret_cast<SectionGraphicsState*>(m_sections[SectionTypeGraphicsState][0])->
+            GetSubState(m_fileName, graphicState, &m_errorMsg);
         auto pGfxPipelineInfo = &m_pipelineState.gfxPipelineInfo;
         pGfxPipelineInfo->iaState.topology                = graphicState.topology;
         pGfxPipelineInfo->iaState.patchControlPoints      = graphicState.patchControlPoints;
@@ -134,7 +135,8 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
     {
         ComputePipelineState computeState;
         m_pipelineState.pipelineType = VfxPipelineTypeCompute;
-        reinterpret_cast<SectionComputeState*>(m_sections[SectionTypeComputeState][0])->GetSubState(computeState);
+        reinterpret_cast<SectionComputeState*>(m_sections[SectionTypeComputeState][0])->
+            GetSubState(m_fileName, computeState, &m_errorMsg);
         auto pComputePipelineInfo = &m_pipelineState.compPipelineInfo;
         pComputePipelineInfo->deviceIndex = computeState.deviceIndex;
         pComputePipelineInfo->options     = computeState.options;

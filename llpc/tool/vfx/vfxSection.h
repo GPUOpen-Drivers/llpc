@@ -1272,7 +1272,7 @@ public:
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)
+    void GetSubState(const std::string& docFilename, SubState& state, std::string* pErrorMsg)
     {
         for (uint32_t i = 0; i < MaxColorTargets; ++i)
         {
@@ -1314,7 +1314,7 @@ public:
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)
+    void GetSubState(const std::string& docFilename, SubState& state, std::string* pErrorMsg)
     {
         options.GetSubState(m_state.options);
         state = m_state;
