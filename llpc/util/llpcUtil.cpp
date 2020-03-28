@@ -213,6 +213,7 @@ lgc::ShaderStage GetLgcShaderStage(Llpc::ShaderStage stage)
         return lgc::ShaderStageFragment;
     default:
         llvm_unreachable("");
+        return lgc::ShaderStageInvalid;
     }
 }
 

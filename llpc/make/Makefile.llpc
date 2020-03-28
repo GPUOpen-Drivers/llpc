@@ -4,6 +4,7 @@ ifndef LLPC_VULKAN_INCLUDE
 endif
 
 LCXXINCS += -I$(LLPC_VULKAN_INCLUDE)
+LCXXINCS += -I$(LLPC_DEPTH)/builder
 LCXXINCS += -I$(LLPC_DEPTH)/imported/chip/gfx6
 LCXXINCS += -I$(LLPC_DEPTH)/imported/chip/gfx9
 LCXXINCS += -I$(LLPC_DEPTH)/include
@@ -309,3 +310,4 @@ else
 endif
 
 .FORCE:
+

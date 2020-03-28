@@ -697,7 +697,7 @@ void PipelineDumper::DumpVersionInfo(
 void PipelineDumper::DumpComputeStateInfo(
     const ComputePipelineBuildInfo* pPipelineInfo,  // [in] Info of the graphics pipeline to be built
     const char*                     pDumpDir,       // [in] Directory of pipeline dump
-    std::ostream&                   dumpFile)      // [out] dump file
+    std::ostream&                   dumpFile)       // [out] dump file
 {
     dumpFile << "[ComputePipelineState]\n";
 
@@ -831,6 +831,7 @@ void PipelineDumper::DumpGraphicsStateInfo(
             dumpFile << "divisor[" << i << "].divisor = " << pDivisor->divisor << "\n";
         }
     }
+
 }
 
 // =====================================================================================================================

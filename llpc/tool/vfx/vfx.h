@@ -579,7 +579,7 @@ struct GraphicsPipelineState
     uint32_t    enableMultiView;              // Whether to enable multi-view support
     Llpc::PipelineOptions options;            // Pipeline options
 
-    Llpc::NggState nggState;                    // NGG state
+    Llpc::NggState nggState;                  // NGG state
 
     ColorBuffer colorBuffer[MaxColorTargets]; // Color target state.
 };
