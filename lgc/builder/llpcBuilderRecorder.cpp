@@ -231,6 +231,8 @@ StringRef BuilderRecorder::GetCallName(
         return "image.query.size";
     case Opcode::ImageGetLod:
         return "image.get.lod";
+    case Opcode::Reserved1:
+        return "reserved1";
     case GetSubgroupSize:
         return "get.subgroup.size";
     case SubgroupElect:
