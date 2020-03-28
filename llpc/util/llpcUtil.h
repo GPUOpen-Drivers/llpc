@@ -117,13 +117,5 @@ inline uint32_t Log2(
     return logValue;
 }
 
-// ===================================================================================
-// Returns the bits of a floating point value as an unsigned integer.
-inline uint32_t FloatToBits(
-    float f)        // Float to be converted to bits
-{
-    return (*(reinterpret_cast<uint32_t*>(&f)));
-}
-
 } // Llpc
 
