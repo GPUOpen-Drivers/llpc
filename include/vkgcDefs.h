@@ -654,22 +654,22 @@ struct GraphicsPipelineBuildInfo
         ColorTarget target[MaxColorTargets];    ///< Per-MRT color target info
     } cbState;                                  ///< Color target state
 
-    NggState            nggState;           ///< NGG state used for tuning and debugging
-    PipelineOptions     options;            ///< Per pipeline tuning/debugging options
+    NggState            nggState;               ///< NGG state used for tuning and debugging
+    PipelineOptions     options;                ///< Per pipeline tuning/debugging options
 };
 
 /// Represents info to build a compute pipeline.
 struct ComputePipelineBuildInfo
 {
-    void*               pInstance;          ///< Vulkan instance object
-    void*               pUserData;          ///< User data
-    OutputAllocFunc     pfnOutputAlloc;     ///< Output buffer allocator
+    void*               pInstance;            ///< Vulkan instance object
+    void*               pUserData;            ///< User data
+    OutputAllocFunc     pfnOutputAlloc;       ///< Output buffer allocator
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-    IShaderCache*       pShaderCache;       ///< Shader cache, used to search for the compiled shader data
+    IShaderCache*       pShaderCache;         ///< Shader cache, used to search for the compiled shader data
 #endif
-    uint32_t            deviceIndex;        ///< Device index for device group
-    PipelineShaderInfo  cs;                 ///< Compute shader
-    PipelineOptions     options;            ///< Per pipeline tuning options
+    uint32_t            deviceIndex;          ///< Device index for device group
+    PipelineShaderInfo  cs;                   ///< Compute shader
+    PipelineOptions     options;              ///< Per pipeline tuning options
 };
 
 // =====================================================================================================================

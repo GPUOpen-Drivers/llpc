@@ -1285,12 +1285,11 @@ public:
 
 private:
     SectionNggState        nggState;
-    static const uint32_t  MemberCount = 21;
+    static const uint32_t  MemberCount = 22;
     static StrToMemberAddr m_addrTable[MemberCount];
     SubState               m_state;
     SectionColorBuffer     colorBuffer[MaxColorTargets]; // Color buffer
     SectionPipelineOption  options;
-
 };
 
 // =====================================================================================================================
@@ -1321,7 +1320,7 @@ public:
     };
 
 private:
-    static const uint32_t  MemberCount = 2;
+    static const uint32_t  MemberCount = 3;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
