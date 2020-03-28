@@ -49,6 +49,8 @@ extern opt<bool> InRegEsGsLdsSize;
 
 } // llvm
 
+using namespace llvm;
+
 namespace lgc
 {
 

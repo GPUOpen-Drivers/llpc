@@ -85,7 +85,7 @@ private:
                                            llvm::Value*       pCompIdx,
                                            llvm::Value*       pVertexIdx,
                                            uint32_t           interpLoc,
-                                           Value*             pInterpInfo,
+                                           llvm::Value*             pInterpInfo,
                                            llvm::Instruction* pInsertPos);
 
     void AddCallInstForOutputExport(llvm::Value*       pOutputValue,

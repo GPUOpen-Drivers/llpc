@@ -50,7 +50,7 @@
 #endif
 
 namespace llvm {
-// Pass initialization functions need to be declared before inclusion of
+// llvm::Pass initialization functions need to be declared before inclusion of
 // PassSupport.h.
 class PassRegistry;
 void initializeSPIRVLowerBoolPass(PassRegistry&);
@@ -122,47 +122,47 @@ bool readSpirv(lgc::Builder *Builder,
 bool regularizeLlvmForSpirv(llvm::Module *M, std::string &ErrMsg);
 
 /// Create a pass for lowering cast instructions of i1 type.
-ModulePass *createSPIRVLowerBool();
+llvm::ModulePass *createSPIRVLowerBool();
 
 /// Create a pass for lowering constant expressions to instructions.
-ModulePass *createSPIRVLowerConstExpr();
+llvm::ModulePass *createSPIRVLowerConstExpr();
 
 /// Create a pass for regularize LLVM module to be translated to SPIR-V.
-ModulePass *createSPIRVRegularizeLLVM();
+llvm::ModulePass *createSPIRVRegularizeLLVM();
 
 /// Create a pass for lowering llvm.memmove to llvm.memcpys with a temporary variable.
-ModulePass *createSPIRVLowerMemmove();
+llvm::ModulePass *createSPIRVLowerMemmove();
 
 /// Create a pass for lowering GLSL inputs to function calls
-ModulePass *createSPIRVLowerInput();
+llvm::ModulePass *createSPIRVLowerInput();
 
 /// Create a pass for lowering GLSL outputs to function calls
-ModulePass *createSPIRVLowerOutput();
+llvm::ModulePass *createSPIRVLowerOutput();
 
 /// Create a pass for translating GLSL generic global variables to function local variables
-ModulePass *createSPIRVLowerGlobal();
+llvm::ModulePass *createSPIRVLowerGlobal();
 
 /// Create a pass for lowering GLSL buffers (UBO and SSBO) to function calls
-ModulePass *createSPIRVLowerBuffer();
+llvm::ModulePass *createSPIRVLowerBuffer();
 
 /// Create a pass for lowering resource fetches to function calls
-ModulePass *createSPIRVLowerFetch();
+llvm::ModulePass *createSPIRVLowerFetch();
 
-ModulePass *createSPIRVResourceCollect();
+llvm::ModulePass *createSPIRVResourceCollect();
 
 /// Create a pass for translating input function call to real access input instruction
-ModulePass *createLLVMInput();
+llvm::ModulePass *createLLVMInput();
 
 /// Create a pass for translating input function call to real access output instruction
-ModulePass *createLLVMOutput();
+llvm::ModulePass *createLLVMOutput();
 
 /// Create a pass for translating descriptor function call to real descritpor setup instruction
-ModulePass *createLLVMDescriptor();
+llvm::ModulePass *createLLVMDescriptor();
 
 /// Create a pass for removing unused built-in functions
-ModulePass *createLLVMBuiltInFunc();
+llvm::ModulePass *createLLVMBuiltInFunc();
 
-ModulePass *createLLVMMutateEntry();
+llvm::ModulePass *createLLVMMutateEntry();
 
 } // namespace llvm
 

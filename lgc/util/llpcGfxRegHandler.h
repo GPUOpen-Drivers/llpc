@@ -36,8 +36,6 @@
 namespace lgc
 {
 
-using namespace llvm;
-
 // General bits info for indexed DWORD
 struct BitsInfo
 {
@@ -52,34 +50,34 @@ class GfxRegHandlerBase
 {
 public:
     // Set register
-    void SetRegister(Value* pNewRegister);
+    void SetRegister(llvm::Value* pNewRegister);
 
     // Get register
-    Value* GetRegister();
+    llvm::Value* GetRegister();
 
 protected:
     // Constructor
-    inline GfxRegHandlerBase(Builder* pBuilder, Value* pRegister)
+    inline GfxRegHandlerBase(Builder* pBuilder, llvm::Value* pRegister)
     {
         m_pBuilder = pBuilder;
         SetRegister(pRegister);
     }
 
     // Return new DWORD with replacing the specific range of bits in old DWORD
-    Value* ReplaceBits(Value* pDword, uint32_t offset, uint32_t count, Value* pNewBits);
+    llvm::Value* ReplaceBits(llvm::Value* pDword, uint32_t offset, uint32_t count, llvm::Value* pNewBits);
 
     // Return the size of registered DWORDs
     inline uint32_t GetDwordsCount() { return m_dwords.size(); }
 
     // Get indexed DWORD
-    inline Value* GetDword(uint32_t index)
+    inline llvm::Value* GetDword(uint32_t index)
     {
         ExtractDwordIfNecessary(index);
         return m_dwords[index];
     }
 
     // Set indexed DWORD
-    inline void SetDword(uint32_t index, Value* pDword)
+    inline void SetDword(uint32_t index, llvm::Value* pDword)
     {
         // Set the whole 32bits data
         m_dwords[index] = pDword;
@@ -94,10 +92,10 @@ protected:
     }
 
     // Get data from a range of bits in indexed DWORD according to BitsInfo
-    Value* GetBits(const BitsInfo& bitsInfo);
+    llvm::Value* GetBits(const BitsInfo& bitsInfo);
 
     // Set data to a range of bits in indexed DWORD according to BitsInfo
-    void SetBits(const BitsInfo& bitsInfo, Value* pNewBits);
+    void SetBits(const BitsInfo& bitsInfo, llvm::Value* pNewBits);
 
 private:
     // Load indexed DWORD from <n x i32> vector, if the specific DWORD is nullptr
@@ -115,11 +113,11 @@ protected:
 private:
     // Contains (possibly updated) dwords for the register value. Each element will be a nullptr until it
     // is requested or updated for the first time.
-    SmallVector<Value*, 8> m_dwords;
+    llvm::SmallVector<llvm::Value*, 8> m_dwords;
 
     // Combined <n x i32> vector containing the register value, which does not yet reflect the dwords
     // that are marked as dirty.
-    Value* m_pRegister;
+    llvm::Value* m_pRegister;
 
     // Bit-mask of dwords whose value was changed but is not yet reflected in m_pRegister.
     uint32_t m_dirtyDwords;

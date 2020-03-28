@@ -68,7 +68,7 @@ private:
     SpirvLowerAlgebraTransform& operator=(const SpirvLowerAlgebraTransform&) = delete;
 
     bool IsOperandNoContract(llvm::Value* pOperand);
-    void DisableFastMath(Value* pValue);
+    void DisableFastMath(llvm::Value* pValue);
 
     bool m_enableConstFolding; // Whether enable constant folding in this pass
     bool m_enableFloatOpt;     // Whether enable floating point optimization in this pass

@@ -68,8 +68,6 @@ void initializePatchSetupTargetFeaturesPass(PassRegistry&);
 namespace lgc
 {
 
-using namespace llvm;
-
 class PatchCheckShaderCache;
 
 // Initialize passes for patching

@@ -44,7 +44,7 @@ class PipelineShaders : public llvm::ModulePass
 {
 public:
     static char ID;
-    PipelineShaders() : ModulePass(ID)
+    PipelineShaders() : llvm::ModulePass(ID)
     {
     }
 

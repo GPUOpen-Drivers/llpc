@@ -98,9 +98,9 @@ private:
     void ReassembleOutputExportCalls();
 
     // Input/output scalarizing
-    void ScalarizeForInOutPacking(Module* pModule);
-    void ScalarizeGenericInput(CallInst* pCall);
-    void ScalarizeGenericOutput(CallInst* pCall);
+    void ScalarizeForInOutPacking(llvm::Module* pModule);
+    void ScalarizeGenericInput(llvm::CallInst* pCall);
+    void ScalarizeGenericOutput(llvm::CallInst* pCall);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -170,7 +170,7 @@ class InOutLocationMapManager
 public:
     InOutLocationMapManager() {}
 
-    bool AddSpan(CallInst* pCall);
+    bool AddSpan(llvm::CallInst* pCall);
     void BuildLocationMap();
 
     bool FindMap(const InOutLocation& originalLocation, const InOutLocation*& pNewLocation);

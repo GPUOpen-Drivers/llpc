@@ -91,7 +91,7 @@ private:
                                       llvm::Value*        pArrayOffset,
                                       llvm::Instruction*  pInsertPoint);
 
-    llvm::Value* BuildInlineBufferDesc(Value* pDescPtr, llvm::IRBuilder<>& builder);
+    llvm::Value* BuildInlineBufferDesc(llvm::Value* pDescPtr, llvm::IRBuilder<>& builder);
     llvm::Value* BuildBufferCompactDesc(llvm::Value* pDesc, llvm::Instruction* pInsertPoint);
 
     // -----------------------------------------------------------------------------------------------------------------
