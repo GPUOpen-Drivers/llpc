@@ -103,9 +103,9 @@ private:
                                            llvm::Instruction* pInsertPos);
     llvm::Value* PatchFsGenericInputImport(llvm::Type*        pInputTy,
                                            uint32_t           location,
-                                           Value*             pLocOffset,
-                                           Value*             pCompIdx,
-                                           Value*             pAuxInterpValue,
+                                           llvm::Value*             pLocOffset,
+                                           llvm::Value*             pCompIdx,
+                                           llvm::Value*             pAuxInterpValue,
                                            uint32_t           interpMode,
                                            uint32_t           interpLoc,
                                            llvm::Instruction* pInsertPos);
@@ -158,7 +158,7 @@ private:
                                            llvm::Instruction* pInsertPos);
     llvm::Value* PatchFsBuiltInInputImport(llvm::Type*        pInputTy,
                                            uint32_t           builtInId,
-                                           Value*             pSampleId,
+                                           llvm::Value*             pSampleId,
                                            llvm::Instruction* pInsertPos);
     llvm::Value* GetSamplePosOffset(llvm::Type* pInputTy, llvm::Value* pSampleId, llvm::Instruction* pInsertPos);
     llvm::Value* GetSamplePosition(llvm::Type* pInputTy, llvm::Instruction* pInsertPos);
@@ -273,26 +273,26 @@ private:
                                           uint32_t patchConstCount,
                                           uint32_t tessFactorStride) const;
 
-    llvm::Value* CalcLdsOffsetForVsOutput(Type*              pOutputTy,
+    llvm::Value* CalcLdsOffsetForVsOutput(llvm::Type*        pOutputTy,
                                           uint32_t           location,
                                           uint32_t           compIdx,
                                           llvm::Instruction* pInsertPos);
 
-    llvm::Value* CalcLdsOffsetForTcsInput(Type*              pInputTy,
+    llvm::Value* CalcLdsOffsetForTcsInput(llvm::Type*        pInputTy,
                                           uint32_t           location,
                                           llvm::Value*       pLocOffset,
                                           llvm::Value*       pCompIdx,
                                           llvm::Value*       pVertexIdx,
                                           llvm::Instruction* pInsertPos);
 
-    llvm::Value* CalcLdsOffsetForTcsOutput(Type*              pOutputTy,
+    llvm::Value* CalcLdsOffsetForTcsOutput(llvm::Type*        pOutputTy,
                                            uint32_t           location,
                                            llvm::Value*       pLocOffset,
                                            llvm::Value*       pCompIdx,
                                            llvm::Value*       pVertexIdx,
                                            llvm::Instruction* pInsertPos);
 
-    llvm::Value* CalcLdsOffsetForTesInput(Type*              pInputTy,
+    llvm::Value* CalcLdsOffsetForTesInput(llvm::Type*        pInputTy,
                                           uint32_t           location,
                                           llvm::Value*       pLocOffset,
                                           llvm::Value*       pCompIdx,
@@ -344,7 +344,7 @@ private:
     llvm::GlobalVariable*   m_pLds;                     // Global variable to model LDS
     llvm::Value*            m_pThreadId;                // Thread ID
 
-    std::vector<Value*>     m_expFragColors[MaxColorTargets]; // Exported fragment colors
+    std::vector<llvm::Value*>     m_expFragColors[MaxColorTargets]; // Exported fragment colors
     std::vector<llvm::CallInst*> m_importCalls; // List of "call" instructions to import inputs
     std::vector<llvm::CallInst*> m_exportCalls; // List of "call" instructions to export outputs
     PipelineState*          m_pPipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass

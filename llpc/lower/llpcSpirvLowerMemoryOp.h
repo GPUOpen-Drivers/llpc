@@ -43,8 +43,8 @@ namespace Llpc
 struct StoreExpandInfo
 {
     StoreInst*                          pStoreInst;  ///< "Store" instruction
-    SmallVector<GetElementPtrInst*, 1>  getElemPtrs; ///< A group of "getelementptr" with constant indices
-    Value*                              pDynIndex;   ///< Dynamic index of destination.
+    llvm::SmallVector<GetElementPtrInst*, 1>  getElemPtrs; ///< A group of "getelementptr" with constant indices
+    llvm::Value*                              pDynIndex;   ///< Dynamic index of destination.
 };
 
 // =====================================================================================================================
@@ -82,7 +82,7 @@ private:
 
     std::unordered_set<llvm::Instruction*> m_removeInsts;
     std::unordered_set<llvm::Instruction*> m_preRemoveInsts;
-    SmallVector<StoreExpandInfo, 1>        m_storeExpandInfo;
+    llvm::SmallVector<StoreExpandInfo, 1>        m_storeExpandInfo;
 };
 
 } // Llpc

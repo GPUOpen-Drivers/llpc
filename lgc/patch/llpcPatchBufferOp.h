@@ -53,7 +53,7 @@ public:
     bool runOnFunction(llvm::Function& function) override;
 
     // Visitors
-    void visitAtomicCmpXchgInst(AtomicCmpXchgInst& atomicCmpXchgInst);
+    void visitAtomicCmpXchgInst(llvm::AtomicCmpXchgInst& atomicCmpXchgInst);
     void visitAtomicRMWInst(llvm::AtomicRMWInst& atomicRmwInst);
     void visitBitCastInst(llvm::BitCastInst& bitCastInst);
     void visitCallInst(llvm::CallInst& callInst);

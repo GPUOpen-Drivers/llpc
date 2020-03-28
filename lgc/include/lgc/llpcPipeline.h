@@ -45,8 +45,6 @@ class Timer;
 namespace lgc
 {
 
-using namespace llvm;
-
 class BuilderContext;
 
 // =====================================================================================================================
@@ -218,11 +216,11 @@ struct ResourceNode
         {
             uint32_t            set;                  // Descriptor set
             uint32_t            binding;              // Binding
-            Constant*           pImmutableValue;      // Array of vectors of i32 constants for immutable value
+            llvm::Constant*           pImmutableValue;      // Array of vectors of i32 constants for immutable value
         };
 
         // Info for DescriptorTableVaPtr
-        ArrayRef<ResourceNode>  innerTable;
+        llvm::ArrayRef<ResourceNode>  innerTable;
 
         // Info for indirect data nodes (IndirectUserDataVaPtr, StreamOutVaTablePtr)
         uint32_t                indirectSizeInDwords;
@@ -556,7 +554,7 @@ public:
     BuilderContext* GetBuilderContext() const { return m_pBuilderContext; }
 
     // Get LLVMContext
-    LLVMContext& GetContext() const;
+    llvm::LLVMContext& GetContext() const;
 
     // -----------------------------------------------------------------------------------------------------------------
     // State setting methods
@@ -580,7 +578,7 @@ public:
     // If using a BuilderImpl, this method must be called before any Create* methods.
     // If using a BuilderRecorder, it can be delayed until after linking.
     virtual void SetUserDataNodes(
-        ArrayRef<ResourceNode>          nodes) = 0;       // The resource mapping nodes. Only used for the duration
+        llvm::ArrayRef<ResourceNode>          nodes) = 0;       // The resource mapping nodes. Only used for the duration
                                                           //  of the call; the call copies the nodes.
 
     // Set device index.
@@ -588,13 +586,13 @@ public:
 
     // Set vertex input descriptions. Each location referenced in a call to CreateReadGenericInput in the
     // vertex shader must have a corresponding description provided here.
-    virtual void SetVertexInputDescriptions(ArrayRef<VertexInputDescription> inputs) = 0;
+    virtual void SetVertexInputDescriptions(llvm::ArrayRef<VertexInputDescription> inputs) = 0;
 
     // Set color export state.
     // The client should always zero-initialize the ColorExportState struct before setting it up, in case future
     // versions add more fields. A local struct variable can be zero-initialized with " = {}".
     virtual void SetColorExportState(
-        ArrayRef<ColorExportFormat> formats,          // Array of ColorExportFormat structs
+        llvm::ArrayRef<ColorExportFormat> formats,          // Array of ColorExportFormat structs
         const ColorExportState&     exportState) = 0; // [in] Color export flags
 
     // Set graphics state (input-assembly, viewport, rasterizer).
@@ -613,17 +611,17 @@ public:
     // Before calling this, each shader module needs to have one global function for the shader
     // entrypoint, then all other functions with internal linkage.
     // Returns the pipeline module, or nullptr on link failure.
-    virtual Module* Link(
-        ArrayRef<Module*> modules) = 0; // Array of modules indexed by shader stage, with nullptr entry
+    virtual llvm::Module* Link(
+        llvm::ArrayRef<llvm::Module*> modules) = 0; // Array of modules indexed by shader stage, with nullptr entry
                                         //  for any stage not present in the pipeline
 
     // Typedef of function passed in to Generate to check the shader cache.
     // Returns the updated shader stage mask, allowing the client to decide not to compile shader stages
     // that got a hit in the cache.
     typedef std::function<uint32_t(
-        const Module*               pModule,      // [in] Module
+        const llvm::Module*               pModule,      // [in] Module
         uint32_t                    stageMask,    // Shader stage mask
-        ArrayRef<ArrayRef<uint8_t>> stageHashes   // Per-stage hash of in/out usage
+        llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes   // Per-stage hash of in/out usage
     )> CheckShaderCacheFunc;
 
     // Generate pipeline module by running patch, middle-end optimization and backend codegen passes.
@@ -632,10 +630,10 @@ public:
     // Like other Builder methods, on error, this calls report_fatal_error, which you can catch by setting
     // a diagnostic handler with LLVMContext::setDiagnosticHandler.
     virtual void Generate(
-        std::unique_ptr<Module>   pipelineModule,       // IR pipeline module
-        raw_pwrite_stream&        outStream,            // [in/out] Stream to write ELF or IR disassembly output
+        std::unique_ptr<llvm::Module>   pipelineModule,       // IR pipeline module
+        llvm::raw_pwrite_stream&        outStream,            // [in/out] Stream to write ELF or IR disassembly output
         CheckShaderCacheFunc      checkShaderCacheFunc, // Function to check shader cache in graphics pipeline
-        ArrayRef<Timer*>          timers) = 0;          // Timers for: patch passes, llvm optimizations, codegen
+        llvm::ArrayRef<llvm::Timer*>          timers) = 0;          // Timers for: patch passes, llvm optimizations, codegen
 
     // -----------------------------------------------------------------------------------------------------------------
     // Non-compiling methods
@@ -643,7 +641,7 @@ public:
     // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
     // type. Only the number of elements of the type is significant.
     // This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.
-    virtual uint32_t ComputeExportFormat(Type* pOutputTy, uint32_t location) = 0;
+    virtual uint32_t ComputeExportFormat(llvm::Type* pOutputTy, uint32_t location) = 0;
 
 private:
     BuilderContext*                 m_pBuilderContext;                  // Builder context

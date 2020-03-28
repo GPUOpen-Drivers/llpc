@@ -35,8 +35,6 @@
 namespace lgc
 {
 
-using namespace llvm;
-
 // Represents graphics IP version info. See https://llvm.org/docs/AMDGPUUsage.html#processors for more
 // details.
 struct GfxIpVersion
@@ -144,7 +142,7 @@ class TargetInfo
 {
 public:
     // Set TargetInfo. Returns false if the GPU name is not found or not supported.
-    bool SetTargetInfo(StringRef gpuName);
+    bool SetTargetInfo(llvm::StringRef gpuName);
 
     // Accessors.
     GfxIpVersion GetGfxIpVersion() const { return m_gfxIp; }

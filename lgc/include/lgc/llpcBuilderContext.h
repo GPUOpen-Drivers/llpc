@@ -53,8 +53,6 @@ class PassManager;
 namespace lgc
 {
 
-using namespace llvm;
-
 class Builder;
 class PassManager;
 class Pipeline;
@@ -74,17 +72,17 @@ public:
 
     // Create the BuilderContext. Returns nullptr on failure to recognize the AMDGPU target whose name is specified
     static BuilderContext* Create(
-        LLVMContext&  context,               // [in] LLVM context to use on all compiles
-        StringRef     gpuName,               // LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
+        llvm::LLVMContext&  context,               // [in] LLVM context to use on all compiles
+        llvm::StringRef     gpuName,               // LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
         uint32_t      palAbiVersion);        // PAL pipeline ABI version to compile for
 
     ~BuilderContext();
 
     // Get LLVM context
-    LLVMContext& GetContext() const { return m_context; }
+    llvm::LLVMContext& GetContext() const { return m_context; }
 
     // Get the target machine.
-    TargetMachine* GetTargetMachine() const { return m_pTargetMachine; }
+    llvm::TargetMachine* GetTargetMachine() const { return m_pTargetMachine; }
 
     // Get targetinfo
     const TargetInfo& GetTargetInfo() const { return *m_pTargetInfo; }
@@ -104,36 +102,36 @@ public:
     // Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not
     // think that we have library functions.
     void PreparePassManager(
-        legacy::PassManager*  pPassMgr);  // [in/out] Pass manager
+        llvm::legacy::PassManager*  pPassMgr);  // [in/out] Pass manager
 
     // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
-    void AddTargetPasses(lgc::PassManager& passMgr, Timer* pCodeGenTimer, raw_pwrite_stream& outStream);
+    void AddTargetPasses(lgc::PassManager& passMgr, llvm::Timer* pCodeGenTimer, llvm::raw_pwrite_stream& outStream);
 
     void SetBuildRelocatableElf(bool buildRelocatableElf) { m_buildRelocatableElf = buildRelocatableElf; }
     bool BuildingRelocatableElf() { return m_buildRelocatableElf; }
 
     // Utility method to create a start/stop timer pass
-    static ModulePass* CreateStartStopTimer(Timer* pTimer, bool starting);
+    static llvm::ModulePass* CreateStartStopTimer(llvm::Timer* pTimer, bool starting);
 
     // Set and get a pointer to the stream used for LLPC_OUTS. This is initially nullptr,
     // signifying no output from LLPC_OUTS. Setting this to a stream means that LLPC_OUTS
     // statements in the middle-end output to that stream, giving a dump of LLVM IR at a
     // few strategic places in the pass flow, as well as information such as input/output
     // mapping.
-    static void SetLlpcOuts(raw_ostream* pStream) { m_pLlpcOuts = pStream; }
-    static raw_ostream* GetLgcOuts() { return m_pLlpcOuts; }
+    static void SetLlpcOuts(llvm::raw_ostream* pStream) { m_pLlpcOuts = pStream; }
+    static llvm::raw_ostream* GetLgcOuts() { return m_pLlpcOuts; }
 
 private:
     BuilderContext() = delete;
     BuilderContext(const BuilderContext&) = delete;
     BuilderContext& operator =(const BuilderContext&) = delete;
 
-    BuilderContext(LLVMContext& context, uint32_t palAbiVersion);
+    BuilderContext(llvm::LLVMContext& context, uint32_t palAbiVersion);
 
     // -----------------------------------------------------------------------------------------------------------------
-    static raw_ostream*        m_pLlpcOuts;                   // nullptr or stream for LLPC_OUTS
-    LLVMContext&               m_context;                     // LLVM context
-    TargetMachine*             m_pTargetMachine = nullptr;    // Target machine
+    static llvm::raw_ostream*        m_pLlpcOuts;                   // nullptr or stream for LLPC_OUTS
+    llvm::LLVMContext&               m_context;                     // LLVM context
+    llvm::TargetMachine*             m_pTargetMachine = nullptr;    // Target machine
     TargetInfo*                m_pTargetInfo = nullptr;       // Target info
     bool                       m_buildRelocatableElf = false; // Flag indicating whether we are building relocatable ELF
     uint32_t                   m_palAbiVersion = 0xFFFFFFFF;  // PAL pipeline ABI version to compile for

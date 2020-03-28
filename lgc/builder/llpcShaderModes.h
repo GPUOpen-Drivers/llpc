@@ -80,15 +80,15 @@ public:
     void Clear();
 
     // Record modes to IR metadata
-    void Record(Module* pModule);
+    void Record(llvm::Module* pModule);
 
     // Read shader modes (common and specific) from a shader IR module, but only if no modes have been set
     // in this ShaderModes. This is used to handle the case that the shader module comes from an earlier
     // shader compile, and it had its ShaderModes recorded into IR then.
-    void ReadModesFromShader(Module* pModule, ShaderStage stage);
+    void ReadModesFromShader(llvm::Module* pModule, ShaderStage stage);
 
     // Read shader modes from IR metadata in a pipeline
-    void ReadModesFromPipeline(Module* pModule);
+    void ReadModesFromPipeline(llvm::Module* pModule);
 
 private:
     bool                m_anySet = false;                                 // Whether any Set*Mode method called

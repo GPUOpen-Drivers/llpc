@@ -35,12 +35,10 @@
 namespace lgc
 {
 
-using namespace llvm;
-
 // Get pointer to stream for LLPC_OUTS, or nullptr if disabled.
-raw_ostream* GetLgcOuts();
+llvm::raw_ostream* GetLgcOuts();
 
 } // lgc
 
 // Output general message
-#define LLPC_OUTS(msg) do if (raw_ostream* pStream = GetLgcOuts()) { *pStream << msg; } while (false)
+#define LLPC_OUTS(msg) do if (llvm::raw_ostream* pStream = GetLgcOuts()) { *pStream << msg; } while (false)
