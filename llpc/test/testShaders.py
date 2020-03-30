@@ -163,7 +163,7 @@ if __name__=='__main__':
             result_msg = []
             sub_index = 0
             for f in os.listdir(SHADER_SRC + "/" + gfx):
-                if f.endswith(".vert") or f.endswith(".tesc") or f.endswith(".tese") or f.endswith(".frag") or f.endswith(".geom") or f.endswith(".comp") or f.endswith(".spvas") or f.endswith(".pipe"):
+                if f.endswith(".vert") or f.endswith(".tesc") or f.endswith(".tese") or f.endswith(".frag") or f.endswith(".geom") or f.endswith(".comp") or f.endswith(".spvasm") or f.endswith(".pipe"):
                     # Build test command
                     gfxip = " "
                     if GFXIP:
@@ -173,7 +173,7 @@ if __name__=='__main__':
 
                     if compile_name == "amdllpc":
                         val = ""
-                        if f.endswith(".spvas"):
+                        if f.endswith(".spvasm"):
                             file = open(SHADER_SRC + "/" + gfx + "/" + f, "r")
                             fileContents = file.read()
                             file.close()

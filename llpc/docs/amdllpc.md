@@ -82,7 +82,7 @@ amdllpc [<options>...] [<files>...]
 
 <file>.spv      SPIR-V binary file
 
-<file>.spvas    SPIR-V text file
+<file>.spvasm   SPIR-V text file
 
 <file>.pipe     Pipeline info file
 ```
@@ -136,6 +136,6 @@ and then retry the `check-amdllpc`.
 
 When you need to investigate a test failure, run a single test from that same build directory like this example:
 ```
-llvm/bin/llvm-lit -v llpc/test/shaderdb/OpAtomicIIncrement_TestVariablePointer_lit.spvas
+llvm/bin/llvm-lit -v llpc/test/shaderdb/OpAtomicIIncrement_TestVariablePointer_lit.spvasm
 ```
 

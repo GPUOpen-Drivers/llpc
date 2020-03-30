@@ -107,7 +107,7 @@ static cl::list<std::string> InFiles(cl::Positional, cl::OneOrMore, cl::ValueReq
             cl::desc("<source>...\n"
               "Type of input file is determined by its filename extension:\n"
               "  .spv      SPIR-V binary\n"
-              "  .spvas    SPIR-V assembly text\n"
+              "  .spvasm   SPIR-V assembly text\n"
               "  .vert     GLSL vertex shader\n"
               "  .tesc     GLSL tessellation control shader\n"
               "  .tese     GLSL tessellation evaluation shader\n"
@@ -309,7 +309,7 @@ namespace LlpcExt
 {
 
 const char SpirvBin[]       = ".spv";
-const char SpirvText[]      = ".spvas";
+const char SpirvText[]      = ".spvasm";
 const char PipelineInfo[]   = ".pipe";
 const char LlvmIr[]         = ".ll";
 
@@ -647,7 +647,7 @@ void* VKAPI_CALL AllocateBuffer(
 }
 
 // =====================================================================================================================
-// Checks whether the specified file name represents a SPRI-V assembly text file (.spvas).
+// Checks whether the specified file name represents a SPIR-V assembly text file (.spvasm).
 static bool IsSpirvTextFile(
     const std::string& fileName)
 {
@@ -669,7 +669,7 @@ static bool IsSpirvTextFile(
 }
 
 // =====================================================================================================================
-// Checks whether the specified file name represents a SPRI-V binary file (.spv).
+// Checks whether the specified file name represents a SPIR-V binary file (.spv).
 static bool IsSpirvBinaryFile(
     const std::string& fileName) // [in] File name to check
 {
