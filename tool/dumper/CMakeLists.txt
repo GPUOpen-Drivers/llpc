@@ -23,18 +23,18 @@
  #
  #######################################################################################################################
 
-project(PIPELINEDUMP C CXX)
+project(DUMPER C CXX)
 
-### Create PIPELINEDUMP Library ################################################################################################
-add_library(pipelineDump STATIC "")
+### Create DUMPER Library ################################################################################################
+add_library(dumper STATIC "")
 
 ### Compiler Options ###################################################################################################
 if(UNIX)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         # SEE: https://gcc.gnu.org/onlinedocs/gcc-6.2.0/gcc/Option-Summary.html#Option-Summary
         # for a list of all options and documentation.
-        #target_compile_options(pipelineDump PRIVATE option)
-        target_compile_options(pipelineDump PRIVATE
+        #target_compile_options(dumper PRIVATE option)
+        target_compile_options(dumper PRIVATE
             -Wno-unused-parameter
             -Wno-type-limits
             -Wno-switch
@@ -49,16 +49,16 @@ if(UNIX)
             -Werror=unused-function
         )
 
-        target_compile_options(pipelineDump PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+        target_compile_options(dumper PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -Wno-unused
             -Wno-ignored-qualifiers
             -Wno-missing-field-initializers
             -Wno-invalid-offsetof           # offsetof within non-standard-layout type 'x' is undefined
         >)
 
-        target_compile_options(pipelineDump PRIVATE -fno-strict-aliasing)
+        target_compile_options(dumper PRIVATE -fno-strict-aliasing)
 
-        target_compile_options(pipelineDump PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+        target_compile_options(dumper PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -std=c++14
             -fno-rtti
             -fPIC
@@ -66,7 +66,7 @@ if(UNIX)
 
         message(STATUS "Configured ${PROJECT_NAME} compiler options for GCC.")
     elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-        target_compile_options(pipelineDump PRIVATE
+        target_compile_options(dumper PRIVATE
             -fvisibility-inlines-hidden
             -fcolor-diagnostics
             -Wall
@@ -74,7 +74,7 @@ if(UNIX)
             -Wno-invalid-offsetof
             -Wno-missing-braces
         )
-        target_compile_options(pipelineDump PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+        target_compile_options(dumper PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -std=c++14
             -fno-rtti
             -fPIC
@@ -87,7 +87,7 @@ if(UNIX)
 elseif(WIN32)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
         # CMAKE-TODO: These are /W4 (level 4) warnings
-        target_compile_options(pipelineDump
+        target_compile_options(dumper
             PRIVATE # Warnings in interface and src
                 /wd4005 # 'DEBUG' : macro redefinition ??? Defined in toolchain ??? importedllvmincludellvm/Support/Debug.h
                 /wd4018 # '<' : signed/unsigned mismatch
@@ -115,8 +115,8 @@ elseif(WIN32)
                 /wd6323 # Use of arithmetic operator on Boolean type(s)
         )
 
-        target_compile_definitions(pipelineDump PRIVATE _SCL_SECURE_NO_WARNINGS)
-        target_compile_definitions(pipelineDump PRIVATE _CRT_SECURE_NO_WARNINGS)
+        target_compile_definitions(dumper PRIVATE _SCL_SECURE_NO_WARNINGS)
+        target_compile_definitions(dumper PRIVATE _CRT_SECURE_NO_WARNINGS)
 
         message(STATUS "Configured ${PROJECT_NAME} compiler options for MSVC.")
     else()
@@ -125,22 +125,22 @@ elseif(WIN32)
 endif()
 
 ### Defines/Includes/Sources ###########################################################################################
-target_compile_definitions(pipelineDump PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
-target_compile_definitions(pipelineDump PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
+target_compile_definitions(dumper PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
+target_compile_definitions(dumper PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
 if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
-    target_compile_definitions(pipelineDump PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
+    target_compile_definitions(dumper PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
 endif()
 if(ICD_BUILD_LLPC)
-    target_compile_definitions(pipelineDump PRIVATE ICD_BUILD_LLPC)
+    target_compile_definitions(dumper PRIVATE ICD_BUILD_LLPC)
 endif()
 
 # metrohash
-target_link_libraries(pipelineDump PUBLIC metrohash)
-target_compile_definitions(pipelineDump PUBLIC SINGLE_EXTERNAL_METROHASH)
+target_link_libraries(dumper PUBLIC metrohash)
+target_compile_definitions(dumper PUBLIC SINGLE_EXTERNAL_METROHASH)
 
-target_link_libraries(pipelineDump PRIVATE cwpack)
+target_link_libraries(dumper PRIVATE cwpack)
 
-target_include_directories(pipelineDump
+target_include_directories(dumper
     PUBLIC
         ${XGL_LLPC_PATH}/../include
     PRIVATE
@@ -152,7 +152,7 @@ target_include_directories(pipelineDump
         ${XGL_LLPC_PATH}/../util
 )
 
-target_sources(pipelineDump PRIVATE
+target_sources(dumper PRIVATE
     ../../util/vkgcUtil.cpp
     ../../util/vkgcElfReader.cpp
     vkgcPipelineDumper.cpp
