@@ -139,7 +139,6 @@ target_link_libraries(pipelineDump PUBLIC metrohash)
 target_compile_definitions(pipelineDump PUBLIC SINGLE_EXTERNAL_METROHASH)
 
 target_link_libraries(pipelineDump PRIVATE cwpack)
-target_link_libraries(pipelineDump PRIVATE pal)
 
 target_include_directories(pipelineDump
     PUBLIC
