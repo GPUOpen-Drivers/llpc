@@ -246,6 +246,16 @@ void PipelineContext::SetOptionsInPipeline(
     options.reconfigWorkgroupLayout = GetPipelineOptions()->reconfigWorkgroupLayout;
     options.includeIr = (IncludeLlvmIr || GetPipelineOptions()->includeIr);
 
+    static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Llpc::ShadowDescriptorTableUsage::Auto) ==
+                                                          lgc::ShadowDescriptorTableUsage::Auto, "mismatch");
+    static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Llpc::ShadowDescriptorTableUsage::Enable) ==
+                                                          lgc::ShadowDescriptorTableUsage::Enable, "mismatch");
+    static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Llpc::ShadowDescriptorTableUsage::Disable) ==
+                                                          lgc::ShadowDescriptorTableUsage::Disable, "mismatch");
+    options.shadowDescriptorTableUsage =
+          static_cast<lgc::ShadowDescriptorTableUsage>(GetPipelineOptions()->shadowDescriptorTableUsage);
+    options.shadowDescriptorTablePtrHigh = GetPipelineOptions()->shadowDescriptorTablePtrHigh;
+
     if (IsGraphics() && (GetGfxIpVersion().major >= 10))
     {
         // Only set NGG options for a GFX10+ graphics pipeline.

@@ -41,11 +41,12 @@
 using namespace lgc;
 using namespace llvm;
 
+// -enable-shadow-desc: enable shadow descriptor table
+static cl::opt<bool> EnableShadowDescriptorTable("enable-shadow-desc",
+                                                 cl::desc("Enable shadow descriptor table"));
 // -shadow-desc-table-ptr-high: high part of VA for shadow descriptor table pointer
-// The default value 2 is a dummy value for use in offline compiling.
 static cl::opt<uint32_t> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
-                                                cl::desc("High part of VA for shadow descriptor table pointer"),
-                                                cl::init(2));
+                                                cl::desc("High part of VA for shadow descriptor table pointer"));
 
 // =====================================================================================================================
 // Initialize this ShaderSystemValues if it was previously uninitialized.
@@ -62,6 +63,35 @@ void ShaderSystemValues::Initialize(
 
         assert(m_shaderStage != ShaderStageInvalid);
         assert(m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.initialized);
+
+        // Load shadow descriptor table settings from pipeline options.
+        const auto pPipelineOptions = &m_pPipelineState->GetOptions();
+        switch (pPipelineOptions->shadowDescriptorTableUsage)
+        {
+        case ShadowDescriptorTableUsage::Auto: // Use defaults defined in class
+            break;
+        case ShadowDescriptorTableUsage::Enable:
+            m_enableShadowDescTable = true;
+            m_shadowDescTablePtrHigh = pPipelineOptions->shadowDescriptorTablePtrHigh;
+            break;
+        case ShadowDescriptorTableUsage::Disable:
+            m_enableShadowDescTable = false;
+            break;
+        default:
+            llvm_unreachable("Unsupported value of shadowDescriptorTableUsage");
+            break;
+        }
+
+        // Command line options override pipeline options.
+        if (EnableShadowDescriptorTable.getNumOccurrences() > 0)
+        {
+            m_enableShadowDescTable = EnableShadowDescriptorTable;
+        }
+
+        if (ShadowDescTablePtrHigh.getNumOccurrences() > 0)
+        {
+            m_shadowDescTablePtrHigh = ShadowDescTablePtrHigh;
+        }
     }
 }
 
@@ -399,7 +429,7 @@ Value* ShaderSystemValues::GetShadowDescTablePtr(
                                                     ADDR_SPACE_CONST);
             m_shadowDescTablePtrs[descSet] = GetExtendedResourceNodeValue(resNodeIdx,
                                                                           pDescTablePtrTy,
-                                                                          ShadowDescTablePtrHigh);
+                                                                          m_shadowDescTablePtrHigh);
         }
     }
     return m_shadowDescTablePtrs[descSet];
@@ -823,5 +853,12 @@ uint32_t ShaderSystemValues::FindResourceNodeByDescSet(
         }
     }
     return InvalidValue;
+}
+
+// =====================================================================================================================
+// Test if shadow descriptor table is enabled
+bool ShaderSystemValues::IsShadowDescTableEnabled() const
+{
+    return m_enableShadowDescTable;
 }
 

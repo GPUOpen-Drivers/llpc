@@ -41,11 +41,6 @@
 using namespace lgc;
 using namespace llvm;
 
-// -enable-shadow-desc: enable shadow desriptor table
-static cl::opt<bool> EnableShadowDescriptorTable("enable-shadow-desc",
-                                                 cl::desc("Enable shadow descriptor table"),
-                                                 cl::init(true));
-
 namespace lgc
 {
 
@@ -161,7 +156,7 @@ void PatchDescriptorLoad::ProcessDescriptorGetPtr(
     }
     else if (descPtrCallName.startswith(lgcName::DescriptorGetFmaskPtr))
     {
-        shadow = EnableShadowDescriptorTable;
+        shadow = m_pipelineSysValues.Get(m_pEntryPoint)->IsShadowDescTableEnabled();
         resType = ResourceNodeType::DescriptorFmask;
     }
 

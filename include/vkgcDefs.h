@@ -71,6 +71,7 @@
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
 //* |     40.0 | Added DescriptorReserved12, which moves DescriptorYCbCrSampler down to 13                             |
 //* |     39.0 | Non-LLPC-specific XGL code should #include vkcgDefs.h instead of llpc.h                               |
+//* |     38.3 | Added shadowDescriptorTableUsage and shadowDescriptorTablePtrHigh to PipelineOptions                  |
 //* |     38.2 | Added scalarThreshold to PipelineShaderOptions                                                        |
 //* |     38.1 | Added unrollThreshold to PipelineShaderOptions                                                        |
 //* |     38.0 | Removed CreateShaderCache in ICompiler and pShaderCache in pipeline build info                        |
@@ -253,6 +254,14 @@ struct BinaryData
     const void*     pCode;              ///< Shader binary data
 };
 
+/// Values for shadowDescriptorTableUsage pipeline option.
+enum class ShadowDescriptorTableUsage : uint32_t
+{
+    Auto     = 0,  ///< Use 0 for auto setting so null initialized structures default to auto.
+    Enable   = 1,
+    Disable  = 2,
+};
+
 /// Represents per pipeline options.
 struct PipelineOptions
 {
@@ -264,6 +273,9 @@ struct PipelineOptions
     bool robustBufferAccess;       ///< If set, out of bounds accesses to buffer or private array will be handled.
                                    ///  for now this option is used by LLPC shader and affects only the private array,
                                    ///  the out of bounds accesses will be skipped with this setting.
+
+    ShadowDescriptorTableUsage shadowDescriptorTableUsage;    ///< Controls shadow descriptor table.
+    uint32_t                   shadowDescriptorTablePtrHigh;  ///< Sets high part of VA ptr for shadow descriptor table.
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.

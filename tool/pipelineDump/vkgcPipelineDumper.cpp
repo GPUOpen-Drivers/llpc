@@ -53,16 +53,17 @@ namespace Vkgc
 {
 
 // Forward declaration
-std::ostream& operator<<(std::ostream& out, VkVertexInputRate       inputRate);
-std::ostream& operator<<(std::ostream& out, VkFormat                format);
-std::ostream& operator<<(std::ostream& out, VkPrimitiveTopology     topology);
-std::ostream& operator<<(std::ostream& out, VkPolygonMode           polygonMode);
-std::ostream& operator<<(std::ostream& out, VkCullModeFlagBits      cullMode);
-std::ostream& operator<<(std::ostream& out, VkFrontFace             frontFace);
-std::ostream& operator<<(std::ostream& out, ResourceMappingNodeType type);
-std::ostream& operator<<(std::ostream& out, NggSubgroupSizingType   subgroupSizing);
-std::ostream& operator<<(std::ostream& out, NggCompactMode          compactMode);
-std::ostream& operator<<(std::ostream& out, WaveBreakSize           waveBreakSize);
+std::ostream& operator<<(std::ostream& out, VkVertexInputRate           inputRate);
+std::ostream& operator<<(std::ostream& out, VkFormat                    format);
+std::ostream& operator<<(std::ostream& out, VkPrimitiveTopology         topology);
+std::ostream& operator<<(std::ostream& out, VkPolygonMode               polygonMode);
+std::ostream& operator<<(std::ostream& out, VkCullModeFlagBits          cullMode);
+std::ostream& operator<<(std::ostream& out, VkFrontFace                 frontFace);
+std::ostream& operator<<(std::ostream& out, ResourceMappingNodeType     type);
+std::ostream& operator<<(std::ostream& out, NggSubgroupSizingType       subgroupSizing);
+std::ostream& operator<<(std::ostream& out, NggCompactMode              compactMode);
+std::ostream& operator<<(std::ostream& out, WaveBreakSize               waveBreakSize);
+std::ostream& operator<<(std::ostream& out, ShadowDescriptorTableUsage  shadowDescriptorTableUsage);
 
 template std::ostream& operator<<(std::ostream& out, ElfReader<Elf64>& reader);
 template raw_ostream& operator<<(raw_ostream& out, ElfReader<Elf64>& reader);
@@ -714,6 +715,8 @@ void PipelineDumper::DumpPipelineOptions(
     dumpFile << "options.includeIr = " << pOptions->includeIr << "\n";
     dumpFile << "options.robustBufferAccess = " << pOptions->robustBufferAccess << "\n";
     dumpFile << "options.reconfigWorkgroupLayout = " << pOptions->reconfigWorkgroupLayout << "\n";
+    dumpFile << "options.shadowDescriptorTableUsgae = " << pOptions->shadowDescriptorTableUsage << "\n";
+    dumpFile << "options.shadowDescriptorTablePtrHigh = " << pOptions->shadowDescriptorTablePtrHigh << "\n";
 }
 
 // =====================================================================================================================
@@ -939,6 +942,8 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
     hasher.Update(pPipeline->options.scalarBlockLayout);
     hasher.Update(pPipeline->options.includeIr);
     hasher.Update(pPipeline->options.robustBufferAccess);
+    hasher.Update(pPipeline->options.shadowDescriptorTableUsage);
+    hasher.Update(pPipeline->options.shadowDescriptorTablePtrHigh);
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
@@ -1045,6 +1050,8 @@ void PipelineDumper::UpdateHashForNonFragmentState(
         pHasher->Update(pPipeline->options.includeIr);
         pHasher->Update(pPipeline->options.robustBufferAccess);
         pHasher->Update(pPipeline->options.reconfigWorkgroupLayout);
+        pHasher->Update(pPipeline->options.shadowDescriptorTableUsage);
+        pHasher->Update(pPipeline->options.shadowDescriptorTablePtrHigh);
     }
 }
 
@@ -1803,6 +1810,27 @@ std::ostream& operator<<(
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _16x16)
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _32x32)
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, DrawTime)
+        break;
+    default:
+        llvm_unreachable("Should never be called!");
+        break;
+    }
+
+    return out << pString;
+}
+
+// =====================================================================================================================
+// Translates enum "ShadowDescriptorTableUsage" to string and output to ostream.
+std::ostream& operator<<(
+    std::ostream&              out,                         // [out] Output stream
+    ShadowDescriptorTableUsage shadowDescriptorTableUsage)  // Shadow descriptor table setting
+{
+    const char* pString = nullptr;
+    switch (shadowDescriptorTableUsage)
+    {
+    CASE_CLASSENUM_TO_STRING(ShadowDescriptorTableUsage, Auto)
+    CASE_CLASSENUM_TO_STRING(ShadowDescriptorTableUsage, Enable)
+    CASE_CLASSENUM_TO_STRING(ShadowDescriptorTableUsage, Disable)
         break;
     default:
         llvm_unreachable("Should never be called!");

@@ -113,6 +113,9 @@ public:
     // Get spill table pointer
     llvm::Instruction* GetSpillTablePtr();
 
+    // Test if shadow descriptor table is enabled
+    bool IsShadowDescTableEnabled() const;
+
 private:
     // Get stream-out buffer table pointer
     llvm::Instruction* GetStreamOutTablePtr();
@@ -178,6 +181,10 @@ private:
     llvm::Instruction*  m_pStreamOutTablePtr;           // Stream-out buffer table pointer
     llvm::Instruction*  m_pSpillTablePtr = nullptr;     // Spill table pointer
     llvm::Instruction*  m_pPc = nullptr;                // Program counter as <2 x i32>
+
+    bool                m_enableShadowDescTable = true; // Enable shadow descriptor table
+    uint32_t            m_shadowDescTablePtrHigh = 2;   // High part of VA for shadow table pointer
+                                                        // 2 is a dummy value for use in offline compiling
 };
 
 // =====================================================================================================================
