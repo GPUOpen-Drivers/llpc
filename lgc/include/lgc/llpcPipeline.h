@@ -97,10 +97,16 @@ enum class WaveBreak : uint32_t
     DrawTime = 0xF,        ///< Choose wave break size per draw
 };
 
+/// Values for shadowDescriptorTableUsage pipeline option.
+enum class ShadowDescriptorTableUsage : uint32_t
+{
+    Auto     = 0,  ///< Use 0 for auto setting so null initialized structures default to auto.
+    Enable   = 1,
+    Disable  = 2,
+};
+
 // Middle-end per-pipeline options to pass to SetOptions.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
-// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
-// from IR metadata relies on that.
 struct Options
 {
     uint64_t              hash[2];                 // Pipeline hash to set in ELF PAL metadata
@@ -119,12 +125,12 @@ struct Options
     NggSubgroupSizing     nggSubgroupSizing;       // NGG subgroup sizing type
     uint32_t              nggVertsPerSubgroup;     // How to determine NGG verts per subgroup
     uint32_t              nggPrimsPerSubgroup;     // How to determine NGG prims per subgroup
+    ShadowDescriptorTableUsage  shadowDescriptorTableUsage;   // Shadow descriptor table setting
+    uint32_t                    shadowDescriptorTablePtrHigh; // High part of VA ptr.
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
-// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
-// from IR metadata relies on that.
 struct ShaderOptions
 {
     uint64_t      hash[2];        // Shader hash to set in ELF PAL metadata
