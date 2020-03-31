@@ -185,7 +185,7 @@ target_include_directories(llpc
         ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
         ${PROJECT_SOURCE_DIR}/util
         ${PROJECT_SOURCE_DIR}/../util
-        ${PROJECT_SOURCE_DIR}/../tool/pipelineDump
+        ${PROJECT_SOURCE_DIR}/../tool/dumper
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
         ${LLVM_INCLUDE_DIRS}
@@ -260,8 +260,8 @@ else()
     )
 endif()
 
-add_subdirectory(../tool/pipelineDump ${PROJECT_BINARY_DIR}/../pipelineDump)
-target_link_libraries(llpc PRIVATE pipelineDump)
+add_subdirectory(../tool/dumper ${PROJECT_BINARY_DIR}/../dumper)
+target_link_libraries(llpc PRIVATE dumper)
 
 target_link_libraries(llpc PRIVATE cwpack)
 
@@ -332,7 +332,7 @@ PRIVATE
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
     ${PROJECT_SOURCE_DIR}/util
     ${PROJECT_SOURCE_DIR}/../util
-    ${PROJECT_SOURCE_DIR}/../tool/pipelineDump
+    ${PROJECT_SOURCE_DIR}/../tool/dumper
     ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx6/chip
     ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx9/chip
     ${XGL_PAL_PATH}/inc/core

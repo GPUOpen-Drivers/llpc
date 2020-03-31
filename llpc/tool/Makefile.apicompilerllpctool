@@ -23,7 +23,7 @@ LCXXINCS += -I$(LLPC_DEPTH)/translator/lib/SPIRV/libSPIRV
 LCXXINCS += -I$(LLPC_DEPTH)/util
 LCXXINCS += -I$(VKGC_DEPTH)/include
 LCXXINCS += -I$(VKGC_DEPTH)/util
-LCXXINCS += -I$(VKGC_DEPTH)/tool/pipelineDump
+LCXXINCS += -I$(VKGC_DEPTH)/tool/dumper
 LCXXINCS += -I$(VKGC_DEPTH)/tool/vfx
 
 vpath %.cpp $(LLPC_DEPTH)/tool
@@ -118,7 +118,7 @@ endif
 
 LLLIBS += ../../$(BUILD_DIR)/icdapicompilerllpc$(LIB_EXT) \
           ../../../tool/vfx/$(BUILD_DIR)/icdapicompilertoolvfx$(LIB_EXT) \
-          ../../../tool/pipelineDump/$(BUILD_DIR)/icdapicompilertoolpipelineDump$(LIB_EXT)
+          ../../../tool/dumper/$(BUILD_DIR)/icdapicompilertooldumper$(LIB_EXT)
 
 ifeq ($(BUILD_LLVM_SHARED),1)
     LLOPTS += $(shell cat ../../../../../imported/llvm/$(BUILD_DIR)/link_options)

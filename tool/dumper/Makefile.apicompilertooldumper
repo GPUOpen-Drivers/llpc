@@ -2,7 +2,7 @@ include $(ICD_DEPTH)/make/icddefs
 
 include $(ICD_DEPTH)/make/Makefile.$(ICD_PLATFORM).icd
 
-LIB_TARGET = icdapicompilertoolpipelineDump
+LIB_TARGET = icdapicompilertooldumper
 
 # MetroHash
 # If define METROHASH_PATH, pipeline dump use the external single Metrohash.
@@ -21,10 +21,10 @@ LCXXINCS += -I$(LLVM_DEPTH)/include
 LCXXINCS += -I$(LLVM_BUILD_DIR)/include
 LCXXINCS += -I$(CWPACK_DEPTH)/inc
 LCXXINCS += -I$(ICD_DEPTH)/api/compiler/include
-LCXXINCS += -I$(ICD_DEPTH)/api/compiler/tool/pipelineDump
+LCXXINCS += -I$(ICD_DEPTH)/api/compiler/tool/dumper
 LCXXINCS += -I$(ICD_DEPTH)/api/compiler/util
 
-vpath %.cpp $(ICD_DEPTH)/api/compiler/tool/pipelineDump
+vpath %.cpp $(ICD_DEPTH)/api/compiler/tool/dumper
 vpath %.cpp $(ICD_DEPTH)/api/compiler/util
 
 CPPFILES +=              \
