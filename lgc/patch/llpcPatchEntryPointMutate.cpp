@@ -433,7 +433,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             switch (pNode->type)
             {
             case ResourceNodeType::DescriptorBuffer:
-            case ResourceNodeType::DescriptorBufferCompact:
             case ResourceNodeType::DescriptorResource:
             case ResourceNodeType::DescriptorSampler:
             case ResourceNodeType::DescriptorTexelBuffer:
@@ -705,7 +704,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 }
 
             case ResourceNodeType::DescriptorBuffer:
-            case ResourceNodeType::DescriptorBufferCompact:
             case ResourceNodeType::DescriptorResource:
             case ResourceNodeType::DescriptorSampler:
             case ResourceNodeType::DescriptorTexelBuffer:
@@ -720,6 +718,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 break;
 
             case ResourceNodeType::PushConst:
+            case ResourceNodeType::DescriptorBufferCompact:
                 {
                     argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), pNode->sizeInDwords));
                     for (uint32_t j = 0; j < pNode->sizeInDwords; ++j)

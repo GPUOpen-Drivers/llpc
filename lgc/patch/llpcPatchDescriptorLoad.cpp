@@ -531,6 +531,32 @@ Value* PatchDescriptorLoad::LoadBufferDescriptor(
         return UndefValue::get(VectorType::get(builder.getInt32Ty(), 4));
     }
 
+    if ((pNode == pTopNode) && (pNode->type == ResourceNodeType::DescriptorBufferCompact))
+    {
+        // This is a compact buffer descriptor (only two dwords) in the top-level table. We special-case
+        // that to use user data SGPRs directly, if PatchEntryPointMutate managed to fit the value into
+        // user data SGPRs.
+        uint32_t resNodeIdx = pTopNode - m_pPipelineState->GetUserDataNodes().data();
+        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
+        uint32_t argIdx = pIntfData->entryArgIdxs.resNodeValues[resNodeIdx];
+        if (argIdx > 0)
+        {
+            // Resource node isn't spilled. Load its value from function argument.
+            Argument* pDescArg = m_pEntryPoint->getArg(argIdx);
+            pDescArg->setName(Twine("resNode") + Twine(resNodeIdx));
+            // The function argument is a vector of i32. Treat it as an array of <2 x i32> and
+            // extract the required array element.
+            pArrayOffset = builder.CreateMul(pArrayOffset, builder.getInt32(2));
+            Value* pDescDword0 = builder.CreateExtractElement(pDescArg, pArrayOffset);
+            pArrayOffset = builder.CreateAdd(pArrayOffset, builder.getInt32(1));
+            Value* pDescDword1 = builder.CreateExtractElement(pDescArg, pArrayOffset);
+            Value* pDesc = UndefValue::get(VectorType::get(builder.getInt32Ty(), 2));
+            pDesc = builder.CreateInsertElement(pDesc, pDescDword0, uint64_t(0));
+            pDesc = builder.CreateInsertElement(pDesc, pDescDword1, 1);
+            return BuildBufferCompactDesc(pDesc, &*builder.GetInsertPoint());
+        }
+    }
+
     // Get a pointer to the descriptor, as a pointer to i32.
     pDescPtr = GetDescPtr(ResourceNodeType::DescriptorBuffer,
                           descSet,
