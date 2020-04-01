@@ -3316,15 +3316,22 @@ Function* NggPrimShader::MutateEsToVariant(
 
     auto savedInsertPos = m_pBuilder->saveIP();
 
-    BasicBlock* pRetBlock = &pEsEntryVariant->back();
+    // Find the return block and remove old return instruction
+    BasicBlock* pRetBlock = nullptr;
+    for (BasicBlock& block : *pEsEntryVariant)
+    {
+        auto pRetInst = dyn_cast<ReturnInst>(block.getTerminator());
+        if (pRetInst != nullptr)
+        {
+            pRetInst->dropAllReferences();
+            pRetInst->eraseFromParent();
+
+            pRetBlock = &block;
+            break;
+        }
+    }
+
     m_pBuilder->SetInsertPoint(pRetBlock);
-
-    // Remove old "return" instruction
-    assert(isa<ReturnInst>(pRetBlock->getTerminator()));
-    ReturnInst* pRetInst = cast<ReturnInst>(pRetBlock->getTerminator());
-
-    pRetInst->dropAllReferences();
-    pRetInst->eraseFromParent();
 
     // Get exported data
     std::vector<Instruction*> expCalls;
