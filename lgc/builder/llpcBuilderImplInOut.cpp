@@ -567,7 +567,7 @@ Value* BuilderImplInOut::EvalIJOffsetSmooth(
     // Adjust each coefficient by offset.
     Value* pAdjusted = AdjustIJ(pPullModel, pOffset);
     // Extract <I/W, J/W, 1/W> part of that
-    Value* pIJDivW = CreateShuffleVector(pAdjusted, pAdjusted, { 0, 1 });
+    Value* pIJDivW = CreateShuffleVector(pAdjusted, pAdjusted, ArrayRef<uint32_t>{ 0, 1 });
     Value* pRcpW = CreateExtractElement(pAdjusted, 2);
     // Get W by making a reciprocal of 1/W
     Value* pW = CreateFDiv(ConstantFP::get(getFloatTy(), 1.0), pRcpW);

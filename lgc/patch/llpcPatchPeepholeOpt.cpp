@@ -230,7 +230,7 @@ void PatchPeepholeOpt::visitBitCast(
 
         // Create our new shuffle instruction.
         ShuffleVectorInst* const pNewShuffleVector = new ShuffleVectorInst(
-            pBitCastLhs, pBitCastRhs, pShuffleVector->getMask(), pShuffleVector->getName());
+            pBitCastLhs, pBitCastRhs, pShuffleVector->getOperand(2), pShuffleVector->getName());
         pNewShuffleVector->insertAfter(&bitCast);
 
         // Replace the bit cast with the new shuffle vector.
