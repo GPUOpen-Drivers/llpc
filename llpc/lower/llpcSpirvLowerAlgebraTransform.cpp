@@ -130,22 +130,22 @@ bool SpirvLowerAlgebraTransform::runOnModule(
                 }
 
                 // ConstantProp instruction if trivially constant.
-                if (Constant* pConst = ConstantFoldInstruction(pInst, dataLayout, &targetLibInfo))
+                if (Constant* pConstVal = ConstantFoldInstruction(pInst, dataLayout, &targetLibInfo))
                 {
-                    LLVM_DEBUG(dbgs() << "Algebriac transform: constant folding: " << *pConst << " from: " << *pInst
+                    LLVM_DEBUG(dbgs() << "Algebriac transform: constant folding: " << *pConstVal << " from: " << *pInst
                         << '\n');
                     if ((pDestType->isHalfTy() && m_fp16DenormFlush) ||
                         (pDestType->isFloatTy() && m_fp32DenormFlush) ||
                         (pDestType->isDoubleTy() && m_fp64DenormFlush))
                     {
                         // Replace denorm value with zero
-                        if (pConst->isFiniteNonZeroFP() && (pConst->isNormalFP() == false))
+                        if (pConstVal->isFiniteNonZeroFP() && (pConstVal->isNormalFP() == false))
                         {
-                            pConst = ConstantFP::get(pDestType, 0.0);
+                            pConstVal = ConstantFP::get(pDestType, 0.0);
                         }
                     }
 
-                    pInst->replaceAllUsesWith(pConst);
+                    pInst->replaceAllUsesWith(pConstVal);
                     if (isInstructionTriviallyDead(pInst, &targetLibInfo))
                     {
                         pInst->eraseFromParent();

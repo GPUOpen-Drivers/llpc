@@ -128,11 +128,11 @@ private:
     {
         llvm::Constant*   pInt8;      // < 0, 0, 0, 1 >
         llvm::Constant*   pInt16;     // < 0, 0, 0, 1 >
-        llvm::Constant*   pInt;       // < 0, 0, 0, 1 >
+        llvm::Constant*   pInt32;     // < 0, 0, 0, 1 >
         llvm::Constant*   pInt64;     // < 0, 0, 0, 0, 0, 0, 0, 1 >
         llvm::Constant*   pFloat16;   // < 0, 0, 0, 0x3C00 >
-        llvm::Constant*   pFloat;     // < 0, 0, 0, 0x3F800000 >
-        llvm::Constant*   pDouble;    // < 0, 0, 0, 0, 0, 0, 0, 0x3FF00000 >
+        llvm::Constant*   pFloat32;   // < 0, 0, 0, 0x3F800000 >
+        llvm::Constant*   pDouble64;  // < 0, 0, 0, 0, 0, 0, 0, 0x3FF00000 >
     } m_fetchDefaults;
 };
 

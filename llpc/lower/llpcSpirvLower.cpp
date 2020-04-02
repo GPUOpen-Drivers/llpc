@@ -67,12 +67,12 @@ namespace Llpc
 // Replace a constant with instructions using a builder.
 void SpirvLower::ReplaceConstWithInsts(
     Context*        pContext,      // [in] The context
-    Constant* const pConst)        // [in/out] The constant to replace with instructions.
+    Constant* const pConstVal)     // [in/out] The constant to replace with instructions.
 
 {
     SmallSet<Constant*, 8> otherConsts;
     Builder* pBuilder = pContext->GetBuilder();
-    for (User* const pUser : pConst->users())
+    for (User* const pUser : pConstVal->users())
     {
         if (Constant* const pOtherConst = dyn_cast<Constant>(pUser))
         {
@@ -89,7 +89,7 @@ void SpirvLower::ReplaceConstWithInsts(
 
     SmallVector<Value*, 8> users;
 
-    for (User* const pUser : pConst->users())
+    for (User* const pUser : pConstVal->users())
     {
         users.push_back(pUser);
     }
@@ -105,7 +105,7 @@ void SpirvLower::ReplaceConstWithInsts(
             const uint32_t incomingValueCount = pPhiNode->getNumIncomingValues();
             for (uint32_t i = 0; i < incomingValueCount; i++)
             {
-                if (pPhiNode->getIncomingValue(i) == pConst)
+                if (pPhiNode->getIncomingValue(i) == pConstVal)
                 {
                     pBuilder->SetInsertPoint(pPhiNode->getIncomingBlock(i)->getTerminator());
                     break;
@@ -117,12 +117,12 @@ void SpirvLower::ReplaceConstWithInsts(
             pBuilder->SetInsertPoint(pInst);
         }
 
-        if (ConstantExpr* const pConstExpr = dyn_cast<ConstantExpr>(pConst))
+        if (ConstantExpr* const pConstExpr = dyn_cast<ConstantExpr>(pConstVal))
         {
             Instruction* const pInsertPos = pBuilder->Insert(pConstExpr->getAsInstruction());
             pInst->replaceUsesOfWith(pConstExpr, pInsertPos);
         }
-        else if (ConstantVector* const pConstVector = dyn_cast<ConstantVector>(pConst))
+        else if (ConstantVector* const pConstVector = dyn_cast<ConstantVector>(pConstVal))
         {
             Value* pResultValue = UndefValue::get(pConstVector->getType());
             for (uint32_t i = 0; i < pConstVector->getNumOperands(); i++)
@@ -141,8 +141,8 @@ void SpirvLower::ReplaceConstWithInsts(
         }
     }
 
-    pConst->removeDeadConstantUsers();
-    pConst->destroyConstant();
+    pConstVal->removeDeadConstantUsers();
+    pConstVal->destroyConstant();
 }
 
 // =====================================================================================================================
@@ -161,9 +161,9 @@ void SpirvLower::RemoveConstantExpr(
         }
     }
 
-    for (Constant* const pConst : constantUsers)
+    for (Constant* const pConstVal : constantUsers)
     {
-        ReplaceConstWithInsts(pContext, pConst);
+        ReplaceConstWithInsts(pContext, pConstVal);
     }
 }
 

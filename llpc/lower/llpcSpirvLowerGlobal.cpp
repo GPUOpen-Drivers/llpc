@@ -2041,15 +2041,15 @@ void SpirvLowerGlobal::LowerBufferBlock()
 
         for (User* const pUser : global.users())
         {
-            if (Constant* const pConst = dyn_cast<Constant>(pUser))
+            if (Constant* const pConstVal = dyn_cast<Constant>(pUser))
             {
-                constantUsers.push_back(pConst);
+                constantUsers.push_back(pConstVal);
             }
         }
 
-        for (Constant* const pConst : constantUsers)
+        for (Constant* const pConstVal : constantUsers)
         {
-            ReplaceConstWithInsts(m_pContext, pConst);
+            ReplaceConstWithInsts(m_pContext, pConstVal);
         }
 
         // Record of all the functions that our global is used within.
@@ -2294,15 +2294,15 @@ void SpirvLowerGlobal::LowerPushConsts()
 
         for (User* const pUser : global.users())
         {
-            if (Constant* const pConst = dyn_cast<Constant>(pUser))
+            if (Constant* const pConstVal = dyn_cast<Constant>(pUser))
             {
-                constantUsers.push_back(pConst);
+                constantUsers.push_back(pConstVal);
             }
         }
 
-        for (Constant* const pConst : constantUsers)
+        for (Constant* const pConstVal : constantUsers)
         {
-            ReplaceConstWithInsts(m_pContext, pConst);
+            ReplaceConstWithInsts(m_pContext, pConstVal);
         }
 
         // Record of all the functions that our global is used within.

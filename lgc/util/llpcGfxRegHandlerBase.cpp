@@ -64,7 +64,7 @@ void GfxRegHandlerBase::SetRegister(
         m_dwords.push_back(nullptr);
     }
 
-    m_pRegister = pNewRegister;
+    m_pReg = pNewRegister;
     m_dirtyDwords = 0u;
 }
 
@@ -80,7 +80,7 @@ Value* GfxRegHandlerBase::GetRegister()
     {
         if (dirtyMask & 1)
         {
-            m_pRegister = m_pBuilder->CreateInsertElement(m_pRegister,
+            m_pReg = m_pBuilder->CreateInsertElement(m_pReg,
                                                           m_dwords[i],
                                                           m_pBuilder->getInt64(i));
         }
@@ -91,8 +91,8 @@ Value* GfxRegHandlerBase::GetRegister()
     // Set mask as all clean since we've update the registered <nxi32>
     m_dirtyDwords = 0u;
 
-    // Just return updated m_pRegister
-    return m_pRegister;
+    // Just return updated m_pReg
+    return m_pReg;
 }
 
 // =====================================================================================================================

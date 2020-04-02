@@ -37,9 +37,9 @@ using namespace llvm;
 // =====================================================================================================================
 GfxRegHandler::GfxRegHandler(
     Builder* pBuilder,  // [in] The builder handle
-    Value*   pRegister) // [in] The registered target vec <n x i32>
+    Value*   pReg) // [in] The registered target vec <n x i32>
     :
-    GfxRegHandlerBase(pBuilder, pRegister)
+    GfxRegHandlerBase(pBuilder, pReg)
 {
     m_pOne = pBuilder->getInt32(1);
 }
@@ -113,10 +113,10 @@ static constexpr BitsInfo SqImgSampRegBitsGfx9[static_cast<uint32_t>(SqSampRegs:
 // Helper class for handling Registers defined in SQ_IMG_SAMP_WORD
 SqImgSampRegHandler::SqImgSampRegHandler(
     Builder*      pBuilder,      // [in] Bound builder context
-    Value*        pRegister,     // [in] Bound register vec <n x i32>
+    Value*        pReg,     // [in] Bound register vec <n x i32>
     GfxIpVersion* pGfxIpVersion) // [in] Target GFX IP version
     :
-    GfxRegHandler(pBuilder, pRegister)
+    GfxRegHandler(pBuilder, pReg)
 {
     m_pGfxIpVersion = pGfxIpVersion;
 
@@ -213,10 +213,10 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx10[static_cast<uint32_t>(SqRsrcRegs
 // Helper class for handling Registers defined in SQ_IMG_RSRC_WORD
 SqImgRsrcRegHandler::SqImgRsrcRegHandler(
     Builder*      pBuilder,      // [in] Bound builder context
-    Value*        pRegister,     // [in] Bound register vec <n x i32>
+    Value*        pReg,     // [in] Bound register vec <n x i32>
     GfxIpVersion* pGfxIpVersion) // [in] Current GFX IP version
     :
-    GfxRegHandler(pBuilder, pRegister)
+    GfxRegHandler(pBuilder, pReg)
 {
     m_pGfxIpVersion = pGfxIpVersion;
 

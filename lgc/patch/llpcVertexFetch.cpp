@@ -289,7 +289,7 @@ VertexFetch::VertexFetch(
     m_fetchDefaults.pInt16 = ConstantVector::get({ pZero, pZero, pZero, pOne });
 
     // Int (0, 0, 0, 1)
-    m_fetchDefaults.pInt = ConstantVector::get({ pZero, pZero, pZero, pOne });
+    m_fetchDefaults.pInt32 = ConstantVector::get({ pZero, pZero, pZero, pOne });
 
     // Int64 (0, 0, 0, 1)
     m_fetchDefaults.pInt64 = ConstantVector::get({ pZero, pZero, pZero, pZero, pZero, pZero, pZero, pOne });
@@ -306,7 +306,7 @@ VertexFetch::VertexFetch(
         uint32_t u32;
     } floatOne = { 1.0f };
     auto pFloatOneVal = ConstantInt::get(Type::getInt32Ty(*m_pContext), floatOne.u32);
-    m_fetchDefaults.pFloat = ConstantVector::get({ pZero, pZero, pZero, pFloatOneVal });
+    m_fetchDefaults.pFloat32 = ConstantVector::get({ pZero, pZero, pZero, pFloatOneVal });
 
     // Double (0.0, 0.0, 0.0, 1.0)
     union
@@ -316,10 +316,10 @@ VertexFetch::VertexFetch(
     } doubleOne = { 1.0 };
     auto pDoubleOne0 = ConstantInt::get(Type::getInt32Ty(*m_pContext), doubleOne.u32[0]);
     auto pDoubleOne1 = ConstantInt::get(Type::getInt32Ty(*m_pContext), doubleOne.u32[1]);
-    m_fetchDefaults.pDouble = ConstantVector::get({ pZero, pZero,
-                                                    pZero, pZero,
-                                                    pZero, pZero,
-                                                    pDoubleOne0, pDoubleOne1 });
+    m_fetchDefaults.pDouble64 = ConstantVector::get({ pZero, pZero,
+                                                      pZero, pZero,
+                                                      pZero, pZero,
+                                                      pDoubleOne0, pDoubleOne1 });
 }
 
 // =====================================================================================================================
@@ -605,7 +605,7 @@ Value* VertexFetch::Run(
         }
         else if (bitWidth == 32)
         {
-            pDefaults = m_fetchDefaults.pInt;
+            pDefaults = m_fetchDefaults.pInt32;
         }
         else
         {
@@ -621,12 +621,12 @@ Value* VertexFetch::Run(
         }
         else if (bitWidth == 32)
         {
-            pDefaults = m_fetchDefaults.pFloat;
+            pDefaults = m_fetchDefaults.pFloat32;
         }
         else
         {
             assert(bitWidth == 64);
-            pDefaults = m_fetchDefaults.pDouble;
+            pDefaults = m_fetchDefaults.pDouble64;
         }
     }
     else

@@ -100,12 +100,12 @@ void SpirvLowerConstImmediateStore::ProcessAllocaInsts(
     for (auto instIt = pEntryBlock->begin(), instItEnd = pEntryBlock->end(); instIt != instItEnd; ++instIt)
     {
         auto pInst = &*instIt;
-        if (auto pAlloca = dyn_cast<AllocaInst>(pInst))
+        if (auto pAllocaInst = dyn_cast<AllocaInst>(pInst))
         {
-            if (pAlloca->getType()->getElementType()->isAggregateType())
+            if (pAllocaInst->getType()->getElementType()->isAggregateType())
             {
                 // Got an "alloca" instruction of aggregate type.
-                auto pStoreInst = FindSingleStore(pAlloca);
+                auto pStoreInst = FindSingleStore(pAllocaInst);
                 if ((pStoreInst != nullptr) && isa<Constant>(pStoreInst->getValueOperand()))
                 {
                     // Got an aggregate "alloca" with a single store to the whole type.
@@ -126,12 +126,12 @@ void SpirvLowerConstImmediateStore::ProcessAllocaInsts(
 // NOTE: This is conservative in that it returns nullptr if the pointer escapes by being used in anything
 // other than "store" (as the pointer), "load" or "getelementptr" instruction.
 StoreInst* SpirvLowerConstImmediateStore::FindSingleStore(
-    AllocaInst* pAlloca)  // [in] The "alloca" instruction to process
+    AllocaInst* pAllocaInst)  // [in] The "alloca" instruction to process
 {
     std::vector<Instruction*> pointers;
     bool isOuterPointer = true;
     StoreInst* pStoreInstFound = nullptr;
-    Instruction* pPointer = pAlloca;
+    Instruction* pPointer = pAllocaInst;
     while (true)
     {
         for (auto useIt = pPointer->use_begin(), useItEnd = pPointer->use_end(); useIt != useItEnd; ++useIt)
@@ -181,9 +181,9 @@ StoreInst* SpirvLowerConstImmediateStore::FindSingleStore(
 void SpirvLowerConstImmediateStore::ConvertAllocaToReadOnlyGlobal(
     StoreInst* pStoreInst)  // [in] The single constant store into the "alloca"
 {
-    auto pAlloca = cast<AllocaInst>(pStoreInst->getPointerOperand());
+    auto pAllocaInst = cast<AllocaInst>(pStoreInst->getPointerOperand());
     auto pGlobal = new GlobalVariable(*m_pModule,
-                                      pAlloca->getType()->getElementType(),
+                                      pAllocaInst->getType()->getElementType(),
                                       true, // isConstant
                                       GlobalValue::InternalLinkage,
                                       cast<Constant>(pStoreInst->getValueOperand()),
@@ -191,19 +191,19 @@ void SpirvLowerConstImmediateStore::ConvertAllocaToReadOnlyGlobal(
                                       nullptr,
                                       GlobalValue::NotThreadLocal,
                                       SPIRAS_Constant);
-    pGlobal->takeName(pAlloca);
-    // Change all uses of pAlloca to use pGlobal. We need to do it manually, as there is a change
+    pGlobal->takeName(pAllocaInst);
+    // Change all uses of pAllocaInst to use pGlobal. We need to do it manually, as there is a change
     // of address space, and we also need to recreate "getelementptr"s.
     std::vector<std::pair<Instruction*, Value*>> allocaToGlobalMap;
-    allocaToGlobalMap.push_back(std::pair<Instruction*, Value*>(pAlloca, pGlobal));
+    allocaToGlobalMap.push_back(std::pair<Instruction*, Value*>(pAllocaInst, pGlobal));
     do
     {
-        auto pAlloca = allocaToGlobalMap.back().first;
+        auto pAllocaInst = allocaToGlobalMap.back().first;
         auto pGlobal = allocaToGlobalMap.back().second;
         allocaToGlobalMap.pop_back();
-        while (pAlloca->use_empty() == false)
+        while (pAllocaInst->use_empty() == false)
         {
-            auto useIt = pAlloca->use_begin();
+            auto useIt = pAllocaInst->use_begin();
             if (auto pOrigGetElemPtrInst = dyn_cast<GetElementPtrInst>(useIt->getUser()))
             {
                 // This use is a "getelementptr" instruction. Create a replacement one with the new address space.
@@ -224,7 +224,7 @@ void SpirvLowerConstImmediateStore::ConvertAllocaToReadOnlyGlobal(
                 // Remember that we need to replace the uses of the original "getelementptr" with the new one.
                 allocaToGlobalMap.push_back(std::pair<Instruction*, Value*>(pOrigGetElemPtrInst, pNewGetElemPtrInst));
                 // Remove the use from the original "getelementptr".
-                *useIt = UndefValue::get(pAlloca->getType());
+                *useIt = UndefValue::get(pAllocaInst->getType());
             }
             else
             {

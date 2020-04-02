@@ -121,7 +121,7 @@ public:
                           uint32_t                    forceLoopUnrollCount);
 
     static void RemoveConstantExpr(Context* pContext, llvm::GlobalVariable* pGlobal);
-    static void ReplaceConstWithInsts(Context* pContext, llvm::Constant* const pConst);
+    static void ReplaceConstWithInsts(Context* pContext, llvm::Constant* const pConstVal);
 
 protected:
     void Init(llvm::Module* pModule);
