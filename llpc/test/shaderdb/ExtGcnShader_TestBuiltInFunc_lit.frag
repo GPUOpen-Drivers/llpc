@@ -31,7 +31,7 @@ void main()
 ; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubema
 ; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubesc
 ; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubetc
-; SHADERTEST: [[TIME:%[^ ]*]] = call i64 @llvm.amdgcn.s.memtime()
+; SHADERTEST: [[TIME:%[^ ]*]] = call i64 @llvm.readcyclecounter()
 ; SHADERTEST: = call i64 asm sideeffect "; %1", "=r,0"(i64 [[TIME]])
 ; SHADERTEST: AMDLLPC SUCCESS
 */
