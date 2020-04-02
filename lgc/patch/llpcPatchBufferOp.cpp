@@ -1422,7 +1422,9 @@ Value* PatchBufferOp::GetBaseAddressFromBufferDesc(
     assert(pDescType->getVectorElementType()->isIntegerTy(32));
 
     // Get the base address of our buffer by extracting the two components with the 48-bit address, and masking.
-    Value* pBaseAddr = m_pBuilder->CreateShuffleVector(pBufferDesc, UndefValue::get(pDescType), { 0, 1 });
+    Value* pBaseAddr = m_pBuilder->CreateShuffleVector(pBufferDesc,
+                                                       UndefValue::get(pDescType),
+                                                       ArrayRef<uint32_t>{ 0, 1 });
     Value* const pBaseAddrMask = ConstantVector::get({
                                                         m_pBuilder->getInt32(0xFFFFFFFF),
                                                         m_pBuilder->getInt32(0xFFFF)

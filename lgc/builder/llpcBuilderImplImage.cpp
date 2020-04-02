@@ -1188,7 +1188,9 @@ Value* BuilderImplImage::CreateImageStore(
         {
             if (pVectorTexelTy->getNumElements() != 4)
             {
-                pTexel = CreateShuffleVector(pTexel, Constant::getNullValue(pTexelTy), { 0, 1, 2, 3 });
+                pTexel = CreateShuffleVector(pTexel,
+                                             Constant::getNullValue(pTexelTy),
+                                             ArrayRef<uint32_t>{ 0, 1, 2, 3 });
             }
         }
         else
@@ -1354,7 +1356,7 @@ Value* BuilderImplImage::CreateImageGather(
     }
 
     // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
-    pSamplerDesc = CreateShuffleVector(pSamplerDesc, pSamplerDesc, { 0, 1, 2, 3 });
+    pSamplerDesc = CreateShuffleVector(pSamplerDesc, pSamplerDesc, ArrayRef<uint32_t>{ 0, 1, 2, 3 });
 
     Value* pResult = nullptr;
     Value* pAddrOffset = address[ImageAddressIdxOffset];
@@ -1477,7 +1479,7 @@ Value* BuilderImplImage::PreprocessIntegerImageGather(
                                       { getInt32(15), pZero, pImageDesc, pZero, pZero });
     pResInfo = CreateBitCast(pResInfo, VectorType::get(getInt32Ty(), 4));
 
-    Value* pWidthHeight = CreateShuffleVector(pResInfo, pResInfo, { 0, 1 });
+    Value* pWidthHeight = CreateShuffleVector(pResInfo, pResInfo, ArrayRef<uint32_t>{ 0, 1 });
     pWidthHeight = CreateSIToFP(pWidthHeight, VectorType::get(getFloatTy(), 2));
     Value* pValueToAdd = CreateFDiv(ConstantFP::get(pWidthHeight->getType(), -0.5), pWidthHeight);
     uint32_t coordCount = pCoord->getType()->getVectorNumElements();
@@ -1995,7 +1997,7 @@ Value* BuilderImplImage::CreateImageQuerySize(
     if ((dim == Dim1DArray) && (modifiedDim == Dim2DArray))
     {
         // For a 1D array on gfx9+ that we treated as a 2D array, we want components 0 and 2.
-        return CreateShuffleVector(pIntResInfo, pIntResInfo, { 0, 2 }, instName);
+        return CreateShuffleVector(pIntResInfo, pIntResInfo, ArrayRef<uint32_t>{ 0, 2 }, instName);
     }
     return CreateShuffleVector(pIntResInfo,
                                pIntResInfo,
@@ -2039,7 +2041,7 @@ Value* BuilderImplImage::CreateImageGetLod(
                             derivatives);
 
     // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
-    pSamplerDesc = CreateShuffleVector(pSamplerDesc, pSamplerDesc, { 0, 1, 2, 3 });
+    pSamplerDesc = CreateShuffleVector(pSamplerDesc, pSamplerDesc, ArrayRef<uint32_t>{ 0, 1, 2, 3 });
 
     SmallVector<Value*, 9> args;
     args.push_back(getInt32(3));                    // dmask
@@ -2506,7 +2508,7 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
                                      {},
                                      &*GetInsertPoint());
         pFragCoord->setName("FragCoord");
-        pFragCoord = CreateShuffleVector(pFragCoord, pFragCoord, { 0, 1 });
+        pFragCoord = CreateShuffleVector(pFragCoord, pFragCoord, ArrayRef<uint32_t>{ 0, 1 });
         pFragCoord = CreateFPToSI(pFragCoord, VectorType::get(getInt32Ty(), 2));
         uint32_t coordCount = pCoord->getType()->getVectorNumElements();
         if (coordCount > 2)

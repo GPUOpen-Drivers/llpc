@@ -346,7 +346,7 @@ Value* BuilderImplBase::ScalarizeInPairs(
 {
     if (auto pVecTy = dyn_cast<VectorType>(pValue->getType()))
     {
-        Value* pInComps = CreateShuffleVector(pValue, pValue, { 0, 1 });
+        Value* pInComps = CreateShuffleVector(pValue, pValue, ArrayRef<uint32_t>{ 0, 1 });
         Value* pResultComps = callback(pInComps);
         Value* pResult = UndefValue::get(VectorType::get(pResultComps->getType()->getScalarType(),
                                                          pVecTy->getNumElements()));
