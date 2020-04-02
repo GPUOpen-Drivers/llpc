@@ -75,7 +75,7 @@ struct BitsState
 class GfxRegHandler : public GfxRegHandlerBase
 {
 protected:
-    GfxRegHandler(Builder* pBuilder, llvm::Value* pRegister);
+    GfxRegHandler(Builder* pBuilder, llvm::Value* pReg);
 
     // Common function for getting the current value for the hardware register
     llvm::Value* GetRegCommon(uint32_t regId);
@@ -109,7 +109,7 @@ private:
     BitsState*      m_pBitsState    = nullptr;
 };
 
-// SqImgSampRegisters ID
+// SqImgSampRegs ID
 // Corresponds to SqImgSampRegBitsGfx9
 enum class SqSampRegs
 {
@@ -125,7 +125,7 @@ enum class SqSampRegs
 class SqImgSampRegHandler: public GfxRegHandler
 {
 public:
-    SqImgSampRegHandler(Builder* pBuilder, llvm::Value* pRegister, GfxIpVersion* pGfxIpVersion);
+    SqImgSampRegHandler(Builder* pBuilder, llvm::Value* pReg, GfxIpVersion* pGfxIpVersion);
 
     // Get the current value for the hardware register
     llvm::Value* GetReg(SqSampRegs regId);
@@ -164,7 +164,7 @@ enum class SqRsrcRegs
 class SqImgRsrcRegHandler : public GfxRegHandler
 {
 public:
-    SqImgRsrcRegHandler(Builder* pBuilder, llvm::Value* pRegister, GfxIpVersion* pGfxIpVersion);
+    SqImgRsrcRegHandler(Builder* pBuilder, llvm::Value* pReg, GfxIpVersion* pGfxIpVersion);
 
     // Get the current value for the hardware register
     llvm::Value* GetReg(SqRsrcRegs regId);

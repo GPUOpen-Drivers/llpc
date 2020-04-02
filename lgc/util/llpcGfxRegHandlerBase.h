@@ -57,10 +57,10 @@ public:
 
 protected:
     // Constructor
-    inline GfxRegHandlerBase(Builder* pBuilder, llvm::Value* pRegister)
+    inline GfxRegHandlerBase(Builder* pBuilder, llvm::Value* pReg)
     {
         m_pBuilder = pBuilder;
-        SetRegister(pRegister);
+        SetRegister(pReg);
     }
 
     // Return new DWORD with replacing the specific range of bits in old DWORD
@@ -103,7 +103,7 @@ private:
     {
         if (m_dwords[index] == nullptr)
         {
-            m_dwords[index] = m_pBuilder->CreateExtractElement(m_pRegister, m_pBuilder->getInt64(index));
+            m_dwords[index] = m_pBuilder->CreateExtractElement(m_pReg, m_pBuilder->getInt64(index));
         }
     }
 
@@ -117,9 +117,9 @@ private:
 
     // Combined <n x i32> vector containing the register value, which does not yet reflect the dwords
     // that are marked as dirty.
-    llvm::Value* m_pRegister;
+    llvm::Value* m_pReg;
 
-    // Bit-mask of dwords whose value was changed but is not yet reflected in m_pRegister.
+    // Bit-mask of dwords whose value was changed but is not yet reflected in m_pReg.
     uint32_t m_dirtyDwords;
 };
 

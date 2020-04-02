@@ -395,7 +395,7 @@ Value* FragColorExport::Run(
         }
     }
 
-    Value* pExport = nullptr;
+    Value* pExportCall = nullptr;
 
     if (expFmt == EXP_FORMAT_ZERO)
     {
@@ -453,7 +453,7 @@ Value* FragColorExport::Run(
             ConstantInt::get(Type::getInt1Ty(*m_pContext), true)                          // vm
         };
 
-        pExport = EmitCall("llvm.amdgcn.exp.compr.v2f16", Type::getVoidTy(*m_pContext), args, {}, pInsertPos);
+        pExportCall = EmitCall("llvm.amdgcn.exp.compr.v2f16", Type::getVoidTy(*m_pContext), args, {}, pInsertPos);
     }
     else
     {
@@ -469,10 +469,10 @@ Value* FragColorExport::Run(
             ConstantInt::get(Type::getInt1Ty(*m_pContext), true)                          // vm
         };
 
-        pExport = EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, {}, pInsertPos);
+        pExportCall = EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, {}, pInsertPos);
     }
 
-    return pExport;
+    return pExportCall;
 }
 
 // =====================================================================================================================

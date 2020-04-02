@@ -1651,10 +1651,10 @@ void PatchInOutImportExport::visitReturnInst(
                 }
 
                 // Do fragment color exporting
-                auto pExport = m_pFragColorExport->Run(pOutput, location, pInsertPos);
-                if (pExport != nullptr)
+                auto pExportInst = m_pFragColorExport->Run(pOutput, location, pInsertPos);
+                if (pExportInst != nullptr)
                 {
-                    m_pLastExport = cast<CallInst>(pExport);
+                    m_pLastExport = cast<CallInst>(pExportInst);
                 }
             }
         }
@@ -6346,7 +6346,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
     assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
     // Convert the output value to floating-point export value
-    Value* pExport = nullptr;
+    Value* pExportInst = nullptr;
     const uint32_t numChannels = (bitWidth == 64) ? compCount * 2 : compCount;
     uint32_t startChannel = (bitWidth == 64) ? compIdx * 2 : compIdx;
     Type* pExportTy = (numChannels > 1) ? VectorType::get(Type::getFloatTy(*m_pContext), numChannels) :
@@ -6360,11 +6360,11 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
             assert(pOutputTy->isIntOrIntVectorTy());
             Type* pZExtTy = Type::getInt32Ty(*m_pContext);
             pZExtTy = pOutputTy->isVectorTy() ? cast<Type>(VectorType::get(pZExtTy, compCount)) : pZExtTy;
-            pExport = new ZExtInst(pOutput,
+            pExportInst = new ZExtInst(pOutput,
                                    pZExtTy,
                                    "",
                                    pInsertPos);
-            pExport = new BitCastInst(pExport, pExportTy, "", pInsertPos);
+            pExportInst = new BitCastInst(pExportInst, pExportTy, "", pInsertPos);
         }
         else if (bitWidth == 16)
         {
@@ -6373,7 +6373,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
             {
                 Type* pBitCastTy = Type::getInt16Ty(*m_pContext);
                 pBitCastTy = pOutputTy->isVectorTy() ? cast<Type>(VectorType::get(pBitCastTy, compCount)) : pBitCastTy;
-                pExport = new BitCastInst(pOutput,
+                pExportInst = new BitCastInst(pOutput,
                                           pBitCastTy,
                                           "",
                                           pInsertPos);
@@ -6381,26 +6381,26 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
             else
             {
                 assert(pOutputTy->isIntOrIntVectorTy());
-                pExport = pOutput;
+                pExportInst = pOutput;
             }
 
             Type* pZExtTy = Type::getInt32Ty(*m_pContext);
             pZExtTy = pOutputTy->isVectorTy() ? cast<Type>(VectorType::get(pZExtTy, compCount)) : pZExtTy;
-            pExport = new ZExtInst(pExport,
+            pExportInst = new ZExtInst(pExportInst,
                                    pZExtTy,
                                    "",
                                    pInsertPos);
-            pExport = new BitCastInst(pExport, pExportTy, "", pInsertPos);
+            pExportInst = new BitCastInst(pExportInst, pExportTy, "", pInsertPos);
         }
         else
         {
             assert(CanBitCast(pOutputTy, pExportTy));
-            pExport = new BitCastInst(pOutput, pExportTy, "", pInsertPos);
+            pExportInst = new BitCastInst(pOutput, pExportTy, "", pInsertPos);
         }
     }
     else
     {
-        pExport = pOutput;
+        pExportInst = pOutput;
     }
 
     assert(numChannels <= 8);
@@ -6408,13 +6408,13 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
 
     if (numChannels == 1)
     {
-        exportValues[0] = pExport;
+        exportValues[0] = pExportInst;
     }
     else
     {
         for (uint32_t i = 0; i < numChannels; ++i)
         {
-            exportValues[i] = ExtractElementInst::Create(pExport,
+            exportValues[i] = ExtractElementInst::Create(pExportInst,
                                                          ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                          "",
                                                          pInsertPos);

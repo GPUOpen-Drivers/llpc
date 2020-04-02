@@ -59,7 +59,7 @@ private:
     SpirvLowerConstImmediateStore& operator=(const SpirvLowerConstImmediateStore&) = delete;
 
     void ProcessAllocaInsts(llvm::Function* pFunc);
-    llvm::StoreInst* FindSingleStore(llvm::AllocaInst* pAlloca);
+    llvm::StoreInst* FindSingleStore(llvm::AllocaInst* pAllocaInst);
     void ConvertAllocaToReadOnlyGlobal(llvm::StoreInst* pStoreInst);
 };
 

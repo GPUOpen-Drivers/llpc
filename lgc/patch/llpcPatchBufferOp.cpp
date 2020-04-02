@@ -1275,9 +1275,9 @@ void PatchBufferOp::PostVisitMemSetInst(
 
         Value* pNewValue = nullptr;
 
-        if (Constant* const pConst = dyn_cast<Constant>(pValue))
+        if (Constant* const pConstVal = dyn_cast<Constant>(pValue))
         {
-            pNewValue = ConstantVector::getSplat({stride, false}, pConst);
+            pNewValue = ConstantVector::getSplat({stride, false}, pConstVal);
             pNewValue = m_pBuilder->CreateBitCast(pNewValue, pCastDestType->getPointerElementType());
             CopyMetadata(pNewValue, &memSetInst);
         }
@@ -1339,9 +1339,9 @@ void PatchBufferOp::PostVisitMemSetInst(
 
         Value* pNewValue = nullptr;
 
-        if (Constant* const pConst = dyn_cast<Constant>(pValue))
+        if (Constant* const pConstVal = dyn_cast<Constant>(pValue))
         {
-            pNewValue = ConstantVector::getSplat(pMemoryType->getVectorElementCount(), pConst);
+            pNewValue = ConstantVector::getSplat(pMemoryType->getVectorElementCount(), pConstVal);
         }
         else
         {

@@ -257,7 +257,7 @@ bool PatchCopyShader::runOnModule(
         //
 
         // Add switchInst to entry block
-        auto pSwitch = builder.CreateSwitch(pStreamId, pEndBlock, outputStreamCount);
+        auto pSwitchInst = builder.CreateSwitch(pStreamId, pEndBlock, outputStreamCount);
 
         for (uint32_t streamId = 0; streamId < MaxGsStreams; ++streamId)
         {
@@ -267,7 +267,7 @@ bool PatchCopyShader::runOnModule(
                 BasicBlock* pStreamBlock = BasicBlock::Create(*m_pContext, blockName, pEntryPoint, pEndBlock);
                 builder.SetInsertPoint(pStreamBlock);
 
-                pSwitch->addCase(builder.getInt32(streamId), pStreamBlock);
+                pSwitchInst->addCase(builder.getInt32(streamId), pStreamBlock);
 
                 ExportOutput(streamId, builder);
                 builder.CreateBr(pEndBlock);
