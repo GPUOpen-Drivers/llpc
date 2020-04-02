@@ -766,14 +766,18 @@ void DoAutoLayoutDesc(
                     }
                     else if (pNode->type != nodeType)
                     {
-                        assert(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
-                                     (nodeType == ResourceMappingNodeType::DescriptorResource) ||
-                                     (nodeType == ResourceMappingNodeType::DescriptorTexelBuffer) ||
-                                     (nodeType == ResourceMappingNodeType::DescriptorSampler)) &&
-                                    ((pNode->type == ResourceMappingNodeType::DescriptorCombinedTexture) ||
-                                     (pNode->type == ResourceMappingNodeType::DescriptorResource) ||
-                                     (pNode->type == ResourceMappingNodeType::DescriptorTexelBuffer) ||
-                                     (pNode->type == ResourceMappingNodeType::DescriptorSampler)));
+                        {
+                            assert((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
+                                         (nodeType == ResourceMappingNodeType::DescriptorResource) ||
+                                         (nodeType == ResourceMappingNodeType::DescriptorTexelBuffer) ||
+                                         (nodeType == ResourceMappingNodeType::DescriptorSampler));
+                        }
+                        {
+                            assert((pNode->type == ResourceMappingNodeType::DescriptorCombinedTexture) ||
+                                   (pNode->type == ResourceMappingNodeType::DescriptorResource) ||
+                                   (pNode->type == ResourceMappingNodeType::DescriptorTexelBuffer) ||
+                                   (pNode->type == ResourceMappingNodeType::DescriptorSampler));
+                        }
 
                         pNode->type = ResourceMappingNodeType::DescriptorCombinedTexture;
                         sizeInDwords = 12 * arraySize;
