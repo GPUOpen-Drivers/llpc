@@ -138,7 +138,7 @@ Instruction* BuilderImplMisc::CreateReadClock(
     }
     else
     {
-        pReadClock = CreateIntrinsic(Intrinsic::amdgcn_s_memtime, {}, {}, nullptr, instName);
+        pReadClock = CreateIntrinsic(Intrinsic::readcyclecounter, {}, {}, nullptr, instName);
     }
     pReadClock->addAttribute(AttributeList::FunctionIndex, Attribute::ReadOnly);
 
