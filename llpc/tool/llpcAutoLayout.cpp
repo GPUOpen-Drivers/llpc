@@ -695,7 +695,7 @@ void DoAutoLayoutDesc(
                 SPIRVWord descSet = 0;
                 if (pVar->hasDecorate(DecorationBinding, 0, &binding))
                 {
-                    // Test shaderdb/OpDecorationGroup_TestGroupAndGroupMember_lit.spvas
+                    // Test shaderdb/OpDecorationGroup_TestGroupAndGroupMember_lit.spvasm
                     // defines a variable with a binding but no set. Handle that case.
                     pVar->hasDecorate(DecorationDescriptorSet, 0, &descSet);
 
