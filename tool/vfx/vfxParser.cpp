@@ -353,25 +353,22 @@ bool VfxParser::ParseKey(
     pKeyTok = TrimStringEnd(pKeyTok);
 
     bool isSection = false;          // Is this member an Section object
-    bool isArrayAccess = false;     // Is containing array access
-    uint32_t arrayIndex = 0;        // Array access index
+    uint32_t parsedArrayIndex = 0;        // Array access index
     MemberType memberType;
 
     while (pKeyTok != nullptr)
     {
-        isArrayAccess = IsArrayAccess(pKeyTok);
-
-        if (isArrayAccess)
+        if (IsArrayAccess(pKeyTok))
         {
             char* pLBracket = nullptr;
-            result = ParseArrayAccess(pKeyTok, lineNum, &arrayIndex, &pLBracket, nullptr, m_pErrorMsg);
+            result = ParseArrayAccess(pKeyTok, lineNum, &parsedArrayIndex, &pLBracket, nullptr, m_pErrorMsg);
             // Remove bracket from string token
             *pLBracket = '\0';
             pKeyTok = TrimStringEnd(pKeyTok);
         }
         else
         {
-            arrayIndex = 0;
+            parsedArrayIndex = 0;
         }
 
         result = pTempSectionObj->IsSection(lineNum, pKeyTok, &isSection, &memberType, m_pErrorMsg);
@@ -391,7 +388,7 @@ bool VfxParser::ParseKey(
                                                          pKeyTok,
                                                          memberType,
                                                          true,
-                                                         arrayIndex,
+                                                         parsedArrayIndex,
                                                          &pTempSectionObj,
                                                          m_pErrorMsg);
             if (result == false)
@@ -405,7 +402,7 @@ bool VfxParser::ParseKey(
 
     if (pArrayIndex != nullptr)
     {
-        *pArrayIndex = arrayIndex;
+        *pArrayIndex = parsedArrayIndex;
     }
 
     if (ppSectionObjectOut != nullptr)
@@ -420,7 +417,7 @@ bool VfxParser::ParseKey(
 // Parses a key-value pair according to predefined rule.
 bool VfxParser::ParseKeyValue(
     char*                         pKey,           // [in] Input key string
-    char*                         pValue,         // [in] Input value string
+    char*                         pValueStr,         // [in] Input value string
     uint32_t                      lineNum,        // Line number
     Section*                      pSectionObject) // [out] Key-value map to hold the parse results.
 {
@@ -451,7 +448,7 @@ bool VfxParser::ParseKeyValue(
             {
             case MemberTypeEnum:
                 {
-                    result = ParseEnumName(pValue, lineNum, &value, m_pErrorMsg);
+                    result = ParseEnumName(pValueStr, lineNum, &value, m_pErrorMsg);
                     if (result == true)
                     {
                         result = pAccessedSectionObject->Set(lineNum, memberName, &(value.iVec4[0]));
@@ -460,7 +457,7 @@ bool VfxParser::ParseKeyValue(
                 }
             case MemberTypeInt:
                 {
-                    result = ParseInt(pValue, lineNum, &value);
+                    result = ParseInt(pValueStr, lineNum, &value);
                     if (result == true)
                     {
                         result = pAccessedSectionObject->Set(lineNum, memberName, &(value.iVec4[0]));
@@ -469,7 +466,7 @@ bool VfxParser::ParseKeyValue(
                 }
             case MemberTypeFloat:
                 {
-                    result = ParseFloat16(pValue, lineNum, &value);
+                    result = ParseFloat16(pValueStr, lineNum, &value);
                     if (result == true)
                     {
                         result = pAccessedSectionObject->Set(lineNum, memberName, &(value.f16Vec4[0]));
@@ -478,7 +475,7 @@ bool VfxParser::ParseKeyValue(
                 }
             case MemberTypeDouble:
                 {
-                    result = ParseDouble(pValue, lineNum, &value);
+                    result = ParseDouble(pValueStr, lineNum, &value);
                     if (result == true)
                     {
                         result = pAccessedSectionObject->Set(lineNum, memberName, &(value.dVec2[0]));
@@ -487,18 +484,18 @@ bool VfxParser::ParseKeyValue(
                 }
             case MemberTypeBool:
                 {
-                    result = ParseBool(pValue, lineNum, &value, m_pErrorMsg);
+                    result = ParseBool(pValueStr, lineNum, &value, m_pErrorMsg);
                     if (result == true)
                     {
                         static_assert(sizeof(uint8_t) == sizeof(bool), "");
-                        uint8_t bValue = value.iVec4[0] ? 1 : 0;
-                        result = pAccessedSectionObject->Set(lineNum, memberName, &bValue);
+                        uint8_t boolValue = value.iVec4[0] ? 1 : 0;
+                        result = pAccessedSectionObject->Set(lineNum, memberName, &boolValue);
                     }
                     break;
                 }
             case MemberTypeIVec4:
                 {
-                    result = ParseIVec4(pValue, lineNum, &value);
+                    result = ParseIVec4(pValueStr, lineNum, &value);
                     if (result == false)
                     {
                         break;
@@ -508,7 +505,7 @@ bool VfxParser::ParseKeyValue(
                 }
             case MemberTypeI64Vec2:
                 {
-                    result = ParseI64Vec2(pValue, lineNum, &value);
+                    result = ParseI64Vec2(pValueStr, lineNum, &value);
                     if (result == false)
                     {
                         break;
@@ -518,7 +515,7 @@ bool VfxParser::ParseKeyValue(
                 }
             case MemberTypeBinding:
                 {
-                    result = ParseBinding(pValue, lineNum, &value);
+                    result = ParseBinding(pValueStr, lineNum, &value);
                     if (result == false)
                     {
                         break;
@@ -528,7 +525,7 @@ bool VfxParser::ParseKeyValue(
                 }
             case MemberTypeFVec4:
                 {
-                    result = ParseFVec4(pValue, lineNum, &value);
+                    result = ParseFVec4(pValueStr, lineNum, &value);
                     if (result == false)
                     {
                         break;
@@ -538,7 +535,7 @@ bool VfxParser::ParseKeyValue(
                 }
             case MemberTypeF16Vec4:
                 {
-                    result = ParseF16Vec4(pValue, lineNum, &value);
+                    result = ParseF16Vec4(pValueStr, lineNum, &value);
                     if (result == false)
                     {
                         break;
@@ -548,7 +545,7 @@ bool VfxParser::ParseKeyValue(
                 }
             case MemberTypeDVec2:
                 {
-                    result = ParseDVec2(pValue, lineNum, &value);
+                    result = ParseDVec2(pValueStr, lineNum, &value);
                     if (result == false)
                     {
                         break;
@@ -560,42 +557,42 @@ bool VfxParser::ParseKeyValue(
             case MemberTypeUArray:
                 {
                     std::vector<uint8_t>** ppIntData = nullptr;
-                    pAccessedSectionObject->GetPtrOf(lineNum, memberName, true, 0, &ppIntData, m_pErrorMsg);
-                    result = ParseIArray(pValue, lineNum, valueType == MemberTypeIArray, **ppIntData);
+                    pAccessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppIntData, m_pErrorMsg);
+                    result = ParseIArray(pValueStr, lineNum, valueType == MemberTypeIArray, **ppIntData);
                     break;
                 }
             case MemberTypeI64Array:
             case MemberTypeU64Array:
                 {
                     std::vector<uint8_t>** ppIntData = nullptr;
-                    pAccessedSectionObject->GetPtrOf(lineNum, memberName, true, 0, &ppIntData, m_pErrorMsg);
-                    result = ParseI64Array(pValue, lineNum, valueType == MemberTypeI64Array, **ppIntData);
+                    pAccessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppIntData, m_pErrorMsg);
+                    result = ParseI64Array(pValueStr, lineNum, valueType == MemberTypeI64Array, **ppIntData);
                     break;
                 }
             case MemberTypeFArray:
                 {
                     std::vector<uint8_t>** ppFloatData = nullptr;
-                    pAccessedSectionObject->GetPtrOf(lineNum, memberName, true, 0, &ppFloatData, m_pErrorMsg);
-                    result = ParseFArray(pValue, lineNum, **ppFloatData);
+                    pAccessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppFloatData, m_pErrorMsg);
+                    result = ParseFArray(pValueStr, lineNum, **ppFloatData);
                     break;
                 }
             case MemberTypeF16Array:
                 {
                     std::vector<uint8_t>** ppFloatData = nullptr;
-                    pAccessedSectionObject->GetPtrOf(lineNum, memberName, true, 0, &ppFloatData, m_pErrorMsg);
-                    result = ParseF16Array(pValue, lineNum, **ppFloatData);
+                    pAccessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppFloatData, m_pErrorMsg);
+                    result = ParseF16Array(pValueStr, lineNum, **ppFloatData);
                     break;
                 }
             case MemberTypeDArray:
                 {
                     std::vector<uint8_t>** ppDoubleData;
-                    pAccessedSectionObject->GetPtrOf(lineNum, memberName, true, 0, &ppDoubleData, m_pErrorMsg);
-                    result = ParseDArray(pValue, lineNum, **ppDoubleData);
+                    pAccessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppDoubleData, m_pErrorMsg);
+                    result = ParseDArray(pValueStr, lineNum, **ppDoubleData);
                     break;
                 }
             case MemberTypeString:
                 {
-                    std::string str = pValue;
+                    std::string str = pValueStr;
                     result = pAccessedSectionObject->Set(lineNum, memberName, &str);
                     break;
                 }
@@ -1427,8 +1424,8 @@ bool ParseArrayAccess(
         }
         if (pArrayIndex != nullptr)
         {
-            uint32_t arrayIndex = strtol(pLBracket + 1, nullptr, 10);
-            *pArrayIndex = arrayIndex;
+            uint32_t parsedArrayIndex = strtol(pLBracket + 1, nullptr, 10);
+            *pArrayIndex = parsedArrayIndex;
         }
     }
 
