@@ -229,8 +229,25 @@ void PatchPeepholeOpt::visitBitCast(
         insertAfter(*pBitCastRhs, *pBitCastLhs);
 
         // Create our new shuffle instruction.
+
+        // TODO: Simplify by using pShuffleVector->getShuffleMask() (no arguments) when it becomes available.
+        SmallVector<int, 8> maskVals;
+        pShuffleVector->getShuffleMask(maskVals);
+
+        auto pInt32Type = Type::getInt32Ty(pShuffleVector->getContext());
+        SmallVector<Constant*, 8> masks;
+        for (unsigned i = 0; i < maskVals.size(); ++i) {
+            if (maskVals[i] == -1)
+            {
+                masks.push_back(UndefValue::get(pInt32Type));
+            }
+            else
+            {
+                masks.push_back(ConstantInt::get(pInt32Type, maskVals[i]));
+            }
+        }
         ShuffleVectorInst* const pNewShuffleVector = new ShuffleVectorInst(
-            pBitCastLhs, pBitCastRhs, pShuffleVector->getOperand(2), pShuffleVector->getName());
+            pBitCastLhs, pBitCastRhs, ConstantVector::get(masks), pShuffleVector->getName());
         pNewShuffleVector->insertAfter(&bitCast);
 
         // Replace the bit cast with the new shuffle vector.
