@@ -135,58 +135,68 @@ enum ShaderType
 
 // =====================================================================================================================
 // Initiates a member to address table
-#define INIT_MEMBER_NAME_TO_ADDR(T, name, type, _isObject) pTableItem->pMemberName = STRING(name); \
-    pTableItem->memberOffset = (uint32_t)(OFFSETOF(T, name));       \
-    pTableItem->memberType = type;         \
-    pTableItem->arrayMaxSize = 1;          \
-    pTableItem->isSection = _isObject;      \
-    ++pTableItem;
+#define INIT_MEMBER_NAME_TO_ADDR(T, name, type, _isObject) tableItem->memberName = STRING(name); \
+    if (!strncmp(tableItem->memberName, "m_", 2)) \
+        tableItem->memberName += 2; \
+    tableItem->memberOffset = (uint32_t)(OFFSETOF(T, name));       \
+    tableItem->memberType = type;         \
+    tableItem->arrayMaxSize = 1;          \
+    tableItem->isSection = _isObject;      \
+    ++tableItem;
 
 // =====================================================================================================================
 // Initiates a state's member to address table
-#define INIT_STATE_MEMBER_NAME_TO_ADDR(T, name, type, _isObject) pTableItem->pMemberName = STRING(name); \
-    pTableItem->memberOffset = (uint32_t)(OFFSETOF(SubState, name) + OFFSETOF(T, m_state));       \
-    pTableItem->memberType = type;         \
-    pTableItem->arrayMaxSize = 1;          \
-    pTableItem->isSection = _isObject;      \
-    ++pTableItem;
+#define INIT_STATE_MEMBER_NAME_TO_ADDR(T, name, type, _isObject) tableItem->memberName = STRING(name); \
+    if (!strncmp(tableItem->memberName, "m_", 2)) \
+        tableItem->memberName += 2; \
+    tableItem->memberOffset = (uint32_t)(OFFSETOF(SubState, name) + OFFSETOF(T, m_state));       \
+    tableItem->memberType = type;         \
+    tableItem->arrayMaxSize = 1;          \
+    tableItem->isSection = _isObject;      \
+    ++tableItem;
 
 // =====================================================================================================================
 // Initiates a state's member to address table with explicit name
 #define INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(T, name, member, type, _isObject) \
-    pTableItem->pMemberName = STRING(name); \
-    pTableItem->memberOffset = (uint32_t)(OFFSETOF(SubState, member) + OFFSETOF(T, m_state));       \
-    pTableItem->memberType = type;         \
-    pTableItem->arrayMaxSize = 1;          \
-    pTableItem->isSection = _isObject;      \
-    ++pTableItem;
+    tableItem->memberName = STRING(name); \
+    if (!strncmp(tableItem->memberName, "m_", 2)) \
+        tableItem->memberName += 2; \
+    tableItem->memberOffset = (uint32_t)(OFFSETOF(SubState, member) + OFFSETOF(T, m_state));       \
+    tableItem->memberType = type;         \
+    tableItem->arrayMaxSize = 1;          \
+    tableItem->isSection = _isObject;      \
+    ++tableItem;
 
 // =====================================================================================================================
 // Initiates a array member to address table
-#define INIT_MEMBER_ARRAY_NAME_TO_ADDR(T, name, type, maxSize, _isObject) pTableItem->pMemberName = STRING(name); \
-    pTableItem->memberOffset = (uint32_t)(OFFSETOF(T, name));        \
-    pTableItem->memberType = type;         \
-    pTableItem->arrayMaxSize = maxSize;    \
-    pTableItem->isSection = _isObject;      \
-    ++pTableItem;
+#define INIT_MEMBER_ARRAY_NAME_TO_ADDR(T, name, type, maxSize, _isObject) tableItem->memberName = STRING(name); \
+    if (!strncmp(tableItem->memberName, "m_", 2)) \
+        tableItem->memberName += 2; \
+    tableItem->memberOffset = (uint32_t)(OFFSETOF(T, name));        \
+    tableItem->memberType = type;         \
+    tableItem->arrayMaxSize = maxSize;    \
+    tableItem->isSection = _isObject;      \
+    ++tableItem;
 
 // =====================================================================================================================
 // Initiates a dynamic array member to address table
-#define INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(T, name, type, _isObject) pTableItem->pMemberName = STRING(name); \
-    pTableItem->memberOffset = (uint32_t)(OFFSETOF(T, name));        \
-    pTableItem->memberType = type;         \
-    pTableItem->arrayMaxSize = VfxDynamicArrayId;  \
-    pTableItem->isSection = _isObject;      \
-    ++pTableItem;
+#define INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(T, name, type, _isObject) tableItem->memberName = STRING(name); \
+    if (!strncmp(tableItem->memberName, "m_", 2)) \
+        tableItem->memberName += 2; \
+    tableItem->memberOffset = (uint32_t)(OFFSETOF(T, name));        \
+    tableItem->memberType = type;         \
+    tableItem->arrayMaxSize = VfxDynamicArrayId;  \
+    tableItem->isSection = _isObject;      \
+    ++tableItem;
 
 // =====================================================================================================================
 // Csses a section to sub section
 #define CASE_SUBSECTION(ENUM, TYPE)  \
     case ENUM:    \
         {                            \
-            TYPE *pSubSectionObj = nullptr;   \
-            result = GetPtrOf(lineNum, pMemberName, true, arrayIndex, &pSubSectionObj, pErrorMsg);\
-            *ptrOut = pSubSectionObj; \
+            TYPE *subSectionObj = nullptr;   \
+            result = getPtrOf(lineNum, memberName, true, arrayIndex, &subSectionObj, errorMsg);\
+            *ptrOut = subSectionObj; \
             break; \
         }
 
@@ -200,7 +210,7 @@ enum ShaderType
 // Represents the structure that maps a string to a class member offset
 struct StrToMemberAddr
 {
-    const char*   pMemberName;    // String form name
+    const char*   memberName;    // String form name
     MemberType    memberType;     // Member value type
     uint32_t      memberOffset;   // Member offset in bytes within the object
     uint32_t      arrayMaxSize;   // If greater than 1, this member is an array
@@ -231,7 +241,7 @@ public:
                          bool                  isBinary,
                          std::vector<uint8_t>* pBinaryData,
                          std::string*          pTextData,
-                         std::string*          pErrorMsg);
+                         std::string*          errorMsg);
 
     virtual bool IsShaderSourceSection() { return false;}
 
@@ -246,7 +256,7 @@ public:
         return reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(this) + m_pMemberTable[i].memberOffset);
     }
 
-    bool GetMemberType(uint32_t lineNum, const char* memberName, MemberType* pValueType, std::string* pErrorMsg);
+    bool GetMemberType(uint32_t lineNum, const char* memberName, MemberType* pValueType, std::string* errorMsg);
 
     bool GetPtrOfSubSection(uint32_t     lineNum,
                             const char*  memberName,
@@ -254,16 +264,16 @@ public:
                             bool         isWriteAccess,
                             uint32_t     arrayIndex,
                             Section**    ptrOut,
-                            std::string* pErrorMsg);
+                            std::string* errorMsg);
 
     // Gets ptr of a member.
     template<typename TValue>
-    bool GetPtrOf(uint32_t     lineNum,
+    bool getPtrOf(uint32_t     lineNum,
                   const char*  memberName,
                   bool         isWriteAccess,
                   uint32_t     arrayIndex,
                   TValue**     ptrOut,
-                  std::string* pErrorMsg);
+                  std::string* errorMsg);
 
     // Sets value to a member array
     template<typename TValue>
@@ -276,7 +286,7 @@ public:
         return Set(lineNum, fieldName, 0, pValue);
     };
 
-    bool IsSection(uint32_t lineNum, const char* memberName, bool* pOutput, MemberType *pType, std::string* pErrorMsg);
+    bool IsSection(uint32_t lineNum, const char* memberName, bool* pOutput, MemberType *pType, std::string* errorMsg);
 
     // Has this object been configured in VFX file.
     bool IsActive() { return m_isActive; }
@@ -306,13 +316,13 @@ private:
 // =====================================================================================================================
 // Gets ptr of a member. return true if operation success
 template<typename TValue>
-bool Section::GetPtrOf(
+bool Section::getPtrOf(
     uint32_t     lineNum,           // Line No.
     const char*  memberName,        // [in] Member name
     bool         isWriteAccess,     // True for write
     uint32_t     arrayIndex,        // Array index
     TValue**     ptrOut,            // [out] Pointer of section member
-    std::string* pErrorMsg)         // [out] Error message
+    std::string* errorMsg)         // [out] Error message
 {
     bool        result      = true;
     void*      pMemberAddr  = reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue));
@@ -326,13 +336,13 @@ bool Section::GetPtrOf(
     // Search section member
     for (uint32_t i = 0; i < m_tableSize; ++i)
     {
-        if (strcmp(memberName, m_pMemberTable[i].pMemberName) == 0)
+        if (strcmp(memberName, m_pMemberTable[i].memberName) == 0)
         {
             pMemberAddr = GetMemberAddr(i);
             memberType  = m_pMemberTable[i].memberType;
             if (arrayIndex >= m_pMemberTable[i].arrayMaxSize)
             {
-                PARSE_ERROR(*pErrorMsg,
+                PARSE_ERROR(*errorMsg,
                             lineNum,
                             "Array access out of bound: %u of %s[%u]",
                             arrayIndex,
@@ -347,7 +357,7 @@ bool Section::GetPtrOf(
 
     if ((result == true) && (pMemberAddr == reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue))))
     {
-        PARSE_WARNING(*pErrorMsg, lineNum, "Invalid member name: %s", memberName);
+        PARSE_WARNING(*errorMsg, lineNum, "Invalid member name: %s", memberName);
         result = false;
     }
 
@@ -379,7 +389,7 @@ bool Section::GetPtrOf(
 template<typename TValue>
 bool Section::Set(
     uint32_t    lineNum,           // Line No.
-    const char* pMemberName,       // [in] Name of section member
+    const char* memberName,       // [in] Name of section member
     uint32_t    arrayIndex,        // Array index
     TValue*     pValue)            // [in] Value to be set
 {
@@ -387,7 +397,7 @@ bool Section::Set(
     VFX_ASSERT(pValue != nullptr);
     TValue* pMemberPtr = nullptr;
     std::string dummyMsg;
-    result = GetPtrOf(lineNum, pMemberName, true, arrayIndex, &pMemberPtr, &dummyMsg);
+    result = getPtrOf(lineNum, memberName, true, arrayIndex, &pMemberPtr, &dummyMsg);
     VFX_ASSERT(result == true);
     if (result == true)
     {
@@ -411,9 +421,9 @@ public:
     // Setup member name to member offset mapping.
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_MEMBER_NAME_TO_ADDR(SectionVersion, version, MemberTypeInt, false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(uint32_t& state)  { state = version; };
@@ -442,7 +452,7 @@ public:
     // Setup member name to member offset mapping.
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResultItem, resultSource,   MemberTypeEnum,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResultItem, bufferBinding,  MemberTypeBinding, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResultItem, offset,         MemberTypeIVec4,   false);
@@ -452,7 +462,7 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResultItem, f16Vec4Value,   MemberTypeF16Vec4, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResultItem, dVec2Value,     MemberTypeDVec2,   false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResultItem, compareMethod,  MemberTypeEnum,    false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)  { state = m_state; };
@@ -479,13 +489,13 @@ public:
     // Setup member name to member address mapping.
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionResult,
                                        result,
                                        MemberTypeResultItem,
                                        MaxResultCount,
                                        true);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)
@@ -522,11 +532,11 @@ public:
     // Setup member name to member address mapping.
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecConstItem, i, MemberTypeIVec4, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecConstItem, f, MemberTypeFVec4, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecConstItem, d, MemberTypeDVec2, false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)  { state = m_state; };
@@ -552,13 +562,13 @@ public:
     // Setup member name to member address mapping.
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionSpecConst,
                                        specConst,
                                        MemberTypeSpecConstItem,
                                        MaxSpecConstantCount,
                                        true);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)
@@ -598,11 +608,11 @@ public:
     // Setup member name to member address mapping.
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexBufferBinding, binding,       MemberTypeInt,  false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexBufferBinding, strideInBytes, MemberTypeInt,  false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexBufferBinding, stepRate,      MemberTypeEnum, false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)  { state = m_state; };
@@ -633,12 +643,12 @@ public:
     // Setup member name to member address mapping.
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexAttribute, binding,       MemberTypeInt,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexAttribute, format,        MemberTypeEnum,   false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexAttribute, location,      MemberTypeInt,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexAttribute, offsetInBytes, MemberTypeInt,    false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)  { state = m_state; };
@@ -665,7 +675,7 @@ public:
     // Setup member name to member address mapping.
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionVertexState,
                                        vbBinding,
                                        MemberTypeVertexBufferBindingItem,
@@ -676,7 +686,7 @@ public:
                                        MemberTypeVertexAttributeItem,
                                        MaxVertexAttributeCount,
                                        true);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)
@@ -732,7 +742,7 @@ public:
     // Setup member name to member address mapping.
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionBufferView, binding,       MemberTypeBinding,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionBufferView, descriptorType,MemberTypeEnum,       false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionBufferView, size,          MemberTypeInt,        false);
@@ -744,7 +754,7 @@ public:
         INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       floatData,     MemberTypeFArray,     false);
         INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       doubleData,    MemberTypeDArray,     false);
         INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       float16Data,   MemberTypeF16Array,   false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)
@@ -789,7 +799,7 @@ public:
     // Setup member name to member address mapping.
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionImageView, binding,       MemberTypeBinding,  false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionImageView, descriptorType,MemberTypeEnum,     false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionImageView, size,          MemberTypeBinding,  false);
@@ -797,7 +807,7 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionImageView, dataPattern,   MemberTypeEnum,     false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionImageView, samples,       MemberTypeInt,      false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionImageView, mipmap,        MemberTypeInt,      false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)  { state = m_state; };
@@ -826,11 +836,11 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSampler, binding,       MemberTypeBinding, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSampler, descriptorType,MemberTypeEnum,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSampler, dataPattern,   MemberTypeEnum,    false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)  { state = m_state; };
@@ -861,14 +871,14 @@ public:
     // Setup member name to member address mapping.
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPushConstRange, start,       MemberTypeInt,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPushConstRange, length,      MemberTypeInt,    false);
         INIT_MEMBER_NAME_TO_ADDR(SectionPushConstRange,       intData,     MemberTypeIArray, false);
         INIT_MEMBER_NAME_TO_ADDR(SectionPushConstRange,       uintData,    MemberTypeUArray, false);
         INIT_MEMBER_NAME_TO_ADDR(SectionPushConstRange,       floatData,   MemberTypeFArray, false);
         INIT_MEMBER_NAME_TO_ADDR(SectionPushConstRange,       doubleData,  MemberTypeDArray, false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)
@@ -938,7 +948,7 @@ public:
     // Setup member name to member address mapping.
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, instance,       MemberTypeInt,      false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, vertex,         MemberTypeInt,      false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, firstInstance,  MemberTypeInt,      false);
@@ -964,7 +974,7 @@ public:
         INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, fs,   MemberTypeSpecConst, true);
         INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, cs,   MemberTypeSpecConst, true);
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionDrawState, pushConstRange, MemberTypePushConstRange, MaxPushConstRangCount, true);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)
@@ -1015,21 +1025,21 @@ public:
     // Setup member name to member address mapping.
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_MEMBER_NAME_TO_ADDR(SectionShader, fileName, MemberTypeString, false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     virtual bool IsShaderSourceSection();
 
     virtual void AddLine(const char* pLine) { shaderSource += pLine; };
 
-    bool CompileShader(const std::string& docFilename, const Section* pShaderInfo, std::string* pErrorMsg);
+    bool CompileShader(const std::string& docFilename, const Section* pShaderInfo, std::string* errorMsg);
 
     void GetSubState(SubState& state);
 private:
-    bool CompileGlsl(const Section* pShaderInfo, std::string* pErrorMsg);
-    bool AssembleSpirv(std::string* pErrorMsg);
+    bool CompileGlsl(const Section* pShaderInfo, std::string* errorMsg);
+    bool AssembleSpirv(std::string* errorMsg);
 
     static const uint32_t  MemberCount = 1;
     static StrToMemberAddr m_addrTable[MemberCount];
@@ -1080,12 +1090,12 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, format,               MemberTypeEnum,   false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, blendEnable,          MemberTypeInt,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, blendSrcAlphaToColor, MemberTypeInt,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, channelWriteMask,     MemberTypeInt,    false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)  { state = m_state; };
@@ -1112,7 +1122,7 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeDisassembly, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, scalarBlockLayout, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIr, MemberTypeBool, false);
@@ -1120,7 +1130,7 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, reconfigWorkgroupLayout, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, shadowDescriptorTableUsage, MemberTypeEnum, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, shadowDescriptorTablePtrHigh, MemberTypeInt, false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state) { state = m_state; };
@@ -1147,7 +1157,7 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, trapPresent, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, debugMode, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enablePerformanceData, MemberTypeBool, false);
@@ -1172,7 +1182,7 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, unrollThreshold, MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, scalarThreshold, MemberTypeInt, false);
 
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state) { state = m_state; };
@@ -1199,7 +1209,7 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableNgg, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableGsUse, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, forceNonPassthrough, MemberTypeBool, false);
@@ -1218,7 +1228,7 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, primsPerSubgroup, MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, vertsPerSubgroup, MemberTypeInt, false);
 
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state) { state = m_state; };
@@ -1245,7 +1255,7 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, topology,                MemberTypeEnum, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, polygonMode,             MemberTypeEnum, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, cullMode,                MemberTypeEnum, false);
@@ -1271,10 +1281,10 @@ public:
                                        MemberTypeColorBufferItem,
                                        Vkgc::MaxColorTargets,
                                        true);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(const std::string& docFilename, SubState& state, std::string* pErrorMsg)
+    void GetSubState(const std::string& docFilename, SubState& state, std::string* errorMsg)
     {
         for (uint32_t i = 0; i < Vkgc::MaxColorTargets; ++i)
         {
@@ -1309,13 +1319,13 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionComputeState, deviceIndex, MemberTypeInt, false);
         INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, options, MemberTypePipelineOption, true);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(const std::string& docFilename, SubState& state, std::string* pErrorMsg)
+    void GetSubState(const std::string& docFilename, SubState& state, std::string* errorMsg)
     {
         options.GetSubState(m_state.options);
         state = m_state;
@@ -1344,11 +1354,11 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputBinding, binding,   MemberTypeInt,  false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputBinding, stride,    MemberTypeInt,  false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputBinding, inputRate, MemberTypeEnum, false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)  { state = m_state; };
@@ -1375,12 +1385,12 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, location,  MemberTypeInt,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, binding,   MemberTypeInt,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, format,    MemberTypeEnum,   false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, offset,    MemberTypeInt,    false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)  { state = m_state; };
@@ -1407,10 +1417,10 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputDivisor, binding,   MemberTypeInt,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputDivisor, divisor,    MemberTypeInt,    false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)  { state = m_state; };
@@ -1438,11 +1448,11 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, attribute, MemberTypeVertexInputAttributeItem, true);
         INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, binding,   MemberTypeVertexInputBindingItem,   true);
         INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, divisor,   MemberTypeVertexInputDivisorItem,   true);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)
@@ -1506,11 +1516,11 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecEntryItem, constantID,  MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecEntryItem, offset,      MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecEntryItem, size,        MemberTypeInt, false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)  { state = m_state; };
@@ -1543,7 +1553,7 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionSpecInfo, mapEntry, MemberTypeSpecEntryItem, true);
         INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, intData,       MemberTypeIArray,       false);
         INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, uintData,      MemberTypeUArray,       false);
@@ -1552,7 +1562,7 @@ public:
         INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, floatData,     MemberTypeFArray,       false);
         INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, doubleData,    MemberTypeDArray,       false);
         INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, float16Data,   MemberTypeF16Array,     false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)
@@ -1609,14 +1619,14 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, type,      MemberTypeEnum, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, set,       MemberTypeInt,  false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, binding,   MemberTypeInt,  false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, arraySize, MemberTypeInt,  false);
         INIT_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem,       uintData,  MemberTypeUArray, false);
         INIT_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem,       intData,   MemberTypeIArray, false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
     void GetSubState(SubState& state)
     {
@@ -1648,7 +1658,7 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, type,           MemberTypeEnum, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, sizeInDwords,   MemberTypeInt,  false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, offsetInDwords, MemberTypeInt,  false);
@@ -1671,7 +1681,7 @@ public:
                                                userDataPtr.sizeInDwords,
                                                MemberTypeInt,
                                                false);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)
@@ -1712,13 +1722,13 @@ public:
 
     static void InitialAddrTable()
     {
-        StrToMemberAddr* pTableItem = m_addrTable;
+        StrToMemberAddr* tableItem = m_addrTable;
         INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, entryPoint,  MemberTypeString, false);
         INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, specConst,   MemberTypeSpecInfo, true);
         INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, options, MemberTypeShaderOption, true);
         INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, descriptorRangeValue, MemberTypeDescriptorRangeValue, true);
         INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, userDataNode, MemberTypeResourceMappingNode, true);
-        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+        VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)

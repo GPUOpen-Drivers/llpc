@@ -43,7 +43,7 @@ namespace Vfx
 
 // =====================================================================================================================
 // Gets enum convert map
-static std::map<std::string, int>& GetEnumMap()
+static std::map<std::string, int>& getEnumMap()
 {
     static std::map<std::string, int> EnumMap;
     return EnumMap;
@@ -56,8 +56,8 @@ bool GetEnumValue(
     int&        value)    // [out] Enum value
 {
     bool ret = false;
-    std::map<std::string, int>::iterator it = GetEnumMap().find(pString);
-    if (it != GetEnumMap().end())
+    std::map<std::string, int>::iterator it = getEnumMap().find(pString);
+    if (it != getEnumMap().end())
     {
         value = it->second;
         ret = true;
@@ -65,8 +65,8 @@ bool GetEnumValue(
     return ret;
 }
 
-#define ADD_ENUM_MAP(EnumType, EnumName) GetEnumMap()[#EnumName] = EnumName;
-#define ADD_CLASS_ENUM_MAP(Class, EnumName) GetEnumMap()[#EnumName] =static_cast<int32_t>(Class::EnumName);
+#define ADD_ENUM_MAP(EnumType, EnumName) getEnumMap()[#EnumName] = EnumName;
+#define ADD_CLASS_ENUM_MAP(Class, EnumName) getEnumMap()[#EnumName] =static_cast<int32_t>(Class::EnumName);
 
 // =====================================================================================================================
 // Initializes enum convert map
