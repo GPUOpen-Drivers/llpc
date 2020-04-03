@@ -246,11 +246,11 @@ void PipelineContext::SetOptionsInPipeline(
     options.reconfigWorkgroupLayout = GetPipelineOptions()->reconfigWorkgroupLayout;
     options.includeIr = (IncludeLlvmIr || GetPipelineOptions()->includeIr);
 
-    static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Llpc::ShadowDescriptorTableUsage::Auto) ==
+    static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Vkgc::ShadowDescriptorTableUsage::Auto) ==
                                                           lgc::ShadowDescriptorTableUsage::Auto, "mismatch");
-    static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Llpc::ShadowDescriptorTableUsage::Enable) ==
+    static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Vkgc::ShadowDescriptorTableUsage::Enable) ==
                                                           lgc::ShadowDescriptorTableUsage::Enable, "mismatch");
-    static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Llpc::ShadowDescriptorTableUsage::Disable) ==
+    static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Vkgc::ShadowDescriptorTableUsage::Disable) ==
                                                           lgc::ShadowDescriptorTableUsage::Disable, "mismatch");
     options.shadowDescriptorTableUsage =
           static_cast<lgc::ShadowDescriptorTableUsage>(GetPipelineOptions()->shadowDescriptorTableUsage);
