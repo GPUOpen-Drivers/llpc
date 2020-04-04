@@ -31,6 +31,7 @@
 #pragma once
 
 #include "lgc/llpcBuilder.h"
+#include "lgc/llpcPipeline.h"
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
 

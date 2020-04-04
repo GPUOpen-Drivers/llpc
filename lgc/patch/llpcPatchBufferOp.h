@@ -32,8 +32,14 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/IRBuilder.h"
 
 #include "llpcPatch.h"
+
+namespace llvm
+{
+class LegacyDivergenceAnalysis;
+} // llvm
 
 namespace lgc
 {

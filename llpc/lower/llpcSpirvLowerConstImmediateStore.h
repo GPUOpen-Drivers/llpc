@@ -32,6 +32,12 @@
 
 #include "llpcSpirvLower.h"
 
+namespace llvm
+{
+class AllocaInst;
+class StoreInst;
+} // llvm
+
 namespace Llpc
 {
 
