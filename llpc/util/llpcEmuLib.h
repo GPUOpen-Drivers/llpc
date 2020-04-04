@@ -34,6 +34,7 @@
 #include "llvm/Object/Archive.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <map>
+#include <unordered_map>
 #include <vector>
 
 namespace llvm

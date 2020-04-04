@@ -35,6 +35,12 @@
 #include <unordered_set>
 #include "llpcSpirvLower.h"
 
+namespace llvm
+{
+class GetElementPtrInst;
+class StoreInst;
+} // llvm
+
 namespace Llpc
 {
 
@@ -42,9 +48,9 @@ namespace Llpc
 // The structure for store instruction which needs to be expanded.
 struct StoreExpandInfo
 {
-    StoreInst*                          pStoreInst;  ///< "Store" instruction
-    llvm::SmallVector<GetElementPtrInst*, 1>  getElemPtrs; ///< A group of "getelementptr" with constant indices
-    llvm::Value*                              pDynIndex;   ///< Dynamic index of destination.
+    llvm::StoreInst *pStoreInst;                                  ///< "Store" instruction
+    llvm::SmallVector<llvm::GetElementPtrInst *, 1> getElemPtrs;  ///< A group of "getelementptr" with constant indices
+    llvm::Value *pDynIndex;                                       ///< Dynamic index of destination.
 };
 
 // =====================================================================================================================

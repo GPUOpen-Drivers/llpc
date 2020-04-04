@@ -34,6 +34,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 #include "lgc/llpcBuilderBase.h"
+#include "lgc/llpcPipeline.h"
 #include "llpcInternal.h"
 
 #include <map>
@@ -167,9 +168,9 @@ private:
                         m_emitCounterPtrs;              // Pointers to emit counters (GS)
     llvm::Value*        m_pNumWorkgroups = nullptr;     // NumWorkgroups
 
-    llvm::SmallVector<llvm::Value*, InterfaceData::MaxDescTableCount>
+    llvm::SmallVector<llvm::Value *, 8>
                         m_descTablePtrs;                // Descriptor table pointers
-    llvm::SmallVector<llvm::Value*, InterfaceData::MaxDescTableCount>
+    llvm::SmallVector<llvm::Value *, 8>
                         m_shadowDescTablePtrs;          // Shadow descriptor table pointers
     llvm::Value*        m_pInternalGlobalTablePtr = nullptr;
                                                         // Internal global table pointer
