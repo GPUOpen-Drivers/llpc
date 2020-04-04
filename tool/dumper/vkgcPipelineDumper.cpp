@@ -53,16 +53,16 @@ namespace Vkgc
 {
 
 // Forward declaration
-std::ostream& operator<<(std::ostream& out, VkVertexInputRate           inputRate);
-std::ostream& operator<<(std::ostream& out, VkFormat                    format);
-std::ostream& operator<<(std::ostream& out, VkPrimitiveTopology         topology);
-std::ostream& operator<<(std::ostream& out, VkPolygonMode               polygonMode);
-std::ostream& operator<<(std::ostream& out, VkCullModeFlagBits          cullMode);
-std::ostream& operator<<(std::ostream& out, VkFrontFace                 frontFace);
-std::ostream& operator<<(std::ostream& out, ResourceMappingNodeType     type);
-std::ostream& operator<<(std::ostream& out, NggSubgroupSizingType       subgroupSizing);
-std::ostream& operator<<(std::ostream& out, NggCompactMode              compactMode);
-std::ostream& operator<<(std::ostream& out, WaveBreakSize               waveBreakSize);
+std::ostream& operator<<(std::ostream& out, VkVertexInputRate       inputRate);
+std::ostream& operator<<(std::ostream& out, VkFormat                format);
+std::ostream& operator<<(std::ostream& out, VkPrimitiveTopology     topology);
+std::ostream& operator<<(std::ostream& out, VkPolygonMode           polygonMode);
+std::ostream& operator<<(std::ostream& out, VkCullModeFlagBits      cullMode);
+std::ostream& operator<<(std::ostream& out, VkFrontFace             frontFace);
+std::ostream& operator<<(std::ostream& out, ResourceMappingNodeType type);
+std::ostream& operator<<(std::ostream& out, NggSubgroupSizingType   subgroupSizing);
+std::ostream& operator<<(std::ostream& out, NggCompactMode          compactMode);
+std::ostream& operator<<(std::ostream& out, WaveBreakSize           waveBreakSize);
 std::ostream& operator<<(std::ostream& out, ShadowDescriptorTableUsage  shadowDescriptorTableUsage);
 
 template std::ostream& operator<<(std::ostream& out, ElfReader<Elf64>& reader);
