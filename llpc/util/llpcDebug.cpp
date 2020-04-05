@@ -105,7 +105,7 @@ bool EnableErrs()
 // With this method, we can redirect logs in all environments, include both standalone compiler and Vulkan ICD. and we
 // can restore the output on all platform, which is very useful when app crashes or hits an assert.
 // CAUTION: The behavior isn't changed if app outputs logs to STDOUT or STDERR directly.
-void RedirectLogOutput(
+void redirectLogOutput(
     bool              restoreToDefault,   // Restore the default behavior of outs() and errs() if it is true
     uint32_t          optionCount,        // Count of compilation-option strings
     const char*const* pOptions)            // [in] An array of compilation-option strings

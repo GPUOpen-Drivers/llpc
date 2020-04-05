@@ -343,7 +343,7 @@ Compiler::Compiler(
 
     if (m_outRedirectCount == 0)
     {
-        RedirectLogOutput(false, optionCount, pOptions);
+        redirectLogOutput(false, optionCount, pOptions);
     }
 
     if (m_instanceCount == 0)
@@ -425,7 +425,7 @@ Compiler::~Compiler()
         -- m_outRedirectCount;
         if (m_outRedirectCount == 0)
         {
-            RedirectLogOutput(true, 0, nullptr);
+            redirectLogOutput(true, 0, nullptr);
         }
 
         ShaderCacheManager::GetShaderCacheManager()->ReleaseShaderCacheObject(m_shaderCache);
