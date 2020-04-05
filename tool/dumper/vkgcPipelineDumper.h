@@ -64,6 +64,12 @@ enum PipelineDumpFilters : uint32_t
 class PipelineDumper
 {
 public:
+#if defined(SINGLE_EXTERNAL_METROHASH)
+    typedef Util::MetroHash64 MetroHash64;
+#else
+    typedef MetroHash::MetroHash64 MetroHash64;
+#endif
+
     static void DumpSpirvBinary(const char*                     pDumpDir,
                                 const BinaryData*               pSpirvBin,
                                 MetroHash::Hash*                pHash);
@@ -93,26 +99,14 @@ public:
     static void UpdateHashForPipelineShaderInfo(ShaderStage               stage,
                                                 const PipelineShaderInfo* pShaderInfo,
                                                 bool                      isCacheHash,
-#if defined(SINGLE_EXTERNAL_METROHASH)
-                                                Util::MetroHash64*        pHasher);
-#else
-                                                MetroHash::MetroHash64*   pHasher);
-#endif
+                                                MetroHash64*              pHasher);
 
     static void UpdateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo* pVertexInput,
-#if defined(SINGLE_EXTERNAL_METROHASH)
-                                              Util::MetroHash64*                          pHasher);
-#else
-                                              MetroHash::MetroHash64*                     pHasher);
-#endif
+                                              MetroHash64*                          pHasher);
 
     // Update hash for map object
     template <class MapType>
-#if defined(SINGLE_EXTERNAL_METROHASH)
-    static void UpdateHashForMap(MapType& m, Util::MetroHash64* pHasher)
-#else
-    static void UpdateHashForMap(MapType& m, MetroHash::MetroHash64* pHasher)
-#endif
+    static void UpdateHashForMap(MapType& m, MetroHash64* pHasher)
     {
         pHasher->Update(m.size());
         for (auto mapIt : m)
@@ -125,22 +119,14 @@ public:
     static void UpdateHashForNonFragmentState(
         const GraphicsPipelineBuildInfo* pPipeline,
         bool                             isCacheHash,
-#if defined(SINGLE_EXTERNAL_METROHASH)
-        Util::MetroHash64*               pHasher);
-#else
-        MetroHash::MetroHash64*          pHasher);
-#endif
+        MetroHash64*               pHasher);
 
     static void UpdateHashForFragmentState(
         const GraphicsPipelineBuildInfo* pPipeline,
-#if defined(SINGLE_EXTERNAL_METROHASH)
-        Util::MetroHash64*               pHasher);
-#else
-        MetroHash::MetroHash64*          pHasher);
-#endif
+        MetroHash64*               pHasher);
 
     // Get name of register, or "" if not known
-    static const char* GetRegisterNameString(uint32_t regNumber);
+    static const char* getRegisterNameString(uint32_t regNumber);
 
 private:
     static std::string GetSpirvBinaryFileName(const MetroHash::Hash* pHash);
@@ -169,11 +155,7 @@ private:
 
     static void UpdateHashForResourceMappingNode(const ResourceMappingNode* pUserDataNode,
                                                  bool                       isRootNode,
-#if defined(SINGLE_EXTERNAL_METROHASH)
-                                                 Util::MetroHash64*         pHasher);
-#else
-                                                 MetroHash::MetroHash64*    pHasher);
-#endif
+                                                 MetroHash64*         pHasher);
 };
 
 } // Vkgc

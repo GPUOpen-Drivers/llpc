@@ -78,12 +78,12 @@ public:
     {
     }
 
-    void Lock()
+    void lock()
     {
         m_mutex.lock();
     }
 
-    void Unlock()
+    void unlock()
     {
         m_mutex.unlock();
     }
@@ -349,7 +349,7 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
     if (disableLog == false)
     {
         bool enableDump = true;
-        s_dumpMutex.Lock();
+        s_dumpMutex.lock();
 
         // Create the dump directory
         CreateDirectory(pDumpOptions->pDumpDir);
@@ -407,7 +407,7 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
             }
         }
 
-        s_dumpMutex.Unlock();
+        s_dumpMutex.unlock();
 
         // Dump pipeline input info
         if (pDumpFile != nullptr)
@@ -1257,7 +1257,7 @@ void PipelineDumper::UpdateHashForResourceMappingNode(
 // =====================================================================================================================
 // Outputs text with specified range to output stream.
 template <class OStream>
-void OutputText(
+void outputText(
     const uint8_t* pData,    // [in] Text data
     uint32_t       startPos, // Starting position
     uint32_t       endPos,   // End position
@@ -1291,7 +1291,7 @@ void OutputText(
 // =====================================================================================================================
 // Outputs binary data with specified range to output stream.
 template<class OStream>
-void OutputBinary(
+void outputBinary(
     const uint8_t* pData,     // [in] Binary data
     uint32_t       startPos,  // Starting position
     uint32_t       endPos,    // End position
@@ -1405,8 +1405,9 @@ OStream& operator<<(
                     out << "    PalMetadata                  (name = "
                         << pNode->name << "  size = " << pNode->descSize << ")\n";
 
-                    auto pBuffer = pSection->pData + offset + noteHeaderSize + noteNameSize;
-                    reader.initMsgPackDocument(pBuffer, pNode->descSize);
+                    auto buffer = pSection->pData + offset + noteHeaderSize + noteNameSize;
+                    auto descSize = pNode->descSize;
+                    reader.initMsgPackDocument(buffer, descSize);
 
                     do
                     {
@@ -1420,7 +1421,7 @@ OStream& operator<<(
                                 if (msgIterStatus == MsgPackIteratorMapKey)
                                 {
                                     uint32_t regId = static_cast<uint32_t>(pNode->getUInt());
-                                    const char* pRegName = PipelineDumper::GetRegisterNameString(regId);
+                                    const char* pRegName = PipelineDumper::getRegisterNameString(regId);
 
                                     auto length = snprintf(formatBuf,
                                         sizeof(formatBuf),
@@ -1443,7 +1444,7 @@ OStream& operator<<(
                         case msgpack::Type::String:
                         case msgpack::Type::Binary:
                             {
-                                OutputText((const uint8_t*)(pNode->getString().data()),
+                                outputText((const uint8_t*)(pNode->getString().data()),
                                     0,
                                     pNode->getString().size(),
                                     out);
@@ -1517,7 +1518,7 @@ OStream& operator<<(
                         out << "    IsaVersion                   (name = "
                             << pNode->name << "  size = " << pNode->descSize << ")\n";
                         auto pDesc = pSection->pData + offset + noteHeaderSize + noteNameSize;
-                        OutputText(pDesc, 0, pNode->descSize, out);
+                        outputText(pDesc, 0, pNode->descSize, out);
                         out << "\n";
                     }
                     else
@@ -1525,7 +1526,7 @@ OStream& operator<<(
                         out << "    Unknown(" << (uint32_t)pNode->type << ")                (name = "
                             << pNode->name << "  size = " << pNode->descSize << ")\n";
                         auto pDesc = pSection->pData + offset + noteHeaderSize + noteNameSize;
-                        OutputBinary(pDesc, 0, pNode->descSize, out);
+                        outputBinary(pDesc, 0, pNode->descSize, out);
                     }
                     break;
                 }
@@ -1560,7 +1561,7 @@ OStream& operator<<(
 
             for (uint32_t i = 0; i < configCount; ++i)
             {
-                const char* pRegName = PipelineDumper::GetRegisterNameString(pConfig[2 * i] / 4);
+                const char* pRegName = PipelineDumper::getRegisterNameString(pConfig[2 * i] / 4);
                 auto length = snprintf(formatBuf, sizeof(formatBuf), "        %-45s = 0x%08X\n", pRegName, pConfig[2 * i + 1]);
                 (void(length)); // unused
                 out << formatBuf;
@@ -1589,7 +1590,7 @@ OStream& operator<<(
                     endPos = static_cast<uint32_t>(pSection->secHead.sh_size);
                 }
 
-                OutputText(pSection->pData, startPos, endPos, out);
+                outputText(pSection->pData, startPos, endPos, out);
                 out << "\n";
 
                 if (symIdx < symbols.size())
@@ -1612,10 +1613,11 @@ OStream& operator<<(
         }
         else if (strncmp(pSection->pName, Util::Abi::AmdGpuCommentName, sizeof(Util::Abi::AmdGpuCommentName) - 1) == 0)
         {
+            auto name = pSection->pName;
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 475
-            if (strncmp(pSection->pName, Util::Abi::AmdGpuCommentAmdIlName, sizeof(Util::Abi::AmdGpuCommentAmdIlName) - 1) == 0)
+            if (strncmp(name, Util::Abi::AmdGpuCommentAmdIlName, sizeof(Util::Abi::AmdGpuCommentAmdIlName) - 1) == 0)
 #else
-            if (strncmp(pSection->pName, ".AMDGPU.comment.amdil", sizeof(".AMDGPU.comment.amdil") - 1) == 0)
+            if (strncmp(name, ".AMDGPU.comment.amdil", sizeof(".AMDGPU.comment.amdil") - 1) == 0)
 #endif
             {
                 // Output text based sections
@@ -1637,7 +1639,7 @@ OStream& operator<<(
                         endPos = static_cast<uint32_t>(pSection->secHead.sh_size);
                     }
 
-                    OutputText(pSection->pData, startPos, endPos, out);
+                    outputText(pSection->pData, startPos, endPos, out);
                     out << "\n";
 
                     if (symIdx < symbols.size())
@@ -1663,7 +1665,7 @@ OStream& operator<<(
                 // Output text based sections
                 out << pSection->pName << " (size = " << pSection->secHead.sh_size << " bytes)\n";
 
-                OutputText(pSection->pData, 0, static_cast<uint32_t>(pSection->secHead.sh_size), out);
+                outputText(pSection->pData, 0, static_cast<uint32_t>(pSection->secHead.sh_size), out);
             }
         }
         else
@@ -1690,7 +1692,7 @@ OStream& operator<<(
                     endPos = static_cast<uint32_t>(pSection->secHead.sh_size);
                 }
 
-                OutputBinary(pSection->pData, startPos, endPos, out);
+                outputBinary(pSection->pData, startPos, endPos, out);
 
                 if (symIdx < symbols.size())
                 {

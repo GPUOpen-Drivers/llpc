@@ -423,7 +423,7 @@ const PipelineDumperReg pipelineDumperRegs[] =
 
 // =====================================================================================================================
 // Get name of register, or "" if not known
-const char* PipelineDumper::GetRegisterNameString(
+const char* PipelineDumper::getRegisterNameString(
     uint32_t  regNumber)  // Register number
 {
     for (uint32_t idx = 0, end = sizeof(pipelineDumperRegs) / sizeof(pipelineDumperRegs[0]); idx != end; ++idx)
