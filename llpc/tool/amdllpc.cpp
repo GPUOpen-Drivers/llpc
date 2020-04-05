@@ -506,13 +506,13 @@ static Result Init(
             // Initialize the root path of cache files
             // Steps:
             //   1. Find AMD_SHADER_DISK_CACHE_PATH to keep backward compatibility.
-            const char* pEnvString = getenv("AMD_SHADER_DISK_CACHE_PATH");
+            const char* envString = getenv("AMD_SHADER_DISK_CACHE_PATH");
 
 #ifdef WIN_OS
             //   2. Find LOCALAPPDATA.
-            if (pEnvString == nullptr)
+            if (envString == nullptr)
             {
-                pEnvString = getenv("LOCALAPPDATA");
+                envString = getenv("LOCALAPPDATA");
             }
 #else
             char shaderCacheFileRootDir[MaxFilePathLen];
@@ -520,27 +520,27 @@ static Result Init(
             //   2. Find XDG_CACHE_HOME.
             //   3. If AMD_SHADER_DISK_CACHE_PATH and XDG_CACHE_HOME both not set,
             //      use "$HOME/.cache".
-            if (pEnvString == nullptr)
+            if (envString == nullptr)
             {
-                pEnvString = getenv("XDG_CACHE_HOME");
+                envString = getenv("XDG_CACHE_HOME");
             }
 
-            if (pEnvString == nullptr)
+            if (envString == nullptr)
             {
-                pEnvString = getenv("HOME");
-                if (pEnvString != nullptr)
+                envString = getenv("HOME");
+                if (envString != nullptr)
                 {
                     snprintf(shaderCacheFileRootDir, sizeof(shaderCacheFileRootDir),
-                        "%s/.cache", pEnvString);
-                    pEnvString = &shaderCacheFileRootDir[0];
+                        "%s/.cache", envString);
+                    envString = &shaderCacheFileRootDir[0];
                 }
             }
 #endif
 
-            if (pEnvString != nullptr)
+            if (envString != nullptr)
             {
                 snprintf(shaderCacheFileDirOption, sizeof(shaderCacheFileDirOption),
-                         "-shader-cache-file-dir=%s", pEnvString);
+                         "-shader-cache-file-dir=%s", envString);
             }
             else
             {
@@ -1382,7 +1382,7 @@ extern "C" void LlpcSignalAbortHandler(
 {
     if (signal == SIGABRT)
     {
-        RedirectLogOutput(true, 0, nullptr); // Restore redirecting to show crash in console window
+        redirectLogOutput(true, 0, nullptr); // Restore redirecting to show crash in console window
         LLVM_BUILTIN_TRAP;
     }
 }
@@ -1407,7 +1407,7 @@ static void EnableMemoryLeakDetection()
 
 // =====================================================================================================================
 // Process one pipeline.
-static Result ProcessPipeline(
+static Result processPipeline(
     ICompiler*            pCompiler,   // [in] LLPC context
     ArrayRef<std::string> inFiles,     // Input filename(s)
     uint32_t              startFile,   // Index of the starting file name being processed in the file name array
@@ -1761,7 +1761,7 @@ static Result ProcessPipeline(
 #ifdef WIN_OS
 // =====================================================================================================================
 // Finds all filenames which can match input file name
-void FindAllMatchFiles(
+void findAllMatchFiles(
     const std::string&        inFile,         // [in] Input file name, include wildcard
     std::vector<std::string>* pOutFiles)      // [out] Output file names which can match input file name
 {
@@ -1805,7 +1805,7 @@ int32_t main(
 {
     Result result = Result::Success;
 
-    ICompiler*  pCompiler   = nullptr;
+    ICompiler*  compiler   = nullptr;
 
     //
     // Initialization
@@ -1824,7 +1824,7 @@ int32_t main(
 #endif
 #endif
 
-    result = Init(argc, argv, &pCompiler);
+    result = Init(argc, argv, &compiler);
 
 #ifdef WIN_OS
     if (AssertToMsgBox)
@@ -1845,7 +1845,7 @@ int32_t main(
             if (InFiles[i].find_last_of("*?") != std::string::npos)
             {
                 std::vector<std::string> matchFiles;
-                FindAllMatchFiles(InFiles[i], &matchFiles);
+                findAllMatchFiles(InFiles[i], &matchFiles);
                 if (matchFiles.size() == 0)
                 {
                     LLPC_ERRS("\nFailed to read file " << InFiles[i] << "\n");
@@ -1855,14 +1855,14 @@ int32_t main(
                 {
                     for (uint32_t j = 0; (j < matchFiles.size()) && (result == Result::Success); ++j)
                     {
-                        result = ProcessPipeline(pCompiler, matchFiles[j], 0, &nextFile);
+                        result = processPipeline(compiler, matchFiles[j], 0, &nextFile);
                     }
                 }
             }
             else
 #endif
             {
-                result = ProcessPipeline(pCompiler, InFiles[i], 0, &nextFile);
+                result = processPipeline(compiler, InFiles[i], 0, &nextFile);
             }
         }
     }
@@ -1874,7 +1874,7 @@ int32_t main(
             (InFiles[0].find_last_of("*?") != std::string::npos))
         {
             std::vector<std::string> matchFiles;
-            FindAllMatchFiles(InFiles[0], &matchFiles);
+            findAllMatchFiles(InFiles[0], &matchFiles);
             if (matchFiles.size() == 0)
             {
                 LLPC_ERRS("\nFailed to read file " << InFiles[0] << "\n");
@@ -1885,7 +1885,7 @@ int32_t main(
                 uint32_t nextFile = 0;
                 for (uint32_t i = 0; (i < matchFiles.size()) && (result == Result::Success); ++i)
                 {
-                    result = ProcessPipeline(pCompiler, matchFiles[i], 0, &nextFile);
+                    result = processPipeline(compiler, matchFiles[i], 0, &nextFile);
                 }
             }
         }
@@ -1911,13 +1911,13 @@ int32_t main(
                 uint32_t nextFile = 0;
                 for (; result == Result::Success && nextFile < inFiles.size();)
                 {
-                    result = ProcessPipeline(pCompiler, inFiles, nextFile, &nextFile);
+                    result = processPipeline(compiler, inFiles, nextFile, &nextFile);
                 }
             }
         }
     }
 
-    pCompiler->Destroy();
+    compiler->Destroy();
 
     if (result == Result::Success)
     {
