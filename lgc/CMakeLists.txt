@@ -229,6 +229,7 @@ target_sources(LLVMlgc PRIVATE
 # lgc/util
 target_sources(LLVMlgc PRIVATE
     util/llpcBuilderDebug.cpp
+    util/llpcGfxRegHandlerBase.cpp
     util/llpcGfxRegHandler.cpp
     util/llpcInternal.cpp
     util/llpcPassManager.cpp
