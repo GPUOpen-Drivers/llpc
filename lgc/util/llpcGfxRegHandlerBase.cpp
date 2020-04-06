@@ -24,11 +24,11 @@
  **********************************************************************************************************************/
 /**
 ***********************************************************************************************************************
-* @file  llpcGfxRegHandler.cpp
-* @brief LLPC source file: Implementation of LLPC utility class llpcGfxRegHandler
+* @file  llpcGfxRegHandlerBase.cpp
+* @brief LLPC source file: Implementation of LLPC utility class GfxRegHandlerBase
 ***********************************************************************************************************************
 */
-#include "llpcGfxRegHandler.h"
+#include "llpcGfxRegHandlerBase.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llpcTargetInfo.h"
 
