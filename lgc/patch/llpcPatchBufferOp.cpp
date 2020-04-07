@@ -50,6 +50,10 @@
 using namespace llvm;
 using namespace lgc;
 
+//FIXME: Override -Werror temporarily to synchronize with LLVM updates. Remove this as soon as LLVM is updated and we
+//       can remove the use of getParamAlignment.
+#pragma GCC diagnostic warning "-Wdeprecated-declarations"
+
 namespace lgc
 {
 
