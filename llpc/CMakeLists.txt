@@ -33,72 +33,79 @@ if(ICD_BUILD_LLPC)
 endif()
 
 ### Cached Project Options #############################################################################################
-option(LLPC_BUILD_LIT      "LLPC build lit test"        OFF)
+option(LLPC_BUILD_LIT     "LLPC build lit test"         OFF)
+option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
 
 if(ICD_BUILD_LLPC)
-    set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR} )
+    set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
 ### Compiler Options ###################################################################################################
-if(UNIX)
-    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+function(llpc_set_compiler_options PROJECT_NAME)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        if(LLPC_ENABLE_WERROR)
+            target_compile_options("${PROJECT_NAME}" PRIVATE
+                -Werror
+                -Wno-error=deprecated-declarations
+            )
+        endif()
+
         # SEE: https://gcc.gnu.org/onlinedocs/gcc-6.2.0/gcc/Option-Summary.html#Option-Summary
         # for a list of all options and documentation.
-        #target_compile_options(llpc PRIVATE option)
-        target_compile_options(llpc PRIVATE
-            -Wno-unused-parameter
-            -Wno-type-limits
-            -Wno-switch
-            -Wno-parentheses
-            -Wno-maybe-uninitialized
-            -Wno-delete-non-virtual-dtor
-            -Wno-sign-compare
+        target_compile_options("${PROJECT_NAME}" PRIVATE
+            -fno-strict-aliasing
+            -fvisibility-inlines-hidden
+            -Wall
             -Wno-delete-incomplete
+            -Wno-delete-non-virtual-dtor
+            -Wno-invalid-offsetof
+            -Wno-missing-braces
+            -Wno-missing-field-initializers
+            -Wno-parentheses
+            -Wno-sign-compare
+            -Wno-switch
+            -Wno-type-limits
+            -Wno-unused-parameter
             -Wunused-variable
             -Werror=unused-variable
             -Wunused-function
             -Werror=unused-function
         )
 
-        target_compile_options(llpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+        target_compile_options("${PROJECT_NAME}" PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+            -fno-rtti
+            -fPIC
+            -std=c++14
             -Wno-unused
             -Wno-ignored-qualifiers
             -Wno-missing-field-initializers
             -Wno-invalid-offsetof           # offsetof within non-standard-layout type 'x' is undefined
         >)
 
-        target_compile_options(llpc PRIVATE -fno-strict-aliasing)
-
-        target_compile_options(llpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
-            -std=c++14
-            -fno-rtti
-            -fPIC
-        >)
-
-        message(STATUS "Configured ${PROJECT_NAME} compiler options for GCC.")
-    elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-        target_compile_options(llpc PRIVATE
-            -fvisibility-inlines-hidden
-            -fcolor-diagnostics
-            -Wall
-            -Werror
-            -Wno-invalid-offsetof
-            -Wno-missing-braces
-        )
-        target_compile_options(llpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
-            -std=c++14
-            -fno-rtti
-            -fPIC
-        >)
-        #message(STATUS "Configured compiler options for Clang.")
-        message(WARNING "Clang is untested.")
-    else()
-        message(FATAL_ERROR "Using unknown compiler.")
-    endif()
-elseif(WIN32)
-    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+        if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            target_compile_options("${PROJECT_NAME}" PRIVATE
+                -Wno-extra
+                -Wno-maybe-uninitialized
+                -Wno-pedantic
+            )
+            if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 8.4)
+                target_compile_options("${PROJECT_NAME}" PRIVATE
+                    -Wno-class-memaccess
+                    # TODO This should be removed once all issues are fixed
+                    -Wno-format-truncation
+                )
+            endif()
+        elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            target_compile_options("${PROJECT_NAME}" PRIVATE
+                -Wno-covered-switch-default
+                -Wno-extra-semi
+                -Wno-gnu-anonymous-struct
+                -Wno-nested-anon-types
+            )
+        endif()
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
         # CMAKE-TODO: These are /W4 (level 4) warnings
-        target_compile_options(llpc
+        target_compile_options("${PROJECT_NAME}"
             PRIVATE # Warnings in interface and src
                 /wd4005 # 'DEBUG' : macro redefinition ??? Defined in toolchain ??? importedllvmincludellvm/Support/Debug.h
                 /wd4018 # '<' : signed/unsigned mismatch
@@ -126,14 +133,13 @@ elseif(WIN32)
                 /wd6323 # Use of arithmetic operator on Boolean type(s)
         )
 
-        target_compile_definitions(llpc PRIVATE _SCL_SECURE_NO_WARNINGS)
-        target_compile_definitions(llpc PRIVATE _CRT_SECURE_NO_WARNINGS)
-
-        message(STATUS "Configured ${PROJECT_NAME} compiler options for MSVC.")
+        target_compile_definitions("${PROJECT_NAME}" PRIVATE _SCL_SECURE_NO_WARNINGS)
+        target_compile_definitions("${PROJECT_NAME}" PRIVATE _CRT_SECURE_NO_WARNINGS)
     else()
         message(FATAL_ERROR "Using unknown compiler")
     endif()
-endif()
+endfunction()
+llpc_set_compiler_options(llpc)
 
 ### Defines/Includes/Sources ###########################################################################################
 if(ICD_BUILD_LLPC)
@@ -343,33 +349,7 @@ PRIVATE
 set(VULKAN_HEADER_PATH ${XGL_ICD_PATH}/api/include/khronos)
 target_include_directories(amdllpc PRIVATE ${VULKAN_HEADER_PATH})
 
-if(UNIX)
-    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-        target_compile_options(amdllpc PRIVATE -fno-strict-aliasing)
-        target_compile_options(amdllpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++14 -fno-rtti>)
-
-        target_compile_options(amdllpc PRIVATE -Wno-unused-parameter -Wno-shift-negative-value -Wno-type-limits -Wno-error=switch -Wno-error=sign-compare -Wno-error=parentheses -Wno-error=maybe-uninitialized -Wno-error=delete-non-virtual-dtor -Wno-sign-compare -Wno-error -Wunused-variable -Werror=unused-variable -Wunused-function -Werror=unused-function)
-        target_compile_options(amdllpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused -Wno-unused-parameter -Wno-ignored-qualifiers -Wno-missing-field-initializers>)
-
-        message(STATUS "Configured ${PROJECT_NAME} compiler options for GCC.")
-    elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-        target_compile_options(amdllpc PRIVATE
-            -fvisibility-inlines-hidden
-            -fcolor-diagnostics
-            -Wall
-            -Werror
-            -Wno-missing-braces
-        )
-        target_compile_options(amdllpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
-            -std=c++14
-            -fno-rtti
-        >)
-        #message(STATUS "Configured compiler options for Clang.")
-        message(WARNING "Clang is untested.")
-    else()
-        message(FATAL_ERROR "Using unknown compiler.")
-    endif()
-endif()
+llpc_set_compiler_options(amdllpc)
 
 if(UNIX)
     target_link_libraries(amdllpc PRIVATE llpc vfx dl stdc++)
