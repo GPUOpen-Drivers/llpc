@@ -32,67 +32,71 @@ add_dependencies(LLVMlgc
 )
 
 ### Cached Project Options #############################################################################################
-option(LLPC_BUILD_RENOIR   "LLPC support for Renoir?"   ON)
+option(LLPC_BUILD_RENOIR  "LLPC support for Renoir?"    ON)
+option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
 
 ### Compiler Options ###################################################################################################
 function(lgc_set_compiler_options PROJECT_NAME)
-    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        if(LLPC_ENABLE_WERROR)
+            target_compile_options("${PROJECT_NAME}" PRIVATE
+                -Werror
+                -Wno-error=deprecated-declarations
+            )
+        endif()
+
         # SEE: https://gcc.gnu.org/onlinedocs/gcc-6.2.0/gcc/Option-Summary.html#Option-Summary
         # for a list of all options and documentation.
-        #target_compile_options(${PROJECT_NAME} PRIVATE option)
         target_compile_options(${PROJECT_NAME} PRIVATE
-            -Wno-unused-parameter
-            -Wno-type-limits
-            -Wno-switch
-            -Wno-parentheses
-            -Wno-maybe-uninitialized
-            -Wno-delete-non-virtual-dtor
-            -Wno-sign-compare
+            -fno-strict-aliasing
+            -fvisibility-inlines-hidden
+            -Wall
             -Wno-delete-incomplete
+            -Wno-delete-non-virtual-dtor
+            -Wno-invalid-offsetof
+            -Wno-missing-braces
+            -Wno-missing-field-initializers
+            -Wno-parentheses
+            -Wno-sign-compare
+            -Wno-switch
+            -Wno-type-limits
+            -Wno-unused-parameter
             -Wunused-variable
             -Werror=unused-variable
             -Wunused-function
             -Werror=unused-function
-            -Wno-pedantic
-            -Wno-extra
         )
 
         target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+            -fno-rtti
+            -fPIC
+            -std=c++14
             -Wno-unused
             -Wno-ignored-qualifiers
             -Wno-missing-field-initializers
             -Wno-invalid-offsetof           # offsetof within non-standard-layout type 'x' is undefined
         >)
 
-        target_compile_options(${PROJECT_NAME} PRIVATE -fno-strict-aliasing)
-
-        target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
-            -std=c++14
-            -fno-rtti
-            -fPIC
-        >)
-    elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-        target_compile_options(${PROJECT_NAME} PRIVATE
-            -fvisibility-inlines-hidden
-            -fcolor-diagnostics
-            -Wall
-            -Werror
-            -Wno-invalid-offsetof
-            -Wno-missing-braces
-            -Wno-nested-anon-types
-            -Wno-gnu-anonymous-struct
-            -Wno-covered-switch-default
-            -Wno-missing-field-initializers
-            -Wno-extra-semi
-            -Wno-sign-compare
-            -Wno-gnu-anonymous-struct
-        )
-        target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
-            -std=c++14
-            -fno-rtti
-            -fPIC
-        >)
-    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+        if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            target_compile_options("${PROJECT_NAME}" PRIVATE
+                -Wno-extra
+                -Wno-maybe-uninitialized
+                -Wno-pedantic
+            )
+            if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 8.4)
+                target_compile_options("${PROJECT_NAME}" PRIVATE
+                    -Wno-class-memaccess
+                )
+            endif()
+        elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            target_compile_options("${PROJECT_NAME}" PRIVATE
+                -Wno-covered-switch-default
+                -Wno-extra-semi
+                -Wno-gnu-anonymous-struct
+                -Wno-nested-anon-types
+            )
+        endif()
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
         # CMAKE-TODO: These are /W4 (level 4) warnings
         target_compile_options(${PROJECT_NAME}
             PRIVATE # Warnings in interface and src
