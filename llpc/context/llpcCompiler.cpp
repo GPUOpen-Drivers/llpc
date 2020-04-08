@@ -485,7 +485,7 @@ Result Compiler::BuildShaderModule(
 
     // Calculate the hash code of input data
     MetroHash::Hash hash = {};
-    MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->shaderBin.pCode),
+    MetroHash128::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->shaderBin.pCode),
         pShaderInfo->shaderBin.codeSize,
         hash.bytes);
 
@@ -551,7 +551,7 @@ Result Compiler::BuildShaderModule(
 
         // Calculate SPIR-V cache hash
         MetroHash::Hash cacheHash = {};
-        MetroHash64::Hash(reinterpret_cast<const uint8_t*>(moduleDataEx.common.binCode.pCode),
+        MetroHash128::Hash(reinterpret_cast<const uint8_t*>(moduleDataEx.common.binCode.pCode),
             moduleDataEx.common.binCode.codeSize,
             cacheHash.bytes);
         static_assert(sizeof(moduleDataEx.common.cacheHash) == sizeof(cacheHash), "Unexpected value!");
@@ -589,7 +589,7 @@ Result Compiler::BuildShaderModule(
                     moduleEntryData.pEntryName = entryNames[i].pName;
                     moduleEntry.entryOffset = moduleBinary.size();
                     MetroHash::Hash entryNamehash = {};
-                    MetroHash64::Hash(reinterpret_cast<const uint8_t*>(entryNames[i].pName),
+                    MetroHash128::Hash(reinterpret_cast<const uint8_t*>(entryNames[i].pName),
                         strlen(entryNames[i].pName),
                         entryNamehash.bytes);
                     memcpy(moduleEntry.entryNameHash, entryNamehash.dwords, sizeof(entryNamehash));
@@ -1086,7 +1086,7 @@ Result Compiler::BuildPipelineInternal(
                 MetroHash::Hash entryNameHash = {};
 
                 assert(pShaderInfo->pEntryTarget != nullptr);
-                MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->pEntryTarget),
+                MetroHash128::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->pEntryTarget),
                                   strlen(pShaderInfo->pEntryTarget),
                                   entryNameHash.bytes);
 
@@ -1783,7 +1783,7 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
         }
     }
 
-    MetroHash64 hasher;
+    MetroHash128 hasher;
 
     // Build hash code from effecting options
     for (auto option : effectingOptions)
@@ -2047,8 +2047,8 @@ void Compiler::BuildShaderCacheHash(
     MetroHash::Hash*            pFragmentHash,      // [out] Hash code of fragment shader
     MetroHash::Hash*            pNonFragmentHash)   // [out] Hash code of all non-fragment shader
 {
-    MetroHash64 fragmentHasher;
-    MetroHash64 nonFragmentHasher;
+    MetroHash128 fragmentHasher;
+    MetroHash128 nonFragmentHasher;
     auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
     auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
 
@@ -2061,7 +2061,7 @@ void Compiler::BuildShaderCacheHash(
         }
 
         auto pShaderInfo = pContext->GetPipelineShaderInfo(stage);
-        MetroHash64 hasher;
+        MetroHash128 hasher;
 
         // Update common shader info
         PipelineDumper::UpdateHashForPipelineShaderInfo(stage, pShaderInfo, true, &hasher);

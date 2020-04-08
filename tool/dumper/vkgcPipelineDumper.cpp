@@ -121,7 +121,7 @@ void VKAPI_CALL IPipelineDumper::DumpSpirvBinary(
     const BinaryData*               pSpirvBin)  // [in] SPIR-V binary
 {
     MetroHash::Hash hash = {};
-    MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pSpirvBin->pCode),
+    MetroHash128::Hash(reinterpret_cast<const uint8_t*>(pSpirvBin->pCode),
                       pSpirvBin->codeSize,
                       hash.bytes);
     PipelineDumper::DumpSpirvBinary(pDumpDir, pSpirvBin, &hash);
@@ -877,7 +877,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForGraphicsPipeline(
     uint32_t                        stage)        // [in] The stage for which we are building the hash.
                                                   // ShaderStageInvalid if building for the entire pipeline.
 {
-    MetroHash64 hasher;
+    MetroHash128 hasher;
 
     switch (stage)
     {
@@ -934,7 +934,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
     bool                            isCacheHash  // TRUE if the hash is used by shader cache
     )
 {
-    MetroHash64 hasher;
+    MetroHash128 hasher;
 
     UpdateHashForPipelineShaderInfo(ShaderStageCompute, &pPipeline->cs, isCacheHash, &hasher);
     hasher.Update(pPipeline->deviceIndex);
@@ -955,7 +955,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
 // Updates hash code context for vertex input state
 void PipelineDumper::UpdateHashForVertexInputState(
     const VkPipelineVertexInputStateCreateInfo* pVertexInput,  // [in] Vertex input state
-    MetroHash64*                                pHasher)       // [in,out] Haher to generate hash code
+    MetroHash128*                                pHasher)       // [in,out] Haher to generate hash code
 {
     if ((pVertexInput != nullptr) && (pVertexInput->vertexBindingDescriptionCount > 0))
     {
@@ -987,7 +987,7 @@ void PipelineDumper::UpdateHashForVertexInputState(
 void PipelineDumper::UpdateHashForNonFragmentState(
     const GraphicsPipelineBuildInfo* pPipeline,     // [in] Info to build a graphics pipeline
     bool                             isCacheHash,   // TRUE if the hash is used by shader cache
-    MetroHash64*                     pHasher)       // [in,out] Hasher to generate hash code
+    MetroHash128*                     pHasher)       // [in,out] Hasher to generate hash code
 {
     auto pIaState = &pPipeline->iaState;
     pHasher->Update(pIaState->topology);
@@ -1059,7 +1059,7 @@ void PipelineDumper::UpdateHashForNonFragmentState(
 // Update hash code from fragment pipeline state
 void PipelineDumper::UpdateHashForFragmentState(
     const GraphicsPipelineBuildInfo* pPipeline,     // [in] Info to build a graphics pipeline
-    MetroHash64*                     pHasher)       // [in,out] Hasher to generate hash code
+    MetroHash128*                     pHasher)       // [in,out] Hasher to generate hash code
 {
     auto pRsState = &pPipeline->rsState;
     pHasher->Update(pRsState->innerCoverage);
@@ -1088,7 +1088,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
     ShaderStage               stage,           // shader stage
     const PipelineShaderInfo* pShaderInfo,     // [in] Shader info in specified shader stage
     bool                      isCacheHash,     // TRUE if the hash is used by shader cache
-    MetroHash64*              pHasher          // [in,out] Haher to generate hash code
+    MetroHash128*              pHasher          // [in,out] Haher to generate hash code
     )
 {
     if (pShaderInfo->pModuleData)
@@ -1199,7 +1199,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
 void PipelineDumper::UpdateHashForResourceMappingNode(
     const ResourceMappingNode* pUserDataNode,    // [in] Resource mapping node
     bool                       isRootNode,       // TRUE if the node is in root level
-    MetroHash64*               pHasher           // [in,out] Haher to generate hash code
+    MetroHash128*               pHasher           // [in,out] Haher to generate hash code
     )
 {
     pHasher->Update(pUserDataNode->type);
@@ -1597,7 +1597,7 @@ OStream& operator<<(
                     out << "    " << symbols[symIdx].pSymName
                         << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size;
                     MetroHash::Hash hash = {};
-                    MetroHash64::Hash(
+                    MetroHash128::Hash(
                         reinterpret_cast<const uint8_t*>(
                             VoidPtrInc(pSection->pData, static_cast<size_t>(symbols[symIdx].value))),
                         symbols[symIdx].size,
@@ -1645,7 +1645,7 @@ OStream& operator<<(
                         out << "    " << symbols[symIdx].pSymName
                             << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size;
                         MetroHash::Hash hash = {};
-                        MetroHash64::Hash(
+                        MetroHash128::Hash(
                             reinterpret_cast<const uint8_t*>(
                                 VoidPtrInc(pSection->pData, static_cast<size_t>(symbols[symIdx].value))),
                             symbols[symIdx].size,
@@ -1698,7 +1698,7 @@ OStream& operator<<(
                         << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size;
 
                     MetroHash::Hash hash = {};
-                    MetroHash64::Hash(
+                    MetroHash128::Hash(
                         reinterpret_cast<const uint8_t*>(
                             VoidPtrInc(pSection->pData, static_cast<size_t>(symbols[symIdx].value))),
                         symbols[symIdx].size,

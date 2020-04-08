@@ -37,7 +37,7 @@
 #if !defined(SINGLE_EXTERNAL_METROHASH)
 namespace MetroHash
 {
-    class MetroHash64;
+    class MetroHash128;
     struct Hash;
 };
 #endif
@@ -94,24 +94,24 @@ public:
                                                 const PipelineShaderInfo* pShaderInfo,
                                                 bool                      isCacheHash,
 #if defined(SINGLE_EXTERNAL_METROHASH)
-                                                Util::MetroHash64*        pHasher);
+                                                Util::MetroHash128*        pHasher);
 #else
-                                                MetroHash::MetroHash64*   pHasher);
+                                                MetroHash::MetroHash128*   pHasher);
 #endif
 
     static void UpdateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo* pVertexInput,
 #if defined(SINGLE_EXTERNAL_METROHASH)
-                                              Util::MetroHash64*                          pHasher);
+                                              Util::MetroHash128*                          pHasher);
 #else
-                                              MetroHash::MetroHash64*                     pHasher);
+                                              MetroHash::MetroHash128*                     pHasher);
 #endif
 
     // Update hash for map object
     template <class MapType>
 #if defined(SINGLE_EXTERNAL_METROHASH)
-    static void UpdateHashForMap(MapType& m, Util::MetroHash64* pHasher)
+    static void UpdateHashForMap(MapType& m, Util::MetroHash128* pHasher)
 #else
-    static void UpdateHashForMap(MapType& m, MetroHash::MetroHash64* pHasher)
+    static void UpdateHashForMap(MapType& m, MetroHash::MetroHash128* pHasher)
 #endif
     {
         pHasher->Update(m.size());
@@ -126,17 +126,17 @@ public:
         const GraphicsPipelineBuildInfo* pPipeline,
         bool                             isCacheHash,
 #if defined(SINGLE_EXTERNAL_METROHASH)
-        Util::MetroHash64*               pHasher);
+        Util::MetroHash128*               pHasher);
 #else
-        MetroHash::MetroHash64*          pHasher);
+        MetroHash::MetroHash128*          pHasher);
 #endif
 
     static void UpdateHashForFragmentState(
         const GraphicsPipelineBuildInfo* pPipeline,
 #if defined(SINGLE_EXTERNAL_METROHASH)
-        Util::MetroHash64*               pHasher);
+        Util::MetroHash128*               pHasher);
 #else
-        MetroHash::MetroHash64*          pHasher);
+        MetroHash::MetroHash128*          pHasher);
 #endif
 
     // Get name of register, or "" if not known
@@ -170,9 +170,9 @@ private:
     static void UpdateHashForResourceMappingNode(const ResourceMappingNode* pUserDataNode,
                                                  bool                       isRootNode,
 #if defined(SINGLE_EXTERNAL_METROHASH)
-                                                 Util::MetroHash64*         pHasher);
+                                                 Util::MetroHash128*         pHasher);
 #else
-                                                 MetroHash::MetroHash64*    pHasher);
+                                                 MetroHash::MetroHash128*    pHasher);
 #endif
 };
 
