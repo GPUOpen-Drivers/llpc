@@ -715,7 +715,7 @@ void PipelineDumper::DumpPipelineOptions(
     dumpFile << "options.includeIr = " << pOptions->includeIr << "\n";
     dumpFile << "options.robustBufferAccess = " << pOptions->robustBufferAccess << "\n";
     dumpFile << "options.reconfigWorkgroupLayout = " << pOptions->reconfigWorkgroupLayout << "\n";
-    dumpFile << "options.shadowDescriptorTableUsgae = " << pOptions->shadowDescriptorTableUsage << "\n";
+    dumpFile << "options.shadowDescriptorTableUsage = " << pOptions->shadowDescriptorTableUsage << "\n";
     dumpFile << "options.shadowDescriptorTablePtrHigh = " << pOptions->shadowDescriptorTablePtrHigh << "\n";
 }
 
