@@ -180,6 +180,7 @@ target_sources(LLVMlgc PRIVATE
     builder/InOutBuilder.cpp
     builder/MatrixBuilder.cpp
     builder/MiscBuilder.cpp
+    builder/ResourceUsage.cpp
     builder/SubgroupBuilder.cpp
     builder/YCbCrAddressHandler.cpp
 )
