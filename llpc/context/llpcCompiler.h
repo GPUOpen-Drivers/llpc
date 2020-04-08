@@ -134,7 +134,7 @@ public:
 
   static MetroHash::Hash generateHashForCompileOptions(unsigned optionCount, const char *const *options);
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES
   virtual Result CreateShaderCache(const ShaderCacheCreateInfo *pCreateInfo, IShaderCache **ppShaderCache);
 #endif
 

@@ -131,6 +131,12 @@ public:
 
   virtual Result Merge(unsigned srcCacheCount, const IShaderCache **ppSrcCaches);
 
+#if LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES
+  Result StorePipelineBinary(const void *pHash, size_t pipelineBinarySize, const void *pPipelineBinary) override;
+
+  Result RetrievePipeline(const void *pHash, size_t *pPipelineBinarySize, const void **ppPipelineBinary) override;
+#endif // LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES
+
   ShaderEntryState findShader(MetroHash::Hash hash, bool allocateOnMiss, CacheEntryHandle *phEntry);
 
   void insertShader(CacheEntryHandle hEntry, const void *blob, size_t size);

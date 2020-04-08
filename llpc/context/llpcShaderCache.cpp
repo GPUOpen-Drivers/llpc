@@ -35,6 +35,15 @@
 #include "llvm/Support/FileSystem.h"
 #include <string.h>
 
+#ifndef LLPC_HAS_LZ4
+#define LLPC_HAS_LZ4 0
+#endif
+
+#if LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES && LLPC_HAS_LZ4
+#include "lz4.h"
+#include "lz4hc.h"
+#endif
+
 #define DEBUG_TYPE "llpc-shader-cache"
 
 using namespace llvm;
@@ -853,5 +862,166 @@ bool ShaderCache::isCompatible(const ShaderCacheCreateInfo *createInfo, const Sh
   return isCompatible && m_gfxIp.major == auxCreateInfo->gfxIp.major && m_gfxIp.minor == auxCreateInfo->gfxIp.minor &&
          m_gfxIp.stepping == auxCreateInfo->gfxIp.stepping;
 }
+
+#if LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES
+namespace {
+#if LLPC_HAS_LZ4
+constexpr bool CompressCachedPipelines = true;
+#else
+constexpr bool CompressCachedPipelines = false;
+#endif // LLPC_HAS_LZ4
+
+constexpr uint32_t NoCompressionMagicNumber = 0x12345678;
+constexpr uint32_t Lz4MagicNumber = 0x43345A4C;
+
+#pragma pack(push, 1)
+struct PipelineHeader {
+  ShaderHeader shaderHeader;
+  uint32_t magic;
+  uint32_t uncompressedSize;
+};
+#pragma pack(pop)
+
+MetroHash::Hash ToLlpcHash(const void *pHash) {
+  MetroHash::Hash hash = {};
+  memcpy(&hash.bytes, pHash, sizeof(hash.bytes));
+  return hash;
+}
+} // namespace
+
+Result ShaderCache::StorePipelineBinary(const void *pHash, size_t pipelineBinarySize, const void *pPipelineBinary) {
+  // Create shader hash from pipeline hash.
+  MetroHash::Hash hash = ToLlpcHash(pHash);
+  CacheEntryHandle hEntry{};
+  ShaderEntryState entryState = ShaderCache::findShader(hash, true, &hEntry);
+  (void)entryState;
+
+  auto *const index = static_cast<ShaderIndex *>(hEntry);
+  auto OnFailure = [index] {
+    // Something failed while attempting to add the shader, most likely memory allocation.  There's not much we
+    // can do here except give up on adding data.  This means we need to set the entry back to New so if another
+    // thread is waiting it will be allowed to continue (it will likely just get to this same point, but at least
+    // we won't hang or crash).
+    index->state = ShaderEntryState::New;
+    index->header.size = 0;
+    index->dataBlob = nullptr;
+  };
+
+  const void *sourceBuffer = pPipelineBinary;
+  std::unique_ptr<char> lz4TempBuffer(nullptr);
+  int payloadSize = pipelineBinarySize;
+
+  if (CompressCachedPipelines) {
+#if LLPC_HAS_LZ4
+    const int compressBound = LZ4_COMPRESSBOUND(pipelineBinarySize);
+    lz4TempBuffer.reset(new (std::nothrow) char[compressBound]);
+    if (!lz4TempBuffer) {
+      OnFailure();
+      return Result::ErrorOutOfMemory;
+    }
+    // Compression is guaranteed to succeed since we pass bound as ouptut size.
+    payloadSize = LZ4_compress_default(static_cast<const char *>(pPipelineBinary), lz4TempBuffer.get(),
+                                       pipelineBinarySize, compressBound);
+    sourceBuffer = lz4TempBuffer.get();
+#endif // LLPC_HAS_LZ4
+  }
+
+  std::lock_guard<llvm::sys::Mutex> lock(m_lock);
+  const int totalSize = payloadSize + sizeof(PipelineHeader);
+  index->header.size = totalSize;
+  index->dataBlob = getCacheSpace(totalSize);
+
+  if (!index->dataBlob) {
+    OnFailure();
+    return Result::ErrorOutOfMemory;
+  }
+
+  ++m_totalShaders;
+
+  // Construct a pipeline header in place.
+  PipelineHeader *const header = new (index->dataBlob) PipelineHeader();
+  header->magic = CompressCachedPipelines ? Lz4MagicNumber : NoCompressionMagicNumber;
+  header->uncompressedSize = pipelineBinarySize;
+
+  void *const dataBlob = header + 1;
+  memcpy(dataBlob, sourceBuffer, payloadSize);
+
+  // Compute a CRC for the serialized data (useful for detecting data corruption), and copy the index's
+  // header into the data's header.
+  index->header.crc =
+      calculateCrc(reinterpret_cast<const uint8_t *>(&header->magic), totalSize - offsetof(PipelineHeader, magic));
+  header->shaderHeader = index->header;
+
+  // Mark this entry as ready, we'll wake the waiting threads once we release the lock
+  index->state = ShaderEntryState::Ready;
+
+  // Finally, update the file if necessary.
+  if (m_onDiskFile.isOpen()) {
+    addShaderToFile(index);
+  }
+
+  return Result::Success;
+}
+
+Result ShaderCache::RetrievePipeline(const void *pHash, size_t *pPipelineBinarySize, const void **ppPipelineBinary) {
+  // Create shader hash from pipeline hash
+  CacheEntryHandle hEntry{};
+  MetroHash::Hash hash = ToLlpcHash(pHash);
+  ShaderEntryState entryState = ShaderCache::findShader(hash, false, &hEntry);
+
+  if (entryState != ShaderEntryState::Ready) {
+    return Result::ErrorUnavailable;
+  }
+
+  std::lock_guard<llvm::sys::Mutex> lock(m_lock);
+
+  const auto *const index = static_cast<ShaderIndex *>(hEntry);
+  if (index->header.size - sizeof(PipelineHeader) <= 0) {
+    return Result::ErrorUnavailable;
+  }
+
+  auto *const header = static_cast<PipelineHeader *>(index->dataBlob);
+  if (!header) {
+    return Result::ErrorUnknown;
+  }
+  auto *const dataBlob = reinterpret_cast<const char *>(header + 1);
+
+  if (header->magic != NoCompressionMagicNumber && header->magic != Lz4MagicNumber) {
+    llvm_unreachable("Unexpected magic number found.");
+    return Result::ErrorUnknown;
+  }
+
+  const int uncompressedSize = header->uncompressedSize;
+  *pPipelineBinarySize = uncompressedSize;
+  // In case the caller only needs the uncompressed size.
+  if (!ppPipelineBinary || !(*ppPipelineBinary)) {
+    return Result::Success;
+  }
+
+  auto *const pPipelineBinary = static_cast<char *>(const_cast<void *>(*ppPipelineBinary));
+
+  // If not compressed.
+  if (header->magic == NoCompressionMagicNumber) {
+    memcpy(pPipelineBinary, dataBlob, uncompressedSize);
+    return Result::Success;
+  }
+
+#if LLPC_HAS_LZ4
+  // Handle compression.
+  const int compressedSize = index->header.size - sizeof(PipelineHeader);
+  const int outputSize = LZ4_decompress_safe(dataBlob, pPipelineBinary, compressedSize, uncompressedSize);
+
+  if (outputSize <= 0) {
+    llvm_unreachable("Lz4 decompression failed.");
+    return Result::ErrorUnknown;
+  }
+
+  return Result::Success;
+#else
+  llvm_unreachable("LLPC built without LZ4 cannot uncompress a compressed pipeline.");
+  return Result::ErrorUnavailable;
+#endif // LLPC_HAS_LZ4
+}
+#endif // LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES
 
 } // namespace Llpc

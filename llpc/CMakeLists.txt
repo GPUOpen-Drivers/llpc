@@ -158,6 +158,11 @@ if(ICD_BUILD_LLPC)
     target_compile_definitions(llpc PRIVATE ICD_BUILD_LLPC)
 endif()
 
+option(LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES "Use experimental shader cache for pipeline caching instead of PAL pipeline caching?" OFF)
+if(LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES)
+    target_compile_definitions(llpc PRIVATE LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES=1)
+endif()
+
 if(ICD_BUILD_LLPC)
     if(XGL_LLVM_UPSTREAM)
         target_compile_definitions(llpc PRIVATE XGL_LLVM_UPSTREAM)
@@ -312,6 +317,10 @@ if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
 endif()
 
 target_compile_definitions(amdllpc PRIVATE ICD_BUILD_LLPC)
+
+if(LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES)
+    target_compile_definitions(amdllpc PRIVATE LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES=1)
+endif()
 
 target_include_directories(amdllpc
 PUBLIC

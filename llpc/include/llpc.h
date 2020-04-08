@@ -155,6 +155,34 @@ public:
   ///          memory cannot be allocated.
   virtual Result Merge(unsigned srcCacheCount, const IShaderCache **ppSrcCaches) = 0;
 
+#if LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES
+  /// Hashes used by these two functions are really MetroHash::Hash.
+  /// We don't use the LLPC typedef directly because XGL doesn't have its definition.
+  /// We don't use the XGL typedef either to avoid depending on the XGL code.
+
+  /// Stores the pipeline binary in the shader cache.
+  ///
+  /// @param [in]  pHash               Pointer to the pipeline's hash (MetroHash::Hash *).
+  /// @param [in]  pipelineBinarySize  Pipeline blob size in bytes.
+  /// @param [in]  pPipelineBinary     Pointer to the pipeline blob.
+  ///
+  /// @returns Success if the pipeline was stored in the cache, OutOfMemory if the internal allocator
+  ///          memory cannot be allocated.
+  virtual Result StorePipelineBinary(const void *pHash, size_t pipelineBinarySize, const void *pPipelineBinary) = 0;
+
+  /// Retrieves a matching pipeline binary from the shader cache, if found.
+  /// Results is returned through |pPipelineBinarySize| and |ppPielineBinary|.
+  ///
+  /// @param [in]      pHash                Pointer to the pipeline's hash (MetroHash::Hash *).
+  /// @param [in,out]  pPipelineBinarySize  Pipeline blob size in bytes. If ppPipelineBinary is null,
+  ///                                       the necessary allocation sized will be written to pPipelineBinarySize.
+  /// @param [in,out]  ppPipelineBinary     Pointer to a writable storage large enough to store the deserialized
+  ///                                       pipeline, or null.
+  ///
+  /// @returns Success if the pipelie was founds, ErrorUnavailable if not found, ErrorUnknown otherwise.
+  virtual Result RetrievePipeline(const void *pHash, size_t *pPipelineBinarySize, const void **ppPipelineBinary) = 0;
+#endif // LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES
+
   /// Frees all resources associated with this object.
   virtual void Destroy() = 0;
 
@@ -226,7 +254,7 @@ public:
   virtual Result BuildComputePipeline(const ComputePipelineBuildInfo *pPipelineInfo,
                                       ComputePipelineBuildOut *pPipelineOut, void *pPipelineDumpFile = nullptr) = 0;
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES
   /// Creates a shader cache object with the requested properties.
   ///
   /// @param [in]  pCreateInfo    Create info of the shader cache.

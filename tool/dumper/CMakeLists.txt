@@ -134,6 +134,10 @@ if(ICD_BUILD_LLPC)
     target_compile_definitions(dumper PRIVATE ICD_BUILD_LLPC)
 endif()
 
+if(LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES)
+    target_compile_definitions(dumper PRIVATE LLPC_USE_EXPERIMENTAL_SHADER_CACHE_PIPELINES=1)
+endif()
+
 # metrohash
 target_link_libraries(dumper PUBLIC metrohash)
 target_compile_definitions(dumper PUBLIC SINGLE_EXTERNAL_METROHASH)
