@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "lgc/state/Defs.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/util/Internal.h"
 #include <unordered_map>
@@ -112,14 +113,14 @@ enum class WorkgroupLayout : unsigned {
 //
 // NOTE: All fields must be initialized in InitShaderResourceUsage().
 struct ResourceUsage {
-  std::unordered_set<uint64_t> descPairs; // Pairs of descriptor set/binding
-  unsigned pushConstSizeInBytes;          // Push constant size (in bytes)
-  bool resourceWrite;                     // Whether shader does resource-write operations (UAV)
-  bool resourceRead;                      // Whether shader does resource-read operrations (UAV)
-  bool perShaderTable;                    // Whether per shader stage table is used
-  unsigned numSgprsAvailable;             // Number of available SGPRs
-  unsigned numVgprsAvailable;             // Number of available VGPRs
-  bool useImages;                         // Whether images are used
+  std::unordered_set<uint64_t> descPairs;  // Pairs of descriptor set/binding
+  unsigned pushConstSizeInBytes = 0;       // Push constant size (in bytes)
+  bool resourceWrite = false;              // Whether shader does resource-write operations (UAV)
+  bool resourceRead = false;               // Whether shader does resource-read operrations (UAV)
+  bool perShaderTable = false;             // Whether per shader stage table is used
+  unsigned numSgprsAvailable = UINT32_MAX; // Number of available SGPRs
+  unsigned numVgprsAvailable = UINT32_MAX; // Number of available VGPRs
+  bool useImages = false;                  // Whether images are used
 
   // Usage of built-ins
   struct {
@@ -298,7 +299,7 @@ struct ResourceUsage {
       } allStage;
     };
 
-  } builtInUsage;
+  } builtInUsage = {};
 
   // Usage of generic input/output
   struct {
@@ -320,22 +321,22 @@ struct ResourceUsage {
     std::map<unsigned, unsigned> perPatchBuiltInOutputLocMap;
 
     // Transform feedback strides
-    unsigned xfbStrides[MaxTransformFeedbackBuffers];
+    unsigned xfbStrides[MaxTransformFeedbackBuffers] = {};
 
     // Transform feedback enablement
-    bool enableXfb;
+    bool enableXfb = false;
 
     // Stream to transform feedback buffers
-    unsigned streamXfbBuffers[MaxGsStreams];
+    unsigned streamXfbBuffers[MaxGsStreams] = {};
 
     // Count of mapped location for inputs/outputs (including those special locations to which the built-ins
     // are mapped)
-    unsigned inputMapLocCount;
-    unsigned outputMapLocCount;
-    unsigned perPatchInputMapLocCount;
-    unsigned perPatchOutputMapLocCount;
+    unsigned inputMapLocCount = 0;
+    unsigned outputMapLocCount = 0;
+    unsigned perPatchInputMapLocCount = 0;
+    unsigned perPatchOutputMapLocCount = 0;
 
-    unsigned expCount; // Export count (number of "exp" instructions) for generic outputs
+    unsigned expCount = 0; // Export count (number of "exp" instructions) for generic outputs
 
     struct {
       struct {
@@ -370,7 +371,7 @@ struct ResourceUsage {
         unsigned tessFactorStride; // Size of tess factor stride (in DWORD)
 
       } calcFactor;
-    } tcs;
+    } tcs = {};
 
     struct {
       // Map from IDs of built-in outputs to locations of generic outputs (used by copy shader to export built-in
@@ -386,7 +387,7 @@ struct ResourceUsage {
       std::map<unsigned, unsigned> xfbOutsInfo;
 
       // ID of the vertex stream sent to rasterizor
-      unsigned rasterStream;
+      unsigned rasterStream = 0;
 
       struct {
         unsigned esGsRingItemSize;   // Size of each vertex written to the ES -> GS Ring.
@@ -398,9 +399,9 @@ struct ResourceUsage {
         unsigned inputVertices;      // Number of GS input vertices
         unsigned primAmpFactor;      // GS primitive amplification factor
         bool enableMaxVertOut;       // Whether to allow each GS instance to emit maximum vertices (NGG)
-      } calcFactor;
+      } calcFactor = {};
 
-      unsigned outLocCount[MaxGsStreams];
+      unsigned outLocCount[MaxGsStreams] = {};
     } gs;
 
     struct {
@@ -420,6 +421,8 @@ struct ResourceUsage {
       bool isNullFs;                          // Is null FS, so should set final cbShaderMask to 0
     } fs;
   } inOutUsage;
+
+  ResourceUsage(ShaderStage shaderStage);
 };
 
 // Represents stream-out data
@@ -444,16 +447,16 @@ struct InterfaceData {
   static const unsigned CsStartUserData = 2;
   static const unsigned UserDataUnmapped = InvalidValue;
 
-  unsigned userDataCount;                 // User data count
-  unsigned userDataMap[MaxUserDataCount]; // User data map (from SGPR No. to API logical ID)
+  unsigned userDataCount = 0;                  // User data count
+  unsigned userDataMap[MaxUserDataCount] = {}; // User data map (from SGPR No. to API logical ID)
 
   struct {
-    unsigned resNodeIdx; // Resource node index for push constant
+    unsigned resNodeIdx = InvalidValue; // Resource node index for push constant
   } pushConst;
 
   struct {
-    unsigned sizeInDwords;   // Spill table size in dwords
-    unsigned offsetInDwords; // Start offset of Spill table
+    unsigned sizeInDwords = 0;              // Spill table size in dwords
+    unsigned offsetInDwords = InvalidValue; // Start offset of Spill table
   } spillTable;
 
   // Usage of user data registers for internal-use variables
@@ -492,7 +495,7 @@ struct InterfaceData {
 
     unsigned spillTable; // Spill table user data map
 
-  } userDataUsage;
+  } userDataUsage = {};
 
   // Indices of the arguments in shader entry-point
   struct {
@@ -587,7 +590,9 @@ struct InterfaceData {
     unsigned spillTable;                       // Spill table
     bool initialized;                          // Whether entryArgIdxs has been initialized
                                                //   by PatchEntryPointMutate
-  } entryArgIdxs;
+  } entryArgIdxs = {};
+
+  InterfaceData();
 };
 
 } // namespace lgc

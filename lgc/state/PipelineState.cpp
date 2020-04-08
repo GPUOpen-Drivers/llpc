@@ -964,8 +964,7 @@ ResourceUsage *PipelineState::getShaderResourceUsage(ShaderStage shaderStage) {
 
   auto &resUsage = MutableArrayRef<std::unique_ptr<ResourceUsage>>(m_resourceUsage)[shaderStage];
   if (!resUsage) {
-    resUsage.reset(new ResourceUsage);
-    initShaderResourceUsage(shaderStage, &*resUsage);
+    resUsage.reset(new ResourceUsage(shaderStage));
   }
   return &*resUsage;
 }
@@ -980,93 +979,9 @@ InterfaceData *PipelineState::getShaderInterfaceData(ShaderStage shaderStage) {
 
   auto &intfData = MutableArrayRef<std::unique_ptr<InterfaceData>>(m_interfaceData)[shaderStage];
   if (!intfData) {
-    intfData.reset(new InterfaceData);
-    initShaderInterfaceData(&*intfData);
+    intfData.reset(new InterfaceData());
   }
   return &*intfData;
-}
-
-// =====================================================================================================================
-// Initializes resource usage of the specified shader stage.
-//
-// @param shaderStage : Shader stage
-// @param [out] resUsage : Resource usage
-void PipelineState::initShaderResourceUsage(ShaderStage shaderStage, ResourceUsage *resUsage) {
-  memset(&resUsage->builtInUsage, 0, sizeof(resUsage->builtInUsage));
-
-  resUsage->pushConstSizeInBytes = 0;
-  resUsage->resourceWrite = false;
-  resUsage->resourceRead = false;
-  resUsage->perShaderTable = false;
-
-  resUsage->numSgprsAvailable = UINT32_MAX;
-  resUsage->numVgprsAvailable = UINT32_MAX;
-
-  resUsage->inOutUsage.inputMapLocCount = 0;
-  resUsage->inOutUsage.outputMapLocCount = 0;
-  memset(resUsage->inOutUsage.gs.outLocCount, 0, sizeof(resUsage->inOutUsage.gs.outLocCount));
-  resUsage->inOutUsage.perPatchInputMapLocCount = 0;
-  resUsage->inOutUsage.perPatchOutputMapLocCount = 0;
-
-  resUsage->inOutUsage.expCount = 0;
-
-  memset(resUsage->inOutUsage.xfbStrides, 0, sizeof(resUsage->inOutUsage.xfbStrides));
-  resUsage->inOutUsage.enableXfb = false;
-
-  memset(resUsage->inOutUsage.streamXfbBuffers, 0, sizeof(resUsage->inOutUsage.streamXfbBuffers));
-
-  if (shaderStage == ShaderStageVertex) {
-    // NOTE: For vertex shader, PAL expects base vertex and base instance in user data,
-    // even if they are not used in shader.
-    resUsage->builtInUsage.vs.baseVertex = true;
-    resUsage->builtInUsage.vs.baseInstance = true;
-  } else if (shaderStage == ShaderStageTessControl) {
-    auto &calcFactor = resUsage->inOutUsage.tcs.calcFactor;
-
-    calcFactor.inVertexStride = InvalidValue;
-    calcFactor.outVertexStride = InvalidValue;
-    calcFactor.patchCountPerThreadGroup = InvalidValue;
-    calcFactor.offChip.outPatchStart = InvalidValue;
-    calcFactor.offChip.patchConstStart = InvalidValue;
-    calcFactor.onChip.outPatchStart = InvalidValue;
-    calcFactor.onChip.patchConstStart = InvalidValue;
-    calcFactor.outPatchSize = InvalidValue;
-    calcFactor.patchConstSize = InvalidValue;
-  } else if (shaderStage == ShaderStageGeometry) {
-    resUsage->inOutUsage.gs.rasterStream = 0;
-
-    auto &calcFactor = resUsage->inOutUsage.gs.calcFactor;
-    memset(&calcFactor, 0, sizeof(calcFactor));
-  } else if (shaderStage == ShaderStageFragment) {
-    for (unsigned i = 0; i < MaxColorTargets; ++i) {
-      resUsage->inOutUsage.fs.expFmts[i] = EXP_FORMAT_ZERO;
-      resUsage->inOutUsage.fs.outputTypes[i] = BasicType::Unknown;
-    }
-
-    resUsage->inOutUsage.fs.cbShaderMask = 0;
-    resUsage->inOutUsage.fs.dummyExport = true;
-    resUsage->inOutUsage.fs.isNullFs = false;
-  }
-}
-
-// =====================================================================================================================
-// Initializes interface data of the specified shader stage.
-//
-// @param [out] intfData : Interface data
-void PipelineState::initShaderInterfaceData(InterfaceData *intfData) {
-  intfData->userDataCount = 0;
-  memset(intfData->userDataMap, InterfaceData::UserDataUnmapped, sizeof(intfData->userDataMap));
-
-  memset(&intfData->pushConst, 0, sizeof(intfData->pushConst));
-  intfData->pushConst.resNodeIdx = InvalidValue;
-
-  memset(&intfData->spillTable, 0, sizeof(intfData->spillTable));
-  intfData->spillTable.offsetInDwords = InvalidValue;
-
-  memset(&intfData->userDataUsage, 0, sizeof(intfData->userDataUsage));
-
-  memset(&intfData->entryArgIdxs, 0, sizeof(intfData->entryArgIdxs));
-  intfData->entryArgIdxs.spillTable = InvalidValue;
 }
 
 // =====================================================================================================================

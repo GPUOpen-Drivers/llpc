@@ -367,10 +367,6 @@ private:
   void recordGraphicsState(llvm::Module *module);
   void readGraphicsState(llvm::Module *module);
 
-  // Initialization of ResourceUsage and InterfaceData.
-  static void initShaderResourceUsage(ShaderStage shaderStage, ResourceUsage *resUsage);
-  static void initShaderInterfaceData(InterfaceData *intfData);
-
   // -----------------------------------------------------------------------------------------------------------------
   bool m_noReplayer = false;                            // True if no BuilderReplayer needed
   unsigned m_stageMask = 0;                             // Mask of active shader stages
