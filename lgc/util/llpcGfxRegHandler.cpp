@@ -310,7 +310,10 @@ void SqImgRsrcRegHandler::SetReg(
         }
         break;
     case SqRsrcRegs::IsTileOpt:
-        llvm_unreachable("Set \"IsTileOpt\" is not allowed!");
+    case SqRsrcRegs::WidthLo:
+    case SqRsrcRegs::WidthHi:
+    case SqRsrcRegs::Count:
+        llvm_unreachable("Bad SqImgRsrcRegHandler::SetReg!");
         break;
     }
 }
