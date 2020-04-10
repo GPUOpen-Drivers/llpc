@@ -56,10 +56,10 @@ namespace lgc
 {
 
 // Invalid value
-static const uint32_t InvalidValue  = ~0u;
+static const unsigned InvalidValue  = ~0u;
 
 // Size of vec4
-static const uint32_t SizeOfVec4 = sizeof(float) * 4;
+static const unsigned SizeOfVec4 = sizeof(float) * 4;
 
 // Initialize helper passes
 inline static void InitializeUtilPasses(
@@ -150,29 +150,29 @@ namespace lgcName
 const static char MetaNameUniform[] = "amdgpu.uniform";
 
 // Maximum count of input/output locations that a shader stage (except fragment shader outputs) is allowed to specify
-static const uint32_t MaxInOutLocCount = 32;
+static const unsigned MaxInOutLocCount = 32;
 
 // Maximum array size of gl_ClipDistance[] and gl_CullDistance[]
-static const uint32_t MaxClipCullDistanceCount = 8;
+static const unsigned MaxClipCullDistanceCount = 8;
 
 // Maximum transform feedback buffers
-static const uint32_t MaxTransformFeedbackBuffers = 4;
+static const unsigned MaxTransformFeedbackBuffers = 4;
 
 // Maximum GS output vertex streams
-static const uint32_t MaxGsStreams = 4;
+static const unsigned MaxGsStreams = 4;
 static_assert(MaxGsStreams == MaxTransformFeedbackBuffers, "Unexpected value!");
 
 // Internal resource table's virtual descriptor sets
-static const uint32_t InternalResourceTable  = 0x10000000;
-static const uint32_t InternalPerShaderTable = 0x10000001;
+static const unsigned InternalResourceTable  = 0x10000000;
+static const unsigned InternalPerShaderTable = 0x10000001;
 
 // Descriptor offset reloc magic number
-static const uint32_t DescRelocMagic        = 0xA5A5A500;
-static const uint32_t DescRelocMagicMask    = 0xFFFFFF00;
-static const uint32_t DescSetMask           = 0x000000FF;
+static const unsigned DescRelocMagic        = 0xA5A5A500;
+static const unsigned DescRelocMagicMask    = 0xFFFFFF00;
+static const unsigned DescSetMask           = 0x000000FF;
 
 // Translates shader stage to corresponding stage mask.
-static inline uint32_t ShaderStageToMask(ShaderStage stage) { return 1U << static_cast<uint32_t>(stage); }
+static inline unsigned ShaderStageToMask(ShaderStage stage) { return 1U << static_cast<unsigned>(stage); }
 
 // Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
 // and its parameters.
@@ -201,10 +201,10 @@ std::string GetTypeName(llvm::Type* pTy);
 ShaderStage GetShaderStageFromFunction(const llvm::Function* pFunc);
 
 // Gets the shader stage from the specified calling convention.
-ShaderStage GetShaderStageFromCallingConv(uint32_t stageMask, llvm::CallingConv::ID callConv);
+ShaderStage GetShaderStageFromCallingConv(unsigned stageMask, llvm::CallingConv::ID callConv);
 
 // Gets the argument from the specified function according to the argument index.
-llvm::Value* GetFunctionArgument(llvm::Function* pFunc, uint32_t idx, const llvm::Twine& name = "");
+llvm::Value* GetFunctionArgument(llvm::Function* pFunc, unsigned idx, const llvm::Twine& name = "");
 
 // Checks if one type can be bitcasted to the other (type1 -> type2).
 bool CanBitCast(const llvm::Type* pTy1, const llvm::Type* pTy2);

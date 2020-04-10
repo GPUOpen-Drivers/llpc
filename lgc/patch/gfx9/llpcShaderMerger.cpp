@@ -86,14 +86,14 @@ FunctionType* ShaderMerger::GenerateLsHsEntryPointType(
     std::vector<Type*> argTys;
 
     // First 8 system values (SGPRs)
-    for (uint32_t i = 0; i < LsHsSpecialSysValueCount; ++i)
+    for (unsigned i = 0; i < LsHsSpecialSysValueCount; ++i)
     {
         argTys.push_back(Type::getInt32Ty(*m_pContext));
         *pInRegMask |= (1ull << i);
     }
 
     // User data (SGPRs)
-    uint32_t userDataCount = 0;
+    unsigned userDataCount = 0;
     if (m_hasVs)
     {
         const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
@@ -253,7 +253,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
 
     auto pThreadId = EmitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
 
-    uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageTessControl);
+    unsigned waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageTessControl);
     if (waveSize == 64)
     {
         args.clear();
@@ -313,14 +313,14 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         args.clear();
 
         auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
-        const uint32_t userDataCount = pIntfData->userDataCount;
+        const unsigned userDataCount = pIntfData->userDataCount;
 
-        uint32_t userDataIdx = 0;
+        unsigned userDataIdx = 0;
 
         auto pLsArgBegin = pLsEntryPoint->arg_begin();
-        const uint32_t lsArgCount = pLsEntryPoint->arg_size();
+        const unsigned lsArgCount = pLsEntryPoint->arg_size();
 
-        uint32_t lsArgIdx = 0;
+        unsigned lsArgIdx = 0;
 
         // Set up user data SGPRs
         while (userDataIdx < userDataCount)
@@ -335,10 +335,10 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
             {
                 assert(pLsArgTy->getVectorElementType()->isIntegerTy());
 
-                const uint32_t userDataSize = pLsArgTy->getVectorNumElements();
+                const unsigned userDataSize = pLsArgTy->getVectorNumElements();
 
                 std::vector<Constant*> shuffleMask;
-                for (uint32_t i = 0; i < userDataSize; ++i)
+                for (unsigned i = 0; i < userDataSize; ++i)
                 {
                     shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), userDataIdx + i));
                 }
@@ -412,13 +412,13 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         args.clear();
 
         auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessControl);
-        const uint32_t userDataCount = pIntfData->userDataCount;
+        const unsigned userDataCount = pIntfData->userDataCount;
 
-        uint32_t userDataIdx = 0;
+        unsigned userDataIdx = 0;
 
         auto pHsArgBegin = pHsEntryPoint->arg_begin();
 
-        uint32_t hsArgIdx = 0;
+        unsigned hsArgIdx = 0;
 
         // Set up user data SGPRs
         while (userDataIdx < userDataCount)
@@ -433,10 +433,10 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
             {
                 assert(pHsArgTy->getVectorElementType()->isIntegerTy());
 
-                const uint32_t userDataSize = pHsArgTy->getVectorNumElements();
+                const unsigned userDataSize = pHsArgTy->getVectorNumElements();
 
                 std::vector<Constant*> shuffleMask;
-                for (uint32_t i = 0; i < userDataSize; ++i)
+                for (unsigned i = 0; i < userDataSize; ++i)
                 {
                     shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), userDataIdx + i));
                 }
@@ -450,7 +450,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
             else
             {
                 assert(pHsArgTy->isIntegerTy());
-                uint32_t actualUserDataIdx = userDataIdx;
+                unsigned actualUserDataIdx = userDataIdx;
                 if (pIntfData->spillTable.sizeInDwords > 0)
                 {
                     if (pIntfData->userDataUsage.spillTable == userDataIdx)
@@ -515,14 +515,14 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
     std::vector<Type*> argTys;
 
     // First 8 system values (SGPRs)
-    for (uint32_t i = 0; i < EsGsSpecialSysValueCount; ++i)
+    for (unsigned i = 0; i < EsGsSpecialSysValueCount; ++i)
     {
         argTys.push_back(Type::getInt32Ty(*m_pContext));
         *pInRegMask |= (1ull << i);
     }
 
     // User data (SGPRs)
-    uint32_t userDataCount = 0;
+    unsigned userDataCount = 0;
     bool hasTs = (m_hasTcs || m_hasTes);
     if (hasTs)
     {
@@ -720,7 +720,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
 
     auto pThreadId = EmitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
 
-    uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
+    unsigned waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     if (waveSize == 64)
     {
         args.clear();
@@ -801,22 +801,22 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
     Value* pInstanceId    = (pArg + 8);
 
     // Construct ".begines" block
-    uint32_t spillTableIdx = 0;
+    unsigned spillTableIdx = 0;
     if ((hasTs && m_hasTes) || ((hasTs == false) && m_hasVs))
     {
         // Call ES main function
         args.clear();
 
         auto pIntfData = m_pPipelineState->GetShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
-        const uint32_t userDataCount = pIntfData->userDataCount;
+        const unsigned userDataCount = pIntfData->userDataCount;
         spillTableIdx = pIntfData->userDataUsage.spillTable;
 
-        uint32_t userDataIdx = 0;
+        unsigned userDataIdx = 0;
 
         auto pEsArgBegin = pEsEntryPoint->arg_begin();
-        const uint32_t esArgCount = pEsEntryPoint->arg_size();
+        const unsigned esArgCount = pEsEntryPoint->arg_size();
 
-        uint32_t esArgIdx = 0;
+        unsigned esArgIdx = 0;
 
         // Set up user data SGPRs
         while (userDataIdx < userDataCount)
@@ -831,10 +831,10 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
             {
                 assert(pEsArgTy->getVectorElementType()->isIntegerTy());
 
-                const uint32_t userDataSize = pEsArgTy->getVectorNumElements();
+                const unsigned userDataSize = pEsArgTy->getVectorNumElements();
 
                 std::vector<Constant*> shuffleMask;
-                for (uint32_t i = 0; i < userDataSize; ++i)
+                for (unsigned i = 0; i < userDataSize; ++i)
                 {
                     shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), userDataIdx + i));
                 }
@@ -993,13 +993,13 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
         args.clear();
 
         auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry);
-        const uint32_t userDataCount = pIntfData->userDataCount;
+        const unsigned userDataCount = pIntfData->userDataCount;
 
-        uint32_t userDataIdx = 0;
+        unsigned userDataIdx = 0;
 
         auto pGsArgBegin = pGsEntryPoint->arg_begin();
 
-        uint32_t gsArgIdx = 0;
+        unsigned gsArgIdx = 0;
 
         // Set up user data SGPRs
         while (userDataIdx < userDataCount)
@@ -1014,10 +1014,10 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
             {
                 assert(pGsArgTy->getVectorElementType()->isIntegerTy());
 
-                const uint32_t userDataSize = pGsArgTy->getVectorNumElements();
+                const unsigned userDataSize = pGsArgTy->getVectorNumElements();
 
                 std::vector<Constant*> shuffleMask;
-                for (uint32_t i = 0; i < userDataSize; ++i)
+                for (unsigned i = 0; i < userDataSize; ++i)
                 {
                     shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), userDataIdx + i));
                 }
@@ -1031,7 +1031,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
             else
             {
                 assert(pGsArgTy->isIntegerTy());
-                uint32_t actualUserDataIdx = userDataIdx;
+                unsigned actualUserDataIdx = userDataIdx;
                 if (pIntfData->spillTable.sizeInDwords > 0)
                 {
                     if (pIntfData->userDataUsage.spillTable == userDataIdx)

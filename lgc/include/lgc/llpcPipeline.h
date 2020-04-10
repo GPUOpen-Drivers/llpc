@@ -52,7 +52,7 @@ class BuilderContext;
 
 // Bit values of NGG flags. This is done as bit values rather than bitfields so the flags word appears
 // in a platform-independent way in IR metdata.
-enum NggFlag : uint32_t
+enum NggFlag : unsigned
 {
     NggFlagDisable = 0x0001,                      // Disable NGG
     NggFlagEnableGsUse = 0x0002,                  // Enable NGG when pipeline has GS
@@ -71,7 +71,7 @@ enum NggFlag : uint32_t
 };
 
 // Enumerates various sizing options of sub-group size for NGG primitive shader.
-enum class NggSubgroupSizing : uint32_t
+enum class NggSubgroupSizing : unsigned
 {
     Auto,                           ///< Sub-group size is allocated as optimally determined
     MaximumSize,                    ///< Sub-group size is allocated to the maximum allowable size by the hardware
@@ -86,7 +86,7 @@ enum class NggSubgroupSizing : uint32_t
 // If next available quad falls outside tile aligned region of size defined by this enumeration, the compiler
 // will force end of vector in the compiler to shader wavefront.
 // All of these values except DrawTime correspond to settings of WAVE_BREAK_REGION_SIZE in PA_SC_SHADER_CONTROL.
-enum class WaveBreak : uint32_t
+enum class WaveBreak : unsigned
 {
     None     = 0x0,        ///< No wave break by region
     _8x8     = 0x1,        ///< Outside a 8x8 pixel region
@@ -96,7 +96,7 @@ enum class WaveBreak : uint32_t
 };
 
 /// Values for shadowDescriptorTableUsage pipeline option.
-enum class ShadowDescriptorTableUsage : uint32_t
+enum class ShadowDescriptorTableUsage : unsigned
 {
     Auto     = 0,  ///< Use 0 for auto setting so null initialized structures default to auto.
     Enable   = 1,
@@ -108,23 +108,23 @@ enum class ShadowDescriptorTableUsage : uint32_t
 struct Options
 {
     uint64_t              hash[2];                 // Pipeline hash to set in ELF PAL metadata
-    uint32_t              includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
+    unsigned              includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
                                                    //   in the pipeline ELF.
-    uint32_t              reconfigWorkgroupLayout; // If set, allows automatic workgroup reconfigure to take place on
+    unsigned              reconfigWorkgroupLayout; // If set, allows automatic workgroup reconfigure to take place on
                                                    //   compute shaders.
-    uint32_t              includeIr;               // If set, the IR for all compiled shaders will be included in the
+    unsigned              includeIr;               // If set, the IR for all compiled shaders will be included in the
                                                    //   pipeline ELF.
-    uint32_t              nggFlags;                // Flags to control NGG (NggFlag* values ored together)
-    uint32_t              nggBackfaceExponent;     // Value from 1 to UINT32_MAX that will cause the backface culling
+    unsigned              nggFlags;                // Flags to control NGG (NggFlag* values ored together)
+    unsigned              nggBackfaceExponent;     // Value from 1 to UINT32_MAX that will cause the backface culling
                                                    // algorithm to ignore area calculations that are less than
                                                    // (10 ^ -(backfaceExponent)) / abs(w0 * w1 * w2)
                                                    //  Only valid if the NGG backface culler is enabled.
                                                    //  A value of 0 will disable the threshold.
     NggSubgroupSizing     nggSubgroupSizing;       // NGG subgroup sizing type
-    uint32_t              nggVertsPerSubgroup;     // How to determine NGG verts per subgroup
-    uint32_t              nggPrimsPerSubgroup;     // How to determine NGG prims per subgroup
+    unsigned              nggVertsPerSubgroup;     // How to determine NGG verts per subgroup
+    unsigned              nggPrimsPerSubgroup;     // How to determine NGG prims per subgroup
     ShadowDescriptorTableUsage  shadowDescriptorTableUsage;   // Shadow descriptor table setting
-    uint32_t                    shadowDescriptorTablePtrHigh; // High part of VA ptr.
+    unsigned                    shadowDescriptorTablePtrHigh; // High part of VA ptr.
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.
@@ -132,38 +132,38 @@ struct Options
 struct ShaderOptions
 {
     uint64_t      hash[2];        // Shader hash to set in ELF PAL metadata
-    uint32_t      trapPresent;    // Indicates a trap handler will be present when this pipeline is executed,
+    unsigned      trapPresent;    // Indicates a trap handler will be present when this pipeline is executed,
                                   //  and any trap conditions encountered in this shader should call the trap
                                   //  handler. This could include an arithmetic exception, an explicit trap
                                   //  request from the host, or a trap after every instruction when in debug
                                   //  mode.
-    uint32_t      debugMode;      // When set, this shader should cause the trap handler to be executed after
+    unsigned      debugMode;      // When set, this shader should cause the trap handler to be executed after
                                   //  every instruction.  Only valid if trapPresent is set.
-    uint32_t      allowReZ;       // Allow the DB ReZ feature to be enabled.  This will cause an early-Z test
+    unsigned      allowReZ;       // Allow the DB ReZ feature to be enabled.  This will cause an early-Z test
                                   //  to potentially kill PS waves before launch, and also issues a late-Z test
                                   //  in case the PS kills pixels.  Only valid for pixel shaders.
 
     // Maximum VGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
     // of this value and whatever the target GPU supports. To effectively disable this limit, set this to 0.
-    uint32_t  vgprLimit;
+    unsigned  vgprLimit;
 
     // Maximum SGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
     // of this value and whatever the target GPU supports. To effectively disable this limit, set this to 0.
-    uint32_t  sgprLimit;
+    unsigned  sgprLimit;
 
     /// Overrides the number of CS thread-groups which the GPU will launch per compute-unit. This throttles the
     /// shader, which can sometimes enable more graphics shader work to complete in parallel. A value of zero
     /// disables limiting the number of thread-groups to launch. This field is ignored for graphics shaders.
-    uint32_t  maxThreadGroupsPerComputeUnit;
+    unsigned  maxThreadGroupsPerComputeUnit;
 
-    uint32_t      waveSize;       // Control the number of threads per wavefront (GFX10+)
-    uint32_t      subgroupSize;   // Override for the wave size when the shader uses gl_SubgroupSize, 0 for no override
-    uint32_t      wgpMode;        // Whether to choose WGP mode or CU mode (GFX10+)
+    unsigned      waveSize;       // Control the number of threads per wavefront (GFX10+)
+    unsigned      subgroupSize;   // Override for the wave size when the shader uses gl_SubgroupSize, 0 for no override
+    unsigned      wgpMode;        // Whether to choose WGP mode or CU mode (GFX10+)
     WaveBreak     waveBreakSize;  // Size of region to force the end of a wavefront (GFX10+).
                                   // Only valid for fragment shaders.
 
     // Vector szie threshold for load scalarizer. 0 means do not scalarize loads at all.
-    uint32_t  loadScalarizerThreshold;
+    unsigned  loadScalarizerThreshold;
 
     // Use the LLVM backend's SI scheduler instead of the default scheduler.
     bool      useSiScheduler;
@@ -172,14 +172,14 @@ struct ShaderOptions
     bool      updateDescInElf;
 
     /// Default unroll threshold for LLVM.
-    uint32_t  unrollThreshold;
+    unsigned  unrollThreshold;
 };
 
 // =====================================================================================================================
 // Definitions for user data resource nodes
 
 /// Enumerates the function of a particular node in a shader's resource mapping graph.
-enum class ResourceNodeType : uint32_t
+enum class ResourceNodeType : unsigned
 {
     Unknown,                        ///< Invalid type
     DescriptorResource,             ///< Generic descriptor: resource, including texture resource, image, input
@@ -206,16 +206,16 @@ struct ResourceNode
     ResourceNode() {}
 
     ResourceNodeType            type;                 // Type of this node
-    uint32_t                    sizeInDwords;         // Size in dwords
-    uint32_t                    offsetInDwords;       // Offset in dwords
+    unsigned                    sizeInDwords;         // Size in dwords
+    unsigned                    offsetInDwords;       // Offset in dwords
 
     union
     {
         // Info for generic descriptor nodes.
         struct
         {
-            uint32_t            set;                  // Descriptor set
-            uint32_t            binding;              // Binding
+            unsigned            set;                  // Descriptor set
+            unsigned            binding;              // Binding
             llvm::Constant*           pImmutableValue;      // Array of vectors of i32 constants for immutable value
         };
 
@@ -223,7 +223,7 @@ struct ResourceNode
         llvm::ArrayRef<ResourceNode>  innerTable;
 
         // Info for indirect data nodes (IndirectUserDataVaPtr, StreamOutVaTablePtr)
-        uint32_t                indirectSizeInDwords;
+        unsigned                indirectSizeInDwords;
     };
 };
 
@@ -231,20 +231,20 @@ struct ResourceNode
 struct ImmutableDescriptor
 {
     ResourceNodeType        type;       ///< Type of this resource node (currently, only sampler is supported)
-    uint32_t                set;        ///< ID of descriptor set
-    uint32_t                binding;    ///< ID of descriptor binding
-    uint32_t                arraySize;  ///< Element count for arrayed binding
-    const uint32_t*         pValue;     ///< Static SRDs
+    unsigned                set;        ///< ID of descriptor set
+    unsigned                binding;    ///< ID of descriptor binding
+    unsigned                arraySize;  ///< Element count for arrayed binding
+    const unsigned*         pValue;     ///< Static SRDs
 };
 
 // =====================================================================================================================
 // Structs for setting pipeline state.
 // The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
-// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// All fields are unsigned, even those that could be bool, because the way the state is written to and read
 // from IR metadata relies on that.
 
 // Primitive topology. These happen to have the same values as the corresponding Vulkan enum.
-enum class PrimitiveTopology : uint32_t
+enum class PrimitiveTopology : unsigned
 {
     PointList = 0,
     LineList = 1,
@@ -329,13 +329,13 @@ enum VertexInputRate
 // Structure for a vertex input
 struct VertexInputDescription
 {
-    uint32_t        location;       // Location of input, as provided to CreateReadGenericInput
-    uint32_t        binding;        // Index of the vertex buffer descriptor in the vertex buffer table
-    uint32_t        offset;         // Byte offset of the input in the binding's vertex buffer
-    uint32_t        stride;         // Byte stride of per-vertex/per-instance elements in the vertex buffer
+    unsigned        location;       // Location of input, as provided to CreateReadGenericInput
+    unsigned        binding;        // Index of the vertex buffer descriptor in the vertex buffer table
+    unsigned        offset;         // Byte offset of the input in the binding's vertex buffer
+    unsigned        stride;         // Byte stride of per-vertex/per-instance elements in the vertex buffer
     BufDataFormat   dfmt;           // Data format of input; one of the BufDataFormat* values
     BufNumFormat    nfmt;           // Numeric format of input; one of the BufNumFormat* values
-    uint32_t        inputRate;      // Vertex input rate for the binding
+    unsigned        inputRate;      // Vertex input rate for the binding
 };
 
 // A single color export format.
@@ -343,36 +343,36 @@ struct ColorExportFormat
 {
     BufDataFormat dfmt;                 // Data format
     BufNumFormat  nfmt;                 // Numeric format
-    uint32_t      blendEnable;          // Blend will be enabled for this target at draw time
-    uint32_t      blendSrcAlphaToColor; // Whether source alpha is blended to color channels for this target
+    unsigned      blendEnable;          // Blend will be enabled for this target at draw time
+    unsigned      blendSrcAlphaToColor; // Whether source alpha is blended to color channels for this target
                                         //  at draw time
 };
 
 // Struct to pass to SetColorExportState
 struct ColorExportState
 {
-    uint32_t alphaToCoverageEnable;          // Enable alpha to coverage
-    uint32_t dualSourceBlendEnable;          // Blend state bound at draw time will use a dual source blend mode
+    unsigned alphaToCoverageEnable;          // Enable alpha to coverage
+    unsigned dualSourceBlendEnable;          // Blend state bound at draw time will use a dual source blend mode
 };
 
 // Struct to pass to SetInputAssemblyState.
 struct InputAssemblyState
 {
     PrimitiveTopology topology;           // Primitive topology
-    uint32_t          patchControlPoints; // Number of control points for PrimitiveTopology::PatchList
-    uint32_t          disableVertexReuse; // Disable reusing vertex shader output for indexed draws
-    uint32_t          switchWinding;      // Whether to reverse vertex ordering for tessellation
-    uint32_t          enableMultiView;    // Whether to enable multi-view support
+    unsigned          patchControlPoints; // Number of control points for PrimitiveTopology::PatchList
+    unsigned          disableVertexReuse; // Disable reusing vertex shader output for indexed draws
+    unsigned          switchWinding;      // Whether to reverse vertex ordering for tessellation
+    unsigned          enableMultiView;    // Whether to enable multi-view support
 };
 
 // Struct to pass to SetViewportState.
 struct ViewportState
 {
-    uint32_t          depthClipEnable;    // Enable clipping based on Z coordinate
+    unsigned          depthClipEnable;    // Enable clipping based on Z coordinate
 };
 
 // Polygon mode. These happen to have the same values as the corresponding Vulkan enum.
-enum PolygonMode : uint32_t
+enum PolygonMode : unsigned
 {
     PolygonModeFill = 0,
     PolygonModeLine = 1,
@@ -380,7 +380,7 @@ enum PolygonMode : uint32_t
 };
 
 // Fragment cull mode flags. These happen to have the same values as the corresponding Vulkan enum.
-enum CullModeFlags : uint32_t
+enum CullModeFlags : unsigned
 {
     CullModeNone = 0,
     CullModeFront = 1,
@@ -391,20 +391,20 @@ enum CullModeFlags : uint32_t
 // Struct to pass to SetRasterizerState
 struct RasterizerState
 {
-    uint32_t      rasterizerDiscardEnable;  // Kill all rasterized pixels. This is implicitly true if stream out
+    unsigned      rasterizerDiscardEnable;  // Kill all rasterized pixels. This is implicitly true if stream out
                                             //  is enabled and no streams are rasterized
-    uint32_t      innerCoverage;            // Related to conservative rasterization.  Must be false if
+    unsigned      innerCoverage;            // Related to conservative rasterization.  Must be false if
                                             //  conservative rasterization is disabled.
-    uint32_t      perSampleShading;         // Enable per sample shading
-    uint32_t      numSamples;               // Number of coverage samples used when rendering with this pipeline
-    uint32_t      samplePatternIdx;         // Index into the currently bound MSAA sample pattern table that
+    unsigned      perSampleShading;         // Enable per sample shading
+    unsigned      numSamples;               // Number of coverage samples used when rendering with this pipeline
+    unsigned      samplePatternIdx;         // Index into the currently bound MSAA sample pattern table that
                                             //  matches the sample pattern used by the rasterizer when rendering
                                             //  with this pipeline.
-    uint32_t      usrClipPlaneMask;         // Mask to indicate the enabled user defined clip planes
+    unsigned      usrClipPlaneMask;         // Mask to indicate the enabled user defined clip planes
     PolygonMode   polygonMode;              // Polygon mode
     CullModeFlags cullMode;                 // Fragment culling mode
-    uint32_t      frontFaceClockwise;       // Front-facing triangle orientation: false=counter, true=clockwise
-    uint32_t      depthBiasEnable;          // Whether to bias fragment depth values
+    unsigned      frontFaceClockwise;       // Front-facing triangle orientation: false=counter, true=clockwise
+    unsigned      depthBiasEnable;          // Whether to bias fragment depth values
 };
 
 // =====================================================================================================================
@@ -412,7 +412,7 @@ struct RasterizerState
 
 // FP rounding mode. These happen to have values one more than the corresponding register field in current
 // hardware, so we can make the zero initializer equivalent to DontCare.
-enum class FpRoundMode : uint32_t
+enum class FpRoundMode : unsigned
 {
     DontCare,   // Don't care
     Even,       // Round to nearest even
@@ -423,7 +423,7 @@ enum class FpRoundMode : uint32_t
 
 // Denormal flush mode. These happen to have values one more than the corresponding register field in current
 // hardware, so we can make the zero initializer equivalent to DontCare.
-enum class FpDenormMode :uint32_t
+enum class FpDenormMode :unsigned
 {
     DontCare,     // Don't care
     FlushInOut,   // Flush input/output denormals
@@ -434,7 +434,7 @@ enum class FpDenormMode :uint32_t
 
 // Struct to pass to SetCommonShaderMode.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
-// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// All fields are unsigned, even those that could be bool, because the way the state is written to and read
 // from IR metadata relies on that.
 struct CommonShaderMode
 {
@@ -444,11 +444,11 @@ struct CommonShaderMode
     FpDenormMode  fp32DenormMode;
     FpRoundMode   fp64RoundMode;
     FpDenormMode  fp64DenormMode;
-    uint32_t      useSubgroupSize;  // True if shader relies on SubgroupSize
+    unsigned      useSubgroupSize;  // True if shader relies on SubgroupSize
 };
 
 // Tessellation vertex spacing
-enum class VertexSpacing : uint32_t
+enum class VertexSpacing : unsigned
 {
     Unknown,
     Equal,
@@ -457,7 +457,7 @@ enum class VertexSpacing : uint32_t
 };
 
 // Tessellation vertex order
-enum class VertexOrder : uint32_t
+enum class VertexOrder : unsigned
 {
     Unknown,
     Ccw,
@@ -465,7 +465,7 @@ enum class VertexOrder : uint32_t
 };
 
 // Tessellation primitive mode
-enum class PrimitiveMode : uint32_t
+enum class PrimitiveMode : unsigned
 {
     Unknown,
     Triangles,
@@ -475,19 +475,19 @@ enum class PrimitiveMode : uint32_t
 
 // Struct to pass to SetTessellationMode.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
-// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// All fields are unsigned, even those that could be bool, because the way the state is written to and read
 // from IR metadata relies on that.
 struct TessellationMode
 {
     VertexSpacing vertexSpacing;  // Vertex spacing
     VertexOrder   vertexOrder;    // Vertex ordering
     PrimitiveMode primitiveMode;  // Tessellation primitive mode
-    uint32_t      pointMode;      // Whether point mode is specified
-    uint32_t      outputVertices; // Number of produced vertices in the output patch
+    unsigned      pointMode;      // Whether point mode is specified
+    unsigned      outputVertices; // Number of produced vertices in the output patch
 };
 
 // Kind of GS input primitives.
-enum class InputPrimitives : uint32_t
+enum class InputPrimitives : unsigned
 {
     Points,
     Lines,
@@ -497,7 +497,7 @@ enum class InputPrimitives : uint32_t
 };
 
 // Kind of GS output primitives
-enum class OutputPrimitives : uint32_t
+enum class OutputPrimitives : unsigned
 {
     Points,
     LineStrip,
@@ -506,36 +506,36 @@ enum class OutputPrimitives : uint32_t
 
 // Struct to pass to SetGeometryShaderMode. The front-end should zero-initialize it with "= {}" in case
 // future changes add new fields.
-// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// All fields are unsigned, even those that could be bool, because the way the state is written to and read
 // from IR metadata relies on that.
 struct GeometryShaderMode
 {
     InputPrimitives   inputPrimitive;   // Kind of input primitives
     OutputPrimitives  outputPrimitive;  // Kind of output primitives
-    uint32_t          invocations;      // Number of times to invoke shader for each input primitive
-    uint32_t          outputVertices;   // Max number of vertices the shader will emit in one invocation
+    unsigned          invocations;      // Number of times to invoke shader for each input primitive
+    unsigned          outputVertices;   // Max number of vertices the shader will emit in one invocation
 };
 
 // Struct to pass to SetFragmentShaderMode.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
-// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// All fields are unsigned, even those that could be bool, because the way the state is written to and read
 // from IR metadata relies on that.
 struct FragmentShaderMode
 {
-    uint32_t  pixelCenterInteger;
-    uint32_t  earlyFragmentTests;
-    uint32_t  postDepthCoverage;
+    unsigned  pixelCenterInteger;
+    unsigned  earlyFragmentTests;
+    unsigned  postDepthCoverage;
 };
 
 // Struct to pass to SetComputeShaderMode.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
-// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// All fields are unsigned, even those that could be bool, because the way the state is written to and read
 // from IR metadata relies on that.
 struct ComputeShaderMode
 {
-    uint32_t  workgroupSizeX;     // X dimension of workgroup size. 0 is taken to be 1
-    uint32_t  workgroupSizeY;     // Y dimension of workgroup size. 0 is taken to be 1
-    uint32_t  workgroupSizeZ;     // Z dimension of workgroup size. 0 is taken to be 1
+    unsigned  workgroupSizeX;     // X dimension of workgroup size. 0 is taken to be 1
+    unsigned  workgroupSizeY;     // Y dimension of workgroup size. 0 is taken to be 1
+    unsigned  workgroupSizeZ;     // Z dimension of workgroup size. 0 is taken to be 1
 };
 
 // =====================================================================================================================
@@ -560,7 +560,7 @@ public:
     // State setting methods
 
     // Set the shader stage mask
-    virtual void SetShaderStageMask(uint32_t mask) = 0;
+    virtual void SetShaderStageMask(unsigned mask) = 0;
 
     // Set and get per-pipeline options
     virtual void SetOptions(const Options& options) = 0;
@@ -582,7 +582,7 @@ public:
                                                           //  of the call; the call copies the nodes.
 
     // Set device index.
-    virtual void SetDeviceIndex(uint32_t deviceIndex) = 0;
+    virtual void SetDeviceIndex(unsigned deviceIndex) = 0;
 
     // Set vertex input descriptions. Each location referenced in a call to CreateReadGenericInput in the
     // vertex shader must have a corresponding description provided here.
@@ -618,9 +618,9 @@ public:
     // Typedef of function passed in to Generate to check the shader cache.
     // Returns the updated shader stage mask, allowing the client to decide not to compile shader stages
     // that got a hit in the cache.
-    typedef std::function<uint32_t(
+    typedef std::function<unsigned(
         const llvm::Module*               pModule,      // [in] Module
-        uint32_t                    stageMask,    // Shader stage mask
+        unsigned                    stageMask,    // Shader stage mask
         llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes   // Per-stage hash of in/out usage
     )> CheckShaderCacheFunc;
 
@@ -641,7 +641,7 @@ public:
     // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
     // type. Only the number of elements of the type is significant.
     // This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.
-    virtual uint32_t ComputeExportFormat(llvm::Type* pOutputTy, uint32_t location) = 0;
+    virtual unsigned ComputeExportFormat(llvm::Type* pOutputTy, unsigned location) = 0;
 
 private:
     BuilderContext*                 m_pBuilderContext;                  // Builder context

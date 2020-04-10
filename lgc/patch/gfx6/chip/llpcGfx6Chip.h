@@ -49,7 +49,7 @@ namespace Gfx6
 // Helper macros to operate registers
 
 // Defines fields: register ID (byte-based) and its value
-#define DEF_REG(_reg)             uint32_t _reg##_ID; reg##_reg _reg##_VAL;
+#define DEF_REG(_reg)             unsigned _reg##_ID; reg##_reg _reg##_VAL;
 
 // Initializes register ID and its value
 #define INIT_REG(_reg)            { _reg##_ID = mm##_reg; _reg##_VAL.u32All = 0; }
@@ -70,20 +70,20 @@ namespace Gfx6
 #define SET_REG_FIELD(_stage, _reg, _field, _val)  (_stage)->_reg##_VAL.bits._field = (_val);
 
 // Preferred number of ES threads per GS thread.
-constexpr uint32_t EsThreadsPerGsThread = 128;
+constexpr unsigned EsThreadsPerGsThread = 128;
 
 // Preferred number of GS primitives per ES thread.
-constexpr uint32_t GsPrimsPerEsThread = 256;
+constexpr unsigned GsPrimsPerEsThread = 256;
 
 // Preferred number of GS threads per VS thread.
-constexpr uint32_t GsThreadsPerVsThread = 2;
+constexpr unsigned GsThreadsPerVsThread = 2;
 
 // Max size of primitives per subgroup for adjacency primitives or when GS instancing is used. This restriction is
 // applicable only when GS on-chip mode is used.
-constexpr uint32_t GsOnChipMaxPrimsPerSubgroup = 128;
+constexpr unsigned GsOnChipMaxPrimsPerSubgroup = 128;
 
 // The register headers don't specify an enum for the values of VGT_GS_MODE.ONCHIP.
-enum VGT_GS_MODE_ONCHIP_TYPE : uint32_t
+enum VGT_GS_MODE_ONCHIP_TYPE : unsigned
 {
     VGT_GS_MODE_ONCHIP_OFF         = 0,
     VGT_GS_MODE_ONCHIP_ON          = 3,
@@ -190,8 +190,8 @@ struct PsRegConfig
     DEF_REG(DB_SHADER_CONTROL);
     DEF_REG(CB_SHADER_MASK);
 
-    static uint32_t GetPsInputCntlStart();
-    static uint32_t GetPsUserDataStart();
+    static unsigned GetPsInputCntlStart();
+    static unsigned GetPsUserDataStart();
 
     PsRegConfig();
 };
@@ -281,7 +281,7 @@ struct CsRegConfig
 };
 
 // Map from register ID to its name string
-static std::unordered_map<uint32_t, const char*>    RegNameMap;
+static std::unordered_map<unsigned, const char*>    RegNameMap;
 
 // Adds entries to register name map.
 void InitRegisterNameMap(GfxIpVersion gfxIp);

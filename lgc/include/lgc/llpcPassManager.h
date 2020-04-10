@@ -43,7 +43,7 @@ public:
     static PassManager* Create();
     virtual ~PassManager() {}
     virtual void stop() = 0;
-    virtual void SetPassIndex(uint32_t* pPassIndex) = 0;
+    virtual void SetPassIndex(unsigned* pPassIndex) = 0;
 };
 
 } // lgc

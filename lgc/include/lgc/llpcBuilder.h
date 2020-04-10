@@ -76,29 +76,29 @@ public:
     };
 
     InOutInfo() { data.u32All = 0; }
-    InOutInfo(uint32_t data) { this->data.u32All = data; }
+    InOutInfo(unsigned data) { this->data.u32All = data; }
     InOutInfo(const InOutInfo& inOutInfo) { data.u32All = inOutInfo.GetData(); }
 
-    uint32_t GetData() const { return data.u32All; }
+    unsigned GetData() const { return data.u32All; }
 
-    uint32_t GetInterpMode() const { return data.bits.interpMode; }
-    void SetInterpMode(uint32_t mode) { data.bits.interpMode = mode; }
+    unsigned GetInterpMode() const { return data.bits.interpMode; }
+    void SetInterpMode(unsigned mode) { data.bits.interpMode = mode; }
 
-    uint32_t GetInterpLoc() const { return data.bits.interpLoc; }
-    void SetInterpLoc(uint32_t loc) { data.bits.interpLoc = loc; }
+    unsigned GetInterpLoc() const { return data.bits.interpLoc; }
+    void SetInterpLoc(unsigned loc) { data.bits.interpLoc = loc; }
 
     bool HasInterpAux() const { return data.bits.hasInterpAux; }
     void SetHasInterpAux(bool hasInterpAux = true) { data.bits.hasInterpAux = hasInterpAux; }
 
     bool HasStreamId() const { return data.bits.hasStreamId; }
-    uint32_t GetStreamId() const { return data.bits.streamId; }
-    void SetStreamId(uint32_t streamId) { data.bits.hasStreamId = true; data.bits.streamId = streamId; }
+    unsigned GetStreamId() const { return data.bits.streamId; }
+    void SetStreamId(unsigned streamId) { data.bits.hasStreamId = true; data.bits.streamId = streamId; }
 
     bool IsSigned() const { return data.bits.isSigned; }
     void SetIsSigned(bool isSigned = true) { data.bits.isSigned = isSigned; }
 
-    uint32_t GetArraySize() const { return data.bits.arraySize; }
-    void SetArraySize(uint32_t arraySize) { data.bits.arraySize = arraySize; }
+    unsigned GetArraySize() const { return data.bits.arraySize; }
+    void SetArraySize(unsigned arraySize) { data.bits.arraySize = arraySize; }
 
 private:
     union
@@ -117,7 +117,7 @@ private:
                                         //    whole array or of an element with a variable index.
         }
         bits;
-        uint32_t  u32All;
+        unsigned  u32All;
     } data;
 };
 
@@ -253,7 +253,7 @@ public:
     llvm::Constant* Get180OverPi(llvm::Type* pTy);
 
     // Get a constant of FP or vector of FP type for the value 1/(2^n - 1)
-    llvm::Constant* GetOneOverPower2MinusOne(llvm::Type* pTy, uint32_t n);
+    llvm::Constant* GetOneOverPower2MinusOne(llvm::Type* pTy, unsigned n);
 
     // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
     // the given cube map texture coordinates. Returns <2 x float>.
@@ -612,8 +612,8 @@ public:
 
     // Create a load of a buffer descriptor.
     virtual llvm::Value* CreateLoadBufferDesc(
-        uint32_t      descSet,            // Descriptor set
-        uint32_t      binding,            // Descriptor binding
+        unsigned      descSet,            // Descriptor set
+        unsigned      binding,            // Descriptor binding
         llvm::Value*        pDescIndex,         // [in] Descriptor index
         bool          isNonUniform,       // Whether the descriptor index is non-uniform
         bool          isWritten,          // Whether the buffer is (or might be) written to
@@ -669,29 +669,29 @@ public:
 
     // Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
     virtual llvm::Value* CreateGetSamplerDescPtr(
-        uint32_t      descSet,          // Descriptor set
-        uint32_t      binding,          // Descriptor binding
+        unsigned      descSet,          // Descriptor set
+        unsigned      binding,          // Descriptor binding
         const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
     ) = 0;
 
     // Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
     virtual llvm::Value* CreateGetImageDescPtr(
-        uint32_t      descSet,          // Descriptor set
-        uint32_t      binding,          // Descriptor binding
+        unsigned      descSet,          // Descriptor set
+        unsigned      binding,          // Descriptor binding
         const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
     ) = 0;
 
     // Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
     virtual llvm::Value* CreateGetTexelBufferDescPtr(
-        uint32_t      descSet,          // Descriptor set
-        uint32_t      binding,          // Descriptor binding
+        unsigned      descSet,          // Descriptor set
+        unsigned      binding,          // Descriptor binding
         const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
     ) = 0;
 
     // Create a load of a F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
     virtual llvm::Value* CreateGetFmaskDescPtr(
-        uint32_t      descSet,          // Descriptor set
-        uint32_t      binding,          // Descriptor binding
+        unsigned      descSet,          // Descriptor set
+        unsigned      binding,          // Descriptor binding
         const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
     ) = 0;
 
@@ -725,8 +725,8 @@ public:
     };
 
     // Get the number of coordinates for the specified dimension argument.
-    static uint32_t GetImageNumCoords(
-        uint32_t dim)   // Image dimension
+    static unsigned GetImageNumCoords(
+        unsigned dim)   // Image dimension
     {
         switch (dim)
         {
@@ -745,8 +745,8 @@ public:
     }
 
     // Get the number of components of a size query for the specified dimension argument.
-    static uint32_t GetImageQuerySizeComponentCount(
-        uint32_t dim)   // Image dimension
+    static unsigned GetImageQuerySizeComponentCount(
+        unsigned dim)   // Image dimension
     {
         switch (dim)
         {
@@ -825,8 +825,8 @@ public:
     // Create an image load.
     virtual llvm::Value* CreateImageLoad(
         llvm::Type*                   pResultTy,          // [in] Result type
-        uint32_t                dim,                // Image dimension
-        uint32_t                flags,              // ImageFlag* flags
+        unsigned                dim,                // Image dimension
+        unsigned                flags,              // ImageFlag* flags
         llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor.
         llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
         llvm::Value*                  pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
@@ -840,8 +840,8 @@ public:
     // for a normal image load.
     virtual llvm::Value* CreateImageLoadWithFmask(
         llvm::Type*                   pResultTy,          // [in] Result type
-        uint32_t                dim,                // Image dimension, 2DMsaa or 2DArrayMsaa
-        uint32_t                flags,              // ImageFlag* flags
+        unsigned                dim,                // Image dimension, 2DMsaa or 2DArrayMsaa
+        unsigned                flags,              // ImageFlag* flags
         llvm::Value*                  pImageDesc,         // [in] Image descriptor
         llvm::Value*                  pFmaskDesc,         // [in] Fmask descriptor
         llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right
@@ -852,8 +852,8 @@ public:
     // Create an image store.
     virtual llvm::Value* CreateImageStore(
         llvm::Value*                  pTexel,             // [in] Texel value to store; v4i16, v4i32, v4f16 or v4f32
-        uint32_t                dim,                // Image dimension
-        uint32_t                flags,              // ImageFlag* flags
+        unsigned                dim,                // Image dimension
+        unsigned                flags,              // ImageFlag* flags
         llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
         llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
         llvm::Value*                  pMipLevel,          // [in] Mipmap level if doing store_mip, otherwise nullptr
@@ -869,8 +869,8 @@ public:
     // * The texel component type is i32, f16 or f32.
     virtual llvm::Value* CreateImageSample(
         llvm::Type*                   pResultTy,          // [in] Result type
-        uint32_t                dim,                // Image dimension
-        uint32_t                flags,              // ImageFlag* flags
+        unsigned                dim,                // Image dimension
+        unsigned                flags,              // ImageFlag* flags
         llvm::Value*                  pImageDesc,         // [in] Image descriptor
         llvm::Value*                  pSamplerDesc,       // [in] Sampler descriptor
         llvm::ArrayRef<llvm::Value*>        address,            // Address and other arguments
@@ -884,8 +884,8 @@ public:
     // * The texel type is a 4-vector of the texel component type, which is i32, f16 or f32.
     virtual llvm::Value* CreateImageGather(
         llvm::Type*                   pResultTy,          // [in] Result type
-        uint32_t                dim,                // Image dimension
-        uint32_t                flags,              // ImageFlag* flags
+        unsigned                dim,                // Image dimension
+        unsigned                flags,              // ImageFlag* flags
         llvm::Value*                  pImageDesc,         // [in] Image descriptor
         llvm::Value*                  pSamplerDesc,       // [in] Sampler descriptor
         llvm::ArrayRef<llvm::Value*>        address,            // Address and other arguments
@@ -897,9 +897,9 @@ public:
     // creates an image atomic instruction. But pImageDesc can instead be a texel buffer descriptor, as
     // returned by CreateLoadTexelBufferDesc, in which case the method creates a buffer atomic instruction.
     virtual llvm::Value* CreateImageAtomic(
-        uint32_t                atomicOp,           // Atomic op to create
-        uint32_t                dim,                // Image dimension
-        uint32_t                flags,              // ImageFlag* flags
+        unsigned                atomicOp,           // Atomic op to create
+        unsigned                dim,                // Image dimension
+        unsigned                flags,              // ImageFlag* flags
         llvm::AtomicOrdering          ordering,           // Atomic ordering
         llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
         llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
@@ -911,8 +911,8 @@ public:
     // creates an image atomic instruction. But pImageDesc can instead be a texel buffer descriptor, as
     // returned by CreateLoadTexelBufferDesc, in which case the method creates a buffer atomic instruction.
     virtual llvm::Value* CreateImageAtomicCompareSwap(
-        uint32_t                dim,                // Image dimension
-        uint32_t                flags,              // ImageFlag* flags
+        unsigned                dim,                // Image dimension
+        unsigned                flags,              // ImageFlag* flags
         llvm::AtomicOrdering          ordering,           // Atomic ordering
         llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
         llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
@@ -922,23 +922,23 @@ public:
 
     // Create a query of the number of mipmap levels in an image. Returns an i32 value.
     virtual llvm::Value* CreateImageQueryLevels(
-        uint32_t                dim,                // Image dimension
-        uint32_t                flags,              // ImageFlag* flags
+        unsigned                dim,                // Image dimension
+        unsigned                flags,              // ImageFlag* flags
         llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
         const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a query of the number of samples in an image. Returns an i32 value.
     virtual llvm::Value* CreateImageQuerySamples(
-        uint32_t                dim,                // Image dimension
-        uint32_t                flags,              // ImageFlag* flags
+        unsigned                dim,                // Image dimension
+        unsigned                flags,              // ImageFlag* flags
         llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
         const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a query of size of an image at the specified LOD.
     // Returns an i32 scalar or vector of the width given by GetImageQuerySizeComponentCount.
     virtual llvm::Value* CreateImageQuerySize(
-        uint32_t                dim,                // Image dimension
-        uint32_t                flags,              // ImageFlag* flags
+        unsigned                dim,                // Image dimension
+        unsigned                flags,              // ImageFlag* flags
         llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
         llvm::Value*                  pLod,               // [in] LOD
         const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
@@ -947,8 +947,8 @@ public:
     // and implicit LOD. Returns a v2f32 containing the layer number and the implicit level of
     // detail relative to the base level.
     virtual llvm::Value* CreateImageGetLod(
-        uint32_t                dim,                // Image dimension
-        uint32_t                flags,              // ImageFlag* flags
+        unsigned                dim,                // Image dimension
+        unsigned                flags,              // ImageFlag* flags
         llvm::Value*                  pImageDesc,         // [in] Image descriptor
         llvm::Value*                  pSamplerDesc,       // [in] Sampler descriptor
         llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector f32, exactly right
@@ -966,11 +966,11 @@ public:
     // input.
     virtual llvm::Value* CreateReadGenericInput(
         llvm::Type*         pResultTy,          // [in] Type of value to read
-        uint32_t      location,           // Base location (row) of input
+        unsigned      location,           // Base location (row) of input
         llvm::Value*        pLocationOffset,    // [in] Location offset; must be within locationCount if variable
         llvm::Value*        pElemIdx,           // [in] Element index in vector. (This is the SPIR-V "component", except
                                           //      that it is half the component for 64-bit elements.)
-        uint32_t      locationCount,      // Count of locations taken by the input. Ignored if pLocationOffset is const
+        unsigned      locationCount,      // Count of locations taken by the input. Ignored if pLocationOffset is const
         InOutInfo     inputInfo,          // Extra input info (FS interp info)
         llvm::Value*        pVertexIndex,       // [in] For TCS/TES/GS per-vertex input: vertex index;
                                           //      for FS custom interpolated input: auxiliary interpolation value;
@@ -985,11 +985,11 @@ public:
     // the frontend is expected to do its own cacheing of a written output if the shader wants to read it back again.
     virtual llvm::Value* CreateReadGenericOutput(
         llvm::Type*         pResultTy,          // [in] Type of value to read
-        uint32_t      location,           // Base location (row) of output
+        unsigned      location,           // Base location (row) of output
         llvm::Value*        pLocationOffset,    // [in] Location offset; must be within locationCount if variable
         llvm::Value*        pElemIdx,           // [in] Element index in vector. (This is the SPIR-V "component", except
                                           //      that it is half the component for 64-bit elements.)
-        uint32_t      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
+        unsigned      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
         InOutInfo     outputInfo,         // Extra output info (GS stream ID)
         llvm::Value*        pVertexIndex,       // [in] For TCS per-vertex output: vertex index; else nullptr
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
@@ -1001,11 +1001,11 @@ public:
     // A non-constant pLocationOffset is currently only supported for TCS.
     virtual llvm::Instruction* CreateWriteGenericOutput(
         llvm::Value*        pValueToWrite,      // [in] Value to write
-        uint32_t      location,           // Base location (row) of output
+        unsigned      location,           // Base location (row) of output
         llvm::Value*        pLocationOffset,    // [in] Location offset; must be within locationCount if variable
         llvm::Value*        pElemIdx,           // [in] Element index in vector. (This is the SPIR-V "component", except
                                           //      that it is half the component for 64-bit elements.)
-        uint32_t      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
+        unsigned      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
         InOutInfo     outputInfo,         // Extra output info (GS stream ID, FS integer signedness)
         llvm::Value*        pVertexIndex) = 0;  // [in] For TCS per-vertex output: vertex index; else nullptr
 
@@ -1026,9 +1026,9 @@ public:
     virtual llvm::Instruction* CreateWriteXfbOutput(
         llvm::Value*        pValueToWrite,      // [in] Value to write
         bool          isBuiltIn,          // True for built-in, false for user output (ignored if not GS)
-        uint32_t      location,           // Location (row) or built-in kind of output (ignored if not GS)
-        uint32_t      xfbBuffer,          // XFB buffer ID
-        uint32_t      xfbStride,          // XFB stride
+        unsigned      location,           // Location (row) or built-in kind of output (ignored if not GS)
+        unsigned      xfbBuffer,          // XFB buffer ID
+        unsigned      xfbStride,          // XFB stride
         llvm::Value*        pXfbOffset,         // [in] XFB byte offset
         InOutInfo     outputInfo) = 0;    // Extra output info (GS stream ID)
 
@@ -1126,11 +1126,11 @@ public:
     // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
     // the current output primitive in the specified output-primitive stream.
     virtual llvm::Instruction* CreateEmitVertex(
-        uint32_t                      streamId) = 0;      // Stream number, 0 if only one stream is present
+        unsigned                      streamId) = 0;      // Stream number, 0 if only one stream is present
 
     // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
     virtual llvm::Instruction* CreateEndPrimitive(
-        uint32_t                      streamId) = 0;      // Stream number, 0 if only one stream is present
+        unsigned                      streamId) = 0;      // Stream number, 0 if only one stream is present
 
     // Create a workgroup control barrier.
     virtual llvm::Instruction* CreateBarrier() = 0;

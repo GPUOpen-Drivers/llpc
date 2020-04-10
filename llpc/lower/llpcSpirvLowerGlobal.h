@@ -78,50 +78,50 @@ private:
     void CleanupReturnBlock();
 
     llvm::Value* AddCallInstForInOutImport(llvm::Type*        pInOutTy,
-                                           uint32_t           addrSpace,
+                                           unsigned           addrSpace,
                                            llvm::Constant*    pInOutMeta,
                                            llvm::Value*       pStartLoc,
-                                           uint32_t           maxLocOffset,
+                                           unsigned           maxLocOffset,
                                            llvm::Value*       pCompIdx,
                                            llvm::Value*       pVertexIdx,
-                                           uint32_t           interpLoc,
+                                           unsigned           interpLoc,
                                            llvm::Value*             pInterpInfo,
                                            llvm::Instruction* pInsertPos);
 
     void AddCallInstForOutputExport(llvm::Value*       pOutputValue,
                                     llvm::Constant*    pOutputMeta,
                                     llvm::Value*       pLocOffset,
-                                    uint32_t           maxLocOffset,
-                                    uint32_t           xfbOffsetAdjust,
-                                    uint32_t           xfbBufferAdjust,
+                                    unsigned           maxLocOffset,
+                                    unsigned           xfbOffsetAdjust,
+                                    unsigned           xfbBufferAdjust,
                                     llvm::Value*       pElemIdx,
                                     llvm::Value*       pVertexIdx,
-                                    uint32_t           emitStreamId,
+                                    unsigned           emitStreamId,
                                     llvm::Instruction* pInsertPos);
 
     llvm::Value* LoadInOutMember(llvm::Type*                      pInOutTy,
-                                 uint32_t                         addrSpace,
+                                 unsigned                         addrSpace,
                                  const std::vector<llvm::Value*>& indexOperands,
-                                 uint32_t                         operandIdx,
-                                 uint32_t                         maxLocOffset,
+                                 unsigned                         operandIdx,
+                                 unsigned                         maxLocOffset,
                                  llvm::Constant*                  pInOutMeta,
                                  llvm::Value*                     pLocOffset,
                                  llvm::Value*                     pVertexIdx,
-                                 uint32_t                         interpLoc,
+                                 unsigned                         interpLoc,
                                  llvm::Value*                     pInterpInfo,
                                  llvm::Instruction*               pInsertPos);
 
     void StoreOutputMember(llvm::Type*                      pOutputTy,
                            llvm::Value*                     pStoreValue,
                            const std::vector<llvm::Value*>& indexOperands,
-                           uint32_t                         operandIdx,
-                           uint32_t                         maxLocOffset,
+                           unsigned                         operandIdx,
+                           unsigned                         maxLocOffset,
                            llvm::Constant*                  pOutputMeta,
                            llvm::Value*                     pLocOffset,
                            llvm::Value*                     pVertexIdx,
                            llvm::Instruction*               pInsertPos);
 
-    void InterpolateInputElement(uint32_t           interpLoc,
+    void InterpolateInputElement(unsigned           interpLoc,
                                  llvm::Value*       pInterpInfo,
                                  llvm::CallInst&    callInst);
 
@@ -146,16 +146,16 @@ private:
     {
         struct
         {
-            uint32_t checkEmitCall    : 1;  // Whether to check "emit" calls
-            uint32_t checkInterpCall  : 1;  // Whether to check interpolation calls
-            uint32_t checkReturn      : 1;  // Whether to check "return" instructions
-            uint32_t checkLoad        : 1;  // Whether to check "load" instructions
-            uint32_t checkStore       : 1;  // Whether to check "store" instructions
+            unsigned checkEmitCall    : 1;  // Whether to check "emit" calls
+            unsigned checkInterpCall  : 1;  // Whether to check interpolation calls
+            unsigned checkReturn      : 1;  // Whether to check "return" instructions
+            unsigned checkLoad        : 1;  // Whether to check "load" instructions
+            unsigned checkStore       : 1;  // Whether to check "store" instructions
 
-            uint32_t unused           : 27;
+            unsigned unused           : 27;
         };
 
-        uint32_t u32All;
+        unsigned u32All;
 
     } m_instVisitFlags;
 

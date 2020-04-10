@@ -45,11 +45,11 @@ using namespace llvm;
 // 64-bit scalar value takes two components.
 Value* BuilderImplInOut::CreateReadGenericInput(
     Type*         pResultTy,          // [in] Type of value to read
-    uint32_t      location,           // Base location (row) of input
+    unsigned      location,           // Base location (row) of input
     Value*        pLocationOffset,    // [in] Variable location offset; must be within locationCount
     Value*        pElemIdx,           // [in] Element index in vector. (This is the SPIR-V "component", except
                                       //      that it is half the component for 64-bit elements.)
-    uint32_t      locationCount,      // Count of locations taken by the input
+    unsigned      locationCount,      // Count of locations taken by the input
     InOutInfo     inputInfo,          // Extra input info (FS interp info)
     Value*        pVertexIndex,       // [in] For TCS/TES/GS per-vertex input: vertex index;
                                       //      for FS custom interpolated input: auxiliary interpolation value;
@@ -75,11 +75,11 @@ Value* BuilderImplInOut::CreateReadGenericInput(
 // This operation is only supported for TCS.
 Value* BuilderImplInOut::CreateReadGenericOutput(
     Type*         pResultTy,          // [in] Type of value to read
-    uint32_t      location,           // Base location (row) of output
+    unsigned      location,           // Base location (row) of output
     Value*        pLocationOffset,    // [in] Location offset; must be within locationCount if variable
     Value*        pElemIdx,           // [in] Element index in vector. (This is the SPIR-V "component", except
                                       //      that it is half the component for 64-bit elements.)
-    uint32_t      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
+    unsigned      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
     InOutInfo     outputInfo,         // Extra output info
     Value*        pVertexIndex,       // [in] For TCS per-vertex output: vertex index; else nullptr
     const Twine&  instName)           // [in] Name to give instruction(s)
@@ -100,11 +100,11 @@ Value* BuilderImplInOut::CreateReadGenericOutput(
 Value* BuilderImplInOut::ReadGenericInputOutput(
     bool          isOutput,           // True if reading an output (currently only supported with TCS)
     Type*         pResultTy,          // [in] Type of value to read
-    uint32_t      location,           // Base location (row) of input
+    unsigned      location,           // Base location (row) of input
     Value*        pLocationOffset,    // [in] Variable location offset; must be within locationCount
     Value*        pElemIdx,           // [in] Element index in vector. (This is the SPIR-V "component", except
                                       //      that it is half the component for 64-bit elements.)
-    uint32_t      locationCount,      // Count of locations taken by the input
+    unsigned      locationCount,      // Count of locations taken by the input
     InOutInfo     inOutInfo,          // Extra input/output info (FS interp info)
     Value*        pVertexIndex,       // [in] For TCS/TES/GS per-vertex input: vertex index;
                                       //      for FS custom interpolated input: auxiliary interpolation value;
@@ -218,11 +218,11 @@ Value* BuilderImplInOut::ReadGenericInputOutput(
 // A non-constant pLocationOffset is currently only supported for TCS.
 Instruction* BuilderImplInOut::CreateWriteGenericOutput(
     Value*        pValueToWrite,      // [in] Value to write
-    uint32_t      location,           // Base location (row) of output
+    unsigned      location,           // Base location (row) of output
     Value*        pLocationOffset,    // [in] Location offset; must be within locationCount if variable
     Value*        pElemIdx,           // [in] Element index in vector. (This is the SPIR-V "component", except
                                       //      that it is half the component for 64-bit elements.)
-    uint32_t      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
+    unsigned      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
     InOutInfo     outputInfo,         // Extra output info (GS stream ID, FS integer signedness)
     Value*        pVertexIndex)       // [in] For TCS per-vertex output: vertex index; else nullptr
 {
@@ -269,7 +269,7 @@ Instruction* BuilderImplInOut::CreateWriteGenericOutput(
     case ShaderStageGeometry:
         {
             // GS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
-            uint32_t streamId = outputInfo.HasStreamId() ? outputInfo.GetStreamId() : InvalidValue;
+            unsigned streamId = outputInfo.HasStreamId() ? outputInfo.GetStreamId() : InvalidValue;
             assert(pLocationOffset == getInt32(0));
             args.push_back(getInt32(location));
             args.push_back(pElemIdx);
@@ -308,8 +308,8 @@ Instruction* BuilderImplInOut::CreateWriteGenericOutput(
 // Mark usage for a generic (user) input or output
 void BuilderImplInOut::MarkGenericInputOutputUsage(
     bool          isOutput,       // False for input, true for output
-    uint32_t      location,       // Input/output base location
-    uint32_t      locationCount,  // Count of locations taken by the input
+    unsigned      location,       // Input/output base location
+    unsigned      locationCount,  // Count of locations taken by the input
     InOutInfo     inOutInfo,      // Extra input/output information
     Value*        pVertexIndex)  // [in] For TCS/TES/GS per-vertex input/output: vertex index;
                                   //      for FS custom-interpolated input: auxiliary value;
@@ -319,7 +319,7 @@ void BuilderImplInOut::MarkGenericInputOutputUsage(
     auto pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
 
     // Mark the input or output locations as in use.
-    std::map<uint32_t, uint32_t>* pInOutLocMap = nullptr;
+    std::map<unsigned, unsigned>* pInOutLocMap = nullptr;
     if (isOutput == false)
     {
         if ((m_shaderStage != ShaderStageTessEval) || (pVertexIndex != nullptr))
@@ -361,9 +361,9 @@ void BuilderImplInOut::MarkGenericInputOutputUsage(
                 keepAllLocations = true;
             }
         }
-        uint32_t startLocation = (keepAllLocations ? 0 : location);
+        unsigned startLocation = (keepAllLocations ? 0 : location);
         // Non-GS-output case.
-        for (uint32_t i = startLocation; i < location + locationCount; ++i)
+        for (unsigned i = startLocation; i < location + locationCount; ++i)
         {
             (*pInOutLocMap)[i] = InvalidValue;
         }
@@ -371,7 +371,7 @@ void BuilderImplInOut::MarkGenericInputOutputUsage(
     else
     {
         // GS output. We include the stream ID with the location in the map key.
-        for (uint32_t i = 0; i < locationCount; ++i)
+        for (unsigned i = 0; i < locationCount; ++i)
         {
             GsOutLocInfo outLocInfo = {};
             outLocInfo.location = location + i;
@@ -435,7 +435,7 @@ void BuilderImplInOut::MarkInterpolationInfo(
 // Mark fragment output type
 void BuilderImplInOut::MarkFsOutputType(
     Type*     pOutputTy,      // [in] Output type
-    uint32_t  location,       // Output location
+    unsigned  location,       // Output location
     InOutInfo outputInfo)     // Extra output info (whether the output is signed)
 {
     assert(m_shaderStage == ShaderStageFragment);
@@ -444,7 +444,7 @@ void BuilderImplInOut::MarkFsOutputType(
     BasicType basicTy = BasicType::Unknown;
 
     Type* pCompTy = pOutputTy->getScalarType();
-    const uint32_t bitWidth = pCompTy->getScalarSizeInBits();
+    const unsigned bitWidth = pCompTy->getScalarSizeInBits();
     const bool signedness = outputInfo.IsSigned();
 
     if (pCompTy->isIntegerTy())
@@ -567,7 +567,7 @@ Value* BuilderImplInOut::EvalIJOffsetSmooth(
     // Adjust each coefficient by offset.
     Value* pAdjusted = AdjustIJ(pPullModel, pOffset);
     // Extract <I/W, J/W, 1/W> part of that
-    Value* pIJDivW = CreateShuffleVector(pAdjusted, pAdjusted, ArrayRef<uint32_t>{ 0, 1 });
+    Value* pIJDivW = CreateShuffleVector(pAdjusted, pAdjusted, ArrayRef<unsigned>{ 0, 1 });
     Value* pRcpW = CreateExtractElement(pAdjusted, 2);
     // Get W by making a reciprocal of 1/W
     Value* pW = CreateFDiv(ConstantFP::get(getFloatTy(), 1.0), pRcpW);
@@ -616,9 +616,9 @@ Value* BuilderImplInOut::AdjustIJ(
 Instruction* BuilderImplInOut::CreateWriteXfbOutput(
     Value*        pValueToWrite,      // [in] Value to write
     bool          isBuiltIn,          // True for built-in, false for user output (ignored if not GS)
-    uint32_t      location,           // Location (row) or built-in kind of output (ignored if not GS)
-    uint32_t      xfbBuffer,          // XFB buffer ID
-    uint32_t      xfbStride,          // XFB stride
+    unsigned      location,           // Location (row) or built-in kind of output (ignored if not GS)
+    unsigned      xfbBuffer,          // XFB buffer ID
+    unsigned      xfbStride,          // XFB stride
     Value*        pXfbOffset,         // [in] XFB byte offset
     InOutInfo     outputInfo)         // Extra output info (GS stream ID)
 {
@@ -635,7 +635,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
 
     // Mark the usage of the XFB buffer.
     auto pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
-    uint32_t streamId = outputInfo.HasStreamId() ? outputInfo.GetStreamId() : 0;
+    unsigned streamId = outputInfo.HasStreamId() ? outputInfo.GetStreamId() : 0;
     assert(xfbBuffer < MaxTransformFeedbackBuffers);
     assert(streamId < MaxGsStreams);
     pResUsage->inOutUsage.xfbStrides[xfbBuffer] = xfbStride;
@@ -727,7 +727,7 @@ Value* BuilderImplInOut::ReadBuiltIn(
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
     // Mark usage.
-    uint32_t arraySize = inOutInfo.GetArraySize();
+    unsigned arraySize = inOutInfo.GetArraySize();
     if (auto pConstIndex = dyn_cast_or_null<ConstantInt>(pIndex))
     {
         arraySize = pConstIndex->getZExtValue() + 1;
@@ -873,8 +873,8 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
     Value*        pIndex)             // [in] Array or vector index to access part of an input, else nullptr
 {
     // Mark usage.
-    uint32_t streamId = outputInfo.HasStreamId() ? outputInfo.GetStreamId() : InvalidValue;
-    uint32_t arraySize = outputInfo.GetArraySize();
+    unsigned streamId = outputInfo.HasStreamId() ? outputInfo.GetStreamId() : InvalidValue;
+    unsigned arraySize = outputInfo.GetArraySize();
     if (auto pConstIndex = dyn_cast_or_null<ConstantInt>(pIndex))
     {
         arraySize = pConstIndex->getZExtValue() + 1;
@@ -945,7 +945,7 @@ Type* BuilderImplInOut::GetBuiltInTy(
     BuiltInKind   builtIn,            // Built-in kind
     InOutInfo     inOutInfo)          // Extra input/output info (shader-defined array size)
 {
-    switch (static_cast<uint32_t>(builtIn))
+    switch (static_cast<unsigned>(builtIn))
     {
     case BuiltInSamplePosOffset:
     case BuiltInInterpLinearCenter:
@@ -962,7 +962,7 @@ Type* BuilderImplInOut::GetBuiltInTy(
 StringRef BuilderImplInOut::GetBuiltInName(
     BuiltInKind   builtIn)            // Built-in type, one of the BuiltIn* constants
 {
-    switch (static_cast<uint32_t>(builtIn))
+    switch (static_cast<unsigned>(builtIn))
     {
 #define BUILTIN(name, number, out, in, type) \
     case BuiltIn ## name: return # name;
@@ -987,7 +987,7 @@ StringRef BuilderImplInOut::GetBuiltInName(
 // Mark usage of a built-in input
 void BuilderImplInOut::MarkBuiltInInputUsage(
     BuiltInKind builtIn,      // Built-in ID
-    uint32_t    arraySize)    // Number of array elements for ClipDistance and CullDistance. (Multiple calls to
+    unsigned    arraySize)    // Number of array elements for ClipDistance and CullDistance. (Multiple calls to
                               //    this function for this built-in might have different array sizes; we take the max)
 {
     auto& pUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->builtInUsage;
@@ -1081,7 +1081,7 @@ void BuilderImplInOut::MarkBuiltInInputUsage(
 
     case ShaderStageFragment:
         {
-            switch (static_cast<uint32_t>(builtIn))
+            switch (static_cast<unsigned>(builtIn))
             {
             case BuiltInFragCoord: pUsage.fs.fragCoord = true; break;
             case BuiltInFrontFacing: pUsage.fs.frontFacing = true; break;
@@ -1181,9 +1181,9 @@ void BuilderImplInOut::MarkBuiltInInputUsage(
 // Mark usage of a built-in output
 void BuilderImplInOut::MarkBuiltInOutputUsage(
     BuiltInKind builtIn,      // Built-in ID
-    uint32_t    arraySize,    // Number of array elements for ClipDistance and CullDistance. (Multiple calls to this
+    unsigned    arraySize,    // Number of array elements for ClipDistance and CullDistance. (Multiple calls to this
                               //    function for this built-in might have different array sizes; we take the max)
-    uint32_t    streamId)     // GS stream ID, or InvalidValue if not known
+    unsigned    streamId)     // GS stream ID, or InvalidValue if not known
 {
     auto& pUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->builtInUsage;
     assert(((builtIn != BuiltInClipDistance) && (builtIn != BuiltInCullDistance)) || (arraySize != 0));
@@ -1291,12 +1291,12 @@ void BuilderImplInOut::MarkBuiltInOutputUsage(
 #ifndef NDEBUG
 // =====================================================================================================================
 // Get a bitmask of which shader stages are valid for a built-in to be an input or output of
-uint32_t BuilderImplInOut::GetBuiltInValidMask(
+unsigned BuilderImplInOut::GetBuiltInValidMask(
     BuiltInKind builtIn,    // Built-in kind, one of the BuiltIn* constants
     bool        isOutput)   // True to get the mask for output rather than input
 {
     // See llpcBuilderBuiltInDefs.h for an explanation of the letter codes.
-    enum class StageValidMask: uint32_t
+    enum class StageValidMask: unsigned
     {
         C = (1 << ShaderStageCompute),
         D = (1 << ShaderStageTessEval),
@@ -1320,12 +1320,12 @@ uint32_t BuilderImplInOut::GetBuiltInValidMask(
         VDG = (1 << ShaderStageVertex) | (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry),
     };
 
-    uint32_t validMask = 0;
+    unsigned validMask = 0;
     switch (builtIn)
     {
 #define BUILTIN(name, number, out, in, type) \
     case BuiltIn ## name: \
-        validMask = static_cast<uint32_t>(StageValidMask::in) | (static_cast<uint32_t>(StageValidMask::out) << 16); \
+        validMask = static_cast<unsigned>(StageValidMask::in) | (static_cast<unsigned>(StageValidMask::out) << 16); \
         break;
 #include "lgc/llpcBuilderBuiltInDefs.h"
 #undef BUILTIN

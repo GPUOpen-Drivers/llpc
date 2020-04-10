@@ -66,7 +66,7 @@ bool GetEnumValue(
 }
 
 #define ADD_ENUM_MAP(EnumType, EnumName) getEnumMap()[#EnumName] = EnumName;
-#define ADD_CLASS_ENUM_MAP(Class, EnumName) getEnumMap()[#EnumName] =static_cast<int32_t>(Class::EnumName);
+#define ADD_CLASS_ENUM_MAP(Class, EnumName) getEnumMap()[#EnumName] =static_cast<int>(Class::EnumName);
 
 // =====================================================================================================================
 // Initializes enum convert map

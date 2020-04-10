@@ -57,7 +57,7 @@ using namespace SPIRV;
 struct ResourceNodeSet
 {
     std::vector<ResourceMappingNode> nodes;   // Vector of resource mapping nodes
-    std::map<uint32_t, uint32_t> bindingMap;  // Map from binding to index in nodes vector
+    std::map<unsigned, unsigned> bindingMap;  // Map from binding to index in nodes vector
 };
 
 // -auto-layout-desc: automatically create descriptor layout based on resource usages
@@ -67,12 +67,12 @@ static cl::opt<bool> AutoLayoutDesc("auto-layout-desc",
                                     cl::desc("Automatically create descriptor layout based on resource usages"));
 
 // Offset in Node will be a fixed number, which will be conveniently to identify offset in auto-layout.
-static const uint32_t OffsetStrideInDwords = 12;
+static const unsigned OffsetStrideInDwords = 12;
 
 // =====================================================================================================================
 // Get the storage size in bytes of a SPIR-V type.
 // This does not need to be completely accurate, as it is only used to fake up a push constant user data node.
-static uint32_t GetTypeDataSize(
+static unsigned GetTypeDataSize(
     const SPIRVType*  pTy)  // [in] Type to determine the data size of
 {
     switch (pTy->getOpCode())
@@ -85,8 +85,8 @@ static uint32_t GetTypeDataSize(
         return GetTypeDataSize(pTy->getArrayElementType()) * pTy->getArrayLength();
     case OpTypeStruct:
         {
-            uint32_t totalSize = 0;
-            for (uint32_t memberIdx = 0; memberIdx < pTy->getStructMemberCount(); ++memberIdx)
+            unsigned totalSize = 0;
+            for (unsigned memberIdx = 0; memberIdx < pTy->getStructMemberCount(); ++memberIdx)
             {
                 totalSize += GetTypeDataSize(pTy->getStructMemberType(memberIdx));
             }
@@ -101,11 +101,11 @@ static uint32_t GetTypeDataSize(
 // Find VaPtr userDataNode with specified set.
 static const ResourceMappingNode* FindDescriptorTableVaPtr(
     PipelineShaderInfo*         pShaderInfo,                 // [in] Shader info, will have user data nodes added to it
-    uint32_t set)                                            // [in] Accroding this set to find ResourceMappingNode
+    unsigned set)                                            // [in] Accroding this set to find ResourceMappingNode
 {
     const ResourceMappingNode* pDescriptorTableVaPtr = nullptr;
 
-    for (uint32_t k = 0; k < pShaderInfo->userDataNodeCount; ++k)
+    for (unsigned k = 0; k < pShaderInfo->userDataNodeCount; ++k)
     {
         const ResourceMappingNode* pUserDataNode = &pShaderInfo->pUserDataNodes[k];
 
@@ -126,14 +126,14 @@ static const ResourceMappingNode* FindDescriptorTableVaPtr(
 // Find userDataNode with specified set and binding. And return Node index.
 static const ResourceMappingNode* FindResourceNode(
     const ResourceMappingNode* pUserDataNode, // [in] ResourceMappingNode pointer
-    uint32_t                   nodeCount,     // [in] User data node count
-    uint32_t                   set,           // [in] find same set in node array
-    uint32_t                   binding,       // [in] find same binding in node array
-    uint32_t*                  index)         // [out] Return node position in node array
+    unsigned                   nodeCount,     // [in] User data node count
+    unsigned                   set,           // [in] find same set in node array
+    unsigned                   binding,       // [in] find same binding in node array
+    unsigned*                  index)         // [out] Return node position in node array
 {
     const ResourceMappingNode* pResourceNode = nullptr;
 
-    for (uint32_t j = 0; j < nodeCount; ++j)
+    for (unsigned j = 0; j < nodeCount; ++j)
     {
         const ResourceMappingNode* pNext = &pUserDataNode[j];
 
@@ -152,7 +152,7 @@ static const ResourceMappingNode* FindResourceNode(
 // Compare if pAutoLayoutUserDataNodes is subset of pUserDataNodes.
 bool CheckShaderInfoComptible(
     PipelineShaderInfo*         pShaderInfo,                 // [in/out] Shader info, will have user data nodes added to it
-    uint32_t                    autoLayoutUserDataNodeCount, // [in] UserData Node count
+    unsigned                    autoLayoutUserDataNodeCount, // [in] UserData Node count
     const ResourceMappingNode*  pAutoLayoutUserDataNodes)    // [in] ResourceMappingNode
 {
     bool hit = false;
@@ -167,24 +167,24 @@ bool CheckShaderInfoComptible(
     }
     else if (pShaderInfo->userDataNodeCount >= autoLayoutUserDataNodeCount)
     {
-        for (uint32_t n = 0; n < autoLayoutUserDataNodeCount; ++n)
+        for (unsigned n = 0; n < autoLayoutUserDataNodeCount; ++n)
         {
             const ResourceMappingNode* pAutoLayoutUserDataNode = &pAutoLayoutUserDataNodes[n];
 
             // Multiple levels
             if (pAutoLayoutUserDataNode->type == Llpc::ResourceMappingNodeType::DescriptorTableVaPtr)
             {
-                uint32_t set = pAutoLayoutUserDataNode->tablePtr.pNext[0].srdRange.set;
+                unsigned set = pAutoLayoutUserDataNode->tablePtr.pNext[0].srdRange.set;
                 const ResourceMappingNode* pUserDataNode = FindDescriptorTableVaPtr(pShaderInfo, set);
 
                 if (pUserDataNode != nullptr)
                 {
                     bool hitNode = false;
-                    for (uint32_t i = 0; i < pAutoLayoutUserDataNode->tablePtr.nodeCount; ++i)
+                    for (unsigned i = 0; i < pAutoLayoutUserDataNode->tablePtr.nodeCount; ++i)
                     {
                         const ResourceMappingNode* pAutoLayoutNext = &pAutoLayoutUserDataNode->tablePtr.pNext[i];
 
-                        uint32_t index = 0;
+                        unsigned index = 0;
                         const ResourceMappingNode* pNode = FindResourceNode(
                                                             pUserDataNode->tablePtr.pNext,
                                                             pUserDataNode->tablePtr.nodeCount,
@@ -206,13 +206,13 @@ bool CheckShaderInfoComptible(
                             {
                                 outs() << "AutoLayoutNode:"
                                        << "\n ->type                    : "
-                                       << format("0x%016" PRIX64, static_cast<uint32_t>(pAutoLayoutNext->type))
+                                       << format("0x%016" PRIX64, static_cast<unsigned>(pAutoLayoutNext->type))
                                        << "\n ->sizeInDwords            : " << pAutoLayoutNext->sizeInDwords
                                        << "\n ->offsetInDwords          : " << pAutoLayoutNext->offsetInDwords;
 
                                 outs() << "\nShaderInfoNode:"
                                        << "\n ->type                    : "
-                                       << format("0x%016" PRIX64, static_cast<uint32_t>(pNode->type))
+                                       << format("0x%016" PRIX64, static_cast<unsigned>(pNode->type))
                                        << "\n ->sizeInDwords            : " << pNode->sizeInDwords
                                        << "\n OffsetStrideInDwords      : " << OffsetStrideInDwords
                                        << "\n index*OffsetStrideInDwords: " << (index * OffsetStrideInDwords) << "\n";
@@ -244,7 +244,7 @@ bool CheckShaderInfoComptible(
             // Single level
             else
             {
-                uint32_t index = 0;
+                unsigned index = 0;
                 const ResourceMappingNode* pNode = FindResourceNode(
                                                             pShaderInfo->pUserDataNodes,
                                                             pShaderInfo->userDataNodeCount,
@@ -281,17 +281,17 @@ bool CheckPipelineStateCompatible(
     auto pCbState = &pPipelineInfo->cbState;
     auto pAutoLayoutCbState = &pAutoLayoutPipelineInfo->cbState;
 
-    for (uint32_t i = 0; i < MaxColorTargets; ++i)
+    for (unsigned i = 0; i < MaxColorTargets; ++i)
     {
         if (pCbState->target[i].format != VK_FORMAT_UNDEFINED)
         {
             // NOTE: Alpha-to-coverage only take effect for output from color target 0.
             const bool enableAlphaToCoverage = pCbState->alphaToCoverageEnable && (i == 0);
-            uint32_t exportFormat = pCompiler->ConvertColorBufferFormatToExportFormat(
+            unsigned exportFormat = pCompiler->ConvertColorBufferFormatToExportFormat(
                                                             &pCbState->target[i],
                                                             enableAlphaToCoverage);
             const bool autoLayoutEnableAlphaToCoverage = pAutoLayoutCbState->alphaToCoverageEnable && (i == 0);
-            uint32_t autoLayoutExportFormat = pCompiler->ConvertColorBufferFormatToExportFormat(
+            unsigned autoLayoutExportFormat = pCompiler->ConvertColorBufferFormatToExportFormat(
                                                             &pAutoLayoutCbState->target[i],
                                                             autoLayoutEnableAlphaToCoverage);
 
@@ -324,7 +324,7 @@ void DoAutoLayoutDesc(
     GraphicsPipelineBuildInfo*  pPipelineInfo,  // [in/out] Graphics pipeline info, will have dummy information filled
                                                 //   in. nullptr if not a graphics pipeline.
     PipelineShaderInfo*         pShaderInfo,    // [in/out] Shader info, will have user data nodes added to it
-    uint32_t&                   topLevelOffset, // [in/out] User data offset; ensures that multiple shader stages use
+    unsigned&                   topLevelOffset, // [in/out] User data offset; ensures that multiple shader stages use
                                                 //    disjoint offsets
     bool                        checkAutoLayoutCompatible) // [in] if check AutoLayout Compatiple
 {
@@ -337,7 +337,7 @@ void DoAutoLayoutDesc(
     // Find the entry target.
     SPIRVEntryPoint* pEntryPoint = nullptr;
     SPIRVFunction* pFunc = nullptr;
-    for (uint32_t i = 0, funcCount = module->getNumFunctions(); i < funcCount; ++i)
+    for (unsigned i = 0, funcCount = module->getNumFunctions(); i < funcCount; ++i)
     {
         pFunc = module->getFunction(i);
         pEntryPoint = module->getEntryPoint(pFunc->getId());
@@ -515,7 +515,7 @@ void DoAutoLayoutDesc(
             }
 
             SPIRVType* pVarElemTy = pVar->getType()->getPointerElementType();
-            uint32_t elemCount = 1;
+            unsigned elemCount = 1;
             if (pVarElemTy->getOpCode() == OpTypeVector)
             {
                 elemCount = pVarElemTy->getVectorComponentCount();
@@ -668,10 +668,10 @@ void DoAutoLayoutDesc(
     }
 
     // Collect ResourceMappingNode entries in sets.
-    std::map<uint32_t, ResourceNodeSet> resNodeSets;
-    std::map<std::pair<uint32_t, uint32_t>, uint32_t> bindingIndex;
-    uint32_t pushConstSize = 0;
-    for (uint32_t i = 0, varCount = module->getNumVariables(); i < varCount; ++i)
+    std::map<unsigned, ResourceNodeSet> resNodeSets;
+    std::map<std::pair<unsigned, unsigned>, unsigned> bindingIndex;
+    unsigned pushConstSize = 0;
+    for (unsigned i = 0, varCount = module->getNumVariables(); i < varCount; ++i)
     {
         auto pVar = module->getVariable(i);
         switch (pVar->getStorageClass())
@@ -702,7 +702,7 @@ void DoAutoLayoutDesc(
                     // Find/create the node entry for this set and binding.
                     ResourceNodeSet& resNodeSet = resNodeSets[descSet];
                     auto iteratorAndCreated = resNodeSet.bindingMap.insert({binding, resNodeSet.nodes.size()});
-                    uint32_t nodesIndex = iteratorAndCreated.first->second;
+                    unsigned nodesIndex = iteratorAndCreated.first->second;
                     if (iteratorAndCreated.second)
                     {
                         resNodeSet.nodes.push_back({});
@@ -712,7 +712,7 @@ void DoAutoLayoutDesc(
 
                     // Get the element type and array size.
                     auto pVarElemTy = pVar->getType()->getPointerElementType();
-                    uint32_t arraySize = 1;
+                    unsigned arraySize = 1;
                     while (pVarElemTy->isTypeArray())
                     {
                         arraySize *= pVarElemTy->getArrayLength();
@@ -721,7 +721,7 @@ void DoAutoLayoutDesc(
 
                     // Map the SPIR-V opcode to descriptor type and size.
                     ResourceMappingNodeType nodeType;
-                    uint32_t sizeInDwords;
+                    unsigned sizeInDwords;
                     switch (pVarElemTy->getOpCode())
                     {
                     case OpTypeSampler:
@@ -797,7 +797,7 @@ void DoAutoLayoutDesc(
     for (auto& it : resNodeSets)
     {
         ResourceNodeSet& resNodeSet = it.second;
-        uint32_t offsetInDwords = 0;
+        unsigned offsetInDwords = 0;
         for (auto& node : resNodeSet.nodes)
         {
             if (checkAutoLayoutCompatible)
@@ -813,9 +813,9 @@ void DoAutoLayoutDesc(
     }
 
     // Add up how much memory we need and allocate it.
-    uint32_t topLevelCount = resNodeSets.size();
+    unsigned topLevelCount = resNodeSets.size();
     topLevelCount += 3; // Allow one for push consts, one for XFB and one for vertex buffer.
-    uint32_t resNodeCount = topLevelCount;
+    unsigned resNodeCount = topLevelCount;
     for (const auto& resNodeSet : resNodeSets)
     {
         resNodeCount += resNodeSet.second.nodes.size();

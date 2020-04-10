@@ -91,7 +91,7 @@ private:
     SpirvLowerResourceCollect(const SpirvLowerResourceCollect&) = delete;
     SpirvLowerResourceCollect& operator=(const SpirvLowerResourceCollect&) = delete;
 
-    uint32_t GetFlattenArrayElementCount(const llvm::Type* pTy) const;
+    unsigned GetFlattenArrayElementCount(const llvm::Type* pTy) const;
     const llvm::Type* GetFlattenArrayElementType(const llvm::Type* pTy) const;
 
     void CollectResourceNodeData(const GlobalVariable* pGlobal);
@@ -101,7 +101,7 @@ private:
     bool m_collectDetailUsage;      // If enabled, collect detailed usages of resource node datas and FS output infos
     std::map<ResourceNodeDataKey, ResourceMappingNodeType, ResNodeDataSortingComparer> m_resNodeDatas; // Resource
                                                                                                        // node data
-    uint32_t m_pushConstSize;        // Push constant size in byte
+    unsigned m_pushConstSize;        // Push constant size in byte
     std::vector<FsOutInfo> m_fsOutInfos;   // FS output info array
     bool m_detailUsageValid; // Indicate whether detailed usages (resource node datas
                              // or fragment shader output infos) are valid

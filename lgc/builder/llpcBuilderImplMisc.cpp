@@ -42,7 +42,7 @@ using namespace llvm;
 // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
 // the current output primitive in the specified output-primitive stream number.
 Instruction* BuilderImplMisc::CreateEmitVertex(
-    uint32_t                streamId)           // Stream number, 0 if only one stream is present
+    unsigned                streamId)           // Stream number, 0 if only one stream is present
 {
     assert(m_shaderStage == ShaderStageGeometry);
 
@@ -57,14 +57,14 @@ Instruction* BuilderImplMisc::CreateEmitVertex(
 
     // Do the sendmsg.
     // [9:8] = stream, [5:4] = 2 (emit), [3:0] = 2 (GS)
-    uint32_t msg = (streamId << GS_EMIT_CUT_STREAM_ID_SHIFT) | GS_EMIT;
+    unsigned msg = (streamId << GS_EMIT_CUT_STREAM_ID_SHIFT) | GS_EMIT;
     return CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, { getInt32(msg), pGsWaveId }, nullptr);
 }
 
 // =====================================================================================================================
 // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
 Instruction* BuilderImplMisc::CreateEndPrimitive(
-    uint32_t                streamId)           // Stream number, 0 if only one stream is present
+    unsigned                streamId)           // Stream number, 0 if only one stream is present
 {
     assert(m_shaderStage == ShaderStageGeometry);
 
@@ -79,7 +79,7 @@ Instruction* BuilderImplMisc::CreateEndPrimitive(
 
     // Do the sendmsg.
     // [9:8] = stream, [5:4] = 1 (cut), [3:0] = 2 (GS)
-    uint32_t msg = (streamId << GS_EMIT_CUT_STREAM_ID_SHIFT) | GS_CUT;
+    unsigned msg = (streamId << GS_EMIT_CUT_STREAM_ID_SHIFT) | GS_CUT;
     return CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, { getInt32(msg), pGsWaveId }, nullptr);
 }
 
@@ -160,14 +160,14 @@ Value* BuilderImplMisc::CreateDerivative(
                                 // False for "coarse" calculation, where it might use fewer locations to calculate.
     const Twine&  instName)     // [in] Name to give instruction(s)
 {
-    uint32_t tableIdx = isDirectionY * 2 + isFine;
+    unsigned tableIdx = isDirectionY * 2 + isFine;
     Value* pResult = nullptr;
     if (SupportDpp())
     {
         // DPP (GFX8+) version.
         // For quad pixels, quad_perm:[pix0,pix1,pix2,pix3] = [0,1,2,3]
         // Table of first dpp_ctrl, in order coarseX, fineX, coarseY, fineY
-        static const uint32_t firstDppCtrl[4] =
+        static const unsigned firstDppCtrl[4] =
         {
             0x55, // CoarseX: [0,1,2,3] -> [1,1,1,1]
             0xF5, // FineX:   [0,1,2,3]->[1,1,3,3]
@@ -175,15 +175,15 @@ Value* BuilderImplMisc::CreateDerivative(
             0xEE, // FineY:   [0,1,2,3]->[2,3,2,3]
         };
         // Table of second dpp_ctrl, in order coarseX, fineX, coarseY, fineY
-        static const uint32_t secondDppCtrl[4] =
+        static const unsigned secondDppCtrl[4] =
         {
             0x00, // CoarseX: [0,1,2,3]->[0,0,0,0]
             0xA0, // FineX:   [0,1,2,3]->[0,0,2,2]
             0x00, // CoarseY: [0,1,2,3]->[0,0,0,0]
             0x44, // FineY:   [0,1,2,3]->[0,1,0,1]
         };
-        uint32_t perm1 = firstDppCtrl[tableIdx];
-        uint32_t perm2 = secondDppCtrl[tableIdx];
+        unsigned perm1 = firstDppCtrl[tableIdx];
+        unsigned perm2 = secondDppCtrl[tableIdx];
         pResult = Scalarize(pValue,
                             [this, perm1, perm2](Value* pValue)
                             {
@@ -221,7 +221,7 @@ Value* BuilderImplMisc::CreateDerivative(
         // ds_swizzle (pre-GFX8) version
 
         // Table of first swizzle control, in order coarseX, fineX, coarseY, fineY
-        static const uint32_t firstSwizzleCtrl[4] =
+        static const unsigned firstSwizzleCtrl[4] =
         {
             0x8055, // CoarseX: Broadcast channel 1 to whole quad
             0x80F5, // FineX: Swizzle channels in quad (1 -> 0, 1 -> 1, 3 -> 2, 3 -> 3)
@@ -229,15 +229,15 @@ Value* BuilderImplMisc::CreateDerivative(
             0x80EE, // FineY: Swizzle channels in quad (2 -> 0, 3 -> 1, 2 -> 2, 3 -> 3)
         };
         // Table of second swizzle control, in order coarseX, fineX, coarseY, fineY
-        static const uint32_t secondSwizzleCtrl[4] =
+        static const unsigned secondSwizzleCtrl[4] =
         {
             0x8000, // CoarseX: Broadcast channel 0 to whole quad
             0x80A0, // FineX: Swizzle channels in quad (0 -> 0, 0 -> 1, 2 -> 2, 2 -> 3)
             0x8000, // CoarseY: Broadcast channel 0 to whole quad
             0x8044, // FineY: Swizzle channels in quad (0 -> 0, 1 -> 1, 0 -> 2, 1 -> 3)
         };
-        uint32_t perm1 = firstSwizzleCtrl[tableIdx];
-        uint32_t perm2 = secondSwizzleCtrl[tableIdx];
+        unsigned perm1 = firstSwizzleCtrl[tableIdx];
+        unsigned perm2 = secondSwizzleCtrl[tableIdx];
         pResult = Scalarize(pValue,
                             [this, perm1, perm2](Value* pValue)
                             {

@@ -97,7 +97,7 @@ private:
 
     void BuildUserDataConfig(ShaderStage shaderStage1,
                                ShaderStage shaderStage2,
-                               uint32_t    startUserData);
+                               unsigned    startUserData);
 
     void SetupVgtTfParam(LsHsRegConfig* pConfig);
 

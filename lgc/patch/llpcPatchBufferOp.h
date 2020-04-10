@@ -110,7 +110,7 @@ private:
     llvm::LLVMContext*                              m_pContext;            // The LLVM context.
     PipelineState*                                  m_pPipelineState;      // The pipeline state
 
-    static constexpr uint32_t MinMemOpLoopBytes = 256;
+    static constexpr unsigned MinMemOpLoopBytes = 256;
 };
 
 } // lgc

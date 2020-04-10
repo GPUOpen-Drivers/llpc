@@ -103,7 +103,7 @@ bool PatchResourceCollect::runOnModule(
     }
 
     // Process each shader stage, in reverse order.
-    for (int32_t shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage)
+    for (int shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage)
     {
         m_pEntryPoint = m_pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
         if (m_pEntryPoint != nullptr)
@@ -142,7 +142,7 @@ void PatchResourceCollect::SetNggControl()
         return;
     }
 
-    uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
+    unsigned stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                         ShaderStageToMask(ShaderStageTessEval))) != 0);
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
@@ -435,7 +435,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 {
     bool gsOnChip = true;
 
-    uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
+    unsigned stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
@@ -443,7 +443,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
     const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
     auto pGsResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
 
-    uint32_t inVertsPerPrim = 0;
+    unsigned inVertsPerPrim = 0;
     bool useAdjacency = false;
     switch (geometryMode.inputPrimitive)
     {
@@ -471,7 +471,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
     pGsResUsage->inOutUsage.gs.calcFactor.inputVertices = inVertsPerPrim;
 
-    uint32_t outVertsPerPrim = 0;
+    unsigned outVertsPerPrim = 0;
     switch (geometryMode.outputPrimitive)
     {
     case OutputPrimitives::Points:
@@ -490,24 +490,24 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
     if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major <= 8)
     {
-        uint32_t gsPrimsPerSubgroup = m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipDefaultPrimsPerSubgroup;
+        unsigned gsPrimsPerSubgroup = m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipDefaultPrimsPerSubgroup;
 
-        const uint32_t esGsRingItemSize = 4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount);
-        const uint32_t gsInstanceCount  = geometryMode.invocations;
-        const uint32_t gsVsRingItemSize = 4 * std::max(1u,
+        const unsigned esGsRingItemSize = 4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount);
+        const unsigned gsInstanceCount  = geometryMode.invocations;
+        const unsigned gsVsRingItemSize = 4 * std::max(1u,
                                                        (pGsResUsage->inOutUsage.outputMapLocCount *
                                                         geometryMode.outputVertices));
 
-        uint32_t esGsRingItemSizeOnChip = esGsRingItemSize;
-        uint32_t gsVsRingItemSizeOnChip = gsVsRingItemSize;
+        unsigned esGsRingItemSizeOnChip = esGsRingItemSize;
+        unsigned gsVsRingItemSizeOnChip = gsVsRingItemSize;
 
         // Optimize ES -> GS ring and GS -> VS ring layout for bank conflicts
         esGsRingItemSizeOnChip |= 1;
         gsVsRingItemSizeOnChip |= 1;
 
-        uint32_t gsVsRingItemSizeOnChipInstanced = gsVsRingItemSizeOnChip * gsInstanceCount;
+        unsigned gsVsRingItemSizeOnChipInstanced = gsVsRingItemSizeOnChip * gsInstanceCount;
 
-        uint32_t esMinVertsPerSubgroup = inVertsPerPrim;
+        unsigned esMinVertsPerSubgroup = inVertsPerPrim;
 
         // If the primitive has adjacency half the number of vertices will be reused in multiple primitives.
         if (useAdjacency)
@@ -523,32 +523,32 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         }
 
         // Compute GS-VS LDS size based on target GS primitives per subgroup
-        uint32_t gsVsLdsSize = (gsVsRingItemSizeOnChipInstanced * gsPrimsPerSubgroup);
+        unsigned gsVsLdsSize = (gsVsRingItemSizeOnChipInstanced * gsPrimsPerSubgroup);
 
         // Compute ES-GS LDS size based on the worst case number of ES vertices needed to create the target number of
         // GS primitives per subgroup.
-        const uint32_t reuseOffMultiplier = IsVertexReuseDisabled() ? gsInstanceCount : 1;
-        uint32_t worstCaseEsVertsPerSubgroup = esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier;
-        uint32_t esGsLdsSize = esGsRingItemSizeOnChip * worstCaseEsVertsPerSubgroup;
+        const unsigned reuseOffMultiplier = IsVertexReuseDisabled() ? gsInstanceCount : 1;
+        unsigned worstCaseEsVertsPerSubgroup = esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier;
+        unsigned esGsLdsSize = esGsRingItemSizeOnChip * worstCaseEsVertsPerSubgroup;
 
         // Total LDS use per subgroup aligned to the register granularity
-        uint32_t gsOnChipLdsSize =
+        unsigned gsOnChipLdsSize =
             alignTo((esGsLdsSize + gsVsLdsSize),
-                      static_cast<uint32_t>((1 << m_pPipelineState->GetTargetInfo().GetGpuProperty()
+                      static_cast<unsigned>((1 << m_pPipelineState->GetTargetInfo().GetGpuProperty()
                                             .ldsSizeDwordGranularityShift)));
 
         // Use the client-specified amount of LDS space per subgroup. If they specified zero, they want us to choose a
         // reasonable default. The final amount must be 128-DWORD aligned.
 
-        uint32_t maxLdsSize = m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipDefaultLdsSizePerSubgroup;
+        unsigned maxLdsSize = m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipDefaultLdsSizePerSubgroup;
 
         // TODO: For BONAIRE A0, GODAVARI and KALINDI, set maxLdsSize to 1024 due to SPI barrier management bug
 
         // If total LDS usage is too big, refactor partitions based on ratio of ES-GS and GS-VS item sizes.
         if (gsOnChipLdsSize > maxLdsSize)
         {
-            const uint32_t esGsItemSizePerPrim = esGsRingItemSizeOnChip * esMinVertsPerSubgroup * reuseOffMultiplier;
-            const uint32_t itemSizeTotal       = esGsItemSizePerPrim + gsVsRingItemSizeOnChipInstanced;
+            const unsigned esGsItemSizePerPrim = esGsRingItemSizeOnChip * esMinVertsPerSubgroup * reuseOffMultiplier;
+            const unsigned itemSizeTotal       = esGsItemSizePerPrim + gsVsRingItemSizeOnChipInstanced;
 
             esGsLdsSize = alignTo((esGsItemSizePerPrim * maxLdsSize) / itemSizeTotal, esGsItemSizePerPrim);
             gsVsLdsSize = alignDown(maxLdsSize - esGsLdsSize, gsVsRingItemSizeOnChipInstanced);
@@ -558,7 +558,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
         // Based on the LDS space, calculate how many GS prims per subgroup and ES vertices per subgroup can be dispatched.
         gsPrimsPerSubgroup          = (gsVsLdsSize / gsVsRingItemSizeOnChipInstanced);
-        uint32_t esVertsPerSubgroup = (esGsLdsSize / (esGsRingItemSizeOnChip * reuseOffMultiplier));
+        unsigned esVertsPerSubgroup = (esGsLdsSize / (esGsRingItemSizeOnChip * reuseOffMultiplier));
 
         assert(esVertsPerSubgroup >= esMinVertsPerSubgroup);
 
@@ -582,7 +582,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         // determining onchip/offchip mode, unused builtin output like PointSize and Clip/CullDistance is factored in
         // LDS usage and deactivates onchip GS when GsOffChipDefaultThreshold  is 64. To fix this we will probably
         // need to clear unused builtin ouput before determining onchip/offchip GS mode.
-        constexpr uint32_t GsOffChipDefaultThreshold = 32;
+        constexpr unsigned GsOffChipDefaultThreshold = 32;
 
         bool disableGsOnChip = DisableGsOnChip;
         if (hasTs || (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major == 6))
@@ -622,34 +622,34 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         if (pNggControl->enableNgg)
         {
             // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
-            const uint32_t esGsRingItemSize = hasGs ? ((4 * std::max(1u,
+            const unsigned esGsRingItemSize = hasGs ? ((4 * std::max(1u,
                                                                      pGsResUsage->inOutUsage.inputMapLocCount)) | 1) :
                                                       4; // Always 4 components for NGG when GS is not present
 
-            const uint32_t gsVsRingItemSize = hasGs ? std::max(1u,
+            const unsigned gsVsRingItemSize = hasGs ? std::max(1u,
                                                                4 * pGsResUsage->inOutUsage.outputMapLocCount
                                                                  * geometryMode.outputVertices) : 0;
 
-            const uint32_t esExtraLdsSize = NggLdsManager::CalcEsExtraLdsSize(m_pPipelineState) / 4; // In DWORDs
-            const uint32_t gsExtraLdsSize = NggLdsManager::CalcGsExtraLdsSize(m_pPipelineState) / 4; // In DWORDs
+            const unsigned esExtraLdsSize = NggLdsManager::CalcEsExtraLdsSize(m_pPipelineState) / 4; // In DWORDs
+            const unsigned gsExtraLdsSize = NggLdsManager::CalcGsExtraLdsSize(m_pPipelineState) / 4; // In DWORDs
 
             // NOTE: Primitive amplification factor must be at least 1. If the maximum number of GS output vertices
             // is too small to form a complete primitive, set the factor to 1.
-            uint32_t primAmpFactor = 1;
+            unsigned primAmpFactor = 1;
             if (hasGs && (geometryMode.outputVertices > (outVertsPerPrim - 1)))
             {
                 // primAmpFactor = outputVertices - (outVertsPerPrim - 1)
                 primAmpFactor = geometryMode.outputVertices - (outVertsPerPrim - 1);
             }
 
-            const uint32_t vertsPerPrimitive = GetVerticesPerPrimitive();
+            const unsigned vertsPerPrimitive = GetVerticesPerPrimitive();
 
             const bool needsLds = (hasGs ||
                                    (pNggControl->passthroughMode == false) ||
                                    (esExtraLdsSize > 0) || (gsExtraLdsSize > 0));
 
-            uint32_t esVertsPerSubgroup = 0;
-            uint32_t gsPrimsPerSubgroup = 0;
+            unsigned esVertsPerSubgroup = 0;
+            unsigned gsPrimsPerSubgroup = 0;
 
             // It is expected that regular launch NGG will be the most prevalent, so handle its logic first.
             if (pNggControl->enableFastLaunch == false)
@@ -721,7 +721,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 }
             }
 
-            uint32_t gsInstanceCount = std::max(1u, geometryMode.invocations);
+            unsigned gsInstanceCount = std::max(1u, geometryMode.invocations);
             bool enableMaxVertOut = false;
 
             if (hasGs)
@@ -730,7 +730,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 // by the amplification factor is larger than the supported number of primitives within a subgroup, we
                 // need to shrimp the number of gsPrimsPerSubgroup down to a reasonable level to prevent
                 // over-allocating LDS.
-                uint32_t maxVertOut = hasGs ? geometryMode.outputVertices : 1;
+                unsigned maxVertOut = hasGs ? geometryMode.outputVertices : 1;
 
                 assert(maxVertOut >= primAmpFactor);
 
@@ -766,8 +766,8 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             // Make sure that we have at least one primitive
             assert(gsPrimsPerSubgroup >= 1);
 
-            uint32_t       expectedEsLdsSize = esVertsPerSubgroup * esGsRingItemSize + esExtraLdsSize;
-            const uint32_t expectedGsLdsSize = gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize + gsExtraLdsSize;
+            unsigned       expectedEsLdsSize = esVertsPerSubgroup * esGsRingItemSize + esExtraLdsSize;
+            const unsigned expectedGsLdsSize = gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize + gsExtraLdsSize;
 
             if (expectedGsLdsSize == 0)
             {
@@ -776,9 +776,9 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 expectedEsLdsSize = (Gfx9::NggMaxThreadsPerSubgroup * esGsRingItemSize) + esExtraLdsSize;
             }
 
-            const uint32_t ldsSizeDwords =
+            const unsigned ldsSizeDwords =
                 alignTo(expectedEsLdsSize + expectedGsLdsSize,
-                          static_cast<uint32_t>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty()
+                          static_cast<unsigned>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty()
                                                 .ldsSizeDwordGranularityShift));
 
             // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
@@ -802,31 +802,31 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         }
         else
         {
-            uint32_t ldsSizeDwordGranularity =
-                static_cast<uint32_t>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift);
+            unsigned ldsSizeDwordGranularity =
+                static_cast<unsigned>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift);
 
             // gsPrimsPerSubgroup shouldn't be bigger than wave size.
-            uint32_t gsPrimsPerSubgroup =
+            unsigned gsPrimsPerSubgroup =
                 std::min(m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipDefaultPrimsPerSubgroup,
                          m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry));
 
             // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
-            const uint32_t esGsRingItemSize = (4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount)) | 1;
+            const unsigned esGsRingItemSize = (4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount)) | 1;
 
-            const uint32_t gsVsRingItemSize = 4 * std::max(1u,
+            const unsigned gsVsRingItemSize = 4 * std::max(1u,
                                                            (pGsResUsage->inOutUsage.outputMapLocCount *
                                                             geometryMode.outputVertices));
 
             // NOTE: Make gsVsRingItemSize odd by "| 1", to optimize GS -> VS ring layout for LDS bank conflicts.
-            const uint32_t gsVsRingItemSizeOnChip = gsVsRingItemSize | 1;
+            const unsigned gsVsRingItemSizeOnChip = gsVsRingItemSize | 1;
 
-            const uint32_t gsInstanceCount  = geometryMode.invocations;
+            const unsigned gsInstanceCount  = geometryMode.invocations;
 
             // TODO: Confirm no ES-GS extra LDS space used.
-            const uint32_t esGsExtraLdsDwords  = 0;
-            const uint32_t maxEsVertsPerSubgroup = Gfx9::OnChipGsMaxEsVertsPerSubgroup;
+            const unsigned esGsExtraLdsDwords  = 0;
+            const unsigned maxEsVertsPerSubgroup = Gfx9::OnChipGsMaxEsVertsPerSubgroup;
 
-            uint32_t esMinVertsPerSubgroup = inVertsPerPrim;
+            unsigned esMinVertsPerSubgroup = inVertsPerPrim;
 
             // If the primitive has adjacency half the number of vertices will be reused in multiple primitives.
             if (useAdjacency)
@@ -834,7 +834,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 esMinVertsPerSubgroup >>= 1;
             }
 
-            uint32_t maxGsPrimsPerSubgroup = Gfx9::OnChipGsMaxPrimPerSubgroup;
+            unsigned maxGsPrimsPerSubgroup = Gfx9::OnChipGsMaxPrimPerSubgroup;
 
             // There is a hardware requirement for gsPrimsPerSubgroup * gsInstanceCount to be capped by
             // OnChipGsMaxPrimPerSubgroup for adjacency primitive or when GS instanceing is used.
@@ -845,19 +845,19 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
             gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, maxGsPrimsPerSubgroup);
 
-            const uint32_t reuseOffMultiplier = IsVertexReuseDisabled() ? gsInstanceCount : 1;
-            uint32_t worstCaseEsVertsPerSubgroup =
+            const unsigned reuseOffMultiplier = IsVertexReuseDisabled() ? gsInstanceCount : 1;
+            unsigned worstCaseEsVertsPerSubgroup =
                 std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier, maxEsVertsPerSubgroup);
 
-            uint32_t esGsLdsSize = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
+            unsigned esGsLdsSize = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
 
             // Total LDS use per subgroup aligned to the register granularity.
-            uint32_t gsOnChipLdsSize = alignTo(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
+            unsigned gsOnChipLdsSize = alignTo(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
 
             // Use the client-specified amount of LDS space per sub-group. If they specified zero, they want us to
             // choose a reasonable default. The final amount must be 128-DWORD aligned.
             // TODO: Accept DefaultLdsSizePerSubgroup from panel setting
-            uint32_t maxLdsSize = Gfx9::DefaultLdsSizePerSubgroup;
+            unsigned maxLdsSize = Gfx9::DefaultLdsSizePerSubgroup;
 
             // If total LDS usage is too big, refactor partitions based on ratio of ES-GS item sizes.
             if (gsOnChipLdsSize > maxLdsSize)
@@ -866,7 +866,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
                 // Calculate the maximum number of GS primitives per sub-group that will fit into LDS, capped
                 // by the maximum that the hardware can support.
-                uint32_t availableLdsSize   = maxLdsSize - esGsExtraLdsDwords;
+                unsigned availableLdsSize   = maxLdsSize - esGsExtraLdsDwords;
                 gsPrimsPerSubgroup          = std::min((availableLdsSize / (esGsRingItemSize * esMinVertsPerSubgroup)),
                                                        maxGsPrimsPerSubgroup);
                 worstCaseEsVertsPerSubgroup = std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier,
@@ -887,17 +887,17 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             else
             {
                 // Now let's calculate the onchip GSVS info and determine if it should be on or off chip.
-                uint32_t gsVsItemSize = gsVsRingItemSizeOnChip * gsInstanceCount;
+                unsigned gsVsItemSize = gsVsRingItemSizeOnChip * gsInstanceCount;
 
                 // Compute GSVS LDS size based on target GS prims per subgroup.
-                uint32_t gsVsLdsSize = gsVsItemSize * gsPrimsPerSubgroup;
+                unsigned gsVsLdsSize = gsVsItemSize * gsPrimsPerSubgroup;
 
                 // Start out with the assumption that our GS prims per subgroup won't change.
-                uint32_t onchipGsPrimsPerSubgroup = gsPrimsPerSubgroup;
+                unsigned onchipGsPrimsPerSubgroup = gsPrimsPerSubgroup;
 
                 // Total LDS use per subgroup aligned to the register granularity to keep ESGS and GSVS data on chip.
-                uint32_t onchipEsGsVsLdsSize = alignTo(esGsLdsSize + gsVsLdsSize, ldsSizeDwordGranularity);
-                uint32_t onchipEsGsLdsSizeOnchipGsVs = esGsLdsSize;
+                unsigned onchipEsGsVsLdsSize = alignTo(esGsLdsSize + gsVsLdsSize, ldsSizeDwordGranularity);
+                unsigned onchipEsGsLdsSizeOnchipGsVs = esGsLdsSize;
 
                 if (onchipEsGsVsLdsSize > maxLdsSize)
                 {
@@ -943,7 +943,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 }
             }
 
-            uint32_t esVertsPerSubgroup =
+            unsigned esVertsPerSubgroup =
                 std::min(esGsLdsSize / (esGsRingItemSize * reuseOffMultiplier), maxEsVertsPerSubgroup);
 
             assert(esVertsPerSubgroup >= esMinVertsPerSubgroup);
@@ -973,9 +973,9 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
             if ((m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major == 10) && hasTs && (gsOnChip == false))
             {
-                uint32_t esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
-                uint32_t onChipGsLdsMagicSize = alignTo((esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
-                            static_cast<uint32_t>((1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift)));
+                unsigned esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
+                unsigned onChipGsLdsMagicSize = alignTo((esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
+                            static_cast<unsigned>((1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift)));
 
                 // If the new size is greater than the size we previously set
                 // then we need to either increase the size or decrease the verts
@@ -994,7 +994,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                     }
                 }
                 // Support multiple GS instances
-                uint32_t gsPrimsNum = Gfx9::GsPrimsOffchipGsOrTess / gsInstanceCount;
+                unsigned gsPrimsNum = Gfx9::GsPrimsOffchipGsOrTess / gsInstanceCount;
 
                 pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsNum;
                 pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsNum;
@@ -1015,16 +1015,16 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
     LLPC_OUTS("\n");
 
     LLPC_OUTS("GS stream item size:\n");
-    for (uint32_t i = 0; i < MaxGsStreams; ++i)
+    for (unsigned i = 0; i < MaxGsStreams; ++i)
     {
-        uint32_t streamItemSize = pGsResUsage->inOutUsage.gs.outLocCount[i] *
+        unsigned streamItemSize = pGsResUsage->inOutUsage.gs.outLocCount[i] *
                                     geometryMode.outputVertices * 4;
         LLPC_OUTS("    stream " << i << " = " << streamItemSize);
 
         if (pGsResUsage->inOutUsage.enableXfb)
         {
             LLPC_OUTS(", XFB buffer = ");
-            for (uint32_t j = 0; j < MaxTransformFeedbackBuffers; ++j)
+            for (unsigned j = 0; j < MaxTransformFeedbackBuffers; ++j)
             {
                 if ((pGsResUsage->inOutUsage.streamXfbBuffers[i] & (1 << j)) != 0)
                 {
@@ -1071,9 +1071,9 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
 // =====================================================================================================================
 // Gets the count of vertices per primitive
-uint32_t PatchResourceCollect::GetVerticesPerPrimitive() const
+unsigned PatchResourceCollect::GetVerticesPerPrimitive() const
 {
-    uint32_t vertsPerPrim = 1;
+    unsigned vertsPerPrim = 1;
 
     switch (m_pPipelineState->GetInputAssemblyState().topology)
     {
@@ -1253,8 +1253,8 @@ void PatchResourceCollect::visitCallInst(
              mangledName.startswith(lgcName::DescriptorGetFmaskPtr) ||
              mangledName.startswith(lgcName::DescriptorGetSamplerPtr))
     {
-        uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-        uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+        unsigned descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
+        unsigned binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
         DescriptorPair descPair = { descSet, binding };
         m_pResUsage->descPairs.insert(descPair.u64All);
     }
@@ -1373,7 +1373,7 @@ void PatchResourceCollect::visitCallInst(
         }
         else
         {
-            uint32_t builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
+            unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
             m_activeInputBuiltIns.insert(builtInId);
         }
     }
@@ -1432,7 +1432,7 @@ void PatchResourceCollect::visitCallInst(
         // Built-in output import
         assert(m_shaderStage == ShaderStageTessControl);
 
-        uint32_t builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
+        unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         m_importedOutputBuiltIns.insert(builtInId);
     }
     else if (mangledName.startswith(lgcName::OutputExportGeneric))
@@ -1478,7 +1478,7 @@ void PatchResourceCollect::visitCallInst(
             }
             else
             {
-                uint32_t builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
+                unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
                 m_activeOutputBuiltIns.insert(builtInId);
             }
         }
@@ -1518,10 +1518,10 @@ void PatchResourceCollect::ClearInactiveInput()
         // is easy to cause incorrectness of location mapping.
 
         // Clear normal inputs
-        std::unordered_set<uint32_t> unusedLocs;
+        std::unordered_set<unsigned> unusedLocs;
         for (auto locMap : m_pResUsage->inOutUsage.inputLocMap)
         {
-            uint32_t loc = locMap.first;
+            unsigned loc = locMap.first;
             if (m_activeInputLocs.find(loc) == m_activeInputLocs.end())
             {
                  unusedLocs.insert(loc);
@@ -1539,7 +1539,7 @@ void PatchResourceCollect::ClearInactiveInput()
             unusedLocs.clear();
             for (auto locMap : m_pResUsage->inOutUsage.perPatchInputLocMap)
             {
-                uint32_t loc = locMap.first;
+                unsigned loc = locMap.first;
                 if (m_activeInputLocs.find(loc) == m_activeInputLocs.end())
                 {
                      unusedLocs.insert(loc);
@@ -2007,17 +2007,17 @@ void PatchResourceCollect::MatchGenericInOut()
             const auto pNextResUsage = m_pPipelineState->GetShaderResourceUsage(nextStage);
             const auto& nextInLocMap = pNextResUsage->inOutUsage.inputLocMap;
 
-            uint32_t availInMapLoc = pNextResUsage->inOutUsage.inputMapLocCount;
+            unsigned availInMapLoc = pNextResUsage->inOutUsage.inputMapLocCount;
 
             // Collect locations of those outputs that are not used by next shader stage
-            std::vector<uint32_t> unusedLocs;
+            std::vector<unsigned> unusedLocs;
             for (auto& locMap : outLocMap)
             {
-                uint32_t loc = locMap.first;
+                unsigned loc = locMap.first;
                 bool outputXfb = false;
                 if (m_shaderStage == ShaderStageGeometry)
                 {
-                    uint32_t outLocInfo = locMap.first;
+                    unsigned outLocInfo = locMap.first;
                     loc = reinterpret_cast<GsOutLocInfo*>(&outLocInfo)->location;
                     outputXfb = inOutUsage.gs.xfbOutsInfo.find(outLocInfo) != inOutUsage.gs.xfbOutsInfo.end();
                 }
@@ -2054,13 +2054,13 @@ void PatchResourceCollect::MatchGenericInOut()
                 const auto pNextResUsage = m_pPipelineState->GetShaderResourceUsage(nextStage);
                 const auto& nextPerPatchInLocMap = pNextResUsage->inOutUsage.perPatchInputLocMap;
 
-                uint32_t availPerPatchInMapLoc = pNextResUsage->inOutUsage.perPatchInputMapLocCount;
+                unsigned availPerPatchInMapLoc = pNextResUsage->inOutUsage.perPatchInputMapLocCount;
 
                 // Collect locations of those outputs that are not used by next shader stage
-                std::vector<uint32_t> unusedLocs;
+                std::vector<unsigned> unusedLocs;
                 for (auto& locMap : perPatchOutLocMap)
                 {
-                    const uint32_t loc = locMap.first;
+                    const unsigned loc = locMap.first;
                     if (nextPerPatchInLocMap.find(loc) == nextPerPatchInLocMap.end())
                     {
                         // NOTE: If either dynamic indexing of generic outputs exists or the generic output involve in
@@ -2102,7 +2102,7 @@ void PatchResourceCollect::MatchGenericInOut()
     LLPC_OUTS("===============================================================================\n");
     LLPC_OUTS("// LLPC location input/output mapping results (" << PipelineState::GetShaderStageAbbreviation(m_shaderStage)
               << " shader)\n\n");
-    uint32_t nextMapLoc = 0;
+    unsigned nextMapLoc = 0;
     if (inLocMap.empty() == false)
     {
         assert(inOutUsage.inputMapLocCount == 0);
@@ -2134,7 +2134,7 @@ void PatchResourceCollect::MatchGenericInOut()
             auto& locMap = *locMapIt;
             if (m_shaderStage == ShaderStageFragment)
             {
-                uint32_t location = locMap.first;
+                unsigned location = locMap.first;
                 if (m_pPipelineState->GetColorExportState().dualSourceBlendEnable && (location == 1))
                 {
                     location = 0;
@@ -2150,7 +2150,7 @@ void PatchResourceCollect::MatchGenericInOut()
             {
                 if (locMap.second == InvalidValue)
                 {
-                    uint32_t outLocInfo = locMap.first;
+                    unsigned outLocInfo = locMap.first;
                     MapGsGenericOutput(*(reinterpret_cast<GsOutLocInfo*>(&outLocInfo)));
                 }
             }
@@ -2257,7 +2257,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
     if (m_shaderStage == ShaderStageVertex)
     {
         // VS  ==>  XXX
-        uint32_t availOutMapLoc = inOutUsage.outputMapLocCount;
+        unsigned availOutMapLoc = inOutUsage.outputMapLocCount;
 
         // Map built-in outputs to generic ones
         if (nextStage == ShaderStageFragment)
@@ -2270,7 +2270,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
             }
 
@@ -2278,7 +2278,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
             }
 
@@ -2289,7 +2289,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPrimitiveId) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPrimitiveId];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPrimitiveId];
                 inOutUsage.builtInOutputLocMap[BuiltInPrimitiveId] = mapLoc;
             }
 
@@ -2297,7 +2297,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
                 inOutUsage.builtInOutputLocMap[BuiltInLayer] = mapLoc;
             }
 
@@ -2305,7 +2305,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewIndex) !=
                     nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewIndex];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewIndex];
                 inOutUsage.builtInOutputLocMap[BuiltInViewIndex] = mapLoc;
             }
 
@@ -2313,7 +2313,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
                 inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = mapLoc;
             }
         }
@@ -2327,7 +2327,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPosition) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
                 inOutUsage.builtInOutputLocMap[BuiltInPosition] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
             }
@@ -2340,7 +2340,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
                 inOutUsage.builtInOutputLocMap[BuiltInPointSize] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
             }
@@ -2353,7 +2353,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.clipDistanceIn > 4) ? 2u : 1u));
             }
@@ -2366,7 +2366,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.cullDistanceIn > 4) ? 2u : 1u));
             }
@@ -2388,7 +2388,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPosition) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
                 inOutUsage.builtInOutputLocMap[BuiltInPosition] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
             }
@@ -2401,7 +2401,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
                 inOutUsage.builtInOutputLocMap[BuiltInPointSize] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
             }
@@ -2414,7 +2414,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.clipDistanceIn > 4) ? 2u : 1u));
             }
@@ -2427,7 +2427,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.cullDistanceIn > 4) ? 2u : 1u));
             }
@@ -2444,7 +2444,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             // VS only
             if ((builtInUsage.vs.clipDistance > 0) || (builtInUsage.vs.cullDistance > 0))
             {
-                uint32_t mapLoc = availOutMapLoc++;
+                unsigned mapLoc = availOutMapLoc++;
                 if (builtInUsage.vs.clipDistance + builtInUsage.vs.cullDistance > 4)
                 {
                     assert(builtInUsage.vs.clipDistance +
@@ -2488,10 +2488,10 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
     else if (m_shaderStage == ShaderStageTessControl)
     {
         // TCS  ==>  XXX
-        uint32_t availInMapLoc = inOutUsage.inputMapLocCount;
-        uint32_t availOutMapLoc = inOutUsage.outputMapLocCount;
+        unsigned availInMapLoc = inOutUsage.inputMapLocCount;
+        unsigned availOutMapLoc = inOutUsage.outputMapLocCount;
 
-        uint32_t availPerPatchOutMapLoc = inOutUsage.perPatchOutputMapLocCount;
+        unsigned availPerPatchOutMapLoc = inOutUsage.perPatchOutputMapLocCount;
 
         // Map built-in inputs to generic ones
         if (builtInUsage.tcs.positionIn)
@@ -2535,7 +2535,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPosition) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
                 inOutUsage.builtInOutputLocMap[BuiltInPosition] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
             }
@@ -2555,7 +2555,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
                 inOutUsage.builtInOutputLocMap[BuiltInPointSize] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
             }
@@ -2575,7 +2575,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.clipDistanceIn > 4) ? 2u : 1u));
             }
@@ -2595,7 +2595,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.cullDistanceIn > 4) ? 2u : 1u));
             }
@@ -2615,7 +2615,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.perPatchBuiltInInputLocMap.find(BuiltInTessLevelOuter) !=
                             nextInOutUsage.perPatchBuiltInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelOuter];
+                const unsigned mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelOuter];
                 inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = mapLoc;
                 availPerPatchOutMapLoc = std::max(availPerPatchOutMapLoc, mapLoc + 1);
             }
@@ -2632,7 +2632,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.perPatchBuiltInInputLocMap.find(BuiltInTessLevelInner) !=
                             nextInOutUsage.perPatchBuiltInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelInner];
+                const unsigned mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelInner];
                 inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = mapLoc;
                 availPerPatchOutMapLoc = std::max(availPerPatchOutMapLoc, mapLoc + 1);
             }
@@ -2733,10 +2733,10 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
     else if (m_shaderStage == ShaderStageTessEval)
     {
         // TES  ==>  XXX
-        uint32_t availInMapLoc = inOutUsage.inputMapLocCount;
-        uint32_t availOutMapLoc = inOutUsage.outputMapLocCount;
+        unsigned availInMapLoc = inOutUsage.inputMapLocCount;
+        unsigned availOutMapLoc = inOutUsage.outputMapLocCount;
 
-        uint32_t availPerPatchInMapLoc = inOutUsage.perPatchInputMapLocCount;
+        unsigned availPerPatchInMapLoc = inOutUsage.perPatchInputMapLocCount;
 
         // Map built-in inputs to generic ones
         if (builtInUsage.tes.positionIn)
@@ -2751,7 +2751,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
         if (builtInUsage.tes.clipDistanceIn > 0)
         {
-            uint32_t clipDistanceCount = builtInUsage.tes.clipDistanceIn;
+            unsigned clipDistanceCount = builtInUsage.tes.clipDistanceIn;
 
             // NOTE: If gl_in[].gl_ClipDistance is used, we have to check the usage of gl_out[].gl_ClipDistance in
             // tessellation control shader. The clip distance is the maximum of the two. We do this to avoid
@@ -2772,7 +2772,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
         if (builtInUsage.tes.cullDistanceIn > 0)
         {
-            uint32_t cullDistanceCount = builtInUsage.tes.cullDistanceIn;
+            unsigned cullDistanceCount = builtInUsage.tes.cullDistanceIn;
 
             const auto prevStage = m_pPipelineState->GetPrevShaderStage(m_shaderStage);
             if (prevStage == ShaderStageTessControl)
@@ -2809,7 +2809,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
             }
 
@@ -2817,7 +2817,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
             }
 
@@ -2828,7 +2828,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPrimitiveId) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPrimitiveId];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPrimitiveId];
                 inOutUsage.builtInOutputLocMap[BuiltInPrimitiveId] = mapLoc;
             }
 
@@ -2836,7 +2836,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
                 inOutUsage.builtInOutputLocMap[BuiltInLayer] = mapLoc;
             }
 
@@ -2844,7 +2844,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewIndex) !=
                     nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewIndex];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewIndex];
                 inOutUsage.builtInOutputLocMap[BuiltInViewIndex] = mapLoc;
             }
 
@@ -2852,7 +2852,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
                 inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = mapLoc;
             }
         }
@@ -2866,7 +2866,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPosition) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
                 inOutUsage.builtInOutputLocMap[BuiltInPosition] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
             }
@@ -2879,7 +2879,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
                 inOutUsage.builtInOutputLocMap[BuiltInPointSize] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
             }
@@ -2892,7 +2892,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.clipDistanceIn > 4) ? 2u : 1u));
             }
@@ -2905,7 +2905,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
                 availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.cullDistanceIn > 4) ? 2u : 1u));
             }
@@ -2922,7 +2922,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             // TES only
             if ((builtInUsage.tes.clipDistance > 0) || (builtInUsage.tes.cullDistance > 0))
             {
-                uint32_t mapLoc = availOutMapLoc++;
+                unsigned mapLoc = availOutMapLoc++;
                 if (builtInUsage.tes.clipDistance + builtInUsage.tes.cullDistance > 4)
                 {
                     assert(builtInUsage.tes.clipDistance +
@@ -2969,7 +2969,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
     else if (m_shaderStage == ShaderStageGeometry)
     {
         // GS  ==>  XXX
-        uint32_t availInMapLoc  = inOutUsage.inputMapLocCount;
+        unsigned availInMapLoc  = inOutUsage.inputMapLocCount;
 
         // Map built-in inputs to generic ones
         if (builtInUsage.gs.positionIn)
@@ -3054,7 +3054,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 builtInOutLocs[BuiltInClipDistance] = mapLoc;
             }
 
@@ -3062,7 +3062,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 builtInOutLocs[BuiltInCullDistance] = mapLoc;
             }
 
@@ -3070,7 +3070,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPrimitiveId) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPrimitiveId];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPrimitiveId];
                 builtInOutLocs[BuiltInPrimitiveId] = mapLoc;
             }
 
@@ -3078,7 +3078,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
                 builtInOutLocs[BuiltInLayer] = mapLoc;
             }
 
@@ -3086,7 +3086,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewIndex) !=
                     nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewIndex];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewIndex];
                 builtInOutLocs[BuiltInViewIndex] = mapLoc;
             }
 
@@ -3094,18 +3094,18 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             {
                 assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) !=
                             nextInOutUsage.builtInInputLocMap.end());
-                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
+                const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
                 builtInOutLocs[BuiltInViewportIndex] = mapLoc;
             }
         }
         else if (nextStage == ShaderStageInvalid)
         {
             // GS only
-            uint32_t availOutMapLoc = inOutUsage.outputLocMap.size(); // Reset available location
+            unsigned availOutMapLoc = inOutUsage.outputLocMap.size(); // Reset available location
 
             if ((builtInUsage.gs.clipDistance > 0) || (builtInUsage.gs.cullDistance > 0))
             {
-                uint32_t mapLoc = availOutMapLoc++;
+                unsigned mapLoc = availOutMapLoc++;
                 if (builtInUsage.gs.clipDistance + builtInUsage.gs.cullDistance > 4)
                 {
                     assert(builtInUsage.gs.clipDistance +
@@ -3154,7 +3154,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
     else if (m_shaderStage == ShaderStageFragment)
     {
         // FS
-        uint32_t availInMapLoc = inOutUsage.inputMapLocCount;
+        unsigned availInMapLoc = inOutUsage.inputMapLocCount;
 
         if (builtInUsage.fs.pointCoord)
         {
@@ -3183,7 +3183,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
         if ((builtInUsage.fs.clipDistance > 0) || (builtInUsage.fs.cullDistance > 0))
         {
-            uint32_t mapLoc = availInMapLoc++;
+            unsigned mapLoc = availInMapLoc++;
             if (builtInUsage.fs.clipDistance + builtInUsage.fs.cullDistance > 4)
             {
                 assert(builtInUsage.fs.clipDistance +
@@ -3218,7 +3218,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         for (const auto& builtInMap : inOutUsage.builtInInputLocMap)
         {
             const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
-            const uint32_t loc = builtInMap.second;
+            const unsigned loc = builtInMap.second;
             LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Input:  builtin = "
                           << BuilderImplInOut::GetBuiltInName(builtInId)
                           << "  =>  Mapped = " << loc << "\n");
@@ -3231,7 +3231,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         for (const auto& builtInMap : inOutUsage.builtInOutputLocMap)
         {
             const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
-            const uint32_t loc = builtInMap.second;
+            const unsigned loc = builtInMap.second;
 
             if (m_shaderStage == ShaderStageGeometry)
             {
@@ -3256,7 +3256,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         for (const auto& builtInMap : inOutUsage.perPatchBuiltInInputLocMap)
         {
             const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
-            const uint32_t loc = builtInMap.second;
+            const unsigned loc = builtInMap.second;
             LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  builtin = "
                           << BuilderImplInOut::GetBuiltInName(builtInId)
                           << "  =>  Mapped = " << loc << "\n");
@@ -3269,7 +3269,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         for (const auto& builtInMap : inOutUsage.perPatchBuiltInOutputLocMap)
         {
             const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
-            const uint32_t loc = builtInMap.second;
+            const unsigned loc = builtInMap.second;
             LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): builtin = "
                           << BuilderImplInOut::GetBuiltInName(builtInId)
                           << "  =>  Mapped = " << loc << "\n");
@@ -3295,13 +3295,13 @@ void PatchResourceCollect::MapGsGenericOutput(
     GsOutLocInfo outLocInfo)             // GS output location info
 {
     assert(m_shaderStage == ShaderStageGeometry);
-    uint32_t streamId = outLocInfo.streamId;
+    unsigned streamId = outLocInfo.streamId;
     auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
     auto& inOutUsage = pResUsage->inOutUsage.gs;
 
     pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All] = inOutUsage.outLocCount[streamId]++;
 
-    uint32_t assignedLocCount = inOutUsage.outLocCount[0] +
+    unsigned assignedLocCount = inOutUsage.outLocCount[0] +
                             inOutUsage.outLocCount[1] +
                             inOutUsage.outLocCount[2] +
                             inOutUsage.outLocCount[3];
@@ -3318,13 +3318,13 @@ void PatchResourceCollect::MapGsGenericOutput(
 // =====================================================================================================================
 // Map built-in outputs of geometry shader to tightly packed locations.
 void PatchResourceCollect::MapGsBuiltInOutput(
-    uint32_t builtInId,         // Built-in ID
-    uint32_t elemCount)         // Element count of this built-in
+    unsigned builtInId,         // Built-in ID
+    unsigned elemCount)         // Element count of this built-in
 {
     assert(m_shaderStage == ShaderStageGeometry);
     auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
     auto& inOutUsage = pResUsage->inOutUsage.gs;
-    uint32_t streamId = inOutUsage.rasterStream;
+    unsigned streamId = inOutUsage.rasterStream;
 
     pResUsage->inOutUsage.builtInOutputLocMap[builtInId] = inOutUsage.outLocCount[streamId]++;
 
@@ -3333,7 +3333,7 @@ void PatchResourceCollect::MapGsBuiltInOutput(
         inOutUsage.outLocCount[streamId]++;
     }
 
-    uint32_t assignedLocCount = inOutUsage.outLocCount[0] +
+    unsigned assignedLocCount = inOutUsage.outLocCount[0] +
                             inOutUsage.outLocCount[1] +
                             inOutUsage.outLocCount[2] +
                             inOutUsage.outLocCount[3];
@@ -3401,8 +3401,8 @@ void PatchResourceCollect::ReviseInputImportCalls()
     {
         auto argCount = pCall->arg_size();
         const bool isInterpolant = (argCount == 5);
-        uint32_t compIdx = 1;
-        uint32_t locOffset = 0;
+        unsigned compIdx = 1;
+        unsigned locOffset = 0;
         if (isInterpolant)
         {
             compIdx = 2;
@@ -3521,10 +3521,10 @@ void PatchResourceCollect::ReassembleOutputExportCalls()
     outputLocMap.clear();
 
     Value* args[3] = {};
-    uint32_t consectiveLocation = 0;
+    unsigned consectiveLocation = 0;
     for (auto components : packedComponents)
     {
-        uint32_t compCount = 0;
+        unsigned compCount = 0;
         for (auto pComp : components)
         {
             if (pComp != nullptr)
@@ -3660,14 +3660,14 @@ void PatchResourceCollect::ScalarizeGenericInput(
     //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
     //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
     SmallVector<Value*, 5> args;
-    for (uint32_t i = 0, end = pCall->getNumArgOperands(); i != end; ++i)
+    for (unsigned i = 0, end = pCall->getNumArgOperands(); i != end; ++i)
     {
         args.push_back(pCall->getArgOperand(i));
     }
 
     bool isInterpolant = args.size() != 4;
-    uint32_t elemIdxArgIdx = isInterpolant ? 2 : 1;
-    uint32_t elemIdx = cast<ConstantInt>(args[elemIdxArgIdx])->getZExtValue();
+    unsigned elemIdxArgIdx = isInterpolant ? 2 : 1;
+    unsigned elemIdx = cast<ConstantInt>(args[elemIdxArgIdx])->getZExtValue();
     Type* pResultTy = pCall->getType();
 
     if (!isa<VectorType>(pResultTy))
@@ -3677,7 +3677,7 @@ void PatchResourceCollect::ScalarizeGenericInput(
         std::string callName = isInterpolant ? lgcName::InputImportInterpolant : lgcName::InputImportGeneric;
         AddTypeMangling(builder.getInt32Ty(), args, callName);
         Value* pResult = UndefValue::get(VectorType::get(builder.getInt32Ty(), 2));
-        for (uint32_t i = 0; i != 2; ++i)
+        for (unsigned i = 0; i != 2; ++i)
         {
             args[elemIdxArgIdx] = builder.getInt32(elemIdx * 2 + i);
             pResult = builder.CreateInsertElement(pResult,
@@ -3695,14 +3695,14 @@ void PatchResourceCollect::ScalarizeGenericInput(
 
     // Now we know we're reading a vector.
     Type* pElementTy = pResultTy->getVectorElementType();
-    uint32_t scalarizeBy = pResultTy->getVectorNumElements();
+    unsigned scalarizeBy = pResultTy->getVectorNumElements();
 
     // Find trivially unused elements.
     // This is not quite as good as the previous version of this code that scalarized in the
     // front-end before running some LLVM optimizations that removed unused inputs. In the future,
     // we can fix this properly by doing the whole of generic input/output assignment later on in
     // the middle-end, somewhere in the LLVM middle-end optimization pass flow.
-    static const uint32_t MaxScalarizeBy = 4;
+    static const unsigned MaxScalarizeBy = 4;
     assert(scalarizeBy <= MaxScalarizeBy);
     bool elementUsed[MaxScalarizeBy] = {};
     bool unknownElementsUsed = false;
@@ -3710,7 +3710,7 @@ void PatchResourceCollect::ScalarizeGenericInput(
     {
         if (auto pExtract = dyn_cast<ExtractElementInst>(pUser))
         {
-            uint32_t idx = cast<ConstantInt>(pExtract->getIndexOperand())->getZExtValue();
+            unsigned idx = cast<ConstantInt>(pExtract->getIndexOperand())->getZExtValue();
             assert(idx < scalarizeBy);
             elementUsed[idx] = true;
             continue;
@@ -3750,7 +3750,7 @@ void PatchResourceCollect::ScalarizeGenericInput(
     Value* pResult = UndefValue::get(pResultTy);
     std::string callName = isInterpolant ? lgcName::InputImportInterpolant : lgcName::InputImportGeneric;
     AddTypeMangling(pElementTy, args, callName);
-    for (uint32_t i = 0; i != scalarizeBy; ++i)
+    for (unsigned i = 0; i != scalarizeBy; ++i)
     {
         if (!unknownElementsUsed && !elementUsed[i])
         {
@@ -3784,17 +3784,17 @@ void PatchResourceCollect::ScalarizeGenericOutput(
     // TES: @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
     // GS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
     SmallVector<Value*, 5> args;
-    for (uint32_t i = 0, end = pCall->getNumArgOperands(); i != end; ++i)
+    for (unsigned i = 0, end = pCall->getNumArgOperands(); i != end; ++i)
     {
         args.push_back(pCall->getArgOperand(i));
     }
 
-    static const uint32_t ElemIdxArgIdx = 1;
-    uint32_t valArgIdx = pCall->getNumArgOperands() - 1;
-    uint32_t elemIdx = cast<ConstantInt>(args[ElemIdxArgIdx])->getZExtValue();
+    static const unsigned ElemIdxArgIdx = 1;
+    unsigned valArgIdx = pCall->getNumArgOperands() - 1;
+    unsigned elemIdx = cast<ConstantInt>(args[ElemIdxArgIdx])->getZExtValue();
     Value* pOutputVal = pCall->getArgOperand(valArgIdx);
     Type* pElementTy = pOutputVal->getType();
-    uint32_t scalarizeBy = 1;
+    unsigned scalarizeBy = 1;
     if (auto pVectorTy = dyn_cast<VectorType>(pElementTy))
     {
         scalarizeBy = pVectorTy->getNumElements();
@@ -3814,7 +3814,7 @@ void PatchResourceCollect::ScalarizeGenericOutput(
 
     // Extract and store the individual elements.
     std::string callName;
-    for (uint32_t i = 0; i != scalarizeBy; ++i)
+    for (unsigned i = 0; i != scalarizeBy; ++i)
     {
         args[ElemIdxArgIdx] = builder.getInt32(elemIdx + i);
         args[valArgIdx] = builder.CreateExtractElement(pOutputVal, i);
@@ -3845,7 +3845,7 @@ bool InOutLocationMapManager::AddSpan(
         span.firstLocation.locationInfo.component = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
         span.firstLocation.locationInfo.half = false;
 
-        const uint32_t bitWidth = pCallee->getReturnType()->getScalarSizeInBits();
+        const unsigned bitWidth = pCallee->getReturnType()->getScalarSizeInBits();
         span.compatibilityInfo.halfComponentCount = bitWidth < 64 ? 2 : 4;
 
         span.compatibilityInfo.isFlat =
@@ -3871,7 +3871,7 @@ bool InOutLocationMapManager::AddSpan(
         span.firstLocation.locationInfo.component = cast<ConstantInt>(pCall->getOperand(2))->getZExtValue();
         span.firstLocation.locationInfo.half = false;
 
-        const uint32_t bitWidth = pCallee->getReturnType()->getScalarSizeInBits();
+        const unsigned bitWidth = pCallee->getReturnType()->getScalarSizeInBits();
         span.compatibilityInfo.halfComponentCount = bitWidth < 64 ? 2 : 4;
 
         span.compatibilityInfo.isFlat =
@@ -3899,8 +3899,8 @@ void InOutLocationMapManager::BuildLocationMap()
     std::sort(m_locationSpans.begin(), m_locationSpans.end());
 
     // Map original InOutLocation to new InOutLocation
-    uint32_t consectiveLocation = 0;
-    uint32_t compIdx = 0;
+    unsigned consectiveLocation = 0;
+    unsigned compIdx = 0;
     for (auto spanIt = m_locationSpans.begin(); spanIt != m_locationSpans.end(); ++spanIt)
     {
         // Increase consectiveLocation when halfComponentCount is up to 8 or the span isn't compatible to previous

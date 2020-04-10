@@ -237,14 +237,14 @@ bool SpirvLowerResourceCollect::runOnModule(
                 inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaConst->getOperand(0))->getZExtValue();
                 inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaConst->getOperand(1))->getZExtValue();
 
-                const uint32_t location = inOutMeta.Value;
-                const uint32_t index = inOutMeta.Index;
+                const unsigned location = inOutMeta.Value;
+                const unsigned index = inOutMeta.Index;
 
                 // Collect basic types of fragment outputs
                 BasicType basicTy = BasicType::Unknown;
 
                 const auto pCompTy = pGlobalTy->isVectorTy() ? pGlobalTy->getVectorElementType() : pGlobalTy;
-                const uint32_t bitWidth = pCompTy->getScalarSizeInBits();
+                const unsigned bitWidth = pCompTy->getScalarSizeInBits();
                 const bool signedness = (inOutMeta.Signedness != 0);
 
                 if (pCompTy->isIntegerTy())
@@ -320,11 +320,11 @@ bool SpirvLowerResourceCollect::runOnModule(
 
 // =====================================================================================================================
 // Gets element count if the specified type is an array (flattened for multi-dimension array).
-uint32_t SpirvLowerResourceCollect::GetFlattenArrayElementCount(
+unsigned SpirvLowerResourceCollect::GetFlattenArrayElementCount(
     const Type* pTy // [in] Type to check
     ) const
 {
-    uint32_t elemCount = 1;
+    unsigned elemCount = 1;
 
     auto pArrayTy = dyn_cast<ArrayType>(pTy);
     while (pArrayTy != nullptr)
@@ -377,7 +377,7 @@ Value* SpirvLowerResourceCollect::FindCallAndGetIndexValue(
         }
 
         const ConstantAsMetadata* const pMetaConst = cast<ConstantAsMetadata>(pFuncMeta->getOperand(0));
-        uint32_t opcode = cast<ConstantInt>(pMetaConst->getValue())->getZExtValue();
+        unsigned opcode = cast<ConstantInt>(pMetaConst->getValue())->getZExtValue();
 
         if (opcode == BuilderRecorder::Opcode::IndexDescPtr)
         {
@@ -423,7 +423,7 @@ void SpirvLowerResourceCollect::VisitCalls(
         }
 
         const ConstantAsMetadata* const pMetaConst = cast<ConstantAsMetadata>(pFuncMeta->getOperand(0));
-        uint32_t opcode = cast<ConstantInt>(pMetaConst->getValue())->getZExtValue();
+        unsigned opcode = cast<ConstantInt>(pMetaConst->getValue())->getZExtValue();
 
         for (auto useIt = func.use_begin(), useItEnd = func.use_end(); useIt != useItEnd; ++useIt)
         {

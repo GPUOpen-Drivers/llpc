@@ -66,7 +66,7 @@ const char* GetShaderStageName(
             "compute",
         };
 
-        pName = ShaderStageNames[static_cast<uint32_t>(shaderStage)];
+        pName = ShaderStageNames[static_cast<unsigned>(shaderStage)];
     }
     else
     {
@@ -79,7 +79,7 @@ const char* GetShaderStageName(
 // =====================================================================================================================
 // Converts the SPIR-V execution model to the shader stage
 ShaderStage ConvertToStageShage(
-    uint32_t execModel)  // SPIR-V execution model
+    unsigned execModel)  // SPIR-V execution model
 {
     switch (execModel)
     {
@@ -132,7 +132,7 @@ spv::ExecutionModel ConvertToExecModel(
 
 // =====================================================================================================================
 // Translates shader stage to corresponding stage mask.
-uint32_t ShaderStageToMask(
+unsigned ShaderStageToMask(
     ShaderStage stage)  // Shader stage
 {
     assert((stage < ShaderStageCount) || (stage == ShaderStageCopyShader));

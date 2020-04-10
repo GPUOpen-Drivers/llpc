@@ -77,7 +77,7 @@ private:
     // Sets NGG control settings
     void SetNggControl();
     void BuildNggCullingControlRegister(NggControl& nggControl);
-    uint32_t GetVerticesPerPrimitive() const;
+    unsigned GetVerticesPerPrimitive() const;
 
     void ProcessShader();
 
@@ -90,7 +90,7 @@ private:
     void MapBuiltInToGenericInOut();
 
     void MapGsGenericOutput(GsOutLocInfo outLocInfo);
-    void MapGsBuiltInOutput(uint32_t builtInId, uint32_t elemCount);
+    void MapGsBuiltInOutput(unsigned builtInId, unsigned elemCount);
 
     bool CanPackInOut() const;
     void PackInOutLocation();
@@ -109,12 +109,12 @@ private:
 
     std::unordered_set<llvm::CallInst*> m_deadCalls;            // Dead calls
 
-    std::unordered_set<uint32_t>    m_activeInputLocs;          // Locations of active generic inputs
-    std::unordered_set<uint32_t>    m_activeInputBuiltIns;      // IDs of active built-in inputs
-    std::unordered_set<uint32_t>    m_activeOutputBuiltIns;     // IDs of active built-in outputs
+    std::unordered_set<unsigned>    m_activeInputLocs;          // Locations of active generic inputs
+    std::unordered_set<unsigned>    m_activeInputBuiltIns;      // IDs of active built-in inputs
+    std::unordered_set<unsigned>    m_activeOutputBuiltIns;     // IDs of active built-in outputs
 
-    std::unordered_set<uint32_t>    m_importedOutputLocs;       // Locations of imported generic outputs
-    std::unordered_set<uint32_t>    m_importedOutputBuiltIns;   // IDs of imported built-in outputs
+    std::unordered_set<unsigned>    m_importedOutputLocs;       // Locations of imported generic outputs
+    std::unordered_set<unsigned>    m_importedOutputBuiltIns;   // IDs of imported built-in outputs
 
     std::vector<llvm::CallInst*>    m_inOutCalls;               // The import or export calls
 
@@ -179,7 +179,7 @@ public:
     {
         uint16_t GetCompatibilityKey() const { return compatibilityInfo.u16All; }
 
-        uint32_t AsIndex() const { return ((GetCompatibilityKey() << 16) | firstLocation.AsIndex()); }
+        unsigned AsIndex() const { return ((GetCompatibilityKey() << 16) | firstLocation.AsIndex()); }
 
         bool operator==(const LocationSpan& rhs) const { return (this->AsIndex() == rhs.AsIndex()); }
 

@@ -36,7 +36,7 @@ namespace Vkgc
 // A single register in the pipelineDumperRegs table
 struct PipelineDumperReg
 {
-    uint32_t    number;
+    unsigned    number;
     const char* name;
 };
 
@@ -424,9 +424,9 @@ const PipelineDumperReg pipelineDumperRegs[] =
 // =====================================================================================================================
 // Get name of register, or "" if not known
 const char* PipelineDumper::getRegisterNameString(
-    uint32_t  regNumber)  // Register number
+    unsigned  regNumber)  // Register number
 {
-    for (uint32_t idx = 0, end = sizeof(pipelineDumperRegs) / sizeof(pipelineDumperRegs[0]); idx != end; ++idx)
+    for (unsigned idx = 0, end = sizeof(pipelineDumperRegs) / sizeof(pipelineDumperRegs[0]); idx != end; ++idx)
     {
         const auto& regEntry = pipelineDumperRegs[idx];
         if (regEntry.number == regNumber)

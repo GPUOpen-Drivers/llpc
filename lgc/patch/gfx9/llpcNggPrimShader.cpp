@@ -137,14 +137,14 @@ FunctionType* NggPrimShader::GeneratePrimShaderEntryPointType(
     std::vector<Type*> argTys;
 
     // First 8 system values (SGPRs)
-    for (uint32_t i = 0; i < EsGsSpecialSysValueCount; ++i)
+    for (unsigned i = 0; i < EsGsSpecialSysValueCount; ++i)
     {
         argTys.push_back(m_pBuilder->getInt32Ty());
         *pInRegMask |= (1ull << i);
     }
 
     // User data (SGPRs)
-    uint32_t userDataCount = 0;
+    unsigned userDataCount = 0;
 
     const auto pGsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry);
     const auto pTesIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessEval);
@@ -346,10 +346,10 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
 
     const bool hasTs = (m_hasTcs || m_hasTes);
 
-    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
+    const unsigned waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     assert((waveSize == 32) || (waveSize == 64));
 
-    const uint32_t waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
+    const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
 
     auto pEntryPoint = pModule->getFunction(lgcName::NggPrimShaderEntryPoint);
 
@@ -545,7 +545,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                                                                   m_pBuilder->getInt32(9)
                                                               });
 
-                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
+                unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
 
                 auto pLdsOffset = m_pBuilder->CreateShl(pVertexId0, 2);
                 pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
@@ -572,7 +572,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
             {
                 m_pBuilder->SetInsertPoint(pReadPrimIdBlock);
 
-                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
+                unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
 
                 auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, 2);
                 pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
@@ -877,7 +877,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
         const bool vertexCompact = (m_pNggControl->compactMode == NggCompactVertices);
 
         // Thread count when the entire sub-group is fully culled
-        const uint32_t fullyCulledThreadCount =
+        const unsigned fullyCulledThreadCount =
             m_pPipelineState->GetTargetInfo().GetGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups ? 1 : 0;
 
         // Define basic blocks
@@ -997,7 +997,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
 
                 auto pVertexId0 = m_pBuilder->CreateLShr(pEsGsOffset0, 2);
 
-                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
+                unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
 
                 auto pLdsOffset = m_pBuilder->CreateShl(pVertexId0, 2);
                 pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
@@ -1024,7 +1024,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
             {
                 m_pBuilder->SetInsertPoint(pReadPrimIdBlock);
 
-                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
+                unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
 
                 auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, 2);
                 pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
@@ -1059,7 +1059,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
         {
             m_pBuilder->SetInsertPoint(pZeroThreadCountBlock);
 
-            uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(
+            unsigned regionStart = m_pLdsManager->GetLdsRegionStart(
                 vertexCompact ? LdsRegionVertCountInWaves : LdsRegionPrimCountInWaves);
 
             auto pZero = m_pBuilder->getInt32(0);
@@ -1092,7 +1092,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
 
             Value* pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInWave, 2);
 
-            uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
+            unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
 
             pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
 
@@ -1159,15 +1159,15 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
             // Write cull distance sign mask to LDS
             if (m_pNggControl->enableCullDistanceCulling)
             {
-                uint32_t clipCullPos = EXP_TARGET_POS_1;
+                unsigned clipCullPos = EXP_TARGET_POS_1;
                 std::vector<Value*> clipCullDistance;
                 std::vector<Value*> cullDistance;
 
                 bool usePointSize     = false;
                 bool useLayer         = false;
                 bool useViewportIndex = false;
-                uint32_t clipDistanceCount = 0;
-                uint32_t cullDistanceCount = 0;
+                unsigned clipDistanceCount = 0;
+                unsigned cullDistanceCount = 0;
 
                 if (hasTs)
                 {
@@ -1200,7 +1200,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                 {
                     if ((expData.target == clipCullPos) || (expData.target == clipCullPos + 1))
                     {
-                        for (uint32_t i = 0; i < 4; ++i)
+                        for (unsigned i = 0; i < 4; ++i)
                         {
                             auto pExpValue = m_pBuilder->CreateExtractElement(expData.pExpValue, i);
                             clipCullDistance.push_back(pExpValue);
@@ -1209,14 +1209,14 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                 }
                 assert(clipCullDistance.size() < MaxClipCullDistanceCount);
 
-                for (uint32_t i = clipDistanceCount; i < clipDistanceCount + cullDistanceCount; ++i)
+                for (unsigned i = clipDistanceCount; i < clipDistanceCount + cullDistanceCount; ++i)
                 {
                     cullDistance.push_back(clipCullDistance[i]);
                 }
 
                 // Calculate the sign mask for cull distance
                 Value* pSignMask = m_pBuilder->getInt32(0);
-                for (uint32_t i = 0; i < cullDistance.size(); ++i)
+                for (unsigned i = 0; i < cullDistance.size(); ++i)
                 {
                     auto pCullDistanceVal = m_pBuilder->CreateBitCast(cullDistance[i], m_pBuilder->getInt32Ty());
 
@@ -1326,12 +1326,12 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
 
             Value* vertexId[3] = { pVertexId0, pVertexId1, pVertexId2 };
 
-            uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
+            unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
             auto pRegionStartVal = m_pBuilder->getInt32(regionStart);
 
             auto pOne = m_pBuilder->getInt8(1);
 
-            for (uint32_t i = 0; i < 3; ++i)
+            for (unsigned i = 0; i < 3; ++i)
             {
                 auto pLdsOffset = m_pBuilder->CreateAdd(pRegionStartVal, vertexId[i]);
                 m_pLdsManager->WriteValueToLds(pOne, pLdsOffset);
@@ -1349,7 +1349,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
 
             if (vertexCompact)
             {
-                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
+                unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
 
                 auto pLdsOffset =
                     m_pBuilder->CreateAdd(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(regionStart));
@@ -1390,7 +1390,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
             pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(1));
             pLdsOffset = m_pBuilder->CreateShl(pLdsOffset, 2);
 
-            uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(
+            unsigned regionStart = m_pLdsManager->GetLdsRegionStart(
                 vertexCompact ? LdsRegionVertCountInWaves : LdsRegionPrimCountInWaves);
 
             pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
@@ -1427,7 +1427,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
             {
                 m_pBuilder->SetInsertPoint(pReadThreadCountBlock);
 
-                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionVertCountInWaves);
+                unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionVertCountInWaves);
 
                 // The DWORD following DWORDs for all waves stores the vertex count of the entire sub-group
                 Value* pLdsOffset = m_pBuilder->getInt32(regionStart + waveCountInSubgroup * SizeOfDword);
@@ -1594,7 +1594,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
             {
                 m_pBuilder->SetInsertPoint(pReadThreadCountBlock);
 
-                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPrimCountInWaves);
+                unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPrimCountInWaves);
 
                 // The DWORD following DWORDs for all waves stores the primitive count of the entire sub-group
                 auto pLdsOffset = m_pBuilder->getInt32(regionStart + waveCountInSubgroup * SizeOfDword);
@@ -1673,7 +1673,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
         {
             m_pBuilder->SetInsertPoint(pEarlyExitBlock);
 
-            uint32_t expPosCount = 0;
+            unsigned expPosCount = 0;
             for (const auto& expData : expDataSet)
             {
                 if ((expData.target >= EXP_TARGET_POS_0) && (expData.target <= EXP_TARGET_POS_4))
@@ -1762,7 +1762,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                     args.push_back(m_pBuilder->getInt32(expData.channelMask));   // en
 
                     // src0 ~ src3
-                    for (uint32_t i = 0; i < 4; ++i)
+                    for (unsigned i = 0; i < 4; ++i)
                     {
                         auto pExpValue = m_pBuilder->CreateExtractElement(expData.pExpValue, i);
                         args.push_back(pExpValue);
@@ -1830,7 +1830,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                     args.push_back(m_pBuilder->getInt32(expData.channelMask));   // en
 
                                                                                     // src0 ~ src3
-                    for (uint32_t i = 0; i < 4; ++i)
+                    for (unsigned i = 0; i < 4; ++i)
                     {
                         auto pExpValue = m_pBuilder->CreateExtractElement(expData.pExpValue, i);
                         args.push_back(pExpValue);
@@ -1862,17 +1862,17 @@ void NggPrimShader::ConstructPrimShaderWithGs(
 {
     assert(m_hasGs);
 
-    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
+    const unsigned waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     assert((waveSize == 32) || (waveSize == 64));
 
-    const uint32_t waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
+    const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
 
     const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
-    const uint32_t rasterStream = pResUsage->inOutUsage.gs.rasterStream;
+    const unsigned rasterStream = pResUsage->inOutUsage.gs.rasterStream;
     assert(rasterStream < MaxGsStreams);
 
     const auto& calcFactor = pResUsage->inOutUsage.gs.calcFactor;
-    const uint32_t maxOutPrims = calcFactor.primAmpFactor;
+    const unsigned maxOutPrims = calcFactor.primAmpFactor;
 
     auto pEntryPoint = pModule->getFunction(lgcName::NggPrimShaderEntryPoint);
 
@@ -2146,7 +2146,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     {
         m_pBuilder->SetInsertPoint(pInitOutPrimDataBlock);
 
-        uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
+        unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
 
         auto pLdsOffset = m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(maxOutPrims));
         pLdsOffset = m_pBuilder->CreateShl(pLdsOffset, 2);
@@ -2154,7 +2154,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
 
         auto pNullPrimVal = m_pBuilder->getInt32(NullPrim);
         Value* pNullPrims = UndefValue::get(VectorType::get(m_pBuilder->getInt32Ty(), maxOutPrims));
-        for (uint32_t i = 0; i < maxOutPrims; ++i)
+        for (unsigned i = 0; i < maxOutPrims; ++i)
         {
             pNullPrims = m_pBuilder->CreateInsertElement(pNullPrims, pNullPrimVal, i);
         }
@@ -2177,11 +2177,11 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     {
         m_pBuilder->SetInsertPoint(pZeroOutVertCountBlock);
 
-        uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertCountInWaves);
+        unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertCountInWaves);
 
         auto pZero = m_pBuilder->getInt32(0);
 
-        for (uint32_t i = 0; i < MaxGsStreams; ++i)
+        for (unsigned i = 0; i < MaxGsStreams; ++i)
         {
             // NOTE: Only do this for rasterization stream.
             if (i == rasterStream)
@@ -2284,7 +2284,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(1));
         pLdsOffset = m_pBuilder->CreateShl(pLdsOffset, 2);
 
-        uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertCountInWaves);
+        unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertCountInWaves);
 
         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
         m_pLdsManager->AtomicOpWithLds(AtomicRMWInst::Add, pOutVertCountInWave, pLdsOffset);
@@ -2307,7 +2307,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     {
         m_pBuilder->SetInsertPoint(pReadVertCountBlock);
 
-        uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertCountInWaves);
+        unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertCountInWaves);
 
         // The DWORD following DWORDs for all waves stores GS output vertex count of the entire sub-group
         auto pLdsOffset = m_pBuilder->getInt32(regionStart + waveCountInSubgroup * SizeOfDword);
@@ -2354,7 +2354,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     {
         m_pBuilder->SetInsertPoint(pReviseOutPrimDataBlock);
 
-        uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertCountInWaves);
+        unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertCountInWaves);
 
         auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pWaveIdInSubgroup, 2);
         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
@@ -2406,7 +2406,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     {
         m_pBuilder->SetInsertPoint(pExpPrimBlock);
 
-        uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
+        unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
 
         auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, 2);
         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
@@ -2444,7 +2444,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     {
         m_pBuilder->SetInsertPoint(pWriteOutVertOffsetBlock);
 
-        uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertCountInWaves);
+        unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertCountInWaves);
 
         auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pWaveIdInSubgroup, 2);
         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
@@ -2489,7 +2489,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
         auto pLdsOffset = m_pBuilder->CreateShl(pOutVertIdInPrimPhi, 2);
         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, pWriteOffset);
 
-        const uint32_t vertexSize = pResUsage->inOutUsage.gs.outLocCount[rasterStream] * 4;
+        const unsigned vertexSize = pResUsage->inOutUsage.gs.outLocCount[rasterStream] * 4;
         auto pVertexoffset = m_pBuilder->CreateMul(pOutVertIdInPrimPhi, m_pBuilder->getInt32(4 * vertexSize));
         pVertexoffset = m_pBuilder->CreateAdd(pVertexoffset, pWriteValue);
 
@@ -2537,7 +2537,7 @@ void NggPrimShader::InitWaveThreadInfo(
     Value* pMergedGroupInfo,    // [in] Merged group info
     Value* pMergedWaveInfo)     // [in] Merged wave info
 {
-    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
+    const unsigned waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     assert((waveSize == 32) || (waveSize == 64));
 
     m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, m_pBuilder->getInt64(-1));
@@ -2669,7 +2669,7 @@ Value* NggPrimShader::DoCulling(
     assert(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
     auto pRegionStartVal = m_pBuilder->getInt32(regionStart);
 
-    for (uint32_t i = 0; i < 3; ++i)
+    for (unsigned i = 0; i < 3; ++i)
     {
         Value* pLdsOffset = m_pBuilder->CreateMul(vertexId[i], m_pBuilder->getInt32(SizeOfVec4));
         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, pRegionStartVal);
@@ -2717,7 +2717,7 @@ Value* NggPrimShader::DoCulling(
         const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionCullDistance);
         auto pRegionStartVal = m_pBuilder->getInt32(regionStart);
 
-        for (uint32_t i = 0; i < 3; ++i)
+        for (unsigned i = 0; i < 3; ++i)
         {
             Value* pLdsOffset = m_pBuilder->CreateShl(vertexId[i], 2);
             pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, pRegionStartVal);
@@ -2897,8 +2897,8 @@ void NggPrimShader::DoPrimitiveExport(
 // Early exit NGG primitive shader when we detect that the entire sub-group is fully culled, doing dummy
 // primitive/vertex export if necessary.
 void NggPrimShader::DoEarlyExit(
-    uint32_t  fullyCulledThreadCount,   // Thread count left when the entire sub-group is fully culled
-    uint32_t  expPosCount)              // Position export count
+    unsigned  fullyCulledThreadCount,   // Thread count left when the entire sub-group is fully culled
+    unsigned  expPosCount)              // Position export count
 {
     if (fullyCulledThreadCount > 0)
     {
@@ -2941,7 +2941,7 @@ void NggPrimShader::DoEarlyExit(
 
             pUndef = UndefValue::get(m_pBuilder->getFloatTy());
 
-            for (uint32_t i = 0; i < expPosCount; ++i)
+            for (unsigned i = 0; i < expPosCount; ++i)
             {
                 m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_exp,
                                             m_pBuilder->getFloatTy(),
@@ -3120,12 +3120,12 @@ void NggPrimShader::RunEsOrEsVariant(
 
     auto pIntfData =
         m_pPipelineState->GetShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
-    const uint32_t userDataCount = pIntfData->userDataCount;
+    const unsigned userDataCount = pIntfData->userDataCount;
 
-    uint32_t userDataIdx = 0;
+    unsigned userDataIdx = 0;
 
     auto pEsArgBegin = pEsEntry->arg_begin();
-    const uint32_t esArgCount = pEsEntry->arg_size();
+    const unsigned esArgCount = pEsEntry->arg_size();
     (void(esArgCount)); // unused
 
     // Set up user data SGPRs
@@ -3141,10 +3141,10 @@ void NggPrimShader::RunEsOrEsVariant(
         {
             assert(pEsArgTy->getVectorElementType()->isIntegerTy());
 
-            const uint32_t userDataSize = pEsArgTy->getVectorNumElements();
+            const unsigned userDataSize = pEsArgTy->getVectorNumElements();
 
-            std::vector<uint32_t> shuffleMask;
-            for (uint32_t i = 0; i < userDataSize; ++i)
+            std::vector<unsigned> shuffleMask;
+            for (unsigned i = 0; i < userDataSize; ++i)
             {
                 shuffleMask.push_back(userDataIdx + i);
             }
@@ -3213,8 +3213,8 @@ void NggPrimShader::RunEsOrEsVariant(
         auto pExpDataTy = pExpData->getType();
         assert(pExpDataTy->isArrayTy());
 
-        const uint32_t expCount = pExpDataTy->getArrayNumElements();
-        for (uint32_t i = 0; i < expCount; ++i)
+        const unsigned expCount = pExpDataTy->getArrayNumElements();
+        for (unsigned i = 0; i < expCount; ++i)
         {
             Value* pExpValue = m_pBuilder->CreateExtractValue(pExpData, i);
             (*pExpDataSet)[i].pExpValue = pExpValue;
@@ -3255,7 +3255,7 @@ Function* NggPrimShader::MutateEsToVariant(
     const bool doParamExp = (entryName == lgcName::NggEsEntryVariantParam);
 
     // Calculate export count
-    uint32_t expCount = 0;
+    unsigned expCount = 0;
 
     for (auto& func : pModule->functions())
     {
@@ -3336,7 +3336,7 @@ Function* NggPrimShader::MutateEsToVariant(
     // Get exported data
     std::vector<Instruction*> expCalls;
 
-    uint32_t lastExport = InvalidValue; // Record last position export that needs "done" flag
+    unsigned lastExport = InvalidValue; // Record last position export that needs "done" flag
     for (auto& func : pModule->functions())
     {
         if (func.isIntrinsic() && (func.getIntrinsicID() == Intrinsic::amdgcn_exp))
@@ -3380,7 +3380,7 @@ Function* NggPrimShader::MutateEsToVariant(
                     }
 
                     Value* pExpValue = UndefValue::get(VectorType::get(Type::getFloatTy(*m_pContext), 4));
-                    for (uint32_t i = 0; i < 4; ++i)
+                    for (unsigned i = 0; i < 4; ++i)
                     {
                         pExpValue = m_pBuilder->CreateInsertElement(pExpValue, expValues[i], i);
                     }
@@ -3408,7 +3408,7 @@ Function* NggPrimShader::MutateEsToVariant(
     }
 
     // Construct exported data
-    uint32_t i = 0;
+    unsigned i = 0;
     for (auto& expDataElement : expDataSet)
     {
         pExpData = m_pBuilder->CreateInsertValue(pExpData, expDataElement.pExpValue, i++);
@@ -3519,12 +3519,12 @@ Value* NggPrimShader::RunGsVariant(
     std::vector<Value*> args;
 
     auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry);
-    const uint32_t userDataCount = pIntfData->userDataCount;
+    const unsigned userDataCount = pIntfData->userDataCount;
 
-    uint32_t userDataIdx = 0;
+    unsigned userDataIdx = 0;
 
     auto pGsArgBegin = pGsEntry->arg_begin();
-    const uint32_t gsArgCount = pGsEntry->arg_size();
+    const unsigned gsArgCount = pGsEntry->arg_size();
     (void(gsArgCount)); // unused
 
     // Set up user data SGPRs
@@ -3540,10 +3540,10 @@ Value* NggPrimShader::RunGsVariant(
         {
             assert(pGsArgTy->getVectorElementType()->isIntegerTy());
 
-            const uint32_t userDataSize = pGsArgTy->getVectorNumElements();
+            const unsigned userDataSize = pGsArgTy->getVectorNumElements();
 
-            std::vector<uint32_t> shuffleMask;
-            for (uint32_t i = 0; i < userDataSize; ++i)
+            std::vector<unsigned> shuffleMask;
+            for (unsigned i = 0; i < userDataSize; ++i)
             {
                 shuffleMask.push_back(userDataIdx + i);
             }
@@ -3683,7 +3683,7 @@ Function* NggPrimShader::MutateGsToVariant(
     }
 
     // Initialize thread ID in wave
-    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
+    const unsigned waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     assert((waveSize == 32) || (waveSize == 64));
 
     auto pThreadIdInWave = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo,
@@ -3723,9 +3723,9 @@ Function* NggPrimShader::MutateGsToVariant(
                 m_pBuilder->SetInsertPoint(pCall);
 
                 assert(pCall->getNumArgOperands() == 4);
-                const uint32_t location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
-                const uint32_t compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
-                const uint32_t streamId = cast<ConstantInt>(pCall->getOperand(2))->getZExtValue();
+                const unsigned location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
+                const unsigned compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+                const unsigned streamId = cast<ConstantInt>(pCall->getOperand(2))->getZExtValue();
                 assert(streamId < MaxGsStreams);
                 Value* pOutput = pCall->getOperand(3);
 
@@ -3749,7 +3749,7 @@ Function* NggPrimShader::MutateGsToVariant(
                     (message == GS_EMIT_STREAM2) || (message == GS_EMIT_STREAM3))
                 {
                     // Handle GS_EMIT, MSG[9:8] = STREAM_ID
-                    uint32_t streamId = (message & GS_EMIT_CUT_STREAM_ID_MASK) >> GS_EMIT_CUT_STREAM_ID_SHIFT;
+                    unsigned streamId = (message & GS_EMIT_CUT_STREAM_ID_MASK) >> GS_EMIT_CUT_STREAM_ID_SHIFT;
                     assert(streamId < MaxGsStreams);
                     ProcessGsEmit(pModule,
                                  streamId,
@@ -3764,7 +3764,7 @@ Function* NggPrimShader::MutateGsToVariant(
                          (message == GS_CUT_STREAM2) || (message == GS_CUT_STREAM3))
                 {
                     // Handle GS_CUT, MSG[9:8] = STREAM_ID
-                    uint32_t streamId = (message & GS_EMIT_CUT_STREAM_ID_MASK) >> GS_EMIT_CUT_STREAM_ID_SHIFT;
+                    unsigned streamId = (message & GS_EMIT_CUT_STREAM_ID_MASK) >> GS_EMIT_CUT_STREAM_ID_SHIFT;
                     assert(streamId < MaxGsStreams);
                     ProcessGsCut(pModule,
                                  streamId,
@@ -3860,9 +3860,9 @@ void NggPrimShader::RunCopyShader(
                     m_pBuilder->SetInsertPoint(pCall);
 
                     assert(pCall->getNumArgOperands() == 3);
-                    const uint32_t location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
-                    const uint32_t compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
-                    const uint32_t streamId = cast<ConstantInt>(pCall->getOperand(2))->getZExtValue();
+                    const unsigned location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
+                    const unsigned compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+                    const unsigned streamId = cast<ConstantInt>(pCall->getOperand(2))->getZExtValue();
                     assert(streamId < MaxGsStreams);
 
                     auto pOutput = ImportGsOutput(pCall->getType(), location, compIdx, streamId, pVertexOffset);
@@ -3887,12 +3887,12 @@ void NggPrimShader::RunCopyShader(
     {
         std::vector<Value*> args;
 
-        static const uint32_t CopyShaderSysValueCount = 11; // Fixed layout: 10 SGPRs, 1 VGPR
-        for (uint32_t i = 0; i < CopyShaderSysValueCount; ++i)
+        static const unsigned CopyShaderSysValueCount = 11; // Fixed layout: 10 SGPRs, 1 VGPR
+        for (unsigned i = 0; i < CopyShaderSysValueCount; ++i)
         {
             if (i == CopyShaderUserSgprIdxVertexOffset)
             {
-                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertOffset);
+                unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertOffset);
 
                 auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, 2);
                 pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
@@ -3918,9 +3918,9 @@ void NggPrimShader::RunCopyShader(
 // Exports outputs of geometry shader to GS-VS ring.
 void NggPrimShader::ExportGsOutput(
     Value*       pOutput,               // [in] Output value
-    uint32_t     location,              // Location of the output
-    uint32_t     compIdx,               // Index used for vector element indexing
-    uint32_t     streamId,              // ID of output vertex stream
+    unsigned     location,              // Location of the output
+    unsigned     compIdx,               // Index used for vector element indexing
+    unsigned     streamId,              // ID of output vertex stream
     llvm::Value* pThreadIdInSubgroup,   // [in] Thread ID in sub-group
     Value*       pOutVertCounter)       // [in] GS output vertex counter for this stream
 {
@@ -3940,9 +3940,9 @@ void NggPrimShader::ExportGsOutput(
         assert(pOutputElemTy->isSingleValueType());
 
         // [n x Ty] -> <n x Ty>
-        const uint32_t elemCount = pOutputTy->getArrayNumElements();
+        const unsigned elemCount = pOutputTy->getArrayNumElements();
         Value* pOutputVec = UndefValue::get(VectorType::get(pOutputElemTy, elemCount));
-        for (uint32_t i = 0; i < elemCount; ++i)
+        for (unsigned i = 0; i < elemCount; ++i)
         {
             auto pOutputElem = m_pBuilder->CreateExtractValue(pOutput, i);
             m_pBuilder->CreateInsertElement(pOutputVec, pOutputElem, i);
@@ -3952,7 +3952,7 @@ void NggPrimShader::ExportGsOutput(
         pOutput = pOutputVec;
     }
 
-    const uint32_t bitWidth = pOutput->getType()->getScalarSizeInBits();
+    const unsigned bitWidth = pOutput->getType()->getScalarSizeInBits();
     if ((bitWidth == 8) || (bitWidth == 16))
     {
         // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD
@@ -3984,19 +3984,19 @@ void NggPrimShader::ExportGsOutput(
     // gsVsRingOffset = threadIdInSubgroup * gsVsRingItemSize +
     //                  outVertcounter * vertexSize +
     //                  location * 4 + compIdx (in DWORDS)
-    const uint32_t gsVsRingItemSize = pResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize;
+    const unsigned gsVsRingItemSize = pResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize;
     Value* pGsVsRingOffset = m_pBuilder->CreateMul(pThreadIdInSubgroup, m_pBuilder->getInt32(gsVsRingItemSize));
 
-    const uint32_t vertexSize = pResUsage->inOutUsage.gs.outLocCount[streamId] * 4;
+    const unsigned vertexSize = pResUsage->inOutUsage.gs.outLocCount[streamId] * 4;
     auto pVertexItemOffset = m_pBuilder->CreateMul(pOutVertCounter, m_pBuilder->getInt32(vertexSize));
 
     pGsVsRingOffset = m_pBuilder->CreateAdd(pGsVsRingOffset, pVertexItemOffset);
 
-    const uint32_t attribOffset = (location * 4) + compIdx;
+    const unsigned attribOffset = (location * 4) + compIdx;
     pGsVsRingOffset = m_pBuilder->CreateAdd(pGsVsRingOffset, m_pBuilder->getInt32(attribOffset));
 
     // ldsOffset = gsVsRingStart + gsVsRingOffset * 4 (in BYTES)
-    const uint32_t gsVsRingStart = m_pLdsManager->GetLdsRegionStart(LdsRegionGsVsRing);
+    const unsigned gsVsRingStart = m_pLdsManager->GetLdsRegionStart(LdsRegionGsVsRing);
 
     auto pLdsOffset = m_pBuilder->CreateShl(pGsVsRingOffset, 2);
     pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(gsVsRingStart), pLdsOffset);
@@ -4008,9 +4008,9 @@ void NggPrimShader::ExportGsOutput(
 // Imports outputs of geometry shader from GS-VS ring.
 Value* NggPrimShader::ImportGsOutput(
     Type*        pOutputTy,             // [in] Type of the output
-    uint32_t     location,              // Location of the output
-    uint32_t     compIdx,               // Index used for vector element indexing
-    uint32_t     streamId,              // ID of output vertex stream
+    unsigned     location,              // Location of the output
+    unsigned     compIdx,               // Index used for vector element indexing
+    unsigned     streamId,              // ID of output vertex stream
     Value*       pVertexOffset)         // [in] Start offset of vertex item in GS-VS ring (in BYTES)
 {
     auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
@@ -4029,12 +4029,12 @@ Value* NggPrimShader::ImportGsOutput(
         assert(pOutputElemTy->isSingleValueType());
 
         // [n x Ty] -> <n x Ty>
-        const uint32_t elemCount = pOutputTy->getArrayNumElements();
+        const unsigned elemCount = pOutputTy->getArrayNumElements();
         pOutputTy = VectorType::get(pOutputElemTy, elemCount);
     }
 
     // ldsOffset = vertexOffset + (location * 4 + compIdx) * 4 (in BYTES)
-    const uint32_t attribOffset = (location * 4) + compIdx;
+    const unsigned attribOffset = (location * 4) + compIdx;
     auto pLdsOffset = m_pBuilder->CreateAdd(pVertexOffset, m_pBuilder->getInt32(attribOffset * 4));
     // Use 128-bit LDS load
     auto pOutput = m_pLdsManager->ReadValueFromLds(
@@ -4046,9 +4046,9 @@ Value* NggPrimShader::ImportGsOutput(
                     (pOrigOutputTy->getArrayNumElements() == pOutputTy->getVectorNumElements()));
 
         // <n x Ty> -> [n x Ty]
-        const uint32_t elemCount = pOrigOutputTy->getArrayNumElements();
+        const unsigned elemCount = pOrigOutputTy->getArrayNumElements();
         Value* pOutputArray = UndefValue::get(pOrigOutputTy);
-        for (uint32_t i = 0; i < elemCount; ++i)
+        for (unsigned i = 0; i < elemCount; ++i)
         {
             auto pOutputElem = m_pBuilder->CreateExtractElement(pOutput, i);
             pOutputArray = m_pBuilder->CreateInsertValue(pOutputArray, pOutputElem, i);
@@ -4064,7 +4064,7 @@ Value* NggPrimShader::ImportGsOutput(
 // Processes the message GS_EMIT.
 void NggPrimShader::ProcessGsEmit(
     Module*  pModule,                       // [in] LLVM module
-    uint32_t streamId,                      // ID of output vertex stream
+    unsigned streamId,                      // ID of output vertex stream
     Value*   pThreadIdInSubgroup,           // [in] Thread ID in subgroup
     Value*   pEmitCounterPtr,               // [in,out] Pointer to GS emit counter for this stream
     Value*   pOutVertCounterPtr,            // [in,out] Pointer to GS output vertex counter for this stream
@@ -4093,7 +4093,7 @@ void NggPrimShader::ProcessGsEmit(
 // Processes the message GS_CUT.
 void NggPrimShader::ProcessGsCut(
     Module*  pModule,                       // [in] LLVM module
-    uint32_t streamId,                      // ID of output vertex stream
+    unsigned streamId,                      // ID of output vertex stream
     Value*   pThreadIdInSubgroup,           // [in] Thread ID in subgroup
     Value*   pEmitCounterPtr,               // [in,out] Pointer to GS emit counter for this stream
     Value*   pOutVertCounterPtr,            // [in,out] Pointer to GS output vertex counter for this stream
@@ -4122,7 +4122,7 @@ void NggPrimShader::ProcessGsCut(
 // Creates the function that processes GS_EMIT.
 Function* NggPrimShader::CreateGsEmitHandler(
     Module*     pModule,    // [in] LLVM module
-    uint32_t    streamId)   // ID of output vertex stream
+    unsigned    streamId)   // ID of output vertex stream
 {
     assert(m_hasGs);
 
@@ -4187,7 +4187,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
     const auto& pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
 
     // Get GS output vertices per output primitive
-    uint32_t outVertsPerPrim = 0;
+    unsigned outVertsPerPrim = 0;
     switch (geometryMode.outputPrimitive)
     {
     case OutputPrimitives::Points:
@@ -4302,9 +4302,9 @@ Function* NggPrimShader::CreateGsEmitHandler(
                 llvm_unreachable("Should never be called!");
             }
 
-            const uint32_t maxOutPrims = pResUsage->inOutUsage.gs.calcFactor.primAmpFactor;
+            const unsigned maxOutPrims = pResUsage->inOutUsage.gs.calcFactor.primAmpFactor;
 
-            uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
+            unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
 
             // ldsOffset = regionStart + (threadIdInSubgroup * maxOutPrims + outPrimCounter) * 4
             auto pLdsOffset = m_pBuilder->CreateMul(pThreadIdInSubgroup, m_pBuilder->getInt32(maxOutPrims));
@@ -4363,7 +4363,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
 // Creates the function that processes GS_EMIT.
 Function* NggPrimShader::CreateGsCutHandler(
     Module*     pModule,    // [in] LLVM module
-    uint32_t    streamId)   // ID of output vertex stream
+    unsigned    streamId)   // ID of output vertex stream
 {
     assert(m_hasGs);
 
@@ -4426,7 +4426,7 @@ Function* NggPrimShader::CreateGsCutHandler(
     const auto& pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
 
     // Get GS output vertices per output primitive
-    uint32_t outVertsPerPrim = 0;
+    unsigned outVertsPerPrim = 0;
     switch (geometryMode.outputPrimitive)
     {
     case OutputPrimitives::Points:
@@ -4444,7 +4444,7 @@ Function* NggPrimShader::CreateGsCutHandler(
     }
     auto pOutVertsPerPrimVal = m_pBuilder->getInt32(outVertsPerPrim);
 
-    const uint32_t maxOutPrims = pResUsage->inOutUsage.gs.calcFactor.primAmpFactor;
+    const unsigned maxOutPrims = pResUsage->inOutUsage.gs.calcFactor.primAmpFactor;
     auto pMaxOutPrimsVal = m_pBuilder->getInt32(maxOutPrims);
 
     // Construct ".entry" block
@@ -4479,7 +4479,7 @@ Function* NggPrimShader::CreateGsCutHandler(
         // NOTE: Only write incomplete GS output primitive to LDS for rasterization stream.
         if (streamId == pResUsage->inOutUsage.gs.rasterStream)
         {
-            uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
+            unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
 
             // ldsOffset = regionStart + (threadIdInSubgroup * maxOutPrims + outPrimCounter) * 4
             auto pLdsOffset = m_pBuilder->CreateMul(pThreadIdInSubgroup, m_pBuilder->getInt32(maxOutPrims));
@@ -4546,10 +4546,10 @@ void NggPrimShader::ReviseOutputPrimitiveData(
     const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
     const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
 
-    uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
+    unsigned regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
 
     // ldsOffset = regionStart + (threadIdInSubgroup * maxOutPrims + outPrimId) * 4
-    const uint32_t maxOutPrims = pResUsage->inOutUsage.gs.calcFactor.primAmpFactor;
+    const unsigned maxOutPrims = pResUsage->inOutUsage.gs.calcFactor.primAmpFactor;
     auto pLdsOffset = m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(maxOutPrims));
     pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, pOutPrimId);
     pLdsOffset = m_pBuilder->CreateShl(pLdsOffset, m_pBuilder->getInt32(2));
@@ -4558,7 +4558,7 @@ void NggPrimShader::ReviseOutputPrimitiveData(
     auto pPrimData = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
 
     // Get GS output vertices per output primitive
-    uint32_t outVertsPerPrim = 0;
+    unsigned outVertsPerPrim = 0;
     switch (geometryMode.outputPrimitive)
     {
     case OutputPrimitives::Points:
@@ -4711,7 +4711,7 @@ Value* NggPrimShader::DoBackfaceCulling(
         pBackfaceCuller = CreateBackfaceCuller(pModule);
     }
 
-    uint32_t regOffset = 0;
+    unsigned regOffset = 0;
 
     // Get register PA_SU_SC_MODE_CNTL
     Value* pPaSuScModeCntl = nullptr;
@@ -4767,7 +4767,7 @@ Value* NggPrimShader::DoFrustumCulling(
         pFrustumCuller = CreateFrustumCuller(pModule);
     }
 
-    uint32_t regOffset = 0;
+    unsigned regOffset = 0;
 
     // Get register PA_CL_CLIP_CNTL
     Value* pPaClClipCntl = nullptr;
@@ -4822,7 +4822,7 @@ Value* NggPrimShader::DoBoxFilterCulling(
         pBoxFilterCuller = CreateBoxFilterCuller(pModule);
     }
 
-    uint32_t regOffset = 0;
+    unsigned regOffset = 0;
 
     // Get register PA_CL_VTE_CNTL
     Value* pPaClVteCntl = m_pBuilder->getInt32(m_pNggControl->primShaderTable.pipelineStateCb.paClVteCntl);
@@ -4881,7 +4881,7 @@ Value* NggPrimShader::DoSphereCulling(
         pSphereCuller = CreateSphereCuller(pModule);
     }
 
-    uint32_t regOffset = 0;
+    unsigned regOffset = 0;
 
     // Get register PA_CL_VTE_CNTL
     Value* pPaClVteCntl = m_pBuilder->getInt32(m_pNggControl->primShaderTable.pipelineStateCb.paClVteCntl);
@@ -4940,7 +4940,7 @@ Value* NggPrimShader::DoSmallPrimFilterCulling(
         pSmallPrimFilterCuller = CreateSmallPrimFilterCuller(pModule);
     }
 
-    uint32_t regOffset = 0;
+    unsigned regOffset = 0;
 
     // Get register PA_CL_VTE_CNTL
     Value* pPaClVteCntl = m_pBuilder->getInt32(m_pNggControl->primShaderTable.pipelineStateCb.paClVteCntl);
@@ -4999,7 +4999,7 @@ Value* NggPrimShader::DoCullDistanceCulling(
 // Fetches culling-control register from primitive shader table.
 Value* NggPrimShader::FetchCullingControlRegister(
     Module*     pModule,        // [in] LLVM module
-    uint32_t    regOffset)      // Register offset in the primitive shader table (in BYTEs)
+    unsigned    regOffset)      // Register offset in the primitive shader table (in BYTEs)
 {
     auto pFetchCullingRegister = pModule->getFunction(lgcName::NggCullingFetchReg);
     if (pFetchCullingRegister == nullptr)
@@ -6655,7 +6655,7 @@ Value* NggPrimShader::DoSubgroupBallot(
 {
     assert(pValue->getType()->isIntegerTy(1)); // Should be i1
 
-    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
+    const unsigned waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     assert((waveSize == 32) || (waveSize == 64));
 
     pValue = m_pBuilder->CreateSelect(pValue, m_pBuilder->getInt32(1), m_pBuilder->getInt32(0));
@@ -6664,7 +6664,7 @@ Value* NggPrimShader::DoSubgroupBallot(
     auto pInlineAsm = InlineAsm::get(pInlineAsmTy, "; %1", "=v,0", true);
     pValue = m_pBuilder->CreateCall(pInlineAsm, pValue);
 
-    static const uint32_t PredicateNE = 33; // 33 = predicate NE
+    static const unsigned PredicateNE = 33; // 33 = predicate NE
     Value* pBallot = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_icmp,
                                                  {
                                                      m_pBuilder->getIntNTy(waveSize),  // Return type
@@ -6692,7 +6692,7 @@ Value* NggPrimShader::DoSubgroupInclusiveAdd(
 {
     assert(pValue->getType()->isIntegerTy(32)); // Should be i32
 
-    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
+    const unsigned waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     assert((waveSize == 32) || (waveSize == 64));
 
     auto pInlineAsmTy = FunctionType::get(m_pBuilder->getInt32Ty(), m_pBuilder->getInt32Ty(), false);
@@ -6797,9 +6797,9 @@ Value* NggPrimShader::DoSubgroupInclusiveAdd(
 Value* NggPrimShader::DoDppUpdate(
     Value*      pOldValue,  // [in] Old value
     Value*      pSrcValue,  // [in] Source value to update with
-    uint32_t    dppCtrl,    // DPP controls
-    uint32_t    rowMask,    // Row mask
-    uint32_t    bankMask,   // Bank mask
+    unsigned    dppCtrl,    // DPP controls
+    unsigned    rowMask,    // Row mask
+    unsigned    bankMask,   // Bank mask
     bool        boundCtrl)  // Whether to do bound control
 {
     return m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_update_dpp,

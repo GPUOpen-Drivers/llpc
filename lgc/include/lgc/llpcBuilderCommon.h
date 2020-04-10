@@ -36,7 +36,7 @@ namespace lgc
 {
 
 /// Enumerates LGC shader stages.
-enum ShaderStage : uint32_t
+enum ShaderStage : unsigned
 {
     ShaderStageVertex = 0,                                ///< Vertex shader
     ShaderStageTessControl,                               ///< Tessellation control shader

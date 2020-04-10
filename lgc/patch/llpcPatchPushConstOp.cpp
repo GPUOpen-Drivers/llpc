@@ -102,7 +102,7 @@ bool PatchPushConstOp::runOnModule(
 
     m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
     const PipelineShaders& pipelineShaders = getAnalysis<PipelineShaders>();
-    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
+    for (unsigned shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
     {
         m_pEntryPoint = pipelineShaders.GetEntryPoint(static_cast<ShaderStage>(shaderStage));
 
@@ -169,7 +169,7 @@ void PatchPushConstOp::visitCallInst(
     (void(pCallee)); // unused
 
     auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
-    uint32_t pushConstNodeIdx = pIntfData->pushConst.resNodeIdx;
+    unsigned pushConstNodeIdx = pIntfData->pushConst.resNodeIdx;
     assert(pushConstNodeIdx != InvalidValue);
     auto pPushConstNode = &m_pPipelineState->GetUserDataNodes()[pushConstNodeIdx];
 

@@ -330,22 +330,22 @@ typedef SPIRVMap<Op, std::string, ImageQueryOpKindNameMapId> SPIRVImageQueryOpKi
 union SPIRVImageOpInfo {
   struct {
     SPIRVImageOpKind OpKind               : 6;  // Kind of image operation
-    uint32_t         OperMask             : 3;  // Index of image operand mask
-    uint32_t         OperDref             : 3;  // Index of Dref operand
-    uint32_t         HasProj              : 1;  // Whether project is present
-    uint32_t         IsSparse             : 1;  // Is sparse image operation
-    uint32_t         OperAtomicData       : 3;  // Index of atomic value
+    unsigned         OperMask             : 3;  // Index of image operand mask
+    unsigned         OperDref             : 3;  // Index of Dref operand
+    unsigned         HasProj              : 1;  // Whether project is present
+    unsigned         IsSparse             : 1;  // Is sparse image operation
+    unsigned         OperAtomicData       : 3;  // Index of atomic value
                                                 // operand
-    uint32_t         OperAtomicComparator : 3;  // Index of atomic comparator
+    unsigned         OperAtomicComparator : 3;  // Index of atomic comparator
                                                 // operand (valid for
                                                 // CompareExchange)
-    uint32_t         OperScope            : 3;  // Index of the scope (valid for atomics)
-    uint32_t         Unused               : 9;
+    unsigned         OperScope            : 3;  // Index of the scope (valid for atomics)
+    unsigned         Unused               : 9;
   };
-  uint32_t           U32All;
+  unsigned           U32All;
 };
 
-static const uint32_t InvalidOperIdx = 0x7;
+static const unsigned InvalidOperIdx = 0x7;
 
 template<> inline void
 SPIRVMap<Op, SPIRVImageOpInfo>::init() {
@@ -494,13 +494,13 @@ union ShaderInOutMetadata {
 struct ShaderInOutDecorate {
   union
   {
-    uint32_t     BuiltIn;           // SPIR-V built-in ID
-    uint32_t     Loc;               // Location of generic inputs and outputs
+    unsigned     BuiltIn;           // SPIR-V built-in ID
+    unsigned     Loc;               // Location of generic inputs and outputs
 
-    uint32_t     U32All;
+    unsigned     U32All;
   } Value;
 
-  uint32_t       Index;             // Output index for dual source blending
+  unsigned       Index;             // Output index for dual source blending
 
   bool           IsBuiltIn;         // Whether this is a SPIR-V built-in
 
@@ -508,7 +508,7 @@ struct ShaderInOutDecorate {
 
   bool           IsBlockArray;      // Whether we are handling a block array
 
-  uint32_t       Component;         // Component offset of inputs and outputs
+  unsigned       Component;         // Component offset of inputs and outputs
 
   bool           PerPatch;          // Whether this is a per-patch input/output
                                     // (tessellation shader)
@@ -518,12 +518,12 @@ struct ShaderInOutDecorate {
       SPIRVInterpLocKind    Loc;    // Interpolation location
   } Interp;
 
-  uint32_t       StreamId;           // ID of output stream (geometry shader)
-  uint32_t       XfbBuffer;          // Transform feedback buffer ID
-  uint32_t       XfbOffset;          // Transform feedback offset
-  uint32_t       XfbStride;          // Transform feedback stride
-  uint32_t       XfbExtraOffset;     // Transform feedback extra offset
-  uint32_t       XfbArrayStride;     // Transform feedback array stride (for
+  unsigned       StreamId;           // ID of output stream (geometry shader)
+  unsigned       XfbBuffer;          // Transform feedback buffer ID
+  unsigned       XfbOffset;          // Transform feedback offset
+  unsigned       XfbStride;          // Transform feedback stride
+  unsigned       XfbExtraOffset;     // Transform feedback extra offset
+  unsigned       XfbArrayStride;     // Transform feedback array stride (for
                                      //   block array, it's flatten dimension
                                      //   of an element (1 if element is not
                                      //   sub-array; for non block array, it's
@@ -535,28 +535,28 @@ struct ShaderInOutDecorate {
 union ShaderBlockMetadata {
   struct
   {
-    uint32_t offset       : 32; // Offset (bytes) in block
-    uint32_t IsMatrix     : 1;  // Whether it it is a matrix
-    uint32_t IsRowMajor   : 1;  // Whether it is a "row_major" qualified matrix
-    uint32_t MatrixStride : 6;  // Matrix stride, valid for matrix
-    uint32_t Restrict     : 1;  // Whether "restrict" qualifier is present
-    uint32_t Coherent     : 1;  // Whether "coherent" qualifier is present
-    uint32_t Volatile     : 1;  // Whether "volatile" qualifier is present
-    uint32_t NonWritable  : 1;  // Whether "readonly" qualifier is present
-    uint32_t NonReadable  : 1;  // Whether "writeonly" qualifier is present
-    uint32_t IsPointer    : 1;  // Whether it is a pointer
-    uint32_t IsStruct     : 1;  // Whether it is a structure
-    uint32_t Unused       : 17;
+    unsigned offset       : 32; // Offset (bytes) in block
+    unsigned IsMatrix     : 1;  // Whether it it is a matrix
+    unsigned IsRowMajor   : 1;  // Whether it is a "row_major" qualified matrix
+    unsigned MatrixStride : 6;  // Matrix stride, valid for matrix
+    unsigned Restrict     : 1;  // Whether "restrict" qualifier is present
+    unsigned Coherent     : 1;  // Whether "coherent" qualifier is present
+    unsigned Volatile     : 1;  // Whether "volatile" qualifier is present
+    unsigned NonWritable  : 1;  // Whether "readonly" qualifier is present
+    unsigned NonReadable  : 1;  // Whether "writeonly" qualifier is present
+    unsigned IsPointer    : 1;  // Whether it is a pointer
+    unsigned IsStruct     : 1;  // Whether it is a structure
+    unsigned Unused       : 17;
   };
   uint64_t U64All;
 };
 
 /// Info structure for all decorations applied to shader block.
 struct ShaderBlockDecorate {
-  uint32_t    Offset;       // Offset (bytes) in block
+  unsigned    Offset;       // Offset (bytes) in block
   bool        IsMatrix;     // Whether it is a matrix
   bool        IsRowMajor;   // Whether it is a "row_major" qualified matrix
-  uint32_t    MatrixStride; // Matrix stride, valid for matrix
+  unsigned    MatrixStride; // Matrix stride, valid for matrix
   bool        Restrict;     // Whether "restrict" qualifier is present
   bool        Coherent;     // Whether "coherent" qualifier is present
   bool        Volatile;     // Whether "volatile" qualifier is present
@@ -568,43 +568,43 @@ struct ShaderBlockDecorate {
 union ShaderImageCallMetadata {
   struct {
     SPIRVImageOpKind  OpKind             : 6; // Kind of image operation
-    uint32_t          Dim                : 3; // Image dimension
-    uint32_t          Arrayed            : 1; // Whether image is arrayed
-    uint32_t          Multisampled       : 1; // Whether image is multisampled
-    uint32_t          NonUniformSampler  : 1; // Whether sampler is non-uniform
-    uint32_t          NonUniformResource : 1; // Whether resource is non-uniform
-    uint32_t          WriteOnly          : 1; // Whetehr it is a write-only operation
-    uint32_t          Unused             : 18;
+    unsigned          Dim                : 3; // Image dimension
+    unsigned          Arrayed            : 1; // Whether image is arrayed
+    unsigned          Multisampled       : 1; // Whether image is multisampled
+    unsigned          NonUniformSampler  : 1; // Whether sampler is non-uniform
+    unsigned          NonUniformResource : 1; // Whether resource is non-uniform
+    unsigned          WriteOnly          : 1; // Whetehr it is a write-only operation
+    unsigned          Unused             : 18;
   };
-  uint32_t U32All;
+  unsigned U32All;
 };
 
 /// Metadata for image memory (memory qualifiers)
 union ShaderImageMemoryMetadata {
   struct {
-    uint32_t Restrict     : 1;    // Whether "restrict" qualifier is present
-    uint32_t Coherent     : 1;    // Whether "coherent" qualifier is present
-    uint32_t Volatile     : 1;    // Whether "volatile" qualifier is present
-    uint32_t NonWritable  : 1;    // Whether "readonly" qualifier is present
-    uint32_t NonReadable  : 1;    // Whether "writeonly" qualifier is present
+    unsigned Restrict     : 1;    // Whether "restrict" qualifier is present
+    unsigned Coherent     : 1;    // Whether "coherent" qualifier is present
+    unsigned Volatile     : 1;    // Whether "volatile" qualifier is present
+    unsigned NonWritable  : 1;    // Whether "readonly" qualifier is present
+    unsigned NonReadable  : 1;    // Whether "writeonly" qualifier is present
 
-    uint32_t Unused       : 27;
+    unsigned Unused       : 27;
   };
-  uint32_t U32All;
+  unsigned U32All;
 };
 
 /// Flags used for floating-point control
 union ShaderFloatControlFlags {
   struct {
-  uint32_t DenormPerserve           : 4;    // Preserve denormals
-  uint32_t DenormFlushToZero        : 4;    // Flush denormals to zeros
-  uint32_t SignedZeroInfNanPreserve : 4;    // Preserve signed zero, INF, NaN
-  uint32_t RoundingModeRTE          : 4;    // Rounding to even
-  uint32_t RoundingModeRTZ          : 4;    // Rounding to zero
+  unsigned DenormPerserve           : 4;    // Preserve denormals
+  unsigned DenormFlushToZero        : 4;    // Flush denormals to zeros
+  unsigned SignedZeroInfNanPreserve : 4;    // Preserve signed zero, INF, NaN
+  unsigned RoundingModeRTE          : 4;    // Rounding to even
+  unsigned RoundingModeRTZ          : 4;    // Rounding to zero
 
-  uint32_t Unused                   : 12;
+  unsigned Unused                   : 12;
   };
-  uint32_t U32All;
+  unsigned U32All;
 };
 
 /// Metadata for execution modes of each shader entry-point
@@ -617,62 +617,62 @@ union ShaderExecModeMetadata {
 
     union {
       struct {
-        uint32_t Xfb                      : 1;  // Transform feedback mode
-        uint32_t Unused                   : 31;
+        unsigned Xfb                      : 1;  // Transform feedback mode
+        unsigned Unused                   : 31;
       } vs;
 
       struct {
-        uint32_t SpacingEqual             : 1;  // Layout "equal_spacing"
-        uint32_t SpacingFractionalEven    : 1;  // Layout "fractional_even_spacing"
-        uint32_t SpacingFractionalOdd     : 1;  // Layout "fractional_odd_spacing"
-        uint32_t VertexOrderCw            : 1;  // Layout "cw"
-        uint32_t VertexOrderCcw           : 1;  // Layout "ccw"
-        uint32_t PointMode                : 1;  // Layout "point_mode"
-        uint32_t Triangles                : 1;  // Layout "triangles"
-        uint32_t Quads                    : 1;  // Layout "quads"
-        uint32_t Isolines                 : 1;  // Layout "isolines"
-        uint32_t Xfb                      : 1;  // Transform feedback mode
-        uint32_t Unused                   : 22;
+        unsigned SpacingEqual             : 1;  // Layout "equal_spacing"
+        unsigned SpacingFractionalEven    : 1;  // Layout "fractional_even_spacing"
+        unsigned SpacingFractionalOdd     : 1;  // Layout "fractional_odd_spacing"
+        unsigned VertexOrderCw            : 1;  // Layout "cw"
+        unsigned VertexOrderCcw           : 1;  // Layout "ccw"
+        unsigned PointMode                : 1;  // Layout "point_mode"
+        unsigned Triangles                : 1;  // Layout "triangles"
+        unsigned Quads                    : 1;  // Layout "quads"
+        unsigned Isolines                 : 1;  // Layout "isolines"
+        unsigned Xfb                      : 1;  // Transform feedback mode
+        unsigned Unused                   : 22;
 
-        uint32_t OutputVertices;                // Layout "vertices ="
+        unsigned OutputVertices;                // Layout "vertices ="
       } ts;
 
       struct {
-        uint32_t InputPoints              : 1;  // Layout "points"
-        uint32_t InputLines               : 1;  // Layout "lines"
-        uint32_t InputLinesAdjacency      : 1;  // Layout "lines_adjacency"
-        uint32_t Triangles                : 1;  // Layout "triangles"
-        uint32_t InputTrianglesAdjacency  : 1;  // Layout "triangles_adjacency"
-        uint32_t OutputPoints             : 1;  // Layout "points"
-        uint32_t OutputLineStrip          : 1;  // Layout "line_strip"
-        uint32_t OutputTriangleStrip      : 1;  // Layout "triangle_strip"
-        uint32_t Xfb                      : 1;  // Transform feedback mode
-        uint32_t Unused                   : 23;
+        unsigned InputPoints              : 1;  // Layout "points"
+        unsigned InputLines               : 1;  // Layout "lines"
+        unsigned InputLinesAdjacency      : 1;  // Layout "lines_adjacency"
+        unsigned Triangles                : 1;  // Layout "triangles"
+        unsigned InputTrianglesAdjacency  : 1;  // Layout "triangles_adjacency"
+        unsigned OutputPoints             : 1;  // Layout "points"
+        unsigned OutputLineStrip          : 1;  // Layout "line_strip"
+        unsigned OutputTriangleStrip      : 1;  // Layout "triangle_strip"
+        unsigned Xfb                      : 1;  // Transform feedback mode
+        unsigned Unused                   : 23;
 
-        uint32_t Invocations;                   // Layout "invocations ="
-        uint32_t OutputVertices;                // Layout "max_vertices ="
+        unsigned Invocations;                   // Layout "invocations ="
+        unsigned OutputVertices;                // Layout "max_vertices ="
       } gs;
 
       struct {
-        uint32_t OriginUpperLeft          : 1;  // Layout "origin_upper_left"
-        uint32_t PixelCenterInteger       : 1;  // Layout "pixel_center_integer"
-        uint32_t EarlyFragmentTests       : 1;  // Layout "early_fragment_tests"
-        uint32_t DepthUnchanged           : 1;  // Layout "depth_unchanged"
-        uint32_t DepthGreater             : 1;  // Layout "depth_greater"
-        uint32_t DepthLess                : 1;  // Layout "depth_less"
-        uint32_t DepthReplacing           : 1;  // Layout "depth_any"
-        uint32_t PostDepthCoverage        : 1;  // Layout "post_depth_coverage"
-        uint32_t Unused                   : 24;
+        unsigned OriginUpperLeft          : 1;  // Layout "origin_upper_left"
+        unsigned PixelCenterInteger       : 1;  // Layout "pixel_center_integer"
+        unsigned EarlyFragmentTests       : 1;  // Layout "early_fragment_tests"
+        unsigned DepthUnchanged           : 1;  // Layout "depth_unchanged"
+        unsigned DepthGreater             : 1;  // Layout "depth_greater"
+        unsigned DepthLess                : 1;  // Layout "depth_less"
+        unsigned DepthReplacing           : 1;  // Layout "depth_any"
+        unsigned PostDepthCoverage        : 1;  // Layout "post_depth_coverage"
+        unsigned Unused                   : 24;
       } fs;
 
       struct {
-        uint32_t LocalSizeX;                    // Layout "local_size_x ="
-        uint32_t LocalSizeY;                    // Layout "local_size_y ="
-        uint32_t LocalSizeZ;                    // Layout "local_size_z ="
+        unsigned LocalSizeX;                    // Layout "local_size_x ="
+        unsigned LocalSizeY;                    // Layout "local_size_y ="
+        unsigned LocalSizeZ;                    // Layout "local_size_z ="
       } cs;
     };
   };
-  uint32_t U32All[4];
+  unsigned U32All[4];
 };
 
 } // namespace SPIRV

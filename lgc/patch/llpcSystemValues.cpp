@@ -45,7 +45,7 @@ using namespace llvm;
 static cl::opt<bool> EnableShadowDescriptorTable("enable-shadow-desc",
                                                  cl::desc("Enable shadow descriptor table"));
 // -shadow-desc-table-ptr-high: high part of VA for shadow descriptor table pointer
-static cl::opt<uint32_t> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
+static cl::opt<unsigned> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
                                                 cl::desc("High part of VA for shadow descriptor table pointer"));
 
 // =====================================================================================================================
@@ -101,7 +101,7 @@ Value* ShaderSystemValues::GetEsGsRingBufDesc()
 {
     if (m_pEsGsRingBufDesc == nullptr)
     {
-        uint32_t tableOffset = 0;
+        unsigned tableOffset = 0;
         switch (m_shaderStage)
         {
         case ShaderStageVertex:
@@ -267,7 +267,7 @@ Value* ShaderSystemValues::GetEsGsOffsets()
         auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
 
         m_pEsGsOffsets = UndefValue::get(VectorType::get(Type::getInt32Ty(*m_pContext), 6));
-        for (uint32_t i = 0; i < InterfaceData::MaxEsGsOffsetCount; ++i)
+        for (unsigned i = 0; i < InterfaceData::MaxEsGsOffsetCount; ++i)
         {
             auto pEsGsOffset = GetFunctionArgument(m_pEntryPoint,
                                                    pIntfData->entryArgIdxs.gs.esGsOffsets[i],
@@ -285,7 +285,7 @@ Value* ShaderSystemValues::GetEsGsOffsets()
 // =====================================================================================================================
 // Get GS -> VS ring buffer descriptor (GS out and copy shader in)
 Value* ShaderSystemValues::GetGsVsRingBufDesc(
-    uint32_t streamId)  // Stream ID, always 0 for copy shader
+    unsigned streamId)  // Stream ID, always 0 for copy shader
 {
     assert((m_shaderStage == ShaderStageGeometry) || (m_shaderStage == ShaderStageCopyShader));
     if (m_gsVsRingBufDescs.size() <= streamId)
@@ -303,15 +303,15 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
             // Geometry shader, using GS-VS ring for output.
             Value* pDesc = LoadDescFromDriverTable(SI_DRV_TABLE_GS_RING_OUT0_OFFS + streamId, builder);
 
-            uint32_t outLocStart = 0;
+            unsigned outLocStart = 0;
             for (int i = 0; i < streamId; ++i)
                 outLocStart += pResUsage->inOutUsage.gs.outLocCount[i];
 
-            // streamSize[streamId] = outLocCount[streamId] * 4 * sizeof(uint32_t)
+            // streamSize[streamId] = outLocCount[streamId] * 4 * sizeof(unsigned)
             // streamOffset = (streamSize[0] + ... + streamSize[streamId - 1]) * 64 * outputVertices
-            uint32_t baseAddr = outLocStart *
+            unsigned baseAddr = outLocStart *
                                 m_pPipelineState->GetShaderModes()->GetGeometryShaderMode().outputVertices
-                * sizeof(uint32_t) * 4 * 64;
+                * sizeof(unsigned) * 4 * 64;
 
             // Patch GS-VS ring buffer descriptor base address for GS output
             Value* pGsVsOutRingBufDescElem0 = builder.CreateExtractElement(pDesc, (uint64_t)0);
@@ -328,9 +328,9 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
             pGsVsRingBufDescElem1 = builder.CreateAnd(pGsVsRingBufDescElem1, builder.getInt32(strideClearMask.u32All));
 
             // Calculate and set stride in SRD dword1
-            uint32_t gsVsStride = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode().outputVertices *
+            unsigned gsVsStride = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode().outputVertices *
                                   pResUsage->inOutUsage.gs.outLocCount[streamId] *
-                                  sizeof(uint32_t) * 4;
+                                  sizeof(unsigned) * 4;
 
             SqBufRsrcWord1 strideSetValue = {};
             strideSetValue.bits.STRIDE = gsVsStride;
@@ -386,7 +386,7 @@ ArrayRef<Value*> ShaderSystemValues::GetEmitCounterPtr()
 // =====================================================================================================================
 // Get descriptor table pointer
 Value* ShaderSystemValues::GetDescTablePtr(
-    uint32_t        descSet)        // Descriptor set ID
+    unsigned        descSet)        // Descriptor set ID
 {
     if (m_descTablePtrs.size() <= descSet)
     {
@@ -395,7 +395,7 @@ Value* ShaderSystemValues::GetDescTablePtr(
     if (m_descTablePtrs[descSet] == nullptr)
     {
         // Find the node.
-        uint32_t resNodeIdx = FindResourceNodeByDescSet(descSet);
+        unsigned resNodeIdx = FindResourceNodeByDescSet(descSet);
         if (resNodeIdx != InvalidValue)
         {
             // Get the 64-bit extended node value.
@@ -412,7 +412,7 @@ Value* ShaderSystemValues::GetDescTablePtr(
 // =====================================================================================================================
 // Get shadow descriptor table pointer
 Value* ShaderSystemValues::GetShadowDescTablePtr(
-    uint32_t        descSet)        // Descriptor set ID
+    unsigned        descSet)        // Descriptor set ID
 {
     if (m_shadowDescTablePtrs.size() <= descSet)
     {
@@ -421,7 +421,7 @@ Value* ShaderSystemValues::GetShadowDescTablePtr(
     if (m_shadowDescTablePtrs[descSet] == nullptr)
     {
         // Find the node.
-        uint32_t resNodeIdx = FindResourceNodeByDescSet(descSet);
+        unsigned resNodeIdx = FindResourceNodeByDescSet(descSet);
         if (resNodeIdx != InvalidValue)
         {
             // Get the 64-bit extended node value.
@@ -497,7 +497,7 @@ Value* ShaderSystemValues::GetSpilledPushConstTablePtr()
         Instruction* pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
 
         auto pPushConstNode = &m_pPipelineState->GetUserDataNodes()[pIntfData->pushConst.resNodeIdx];
-        uint32_t pushConstOffset = pPushConstNode->offsetInDwords * sizeof(uint32_t);
+        unsigned pushConstOffset = pPushConstNode->offsetInDwords * sizeof(unsigned);
 
         auto pSpillTablePtrLow = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.spillTable, "spillTable");
         auto pSpilledPushConstTablePtrLow = BinaryOperator::CreateAdd(pSpillTablePtrLow,
@@ -527,7 +527,7 @@ Value* ShaderSystemValues::GetVertexBufTablePtr()
             auto pVbTablePtrLow = GetFunctionArgument(m_pEntryPoint,
                                                       pIntfData->entryArgIdxs.vs.vbTablePtr,
                                                       "vbTablePtr");
-            static const uint32_t MaxVertexBufferSize = 0x10000000;
+            static const unsigned MaxVertexBufferSize = 0x10000000;
             auto pVbTablePtrTy = PointerType::get(ArrayType::get(VectorType::get(Type::getInt32Ty(*m_pContext), 4),
                                                                  MaxVertexBufferSize),
                                                   ADDR_SPACE_CONST);
@@ -540,7 +540,7 @@ Value* ShaderSystemValues::GetVertexBufTablePtr()
 // =====================================================================================================================
 // Get stream-out buffer descriptor
 Value* ShaderSystemValues::GetStreamOutBufDesc(
-    uint32_t        xfbBuffer)      // Transform feedback buffer ID
+    unsigned        xfbBuffer)      // Transform feedback buffer ID
 {
     if (m_streamOutBufDescs.size() <= xfbBuffer)
     {
@@ -581,7 +581,7 @@ Instruction* ShaderSystemValues::GetStreamOutTablePtr()
     if (m_pStreamOutTablePtr == nullptr)
     {
         auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
-        uint32_t entryArgIdx = 0;
+        unsigned entryArgIdx = 0;
 
         if (m_shaderStage != ShaderStageCopyShader)
         {
@@ -627,7 +627,7 @@ Instruction* ShaderSystemValues::GetStreamOutTablePtr()
 Instruction* ShaderSystemValues::MakePointer(
     Value*    pLowValue,  // [in] 32-bit int value to extend
     Type*     pPtrTy,     // [in] Type that result pointer needs to be
-    uint32_t  highValue)  // Value to use for high part, or InvalidValue to use PC
+    unsigned  highValue)  // Value to use for high part, or InvalidValue to use PC
 {
     // Insert extending code after pLowValue if it is an instruction.
     Instruction* pInsertPos = nullptr;
@@ -694,9 +694,9 @@ Instruction* ShaderSystemValues::MakePointer(
 // =====================================================================================================================
 // Get 64-bit extended resource node value
 Value* ShaderSystemValues::GetExtendedResourceNodeValue(
-    uint32_t        resNodeIdx,     // Resource node index
+    unsigned        resNodeIdx,     // Resource node index
     Type*           pResNodeTy,     // [in] Pointer type of result
-    uint32_t        highValue)      // Value to use for high part, or InvalidValue to use PC
+    unsigned        highValue)      // Value to use for high part, or InvalidValue to use PC
 {
     return MakePointer(GetResourceNodeValue(resNodeIdx), pResNodeTy, highValue);
 }
@@ -704,7 +704,7 @@ Value* ShaderSystemValues::GetExtendedResourceNodeValue(
 // =====================================================================================================================
 // Get 32 bit resource node value
 Value* ShaderSystemValues::GetResourceNodeValue(
-    uint32_t        resNodeIdx)     // Resource node index
+    unsigned        resNodeIdx)     // Resource node index
 {
     auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
     auto pIntfData   = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
@@ -726,7 +726,7 @@ Value* ShaderSystemValues::GetResourceNodeValue(
     else if (pNode->type != ResourceNodeType::PushConst)
     {
         // Resource node is spilled, load its value from spill table
-        uint32_t byteOffset = pNode->offsetInDwords * sizeof(uint32_t);
+        unsigned byteOffset = pNode->offsetInDwords * sizeof(unsigned);
 
         Value* idxs[] =
         {
@@ -782,7 +782,7 @@ Instruction* ShaderSystemValues::GetSpillTablePtr()
 // =====================================================================================================================
 // Load descriptor from driver table
 Instruction* ShaderSystemValues::LoadDescFromDriverTable(
-    uint32_t tableOffset,    // Byte offset in driver table
+    unsigned tableOffset,    // Byte offset in driver table
     BuilderBase& builder)    // Builder to use for insertion
 {
     Value* args[] =
@@ -801,7 +801,7 @@ Instruction* ShaderSystemValues::LoadDescFromDriverTable(
 // Explicitly set the DATA_FORMAT of ring buffer descriptor.
 Value* ShaderSystemValues::SetRingBufferDataFormat(
     Value*          pBufDesc,       // [in] Buffer Descriptor
-    uint32_t        dataFormat,     // Data format
+    unsigned        dataFormat,     // Data format
     BuilderBase&    builder         // [in] Builder to use for inserting instructions
     ) const
 {
@@ -826,7 +826,7 @@ const ResourceNode* ShaderSystemValues::FindResourceNodeByType(
     ResourceNodeType type)           // Resource node type to find
 {
     auto userDataNodes = m_pPipelineState->GetUserDataNodes();
-    for (uint32_t i = 0; i < userDataNodes.size(); ++i)
+    for (unsigned i = 0; i < userDataNodes.size(); ++i)
     {
         auto pNode = &userDataNodes[i];
         if (pNode->type == type)
@@ -839,11 +839,11 @@ const ResourceNode* ShaderSystemValues::FindResourceNodeByType(
 
 // =====================================================================================================================
 // Find resource node by descriptor set ID
-uint32_t ShaderSystemValues::FindResourceNodeByDescSet(
-    uint32_t        descSet)        // Descriptor set to find
+unsigned ShaderSystemValues::FindResourceNodeByDescSet(
+    unsigned        descSet)        // Descriptor set to find
 {
     auto userDataNodes = m_pPipelineState->GetUserDataNodes();
-    for (uint32_t i = 0; i < userDataNodes.size(); ++i)
+    for (unsigned i = 0; i < userDataNodes.size(); ++i)
     {
         auto pNode = &userDataNodes[i];
         if ((pNode->type == ResourceNodeType::DescriptorTableVaPtr) &&

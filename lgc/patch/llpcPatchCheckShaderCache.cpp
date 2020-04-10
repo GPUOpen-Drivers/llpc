@@ -106,7 +106,7 @@ bool PatchCheckShaderCache::runOnModule(
             {
                 SmallVector<const Value*, 4> vals;
                 vals.push_back(pGlobalVar);
-                for (uint32_t i = 0; i != vals.size(); ++i)
+                for (unsigned i = 0; i != vals.size(); ++i)
                 {
                     for (auto pUser : vals[i]->users())
                     {
@@ -166,7 +166,7 @@ bool PatchCheckShaderCache::runOnModule(
     }
 
     // Ask callback function if it wants to remove any shader stages.
-    uint32_t modifiedStageMask = m_callbackFunc(&module, stageMask, inOutUsageValues);
+    unsigned modifiedStageMask = m_callbackFunc(&module, stageMask, inOutUsageValues);
     if (modifiedStageMask == stageMask)
     {
         return false;

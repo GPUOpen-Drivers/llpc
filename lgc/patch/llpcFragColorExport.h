@@ -42,7 +42,7 @@ struct WorkaroundFlags;
 
 // Enumerates component setting of color format. This is a "helper" enum used in the CB's algorithm for deriving
 // an ideal shader export format.
-enum class CompSetting : uint32_t
+enum class CompSetting : unsigned
 {
     Invalid,            // Invalid
     OneCompRed,         // Red
@@ -58,9 +58,9 @@ class FragColorExport
 public:
     FragColorExport(PipelineState* pPipelineState, llvm::Module* pModule);
 
-    llvm::Value* Run(llvm::Value* pOutput, uint32_t location, llvm::Instruction* pInsertPos);
+    llvm::Value* Run(llvm::Value* pOutput, unsigned location, llvm::Instruction* pInsertPos);
 
-    ExportFormat ComputeExportFormat(llvm::Type* pOutputTy, uint32_t location) const;
+    ExportFormat ComputeExportFormat(llvm::Type* pOutputTy, unsigned location) const;
 
 private:
     FragColorExport() = delete;
@@ -68,11 +68,11 @@ private:
     FragColorExport& operator =(const FragColorExport&) = delete;
 
     static CompSetting ComputeCompSetting(BufDataFormat dfmt);
-    static uint32_t GetNumChannels(BufDataFormat dfmt);
+    static unsigned GetNumChannels(BufDataFormat dfmt);
 
     static bool HasAlpha(BufDataFormat dfmt);
 
-    static uint32_t GetMaxComponentBitCount(BufDataFormat dfmt);
+    static unsigned GetMaxComponentBitCount(BufDataFormat dfmt);
 
     llvm::Value* ConvertToFloat(llvm::Value* pValue, bool signedness, llvm::Instruction* pInsertPos) const;
     llvm::Value* ConvertToInt(llvm::Value* pValue, bool signedness, llvm::Instruction* pInsertPos) const;

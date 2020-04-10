@@ -92,13 +92,13 @@ public:
                         ElfPackage*       pPipelineElf);
 
     // Gets the section index for the specified section name.
-    int32_t GetSectionIndex(const char* pName) const
+    int GetSectionIndex(const char* pName) const
     {
         auto pEntry = m_map.find(pName);
         return (pEntry != m_map.end()) ? pEntry->second : InvalidValue;
     }
 
-    void setSection(uint32_t secIndex, SectionBuffer* pSection);
+    void setSection(unsigned secIndex, SectionBuffer* pSection);
 
     ElfSymbol* getSymbol(const char* pSymbolName);
 
@@ -106,9 +106,9 @@ public:
 
     void setNote(ElfNote* pNote);
 
-    Result getSectionDataBySectionIndex(uint32_t secIdx, const SectionBuffer** ppSectionData) const;
+    Result getSectionDataBySectionIndex(unsigned secIdx, const SectionBuffer** ppSectionData) const;
 
-    void GetSymbolsBySectionIndex(uint32_t secIdx, std::vector<ElfSymbol*>& secSymbols);
+    void GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol*>& secSymbols);
 
     void writeToBuffer(ElfPackage* pElf);
 
@@ -119,7 +119,7 @@ private:
     ElfWriter(const ElfWriter&) = delete;
     ElfWriter& operator=(const ElfWriter&) = delete;
 
-    static void mergeMapItem(llvm::msgpack::MapDocNode& destMap, llvm::msgpack::MapDocNode& srcMap, uint32_t key);
+    static void mergeMapItem(llvm::msgpack::MapDocNode& destMap, llvm::msgpack::MapDocNode& srcMap, unsigned key);
 
     size_t getRequiredBufferSizeBytes();
 
@@ -135,16 +135,16 @@ private:
 
     GfxIpVersion                      m_gfxIp;    // Graphics IP version info (used by ELF dump only)
     typename Elf::FormatHeader        m_header;   // ELF header
-    std::map<std::string, uint32_t>   m_map;      // Map between section name and section index
+    std::map<std::string, unsigned>   m_map;      // Map between section name and section index
 
     std::vector<SectionBuffer>        m_sections;    // List of section data and headers
     std::vector<ElfNote>              m_notes;       // List of Elf notes
     std::vector<ElfSymbol>            m_symbols;     // List of Elf symbols
 
-    int32_t m_textSecIdx;       // Section index of .text section
-    int32_t m_noteSecIdx;       // Section index of .note section
-    int32_t m_symSecIdx;        // Section index of symbol table section
-    int32_t m_strtabSecIdx;     // Section index of string table section
+    int m_textSecIdx;       // Section index of .text section
+    int m_noteSecIdx;       // Section index of .note section
+    int m_symSecIdx;        // Section index of symbol table section
+    int m_strtabSecIdx;     // Section index of string table section
 };
 
 } // Llpc

@@ -91,7 +91,7 @@ private:
                           CsRegConfig* pConfig);
 
     void BuildUserDataConfig(ShaderStage shaderStage,
-                             uint32_t    startUserData);
+                             unsigned    startUserData);
 
     template <typename T>
     void SetupVgtTfParam(T* pConfig);

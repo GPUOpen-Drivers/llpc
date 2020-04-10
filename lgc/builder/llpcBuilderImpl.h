@@ -69,7 +69,7 @@ protected:
 
     // Create a waterfall loop containing the specified instruction.
     llvm::Instruction* CreateWaterfallLoop(llvm::Instruction*       pNonUniformInst,
-                                     llvm::ArrayRef<uint32_t> operandIdxs,
+                                     llvm::ArrayRef<unsigned> operandIdxs,
                                      const llvm::Twine&       instName = "");
 
     // Helper method to scalarize a possibly vector unary operation
@@ -212,7 +212,7 @@ private:
 
     // Helper method to create call to llvm.amdgcn.class, scalarizing if necessary. This is not exposed outside of
     // BuilderImplArith.
-    llvm::Value* CreateCallAmdgcnClass(llvm::Value* pValue, uint32_t flags, const llvm::Twine& instName = "");
+    llvm::Value* CreateCallAmdgcnClass(llvm::Value* pValue, unsigned flags, const llvm::Twine& instName = "");
 
     // Methods to get various FP constants as scalar or vector. Any needed directly by a client should be moved
     // to llpcBuilder.h. Using these (rather than just using for example
@@ -274,8 +274,8 @@ public:
     BuilderImplDesc(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // Create a load of a buffer descriptor.
-    llvm::Value* CreateLoadBufferDesc(uint32_t      descSet,
-                                uint32_t      binding,
+    llvm::Value* CreateLoadBufferDesc(unsigned      descSet,
+                                unsigned      binding,
                                 llvm::Value*        pDescIndex,
                                 bool          isNonUniform,
                                 bool          isWritten,
@@ -293,23 +293,23 @@ public:
                                  const llvm::Twine&  instName) override final;
 
     // Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
-    llvm::Value* CreateGetSamplerDescPtr(uint32_t      descSet,
-                                   uint32_t      binding,
+    llvm::Value* CreateGetSamplerDescPtr(unsigned      descSet,
+                                   unsigned      binding,
                                    const llvm::Twine&  instName) override final;
 
     // Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
-    llvm::Value* CreateGetImageDescPtr(uint32_t      descSet,
-                                 uint32_t      binding,
+    llvm::Value* CreateGetImageDescPtr(unsigned      descSet,
+                                 unsigned      binding,
                                  const llvm::Twine&  instName) override final;
 
     // Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
-    llvm::Value* CreateGetTexelBufferDescPtr(uint32_t      descSet,
-                                       uint32_t      binding,
+    llvm::Value* CreateGetTexelBufferDescPtr(unsigned      descSet,
+                                       unsigned      binding,
                                        const llvm::Twine&  instName) override final;
 
     // Create a pointer to F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
-    llvm::Value* CreateGetFmaskDescPtr(uint32_t      descSet,
-                                 uint32_t      binding,
+    llvm::Value* CreateGetFmaskDescPtr(unsigned      descSet,
+                                 unsigned      binding,
                                  const llvm::Twine&  instName) override final;
 
     // Create a load of the push constants pointer.
@@ -337,8 +337,8 @@ public:
 
     // Create an image load.
     llvm::Value* CreateImageLoad(llvm::Type*             pResultTy,
-                           uint32_t          dim,
-                           uint32_t          flags,
+                           unsigned          dim,
+                           unsigned          flags,
                            llvm::Value*            pImageDesc,
                            llvm::Value*            pCoord,
                            llvm::Value*            pMipLevel,
@@ -346,8 +346,8 @@ public:
 
     // Create an image load with F-mask.
     llvm::Value* CreateImageLoadWithFmask(llvm::Type*             pResultTy,
-                                    uint32_t          dim,
-                                    uint32_t          flags,
+                                    unsigned          dim,
+                                    unsigned          flags,
                                     llvm::Value*            pImageDesc,
                                     llvm::Value*            pFmaskDesc,
                                     llvm::Value*            pCoord,
@@ -356,8 +356,8 @@ public:
 
     // Create an image store.
     llvm::Value* CreateImageStore(llvm::Value*           pTexel,
-                            uint32_t         dim,
-                            uint32_t         flags,
+                            unsigned         dim,
+                            unsigned         flags,
                             llvm::Value*           pImageDesc,
                             llvm::Value*           pCoord,
                             llvm::Value*           pMipLevel,
@@ -365,8 +365,8 @@ public:
 
     // Create an image sample.
     llvm::Value* CreateImageSample(llvm::Type*             pResultTy,
-                             uint32_t          dim,
-                             uint32_t          flags,
+                             unsigned          dim,
+                             unsigned          flags,
                              llvm::Value*            pImageDesc,
                              llvm::Value*            pSamplerDesc,
                              llvm::ArrayRef<llvm::Value*>  address,
@@ -376,8 +376,8 @@ public:
     // This is not yet a Builder API, but it could become one if there was to be a new SPIR-V YCbCr
     // converting sampler spec that allows the SPIR-V reader to tell that it has a converting sampler.
     llvm::Value* CreateImageSampleConvert(llvm::Type*             pResultTy,
-                                    uint32_t          dim,
-                                    uint32_t          flags,
+                                    unsigned          dim,
+                                    unsigned          flags,
                                     llvm::Value*            pImageDesc,
                                     llvm::Value*            pConvertingSamplerDesc,
                                     llvm::ArrayRef<llvm::Value*>  address,
@@ -385,17 +385,17 @@ public:
 
     // Create an image gather
     llvm::Value* CreateImageGather(llvm::Type*             pResultTy,
-                             uint32_t          dim,
-                             uint32_t          flags,
+                             unsigned          dim,
+                             unsigned          flags,
                              llvm::Value*            pImageDesc,
                              llvm::Value*            pSamplerDesc,
                              llvm::ArrayRef<llvm::Value*>  address,
                              const llvm::Twine&      instName = "") override final;
 
     // Create an image atomic operation other than compare-and-swap.
-    llvm::Value* CreateImageAtomic(uint32_t         atomicOp,
-                             uint32_t         dim,
-                             uint32_t         flags,
+    llvm::Value* CreateImageAtomic(unsigned         atomicOp,
+                             unsigned         dim,
+                             unsigned         flags,
                              llvm::AtomicOrdering   ordering,
                              llvm::Value*           pImageDesc,
                              llvm::Value*           pCoord,
@@ -403,8 +403,8 @@ public:
                              const llvm::Twine&     instName = "") override final;
 
     // Create an image atomic compare-and-swap.
-    llvm::Value* CreateImageAtomicCompareSwap(uint32_t        dim,
-                                        uint32_t        flags,
+    llvm::Value* CreateImageAtomicCompareSwap(unsigned        dim,
+                                        unsigned        flags,
                                         llvm::AtomicOrdering  ordering,
                                         llvm::Value*          pImageDesc,
                                         llvm::Value*          pCoord,
@@ -413,28 +413,28 @@ public:
                                         const llvm::Twine&    instName = "") override final;
 
     // Create a query of the number of mipmap levels in an image. Returns an i32 value.
-    llvm::Value* CreateImageQueryLevels(uint32_t                dim,
-                                  uint32_t                flags,
+    llvm::Value* CreateImageQueryLevels(unsigned                dim,
+                                  unsigned                flags,
                                   llvm::Value*                  pImageDesc,
                                   const llvm::Twine&            instName = "") override final;
 
     // Create a query of the number of samples in an image. Returns an i32 value.
-    llvm::Value* CreateImageQuerySamples(uint32_t                dim,
-                                   uint32_t                flags,
+    llvm::Value* CreateImageQuerySamples(unsigned                dim,
+                                   unsigned                flags,
                                    llvm::Value*                  pImageDesc,
                                    const llvm::Twine&            instName = "") override final;
 
     // Create a query of size of an image at the specified LOD
-    llvm::Value* CreateImageQuerySize(uint32_t          dim,
-                                uint32_t          flags,
+    llvm::Value* CreateImageQuerySize(unsigned          dim,
+                                unsigned          flags,
                                 llvm::Value*            pImageDesc,
                                 llvm::Value*            pLod,
                                 const llvm::Twine&      instName = "") override final;
 
     // Create a get of the LOD that would be used for an image sample with the given coordinates
     // and implicit LOD.
-    llvm::Value* CreateImageGetLod(uint32_t          dim,
-                             uint32_t          flags,
+    llvm::Value* CreateImageGetLod(unsigned          dim,
+                             unsigned          flags,
                              llvm::Value*            pImageDesc,
                              llvm::Value*            pSamplerDesc,
                              llvm::Value*            pCoord,
@@ -446,19 +446,19 @@ private:
     BuilderImplImage& operator=(const BuilderImplImage&) = delete;
 
     // Implement pre-GFX9 integer gather workaround to patch descriptor or coordinate before the gather
-    llvm::Value* PreprocessIntegerImageGather(uint32_t dim, llvm::Value*& pImageDesc, llvm::Value*& pCoord);
+    llvm::Value* PreprocessIntegerImageGather(unsigned dim, llvm::Value*& pImageDesc, llvm::Value*& pCoord);
 
     // Implement pre-GFX9 integer gather workaround to modify result.
     llvm::Value* PostprocessIntegerImageGather(llvm::Value*   pNeedDescPatch,
-                                         uint32_t flags,
+                                         unsigned flags,
                                          llvm::Value*   pImageDesc,
                                          llvm::Type*    pTexelTy,
                                          llvm::Value*   pResult);
 
     // Common code to create an image sample or gather.
     llvm::Value* CreateImageSampleGather(llvm::Type*            pResultTy,
-                                   uint32_t         dim,
-                                   uint32_t         flags,
+                                   unsigned         dim,
+                                   unsigned         flags,
                                    llvm::Value*           pCoord,
                                    llvm::Value*           pImageDesc,
                                    llvm::Value*           pSamplerDesc,
@@ -467,9 +467,9 @@ private:
                                    bool             isSample);
 
     // Common code for CreateImageAtomic and CreateImageAtomicCompareSwap
-    llvm::Value* CreateImageAtomicCommon(uint32_t          atomicOp,
-                                   uint32_t          dim,
-                                   uint32_t          flags,
+    llvm::Value* CreateImageAtomicCommon(unsigned          atomicOp,
+                                   unsigned          dim,
+                                   unsigned          flags,
                                    llvm::AtomicOrdering    ordering,
                                    llvm::Value*            pImageDesc,
                                    llvm::Value*            pCoord,
@@ -478,12 +478,12 @@ private:
                                    const llvm::Twine&      instName);
 
     // Change 1D or 1DArray dimension to 2D or 2DArray if needed as a workaround on GFX9+
-    uint32_t Change1DTo2DIfNeeded(uint32_t dim);
+    unsigned Change1DTo2DIfNeeded(unsigned dim);
 
     // Prepare coordinate and explicit derivatives, pushing the separate components into the supplied vectors, and
     // modifying if necessary.
     // Returns possibly modified image dimension.
-    uint32_t PrepareCoordinate(uint32_t                  dim,
+    unsigned PrepareCoordinate(unsigned                  dim,
                                llvm::Value*                    pCoord,
                                llvm::Value*                    pProjective,
                                llvm::Value*                    pDerivativeX,
@@ -495,10 +495,10 @@ private:
     void CombineCubeArrayFaceAndSlice(llvm::Value* pCoord, llvm::SmallVectorImpl<llvm::Value*>& coords);
 
     // Patch descriptor with cube dimension for image call
-    llvm::Value* PatchCubeDescriptor(llvm::Value* pDesc, uint32_t dim);
+    llvm::Value* PatchCubeDescriptor(llvm::Value* pDesc, unsigned dim);
 
     // Handle cases where we need to add the FragCoord x,y to the coordinate, and use ViewIndex as the z coordinate.
-    llvm::Value* HandleFragCoordViewIndex(llvm::Value* pCoord, uint32_t flags, uint32_t& dim);
+    llvm::Value* HandleFragCoordViewIndex(llvm::Value* pCoord, unsigned flags, unsigned& dim);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -509,7 +509,7 @@ private:
         IMG_DATA_FORMAT_32_32_32_32 = 14,
     };
 
-    static const uint32_t AtomicOpCompareSwap = 1;
+    static const unsigned AtomicOpCompareSwap = 1;
 };
 
 // =====================================================================================================================
@@ -521,39 +521,39 @@ public:
 
     // Create a read of (part of) a user input value.
     llvm::Value* CreateReadGenericInput(llvm::Type*         pResultTy,
-                                  uint32_t      location,
+                                  unsigned      location,
                                   llvm::Value*        pLocationOffset,
                                   llvm::Value*        pElemIdx,
-                                  uint32_t      locationCount,
+                                  unsigned      locationCount,
                                   InOutInfo     inputInfo,
                                   llvm::Value*        pVertexIndex,
                                   const llvm::Twine&  instName = "") override final;
 
     // Create a read of (part of) a user output value.
     llvm::Value* CreateReadGenericOutput(llvm::Type*         pResultTy,
-                                   uint32_t      location,
+                                   unsigned      location,
                                    llvm::Value*        pLocationOffset,
                                    llvm::Value*        pElemIdx,
-                                   uint32_t      locationCount,
+                                   unsigned      locationCount,
                                    InOutInfo     outputInfo,
                                    llvm::Value*        pVertexIndex,
                                    const llvm::Twine&  instName = "") override final;
 
     // Create a write of (part of) a user output value.
     llvm::Instruction* CreateWriteGenericOutput(llvm::Value*        pValueToWrite,
-                                          uint32_t      location,
+                                          unsigned      location,
                                           llvm::Value*        pLocationOffset,
                                           llvm::Value*        pElemIdx,
-                                          uint32_t      locationCount,
+                                          unsigned      locationCount,
                                           InOutInfo     outputInfo,
                                           llvm::Value*        pVertexIndex) override final;
 
     // Create a write to an XFB (transform feedback / streamout) buffer.
     llvm::Instruction* CreateWriteXfbOutput(llvm::Value*        pValueToWrite,
                                       bool          isBuiltIn,
-                                      uint32_t      location,
-                                      uint32_t      xfbBuffer,
-                                      uint32_t      xfbStride,
+                                      unsigned      location,
+                                      unsigned      xfbBuffer,
+                                      unsigned      xfbStride,
                                       llvm::Value*        pXfbOffset,
                                       InOutInfo     outputInfo) override final;
 
@@ -589,18 +589,18 @@ private:
     // Read (a part of) a generic (user) input/output value.
     llvm::Value* ReadGenericInputOutput(bool          isOutput,
                                   llvm::Type*         pResultTy,
-                                  uint32_t      location,
+                                  unsigned      location,
                                   llvm::Value*        pLocationOffset,
                                   llvm::Value*        pElemIdx,
-                                  uint32_t      locationCount,
+                                  unsigned      locationCount,
                                   InOutInfo     inOutInfo,
                                   llvm::Value*        pVertexIndex,
                                   const llvm::Twine&  instName);
 
     // Mark usage for a generic (user) input or output
     void MarkGenericInputOutputUsage(bool          isOutput,
-                                     uint32_t      location,
-                                     uint32_t      locationCount,
+                                     unsigned      location,
+                                     unsigned      locationCount,
                                      InOutInfo     inOutInfo,
                                      llvm::Value*        pVertexIndex);
 
@@ -608,7 +608,7 @@ private:
     void MarkInterpolationInfo(InOutInfo interpInfo);
 
     // Mark fragment output type
-    void MarkFsOutputType(llvm::Type* pOutputTy, uint32_t location, InOutInfo outputInfo);
+    void MarkFsOutputType(llvm::Type* pOutputTy, unsigned location, InOutInfo outputInfo);
 
     // Modify aux interp value according to custom interp mode, and its helper functions.
     llvm::Value* ModifyAuxInterpValue(llvm::Value* pAuxInterpValue, InOutInfo inputInfo);
@@ -628,14 +628,14 @@ private:
     llvm::Type* GetBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo);
 
     // Mark usage of a built-in input
-    void MarkBuiltInInputUsage(BuiltInKind builtIn, uint32_t arraySize);
+    void MarkBuiltInInputUsage(BuiltInKind builtIn, unsigned arraySize);
 
     // Mark usage of a built-in output
-    void MarkBuiltInOutputUsage(BuiltInKind builtIn, uint32_t arraySize, uint32_t streamId);
+    void MarkBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySize, unsigned streamId);
 
 #ifndef NDEBUG
     // Get a bitmask of which shader stages are valid for a built-in to be an input or output of
-    uint32_t GetBuiltInValidMask(BuiltInKind builtIn, bool isOutput);
+    unsigned GetBuiltInValidMask(BuiltInKind builtIn, bool isOutput);
 
     // Determine whether a built-in is an input for a particular shader stage.
     bool IsBuiltInInput(BuiltInKind builtIn);
@@ -693,14 +693,14 @@ private:
     BuilderImplMatrix& operator=(const BuilderImplMatrix&) = delete;
 
     // Helper function for determinant calculation
-    llvm::Value* Determinant(llvm::ArrayRef<llvm::Value*> elements, uint32_t order);
+    llvm::Value* Determinant(llvm::ArrayRef<llvm::Value*> elements, unsigned order);
 
     // Get submatrix by deleting specified row and column
     void GetSubmatrix(llvm::ArrayRef<llvm::Value*>        matrix,
                       llvm::MutableArrayRef<llvm::Value*> submatrix,
-                      uint32_t                order,
-                      uint32_t                rowToDelete,
-                      uint32_t                columnToDelete);
+                      unsigned                order,
+                      unsigned                rowToDelete,
+                      unsigned                columnToDelete);
 };
 
 // =====================================================================================================================
@@ -712,10 +712,10 @@ public:
 
     // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
     // the current output primitive in the specified output-primitive stream.
-    llvm::Instruction* CreateEmitVertex(uint32_t streamId) override final;
+    llvm::Instruction* CreateEmitVertex(unsigned streamId) override final;
 
     // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
-    llvm::Instruction* CreateEndPrimitive(uint32_t streamId) override final;
+    llvm::Instruction* CreateEndPrimitive(unsigned streamId) override final;
 
     // Create a workgroup control barrier.
     llvm::Instruction* CreateBarrier() override final;
@@ -891,7 +891,7 @@ private:
     BuilderImplSubgroup(const BuilderImplSubgroup&) = delete;
     BuilderImplSubgroup& operator=(const BuilderImplSubgroup&) = delete;
 
-    enum class DppCtrl : uint32_t
+    enum class DppCtrl : unsigned
     {
         DppQuadPerm0000   = 0x000,
         DppQuadPerm1111   = 0x055,
@@ -913,7 +913,7 @@ private:
         DppRowBcast31     = 0x143,
     };
 
-    uint32_t GetShaderSubgroupSize();
+    unsigned GetShaderSubgroupSize();
     llvm::Value* CreateGroupArithmeticIdentity(GroupArithOp   groupArithOp,
                                          llvm::Type* const    pType);
     llvm::Value* CreateGroupArithmeticOperation(GroupArithOp groupArithOp,
@@ -922,26 +922,26 @@ private:
     llvm::Value* CreateInlineAsmSideEffect(llvm::Value* const pValue);
     llvm::Value* CreateDppMov(llvm::Value* const pValue,
                         DppCtrl      dppCtrl,
-                        uint32_t     rowMask,
-                        uint32_t     bankMask,
+                        unsigned     rowMask,
+                        unsigned     bankMask,
                         bool         boundCtrl);
     llvm::Value* CreateDppUpdate(llvm::Value* const pOrigValue,
                            llvm::Value* const pUpdateValue,
                            DppCtrl      dppCtrl,
-                           uint32_t     rowMask,
-                           uint32_t     bankMask,
+                           unsigned     rowMask,
+                           unsigned     bankMask,
                            bool         boundCtrl);
 
     llvm::Value* CreatePermLane16(llvm::Value* const pOrigValue,
                             llvm::Value* const pUpdateValue,
-                            uint32_t     selectBitsLow,
-                            uint32_t     selectBitsHigh,
+                            unsigned     selectBitsLow,
+                            unsigned     selectBitsHigh,
                             bool         fetchInactive,
                             bool         boundCtrl);
     llvm::Value* CreatePermLaneX16(llvm::Value* const pOrigValue,
                              llvm::Value* const pUpdateValue,
-                             uint32_t     selectBitsLow,
-                             uint32_t     selectBitsHigh,
+                             unsigned     selectBitsLow,
+                             unsigned     selectBitsHigh,
                              bool         fetchInactive,
                              bool         boundCtrl);
 

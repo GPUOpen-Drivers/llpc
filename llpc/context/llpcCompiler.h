@@ -73,8 +73,8 @@ public:
     {}
 
     // Check shader caches, returning mask of which shader stages we want to keep in this compile.
-    uint32_t Check(const llvm::Module*                     pModule,
-                   uint32_t                                stageMask,
+    unsigned Check(const llvm::Module*                     pModule,
+                   unsigned                                stageMask,
                    llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes);
 
     // Get cache results.
@@ -105,7 +105,7 @@ private:
 class Compiler: public ICompiler
 {
 public:
-    Compiler(GfxIpVersion gfxIp, uint32_t optionCount, const char*const* pOptions, MetroHash::Hash optionHash);
+    Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char*const* pOptions, MetroHash::Hash optionHash);
     ~Compiler();
 
     virtual void VKAPI_CALL Destroy();
@@ -113,7 +113,7 @@ public:
     virtual Result BuildShaderModule(const ShaderModuleBuildInfo* pShaderInfo,
                                      ShaderModuleBuildOut*        pShaderOut) const;
 
-    virtual uint32_t ConvertColorBufferFormatToExportFormat(const ColorTarget*  pTarget,
+    virtual unsigned ConvertColorBufferFormatToExportFormat(const ColorTarget*  pTarget,
                                                             const bool          enableAlphaToCoverage) const;
 
     virtual Result BuildGraphicsPipeline(const GraphicsPipelineBuildInfo* pPipelineInfo,
@@ -125,33 +125,33 @@ public:
                                         void*                           pPipelineDumpFile = nullptr);
     Result BuildGraphicsPipelineInternal(GraphicsContext*                          pGraphicsContext,
                                          llvm::ArrayRef<const PipelineShaderInfo*> shaderInfo,
-                                         uint32_t                                  forceLoopUnrollCount,
+                                         unsigned                                  forceLoopUnrollCount,
                                          bool                                      buildingRelocatableElf,
                                          ElfPackage*                               pPipelineElf);
 
     Result BuildComputePipelineInternal(ComputeContext*                 pComputeContext,
                                         const ComputePipelineBuildInfo* pPipelineInfo,
-                                        uint32_t                        forceLoopUnrollCount,
+                                        unsigned                        forceLoopUnrollCount,
                                         bool                            buildingRelocatableElf,
                                         ElfPackage*                     pPipelineElf);
 
     Result BuildPipelineWithRelocatableElf(Context*                                   pContext,
                                            llvm::ArrayRef<const PipelineShaderInfo*>  shaderInfo,
-                                           uint32_t                                   forceLoopUnrollCount,
+                                           unsigned                                   forceLoopUnrollCount,
                                            ElfPackage*                                pPipelineElf);
 
     Result BuildPipelineInternal(Context*                                   pContext,
                                  llvm::ArrayRef<const PipelineShaderInfo*>  shaderInfo,
-                                 uint32_t                                   forceLoopUnrollCount,
+                                 unsigned                                   forceLoopUnrollCount,
                                  ElfPackage*                                pPipelineElf);
 
     // Gets the count of compiler instance.
-    static uint32_t GetInstanceCount() { return m_instanceCount; }
+    static unsigned GetInstanceCount() { return m_instanceCount; }
 
     // Gets the count of redirect output
-    static uint32_t GetOutRedirectCount() { return m_outRedirectCount; }
+    static unsigned GetOutRedirectCount() { return m_outRedirectCount; }
 
-    static MetroHash::Hash GenerateHashForCompileOptions(uint32_t          optionCount,
+    static MetroHash::Hash GenerateHashForCompileOptions(unsigned          optionCount,
                                                          const char*const* pOptions);
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
@@ -170,7 +170,7 @@ public:
                            CacheEntryHandle    phEntry);
 
     static void BuildShaderCacheHash(Context*                                 pContext,
-                                     uint32_t                                 stageMask,
+                                     unsigned                                 stageMask,
                                      llvm::ArrayRef<llvm::ArrayRef<uint8_t>>  stageHashes,
                                      MetroHash::Hash*                         pFragmentHash,
                                      MetroHash::Hash*                         pNonFragmentHash);
@@ -195,8 +195,8 @@ private:
     std::vector<std::string>      m_options;          // Compilation options
     MetroHash::Hash               m_optionHash;       // Hash code of compilation options
     GfxIpVersion                  m_gfxIp;            // Graphics IP version info
-    static uint32_t               m_instanceCount;    // The count of compiler instance
-    static uint32_t               m_outRedirectCount; // The count of output redirect
+    static unsigned               m_instanceCount;    // The count of compiler instance
+    static unsigned               m_outRedirectCount; // The count of output redirect
     ShaderCachePtr                m_shaderCache;      // Shader cache
     static llvm::sys::Mutex       m_contextPoolMutex; // Mutex for context pool access
     static std::vector<Context*>* m_pContextPool;      // Context pool

@@ -82,16 +82,16 @@ public:
     llvm::Value* GetEsGsOffsets();
 
     // Get GS -> VS ring buffer descriptor (GS out and copy shader in)
-    llvm::Value* GetGsVsRingBufDesc(uint32_t streamId);
+    llvm::Value* GetGsVsRingBufDesc(unsigned streamId);
 
     // Get pointers to emit counters (GS)
     llvm::ArrayRef<llvm::Value*> GetEmitCounterPtr();
 
     // Get descriptor table pointer
-    llvm::Value* GetDescTablePtr(uint32_t descSet);
+    llvm::Value* GetDescTablePtr(unsigned descSet);
 
     // Get shadow descriptor table pointer
-    llvm::Value* GetShadowDescTablePtr(uint32_t descSet);
+    llvm::Value* GetShadowDescTablePtr(unsigned descSet);
 
     // Get global internal table pointer as pointer to i8.
     llvm::Value* GetInternalGlobalTablePtr();
@@ -109,7 +109,7 @@ public:
     llvm::Value* GetVertexBufTablePtr();
 
     // Get stream-out buffer descriptor
-    llvm::Value* GetStreamOutBufDesc(uint32_t xfbBuffer);
+    llvm::Value* GetStreamOutBufDesc(unsigned xfbBuffer);
 
     // Get spill table pointer
     llvm::Instruction* GetSpillTablePtr();
@@ -122,27 +122,27 @@ private:
     llvm::Instruction* GetStreamOutTablePtr();
 
     // Make 64-bit pointer of specified type from 32-bit int, extending with the specified value, or PC if InvalidValue
-    llvm::Instruction* MakePointer(llvm::Value* pLowValue, llvm::Type* pPtrTy, uint32_t highValue);
+    llvm::Instruction* MakePointer(llvm::Value* pLowValue, llvm::Type* pPtrTy, unsigned highValue);
 
     // Get 64-bit extended resource node value
-    llvm::Value* GetExtendedResourceNodeValue(uint32_t resNodeIdx, llvm::Type* pResNodeTy, uint32_t highValue);
+    llvm::Value* GetExtendedResourceNodeValue(unsigned resNodeIdx, llvm::Type* pResNodeTy, unsigned highValue);
 
     // Get 32 bit resource node value
-    llvm::Value* GetResourceNodeValue(uint32_t resNodeIdx);
+    llvm::Value* GetResourceNodeValue(unsigned resNodeIdx);
 
     // Load descriptor from driver table
-    llvm::Instruction* LoadDescFromDriverTable(uint32_t tableOffset, BuilderBase& builder);
+    llvm::Instruction* LoadDescFromDriverTable(unsigned tableOffset, BuilderBase& builder);
 
     // Explicitly set the DATA_FORMAT of ring buffer descriptor.
     llvm::Value* SetRingBufferDataFormat(llvm::Value*       pBufDesc,
-                                         uint32_t           dataFormat,
+                                         unsigned           dataFormat,
                                          BuilderBase&       builder) const;
 
     // Find resource node by type
     const ResourceNode* FindResourceNodeByType(ResourceNodeType type);
 
     // Find resource node by descriptor set ID
-    uint32_t FindResourceNodeByDescSet(uint32_t descSet);
+    unsigned FindResourceNodeByDescSet(unsigned descSet);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -184,7 +184,7 @@ private:
     llvm::Instruction*  m_pPc = nullptr;                // Program counter as <2 x i32>
 
     bool                m_enableShadowDescTable = true; // Enable shadow descriptor table
-    uint32_t            m_shadowDescTablePtrHigh = 2;   // High part of VA for shadow table pointer
+    unsigned            m_shadowDescTablePtrHigh = 2;   // High part of VA for shadow table pointer
                                                         // 2 is a dummy value for use in offline compiling
 };
 

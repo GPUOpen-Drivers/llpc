@@ -43,7 +43,7 @@ using namespace llvm;
 // Note: If input planeCount == 1, it'll generate the base address for plane 0. This function accepts the concept of
 // planeCount rather a specific plane for that the calulation of plane[n+1] is always based on plane[n].
 void YCbCrAddressHandler::GenBaseAddress(
-    uint32_t planeCount) // The plane counts
+    unsigned planeCount) // The plane counts
 {
     // For YCbCr, the possible plane counts are among 1 and 3.
     assert(planeCount > 0 && planeCount < 4);
@@ -71,7 +71,7 @@ void YCbCrAddressHandler::GenBaseAddress(
 // Power2Align operation
 Value* YCbCrAddressHandler::Power2Align(
     Value*   pX,    // [in] Value needs to be aligned
-    uint32_t align) // Align base
+    unsigned align) // Align base
 {
     // Check if align is a power of 2
     assert(align != 0 && (align & (align - 1)) == 0);
@@ -83,11 +83,11 @@ Value* YCbCrAddressHandler::Power2Align(
 // =====================================================================================================================
 // Calculate height and pitch
 void YCbCrAddressHandler::GenHeightAndPitch(
-    uint32_t bits,          // Channel bits
-    uint32_t bpp,           // Bits per pixel
-    uint32_t xBitCount,     // Effective channel bits
+    unsigned bits,          // Channel bits
+    unsigned bpp,           // Bits per pixel
+    unsigned xBitCount,     // Effective channel bits
     bool     isTileOptimal, // Is tiling optimal
-    uint32_t planeNum)      // Number of planes
+    unsigned planeNum)      // Number of planes
 {
     switch (m_pGfxIp->major)
     {
@@ -134,8 +134,8 @@ void YCbCrAddressHandler::GenHeightAndPitch(
         }
     case 10:
         {
-            const uint32_t elementBytes = bpp >> 3;
-            const uint32_t pitchAlign = (256 / elementBytes);
+            const unsigned elementBytes = bpp >> 3;
+            const unsigned pitchAlign = (256 / elementBytes);
 
             // Height = SqRsrcRegs::Height
             Value* pHeight = m_pRegHelper->GetReg(SqRsrcRegs::Height);
@@ -161,13 +161,13 @@ void YCbCrAddressHandler::GenHeightAndPitch(
 
             if (isTileOptimal)
             {
-                const uint32_t log2BlkSize = 16;
-                const uint32_t log2EleBytes = log2(bpp >> 3);
-                const uint32_t log2NumEle = log2BlkSize - log2EleBytes;
+                const unsigned log2BlkSize = 16;
+                const unsigned log2EleBytes = log2(bpp >> 3);
+                const unsigned log2NumEle = log2BlkSize - log2EleBytes;
                 const bool widthPrecedent = 1;
-                const uint32_t log2Width = (log2NumEle + (widthPrecedent ? 1 : 0)) / 2;
-                const uint32_t pitchAlignOpt = 1u << log2Width;
-                const uint32_t heightAlignOpt = 1u << (log2NumEle - log2Width);
+                const unsigned log2Width = (log2NumEle + (widthPrecedent ? 1 : 0)) / 2;
+                const unsigned pitchAlignOpt = 1u << log2Width;
+                const unsigned heightAlignOpt = 1u << (log2NumEle - log2Width);
 
                 // PitchY = PitchY * ElementBytes
                 Value* pPtchYOpt = m_pBuilder->CreateMul(Power2Align(pWidth, pitchAlignOpt),

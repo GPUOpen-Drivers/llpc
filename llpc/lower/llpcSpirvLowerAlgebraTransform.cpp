@@ -374,7 +374,7 @@ void SpirvLowerAlgebraTransform::visitCallInst(
         // TODO: Having this here is not good, as it requires us to know implementation details of Builder.
         // We need to find a neater way to do it.
         auto calleeName = pCallee->getName();
-        uint32_t builtIn = InvalidValue;
+        unsigned builtIn = InvalidValue;
         Value* pValueWritten = nullptr;
         if (calleeName.startswith("llpc.output.export.builtin."))
         {

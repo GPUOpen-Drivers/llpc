@@ -174,9 +174,9 @@ void ElfWriter<Elf>::mergeSection(
     {
         // NOTE: All disassemble section don't have any alignmeent requirement, so it happen only if we merge
         // .text section.
-        constexpr uint32_t Nop = 0xBF800000;
-        uint32_t* pDataDw = reinterpret_cast<uint32_t*>(pData);
-        for (uint32_t i = 0; i < (section1Size - baseCopySize) / sizeof(uint32_t); ++i)
+        constexpr unsigned Nop = 0xBF800000;
+        unsigned* pDataDw = reinterpret_cast<unsigned*>(pData);
+        for (unsigned i = 0; i < (section1Size - baseCopySize) / sizeof(unsigned); ++i)
         {
             pDataDw[i] = Nop;
         }
@@ -213,7 +213,7 @@ template<class Elf>
 void ElfWriter<Elf>::mergeMapItem(
     llvm::msgpack::MapDocNode& destMap,    // [in,out] Destination map
     llvm::msgpack::MapDocNode& srcMap,     // [in] Source map
-    uint32_t                    key)       // Key to check in source map
+    unsigned                    key)       // Key to check in source map
 {
     auto srcKeyNode = srcMap.getDocument()->getNode(key);
     auto srcIt = srcMap.find(srcKeyNode);
@@ -284,7 +284,7 @@ void ElfWriter<Elf>::mergeMetaNote(
     // Copy whole .ps hw stage
     auto destHwStages = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
     auto srcHwStages = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
-    auto pHwPsStageName = HwStageNames[static_cast<uint32_t>(Util::Abi::HardwareStage::Ps)];
+    auto pHwPsStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Ps)];
     destHwStages[pHwPsStageName] = srcHwStages[pHwPsStageName];
 
     // Copy whole .pixel shader
@@ -298,7 +298,7 @@ void ElfWriter<Elf>::mergeMetaNote(
     pipelineHash[1] = destDocument.getNode(pContext->GetPiplineHashCode());
 
     // List of fragment shader related registers.
-    static const uint32_t PsRegNumbers[] =
+    static const unsigned PsRegNumbers[] =
     {
         0x2C0A, // mmSPI_SHADER_PGM_RSRC1_PS
         0x2C0B, // mmSPI_SHADER_PGM_RSRC2_PS
@@ -332,21 +332,21 @@ void ElfWriter<Elf>::mergeMetaNote(
     auto destRegisters = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
     auto srcRegisters = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
 
-    for (uint32_t regNumber : ArrayRef<uint32_t>(PsRegNumbers))
+    for (unsigned regNumber : ArrayRef<unsigned>(PsRegNumbers))
     {
         mergeMapItem(destRegisters, srcRegisters, regNumber);
     }
 
-    const uint32_t mmSPI_PS_INPUT_CNTL_0 = 0xa191;
-    const uint32_t mmSPI_PS_INPUT_CNTL_31 = 0xa1b0;
-    for (uint32_t regNumber = mmSPI_PS_INPUT_CNTL_0; regNumber != mmSPI_PS_INPUT_CNTL_31 + 1; ++regNumber)
+    const unsigned mmSPI_PS_INPUT_CNTL_0 = 0xa191;
+    const unsigned mmSPI_PS_INPUT_CNTL_31 = 0xa1b0;
+    for (unsigned regNumber = mmSPI_PS_INPUT_CNTL_0; regNumber != mmSPI_PS_INPUT_CNTL_31 + 1; ++regNumber)
     {
         mergeMapItem(destRegisters, srcRegisters, regNumber);
     }
 
-    const uint32_t mmSPI_SHADER_USER_DATA_PS_0 = 0x2c0c;
-    uint32_t psUserDataCount = (pContext->GetGfxIpVersion().major < 9) ? 16 : 32;
-    for (uint32_t regNumber = mmSPI_SHADER_USER_DATA_PS_0;
+    const unsigned mmSPI_SHADER_USER_DATA_PS_0 = 0x2c0c;
+    unsigned psUserDataCount = (pContext->GetGfxIpVersion().major < 9) ? 16 : 32;
+    for (unsigned regNumber = mmSPI_SHADER_USER_DATA_PS_0;
          regNumber != mmSPI_SHADER_USER_DATA_PS_0 + psUserDataCount; ++regNumber)
     {
         mergeMapItem(destRegisters, srcRegisters, regNumber);
@@ -432,7 +432,7 @@ void ElfWriter<Elf>::setNote(
 // Replace exist section with input section according to section index
 template<class Elf>
 void ElfWriter<Elf>::setSection(
-    uint32_t          secIndex,   //  Section index
+    unsigned          secIndex,   //  Section index
     SectionBuffer*    pSection)   // [in] Input section
 {
     assert(secIndex < m_sections.size());
@@ -456,7 +456,7 @@ size_t ElfWriter<Elf>::getRequiredBufferSizeBytes()
     // Iterate through the section list
     for (auto& section : m_sections)
     {
-        totalBytes += alignTo(section.secHead.sh_size, sizeof(uint32_t));
+        totalBytes += alignTo(section.secHead.sh_size, sizeof(unsigned));
     }
 
     totalBytes += m_header.e_shentsize * m_header.e_shnum;
@@ -475,12 +475,12 @@ void ElfWriter<Elf>::assembleNotes()
         return;
     }
     auto pNoteSection = &m_sections[m_noteSecIdx];
-    const uint32_t noteHeaderSize = sizeof(NoteHeader) - 8;
-    uint32_t noteSize = 0;
+    const unsigned noteHeaderSize = sizeof(NoteHeader) - 8;
+    unsigned noteSize = 0;
     for (auto& note : m_notes)
     {
-        const uint32_t noteNameSize = alignTo(note.hdr.nameSize, sizeof(uint32_t));
-        noteSize += noteHeaderSize + noteNameSize + alignTo(note.hdr.descSize, sizeof(uint32_t));
+        const unsigned noteNameSize = alignTo(note.hdr.nameSize, sizeof(unsigned));
+        noteSize += noteHeaderSize + noteNameSize + alignTo(note.hdr.descSize, sizeof(unsigned));
     }
 
     delete[] pNoteSection->pData;
@@ -493,15 +493,15 @@ void ElfWriter<Elf>::assembleNotes()
     {
         memcpy(pData, &note.hdr, noteHeaderSize);
         pData += noteHeaderSize;
-        const uint32_t noteNameSize = alignTo(note.hdr.nameSize, sizeof(uint32_t));
+        const unsigned noteNameSize = alignTo(note.hdr.nameSize, sizeof(unsigned));
         memcpy(pData, &note.hdr.name, noteNameSize);
         pData += noteNameSize;
-        const uint32_t noteDescSize = alignTo(note.hdr.descSize, sizeof(uint32_t));
+        const unsigned noteDescSize = alignTo(note.hdr.descSize, sizeof(unsigned));
         memcpy(pData, note.pData, noteDescSize);
         pData += noteDescSize;
     }
 
-    assert(pNoteSection->secHead.sh_size == static_cast<uint32_t>(pData - pNoteSection->pData));
+    assert(pNoteSection->secHead.sh_size == static_cast<unsigned>(pData - pNoteSection->pData));
 }
 
 // =====================================================================================================================
@@ -515,7 +515,7 @@ void ElfWriter<Elf>::assembleSymbols()
     }
     auto pStrTabSection = &m_sections[m_strtabSecIdx];
     auto newStrTabSize = 0;
-    uint32_t symbolCount = 0;
+    unsigned symbolCount = 0;
     for (auto& symbol : m_symbols)
     {
         if (symbol.nameOffset == InvalidValue)
@@ -531,7 +531,7 @@ void ElfWriter<Elf>::assembleSymbols()
 
     if (newStrTabSize > 0)
     {
-        uint32_t strTabOffset = pStrTabSection->secHead.sh_size;
+        unsigned strTabOffset = pStrTabSection->secHead.sh_size;
         auto pStrTabBuffer = new uint8_t[pStrTabSection->secHead.sh_size + newStrTabSize];
         memcpy(pStrTabBuffer, pStrTabSection->pData, pStrTabSection->secHead.sh_size);
         delete[] pStrTabSection->pData;
@@ -583,7 +583,7 @@ void ElfWriter<Elf>::assembleSymbols()
     }
 
     assert(pSymbolSection->secHead.sh_size ==
-                static_cast<uint32_t>(reinterpret_cast<uint8_t*>(pSymbolToWrite) - pSymbolSection->pData));
+                static_cast<unsigned>(reinterpret_cast<uint8_t*>(pSymbolToWrite) - pSymbolSection->pData));
 }
 
 // =====================================================================================================================
@@ -592,17 +592,17 @@ void ElfWriter<Elf>::assembleSymbols()
 template<class Elf>
 void ElfWriter<Elf>::calcSectionHeaderOffset()
 {
-    uint32_t sharedHdrOffset = 0;
+    unsigned sharedHdrOffset = 0;
 
-    const uint32_t elfHdrSize = sizeof(typename Elf::FormatHeader);
-    const uint32_t pHdrSize = sizeof(typename Elf::Phdr);
+    const unsigned elfHdrSize = sizeof(typename Elf::FormatHeader);
+    const unsigned pHdrSize = sizeof(typename Elf::Phdr);
 
     sharedHdrOffset += elfHdrSize;
     sharedHdrOffset += m_header.e_phnum * pHdrSize;
 
     for (auto& section : m_sections)
     {
-        const uint32_t secSzBytes = alignTo(section.secHead.sh_size, sizeof(uint32_t));
+        const unsigned secSzBytes = alignTo(section.secHead.sh_size, sizeof(unsigned));
         sharedHdrOffset += secSzBytes;
     }
 
@@ -633,7 +633,7 @@ void ElfWriter<Elf>::writeToBuffer(
     char* pBuffer = static_cast<char*>(pData);
 
     // ELF header comes first
-    const uint32_t elfHdrSize = sizeof(typename Elf::FormatHeader);
+    const unsigned elfHdrSize = sizeof(typename Elf::FormatHeader);
     memcpy(pBuffer, &m_header, elfHdrSize);
     pBuffer += elfHdrSize;
 
@@ -642,13 +642,13 @@ void ElfWriter<Elf>::writeToBuffer(
     // Write each section buffer
     for (auto& section : m_sections)
     {
-        section.secHead.sh_offset = static_cast<uint32_t>(pBuffer - pData);
-        const uint32_t sizeBytes = section.secHead.sh_size;
+        section.secHead.sh_offset = static_cast<unsigned>(pBuffer - pData);
+        const unsigned sizeBytes = section.secHead.sh_size;
         memcpy(pBuffer, section.pData, sizeBytes);
-        pBuffer += alignTo(sizeBytes, sizeof(uint32_t));
+        pBuffer += alignTo(sizeBytes, sizeof(unsigned));
     }
 
-    const uint32_t secHdrSize = sizeof(typename Elf::SectionHeader);
+    const unsigned secHdrSize = sizeof(typename Elf::SectionHeader);
     for (auto& section : m_sections)
     {
         memcpy(pBuffer, &section.secHead, secHdrSize);
@@ -691,17 +691,17 @@ Result ElfWriter<Elf>::copyFromReader(
     assert(m_strtabSecIdx > 0);
 
     auto pNoteSection = &m_sections[m_noteSecIdx];
-    const uint32_t noteHeaderSize = sizeof(NoteHeader) - 8;
+    const unsigned noteHeaderSize = sizeof(NoteHeader) - 8;
     size_t offset = 0;
     while (offset < pNoteSection->secHead.sh_size)
     {
         const NoteHeader* pNote = reinterpret_cast<const NoteHeader*>(pNoteSection->pData + offset);
-        const uint32_t noteNameSize = alignTo(pNote->nameSize, 4);
+        const unsigned noteNameSize = alignTo(pNote->nameSize, 4);
         ElfNote noteNode;
         memcpy(&noteNode.hdr, pNote, noteHeaderSize);
         memcpy(noteNode.hdr.name, pNote->name, noteNameSize);
 
-        const uint32_t noteDescSize = alignTo(pNote->descSize, 4);
+        const unsigned noteDescSize = alignTo(pNote->descSize, 4);
         auto pData = new uint8_t[noteDescSize];
         memcpy(pData, pNoteSection->pData + offset + noteHeaderSize + noteNameSize, noteDescSize);
         noteNode.pData = pData;
@@ -714,9 +714,9 @@ Result ElfWriter<Elf>::copyFromReader(
     const char* pStrTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx].pData);
 
     auto symbols = reinterpret_cast<const typename Elf::Symbol*>(pSymSection->pData);
-    auto symCount = static_cast<uint32_t>(pSymSection->secHead.sh_size / pSymSection->secHead.sh_entsize);
+    auto symCount = static_cast<unsigned>(pSymSection->secHead.sh_size / pSymSection->secHead.sh_entsize);
 
-    for (uint32_t idx = 0; idx < symCount; ++idx)
+    for (unsigned idx = 0; idx < symCount; ++idx)
     {
         ElfSymbol symbol = {};
         symbol.secIdx = symbols[idx].st_shndx;
@@ -757,7 +757,7 @@ Result ElfWriter<Elf>::ReadFromBuffer(
 // Gets section data by section index.
 template<class Elf>
 Result ElfWriter<Elf>::getSectionDataBySectionIndex(
-    uint32_t                 secIdx,          // Section index
+    unsigned                 secIdx,          // Section index
     const SectionBuffer**    ppSectionData    // [out] Section data
     ) const
 {
@@ -791,34 +791,34 @@ void ElfWriter<Elf>::updateMetaNote(
 
     auto registers = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
 
-    const uint32_t mmSPI_SHADER_USER_DATA_PS_0 = 0x2c0c;
-    uint32_t psUserDataBase = mmSPI_SHADER_USER_DATA_PS_0;
-    uint32_t psUserDataCount = (pContext->GetGfxIpVersion().major < 9) ? 16 : 32;
+    const unsigned mmSPI_SHADER_USER_DATA_PS_0 = 0x2c0c;
+    unsigned psUserDataBase = mmSPI_SHADER_USER_DATA_PS_0;
+    unsigned psUserDataCount = (pContext->GetGfxIpVersion().major < 9) ? 16 : 32;
     auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
 
-    for (uint32_t i = 0; i < psUserDataCount; ++i)
+    for (unsigned i = 0; i < psUserDataCount; ++i)
     {
-        uint32_t key = psUserDataBase + i;
+        unsigned key = psUserDataBase + i;
         auto keyNode = registers.getDocument()->getNode(key);
         auto keyIt = registers.find(keyNode);
         if (keyIt != registers.end())
         {
             assert(keyIt->first.getUInt() == key);
             // Reloc Descriptor user data value is consisted by DescRelocMagic | set.
-            uint32_t regValue = keyIt->second.getUInt();
+            unsigned regValue = keyIt->second.getUInt();
             if (DescRelocMagic == (regValue & DescRelocMagicMask))
             {
-                uint32_t set = regValue & DescSetMask;
-                for (uint32_t j = 0; j < pPipelineInfo->fs.userDataNodeCount; ++j)
+                unsigned set = regValue & DescSetMask;
+                for (unsigned j = 0; j < pPipelineInfo->fs.userDataNodeCount; ++j)
                 {
                     if ((pPipelineInfo->fs.pUserDataNodes[j].type == ResourceMappingNodeType::DescriptorTableVaPtr) &&
                         (set == pPipelineInfo->fs.pUserDataNodes[j].tablePtr.pNext[0].srdRange.set))
                     {
                         // If it's descriptor user data, then update its offset to it.
-                        uint32_t value = pPipelineInfo->fs.pUserDataNodes[j].offsetInDwords;
+                        unsigned value = pPipelineInfo->fs.pUserDataNodes[j].offsetInDwords;
                         keyIt->second = registers.getDocument()->getNode(value);
                         // Update userDataLimit if neccessary
-                        uint32_t userDataLimit = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
+                        unsigned userDataLimit = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
                         pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit] =
                             document.getNode(std::max(userDataLimit, value + 1));
                         break;
@@ -841,12 +841,12 @@ void ElfWriter<Elf>::updateMetaNote(
 // Gets all associated symbols by section index.
 template<class Elf>
 void ElfWriter<Elf>::GetSymbolsBySectionIndex(
-    uint32_t                secIdx,         // Section index
+    unsigned                secIdx,         // Section index
     std::vector<ElfSymbol*>& secSymbols)    // [out] ELF symbols
 {
-    uint32_t symCount = m_symbols.size();
+    unsigned symCount = m_symbols.size();
 
-    for (uint32_t idx = 0; idx < symCount; ++idx)
+    for (unsigned idx = 0; idx < symCount; ++idx)
     {
         if (m_symbols[idx].secIdx == secIdx)
         {
@@ -883,15 +883,15 @@ void ElfWriter<Elf>::mergeElfBinary(
     ElfPackage*       pPipelineElf)    // [out] Final ELF binary
 {
     auto FragmentIsaSymbolName =
-        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsMainEntry)];
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<unsigned>(Util::Abi::PipelineSymbolType::PsMainEntry)];
     auto FragmentIntrlTblSymbolName =
-        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsShdrIntrlTblPtr)];
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<unsigned>(Util::Abi::PipelineSymbolType::PsShdrIntrlTblPtr)];
     auto FragmentDisassemblySymbolName =
-        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsDisassembly)];
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<unsigned>(Util::Abi::PipelineSymbolType::PsDisassembly)];
     auto FragmentIntrlDataSymbolName =
-        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsShdrIntrlData)];
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<unsigned>(Util::Abi::PipelineSymbolType::PsShdrIntrlData)];
     auto FragmentAmdIlSymbolName =
-        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsAmdIl)];
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<unsigned>(Util::Abi::PipelineSymbolType::PsAmdIl)];
 
     ElfReader<Elf64> reader(m_gfxIp);
 
@@ -1167,10 +1167,10 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(
     m_sections[m_symSecIdx].secHead = pSymbolTableSection->secHead;
 
     // Now get the symbols that belong in the symbol table.
-    uint32_t offset = 0;
+    unsigned offset = 0;
     for (const ElfReader<Elf>* pElf : relocatableElfs)
     {
-        uint32_t relocElfTextSectionId = pElf->GetSectionIndex(TextName);
+        unsigned relocElfTextSectionId = pElf->GetSectionIndex(TextName);
         std::vector<ElfSymbol> symbols;
         pElf->GetSymbolsBySectionIndex(relocElfTextSectionId, symbols);
         for (auto sym : symbols)

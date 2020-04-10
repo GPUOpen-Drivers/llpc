@@ -360,7 +360,7 @@ Value* BuilderRecorder::CreateDotProduct(
 // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
 // the current output primitive in the specified output-primitive stream number.
 Instruction* BuilderRecorder::CreateEmitVertex(
-    uint32_t                streamId)           // Stream number, 0 if only one stream is present
+    unsigned                streamId)           // Stream number, 0 if only one stream is present
 {
     return Record(Opcode::EmitVertex, nullptr, getInt32(streamId), "");
 }
@@ -368,7 +368,7 @@ Instruction* BuilderRecorder::CreateEmitVertex(
 // =====================================================================================================================
 // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
 Instruction* BuilderRecorder::CreateEndPrimitive(
-    uint32_t                streamId)           // Stream number, 0 if only one stream is present
+    unsigned                streamId)           // Stream number, 0 if only one stream is present
 {
     return Record(Opcode::EndPrimitive, nullptr, getInt32(streamId), "");
 }
@@ -416,7 +416,7 @@ Value* BuilderRecorder::CreateVectorTimesMatrix(
 {
     Type* const pMatrixType = pMatrix->getType();
     Type* const pCompType = pMatrixType->getArrayElementType()->getVectorElementType();
-    const uint32_t columnCount = pMatrixType->getArrayNumElements();
+    const unsigned columnCount = pMatrixType->getArrayNumElements();
     Type* const pResultTy = VectorType::get(pCompType, columnCount);
     return Record(Opcode::VectorTimesMatrix, pResultTy, { pVector, pMatrix }, instName);
 }
@@ -430,7 +430,7 @@ Value* BuilderRecorder::CreateMatrixTimesVector(
 {
     Type* const pColumnType = pMatrix->getType()->getArrayElementType();
     Type* const pCompType = pColumnType->getVectorElementType();
-    const uint32_t rowCount = pColumnType->getVectorNumElements();
+    const unsigned rowCount = pColumnType->getVectorNumElements();
     Type* const pVectorType = VectorType::get(pCompType, rowCount);
     return Record(Opcode::MatrixTimesVector, pVectorType, { pMatrix, pVector }, instName);
 }
@@ -443,7 +443,7 @@ Value* BuilderRecorder::CreateMatrixTimesMatrix(
     const Twine& instName)             // [in] Name to give instruction(s)
 {
     Type* const pMat1ColumnType = pMatrix1->getType()->getArrayElementType();
-    const uint32_t mat2ColCount = pMatrix2->getType()->getArrayNumElements();
+    const unsigned mat2ColCount = pMatrix2->getType()->getArrayNumElements();
     Type* const pResultTy = ArrayType::get(pMat1ColumnType, mat2ColCount);
     return Record(Opcode::MatrixTimesMatrix, pResultTy, { pMatrix1, pMatrix2 }, instName);
 }
@@ -455,7 +455,7 @@ Value* BuilderRecorder::CreateOuterProduct(
     Value* const pVector2,            // [in] The vector 2
     const Twine& instName)            // [in] Name to give instruction(s)
 {
-    const uint32_t colCount = pVector2->getType()->getVectorNumElements();
+    const unsigned colCount = pVector2->getType()->getVectorNumElements();
     Type* const pResultTy = ArrayType::get(pVector1->getType(), colCount);
     return Record(Opcode::OuterProduct, pResultTy, { pVector1, pVector2 }, instName);
 }
@@ -1003,8 +1003,8 @@ Value* BuilderRecorder::CreateFindSMsb(
 // =====================================================================================================================
 // Create a load of a buffer descriptor.
 Value* BuilderRecorder::CreateLoadBufferDesc(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
+    unsigned      descSet,          // Descriptor set
+    unsigned      binding,          // Descriptor binding
     Value*        pDescIndex,       // [in] Descriptor index
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
     bool          isWritten,        // Whether the buffer is written to
@@ -1060,8 +1060,8 @@ Value* BuilderRecorder::CreateLoadDescFromPtr(
 // =====================================================================================================================
 // Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
 Value* BuilderRecorder::CreateGetSamplerDescPtr(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
+    unsigned      descSet,          // Descriptor set
+    unsigned      binding,          // Descriptor binding
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     return Record(Opcode::GetSamplerDescPtr, GetSamplerDescPtrTy(), { getInt32(descSet), getInt32(binding) }, instName);
@@ -1070,8 +1070,8 @@ Value* BuilderRecorder::CreateGetSamplerDescPtr(
 // =====================================================================================================================
 // Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
 Value* BuilderRecorder::CreateGetImageDescPtr(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
+    unsigned      descSet,          // Descriptor set
+    unsigned      binding,          // Descriptor binding
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     return Record(Opcode::GetImageDescPtr, GetImageDescPtrTy(), { getInt32(descSet), getInt32(binding) }, instName);
@@ -1080,8 +1080,8 @@ Value* BuilderRecorder::CreateGetImageDescPtr(
 // =====================================================================================================================
 // Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
 Value* BuilderRecorder::CreateGetTexelBufferDescPtr(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
+    unsigned      descSet,          // Descriptor set
+    unsigned      binding,          // Descriptor binding
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     return Record(Opcode::GetTexelBufferDescPtr,
@@ -1093,8 +1093,8 @@ Value* BuilderRecorder::CreateGetTexelBufferDescPtr(
 // =====================================================================================================================
 // Create a load of a F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
 Value* BuilderRecorder::CreateGetFmaskDescPtr(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
+    unsigned      descSet,          // Descriptor set
+    unsigned      binding,          // Descriptor binding
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     return Record(Opcode::GetFmaskDescPtr, GetFmaskDescPtrTy(), { getInt32(descSet), getInt32(binding) }, instName);
@@ -1123,8 +1123,8 @@ Value* BuilderRecorder::CreateGetBufferDescLength(
 // Create an image load.
 Value* BuilderRecorder::CreateImageLoad(
     Type*                   pResultTy,          // [in] Result type
-    uint32_t                dim,                // Image dimension
-    uint32_t                flags,              // ImageFlag* flags
+    unsigned                dim,                // Image dimension
+    unsigned                flags,              // ImageFlag* flags
     Value*                  pImageDesc,         // [in] Image descriptor
     Value*                  pCoord,             // [in] Coordinates: scalar or vector i32
     Value*                  pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
@@ -1146,8 +1146,8 @@ Value* BuilderRecorder::CreateImageLoad(
 // Create an image load with F-mask.
 Value* BuilderRecorder::CreateImageLoadWithFmask(
     Type*                   pResultTy,          // [in] Result type
-    uint32_t                dim,                // Image dimension
-    uint32_t                flags,              // ImageFlag* flags
+    unsigned                dim,                // Image dimension
+    unsigned                flags,              // ImageFlag* flags
     Value*                  pImageDesc,         // [in] Image descriptor
     Value*                  pFmaskDesc,         // [in] Fmask descriptor
     Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right
@@ -1165,8 +1165,8 @@ Value* BuilderRecorder::CreateImageLoadWithFmask(
 // Create an image store.
 Value* BuilderRecorder::CreateImageStore(
     Value*            pTexel,             // [in] Texel value to store; v4f16 or v4f32
-    uint32_t          dim,                // Image dimension
-    uint32_t          flags,              // ImageFlag* flags
+    unsigned          dim,                // Image dimension
+    unsigned          flags,              // ImageFlag* flags
     Value*            pImageDesc,         // [in] Image descriptor
     Value*            pCoord,             // [in] Coordinates: scalar or vector i32
     Value*            pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
@@ -1189,16 +1189,16 @@ Value* BuilderRecorder::CreateImageStore(
 // Create an image sample.
 Value* BuilderRecorder::CreateImageSample(
     Type*               pResultTy,          // [in] Result type
-    uint32_t            dim,                // Image dimension
-    uint32_t            flags,              // ImageFlag* flags
+    unsigned            dim,                // Image dimension
+    unsigned            flags,              // ImageFlag* flags
     Value*              pImageDesc,         // [in] Image descriptor
     Value*              pSamplerDesc,       // [in] Sampler descriptor
     ArrayRef<Value*>    address,            // Address and other arguments
     const Twine&        instName)           // [in] Name to give instruction(s)
 {
     // Gather a mask of address elements that are not nullptr.
-    uint32_t addressMask = 0;
-    for (uint32_t i = 0; i != address.size(); ++i)
+    unsigned addressMask = 0;
+    for (unsigned i = 0; i != address.size(); ++i)
     {
         if (address[i] != nullptr)
         {
@@ -1212,7 +1212,7 @@ Value* BuilderRecorder::CreateImageSample(
     args.push_back(pImageDesc);
     args.push_back(pSamplerDesc);
     args.push_back(getInt32(addressMask));
-    for (uint32_t i = 0; i != address.size(); ++i)
+    for (unsigned i = 0; i != address.size(); ++i)
     {
         if (address[i] != nullptr)
         {
@@ -1226,16 +1226,16 @@ Value* BuilderRecorder::CreateImageSample(
 // Create an image gather.
 Value* BuilderRecorder::CreateImageGather(
     Type*               pResultTy,          // [in] Result type
-    uint32_t            dim,                // Image dimension
-    uint32_t            flags,              // ImageFlag* flags
+    unsigned            dim,                // Image dimension
+    unsigned            flags,              // ImageFlag* flags
     Value*              pImageDesc,         // [in] Image descriptor
     Value*              pSamplerDesc,       // [in] Sampler descriptor
     ArrayRef<Value*>    address,            // Address and other arguments
     const Twine&        instName)           // [in] Name to give instruction(s)
 {
     // Gather a mask of address elements that are not nullptr.
-    uint32_t addressMask = 0;
-    for (uint32_t i = 0; i != address.size(); ++i)
+    unsigned addressMask = 0;
+    for (unsigned i = 0; i != address.size(); ++i)
     {
         if (address[i] != nullptr)
         {
@@ -1249,7 +1249,7 @@ Value* BuilderRecorder::CreateImageGather(
     args.push_back(pImageDesc);
     args.push_back(pSamplerDesc);
     args.push_back(getInt32(addressMask));
-    for (uint32_t i = 0; i != address.size(); ++i)
+    for (unsigned i = 0; i != address.size(); ++i)
     {
         if (address[i] != nullptr)
         {
@@ -1262,9 +1262,9 @@ Value* BuilderRecorder::CreateImageGather(
 // =====================================================================================================================
 // Create an image atomic operation other than compare-and-swap.
 Value* BuilderRecorder::CreateImageAtomic(
-    uint32_t                atomicOp,           // Atomic op to create
-    uint32_t                dim,                // Image dimension
-    uint32_t                flags,              // ImageFlag* flags
+    unsigned                atomicOp,           // Atomic op to create
+    unsigned                dim,                // Image dimension
+    unsigned                flags,              // ImageFlag* flags
     AtomicOrdering          ordering,           // Atomic ordering
     Value*                  pImageDesc,         // [in] Image descriptor
     Value*                  pCoord,             // [in] Coordinates: scalar or vector i32
@@ -1277,7 +1277,7 @@ Value* BuilderRecorder::CreateImageAtomic(
                       getInt32(atomicOp),
                       getInt32(dim),
                       getInt32(flags),
-                      getInt32(static_cast<uint32_t>(ordering)),
+                      getInt32(static_cast<unsigned>(ordering)),
                       pImageDesc,
                       pCoord,
                       pInputValue
@@ -1288,8 +1288,8 @@ Value* BuilderRecorder::CreateImageAtomic(
 // =====================================================================================================================
 // Create an image atomic compare-and-swap.
 Value* BuilderRecorder::CreateImageAtomicCompareSwap(
-    uint32_t                dim,                // Image dimension
-    uint32_t                flags,              // ImageFlag* flags
+    unsigned                dim,                // Image dimension
+    unsigned                flags,              // ImageFlag* flags
     AtomicOrdering          ordering,           // Atomic ordering
     Value*                  pImageDesc,         // [in] Image descriptor
     Value*                  pCoord,             // [in] Coordinates: scalar or vector i32
@@ -1302,7 +1302,7 @@ Value* BuilderRecorder::CreateImageAtomicCompareSwap(
                   {
                       getInt32(dim),
                       getInt32(flags),
-                      getInt32(static_cast<uint32_t>(ordering)),
+                      getInt32(static_cast<unsigned>(ordering)),
                       pImageDesc,
                       pCoord,
                       pInputValue,
@@ -1314,8 +1314,8 @@ Value* BuilderRecorder::CreateImageAtomicCompareSwap(
 // =====================================================================================================================
 // Create a query of the number of mipmap levels in an image. Returns an i32 value.
 Value* BuilderRecorder::CreateImageQueryLevels(
-    uint32_t                dim,                // Image dimension
-    uint32_t                flags,              // ImageFlag* flags
+    unsigned                dim,                // Image dimension
+    unsigned                flags,              // ImageFlag* flags
     Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
@@ -1325,8 +1325,8 @@ Value* BuilderRecorder::CreateImageQueryLevels(
 // =====================================================================================================================
 // Create a query of the number of samples in an image. Returns an i32 value.
 Value* BuilderRecorder::CreateImageQuerySamples(
-    uint32_t                dim,                // Image dimension
-    uint32_t                flags,              // ImageFlag* flags
+    unsigned                dim,                // Image dimension
+    unsigned                flags,              // ImageFlag* flags
     Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
@@ -1337,13 +1337,13 @@ Value* BuilderRecorder::CreateImageQuerySamples(
 // Create a query of size of an image.
 // Returns an i32 scalar or vector of the width given by GetImageQuerySizeComponentCount.
 Value* BuilderRecorder::CreateImageQuerySize(
-    uint32_t                dim,                // Image dimension
-    uint32_t                flags,              // ImageFlag* flags
+    unsigned                dim,                // Image dimension
+    unsigned                flags,              // ImageFlag* flags
     Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
     Value*                  pLod,               // [in] LOD
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
-    uint32_t compCount = GetImageQuerySizeComponentCount(dim);
+    unsigned compCount = GetImageQuerySizeComponentCount(dim);
     Type* pResultTy = getInt32Ty();
     if (compCount > 1)
     {
@@ -1357,8 +1357,8 @@ Value* BuilderRecorder::CreateImageQuerySize(
 // and implicit LOD. Returns a v2f32 containing the layer number and the implicit level of
 // detail relative to the base level.
 Value* BuilderRecorder::CreateImageGetLod(
-    uint32_t                dim,                // Image dimension
-    uint32_t                flags,              // ImageFlag* flags
+    unsigned                dim,                // Image dimension
+    unsigned                flags,              // ImageFlag* flags
     Value*                  pImageDesc,         // [in] Image descriptor
     Value*                  pSamplerDesc,       // [in] Sampler descriptor
     Value*                  pCoord,             // [in] Coordinates
@@ -1374,10 +1374,10 @@ Value* BuilderRecorder::CreateImageGetLod(
 // Create a read of (part of) a user input value, passed from the previous shader stage.
 Value* BuilderRecorder::CreateReadGenericInput(
     Type*         pResultTy,          // [in] Type of value to read
-    uint32_t      location,           // Base location (row) of input
+    unsigned      location,           // Base location (row) of input
     Value*        pLocationOffset,    // [in] Variable location offset; must be within locationCount
     Value*        pElemIdx,           // [in] Vector index
-    uint32_t      locationCount,      // Count of locations taken by the input
+    unsigned      locationCount,      // Count of locations taken by the input
     InOutInfo     inputInfo,          // Extra input info (FS interp info)
     Value*        pVertexIndex,       // [in] For TCS/TES/GS per-vertex input: vertex index, else nullptr
     const Twine&  instName)           // [in] Name to give instruction(s)
@@ -1400,10 +1400,10 @@ Value* BuilderRecorder::CreateReadGenericInput(
 // Create a read of (part of) a user output value, the last written value in the same shader stage.
 Value* BuilderRecorder::CreateReadGenericOutput(
     Type*         pResultTy,          // [in] Type of value to read
-    uint32_t      location,           // Base location (row) of input
+    unsigned      location,           // Base location (row) of input
     Value*        pLocationOffset,    // [in] Variable location offset; must be within locationCount
     Value*        pElemIdx,           // [in] Vector index
-    uint32_t      locationCount,      // Count of locations taken by the input
+    unsigned      locationCount,      // Count of locations taken by the input
     InOutInfo     outputInfo,         // Extra output info
     Value*        pVertexIndex,       // [in] For TCS per-vertex output: vertex index, else nullptr
     const Twine&  instName)           // [in] Name to give instruction(s)
@@ -1430,11 +1430,11 @@ Value* BuilderRecorder::CreateReadGenericOutput(
 // A non-constant pLocationOffset is currently only supported for TCS.
 Instruction* BuilderRecorder::CreateWriteGenericOutput(
     Value*        pValueToWrite,      // [in] Value to write
-    uint32_t      location,           // Base location (row) of output
+    unsigned      location,           // Base location (row) of output
     Value*        pLocationOffset,    // [in] Location offset; must be within locationCount if variable
     Value*        pElemIdx,           // [in] Element index in vector. (This is the SPIR-V "component", except
                                       //      that it is half the component for 64-bit elements.)
-    uint32_t      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
+    unsigned      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
     InOutInfo     outputInfo,         // Extra output info (GS stream ID, FS integer signedness)
     Value*        pVertexIndex)       // [in] For TCS per-vertex output: vertex index; else nullptr
 {
@@ -1458,9 +1458,9 @@ Instruction* BuilderRecorder::CreateWriteGenericOutput(
 Instruction* BuilderRecorder::CreateWriteXfbOutput(
     Value*        pValueToWrite,      // [in] Value to write
     bool          isBuiltIn,          // True for built-in, false for user output (ignored if not GS)
-    uint32_t      location,           // Location (row) or built-in kind of output (ignored if not GS)
-    uint32_t      xfbBuffer,          // XFB buffer ID
-    uint32_t      xfbStride,          // XFB stride
+    unsigned      location,           // Location (row) or built-in kind of output (ignored if not GS)
+    unsigned      xfbBuffer,          // XFB buffer ID
+    unsigned      xfbStride,          // XFB stride
     Value*        pXfbOffset,         // [in] XFB byte offset
     InOutInfo     outputInfo)         // Extra output info (GS stream ID)
 {

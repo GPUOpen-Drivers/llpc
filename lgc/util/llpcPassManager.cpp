@@ -54,7 +54,7 @@ static cl::opt<std::string> DumpCfgAfter("dump-cfg-after",
 static cl::opt<bool> DumpPassName("dump-pass-name", cl::desc("Dump executed pass name"), cl::init(false));
 
 // -disable-pass-indices: indices of passes to be disabled
-static cl::list<uint32_t> DisablePassIndices("disable-pass-indices", cl::ZeroOrMore, cl::desc("Indices of passes to be disabled"));
+static cl::list<unsigned> DisablePassIndices("disable-pass-indices", cl::ZeroOrMore, cl::desc("Indices of passes to be disabled"));
 
 } // cl
 
@@ -76,7 +76,7 @@ public:
     PassManagerImpl();
     ~PassManagerImpl() override {}
 
-    void SetPassIndex(uint32_t* pPassIndex) override { m_pPassIndex = pPassIndex; }
+    void SetPassIndex(unsigned* pPassIndex) override { m_pPassIndex = pPassIndex; }
     void add(llvm::Pass* pPass) override;
     void stop() override;
 
@@ -85,7 +85,7 @@ private:
     llvm::AnalysisID  m_dumpCfgAfter = nullptr;  // -dump-cfg-after pass id
     llvm::AnalysisID  m_printModule = nullptr;   // Pass id of dump pass "Print Module IR"
     llvm::AnalysisID  m_jumpThreading = nullptr; // Pass id of opt pass "Jump Threading"
-    uint32_t*         m_pPassIndex = nullptr;    // Pass Index
+    unsigned*         m_pPassIndex = nullptr;    // Pass Index
 };
 
 } // anonymous
@@ -161,7 +161,7 @@ void PassManagerImpl::add(
 
     if ((passId != m_printModule) && (m_pPassIndex != nullptr))
     {
-        uint32_t passIndex = (*m_pPassIndex)++;
+        unsigned passIndex = (*m_pPassIndex)++;
 
         for (auto disableIndex : cl::DisablePassIndices)
         {

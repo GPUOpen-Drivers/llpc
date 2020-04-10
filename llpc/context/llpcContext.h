@@ -121,12 +121,12 @@ public:
         return m_pPipelineContext->GetPipelineBuildInfo();
     }
 
-    uint32_t GetShaderStageMask() const
+    unsigned GetShaderStageMask() const
     {
         return m_pPipelineContext->GetShaderStageMask();
     }
 
-    uint32_t GetActiveShaderStageCount() const
+    unsigned GetActiveShaderStageCount() const
     {
         return m_pPipelineContext->GetActiveShaderStageCount();
     }

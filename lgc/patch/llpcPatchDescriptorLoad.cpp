@@ -77,7 +77,7 @@ bool PatchDescriptorLoad::runOnModule(
 
     // Invoke handling of "call" instruction
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
-    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
+    for (unsigned shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
     {
         m_pEntryPoint = pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
         if (m_pEntryPoint != nullptr)
@@ -142,8 +142,8 @@ void PatchDescriptorLoad::ProcessDescriptorGetPtr(
     builder.SetInsertPoint(pDescPtrCall);
 
     // Find the resource node for the descriptor set and binding.
-    uint32_t descSet = cast<ConstantInt>(pDescPtrCall->getArgOperand(0))->getZExtValue();
-    uint32_t binding = cast<ConstantInt>(pDescPtrCall->getArgOperand(1))->getZExtValue();
+    unsigned descSet = cast<ConstantInt>(pDescPtrCall->getArgOperand(0))->getZExtValue();
+    unsigned binding = cast<ConstantInt>(pDescPtrCall->getArgOperand(1))->getZExtValue();
     auto resType = ResourceNodeType::DescriptorResource;
     bool shadow = false;
     if (descPtrCallName.startswith(lgcName::DescriptorGetTexelBufferPtr))
@@ -192,15 +192,15 @@ void PatchDescriptorLoad::ProcessDescriptorGetPtr(
 // Get a struct containing the pointer and byte stride for a descriptor
 Value* PatchDescriptorLoad::GetDescPtrAndStride(
     ResourceNodeType        resType,    // Resource type
-    uint32_t                descSet,    // Descriptor set
-    uint32_t                binding,    // Binding
+    unsigned                descSet,    // Descriptor set
+    unsigned                binding,    // Binding
     const ResourceNode*     pTopNode,   // Node in top-level descriptor table (TODO: nullptr for shader compilation)
     const ResourceNode*     pNode,      // The descriptor node itself (TODO: nullptr for shader compilation)
     bool                    shadow,     // Whether to load from shadow descriptor table
     IRBuilder<>&            builder)    // [in/out] IRBuilder
 {
     // Determine the stride if possible without looking at the resource node.
-    uint32_t byteSize = 0;
+    unsigned byteSize = 0;
     Value* pStride = nullptr;
     switch (resType)
     {
@@ -305,8 +305,8 @@ Value* PatchDescriptorLoad::GetDescPtrAndStride(
 // Get a pointer to a descriptor, as a pointer to i32
 Value* PatchDescriptorLoad::GetDescPtr(
     ResourceNodeType        resType,    // Resource type
-    uint32_t                descSet,    // Descriptor set
-    uint32_t                binding,    // Binding
+    unsigned                descSet,    // Descriptor set
+    unsigned                binding,    // Binding
     const ResourceNode*     pTopNode,   // Node in top-level descriptor table (TODO: nullptr for shader compilation)
     const ResourceNode*     pNode,      // The descriptor node itself (TODO: nullptr for shader compilation)
     bool                    shadow,     // Whether to load from shadow descriptor table
@@ -347,7 +347,7 @@ Value* PatchDescriptorLoad::GetDescPtr(
     {
         // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
         // add on the size of the first part.
-        uint32_t offsetInDwords = pNode->offsetInDwords;
+        unsigned offsetInDwords = pNode->offsetInDwords;
         if ((resType == ResourceNodeType::DescriptorSampler) &&
             (pNode->type == ResourceNodeType::DescriptorCombinedTexture))
         {
@@ -469,8 +469,8 @@ void PatchDescriptorLoad::visitCallInst(
 
         if (callInst.use_empty() == false)
         {
-            uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-            uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+            unsigned descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
+            unsigned binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
             Value* pArrayOffset = callInst.getOperand(2); // Offset for arrayed resource (index)
             Value* pDesc = LoadBufferDescriptor(descSet, binding, pArrayOffset, &callInst);
             callInst.replaceAllUsesWith(pDesc);
@@ -486,8 +486,8 @@ void PatchDescriptorLoad::visitCallInst(
 // This is the handler for llpc.descriptor.load.buffer, which is also used for loading a descriptor
 // from the global table or the per-shader table.
 Value* PatchDescriptorLoad::LoadBufferDescriptor(
-    uint32_t      descSet,        // Descriptor set
-    uint32_t      binding,        // Binding
+    unsigned      descSet,        // Descriptor set
+    unsigned      binding,        // Binding
     Value*        pArrayOffset,   // [in] Index in descriptor array
     Instruction*  pInsertPoint)   // [in] Insert point
 {
@@ -536,9 +536,9 @@ Value* PatchDescriptorLoad::LoadBufferDescriptor(
         // This is a compact buffer descriptor (only two dwords) in the top-level table. We special-case
         // that to use user data SGPRs directly, if PatchEntryPointMutate managed to fit the value into
         // user data SGPRs.
-        uint32_t resNodeIdx = pTopNode - m_pPipelineState->GetUserDataNodes().data();
+        unsigned resNodeIdx = pTopNode - m_pPipelineState->GetUserDataNodes().data();
         auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
-        uint32_t argIdx = pIntfData->entryArgIdxs.resNodeValues[resNodeIdx];
+        unsigned argIdx = pIntfData->entryArgIdxs.resNodeValues[resNodeIdx];
         if (argIdx > 0)
         {
             // Resource node isn't spilled. Load its value from function argument.
@@ -573,7 +573,7 @@ Value* PatchDescriptorLoad::LoadBufferDescriptor(
     }
 
     // Add on the index.
-    uint32_t dwordStride = DescriptorSizeBuffer / 4;
+    unsigned dwordStride = DescriptorSizeBuffer / 4;
     if ((pNode != nullptr) && (pNode->type == ResourceNodeType::DescriptorBufferCompact))
     {
         dwordStride = DescriptorSizeBufferCompact / 4;

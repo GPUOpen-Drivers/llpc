@@ -60,8 +60,8 @@ public:
     Document() {}
     virtual ~Document();
 
-    virtual uint32_t GetMaxSectionCount(SectionType type) = 0;
-    virtual bool CheckVersion(uint32_t ver) { return true; }
+    virtual unsigned GetMaxSectionCount(SectionType type) = 0;
+    virtual bool CheckVersion(unsigned ver) { return true; }
     virtual bool Validate() { return true; }
 
     static Document* CreateDocument(VfxDocType type);
@@ -92,9 +92,9 @@ public:
 
 private:
     bool MacroSubstituteLine(char* pLine,
-                             uint32_t lineNum,
+                             unsigned lineNum,
                              const MacroDefinition* pMacroDefinition,
-                             uint32_t maxLineLength);
+                             unsigned maxLineLength);
 
     bool ParseLine(char* pLine);
 
@@ -107,24 +107,24 @@ private:
     bool ParseSectionKeyValues();
 
     bool ParseKey(const char* pKey,
-                  uint32_t    lineNum,
+                  unsigned    lineNum,
                   Section*    pSectionObjectIn,
                   Section**   ppSectionObjectOut,
                   char*       pSectionMemberName,
-                  uint32_t    memberNameBufferSize,
-                  uint32_t*   pArrayIndex);
+                  unsigned    memberNameBufferSize,
+                  unsigned*   pArrayIndex);
 
     bool ParseKeyValue(char*      pKey,
                        char*      pValue,
-                       uint32_t   lineNum,
+                       unsigned   lineNum,
                        Section*   pSectionObject);
 
     Document*           m_pVfxDoc;                       // Parse result
     bool                m_isValidVfxFile;                // If vfx file is valid
     Section*            m_pCurrentSection;               // Current section
-    uint32_t            m_currentLineNum;                // Current line number
+    unsigned            m_currentLineNum;                // Current line number
     std::stringstream   m_currentSectionStringBuffer;    // Current section string buffer
-    uint32_t            m_currentSectionLineNum;         // Current section line number
+    unsigned            m_currentSectionLineNum;         // Current section line number
     std::string*        m_pErrorMsg;                     // Error message
 };
 

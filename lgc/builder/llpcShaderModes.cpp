@@ -184,7 +184,7 @@ void ShaderModes::Record(
     Module* pModule)    // [in/out] Module to record the IR metadata in
 {
     // First the common state.
-    for (uint32_t stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage)
+    for (unsigned stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage)
     {
         std::string metadataName = std::string(CommonShaderModeMetadataPrefix) +
                                    PipelineState::GetShaderStageAbbreviation(static_cast<ShaderStage>(stage));
@@ -246,7 +246,7 @@ void ShaderModes::ReadModesFromPipeline(
     Module* pModule)    // [in] LLVM module
 {
     // First the common state.
-    for (uint32_t stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage)
+    for (unsigned stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage)
     {
         std::string metadataName = std::string(CommonShaderModeMetadataPrefix) +
                                    PipelineState::GetShaderStageAbbreviation(static_cast<ShaderStage>(stage));

@@ -57,7 +57,7 @@ private:
     SpirvLowerAccessChain(const SpirvLowerAccessChain&) = delete;
     SpirvLowerAccessChain& operator=(const SpirvLowerAccessChain&) = delete;
 
-    llvm::GetElementPtrInst* TryToCoalesceChain(llvm::GetElementPtrInst* pGetElemPtr, uint32_t addrSpace);
+    llvm::GetElementPtrInst* TryToCoalesceChain(llvm::GetElementPtrInst* pGetElemPtr, unsigned addrSpace);
 };
 
 } // Llpc

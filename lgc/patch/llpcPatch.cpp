@@ -245,7 +245,7 @@ void Patch::AddOptimizationPasses(
     // Set up standard optimization passes.
     if (cl::UseLlvmOpt == false)
     {
-        uint32_t optLevel = 3;
+        unsigned optLevel = 3;
         bool expensiveCombines = false;
         bool disableGvnLoadPre = true;
 
@@ -378,7 +378,7 @@ GlobalVariable* Patch::GetLdsVariable(
     // Now we can create LDS.
     // Construct LDS type: [ldsSize * i32], address space 3
     auto ldsSize = pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizePerCu;
-    auto pLdsTy = ArrayType::get(Type::getInt32Ty(*pContext), ldsSize / sizeof(uint32_t));
+    auto pLdsTy = ArrayType::get(Type::getInt32Ty(*pContext), ldsSize / sizeof(unsigned));
 
     auto pLds = new GlobalVariable(*pModule,
                                    pLdsTy,
@@ -389,7 +389,7 @@ GlobalVariable* Patch::GetLdsVariable(
                                    nullptr,
                                    GlobalValue::NotThreadLocal,
                                    ADDR_SPACE_LOCAL);
-    pLds->setAlignment(MaybeAlign(sizeof(uint32_t)));
+    pLds->setAlignment(MaybeAlign(sizeof(unsigned)));
     return pLds;
 }
 

@@ -64,7 +64,7 @@ char SpirvLowerLoopUnrollControl::ID = 0;
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for loop unroll control
 ModulePass* CreateSpirvLowerLoopUnrollControl(
-    uint32_t forceLoopUnrollCount)    // Force loop unroll count
+    unsigned forceLoopUnrollCount)    // Force loop unroll count
 {
     auto pPass = new SpirvLowerLoopUnrollControl(forceLoopUnrollCount);
     return pPass;
@@ -81,7 +81,7 @@ SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl()
 
 // =====================================================================================================================
 SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl(
-    uint32_t forceLoopUnrollCount)    // Force loop unroll count
+    unsigned forceLoopUnrollCount)    // Force loop unroll count
     :
     SpirvLower(ID),
     m_forceLoopUnrollCount(forceLoopUnrollCount),

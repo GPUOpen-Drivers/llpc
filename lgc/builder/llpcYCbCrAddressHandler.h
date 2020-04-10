@@ -52,16 +52,16 @@ public:
     }
 
     // Generate base address for image planes
-    void GenBaseAddress(uint32_t planeCount);
+    void GenBaseAddress(unsigned planeCount);
 
     // Generate height and pitch
-    void GenHeightAndPitch(uint32_t bits, uint32_t bpp, uint32_t xBitCount, bool isTileOptimal, uint32_t planeNum);
+    void GenHeightAndPitch(unsigned bits, unsigned bpp, unsigned xBitCount, bool isTileOptimal, unsigned planeNum);
 
     // Power2Align operation
-    llvm::Value* Power2Align(llvm::Value* pX, uint32_t align);
+    llvm::Value* Power2Align(llvm::Value* pX, unsigned align);
 
     // Get specific plane
-    llvm::Value* GetPlane(uint32_t idx) { assert(idx < 3); return m_PlaneBaseAddresses[idx]; }
+    llvm::Value* GetPlane(unsigned idx) { assert(idx < 3); return m_PlaneBaseAddresses[idx]; }
 
     // Get pitch for Y plane
     llvm::Value* GetPitchY() { return m_pPitchY; }

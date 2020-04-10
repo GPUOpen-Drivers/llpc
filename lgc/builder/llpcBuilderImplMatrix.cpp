@@ -49,8 +49,8 @@ Value* BuilderImplMatrix::CreateTransposeMatrix(
     Type* const pColumnVectorType = pMatrixType->getArrayElementType();
     assert(pColumnVectorType->isVectorTy());
 
-    const uint32_t columnCount = pMatrixType->getArrayNumElements();
-    const uint32_t rowCount = pColumnVectorType->getVectorNumElements();
+    const unsigned columnCount = pMatrixType->getArrayNumElements();
+    const unsigned rowCount = pColumnVectorType->getVectorNumElements();
 
     Type* const pElementType = pColumnVectorType->getVectorElementType();
 
@@ -59,21 +59,21 @@ Value* BuilderImplMatrix::CreateTransposeMatrix(
 
     SmallVector<Value*, 4> columns;
 
-    for (uint32_t column = 0; column < columnCount; column++)
+    for (unsigned column = 0; column < columnCount; column++)
     {
         columns.push_back(CreateExtractValue(pMatrix, column));
     }
 
     SmallVector<Value*, 4> newColumns;
 
-    for (uint32_t row = 0; row < rowCount; row++)
+    for (unsigned row = 0; row < rowCount; row++)
     {
         newColumns.push_back(UndefValue::get(pNewColumnVectorType));
     }
 
-    for (uint32_t column = 0; column < columnCount; column++)
+    for (unsigned column = 0; column < columnCount; column++)
     {
-        for (uint32_t row = 0; row < rowCount; row++)
+        for (unsigned row = 0; row < rowCount; row++)
         {
             Value* const pElement = CreateExtractElement(columns[column], row);
             newColumns[row] = CreateInsertElement(newColumns[row], pElement, column);
@@ -82,7 +82,7 @@ Value* BuilderImplMatrix::CreateTransposeMatrix(
 
     Value* pNewMatrix = UndefValue::get(pNewMatrixType);
 
-    for (uint32_t row = 0; row < rowCount; row++)
+    for (unsigned row = 0; row < rowCount; row++)
     {
         pNewMatrix = CreateInsertValue(pNewMatrix, newColumns[row], row);
     }
@@ -100,12 +100,12 @@ Value* BuilderImplMatrix::CreateMatrixTimesScalar(
 {
     Type* const pMatrixTy = pMatrix->getType();
     Type* const pColumnTy = pMatrixTy->getArrayElementType();
-    const uint32_t rowCount = pColumnTy->getVectorNumElements();
-    uint32_t columnCount = pMatrixTy->getArrayNumElements();
+    const unsigned rowCount = pColumnTy->getVectorNumElements();
+    unsigned columnCount = pMatrixTy->getArrayNumElements();
     auto pSmearScalar = CreateVectorSplat(rowCount, pScalar);
 
     Value* pResult = UndefValue::get(pMatrixTy);
-    for (uint32_t column = 0; column < columnCount; column++)
+    for (unsigned column = 0; column < columnCount; column++)
     {
         auto pColumnVector = CreateExtractValue(pMatrix, column);
         pColumnVector = CreateFMul(pColumnVector, pSmearScalar);
@@ -125,11 +125,11 @@ Value* BuilderImplMatrix::CreateVectorTimesMatrix(
 {
     Type* const pMatrixTy = pMatrix->getType();
     Type* const pCompTy = pMatrixTy->getArrayElementType()->getVectorElementType();
-    const uint32_t columnCount = pMatrixTy->getArrayNumElements();
+    const unsigned columnCount = pMatrixTy->getArrayNumElements();
     Type* const pResultTy = VectorType::get(pCompTy, columnCount);
     Value* pResult = UndefValue::get(pResultTy);
 
-    for (uint32_t column = 0; column < columnCount; column++)
+    for (unsigned column = 0; column < columnCount; column++)
     {
         auto pColumnVector = CreateExtractValue(pMatrix, column);
         pResult = CreateInsertElement(pResult, CreateDotProduct(pColumnVector, pVector), column);
@@ -147,12 +147,12 @@ Value* BuilderImplMatrix::CreateMatrixTimesVector(
     const Twine& instName)            // [in] Name to give instruction(s)
 {
     Type* const pColumnTy = pMatrix->getType()->getArrayElementType();
-    const uint32_t rowCount = pColumnTy->getVectorNumElements();
+    const unsigned rowCount = pColumnTy->getVectorNumElements();
     Value* pResult = nullptr;
 
-    for (uint32_t i = 0; i < pMatrix->getType()->getArrayNumElements(); ++i)
+    for (unsigned i = 0; i < pMatrix->getType()->getArrayNumElements(); ++i)
     {
-        SmallVector<uint32_t, 4> shuffleMask(rowCount, i);
+        SmallVector<unsigned, 4> shuffleMask(rowCount, i);
         auto pPartialResult = CreateShuffleVector(pVector, pVector, shuffleMask);
         pPartialResult = CreateFMul(CreateExtractValue(pMatrix, i), pPartialResult);
         if (pResult != nullptr)
@@ -177,11 +177,11 @@ Value* BuilderImplMatrix::CreateMatrixTimesMatrix(
     const Twine& instName)             // [in] Name to give instruction(s)
 {
     Type* const pMat1ColumnType = pMatrix1->getType()->getArrayElementType();
-    const uint32_t mat2ColCount = pMatrix2->getType()->getArrayNumElements();
+    const unsigned mat2ColCount = pMatrix2->getType()->getArrayNumElements();
     Type* const pResultTy = ArrayType::get(pMat1ColumnType, mat2ColCount);
     Value* pResult = UndefValue::get(pResultTy);
 
-    for (uint32_t i = 0; i < mat2ColCount; ++i)
+    for (unsigned i = 0; i < mat2ColCount; ++i)
     {
         Value* pNewColumnVector = CreateMatrixTimesVector(pMatrix1, CreateExtractValue(pMatrix2, i));
         pResult = CreateInsertValue(pResult, pNewColumnVector, i);
@@ -198,14 +198,14 @@ Value* BuilderImplMatrix::CreateOuterProduct(
     Value* const pVector2,            // [in] The float vector 2
     const Twine& instName)            // [in] Name to give instruction(s)
 {
-    const uint32_t rowCount = pVector1->getType()->getVectorNumElements();
-    const uint32_t colCount = pVector2->getType()->getVectorNumElements();
+    const unsigned rowCount = pVector1->getType()->getVectorNumElements();
+    const unsigned colCount = pVector2->getType()->getVectorNumElements();
     Type* const pResultTy = ArrayType::get(pVector1->getType(), colCount);
     Value* pResult = UndefValue::get(pResultTy);
 
-    for (uint32_t i = 0; i < colCount; ++i)
+    for (unsigned i = 0; i < colCount; ++i)
     {
-        SmallVector<uint32_t, 4> shuffleIdx(rowCount, i);
+        SmallVector<unsigned, 4> shuffleIdx(rowCount, i);
         Value* pColumnVector = CreateFMul(pVector1, CreateShuffleVector(pVector2, pVector2, shuffleIdx));
         pResult = CreateInsertValue(pResult, pColumnVector, i);
     }
@@ -220,16 +220,16 @@ Value* BuilderImplMatrix::CreateDeterminant(
     Value* const pMatrix,     // [in] Matrix
     const Twine& instName)    // [in] Name to give instruction(s)
 {
-    uint32_t order = pMatrix->getType()->getArrayNumElements();
+    unsigned order = pMatrix->getType()->getArrayNumElements();
     assert(pMatrix->getType()->getArrayElementType()->getVectorNumElements() == order);
     assert(order >= 2);
 
     // Extract matrix elements.
     SmallVector<Value*, 16> elements;
-    for (uint32_t columnIdx = 0; columnIdx != order; ++columnIdx)
+    for (unsigned columnIdx = 0; columnIdx != order; ++columnIdx)
     {
         Value* pColumn = CreateExtractValue(pMatrix, columnIdx);
-        for (uint32_t rowIdx = 0; rowIdx != order; ++rowIdx)
+        for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
         {
             elements.push_back(CreateExtractElement(pColumn, rowIdx));
         }
@@ -244,7 +244,7 @@ Value* BuilderImplMatrix::CreateDeterminant(
 // Helper function for determinant calculation
 Value* BuilderImplMatrix::Determinant(
     ArrayRef<Value*>    elements,     // Elements of matrix (order*order of them)
-    uint32_t            order)        // Order of matrix
+    unsigned            order)        // Order of matrix
 {
     if (order == 1)
     {
@@ -267,7 +267,7 @@ Value* BuilderImplMatrix::Determinant(
     SmallVector<Value*, 9> submatrix;
     submatrix.resize((order - 1) * (order - 1));
     Value* pResult = nullptr;
-    for (uint32_t leadRowIdx = 0; leadRowIdx != order; ++leadRowIdx)
+    for (unsigned leadRowIdx = 0; leadRowIdx != order; ++leadRowIdx)
     {
         GetSubmatrix(elements, submatrix, order, leadRowIdx, 0);
         Value* pSubdeterminant = CreateFMul(elements[leadRowIdx], Determinant(submatrix, order - 1));
@@ -295,14 +295,14 @@ Value* BuilderImplMatrix::Determinant(
 void BuilderImplMatrix::GetSubmatrix(
     ArrayRef<Value*>        matrix,         // Input matrix (as linearized array of values, order*order of them)
     MutableArrayRef<Value*> submatrix,      // Output matrix (ditto, (order-1)*(order-1) of them)
-    uint32_t                order,          // Order of input matrix
-    uint32_t                rowToDelete,    // Row index to delete
-    uint32_t                columnToDelete) // Column index to delete
+    unsigned                order,          // Order of input matrix
+    unsigned                rowToDelete,    // Row index to delete
+    unsigned                columnToDelete) // Column index to delete
 {
-    uint32_t inElementIdx = 0, outElementIdx = 0;
-    for (uint32_t columnIdx = 0; columnIdx != order; ++columnIdx)
+    unsigned inElementIdx = 0, outElementIdx = 0;
+    for (unsigned columnIdx = 0; columnIdx != order; ++columnIdx)
     {
-        for (uint32_t rowIdx = 0; rowIdx != order; ++rowIdx)
+        for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
         {
             if ((rowIdx != rowToDelete) && (columnIdx != columnToDelete))
             {
@@ -320,16 +320,16 @@ Value* BuilderImplMatrix::CreateMatrixInverse(
     Value* const pMatrix,     // [in] Matrix
     const Twine& instName)    // [in] Name to give instruction(s)
 {
-    uint32_t order = pMatrix->getType()->getArrayNumElements();
+    unsigned order = pMatrix->getType()->getArrayNumElements();
     assert(pMatrix->getType()->getArrayElementType()->getVectorNumElements() == order);
     assert(order >= 2);
 
     // Extract matrix elements.
     SmallVector<Value*, 16> elements;
-    for (uint32_t columnIdx = 0; columnIdx != order; ++columnIdx)
+    for (unsigned columnIdx = 0; columnIdx != order; ++columnIdx)
     {
         Value* pColumn = CreateExtractValue(pMatrix, columnIdx);
-        for (uint32_t rowIdx = 0; rowIdx != order; ++rowIdx)
+        for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
         {
             elements.push_back(CreateExtractElement(pColumn, rowIdx));
         }
@@ -354,9 +354,9 @@ Value* BuilderImplMatrix::CreateMatrixInverse(
     Value* pNegRcpDet = CreateFSub(Constant::getNullValue(elements[0]->getType()), pRcpDet);
 
     // For each element:
-    for (uint32_t columnIdx = 0; columnIdx != order; ++columnIdx)
+    for (unsigned columnIdx = 0; columnIdx != order; ++columnIdx)
     {
-        for (uint32_t rowIdx = 0; rowIdx != order; ++rowIdx)
+        for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
         {
             // Calculate cofactor for this element.
             GetSubmatrix(elements, submatrix, order, rowIdx, columnIdx);
@@ -372,10 +372,10 @@ Value* BuilderImplMatrix::CreateMatrixInverse(
 
     // Create the result matrix.
     Value* pResult = UndefValue::get(pMatrix->getType());
-    for (uint32_t columnIdx = 0; columnIdx != order; ++columnIdx)
+    for (unsigned columnIdx = 0; columnIdx != order; ++columnIdx)
     {
         Value* pColumn = UndefValue::get(pMatrix->getType()->getArrayElementType());
-        for (uint32_t rowIdx = 0; rowIdx != order; ++rowIdx)
+        for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
         {
             pColumn = CreateInsertElement(pColumn, resultElements[rowIdx + columnIdx * order], rowIdx);
         }

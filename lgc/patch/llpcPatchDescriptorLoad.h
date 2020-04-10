@@ -70,15 +70,15 @@ private:
 
     void ProcessDescriptorGetPtr(llvm::CallInst* pDescPtrCall, llvm::StringRef descPtrCallName);
     llvm::Value* GetDescPtrAndStride(ResourceNodeType        resType,
-                                     uint32_t                descSet,
-                                     uint32_t                binding,
+                                     unsigned                descSet,
+                                     unsigned                binding,
                                      const ResourceNode*     pTopNode,
                                      const ResourceNode*     pNode,
                                      bool                    shadow,
                                      llvm::IRBuilder<>&      builder);
     llvm::Value* GetDescPtr(ResourceNodeType resType,
-                            uint32_t                descSet,
-                            uint32_t                binding,
+                            unsigned                descSet,
+                            unsigned                binding,
                             const ResourceNode*     pTopNode,
                             const ResourceNode*     pNode,
                             bool                    shadow,
@@ -86,8 +86,8 @@ private:
 
     void ProcessDescriptorIndex(llvm::CallInst* pCall);
     void ProcessLoadDescFromPtr(llvm::CallInst* pLoadFromPtr);
-    llvm::Value* LoadBufferDescriptor(uint32_t            descSet,
-                                      uint32_t            binding,
+    llvm::Value* LoadBufferDescriptor(unsigned            descSet,
+                                      unsigned            binding,
                                       llvm::Value*        pArrayOffset,
                                       llvm::Instruction*  pInsertPoint);
 
@@ -97,10 +97,10 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
 
     // Descriptor size
-    static const uint32_t  DescriptorSizeResource      = 8 * sizeof(uint32_t);
-    static const uint32_t  DescriptorSizeSampler       = 4 * sizeof(uint32_t);
-    static const uint32_t  DescriptorSizeBuffer        = 4 * sizeof(uint32_t);
-    static const uint32_t  DescriptorSizeBufferCompact = 2 * sizeof(uint32_t);
+    static const unsigned  DescriptorSizeResource      = 8 * sizeof(unsigned);
+    static const unsigned  DescriptorSizeSampler       = 4 * sizeof(unsigned);
+    static const unsigned  DescriptorSizeBuffer        = 4 * sizeof(unsigned);
+    static const unsigned  DescriptorSizeBufferCompact = 2 * sizeof(unsigned);
 
     bool                                m_changed;            // Whether the pass has modified the code
     PipelineSystemValues                m_pipelineSysValues;  // Cache of ShaderValues object per shader

@@ -43,31 +43,31 @@ using Vkgc::InvalidValue;
 using Vkgc::VoidPtrInc;
 
 // Size of vec4
-static const uint32_t SizeOfVec4 = sizeof(float) * 4;
+static const unsigned SizeOfVec4 = sizeof(float) * 4;
 
 // Descriptor offset reloc magic number
-static const uint32_t DescRelocMagic        = 0xA5A5A500;
-static const uint32_t DescRelocMagicMask    = 0xFFFFFF00;
-static const uint32_t DescSetMask           = 0x000000FF;
+static const unsigned DescRelocMagic        = 0xA5A5A500;
+static const unsigned DescRelocMagicMask    = 0xFFFFFF00;
+static const unsigned DescSetMask           = 0x000000FF;
 
 // Gets the name string of shader stage.
 const char* GetShaderStageName(ShaderStage shaderStage);
 
 // Translates shader stage to corresponding stage mask.
-uint32_t ShaderStageToMask(ShaderStage stage);
+unsigned ShaderStageToMask(ShaderStage stage);
 
 // Convert shader stage to the SPIR-V execution model
 spv::ExecutionModel ConvertToExecModel(ShaderStage shaderStage);
 
 // Convert SPIR-V execution model to the shader stage
-ShaderStage ConvertToStageShage(uint32_t execModel);
+ShaderStage ConvertToStageShage(unsigned execModel);
 
 // =====================================================================================================================
 // Gets module ID according to the index
-inline uint32_t GetModuleIdByIndex(
-    uint32_t index)  // Index in stage array
+inline unsigned GetModuleIdByIndex(
+    unsigned index)  // Index in stage array
 {
-    static const uint32_t BaseModuleId = 1;
+    static const unsigned BaseModuleId = 1;
     return BaseModuleId + index;
 }
 
@@ -103,10 +103,10 @@ inline size_t VoidPtrDiff(
 //
 // Returns log2(u)
 template< typename T>
-inline uint32_t Log2(
+inline unsigned Log2(
     T u)  // Value to compute the logarithm of.
 {
-    uint32_t logValue = 0;
+    unsigned logValue = 0;
 
     while (u > 1)
     {

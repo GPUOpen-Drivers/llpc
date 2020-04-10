@@ -62,7 +62,7 @@ namespace Llpc
 TimerProfiler::TimerProfiler(
     uint64_t      hash64,              // Hash code
     const char*   pDescriptionPrefix,  // [in] Profiler description prefix string
-    uint32_t      enableMask)           // Mask of enabled phase timers
+    unsigned      enableMask)           // Mask of enabled phase timers
     :
     m_total("", "", GetDummyTimeRecords()),
     m_phases("", "", GetDummyTimeRecords())

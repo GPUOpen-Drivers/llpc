@@ -48,7 +48,7 @@ namespace Llpc
 
 // =====================================================================================================================
 // Enumerates the kinds of timer used to do profiling for LLPC compilation phases.
-enum TimerKind : uint32_t
+enum TimerKind : unsigned
 {
     TimerTranslate,  // Timer for translator
     TimerLower,      // Timer for SPIR-V lowering
@@ -65,7 +65,7 @@ enum TimerKind : uint32_t
 class TimerProfiler
 {
 public:
-    TimerProfiler(uint64_t hash64, const char* pDescriptionPrefix, uint32_t enableMask);
+    TimerProfiler(uint64_t hash64, const char* pDescriptionPrefix, unsigned enableMask);
 
     ~TimerProfiler();
 
@@ -79,8 +79,8 @@ public:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    static const uint32_t PipelineTimerEnableMask = ((1 << TimerCount) - 1);
-    static const uint32_t ShaderModuleTimerEnableMask = ((1 << TimerTranslate) | (1 << TimerLower));
+    static const unsigned PipelineTimerEnableMask = ((1 << TimerCount) - 1);
+    static const unsigned ShaderModuleTimerEnableMask = ((1 << TimerTranslate) | (1 << TimerLower));
 
 private:
     TimerProfiler(const TimerProfiler&) = delete;

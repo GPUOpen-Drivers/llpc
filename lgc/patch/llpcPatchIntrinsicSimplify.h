@@ -77,7 +77,7 @@ private:
     bool CanSafelyConvertTo16Bit(llvm::Value& value) const;
     llvm::Value* ConvertTo16Bit(llvm::Value& value, llvm::IRBuilder<>& builder) const;
     llvm::Value* SimplifyImage(llvm::IntrinsicInst& intrinsicCall,
-                               llvm::ArrayRef<uint32_t> coordOperandIndices) const;
+                               llvm::ArrayRef<unsigned> coordOperandIndices) const;
     llvm::Value* SimplifyTrigonometric(llvm::IntrinsicInst& intrinsicCall) const;
     bool CanSimplify(llvm::IntrinsicInst& intrinsicCall) const;
     llvm::Value* Simplify(llvm::IntrinsicInst& intrinsicCall) const;

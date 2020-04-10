@@ -55,7 +55,7 @@ namespace Llpc
 {
 
 // Enumerates types of descriptor.
-enum class DescriptorType : uint32_t
+enum class DescriptorType : unsigned
 {
     UniformBlock = 0,     // Uniform block
     ShaderStorageBlock,   // Shader storage block
@@ -81,7 +81,7 @@ struct FloatControl
 struct DescriptorBinding
 {
     DescriptorType descType;        // Type of the descriptor
-    uint32_t       arraySize;       // Element count of arrayed binding (flattened)
+    unsigned       arraySize;       // Element count of arrayed binding (flattened)
     bool           isMultisampled;  // Whether multisampled texture is used
 };
 
@@ -90,11 +90,11 @@ typedef std::vector<DescriptorBinding> DescriptorSet;
 // Shader FP mode for use by front-end
 struct ShaderFpMode
 {
-    uint32_t denormPerserve            : 4;  // Bitmask of denormPerserve flags
-    uint32_t denormFlushToZero         : 4;  // Bitmask of denormFlushToZero flags
-    uint32_t signedZeroInfNanPreserve  : 4;  // Bitmask of signedZeroInfNanPreserve flags
-    uint32_t roundingModeRTE           : 4;  // Bitmask of roundingModeRTE flags
-    uint32_t roundingModeRTZ           : 4;  // Bitmask of roundingModeRTZ flags
+    unsigned denormPerserve            : 4;  // Bitmask of denormPerserve flags
+    unsigned denormFlushToZero         : 4;  // Bitmask of denormFlushToZero flags
+    unsigned signedZeroInfNanPreserve  : 4;  // Bitmask of signedZeroInfNanPreserve flags
+    unsigned roundingModeRTE           : 4;  // Bitmask of roundingModeRTE flags
+    unsigned roundingModeRTZ           : 4;  // Bitmask of roundingModeRTZ flags
 };
 
 // =====================================================================================================================
@@ -117,13 +117,13 @@ public:
     virtual const void* GetPipelineBuildInfo() const = 0;
 
     // Gets the mask of active shader stages bound to this pipeline
-    virtual uint32_t GetShaderStageMask() const = 0;
+    virtual unsigned GetShaderStageMask() const = 0;
 
     // Sets the mask of active shader stages bound to this pipeline
-    virtual void SetShaderStageMask(uint32_t mask) = 0;
+    virtual void SetShaderStageMask(unsigned mask) = 0;
 
     // Gets the count of active shader stages
-    virtual uint32_t GetActiveShaderStageCount() const = 0;
+    virtual unsigned GetActiveShaderStageCount() const = 0;
 
     // Does user data node merge for merged shader
     virtual void DoUserDataNodeMerge() = 0;
@@ -175,7 +175,7 @@ private:
     PipelineContext& operator=(const PipelineContext&) = delete;
 
     // Type of immutable nodes map used in SetUserDataNodesTable
-    typedef std::map<std::pair<uint32_t, uint32_t>, const DescriptorRangeValue*> ImmutableNodesMap;
+    typedef std::map<std::pair<unsigned, unsigned>, const DescriptorRangeValue*> ImmutableNodesMap;
 
     // Give the pipeline options to the middle-end.
     void SetOptionsInPipeline(lgc::Pipeline* pPipeline) const;

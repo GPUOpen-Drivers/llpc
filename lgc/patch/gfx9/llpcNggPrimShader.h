@@ -82,7 +82,7 @@ private:
     void DoParamCacheAllocRequest();
     void DoPrimitiveExport(llvm::Value* pCullFlag = nullptr);
 
-    void DoEarlyExit(uint32_t fullyCullThreadCount, uint32_t expPosCount);
+    void DoEarlyExit(unsigned fullyCullThreadCount, unsigned expPosCount);
 
     void RunEsOrEsVariant(llvm::Module*         pModule,
                           llvm::StringRef       entryName,
@@ -104,20 +104,20 @@ private:
     void RunCopyShader(llvm::Module* pModule, llvm::BasicBlock* pInsertAtEnd);
 
     void ExportGsOutput(llvm::Value* pOutput,
-                        uint32_t     location,
-                        uint32_t     compIdx,
-                        uint32_t     streamId,
+                        unsigned     location,
+                        unsigned     compIdx,
+                        unsigned     streamId,
                         llvm::Value* pThreadIdInSubgroup,
                         llvm::Value* pOutVertCounter);
 
     llvm::Value* ImportGsOutput(llvm::Type*  pOutputTy,
-                                uint32_t     location,
-                                uint32_t     compIdx,
-                                uint32_t     streamId,
+                                unsigned     location,
+                                unsigned     compIdx,
+                                unsigned     streamId,
                                 llvm::Value* pThreadIdInSubgroup);
 
     void ProcessGsEmit(llvm::Module* pModule,
-                        uint32_t     streamId,
+                        unsigned     streamId,
                         llvm::Value* pThreadIdInSubgroup,
                         llvm::Value* pEmitCounterPtr,
                         llvm::Value* pOutVertCounterPtr,
@@ -126,7 +126,7 @@ private:
                         llvm::Value* pFlipVertOrderPtr);
 
     void ProcessGsCut(llvm::Module*  pModule,
-                      uint32_t       streamId,
+                      unsigned       streamId,
                       llvm::Value*   pThreadIdInSubgroup,
                       llvm::Value*   pEmitCounterPtr,
                       llvm::Value*   pOutVertCounterPtr,
@@ -134,8 +134,8 @@ private:
                       llvm::Value*   pOutstandingVertCounterPtr,
                       llvm::Value*   pFlipVertOrderPtr);
 
-    llvm::Function* CreateGsEmitHandler(llvm::Module* pModule, uint32_t streamId);
-    llvm::Function* CreateGsCutHandler(llvm::Module* pModule, uint32_t streamId);
+    llvm::Function* CreateGsEmitHandler(llvm::Module* pModule, unsigned streamId);
+    llvm::Function* CreateGsCutHandler(llvm::Module* pModule, unsigned streamId);
 
     void ReviseOutputPrimitiveData(llvm::Value* pOutPrimId, llvm::Value* pVertexIdAdjust);
 
@@ -183,7 +183,7 @@ private:
                                        llvm::Value*      pSignMask1,
                                        llvm::Value*      pSignMask2);
 
-    llvm::Value* FetchCullingControlRegister(llvm::Module* pModule, uint32_t regOffset);
+    llvm::Value* FetchCullingControlRegister(llvm::Module* pModule, unsigned regOffset);
 
     llvm::Function* CreateBackfaceCuller(llvm::Module* pModule);
     llvm::Function* CreateFrustumCuller(llvm::Module* pModule);
@@ -198,9 +198,9 @@ private:
     llvm::Value* DoSubgroupInclusiveAdd(llvm::Value* pValue, llvm::Value** ppWwmResult = nullptr);
     llvm::Value* DoDppUpdate(llvm::Value* pOldValue,
                              llvm::Value* pSrcValue,
-                             uint32_t     dppCtrl,
-                             uint32_t     rowMask,
-                             uint32_t     bankMask,
+                             unsigned     dppCtrl,
+                             unsigned     rowMask,
+                             unsigned     bankMask,
                              bool         boundCtrl = false);
 
     // Checks if NGG culling operations are enabled
@@ -218,7 +218,7 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    static const uint32_t NullPrim = (1u << 31); // Null primitive data (invalid)
+    static const unsigned NullPrim = (1u << 31); // Null primitive data (invalid)
 
     PipelineState*  m_pPipelineState; // Pipeline state
     llvm::LLVMContext*        m_pContext;       // LLVM context

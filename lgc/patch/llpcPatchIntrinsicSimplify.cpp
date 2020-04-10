@@ -228,7 +228,7 @@ Value* PatchIntrinsicSimplify::ConvertTo16Bit(
 // Simplify image intrinsics.
 Value* PatchIntrinsicSimplify::SimplifyImage(
     IntrinsicInst& intrinsicCall,     // [in] The intrinsic call to simplify
-    ArrayRef<uint32_t>   coordOperandIndices // Operand indices of image coordinate
+    ArrayRef<unsigned>   coordOperandIndices // Operand indices of image coordinate
     ) const
 {
     // If we're not on GFX9 or above, bail.
@@ -239,7 +239,7 @@ Value* PatchIntrinsicSimplify::SimplifyImage(
 
     bool floatCoord = false;
 
-    for (uint32_t operandIndex : coordOperandIndices)
+    for (unsigned operandIndex : coordOperandIndices)
     {
         Value* const pCoord = intrinsicCall.getOperand(operandIndex);
         // If the values are not derived from 16-bit values, we cannot optimize.
@@ -265,7 +265,7 @@ Value* PatchIntrinsicSimplify::SimplifyImage(
 
     IRBuilder<> builder(&intrinsicCall);
 
-    for (uint32_t operandIndex : coordOperandIndices)
+    for (unsigned operandIndex : coordOperandIndices)
     {
         args[operandIndex] = ConvertTo16Bit(*intrinsicCall.getOperand(operandIndex), builder);
     }

@@ -118,7 +118,7 @@ bool PatchLoadScalarizer::runOnFunction(
 void PatchLoadScalarizer::visitLoadInst(
     LoadInst& loadInst) // [in] The instruction
 {
-    const uint32_t addrSpace = loadInst.getPointerAddressSpace();
+    const unsigned addrSpace = loadInst.getPointerAddressSpace();
     auto pLoadTy = dyn_cast<VectorType>(loadInst.getType());
 
     if (pLoadTy != nullptr)
@@ -140,7 +140,7 @@ void PatchLoadScalarizer::visitLoadInst(
         //    %loadValue.i012 = insertelement <4 x float> %loadValue.i01, float %loadComp.i2, i32 2
         //    %loadValue = insertelement <4 x float> %loadValue.i012, float %loadComp.i3, i32 3
 
-        uint32_t compCount = pLoadTy->getNumElements();
+        unsigned compCount = pLoadTy->getNumElements();
 
         if (compCount > m_scalarThreshold)
         {
@@ -157,7 +157,7 @@ void PatchLoadScalarizer::visitLoadInst(
         loadComps.resize(compCount);
 
         // Get all the metadata
-        SmallVector<std::pair<uint32_t, MDNode*>, 8> allMetaNodes;
+        SmallVector<std::pair<unsigned, MDNode*>, 8> allMetaNodes;
         loadInst.getAllMetadata(allMetaNodes);
 
         m_pBuilder->SetInsertPoint(&loadInst);
@@ -165,7 +165,7 @@ void PatchLoadScalarizer::visitLoadInst(
                                                        pNewLoadPtrTy,
                                                        loadInst.getPointerOperand()->getName() + ".i0");
 
-        for (uint32_t i = 0; i < compCount; i++)
+        for (unsigned i = 0; i < compCount; i++)
         {
             Value* pLoadCompPtr = m_pBuilder->CreateConstGEP1_32(pCompTy,
                                                                  pNewLoadPtr,
@@ -185,7 +185,7 @@ void PatchLoadScalarizer::visitLoadInst(
             }
         }
 
-        for (uint32_t i = 0; i < compCount; i++)
+        for (unsigned i = 0; i < compCount; i++)
         {
             pLoadValue = m_pBuilder->CreateInsertElement(pLoadValue, loadComps[i], m_pBuilder->getInt32(i),
                 loadInst.getName() + ".u" + Twine(i));

@@ -51,7 +51,7 @@ Value* BuilderImplSubgroup::CreateGetSubgroupSize(
 
 // =====================================================================================================================
 // Get the shader subgroup size for the current insertion block.
-uint32_t BuilderImplSubgroup::GetShaderSubgroupSize()
+unsigned BuilderImplSubgroup::GetShaderSubgroupSize()
 {
     return GetPipelineState()->GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent()));
 }
@@ -129,7 +129,7 @@ Value* BuilderImplSubgroup::CreateSubgroupAllEqual(
     {
         Value* pResult = CreateExtractElement(pCompare, getInt32(0));
 
-        for (uint32_t i = 1, compCount = pType->getVectorNumElements(); i < compCount; i++)
+        for (unsigned i = 1, compCount = pType->getVectorNumElements(); i < compCount; i++)
         {
             pResult = CreateAnd(pResult, CreateExtractElement(pCompare, i));
         }
@@ -193,7 +193,7 @@ Value* BuilderImplSubgroup::CreateSubgroupBallot(
     ElementCount elementCount = pBallot->getType()->getVectorElementCount();
     return CreateShuffleVector(pBallot,
                                ConstantVector::getSplat(elementCount, getInt32(0)),
-                               ArrayRef<uint32_t>{ 0, 1, 2, 3 });
+                               ArrayRef<unsigned>{ 0, 1, 2, 3 });
 }
 
 // =====================================================================================================================
@@ -225,7 +225,7 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotBitExtract(
         pIndexMask = CreateShl(getInt64(1), pIndexMask);
         Value* pValueAsInt64 = CreateShuffleVector(pValue,
                                                    UndefValue::get(pValue->getType()),
-                                                   ArrayRef<uint32_t>{ 0, 1 });
+                                                   ArrayRef<unsigned>{ 0, 1 });
         pValueAsInt64 = CreateBitCast(pValueAsInt64, getInt64Ty());
         Value* const pResult = CreateAnd(pIndexMask, pValueAsInt64);
         return CreateICmpNE(pResult, getInt64(0));
@@ -244,7 +244,7 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotBitCount(
     }
     else
     {
-        Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), ArrayRef<uint32_t>{ 0, 1 });
+        Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), ArrayRef<unsigned>{ 0, 1 });
         pResult = CreateBitCast(pResult, getInt64Ty());
         pResult = CreateUnaryIntrinsic(Intrinsic::ctpop, pResult);
         return CreateZExtOrTrunc(pResult, getInt32Ty());
@@ -275,7 +275,7 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotExclusiveBitCount(
     }
     else
     {
-        Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), ArrayRef<uint32_t>{ 0, 1 });
+        Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), ArrayRef<unsigned>{ 0, 1 });
         pResult = CreateBitCast(pResult, getInt64Ty());
         return CreateSubgroupMbcnt(pResult, "");
     }
@@ -294,7 +294,7 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotFindLsb(
     }
     else
     {
-        Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), ArrayRef<uint32_t>{ 0, 1 });
+        Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), ArrayRef<unsigned>{ 0, 1 });
         pResult = CreateBitCast(pResult, getInt64Ty());
         pResult = CreateIntrinsic(Intrinsic::cttz, getInt64Ty(), { pResult, getTrue() });
         return CreateZExtOrTrunc(pResult, getInt32Ty());
@@ -315,7 +315,7 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotFindMsb(
     }
     else
     {
-        Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), ArrayRef<uint32_t>{ 0, 1 });
+        Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), ArrayRef<unsigned>{ 0, 1 });
         pResult = CreateBitCast(pResult, getInt64Ty());
         pResult = CreateIntrinsic(Intrinsic::ctlz, getInt64Ty(), { pResult, getTrue() });
         pResult = CreateZExtOrTrunc(pResult, getInt32Ty());
@@ -866,7 +866,7 @@ Value* BuilderImplSubgroup::CreateSubgroupQuadBroadcast(
 {
     Value* pResult = UndefValue::get(pValue->getType());
 
-    const uint32_t indexBits = pIndex->getType()->getPrimitiveSizeInBits();
+    const unsigned indexBits = pIndex->getType()->getPrimitiveSizeInBits();
 
     if (SupportDpp())
     {
@@ -1170,8 +1170,8 @@ Value* BuilderImplSubgroup::CreateInlineAsmSideEffect(
 Value* BuilderImplSubgroup::CreateDppMov(
     Value* const pValue,    // [in] The value to DPP mov.
     DppCtrl      dppCtrl,   // The dpp_ctrl to use.
-    uint32_t     rowMask,   // The row mask.
-    uint32_t     bankMask,  // The bank mask.
+    unsigned     rowMask,   // The row mask.
+    unsigned     bankMask,  // The bank mask.
     bool         boundCtrl) // Whether bound_ctrl is used or not.
 {
     auto pfnMapFunc = [](Builder& builder, ArrayRef<Value*> mappedArgs, ArrayRef<Value*> passthroughArgs) -> Value*
@@ -1190,7 +1190,7 @@ Value* BuilderImplSubgroup::CreateDppMov(
     return CreateMapToInt32(pfnMapFunc,
                           pValue,
                           {
-                                getInt32(static_cast<uint32_t>(dppCtrl)),
+                                getInt32(static_cast<unsigned>(dppCtrl)),
                                 getInt32(rowMask),
                                 getInt32(bankMask),
                                 getInt1(boundCtrl)
@@ -1203,8 +1203,8 @@ Value* BuilderImplSubgroup::CreateDppUpdate(
     Value* const pOrigValue,   // [in] The original value we are going to update.
     Value* const pUpdateValue, // [in] The value to DPP update.
     DppCtrl      dppCtrl,      // The dpp_ctrl to use.
-    uint32_t     rowMask,      // The row mask.
-    uint32_t     bankMask,     // The bank mask.
+    unsigned     rowMask,      // The row mask.
+    unsigned     bankMask,     // The bank mask.
     bool         boundCtrl)    // Whether bound_ctrl is used or not.
 {
     auto pfnMapFunc = [](Builder& builder, ArrayRef<Value*> mappedArgs, ArrayRef<Value*> passthroughArgs) -> Value*
@@ -1227,7 +1227,7 @@ Value* BuilderImplSubgroup::CreateDppUpdate(
                                 pUpdateValue,
                           },
                           {
-                                getInt32(static_cast<uint32_t>(dppCtrl)),
+                                getInt32(static_cast<unsigned>(dppCtrl)),
                                 getInt32(rowMask),
                                 getInt32(bankMask),
                                 getInt1(boundCtrl)
@@ -1239,8 +1239,8 @@ Value* BuilderImplSubgroup::CreateDppUpdate(
 Value* BuilderImplSubgroup::CreatePermLane16(
     Value* const pOrigValue,     // [in] The original value we are going to update.
     Value* const pUpdateValue,   // [in] The value to update with.
-    uint32_t     selectBitsLow,  // Select bits low.
-    uint32_t     selectBitsHigh, // Select bits high.
+    unsigned     selectBitsLow,  // Select bits low.
+    unsigned     selectBitsHigh, // Select bits high.
     bool         fetchInactive,  // FI mode, whether to fetch inactive lane.
     bool         boundCtrl)      // Whether bound_ctrl is used or not.
 {
@@ -1290,8 +1290,8 @@ Value* BuilderImplSubgroup::CreatePermLane16(
 Value* BuilderImplSubgroup::CreatePermLaneX16(
     Value* const pOrigValue,     // [in] The original value we are going to update.
     Value* const pUpdateValue,   // [in] The value to update with.
-    uint32_t     selectBitsLow,  // Select bits low.
-    uint32_t     selectBitsHigh, // Select bits high.
+    unsigned     selectBitsLow,  // Select bits low.
+    unsigned     selectBitsHigh, // Select bits high.
     bool         fetchInactive,  // FI mode, whether to fetch inactive lane.
     bool         boundCtrl)      // Whether bound_ctrl is used or not.
 {

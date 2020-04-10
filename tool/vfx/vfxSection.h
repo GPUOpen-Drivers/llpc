@@ -42,7 +42,7 @@ namespace Vfx
 {
 // =====================================================================================================================
 // Enumerates VFX section type.
-enum SectionType : uint32_t
+enum SectionType : unsigned
 {
     SectionTypeUnset = 0,               // Initial state, not entering any section.
     // Beginning of rule based key-value sections
@@ -74,7 +74,7 @@ enum SectionType : uint32_t
 
 // =====================================================================================================================
 // Enumerates VFX member type.
-enum MemberType : uint32_t
+enum MemberType : unsigned
 {
     MemberTypeInt,                           // VFX member type: 32 bit integer
     MemberTypeFloat,                         // VFX member type: 32 bit float
@@ -138,7 +138,7 @@ enum ShaderType
 #define INIT_MEMBER_NAME_TO_ADDR(T, name, type, _isObject) tableItem->memberName = STRING(name); \
     if (!strncmp(tableItem->memberName, "m_", 2)) \
         tableItem->memberName += 2; \
-    tableItem->memberOffset = (uint32_t)(OFFSETOF(T, name));       \
+    tableItem->memberOffset = (unsigned)(OFFSETOF(T, name));       \
     tableItem->memberType = type;         \
     tableItem->arrayMaxSize = 1;          \
     tableItem->isSection = _isObject;      \
@@ -149,7 +149,7 @@ enum ShaderType
 #define INIT_STATE_MEMBER_NAME_TO_ADDR(T, name, type, _isObject) tableItem->memberName = STRING(name); \
     if (!strncmp(tableItem->memberName, "m_", 2)) \
         tableItem->memberName += 2; \
-    tableItem->memberOffset = (uint32_t)(OFFSETOF(SubState, name) + OFFSETOF(T, m_state));       \
+    tableItem->memberOffset = (unsigned)(OFFSETOF(SubState, name) + OFFSETOF(T, m_state));       \
     tableItem->memberType = type;         \
     tableItem->arrayMaxSize = 1;          \
     tableItem->isSection = _isObject;      \
@@ -161,7 +161,7 @@ enum ShaderType
     tableItem->memberName = STRING(name); \
     if (!strncmp(tableItem->memberName, "m_", 2)) \
         tableItem->memberName += 2; \
-    tableItem->memberOffset = (uint32_t)(OFFSETOF(SubState, member) + OFFSETOF(T, m_state));       \
+    tableItem->memberOffset = (unsigned)(OFFSETOF(SubState, member) + OFFSETOF(T, m_state));       \
     tableItem->memberType = type;         \
     tableItem->arrayMaxSize = 1;          \
     tableItem->isSection = _isObject;      \
@@ -172,7 +172,7 @@ enum ShaderType
 #define INIT_MEMBER_ARRAY_NAME_TO_ADDR(T, name, type, maxSize, _isObject) tableItem->memberName = STRING(name); \
     if (!strncmp(tableItem->memberName, "m_", 2)) \
         tableItem->memberName += 2; \
-    tableItem->memberOffset = (uint32_t)(OFFSETOF(T, name));        \
+    tableItem->memberOffset = (unsigned)(OFFSETOF(T, name));        \
     tableItem->memberType = type;         \
     tableItem->arrayMaxSize = maxSize;    \
     tableItem->isSection = _isObject;      \
@@ -183,7 +183,7 @@ enum ShaderType
 #define INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(T, name, type, _isObject) tableItem->memberName = STRING(name); \
     if (!strncmp(tableItem->memberName, "m_", 2)) \
         tableItem->memberName += 2; \
-    tableItem->memberOffset = (uint32_t)(OFFSETOF(T, name));        \
+    tableItem->memberOffset = (unsigned)(OFFSETOF(T, name));        \
     tableItem->memberType = type;         \
     tableItem->arrayMaxSize = VfxDynamicArrayId;  \
     tableItem->isSection = _isObject;      \
@@ -212,8 +212,8 @@ struct StrToMemberAddr
 {
     const char*   memberName;    // String form name
     MemberType    memberType;     // Member value type
-    uint32_t      memberOffset;   // Member offset in bytes within the object
-    uint32_t      arrayMaxSize;   // If greater than 1, this member is an array
+    unsigned      memberOffset;   // Member offset in bytes within the object
+    unsigned      arrayMaxSize;   // If greater than 1, this member is an array
     bool          isSection;      // Is this member another Section object
 };
 
@@ -222,7 +222,7 @@ struct StrToMemberAddr
 struct SectionInfo
 {
     SectionType type;           // Section type
-    uint32_t    property;       // Additional section information
+    unsigned    property;       // Additional section information
 };
 
 // =====================================================================================================================
@@ -230,7 +230,7 @@ struct SectionInfo
 class Section
 {
 public:
-    Section(StrToMemberAddr* addrTable, uint32_t tableSize, SectionType type, const char* sectionName);
+    Section(StrToMemberAddr* addrTable, unsigned tableSize, SectionType type, const char* sectionName);
     virtual ~Section() {}
 
     static Section* CreateSection(const char* pSectionName);
@@ -251,53 +251,53 @@ public:
     // Gets section type.
     SectionType GetSectionType() const { return m_sectionType; }
 
-    void* GetMemberAddr(uint32_t i)
+    void* GetMemberAddr(unsigned i)
     {
         return reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(this) + m_pMemberTable[i].memberOffset);
     }
 
-    bool GetMemberType(uint32_t lineNum, const char* memberName, MemberType* pValueType, std::string* errorMsg);
+    bool GetMemberType(unsigned lineNum, const char* memberName, MemberType* pValueType, std::string* errorMsg);
 
-    bool GetPtrOfSubSection(uint32_t     lineNum,
+    bool GetPtrOfSubSection(unsigned     lineNum,
                             const char*  memberName,
                             MemberType   memberType,
                             bool         isWriteAccess,
-                            uint32_t     arrayIndex,
+                            unsigned     arrayIndex,
                             Section**    ptrOut,
                             std::string* errorMsg);
 
     // Gets ptr of a member.
     template<typename TValue>
-    bool getPtrOf(uint32_t     lineNum,
+    bool getPtrOf(unsigned     lineNum,
                   const char*  memberName,
                   bool         isWriteAccess,
-                  uint32_t     arrayIndex,
+                  unsigned     arrayIndex,
                   TValue**     ptrOut,
                   std::string* errorMsg);
 
     // Sets value to a member array
     template<typename TValue>
-    bool Set(uint32_t lineNum, const char* fieldName, uint32_t arrayIndex, TValue* pValue);
+    bool Set(unsigned lineNum, const char* fieldName, unsigned arrayIndex, TValue* pValue);
 
     // Sets value to a member
     template<typename TValue>
-    bool Set(uint32_t lineNum, const char* fieldName, TValue* pValue)
+    bool Set(unsigned lineNum, const char* fieldName, TValue* pValue)
     {
         return Set(lineNum, fieldName, 0, pValue);
     };
 
-    bool IsSection(uint32_t lineNum, const char* memberName, bool* pOutput, MemberType *pType, std::string* errorMsg);
+    bool IsSection(unsigned lineNum, const char* memberName, bool* pOutput, MemberType *pType, std::string* errorMsg);
 
     // Has this object been configured in VFX file.
     bool IsActive() { return m_isActive; }
 
     void SetActive(bool isActive) { m_isActive = isActive; }
 
-    void PrintSelf(uint32_t level);
+    void PrintSelf(unsigned level);
 
-    void SetLineNum(uint32_t lineNum) { m_lineNum = lineNum; }
+    void SetLineNum(unsigned lineNum) { m_lineNum = lineNum; }
 
-    uint32_t GetLineNum() const { return m_lineNum; }
+    unsigned GetLineNum() const { return m_lineNum; }
 
 private:
     Section() {};
@@ -305,10 +305,10 @@ private:
 protected:
     SectionType               m_sectionType;        // Section type
     const char*               m_pSectionName;       // Section name
-    uint32_t                  m_lineNum;            // Line number of this section
+    unsigned                  m_lineNum;            // Line number of this section
 private:
     StrToMemberAddr*          m_pMemberTable;      // Member address table
-    uint32_t                  m_tableSize;         // Address table size
+    unsigned                  m_tableSize;         // Address table size
     bool                      m_isActive;          // If the scestion is active
     static std::map<std::string, SectionInfo> m_sectionInfo;    //Section info
 };
@@ -317,24 +317,24 @@ private:
 // Gets ptr of a member. return true if operation success
 template<typename TValue>
 bool Section::getPtrOf(
-    uint32_t     lineNum,           // Line No.
+    unsigned     lineNum,           // Line No.
     const char*  memberName,        // [in] Member name
     bool         isWriteAccess,     // True for write
-    uint32_t     arrayIndex,        // Array index
+    unsigned     arrayIndex,        // Array index
     TValue**     ptrOut,            // [out] Pointer of section member
     std::string* errorMsg)         // [out] Error message
 {
     bool        result      = true;
     void*      pMemberAddr  = reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue));
     MemberType memberType   = MemberTypeInt;
-    uint32_t   arrayMaxSize = 0;
+    unsigned   arrayMaxSize = 0;
 
     if (isWriteAccess == true)
     {
         SetActive(true);
     }
     // Search section member
-    for (uint32_t i = 0; i < m_tableSize; ++i)
+    for (unsigned i = 0; i < m_tableSize; ++i)
     {
         if (strcmp(memberName, m_pMemberTable[i].memberName) == 0)
         {
@@ -388,9 +388,9 @@ bool Section::getPtrOf(
 // Sets value to a member array
 template<typename TValue>
 bool Section::Set(
-    uint32_t    lineNum,           // Line No.
+    unsigned    lineNum,           // Line No.
     const char* memberName,       // [in] Name of section member
-    uint32_t    arrayIndex,        // Array index
+    unsigned    arrayIndex,        // Array index
     TValue*     pValue)            // [in] Value to be set
 {
     bool result = false;
@@ -426,13 +426,13 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(uint32_t& state)  { state = version; };
+    void GetSubState(unsigned& state)  { state = version; };
 
 private:
-    static const uint32_t  MemberCount = 1;
+    static const unsigned  MemberCount = 1;
     static StrToMemberAddr m_addrTable[MemberCount];
 
-    uint32_t               version;            // Document version
+    unsigned               version;            // Document version
 };
 // =====================================================================================================================
 // Represents the class that includes data to verify a test result.
@@ -468,7 +468,7 @@ public:
     void GetSubState(SubState& state)  { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 9;
+    static const unsigned  MemberCount = 9;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
@@ -501,7 +501,7 @@ public:
     void GetSubState(SubState& state)
     {
         state.numResult = 0;
-        for (uint32_t i = 0; i < MaxResultCount; ++i)
+        for (unsigned i = 0; i < MaxResultCount; ++i)
         {
             if (result[i].IsActive())
             {
@@ -511,7 +511,7 @@ public:
     }
 
 private:
-    static const uint32_t  MemberCount = 1;
+    static const unsigned  MemberCount = 1;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SectionResultItem      result[MaxResultCount]; // section result items
@@ -541,7 +541,7 @@ public:
 
     void GetSubState(SubState& state)  { state = m_state; };
 private:
-    static const uint32_t     MemberCount = 3;
+    static const unsigned     MemberCount = 3;
     static StrToMemberAddr    m_addrTable[MemberCount];
 
     SubState                  m_state;
@@ -574,7 +574,7 @@ public:
     void GetSubState(SubState& state)
     {
         state.numSpecConst = 0;
-        for (uint32_t i = 0; i < MaxResultCount; ++i)
+        for (unsigned i = 0; i < MaxResultCount; ++i)
         {
             if (specConst[i].IsActive())
             {
@@ -584,7 +584,7 @@ public:
     }
 
 private:
-    static const uint32_t  MemberCount = 3;
+    static const unsigned  MemberCount = 3;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SectionSpecConstItem   specConst[MaxSpecConstantCount]; // Spec constant for one shader stage
@@ -618,7 +618,7 @@ public:
     void GetSubState(SubState& state)  { state = m_state; };
 
 private:
-    static const uint32_t     MemberCount = 3;
+    static const unsigned     MemberCount = 3;
     static StrToMemberAddr    m_addrTable[MemberCount];
 
     SubState                  m_state;
@@ -654,7 +654,7 @@ public:
     void GetSubState(SubState& state)  { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 4;
+    static const unsigned  MemberCount = 4;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
@@ -692,7 +692,7 @@ public:
     void GetSubState(SubState& state)
     {
         state.numVbBinding = 0;
-        for (uint32_t i = 0; i < MaxVertexBufferBindingCount; ++i)
+        for (unsigned i = 0; i < MaxVertexBufferBindingCount; ++i)
         {
             if (vbBinding[i].IsActive())
             {
@@ -701,7 +701,7 @@ public:
         }
 
         state.numAttribute = 0;
-        for (uint32_t i = 0; i < MaxVertexAttributeCount; ++i)
+        for (unsigned i = 0; i < MaxVertexAttributeCount; ++i)
         {
             if (attribute[i].IsActive())
             {
@@ -711,7 +711,7 @@ public:
     }
 
 private:
-    static const uint32_t       MemberCount = 2;
+    static const unsigned       MemberCount = 2;
     static StrToMemberAddr      m_addrTable[MemberCount];
     SectionVertexBufferBinding  vbBinding[MaxVertexBufferBindingCount];    // Binding info of all vertex buffers
     SectionVertexAttribute      attribute[MaxVertexAttributeCount];        // Attribute info of all vertex attributes
@@ -759,13 +759,13 @@ public:
 
     void GetSubState(SubState& state)
     {
-        m_state.dataSize = static_cast<uint32_t>(m_bufMem.size());
+        m_state.dataSize = static_cast<unsigned>(m_bufMem.size());
         m_state.pData = m_state.dataSize > 0 ? &m_bufMem[0] : nullptr;
         state = m_state;
     };
 
 private:
-    static const uint32_t     MemberCount = 11;
+    static const unsigned     MemberCount = 11;
     static StrToMemberAddr    m_addrTable[MemberCount];
     SubState                  m_state;       // State of BufferView
     std::vector<uint8_t>      m_bufMem;      // Underlying buffer for all data types.
@@ -813,7 +813,7 @@ public:
     void GetSubState(SubState& state)  { state = m_state; };
 
 private:
-    static const uint32_t     MemberCount = 7;
+    static const unsigned     MemberCount = 7;
     static StrToMemberAddr    m_addrTable[MemberCount];
     SubState                  m_state;
 };
@@ -846,7 +846,7 @@ public:
     void GetSubState(SubState& state)  { state = m_state; };
 
 private:
-    static const uint32_t     MemberCount = 3;
+    static const unsigned     MemberCount = 3;
     static StrToMemberAddr    m_addrTable[MemberCount];
 
     SubState                  m_state;
@@ -883,20 +883,20 @@ public:
 
     void GetSubState(SubState& state)
     {
-       m_state.dataSize = static_cast<uint32_t>(m_bufMem.size()) * sizeof(uint32_t);
+       m_state.dataSize = static_cast<unsigned>(m_bufMem.size()) * sizeof(unsigned);
        m_state.pData = state.dataSize > 0 ? &m_bufMem[0] : nullptr;
        state = m_state;
     };
 
 private:
-    static const uint32_t     MemberCount = 6;
+    static const unsigned     MemberCount = 6;
     static StrToMemberAddr    m_addrTable[MemberCount];
 
-    std::vector<uint32_t>     m_bufMem;      // Underlying buffer for all data types.
-    std::vector<uint32_t>*    intData;       // Contains int data of this push constant range
-    std::vector<uint32_t>*    uintData;      // Contains uint data of this push constant range
-    std::vector<uint32_t>*    floatData;     // Contains float data of this push constant range
-    std::vector<uint32_t>*    doubleData;    // Contains double data of this push constant range
+    std::vector<unsigned>     m_bufMem;      // Underlying buffer for all data types.
+    std::vector<unsigned>*    intData;       // Contains int data of this push constant range
+    std::vector<unsigned>*    uintData;      // Contains uint data of this push constant range
+    std::vector<unsigned>*    floatData;     // Contains float data of this push constant range
+    std::vector<unsigned>*    doubleData;    // Contains double data of this push constant range
     SubState                  m_state;
 };
 
@@ -987,7 +987,7 @@ public:
         fs.GetSubState(state.fs);
         cs.GetSubState(state.cs);
         state.numPushConstRange = 0;
-        for (uint32_t i = 0; i < MaxPushConstRangCount; ++i)
+        for (unsigned i = 0; i < MaxPushConstRangCount; ++i)
         {
             if (pushConstRange[i].IsActive())
             {
@@ -997,7 +997,7 @@ public:
     };
 
 private:
-    static const uint32_t  MemberCount = 25;
+    static const unsigned  MemberCount = 25;
     static StrToMemberAddr m_addrTable[MemberCount];
     SubState               m_state;
     SectionSpecConst       vs;                                       // Vertex shader's spec constant
@@ -1041,7 +1041,7 @@ private:
     bool CompileGlsl(const Section* pShaderInfo, std::string* errorMsg);
     bool AssembleSpirv(std::string* errorMsg);
 
-    static const uint32_t  MemberCount = 1;
+    static const unsigned  MemberCount = 1;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     std::string          fileName;                // External shader source file name
@@ -1069,7 +1069,7 @@ public:
     virtual void AddLine(const char* pLine) { compileLog += pLine; };
 
 private:
-    static const uint32_t  MemberCount = 1;
+    static const unsigned  MemberCount = 1;
     static StrToMemberAddr m_addrTable[MemberCount];
     std::string            compileLog;            // Compile Log
 };
@@ -1101,7 +1101,7 @@ public:
     void GetSubState(SubState& state)  { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 4;
+    static const unsigned  MemberCount = 4;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
@@ -1136,7 +1136,7 @@ public:
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 7;
+    static const unsigned  MemberCount = 7;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
@@ -1188,7 +1188,7 @@ public:
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 18;
+    static const unsigned  MemberCount = 18;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
@@ -1234,7 +1234,7 @@ public:
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 17;
+    static const unsigned  MemberCount = 17;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
@@ -1286,7 +1286,7 @@ public:
 
     void GetSubState(const std::string& docFilename, SubState& state, std::string* errorMsg)
     {
-        for (uint32_t i = 0; i < Vkgc::MaxColorTargets; ++i)
+        for (unsigned i = 0; i < Vkgc::MaxColorTargets; ++i)
         {
             colorBuffer[i].GetSubState(m_state.colorBuffer[i]);
         }
@@ -1297,7 +1297,7 @@ public:
 
 private:
     SectionNggState        nggState;
-    static const uint32_t  MemberCount = 22;
+    static const unsigned  MemberCount = 22;
     static StrToMemberAddr m_addrTable[MemberCount];
     SubState               m_state;
     SectionColorBuffer     colorBuffer[Vkgc::MaxColorTargets]; // Color buffer
@@ -1332,7 +1332,7 @@ public:
     };
 
 private:
-    static const uint32_t  MemberCount = 3;
+    static const unsigned  MemberCount = 3;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
@@ -1364,7 +1364,7 @@ public:
     void GetSubState(SubState& state)  { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 3;
+    static const unsigned  MemberCount = 3;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState m_state;
@@ -1396,7 +1396,7 @@ public:
     void GetSubState(SubState& state)  { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 4;
+    static const unsigned  MemberCount = 4;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState m_state;
@@ -1426,7 +1426,7 @@ public:
     void GetSubState(SubState& state)  { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 2;
+    static const unsigned  MemberCount = 2;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState m_state;
@@ -1461,34 +1461,34 @@ public:
         m_vkAttributes.resize(attribute.size());
         m_vkDivisors.resize(divisor.size());
 
-        for (uint32_t i = 0; i < attribute.size(); ++i)
+        for (unsigned i = 0; i < attribute.size(); ++i)
         {
             attribute[i].GetSubState(m_vkAttributes[i]);
         }
 
-        for (uint32_t i = 0; i < binding.size(); ++i)
+        for (unsigned i = 0; i < binding.size(); ++i)
         {
             binding[i].GetSubState(m_vkBindings[i]);
         }
 
-        for (uint32_t i = 0; i < divisor.size(); ++i)
+        for (unsigned i = 0; i < divisor.size(); ++i)
         {
             divisor[i].GetSubState(m_vkDivisors[i]);
         }
 
-        state.vertexAttributeDescriptionCount = static_cast<uint32_t>(m_vkAttributes.size());
-        state.vertexBindingDescriptionCount = static_cast<uint32_t>(m_vkBindings.size());
+        state.vertexAttributeDescriptionCount = static_cast<unsigned>(m_vkAttributes.size());
+        state.vertexBindingDescriptionCount = static_cast<unsigned>(m_vkBindings.size());
         state.pVertexBindingDescriptions = state.vertexBindingDescriptionCount ? &m_vkBindings[0] : nullptr;
         state.pVertexAttributeDescriptions = state.vertexAttributeDescriptionCount ? &m_vkAttributes[0] : nullptr;
         if (m_vkDivisors.size() > 0)
         {
             state.pNext = &m_vkDivisorState;
-            m_vkDivisorState.vertexBindingDivisorCount = static_cast<uint32_t>(m_vkDivisors.size());
+            m_vkDivisorState.vertexBindingDivisorCount = static_cast<unsigned>(m_vkDivisors.size());
             m_vkDivisorState.pVertexBindingDivisors = &m_vkDivisors[0];
         }
     };
 private:
-    static const uint32_t  MemberCount = 3;
+    static const unsigned  MemberCount = 3;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     std::vector<SectionVertexInputAttribute>        attribute;       // Vertex input atribute
@@ -1526,7 +1526,7 @@ public:
     void GetSubState(SubState& state)  { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 3;
+    static const unsigned  MemberCount = 3;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState m_state;
@@ -1569,9 +1569,9 @@ public:
     {
         if (mapEntry.size())
         {
-            state.mapEntryCount = static_cast<uint32_t>(mapEntry.size());
+            state.mapEntryCount = static_cast<unsigned>(mapEntry.size());
             m_vkMapEntries.resize(state.mapEntryCount);
-            for (uint32_t i = 0; i < m_vkMapEntries.size(); ++i)
+            for (unsigned i = 0; i < m_vkMapEntries.size(); ++i)
             {
                 mapEntry[i].GetSubState(m_vkMapEntries[i]);
             }
@@ -1586,7 +1586,7 @@ public:
     }
 
 private:
-    static const uint32_t  MemberCount = 8;
+    static const unsigned  MemberCount = 8;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     std::vector<SectionSpecEntryItem> mapEntry;
@@ -1631,11 +1631,11 @@ public:
     void GetSubState(SubState& state)
     {
         state = m_state;
-        state.pValue = m_bufMem.size() > 0 ? (const uint32_t *)(&m_bufMem[0]) : nullptr;
+        state.pValue = m_bufMem.size() > 0 ? (const unsigned *)(&m_bufMem[0]) : nullptr;
     };
 
 private:
-    static const uint32_t  MemberCount = 6;
+    static const unsigned  MemberCount = 6;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     std::vector<uint8_t>*     intData;
@@ -1689,18 +1689,18 @@ public:
         if (m_state.type == Vkgc::ResourceMappingNodeType::DescriptorTableVaPtr)
         {
             m_nextNodeBuf.resize(next.size());
-            for (uint32_t i = 0; i < next.size(); ++i)
+            for (unsigned i = 0; i < next.size(); ++i)
             {
                 next[i].GetSubState(m_nextNodeBuf[i]);
             }
             m_state.tablePtr.pNext = &m_nextNodeBuf[0];
-            m_state.tablePtr.nodeCount = static_cast<uint32_t>(m_nextNodeBuf.size());
+            m_state.tablePtr.nodeCount = static_cast<unsigned>(m_nextNodeBuf.size());
         }
         state = m_state;
     };
 
 private:
-    static const uint32_t                   MemberCount = 7;
+    static const unsigned                   MemberCount = 7;
     static StrToMemberAddr                  m_addrTable[MemberCount];
 
     std::vector<SectionResourceMappingNode> next;          // Next rsource mapping node
@@ -1745,19 +1745,19 @@ public:
         if (descriptorRangeValue.size() > 0)
         {
             m_descriptorRangeValues.resize(descriptorRangeValue.size());
-            for (uint32_t i = 0; i < descriptorRangeValue.size(); ++i)
+            for (unsigned i = 0; i < descriptorRangeValue.size(); ++i)
             {
                 descriptorRangeValue[i].GetSubState(m_descriptorRangeValues[i]);
             }
-            state.descriptorRangeValueCount = static_cast<uint32_t>(descriptorRangeValue.size());
+            state.descriptorRangeValueCount = static_cast<unsigned>(descriptorRangeValue.size());
             state.pDescriptorRangeValues = &m_descriptorRangeValues[0];
         }
 
         if (userDataNode.size() > 0)
         {
-            state.userDataNodeCount = static_cast<uint32_t>(userDataNode.size());
+            state.userDataNodeCount = static_cast<unsigned>(userDataNode.size());
             m_userDataNodes.resize(state.userDataNodeCount);
-            for (uint32_t i = 0; i< state.userDataNodeCount; ++i)
+            for (unsigned i = 0; i< state.userDataNodeCount; ++i)
             {
                 userDataNode[i].GetSubState(m_userDataNodes[i]);
             }
@@ -1767,7 +1767,7 @@ public:
 
     const char* GetEntryPoint() const { return entryPoint.empty() ? nullptr : entryPoint.c_str(); }
 private:
-    static const uint32_t                        MemberCount = 5;
+    static const unsigned                        MemberCount = 5;
     static StrToMemberAddr                       m_addrTable[MemberCount];
     SubState                                     m_state;
     SectionSpecInfo                              specConst;               // Specialization constant info

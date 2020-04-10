@@ -85,7 +85,7 @@ void SpirvLowerAccessChain::visitGetElementPtrInst(
 {
     // NOTE: Here, we try to coalesce chained "getelementptr" instructions (created from multi-level access chain).
     // Because the metadata is always decorated on top-level pointer value (actually a global variable).
-    const uint32_t addrSpace = getElemPtrInst.getType()->getPointerAddressSpace();
+    const unsigned addrSpace = getElemPtrInst.getType()->getPointerAddressSpace();
     if ((addrSpace == SPIRAS_Private) ||
         (addrSpace == SPIRAS_Input) || (addrSpace == SPIRAS_Output))
     {
@@ -107,7 +107,7 @@ void SpirvLowerAccessChain::visitGetElementPtrInst(
 //
 llvm::GetElementPtrInst* SpirvLowerAccessChain::TryToCoalesceChain(
     GetElementPtrInst* pGetElemPtr, // [in] "getelementptr" instruction in the bottom to do coalescing
-    uint32_t           addrSpace)   // Address space of the pointer value of "getelementptr"
+    unsigned           addrSpace)   // Address space of the pointer value of "getelementptr"
 {
     GetElementPtrInst* pCoalescedGetElemPtr = pGetElemPtr;
 
@@ -137,7 +137,7 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::TryToCoalesceChain(
     if (chainedInsts.size() > 1)
     {
         std::vector<Value*> idxs;
-        uint32_t startOperand = 1;
+        unsigned startOperand = 1;
         Value* pBlockPtr = nullptr;
 
         do
@@ -148,7 +148,7 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::TryToCoalesceChain(
             {
                 pBlockPtr = pPtrVal->getOperand(0);
             }
-            for (uint32_t i = startOperand; i != pPtrVal->getNumOperands(); ++i)
+            for (unsigned i = startOperand; i != pPtrVal->getNumOperands(); ++i)
             {
                 idxs.push_back(pPtrVal->getOperand(i));
             }

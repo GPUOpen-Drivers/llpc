@@ -51,7 +51,7 @@ struct BinaryData;
 struct PipelineDumpFile;
 
 // Enumerates which types of pipeline dump are disable
-enum PipelineDumpFilters : uint32_t
+enum PipelineDumpFilters : unsigned
 {
     PipelineDumpFilterNone = 0x00, // Do not disable any pipeline type
     PipelineDumpFilterCs   = 0x01, // Disable pipeline dump for Cs
@@ -89,7 +89,7 @@ public:
 
     static MetroHash::Hash GenerateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo* pPipeline,
                                                            bool                             isCacheHash,
-                                                           uint32_t                         stage = ShaderStageInvalid);
+                                                           unsigned                         stage = ShaderStageInvalid);
 
     static MetroHash::Hash GenerateHashForComputePipeline(const ComputePipelineBuildInfo* pPipeline, bool isCacheHash);
 
@@ -126,7 +126,7 @@ public:
         MetroHash64*               pHasher);
 
     // Get name of register, or "" if not known
-    static const char* getRegisterNameString(uint32_t regNumber);
+    static const char* getRegisterNameString(unsigned regNumber);
 
 private:
     static std::string GetSpirvBinaryFileName(const MetroHash::Hash* pHash);
