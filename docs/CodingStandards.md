@@ -132,7 +132,11 @@ or `return`.
 Despite the look of much LLVM code, the LLVM coding standard does actually recommend
 placing a comment at the top of a function/method. :-)
 
-In LLPC, that is mandatory. Parameters should be commented in the main comment at
+In LLPC, it is mandatory to add a comment at the top of each class declaration, function
+definition and out-of-line method definition. The comment should start with a separator
+line `// ======` (117 equals signs for a total width of 120).
+
+Parameters should be commented in the main comment at
 the top of the function like this:
 
 ```
