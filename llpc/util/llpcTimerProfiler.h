@@ -22,76 +22,71 @@
  *  SOFTWARE.
  *
  **********************************************************************************************************************/
- /**
-  ***********************************************************************************************************************
-  * @file  llpcTimeProfiler.h
-  * @brief LLPC header file: contains the definition of LLPC utility class TimerProfiler.
-  ***********************************************************************************************************************
-  */
+/**
+ ***********************************************************************************************************************
+ * @file  llpcTimeProfiler.h
+ * @brief LLPC header file: contains the definition of LLPC utility class TimerProfiler.
+ ***********************************************************************************************************************
+ */
 
 #pragma once
 
+#include "llpc.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Timer.h"
 
-#include "llpc.h"
-
-namespace lgc
-{
+namespace lgc {
 
 class PassManager;
 
-} // lgc
+} // namespace lgc
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Enumerates the kinds of timer used to do profiling for LLPC compilation phases.
-enum TimerKind : unsigned
-{
-    TimerTranslate,  // Timer for translator
-    TimerLower,      // Timer for SPIR-V lowering
-    TimerLoadBc,     // Timer for loading LLVM bitcode
-    TimerPatch,      // Timer for LLVM patching
-    TimerOpt,        // Timer for LLVM optimization
-    TimerCodeGen,    // Timer for backend code generation
+enum TimerKind : unsigned {
+  TimerTranslate, // Timer for translator
+  TimerLower,     // Timer for SPIR-V lowering
+  TimerLoadBc,    // Timer for loading LLVM bitcode
+  TimerPatch,     // Timer for LLVM patching
+  TimerOpt,       // Timer for LLVM optimization
+  TimerCodeGen,   // Timer for backend code generation
 
-    TimerCount
+  TimerCount
 };
 
 // =====================================================================================================================
 // Represents a utility class for time profile, it wraps LLVM Timer and TimerGroup in internal.
-class TimerProfiler
-{
+class TimerProfiler {
 public:
-    TimerProfiler(uint64_t hash64, const char* descriptionPrefix, unsigned enableMask);
+  TimerProfiler(uint64_t hash64, const char *descriptionPrefix, unsigned enableMask);
 
-    ~TimerProfiler();
+  ~TimerProfiler();
 
-    void addTimerStartStopPass(lgc::PassManager* passMgr, TimerKind timerKind, bool start);
+  void addTimerStartStopPass(lgc::PassManager *passMgr, TimerKind timerKind, bool start);
 
-    void startStopTimer(TimerKind name, bool start);
+  void startStopTimer(TimerKind name, bool start);
 
-    llvm::Timer* getTimer(TimerKind timerKind);
+  llvm::Timer *getTimer(TimerKind timerKind);
 
-    static const llvm::StringMap<llvm::TimeRecord>& getDummyTimeRecords();
+  static const llvm::StringMap<llvm::TimeRecord> &getDummyTimeRecords();
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static const unsigned PipelineTimerEnableMask = ((1 << TimerCount) - 1);
-    static const unsigned ShaderModuleTimerEnableMask = ((1 << TimerTranslate) | (1 << TimerLower));
+  static const unsigned PipelineTimerEnableMask = ((1 << TimerCount) - 1);
+  static const unsigned ShaderModuleTimerEnableMask = ((1 << TimerTranslate) | (1 << TimerLower));
 
 private:
-    TimerProfiler(const TimerProfiler&) = delete;
-    TimerProfiler& operator=(const TimerProfiler&) = delete;
+  TimerProfiler(const TimerProfiler &) = delete;
+  TimerProfiler &operator=(const TimerProfiler &) = delete;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::TimerGroup m_total;                // TimeGroup for total time
-    llvm::TimerGroup m_phases;               // TimeGroup for each phase
-    llvm::Timer m_wholeTimer;                // Whole timer
-    llvm::Timer m_phaseTimers[TimerCount];   // Phase timer
+  llvm::TimerGroup m_total;              // TimeGroup for total time
+  llvm::TimerGroup m_phases;             // TimeGroup for each phase
+  llvm::Timer m_wholeTimer;              // Whole timer
+  llvm::Timer m_phaseTimers[TimerCount]; // Phase timer
 };
 
-} // Llpc
+} // namespace Llpc

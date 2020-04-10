@@ -28,19 +28,15 @@
  * @brief LLPC header file: middle-end debug functions
  ***********************************************************************************************************************
  */
-#include "lgc/llpcBuilderContext.h"
 #include "llpcBuilderDebug.h"
+#include "lgc/llpcBuilderContext.h"
 
 using namespace llvm;
 
-namespace lgc
-{
+namespace lgc {
 
 //======================================================================================================================
 // Get pointer to stream for LLPC_OUTS, or nullptr if disabled.
-raw_ostream* getLgcOuts()
-{
-    return BuilderContext::getLgcOuts();
-}
+raw_ostream *getLgcOuts() { return BuilderContext::getLgcOuts(); }
 
-} // lgc
+} // namespace lgc

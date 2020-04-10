@@ -33,18 +33,34 @@
 #include <stdint.h>
 
 // Output error message
-#define LLPC_ERRS(_msg) { if (EnableErrs()) { outs() << "ERROR: " << _msg; outs().flush(); } }
+#define LLPC_ERRS(_msg)                                                                                                \
+  {                                                                                                                    \
+    if (EnableErrs()) {                                                                                                \
+      outs() << "ERROR: " << _msg;                                                                                     \
+      outs().flush();                                                                                                  \
+    }                                                                                                                  \
+  }
 
 // Output general message
-#define LLPC_OUTS(_msg) { if (EnableOuts()) { outs() << _msg; } }
+#define LLPC_OUTS(_msg)                                                                                                \
+  {                                                                                                                    \
+    if (EnableOuts()) {                                                                                                \
+      outs() << _msg;                                                                                                  \
+    }                                                                                                                  \
+  }
 
-namespace llvm { class raw_ostream; }
-namespace llvm { class raw_fd_ostream; }
+namespace llvm {
+class raw_ostream;
+}
+namespace llvm {
+class raw_fd_ostream;
+}
 
-namespace MetroHash { struct Hash; };
+namespace MetroHash {
+struct Hash;
+};
 
-namespace Llpc
-{
+namespace Llpc {
 
 // Gets the value of option "enable-outs"
 bool EnableOuts();
@@ -53,12 +69,9 @@ bool EnableOuts();
 bool EnableErrs();
 
 // Redirects the output of logs, It affects the behavior of llvm::outs(), dbgs() and errs().
-void redirectLogOutput(
-    bool              restoreToDefault,
-    unsigned          optionCount,
-    const char*const* options);
+void redirectLogOutput(bool restoreToDefault, unsigned optionCount, const char *const *options);
 
 // Enable/disable the output for debugging.
 void enableDebugOutput(bool restore);
 
-} // Llpc
+} // namespace Llpc

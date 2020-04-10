@@ -28,13 +28,12 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerConstImmediateStore.
  ***********************************************************************************************************************
  */
-#include "llvm/IR/Instructions.h"
-#include "llvm/Support/Debug.h"
-
-#include <vector>
+#include "llpcSpirvLowerConstImmediateStore.h"
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
-#include "llpcSpirvLowerConstImmediateStore.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/Support/Debug.h"
+#include <vector>
 
 #define DEBUG_TYPE "llpc-spirv-lower-const-immediate-store"
 
@@ -42,8 +41,7 @@ using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Initializes static members.
@@ -51,41 +49,30 @@ char SpirvLowerConstImmediateStore::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for constant immediate store
-ModulePass* createSpirvLowerConstImmediateStore()
-{
-    return new SpirvLowerConstImmediateStore();
-}
+ModulePass *createSpirvLowerConstImmediateStore() { return new SpirvLowerConstImmediateStore(); }
 
 // =====================================================================================================================
-SpirvLowerConstImmediateStore::SpirvLowerConstImmediateStore()
-    :
-    SpirvLower(ID)
-{
-}
+SpirvLowerConstImmediateStore::SpirvLowerConstImmediateStore() : SpirvLower(ID) {}
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in,out] module : LLVM module to be run on
-bool SpirvLowerConstImmediateStore::runOnModule(
-    Module& module)
-{
-    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Const-Immediate-Store\n");
+bool SpirvLowerConstImmediateStore::runOnModule(Module &module) {
+  LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Const-Immediate-Store\n");
 
-    SpirvLower::init(&module);
+  SpirvLower::init(&module);
 
-    // Process "alloca" instructions to see if they can be optimized to a read-only global
-    // variable.
-    for (auto funcIt = module.begin(), funcItEnd = module.end(); funcIt != funcItEnd; ++funcIt)
-    {
-        if (auto func = dyn_cast<Function>(&*funcIt))
-        {
-            if (!func->empty())
-                processAllocaInsts(func);
-        }
+  // Process "alloca" instructions to see if they can be optimized to a read-only global
+  // variable.
+  for (auto funcIt = module.begin(), funcItEnd = module.end(); funcIt != funcItEnd; ++funcIt) {
+    if (auto func = dyn_cast<Function>(&*funcIt)) {
+      if (!func->empty())
+        processAllocaInsts(func);
     }
+  }
 
-    return true;
+  return true;
 }
 
 // =====================================================================================================================
@@ -93,30 +80,24 @@ bool SpirvLowerConstImmediateStore::runOnModule(
 // can be optimized to a read-only global variable.
 //
 // @param func : Function to process
-void SpirvLowerConstImmediateStore::processAllocaInsts(
-    Function* func)
-{
-    // NOTE: We only visit the entry block on the basis that SPIR-V translator puts all "alloca"
-    // instructions there.
-    auto entryBlock = &func->front();
-    for (auto instIt = entryBlock->begin(), instItEnd = entryBlock->end(); instIt != instItEnd; ++instIt)
-    {
-        auto inst = &*instIt;
-        if (auto allocaInst = dyn_cast<AllocaInst>(inst))
-        {
-            if (allocaInst->getType()->getElementType()->isAggregateType())
-            {
-                // Got an "alloca" instruction of aggregate type.
-                auto storeInst = findSingleStore(allocaInst);
-                if (storeInst && isa<Constant>(storeInst->getValueOperand()))
-                {
-                    // Got an aggregate "alloca" with a single store to the whole type.
-                    // Do the optimization.
-                    convertAllocaToReadOnlyGlobal(storeInst);
-                }
-            }
+void SpirvLowerConstImmediateStore::processAllocaInsts(Function *func) {
+  // NOTE: We only visit the entry block on the basis that SPIR-V translator puts all "alloca"
+  // instructions there.
+  auto entryBlock = &func->front();
+  for (auto instIt = entryBlock->begin(), instItEnd = entryBlock->end(); instIt != instItEnd; ++instIt) {
+    auto inst = &*instIt;
+    if (auto allocaInst = dyn_cast<AllocaInst>(inst)) {
+      if (allocaInst->getType()->getElementType()->isAggregateType()) {
+        // Got an "alloca" instruction of aggregate type.
+        auto storeInst = findSingleStore(allocaInst);
+        if (storeInst && isa<Constant>(storeInst->getValueOperand())) {
+          // Got an aggregate "alloca" with a single store to the whole type.
+          // Do the optimization.
+          convertAllocaToReadOnlyGlobal(storeInst);
         }
+      }
     }
+  }
 }
 
 // =====================================================================================================================
@@ -129,47 +110,38 @@ void SpirvLowerConstImmediateStore::processAllocaInsts(
 // other than "store" (as the pointer), "load" or "getelementptr" instruction.
 //
 // @param allocaInst : The "alloca" instruction to process
-StoreInst* SpirvLowerConstImmediateStore::findSingleStore(
-    AllocaInst* allocaInst)
-{
-    std::vector<Instruction*> pointers;
-    bool isOuterPointer = true;
-    StoreInst* storeInstFound = nullptr;
-    Instruction* pointer = allocaInst;
-    while (true)
-    {
-        for (auto useIt = pointer->use_begin(), useItEnd = pointer->use_end(); useIt != useItEnd; ++useIt)
-        {
-            auto user = cast<Instruction>(useIt->getUser());
-            if (auto storeInst = dyn_cast<StoreInst>(user))
-            {
-                if (pointer == storeInst->getValueOperand() || storeInstFound
-                      || !isOuterPointer)
-                {
-                    // Pointer escapes by being stored, or we have already found a "store"
-                    // instruction, or this is a partial "store" instruction.
-                    return nullptr;
-                }
-                storeInstFound = storeInst;
-            }
-            else if (auto getElemPtrInst = dyn_cast<GetElementPtrInst>(user))
-                pointers.push_back(getElemPtrInst);
-            else if (!isa<LoadInst>(user))
-            {
-                // Pointer escapes by being used in some way other than "load/store/getelementptr".
-                return nullptr;
-            }
+StoreInst *SpirvLowerConstImmediateStore::findSingleStore(AllocaInst *allocaInst) {
+  std::vector<Instruction *> pointers;
+  bool isOuterPointer = true;
+  StoreInst *storeInstFound = nullptr;
+  Instruction *pointer = allocaInst;
+  while (true) {
+    for (auto useIt = pointer->use_begin(), useItEnd = pointer->use_end(); useIt != useItEnd; ++useIt) {
+      auto user = cast<Instruction>(useIt->getUser());
+      if (auto storeInst = dyn_cast<StoreInst>(user)) {
+        if (pointer == storeInst->getValueOperand() || storeInstFound || !isOuterPointer) {
+          // Pointer escapes by being stored, or we have already found a "store"
+          // instruction, or this is a partial "store" instruction.
+          return nullptr;
         }
-
-        if (pointers.empty())
-            break;
-
-        pointer = pointers.back();
-        pointers.pop_back();
-        isOuterPointer = false;
+        storeInstFound = storeInst;
+      } else if (auto getElemPtrInst = dyn_cast<GetElementPtrInst>(user))
+        pointers.push_back(getElemPtrInst);
+      else if (!isa<LoadInst>(user)) {
+        // Pointer escapes by being used in some way other than "load/store/getelementptr".
+        return nullptr;
+      }
     }
 
-    return storeInstFound;
+    if (pointers.empty())
+      break;
+
+    pointer = pointers.back();
+    pointers.pop_back();
+    isOuterPointer = false;
+  }
+
+  return storeInstFound;
 }
 
 // =====================================================================================================================
@@ -180,63 +152,47 @@ StoreInst* SpirvLowerConstImmediateStore::findSingleStore(
 // later by DCE pass).
 //
 // @param storeInst : The single constant store into the "alloca"
-void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(
-    StoreInst* storeInst)
-{
-    auto allocaInst = cast<AllocaInst>(storeInst->getPointerOperand());
-    auto global = new GlobalVariable(*m_module,
-                                      allocaInst->getType()->getElementType(),
-                                      true, // isConstant
-                                      GlobalValue::InternalLinkage,
-                                      cast<Constant>(storeInst->getValueOperand()),
-                                      "",
-                                      nullptr,
-                                      GlobalValue::NotThreadLocal,
-                                      SPIRAS_Constant);
-    global->takeName(allocaInst);
-    // Change all uses of pAllocaInst to use pGlobal. We need to do it manually, as there is a change
-    // of address space, and we also need to recreate "getelementptr"s.
-    std::vector<std::pair<Instruction*, Value*>> allocaToGlobalMap;
-    allocaToGlobalMap.push_back(std::pair<Instruction*, Value*>(allocaInst, global));
-    do
-    {
-        auto allocaInst = allocaToGlobalMap.back().first;
-        auto global = allocaToGlobalMap.back().second;
-        allocaToGlobalMap.pop_back();
-        while (!allocaInst->use_empty())
-        {
-            auto useIt = allocaInst->use_begin();
-            if (auto origGetElemPtrInst = dyn_cast<GetElementPtrInst>(useIt->getUser()))
-            {
-                // This use is a "getelementptr" instruction. Create a replacement one with the new address space.
-                SmallVector<Value*, 4> indices;
-                for (auto idxIt = origGetElemPtrInst->idx_begin(),
-                        idxItEnd = origGetElemPtrInst->idx_end(); idxIt != idxItEnd; ++idxIt)
-                    indices.push_back(*idxIt);
-                auto newGetElemPtrInst = GetElementPtrInst::Create(nullptr,
-                                                                    global,
-                                                                    indices,
-                                                                    "",
-                                                                    origGetElemPtrInst);
-                newGetElemPtrInst->takeName(origGetElemPtrInst);
-                newGetElemPtrInst->setIsInBounds(origGetElemPtrInst->isInBounds());
-                newGetElemPtrInst->copyMetadata(*origGetElemPtrInst);
-                // Remember that we need to replace the uses of the original "getelementptr" with the new one.
-                allocaToGlobalMap.push_back(std::pair<Instruction*, Value*>(origGetElemPtrInst, newGetElemPtrInst));
-                // Remove the use from the original "getelementptr".
-                *useIt = UndefValue::get(allocaInst->getType());
-            }
-            else
-                *useIt = global;
-        }
-        // Visit next map pair.
-    } while (!allocaToGlobalMap.empty());
-    storeInst->eraseFromParent();
+void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(StoreInst *storeInst) {
+  auto allocaInst = cast<AllocaInst>(storeInst->getPointerOperand());
+  auto global = new GlobalVariable(*m_module, allocaInst->getType()->getElementType(),
+                                   true, // isConstant
+                                   GlobalValue::InternalLinkage, cast<Constant>(storeInst->getValueOperand()), "",
+                                   nullptr, GlobalValue::NotThreadLocal, SPIRAS_Constant);
+  global->takeName(allocaInst);
+  // Change all uses of pAllocaInst to use pGlobal. We need to do it manually, as there is a change
+  // of address space, and we also need to recreate "getelementptr"s.
+  std::vector<std::pair<Instruction *, Value *>> allocaToGlobalMap;
+  allocaToGlobalMap.push_back(std::pair<Instruction *, Value *>(allocaInst, global));
+  do {
+    auto allocaInst = allocaToGlobalMap.back().first;
+    auto global = allocaToGlobalMap.back().second;
+    allocaToGlobalMap.pop_back();
+    while (!allocaInst->use_empty()) {
+      auto useIt = allocaInst->use_begin();
+      if (auto origGetElemPtrInst = dyn_cast<GetElementPtrInst>(useIt->getUser())) {
+        // This use is a "getelementptr" instruction. Create a replacement one with the new address space.
+        SmallVector<Value *, 4> indices;
+        for (auto idxIt = origGetElemPtrInst->idx_begin(), idxItEnd = origGetElemPtrInst->idx_end(); idxIt != idxItEnd;
+             ++idxIt)
+          indices.push_back(*idxIt);
+        auto newGetElemPtrInst = GetElementPtrInst::Create(nullptr, global, indices, "", origGetElemPtrInst);
+        newGetElemPtrInst->takeName(origGetElemPtrInst);
+        newGetElemPtrInst->setIsInBounds(origGetElemPtrInst->isInBounds());
+        newGetElemPtrInst->copyMetadata(*origGetElemPtrInst);
+        // Remember that we need to replace the uses of the original "getelementptr" with the new one.
+        allocaToGlobalMap.push_back(std::pair<Instruction *, Value *>(origGetElemPtrInst, newGetElemPtrInst));
+        // Remove the use from the original "getelementptr".
+        *useIt = UndefValue::get(allocaInst->getType());
+      } else
+        *useIt = global;
+    }
+    // Visit next map pair.
+  } while (!allocaToGlobalMap.empty());
+  storeInst->eraseFromParent();
 }
 
-} // Llpc
+} // namespace Llpc
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering operations for constant immediate store.
-INITIALIZE_PASS(SpirvLowerConstImmediateStore, DEBUG_TYPE,
-                "Lower SPIR-V constant immediate store", false, false)
+INITIALIZE_PASS(SpirvLowerConstImmediateStore, DEBUG_TYPE, "Lower SPIR-V constant immediate store", false, false)

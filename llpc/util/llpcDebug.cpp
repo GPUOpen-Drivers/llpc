@@ -28,6 +28,7 @@
  * @brief LLPC source file: contains implementation of LLPC debug utility functions.
  ***********************************************************************************************************************
  */
+#include "llpcDebug.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -35,68 +36,48 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "llpcDebug.h"
-
 #define DEBUG_TYPE "llpc-debug"
 
-namespace llvm
-{
+namespace llvm {
 
-namespace cl
-{
+namespace cl {
 
 // -enable-outs: enable general message output (to stdout or external file).
-opt<bool> EnableOuts(
-    "enable-outs",
-    desc("Enable LLPC-specific debug dump output (to stdout or external file) (default: false)"),
-    init(false));
+opt<bool> EnableOuts("enable-outs",
+                     desc("Enable LLPC-specific debug dump output (to stdout or external file) (default: false)"),
+                     init(false));
 
 // -v: alias for -enable-outs
-opt<bool> Verbose(
-    "v",
-    desc("Enable LLPC-specific debug dump output (to stdout or external file) (default: false)"),
-    init(false));
+opt<bool> Verbose("v", desc("Enable LLPC-specific debug dump output (to stdout or external file) (default: false)"),
+                  init(false));
 
 // -enable-errs: enable error message output (to stderr or external file).
-opt<bool> EnableErrs(
-    "enable-errs",
-    desc("Enable error message output (to stdout or external file) (default: true)"),
-    init(true));
+opt<bool> EnableErrs("enable-errs", desc("Enable error message output (to stdout or external file) (default: true)"),
+                     init(true));
 
 // -log-file-dbgs: name of the file to log info from dbg()
-opt<std::string> LogFileDbgs("log-file-dbgs",
-                             desc("Name of the file to log info from dbgs()"),
-                             value_desc("filename"),
+opt<std::string> LogFileDbgs("log-file-dbgs", desc("Name of the file to log info from dbgs()"), value_desc("filename"),
                              init(""));
 
 // -log-file-outs: name of the file to log info from LLPC_OUTS() and LLPC_ERRS()
-opt<std::string> LogFileOuts("log-file-outs",
-                             desc("Name of the file to log info from LLPC_OUTS() and LLPC_ERRS()"),
-                             value_desc("filename"),
-                             init(""));
+opt<std::string> LogFileOuts("log-file-outs", desc("Name of the file to log info from LLPC_OUTS() and LLPC_ERRS()"),
+                             value_desc("filename"), init(""));
 
-} // cl
+} // namespace cl
 
-} // llvm
+} // namespace llvm
 
 using namespace llvm;
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Gets the value of option "allow-out".
-bool EnableOuts()
-{
-    return cl::EnableOuts || cl::Verbose;
-}
+bool EnableOuts() { return cl::EnableOuts || cl::Verbose; }
 
 // =====================================================================================================================
 // Gets the value of option "allow-err".
-bool EnableErrs()
-{
-    return cl::EnableErrs;
-}
+bool EnableErrs() { return cl::EnableErrs; }
 
 // =====================================================================================================================
 // Redirects the output of logs. It affects the behavior of llvm::outs(), dbgs() and errs().
@@ -109,112 +90,89 @@ bool EnableErrs()
 // @param restoreToDefault : Restore the default behavior of outs() and errs() if it is true
 // @param optionCount : Count of compilation-option strings
 // @param options : An array of compilation-option strings
-void redirectLogOutput(
-    bool              restoreToDefault,
-    unsigned          optionCount,
-    const char*const* options)
-{
-    static raw_fd_ostream* DbgFile = nullptr;
-    static raw_fd_ostream* OutFile = nullptr;
-    static uint8_t  DbgFileBak[sizeof(raw_fd_ostream)] = {};
-    static uint8_t  OutFileBak[sizeof(raw_fd_ostream)] = {};
+void redirectLogOutput(bool restoreToDefault, unsigned optionCount, const char *const *options) {
+  static raw_fd_ostream *DbgFile = nullptr;
+  static raw_fd_ostream *OutFile = nullptr;
+  static uint8_t DbgFileBak[sizeof(raw_fd_ostream)] = {};
+  static uint8_t OutFileBak[sizeof(raw_fd_ostream)] = {};
 
-    if (restoreToDefault)
-    {
-        // Restore default raw_fd_ostream objects
-        if (DbgFile )
-        {
-            memcpy((void*)&errs(), DbgFileBak, sizeof(raw_fd_ostream));
-            DbgFile->close();
-            DbgFile = nullptr;
-        }
-
-        if (OutFile )
-        {
-            memcpy((void*)&outs(), OutFileBak, sizeof(raw_fd_ostream));
-            OutFile->close();
-            OutFile = nullptr;
-        }
+  if (restoreToDefault) {
+    // Restore default raw_fd_ostream objects
+    if (DbgFile) {
+      memcpy((void *)&errs(), DbgFileBak, sizeof(raw_fd_ostream));
+      DbgFile->close();
+      DbgFile = nullptr;
     }
-    else
-    {
-        // Redirect errs() for dbgs()
-        if (!cl::LogFileDbgs.empty())
-        {
-            // NOTE: Checks whether errs() is needed in compiliation
-            // Until now, option -debug, -debug-only and -print-* need use debug output
-            bool needDebugOut = ::llvm::DebugFlag;
-            for (unsigned i = 1; !needDebugOut && i < optionCount; ++i)
-            {
-                StringRef option = options[i];
-                if (option.startswith("-debug") || option.startswith("-print"))
-                    needDebugOut = true;
-            }
 
-            if (needDebugOut)
-            {
-                std::error_code errCode;
-
-                static raw_fd_ostream NewDbgFile(cl::LogFileDbgs.c_str(), errCode, sys::fs::F_Text);
-                assert(!errCode);
-                if (!DbgFile )
-                {
-                    NewDbgFile.SetUnbuffered();
-                    memcpy((void*)DbgFileBak, (void*)&errs(), sizeof(raw_fd_ostream));
-                    memcpy((void*)&errs(), (void*)&NewDbgFile, sizeof(raw_fd_ostream));
-                    DbgFile = &NewDbgFile;
-                }
-            }
-        }
-
-        // Redirect outs() for LLPC_OUTS() and LLPC_ERRS()
-        if ((cl::EnableOuts || cl::EnableErrs) && !cl::LogFileOuts.empty())
-        {
-            if (cl::LogFileOuts == cl::LogFileDbgs && DbgFile )
-            {
-                 memcpy((void*)OutFileBak, (void*)&outs(), sizeof(raw_fd_ostream));
-                 memcpy((void*)&outs(), (void*)DbgFile, sizeof(raw_fd_ostream));
-                 OutFile = DbgFile;
-            }
-            else
-            {
-                std::error_code errCode;
-
-                static raw_fd_ostream NewOutFile(cl::LogFileOuts.c_str(), errCode, sys::fs::F_Text);
-                assert(!errCode);
-                if (!OutFile )
-                {
-                    NewOutFile.SetUnbuffered();
-                    memcpy((void*)OutFileBak, (void*)&outs(), sizeof(raw_fd_ostream));
-                    memcpy((void*)&outs(), (void*)&NewOutFile, sizeof(raw_fd_ostream));
-                    OutFile = &NewOutFile;
-                }
-            }
-        }
+    if (OutFile) {
+      memcpy((void *)&outs(), OutFileBak, sizeof(raw_fd_ostream));
+      OutFile->close();
+      OutFile = nullptr;
     }
+  } else {
+    // Redirect errs() for dbgs()
+    if (!cl::LogFileDbgs.empty()) {
+      // NOTE: Checks whether errs() is needed in compiliation
+      // Until now, option -debug, -debug-only and -print-* need use debug output
+      bool needDebugOut = ::llvm::DebugFlag;
+      for (unsigned i = 1; !needDebugOut && i < optionCount; ++i) {
+        StringRef option = options[i];
+        if (option.startswith("-debug") || option.startswith("-print"))
+          needDebugOut = true;
+      }
+
+      if (needDebugOut) {
+        std::error_code errCode;
+
+        static raw_fd_ostream NewDbgFile(cl::LogFileDbgs.c_str(), errCode, sys::fs::F_Text);
+        assert(!errCode);
+        if (!DbgFile) {
+          NewDbgFile.SetUnbuffered();
+          memcpy((void *)DbgFileBak, (void *)&errs(), sizeof(raw_fd_ostream));
+          memcpy((void *)&errs(), (void *)&NewDbgFile, sizeof(raw_fd_ostream));
+          DbgFile = &NewDbgFile;
+        }
+      }
+    }
+
+    // Redirect outs() for LLPC_OUTS() and LLPC_ERRS()
+    if ((cl::EnableOuts || cl::EnableErrs) && !cl::LogFileOuts.empty()) {
+      if (cl::LogFileOuts == cl::LogFileDbgs && DbgFile) {
+        memcpy((void *)OutFileBak, (void *)&outs(), sizeof(raw_fd_ostream));
+        memcpy((void *)&outs(), (void *)DbgFile, sizeof(raw_fd_ostream));
+        OutFile = DbgFile;
+      } else {
+        std::error_code errCode;
+
+        static raw_fd_ostream NewOutFile(cl::LogFileOuts.c_str(), errCode, sys::fs::F_Text);
+        assert(!errCode);
+        if (!OutFile) {
+          NewOutFile.SetUnbuffered();
+          memcpy((void *)OutFileBak, (void *)&outs(), sizeof(raw_fd_ostream));
+          memcpy((void *)&outs(), (void *)&NewOutFile, sizeof(raw_fd_ostream));
+          OutFile = &NewOutFile;
+        }
+      }
+    }
+  }
 }
 
 // =====================================================================================================================
 // Enables/disables the output for debugging. TRUE for enable, FALSE for disable.
 //
 // @param restore : Whether to enable debug output
-void enableDebugOutput(
-    bool restore)
-{
-    static raw_null_ostream NullStream;
-    static uint8_t  DbgStream[sizeof(raw_fd_ostream)] = {};
+void enableDebugOutput(bool restore) {
+  static raw_null_ostream NullStream;
+  static uint8_t DbgStream[sizeof(raw_fd_ostream)] = {};
 
-    if (restore)
-    {
-        // Restore default raw_fd_ostream objects
-        memcpy((void*)&errs(), DbgStream, sizeof(raw_fd_ostream));
-    }
-    else
-    {
-        // Redirect errs() for dbgs()
-         memcpy((void*)DbgStream, (void*)&errs(), sizeof(raw_fd_ostream));
-         memcpy((void*)&errs(), (void*)&NullStream, sizeof(NullStream));
-    }
+  if (restore) {
+    // Restore default raw_fd_ostream objects
+    memcpy((void *)&errs(), DbgStream, sizeof(raw_fd_ostream));
+  } else {
+    // Redirect errs() for dbgs()
+    memcpy((void *)DbgStream, (void *)&errs(), sizeof(raw_fd_ostream));
+    memcpy((void *)&errs(), (void *)&NullStream, sizeof(NullStream));
+  }
 }
 
-} // Llpc
+} // namespace Llpc

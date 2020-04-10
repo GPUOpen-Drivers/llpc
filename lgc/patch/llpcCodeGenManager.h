@@ -32,56 +32,49 @@
 
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
-
 #include <string>
 
-namespace llvm
-{
+namespace llvm {
 
-namespace legacy
-{
+namespace legacy {
 
 class PassManager;
 
-} // legacy
+} // namespace legacy
 
 class Timer;
 
-} // llvm
+} // namespace llvm
 
-namespace lgc
-{
+namespace lgc {
 
-namespace Gfx6
-{
-    struct PipelineVsFsRegConfig;
-    struct PipelineCsRegConfig;
-}
+namespace Gfx6 {
+struct PipelineVsFsRegConfig;
+struct PipelineCsRegConfig;
+} // namespace Gfx6
 
 class PassManager;
 class PipelineState;
 
 // Represents data entry in a ELF section, including associated ELF symbols.
-struct ElfDataEntry
-{
-    const void* data;           // Data in the section
-    unsigned    offset;          // Offset of the data
-    unsigned    size;            // Size of the data
-    unsigned    padSize;         // Padding size of the data
-    const char* pSymName;        // Name of associated ELF symbol
+struct ElfDataEntry {
+  const void *data;     // Data in the section
+  unsigned offset;      // Offset of the data
+  unsigned size;        // Size of the data
+  unsigned padSize;     // Padding size of the data
+  const char *pSymName; // Name of associated ELF symbol
 };
 
 // =====================================================================================================================
 // Represents the manager of GPU ISA code generation.
-class CodeGenManager
-{
+class CodeGenManager {
 public:
-    static void setupTargetFeatures(PipelineState* pipelineState, llvm::Module* module);
+  static void setupTargetFeatures(PipelineState *pipelineState, llvm::Module *module);
 
 private:
-    CodeGenManager() = delete;
-    CodeGenManager(const CodeGenManager&) = delete;
-    CodeGenManager& operator=(const CodeGenManager&) = delete;
+  CodeGenManager() = delete;
+  CodeGenManager(const CodeGenManager &) = delete;
+  CodeGenManager &operator=(const CodeGenManager &) = delete;
 };
 
-} // lgc
+} // namespace lgc

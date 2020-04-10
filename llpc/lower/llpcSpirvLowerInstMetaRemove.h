@@ -30,34 +30,29 @@
  */
 #pragma once
 
+#include "llpcSpirvLower.h"
 #include "llvm/IR/InstVisitor.h"
 
-#include "llpcSpirvLower.h"
-
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for removing the instruction metadata.
-class SpirvLowerInstMetaRemove:
-    public SpirvLower,
-    public llvm::InstVisitor<SpirvLowerInstMetaRemove>
-{
+class SpirvLowerInstMetaRemove : public SpirvLower, public llvm::InstVisitor<SpirvLowerInstMetaRemove> {
 public:
-    SpirvLowerInstMetaRemove();
+  SpirvLowerInstMetaRemove();
 
-    virtual bool runOnModule(llvm::Module& module);
-    virtual void visitCallInst(llvm::CallInst& callInst);
+  virtual bool runOnModule(llvm::Module &module);
+  virtual void visitCallInst(llvm::CallInst &callInst);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    SpirvLowerInstMetaRemove(const SpirvLowerInstMetaRemove&) = delete;
-    SpirvLowerInstMetaRemove& operator=(const SpirvLowerInstMetaRemove&) = delete;
+  SpirvLowerInstMetaRemove(const SpirvLowerInstMetaRemove &) = delete;
+  SpirvLowerInstMetaRemove &operator=(const SpirvLowerInstMetaRemove &) = delete;
 
-    bool m_changed;  // Whether the module is changed
+  bool m_changed; // Whether the module is changed
 };
 
-} // Llpc
+} // namespace Llpc

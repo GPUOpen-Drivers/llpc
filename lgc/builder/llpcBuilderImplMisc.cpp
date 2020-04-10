@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "llpcBuilderImpl.h"
-
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
@@ -43,96 +42,75 @@ using namespace llvm;
 // the current output primitive in the specified output-primitive stream number.
 //
 // @param streamId : Stream number, 0 if only one stream is present
-Instruction* BuilderImplMisc::CreateEmitVertex(
-    unsigned                streamId)
-{
-    assert(m_shaderStage == ShaderStageGeometry);
+Instruction *BuilderImplMisc::CreateEmitVertex(unsigned streamId) {
+  assert(m_shaderStage == ShaderStageGeometry);
 
-    // Get GsWaveId
-    std::string callName = lgcName::InputImportBuiltIn;
-    callName += "GsWaveId.i32.i32";
-    Value* gsWaveId = emitCall(callName,
-                                getInt32Ty(),
-                                getInt32(BuiltInWaveId),
-                                {},
-                                &*GetInsertPoint());
+  // Get GsWaveId
+  std::string callName = lgcName::InputImportBuiltIn;
+  callName += "GsWaveId.i32.i32";
+  Value *gsWaveId = emitCall(callName, getInt32Ty(), getInt32(BuiltInWaveId), {}, &*GetInsertPoint());
 
-    // Do the sendmsg.
-    // [9:8] = stream, [5:4] = 2 (emit), [3:0] = 2 (GS)
-    unsigned msg = (streamId << GsEmitCutStreamIdShift) | GsEmit;
-    return CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, { getInt32(msg), gsWaveId }, nullptr);
+  // Do the sendmsg.
+  // [9:8] = stream, [5:4] = 2 (emit), [3:0] = 2 (GS)
+  unsigned msg = (streamId << GsEmitCutStreamIdShift) | GsEmit;
+  return CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {getInt32(msg), gsWaveId}, nullptr);
 }
 
 // =====================================================================================================================
 // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
 //
 // @param streamId : Stream number, 0 if only one stream is present
-Instruction* BuilderImplMisc::CreateEndPrimitive(
-    unsigned                streamId)
-{
-    assert(m_shaderStage == ShaderStageGeometry);
+Instruction *BuilderImplMisc::CreateEndPrimitive(unsigned streamId) {
+  assert(m_shaderStage == ShaderStageGeometry);
 
-    // Get GsWaveId
-    std::string callName = lgcName::InputImportBuiltIn;
-    callName += "GsWaveId.i32.i32";
-    Value* gsWaveId = emitCall(callName,
-                                getInt32Ty(),
-                                getInt32(BuiltInWaveId),
-                                {},
-                                &*GetInsertPoint());
+  // Get GsWaveId
+  std::string callName = lgcName::InputImportBuiltIn;
+  callName += "GsWaveId.i32.i32";
+  Value *gsWaveId = emitCall(callName, getInt32Ty(), getInt32(BuiltInWaveId), {}, &*GetInsertPoint());
 
-    // Do the sendmsg.
-    // [9:8] = stream, [5:4] = 1 (cut), [3:0] = 2 (GS)
-    unsigned msg = (streamId << GsEmitCutStreamIdShift) | GsCut;
-    return CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, { getInt32(msg), gsWaveId }, nullptr);
+  // Do the sendmsg.
+  // [9:8] = stream, [5:4] = 1 (cut), [3:0] = 2 (GS)
+  unsigned msg = (streamId << GsEmitCutStreamIdShift) | GsCut;
+  return CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {getInt32(msg), gsWaveId}, nullptr);
 }
 
 // =====================================================================================================================
 // Create a workgroup control barrier.
-Instruction* BuilderImplMisc::CreateBarrier()
-{
-    return CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-}
+Instruction *BuilderImplMisc::CreateBarrier() { return CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {}); }
 
 // =====================================================================================================================
 // Create a "kill". Only allowed in a fragment shader.
 //
 // @param instName : Name to give instruction(s)
-Instruction* BuilderImplMisc::CreateKill(
-    const Twine& instName)
-{
-    // This tells the config builder to set KILL_ENABLE in DB_SHADER_CONTROL.
-    // Doing it here is suboptimal, as it does not allow for subsequent middle-end optimizations removing the
-    // section of code containing the kill.
-    auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
-    resUsage->builtInUsage.fs.discard = true;
+Instruction *BuilderImplMisc::CreateKill(const Twine &instName) {
+  // This tells the config builder to set KILL_ENABLE in DB_SHADER_CONTROL.
+  // Doing it here is suboptimal, as it does not allow for subsequent middle-end optimizations removing the
+  // section of code containing the kill.
+  auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
+  resUsage->builtInUsage.fs.discard = true;
 
-    return CreateIntrinsic(Intrinsic::amdgcn_kill, {}, getFalse(), nullptr, instName);
+  return CreateIntrinsic(Intrinsic::amdgcn_kill, {}, getFalse(), nullptr, instName);
 }
 
 // =====================================================================================================================
 // Create a demote to helper invocation operation. Only allowed in a fragment shader.
 //
 // @param instName : Name to give instruction(s)
-Instruction* BuilderImplMisc::CreateDemoteToHelperInvocation(
-    const Twine& instName)
-{
-    // Treat a demote as a kill for the purposes of disabling middle-end optimizations.
-    auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
-    resUsage->builtInUsage.fs.discard = true;
+Instruction *BuilderImplMisc::CreateDemoteToHelperInvocation(const Twine &instName) {
+  // Treat a demote as a kill for the purposes of disabling middle-end optimizations.
+  auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
+  resUsage->builtInUsage.fs.discard = true;
 
-    return CreateIntrinsic(Intrinsic::amdgcn_wqm_demote, {}, getFalse(), nullptr, instName);
+  return CreateIntrinsic(Intrinsic::amdgcn_wqm_demote, {}, getFalse(), nullptr, instName);
 }
 
 // =====================================================================================================================
 // Create a helper invocation query. Only allowed in a fragment shader.
 //
 // @param instName : Name to give instruction(s)
-Value* BuilderImplMisc::CreateIsHelperInvocation(
-    const Twine& instName)
-{
-    auto isNotHelper = CreateIntrinsic(Intrinsic::amdgcn_wqm_helper, {}, {}, nullptr, instName);
-    return CreateNot(isNotHelper);
+Value *BuilderImplMisc::CreateIsHelperInvocation(const Twine &instName) {
+  auto isNotHelper = CreateIntrinsic(Intrinsic::amdgcn_wqm_helper, {}, {}, nullptr, instName);
+  return CreateNot(isNotHelper);
 }
 
 // =====================================================================================================================
@@ -140,24 +118,20 @@ Value* BuilderImplMisc::CreateIsHelperInvocation(
 //
 // @param realtime : Whether to read real-time clock counter
 // @param instName : Name to give instruction(s)
-Instruction* BuilderImplMisc::CreateReadClock(
-    bool         realtime,
-    const Twine& instName)
-{
-    CallInst* readClock = nullptr;
-    if (realtime)
-        readClock = CreateIntrinsic(Intrinsic::amdgcn_s_memrealtime, {}, {}, nullptr, instName);
-    else
-        readClock = CreateIntrinsic(Intrinsic::readcyclecounter, {}, {}, nullptr, instName);
-    readClock->addAttribute(AttributeList::FunctionIndex, Attribute::ReadOnly);
+Instruction *BuilderImplMisc::CreateReadClock(bool realtime, const Twine &instName) {
+  CallInst *readClock = nullptr;
+  if (realtime)
+    readClock = CreateIntrinsic(Intrinsic::amdgcn_s_memrealtime, {}, {}, nullptr, instName);
+  else
+    readClock = CreateIntrinsic(Intrinsic::readcyclecounter, {}, {}, nullptr, instName);
+  readClock->addAttribute(AttributeList::FunctionIndex, Attribute::ReadOnly);
 
-    // NOTE: The inline ASM is to prevent optimization of backend compiler.
-    InlineAsm* asmFunc =
-        InlineAsm::get(FunctionType::get(getInt64Ty(), { getInt64Ty() }, false), "; %1", "=r,0", true);
+  // NOTE: The inline ASM is to prevent optimization of backend compiler.
+  InlineAsm *asmFunc = InlineAsm::get(FunctionType::get(getInt64Ty(), {getInt64Ty()}, false), "; %1", "=r,0", true);
 
-    readClock = CreateCall(asmFunc, { readClock });
+  readClock = CreateCall(asmFunc, {readClock});
 
-    return readClock;
+  return readClock;
 }
 
 // =====================================================================================================================
@@ -165,112 +139,79 @@ Instruction* BuilderImplMisc::CreateReadClock(
 //
 // @param value : Input value
 // @param isDirectionY : False for derivative in X direction, true for Y direction
-// @param isFine : True for "fine" calculation, where the value in the current fragment is used. False for "coarse" calculation, where it might use fewer locations to calculate.
+// @param isFine : True for "fine" calculation, where the value in the current fragment is used. False for "coarse"
+// calculation, where it might use fewer locations to calculate.
 // @param instName : Name to give instruction(s)
-Value* BuilderImplMisc::CreateDerivative(
-    Value*        value,
-    bool          isDirectionY,
-    bool          isFine,
-    const Twine&  instName)
-{
-    unsigned tableIdx = isDirectionY * 2 + isFine;
-    Value* result = nullptr;
-    if (supportDpp())
-    {
-        // DPP (GFX8+) version.
-        // For quad pixels, quad_perm:[pix0,pix1,pix2,pix3] = [0,1,2,3]
-        // Table of first dpp_ctrl, in order coarseX, fineX, coarseY, fineY
-        static const unsigned FirstDppCtrl[4] =
-        {
-            0x55, // CoarseX: [0,1,2,3] -> [1,1,1,1]
-            0xF5, // FineX:   [0,1,2,3]->[1,1,3,3]
-            0xAA, // CoarseY: [0,1,2,3] -> [2,2,2,2]
-            0xEE, // FineY:   [0,1,2,3]->[2,3,2,3]
-        };
-        // Table of second dpp_ctrl, in order coarseX, fineX, coarseY, fineY
-        static const unsigned SecondDppCtrl[4] =
-        {
-            0x00, // CoarseX: [0,1,2,3]->[0,0,0,0]
-            0xA0, // FineX:   [0,1,2,3]->[0,0,2,2]
-            0x00, // CoarseY: [0,1,2,3]->[0,0,0,0]
-            0x44, // FineY:   [0,1,2,3]->[0,1,0,1]
-        };
-        unsigned perm1 = FirstDppCtrl[tableIdx];
-        unsigned perm2 = SecondDppCtrl[tableIdx];
-        result = scalarize(value,
-                            [this, perm1, perm2](Value* value)
-                            {
-                               Type* valTy = value->getType();
-                               value = CreateBitCast(value, getIntNTy(valTy->getPrimitiveSizeInBits()));
-                               value = CreateZExtOrTrunc(value, getInt32Ty());
-                               Value* firstVal = CreateIntrinsic(Intrinsic::amdgcn_mov_dpp,
-                                                                  getInt32Ty(),
-                                                                  {
-                                                                     value,
-                                                                     getInt32(perm1),
-                                                                     getInt32(15),
-                                                                     getInt32(15),
-                                                                     getTrue()
-                                                                  });
-                               firstVal = CreateZExtOrTrunc(firstVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
-                               firstVal = CreateBitCast(firstVal, valTy);
-                               Value* secondVal = CreateIntrinsic(Intrinsic::amdgcn_mov_dpp,
-                                                                   getInt32Ty(),
-                                                                   {
-                                                                      value,
-                                                                      getInt32(perm2),
-                                                                      getInt32(15),
-                                                                      getInt32(15),
-                                                                      getTrue()
-                                                                   });
-                               secondVal = CreateZExtOrTrunc(secondVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
-                               secondVal = CreateBitCast(secondVal, valTy);
-                               Value* result = CreateFSub(firstVal, secondVal);
-                               return CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, result);
-                            });
-    }
-    else
-    {
-        // ds_swizzle (pre-GFX8) version
+Value *BuilderImplMisc::CreateDerivative(Value *value, bool isDirectionY, bool isFine, const Twine &instName) {
+  unsigned tableIdx = isDirectionY * 2 + isFine;
+  Value *result = nullptr;
+  if (supportDpp()) {
+    // DPP (GFX8+) version.
+    // For quad pixels, quad_perm:[pix0,pix1,pix2,pix3] = [0,1,2,3]
+    // Table of first dpp_ctrl, in order coarseX, fineX, coarseY, fineY
+    static const unsigned FirstDppCtrl[4] = {
+        0x55, // CoarseX: [0,1,2,3] -> [1,1,1,1]
+        0xF5, // FineX:   [0,1,2,3]->[1,1,3,3]
+        0xAA, // CoarseY: [0,1,2,3] -> [2,2,2,2]
+        0xEE, // FineY:   [0,1,2,3]->[2,3,2,3]
+    };
+    // Table of second dpp_ctrl, in order coarseX, fineX, coarseY, fineY
+    static const unsigned SecondDppCtrl[4] = {
+        0x00, // CoarseX: [0,1,2,3]->[0,0,0,0]
+        0xA0, // FineX:   [0,1,2,3]->[0,0,2,2]
+        0x00, // CoarseY: [0,1,2,3]->[0,0,0,0]
+        0x44, // FineY:   [0,1,2,3]->[0,1,0,1]
+    };
+    unsigned perm1 = FirstDppCtrl[tableIdx];
+    unsigned perm2 = SecondDppCtrl[tableIdx];
+    result = scalarize(value, [this, perm1, perm2](Value *value) {
+      Type *valTy = value->getType();
+      value = CreateBitCast(value, getIntNTy(valTy->getPrimitiveSizeInBits()));
+      value = CreateZExtOrTrunc(value, getInt32Ty());
+      Value *firstVal = CreateIntrinsic(Intrinsic::amdgcn_mov_dpp, getInt32Ty(),
+                                        {value, getInt32(perm1), getInt32(15), getInt32(15), getTrue()});
+      firstVal = CreateZExtOrTrunc(firstVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
+      firstVal = CreateBitCast(firstVal, valTy);
+      Value *secondVal = CreateIntrinsic(Intrinsic::amdgcn_mov_dpp, getInt32Ty(),
+                                         {value, getInt32(perm2), getInt32(15), getInt32(15), getTrue()});
+      secondVal = CreateZExtOrTrunc(secondVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
+      secondVal = CreateBitCast(secondVal, valTy);
+      Value *result = CreateFSub(firstVal, secondVal);
+      return CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, result);
+    });
+  } else {
+    // ds_swizzle (pre-GFX8) version
 
-        // Table of first swizzle control, in order coarseX, fineX, coarseY, fineY
-        static const unsigned FirstSwizzleCtrl[4] =
-        {
-            0x8055, // CoarseX: Broadcast channel 1 to whole quad
-            0x80F5, // FineX: Swizzle channels in quad (1 -> 0, 1 -> 1, 3 -> 2, 3 -> 3)
-            0x80AA, // CoarseY: Broadcast channel 2 to whole quad
-            0x80EE, // FineY: Swizzle channels in quad (2 -> 0, 3 -> 1, 2 -> 2, 3 -> 3)
-        };
-        // Table of second swizzle control, in order coarseX, fineX, coarseY, fineY
-        static const unsigned SecondSwizzleCtrl[4] =
-        {
-            0x8000, // CoarseX: Broadcast channel 0 to whole quad
-            0x80A0, // FineX: Swizzle channels in quad (0 -> 0, 0 -> 1, 2 -> 2, 2 -> 3)
-            0x8000, // CoarseY: Broadcast channel 0 to whole quad
-            0x8044, // FineY: Swizzle channels in quad (0 -> 0, 1 -> 1, 0 -> 2, 1 -> 3)
-        };
-        unsigned perm1 = FirstSwizzleCtrl[tableIdx];
-        unsigned perm2 = SecondSwizzleCtrl[tableIdx];
-        result = scalarize(value,
-                            [this, perm1, perm2](Value* value)
-                            {
-                               Type* valTy = value->getType();
-                               value = CreateBitCast(value, getIntNTy(valTy->getPrimitiveSizeInBits()));
-                               value = CreateZExtOrTrunc(value, getInt32Ty());
-                               Value* firstVal = CreateIntrinsic(Intrinsic::amdgcn_ds_swizzle,
-                                                                  {},
-                                                                  { value, getInt32(perm1)});
-                               firstVal = CreateZExtOrTrunc(firstVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
-                               firstVal = CreateBitCast(firstVal, valTy);
-                               Value* secondVal = CreateIntrinsic(Intrinsic::amdgcn_ds_swizzle,
-                                                                   {},
-                                                                   { value, getInt32(perm2) });
-                               secondVal = CreateZExtOrTrunc(secondVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
-                               secondVal = CreateBitCast(secondVal, valTy);
-                               Value* result = CreateFSub(firstVal, secondVal);
-                               return CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, result);
-                            });
-    }
-    result->setName(instName);
-    return result;
+    // Table of first swizzle control, in order coarseX, fineX, coarseY, fineY
+    static const unsigned FirstSwizzleCtrl[4] = {
+        0x8055, // CoarseX: Broadcast channel 1 to whole quad
+        0x80F5, // FineX: Swizzle channels in quad (1 -> 0, 1 -> 1, 3 -> 2, 3 -> 3)
+        0x80AA, // CoarseY: Broadcast channel 2 to whole quad
+        0x80EE, // FineY: Swizzle channels in quad (2 -> 0, 3 -> 1, 2 -> 2, 3 -> 3)
+    };
+    // Table of second swizzle control, in order coarseX, fineX, coarseY, fineY
+    static const unsigned SecondSwizzleCtrl[4] = {
+        0x8000, // CoarseX: Broadcast channel 0 to whole quad
+        0x80A0, // FineX: Swizzle channels in quad (0 -> 0, 0 -> 1, 2 -> 2, 2 -> 3)
+        0x8000, // CoarseY: Broadcast channel 0 to whole quad
+        0x8044, // FineY: Swizzle channels in quad (0 -> 0, 1 -> 1, 0 -> 2, 1 -> 3)
+    };
+    unsigned perm1 = FirstSwizzleCtrl[tableIdx];
+    unsigned perm2 = SecondSwizzleCtrl[tableIdx];
+    result = scalarize(value, [this, perm1, perm2](Value *value) {
+      Type *valTy = value->getType();
+      value = CreateBitCast(value, getIntNTy(valTy->getPrimitiveSizeInBits()));
+      value = CreateZExtOrTrunc(value, getInt32Ty());
+      Value *firstVal = CreateIntrinsic(Intrinsic::amdgcn_ds_swizzle, {}, {value, getInt32(perm1)});
+      firstVal = CreateZExtOrTrunc(firstVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
+      firstVal = CreateBitCast(firstVal, valTy);
+      Value *secondVal = CreateIntrinsic(Intrinsic::amdgcn_ds_swizzle, {}, {value, getInt32(perm2)});
+      secondVal = CreateZExtOrTrunc(secondVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
+      secondVal = CreateBitCast(secondVal, valTy);
+      Value *result = CreateFSub(firstVal, secondVal);
+      return CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, result);
+    });
+  }
+  result->setName(instName);
+  return result;
 }

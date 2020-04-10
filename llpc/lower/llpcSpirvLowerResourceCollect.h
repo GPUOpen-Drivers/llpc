@@ -30,81 +30,69 @@
  */
 #pragma once
 
-#include "llvm/IR/InstVisitor.h"
-
 #include "SPIRVInternal.h"
 #include "llpc.h"
 #include "llpcSpirvLower.h"
+#include "llvm/IR/InstVisitor.h"
 
-namespace Llpc
-{
+namespace Llpc {
 
 struct DescriptorBinding;
 struct ResourceUsage;
 
 // Compact ResourceNodeData into an uint64 key
-union ResourceNodeDataKey
-{
-    struct
-    {
-        uint64_t reserved   :   16;
-        uint64_t arraySize  :   16;  // Resource array size
-        uint64_t binding    :   16;  // Resource binding
-        uint64_t set        :   16;  // Resource set
-    } value;
-    uint64_t u64All;
+union ResourceNodeDataKey {
+  struct {
+    uint64_t reserved : 16;
+    uint64_t arraySize : 16; // Resource array size
+    uint64_t binding : 16;   // Resource binding
+    uint64_t set : 16;       // Resource set
+  } value;
+  uint64_t u64All;
 };
 
-struct ResNodeDataSortingComparer
-{
-    bool operator()(const ResourceNodeDataKey& set1, const ResourceNodeDataKey& set2) const
-    {
-        return set1.u64All < set2.u64All;
-    }
+struct ResNodeDataSortingComparer {
+  bool operator()(const ResourceNodeDataKey &set1, const ResourceNodeDataKey &set2) const {
+    return set1.u64All < set2.u64All;
+  }
 };
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for resource collecting.
-class SpirvLowerResourceCollect:
-    public SpirvLower,
-    public llvm::InstVisitor<SpirvLowerResourceCollect>
-{
+class SpirvLowerResourceCollect : public SpirvLower, public llvm::InstVisitor<SpirvLowerResourceCollect> {
 public:
-    SpirvLowerResourceCollect(bool collectDetailUsage = false);
-    auto& getResourceNodeDatas()
-    {
-        return m_resNodeDatas;
-    }
-    auto getPushConstSize() {return m_pushConstSize; }
-    auto& getFsOutInfos() { return m_fsOutInfos; }
-    bool detailUsageValid() { return m_detailUsageValid; }
+  SpirvLowerResourceCollect(bool collectDetailUsage = false);
+  auto &getResourceNodeDatas() { return m_resNodeDatas; }
+  auto getPushConstSize() { return m_pushConstSize; }
+  auto &getFsOutInfos() { return m_fsOutInfos; }
+  bool detailUsageValid() { return m_detailUsageValid; }
 
-    virtual bool runOnModule(llvm::Module& module);
-    void visitCalls(llvm::Module& module);
-    llvm::Value* findCallAndGetIndexValue(llvm::Module& module, llvm::CallInst* const targetCall);
+  virtual bool runOnModule(llvm::Module &module);
+  void visitCalls(llvm::Module &module);
+  llvm::Value *findCallAndGetIndexValue(llvm::Module &module, llvm::CallInst *const targetCall);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    SpirvLowerResourceCollect(const SpirvLowerResourceCollect&) = delete;
-    SpirvLowerResourceCollect& operator=(const SpirvLowerResourceCollect&) = delete;
+  SpirvLowerResourceCollect(const SpirvLowerResourceCollect &) = delete;
+  SpirvLowerResourceCollect &operator=(const SpirvLowerResourceCollect &) = delete;
 
-    unsigned getFlattenArrayElementCount(const llvm::Type* ty) const;
-    const llvm::Type* getFlattenArrayElementType(const llvm::Type* ty) const;
+  unsigned getFlattenArrayElementCount(const llvm::Type *ty) const;
+  const llvm::Type *getFlattenArrayElementType(const llvm::Type *ty) const;
 
-    void collectResourceNodeData(const GlobalVariable* global);
+  void collectResourceNodeData(const GlobalVariable *global);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    bool m_collectDetailUsage;      // If enabled, collect detailed usages of resource node datas and FS output infos
-    std::map<ResourceNodeDataKey, ResourceMappingNodeType, ResNodeDataSortingComparer> m_resNodeDatas; // Resource
-                                                                                                       // node data
-    unsigned m_pushConstSize;        // Push constant size in byte
-    std::vector<FsOutInfo> m_fsOutInfos;   // FS output info array
-    bool m_detailUsageValid; // Indicate whether detailed usages (resource node datas
-                             // or fragment shader output infos) are valid
+  bool m_collectDetailUsage; // If enabled, collect detailed usages of resource node datas and FS output infos
+  std::map<ResourceNodeDataKey, ResourceMappingNodeType, ResNodeDataSortingComparer> m_resNodeDatas; // Resource
+                                                                                                     // node data
+  unsigned m_pushConstSize;            // Push constant size in byte
+  std::vector<FsOutInfo> m_fsOutInfos; // FS output info array
+  bool m_detailUsageValid;             // Indicate whether detailed usages (resource node datas
+                                       // or fragment shader output infos) are valid
 };
 
-} // Llpc
+} // namespace Llpc

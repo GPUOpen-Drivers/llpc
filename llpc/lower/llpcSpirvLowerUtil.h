@@ -32,34 +32,31 @@
 
 #include "llpc.h"
 
-namespace llvm
-{
+namespace llvm {
 
 class Function;
 class Module;
 
-} // llvm
+} // namespace llvm
 
-namespace Llpc
-{
+namespace Llpc {
 
 // Well-known names in the front-end.
-namespace LlpcName
-{
+namespace LlpcName {
 
-const static char GlobalProxyPrefix[]             = "__llpc_global_proxy_";
-const static char InputProxyPrefix[]              = "__llpc_input_proxy_";
-const static char OutputProxyPrefix[]             = "__llpc_output_proxy_";
+const static char GlobalProxyPrefix[] = "__llpc_global_proxy_";
+const static char InputProxyPrefix[] = "__llpc_input_proxy_";
+const static char OutputProxyPrefix[] = "__llpc_output_proxy_";
 
-} // LlpcName
+} // namespace LlpcName
 
 // Gets the shader stage from the specified LLVM module.
-ShaderStage getShaderStageFromModule(llvm::Module* module);
+ShaderStage getShaderStageFromModule(llvm::Module *module);
 
 // Set the shader stage to the specified LLVM module.
-void setShaderStageToModule(llvm::Module* module, ShaderStage shaderStage);
+void setShaderStageToModule(llvm::Module *module, ShaderStage shaderStage);
 
 // Gets the entry point (valid for AMD GPU) of a LLVM module.
-llvm::Function* getEntryPoint(llvm::Module* module);
+llvm::Function *getEntryPoint(llvm::Module *module);
 
-} // Llpc
+} // namespace Llpc

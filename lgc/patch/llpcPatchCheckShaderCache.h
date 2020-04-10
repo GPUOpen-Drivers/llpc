@@ -34,45 +34,38 @@
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
 
-namespace lgc
-{
+namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for checking shader cache
-class PatchCheckShaderCache:
-    public Patch
-{
+class PatchCheckShaderCache : public Patch {
 public:
-    PatchCheckShaderCache();
+  PatchCheckShaderCache();
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
-    {
-        analysisUsage.addRequired<PipelineStateWrapper>();
-        analysisUsage.addRequired<PipelineShaders>();
-    }
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
+    analysisUsage.addRequired<PipelineStateWrapper>();
+    analysisUsage.addRequired<PipelineShaders>();
+  }
 
-    virtual bool runOnModule(llvm::Module& module) override;
+  virtual bool runOnModule(llvm::Module &module) override;
 
-    // Set the callback function that this pass uses to ask the front-end whether it wants to remove
-    // any shader stages. The function takes the LLVM IR module and a per-shader-stage array of input/output
-    // usage checksums, and it returns the shader stage mask with bits removed for shader stages that it wants
-    // removed.
-    void setCallbackFunction(Pipeline::CheckShaderCacheFunc callbackFunc)
-    {
-        m_callbackFunc = callbackFunc;
-    }
+  // Set the callback function that this pass uses to ask the front-end whether it wants to remove
+  // any shader stages. The function takes the LLVM IR module and a per-shader-stage array of input/output
+  // usage checksums, and it returns the shader stage mask with bits removed for shader stages that it wants
+  // removed.
+  void setCallbackFunction(Pipeline::CheckShaderCacheFunc callbackFunc) { m_callbackFunc = callbackFunc; }
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    PatchCheckShaderCache(const PatchCheckShaderCache&) = delete;
-    PatchCheckShaderCache& operator=(const PatchCheckShaderCache&) = delete;
+  PatchCheckShaderCache(const PatchCheckShaderCache &) = delete;
+  PatchCheckShaderCache &operator=(const PatchCheckShaderCache &) = delete;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    Pipeline::CheckShaderCacheFunc   m_callbackFunc;
+  Pipeline::CheckShaderCacheFunc m_callbackFunc;
 };
 
-} // lgc
+} // namespace lgc

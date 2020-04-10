@@ -28,46 +28,41 @@
 * @brief LLPC source file: pass to start or stop a timer
 ***********************************************************************************************************************
 */
-#include "lgc/llpcBuilderContext.h"
 #include "llpcInternal.h"
-
-#include "llvm/Support/Timer.h"
+#include "lgc/llpcBuilderContext.h"
 #include "llvm/Pass.h"
+#include "llvm/Support/Timer.h"
 
 #define DEBUG_TYPE "llpc-start-stop-timer"
 
 using namespace llvm;
 using namespace lgc;
 
-namespace
-{
+namespace {
 
 // =====================================================================================================================
 // Pass to start or stop a timer
-class StartStopTimer : public ModulePass
-{
+class StartStopTimer : public ModulePass {
 public:
-    static char ID;
-    StartStopTimer() : ModulePass(ID) {}
-    StartStopTimer(Timer* timer, bool starting) : ModulePass(ID), m_timer(timer), m_starting(starting)
-    {
-    }
+  static char ID;
+  StartStopTimer() : ModulePass(ID) {}
+  StartStopTimer(Timer *timer, bool starting) : ModulePass(ID), m_timer(timer), m_starting(starting) {}
 
-    bool runOnModule(Module& module) override;
+  bool runOnModule(Module &module) override;
 
 private:
-    StartStopTimer(const StartStopTimer&) = delete;
-    StartStopTimer& operator =(const StartStopTimer&) = delete;
+  StartStopTimer(const StartStopTimer &) = delete;
+  StartStopTimer &operator=(const StartStopTimer &) = delete;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    Timer*  m_timer;   // The timer to start or stop when the pass is run
-    bool    m_starting; // True to start the timer, false to stop it
+  Timer *m_timer;  // The timer to start or stop when the pass is run
+  bool m_starting; // True to start the timer, false to stop it
 };
 
 char StartStopTimer::ID = 0;
 
-} // lgc
+} // namespace
 
 // =====================================================================================================================
 // Create a start/stop timer pass. This is a static method in BuilderContext, so it can be accessed by
@@ -75,28 +70,22 @@ char StartStopTimer::ID = 0;
 //
 // @param timer : The timer to start or stop when the pass is run
 // @param starting : True to start the timer, false to stop it
-ModulePass* BuilderContext::createStartStopTimer(
-    Timer*  timer,
-    bool    starting)
-{
-    return new StartStopTimer(timer, starting);
+ModulePass *BuilderContext::createStartStopTimer(Timer *timer, bool starting) {
+  return new StartStopTimer(timer, starting);
 }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
 // @param [in,out] module : LLVM module to be run on
-bool StartStopTimer::runOnModule(
-    Module& module)
-{
-    if (m_starting)
-        m_timer->startTimer();
-    else
-        m_timer->stopTimer();
-    return false;
+bool StartStopTimer::runOnModule(Module &module) {
+  if (m_starting)
+    m_timer->startTimer();
+  else
+    m_timer->stopTimer();
+  return false;
 }
 
 // =====================================================================================================================
 // Initializes the pass
 INITIALIZE_PASS(StartStopTimer, DEBUG_TYPE, "Start or stop timer", false, false)
-

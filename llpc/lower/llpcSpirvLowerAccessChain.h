@@ -30,34 +30,29 @@
  */
 #pragma once
 
+#include "llpcSpirvLower.h"
 #include "llvm/IR/InstVisitor.h"
 
-#include "llpcSpirvLower.h"
-
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for access chain.
-class SpirvLowerAccessChain:
-    public SpirvLower,
-    public llvm::InstVisitor<SpirvLowerAccessChain>
-{
+class SpirvLowerAccessChain : public SpirvLower, public llvm::InstVisitor<SpirvLowerAccessChain> {
 public:
-    SpirvLowerAccessChain();
+  SpirvLowerAccessChain();
 
-    virtual bool runOnModule(llvm::Module& module);
-    virtual void visitGetElementPtrInst(llvm::GetElementPtrInst& getElemPtrInst);
+  virtual bool runOnModule(llvm::Module &module);
+  virtual void visitGetElementPtrInst(llvm::GetElementPtrInst &getElemPtrInst);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    SpirvLowerAccessChain(const SpirvLowerAccessChain&) = delete;
-    SpirvLowerAccessChain& operator=(const SpirvLowerAccessChain&) = delete;
+  SpirvLowerAccessChain(const SpirvLowerAccessChain &) = delete;
+  SpirvLowerAccessChain &operator=(const SpirvLowerAccessChain &) = delete;
 
-    llvm::GetElementPtrInst* tryToCoalesceChain(llvm::GetElementPtrInst* getElemPtr, unsigned addrSpace);
+  llvm::GetElementPtrInst *tryToCoalesceChain(llvm::GetElementPtrInst *getElemPtr, unsigned addrSpace);
 };
 
-} // Llpc
+} // namespace Llpc

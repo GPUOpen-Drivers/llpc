@@ -33,37 +33,30 @@
 
 #include "vfxParser.h"
 
-namespace Vfx
-{
+namespace Vfx {
 
 // =====================================================================================================================
 // Represents the pipeline state result of Vfx parser
-class PipelineDocument : public Document
-{
+class PipelineDocument : public Document {
 public:
-    PipelineDocument()
-    {
-        memset(&m_pipelineState, 0, sizeof(m_pipelineState));
-        memset(&m_vertexInputState, 0, sizeof(m_vertexInputState));
-    };
+  PipelineDocument() {
+    memset(&m_pipelineState, 0, sizeof(m_pipelineState));
+    memset(&m_vertexInputState, 0, sizeof(m_vertexInputState));
+  };
 
-    virtual unsigned getMaxSectionCount(SectionType type)
-    {
-        return m_maxSectionCount[type];
-    }
+  virtual unsigned getMaxSectionCount(SectionType type) { return m_maxSectionCount[type]; }
 
-    virtual bool validate();
+  virtual bool validate();
 
-    virtual bool checkVersion(unsigned ver);
-    VfxPipelineStatePtr getDocument();
+  virtual bool checkVersion(unsigned ver);
+  VfxPipelineStatePtr getDocument();
 
 private:
-    static unsigned m_maxSectionCount[SectionTypeNameNum];    // Contants max section count for each section type
-    VfxPipelineState m_pipelineState;                         // Contants the render state
-    VkPipelineVertexInputStateCreateInfo m_vertexInputState;
-    std::vector<Vfx::ShaderSource> m_shaderSources;
-    std::vector<Vkgc::PipelineShaderInfo> m_shaderInfos;
+  static unsigned m_maxSectionCount[SectionTypeNameNum]; // Contants max section count for each section type
+  VfxPipelineState m_pipelineState;                      // Contants the render state
+  VkPipelineVertexInputStateCreateInfo m_vertexInputState;
+  std::vector<Vfx::ShaderSource> m_shaderSources;
+  std::vector<Vkgc::PipelineShaderInfo> m_shaderInfos;
 };
 
-}
-
+} // namespace Vfx

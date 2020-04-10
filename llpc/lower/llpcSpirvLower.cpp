@@ -28,6 +28,13 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLower.
  ***********************************************************************************************************************
  */
+#include "llpcSpirvLower.h"
+#include "llpcContext.h"
+#include "llpcDebug.h"
+#include "llpcSpirvLowerUtil.h"
+#include "lgc/llpcBuilder.h"
+#include "lgc/llpcBuilderContext.h"
+#include "lgc/llpcPassManager.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/IR/IRPrintingPasses.h"
@@ -48,94 +55,71 @@
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Vectorize.h"
 
-#include "lgc/llpcBuilder.h"
-#include "lgc/llpcBuilderContext.h"
-#include "llpcContext.h"
-#include "llpcDebug.h"
-#include "lgc/llpcPassManager.h"
-#include "llpcSpirvLower.h"
-#include "llpcSpirvLowerUtil.h"
-
 #define DEBUG_TYPE "llpc-spirv-lower"
 
 using namespace lgc;
 using namespace llvm;
 
-namespace Llpc
-{
+namespace Llpc {
 // =====================================================================================================================
 // Replace a constant with instructions using a builder.
 //
 // @param context : The context
 // @param [in/out] constVal : The constant to replace with instructions.
-void SpirvLower::replaceConstWithInsts(
-    Context*        context,
-    Constant* const constVal)
+void SpirvLower::replaceConstWithInsts(Context *context, Constant *const constVal)
 
 {
-    SmallSet<Constant*, 8> otherConsts;
-    Builder* builder = context->getBuilder();
-    for (User* const user : constVal->users())
-    {
-        if (Constant* const otherConst = dyn_cast<Constant>(user))
-            otherConsts.insert(otherConst);
-    }
+  SmallSet<Constant *, 8> otherConsts;
+  Builder *builder = context->getBuilder();
+  for (User *const user : constVal->users()) {
+    if (Constant *const otherConst = dyn_cast<Constant>(user))
+      otherConsts.insert(otherConst);
+  }
 
-    for (Constant* const otherConst : otherConsts)
-        replaceConstWithInsts(context, otherConst);
+  for (Constant *const otherConst : otherConsts)
+    replaceConstWithInsts(context, otherConst);
 
-    otherConsts.clear();
+  otherConsts.clear();
 
-    SmallVector<Value*, 8> users;
+  SmallVector<Value *, 8> users;
 
-    for (User* const user : constVal->users())
-        users.push_back(user);
+  for (User *const user : constVal->users())
+    users.push_back(user);
 
-    for (Value* const user : users)
-    {
-        Instruction* const inst = dyn_cast<Instruction>(user);
-        assert(inst );
+  for (Value *const user : users) {
+    Instruction *const inst = dyn_cast<Instruction>(user);
+    assert(inst);
 
-        // If the instruction is a phi node, we have to insert the new instructions in the correct predecessor.
-        if (PHINode* const phiNode = dyn_cast<PHINode>(inst))
-        {
-            const unsigned incomingValueCount = phiNode->getNumIncomingValues();
-            for (unsigned i = 0; i < incomingValueCount; i++)
-            {
-                if (phiNode->getIncomingValue(i) == constVal)
-                {
-                    builder->SetInsertPoint(phiNode->getIncomingBlock(i)->getTerminator());
-                    break;
-                }
-            }
+    // If the instruction is a phi node, we have to insert the new instructions in the correct predecessor.
+    if (PHINode *const phiNode = dyn_cast<PHINode>(inst)) {
+      const unsigned incomingValueCount = phiNode->getNumIncomingValues();
+      for (unsigned i = 0; i < incomingValueCount; i++) {
+        if (phiNode->getIncomingValue(i) == constVal) {
+          builder->SetInsertPoint(phiNode->getIncomingBlock(i)->getTerminator());
+          break;
         }
-        else
-            builder->SetInsertPoint(inst);
+      }
+    } else
+      builder->SetInsertPoint(inst);
 
-        if (ConstantExpr* const constExpr = dyn_cast<ConstantExpr>(constVal))
-        {
-            Instruction* const insertPos = builder->Insert(constExpr->getAsInstruction());
-            inst->replaceUsesOfWith(constExpr, insertPos);
-        }
-        else if (ConstantVector* const constVector = dyn_cast<ConstantVector>(constVal))
-        {
-            Value* resultValue = UndefValue::get(constVector->getType());
-            for (unsigned i = 0; i < constVector->getNumOperands(); i++)
-            {
-                // Have to not use the builder here because it will constant fold and we are trying to undo that now!
-                Instruction* const insertPos = InsertElementInst::Create(resultValue,
-                    constVector->getOperand(i),
-                    builder->getInt32(i));
-                resultValue = builder->Insert(insertPos);
-            }
-            inst->replaceUsesOfWith(constVector, resultValue);
-        }
-        else
-            llvm_unreachable("Should never be called!");
-    }
+    if (ConstantExpr *const constExpr = dyn_cast<ConstantExpr>(constVal)) {
+      Instruction *const insertPos = builder->Insert(constExpr->getAsInstruction());
+      inst->replaceUsesOfWith(constExpr, insertPos);
+    } else if (ConstantVector *const constVector = dyn_cast<ConstantVector>(constVal)) {
+      Value *resultValue = UndefValue::get(constVector->getType());
+      for (unsigned i = 0; i < constVector->getNumOperands(); i++) {
+        // Have to not use the builder here because it will constant fold and we are trying to undo that now!
+        Instruction *const insertPos =
+            InsertElementInst::Create(resultValue, constVector->getOperand(i), builder->getInt32(i));
+        resultValue = builder->Insert(insertPos);
+      }
+      inst->replaceUsesOfWith(constVector, resultValue);
+    } else
+      llvm_unreachable("Should never be called!");
+  }
 
-    constVal->removeDeadConstantUsers();
-    constVal->destroyConstant();
+  constVal->removeDeadConstantUsers();
+  constVal->destroyConstant();
 }
 
 // =====================================================================================================================
@@ -143,20 +127,16 @@ void SpirvLower::replaceConstWithInsts(
 //
 // @param context : The context
 // @param global : The global variable
-void SpirvLower::removeConstantExpr(
-    Context*        context,
-    GlobalVariable* global)
-{
-    SmallVector<Constant*, 8> constantUsers;
+void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
+  SmallVector<Constant *, 8> constantUsers;
 
-    for (User* const user : global->users())
-    {
-        if (Constant* const pConst = dyn_cast<Constant>(user))
-            constantUsers.push_back(pConst);
-    }
+  for (User *const user : global->users()) {
+    if (Constant *const pConst = dyn_cast<Constant>(user))
+      constantUsers.push_back(pConst);
+  }
 
-    for (Constant* const constVal : constantUsers)
-        replaceConstWithInsts(context, constVal);
+  for (Constant *const constVal : constantUsers)
+    replaceConstWithInsts(context, constVal);
 }
 
 // =====================================================================================================================
@@ -167,77 +147,72 @@ void SpirvLower::removeConstantExpr(
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param lowerTimer : Timer to time lower passes with, nullptr if not timing
 // @param forceLoopUnrollCount : 0 or force loop unroll count
-void SpirvLower::addPasses(
-    Context*              context,
-    ShaderStage           stage,
-    legacy::PassManager&  passMgr,
-    llvm::Timer*          lowerTimer,
-    unsigned              forceLoopUnrollCount)
-{
-    // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-    context->getBuilderContext()->preparePassManager(&passMgr);
+void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassManager &passMgr, llvm::Timer *lowerTimer,
+                           unsigned forceLoopUnrollCount) {
+  // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
+  context->getBuilderContext()->preparePassManager(&passMgr);
 
-    // Start timer for lowering passes.
-    if (lowerTimer )
-        passMgr.add(BuilderContext::createStartStopTimer(lowerTimer, true));
+  // Start timer for lowering passes.
+  if (lowerTimer)
+    passMgr.add(BuilderContext::createStartStopTimer(lowerTimer, true));
 
-    // Lower SPIR-V resource collecting
-    passMgr.add(createSpirvLowerResourceCollect(false));
+  // Lower SPIR-V resource collecting
+  passMgr.add(createSpirvLowerResourceCollect(false));
 
-    // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
-    // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.
-    passMgr.add(createAlwaysInlinerLegacyPass());
-    passMgr.add(createGlobalDCEPass());
+  // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
+  // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.
+  passMgr.add(createAlwaysInlinerLegacyPass());
+  passMgr.add(createGlobalDCEPass());
 
-    // Control loop unrolling
-    passMgr.add(createSpirvLowerLoopUnrollControl(forceLoopUnrollCount));
+  // Control loop unrolling
+  passMgr.add(createSpirvLowerLoopUnrollControl(forceLoopUnrollCount));
 
-    // Lower SPIR-V access chain
-    passMgr.add(createSpirvLowerAccessChain());
+  // Lower SPIR-V access chain
+  passMgr.add(createSpirvLowerAccessChain());
 
-    // Lower SPIR-V global variables, inputs, and outputs
-    passMgr.add(createSpirvLowerGlobal());
+  // Lower SPIR-V global variables, inputs, and outputs
+  passMgr.add(createSpirvLowerGlobal());
 
-    // Lower SPIR-V constant immediate store.
-    passMgr.add(createSpirvLowerConstImmediateStore());
+  // Lower SPIR-V constant immediate store.
+  passMgr.add(createSpirvLowerConstImmediateStore());
 
-    // Lower SPIR-V algebraic transforms, constant folding must be done before instruction combining pass.
-    passMgr.add(createSpirvLowerAlgebraTransform(true, false));
+  // Lower SPIR-V algebraic transforms, constant folding must be done before instruction combining pass.
+  passMgr.add(createSpirvLowerAlgebraTransform(true, false));
 
-    // Lower SPIR-V memory operations
-    passMgr.add(createSpirvLowerMemoryOp());
+  // Lower SPIR-V memory operations
+  passMgr.add(createSpirvLowerMemoryOp());
 
-    // Remove reduant load/store operations and do minimal optimization
-    // It is required by SpirvLowerImageOp.
-    passMgr.add(createSROAPass());
-    passMgr.add(createGlobalOptimizerPass());
-    passMgr.add(createGlobalDCEPass());
-    passMgr.add(createPromoteMemoryToRegisterPass());
-    passMgr.add(createAggressiveDCEPass());
-    passMgr.add(createInstructionCombiningPass(false, 3));
-    passMgr.add(createCFGSimplificationPass());
-    passMgr.add(createSROAPass());
-    passMgr.add(createEarlyCSEPass());
-    passMgr.add(createCFGSimplificationPass());
-    passMgr.add(createIPConstantPropagationPass());
+  // Remove reduant load/store operations and do minimal optimization
+  // It is required by SpirvLowerImageOp.
+  passMgr.add(createSROAPass());
+  passMgr.add(createGlobalOptimizerPass());
+  passMgr.add(createGlobalDCEPass());
+  passMgr.add(createPromoteMemoryToRegisterPass());
+  passMgr.add(createAggressiveDCEPass());
+  passMgr.add(createInstructionCombiningPass(false, 3));
+  passMgr.add(createCFGSimplificationPass());
+  passMgr.add(createSROAPass());
+  passMgr.add(createEarlyCSEPass());
+  passMgr.add(createCFGSimplificationPass());
+  passMgr.add(createIPConstantPropagationPass());
 
-    // Lower SPIR-V algebraic transforms
-    passMgr.add(createSpirvLowerAlgebraTransform(false, true));
+  // Lower SPIR-V algebraic transforms
+  passMgr.add(createSpirvLowerAlgebraTransform(false, true));
 
-    // Lower SPIR-V instruction metadata remove
-    passMgr.add(createSpirvLowerInstMetaRemove());
+  // Lower SPIR-V instruction metadata remove
+  passMgr.add(createSpirvLowerInstMetaRemove());
 
-    // Stop timer for lowering passes.
-    if (lowerTimer )
-        passMgr.add(BuilderContext::createStartStopTimer(lowerTimer, false));
+  // Stop timer for lowering passes.
+  if (lowerTimer)
+    passMgr.add(BuilderContext::createStartStopTimer(lowerTimer, false));
 
-    // Dump the result
-    if (EnableOuts())
-    {
-        passMgr.add(createPrintModulePass(outs(), "\n"
-                    "===============================================================================\n"
-                    "// LLPC SPIR-V lowering results\n"));
-    }
+  // Dump the result
+  if (EnableOuts()) {
+    passMgr.add(createPrintModulePass(
+        outs(), "\n"
+                "===============================================================================\n"
+                "// LLPC SPIR-V lowering results\n"));
+  }
 }
 
 // =====================================================================================================================
@@ -246,22 +221,17 @@ void SpirvLower::addPasses(
 // NOTE: This function should be called at the beginning of "runOnModule()".
 //
 // @param module : LLVM module
-void SpirvLower::init(
-    Module* module)
-{
-    m_module  = module;
-    m_context = static_cast<Context*>(&m_module->getContext());
-    if (m_module->empty())
-    {
-        m_shaderStage = ShaderStageInvalid;
-        m_entryPoint = nullptr;
-    }
-    else
-    {
-        m_shaderStage = getShaderStageFromModule(m_module);
-        m_entryPoint = getEntryPoint(m_module);
-    }
-    m_builder = m_context->getBuilder();
+void SpirvLower::init(Module *module) {
+  m_module = module;
+  m_context = static_cast<Context *>(&m_module->getContext());
+  if (m_module->empty()) {
+    m_shaderStage = ShaderStageInvalid;
+    m_entryPoint = nullptr;
+  } else {
+    m_shaderStage = getShaderStageFromModule(m_module);
+    m_entryPoint = getEntryPoint(m_module);
+  }
+  m_builder = m_context->getBuilder();
 }
 
-} // Llpc
+} // namespace Llpc

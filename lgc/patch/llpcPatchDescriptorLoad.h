@@ -30,85 +30,68 @@
  */
 #pragma once
 
-#include "llvm/IR/InstVisitor.h"
-
-#include <unordered_set>
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
 #include "llpcSystemValues.h"
+#include "llvm/IR/InstVisitor.h"
+#include <unordered_set>
 
-namespace lgc
-{
+namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for descriptor load.
-class PatchDescriptorLoad:
-    public Patch,
-    public llvm::InstVisitor<PatchDescriptorLoad>
-{
+class PatchDescriptorLoad : public Patch, public llvm::InstVisitor<PatchDescriptorLoad> {
 public:
-    PatchDescriptorLoad();
+  PatchDescriptorLoad();
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
-    {
-        analysisUsage.addRequired<PipelineStateWrapper>();
-        analysisUsage.addRequired<PipelineShaders>();
-        analysisUsage.addPreserved<PipelineShaders>();
-    }
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
+    analysisUsage.addRequired<PipelineStateWrapper>();
+    analysisUsage.addRequired<PipelineShaders>();
+    analysisUsage.addPreserved<PipelineShaders>();
+  }
 
-    virtual bool runOnModule(llvm::Module& module) override;
-    virtual void visitCallInst(llvm::CallInst& callInst);
+  virtual bool runOnModule(llvm::Module &module) override;
+  virtual void visitCallInst(llvm::CallInst &callInst);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    PatchDescriptorLoad(const PatchDescriptorLoad&) = delete;
-    PatchDescriptorLoad& operator=(const PatchDescriptorLoad&) = delete;
+  PatchDescriptorLoad(const PatchDescriptorLoad &) = delete;
+  PatchDescriptorLoad &operator=(const PatchDescriptorLoad &) = delete;
 
-    void processDescriptorGetPtr(llvm::CallInst* descPtrCall, llvm::StringRef descPtrCallName);
-    llvm::Value* getDescPtrAndStride(ResourceNodeType        resType,
-                                     unsigned                descSet,
-                                     unsigned                binding,
-                                     const ResourceNode*     topNode,
-                                     const ResourceNode*     node,
-                                     bool                    shadow,
-                                     llvm::IRBuilder<>&      builder);
-    llvm::Value* getDescPtr(ResourceNodeType resType,
-                            unsigned                descSet,
-                            unsigned                binding,
-                            const ResourceNode*     topNode,
-                            const ResourceNode*     node,
-                            bool                    shadow,
-                            llvm::IRBuilder<>&      builder);
+  void processDescriptorGetPtr(llvm::CallInst *descPtrCall, llvm::StringRef descPtrCallName);
+  llvm::Value *getDescPtrAndStride(ResourceNodeType resType, unsigned descSet, unsigned binding,
+                                   const ResourceNode *topNode, const ResourceNode *node, bool shadow,
+                                   llvm::IRBuilder<> &builder);
+  llvm::Value *getDescPtr(ResourceNodeType resType, unsigned descSet, unsigned binding, const ResourceNode *topNode,
+                          const ResourceNode *node, bool shadow, llvm::IRBuilder<> &builder);
 
-    void processDescriptorIndex(llvm::CallInst* call);
-    void processLoadDescFromPtr(llvm::CallInst* loadFromPtr);
-    llvm::Value* loadBufferDescriptor(unsigned            descSet,
-                                      unsigned            binding,
-                                      llvm::Value*        arrayOffset,
-                                      llvm::Instruction*  insertPoint);
+  void processDescriptorIndex(llvm::CallInst *call);
+  void processLoadDescFromPtr(llvm::CallInst *loadFromPtr);
+  llvm::Value *loadBufferDescriptor(unsigned descSet, unsigned binding, llvm::Value *arrayOffset,
+                                    llvm::Instruction *insertPoint);
 
-    llvm::Value* buildInlineBufferDesc(llvm::Value* descPtr, llvm::IRBuilder<>& builder);
-    llvm::Value* buildBufferCompactDesc(llvm::Value* desc, llvm::Instruction* insertPoint);
+  llvm::Value *buildInlineBufferDesc(llvm::Value *descPtr, llvm::IRBuilder<> &builder);
+  llvm::Value *buildBufferCompactDesc(llvm::Value *desc, llvm::Instruction *insertPoint);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    // Descriptor size
-    static const unsigned  DescriptorSizeResource      = 8 * sizeof(unsigned);
-    static const unsigned  DescriptorSizeSampler       = 4 * sizeof(unsigned);
-    static const unsigned  DescriptorSizeBuffer        = 4 * sizeof(unsigned);
-    static const unsigned  DescriptorSizeBufferCompact = 2 * sizeof(unsigned);
+  // Descriptor size
+  static const unsigned DescriptorSizeResource = 8 * sizeof(unsigned);
+  static const unsigned DescriptorSizeSampler = 4 * sizeof(unsigned);
+  static const unsigned DescriptorSizeBuffer = 4 * sizeof(unsigned);
+  static const unsigned DescriptorSizeBufferCompact = 2 * sizeof(unsigned);
 
-    bool                                m_changed;            // Whether the pass has modified the code
-    PipelineSystemValues                m_pipelineSysValues;  // Cache of ShaderValues object per shader
-    std::vector<llvm::CallInst*>        m_descLoadCalls;      // List of instructions to load descriptors
-    std::unordered_set<llvm::Function*> m_descLoadFuncs;      // Set of descriptor load functions
+  bool m_changed;                                       // Whether the pass has modified the code
+  PipelineSystemValues m_pipelineSysValues;             // Cache of ShaderValues object per shader
+  std::vector<llvm::CallInst *> m_descLoadCalls;        // List of instructions to load descriptors
+  std::unordered_set<llvm::Function *> m_descLoadFuncs; // Set of descriptor load functions
 
-    PipelineState*                  m_pipelineState = nullptr;
-                                                              // Pipeline state from PipelineStateWrapper pass
+  PipelineState *m_pipelineState = nullptr;
+  // Pipeline state from PipelineStateWrapper pass
 };
 
-} // lgc
+} // namespace lgc

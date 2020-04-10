@@ -35,16 +35,14 @@
 #define _USE_MATH_DEFINES
 #endif
 
-#include <math.h>
-
-#include "llvm/InitializePasses.h"
-#include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/IR/Intrinsics.h"
-#include "llvm/IR/IntrinsicsAMDGPU.h"
-
 #include "llpcPatchIntrinsicSimplify.h"
 #include "llpcPipelineState.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
+#include "llvm/InitializePasses.h"
+#include <math.h>
 
 #define DEBUG_TYPE "llpc-patch-intrinsic-simplify"
 
@@ -57,136 +55,111 @@ char PatchIntrinsicSimplify::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the LLVM pass intrinsic simplifcations.
-FunctionPass* lgc::createPatchIntrinsicSimplify()
-{
-    return new PatchIntrinsicSimplify();
-}
+FunctionPass *lgc::createPatchIntrinsicSimplify() { return new PatchIntrinsicSimplify(); }
 
 // =====================================================================================================================
 // Constructor.
-PatchIntrinsicSimplify::PatchIntrinsicSimplify()
-    :
-    FunctionPass(ID)
-{
-}
+PatchIntrinsicSimplify::PatchIntrinsicSimplify() : FunctionPass(ID) {}
 
 // =====================================================================================================================
 // Get the analysis usage.
 //
 // @param [out] analysisUsage : The analysis usage for this pass.
-void PatchIntrinsicSimplify::getAnalysisUsage(
-    AnalysisUsage& analysisUsage
-    ) const
-{
-    analysisUsage.addRequired<ScalarEvolutionWrapperPass>();
-    analysisUsage.addPreserved<ScalarEvolutionWrapperPass>();
-    analysisUsage.addRequired<PipelineStateWrapper>();
-    analysisUsage.setPreservesCFG();
+void PatchIntrinsicSimplify::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
+  analysisUsage.addRequired<ScalarEvolutionWrapperPass>();
+  analysisUsage.addPreserved<ScalarEvolutionWrapperPass>();
+  analysisUsage.addRequired<PipelineStateWrapper>();
+  analysisUsage.setPreservesCFG();
 }
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM function.
 //
 // @param [in,out] func : LLVM function to be run on.
-bool PatchIntrinsicSimplify::runOnFunction(
-    Function& func)
-{
-    SmallVector<IntrinsicInst*, 32> candidateCalls;
-    bool changed = false;
+bool PatchIntrinsicSimplify::runOnFunction(Function &func) {
+  SmallVector<IntrinsicInst *, 32> candidateCalls;
+  bool changed = false;
 
-    m_module = func.getParent();
+  m_module = func.getParent();
 
-    m_gfxIp = getAnalysis<PipelineStateWrapper>().getPipelineState(m_module)
-        ->getTargetInfo().getGfxIpVersion();
+  m_gfxIp = getAnalysis<PipelineStateWrapper>().getPipelineState(m_module)->getTargetInfo().getGfxIpVersion();
 
-    m_scalarEvolution = &getAnalysis<ScalarEvolutionWrapperPass>().getSE();
-    m_context = &func.getContext();
+  m_scalarEvolution = &getAnalysis<ScalarEvolutionWrapperPass>().getSE();
+  m_context = &func.getContext();
 
-    // We iterate over users of intrinsics which should be less work than
-    // iterating over all instructions in the module.
-    for (Function& otherFunc : m_module->functions())
-    {
-        // Skip non intrinsics.
-        if (!otherFunc.isIntrinsic())
-            continue;
+  // We iterate over users of intrinsics which should be less work than
+  // iterating over all instructions in the module.
+  for (Function &otherFunc : m_module->functions()) {
+    // Skip non intrinsics.
+    if (!otherFunc.isIntrinsic())
+      continue;
 
-        for (Value* const user : otherFunc.users())
-        {
-            IntrinsicInst* const intrinsicCall = dyn_cast<IntrinsicInst>(user);
+    for (Value *const user : otherFunc.users()) {
+      IntrinsicInst *const intrinsicCall = dyn_cast<IntrinsicInst>(user);
 
-            if (!intrinsicCall )
-                continue;
+      if (!intrinsicCall)
+        continue;
 
-            // Skip calls not from our own function.
-            if (intrinsicCall->getFunction() != &func)
-                continue;
+      // Skip calls not from our own function.
+      if (intrinsicCall->getFunction() != &func)
+        continue;
 
-            // Record intrinsic only if it can be simplified.
-            if (canSimplify(*intrinsicCall))
-                candidateCalls.push_back(intrinsicCall);
-        }
+      // Record intrinsic only if it can be simplified.
+      if (canSimplify(*intrinsicCall))
+        candidateCalls.push_back(intrinsicCall);
     }
+  }
 
-    // Process all intrinsics which can be simplified.
-    for (IntrinsicInst* const intrinsicCall : candidateCalls) {
-        Value* const simplifiedValue = simplify(*intrinsicCall);
+  // Process all intrinsics which can be simplified.
+  for (IntrinsicInst *const intrinsicCall : candidateCalls) {
+    Value *const simplifiedValue = simplify(*intrinsicCall);
 
-        // We did not simplify the intrinsic call.
-        if (!simplifiedValue )
-            continue;
+    // We did not simplify the intrinsic call.
+    if (!simplifiedValue)
+      continue;
 
-        changed = true;
+    changed = true;
 
-        intrinsicCall->replaceAllUsesWith(simplifiedValue);
-        m_scalarEvolution->eraseValueFromMap(intrinsicCall);
-        intrinsicCall->eraseFromParent();
-    }
+    intrinsicCall->replaceAllUsesWith(simplifiedValue);
+    m_scalarEvolution->eraseValueFromMap(intrinsicCall);
+    intrinsicCall->eraseFromParent();
+  }
 
-    return changed;
+  return changed;
 }
 
 // =====================================================================================================================
 // Check if a value is safely derived from a 16-bit value.
 //
 // @param value : The value to check
-bool PatchIntrinsicSimplify::canSafelyConvertTo16Bit(
-    Value& value
-    ) const
-{
-    Type* valueTy = value.getType();
-    if (valueTy->isHalfTy() || valueTy->isIntegerTy(16))
-    {
-        // The value is already 16-bit, so we don't want to convert to 16-bit again!
-        return false;
-    }
-    else if (ConstantFP* const constFloat = dyn_cast<ConstantFP>(&value))
-    {
-        // We need to check that if we cast the index down to a half, we do not lose precision.
-        APFloat floatValue(constFloat->getValueAPF());
-        bool losesInfo = true;
-        floatValue.convert(APFloat::IEEEhalf(), APFloat::rmTowardZero, &losesInfo);
-        return !losesInfo;
-    }
-    else if (isa<FPExtInst>(&value) || isa<SExtInst>(&value) || isa<ZExtInst>(&value))
-    {
-        Value* const castSrc = cast<Instruction>(&value)->getOperand(0);
-        Type* const castSrcTy = castSrc->getType();
-        if (castSrcTy->isHalfTy() || castSrcTy->isIntegerTy(16))
-            return true;
-    }
-    else
-    {
-        // Bail out if the type is not able to be used in scalar evolution.
-        if (!m_scalarEvolution->isSCEVable(valueTy))
-            return false;
-
-        const SCEV* const scev = m_scalarEvolution->getSCEV(&value);
-
-        if (valueTy->isIntegerTy() && m_scalarEvolution->getUnsignedRangeMax(scev).ule(UINT16_MAX))
-            return true;
-    }
-
+bool PatchIntrinsicSimplify::canSafelyConvertTo16Bit(Value &value) const {
+  Type *valueTy = value.getType();
+  if (valueTy->isHalfTy() || valueTy->isIntegerTy(16)) {
+    // The value is already 16-bit, so we don't want to convert to 16-bit again!
     return false;
+  } else if (ConstantFP *const constFloat = dyn_cast<ConstantFP>(&value)) {
+    // We need to check that if we cast the index down to a half, we do not lose precision.
+    APFloat floatValue(constFloat->getValueAPF());
+    bool losesInfo = true;
+    floatValue.convert(APFloat::IEEEhalf(), APFloat::rmTowardZero, &losesInfo);
+    return !losesInfo;
+  } else if (isa<FPExtInst>(&value) || isa<SExtInst>(&value) || isa<ZExtInst>(&value)) {
+    Value *const castSrc = cast<Instruction>(&value)->getOperand(0);
+    Type *const castSrcTy = castSrc->getType();
+    if (castSrcTy->isHalfTy() || castSrcTy->isIntegerTy(16))
+      return true;
+  } else {
+    // Bail out if the type is not able to be used in scalar evolution.
+    if (!m_scalarEvolution->isSCEVable(valueTy))
+      return false;
+
+    const SCEV *const scev = m_scalarEvolution->getSCEV(&value);
+
+    if (valueTy->isIntegerTy() && m_scalarEvolution->getUnsignedRangeMax(scev).ule(UINT16_MAX))
+      return true;
+  }
+
+  return false;
 }
 
 // =====================================================================================================================
@@ -194,21 +167,17 @@ bool PatchIntrinsicSimplify::canSafelyConvertTo16Bit(
 //
 // @param value : The value to convert
 // @param builder : IRBuilder to use for instruction constructing
-Value* PatchIntrinsicSimplify::convertTo16Bit(
-    Value& value,
-    IRBuilder<>& builder
-    ) const
-{
-    Type* valueTy = value.getType();
-    if (isa<FPExtInst>(&value) || isa<SExtInst>(&value) || isa<ZExtInst>(&value))
-        return cast<Instruction>(&value)->getOperand(0);
-    else if (valueTy->isIntegerTy())
-        return builder.CreateIntCast(&value, Type::getInt16Ty(*m_context), false);
-    else if (valueTy->isFloatingPointTy())
-        return builder.CreateFPCast(&value, Type::getHalfTy(*m_context));
+Value *PatchIntrinsicSimplify::convertTo16Bit(Value &value, IRBuilder<> &builder) const {
+  Type *valueTy = value.getType();
+  if (isa<FPExtInst>(&value) || isa<SExtInst>(&value) || isa<ZExtInst>(&value))
+    return cast<Instruction>(&value)->getOperand(0);
+  else if (valueTy->isIntegerTy())
+    return builder.CreateIntCast(&value, Type::getInt16Ty(*m_context), false);
+  else if (valueTy->isFloatingPointTy())
+    return builder.CreateFPCast(&value, Type::getHalfTy(*m_context));
 
-    llvm_unreachable("Should never be called!");
-    return nullptr;
+  llvm_unreachable("Should never be called!");
+  return nullptr;
 }
 
 // =====================================================================================================================
@@ -216,213 +185,187 @@ Value* PatchIntrinsicSimplify::convertTo16Bit(
 //
 // @param intrinsicCall : The intrinsic call to simplify
 // @param coordOperandIndices : Operand indices of image coordinate
-Value* PatchIntrinsicSimplify::simplifyImage(
-    IntrinsicInst& intrinsicCall,
-    ArrayRef<unsigned>   coordOperandIndices
-    ) const
-{
-    // If we're not on GFX9 or above, bail.
-    if (m_gfxIp.major < 9)
-        return nullptr;
+Value *PatchIntrinsicSimplify::simplifyImage(IntrinsicInst &intrinsicCall,
+                                             ArrayRef<unsigned> coordOperandIndices) const {
+  // If we're not on GFX9 or above, bail.
+  if (m_gfxIp.major < 9)
+    return nullptr;
 
-    bool floatCoord = false;
+  bool floatCoord = false;
 
-    for (unsigned operandIndex : coordOperandIndices)
-    {
-        Value* const coord = intrinsicCall.getOperand(operandIndex);
-        // If the values are not derived from 16-bit values, we cannot optimize.
-        if (!canSafelyConvertTo16Bit(*coord))
-            return nullptr;
+  for (unsigned operandIndex : coordOperandIndices) {
+    Value *const coord = intrinsicCall.getOperand(operandIndex);
+    // If the values are not derived from 16-bit values, we cannot optimize.
+    if (!canSafelyConvertTo16Bit(*coord))
+      return nullptr;
 
-        assert(operandIndex == coordOperandIndices[0]
-            || floatCoord == coord->getType()->isFloatingPointTy());
-        floatCoord = coord->getType()->isFloatingPointTy();
-    }
+    assert(operandIndex == coordOperandIndices[0] || floatCoord == coord->getType()->isFloatingPointTy());
+    floatCoord = coord->getType()->isFloatingPointTy();
+  }
 
-    Type* const coordType = floatCoord ? Type::getHalfTy(*m_context) : Type::getInt16Ty(*m_context);
+  Type *const coordType = floatCoord ? Type::getHalfTy(*m_context) : Type::getInt16Ty(*m_context);
 
-    Function* const intrinsic = Intrinsic::getDeclaration(m_module,
-                                                           intrinsicCall.getIntrinsicID(),
-                                                           {intrinsicCall.getType(), coordType});
+  Function *const intrinsic =
+      Intrinsic::getDeclaration(m_module, intrinsicCall.getIntrinsicID(), {intrinsicCall.getType(), coordType});
 
-    assert(intrinsic );
+  assert(intrinsic);
 
-    SmallVector<Value*, 8> args(intrinsicCall.arg_operands());
+  SmallVector<Value *, 8> args(intrinsicCall.arg_operands());
 
-    IRBuilder<> builder(&intrinsicCall);
+  IRBuilder<> builder(&intrinsicCall);
 
-    for (unsigned operandIndex : coordOperandIndices)
-        args[operandIndex] = convertTo16Bit(*intrinsicCall.getOperand(operandIndex), builder);
+  for (unsigned operandIndex : coordOperandIndices)
+    args[operandIndex] = convertTo16Bit(*intrinsicCall.getOperand(operandIndex), builder);
 
-    return builder.CreateCall(intrinsic, args);
+  return builder.CreateCall(intrinsic, args);
 }
 
 // =====================================================================================================================
 // Simplify a trigonometric intrinsic.
 //
 // @param intrinsicCall : The intrinsic call to simplify
-Value* PatchIntrinsicSimplify::simplifyTrigonometric(
-    IntrinsicInst& intrinsicCall
-    ) const
-{
-    // The sin and cos function in the hardware are dividing by 2*PI beforehand.
-    // This means      sin(x * 2 * PI) = amdgcn.sin(x)
-    // and                      sin(x) = amdgcn.sin(x / (2 * PI))
-    // We can switch to using our amdgcn trignonometric functions directly if the input conforms to the pattern:
-    // <trigonometric-function>(x * (2 * PI))
-    // <trigonometric-function>(x / (1 / (2 * PI)))
+Value *PatchIntrinsicSimplify::simplifyTrigonometric(IntrinsicInst &intrinsicCall) const {
+  // The sin and cos function in the hardware are dividing by 2*PI beforehand.
+  // This means      sin(x * 2 * PI) = amdgcn.sin(x)
+  // and                      sin(x) = amdgcn.sin(x / (2 * PI))
+  // We can switch to using our amdgcn trignonometric functions directly if the input conforms to the pattern:
+  // <trigonometric-function>(x * (2 * PI))
+  // <trigonometric-function>(x / (1 / (2 * PI)))
 
-    BinaryOperator* const binOp = dyn_cast<BinaryOperator>(intrinsicCall.getOperand(0));
+  BinaryOperator *const binOp = dyn_cast<BinaryOperator>(intrinsicCall.getOperand(0));
 
-    // If the clamped value was not a binary operator, bail.
-    if (!binOp )
-        return nullptr;
+  // If the clamped value was not a binary operator, bail.
+  if (!binOp)
+    return nullptr;
 
-    ConstantFP* const constMultiplicator = dyn_cast<ConstantFP>(binOp->getOperand(1));
+  ConstantFP *const constMultiplicator = dyn_cast<ConstantFP>(binOp->getOperand(1));
 
-    // If the multiplicator was not a constant, bail.
-    if (!constMultiplicator )
-        return nullptr;
+  // If the multiplicator was not a constant, bail.
+  if (!constMultiplicator)
+    return nullptr;
 
-    APFloat multiplicator(constMultiplicator->getValueAPF());
+  APFloat multiplicator(constMultiplicator->getValueAPF());
 
-    bool losesInfo = false;
+  bool losesInfo = false;
 
-    switch (binOp->getOpcode())
-    {
-    case BinaryOperator::FMul:
-        break;
-    case BinaryOperator::FDiv:
-        {
-            APFloat one(1.0);
-            one.convert(multiplicator.getSemantics(), APFloat::rmTowardZero, &losesInfo);
-            multiplicator = one / multiplicator;
-            break;
-        }
-    default:
-        return nullptr;
-    }
+  switch (binOp->getOpcode()) {
+  case BinaryOperator::FMul:
+    break;
+  case BinaryOperator::FDiv: {
+    APFloat one(1.0);
+    one.convert(multiplicator.getSemantics(), APFloat::rmTowardZero, &losesInfo);
+    multiplicator = one / multiplicator;
+    break;
+  }
+  default:
+    return nullptr;
+  }
 
-    APFloat pi(M_PI);
-    pi.convert(multiplicator.getSemantics(), APFloat::rmTowardZero, &losesInfo);
+  APFloat pi(M_PI);
+  pi.convert(multiplicator.getSemantics(), APFloat::rmTowardZero, &losesInfo);
 
-    const APFloat twoPi = pi + pi;
-    APFloat diff = twoPi - multiplicator;
+  const APFloat twoPi = pi + pi;
+  APFloat diff = twoPi - multiplicator;
 
-    // Absolute value the result.
-    diff.clearSign();
+  // Absolute value the result.
+  diff.clearSign();
 
-    APFloat tolerance(0.0001);
-    tolerance.convert(multiplicator.getSemantics(), APFloat::rmTowardZero, &losesInfo);
+  APFloat tolerance(0.0001);
+  tolerance.convert(multiplicator.getSemantics(), APFloat::rmTowardZero, &losesInfo);
 
-    // If the value specified as two * pi was not nearly equal to ours, bail.
-    if (diff.compare(tolerance) != APFloat::cmpLessThan)
-        return nullptr;
+  // If the value specified as two * pi was not nearly equal to ours, bail.
+  if (diff.compare(tolerance) != APFloat::cmpLessThan)
+    return nullptr;
 
-    Intrinsic::ID intrinsicId = Intrinsic::not_intrinsic;
+  Intrinsic::ID intrinsicId = Intrinsic::not_intrinsic;
 
-    switch (intrinsicCall.getIntrinsicID())
-    {
-    case Intrinsic::cos:
-        intrinsicId = Intrinsic::amdgcn_cos;
-        break;
-    case Intrinsic::sin:
-        intrinsicId = Intrinsic::amdgcn_sin;
-        break;
-    default:
-        return nullptr;
-    }
+  switch (intrinsicCall.getIntrinsicID()) {
+  case Intrinsic::cos:
+    intrinsicId = Intrinsic::amdgcn_cos;
+    break;
+  case Intrinsic::sin:
+    intrinsicId = Intrinsic::amdgcn_sin;
+    break;
+  default:
+    return nullptr;
+  }
 
-    Type* intrinsicType = intrinsicCall.getType();
+  Type *intrinsicType = intrinsicCall.getType();
 
-    Function* const intrinsic = Intrinsic::getDeclaration(m_module,
-                                                           intrinsicId,
-                                                           {intrinsicType, intrinsicType});
+  Function *const intrinsic = Intrinsic::getDeclaration(m_module, intrinsicId, {intrinsicType, intrinsicType});
 
-    assert(intrinsic );
+  assert(intrinsic);
 
-    Value* leftOperand = binOp->getOperand(0);
+  Value *leftOperand = binOp->getOperand(0);
 
-    // If we're not on GFX9 or above, we need to add a clamp from 0..1 (using fract).
-    if (m_gfxIp.major < 9)
-    {
-        Function* const fractIntrinsic = Intrinsic::getDeclaration(m_module,
-                                                           Intrinsic::amdgcn_fract,
-                                                           {intrinsicType, intrinsicType});
-        assert(fractIntrinsic );
+  // If we're not on GFX9 or above, we need to add a clamp from 0..1 (using fract).
+  if (m_gfxIp.major < 9) {
+    Function *const fractIntrinsic =
+        Intrinsic::getDeclaration(m_module, Intrinsic::amdgcn_fract, {intrinsicType, intrinsicType});
+    assert(fractIntrinsic);
 
-        CallInst* const fractCall = CallInst::Create(fractIntrinsic, leftOperand, "", &intrinsicCall);
-        leftOperand = fractCall;
-    }
+    CallInst *const fractCall = CallInst::Create(fractIntrinsic, leftOperand, "", &intrinsicCall);
+    leftOperand = fractCall;
+  }
 
-    CallInst* const newCall = CallInst::Create(intrinsic, leftOperand, "", &intrinsicCall);
+  CallInst *const newCall = CallInst::Create(intrinsic, leftOperand, "", &intrinsicCall);
 
-    return newCall;
+  return newCall;
 }
 
 // =====================================================================================================================
 // Check if an intrinsic can be simplified.
 //
 // @param intrinsicCall : The intrinsic call to simplify
-bool PatchIntrinsicSimplify::canSimplify(
-    IntrinsicInst& intrinsicCall
-    ) const
-{
-    switch (intrinsicCall.getIntrinsicID())
-    {
-    case Intrinsic::amdgcn_image_load_1d:
-    case Intrinsic::amdgcn_image_load_2d:
-    case Intrinsic::amdgcn_image_load_3d:
-    case Intrinsic::amdgcn_image_sample_1d:
-    case Intrinsic::amdgcn_image_sample_2d:
-    case Intrinsic::amdgcn_image_sample_l_1d:
-    case Intrinsic::amdgcn_image_sample_3d:
-    case Intrinsic::amdgcn_image_sample_l_2d:
-    case Intrinsic::amdgcn_image_sample_l_3d:
-    case Intrinsic::cos:
-    case Intrinsic::sin:
-        return true;
-    default:
-        return false;
-    }
+bool PatchIntrinsicSimplify::canSimplify(IntrinsicInst &intrinsicCall) const {
+  switch (intrinsicCall.getIntrinsicID()) {
+  case Intrinsic::amdgcn_image_load_1d:
+  case Intrinsic::amdgcn_image_load_2d:
+  case Intrinsic::amdgcn_image_load_3d:
+  case Intrinsic::amdgcn_image_sample_1d:
+  case Intrinsic::amdgcn_image_sample_2d:
+  case Intrinsic::amdgcn_image_sample_l_1d:
+  case Intrinsic::amdgcn_image_sample_3d:
+  case Intrinsic::amdgcn_image_sample_l_2d:
+  case Intrinsic::amdgcn_image_sample_l_3d:
+  case Intrinsic::cos:
+  case Intrinsic::sin:
+    return true;
+  default:
+    return false;
+  }
 }
 
 // =====================================================================================================================
 // Simplify an intrinsic.
 //
 // @param intrinsicCall : The intrinsic call to simplify
-Value* PatchIntrinsicSimplify::simplify(
-    IntrinsicInst& intrinsicCall
-    ) const
-{
-    switch (intrinsicCall.getIntrinsicID())
-    {
-    case Intrinsic::amdgcn_image_load_1d:
-    case Intrinsic::amdgcn_image_sample_1d:
-        return simplifyImage(intrinsicCall, {1});
-    case Intrinsic::amdgcn_image_load_2d:
-    case Intrinsic::amdgcn_image_sample_2d:
-    case Intrinsic::amdgcn_image_sample_l_1d:
-        return simplifyImage(intrinsicCall, {1, 2});
-    case Intrinsic::amdgcn_image_load_3d:
-    case Intrinsic::amdgcn_image_sample_3d:
-    case Intrinsic::amdgcn_image_sample_l_2d:
-        return simplifyImage(intrinsicCall, {1, 2, 3});
-    case Intrinsic::amdgcn_image_sample_l_3d:
-        return simplifyImage(intrinsicCall, {1, 2, 3, 4});
-    case Intrinsic::cos:
-    case Intrinsic::sin:
-        return simplifyTrigonometric(intrinsicCall);
-    default:
-        return nullptr;
-    }
+Value *PatchIntrinsicSimplify::simplify(IntrinsicInst &intrinsicCall) const {
+  switch (intrinsicCall.getIntrinsicID()) {
+  case Intrinsic::amdgcn_image_load_1d:
+  case Intrinsic::amdgcn_image_sample_1d:
+    return simplifyImage(intrinsicCall, {1});
+  case Intrinsic::amdgcn_image_load_2d:
+  case Intrinsic::amdgcn_image_sample_2d:
+  case Intrinsic::amdgcn_image_sample_l_1d:
+    return simplifyImage(intrinsicCall, {1, 2});
+  case Intrinsic::amdgcn_image_load_3d:
+  case Intrinsic::amdgcn_image_sample_3d:
+  case Intrinsic::amdgcn_image_sample_l_2d:
+    return simplifyImage(intrinsicCall, {1, 2, 3});
+  case Intrinsic::amdgcn_image_sample_l_3d:
+    return simplifyImage(intrinsicCall, {1, 2, 3, 4});
+  case Intrinsic::cos:
+  case Intrinsic::sin:
+    return simplifyTrigonometric(intrinsicCall);
+  default:
+    return nullptr;
+  }
 }
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching operations for specifying intrinsic simplifications.
-INITIALIZE_PASS_BEGIN(PatchIntrinsicSimplify, DEBUG_TYPE,
-    "Patch LLVM for intrinsic simplifications", false, false)
+INITIALIZE_PASS_BEGIN(PatchIntrinsicSimplify, DEBUG_TYPE, "Patch LLVM for intrinsic simplifications", false, false)
 INITIALIZE_PASS_DEPENDENCY(ScalarEvolutionWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(PipelineStateWrapper)
-INITIALIZE_PASS_END(PatchIntrinsicSimplify, DEBUG_TYPE,
-    "Patch LLVM for intrinsic simplifications", false, false)
+INITIALIZE_PASS_END(PatchIntrinsicSimplify, DEBUG_TYPE, "Patch LLVM for intrinsic simplifications", false, false)

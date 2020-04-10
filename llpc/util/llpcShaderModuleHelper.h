@@ -22,80 +22,64 @@
  *  SOFTWARE.
  *
  **********************************************************************************************************************/
- /**
-  ***********************************************************************************************************************
-  * @file  llpcShaderModuleHelper.h
-  * @brief LLPC header file: contains the definition of LLPC utility class ShaderModuleHelper.
-  ***********************************************************************************************************************
-  */
+/**
+ ***********************************************************************************************************************
+ * @file  llpcShaderModuleHelper.h
+ * @brief LLPC header file: contains the definition of LLPC utility class ShaderModuleHelper.
+ ***********************************************************************************************************************
+ */
 
 #pragma once
-#include <vector>
 #include "llpc.h"
+#include <vector>
 
-namespace Llpc
-{
+namespace Llpc {
 
 // Represents the special header of SPIR-V token stream (the first DWORD).
-struct SpirvHeader
-{
-    unsigned    magicNumber;        // Magic number of SPIR-V module
-    unsigned    spvVersion;         // SPIR-V version number
-    unsigned    genMagicNumber;     // Generator's magic number
-    unsigned    idBound;            // Upbound (X) of all IDs used in SPIR-V (0 < ID < X)
-    unsigned    reserved;           // Reserved word
+struct SpirvHeader {
+  unsigned magicNumber;    // Magic number of SPIR-V module
+  unsigned spvVersion;     // SPIR-V version number
+  unsigned genMagicNumber; // Generator's magic number
+  unsigned idBound;        // Upbound (X) of all IDs used in SPIR-V (0 < ID < X)
+  unsigned reserved;       // Reserved word
 };
 
 // Represents the information of one shader entry in ShaderModuleData
-struct ShaderModuleEntry
-{
-    unsigned    entryNameHash[4];   // Hash code of entry name
-    unsigned    entryOffset;        // Byte offset of the entry data in the binCode of ShaderModuleData
-    unsigned    entrySize;          // Byte size of the entry data
-    unsigned    passIndex;          // Indices of passes, It is only for internal debug.
+struct ShaderModuleEntry {
+  unsigned entryNameHash[4]; // Hash code of entry name
+  unsigned entryOffset;      // Byte offset of the entry data in the binCode of ShaderModuleData
+  unsigned entrySize;        // Byte size of the entry data
+  unsigned passIndex;        // Indices of passes, It is only for internal debug.
 };
 
 // Represents the name map <stage, name> of shader entry-point
-struct ShaderEntryName
-{
-    ShaderStage stage;             // Shader stage
-    const char* name;             // Entry name
+struct ShaderEntryName {
+  ShaderStage stage; // Shader stage
+  const char *name;  // Entry name
 };
 
 // =====================================================================================================================
 // Represents LLPC shader module helper class
-class ShaderModuleHelper
-{
+class ShaderModuleHelper {
 public:
-    static Result collectInfoFromSpirvBinary(
-        const BinaryData*             spvBinCode,
-        ShaderModuleUsage*            shaderModuleUsage,
-        std::vector<ShaderEntryName>& shaderEntryNames,
-        unsigned*                     debugInfoSize);
+  static Result collectInfoFromSpirvBinary(const BinaryData *spvBinCode, ShaderModuleUsage *shaderModuleUsage,
+                                           std::vector<ShaderEntryName> &shaderEntryNames, unsigned *debugInfoSize);
 
-    static void trimSpirvDebugInfo(
-        const BinaryData* spvBin,
-        unsigned          bufferSize,
-        void*             trimSpvBin);
+  static void trimSpirvDebugInfo(const BinaryData *spvBin, unsigned bufferSize, void *trimSpvBin);
 
-    static Result optimizeSpirv(
-        const BinaryData* spirvBinIn,
-        BinaryData*       spirvBinOut);
+  static Result optimizeSpirv(const BinaryData *spirvBinIn, BinaryData *spirvBinOut);
 
-    static void cleanOptimizedSpirv(BinaryData* spirvBin);
+  static void cleanOptimizedSpirv(BinaryData *spirvBin);
 
-    static unsigned getStageMaskFromSpirvBinary(
-        const BinaryData* spvBin,
-        const char*       entryName);
+  static unsigned getStageMaskFromSpirvBinary(const BinaryData *spvBin, const char *entryName);
 
-    static const char* getEntryPointNameFromSpirvBinary(
-        const BinaryData* spvBin);
+  static const char *getEntryPointNameFromSpirvBinary(const BinaryData *spvBin);
 
-    static Result verifySpirvBinary(const BinaryData* spvBin);
+  static Result verifySpirvBinary(const BinaryData *spvBin);
 
-    static bool isSpirvBinary(const BinaryData* shaderBin);
+  static bool isSpirvBinary(const BinaryData *shaderBin);
 
-    static bool isLlvmBitcode(const BinaryData* shaderBin);
+  static bool isLlvmBitcode(const BinaryData *shaderBin);
 };
 
-} // Llpc
+} // namespace Llpc

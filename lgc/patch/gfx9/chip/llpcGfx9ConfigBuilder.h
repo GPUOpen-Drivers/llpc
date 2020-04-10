@@ -33,77 +33,57 @@
 #include "llpcConfigBuilderBase.h"
 #include "llpcGfx9Chip.h"
 
-namespace lgc
-{
+namespace lgc {
 
 struct ElfDataEntry;
 struct ResourceUsage;
 
-namespace Gfx9
-{
+namespace Gfx9 {
 
 // =====================================================================================================================
 // Represents the builder to generate register configurations for GFX6-generation chips.
-class ConfigBuilder : public ConfigBuilderBase
-{
+class ConfigBuilder : public ConfigBuilderBase {
 public:
-    ConfigBuilder(llvm::Module* module, PipelineState* pipelineState)
-        : ConfigBuilderBase(module, pipelineState) {}
+  ConfigBuilder(llvm::Module *module, PipelineState *pipelineState) : ConfigBuilderBase(module, pipelineState) {}
 
-    void buildPalMetadata();
+  void buildPalMetadata();
 
-    void buildPipelineVsFsRegConfig();
-    void buildPipelineVsTsFsRegConfig();
-    void buildPipelineVsGsFsRegConfig();
-    void buildPipelineVsTsGsFsRegConfig();
+  void buildPipelineVsFsRegConfig();
+  void buildPipelineVsTsFsRegConfig();
+  void buildPipelineVsGsFsRegConfig();
+  void buildPipelineVsTsGsFsRegConfig();
 
-    void buildPipelineNggVsFsRegConfig();
-    void buildPipelineNggVsTsFsRegConfig();
-    void buildPipelineNggVsGsFsRegConfig();
-    void buildPipelineNggVsTsGsFsRegConfig();
+  void buildPipelineNggVsFsRegConfig();
+  void buildPipelineNggVsTsFsRegConfig();
+  void buildPipelineNggVsGsFsRegConfig();
+  void buildPipelineNggVsTsGsFsRegConfig();
 
-    void buildPipelineCsRegConfig();
+  void buildPipelineCsRegConfig();
 
 private:
-    ConfigBuilder() = delete;
-    ConfigBuilder(const ConfigBuilder&) = delete;
-    ConfigBuilder& operator=(const ConfigBuilder&) = delete;
+  ConfigBuilder() = delete;
+  ConfigBuilder(const ConfigBuilder &) = delete;
+  ConfigBuilder &operator=(const ConfigBuilder &) = delete;
 
-    template <typename T>
-    void buildVsRegConfig(ShaderStage         shaderStage,
-                            T*                  config);
+  template <typename T> void buildVsRegConfig(ShaderStage shaderStage, T *config);
 
-    template <typename T>
-    void buildLsHsRegConfig(ShaderStage         shaderStage1,
-                            ShaderStage         shaderStage2,
-                            T*                  config);
+  template <typename T> void buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage shaderStage2, T *config);
 
-    template <typename T>
-    void buildEsGsRegConfig(ShaderStage         shaderStage1,
-                            ShaderStage         shaderStage2,
-                            T*                  config);
+  template <typename T> void buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage shaderStage2, T *config);
 
-    template <typename T>
-    void buildPrimShaderRegConfig(ShaderStage         shaderStage1,
-                                  ShaderStage         shaderStage2,
-                                  T*                  config);
+  template <typename T> void buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderStage shaderStage2, T *config);
 
-    template <typename T>
-    void buildPsRegConfig(ShaderStage         shaderStage,
-                          T*                  config);
+  template <typename T> void buildPsRegConfig(ShaderStage shaderStage, T *config);
 
-    void buildCsRegConfig(ShaderStage shaderStage,
-                            CsRegConfig* config);
+  void buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *config);
 
-    void buildUserDataConfig(ShaderStage shaderStage1,
-                               ShaderStage shaderStage2,
-                               unsigned    startUserData);
+  void buildUserDataConfig(ShaderStage shaderStage1, ShaderStage shaderStage2, unsigned startUserData);
 
-    void setupVgtTfParam(LsHsRegConfig* config);
+  void setupVgtTfParam(LsHsRegConfig *config);
 
-    bool getShaderWgpMode(ShaderStage shaderStage) const;
+  bool getShaderWgpMode(ShaderStage shaderStage) const;
 };
 
-} // Gfx9
+} // namespace Gfx9
 
-} // lgc
+} // namespace lgc

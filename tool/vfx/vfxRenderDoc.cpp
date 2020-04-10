@@ -31,96 +31,82 @@
 
 #include "vfxRenderDoc.h"
 
-namespace Vfx
-{
+namespace Vfx {
 // =====================================================================================================================
 // Max section count for RenderDocument
-unsigned RenderDocument::m_maxSectionCount[SectionTypeNameNum] =
-{
-    0,                     // SectionTypeUnset
-    1,                     // SectionTypeResult
-    MaxSectionCount,       // SectionTypeBufferView
-    1,                     // SectionTypeVertexState
-    1,                     // SectionTypeDrawState
-    MaxSectionCount,       // SectionTypeImageView
-    MaxSectionCount,       // SectionTypeSampler
-    1,                     // SectionTypeVersion
-    0,                     // SectionTypeGraphicsState,
-    0,                     // SectionTypeComputeState,
-    0,                     // SectionTypeVertexInputState,
-    0,                     // SectionTypeVertexShaderInfo,
-    0,                     // SectionTypeTessControlShaderInfo,
-    0,                     // SectionTypeTessEvalShaderInfo,
-    0,                     // SectionTypeGeometryShaderInfo,
-    0,                     // SectionTypeFragmentShaderInfo,
-    0,                     // SectionTypeComputeShaderInfo,
-    0,                     // SectionTypeCompileLog
-    1,                     // SectionTypeVertexShader
-    1,                     // SectionTypeTessControlShader
-    1,                     // SectionTypeTessEvalShader
-    1,                     // SectionTypeGeometryShader
-    1,                     // SectionTypeFragmentShader
-    1,                     // SectionTypeComputeShader
+unsigned RenderDocument::m_maxSectionCount[SectionTypeNameNum] = {
+    0,               // SectionTypeUnset
+    1,               // SectionTypeResult
+    MaxSectionCount, // SectionTypeBufferView
+    1,               // SectionTypeVertexState
+    1,               // SectionTypeDrawState
+    MaxSectionCount, // SectionTypeImageView
+    MaxSectionCount, // SectionTypeSampler
+    1,               // SectionTypeVersion
+    0,               // SectionTypeGraphicsState,
+    0,               // SectionTypeComputeState,
+    0, // SectionTypeVertexInputState,
+    0, // SectionTypeVertexShaderInfo,
+    0, // SectionTypeTessControlShaderInfo,
+    0, // SectionTypeTessEvalShaderInfo,
+    0, // SectionTypeGeometryShaderInfo,
+    0, // SectionTypeFragmentShaderInfo,
+    0, // SectionTypeComputeShaderInfo,
+    0, // SectionTypeCompileLog
+    1, // SectionTypeVertexShader
+    1, // SectionTypeTessControlShader
+    1, // SectionTypeTessEvalShader
+    1, // SectionTypeGeometryShader
+    1, // SectionTypeFragmentShader
+    1, // SectionTypeComputeShader
 };
 
 // =====================================================================================================================
 // Gets RenderDocument content
-VfxRenderStatePtr RenderDocument::getDocument()
-{
-    // Section "Result"
-    if (m_sections[SectionTypeResult].size() > 0)
-        reinterpret_cast<SectionResult*>(m_sections[SectionTypeResult][0])->getSubState(m_renderState.result);
+VfxRenderStatePtr RenderDocument::getDocument() {
+  // Section "Result"
+  if (m_sections[SectionTypeResult].size() > 0)
+    reinterpret_cast<SectionResult *>(m_sections[SectionTypeResult][0])->getSubState(m_renderState.result);
 
-    // Section "BufferView"s
-    m_renderState.numBufferView = static_cast<unsigned>(m_sections[SectionTypeBufferView].size());
-    for (unsigned i = 0; i < m_renderState.numBufferView; ++i)
-    {
-        reinterpret_cast<SectionBufferView*>(m_sections[SectionTypeBufferView][i])->
-            getSubState(m_renderState.bufferView[i]);
+  // Section "BufferView"s
+  m_renderState.numBufferView = static_cast<unsigned>(m_sections[SectionTypeBufferView].size());
+  for (unsigned i = 0; i < m_renderState.numBufferView; ++i) {
+    reinterpret_cast<SectionBufferView *>(m_sections[SectionTypeBufferView][i])
+        ->getSubState(m_renderState.bufferView[i]);
+  }
+
+  // Section "VertexState"
+  if (m_sections[SectionTypeVertexState].size() > 0) {
+    reinterpret_cast<SectionVertexState *>(m_sections[SectionTypeVertexState][0])
+        ->getSubState(m_renderState.vertexState);
+  }
+
+  // Section "DrawState"
+  if (m_sections[SectionTypeDrawState].size() > 0) {
+    reinterpret_cast<SectionDrawState *>(m_sections[SectionTypeDrawState][0])->getSubState(m_renderState.drawState);
+  } else
+    SectionDrawState::initDrawState(m_renderState.drawState);
+
+  // Section "ImageView"s
+  m_renderState.numImageView = static_cast<unsigned>(m_sections[SectionTypeImageView].size());
+  for (unsigned i = 0; i < m_renderState.numImageView; ++i) {
+    reinterpret_cast<SectionImageView *>(m_sections[SectionTypeImageView][i])->getSubState(m_renderState.imageView[i]);
+  }
+
+  // Section "Sampler"s
+  m_renderState.numSampler = static_cast<unsigned>(m_sections[SectionTypeSampler].size());
+  for (unsigned i = 0; i < m_renderState.numSampler; ++i) {
+    reinterpret_cast<SectionSampler *>(m_sections[SectionTypeSampler][i])->getSubState(m_renderState.sampler[i]);
+  }
+
+  // Shader sections
+  for (unsigned i = 0; i < ShaderStageCount; ++i) {
+    if (m_sections[SectionTypeVertexShader + i].size() > 0) {
+      reinterpret_cast<SectionShader *>(m_sections[SectionTypeVertexShader + i][0])
+          ->getSubState(m_renderState.stages[i]);
     }
+  }
 
-    // Section "VertexState"
-    if (m_sections[SectionTypeVertexState].size() > 0)
-    {
-        reinterpret_cast<SectionVertexState*>(m_sections[SectionTypeVertexState][0])->
-            getSubState(m_renderState.vertexState);
-    }
-
-    // Section "DrawState"
-    if (m_sections[SectionTypeDrawState].size() > 0)
-    {
-        reinterpret_cast<SectionDrawState*>(m_sections[SectionTypeDrawState][0])->
-            getSubState(m_renderState.drawState);
-    }
-    else
-        SectionDrawState::initDrawState(m_renderState.drawState);
-
-    // Section "ImageView"s
-    m_renderState.numImageView = static_cast<unsigned>(m_sections[SectionTypeImageView].size());
-    for (unsigned i = 0; i < m_renderState.numImageView; ++i)
-    {
-        reinterpret_cast<SectionImageView*>(m_sections[SectionTypeImageView][i])->
-            getSubState(m_renderState.imageView[i]);
-    }
-
-    // Section "Sampler"s
-    m_renderState.numSampler = static_cast<unsigned>(m_sections[SectionTypeSampler].size());
-    for (unsigned i = 0; i < m_renderState.numSampler; ++i)
-    {
-        reinterpret_cast<SectionSampler*>(m_sections[SectionTypeSampler][i])->
-            getSubState(m_renderState.sampler[i]);
-    }
-
-    // Shader sections
-    for (unsigned i = 0; i < ShaderStageCount; ++i)
-    {
-        if (m_sections[SectionTypeVertexShader + i].size() > 0)
-        {
-            reinterpret_cast<SectionShader*>(m_sections[SectionTypeVertexShader + i][0])->
-                getSubState(m_renderState.stages[i]);
-        }
-    }
-
-    return &m_renderState;
+  return &m_renderState;
 }
-}
+} // namespace Vfx

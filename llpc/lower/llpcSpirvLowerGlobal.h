@@ -30,141 +30,107 @@
  */
 #pragma once
 
-#include "llvm/IR/InstVisitor.h"
-
-#include <unordered_map>
-#include <unordered_set>
-#include <list>
 #include "SPIRVInternal.h"
 #include "llpcSpirvLower.h"
+#include "llvm/IR/InstVisitor.h"
+#include <list>
+#include <unordered_map>
+#include <unordered_set>
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for globals (global variables, inputs, and outputs).
-class SpirvLowerGlobal:
-    public SpirvLower,
-    public llvm::InstVisitor<SpirvLowerGlobal>
-{
+class SpirvLowerGlobal : public SpirvLower, public llvm::InstVisitor<SpirvLowerGlobal> {
 public:
-    SpirvLowerGlobal();
+  SpirvLowerGlobal();
 
-    virtual bool runOnModule(llvm::Module& module);
-    virtual void visitReturnInst(llvm::ReturnInst& retInst);
-    virtual void visitCallInst(llvm::CallInst& callInst);
-    virtual void visitLoadInst(llvm::LoadInst& loadInst);
-    virtual void visitStoreInst(llvm::StoreInst& storeInst);
+  virtual bool runOnModule(llvm::Module &module);
+  virtual void visitReturnInst(llvm::ReturnInst &retInst);
+  virtual void visitCallInst(llvm::CallInst &callInst);
+  virtual void visitLoadInst(llvm::LoadInst &loadInst);
+  virtual void visitStoreInst(llvm::StoreInst &storeInst);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    SpirvLowerGlobal(const SpirvLowerGlobal&) = delete;
-    SpirvLowerGlobal& operator=(const SpirvLowerGlobal&) = delete;
+  SpirvLowerGlobal(const SpirvLowerGlobal &) = delete;
+  SpirvLowerGlobal &operator=(const SpirvLowerGlobal &) = delete;
 
-    void mapGlobalVariableToProxy(llvm::GlobalVariable* globalVar);
-    void mapInputToProxy(llvm::GlobalVariable* input);
-    void mapOutputToProxy(llvm::GlobalVariable* input);
+  void mapGlobalVariableToProxy(llvm::GlobalVariable *globalVar);
+  void mapInputToProxy(llvm::GlobalVariable *input);
+  void mapOutputToProxy(llvm::GlobalVariable *input);
 
-    void lowerGlobalVar();
-    void lowerInput();
-    void lowerOutput();
-    void lowerInOutInPlace();
-    void lowerBufferBlock();
-    void lowerPushConsts();
+  void lowerGlobalVar();
+  void lowerInput();
+  void lowerOutput();
+  void lowerInOutInPlace();
+  void lowerBufferBlock();
+  void lowerPushConsts();
 
-    void cleanupReturnBlock();
+  void cleanupReturnBlock();
 
-    llvm::Value* addCallInstForInOutImport(llvm::Type*        inOutTy,
-                                           unsigned           addrSpace,
-                                           llvm::Constant*    inOutMeta,
-                                           llvm::Value*       startLoc,
-                                           unsigned           maxLocOffset,
-                                           llvm::Value*       compIdx,
-                                           llvm::Value*       vertexIdx,
-                                           unsigned           interpLoc,
-                                           llvm::Value*             interpInfo,
-                                           llvm::Instruction* insertPos);
+  llvm::Value *addCallInstForInOutImport(llvm::Type *inOutTy, unsigned addrSpace, llvm::Constant *inOutMeta,
+                                         llvm::Value *startLoc, unsigned maxLocOffset, llvm::Value *compIdx,
+                                         llvm::Value *vertexIdx, unsigned interpLoc, llvm::Value *interpInfo,
+                                         llvm::Instruction *insertPos);
 
-    void addCallInstForOutputExport(llvm::Value*       outputValue,
-                                    llvm::Constant*    outputMeta,
-                                    llvm::Value*       locOffset,
-                                    unsigned           maxLocOffset,
-                                    unsigned           xfbOffsetAdjust,
-                                    unsigned           xfbBufferAdjust,
-                                    llvm::Value*       elemIdx,
-                                    llvm::Value*       vertexIdx,
-                                    unsigned           emitStreamId,
-                                    llvm::Instruction* insertPos);
+  void addCallInstForOutputExport(llvm::Value *outputValue, llvm::Constant *outputMeta, llvm::Value *locOffset,
+                                  unsigned maxLocOffset, unsigned xfbOffsetAdjust, unsigned xfbBufferAdjust,
+                                  llvm::Value *elemIdx, llvm::Value *vertexIdx, unsigned emitStreamId,
+                                  llvm::Instruction *insertPos);
 
-    llvm::Value* loadInOutMember(llvm::Type*                      inOutTy,
-                                 unsigned                         addrSpace,
-                                 const std::vector<llvm::Value*>& indexOperands,
-                                 unsigned                         operandIdx,
-                                 unsigned                         maxLocOffset,
-                                 llvm::Constant*                  inOutMeta,
-                                 llvm::Value*                     locOffset,
-                                 llvm::Value*                     vertexIdx,
-                                 unsigned                         interpLoc,
-                                 llvm::Value*                     interpInfo,
-                                 llvm::Instruction*               insertPos);
+  llvm::Value *loadInOutMember(llvm::Type *inOutTy, unsigned addrSpace, const std::vector<llvm::Value *> &indexOperands,
+                               unsigned operandIdx, unsigned maxLocOffset, llvm::Constant *inOutMeta,
+                               llvm::Value *locOffset, llvm::Value *vertexIdx, unsigned interpLoc,
+                               llvm::Value *interpInfo, llvm::Instruction *insertPos);
 
-    void storeOutputMember(llvm::Type*                      outputTy,
-                           llvm::Value*                     storeValue,
-                           const std::vector<llvm::Value*>& indexOperands,
-                           unsigned                         operandIdx,
-                           unsigned                         maxLocOffset,
-                           llvm::Constant*                  outputMeta,
-                           llvm::Value*                     locOffset,
-                           llvm::Value*                     vertexIdx,
-                           llvm::Instruction*               insertPos);
+  void storeOutputMember(llvm::Type *outputTy, llvm::Value *storeValue, const std::vector<llvm::Value *> &indexOperands,
+                         unsigned operandIdx, unsigned maxLocOffset, llvm::Constant *outputMeta, llvm::Value *locOffset,
+                         llvm::Value *vertexIdx, llvm::Instruction *insertPos);
 
-    void interpolateInputElement(unsigned           interpLoc,
-                                 llvm::Value*       interpInfo,
-                                 llvm::CallInst&    callInst);
+  void interpolateInputElement(unsigned interpLoc, llvm::Value *interpInfo, llvm::CallInst &callInst);
 
-    llvm::Value* toInt32Value(llvm::Value* value, llvm::Instruction* insertPos);
+  llvm::Value *toInt32Value(llvm::Value *value, llvm::Instruction *insertPos);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    std::unordered_map<llvm::Value*, llvm::Value*>  m_globalVarProxyMap;    // Proxy map for lowering global variables
-    std::unordered_map<llvm::Value*, llvm::Value*>  m_inputProxyMap;        // Proxy map for lowering inputs
+  std::unordered_map<llvm::Value *, llvm::Value *> m_globalVarProxyMap; // Proxy map for lowering global variables
+  std::unordered_map<llvm::Value *, llvm::Value *> m_inputProxyMap;     // Proxy map for lowering inputs
 
-    // NOTE: Here we use list to store pairs of output proxy mappings. This is because we want output patching to be
-    // "ordered" (resulting LLVM IR for the patching always be consistent).
-    std::list<std::pair<llvm::Value*, llvm::Value*> >  m_outputProxyMap;    // Proxy list for lowering outputs
+  // NOTE: Here we use list to store pairs of output proxy mappings. This is because we want output patching to be
+  // "ordered" (resulting LLVM IR for the patching always be consistent).
+  std::list<std::pair<llvm::Value *, llvm::Value *>> m_outputProxyMap; // Proxy list for lowering outputs
 
-    llvm::BasicBlock*   m_retBlock;    // The return block of entry point
+  llvm::BasicBlock *m_retBlock; // The return block of entry point
 
-    bool    m_lowerInputInPlace;    // Whether to lower input inplace
-    bool    m_lowerOutputInPlace;   // Whether to lower output inplace
+  bool m_lowerInputInPlace;  // Whether to lower input inplace
+  bool m_lowerOutputInPlace; // Whether to lower output inplace
 
-    // Flags controlling how to behave when visting the instructions
-    union
-    {
-        struct
-        {
-            unsigned checkEmitCall    : 1;  // Whether to check "emit" calls
-            unsigned checkInterpCall  : 1;  // Whether to check interpolation calls
-            unsigned checkReturn      : 1;  // Whether to check "return" instructions
-            unsigned checkLoad        : 1;  // Whether to check "load" instructions
-            unsigned checkStore       : 1;  // Whether to check "store" instructions
+  // Flags controlling how to behave when visting the instructions
+  union {
+    struct {
+      unsigned checkEmitCall : 1;   // Whether to check "emit" calls
+      unsigned checkInterpCall : 1; // Whether to check interpolation calls
+      unsigned checkReturn : 1;     // Whether to check "return" instructions
+      unsigned checkLoad : 1;       // Whether to check "load" instructions
+      unsigned checkStore : 1;      // Whether to check "store" instructions
 
-            unsigned unused           : 27;
-        };
+      unsigned unused : 27;
+    };
 
-        unsigned u32All;
+    unsigned u32All;
 
-    } m_instVisitFlags;
+  } m_instVisitFlags;
 
-    std::unordered_set<llvm::ReturnInst*>  m_retInsts;      // "Return" instructions to be removed
-    std::unordered_set<llvm::CallInst*>    m_emitCalls;     // "Call" instructions to emit vertex (geometry shader)
-    std::unordered_set<llvm::LoadInst*>    m_loadInsts;     // "Load" instructions to be removed
-    std::unordered_set<llvm::StoreInst*>   m_storeInsts;    // "Store" instructions to be removed
-    std::unordered_set<llvm::CallInst*>    m_interpCalls;   // "Call" instruction to do input interpolation
-                                                            // (fragment shader)
+  std::unordered_set<llvm::ReturnInst *> m_retInsts;  // "Return" instructions to be removed
+  std::unordered_set<llvm::CallInst *> m_emitCalls;   // "Call" instructions to emit vertex (geometry shader)
+  std::unordered_set<llvm::LoadInst *> m_loadInsts;   // "Load" instructions to be removed
+  std::unordered_set<llvm::StoreInst *> m_storeInsts; // "Store" instructions to be removed
+  std::unordered_set<llvm::CallInst *> m_interpCalls; // "Call" instruction to do input interpolation
+                                                      // (fragment shader)
 };
 
-} // Llpc
+} // namespace Llpc

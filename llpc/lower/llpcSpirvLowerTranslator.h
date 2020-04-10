@@ -32,41 +32,32 @@
 
 #include "llpcSpirvLower.h"
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Pass to translate the SPIR-V modules and generate an IR module for the whole pipeline
-class SpirvLowerTranslator : public SpirvLower
-{
+class SpirvLowerTranslator : public SpirvLower {
 public:
-    static char ID;
-    SpirvLowerTranslator() : SpirvLower(ID)
-    {
-    }
+  static char ID;
+  SpirvLowerTranslator() : SpirvLower(ID) {}
 
-    //
-    // @param stage : Shader stage
-    // @param shaderInfo : Shader info for this shader
-    SpirvLowerTranslator(
-        ShaderStage                 stage,
-        const PipelineShaderInfo*   shaderInfo)
-        : SpirvLower(ID), m_shaderInfo(shaderInfo)
-    {
-    }
+  //
+  // @param stage : Shader stage
+  // @param shaderInfo : Shader info for this shader
+  SpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo *shaderInfo)
+      : SpirvLower(ID), m_shaderInfo(shaderInfo) {}
 
-    bool runOnModule(llvm::Module& module) override;
+  bool runOnModule(llvm::Module &module) override;
 
 private:
-    SpirvLowerTranslator(const SpirvLowerTranslator&) = delete;
-    SpirvLowerTranslator& operator=(const SpirvLowerTranslator&) = delete;
+  SpirvLowerTranslator(const SpirvLowerTranslator &) = delete;
+  SpirvLowerTranslator &operator=(const SpirvLowerTranslator &) = delete;
 
-    void translateSpirvToLlvm(const PipelineShaderInfo* shaderInfo,
-                              llvm::Module*             module);
+  void translateSpirvToLlvm(const PipelineShaderInfo *shaderInfo, llvm::Module *module);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    const PipelineShaderInfo* m_shaderInfo;    // Input shader info
+  const PipelineShaderInfo *m_shaderInfo; // Input shader info
 };
 
-} // Llpc
+} // namespace Llpc

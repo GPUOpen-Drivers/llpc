@@ -28,12 +28,11 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerInstMetaRemove.
  ***********************************************************************************************************************
  */
+#include "llpcSpirvLowerInstMetaRemove.h"
+#include "SPIRVInternal.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-
-#include "SPIRVInternal.h"
-#include "llpcSpirvLowerInstMetaRemove.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-inst-meta-remove"
 
@@ -41,8 +40,7 @@ using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Initializes static members.
@@ -50,72 +48,57 @@ char SpirvLowerInstMetaRemove::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering opertions for removing the instruction metadata
-ModulePass* createSpirvLowerInstMetaRemove()
-{
-    return new SpirvLowerInstMetaRemove();
-}
+ModulePass *createSpirvLowerInstMetaRemove() { return new SpirvLowerInstMetaRemove(); }
 
 // =====================================================================================================================
-SpirvLowerInstMetaRemove::SpirvLowerInstMetaRemove()
-    :
-    SpirvLower(ID),
-    m_changed(false)
-{
-}
+SpirvLowerInstMetaRemove::SpirvLowerInstMetaRemove() : SpirvLower(ID), m_changed(false) {}
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in,out] module : LLVM module to be run on
-bool SpirvLowerInstMetaRemove::runOnModule(
-    Module& module)
-{
-    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Inst-Meta-Remove\n");
+bool SpirvLowerInstMetaRemove::runOnModule(Module &module) {
+  LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Inst-Meta-Remove\n");
 
-    SpirvLower::init(&module);
-    m_changed = false;
+  SpirvLower::init(&module);
+  m_changed = false;
 
-    visit(m_module);
+  visit(m_module);
 
-    // Remove any named metadata in the module that starts "spirv.".
-    SmallVector<NamedMDNode*, 8> nodesToRemove;
-    for (auto& namedMdNode : m_module->getNamedMDList())
-    {
-        if (namedMdNode.getName().startswith(gSPIRVMD::Prefix))
-            nodesToRemove.push_back(&namedMdNode);
-    }
-    for (NamedMDNode* namedMdNode : nodesToRemove)
-    {
-        namedMdNode->eraseFromParent();
-        m_changed = true;
-    }
+  // Remove any named metadata in the module that starts "spirv.".
+  SmallVector<NamedMDNode *, 8> nodesToRemove;
+  for (auto &namedMdNode : m_module->getNamedMDList()) {
+    if (namedMdNode.getName().startswith(gSPIRVMD::Prefix))
+      nodesToRemove.push_back(&namedMdNode);
+  }
+  for (NamedMDNode *namedMdNode : nodesToRemove) {
+    namedMdNode->eraseFromParent();
+    m_changed = true;
+  }
 
-    return m_changed;
+  return m_changed;
 }
 
 // =====================================================================================================================
 // Visits "call" instruction.
 //
 // @param callInst : "Call" instruction
-void SpirvLowerInstMetaRemove::visitCallInst(
-    CallInst& callInst)
-{
-    auto callee = callInst.getCalledFunction();
-    if (!callee )
-        return;
+void SpirvLowerInstMetaRemove::visitCallInst(CallInst &callInst) {
+  auto callee = callInst.getCalledFunction();
+  if (!callee)
+    return;
 
-    auto mangledName = callee->getName();
-    if (mangledName.startswith(gSPIRVName::NonUniform))
-    {
-        callInst.dropAllReferences();
-        callInst.eraseFromParent();
-        m_changed = true;
-    }
+  auto mangledName = callee->getName();
+  if (mangledName.startswith(gSPIRVName::NonUniform)) {
+    callInst.dropAllReferences();
+    callInst.eraseFromParent();
+    m_changed = true;
+  }
 }
 
-} // Llpc
+} // namespace Llpc
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for removing instruction metadata.
-INITIALIZE_PASS(SpirvLowerInstMetaRemove, DEBUG_TYPE,
-                "Lower SPIR-V instruction metadata by removing those targeted", false, false)
+INITIALIZE_PASS(SpirvLowerInstMetaRemove, DEBUG_TYPE, "Lower SPIR-V instruction metadata by removing those targeted",
+                false, false)

@@ -30,14 +30,11 @@
  */
 #pragma once
 
+#include "llpcInternal.h"
 #include "llvm/IR/InstVisitor.h"
-
 #include "llvm/Pass.h"
 
-#include "llpcInternal.h"
-
-namespace lgc
-{
+namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for peephole optimizations, with the following patterns covered:
@@ -54,44 +51,37 @@ namespace lgc
 //   multiple extract elements that are identical).
 // - Optimize PHI nodes that are confusingly non-PHIs by deducing these complicated cases and removing the PHIs.
 //
-class PatchPeepholeOpt final:
-    public llvm::FunctionPass,
-    public llvm::InstVisitor<PatchPeepholeOpt>
-{
+class PatchPeepholeOpt final : public llvm::FunctionPass, public llvm::InstVisitor<PatchPeepholeOpt> {
 public:
-    explicit PatchPeepholeOpt(bool enKillOpt);
+  explicit PatchPeepholeOpt(bool enKillOpt);
 
-    PatchPeepholeOpt()
-        :
-        FunctionPass(ID)
-    {
-    }
+  PatchPeepholeOpt() : FunctionPass(ID) {}
 
-    bool runOnFunction(llvm::Function& function) override;
+  bool runOnFunction(llvm::Function &function) override;
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override;
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
 
-    void visitBitCast(llvm::BitCastInst& bitCast);
-    void visitICmp(llvm::ICmpInst& iCmp);
-    void visitExtractElement(llvm::ExtractElementInst& extractElement);
-    void visitPHINode(llvm::PHINode& phiNode);
-    void visitCallInst(llvm::CallInst& callInst);
+  void visitBitCast(llvm::BitCastInst &bitCast);
+  void visitICmp(llvm::ICmpInst &iCmp);
+  void visitExtractElement(llvm::ExtractElementInst &extractElement);
+  void visitPHINode(llvm::PHINode &phiNode);
+  void visitCallInst(llvm::CallInst &callInst);
 
-    void moveAfter(llvm::Instruction& move, llvm::Instruction& after) const;
-    void insertAfter(llvm::Instruction& insert, llvm::Instruction& after) const;
+  void moveAfter(llvm::Instruction &move, llvm::Instruction &after) const;
+  void insertAfter(llvm::Instruction &insert, llvm::Instruction &after) const;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    PatchPeepholeOpt(const PatchPeepholeOpt&) = delete;
-    PatchPeepholeOpt& operator=(const PatchPeepholeOpt&) = delete;
+  PatchPeepholeOpt(const PatchPeepholeOpt &) = delete;
+  PatchPeepholeOpt &operator=(const PatchPeepholeOpt &) = delete;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::SmallVector<llvm::Instruction*, 8> m_instsToErase;
-    bool m_enableDiscardOpt;    // Whether to enable the optimization for "kill" intrinsic
+  llvm::SmallVector<llvm::Instruction *, 8> m_instsToErase;
+  bool m_enableDiscardOpt; // Whether to enable the optimization for "kill" intrinsic
 };
 
-} // lgc
+} // namespace lgc

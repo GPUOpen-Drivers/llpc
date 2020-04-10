@@ -32,35 +32,32 @@
 
 #include "llpcSpirvLower.h"
 
-namespace llvm
-{
+namespace llvm {
 class AllocaInst;
 class StoreInst;
-} // llvm
+} // namespace llvm
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering operations for constant immediate store
-class SpirvLowerConstImmediateStore: public SpirvLower
-{
+class SpirvLowerConstImmediateStore : public SpirvLower {
 public:
-    SpirvLowerConstImmediateStore();
+  SpirvLowerConstImmediateStore();
 
-    virtual bool runOnModule(llvm::Module& module);
+  virtual bool runOnModule(llvm::Module &module);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    SpirvLowerConstImmediateStore(const SpirvLowerConstImmediateStore&) = delete;
-    SpirvLowerConstImmediateStore& operator=(const SpirvLowerConstImmediateStore&) = delete;
+  SpirvLowerConstImmediateStore(const SpirvLowerConstImmediateStore &) = delete;
+  SpirvLowerConstImmediateStore &operator=(const SpirvLowerConstImmediateStore &) = delete;
 
-    void processAllocaInsts(llvm::Function* func);
-    llvm::StoreInst* findSingleStore(llvm::AllocaInst* allocaInst);
-    void convertAllocaToReadOnlyGlobal(llvm::StoreInst* storeInst);
+  void processAllocaInsts(llvm::Function *func);
+  llvm::StoreInst *findSingleStore(llvm::AllocaInst *allocaInst);
+  void convertAllocaToReadOnlyGlobal(llvm::StoreInst *storeInst);
 };
 
-} // Llpc
+} // namespace Llpc

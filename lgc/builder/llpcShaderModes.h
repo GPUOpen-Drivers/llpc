@@ -32,71 +32,69 @@
 
 #include "lgc/llpcPipeline.h"
 
-namespace lgc
-{
+namespace lgc {
 
 // =====================================================================================================================
 // Shader modes from input language. The front-end calls Set*Mode methods in Builder, which forward to here.
 // The middle-end gets these modes by calling PipelineState::GetShaderModes then calling a Get*Mode method here.
 // The structs for the modes are declared in llpcPipeline.h.
-class ShaderModes
-{
+class ShaderModes {
 public:
-    // Set the common shader mode (FP modes) for the given shader stage
-    void setCommonShaderMode(ShaderStage stage, const CommonShaderMode& commonShaderMode);
+  // Set the common shader mode (FP modes) for the given shader stage
+  void setCommonShaderMode(ShaderStage stage, const CommonShaderMode &commonShaderMode);
 
-    // Get the common shader modes for the given shader stage
-    const CommonShaderMode& getCommonShaderMode(ShaderStage stage);
+  // Get the common shader modes for the given shader stage
+  const CommonShaderMode &getCommonShaderMode(ShaderStage stage);
 
-    // Check if any shader stage has useSubgroupSize set
-    bool getAnyUseSubgroupSize();
+  // Check if any shader stage has useSubgroupSize set
+  bool getAnyUseSubgroupSize();
 
-    // Set the tessellation mode. This in fact merges the supplied values with any previously supplied values,
-    // to allow the client to call this twice, once for TCS and once for TES.
-    void setTessellationMode(const TessellationMode& inMode);
+  // Set the tessellation mode. This in fact merges the supplied values with any previously supplied values,
+  // to allow the client to call this twice, once for TCS and once for TES.
+  void setTessellationMode(const TessellationMode &inMode);
 
-    // Get the tessellation state.
-    const TessellationMode& getTessellationMode();
+  // Get the tessellation state.
+  const TessellationMode &getTessellationMode();
 
-    // Set the geometry shader mode
-    void setGeometryShaderMode(const GeometryShaderMode& inMode);
+  // Set the geometry shader mode
+  void setGeometryShaderMode(const GeometryShaderMode &inMode);
 
-    // Get the geometry shader mode
-    const GeometryShaderMode& getGeometryShaderMode();
+  // Get the geometry shader mode
+  const GeometryShaderMode &getGeometryShaderMode();
 
-    // Set the fragment shader mode
-    void setFragmentShaderMode(const FragmentShaderMode& inMode);
+  // Set the fragment shader mode
+  void setFragmentShaderMode(const FragmentShaderMode &inMode);
 
-    // Get the fragment shader mode
-    const FragmentShaderMode& getFragmentShaderMode();
+  // Get the fragment shader mode
+  const FragmentShaderMode &getFragmentShaderMode();
 
-    // Set the compute shader mode (workgroup size)
-    void setComputeShaderMode(const ComputeShaderMode& inMode);
+  // Set the compute shader mode (workgroup size)
+  void setComputeShaderMode(const ComputeShaderMode &inMode);
 
-    // Get the compute shader mode (workgroup size)
-    const ComputeShaderMode& getComputeShaderMode();
+  // Get the compute shader mode (workgroup size)
+  const ComputeShaderMode &getComputeShaderMode();
 
-    // Clear all modes
-    void clear();
+  // Clear all modes
+  void clear();
 
-    // Record modes to IR metadata
-    void record(llvm::Module* module);
+  // Record modes to IR metadata
+  void record(llvm::Module *module);
 
-    // Read shader modes (common and specific) from a shader IR module, but only if no modes have been set
-    // in this ShaderModes. This is used to handle the case that the shader module comes from an earlier
-    // shader compile, and it had its ShaderModes recorded into IR then.
-    void readModesFromShader(llvm::Module* module, ShaderStage stage);
+  // Read shader modes (common and specific) from a shader IR module, but only if no modes have been set
+  // in this ShaderModes. This is used to handle the case that the shader module comes from an earlier
+  // shader compile, and it had its ShaderModes recorded into IR then.
+  void readModesFromShader(llvm::Module *module, ShaderStage stage);
 
-    // Read shader modes from IR metadata in a pipeline
-    void readModesFromPipeline(llvm::Module* module);
+  // Read shader modes from IR metadata in a pipeline
+  void readModesFromPipeline(llvm::Module *module);
 
 private:
-    bool                m_anySet = false;                                 // Whether any Set*Mode method called
-    CommonShaderMode    m_commonShaderModes[ShaderStageCompute + 1] = {}; // Per-shader FP modes
-    TessellationMode    m_tessellationMode = {};                          // Tessellation mode
-    GeometryShaderMode  m_geometryShaderMode = {};                        // Geometry shader mode
-    FragmentShaderMode  m_fragmentShaderMode = {};                        // Fragment shader mode
-    ComputeShaderMode   m_computeShaderMode = {};                         // Compute shader mode (workgroup size)
+  bool m_anySet = false;                                             // Whether any Set*Mode method called
+  CommonShaderMode m_commonShaderModes[ShaderStageCompute + 1] = {}; // Per-shader FP modes
+  TessellationMode m_tessellationMode = {};                          // Tessellation mode
+  GeometryShaderMode m_geometryShaderMode = {};                      // Geometry shader mode
+  FragmentShaderMode m_fragmentShaderMode = {};                      // Fragment shader mode
+  ComputeShaderMode m_computeShaderMode = {};                        // Compute shader mode (workgroup size)
 };
 
-} // lgc
+} // namespace lgc

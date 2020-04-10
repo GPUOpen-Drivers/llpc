@@ -28,6 +28,15 @@
  * @brief LLPC source file: contains implementation of class Llpc::Context.
  ***********************************************************************************************************************
  */
+#include "llpcContext.h"
+#include "SPIRVInternal.h"
+#include "llpcCompiler.h"
+#include "llpcDebug.h"
+#include "llpcPipelineContext.h"
+#include "llpcShaderCache.h"
+#include "llpcShaderCacheManager.h"
+#include "vkgcMetroHash.h"
+#include "lgc/llpcBuilder.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitstream/BitstreamReader.h"
@@ -42,109 +51,75 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "SPIRVInternal.h"
-
-#include "lgc/llpcBuilder.h"
-#include "llpcCompiler.h"
-#include "llpcContext.h"
-#include "llpcDebug.h"
-#include "vkgcMetroHash.h"
-#include "llpcPipelineContext.h"
-#include "llpcShaderCache.h"
-#include "llpcShaderCacheManager.h"
-
 #define DEBUG_TYPE "llpc-context"
 
 using namespace lgc;
 using namespace llvm;
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 //
 // @param gfxIp : Graphics IP version info
-Context::Context(
-    GfxIpVersion gfxIp)
-    :
-    LLVMContext(),
-    m_gfxIp(gfxIp),
-    m_glslEmuLib(this)
-{
-    reset();
-}
+Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp), m_glslEmuLib(this) { reset(); }
 
 // =====================================================================================================================
-Context::~Context()
-{
-}
+Context::~Context() {}
 
 // =====================================================================================================================
-void Context::reset()
-{
-    m_pipelineContext = nullptr;
-    delete m_builder;
-    m_builder = nullptr;
+void Context::reset() {
+  m_pipelineContext = nullptr;
+  delete m_builder;
+  m_builder = nullptr;
 }
 
 // =====================================================================================================================
 // Get (create if necessary) BuilderContext
-BuilderContext* Context::getBuilderContext()
-{
+BuilderContext *Context::getBuilderContext() {
+  if (!m_builderContext) {
+    // First time: Create the BuilderContext.
+    std::string gpuName;
+    PipelineContext::getGpuNameString(m_gfxIp, gpuName);
+    m_builderContext.reset(BuilderContext::Create(*this, gpuName, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
     if (!m_builderContext)
-    {
-        // First time: Create the BuilderContext.
-        std::string gpuName;
-        PipelineContext::getGpuNameString(m_gfxIp, gpuName);
-        m_builderContext.reset(BuilderContext::Create(*this, gpuName, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
-        if (!m_builderContext)
-            report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
-    }
-    return &*m_builderContext;
+      report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
+  }
+  return &*m_builderContext;
 }
 
 // =====================================================================================================================
 // Loads library from external LLVM library.
 //
 // @param lib : Bitcodes of external LLVM library
-std::unique_ptr<Module> Context::loadLibary(
-    const BinaryData* lib)
-{
-    auto memBuffer = MemoryBuffer::getMemBuffer(
-        StringRef(static_cast<const char*>(lib->pCode), lib->codeSize), "", false);
+std::unique_ptr<Module> Context::loadLibary(const BinaryData *lib) {
+  auto memBuffer =
+      MemoryBuffer::getMemBuffer(StringRef(static_cast<const char *>(lib->pCode), lib->codeSize), "", false);
 
-    Expected<std::unique_ptr<Module>> moduleOrErr =
-        getLazyBitcodeModule(memBuffer->getMemBufferRef(), *this);
+  Expected<std::unique_ptr<Module>> moduleOrErr = getLazyBitcodeModule(memBuffer->getMemBufferRef(), *this);
 
-    std::unique_ptr<Module> libModule = nullptr;
-    if (!moduleOrErr)
-    {
-        Error error = moduleOrErr.takeError();
-        LLPC_ERRS("Fails to load LLVM bitcode \n");
+  std::unique_ptr<Module> libModule = nullptr;
+  if (!moduleOrErr) {
+    Error error = moduleOrErr.takeError();
+    LLPC_ERRS("Fails to load LLVM bitcode \n");
+  } else {
+    libModule = std::move(*moduleOrErr);
+    if (llvm::Error errCode = libModule->materializeAll()) {
+      LLPC_ERRS("Fails to materialize \n");
+      libModule = nullptr;
     }
-    else
-    {
-        libModule = std::move(*moduleOrErr);
-        if (llvm::Error errCode = libModule->materializeAll())
-        {
-            LLPC_ERRS("Fails to materialize \n");
-            libModule = nullptr;
-        }
-    }
+  }
 
-    return libModule;
+  return libModule;
 }
 
 // =====================================================================================================================
 // Sets triple and data layout in specified module from the context's target machine.
 //
 // @param [in/out] module : Module to modify
-void Context::setModuleTargetMachine(
-    Module* module)
-{
-    TargetMachine* targetMachine = getBuilderContext()->getTargetMachine();
-    module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
-    module->setDataLayout(targetMachine->createDataLayout());
+void Context::setModuleTargetMachine(Module *module) {
+  TargetMachine *targetMachine = getBuilderContext()->getTargetMachine();
+  module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
+  module->setDataLayout(targetMachine->createDataLayout());
 }
 
-} // Llpc
+} // namespace Llpc

@@ -29,118 +29,97 @@
  * (independent of LLVM use).
  ***********************************************************************************************************************
  */
+#include "llpcUtil.h"
 #include "llpc.h"
 #include "llpcDebug.h"
-#include "vkgcElfReader.h"
-#include "llpcUtil.h"
-
-#include "spirvExt.h"
-
 #include "palPipelineAbi.h"
+#include "spirvExt.h"
+#include "vkgcElfReader.h"
 
 #define DEBUG_TYPE "llpc-util"
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Gets the name string of shader stage.
 //
 // @param shaderStage : Shader stage
-const char* getShaderStageName(
-    ShaderStage shaderStage)
-{
-    const char* name = nullptr;
+const char *getShaderStageName(ShaderStage shaderStage) {
+  const char *name = nullptr;
 
-    if (shaderStage == ShaderStageCopyShader)
-        name = "copy";
-    else if (shaderStage < ShaderStageCount)
-    {
-        static const char* ShaderStageNames[] =
-        {
-            "vertex",
-            "tessellation control",
-            "tessellation evaluation",
-            "geometry",
-            "fragment",
-            "compute",
-        };
+  if (shaderStage == ShaderStageCopyShader)
+    name = "copy";
+  else if (shaderStage < ShaderStageCount) {
+    static const char *ShaderStageNames[] = {
+      "vertex",
+      "tessellation control",
+      "tessellation evaluation",
+      "geometry",
+      "fragment",
+      "compute",
+    };
 
-        name = ShaderStageNames[static_cast<unsigned>(shaderStage)];
-    }
-    else
-        name = "bad";
+    name = ShaderStageNames[static_cast<unsigned>(shaderStage)];
+  } else
+    name = "bad";
 
-    return name;
+  return name;
 }
 
 // =====================================================================================================================
 // Converts the SPIR-V execution model to the shader stage
 //
 // @param execModel : SPIR-V execution model
-ShaderStage convertToStageShage(
-    unsigned execModel)
-{
-    switch (execModel)
-    {
-    case spv::ExecutionModelVertex:
-    case spv::ExecutionModelTessellationControl:
-    case spv::ExecutionModelTessellationEvaluation:
-    case spv::ExecutionModelGeometry:
-    case spv::ExecutionModelFragment:
-    case spv::ExecutionModelGLCompute:
-        {
-            return static_cast<ShaderStage>(execModel);
-        }
-    case spv::ExecutionModelCopyShader:
-        {
-            return ShaderStageCopyShader;
-        }
-    }
+ShaderStage convertToStageShage(unsigned execModel) {
+  switch (execModel) {
+  case spv::ExecutionModelVertex:
+  case spv::ExecutionModelTessellationControl:
+  case spv::ExecutionModelTessellationEvaluation:
+  case spv::ExecutionModelGeometry:
+  case spv::ExecutionModelFragment:
+  case spv::ExecutionModelGLCompute: {
+    return static_cast<ShaderStage>(execModel);
+  }
+  case spv::ExecutionModelCopyShader: {
+    return ShaderStageCopyShader;
+  }
+  }
 
-    llvm_unreachable("Should never be called!");
-    return ShaderStageInvalid;
+  llvm_unreachable("Should never be called!");
+  return ShaderStageInvalid;
 }
 
 // =====================================================================================================================
 // Converts the shader stage to the SPIR-V execution model
 //
 // @param shaderStage : Shader stage
-spv::ExecutionModel convertToExecModel(
-    ShaderStage shaderStage)
-{
-    switch (shaderStage)
-    {
-    case ShaderStageVertex:
-    case ShaderStageTessControl:
-    case ShaderStageTessEval:
-    case ShaderStageGeometry:
-    case ShaderStageFragment:
-    case ShaderStageCompute:
-        {
-            return static_cast<spv::ExecutionModel>(shaderStage);
-        }
-    case ShaderStageCopyShader:
-        {
-            return spv::ExecutionModelCopyShader;
-        }
-    default:
-        {
-            llvm_unreachable("Should never be called!");
-            return static_cast <spv::ExecutionModel>(0);
-        }
-    }
+spv::ExecutionModel convertToExecModel(ShaderStage shaderStage) {
+  switch (shaderStage) {
+  case ShaderStageVertex:
+  case ShaderStageTessControl:
+  case ShaderStageTessEval:
+  case ShaderStageGeometry:
+  case ShaderStageFragment:
+  case ShaderStageCompute: {
+    return static_cast<spv::ExecutionModel>(shaderStage);
+  }
+  case ShaderStageCopyShader: {
+    return spv::ExecutionModelCopyShader;
+  }
+  default: {
+    llvm_unreachable("Should never be called!");
+    return static_cast<spv::ExecutionModel>(0);
+  }
+  }
 }
 
 // =====================================================================================================================
 // Translates shader stage to corresponding stage mask.
 //
 // @param stage : Shader stage
-unsigned shaderStageToMask(
-    ShaderStage stage)
-{
-    assert(stage < ShaderStageCount || stage == ShaderStageCopyShader);
-    return (1 << stage);
+unsigned shaderStageToMask(ShaderStage stage) {
+  assert(stage < ShaderStageCount || stage == ShaderStageCopyShader);
+  return (1 << stage);
 }
 
-} // Llpc
+} // namespace Llpc

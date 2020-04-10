@@ -30,20 +30,17 @@
  */
 #pragma once
 
-#include <fstream>
 #include "vkgcDefs.h"
-
 #include "vkgcMetroHash.h"
+#include <fstream>
 #if !defined(SINGLE_EXTERNAL_METROHASH)
-namespace MetroHash
-{
-    class MetroHash64;
-    struct Hash;
-};
+namespace MetroHash {
+class MetroHash64;
+struct Hash;
+}; // namespace MetroHash
 #endif
 
-namespace Vkgc
-{
+namespace Vkgc {
 
 struct ComputePipelineBuildInfo;
 struct GraphicsPipelineBuildInfo;
@@ -51,111 +48,84 @@ struct BinaryData;
 struct PipelineDumpFile;
 
 // Enumerates which types of pipeline dump are disable
-enum PipelineDumpFilters : unsigned
-{
-    PipelineDumpFilterNone = 0x00, // Do not disable any pipeline type
-    PipelineDumpFilterCs   = 0x01, // Disable pipeline dump for Cs
-    PipelineDumpFilterNgg  = 0x02, // Disable pipeline dump for NGG
-    PipelineDumpFilterGs   = 0x04, // Disable pipeline dump for Gs
-    PipelineDumpFilterTess = 0x08, // Disable pipeline dump for Tess
-    PipelineDumpFilterVsPs = 0x10, // Disable pipeline dump for VsPs
+enum PipelineDumpFilters : unsigned {
+  PipelineDumpFilterNone = 0x00, // Do not disable any pipeline type
+  PipelineDumpFilterCs = 0x01,   // Disable pipeline dump for Cs
+  PipelineDumpFilterNgg = 0x02,  // Disable pipeline dump for NGG
+  PipelineDumpFilterGs = 0x04,   // Disable pipeline dump for Gs
+  PipelineDumpFilterTess = 0x08, // Disable pipeline dump for Tess
+  PipelineDumpFilterVsPs = 0x10, // Disable pipeline dump for VsPs
 };
 
-class PipelineDumper
-{
+class PipelineDumper {
 public:
 #if defined(SINGLE_EXTERNAL_METROHASH)
-    typedef Util::MetroHash64 MetroHash64;
+  typedef Util::MetroHash64 MetroHash64;
 #else
-    typedef MetroHash::MetroHash64 MetroHash64;
+  typedef MetroHash::MetroHash64 MetroHash64;
 #endif
 
-    static void DumpSpirvBinary(const char*                     dumpDir,
-                                const BinaryData*               spirvBin,
-                                MetroHash::Hash*                hash);
+  static void DumpSpirvBinary(const char *dumpDir, const BinaryData *spirvBin, MetroHash::Hash *hash);
 
-    static PipelineDumpFile* BeginPipelineDump(const PipelineDumpOptions*       dumpOptions,
-                                               PipelineBuildInfo                pipelineInfo,
-                                               const MetroHash::Hash*           hash);
+  static PipelineDumpFile *BeginPipelineDump(const PipelineDumpOptions *dumpOptions, PipelineBuildInfo pipelineInfo,
+                                             const MetroHash::Hash *hash);
 
-    static void EndPipelineDump(PipelineDumpFile* dumpFile);
+  static void EndPipelineDump(PipelineDumpFile *dumpFile);
 
-    static void DumpPipelineBinary(PipelineDumpFile*                binaryFile,
-                                   GfxIpVersion                     gfxIp,
-                                   const BinaryData*                pipelineBin);
+  static void DumpPipelineBinary(PipelineDumpFile *binaryFile, GfxIpVersion gfxIp, const BinaryData *pipelineBin);
 
-    static void DumpPipelineExtraInfo(PipelineDumpFile*             binaryFile,
-                                      const std::string*            str);
+  static void DumpPipelineExtraInfo(PipelineDumpFile *binaryFile, const std::string *str);
 
-    static MetroHash::Hash generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo* pipeline,
-                                                           bool                             isCacheHash,
-                                                           unsigned                         stage = ShaderStageInvalid);
+  static MetroHash::Hash generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
+                                                         unsigned stage = ShaderStageInvalid);
 
-    static MetroHash::Hash generateHashForComputePipeline(const ComputePipelineBuildInfo* pipeline, bool isCacheHash);
+  static MetroHash::Hash generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline, bool isCacheHash);
 
-    static std::string getPipelineInfoFileName(PipelineBuildInfo                pipelineInfo,
-                                               const MetroHash::Hash*           hash);
+  static std::string getPipelineInfoFileName(PipelineBuildInfo pipelineInfo, const MetroHash::Hash *hash);
 
-    static void updateHashForPipelineShaderInfo(ShaderStage               stage,
-                                                const PipelineShaderInfo* shaderInfo,
-                                                bool                      isCacheHash,
-                                                MetroHash64*              hasher);
+  static void updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo, bool isCacheHash,
+                                              MetroHash64 *hasher);
 
-    static void updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo* vertexInput,
-                                              MetroHash64*                          hasher);
+  static void updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo *vertexInput,
+                                            MetroHash64 *hasher);
 
-    // Update hash for map object
-    template <class MapType>
-    static void updateHashForMap(MapType& m, MetroHash64* hasher)
-    {
-        hasher->Update(m.size());
-        for (auto mapIt : m)
-        {
-            hasher->Update(mapIt.first);
-            hasher->Update(mapIt.second);
-        }
+  // Update hash for map object
+  template <class MapType> static void updateHashForMap(MapType &m, MetroHash64 *hasher) {
+    hasher->Update(m.size());
+    for (auto mapIt : m) {
+      hasher->Update(mapIt.first);
+      hasher->Update(mapIt.second);
     }
+  }
 
-    static void updateHashForNonFragmentState(
-        const GraphicsPipelineBuildInfo* pipeline,
-        bool                             isCacheHash,
-        MetroHash64*               hasher);
+  static void updateHashForNonFragmentState(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
+                                            MetroHash64 *hasher);
 
-    static void updateHashForFragmentState(
-        const GraphicsPipelineBuildInfo* pipeline,
-        MetroHash64*               hasher);
+  static void updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher);
 
-    // Get name of register, or "" if not known
-    static const char* getRegisterNameString(unsigned regNumber);
+  // Get name of register, or "" if not known
+  static const char *getRegisterNameString(unsigned regNumber);
 
 private:
-    static std::string getSpirvBinaryFileName(const MetroHash::Hash* hash);
+  static std::string getSpirvBinaryFileName(const MetroHash::Hash *hash);
 
-    static void dumpComputePipelineInfo(std::ostream*                   dumpFile,
-                                        const char*                     dumpDir,
-                                        const ComputePipelineBuildInfo* pipelineInfo);
-    static void dumpGraphicsPipelineInfo(std::ostream*                    dumpFile,
-                                         const char*                      dumpDir,
-                                         const GraphicsPipelineBuildInfo* pipelineInfo);
+  static void dumpComputePipelineInfo(std::ostream *dumpFile, const char *dumpDir,
+                                      const ComputePipelineBuildInfo *pipelineInfo);
+  static void dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char *dumpDir,
+                                       const GraphicsPipelineBuildInfo *pipelineInfo);
 
-    static void dumpVersionInfo(std::ostream&                  dumpFile);
-    static void dumpPipelineShaderInfo(const PipelineShaderInfo* shaderInfo,
-                                       std::ostream&             dumpFile);
-    static void dumpResourceMappingNode(const ResourceMappingNode* userDataNode,
-                                        const char*                prefix,
-                                        std::ostream&              dumpFile);
-    static void dumpComputeStateInfo(const ComputePipelineBuildInfo* pipelineInfo,
-                                     const char*                     dumpDir,
-                                     std::ostream&                   dumpFile);
-    static void dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo* pipelineInfo,
-                                      const char*                      dumpDir,
-                                      std::ostream&                    dumpFile);
-    static void dumpPipelineOptions(const PipelineOptions*   options,
-                                    std::ostream&            dumpFile);
+  static void dumpVersionInfo(std::ostream &dumpFile);
+  static void dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo, std::ostream &dumpFile);
+  static void dumpResourceMappingNode(const ResourceMappingNode *userDataNode, const char *prefix,
+                                      std::ostream &dumpFile);
+  static void dumpComputeStateInfo(const ComputePipelineBuildInfo *pipelineInfo, const char *dumpDir,
+                                   std::ostream &dumpFile);
+  static void dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipelineInfo, const char *dumpDir,
+                                    std::ostream &dumpFile);
+  static void dumpPipelineOptions(const PipelineOptions *options, std::ostream &dumpFile);
 
-    static void updateHashForResourceMappingNode(const ResourceMappingNode* userDataNode,
-                                                 bool                       isRootNode,
-                                                 MetroHash64*         hasher);
+  static void updateHashForResourceMappingNode(const ResourceMappingNode *userDataNode, bool isRootNode,
+                                               MetroHash64 *hasher);
 };
 
-} // Vkgc
+} // namespace Vkgc

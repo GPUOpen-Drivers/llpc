@@ -28,10 +28,10 @@
  * @brief LLPC source file: implementation of Builder methods for shader input and output
  ***********************************************************************************************************************
  */
-#include "lgc/llpcBuilderContext.h"
 #include "llpcBuilderImpl.h"
 #include "llpcInternal.h"
 #include "llpcPipelineState.h"
+#include "lgc/llpcBuilderContext.h"
 
 #define DEBUG_TYPE "llpc-builder-impl-inout"
 
@@ -47,30 +47,18 @@ using namespace llvm;
 // @param resultTy : Type of value to read
 // @param location : Base location (row) of input
 // @param locationOffset : Variable location offset; must be within locationCount
-// @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for 64-bit elements.)
+// @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
+// 64-bit elements.)
 // @param locationCount : Count of locations taken by the input
 // @param inputInfo : Extra input info (FS interp info)
-// @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index; for FS custom interpolated input: auxiliary interpolation value; else nullptr
+// @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index; for FS custom interpolated input: auxiliary
+// interpolation value; else nullptr
 // @param instName : Name to give instruction(s)
-Value* BuilderImplInOut::CreateReadGenericInput(
-    Type*         resultTy,
-    unsigned      location,
-    Value*        locationOffset,
-    Value*        elemIdx,
-    unsigned      locationCount,
-    InOutInfo     inputInfo,
-    Value*        vertexIndex,
-    const Twine&  instName)
-{
-    return readGenericInputOutput(false,
-                                  resultTy,
-                                  location,
-                                  locationOffset,
-                                  elemIdx,
-                                  locationCount,
-                                  inputInfo,
-                                  vertexIndex,
-                                  instName);
+Value *BuilderImplInOut::CreateReadGenericInput(Type *resultTy, unsigned location, Value *locationOffset,
+                                                Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,
+                                                Value *vertexIndex, const Twine &instName) {
+  return readGenericInputOutput(false, resultTy, location, locationOffset, elemIdx, locationCount, inputInfo,
+                                vertexIndex, instName);
 }
 
 // =====================================================================================================================
@@ -83,30 +71,17 @@ Value* BuilderImplInOut::CreateReadGenericInput(
 // @param resultTy : Type of value to read
 // @param location : Base location (row) of output
 // @param locationOffset : Location offset; must be within locationCount if variable
-// @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for 64-bit elements.)
+// @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
+// 64-bit elements.)
 // @param locationCount : Count of locations taken by the output. Ignored if pLocationOffset is const
 // @param outputInfo : Extra output info
 // @param vertexIndex : For TCS per-vertex output: vertex index; else nullptr
 // @param instName : Name to give instruction(s)
-Value* BuilderImplInOut::CreateReadGenericOutput(
-    Type*         resultTy,
-    unsigned      location,
-    Value*        locationOffset,
-    Value*        elemIdx,
-    unsigned      locationCount,
-    InOutInfo     outputInfo,
-    Value*        vertexIndex,
-    const Twine&  instName)
-{
-    return readGenericInputOutput(true,
-                                  resultTy,
-                                  location,
-                                  locationOffset,
-                                  elemIdx,
-                                  locationCount,
-                                  outputInfo,
-                                  vertexIndex,
-                                  instName);
+Value *BuilderImplInOut::CreateReadGenericOutput(Type *resultTy, unsigned location, Value *locationOffset,
+                                                 Value *elemIdx, unsigned locationCount, InOutInfo outputInfo,
+                                                 Value *vertexIndex, const Twine &instName) {
+  return readGenericInputOutput(true, resultTy, location, locationOffset, elemIdx, locationCount, outputInfo,
+                                vertexIndex, instName);
 }
 
 // =====================================================================================================================
@@ -116,117 +91,98 @@ Value* BuilderImplInOut::CreateReadGenericOutput(
 // @param resultTy : Type of value to read
 // @param location : Base location (row) of input
 // @param locationOffset : Variable location offset; must be within locationCount
-// @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for 64-bit elements.)
+// @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
+// 64-bit elements.)
 // @param locationCount : Count of locations taken by the input
 // @param inOutInfo : Extra input/output info (FS interp info)
-// @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index; for FS custom interpolated input: auxiliary interpolation value; else nullptr
+// @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index; for FS custom interpolated input: auxiliary
+// interpolation value; else nullptr
 // @param instName : Name to give instruction(s)
-Value* BuilderImplInOut::readGenericInputOutput(
-    bool          isOutput,
-    Type*         resultTy,
-    unsigned      location,
-    Value*        locationOffset,
-    Value*        elemIdx,
-    unsigned      locationCount,
-    InOutInfo     inOutInfo,
-    Value*        vertexIndex,
-    const Twine&  instName)
-{
-    assert(resultTy->isAggregateType() == false);
-    assert(isOutput == false || m_shaderStage == ShaderStageTessControl);
+Value *BuilderImplInOut::readGenericInputOutput(bool isOutput, Type *resultTy, unsigned location, Value *locationOffset,
+                                                Value *elemIdx, unsigned locationCount, InOutInfo inOutInfo,
+                                                Value *vertexIndex, const Twine &instName) {
+  assert(resultTy->isAggregateType() == false);
+  assert(isOutput == false || m_shaderStage == ShaderStageTessControl);
 
-    // Fold constant pLocationOffset into location. (Currently a variable pLocationOffset is only supported in
-    // TCS, TES, and FS custom interpolation.)
-    if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset))
-    {
-        location += constLocOffset->getZExtValue();
-        locationOffset = getInt32(0);
-        locationCount = (resultTy->getPrimitiveSizeInBits() + 127U) / 128U;
+  // Fold constant pLocationOffset into location. (Currently a variable pLocationOffset is only supported in
+  // TCS, TES, and FS custom interpolation.)
+  if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
+    location += constLocOffset->getZExtValue();
+    locationOffset = getInt32(0);
+    locationCount = (resultTy->getPrimitiveSizeInBits() + 127U) / 128U;
+  }
+
+  // Mark the usage of the input/output.
+  markGenericInputOutputUsage(isOutput, location, locationCount, inOutInfo, vertexIndex);
+
+  // Generate LLPC call for reading the input/output.
+  StringRef baseCallName = lgcName::InputImportGeneric;
+  SmallVector<Value *, 6> args;
+  switch (m_shaderStage) {
+  case ShaderStageVertex: {
+    // VS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx)
+    assert(locationOffset == getInt32(0));
+    args.push_back(getInt32(location));
+    args.push_back(elemIdx);
+    break;
+  }
+
+  case ShaderStageTessControl:
+  case ShaderStageTessEval: {
+    // TCS: @llpc.{input|output}.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
+    // TES: @llpc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
+    args.push_back(getInt32(location));
+    args.push_back(locationOffset);
+    args.push_back(elemIdx);
+    args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
+    if (isOutput)
+      baseCallName = lgcName::OutputImportGeneric;
+    break;
+  }
+
+  case ShaderStageGeometry: {
+    // GS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
+    assert(locationOffset == getInt32(0));
+    args.push_back(getInt32(location));
+    args.push_back(elemIdx);
+    args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
+    break;
+  }
+
+  case ShaderStageFragment: {
+    // FS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
+    //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
+    //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
+    if (inOutInfo.hasInterpAux()) {
+      // Prepare arguments for import interpolant call
+      Value *auxInterpValue = modifyAuxInterpValue(vertexIndex, inOutInfo);
+      baseCallName = lgcName::InputImportInterpolant;
+      args.push_back(getInt32(location));
+      args.push_back(locationOffset);
+      args.push_back(elemIdx);
+      args.push_back(getInt32(inOutInfo.getInterpMode()));
+      args.push_back(auxInterpValue);
+    } else {
+      assert(locationOffset == getInt32(0));
+      args.push_back(getInt32(location));
+      args.push_back(elemIdx);
+      args.push_back(getInt32(inOutInfo.getInterpMode()));
+      args.push_back(getInt32(inOutInfo.getInterpLoc()));
     }
+    break;
+  }
 
-    // Mark the usage of the input/output.
-    markGenericInputOutputUsage(isOutput, location, locationCount, inOutInfo, vertexIndex);
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
 
-    // Generate LLPC call for reading the input/output.
-    StringRef baseCallName = lgcName::InputImportGeneric;
-    SmallVector<Value*, 6> args;
-    switch (m_shaderStage)
-    {
-    case ShaderStageVertex:
-        {
-            // VS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx)
-            assert(locationOffset == getInt32(0));
-            args.push_back(getInt32(location));
-            args.push_back(elemIdx);
-            break;
-        }
+  std::string callName(baseCallName);
+  addTypeMangling(resultTy, args, callName);
+  Value *result = emitCall(callName, resultTy, args, Attribute::ReadOnly, &*GetInsertPoint());
 
-    case ShaderStageTessControl:
-    case ShaderStageTessEval:
-        {
-            // TCS: @llpc.{input|output}.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-            // TES: @llpc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-            args.push_back(getInt32(location));
-            args.push_back(locationOffset);
-            args.push_back(elemIdx);
-            args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
-            if (isOutput)
-                baseCallName = lgcName::OutputImportGeneric;
-            break;
-        }
-
-    case ShaderStageGeometry:
-        {
-            // GS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
-            assert(locationOffset == getInt32(0));
-            args.push_back(getInt32(location));
-            args.push_back(elemIdx);
-            args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
-            break;
-        }
-
-    case ShaderStageFragment:
-        {
-            // FS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
-            //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
-            //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
-            if (inOutInfo.hasInterpAux())
-            {
-                // Prepare arguments for import interpolant call
-                Value* auxInterpValue = modifyAuxInterpValue(vertexIndex, inOutInfo);
-                baseCallName  = lgcName::InputImportInterpolant;
-                args.push_back(getInt32(location));
-                args.push_back(locationOffset);
-                args.push_back(elemIdx);
-                args.push_back(getInt32(inOutInfo.getInterpMode()));
-                args.push_back(auxInterpValue);
-            }
-            else
-            {
-                assert(locationOffset == getInt32(0));
-                args.push_back(getInt32(location));
-                args.push_back(elemIdx);
-                args.push_back(getInt32(inOutInfo.getInterpMode()));
-                args.push_back(getInt32(inOutInfo.getInterpLoc()));
-            }
-            break;
-        }
-
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
-
-    std::string callName(baseCallName);
-    addTypeMangling(resultTy, args, callName);
-    Value* result = emitCall(callName,
-                              resultTy,
-                              args,
-                              Attribute::ReadOnly,
-                              &*GetInsertPoint());
-
-    result->setName(instName);
-    return result;
+  result->setName(instName);
+  return result;
 }
 
 // =====================================================================================================================
@@ -239,95 +195,80 @@ Value* BuilderImplInOut::readGenericInputOutput(
 // @param valueToWrite : Value to write
 // @param location : Base location (row) of output
 // @param locationOffset : Location offset; must be within locationCount if variable
-// @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for 64-bit elements.)
+// @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
+// 64-bit elements.)
 // @param locationCount : Count of locations taken by the output. Ignored if pLocationOffset is const
 // @param outputInfo : Extra output info (GS stream ID, FS integer signedness)
 // @param vertexIndex : For TCS per-vertex output: vertex index; else nullptr
-Instruction* BuilderImplInOut::CreateWriteGenericOutput(
-    Value*        valueToWrite,
-    unsigned      location,
-    Value*        locationOffset,
-    Value*        elemIdx,
-    unsigned      locationCount,
-    InOutInfo     outputInfo,
-    Value*        vertexIndex)
-{
-    assert(valueToWrite->getType()->isAggregateType() == false);
+Instruction *BuilderImplInOut::CreateWriteGenericOutput(Value *valueToWrite, unsigned location, Value *locationOffset,
+                                                        Value *elemIdx, unsigned locationCount, InOutInfo outputInfo,
+                                                        Value *vertexIndex) {
+  assert(valueToWrite->getType()->isAggregateType() == false);
 
-    // Fold constant pLocationOffset into location. (Currently a variable pLocationOffset is only supported in
-    // TCS.)
-    if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset))
-    {
-        location += constLocOffset->getZExtValue();
-        locationOffset = getInt32(0);
-        locationCount = (valueToWrite->getType()->getPrimitiveSizeInBits() + 127U) / 128U;
-    }
+  // Fold constant pLocationOffset into location. (Currently a variable pLocationOffset is only supported in
+  // TCS.)
+  if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
+    location += constLocOffset->getZExtValue();
+    locationOffset = getInt32(0);
+    locationCount = (valueToWrite->getType()->getPrimitiveSizeInBits() + 127U) / 128U;
+  }
 
-    // Mark the usage of the output.
-    markGenericInputOutputUsage(/*isOutput=*/true, location, locationCount, outputInfo, vertexIndex);
+  // Mark the usage of the output.
+  markGenericInputOutputUsage(/*isOutput=*/true, location, locationCount, outputInfo, vertexIndex);
 
-    // Set up the args for the llpc call.
-    SmallVector<Value*, 6> args;
-    switch (m_shaderStage)
-    {
-    case ShaderStageVertex:
-    case ShaderStageTessEval:
-        {
-            // VS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
-            // TES: @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
-            assert(locationOffset == getInt32(0));
-            args.push_back(getInt32(location));
-            args.push_back(elemIdx);
-            break;
-        }
+  // Set up the args for the llpc call.
+  SmallVector<Value *, 6> args;
+  switch (m_shaderStage) {
+  case ShaderStageVertex:
+  case ShaderStageTessEval: {
+    // VS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
+    // TES: @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
+    assert(locationOffset == getInt32(0));
+    args.push_back(getInt32(location));
+    args.push_back(elemIdx);
+    break;
+  }
 
-    case ShaderStageTessControl:
-        {
-            // TCS: @llpc.output.export.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx,
-            //                                         %Type% outputValue)
-            args.push_back(getInt32(location));
-            args.push_back(locationOffset);
-            args.push_back(elemIdx);
-            args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
-            break;
-        }
+  case ShaderStageTessControl: {
+    // TCS: @llpc.output.export.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx,
+    //                                         %Type% outputValue)
+    args.push_back(getInt32(location));
+    args.push_back(locationOffset);
+    args.push_back(elemIdx);
+    args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
+    break;
+  }
 
-    case ShaderStageGeometry:
-        {
-            // GS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
-            unsigned streamId = outputInfo.hasStreamId() ? outputInfo.getStreamId() : InvalidValue;
-            assert(locationOffset == getInt32(0));
-            args.push_back(getInt32(location));
-            args.push_back(elemIdx);
-            args.push_back(getInt32(streamId));
-            break;
-        }
+  case ShaderStageGeometry: {
+    // GS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
+    unsigned streamId = outputInfo.hasStreamId() ? outputInfo.getStreamId() : InvalidValue;
+    assert(locationOffset == getInt32(0));
+    args.push_back(getInt32(location));
+    args.push_back(elemIdx);
+    args.push_back(getInt32(streamId));
+    break;
+  }
 
-    case ShaderStageFragment:
-        {
-            // Mark fragment output type.
-            markFsOutputType(valueToWrite->getType(), location, outputInfo);
+  case ShaderStageFragment: {
+    // Mark fragment output type.
+    markFsOutputType(valueToWrite->getType(), location, outputInfo);
 
-            // FS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
-            assert(locationOffset == getInt32(0));
-            args.push_back(getInt32(location));
-            args.push_back(elemIdx);
-            break;
-        }
+    // FS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
+    assert(locationOffset == getInt32(0));
+    args.push_back(getInt32(location));
+    args.push_back(elemIdx);
+    break;
+  }
 
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
-    args.push_back(valueToWrite);
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+  args.push_back(valueToWrite);
 
-    std::string llpcCallName = lgcName::OutputExportGeneric;
-    addTypeMangling(nullptr, args, llpcCallName);
-    return emitCall(llpcCallName,
-                    getVoidTy(),
-                    args,
-                    {},
-                    &*GetInsertPoint());
+  std::string llpcCallName = lgcName::OutputExportGeneric;
+  addTypeMangling(nullptr, args, llpcCallName);
+  return emitCall(llpcCallName, getVoidTy(), args, {}, &*GetInsertPoint());
 }
 
 // =====================================================================================================================
@@ -337,123 +278,100 @@ Instruction* BuilderImplInOut::CreateWriteGenericOutput(
 // @param location : Input/output base location
 // @param locationCount : Count of locations taken by the input
 // @param inOutInfo : Extra input/output information
-// @param vertexIndex : For TCS/TES/GS per-vertex input/output: vertex index; for FS custom-interpolated input: auxiliary value; else nullptr. (This is just used to tell whether an input/output is per-vertex.)
-void BuilderImplInOut::markGenericInputOutputUsage(
-    bool          isOutput,
-    unsigned      location,
-    unsigned      locationCount,
-    InOutInfo     inOutInfo,
-    Value*        vertexIndex)
-{
-    auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
+// @param vertexIndex : For TCS/TES/GS per-vertex input/output: vertex index; for FS custom-interpolated input:
+// auxiliary value; else nullptr. (This is just used to tell whether an input/output is per-vertex.)
+void BuilderImplInOut::markGenericInputOutputUsage(bool isOutput, unsigned location, unsigned locationCount,
+                                                   InOutInfo inOutInfo, Value *vertexIndex) {
+  auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
 
-    // Mark the input or output locations as in use.
-    std::map<unsigned, unsigned>* inOutLocMap = nullptr;
-    if (!isOutput)
-    {
-        if (m_shaderStage != ShaderStageTessEval || vertexIndex )
-        {
-            // Normal input
-            inOutLocMap = &resUsage->inOutUsage.inputLocMap;
-        }
-        else
-        {
-            // TES per-patch input
-            inOutLocMap = &resUsage->inOutUsage.perPatchInputLocMap;
-        }
+  // Mark the input or output locations as in use.
+  std::map<unsigned, unsigned> *inOutLocMap = nullptr;
+  if (!isOutput) {
+    if (m_shaderStage != ShaderStageTessEval || vertexIndex) {
+      // Normal input
+      inOutLocMap = &resUsage->inOutUsage.inputLocMap;
+    } else {
+      // TES per-patch input
+      inOutLocMap = &resUsage->inOutUsage.perPatchInputLocMap;
     }
-    else
-    {
-        if (m_shaderStage != ShaderStageTessControl || vertexIndex )
-        {
-            // Normal output
-            inOutLocMap = &resUsage->inOutUsage.outputLocMap;
-        }
-        else
-        {
-            // TCS per-patch output
-            inOutLocMap = &resUsage->inOutUsage.perPatchOutputLocMap;
-        }
+  } else {
+    if (m_shaderStage != ShaderStageTessControl || vertexIndex) {
+      // Normal output
+      inOutLocMap = &resUsage->inOutUsage.outputLocMap;
+    } else {
+      // TCS per-patch output
+      inOutLocMap = &resUsage->inOutUsage.perPatchOutputLocMap;
     }
+  }
 
-    if (!isOutput || m_shaderStage != ShaderStageGeometry)
-    {
-        bool keepAllLocations = false;
-        if (getBuilderContext()->buildingRelocatableElf())
-        {
-            if (m_shaderStage == ShaderStageVertex && isOutput)
-                keepAllLocations = true;
-            if (m_shaderStage == ShaderStageFragment && !isOutput)
-                keepAllLocations = true;
-        }
-        unsigned startLocation = (keepAllLocations ? 0 : location);
-        // Non-GS-output case.
-        for (unsigned i = startLocation; i < location + locationCount; ++i)
-            (*inOutLocMap)[i] = InvalidValue;
+  if (!isOutput || m_shaderStage != ShaderStageGeometry) {
+    bool keepAllLocations = false;
+    if (getBuilderContext()->buildingRelocatableElf()) {
+      if (m_shaderStage == ShaderStageVertex && isOutput)
+        keepAllLocations = true;
+      if (m_shaderStage == ShaderStageFragment && !isOutput)
+        keepAllLocations = true;
     }
-    else
-    {
-        // GS output. We include the stream ID with the location in the map key.
-        for (unsigned i = 0; i < locationCount; ++i)
-        {
-            GsOutLocInfo outLocInfo = {};
-            outLocInfo.location = location + i;
-            outLocInfo.streamId = inOutInfo.getStreamId();
-            (*inOutLocMap)[outLocInfo.u32All] = InvalidValue;
-        }
+    unsigned startLocation = (keepAllLocations ? 0 : location);
+    // Non-GS-output case.
+    for (unsigned i = startLocation; i < location + locationCount; ++i)
+      (*inOutLocMap)[i] = InvalidValue;
+  } else {
+    // GS output. We include the stream ID with the location in the map key.
+    for (unsigned i = 0; i < locationCount; ++i) {
+      GsOutLocInfo outLocInfo = {};
+      outLocInfo.location = location + i;
+      outLocInfo.streamId = inOutInfo.getStreamId();
+      (*inOutLocMap)[outLocInfo.u32All] = InvalidValue;
     }
+  }
 
-    if (!isOutput && m_shaderStage == ShaderStageFragment)
-    {
-        // Mark usage for interpolation info.
-        markInterpolationInfo(inOutInfo);
-    }
+  if (!isOutput && m_shaderStage == ShaderStageFragment) {
+    // Mark usage for interpolation info.
+    markInterpolationInfo(inOutInfo);
+  }
 }
 
 // =====================================================================================================================
 // Mark interpolation info for FS input.
 //
 // @param interpInfo : Interpolation info (location and mode)
-void BuilderImplInOut::markInterpolationInfo(
-    InOutInfo     interpInfo)
-{
-    assert(m_shaderStage == ShaderStageFragment);
+void BuilderImplInOut::markInterpolationInfo(InOutInfo interpInfo) {
+  assert(m_shaderStage == ShaderStageFragment);
 
-    auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
-    switch (interpInfo.getInterpMode())
-    {
-    case InOutInfo::InterpModeCustom:
-        return;
-    case InOutInfo::InterpModeSmooth:
-        resUsage->builtInUsage.fs.smooth = true;
-        break;
-    case InOutInfo::InterpModeFlat:
-        resUsage->builtInUsage.fs.flat = true;
-        break;
-    case InOutInfo::InterpModeNoPersp:
-        resUsage->builtInUsage.fs.noperspective = true;
-        break;
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
+  auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
+  switch (interpInfo.getInterpMode()) {
+  case InOutInfo::InterpModeCustom:
+    return;
+  case InOutInfo::InterpModeSmooth:
+    resUsage->builtInUsage.fs.smooth = true;
+    break;
+  case InOutInfo::InterpModeFlat:
+    resUsage->builtInUsage.fs.flat = true;
+    break;
+  case InOutInfo::InterpModeNoPersp:
+    resUsage->builtInUsage.fs.noperspective = true;
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
 
-    switch (interpInfo.getInterpLoc())
-    {
-    case InOutInfo::InterpLocCenter:
-        resUsage->builtInUsage.fs.center = true;
-        break;
-    case InOutInfo::InterpLocCentroid:
-        resUsage->builtInUsage.fs.center = true;
-        resUsage->builtInUsage.fs.centroid = true;
-        break;
-    case InOutInfo::InterpLocSample:
-        resUsage->builtInUsage.fs.sample = true;
-        resUsage->builtInUsage.fs.runAtSampleRate = true;
-        break;
-    default:
-        break;
-    }
+  switch (interpInfo.getInterpLoc()) {
+  case InOutInfo::InterpLocCenter:
+    resUsage->builtInUsage.fs.center = true;
+    break;
+  case InOutInfo::InterpLocCentroid:
+    resUsage->builtInUsage.fs.center = true;
+    resUsage->builtInUsage.fs.centroid = true;
+    break;
+  case InOutInfo::InterpLocSample:
+    resUsage->builtInUsage.fs.sample = true;
+    resUsage->builtInUsage.fs.runAtSampleRate = true;
+    break;
+  default:
+    break;
+  }
 }
 
 // =====================================================================================================================
@@ -462,49 +380,39 @@ void BuilderImplInOut::markInterpolationInfo(
 // @param outputTy : Output type
 // @param location : Output location
 // @param outputInfo : Extra output info (whether the output is signed)
-void BuilderImplInOut::markFsOutputType(
-    Type*     outputTy,
-    unsigned  location,
-    InOutInfo outputInfo)
-{
-    assert(m_shaderStage == ShaderStageFragment);
+void BuilderImplInOut::markFsOutputType(Type *outputTy, unsigned location, InOutInfo outputInfo) {
+  assert(m_shaderStage == ShaderStageFragment);
 
-    // Collect basic types of fragment outputs
-    BasicType basicTy = BasicType::Unknown;
+  // Collect basic types of fragment outputs
+  BasicType basicTy = BasicType::Unknown;
 
-    Type* compTy = outputTy->getScalarType();
-    const unsigned bitWidth = compTy->getScalarSizeInBits();
-    const bool signedness = outputInfo.isSigned();
+  Type *compTy = outputTy->getScalarType();
+  const unsigned bitWidth = compTy->getScalarSizeInBits();
+  const bool signedness = outputInfo.isSigned();
 
-    if (compTy->isIntegerTy())
-    {
-        // Integer type
-        if (bitWidth == 8)
-            basicTy = signedness ? BasicType::Int8 : BasicType::Uint8;
-        else if (bitWidth == 16)
-            basicTy = signedness ? BasicType::Int16 : BasicType::Uint16;
-        else
-        {
-            assert(bitWidth == 32);
-            basicTy = signedness ? BasicType::Int : BasicType::Uint;
-        }
+  if (compTy->isIntegerTy()) {
+    // Integer type
+    if (bitWidth == 8)
+      basicTy = signedness ? BasicType::Int8 : BasicType::Uint8;
+    else if (bitWidth == 16)
+      basicTy = signedness ? BasicType::Int16 : BasicType::Uint16;
+    else {
+      assert(bitWidth == 32);
+      basicTy = signedness ? BasicType::Int : BasicType::Uint;
     }
-    else if (compTy->isFloatingPointTy())
-    {
-        // Floating-point type
-        if (bitWidth == 16)
-            basicTy = BasicType::Float16;
-        else
-        {
-            assert(bitWidth == 32);
-            basicTy = BasicType::Float;
-        }
+  } else if (compTy->isFloatingPointTy()) {
+    // Floating-point type
+    if (bitWidth == 16)
+      basicTy = BasicType::Float16;
+    else {
+      assert(bitWidth == 32);
+      basicTy = BasicType::Float;
     }
-    else
-        llvm_unreachable("Should never be called!");
+  } else
+    llvm_unreachable("Should never be called!");
 
-    auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
-    resUsage->inOutUsage.fs.outputTypes[location] = basicTy;
+  auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
+  resUsage->inOutUsage.fs.outputTypes[location] = basicTy;
 }
 
 // =====================================================================================================================
@@ -512,87 +420,69 @@ void BuilderImplInOut::markFsOutputType(
 //
 // @param auxInterpValue : Aux interp value from CreateReadInput (ignored for centroid location)
 // @param inputInfo : InOutInfo containing interp mode and location
-Value* BuilderImplInOut::modifyAuxInterpValue(
-    Value*    auxInterpValue,
-    InOutInfo inputInfo)
-{
-    if (inputInfo.getInterpLoc() != InOutInfo::InterpLocExplicit)
-    {
-        // Add intrinsic to calculate I/J for interpolation function
-        std::string evalInstName;
-        auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
+Value *BuilderImplInOut::modifyAuxInterpValue(Value *auxInterpValue, InOutInfo inputInfo) {
+  if (inputInfo.getInterpLoc() != InOutInfo::InterpLocExplicit) {
+    // Add intrinsic to calculate I/J for interpolation function
+    std::string evalInstName;
+    auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
 
-        if (inputInfo.getInterpLoc() == InOutInfo::InterpLocCentroid)
-        {
-            Value* evalArg = nullptr;
+    if (inputInfo.getInterpLoc() == InOutInfo::InterpLocCentroid) {
+      Value *evalArg = nullptr;
 
-            evalInstName = lgcName::InputImportBuiltIn;
-            if (inputInfo.getInterpMode() == InOutInfo::InterpModeNoPersp)
-            {
-                evalInstName += "InterpLinearCentroid";
-                evalArg = getInt32(BuiltInInterpLinearCentroid);
-                resUsage->builtInUsage.fs.noperspective = true;
-                resUsage->builtInUsage.fs.centroid = true;
-            }
-            else
-            {
-                evalInstName += "InterpPerspCentroid";
-                evalArg = getInt32(BuiltInInterpPerspCentroid);
-                resUsage->builtInUsage.fs.smooth = true;
-                resUsage->builtInUsage.fs.centroid = true;
-            }
+      evalInstName = lgcName::InputImportBuiltIn;
+      if (inputInfo.getInterpMode() == InOutInfo::InterpModeNoPersp) {
+        evalInstName += "InterpLinearCentroid";
+        evalArg = getInt32(BuiltInInterpLinearCentroid);
+        resUsage->builtInUsage.fs.noperspective = true;
+        resUsage->builtInUsage.fs.centroid = true;
+      } else {
+        evalInstName += "InterpPerspCentroid";
+        evalArg = getInt32(BuiltInInterpPerspCentroid);
+        resUsage->builtInUsage.fs.smooth = true;
+        resUsage->builtInUsage.fs.centroid = true;
+      }
 
-            auxInterpValue = emitCall(evalInstName,
-                                       VectorType::get(getFloatTy(), 2),
-                                       { evalArg },
-                                       Attribute::ReadOnly,
-                                       &*GetInsertPoint());
-        }
-        else
-        {
-            // Generate code to evaluate the I,J coordinates.
-            if (inputInfo.getInterpLoc() == InOutInfo::InterpLocSample)
-                auxInterpValue = readBuiltIn(false, BuiltInSamplePosOffset, {}, auxInterpValue, nullptr, "");
-            if (inputInfo.getInterpMode() == InOutInfo::InterpModeNoPersp)
-                auxInterpValue = evalIjOffsetNoPersp(auxInterpValue);
-            else
-                auxInterpValue = evalIjOffsetSmooth(auxInterpValue);
-        }
+      auxInterpValue =
+          emitCall(evalInstName, VectorType::get(getFloatTy(), 2), {evalArg}, Attribute::ReadOnly, &*GetInsertPoint());
+    } else {
+      // Generate code to evaluate the I,J coordinates.
+      if (inputInfo.getInterpLoc() == InOutInfo::InterpLocSample)
+        auxInterpValue = readBuiltIn(false, BuiltInSamplePosOffset, {}, auxInterpValue, nullptr, "");
+      if (inputInfo.getInterpMode() == InOutInfo::InterpModeNoPersp)
+        auxInterpValue = evalIjOffsetNoPersp(auxInterpValue);
+      else
+        auxInterpValue = evalIjOffsetSmooth(auxInterpValue);
     }
-    else
-        assert(inputInfo.getInterpMode() == InOutInfo::InterpModeCustom);
-    return auxInterpValue;
+  } else
+    assert(inputInfo.getInterpMode() == InOutInfo::InterpModeCustom);
+  return auxInterpValue;
 }
 
 // =====================================================================================================================
 // Evaluate I,J for interpolation: center offset, linear (no perspective) version
 //
 // @param offset : Offset value, <2 x float> or <2 x half>
-Value* BuilderImplInOut::evalIjOffsetNoPersp(
-    Value*  offset)
-{
-    Value* center = readBuiltIn(false, BuiltInInterpLinearCenter, {}, nullptr, nullptr, "");
-    return adjustIj(center, offset);
+Value *BuilderImplInOut::evalIjOffsetNoPersp(Value *offset) {
+  Value *center = readBuiltIn(false, BuiltInInterpLinearCenter, {}, nullptr, nullptr, "");
+  return adjustIj(center, offset);
 }
 
 // =====================================================================================================================
 // Evaluate I,J for interpolation: center offset, smooth (perspective) version
 //
 // @param offset : Offset value, <2 x float> or <2 x half>
-Value* BuilderImplInOut::evalIjOffsetSmooth(
-    Value*  offset)
-{
-    // Get <I/W, J/W, 1/W>
-    Value* pullModel = readBuiltIn(false, BuiltInInterpPullMode, {}, nullptr, nullptr, "");
-    // Adjust each coefficient by offset.
-    Value* adjusted = adjustIj(pullModel, offset);
-    // Extract <I/W, J/W, 1/W> part of that
-    Value* ijDivW = CreateShuffleVector(adjusted, adjusted, ArrayRef<unsigned>{ 0, 1 });
-    Value* rcpW = CreateExtractElement(adjusted, 2);
-    // Get W by making a reciprocal of 1/W
-    Value* w = CreateFDiv(ConstantFP::get(getFloatTy(), 1.0), rcpW);
-    w = CreateVectorSplat(2, w);
-    return CreateFMul(ijDivW, w);
+Value *BuilderImplInOut::evalIjOffsetSmooth(Value *offset) {
+  // Get <I/W, J/W, 1/W>
+  Value *pullModel = readBuiltIn(false, BuiltInInterpPullMode, {}, nullptr, nullptr, "");
+  // Adjust each coefficient by offset.
+  Value *adjusted = adjustIj(pullModel, offset);
+  // Extract <I/W, J/W, 1/W> part of that
+  Value *ijDivW = CreateShuffleVector(adjusted, adjusted, ArrayRef<unsigned>{0, 1});
+  Value *rcpW = CreateExtractElement(adjusted, 2);
+  // Get W by making a reciprocal of 1/W
+  Value *w = CreateFDiv(ConstantFP::get(getFloatTy(), 1.0), rcpW);
+  w = CreateVectorSplat(2, w);
+  return CreateFMul(ijDivW, w);
 }
 
 // =====================================================================================================================
@@ -602,23 +492,19 @@ Value* BuilderImplInOut::evalIjOffsetSmooth(
 //
 // @param value : Value to adjust, float or vector of float
 // @param offset : Offset to adjust by, <2 x float> or <2 x half>
-Value* BuilderImplInOut::adjustIj(
-    Value*  value,
-    Value*  offset)
-{
-    offset = CreateFPExt(offset, VectorType::get(getFloatTy(), 2));
-    Value* offsetX = CreateExtractElement(offset, uint64_t(0));
-    Value* offsetY = CreateExtractElement(offset, 1);
-    if (auto vecTy = dyn_cast<VectorType>(value->getType()))
-    {
-        offsetX = CreateVectorSplat(vecTy->getNumElements(), offsetX);
-        offsetY = CreateVectorSplat(vecTy->getNumElements(), offsetY);
-    }
-    Value* derivX = CreateDerivative(value, /*isY=*/false, /*isFine=*/true);
-    Value* derivY = CreateDerivative(value, /*isY=*/true, /*isFine=*/true);
-    Value* adjustX = CreateFAdd(value, CreateFMul(derivX, offsetX));
-    Value* adjustY = CreateFAdd(adjustX, CreateFMul(derivY, offsetY));
-    return adjustY;
+Value *BuilderImplInOut::adjustIj(Value *value, Value *offset) {
+  offset = CreateFPExt(offset, VectorType::get(getFloatTy(), 2));
+  Value *offsetX = CreateExtractElement(offset, uint64_t(0));
+  Value *offsetY = CreateExtractElement(offset, 1);
+  if (auto vecTy = dyn_cast<VectorType>(value->getType())) {
+    offsetX = CreateVectorSplat(vecTy->getNumElements(), offsetX);
+    offsetY = CreateVectorSplat(vecTy->getNumElements(), offsetY);
+  }
+  Value *derivX = CreateDerivative(value, /*isY=*/false, /*isFine=*/true);
+  Value *derivY = CreateDerivative(value, /*isY=*/true, /*isFine=*/true);
+  Value *adjustX = CreateFAdd(value, CreateFMul(derivX, offsetX));
+  Value *adjustY = CreateFAdd(adjustX, CreateFMul(derivY, offsetY));
+  return adjustY;
 }
 
 // =====================================================================================================================
@@ -644,70 +530,58 @@ Value* BuilderImplInOut::adjustIj(
 // @param xfbStride : XFB stride
 // @param xfbOffset : XFB byte offset
 // @param outputInfo : Extra output info (GS stream ID)
-Instruction* BuilderImplInOut::CreateWriteXfbOutput(
-    Value*        valueToWrite,
-    bool          isBuiltIn,
-    unsigned      location,
-    unsigned      xfbBuffer,
-    unsigned      xfbStride,
-    Value*        xfbOffset,
-    InOutInfo     outputInfo)
-{
-    // Can currently only cope with constant pXfbOffset.
-    assert(isa<ConstantInt>(xfbOffset));
+Instruction *BuilderImplInOut::CreateWriteXfbOutput(Value *valueToWrite, bool isBuiltIn, unsigned location,
+                                                    unsigned xfbBuffer, unsigned xfbStride, Value *xfbOffset,
+                                                    InOutInfo outputInfo) {
+  // Can currently only cope with constant pXfbOffset.
+  assert(isa<ConstantInt>(xfbOffset));
 
-    // Ignore if not in last-vertex-stage shader (excluding copy shader).
-    auto stagesAfterThisOneMask = -shaderStageToMask(static_cast<ShaderStage>(m_shaderStage + 1));
-    if ((getPipelineState()->getShaderStageMask() & ~shaderStageToMask(ShaderStageFragment) &
-          ~shaderStageToMask(ShaderStageCopyShader) & stagesAfterThisOneMask) != 0)
-        return nullptr;
+  // Ignore if not in last-vertex-stage shader (excluding copy shader).
+  auto stagesAfterThisOneMask = -shaderStageToMask(static_cast<ShaderStage>(m_shaderStage + 1));
+  if ((getPipelineState()->getShaderStageMask() & ~shaderStageToMask(ShaderStageFragment) &
+       ~shaderStageToMask(ShaderStageCopyShader) & stagesAfterThisOneMask) != 0)
+    return nullptr;
 
-    // Mark the usage of the XFB buffer.
-    auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
-    unsigned streamId = outputInfo.hasStreamId() ? outputInfo.getStreamId() : 0;
-    assert(xfbBuffer < MaxTransformFeedbackBuffers);
-    assert(streamId < MaxGsStreams);
-    resUsage->inOutUsage.xfbStrides[xfbBuffer] = xfbStride;
-    resUsage->inOutUsage.enableXfb = true;
-    resUsage->inOutUsage.streamXfbBuffers[streamId] |= 1 << xfbBuffer;
+  // Mark the usage of the XFB buffer.
+  auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
+  unsigned streamId = outputInfo.hasStreamId() ? outputInfo.getStreamId() : 0;
+  assert(xfbBuffer < MaxTransformFeedbackBuffers);
+  assert(streamId < MaxGsStreams);
+  resUsage->inOutUsage.xfbStrides[xfbBuffer] = xfbStride;
+  resUsage->inOutUsage.enableXfb = true;
+  resUsage->inOutUsage.streamXfbBuffers[streamId] |= 1 << xfbBuffer;
 
-    if (m_shaderStage == ShaderStageGeometry)
-    {
-        // Mark the XFB output for copy shader generation.
-        GsOutLocInfo outLocInfo = {};
-        outLocInfo.location = location;
-        outLocInfo.isBuiltIn = isBuiltIn;
-        outLocInfo.streamId = streamId;
+  if (m_shaderStage == ShaderStageGeometry) {
+    // Mark the XFB output for copy shader generation.
+    GsOutLocInfo outLocInfo = {};
+    outLocInfo.location = location;
+    outLocInfo.isBuiltIn = isBuiltIn;
+    outLocInfo.streamId = streamId;
 
-        XfbOutInfo xfbOutInfo = {};
-        xfbOutInfo.xfbBuffer = xfbBuffer;
-        xfbOutInfo.xfbOffset = cast<ConstantInt>(xfbOffset)->getZExtValue();
-        xfbOutInfo.is16bit = valueToWrite->getType()->getScalarSizeInBits() == 16;
-        xfbOutInfo.xfbExtraOffset = 0;
+    XfbOutInfo xfbOutInfo = {};
+    xfbOutInfo.xfbBuffer = xfbBuffer;
+    xfbOutInfo.xfbOffset = cast<ConstantInt>(xfbOffset)->getZExtValue();
+    xfbOutInfo.is16bit = valueToWrite->getType()->getScalarSizeInBits() == 16;
+    xfbOutInfo.xfbExtraOffset = 0;
 
-        auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageGeometry);
-        resUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
-        if (valueToWrite->getType()->getPrimitiveSizeInBits() > 128)
-        {
-            ++outLocInfo.location;
-            xfbOutInfo.xfbOffset += 32;
-            resUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
-        }
+    auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageGeometry);
+    resUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
+    if (valueToWrite->getType()->getPrimitiveSizeInBits() > 128) {
+      ++outLocInfo.location;
+      xfbOutInfo.xfbOffset += 32;
+      resUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
     }
+  }
 
-    // XFB: @llpc.output.export.xfb.%Type%(i32 xfbBuffer, i32 xfbOffset, i32 xfbExtraOffset, %Type% outputValue)
-    SmallVector<Value*, 4> args;
-    std::string instName = lgcName::OutputExportXfb;
-    args.push_back(getInt32(xfbBuffer));
-    args.push_back(xfbOffset);
-    args.push_back(getInt32(0));
-    args.push_back(valueToWrite);
-    addTypeMangling(nullptr, args, instName);
-    return emitCall(instName,
-                    getVoidTy(),
-                    args,
-                    {},
-                    &*GetInsertPoint());
+  // XFB: @llpc.output.export.xfb.%Type%(i32 xfbBuffer, i32 xfbOffset, i32 xfbExtraOffset, %Type% outputValue)
+  SmallVector<Value *, 4> args;
+  std::string instName = lgcName::OutputExportXfb;
+  args.push_back(getInt32(xfbBuffer));
+  args.push_back(xfbOffset);
+  args.push_back(getInt32(0));
+  args.push_back(valueToWrite);
+  addTypeMangling(nullptr, args, instName);
+  return emitCall(instName, getVoidTy(), args, {}, &*GetInsertPoint());
 }
 
 // =====================================================================================================================
@@ -721,15 +595,10 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
 // @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index, else nullptr
 // @param index : Array or vector index to access part of an input, else nullptr
 // @param instName : Name to give instruction(s)
-Value* BuilderImplInOut::CreateReadBuiltInInput(
-    BuiltInKind   builtIn,
-    InOutInfo     inputInfo,
-    Value*        vertexIndex,
-    Value*        index,
-    const Twine&  instName)
-{
-    assert(isBuiltInInput(builtIn));
-    return readBuiltIn(false, builtIn, inputInfo, vertexIndex, index, instName);
+Value *BuilderImplInOut::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputInfo, Value *vertexIndex,
+                                                Value *index, const Twine &instName) {
+  assert(isBuiltInInput(builtIn));
+  return readBuiltIn(false, builtIn, inputInfo, vertexIndex, index, instName);
 }
 
 // =====================================================================================================================
@@ -742,17 +611,12 @@ Value* BuilderImplInOut::CreateReadBuiltInInput(
 // @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index, else nullptr
 // @param index : Array or vector index to access part of an input, else nullptr
 // @param instName : Name to give instruction(s)
-Value* BuilderImplInOut::CreateReadBuiltInOutput(
-    BuiltInKind   builtIn,
-    InOutInfo     outputInfo,
-    Value*        vertexIndex,
-    Value*        index,
-    const Twine&  instName)
-{
-    // Currently this only copes with reading an output in TCS.
-    assert(m_shaderStage == ShaderStageTessControl);
-    assert(isBuiltInOutput(builtIn));
-    return readBuiltIn(true, builtIn, outputInfo, vertexIndex, index, instName);
+Value *BuilderImplInOut::CreateReadBuiltInOutput(BuiltInKind builtIn, InOutInfo outputInfo, Value *vertexIndex,
+                                                 Value *index, const Twine &instName) {
+  // Currently this only copes with reading an output in TCS.
+  assert(m_shaderStage == ShaderStageTessControl);
+  assert(isBuiltInOutput(builtIn));
+  return readBuiltIn(true, builtIn, outputInfo, vertexIndex, index, instName);
 }
 
 // =====================================================================================================================
@@ -761,132 +625,112 @@ Value* BuilderImplInOut::CreateReadBuiltInOutput(
 // @param isOutput : True to read built-in output, false to read built-in input
 // @param builtIn : Built-in kind, one of the BuiltIn* constants
 // @param inOutInfo : Extra input/output info (shader-defined array size)
-// @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index, else nullptr Special case for FS BuiltInSamplePosOffset: sample number. That special case only happens when ReadBuiltIn is called from ModifyAuxInterpValue.
+// @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index, else nullptr Special case for FS
+// BuiltInSamplePosOffset: sample number. That special case only happens when ReadBuiltIn is called from
+// ModifyAuxInterpValue.
 // @param index : Array or vector index to access part of an input, else nullptr
 // @param instName : Name to give instruction(s)
-Value* BuilderImplInOut::readBuiltIn(
-    bool          isOutput,
-    BuiltInKind   builtIn,
-    InOutInfo     inOutInfo,
-    Value*        vertexIndex,
-    Value*        index,
-    const Twine&  instName)
-{
-    // Mark usage.
-    unsigned arraySize = inOutInfo.getArraySize();
-    if (auto constIndex = dyn_cast_or_null<ConstantInt>(index))
-        arraySize = constIndex->getZExtValue() + 1;
+Value *BuilderImplInOut::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo inOutInfo, Value *vertexIndex,
+                                     Value *index, const Twine &instName) {
+  // Mark usage.
+  unsigned arraySize = inOutInfo.getArraySize();
+  if (auto constIndex = dyn_cast_or_null<ConstantInt>(index))
+    arraySize = constIndex->getZExtValue() + 1;
 
-    if (!isOutput)
-        markBuiltInInputUsage(builtIn, arraySize);
+  if (!isOutput)
+    markBuiltInInputUsage(builtIn, arraySize);
+  else
+    markBuiltInOutputUsage(builtIn, arraySize, InvalidValue);
+
+  // Get the built-in type.
+  Type *resultTy = getBuiltInTy(builtIn, inOutInfo);
+  if (index) {
+    if (isa<ArrayType>(resultTy))
+      resultTy = resultTy->getArrayElementType();
     else
-        markBuiltInOutputUsage(builtIn, arraySize, InvalidValue);
+      resultTy = resultTy->getVectorElementType();
+  }
 
-    // Get the built-in type.
-    Type* resultTy = getBuiltInTy(builtIn, inOutInfo);
-    if (index )
-    {
-        if (isa<ArrayType>(resultTy))
-            resultTy = resultTy->getArrayElementType();
-        else
-            resultTy = resultTy->getVectorElementType();
-    }
+  // Handle the subgroup mask built-ins directly.
+  if (builtIn == BuiltInSubgroupEqMask || builtIn == BuiltInSubgroupGeMask || builtIn == BuiltInSubgroupGtMask ||
+      builtIn == BuiltInSubgroupLeMask || builtIn == BuiltInSubgroupLtMask) {
+    Value *result = nullptr;
+    Value *localInvocationId = readBuiltIn(false, BuiltInSubgroupLocalInvocationId, {}, nullptr, nullptr, "");
+    if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64)
+      localInvocationId = CreateZExt(localInvocationId, getInt64Ty());
 
-    // Handle the subgroup mask built-ins directly.
-    if (builtIn == BuiltInSubgroupEqMask           ||
-        builtIn == BuiltInSubgroupGeMask           ||
-        builtIn == BuiltInSubgroupGtMask           ||
-        builtIn == BuiltInSubgroupLeMask           ||
-        builtIn == BuiltInSubgroupLtMask)
-    {
-        Value* result = nullptr;
-        Value* localInvocationId = readBuiltIn(false, BuiltInSubgroupLocalInvocationId, {}, nullptr, nullptr, "");
-        if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64)
-            localInvocationId = CreateZExt(localInvocationId, getInt64Ty());
-
-        switch (builtIn)
-        {
-        case BuiltInSubgroupEqMask:
-            result = CreateShl(ConstantInt::get(localInvocationId->getType(), 1), localInvocationId);
-            break;
-        case BuiltInSubgroupGeMask:
-            result = CreateShl(ConstantInt::get(localInvocationId->getType(), -1), localInvocationId);
-            break;
-        case BuiltInSubgroupGtMask:
-            result = CreateShl(ConstantInt::get(localInvocationId->getType(), -2), localInvocationId);
-            break;
-        case BuiltInSubgroupLeMask:
-            result = CreateSub(CreateShl(ConstantInt::get(localInvocationId->getType(), 2), localInvocationId),
-                                ConstantInt::get(localInvocationId->getType(), 1));
-            break;
-        case BuiltInSubgroupLtMask:
-            result = CreateSub(CreateShl(ConstantInt::get(localInvocationId->getType(), 1), localInvocationId),
-                                ConstantInt::get(localInvocationId->getType(), 1));
-            break;
-        default:
-            llvm_unreachable("Should never be called!");
-        }
-        if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64)
-        {
-            result = CreateInsertElement(Constant::getNullValue(VectorType::get(getInt64Ty(), 2)),
-                                          result,
-                                          uint64_t(0));
-            result = CreateBitCast(result, resultTy);
-        }
-        else
-            result = CreateInsertElement(ConstantInt::getNullValue(resultTy), result, uint64_t(0));
-        result->setName(instName);
-        return result;
-    }
-
-    // For now, this just generates a call to llpc.input.import.builtin. A future commit will
-    // change it to generate IR more directly here.
-    // A vertex index is valid only in TCS, TES, GS.
-    // Currently we can only cope with an array/vector index in TCS/TES.
-    SmallVector<Value*, 4> args;
-    args.push_back(getInt32(builtIn));
-    switch (m_shaderStage)
-    {
-    case ShaderStageTessControl:
-    case ShaderStageTessEval:
-        args.push_back(index ? index : getInt32(InvalidValue));
-        args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
-        break;
-    case ShaderStageGeometry:
-        assert(!index );
-        args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
-        break;
-    case ShaderStageFragment:
-        if (builtIn == BuiltInSamplePosOffset)
-        {
-            // Special case for BuiltInSamplePosOffset: pVertexIndex is the sample number.
-            // That special case only happens when ReadBuiltIn is called from ModifyAuxInterpValue.
-            Value* sampleNum = vertexIndex;
-            vertexIndex = nullptr;
-            args.push_back(sampleNum);
-        }
-        assert(!index && !vertexIndex );
-        break;
+    switch (builtIn) {
+    case BuiltInSubgroupEqMask:
+      result = CreateShl(ConstantInt::get(localInvocationId->getType(), 1), localInvocationId);
+      break;
+    case BuiltInSubgroupGeMask:
+      result = CreateShl(ConstantInt::get(localInvocationId->getType(), -1), localInvocationId);
+      break;
+    case BuiltInSubgroupGtMask:
+      result = CreateShl(ConstantInt::get(localInvocationId->getType(), -2), localInvocationId);
+      break;
+    case BuiltInSubgroupLeMask:
+      result = CreateSub(CreateShl(ConstantInt::get(localInvocationId->getType(), 2), localInvocationId),
+                         ConstantInt::get(localInvocationId->getType(), 1));
+      break;
+    case BuiltInSubgroupLtMask:
+      result = CreateSub(CreateShl(ConstantInt::get(localInvocationId->getType(), 1), localInvocationId),
+                         ConstantInt::get(localInvocationId->getType(), 1));
+      break;
     default:
-        assert(!index && !vertexIndex );
-        break;
+      llvm_unreachable("Should never be called!");
     }
-
-    std::string callName = isOutput ? lgcName::OutputImportBuiltIn : lgcName::InputImportBuiltIn;
-    callName += getBuiltInName(builtIn);
-    addTypeMangling(resultTy, args, callName);
-    Value* result = emitCall(callName,
-                              resultTy,
-                              args,
-                              Attribute::ReadOnly,
-                              &*GetInsertPoint());
-
-    if (instName.isTriviallyEmpty())
-        result->setName(getBuiltInName(builtIn));
-    else
-        result->setName(instName);
-
+    if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64) {
+      result = CreateInsertElement(Constant::getNullValue(VectorType::get(getInt64Ty(), 2)), result, uint64_t(0));
+      result = CreateBitCast(result, resultTy);
+    } else
+      result = CreateInsertElement(ConstantInt::getNullValue(resultTy), result, uint64_t(0));
+    result->setName(instName);
     return result;
+  }
+
+  // For now, this just generates a call to llpc.input.import.builtin. A future commit will
+  // change it to generate IR more directly here.
+  // A vertex index is valid only in TCS, TES, GS.
+  // Currently we can only cope with an array/vector index in TCS/TES.
+  SmallVector<Value *, 4> args;
+  args.push_back(getInt32(builtIn));
+  switch (m_shaderStage) {
+  case ShaderStageTessControl:
+  case ShaderStageTessEval:
+    args.push_back(index ? index : getInt32(InvalidValue));
+    args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
+    break;
+  case ShaderStageGeometry:
+    assert(!index);
+    args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
+    break;
+  case ShaderStageFragment:
+    if (builtIn == BuiltInSamplePosOffset) {
+      // Special case for BuiltInSamplePosOffset: pVertexIndex is the sample number.
+      // That special case only happens when ReadBuiltIn is called from ModifyAuxInterpValue.
+      Value *sampleNum = vertexIndex;
+      vertexIndex = nullptr;
+      args.push_back(sampleNum);
+    }
+    assert(!index && !vertexIndex);
+    break;
+  default:
+    assert(!index && !vertexIndex);
+    break;
+  }
+
+  std::string callName = isOutput ? lgcName::OutputImportBuiltIn : lgcName::InputImportBuiltIn;
+  callName += getBuiltInName(builtIn);
+  addTypeMangling(resultTy, args, callName);
+  Value *result = emitCall(callName, resultTy, args, Attribute::ReadOnly, &*GetInsertPoint());
+
+  if (instName.isTriviallyEmpty())
+    result->setName(getBuiltInName(builtIn));
+  else
+    result->setName(instName);
+
+  return result;
 }
 
 // =====================================================================================================================
@@ -899,72 +743,61 @@ Value* BuilderImplInOut::readBuiltIn(
 // @param outputInfo : Extra output info (shader-defined array size; GS stream id)
 // @param vertexIndex : For TCS per-vertex output: vertex index, else nullptr
 // @param index : Array or vector index to access part of an input, else nullptr
-Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
-    Value*        valueToWrite,
-    BuiltInKind   builtIn,
-    InOutInfo     outputInfo,
-    Value*        vertexIndex,
-    Value*        index)
-{
-    // Mark usage.
-    unsigned streamId = outputInfo.hasStreamId() ? outputInfo.getStreamId() : InvalidValue;
-    unsigned arraySize = outputInfo.getArraySize();
-    if (auto constIndex = dyn_cast_or_null<ConstantInt>(index))
-        arraySize = constIndex->getZExtValue() + 1;
-    markBuiltInOutputUsage(builtIn, arraySize, streamId);
+Instruction *BuilderImplInOut::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltInKind builtIn, InOutInfo outputInfo,
+                                                        Value *vertexIndex, Value *index) {
+  // Mark usage.
+  unsigned streamId = outputInfo.hasStreamId() ? outputInfo.getStreamId() : InvalidValue;
+  unsigned arraySize = outputInfo.getArraySize();
+  if (auto constIndex = dyn_cast_or_null<ConstantInt>(index))
+    arraySize = constIndex->getZExtValue() + 1;
+  markBuiltInOutputUsage(builtIn, arraySize, streamId);
 
 #ifndef NDEBUG
-    // Assert we have the right type. Allow for ClipDistance/CullDistance being a different array size.
-    Type* expectedTy = getBuiltInTy(builtIn, outputInfo);
-    if (index )
-    {
-        if (isa<ArrayType>(expectedTy))
-            expectedTy = expectedTy->getArrayElementType();
-        else
-            expectedTy = expectedTy->getVectorElementType();
-    }
-    assert(expectedTy == valueToWrite->getType() ||
-                ((builtIn == BuiltInClipDistance || builtIn == BuiltInCullDistance) &&
-                 valueToWrite->getType()->getArrayElementType() == expectedTy->getArrayElementType()));
+  // Assert we have the right type. Allow for ClipDistance/CullDistance being a different array size.
+  Type *expectedTy = getBuiltInTy(builtIn, outputInfo);
+  if (index) {
+    if (isa<ArrayType>(expectedTy))
+      expectedTy = expectedTy->getArrayElementType();
+    else
+      expectedTy = expectedTy->getVectorElementType();
+  }
+  assert(expectedTy == valueToWrite->getType() ||
+         ((builtIn == BuiltInClipDistance || builtIn == BuiltInCullDistance) &&
+          valueToWrite->getType()->getArrayElementType() == expectedTy->getArrayElementType()));
 #endif // NDEBUG
 
-    // For now, this just generates a call to llpc.output.export.builtin. A future commit will
-    // change it to generate IR more directly here.
-    // A vertex index is valid only in TCS.
-    // Currently we can only cope with an array/vector index in TCS.
-    //
-    // VS:  @llpc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
-    // TCS: @llpc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx,
-    //                                                   %Type% outputValue)
-    // TES: @llpc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, %Type% outputValue)
-    // GS:  @llpc.output.export.builtin.%BuiltIn%(i32 builtInId, i32 streamId, %Type% outputValue)
-    // FS:  @llpc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
-    SmallVector<Value*, 4> args;
-    args.push_back(getInt32(builtIn));
-    switch (m_shaderStage)
-    {
-    case ShaderStageTessControl:
-        args.push_back(index ? index : getInt32(InvalidValue));
-        args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
-        break;
-    case ShaderStageGeometry:
-        assert(!index && !vertexIndex );
-        args.push_back(getInt32(streamId));
-        break;
-    default:
-        assert(!index && !vertexIndex );
-        break;
-    }
-    args.push_back(valueToWrite);
+  // For now, this just generates a call to llpc.output.export.builtin. A future commit will
+  // change it to generate IR more directly here.
+  // A vertex index is valid only in TCS.
+  // Currently we can only cope with an array/vector index in TCS.
+  //
+  // VS:  @llpc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
+  // TCS: @llpc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx,
+  //                                                   %Type% outputValue)
+  // TES: @llpc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, %Type% outputValue)
+  // GS:  @llpc.output.export.builtin.%BuiltIn%(i32 builtInId, i32 streamId, %Type% outputValue)
+  // FS:  @llpc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
+  SmallVector<Value *, 4> args;
+  args.push_back(getInt32(builtIn));
+  switch (m_shaderStage) {
+  case ShaderStageTessControl:
+    args.push_back(index ? index : getInt32(InvalidValue));
+    args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
+    break;
+  case ShaderStageGeometry:
+    assert(!index && !vertexIndex);
+    args.push_back(getInt32(streamId));
+    break;
+  default:
+    assert(!index && !vertexIndex);
+    break;
+  }
+  args.push_back(valueToWrite);
 
-    std::string callName = lgcName::OutputExportBuiltIn;
-    callName += getBuiltInName(builtIn);
-    addTypeMangling(nullptr, args, callName);
-    return cast<Instruction>(emitCall(callName,
-                             getVoidTy(),
-                             args,
-                             {},
-                             &*GetInsertPoint()));
+  std::string callName = lgcName::OutputExportBuiltIn;
+  callName += getBuiltInName(builtIn);
+  addTypeMangling(nullptr, args, callName);
+  return cast<Instruction>(emitCall(callName, getVoidTy(), args, {}, &*GetInsertPoint()));
 }
 
 // =====================================================================================================================
@@ -972,352 +805,472 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
 //
 // @param builtIn : Built-in kind
 // @param inOutInfo : Extra input/output info (shader-defined array size)
-Type* BuilderImplInOut::getBuiltInTy(
-    BuiltInKind   builtIn,
-    InOutInfo     inOutInfo)
-{
-    switch (static_cast<unsigned>(builtIn))
-    {
-    case BuiltInSamplePosOffset:
-    case BuiltInInterpLinearCenter:
-        return VectorType::get(getFloatTy(), 2);
-    case BuiltInInterpPullMode:
-        return VectorType::get(getFloatTy(), 3);
-    default:
-        return Builder::getBuiltInTy(builtIn, inOutInfo);
-    }
+Type *BuilderImplInOut::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
+  switch (static_cast<unsigned>(builtIn)) {
+  case BuiltInSamplePosOffset:
+  case BuiltInInterpLinearCenter:
+    return VectorType::get(getFloatTy(), 2);
+  case BuiltInInterpPullMode:
+    return VectorType::get(getFloatTy(), 3);
+  default:
+    return Builder::getBuiltInTy(builtIn, inOutInfo);
+  }
 }
 
 // =====================================================================================================================
 // Get name of built-in
 //
 // @param builtIn : Built-in type, one of the BuiltIn* constants
-StringRef BuilderImplInOut::getBuiltInName(
-    BuiltInKind   builtIn)
-{
-    switch (static_cast<unsigned>(builtIn))
-    {
-#define BUILTIN(name, number, out, in, type) \
-    case BuiltIn ## name: return # name;
+StringRef BuilderImplInOut::getBuiltInName(BuiltInKind builtIn) {
+  switch (static_cast<unsigned>(builtIn)) {
+#define BUILTIN(name, number, out, in, type)                                                                           \
+  case BuiltIn##name:                                                                                                  \
+    return #name;
 #include "lgc/llpcBuilderBuiltInDefs.h"
 #undef BUILTIN
 
-    // Internal built-ins.
-    case BuiltInSamplePosOffset:
-        return "SamplePosOffset";
-    case BuiltInInterpLinearCenter:
-        return "InterpLinearCenter";
-    case BuiltInInterpPullMode:
-        return "InterpPullMode";
+  // Internal built-ins.
+  case BuiltInSamplePosOffset:
+    return "SamplePosOffset";
+  case BuiltInInterpLinearCenter:
+    return "InterpLinearCenter";
+  case BuiltInInterpPullMode:
+    return "InterpPullMode";
 
-    default:
-        llvm_unreachable("Should never be called!");
-        return "unknown";
-    }
+  default:
+    llvm_unreachable("Should never be called!");
+    return "unknown";
+  }
 }
 
 // =====================================================================================================================
 // Mark usage of a built-in input
 //
 // @param builtIn : Built-in ID
-// @param arraySize : Number of array elements for ClipDistance and CullDistance. (Multiple calls to this function for this built-in might have different array sizes; we take the max)
-void BuilderImplInOut::markBuiltInInputUsage(
-    BuiltInKind builtIn,
-    unsigned    arraySize)
-{
-    auto& usage = getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage;
-    assert((builtIn != BuiltInClipDistance && builtIn != BuiltInCullDistance) || arraySize != 0);
-    switch (m_shaderStage)
-    {
-    case ShaderStageVertex:
-        {
-            switch (builtIn)
-            {
-            case BuiltInVertexIndex:
-                usage.vs.vertexIndex = true;
-                usage.vs.baseVertex = true;
-                break;
-            case BuiltInInstanceIndex:
-                usage.vs.instanceIndex = true;
-                usage.vs.baseInstance = true;
-                break;
-            case BuiltInBaseVertex: usage.vs.baseVertex = true; break;
-            case BuiltInBaseInstance: usage.vs.baseInstance = true; break;
-            case BuiltInDrawIndex: usage.vs.drawIndex = true; break;
-            case BuiltInPrimitiveId: usage.vs.primitiveId = true; break;
-            case BuiltInViewIndex: usage.vs.viewIndex = true; break;
-            default: break;
-            }
-            break;
-        }
+// @param arraySize : Number of array elements for ClipDistance and CullDistance. (Multiple calls to this function for
+// this built-in might have different array sizes; we take the max)
+void BuilderImplInOut::markBuiltInInputUsage(BuiltInKind builtIn, unsigned arraySize) {
+  auto &usage = getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage;
+  assert((builtIn != BuiltInClipDistance && builtIn != BuiltInCullDistance) || arraySize != 0);
+  switch (m_shaderStage) {
+  case ShaderStageVertex: {
+    switch (builtIn) {
+    case BuiltInVertexIndex:
+      usage.vs.vertexIndex = true;
+      usage.vs.baseVertex = true;
+      break;
+    case BuiltInInstanceIndex:
+      usage.vs.instanceIndex = true;
+      usage.vs.baseInstance = true;
+      break;
+    case BuiltInBaseVertex:
+      usage.vs.baseVertex = true;
+      break;
+    case BuiltInBaseInstance:
+      usage.vs.baseInstance = true;
+      break;
+    case BuiltInDrawIndex:
+      usage.vs.drawIndex = true;
+      break;
+    case BuiltInPrimitiveId:
+      usage.vs.primitiveId = true;
+      break;
+    case BuiltInViewIndex:
+      usage.vs.viewIndex = true;
+      break;
+    default:
+      break;
+    }
+    break;
+  }
 
-    case ShaderStageTessControl:
-        {
-            switch (builtIn)
-            {
-            case BuiltInPointSize: usage.tcs.pointSizeIn = true; break;
-            case BuiltInPosition: usage.tcs.positionIn = true; break;
-            case BuiltInClipDistance:
-                usage.tcs.clipDistanceIn = std::max(usage.tcs.clipDistanceIn, arraySize);
-                break;
-            case BuiltInCullDistance:
-                usage.tcs.cullDistanceIn = std::max(usage.tcs.cullDistanceIn, arraySize);
-                break;
-            case BuiltInPatchVertices: usage.tcs.patchVertices = true; break;
-            case BuiltInPrimitiveId: usage.tcs.primitiveId = true; break;
-            case BuiltInInvocationId: usage.tcs.invocationId = true; break;
-            default: break;
-            }
-            break;
-        }
+  case ShaderStageTessControl: {
+    switch (builtIn) {
+    case BuiltInPointSize:
+      usage.tcs.pointSizeIn = true;
+      break;
+    case BuiltInPosition:
+      usage.tcs.positionIn = true;
+      break;
+    case BuiltInClipDistance:
+      usage.tcs.clipDistanceIn = std::max(usage.tcs.clipDistanceIn, arraySize);
+      break;
+    case BuiltInCullDistance:
+      usage.tcs.cullDistanceIn = std::max(usage.tcs.cullDistanceIn, arraySize);
+      break;
+    case BuiltInPatchVertices:
+      usage.tcs.patchVertices = true;
+      break;
+    case BuiltInPrimitiveId:
+      usage.tcs.primitiveId = true;
+      break;
+    case BuiltInInvocationId:
+      usage.tcs.invocationId = true;
+      break;
+    default:
+      break;
+    }
+    break;
+  }
 
-    case ShaderStageTessEval:
-        {
-            switch (builtIn)
-            {
-            case BuiltInPointSize: usage.tes.pointSizeIn = true; break;
-            case BuiltInPosition: usage.tes.positionIn = true; break;
-            case BuiltInClipDistance:
-                usage.tes.clipDistanceIn = std::max(usage.tes.clipDistanceIn, arraySize);
-                break;
-            case BuiltInCullDistance:
-                usage.tes.cullDistanceIn = std::max(usage.tes.cullDistanceIn, arraySize);
-                break;
-            case BuiltInPatchVertices: usage.tes.patchVertices = true; break;
-            case BuiltInPrimitiveId: usage.tes.primitiveId = true; break;
-            case BuiltInTessCoord: usage.tes.tessCoord = true; break;
-            case BuiltInTessLevelOuter: usage.tes.tessLevelOuter = true; break;
-            case BuiltInTessLevelInner: usage.tes.tessLevelInner = true; break;
-            case BuiltInViewIndex: usage.tes.viewIndex = true; break;
-            default: break;
-            }
-            break;
-        }
+  case ShaderStageTessEval: {
+    switch (builtIn) {
+    case BuiltInPointSize:
+      usage.tes.pointSizeIn = true;
+      break;
+    case BuiltInPosition:
+      usage.tes.positionIn = true;
+      break;
+    case BuiltInClipDistance:
+      usage.tes.clipDistanceIn = std::max(usage.tes.clipDistanceIn, arraySize);
+      break;
+    case BuiltInCullDistance:
+      usage.tes.cullDistanceIn = std::max(usage.tes.cullDistanceIn, arraySize);
+      break;
+    case BuiltInPatchVertices:
+      usage.tes.patchVertices = true;
+      break;
+    case BuiltInPrimitiveId:
+      usage.tes.primitiveId = true;
+      break;
+    case BuiltInTessCoord:
+      usage.tes.tessCoord = true;
+      break;
+    case BuiltInTessLevelOuter:
+      usage.tes.tessLevelOuter = true;
+      break;
+    case BuiltInTessLevelInner:
+      usage.tes.tessLevelInner = true;
+      break;
+    case BuiltInViewIndex:
+      usage.tes.viewIndex = true;
+      break;
+    default:
+      break;
+    }
+    break;
+  }
 
-    case ShaderStageGeometry:
-        {
-            switch (builtIn)
-            {
-            case BuiltInPointSize: usage.gs.pointSizeIn = true; break;
-            case BuiltInPosition: usage.gs.positionIn = true; break;
-            case BuiltInClipDistance:
-                usage.gs.clipDistanceIn = std::max(usage.gs.clipDistanceIn, arraySize);
-                break;
-            case BuiltInCullDistance:
-                usage.gs.cullDistanceIn = std::max(usage.gs.cullDistanceIn, arraySize);
-                break;
-            case BuiltInPrimitiveId: usage.gs.primitiveIdIn = true; break;
-            case BuiltInInvocationId: usage.gs.invocationId = true; break;
-            case BuiltInViewIndex: usage.gs.viewIndex = true; break;
-            default: break;
-            }
-            break;
-        }
+  case ShaderStageGeometry: {
+    switch (builtIn) {
+    case BuiltInPointSize:
+      usage.gs.pointSizeIn = true;
+      break;
+    case BuiltInPosition:
+      usage.gs.positionIn = true;
+      break;
+    case BuiltInClipDistance:
+      usage.gs.clipDistanceIn = std::max(usage.gs.clipDistanceIn, arraySize);
+      break;
+    case BuiltInCullDistance:
+      usage.gs.cullDistanceIn = std::max(usage.gs.cullDistanceIn, arraySize);
+      break;
+    case BuiltInPrimitiveId:
+      usage.gs.primitiveIdIn = true;
+      break;
+    case BuiltInInvocationId:
+      usage.gs.invocationId = true;
+      break;
+    case BuiltInViewIndex:
+      usage.gs.viewIndex = true;
+      break;
+    default:
+      break;
+    }
+    break;
+  }
 
-    case ShaderStageFragment:
-        {
-            switch (static_cast<unsigned>(builtIn))
-            {
-            case BuiltInFragCoord: usage.fs.fragCoord = true; break;
-            case BuiltInFrontFacing: usage.fs.frontFacing = true; break;
-            case BuiltInClipDistance:
-                usage.fs.clipDistance = std::max(usage.fs.clipDistance, arraySize);
-                break;
-            case BuiltInCullDistance:
-                usage.fs.cullDistance = std::max(usage.fs.cullDistance, arraySize);
-                break;
-            case BuiltInPointCoord:
-                usage.fs.pointCoord = true;
-                // NOTE: gl_PointCoord is emulated via a general input. Those qualifiers therefore have to
-                // be marked as used.
-                usage.fs.smooth = true;
-                if (getPipelineState()->getRasterizerState().perSampleShading)
-                    usage.fs.sample = true;
-                else
-                    usage.fs.center = true;
-                break;
-            case BuiltInPrimitiveId: usage.fs.primitiveId = true; break;
-            case BuiltInSampleId:
-                usage.fs.sampleId = true;
-                usage.fs.runAtSampleRate = true;
-                break;
-            case BuiltInSamplePosition:
-                usage.fs.samplePosition = true;
-                // NOTE: gl_SamplePostion is derived from gl_SampleID
-                usage.fs.sampleId = true;
-                usage.fs.runAtSampleRate = true;
-                break;
-            case BuiltInSampleMask: usage.fs.sampleMaskIn = true; break;
-            case BuiltInLayer: usage.fs.layer = true; break;
-            case BuiltInViewportIndex: usage.fs.viewportIndex = true; break;
-            case BuiltInHelperInvocation: usage.fs.helperInvocation = true; break;
-            case BuiltInViewIndex: usage.fs.viewIndex = true; break;
-            case BuiltInBaryCoordNoPersp: usage.fs.baryCoordNoPersp = true; break;
-            case BuiltInBaryCoordNoPerspCentroid: usage.fs.baryCoordNoPerspCentroid = true; break;
-            case BuiltInBaryCoordNoPerspSample: usage.fs.baryCoordNoPerspSample = true; break;
-            case BuiltInBaryCoordSmooth: usage.fs.baryCoordSmooth = true; break;
-            case BuiltInBaryCoordSmoothCentroid: usage.fs.baryCoordSmoothCentroid = true; break;
-            case BuiltInBaryCoordSmoothSample: usage.fs.baryCoordSmoothSample = true; break;
-            case BuiltInBaryCoordPullModel: usage.fs.baryCoordPullModel = true; break;
+  case ShaderStageFragment: {
+    switch (static_cast<unsigned>(builtIn)) {
+    case BuiltInFragCoord:
+      usage.fs.fragCoord = true;
+      break;
+    case BuiltInFrontFacing:
+      usage.fs.frontFacing = true;
+      break;
+    case BuiltInClipDistance:
+      usage.fs.clipDistance = std::max(usage.fs.clipDistance, arraySize);
+      break;
+    case BuiltInCullDistance:
+      usage.fs.cullDistance = std::max(usage.fs.cullDistance, arraySize);
+      break;
+    case BuiltInPointCoord:
+      usage.fs.pointCoord = true;
+      // NOTE: gl_PointCoord is emulated via a general input. Those qualifiers therefore have to
+      // be marked as used.
+      usage.fs.smooth = true;
+      if (getPipelineState()->getRasterizerState().perSampleShading)
+        usage.fs.sample = true;
+      else
+        usage.fs.center = true;
+      break;
+    case BuiltInPrimitiveId:
+      usage.fs.primitiveId = true;
+      break;
+    case BuiltInSampleId:
+      usage.fs.sampleId = true;
+      usage.fs.runAtSampleRate = true;
+      break;
+    case BuiltInSamplePosition:
+      usage.fs.samplePosition = true;
+      // NOTE: gl_SamplePostion is derived from gl_SampleID
+      usage.fs.sampleId = true;
+      usage.fs.runAtSampleRate = true;
+      break;
+    case BuiltInSampleMask:
+      usage.fs.sampleMaskIn = true;
+      break;
+    case BuiltInLayer:
+      usage.fs.layer = true;
+      break;
+    case BuiltInViewportIndex:
+      usage.fs.viewportIndex = true;
+      break;
+    case BuiltInHelperInvocation:
+      usage.fs.helperInvocation = true;
+      break;
+    case BuiltInViewIndex:
+      usage.fs.viewIndex = true;
+      break;
+    case BuiltInBaryCoordNoPersp:
+      usage.fs.baryCoordNoPersp = true;
+      break;
+    case BuiltInBaryCoordNoPerspCentroid:
+      usage.fs.baryCoordNoPerspCentroid = true;
+      break;
+    case BuiltInBaryCoordNoPerspSample:
+      usage.fs.baryCoordNoPerspSample = true;
+      break;
+    case BuiltInBaryCoordSmooth:
+      usage.fs.baryCoordSmooth = true;
+      break;
+    case BuiltInBaryCoordSmoothCentroid:
+      usage.fs.baryCoordSmoothCentroid = true;
+      break;
+    case BuiltInBaryCoordSmoothSample:
+      usage.fs.baryCoordSmoothSample = true;
+      break;
+    case BuiltInBaryCoordPullModel:
+      usage.fs.baryCoordPullModel = true;
+      break;
 
-            // Internal built-ins.
-            case BuiltInInterpLinearCenter:
-                usage.fs.noperspective = true;
-                usage.fs.center = true;
-                break;
-            case BuiltInInterpPullMode:
-                usage.fs.smooth = true;
-                usage.fs.pullMode = true;
-                break;
-            case BuiltInSamplePosOffset: usage.fs.runAtSampleRate = true; break;
-
-            default: break;
-            }
-            break;
-        }
-
-    case ShaderStageCompute:
-        {
-            switch (builtIn)
-            {
-                case BuiltInNumWorkgroups: usage.cs.numWorkgroups = true; break;
-                case BuiltInLocalInvocationId: usage.cs.localInvocationId = true; break;
-                case BuiltInWorkgroupId: usage.cs.workgroupId = true; break;
-                case BuiltInNumSubgroups: usage.cs.numSubgroups = true; break;
-                case BuiltInSubgroupId: usage.cs.subgroupId = true; break;
-                default: break;
-            }
-            break;
-        }
+    // Internal built-ins.
+    case BuiltInInterpLinearCenter:
+      usage.fs.noperspective = true;
+      usage.fs.center = true;
+      break;
+    case BuiltInInterpPullMode:
+      usage.fs.smooth = true;
+      usage.fs.pullMode = true;
+      break;
+    case BuiltInSamplePosOffset:
+      usage.fs.runAtSampleRate = true;
+      break;
 
     default:
-        break;
+      break;
     }
+    break;
+  }
 
-    switch (builtIn)
-    {
-        case BuiltInSubgroupSize: usage.common.subgroupSize = true; break;
-        case BuiltInSubgroupLocalInvocationId: usage.common.subgroupLocalInvocationId = true; break;
-        case BuiltInSubgroupEqMask: usage.common.subgroupEqMask = true; break;
-        case BuiltInSubgroupGeMask: usage.common.subgroupGeMask = true; break;
-        case BuiltInSubgroupGtMask: usage.common.subgroupGtMask = true; break;
-        case BuiltInSubgroupLeMask: usage.common.subgroupLeMask = true; break;
-        case BuiltInSubgroupLtMask: usage.common.subgroupLtMask = true; break;
-        case BuiltInDeviceIndex: usage.common.deviceIndex = true; break;
-        default: break;
+  case ShaderStageCompute: {
+    switch (builtIn) {
+    case BuiltInNumWorkgroups:
+      usage.cs.numWorkgroups = true;
+      break;
+    case BuiltInLocalInvocationId:
+      usage.cs.localInvocationId = true;
+      break;
+    case BuiltInWorkgroupId:
+      usage.cs.workgroupId = true;
+      break;
+    case BuiltInNumSubgroups:
+      usage.cs.numSubgroups = true;
+      break;
+    case BuiltInSubgroupId:
+      usage.cs.subgroupId = true;
+      break;
+    default:
+      break;
     }
+    break;
+  }
+
+  default:
+    break;
+  }
+
+  switch (builtIn) {
+  case BuiltInSubgroupSize:
+    usage.common.subgroupSize = true;
+    break;
+  case BuiltInSubgroupLocalInvocationId:
+    usage.common.subgroupLocalInvocationId = true;
+    break;
+  case BuiltInSubgroupEqMask:
+    usage.common.subgroupEqMask = true;
+    break;
+  case BuiltInSubgroupGeMask:
+    usage.common.subgroupGeMask = true;
+    break;
+  case BuiltInSubgroupGtMask:
+    usage.common.subgroupGtMask = true;
+    break;
+  case BuiltInSubgroupLeMask:
+    usage.common.subgroupLeMask = true;
+    break;
+  case BuiltInSubgroupLtMask:
+    usage.common.subgroupLtMask = true;
+    break;
+  case BuiltInDeviceIndex:
+    usage.common.deviceIndex = true;
+    break;
+  default:
+    break;
+  }
 }
 
 // =====================================================================================================================
 // Mark usage of a built-in output
 //
 // @param builtIn : Built-in ID
-// @param arraySize : Number of array elements for ClipDistance and CullDistance. (Multiple calls to this function for this built-in might have different array sizes; we take the max)
+// @param arraySize : Number of array elements for ClipDistance and CullDistance. (Multiple calls to this function for
+// this built-in might have different array sizes; we take the max)
 // @param streamId : GS stream ID, or InvalidValue if not known
-void BuilderImplInOut::markBuiltInOutputUsage(
-    BuiltInKind builtIn,
-    unsigned    arraySize,
-    unsigned    streamId)
-{
-    auto& usage = getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage;
-    assert((builtIn != BuiltInClipDistance && builtIn != BuiltInCullDistance) || arraySize != 0);
-    switch (m_shaderStage)
-    {
-    case ShaderStageVertex:
-        {
-            switch (builtIn)
-            {
-            case BuiltInPointSize: usage.vs.pointSize = true; break;
-            case BuiltInPosition: usage.vs.position = true; break;
-            case BuiltInClipDistance:
-                usage.vs.clipDistance = std::max(usage.vs.clipDistance, arraySize);
-                break;
-            case BuiltInCullDistance:
-                usage.vs.cullDistance = std::max(usage.vs.cullDistance, arraySize);
-                break;
-            case BuiltInViewportIndex: usage.vs.viewportIndex = true; break;
-            case BuiltInLayer: usage.vs.layer = true; break;
-            default: break;
-            }
-            break;
-        }
-
-    case ShaderStageTessControl:
-        {
-            switch (builtIn)
-            {
-            case BuiltInPointSize: usage.tcs.pointSize = true; break;
-            case BuiltInPosition: usage.tcs.position = true; break;
-            case BuiltInClipDistance:
-                usage.tcs.clipDistance = std::max(usage.tcs.clipDistance, arraySize);
-                break;
-            case BuiltInCullDistance:
-                usage.tcs.cullDistance = std::max(usage.tcs.cullDistance, arraySize);
-                break;
-            case BuiltInTessLevelOuter: usage.tcs.tessLevelOuter = true; break;
-            case BuiltInTessLevelInner: usage.tcs.tessLevelInner = true; break;
-            default: break;
-            }
-            break;
-        }
-
-    case ShaderStageTessEval:
-        {
-            switch (builtIn)
-            {
-            case BuiltInPointSize: usage.tes.pointSize = true; break;
-            case BuiltInPosition: usage.tes.position = true; break;
-            case BuiltInClipDistance:
-                usage.tes.clipDistance = std::max(usage.tes.clipDistance, arraySize);
-                break;
-            case BuiltInCullDistance:
-                usage.tes.cullDistance = std::max(usage.tes.cullDistance, arraySize);
-                break;
-            case BuiltInViewportIndex: usage.tes.viewportIndex = true; break;
-            case BuiltInLayer: usage.tes.layer = true; break;
-            default: break;
-            }
-            break;
-        }
-
-    case ShaderStageGeometry:
-        {
-            switch (builtIn)
-            {
-            case BuiltInPointSize: usage.gs.pointSize = true; break;
-            case BuiltInPosition: usage.gs.position = true; break;
-            case BuiltInClipDistance:
-                usage.gs.clipDistance = std::max(usage.gs.clipDistance, arraySize);
-                break;
-            case BuiltInCullDistance:
-                usage.gs.cullDistance = std::max(usage.gs.cullDistance, arraySize);
-                break;
-            case BuiltInPrimitiveId: usage.gs.primitiveId = true; break;
-            case BuiltInViewportIndex: usage.gs.viewportIndex = true; break;
-            case BuiltInLayer: usage.gs.layer = true; break;
-            default: break;
-            }
-            // Collect raster stream ID for the export of built-ins
-            if (streamId != InvalidValue)
-                getPipelineState()->getShaderResourceUsage(m_shaderStage)->inOutUsage.gs.rasterStream = streamId;
-            break;
-        }
-
-    case ShaderStageFragment:
-        {
-            switch (builtIn)
-            {
-            case BuiltInFragDepth: usage.fs.fragDepth = true; break;
-            case BuiltInSampleMask: usage.fs.sampleMask = true; break;
-            case BuiltInFragStencilRef: usage.fs.fragStencilRef = true; break;
-            default: break;
-            }
-            break;
-        }
-
+void BuilderImplInOut::markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySize, unsigned streamId) {
+  auto &usage = getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage;
+  assert((builtIn != BuiltInClipDistance && builtIn != BuiltInCullDistance) || arraySize != 0);
+  switch (m_shaderStage) {
+  case ShaderStageVertex: {
+    switch (builtIn) {
+    case BuiltInPointSize:
+      usage.vs.pointSize = true;
+      break;
+    case BuiltInPosition:
+      usage.vs.position = true;
+      break;
+    case BuiltInClipDistance:
+      usage.vs.clipDistance = std::max(usage.vs.clipDistance, arraySize);
+      break;
+    case BuiltInCullDistance:
+      usage.vs.cullDistance = std::max(usage.vs.cullDistance, arraySize);
+      break;
+    case BuiltInViewportIndex:
+      usage.vs.viewportIndex = true;
+      break;
+    case BuiltInLayer:
+      usage.vs.layer = true;
+      break;
     default:
-        break;
+      break;
     }
+    break;
+  }
+
+  case ShaderStageTessControl: {
+    switch (builtIn) {
+    case BuiltInPointSize:
+      usage.tcs.pointSize = true;
+      break;
+    case BuiltInPosition:
+      usage.tcs.position = true;
+      break;
+    case BuiltInClipDistance:
+      usage.tcs.clipDistance = std::max(usage.tcs.clipDistance, arraySize);
+      break;
+    case BuiltInCullDistance:
+      usage.tcs.cullDistance = std::max(usage.tcs.cullDistance, arraySize);
+      break;
+    case BuiltInTessLevelOuter:
+      usage.tcs.tessLevelOuter = true;
+      break;
+    case BuiltInTessLevelInner:
+      usage.tcs.tessLevelInner = true;
+      break;
+    default:
+      break;
+    }
+    break;
+  }
+
+  case ShaderStageTessEval: {
+    switch (builtIn) {
+    case BuiltInPointSize:
+      usage.tes.pointSize = true;
+      break;
+    case BuiltInPosition:
+      usage.tes.position = true;
+      break;
+    case BuiltInClipDistance:
+      usage.tes.clipDistance = std::max(usage.tes.clipDistance, arraySize);
+      break;
+    case BuiltInCullDistance:
+      usage.tes.cullDistance = std::max(usage.tes.cullDistance, arraySize);
+      break;
+    case BuiltInViewportIndex:
+      usage.tes.viewportIndex = true;
+      break;
+    case BuiltInLayer:
+      usage.tes.layer = true;
+      break;
+    default:
+      break;
+    }
+    break;
+  }
+
+  case ShaderStageGeometry: {
+    switch (builtIn) {
+    case BuiltInPointSize:
+      usage.gs.pointSize = true;
+      break;
+    case BuiltInPosition:
+      usage.gs.position = true;
+      break;
+    case BuiltInClipDistance:
+      usage.gs.clipDistance = std::max(usage.gs.clipDistance, arraySize);
+      break;
+    case BuiltInCullDistance:
+      usage.gs.cullDistance = std::max(usage.gs.cullDistance, arraySize);
+      break;
+    case BuiltInPrimitiveId:
+      usage.gs.primitiveId = true;
+      break;
+    case BuiltInViewportIndex:
+      usage.gs.viewportIndex = true;
+      break;
+    case BuiltInLayer:
+      usage.gs.layer = true;
+      break;
+    default:
+      break;
+    }
+    // Collect raster stream ID for the export of built-ins
+    if (streamId != InvalidValue)
+      getPipelineState()->getShaderResourceUsage(m_shaderStage)->inOutUsage.gs.rasterStream = streamId;
+    break;
+  }
+
+  case ShaderStageFragment: {
+    switch (builtIn) {
+    case BuiltInFragDepth:
+      usage.fs.fragDepth = true;
+      break;
+    case BuiltInSampleMask:
+      usage.fs.sampleMask = true;
+      break;
+    case BuiltInFragStencilRef:
+      usage.fs.fragStencilRef = true;
+      break;
+    default:
+      break;
+    }
+    break;
+  }
+
+  default:
+    break;
+  }
 }
 
 #ifndef NDEBUG
@@ -1326,69 +1279,59 @@ void BuilderImplInOut::markBuiltInOutputUsage(
 //
 // @param builtIn : Built-in kind, one of the BuiltIn* constants
 // @param isOutput : True to get the mask for output rather than input
-unsigned BuilderImplInOut::getBuiltInValidMask(
-    BuiltInKind builtIn,
-    bool        isOutput)
-{
-    // See llpcBuilderBuiltInDefs.h for an explanation of the letter codes.
-    enum class StageValidMask: unsigned
-    {
-        C = (1 << ShaderStageCompute),
-        D = (1 << ShaderStageTessEval),
-        H = (1 << ShaderStageTessControl),
-        HD = (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval),
-        HDG = (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry),
-        HDGP = (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval) |
-               (1 << ShaderStageGeometry) | (1 << ShaderStageFragment),
-        HG = (1 << ShaderStageTessControl) | (1 << ShaderStageGeometry),
-        MG = (1 << ShaderStageGeometry),
-        MVDG = (1 << ShaderStageVertex) | (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry),
-        MVHDG = (1 << ShaderStageVertex) | (1 << ShaderStageTessControl) |
-                   (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry),
-        N = 0,
-        P = (1 << ShaderStageFragment),
-        TMC = (1 << ShaderStageCompute),
-        TMV = (1 << ShaderStageVertex), TMVHDGPC = (1 << ShaderStageVertex) | (1 << ShaderStageTessControl) |
-              (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry) |
-              (1 << ShaderStageFragment) | (1 << ShaderStageCompute),
-        V = (1 << ShaderStageVertex),
-        VDG = (1 << ShaderStageVertex) | (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry),
-    };
+unsigned BuilderImplInOut::getBuiltInValidMask(BuiltInKind builtIn, bool isOutput) {
+  // See llpcBuilderBuiltInDefs.h for an explanation of the letter codes.
+  enum class StageValidMask : unsigned {
+    C = (1 << ShaderStageCompute),
+    D = (1 << ShaderStageTessEval),
+    H = (1 << ShaderStageTessControl),
+    HD = (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval),
+    HDG = (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry),
+    HDGP = (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry) |
+           (1 << ShaderStageFragment),
+    HG = (1 << ShaderStageTessControl) | (1 << ShaderStageGeometry),
+    MG = (1 << ShaderStageGeometry),
+    MVDG = (1 << ShaderStageVertex) | (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry),
+    MVHDG = (1 << ShaderStageVertex) | (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval) |
+            (1 << ShaderStageGeometry),
+    N = 0,
+    P = (1 << ShaderStageFragment),
+    TMC = (1 << ShaderStageCompute),
+    TMV = (1 << ShaderStageVertex),
+    TMVHDGPC = (1 << ShaderStageVertex) | (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval) |
+               (1 << ShaderStageGeometry) | (1 << ShaderStageFragment) | (1 << ShaderStageCompute),
+    V = (1 << ShaderStageVertex),
+    VDG = (1 << ShaderStageVertex) | (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry),
+  };
 
-    unsigned validMask = 0;
-    switch (builtIn)
-    {
-#define BUILTIN(name, number, out, in, type) \
-    case BuiltIn ## name: \
-        validMask = static_cast<unsigned>(StageValidMask::in) | (static_cast<unsigned>(StageValidMask::out) << 16); \
-        break;
+  unsigned validMask = 0;
+  switch (builtIn) {
+#define BUILTIN(name, number, out, in, type)                                                                           \
+  case BuiltIn##name:                                                                                                  \
+    validMask = static_cast<unsigned>(StageValidMask::in) | (static_cast<unsigned>(StageValidMask::out) << 16);        \
+    break;
 #include "lgc/llpcBuilderBuiltInDefs.h"
 #undef BUILTIN
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
-    return isOutput ? (validMask >> 16) : (validMask & 0xFFFF);
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+  return isOutput ? (validMask >> 16) : (validMask & 0xFFFF);
 }
 
 // =====================================================================================================================
 // Determine whether a built-in is an input for a particular shader stage.
 //
 // @param builtIn : Built-in type, one of the BuiltIn* constants
-bool BuilderImplInOut::isBuiltInInput(
-    BuiltInKind   builtIn)
-{
-    return (getBuiltInValidMask(builtIn, false) >> m_shaderStage) & 1;
+bool BuilderImplInOut::isBuiltInInput(BuiltInKind builtIn) {
+  return (getBuiltInValidMask(builtIn, false) >> m_shaderStage) & 1;
 }
 
 // =====================================================================================================================
 // Determine whether a built-in is an output for a particular shader stage.
 //
 // @param builtIn : Built-in type, one of the BuiltIn* constants
-bool BuilderImplInOut::isBuiltInOutput(
-    BuiltInKind   builtIn)
-{
-    return (getBuiltInValidMask(builtIn, true) >> m_shaderStage) & 1;
+bool BuilderImplInOut::isBuiltInOutput(BuiltInKind builtIn) {
+  return (getBuiltInValidMask(builtIn, true) >> m_shaderStage) & 1;
 }
 #endif // NDEBUG
-

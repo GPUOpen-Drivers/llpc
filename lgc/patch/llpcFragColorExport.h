@@ -34,53 +34,50 @@
 #include "llpcIntrinsDefs.h"
 #include "lgc/llpcPipeline.h"
 
-namespace lgc
-{
+namespace lgc {
 
 class PipelineState;
 struct WorkaroundFlags;
 
 // Enumerates component setting of color format. This is a "helper" enum used in the CB's algorithm for deriving
 // an ideal shader export format.
-enum class CompSetting : unsigned
-{
-    Invalid,            // Invalid
-    OneCompRed,         // Red
-    OneCompAlpha,       // Alpha
-    TwoCompAlphaRed,    // Alpha, red
-    TwoCompGreenRed     // Green, red
+enum class CompSetting : unsigned {
+  Invalid,         // Invalid
+  OneCompRed,      // Red
+  OneCompAlpha,    // Alpha
+  TwoCompAlphaRed, // Alpha, red
+  TwoCompGreenRed  // Green, red
 };
 
 // =====================================================================================================================
 // Represents the manager of fragment color export operations.
-class FragColorExport
-{
+class FragColorExport {
 public:
-    FragColorExport(PipelineState* pipelineState, llvm::Module* module);
+  FragColorExport(PipelineState *pipelineState, llvm::Module *module);
 
-    llvm::Value* run(llvm::Value* output, unsigned location, llvm::Instruction* insertPos);
+  llvm::Value *run(llvm::Value *output, unsigned location, llvm::Instruction *insertPos);
 
-    ExportFormat computeExportFormat(llvm::Type* outputTy, unsigned location) const;
+  ExportFormat computeExportFormat(llvm::Type *outputTy, unsigned location) const;
 
 private:
-    FragColorExport() = delete;
-    FragColorExport(const FragColorExport&) = delete;
-    FragColorExport& operator =(const FragColorExport&) = delete;
+  FragColorExport() = delete;
+  FragColorExport(const FragColorExport &) = delete;
+  FragColorExport &operator=(const FragColorExport &) = delete;
 
-    static CompSetting computeCompSetting(BufDataFormat dfmt);
-    static unsigned getNumChannels(BufDataFormat dfmt);
+  static CompSetting computeCompSetting(BufDataFormat dfmt);
+  static unsigned getNumChannels(BufDataFormat dfmt);
 
-    static bool hasAlpha(BufDataFormat dfmt);
+  static bool hasAlpha(BufDataFormat dfmt);
 
-    static unsigned getMaxComponentBitCount(BufDataFormat dfmt);
+  static unsigned getMaxComponentBitCount(BufDataFormat dfmt);
 
-    llvm::Value* convertToFloat(llvm::Value* value, bool signedness, llvm::Instruction* insertPos) const;
-    llvm::Value* convertToInt(llvm::Value* value, bool signedness, llvm::Instruction* insertPos) const;
+  llvm::Value *convertToFloat(llvm::Value *value, bool signedness, llvm::Instruction *insertPos) const;
+  llvm::Value *convertToInt(llvm::Value *value, bool signedness, llvm::Instruction *insertPos) const;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    PipelineState*  m_pipelineState;   // Pipeline state
-    llvm::LLVMContext*        m_context;         // LLVM context
+  PipelineState *m_pipelineState; // Pipeline state
+  llvm::LLVMContext *m_context;   // LLVM context
 };
 
-} // lgc
+} // namespace lgc

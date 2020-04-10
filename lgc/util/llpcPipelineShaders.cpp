@@ -28,12 +28,11 @@
 * @brief LLPC source file: contains implementation of class Llpc::PipelineShaders
 ***********************************************************************************************************************
 */
+#include "llpcPipelineShaders.h"
+#include "llpcInternal.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
-
-#include "llpcInternal.h"
-#include "llpcPipelineShaders.h"
 
 #define DEBUG_TYPE "llpc-pipeline-shaders"
 
@@ -44,10 +43,7 @@ char PipelineShaders::ID = 0;
 
 // =====================================================================================================================
 // Create an instance of the pass.
-ModulePass* createPipelineShaders()
-{
-    return new PipelineShaders();
-}
+ModulePass *createPipelineShaders() { return new PipelineShaders(); }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
@@ -56,55 +52,44 @@ ModulePass* createPipelineShaders()
 // and it has metadata giving the SPIR-V execution model.
 //
 // @param [in,out] module : LLVM module to be run on
-bool PipelineShaders::runOnModule(
-    Module& module)
-{
-    LLVM_DEBUG(dbgs() << "Run the pass Pipeline-Shaders\n");
+bool PipelineShaders::runOnModule(Module &module) {
+  LLVM_DEBUG(dbgs() << "Run the pass Pipeline-Shaders\n");
 
-    m_entryPointMap.clear();
-    for (auto& entryPoint : m_entryPoints)
-        entryPoint = nullptr;
+  m_entryPointMap.clear();
+  for (auto &entryPoint : m_entryPoints)
+    entryPoint = nullptr;
 
-    for (auto& func : module)
-    {
-        if (!func.empty() && func.getLinkage() != GlobalValue::InternalLinkage)
-        {
-            auto shaderStage = getShaderStageFromFunction(&func);
+  for (auto &func : module) {
+    if (!func.empty() && func.getLinkage() != GlobalValue::InternalLinkage) {
+      auto shaderStage = getShaderStageFromFunction(&func);
 
-            if (shaderStage != ShaderStageInvalid)
-            {
-                m_entryPoints[shaderStage] = &func;
-                m_entryPointMap[&func] = shaderStage;
-            }
-        }
+      if (shaderStage != ShaderStageInvalid) {
+        m_entryPoints[shaderStage] = &func;
+        m_entryPointMap[&func] = shaderStage;
+      }
     }
-    return false;
+  }
+  return false;
 }
 
 // =====================================================================================================================
 // Get the shader for a particular API shader stage, or nullptr if none
 //
 // @param shaderStage : Shader stage
-Function* PipelineShaders::getEntryPoint(
-    ShaderStage shaderStage
-    ) const
-{
-    assert((unsigned)shaderStage < ShaderStageCountInternal);
-    return m_entryPoints[shaderStage];
+Function *PipelineShaders::getEntryPoint(ShaderStage shaderStage) const {
+  assert((unsigned)shaderStage < ShaderStageCountInternal);
+  return m_entryPoints[shaderStage];
 }
 
 // =====================================================================================================================
 // Get the ABI shader stage for a particular function, or ShaderStageInvalid if not a shader entrypoint.
 //
 // @param func : Function to look up
-ShaderStage PipelineShaders::getShaderStage(
-    const Function* func
-    ) const
-{
-    auto entryMapIt = m_entryPointMap.find(func);
-    if (entryMapIt == m_entryPointMap.end())
-        return ShaderStageInvalid;
-    return entryMapIt->second;
+ShaderStage PipelineShaders::getShaderStage(const Function *func) const {
+  auto entryMapIt = m_entryPointMap.find(func);
+  if (entryMapIt == m_entryPointMap.end())
+    return ShaderStageInvalid;
+  return entryMapIt->second;
 }
 
 // =====================================================================================================================

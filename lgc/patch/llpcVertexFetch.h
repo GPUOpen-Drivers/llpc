@@ -30,23 +30,21 @@
  */
 #pragma once
 
-#include "lgc/llpcBuilder.h"
-#include "lgc/llpcPipeline.h"
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
+#include "lgc/llpcBuilder.h"
+#include "lgc/llpcPipeline.h"
 
-namespace lgc
-{
+namespace lgc {
 
 class PipelineState;
 class ShaderSystemValues;
 
 // Represents vertex format info corresponding to vertex attribute format (VkFormat).
-struct VertexFormatInfo
-{
-    BufNumFormat    nfmt;           // Numeric format of vertex buffer
-    BufDataFormat   dfmt;           // Data format of vertex buffer
-    unsigned        numChannels;    // Valid number of channels
+struct VertexFormatInfo {
+  BufNumFormat nfmt;    // Numeric format of vertex buffer
+  BufDataFormat dfmt;   // Data format of vertex buffer
+  unsigned numChannels; // Valid number of channels
 };
 
 // Represents vertex component info corresponding to to vertex data format (BufDataFormat).
@@ -54,86 +52,75 @@ struct VertexFormatInfo
 // NOTE: This info is used by vertex fetch instructions. We split vertex fetch into its per-component fetches when
 // the original vertex fetch does not match the hardware requirements (such as vertex attribute offset, vertex
 // attribute stride, etc..)
-struct VertexCompFormatInfo
-{
-    unsigned        vertexByteSize; // Byte size of the vertex
-    unsigned        compByteSize;   // Byte size of each individual component
-    unsigned        compCount;      // Component count
-    BufDataFmt      compDfmt;       // Equivalent data format of each component
+struct VertexCompFormatInfo {
+  unsigned vertexByteSize; // Byte size of the vertex
+  unsigned compByteSize;   // Byte size of each individual component
+  unsigned compCount;      // Component count
+  BufDataFmt compDfmt;     // Equivalent data format of each component
 };
 
 // =====================================================================================================================
 // Represents the manager of vertex fetch operations.
-class VertexFetch
-{
+class VertexFetch {
 public:
-    VertexFetch(llvm::Function* entrypoint, ShaderSystemValues* shaderSysValues, PipelineState* pipelineState);
+  VertexFetch(llvm::Function *entrypoint, ShaderSystemValues *shaderSysValues, PipelineState *pipelineState);
 
-    static VertexFormatInfo getVertexFormatInfo(const VertexInputDescription* description);
+  static VertexFormatInfo getVertexFormatInfo(const VertexInputDescription *description);
 
-    llvm::Value* run(llvm::Type* inputTy, unsigned location, unsigned compIdx, llvm::Instruction* insertPos);
+  llvm::Value *run(llvm::Type *inputTy, unsigned location, unsigned compIdx, llvm::Instruction *insertPos);
 
-    // Gets variable corresponding to vertex index
-    llvm::Value* getVertexIndex() { return m_vertexIndex; }
+  // Gets variable corresponding to vertex index
+  llvm::Value *getVertexIndex() { return m_vertexIndex; }
 
-    // Gets variable corresponding to instance index
-    llvm::Value* getInstanceIndex() { return m_instanceIndex; }
+  // Gets variable corresponding to instance index
+  llvm::Value *getInstanceIndex() { return m_instanceIndex; }
 
 private:
-    VertexFetch() = delete;
-    VertexFetch(const VertexFetch&) = delete;
-    VertexFetch& operator=(const VertexFetch&) = delete;
+  VertexFetch() = delete;
+  VertexFetch(const VertexFetch &) = delete;
+  VertexFetch &operator=(const VertexFetch &) = delete;
 
-    static const VertexCompFormatInfo* getVertexComponentFormatInfo(unsigned dfmt);
+  static const VertexCompFormatInfo *getVertexComponentFormatInfo(unsigned dfmt);
 
-    unsigned mapVertexFormat(unsigned dfmt, unsigned nfmt) const;
+  unsigned mapVertexFormat(unsigned dfmt, unsigned nfmt) const;
 
-    llvm::Value* loadVertexBufferDescriptor(unsigned binding, llvm::Instruction* insertPos) const;
+  llvm::Value *loadVertexBufferDescriptor(unsigned binding, llvm::Instruction *insertPos) const;
 
-    void addVertexFetchInst(llvm::Value*       vbDesc,
-                            unsigned           numChannels,
-                            bool               is16bitFetch,
-                            llvm::Value*       vbIndex,
-                            unsigned           offset,
-                            unsigned           stride,
-                            unsigned           dfmt,
-                            unsigned           nfmt,
-                            llvm::Instruction* insertPos,
-                            llvm::Value**      ppFetch) const;
+  void addVertexFetchInst(llvm::Value *vbDesc, unsigned numChannels, bool is16bitFetch, llvm::Value *vbIndex,
+                          unsigned offset, unsigned stride, unsigned dfmt, unsigned nfmt, llvm::Instruction *insertPos,
+                          llvm::Value **ppFetch) const;
 
-    bool needPostShuffle(const VertexInputDescription* inputDesc,
-                         std::vector<llvm::Constant*>&          shuffleMask) const;
+  bool needPostShuffle(const VertexInputDescription *inputDesc, std::vector<llvm::Constant *> &shuffleMask) const;
 
-    bool needPatchA2S(const VertexInputDescription* inputDesc) const;
+  bool needPatchA2S(const VertexInputDescription *inputDesc) const;
 
-    bool needSecondVertexFetch(const VertexInputDescription* inputDesc) const;
+  bool needSecondVertexFetch(const VertexInputDescription *inputDesc) const;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::Module*       m_module;          // LLVM module
-    llvm::LLVMContext*  m_context;         // LLVM context
-    ShaderSystemValues* m_shaderSysValues; // ShaderSystemValues object for getting vertex buffer pointer from
-    PipelineState*      m_pipelineState;   // Pipeline state
+  llvm::Module *m_module;                // LLVM module
+  llvm::LLVMContext *m_context;          // LLVM context
+  ShaderSystemValues *m_shaderSysValues; // ShaderSystemValues object for getting vertex buffer pointer from
+  PipelineState *m_pipelineState;        // Pipeline state
 
-    llvm::Value*    m_vertexIndex;     // Vertex index
-    llvm::Value*    m_instanceIndex;   // Instance index
-    llvm::Value*    m_baseInstance;    // Base instance
-    llvm::Value*    m_instanceId;      // Instance ID
+  llvm::Value *m_vertexIndex;   // Vertex index
+  llvm::Value *m_instanceIndex; // Instance index
+  llvm::Value *m_baseInstance;  // Base instance
+  llvm::Value *m_instanceId;    // Instance ID
 
-    static const VertexCompFormatInfo   MVertexCompFormatInfo[];   // Info table of vertex component format
-    static const BufFormat              MVertexFormatMap[];        // Info table of vertex format mapping
+  static const VertexCompFormatInfo MVertexCompFormatInfo[]; // Info table of vertex component format
+  static const BufFormat MVertexFormatMap[];                 // Info table of vertex format mapping
 
-    // Default values for vertex fetch (<4 x i32> or <8 x i32>)
-    struct
-    {
-        llvm::Constant*   int8;      // < 0, 0, 0, 1 >
-        llvm::Constant*   int16;     // < 0, 0, 0, 1 >
-        llvm::Constant*   int32;     // < 0, 0, 0, 1 >
-        llvm::Constant*   int64;     // < 0, 0, 0, 0, 0, 0, 0, 1 >
-        llvm::Constant*   float16;   // < 0, 0, 0, 0x3C00 >
-        llvm::Constant*   float32;   // < 0, 0, 0, 0x3F800000 >
-        llvm::Constant*   double64;  // < 0, 0, 0, 0, 0, 0, 0, 0x3FF00000 >
-    } m_fetchDefaults;
+  // Default values for vertex fetch (<4 x i32> or <8 x i32>)
+  struct {
+    llvm::Constant *int8;     // < 0, 0, 0, 1 >
+    llvm::Constant *int16;    // < 0, 0, 0, 1 >
+    llvm::Constant *int32;    // < 0, 0, 0, 1 >
+    llvm::Constant *int64;    // < 0, 0, 0, 0, 0, 0, 0, 1 >
+    llvm::Constant *float16;  // < 0, 0, 0, 0x3C00 >
+    llvm::Constant *float32;  // < 0, 0, 0, 0x3F800000 >
+    llvm::Constant *double64; // < 0, 0, 0, 0, 0, 0, 0, 0x3FF00000 >
+  } m_fetchDefaults;
 };
 
-} // lgc
+} // namespace lgc

@@ -22,24 +22,23 @@
  *  SOFTWARE.
  *
  **********************************************************************************************************************/
- /**
- ***********************************************************************************************************************
- * @file  vkgcPipelineDumper.cpp
- * @breif VKGC source file: contains implementation of VKGC pipline dump utility.
- ***********************************************************************************************************************
- */
+/**
+***********************************************************************************************************************
+* @file  vkgcPipelineDumper.cpp
+* @breif VKGC source file: contains implementation of VKGC pipline dump utility.
+***********************************************************************************************************************
+*/
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "vkgcElfReader.h"
+#include "vkgcPipelineDumper.h"
+#include "vkgcUtil.h"
 #include <fstream>
 #include <sstream>
 #include <stdarg.h>
 #include <sys/stat.h>
 #include <unordered_set>
-
-#include "vkgcElfReader.h"
-#include "vkgcPipelineDumper.h"
-#include "vkgcUtil.h"
 
 #define DEBUG_TYPE "vkgc-pipeline-dumper"
 
@@ -47,48 +46,39 @@ using namespace llvm;
 using namespace MetroHash;
 using namespace Util;
 
-    #define FILE_STAT stat
+#define FILE_STAT stat
 
-namespace Vkgc
-{
+namespace Vkgc {
 
 // Forward declaration
-std::ostream& operator<<(std::ostream& out, VkVertexInputRate       inputRate);
-std::ostream& operator<<(std::ostream& out, VkFormat                format);
-std::ostream& operator<<(std::ostream& out, VkPrimitiveTopology     topology);
-std::ostream& operator<<(std::ostream& out, VkPolygonMode           polygonMode);
-std::ostream& operator<<(std::ostream& out, VkCullModeFlagBits      cullMode);
-std::ostream& operator<<(std::ostream& out, VkFrontFace             frontFace);
-std::ostream& operator<<(std::ostream& out, ResourceMappingNodeType type);
-std::ostream& operator<<(std::ostream& out, NggSubgroupSizingType   subgroupSizing);
-std::ostream& operator<<(std::ostream& out, NggCompactMode          compactMode);
-std::ostream& operator<<(std::ostream& out, WaveBreakSize           waveBreakSize);
-std::ostream& operator<<(std::ostream& out, ShadowDescriptorTableUsage  shadowDescriptorTableUsage);
+std::ostream &operator<<(std::ostream &out, VkVertexInputRate inputRate);
+std::ostream &operator<<(std::ostream &out, VkFormat format);
+std::ostream &operator<<(std::ostream &out, VkPrimitiveTopology topology);
+std::ostream &operator<<(std::ostream &out, VkPolygonMode polygonMode);
+std::ostream &operator<<(std::ostream &out, VkCullModeFlagBits cullMode);
+std::ostream &operator<<(std::ostream &out, VkFrontFace frontFace);
+std::ostream &operator<<(std::ostream &out, ResourceMappingNodeType type);
+std::ostream &operator<<(std::ostream &out, NggSubgroupSizingType subgroupSizing);
+std::ostream &operator<<(std::ostream &out, NggCompactMode compactMode);
+std::ostream &operator<<(std::ostream &out, WaveBreakSize waveBreakSize);
+std::ostream &operator<<(std::ostream &out, ShadowDescriptorTableUsage shadowDescriptorTableUsage);
 
-template std::ostream& operator<<(std::ostream& out, ElfReader<Elf64>& reader);
-template raw_ostream& operator<<(raw_ostream& out, ElfReader<Elf64>& reader);
+template std::ostream &operator<<(std::ostream &out, ElfReader<Elf64> &reader);
+template raw_ostream &operator<<(raw_ostream &out, ElfReader<Elf64> &reader);
 constexpr size_t ShaderModuleCacheHashOffset = offsetof(ShaderModuleData, cacheHash);
 
 // =====================================================================================================================
 // Represents LLVM based mutex.
-class Mutex
-{
+class Mutex {
 public:
-    Mutex()
-    {
-    }
+  Mutex() {}
 
-    void lock()
-    {
-        m_mutex.lock();
-    }
+  void lock() { m_mutex.lock(); }
 
-    void unlock()
-    {
-        m_mutex.unlock();
-    }
+  void unlock() { m_mutex.unlock(); }
+
 private:
-    llvm::sys::Mutex m_mutex;
+  llvm::sys::Mutex m_mutex;
 };
 
 // Mutex for pipeline dump
@@ -96,22 +86,14 @@ static Mutex SDumpMutex;
 
 // =====================================================================================================================
 // Represents the file objects for pipeline dump
-struct PipelineDumpFile
-{
-    PipelineDumpFile(
-        const char* dumpFileName,
-        const char* binaryFileName)
-        :
-        dumpFile(dumpFileName),
-        binaryIndex(0),
-        binaryFileName(binaryFileName)
-    {
-    }
+struct PipelineDumpFile {
+  PipelineDumpFile(const char *dumpFileName, const char *binaryFileName)
+      : dumpFile(dumpFileName), binaryIndex(0), binaryFileName(binaryFileName) {}
 
-    std::ofstream dumpFile;       // File object for .pipe file
-    std::ofstream binaryFile;     // File object for ELF binary
-    unsigned      binaryIndex;    // ELF Binary index
-    std::string   binaryFileName; // File name of binary file
+  std::ofstream dumpFile;     // File object for .pipe file
+  std::ofstream binaryFile;   // File object for ELF binary
+  unsigned binaryIndex;       // ELF Binary index
+  std::string binaryFileName; // File name of binary file
 };
 
 // =====================================================================================================================
@@ -119,15 +101,10 @@ struct PipelineDumpFile
 //
 // @param dumpDir : Directory of pipeline dump
 // @param spirvBin : SPIR-V binary
-void VKAPI_CALL IPipelineDumper::DumpSpirvBinary(
-    const char*                     dumpDir,
-    const BinaryData*               spirvBin)
-{
-    MetroHash::Hash hash = {};
-    MetroHash64::Hash(reinterpret_cast<const uint8_t*>(spirvBin->pCode),
-                      spirvBin->codeSize,
-                      hash.bytes);
-    PipelineDumper::DumpSpirvBinary(dumpDir, spirvBin, &hash);
+void VKAPI_CALL IPipelineDumper::DumpSpirvBinary(const char *dumpDir, const BinaryData *spirvBin) {
+  MetroHash::Hash hash = {};
+  MetroHash64::Hash(reinterpret_cast<const uint8_t *>(spirvBin->pCode), spirvBin->codeSize, hash.bytes);
+  PipelineDumper::DumpSpirvBinary(dumpDir, spirvBin, &hash);
 }
 
 // =====================================================================================================================
@@ -135,31 +112,25 @@ void VKAPI_CALL IPipelineDumper::DumpSpirvBinary(
 //
 // @param dumpOptions : Pipeline dump options
 // @param pipelineInfo : Info of the pipeline to be built
-void* VKAPI_CALL IPipelineDumper::BeginPipelineDump(
-    const PipelineDumpOptions*         dumpOptions,
-    PipelineBuildInfo                  pipelineInfo
-    )
-{
-    MetroHash::Hash hash = {};
-    if (pipelineInfo.pComputeInfo )
-        hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo.pComputeInfo, false);
-    else
-    {
-        assert(pipelineInfo.pGraphicsInfo );
-        hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo.pGraphicsInfo, false);
-    }
+void *VKAPI_CALL IPipelineDumper::BeginPipelineDump(const PipelineDumpOptions *dumpOptions,
+                                                    PipelineBuildInfo pipelineInfo) {
+  MetroHash::Hash hash = {};
+  if (pipelineInfo.pComputeInfo)
+    hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo.pComputeInfo, false);
+  else {
+    assert(pipelineInfo.pGraphicsInfo);
+    hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo.pGraphicsInfo, false);
+  }
 
-    return PipelineDumper::BeginPipelineDump(dumpOptions, pipelineInfo, &hash);
+  return PipelineDumper::BeginPipelineDump(dumpOptions, pipelineInfo, &hash);
 }
 
 // =====================================================================================================================
 // Ends to dump graphics/compute pipeline info.
 //
 // @param dumpFile : The handle of pipeline dump file
-void VKAPI_CALL IPipelineDumper::EndPipelineDump(
-    void* dumpFile)
-{
-    PipelineDumper::EndPipelineDump(reinterpret_cast<PipelineDumpFile*>(dumpFile));
+void VKAPI_CALL IPipelineDumper::EndPipelineDump(void *dumpFile) {
+  PipelineDumper::EndPipelineDump(reinterpret_cast<PipelineDumpFile *>(dumpFile));
 }
 
 // =====================================================================================================================
@@ -168,12 +139,8 @@ void VKAPI_CALL IPipelineDumper::EndPipelineDump(
 // @param dumpFile : The handle of pipeline dump file
 // @param gfxIp : Graphics IP version info
 // @param pipelineBin : Pipeline binary (ELF)
-void VKAPI_CALL IPipelineDumper::DumpPipelineBinary(
-    void*                    dumpFile,
-    GfxIpVersion             gfxIp,
-    const BinaryData*        pipelineBin)
-{
-    PipelineDumper::DumpPipelineBinary(reinterpret_cast<PipelineDumpFile*>(dumpFile), gfxIp, pipelineBin);
+void VKAPI_CALL IPipelineDumper::DumpPipelineBinary(void *dumpFile, GfxIpVersion gfxIp, const BinaryData *pipelineBin) {
+  PipelineDumper::DumpPipelineBinary(reinterpret_cast<PipelineDumpFile *>(dumpFile), gfxIp, pipelineBin);
 }
 
 // =====================================================================================================================
@@ -181,34 +148,27 @@ void VKAPI_CALL IPipelineDumper::DumpPipelineBinary(
 //
 // @param dumpFile : The handle of pipeline dump file
 // @param str : Extra string info to dump
-void VKAPI_CALL IPipelineDumper::DumpPipelineExtraInfo(
-    void*                     dumpFile,
-    const char*               str)
-{
-    std::string tmpStr(str);
-    PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(dumpFile), &tmpStr);
+void VKAPI_CALL IPipelineDumper::DumpPipelineExtraInfo(void *dumpFile, const char *str) {
+  std::string tmpStr(str);
+  PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile *>(dumpFile), &tmpStr);
 }
 
 // =====================================================================================================================
 // Gets shader module hash code.
 //
 // @param moduleData : Pointer to the shader module data
-uint64_t VKAPI_CALL IPipelineDumper::GetShaderHash(
-    const void* moduleData)
-{
-    const ShaderModuleData* shaderModuleData = reinterpret_cast<const ShaderModuleData*>(moduleData);
-    return MetroHash::compact64(reinterpret_cast<const MetroHash::Hash*>(&shaderModuleData->hash));
+uint64_t VKAPI_CALL IPipelineDumper::GetShaderHash(const void *moduleData) {
+  const ShaderModuleData *shaderModuleData = reinterpret_cast<const ShaderModuleData *>(moduleData);
+  return MetroHash::compact64(reinterpret_cast<const MetroHash::Hash *>(&shaderModuleData->hash));
 }
 
 // =====================================================================================================================
 // Calculates graphics pipeline hash code.
 //
 // @param pipelineInfo : Info to build this graphics pipeline
-uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(
-    const GraphicsPipelineBuildInfo* pipelineInfo)
-{
-    auto hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false);
-    return MetroHash::compact64(&hash);
+uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(const GraphicsPipelineBuildInfo *pipelineInfo) {
+  auto hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false);
+  return MetroHash::compact64(&hash);
 }
 // =====================================================================================================================
 // Get graphics pipeline name.
@@ -216,18 +176,13 @@ uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(
 // @param [In] graphicsPipelineInfo : Info to build this graphics pipeline
 // @param [Out] pipeNameOut : The full name of this graphics pipeline
 // @param nameBufSize : Size of the buffer to store pipeline name
-void VKAPI_CALL IPipelineDumper::GetPipelineName(
-    const  GraphicsPipelineBuildInfo* graphicsPipelineInfo,
-    char*                             pipeNameOut,
-    const size_t                      nameBufSize)
-{
-    auto hash = PipelineDumper::generateHashForGraphicsPipeline(graphicsPipelineInfo, false);
-    PipelineBuildInfo pipelineInfo = {};
-    pipelineInfo.pGraphicsInfo = graphicsPipelineInfo;
-    std::string pipeName = PipelineDumper::getPipelineInfoFileName(
-        pipelineInfo,
-        &hash);
-    snprintf(pipeNameOut, nameBufSize, "%s", pipeName.c_str());
+void VKAPI_CALL IPipelineDumper::GetPipelineName(const GraphicsPipelineBuildInfo *graphicsPipelineInfo,
+                                                 char *pipeNameOut, const size_t nameBufSize) {
+  auto hash = PipelineDumper::generateHashForGraphicsPipeline(graphicsPipelineInfo, false);
+  PipelineBuildInfo pipelineInfo = {};
+  pipelineInfo.pGraphicsInfo = graphicsPipelineInfo;
+  std::string pipeName = PipelineDumper::getPipelineInfoFileName(pipelineInfo, &hash);
+  snprintf(pipeNameOut, nameBufSize, "%s", pipeName.c_str());
 }
 
 // =====================================================================================================================
@@ -236,44 +191,35 @@ void VKAPI_CALL IPipelineDumper::GetPipelineName(
 // @param [In] computePipelineInfo : Info to build this compute pipeline
 // @param [Out] pipeNameOut : The full name of this compute pipeline
 // @param nameBufSize : Size of the buffer to store pipeline name
-void VKAPI_CALL IPipelineDumper::GetPipelineName(
-    const ComputePipelineBuildInfo* computePipelineInfo,
-    char*                           pipeNameOut,
-    const size_t                    nameBufSize)
-{
-    auto hash = PipelineDumper::generateHashForComputePipeline(computePipelineInfo, false);
-    PipelineBuildInfo pipelineInfo = {};
-    pipelineInfo.pComputeInfo = computePipelineInfo;
+void VKAPI_CALL IPipelineDumper::GetPipelineName(const ComputePipelineBuildInfo *computePipelineInfo, char *pipeNameOut,
+                                                 const size_t nameBufSize) {
+  auto hash = PipelineDumper::generateHashForComputePipeline(computePipelineInfo, false);
+  PipelineBuildInfo pipelineInfo = {};
+  pipelineInfo.pComputeInfo = computePipelineInfo;
 
-    std::string pipeName = PipelineDumper::getPipelineInfoFileName(
-        pipelineInfo,
-        &hash);
-    snprintf(pipeNameOut, nameBufSize, "%s", pipeName.c_str());
+  std::string pipeName = PipelineDumper::getPipelineInfoFileName(pipelineInfo, &hash);
+  snprintf(pipeNameOut, nameBufSize, "%s", pipeName.c_str());
 }
 
 // =====================================================================================================================
 // Calculates compute pipeline hash code.
 //
 // @param pipelineInfo : Info to build this compute pipeline
-uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(
-    const ComputePipelineBuildInfo* pipelineInfo)
-{
-    auto hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false);
-    return MetroHash::compact64(&hash);
+uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(const ComputePipelineBuildInfo *pipelineInfo) {
+  auto hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false);
+  return MetroHash::compact64(&hash);
 }
 
 // =====================================================================================================================
 // Gets the file name of SPIR-V binary according the specified shader hash.
 //
 // @param hash : Shader hash code
-std::string PipelineDumper::getSpirvBinaryFileName(
-     const MetroHash::Hash* hash)
-{
-    uint64_t hashCode64 = MetroHash::compact64(hash);
-    char     fileName[64] = {};
-    auto     length = snprintf(fileName, 64, "Shader_0x%016" PRIX64 ".spv", hashCode64);
-    (void(length)); // unused
-    return std::string(fileName);
+std::string PipelineDumper::getSpirvBinaryFileName(const MetroHash::Hash *hash) {
+  uint64_t hashCode64 = MetroHash::compact64(hash);
+  char fileName[64] = {};
+  auto length = snprintf(fileName, 64, "Shader_0x%016" PRIX64 ".spv", hashCode64);
+  (void(length)); // unused
+  return std::string(fileName);
 }
 
 // =====================================================================================================================
@@ -281,36 +227,30 @@ std::string PipelineDumper::getSpirvBinaryFileName(
 //
 // @param pipelineInfo : Info of the pipeline to be built
 // @param hash : Pipeline hash code
-std::string PipelineDumper::getPipelineInfoFileName(
-    PipelineBuildInfo                  pipelineInfo,
-    const MetroHash::Hash*             hash)
-{
-    uint64_t        hashCode64 = MetroHash::compact64(hash);
-    char            fileName[64] = {};
-    if (pipelineInfo.pComputeInfo )
-    {
-        auto length = snprintf(fileName, 64, "PipelineCs_0x%016" PRIX64, hashCode64);
-        (void(length)); // unused
-    }
+std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineInfo, const MetroHash::Hash *hash) {
+  uint64_t hashCode64 = MetroHash::compact64(hash);
+  char fileName[64] = {};
+  if (pipelineInfo.pComputeInfo) {
+    auto length = snprintf(fileName, 64, "PipelineCs_0x%016" PRIX64, hashCode64);
+    (void(length)); // unused
+  }
+  else {
+    assert(pipelineInfo.pGraphicsInfo);
+    const char *fileNamePrefix = nullptr;
+    if (pipelineInfo.pGraphicsInfo->tes.pModuleData && pipelineInfo.pGraphicsInfo->gs.pModuleData)
+      fileNamePrefix = "PipelineGsTess";
+    else if (pipelineInfo.pGraphicsInfo->gs.pModuleData)
+      fileNamePrefix = "PipelineGs";
+    else if (pipelineInfo.pGraphicsInfo->tes.pModuleData)
+      fileNamePrefix = "PipelineTess";
     else
-    {
-        assert(pipelineInfo.pGraphicsInfo );
-        const char* fileNamePrefix = nullptr;
-        if (pipelineInfo.pGraphicsInfo->tes.pModuleData &&
-            pipelineInfo.pGraphicsInfo->gs.pModuleData )
-             fileNamePrefix = "PipelineGsTess";
-        else if (pipelineInfo.pGraphicsInfo->gs.pModuleData )
-             fileNamePrefix = "PipelineGs";
-        else if (pipelineInfo.pGraphicsInfo->tes.pModuleData )
-             fileNamePrefix = "PipelineTess";
-        else
-            fileNamePrefix = "PipelineVsFs";
+      fileNamePrefix = "PipelineVsFs";
 
-        auto length = snprintf(fileName, 64, "%s_0x%016" PRIX64, fileNamePrefix, hashCode64);
-        (void(length)); // unused
-    }
+    auto length = snprintf(fileName, 64, "%s_0x%016" PRIX64, fileNamePrefix, hashCode64);
+    (void(length)); // unused
+  }
 
-    return std::string(fileName);
+  return std::string(fileName);
 }
 
 // =====================================================================================================================
@@ -319,136 +259,112 @@ std::string PipelineDumper::getPipelineInfoFileName(
 // @param dumpOptions : Pipeline dump options
 // @param pipelineInfo : Info of the pipeline to be built
 // @param hash : Pipeline hash code
-PipelineDumpFile* PipelineDumper::BeginPipelineDump(
-    const PipelineDumpOptions*         dumpOptions,
-    PipelineBuildInfo                  pipelineInfo,
-    const MetroHash::Hash*             hash)
-{
-    bool disableLog = false;
-    std::string dumpFileName;
-    std::string dumpPathName;
-    std::string dumpBinaryName;
-    PipelineDumpFile* dumpFile = nullptr;
+PipelineDumpFile *PipelineDumper::BeginPipelineDump(const PipelineDumpOptions *dumpOptions,
+                                                    PipelineBuildInfo pipelineInfo, const MetroHash::Hash *hash) {
+  bool disableLog = false;
+  std::string dumpFileName;
+  std::string dumpPathName;
+  std::string dumpBinaryName;
+  PipelineDumpFile *dumpFile = nullptr;
 
-    // Filter pipeline hash
-    if (dumpOptions->filterPipelineDumpByHash != 0)
-    {
-        uint64_t hash64 = MetroHash::compact64(hash);
-        if (hash64 != dumpOptions->filterPipelineDumpByHash)
-            disableLog = true;
+  // Filter pipeline hash
+  if (dumpOptions->filterPipelineDumpByHash != 0) {
+    uint64_t hash64 = MetroHash::compact64(hash);
+    if (hash64 != dumpOptions->filterPipelineDumpByHash)
+      disableLog = true;
+  }
+
+  if (!disableLog) {
+    // Filter pipeline type
+    dumpFileName = getPipelineInfoFileName(pipelineInfo, hash);
+    if (dumpOptions->filterPipelineDumpByType & PipelineDumpFilterCs) {
+      if (dumpFileName.find("Cs") != std::string::npos)
+        disableLog = true;
+    }
+    if (dumpOptions->filterPipelineDumpByType & PipelineDumpFilterGs) {
+      if (dumpFileName.find("Gs") != std::string::npos)
+        disableLog = true;
+    }
+    if (dumpOptions->filterPipelineDumpByType & PipelineDumpFilterTess) {
+      if (dumpFileName.find("Tess") != std::string::npos)
+        disableLog = true;
+    }
+    if (dumpOptions->filterPipelineDumpByType & PipelineDumpFilterVsPs) {
+      if (dumpFileName.find("VsFs") != std::string::npos)
+        disableLog = true;
+    }
+  }
+
+  if (!disableLog) {
+    bool enableDump = true;
+    SDumpMutex.lock();
+
+    // Create the dump directory
+    createDirectory(dumpOptions->pDumpDir);
+
+    // Build dump file name
+    if (dumpOptions->dumpDuplicatePipelines) {
+      unsigned index = 0;
+      int result = 0;
+      while (result != -1) {
+        dumpPathName = dumpOptions->pDumpDir;
+        dumpPathName += "/";
+        dumpPathName += dumpFileName;
+        if (index > 0) {
+          dumpPathName += "-[";
+          dumpPathName += std::to_string(index);
+          dumpPathName += "]";
+        }
+        dumpBinaryName = dumpPathName + ".elf";
+        dumpPathName += ".pipe";
+        struct FILE_STAT fileStatus = {};
+        result = FILE_STAT(dumpPathName.c_str(), &fileStatus);
+        ++index;
+      };
+    } else {
+      static std::unordered_set<std::string> FileNames;
+
+      if (FileNames.find(dumpFileName) == FileNames.end()) {
+        dumpPathName = dumpOptions->pDumpDir;
+        dumpPathName += "/";
+        dumpPathName += dumpFileName;
+        dumpBinaryName = dumpPathName + ".elf";
+        dumpPathName += ".pipe";
+        FileNames.insert(dumpFileName);
+      } else
+        enableDump = false;
     }
 
-    if (!disableLog)
-    {
-        // Filter pipeline type
-        dumpFileName = getPipelineInfoFileName(pipelineInfo, hash);
-        if (dumpOptions->filterPipelineDumpByType & PipelineDumpFilterCs)
-        {
-            if (dumpFileName.find("Cs") != std::string::npos)
-                disableLog = true;
-        }
-        if (dumpOptions->filterPipelineDumpByType & PipelineDumpFilterGs)
-        {
-            if (dumpFileName.find("Gs") != std::string::npos)
-                disableLog = true;
-        }
-        if (dumpOptions->filterPipelineDumpByType & PipelineDumpFilterTess)
-        {
-            if (dumpFileName.find("Tess") != std::string::npos)
-                disableLog = true;
-        }
-        if (dumpOptions->filterPipelineDumpByType & PipelineDumpFilterVsPs)
-        {
-            if (dumpFileName.find("VsFs") != std::string::npos)
-                disableLog = true;
-        }
+    // Open dump file
+    if (enableDump) {
+      dumpFile = new PipelineDumpFile(dumpPathName.c_str(), dumpBinaryName.c_str());
+      if (dumpFile->dumpFile.bad()) {
+        delete dumpFile;
+        dumpFile = nullptr;
+      }
     }
 
-    if (!disableLog)
-    {
-        bool enableDump = true;
-        SDumpMutex.lock();
+    SDumpMutex.unlock();
 
-        // Create the dump directory
-        createDirectory(dumpOptions->pDumpDir);
+    // Dump pipeline input info
+    if (dumpFile) {
+      if (pipelineInfo.pComputeInfo)
+        dumpComputePipelineInfo(&dumpFile->dumpFile, dumpOptions->pDumpDir, pipelineInfo.pComputeInfo);
 
-         // Build dump file name
-        if (dumpOptions->dumpDuplicatePipelines)
-        {
-            unsigned index = 0;
-            int result = 0;
-            while (result != -1)
-            {
-                dumpPathName = dumpOptions->pDumpDir;
-                dumpPathName += "/";
-                dumpPathName += dumpFileName;
-                if (index > 0)
-                {
-                    dumpPathName += "-[";
-                    dumpPathName += std::to_string(index);
-                    dumpPathName += "]";
-                }
-                dumpBinaryName = dumpPathName + ".elf";
-                dumpPathName += ".pipe";
-                struct FILE_STAT fileStatus = {};
-                result = FILE_STAT(dumpPathName.c_str(), &fileStatus);
-                ++index;
-            };
-        }
-        else
-        {
-            static std::unordered_set<std::string> FileNames;
+      if (pipelineInfo.pGraphicsInfo)
+        dumpGraphicsPipelineInfo(&dumpFile->dumpFile, dumpOptions->pDumpDir, pipelineInfo.pGraphicsInfo);
 
-            if (FileNames.find(dumpFileName) == FileNames.end())
-            {
-                dumpPathName = dumpOptions->pDumpDir;
-                dumpPathName += "/";
-                dumpPathName += dumpFileName;
-                dumpBinaryName = dumpPathName + ".elf";
-                dumpPathName += ".pipe";
-                FileNames.insert(dumpFileName);
-            }
-            else
-                enableDump = false;
-        }
-
-        // Open dump file
-        if (enableDump)
-        {
-            dumpFile = new PipelineDumpFile(dumpPathName.c_str(), dumpBinaryName.c_str());
-            if (dumpFile->dumpFile.bad())
-            {
-                delete dumpFile;
-                dumpFile = nullptr;
-            }
-        }
-
-        SDumpMutex.unlock();
-
-        // Dump pipeline input info
-        if (dumpFile )
-        {
-            if (pipelineInfo.pComputeInfo)
-                dumpComputePipelineInfo(&dumpFile->dumpFile, dumpOptions->pDumpDir, pipelineInfo.pComputeInfo);
-
-            if (pipelineInfo.pGraphicsInfo)
-                dumpGraphicsPipelineInfo(&dumpFile->dumpFile, dumpOptions->pDumpDir, pipelineInfo.pGraphicsInfo);
-
-        }
     }
+  }
 
-    return dumpFile;
+  return dumpFile;
 }
 
 // =====================================================================================================================
 // Ends to dump graphics/compute pipeline info.
 //
 // @param dumpFile : Dump file
-void PipelineDumper::EndPipelineDump(
-    PipelineDumpFile* dumpFile)
-{
-    delete dumpFile;
-}
+void PipelineDumper::EndPipelineDump(PipelineDumpFile *dumpFile) { delete dumpFile; }
 
 // =====================================================================================================================
 // Dumps resource mapping node to dumpFile.
@@ -456,62 +372,52 @@ void PipelineDumper::EndPipelineDump(
 // @param userDataNode : User data nodes to be dumped
 // @param prefix : Prefix string for each line
 // @param [out] dumpFile : dump file
-void PipelineDumper::dumpResourceMappingNode(
-    const ResourceMappingNode* userDataNode,
-    const char*                prefix,
-    std::ostream&              dumpFile)
-{
-    dumpFile << prefix << ".type = " << userDataNode->type << "\n";
-    dumpFile << prefix << ".offsetInDwords = " << userDataNode->offsetInDwords << "\n";
-    dumpFile << prefix << ".sizeInDwords = " << userDataNode->sizeInDwords << "\n";
+void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userDataNode, const char *prefix,
+                                             std::ostream &dumpFile) {
+  dumpFile << prefix << ".type = " << userDataNode->type << "\n";
+  dumpFile << prefix << ".offsetInDwords = " << userDataNode->offsetInDwords << "\n";
+  dumpFile << prefix << ".sizeInDwords = " << userDataNode->sizeInDwords << "\n";
 
-    switch (userDataNode->type)
-    {
-    case ResourceMappingNodeType::DescriptorResource:
-    case ResourceMappingNodeType::DescriptorSampler:
-    case ResourceMappingNodeType::DescriptorYCbCrSampler:
-    case ResourceMappingNodeType::DescriptorCombinedTexture:
-    case ResourceMappingNodeType::DescriptorTexelBuffer:
-    case ResourceMappingNodeType::DescriptorBuffer:
-    case ResourceMappingNodeType::DescriptorFmask:
-    case ResourceMappingNodeType::DescriptorBufferCompact:
-        {
-            dumpFile << prefix << ".set = " << userDataNode->srdRange.set << "\n";
-            dumpFile << prefix << ".binding = " << userDataNode->srdRange.binding << "\n";
-            break;
-        }
-    case ResourceMappingNodeType::DescriptorTableVaPtr:
-        {
-            char prefixBuf[256];
-            int length = 0;
-            for (unsigned i = 0; i < userDataNode->tablePtr.nodeCount; ++i)
-            {
-                length = snprintf(prefixBuf, 256, "%s.next[%u]", prefix, i);
-                dumpResourceMappingNode(userDataNode->tablePtr.pNext + i, prefixBuf, dumpFile);
-            }
-            break;
-        }
-    case ResourceMappingNodeType::IndirectUserDataVaPtr:
-        {
-            dumpFile << prefix << ".indirectUserDataCount = " << userDataNode->userDataPtr.sizeInDwords << "\n";
-            break;
-        }
-    case ResourceMappingNodeType::StreamOutTableVaPtr:
-        {
-            break;
-        }
-    case ResourceMappingNodeType::PushConst:
-        {
-            dumpFile << prefix << ".set = " << userDataNode->srdRange.set << "\n";
-            dumpFile << prefix << ".binding = " << userDataNode->srdRange.binding << "\n";
-            break;
-        }
-    default:
-        {
-            llvm_unreachable("Should never be called!");
-            break;
-        }
+  switch (userDataNode->type) {
+  case ResourceMappingNodeType::DescriptorResource:
+  case ResourceMappingNodeType::DescriptorSampler:
+  case ResourceMappingNodeType::DescriptorYCbCrSampler:
+  case ResourceMappingNodeType::DescriptorCombinedTexture:
+  case ResourceMappingNodeType::DescriptorTexelBuffer:
+  case ResourceMappingNodeType::DescriptorBuffer:
+  case ResourceMappingNodeType::DescriptorFmask:
+  case ResourceMappingNodeType::DescriptorBufferCompact:
+  {
+    dumpFile << prefix << ".set = " << userDataNode->srdRange.set << "\n";
+    dumpFile << prefix << ".binding = " << userDataNode->srdRange.binding << "\n";
+    break;
+  }
+  case ResourceMappingNodeType::DescriptorTableVaPtr: {
+    char prefixBuf[256];
+    int length = 0;
+    for (unsigned i = 0; i < userDataNode->tablePtr.nodeCount; ++i) {
+      length = snprintf(prefixBuf, 256, "%s.next[%u]", prefix, i);
+      dumpResourceMappingNode(userDataNode->tablePtr.pNext + i, prefixBuf, dumpFile);
     }
+    break;
+  }
+  case ResourceMappingNodeType::IndirectUserDataVaPtr: {
+    dumpFile << prefix << ".indirectUserDataCount = " << userDataNode->userDataPtr.sizeInDwords << "\n";
+    break;
+  }
+  case ResourceMappingNodeType::StreamOutTableVaPtr: {
+    break;
+  }
+  case ResourceMappingNodeType::PushConst: {
+    dumpFile << prefix << ".set = " << userDataNode->srdRange.set << "\n";
+    dumpFile << prefix << ".binding = " << userDataNode->srdRange.binding << "\n";
+    break;
+  }
+  default: {
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+  }
 }
 
 // =====================================================================================================================
@@ -519,111 +425,101 @@ void PipelineDumper::dumpResourceMappingNode(
 //
 // @param shaderInfo : Shader info of specified shader stage
 // @param [out] dumpFile : dump file
-void PipelineDumper::dumpPipelineShaderInfo(
-    const PipelineShaderInfo* shaderInfo,
-    std::ostream&             dumpFile)
-{
-    const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo->pModuleData);
-    auto moduleHash = reinterpret_cast<const MetroHash::Hash*>(&moduleData->hash[0]);
+void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo, std::ostream &dumpFile) {
+  const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+  auto moduleHash = reinterpret_cast<const MetroHash::Hash *>(&moduleData->hash[0]);
 
-    // Output shader binary file
-    ShaderStage stage = shaderInfo->entryStage;
+  // Output shader binary file
+  ShaderStage stage = shaderInfo->entryStage;
 
-    dumpFile << "[" << getShaderStageAbbreviation(stage) << "SpvFile]\n";
-    dumpFile << "fileName = " << getSpirvBinaryFileName(moduleHash) << "\n\n";
+  dumpFile << "[" << getShaderStageAbbreviation(stage) << "SpvFile]\n";
+  dumpFile << "fileName = " << getSpirvBinaryFileName(moduleHash) << "\n\n";
 
-    dumpFile << "[" << getShaderStageAbbreviation(stage) << "Info]\n";
-    // Output entry point
-    if (shaderInfo->pEntryTarget )
-         dumpFile << "entryPoint = " << shaderInfo->pEntryTarget << "\n";
+  dumpFile << "[" << getShaderStageAbbreviation(stage) << "Info]\n";
+  // Output entry point
+  if (shaderInfo->pEntryTarget)
+    dumpFile << "entryPoint = " << shaderInfo->pEntryTarget << "\n";
 
-    // Output specialize info
-    if (shaderInfo->pSpecializationInfo)
-    {
-        auto specializationInfo = shaderInfo->pSpecializationInfo;
-        for (unsigned i = 0; i < specializationInfo->mapEntryCount; ++i)
-        {
-            dumpFile << "specConst.mapEntry[" << i << "].constantID = " << specializationInfo->pMapEntries[i].constantID << "\n";
-            dumpFile << "specConst.mapEntry[" << i << "].offset = " << specializationInfo->pMapEntries[i].offset << "\n";
-            dumpFile << "specConst.mapEntry[" << i << "].size = " << specializationInfo->pMapEntries[i].size << "\n";
-        }
-        const unsigned* data = reinterpret_cast<const unsigned*>(specializationInfo->pData);
-        for (unsigned i = 0; i < (specializationInfo->dataSize + sizeof(unsigned) - 1) / sizeof(unsigned); ++i)
-        {
-            if ((i % 8) == 0)
-                dumpFile << "specConst.uintData = ";
-            dumpFile << data[i];
-            if ((i % 8) == 7)
-                dumpFile << "\n";
-            else
-                dumpFile << ", ";
-        }
-        dumpFile << "\n";
+  // Output specialize info
+  if (shaderInfo->pSpecializationInfo) {
+    auto specializationInfo = shaderInfo->pSpecializationInfo;
+    for (unsigned i = 0; i < specializationInfo->mapEntryCount; ++i) {
+      dumpFile << "specConst.mapEntry[" << i << "].constantID = " << specializationInfo->pMapEntries[i].constantID
+               << "\n";
+      dumpFile << "specConst.mapEntry[" << i << "].offset = " << specializationInfo->pMapEntries[i].offset << "\n";
+      dumpFile << "specConst.mapEntry[" << i << "].size = " << specializationInfo->pMapEntries[i].size << "\n";
     }
-
-    // Output descriptor range value
-    if (shaderInfo->descriptorRangeValueCount > 0)
-    {
-        for (unsigned i = 0; i < shaderInfo->descriptorRangeValueCount; ++i)
-        {
-            auto descriptorRangeValue = &shaderInfo->pDescriptorRangeValues[i];
-            dumpFile << "descriptorRangeValue[" << i << "].type = " << descriptorRangeValue->type << "\n";
-            dumpFile << "descriptorRangeValue[" << i << "].set = " << descriptorRangeValue->set << "\n";
-            dumpFile << "descriptorRangeValue[" << i << "].binding = " << descriptorRangeValue->binding << "\n";
-            dumpFile << "descriptorRangeValue[" << i << "].arraySize = " << descriptorRangeValue->arraySize << "\n";
-            for (unsigned j = 0; j < descriptorRangeValue->arraySize; ++j)
-            {
-                dumpFile << "descriptorRangeValue[" << i << "].uintData = ";
-                const unsigned descriptorSizeInDw =
-                    descriptorRangeValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler ? 8 : 4;
-
-                for (unsigned k = 0; k < descriptorSizeInDw -1; ++k)
-                     dumpFile << descriptorRangeValue->pValue[k] << ", ";
-                dumpFile << descriptorRangeValue->pValue[descriptorSizeInDw - 1] << "\n";
-            }
-        }
+    const unsigned *data = reinterpret_cast<const unsigned *>(specializationInfo->pData);
+    for (unsigned i = 0; i < (specializationInfo->dataSize + sizeof(unsigned) - 1) / sizeof(unsigned); ++i) {
+      if ((i % 8) == 0)
+        dumpFile << "specConst.uintData = ";
+      dumpFile << data[i];
+      if ((i % 8) == 7)
         dumpFile << "\n";
+      else
+        dumpFile << ", ";
     }
+    dumpFile << "\n";
+  }
 
-    // Output resource node mapping
-    if (shaderInfo->userDataNodeCount > 0)
-    {
-        char prefixBuff[64];
-        for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i)
-        {
-            auto userDataNode = &shaderInfo->pUserDataNodes[i];
-            auto length = snprintf(prefixBuff, 64, "userDataNode[%u]", i);
-            (void(length)); // unused
-            dumpResourceMappingNode(userDataNode, prefixBuff, dumpFile);
-        }
-        dumpFile << "\n";
+  // Output descriptor range value
+  if (shaderInfo->descriptorRangeValueCount > 0) {
+    for (unsigned i = 0; i < shaderInfo->descriptorRangeValueCount; ++i) {
+      auto descriptorRangeValue = &shaderInfo->pDescriptorRangeValues[i];
+      dumpFile << "descriptorRangeValue[" << i << "].type = " << descriptorRangeValue->type << "\n";
+      dumpFile << "descriptorRangeValue[" << i << "].set = " << descriptorRangeValue->set << "\n";
+      dumpFile << "descriptorRangeValue[" << i << "].binding = " << descriptorRangeValue->binding << "\n";
+      dumpFile << "descriptorRangeValue[" << i << "].arraySize = " << descriptorRangeValue->arraySize << "\n";
+      for (unsigned j = 0; j < descriptorRangeValue->arraySize; ++j) {
+        dumpFile << "descriptorRangeValue[" << i << "].uintData = ";
+        const unsigned descriptorSizeInDw =
+            descriptorRangeValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler ? 8 : 4;
+
+        for (unsigned k = 0; k < descriptorSizeInDw - 1; ++k)
+          dumpFile << descriptorRangeValue->pValue[k] << ", ";
+        dumpFile << descriptorRangeValue->pValue[descriptorSizeInDw - 1] << "\n";
+      }
     }
+    dumpFile << "\n";
+  }
 
-    // Output pipeline shader options
-    dumpFile << "options.trapPresent = " << shaderInfo->options.trapPresent << "\n";
-    dumpFile << "options.debugMode = " << shaderInfo->options.debugMode << "\n";
-    dumpFile << "options.enablePerformanceData = " << shaderInfo->options.enablePerformanceData << "\n";
-    dumpFile << "options.allowReZ = " << shaderInfo->options.allowReZ << "\n";
-    dumpFile << "options.vgprLimit = " << shaderInfo->options.vgprLimit << "\n";
-    dumpFile << "options.sgprLimit = " << shaderInfo->options.sgprLimit << "\n";
-    dumpFile << "options.maxThreadGroupsPerComputeUnit = " << shaderInfo->options.maxThreadGroupsPerComputeUnit << "\n";
-    dumpFile << "options.waveSize = " << shaderInfo->options.waveSize << "\n";
-    dumpFile << "options.wgpMode = " << shaderInfo->options.wgpMode << "\n";
-    dumpFile << "options.waveBreakSize = " << shaderInfo->options.waveBreakSize << "\n";
-    dumpFile << "options.forceLoopUnrollCount = " << shaderInfo->options.forceLoopUnrollCount << "\n";
-    dumpFile << "options.useSiScheduler = " << shaderInfo->options.useSiScheduler << "\n";
-    dumpFile << "options.updateDescInElf = " << shaderInfo->options.updateDescInElf << "\n";
-    dumpFile << "options.allowVaryWaveSize = " << shaderInfo->options.allowVaryWaveSize << "\n";
+  // Output resource node mapping
+  if (shaderInfo->userDataNodeCount > 0) {
+    char prefixBuff[64];
+    for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
+      auto userDataNode = &shaderInfo->pUserDataNodes[i];
+      auto length = snprintf(prefixBuff, 64, "userDataNode[%u]", i);
+      (void(length)); // unused
+      dumpResourceMappingNode(userDataNode, prefixBuff, dumpFile);
+    }
+    dumpFile << "\n";
+  }
+
+  // Output pipeline shader options
+  dumpFile << "options.trapPresent = " << shaderInfo->options.trapPresent << "\n";
+  dumpFile << "options.debugMode = " << shaderInfo->options.debugMode << "\n";
+  dumpFile << "options.enablePerformanceData = " << shaderInfo->options.enablePerformanceData << "\n";
+  dumpFile << "options.allowReZ = " << shaderInfo->options.allowReZ << "\n";
+  dumpFile << "options.vgprLimit = " << shaderInfo->options.vgprLimit << "\n";
+  dumpFile << "options.sgprLimit = " << shaderInfo->options.sgprLimit << "\n";
+  dumpFile << "options.maxThreadGroupsPerComputeUnit = " << shaderInfo->options.maxThreadGroupsPerComputeUnit << "\n";
+  dumpFile << "options.waveSize = " << shaderInfo->options.waveSize << "\n";
+  dumpFile << "options.wgpMode = " << shaderInfo->options.wgpMode << "\n";
+  dumpFile << "options.waveBreakSize = " << shaderInfo->options.waveBreakSize << "\n";
+  dumpFile << "options.forceLoopUnrollCount = " << shaderInfo->options.forceLoopUnrollCount << "\n";
+  dumpFile << "options.useSiScheduler = " << shaderInfo->options.useSiScheduler << "\n";
+  dumpFile << "options.updateDescInElf = " << shaderInfo->options.updateDescInElf << "\n";
+  dumpFile << "options.allowVaryWaveSize = " << shaderInfo->options.allowVaryWaveSize << "\n";
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-    dumpFile << "options.enableLoadScalarizer = " << shaderInfo->options.enableLoadScalarizer << "\n";
+  dumpFile << "options.enableLoadScalarizer = " << shaderInfo->options.enableLoadScalarizer << "\n";
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
-    dumpFile << "options.disableLicm = " << shaderInfo->options.disableLicm << "\n";
+  dumpFile << "options.disableLicm = " << shaderInfo->options.disableLicm << "\n";
 #endif
-    dumpFile << "options.unrollThreshold = " << shaderInfo->options.unrollThreshold << "\n";
-    dumpFile << "options.scalarThreshold = " << shaderInfo->options.scalarThreshold << "\n";
+  dumpFile << "options.unrollThreshold = " << shaderInfo->options.unrollThreshold << "\n";
+  dumpFile << "options.scalarThreshold = " << shaderInfo->options.scalarThreshold << "\n";
 
-    dumpFile << "\n";
+  dumpFile << "\n";
 }
 
 // =====================================================================================================================
@@ -632,19 +528,15 @@ void PipelineDumper::dumpPipelineShaderInfo(
 // @param dumpDir : Directory of pipeline dump
 // @param spirvBin : SPIR-V binary
 // @param hash : Pipeline hash code
-void PipelineDumper::DumpSpirvBinary(
-    const char*                     dumpDir,
-    const BinaryData*               spirvBin,
-    MetroHash::Hash*                hash)
-{
-    std::string pathName = dumpDir;
-    pathName += "/";
-    pathName += getSpirvBinaryFileName(hash);
+void PipelineDumper::DumpSpirvBinary(const char *dumpDir, const BinaryData *spirvBin, MetroHash::Hash *hash) {
+  std::string pathName = dumpDir;
+  pathName += "/";
+  pathName += getSpirvBinaryFileName(hash);
 
-    // Open dumpfile
-    std::ofstream dumpFile(pathName.c_str(), std::ios_base::binary | std::ios_base::out);
-    if (!dumpFile.bad())
-        dumpFile.write(reinterpret_cast<const char*>(spirvBin->pCode), spirvBin->codeSize);
+  // Open dumpfile
+  std::ofstream dumpFile(pathName.c_str(), std::ios_base::binary | std::ios_base::out);
+  if (!dumpFile.bad())
+    dumpFile.write(reinterpret_cast<const char *>(spirvBin->pCode), spirvBin->codeSize);
 }
 
 // =====================================================================================================================
@@ -653,37 +545,30 @@ void PipelineDumper::DumpSpirvBinary(
 // @param dumpFile : Directory of pipeline dump
 // @param gfxIp : Graphics IP version info
 // @param pipelineBin : Pipeline binary (ELF)
-void PipelineDumper::DumpPipelineBinary(
-    PipelineDumpFile*                dumpFile,
-    GfxIpVersion                     gfxIp,
-    const BinaryData*                pipelineBin)
-{
-    if (dumpFile )
-    {
-        ElfReader<Elf64> reader(gfxIp);
-        size_t codeSize = pipelineBin->codeSize;
-        auto result = reader.ReadFromBuffer(pipelineBin->pCode, &codeSize);
-        assert(result == Result::Success);
-        (void(result)); // unused
+void PipelineDumper::DumpPipelineBinary(PipelineDumpFile *dumpFile, GfxIpVersion gfxIp, const BinaryData *pipelineBin) {
+  if (dumpFile) {
+    ElfReader<Elf64> reader(gfxIp);
+    size_t codeSize = pipelineBin->codeSize;
+    auto result = reader.ReadFromBuffer(pipelineBin->pCode, &codeSize);
+    assert(result == Result::Success);
+    (void(result)); // unused
 
-        dumpFile->dumpFile << "\n[CompileLog]\n";
-        dumpFile->dumpFile << reader;
+    dumpFile->dumpFile << "\n[CompileLog]\n";
+    dumpFile->dumpFile << reader;
 
-        std::string binaryFileName = dumpFile->binaryFileName;
-        if (dumpFile->binaryIndex > 0)
-        {
-            char suffixBuffer[32] = {};
-            snprintf(suffixBuffer, sizeof(suffixBuffer), ".%u", dumpFile->binaryIndex);
-            binaryFileName += suffixBuffer;
-        }
-        dumpFile->binaryIndex++;
-        dumpFile->binaryFile.open(binaryFileName.c_str(), std::ostream::out | std::ostream::binary);
-        if (!dumpFile->binaryFile.bad())
-        {
-            dumpFile->binaryFile.write(reinterpret_cast<const char*>(pipelineBin->pCode), pipelineBin->codeSize);
-            dumpFile->binaryFile.close();
-        }
+    std::string binaryFileName = dumpFile->binaryFileName;
+    if (dumpFile->binaryIndex > 0) {
+      char suffixBuffer[32] = {};
+      snprintf(suffixBuffer, sizeof(suffixBuffer), ".%u", dumpFile->binaryIndex);
+      binaryFileName += suffixBuffer;
     }
+    dumpFile->binaryIndex++;
+    dumpFile->binaryFile.open(binaryFileName.c_str(), std::ostream::out | std::ostream::binary);
+    if (!dumpFile->binaryFile.bad()) {
+      dumpFile->binaryFile.write(reinterpret_cast<const char *>(pipelineBin->pCode), pipelineBin->codeSize);
+      dumpFile->binaryFile.close();
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -691,23 +576,18 @@ void PipelineDumper::DumpPipelineBinary(
 //
 // @param dumpFile : Directory of pipeline dump
 // @param str : Extra info string
-void PipelineDumper::DumpPipelineExtraInfo(
-    PipelineDumpFile*             dumpFile,
-    const std::string*            str)
-{
-    if (dumpFile )
-        dumpFile->dumpFile << *str;
+void PipelineDumper::DumpPipelineExtraInfo(PipelineDumpFile *dumpFile, const std::string *str) {
+  if (dumpFile)
+    dumpFile->dumpFile << *str;
 }
 
 // =====================================================================================================================
 // Dumps LLPC version info to file
 //
 // @param [out] dumpFile : dump file
-void PipelineDumper::dumpVersionInfo(
-    std::ostream&                  dumpFile)
-{
-    dumpFile << "[Version]\n";
-    dumpFile << "version = " << Version << "\n\n";
+void PipelineDumper::dumpVersionInfo(std::ostream &dumpFile) {
+  dumpFile << "[Version]\n";
+  dumpFile << "version = " << Version << "\n\n";
 }
 
 // =====================================================================================================================
@@ -716,16 +596,13 @@ void PipelineDumper::dumpVersionInfo(
 // @param pipelineInfo : Info of the graphics pipeline to be built
 // @param dumpDir : Directory of pipeline dump
 // @param [out] dumpFile : dump file
-void PipelineDumper::dumpComputeStateInfo(
-    const ComputePipelineBuildInfo* pipelineInfo,
-    const char*                     dumpDir,
-    std::ostream&                   dumpFile)
-{
-    dumpFile << "[ComputePipelineState]\n";
+void PipelineDumper::dumpComputeStateInfo(const ComputePipelineBuildInfo *pipelineInfo, const char *dumpDir,
+                                          std::ostream &dumpFile) {
+  dumpFile << "[ComputePipelineState]\n";
 
-    // Output pipeline states
-    dumpFile << "deviceIndex = " << pipelineInfo->deviceIndex << "\n";
-    dumpPipelineOptions(&pipelineInfo->options, dumpFile);
+  // Output pipeline states
+  dumpFile << "deviceIndex = " << pipelineInfo->deviceIndex << "\n";
+  dumpPipelineOptions(&pipelineInfo->options, dumpFile);
 }
 
 // =====================================================================================================================
@@ -733,17 +610,14 @@ void PipelineDumper::dumpComputeStateInfo(
 //
 // @param options : Pipeline options
 // @param [out] dumpFile : dump file
-void PipelineDumper::dumpPipelineOptions(
-    const PipelineOptions*   options,
-    std::ostream&            dumpFile)
-{
-    dumpFile << "options.includeDisassembly = " << options->includeDisassembly << "\n";
-    dumpFile << "options.scalarBlockLayout = " << options->scalarBlockLayout << "\n";
-    dumpFile << "options.includeIr = " << options->includeIr << "\n";
-    dumpFile << "options.robustBufferAccess = " << options->robustBufferAccess << "\n";
-    dumpFile << "options.reconfigWorkgroupLayout = " << options->reconfigWorkgroupLayout << "\n";
-    dumpFile << "options.shadowDescriptorTableUsage = " << options->shadowDescriptorTableUsage << "\n";
-    dumpFile << "options.shadowDescriptorTablePtrHigh = " << options->shadowDescriptorTablePtrHigh << "\n";
+void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::ostream &dumpFile) {
+  dumpFile << "options.includeDisassembly = " << options->includeDisassembly << "\n";
+  dumpFile << "options.scalarBlockLayout = " << options->scalarBlockLayout << "\n";
+  dumpFile << "options.includeIr = " << options->includeIr << "\n";
+  dumpFile << "options.robustBufferAccess = " << options->robustBufferAccess << "\n";
+  dumpFile << "options.reconfigWorkgroupLayout = " << options->reconfigWorkgroupLayout << "\n";
+  dumpFile << "options.shadowDescriptorTableUsage = " << options->shadowDescriptorTableUsage << "\n";
+  dumpFile << "options.shadowDescriptorTablePtrHigh = " << options->shadowDescriptorTablePtrHigh << "\n";
 }
 
 // =====================================================================================================================
@@ -752,18 +626,15 @@ void PipelineDumper::dumpPipelineOptions(
 // @param dumpFile : Pipeline dump file
 // @param dumpDir : Directory of pipeline dump
 // @param pipelineInfo : Info of the compute pipeline to be built
-void PipelineDumper::dumpComputePipelineInfo(
-    std::ostream*                   dumpFile,
-    const char*                     dumpDir,
-    const ComputePipelineBuildInfo* pipelineInfo)
-{
-    dumpVersionInfo(*dumpFile);
+void PipelineDumper::dumpComputePipelineInfo(std::ostream *dumpFile, const char *dumpDir,
+                                             const ComputePipelineBuildInfo *pipelineInfo) {
+  dumpVersionInfo(*dumpFile);
 
-    // Output shader info
-    dumpPipelineShaderInfo(&pipelineInfo->cs, *dumpFile);
-    dumpComputeStateInfo(pipelineInfo, dumpDir, *dumpFile);
+  // Output shader info
+  dumpPipelineShaderInfo(&pipelineInfo->cs, *dumpFile);
+  dumpComputeStateInfo(pipelineInfo, dumpDir, *dumpFile);
 
-    dumpFile->flush();
+  dumpFile->flush();
 }
 
 // =====================================================================================================================
@@ -772,100 +643,90 @@ void PipelineDumper::dumpComputePipelineInfo(
 // @param pipelineInfo : Info of the graphics pipeline to be built
 // @param dumpDir : Directory of pipeline dump
 // @param [out] dumpFile : dump file
-void PipelineDumper::dumpGraphicsStateInfo(
-    const GraphicsPipelineBuildInfo* pipelineInfo,
-    const char*                      dumpDir,
-    std::ostream&                    dumpFile)
-{
-    dumpFile << "[GraphicsPipelineState]\n";
+void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipelineInfo, const char *dumpDir,
+                                           std::ostream &dumpFile) {
+  dumpFile << "[GraphicsPipelineState]\n";
 
-    // Output pipeline states
-    dumpFile << "topology = " << pipelineInfo->iaState.topology << "\n";
-    dumpFile << "patchControlPoints = " << pipelineInfo->iaState.patchControlPoints << "\n";
-    dumpFile << "deviceIndex = " << pipelineInfo->iaState.deviceIndex << "\n";
-    dumpFile << "disableVertexReuse = " << pipelineInfo->iaState.disableVertexReuse << "\n";
-    dumpFile << "switchWinding = " << pipelineInfo->iaState.switchWinding << "\n";
-    dumpFile << "enableMultiView = " << pipelineInfo->iaState.enableMultiView << "\n";
-    dumpFile << "depthClipEnable = " << pipelineInfo->vpState.depthClipEnable << "\n";
+  // Output pipeline states
+  dumpFile << "topology = " << pipelineInfo->iaState.topology << "\n";
+  dumpFile << "patchControlPoints = " << pipelineInfo->iaState.patchControlPoints << "\n";
+  dumpFile << "deviceIndex = " << pipelineInfo->iaState.deviceIndex << "\n";
+  dumpFile << "disableVertexReuse = " << pipelineInfo->iaState.disableVertexReuse << "\n";
+  dumpFile << "switchWinding = " << pipelineInfo->iaState.switchWinding << "\n";
+  dumpFile << "enableMultiView = " << pipelineInfo->iaState.enableMultiView << "\n";
+  dumpFile << "depthClipEnable = " << pipelineInfo->vpState.depthClipEnable << "\n";
 
-    dumpFile << "rasterizerDiscardEnable = " << pipelineInfo->rsState.rasterizerDiscardEnable << "\n";
-    dumpFile << "perSampleShading = " << pipelineInfo->rsState.perSampleShading << "\n";
-    dumpFile << "numSamples = " << pipelineInfo->rsState.numSamples << "\n";
-    dumpFile << "samplePatternIdx = " << pipelineInfo->rsState.samplePatternIdx << "\n";
-    dumpFile << "usrClipPlaneMask = " << static_cast<unsigned>(pipelineInfo->rsState.usrClipPlaneMask) << "\n";
-    dumpFile << "polygonMode = " << pipelineInfo->rsState.polygonMode << "\n";
-    dumpFile << "cullMode = " << static_cast<VkCullModeFlagBits>(pipelineInfo->rsState.cullMode) << "\n";
-    dumpFile << "frontFace = " << pipelineInfo->rsState.frontFace << "\n";
-    dumpFile << "depthBiasEnable = " << pipelineInfo->rsState.depthBiasEnable << "\n";
-    dumpFile << "alphaToCoverageEnable = " << pipelineInfo->cbState.alphaToCoverageEnable << "\n";
-    dumpFile << "dualSourceBlendEnable = " << pipelineInfo->cbState.dualSourceBlendEnable << "\n";
+  dumpFile << "rasterizerDiscardEnable = " << pipelineInfo->rsState.rasterizerDiscardEnable << "\n";
+  dumpFile << "perSampleShading = " << pipelineInfo->rsState.perSampleShading << "\n";
+  dumpFile << "numSamples = " << pipelineInfo->rsState.numSamples << "\n";
+  dumpFile << "samplePatternIdx = " << pipelineInfo->rsState.samplePatternIdx << "\n";
+  dumpFile << "usrClipPlaneMask = " << static_cast<unsigned>(pipelineInfo->rsState.usrClipPlaneMask) << "\n";
+  dumpFile << "polygonMode = " << pipelineInfo->rsState.polygonMode << "\n";
+  dumpFile << "cullMode = " << static_cast<VkCullModeFlagBits>(pipelineInfo->rsState.cullMode) << "\n";
+  dumpFile << "frontFace = " << pipelineInfo->rsState.frontFace << "\n";
+  dumpFile << "depthBiasEnable = " << pipelineInfo->rsState.depthBiasEnable << "\n";
+  dumpFile << "alphaToCoverageEnable = " << pipelineInfo->cbState.alphaToCoverageEnable << "\n";
+  dumpFile << "dualSourceBlendEnable = " << pipelineInfo->cbState.dualSourceBlendEnable << "\n";
 
-    for (unsigned i = 0; i < MaxColorTargets; ++i)
-    {
-        if (pipelineInfo->cbState.target[i].format != VK_FORMAT_UNDEFINED)
-        {
-            auto cbTarget = &pipelineInfo->cbState.target[i];
-            dumpFile << "colorBuffer[" << i << "].format = " << cbTarget->format << "\n";
-            dumpFile << "colorBuffer[" << i << "].channelWriteMask = " << static_cast<unsigned>(cbTarget->channelWriteMask) << "\n";
-            dumpFile << "colorBuffer[" << i << "].blendEnable = " << cbTarget->blendEnable << "\n";
-            dumpFile << "colorBuffer[" << i << "].blendSrcAlphaToColor = " << cbTarget->blendSrcAlphaToColor << "\n";
-        }
+  for (unsigned i = 0; i < MaxColorTargets; ++i) {
+    if (pipelineInfo->cbState.target[i].format != VK_FORMAT_UNDEFINED) {
+      auto cbTarget = &pipelineInfo->cbState.target[i];
+      dumpFile << "colorBuffer[" << i << "].format = " << cbTarget->format << "\n";
+      dumpFile << "colorBuffer[" << i << "].channelWriteMask = " << static_cast<unsigned>(cbTarget->channelWriteMask)
+               << "\n";
+      dumpFile << "colorBuffer[" << i << "].blendEnable = " << cbTarget->blendEnable << "\n";
+      dumpFile << "colorBuffer[" << i << "].blendSrcAlphaToColor = " << cbTarget->blendSrcAlphaToColor << "\n";
+    }
+  }
+
+  dumpFile << "nggState.enableNgg = " << pipelineInfo->nggState.enableNgg << "\n";
+  dumpFile << "nggState.enableGsUse = " << pipelineInfo->nggState.enableGsUse << "\n";
+  dumpFile << "nggState.forceNonPassthrough = " << pipelineInfo->nggState.forceNonPassthrough << "\n";
+  dumpFile << "nggState.alwaysUsePrimShaderTable = " << pipelineInfo->nggState.alwaysUsePrimShaderTable << "\n";
+  dumpFile << "nggState.compactMode = " << pipelineInfo->nggState.compactMode << "\n";
+  dumpFile << "nggState.enableFastLaunch = " << pipelineInfo->nggState.enableFastLaunch << "\n";
+  dumpFile << "nggState.enableVertexReuse = " << pipelineInfo->nggState.enableVertexReuse << "\n";
+  dumpFile << "nggState.enableBackfaceCulling = " << pipelineInfo->nggState.enableBackfaceCulling << "\n";
+  dumpFile << "nggState.enableFrustumCulling = " << pipelineInfo->nggState.enableFrustumCulling << "\n";
+  dumpFile << "nggState.enableBoxFilterCulling = " << pipelineInfo->nggState.enableBoxFilterCulling << "\n";
+  dumpFile << "nggState.enableSphereCulling = " << pipelineInfo->nggState.enableSphereCulling << "\n";
+  dumpFile << "nggState.enableSmallPrimFilter = " << pipelineInfo->nggState.enableSmallPrimFilter << "\n";
+  dumpFile << "nggState.enableCullDistanceCulling = " << pipelineInfo->nggState.enableCullDistanceCulling << "\n";
+  dumpFile << "nggState.backfaceExponent = " << pipelineInfo->nggState.backfaceExponent << "\n";
+  dumpFile << "nggState.subgroupSizing = " << pipelineInfo->nggState.subgroupSizing << "\n";
+  dumpFile << "nggState.primsPerSubgroup = " << pipelineInfo->nggState.primsPerSubgroup << "\n";
+  dumpFile << "nggState.vertsPerSubgroup = " << pipelineInfo->nggState.vertsPerSubgroup << "\n";
+
+  dumpPipelineOptions(&pipelineInfo->options, dumpFile);
+  dumpFile << "\n\n";
+
+  // Output vertex input state
+  if (pipelineInfo->pVertexInput && pipelineInfo->pVertexInput->vertexBindingDescriptionCount > 0) {
+    dumpFile << "[VertexInputState]\n";
+    for (unsigned i = 0; i < pipelineInfo->pVertexInput->vertexBindingDescriptionCount; ++i) {
+      auto binding = &pipelineInfo->pVertexInput->pVertexBindingDescriptions[i];
+      dumpFile << "binding[" << i << "].binding = " << binding->binding << "\n";
+      dumpFile << "binding[" << i << "].stride = " << binding->stride << "\n";
+      dumpFile << "binding[" << i << "].inputRate = " << binding->inputRate << "\n";
     }
 
-    dumpFile << "nggState.enableNgg = " << pipelineInfo->nggState.enableNgg << "\n";
-    dumpFile << "nggState.enableGsUse = " << pipelineInfo->nggState.enableGsUse << "\n";
-    dumpFile << "nggState.forceNonPassthrough = " << pipelineInfo->nggState.forceNonPassthrough << "\n";
-    dumpFile << "nggState.alwaysUsePrimShaderTable = " << pipelineInfo->nggState.alwaysUsePrimShaderTable << "\n";
-    dumpFile << "nggState.compactMode = " << pipelineInfo->nggState.compactMode << "\n";
-    dumpFile << "nggState.enableFastLaunch = " << pipelineInfo->nggState.enableFastLaunch << "\n";
-    dumpFile << "nggState.enableVertexReuse = " << pipelineInfo->nggState.enableVertexReuse << "\n";
-    dumpFile << "nggState.enableBackfaceCulling = " << pipelineInfo->nggState.enableBackfaceCulling << "\n";
-    dumpFile << "nggState.enableFrustumCulling = " << pipelineInfo->nggState.enableFrustumCulling << "\n";
-    dumpFile << "nggState.enableBoxFilterCulling = " << pipelineInfo->nggState.enableBoxFilterCulling << "\n";
-    dumpFile << "nggState.enableSphereCulling = " << pipelineInfo->nggState.enableSphereCulling << "\n";
-    dumpFile << "nggState.enableSmallPrimFilter = " << pipelineInfo->nggState.enableSmallPrimFilter << "\n";
-    dumpFile << "nggState.enableCullDistanceCulling = " << pipelineInfo->nggState.enableCullDistanceCulling << "\n";
-    dumpFile << "nggState.backfaceExponent = " << pipelineInfo->nggState.backfaceExponent << "\n";
-    dumpFile << "nggState.subgroupSizing = " << pipelineInfo->nggState.subgroupSizing << "\n";
-    dumpFile << "nggState.primsPerSubgroup = " << pipelineInfo->nggState.primsPerSubgroup << "\n";
-    dumpFile << "nggState.vertsPerSubgroup = " << pipelineInfo->nggState.vertsPerSubgroup << "\n";
-
-    dumpPipelineOptions(&pipelineInfo->options, dumpFile);
-    dumpFile << "\n\n";
-
-    // Output vertex input state
-    if (pipelineInfo->pVertexInput &&
-        pipelineInfo->pVertexInput->vertexBindingDescriptionCount > 0)
-    {
-        dumpFile << "[VertexInputState]\n";
-        for (unsigned i = 0; i < pipelineInfo->pVertexInput->vertexBindingDescriptionCount; ++i)
-        {
-            auto binding = &pipelineInfo->pVertexInput->pVertexBindingDescriptions[i];
-            dumpFile << "binding[" << i << "].binding = " << binding->binding << "\n";
-            dumpFile << "binding[" << i << "].stride = " << binding->stride << "\n";
-            dumpFile << "binding[" << i << "].inputRate = " << binding->inputRate << "\n";
-        }
-
-        for (unsigned i = 0; i < pipelineInfo->pVertexInput->vertexAttributeDescriptionCount; ++i)
-        {
-            auto attrib = &pipelineInfo->pVertexInput->pVertexAttributeDescriptions[i];
-            dumpFile << "attribute[" << i << "].location = " << attrib->location << "\n";
-            dumpFile << "attribute[" << i << "].binding = " << attrib->binding << "\n";
-            dumpFile << "attribute[" << i << "].format = " << attrib->format << "\n";
-            dumpFile << "attribute[" << i << "].offset = " << attrib->offset << "\n";
-        }
-
-        auto divisorState= findVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
-            VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT,
-            pipelineInfo->pVertexInput->pNext);
-
-        for (unsigned i = 0; divisorState && i < divisorState->vertexBindingDivisorCount; ++i)
-        {
-            auto divisor = &divisorState->pVertexBindingDivisors[i];
-            dumpFile << "divisor[" << i << "].binding = " << divisor->binding << "\n";
-            dumpFile << "divisor[" << i << "].divisor = " << divisor->divisor << "\n";
-        }
+    for (unsigned i = 0; i < pipelineInfo->pVertexInput->vertexAttributeDescriptionCount; ++i) {
+      auto attrib = &pipelineInfo->pVertexInput->pVertexAttributeDescriptions[i];
+      dumpFile << "attribute[" << i << "].location = " << attrib->location << "\n";
+      dumpFile << "attribute[" << i << "].binding = " << attrib->binding << "\n";
+      dumpFile << "attribute[" << i << "].format = " << attrib->format << "\n";
+      dumpFile << "attribute[" << i << "].offset = " << attrib->offset << "\n";
     }
+
+    auto divisorState = findVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
+        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT, pipelineInfo->pVertexInput->pNext);
+
+    for (unsigned i = 0; divisorState && i < divisorState->vertexBindingDivisorCount; ++i) {
+      auto divisor = &divisorState->pVertexBindingDivisors[i];
+      dumpFile << "divisor[" << i << "].binding = " << divisor->binding << "\n";
+      dumpFile << "divisor[" << i << "].divisor = " << divisor->divisor << "\n";
+    }
+  }
 
 }
 
@@ -875,33 +736,24 @@ void PipelineDumper::dumpGraphicsStateInfo(
 // @param dumpFile : Pipeline dump file
 // @param dumpDir : Directory of pipeline dump
 // @param pipelineInfo : Info of the graphics pipeline to be built
-void PipelineDumper::dumpGraphicsPipelineInfo(
-    std::ostream*                    dumpFile,
-    const char*                      dumpDir,
-    const GraphicsPipelineBuildInfo* pipelineInfo)
-{
-    dumpVersionInfo(*dumpFile);
-    // Dump pipeline
-    const PipelineShaderInfo* shaderInfos[ShaderStageGfxCount] =
-    {
-        &pipelineInfo->vs,
-        &pipelineInfo->tcs,
-        &pipelineInfo->tes,
-        &pipelineInfo->gs,
-        &pipelineInfo->fs,
-    };
+void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char *dumpDir,
+                                              const GraphicsPipelineBuildInfo *pipelineInfo) {
+  dumpVersionInfo(*dumpFile);
+  // Dump pipeline
+  const PipelineShaderInfo *shaderInfos[ShaderStageGfxCount] = {
+      &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
+  };
 
-    for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage)
-    {
-        const PipelineShaderInfo* shaderInfo = shaderInfos[stage];
-        if (!shaderInfo->pModuleData )
-            continue;
-        dumpPipelineShaderInfo(shaderInfo, *dumpFile);
-    }
+  for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage) {
+    const PipelineShaderInfo *shaderInfo = shaderInfos[stage];
+    if (!shaderInfo->pModuleData)
+      continue;
+    dumpPipelineShaderInfo(shaderInfo, *dumpFile);
+  }
 
-    dumpGraphicsStateInfo(pipelineInfo, dumpDir, *dumpFile);
+  dumpGraphicsStateInfo(pipelineInfo, dumpDir, *dumpFile);
 
-    dumpFile->flush();
+  dumpFile->flush();
 }
 
 // =====================================================================================================================
@@ -912,57 +764,52 @@ void PipelineDumper::dumpGraphicsPipelineInfo(
 // @param pipeline : Info to build a graphics pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
 // @param stage : The stage for which we are building the hash. ShaderStageInvalid if building for the entire pipeline.
-MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(
-    const GraphicsPipelineBuildInfo* pipeline,
-    bool                            isCacheHash,
-    unsigned                        stage)
-{
-    MetroHash64 hasher;
+MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline,
+                                                                bool isCacheHash, unsigned stage) {
+  MetroHash64 hasher;
 
-    switch (stage)
-    {
-        case ShaderStageVertex:
-            updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher);
-            break;
-        case ShaderStageTessControl:
-            updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher);
-            break;
-        case ShaderStageTessEval:
-            updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher);
-            break;
-        case ShaderStageGeometry:
-            updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher);
-            break;
-        case ShaderStageFragment:
-            updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher);
-            break;
-        case ShaderStageInvalid:
-            updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher);
-            updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher);
-            updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher);
-            updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher);
-            updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher);
-            break;
-        default:
-            llvm_unreachable("Should never be called!");
-            break;
-    }
+  switch (stage) {
+  case ShaderStageVertex:
+    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher);
+    break;
+  case ShaderStageTessControl:
+    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher);
+    break;
+  case ShaderStageTessEval:
+    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher);
+    break;
+  case ShaderStageGeometry:
+    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher);
+    break;
+  case ShaderStageFragment:
+    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher);
+    break;
+  case ShaderStageInvalid:
+    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher);
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
 
-    hasher.Update(pipeline->iaState.deviceIndex);
+  hasher.Update(pipeline->iaState.deviceIndex);
 
-    if (stage != ShaderStageFragment)
-    {
-        updateHashForVertexInputState(pipeline->pVertexInput, &hasher);
-        updateHashForNonFragmentState(pipeline, isCacheHash, &hasher);
-    }
+  if (stage != ShaderStageFragment) {
+    updateHashForVertexInputState(pipeline->pVertexInput, &hasher);
+    updateHashForNonFragmentState(pipeline, isCacheHash, &hasher);
+  }
 
-    if (stage == ShaderStageFragment || stage == ShaderStageInvalid)
-        updateHashForFragmentState(pipeline, &hasher);
+  if (stage == ShaderStageFragment || stage == ShaderStageInvalid)
+    updateHashForFragmentState(pipeline, &hasher);
 
-    MetroHash::Hash hash = {};
-    hasher.Finalize(hash.bytes);
+  MetroHash::Hash hash = {};
+  hasher.Finalize(hash.bytes);
 
-    return hash;
+  return hash;
 }
 
 // =====================================================================================================================
@@ -970,26 +817,23 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(
 //
 // @param pipeline : Info to build a compute pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
-MetroHash::Hash PipelineDumper::generateHashForComputePipeline(
-    const ComputePipelineBuildInfo* pipeline,
-    bool                            isCacheHash
-    )
-{
-    MetroHash64 hasher;
+MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline,
+                                                               bool isCacheHash) {
+  MetroHash64 hasher;
 
-    updateHashForPipelineShaderInfo(ShaderStageCompute, &pipeline->cs, isCacheHash, &hasher);
-    hasher.Update(pipeline->deviceIndex);
-    hasher.Update(pipeline->options.includeDisassembly);
-    hasher.Update(pipeline->options.scalarBlockLayout);
-    hasher.Update(pipeline->options.includeIr);
-    hasher.Update(pipeline->options.robustBufferAccess);
-    hasher.Update(pipeline->options.shadowDescriptorTableUsage);
-    hasher.Update(pipeline->options.shadowDescriptorTablePtrHigh);
+  updateHashForPipelineShaderInfo(ShaderStageCompute, &pipeline->cs, isCacheHash, &hasher);
+  hasher.Update(pipeline->deviceIndex);
+  hasher.Update(pipeline->options.includeDisassembly);
+  hasher.Update(pipeline->options.scalarBlockLayout);
+  hasher.Update(pipeline->options.includeIr);
+  hasher.Update(pipeline->options.robustBufferAccess);
+  hasher.Update(pipeline->options.shadowDescriptorTableUsage);
+  hasher.Update(pipeline->options.shadowDescriptorTablePtrHigh);
 
-    MetroHash::Hash hash = {};
-    hasher.Finalize(hash.bytes);
+  MetroHash::Hash hash = {};
+  hasher.Finalize(hash.bytes);
 
-    return hash;
+  return hash;
 }
 
 // =====================================================================================================================
@@ -997,33 +841,27 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(
 //
 // @param vertexInput : Vertex input state
 // @param [in,out] hasher : Haher to generate hash code
-void PipelineDumper::updateHashForVertexInputState(
-    const VkPipelineVertexInputStateCreateInfo* vertexInput,
-    MetroHash64*                                hasher)
-{
-    if (vertexInput && vertexInput->vertexBindingDescriptionCount > 0)
-    {
-        hasher->Update(vertexInput->vertexBindingDescriptionCount);
-        hasher->Update(reinterpret_cast<const uint8_t*>(vertexInput->pVertexBindingDescriptions),
-            sizeof(VkVertexInputBindingDescription) * vertexInput->vertexBindingDescriptionCount);
-        hasher->Update(vertexInput->vertexAttributeDescriptionCount);
-        if (vertexInput->vertexAttributeDescriptionCount > 0)
-        {
-            hasher->Update(reinterpret_cast<const uint8_t*>(vertexInput->pVertexAttributeDescriptions),
-                sizeof(VkVertexInputAttributeDescription) * vertexInput->vertexAttributeDescriptionCount);
-        }
-
-        auto vertexDivisor = findVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
-            VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT,
-            vertexInput->pNext);
-        unsigned divisorCount = vertexDivisor ? vertexDivisor->vertexBindingDivisorCount : 0;
-        hasher->Update(divisorCount);
-        if (divisorCount > 0)
-        {
-            hasher->Update(reinterpret_cast<const uint8_t*>(vertexDivisor->pVertexBindingDivisors),
-                sizeof(VkVertexInputBindingDivisorDescriptionEXT) * divisorCount);
-        }
+void PipelineDumper::updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo *vertexInput,
+                                                   MetroHash64 *hasher) {
+  if (vertexInput && vertexInput->vertexBindingDescriptionCount > 0) {
+    hasher->Update(vertexInput->vertexBindingDescriptionCount);
+    hasher->Update(reinterpret_cast<const uint8_t *>(vertexInput->pVertexBindingDescriptions),
+                   sizeof(VkVertexInputBindingDescription) * vertexInput->vertexBindingDescriptionCount);
+    hasher->Update(vertexInput->vertexAttributeDescriptionCount);
+    if (vertexInput->vertexAttributeDescriptionCount > 0) {
+      hasher->Update(reinterpret_cast<const uint8_t *>(vertexInput->pVertexAttributeDescriptions),
+                     sizeof(VkVertexInputAttributeDescription) * vertexInput->vertexAttributeDescriptionCount);
     }
+
+    auto vertexDivisor = findVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
+        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT, vertexInput->pNext);
+    unsigned divisorCount = vertexDivisor ? vertexDivisor->vertexBindingDivisorCount : 0;
+    hasher->Update(divisorCount);
+    if (divisorCount > 0) {
+      hasher->Update(reinterpret_cast<const uint8_t *>(vertexDivisor->pVertexBindingDivisors),
+                     sizeof(VkVertexInputBindingDivisorDescriptionEXT) * divisorCount);
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -1032,75 +870,66 @@ void PipelineDumper::updateHashForVertexInputState(
 // @param pipeline : Info to build a graphics pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
 // @param [in,out] hasher : Hasher to generate hash code
-void PipelineDumper::updateHashForNonFragmentState(
-    const GraphicsPipelineBuildInfo* pipeline,
-    bool                             isCacheHash,
-    MetroHash64*                     hasher)
-{
-    auto iaState = &pipeline->iaState;
-    hasher->Update(iaState->topology);
-    hasher->Update(iaState->patchControlPoints);
-    hasher->Update(iaState->disableVertexReuse);
-    hasher->Update(iaState->switchWinding);
-    hasher->Update(iaState->enableMultiView);
+void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
+                                                   MetroHash64 *hasher) {
+  auto iaState = &pipeline->iaState;
+  hasher->Update(iaState->topology);
+  hasher->Update(iaState->patchControlPoints);
+  hasher->Update(iaState->disableVertexReuse);
+  hasher->Update(iaState->switchWinding);
+  hasher->Update(iaState->enableMultiView);
 
-    auto vpState = &pipeline->vpState;
-    hasher->Update(vpState->depthClipEnable);
+  auto vpState = &pipeline->vpState;
+  hasher->Update(vpState->depthClipEnable);
 
-    auto rsState = &pipeline->rsState;
-    hasher->Update(rsState->rasterizerDiscardEnable);
+  auto rsState = &pipeline->rsState;
+  hasher->Update(rsState->rasterizerDiscardEnable);
 
-    auto nggState = &pipeline->nggState;
-    bool enableNgg = nggState->enableNgg;
-    bool passthroughMode =
-        !nggState->enableVertexReuse &&
-        !nggState->enableBackfaceCulling &&
-        !nggState->enableFrustumCulling &&
-        !nggState->enableBoxFilterCulling &&
-        !nggState->enableSphereCulling &&
-        !nggState->enableSmallPrimFilter &&
-        !nggState->enableCullDistanceCulling;
+  auto nggState = &pipeline->nggState;
+  bool enableNgg = nggState->enableNgg;
+  bool passthroughMode = !nggState->enableVertexReuse && !nggState->enableBackfaceCulling &&
+                         !nggState->enableFrustumCulling && !nggState->enableBoxFilterCulling &&
+                         !nggState->enableSphereCulling && !nggState->enableSmallPrimFilter &&
+                         !nggState->enableCullDistanceCulling;
 
-    bool updateHashFromRs = (!isCacheHash);
-    updateHashFromRs |= (enableNgg && !passthroughMode);
+  bool updateHashFromRs = (!isCacheHash);
+  updateHashFromRs |= (enableNgg && !passthroughMode);
 
-    if (updateHashFromRs)
-    {
-        hasher->Update(rsState->usrClipPlaneMask);
-        hasher->Update(rsState->polygonMode);
-        hasher->Update(rsState->cullMode);
-        hasher->Update(rsState->frontFace);
-        hasher->Update(rsState->depthBiasEnable);
-    }
+  if (updateHashFromRs) {
+    hasher->Update(rsState->usrClipPlaneMask);
+    hasher->Update(rsState->polygonMode);
+    hasher->Update(rsState->cullMode);
+    hasher->Update(rsState->frontFace);
+    hasher->Update(rsState->depthBiasEnable);
+  }
 
-    if (isCacheHash)
-    {
-        hasher->Update(nggState->enableNgg);
-        hasher->Update(nggState->enableGsUse);
-        hasher->Update(nggState->forceNonPassthrough);
-        hasher->Update(nggState->alwaysUsePrimShaderTable);
-        hasher->Update(nggState->compactMode);
-        hasher->Update(nggState->enableFastLaunch);
-        hasher->Update(nggState->enableVertexReuse);
-        hasher->Update(nggState->enableBackfaceCulling);
-        hasher->Update(nggState->enableFrustumCulling);
-        hasher->Update(nggState->enableBoxFilterCulling);
-        hasher->Update(nggState->enableSphereCulling);
-        hasher->Update(nggState->enableSmallPrimFilter);
-        hasher->Update(nggState->enableCullDistanceCulling);
-        hasher->Update(nggState->backfaceExponent);
-        hasher->Update(nggState->subgroupSizing);
-        hasher->Update(nggState->primsPerSubgroup);
-        hasher->Update(nggState->vertsPerSubgroup);
+  if (isCacheHash) {
+    hasher->Update(nggState->enableNgg);
+    hasher->Update(nggState->enableGsUse);
+    hasher->Update(nggState->forceNonPassthrough);
+    hasher->Update(nggState->alwaysUsePrimShaderTable);
+    hasher->Update(nggState->compactMode);
+    hasher->Update(nggState->enableFastLaunch);
+    hasher->Update(nggState->enableVertexReuse);
+    hasher->Update(nggState->enableBackfaceCulling);
+    hasher->Update(nggState->enableFrustumCulling);
+    hasher->Update(nggState->enableBoxFilterCulling);
+    hasher->Update(nggState->enableSphereCulling);
+    hasher->Update(nggState->enableSmallPrimFilter);
+    hasher->Update(nggState->enableCullDistanceCulling);
+    hasher->Update(nggState->backfaceExponent);
+    hasher->Update(nggState->subgroupSizing);
+    hasher->Update(nggState->primsPerSubgroup);
+    hasher->Update(nggState->vertsPerSubgroup);
 
-        hasher->Update(pipeline->options.includeDisassembly);
-        hasher->Update(pipeline->options.scalarBlockLayout);
-        hasher->Update(pipeline->options.includeIr);
-        hasher->Update(pipeline->options.robustBufferAccess);
-        hasher->Update(pipeline->options.reconfigWorkgroupLayout);
-        hasher->Update(pipeline->options.shadowDescriptorTableUsage);
-        hasher->Update(pipeline->options.shadowDescriptorTablePtrHigh);
-    }
+    hasher->Update(pipeline->options.includeDisassembly);
+    hasher->Update(pipeline->options.scalarBlockLayout);
+    hasher->Update(pipeline->options.includeIr);
+    hasher->Update(pipeline->options.robustBufferAccess);
+    hasher->Update(pipeline->options.reconfigWorkgroupLayout);
+    hasher->Update(pipeline->options.shadowDescriptorTableUsage);
+    hasher->Update(pipeline->options.shadowDescriptorTablePtrHigh);
+  }
 }
 
 // =====================================================================================================================
@@ -1108,29 +937,24 @@ void PipelineDumper::updateHashForNonFragmentState(
 //
 // @param pipeline : Info to build a graphics pipeline
 // @param [in,out] hasher : Hasher to generate hash code
-void PipelineDumper::updateHashForFragmentState(
-    const GraphicsPipelineBuildInfo* pipeline,
-    MetroHash64*                     hasher)
-{
-    auto rsState = &pipeline->rsState;
-    hasher->Update(rsState->innerCoverage);
-    hasher->Update(rsState->perSampleShading);
-    hasher->Update(rsState->numSamples);
-    hasher->Update(rsState->samplePatternIdx);
+void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher) {
+  auto rsState = &pipeline->rsState;
+  hasher->Update(rsState->innerCoverage);
+  hasher->Update(rsState->perSampleShading);
+  hasher->Update(rsState->numSamples);
+  hasher->Update(rsState->samplePatternIdx);
 
-    auto cbState = &pipeline->cbState;
-    hasher->Update(cbState->alphaToCoverageEnable);
-    hasher->Update(cbState->dualSourceBlendEnable);
-    for (unsigned i = 0; i < MaxColorTargets; ++i)
-    {
-        if (cbState->target[i].format != VK_FORMAT_UNDEFINED)
-        {
-            hasher->Update(cbState->target[i].channelWriteMask);
-            hasher->Update(cbState->target[i].blendEnable);
-            hasher->Update(cbState->target[i].blendSrcAlphaToColor);
-            hasher->Update(cbState->target[i].format);
-        }
+  auto cbState = &pipeline->cbState;
+  hasher->Update(cbState->alphaToCoverageEnable);
+  hasher->Update(cbState->dualSourceBlendEnable);
+  for (unsigned i = 0; i < MaxColorTargets; ++i) {
+    if (cbState->target[i].format != VK_FORMAT_UNDEFINED) {
+      hasher->Update(cbState->target[i].channelWriteMask);
+      hasher->Update(cbState->target[i].blendEnable);
+      hasher->Update(cbState->target[i].blendSrcAlphaToColor);
+      hasher->Update(cbState->target[i].format);
     }
+  }
 }
 
 // =====================================================================================================================
@@ -1140,108 +964,91 @@ void PipelineDumper::updateHashForFragmentState(
 // @param shaderInfo : Shader info in specified shader stage
 // @param isCacheHash : TRUE if the hash is used by shader cache
 // @param [in,out] hasher : Haher to generate hash code
-void PipelineDumper::updateHashForPipelineShaderInfo(
-    ShaderStage               stage,
-    const PipelineShaderInfo* shaderInfo,
-    bool                      isCacheHash,
-    MetroHash64*              hasher
-    )
-{
-    if (shaderInfo->pModuleData)
-    {
-        const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo->pModuleData);
-        hasher->Update(stage);
-        if (isCacheHash)
-        {
-            hasher->Update(static_cast<const uint8_t*>(voidPtrInc(moduleData, ShaderModuleCacheHashOffset)),
-                sizeof(moduleData->hash));
-        }
-        else
-            hasher->Update(moduleData->hash);
+void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo,
+                                                     bool isCacheHash, MetroHash64 *hasher) {
+  if (shaderInfo->pModuleData) {
+    const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+    hasher->Update(stage);
+    if (isCacheHash) {
+      hasher->Update(static_cast<const uint8_t *>(voidPtrInc(moduleData, ShaderModuleCacheHashOffset)),
+                     sizeof(moduleData->hash));
+    } else
+      hasher->Update(moduleData->hash);
 
-        size_t entryNameLen = 0;
-        if (shaderInfo->pEntryTarget)
-        {
-            entryNameLen = strlen(shaderInfo->pEntryTarget);
-            hasher->Update(entryNameLen);
-            hasher->Update(reinterpret_cast<const uint8_t*>(shaderInfo->pEntryTarget), entryNameLen);
-        }
-        else
-            hasher->Update(entryNameLen);
+    size_t entryNameLen = 0;
+    if (shaderInfo->pEntryTarget) {
+      entryNameLen = strlen(shaderInfo->pEntryTarget);
+      hasher->Update(entryNameLen);
+      hasher->Update(reinterpret_cast<const uint8_t *>(shaderInfo->pEntryTarget), entryNameLen);
+    } else
+      hasher->Update(entryNameLen);
 
-        auto specializationInfo = shaderInfo->pSpecializationInfo;
-        unsigned mapEntryCount = specializationInfo ? specializationInfo->mapEntryCount : 0;
-        hasher->Update(mapEntryCount);
-        if (mapEntryCount > 0)
-        {
-            hasher->Update(reinterpret_cast<const uint8_t*>(specializationInfo->pMapEntries),
-                            sizeof(VkSpecializationMapEntry) * specializationInfo->mapEntryCount);
-            hasher->Update(specializationInfo->dataSize);
-            hasher->Update(reinterpret_cast<const uint8_t*>(specializationInfo->pData),
-                            specializationInfo->dataSize);
-        }
+    auto specializationInfo = shaderInfo->pSpecializationInfo;
+    unsigned mapEntryCount = specializationInfo ? specializationInfo->mapEntryCount : 0;
+    hasher->Update(mapEntryCount);
+    if (mapEntryCount > 0) {
+      hasher->Update(reinterpret_cast<const uint8_t *>(specializationInfo->pMapEntries),
+                     sizeof(VkSpecializationMapEntry) * specializationInfo->mapEntryCount);
+      hasher->Update(specializationInfo->dataSize);
+      hasher->Update(reinterpret_cast<const uint8_t *>(specializationInfo->pData), specializationInfo->dataSize);
+    }
 
-        hasher->Update(shaderInfo->descriptorRangeValueCount);
-        if (shaderInfo->descriptorRangeValueCount > 0)
-        {
-            for (unsigned i = 0; i < shaderInfo->descriptorRangeValueCount; ++i)
-            {
-                auto descriptorRangeValue = &shaderInfo->pDescriptorRangeValues[i];
-                hasher->Update(descriptorRangeValue->type);
-                hasher->Update(descriptorRangeValue->set);
-                hasher->Update(descriptorRangeValue->binding);
-                hasher->Update(descriptorRangeValue->arraySize);
+    hasher->Update(shaderInfo->descriptorRangeValueCount);
+    if (shaderInfo->descriptorRangeValueCount > 0) {
+      for (unsigned i = 0; i < shaderInfo->descriptorRangeValueCount; ++i) {
+        auto descriptorRangeValue = &shaderInfo->pDescriptorRangeValues[i];
+        hasher->Update(descriptorRangeValue->type);
+        hasher->Update(descriptorRangeValue->set);
+        hasher->Update(descriptorRangeValue->binding);
+        hasher->Update(descriptorRangeValue->arraySize);
 
-                // TODO: We should query descriptor size from patch
+        // TODO: We should query descriptor size from patch
 
-                // The second part of DescriptorRangeValue is YCbCrMetaData, which is 4 DWORDS.
-                // The hasher should be updated when the content changes, this is because YCbCrMetaData
-                // is engaged in pipeline compiling.
-                const unsigned descriptorSize =
-                    descriptorRangeValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 16 : 32;
+        // The second part of DescriptorRangeValue is YCbCrMetaData, which is 4 DWORDS.
+        // The hasher should be updated when the content changes, this is because YCbCrMetaData
+        // is engaged in pipeline compiling.
+        const unsigned descriptorSize =
+            descriptorRangeValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 16 : 32;
 
-                hasher->Update(reinterpret_cast<const uint8_t*>(descriptorRangeValue->pValue),
-                                descriptorRangeValue->arraySize * descriptorSize);
-            }
-        }
+        hasher->Update(reinterpret_cast<const uint8_t *>(descriptorRangeValue->pValue),
+                       descriptorRangeValue->arraySize * descriptorSize);
+      }
+    }
 
-        hasher->Update(shaderInfo->userDataNodeCount);
-        if (shaderInfo->userDataNodeCount > 0)
-        {
-            for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i)
-            {
-                auto userDataNode = &shaderInfo->pUserDataNodes[i];
-                updateHashForResourceMappingNode(userDataNode, true, hasher);
-            }
-        }
+    hasher->Update(shaderInfo->userDataNodeCount);
+    if (shaderInfo->userDataNodeCount > 0) {
+      for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
+        auto userDataNode = &shaderInfo->pUserDataNodes[i];
+        updateHashForResourceMappingNode(userDataNode, true, hasher);
+      }
+    }
 
-        if (isCacheHash)
-        {
-            auto& options = shaderInfo->options;
-            hasher->Update(options.trapPresent);
-            hasher->Update(options.debugMode);
-            hasher->Update(options.enablePerformanceData);
-            hasher->Update(options.allowReZ);
-            hasher->Update(options.sgprLimit);
-            hasher->Update(options.vgprLimit);
-            hasher->Update(options.maxThreadGroupsPerComputeUnit);
-            hasher->Update(options.waveSize);
-            hasher->Update(options.wgpMode);
-            hasher->Update(options.waveBreakSize);
-            hasher->Update(options.forceLoopUnrollCount);
-            hasher->Update(options.useSiScheduler);
-            hasher->Update(options.updateDescInElf);
-            hasher->Update(options.allowVaryWaveSize);
+    if (isCacheHash) {
+      auto &options = shaderInfo->options;
+      hasher->Update(options.trapPresent);
+      hasher->Update(options.debugMode);
+      hasher->Update(options.enablePerformanceData);
+      hasher->Update(options.allowReZ);
+      hasher->Update(options.sgprLimit);
+      hasher->Update(options.vgprLimit);
+      hasher->Update(options.maxThreadGroupsPerComputeUnit);
+      hasher->Update(options.waveSize);
+      hasher->Update(options.wgpMode);
+      hasher->Update(options.waveBreakSize);
+      hasher->Update(options.forceLoopUnrollCount);
+      hasher->Update(options.useSiScheduler);
+      hasher->Update(options.updateDescInElf);
+      hasher->Update(options.allowVaryWaveSize);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-            hasher->Update(options.enableLoadScalarizer);
+      hasher->Update(options.enableLoadScalarizer);
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
-            hasher->Update(options.disableLicm);
+      hasher->Update(options.disableLicm);
 #endif
-            hasher->Update(options.unrollThreshold);
-            hasher->Update(options.scalarThreshold);
-        }
+      hasher->Update(options.unrollThreshold);
+      hasher->Update(options.scalarThreshold);
     }
+  }
 }
 
 // =====================================================================================================================
@@ -1252,58 +1059,48 @@ void PipelineDumper::updateHashForPipelineShaderInfo(
 // @param userDataNode : Resource mapping node
 // @param isRootNode : TRUE if the node is in root level
 // @param [in,out] hasher : Haher to generate hash code
-void PipelineDumper::updateHashForResourceMappingNode(
-    const ResourceMappingNode* userDataNode,
-    bool                       isRootNode,
-    MetroHash64*               hasher
-    )
-{
-    hasher->Update(userDataNode->type);
-    hasher->Update(userDataNode->sizeInDwords);
-    hasher->Update(userDataNode->offsetInDwords);
+void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode *userDataNode, bool isRootNode,
+                                                      MetroHash64 *hasher) {
+  hasher->Update(userDataNode->type);
+  hasher->Update(userDataNode->sizeInDwords);
+  hasher->Update(userDataNode->offsetInDwords);
 
-    switch (userDataNode->type)
-    {
-    case ResourceMappingNodeType::DescriptorResource:
-    case ResourceMappingNodeType::DescriptorSampler:
-    case ResourceMappingNodeType::DescriptorYCbCrSampler:
-    case ResourceMappingNodeType::DescriptorCombinedTexture:
-    case ResourceMappingNodeType::DescriptorTexelBuffer:
-    case ResourceMappingNodeType::DescriptorBuffer:
-    case ResourceMappingNodeType::DescriptorFmask:
-    case ResourceMappingNodeType::DescriptorBufferCompact:
-        {
-            hasher->Update(userDataNode->srdRange);
-            break;
-        }
-    case ResourceMappingNodeType::DescriptorTableVaPtr:
-        {
-            for (unsigned i = 0; i < userDataNode->tablePtr.nodeCount; ++i)
-                updateHashForResourceMappingNode(&userDataNode->tablePtr.pNext[i], false, hasher);
-            break;
-        }
-    case ResourceMappingNodeType::IndirectUserDataVaPtr:
-        {
-            hasher->Update(userDataNode->userDataPtr);
-            break;
-        }
-    case ResourceMappingNodeType::StreamOutTableVaPtr:
-        {
-            // Do nothing for the stream-out table
-            break;
-        }
-    case ResourceMappingNodeType::PushConst:
-        {
-            if (!isRootNode)
-                hasher->Update(userDataNode->srdRange);
-            break;
-        }
-    default:
-        {
-            llvm_unreachable("Should never be called!");
-            break;
-        }
-    }
+  switch (userDataNode->type) {
+  case ResourceMappingNodeType::DescriptorResource:
+  case ResourceMappingNodeType::DescriptorSampler:
+  case ResourceMappingNodeType::DescriptorYCbCrSampler:
+  case ResourceMappingNodeType::DescriptorCombinedTexture:
+  case ResourceMappingNodeType::DescriptorTexelBuffer:
+  case ResourceMappingNodeType::DescriptorBuffer:
+  case ResourceMappingNodeType::DescriptorFmask:
+  case ResourceMappingNodeType::DescriptorBufferCompact:
+  {
+    hasher->Update(userDataNode->srdRange);
+    break;
+  }
+  case ResourceMappingNodeType::DescriptorTableVaPtr: {
+    for (unsigned i = 0; i < userDataNode->tablePtr.nodeCount; ++i)
+      updateHashForResourceMappingNode(&userDataNode->tablePtr.pNext[i], false, hasher);
+    break;
+  }
+  case ResourceMappingNodeType::IndirectUserDataVaPtr: {
+    hasher->Update(userDataNode->userDataPtr);
+    break;
+  }
+  case ResourceMappingNodeType::StreamOutTableVaPtr: {
+    // Do nothing for the stream-out table
+    break;
+  }
+  case ResourceMappingNodeType::PushConst: {
+    if (!isRootNode)
+      hasher->Update(userDataNode->srdRange);
+    break;
+  }
+  default: {
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+  }
 }
 
 // =====================================================================================================================
@@ -1314,471 +1111,382 @@ template <class OStream>
 // @param startPos : Starting position
 // @param endPos : End position
 // @param [out] out : Output stream
-void outputText(
-    const uint8_t* data,
-    unsigned       startPos,
-    unsigned       endPos,
-    OStream&       out)
-{
-    if (endPos > startPos)
-    {
-        // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
-        // text print will be incorrect.
-        uint8_t lastChar = data[endPos - 1];
-        const_cast<uint8_t*>(data)[endPos - 1] = '\0';
-        const char* end = reinterpret_cast<const char*>(&(data)[endPos]);
-        // Output text
-        const char* text = reinterpret_cast<const char*>(data + startPos);
-        while (text != end)
-        {
-            out << text;
-            text += strlen(text);
-            text++;
-        }
-
-        if (lastChar != 0)
-            out << static_cast<char>(lastChar);
-        // Restore last character
-        const_cast<uint8_t*>(data)[endPos - 1] = lastChar;
+void outputText(const uint8_t *data, unsigned startPos, unsigned endPos, OStream &out) {
+  if (endPos > startPos) {
+    // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
+    // text print will be incorrect.
+    uint8_t lastChar = data[endPos - 1];
+    const_cast<uint8_t *>(data)[endPos - 1] = '\0';
+    const char *end = reinterpret_cast<const char *>(&(data)[endPos]);
+    // Output text
+    const char *text = reinterpret_cast<const char *>(data + startPos);
+    while (text != end) {
+      out << text;
+      text += strlen(text);
+      text++;
     }
+
+    if (lastChar != 0)
+      out << static_cast<char>(lastChar);
+    // Restore last character
+    const_cast<uint8_t *>(data)[endPos - 1] = lastChar;
+  }
 }
 
 // =====================================================================================================================
 // Outputs binary data with specified range to output stream.
-template<class OStream>
+template <class OStream>
 //
 // @param data : Binary data
 // @param startPos : Starting position
 // @param endPos : End position
 // @param [out] out : Output stream
-void outputBinary(
-    const uint8_t* data,
-    unsigned       startPos,
-    unsigned       endPos,
-    OStream&       out)
-{
-    const unsigned* startData = reinterpret_cast<const unsigned*>(data + startPos);
-    int dwordCount = (endPos - startPos) / sizeof(unsigned);
-    char formatBuf[256];
-    for (int i = 0; i < dwordCount; ++i)
-    {
-        size_t length = 0;
-        if (i % 8 == 0)
-        {
-            length = snprintf(formatBuf, sizeof(formatBuf), "    %7u:", startPos + i * 4u);
-            out << formatBuf;
-        }
-        length = snprintf(formatBuf, sizeof(formatBuf), "%08X", startData[i]);
-        (void(length)); // unused
-        out << formatBuf;
-
-        if (i % 8 == 7)
-            out << "\n";
-        else
-            out << " ";
+void outputBinary(const uint8_t *data, unsigned startPos, unsigned endPos, OStream &out) {
+  const unsigned *startData = reinterpret_cast<const unsigned *>(data + startPos);
+  int dwordCount = (endPos - startPos) / sizeof(unsigned);
+  char formatBuf[256];
+  for (int i = 0; i < dwordCount; ++i) {
+    size_t length = 0;
+    if (i % 8 == 0) {
+      length = snprintf(formatBuf, sizeof(formatBuf), "    %7u:", startPos + i * 4u);
+      out << formatBuf;
     }
+    length = snprintf(formatBuf, sizeof(formatBuf), "%08X", startData[i]);
+    (void(length)); // unused
+    out << formatBuf;
 
-    if (endPos > startPos && (endPos - startPos) % sizeof(unsigned))
-    {
-        int padPos = dwordCount * sizeof(unsigned);
-        for (int i = padPos; i < endPos; ++i)
-        {
-            auto length = snprintf(formatBuf, sizeof(formatBuf), "%02X", data[i]);
-            (void(length)); // unused
-            out << formatBuf;
-        }
+    if (i % 8 == 7)
+      out << "\n";
+    else
+      out << " ";
+  }
+
+  if (endPos > startPos && (endPos - startPos) % sizeof(unsigned)) {
+    int padPos = dwordCount * sizeof(unsigned);
+    for (int i = padPos; i < endPos; ++i) {
+      auto length = snprintf(formatBuf, sizeof(formatBuf), "%02X", data[i]);
+      (void(length)); // unused
+      out << formatBuf;
     }
+  }
 
-    if ((dwordCount % 8) != 0)
-        out << "\n";
+  if ((dwordCount % 8) != 0)
+    out << "\n";
 }
 
 // =====================================================================================================================
 //  Dumps ELF package to out stream
-template<class OStream, class Elf>
+template <class OStream, class Elf>
 //
 // @param [out] out : Output stream
 // @param reader : ELF object
-OStream& operator<<(
-    OStream&          out,
-    ElfReader<Elf>&   reader)
-{
-    unsigned sectionCount = reader.getSectionCount();
-    char formatBuf[256];
+OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
+  unsigned sectionCount = reader.getSectionCount();
+  char formatBuf[256];
 
-    for (unsigned sortIdx = 0; sortIdx < sectionCount; ++sortIdx)
-    {
-        typename ElfReader<Elf>::SectionBuffer* section = nullptr;
-        unsigned secIdx = 0;
-        Result result = reader.getSectionDataBySortingIndex(sortIdx, &secIdx, &section);
-        assert(result == Result::Success);
-        (void(result)); // unused
-        if (strcmp(section->name, ShStrTabName) == 0 ||
-            strcmp(section->name, StrTabName) == 0 ||
-            strcmp(section->name, SymTabName) == 0)
-        {
-            // Output system section
-            out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
+  for (unsigned sortIdx = 0; sortIdx < sectionCount; ++sortIdx) {
+    typename ElfReader<Elf>::SectionBuffer *section = nullptr;
+    unsigned secIdx = 0;
+    Result result = reader.getSectionDataBySortingIndex(sortIdx, &secIdx, &section);
+    assert(result == Result::Success);
+    (void(result)); // unused
+    if (strcmp(section->name, ShStrTabName) == 0 || strcmp(section->name, StrTabName) == 0 ||
+        strcmp(section->name, SymTabName) == 0) {
+      // Output system section
+      out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
+    } else if (strcmp(section->name, NoteName) == 0) {
+      // Output .note section
+      out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
+      unsigned offset = 0;
+      const unsigned noteHeaderSize = sizeof(NoteHeader) - 8;
+      while (offset < section->secHead.shSize) {
+        const NoteHeader *node = reinterpret_cast<const NoteHeader *>(section->data + offset);
+        const unsigned noteNameSize = alignTo(node->nameSize, 4);
+        switch (static_cast<unsigned>(node->type)) {
+        case static_cast<unsigned>(Util::Abi::PipelineAbiNoteType::HsaIsa): {
+          out << "    HsaIsa                       (name = " << node->name << "  size = " << node->descSize << ")\n";
+
+          auto gpu = reinterpret_cast<const Util::Abi::AbiAmdGpuVersionNote *>(section->data + offset + noteHeaderSize +
+                                                                               noteNameSize);
+
+          out << "        vendorName  = " << gpu->vendorName << "\n";
+          out << "        archName    = " << gpu->archName << "\n";
+          out << "        gfxIp       = " << gpu->gfxipMajorVer << "." << gpu->gfxipMinorVer << "."
+              << gpu->gfxipStepping << "\n";
+          break;
         }
-        else if (strcmp(section->name, NoteName) == 0)
-        {
-            // Output .note section
-            out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
-            unsigned offset = 0;
-            const unsigned noteHeaderSize = sizeof(NoteHeader) - 8;
-            while (offset < section->secHead.shSize)
-            {
-                const NoteHeader* node = reinterpret_cast<const NoteHeader*>(section->data + offset);
-                const unsigned noteNameSize = alignTo(node->nameSize, 4);
-                switch (static_cast<unsigned>(node->type))
-                {
-                case static_cast<unsigned>(Util::Abi::PipelineAbiNoteType::HsaIsa):
-                {
-                    out << "    HsaIsa                       (name = "
-                        << node->name << "  size = " << node->descSize << ")\n";
+        case static_cast<unsigned>(Util::Abi::PipelineAbiNoteType::AbiMinorVersion): {
+          out << "    AbiMinorVersion              (name = " << node->name << "  size = " << node->descSize << ")\n";
 
-                    auto gpu = reinterpret_cast<const Util::Abi::AbiAmdGpuVersionNote*>(
-                        section->data + offset + noteHeaderSize + noteNameSize);
-
-                    out << "        vendorName  = " << gpu->vendorName << "\n";
-                    out << "        archName    = " << gpu->archName << "\n";
-                    out << "        gfxIp       = " << gpu->gfxipMajorVer << "."
-                        << gpu->gfxipMinorVer << "."
-                        << gpu->gfxipStepping << "\n";
-                    break;
-                }
-                case static_cast<unsigned>(Util::Abi::PipelineAbiNoteType::AbiMinorVersion):
-                {
-                    out << "    AbiMinorVersion              (name = "
-                        << node->name << "  size = " << node->descSize << ")\n";
-
-                    auto codeVersion = reinterpret_cast<const Util::Abi::AbiMinorVersionNote *>(
-                        section->data + offset + noteHeaderSize + noteNameSize);
-                    out << "        minor = " << codeVersion->minorVersion << "\n";
-                    break;
-                }
-                case static_cast<unsigned>(Util::Abi::PipelineAbiNoteType::PalMetadata):
-                {
-                    out << "    PalMetadata                  (name = "
-                        << node->name << "  size = " << node->descSize << ")\n";
-
-                    auto buffer = section->data + offset + noteHeaderSize + noteNameSize;
-                    auto descSize = node->descSize;
-                    reader.initMsgPackDocument(buffer, descSize);
-
-                    do
-                    {
-                        auto node = reader.getMsgNode();
-                        auto msgIterStatus = reader.getMsgIteratorStatus();
-                        switch (node->getKind())
-                        {
-                        case msgpack::Type::Int:
-                        case msgpack::Type::UInt:
-                            {
-                                if (msgIterStatus == MsgPackIteratorMapKey)
-                                {
-                                    unsigned regId = static_cast<unsigned>(node->getUInt());
-                                    const char* regName = PipelineDumper::getRegisterNameString(regId);
-
-                                    auto length = snprintf(formatBuf,
-                                        sizeof(formatBuf),
-                                        "%-45s ",
-                                        regName);
-                                    (void(length)); // unused
-                                    out << formatBuf;
-                                }
-                                else
-                                {
-                                    auto length = snprintf(formatBuf,
-                                        sizeof(formatBuf),
-                                        "0x%016" PRIX64 " ",
-                                        node->getUInt());
-                                    (void(length)); // unused
-                                    out << formatBuf;
-                                }
-                                break;
-                            }
-                        case msgpack::Type::String:
-                        case msgpack::Type::Binary:
-                            {
-                                outputText((const uint8_t*)(node->getString().data()),
-                                    0,
-                                    node->getString().size(),
-                                    out);
-                                if (msgIterStatus == MsgPackIteratorMapKey)
-                                    out << ": ";
-                                break;
-                            }
-                        case msgpack::Type::Array:
-                            {
-                                if (msgIterStatus == MsgPackIteratorArray)
-                                    out << "[ ";
-                                else
-                                    out << "]";
-                                break;
-                            }
-                        case msgpack::Type::Map:
-                            {
-                                if (msgIterStatus == MsgPackIteratorMapPair)
-                                {
-                                    out << "\n";
-                                        for (unsigned i = 0; i < reader.getMsgMapLevel(); ++i)
-                                            out << "    ";
-                                }
-                                else if (msgIterStatus == MsgPackIteratorMapBegin)
-                                    out << "{";
-                                else
-                                    out << "}";
-                                break;
-                            }
-                        case msgpack::Type::Float:
-                            {
-                                out << node->getFloat() << " ";
-                                break;
-                            }
-                        case msgpack::Type::Nil:
-                            {
-                                break;
-                            }
-                        case msgpack::Type::Boolean:
-                            {
-                                out << node->getBool() << " ";
-                                break;
-                            }
-                        default:
-                            {
-                                llvm_unreachable("Should never be called!");
-                                break;
-                            }
-                        }
-
-                    } while (reader.getNextMsgNode());
-                    out << "\n";
-                    break;
-                }
-                default:
-                {
-                    if (static_cast<unsigned>(node->type) == NtAmdAmdgpuIsa)
-                    {
-                        out << "    IsaVersion                   (name = "
-                            << node->name << "  size = " << node->descSize << ")\n";
-                        auto desc = section->data + offset + noteHeaderSize + noteNameSize;
-                        outputText(desc, 0, node->descSize, out);
-                        out << "\n";
-                    }
-                    else
-                    {
-                        out << "    Unknown(" << (unsigned)node->type << ")                (name = "
-                            << node->name << "  size = " << node->descSize << ")\n";
-                        auto desc = section->data + offset + noteHeaderSize + noteNameSize;
-                        outputBinary(desc, 0, node->descSize, out);
-                    }
-                    break;
-                }
-                }
-                offset += noteHeaderSize + noteNameSize + alignTo(node->descSize, sizeof(unsigned));
-                assert(offset <= section->secHead.shSize);
-            }
+          auto codeVersion = reinterpret_cast<const Util::Abi::AbiMinorVersionNote *>(section->data + offset +
+                                                                                      noteHeaderSize + noteNameSize);
+          out << "        minor = " << codeVersion->minorVersion << "\n";
+          break;
         }
-        else if (strcmp(section->name, RelocName) == 0)
-        {
-            // Output .reloc section
-            out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
-            const unsigned relocCount = reader.getRelocationCount();
-            for (unsigned i = 0; i < relocCount; ++i)
-            {
-                ElfReloc reloc = {};
-                reader.getRelocation(i, &reloc);
-                ElfSymbol elfSym = {};
-                reader.getSymbol(reloc.symIdx, &elfSym);
-                auto length = snprintf(formatBuf, sizeof(formatBuf), "    %-35s", elfSym.pSymName);
-                (void(length)); // unused
-                out << "#" << i << "    " << formatBuf
-                    << "    offset = " << reloc.offset << "\n";
-            }
-        }
-        else if (strncmp(section->name, AmdGpuConfigName, sizeof(AmdGpuConfigName) - 1) == 0)
-        {
-            // Output .AMDGPU.config section
-            const unsigned configCount = static_cast<unsigned>(section->secHead.shSize / sizeof(unsigned) / 2);
-            const unsigned* config = reinterpret_cast<const unsigned*>(section->data);
-            out << section->name << " (" << configCount << " registers)\n";
+        case static_cast<unsigned>(Util::Abi::PipelineAbiNoteType::PalMetadata): {
+          out << "    PalMetadata                  (name = " << node->name << "  size = " << node->descSize << ")\n";
 
-            for (unsigned i = 0; i < configCount; ++i)
-            {
-                const char* regName = PipelineDumper::getRegisterNameString(config[2 * i] / 4);
-                auto length = snprintf(formatBuf, sizeof(formatBuf), "        %-45s = 0x%08X\n", regName, config[2 * i + 1]);
+          auto buffer = section->data + offset + noteHeaderSize + noteNameSize;
+          auto descSize = node->descSize;
+          reader.initMsgPackDocument(buffer, descSize);
+
+          do {
+            auto node = reader.getMsgNode();
+            auto msgIterStatus = reader.getMsgIteratorStatus();
+            switch (node->getKind()) {
+            case msgpack::Type::Int:
+            case msgpack::Type::UInt: {
+              if (msgIterStatus == MsgPackIteratorMapKey) {
+                unsigned regId = static_cast<unsigned>(node->getUInt());
+                const char *regName = PipelineDumper::getRegisterNameString(regId);
+
+                auto length = snprintf(formatBuf, sizeof(formatBuf), "%-45s ", regName);
                 (void(length)); // unused
                 out << formatBuf;
+              } else {
+                auto length = snprintf(formatBuf, sizeof(formatBuf), "0x%016" PRIX64 " ", node->getUInt());
+                (void(length)); // unused
+                out << formatBuf;
+              }
+              break;
             }
-        }
-        else if (strncmp(section->name, AmdGpuDisasmName, sizeof(AmdGpuDisasmName) - 1) == 0 ||
-            strncmp(section->name, AmdGpuCsdataName, sizeof(AmdGpuCsdataName) - 1) == 0 ||
-            strncmp(section->name, CommentName, sizeof(CommentName) - 1) == 0)
-        {
-            // Output text based sections
-            out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
-
-            std::vector<ElfSymbol> symbols;
-            reader.GetSymbolsBySectionIndex(secIdx, symbols);
-            unsigned symIdx = 0;
-            unsigned startPos = 0;
-            unsigned endPos = 0;
-            while (startPos < section->secHead.shSize)
-            {
-                if (symIdx < symbols.size())
-                    endPos = static_cast<unsigned>(symbols[symIdx].value);
-                else
-                    endPos = static_cast<unsigned>(section->secHead.shSize);
-
-                outputText(section->data, startPos, endPos, out);
+            case msgpack::Type::String:
+            case msgpack::Type::Binary: {
+              outputText((const uint8_t *)(node->getString().data()), 0, node->getString().size(), out);
+              if (msgIterStatus == MsgPackIteratorMapKey)
+                out << ": ";
+              break;
+            }
+            case msgpack::Type::Array: {
+              if (msgIterStatus == MsgPackIteratorArray)
+                out << "[ ";
+              else
+                out << "]";
+              break;
+            }
+            case msgpack::Type::Map: {
+              if (msgIterStatus == MsgPackIteratorMapPair) {
                 out << "\n";
-
-                if (symIdx < symbols.size())
-                {
-                    out << "    " << symbols[symIdx].pSymName
-                        << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size;
-                    MetroHash::Hash hash = {};
-                    MetroHash64::Hash(
-                        reinterpret_cast<const uint8_t*>(
-                            voidPtrInc(section->data, static_cast<size_t>(symbols[symIdx].value))),
-                        symbols[symIdx].size,
-                        hash.bytes);
-                    uint64_t hashCode64 = MetroHash::compact64(&hash);
-                    snprintf(formatBuf, sizeof(formatBuf), " hash = 0x%016" PRIX64 ")\n", hashCode64);
-                    out << formatBuf;
-                }
-                ++symIdx;
-                startPos = endPos;
+                for (unsigned i = 0; i < reader.getMsgMapLevel(); ++i)
+                  out << "    ";
+              } else if (msgIterStatus == MsgPackIteratorMapBegin)
+                out << "{";
+              else
+                out << "}";
+              break;
             }
+            case msgpack::Type::Float: {
+              out << node->getFloat() << " ";
+              break;
+            }
+            case msgpack::Type::Nil: {
+              break;
+            }
+            case msgpack::Type::Boolean: {
+              out << node->getBool() << " ";
+              break;
+            }
+            default: {
+              llvm_unreachable("Should never be called!");
+              break;
+            }
+            }
+
+          } while (reader.getNextMsgNode());
+          out << "\n";
+          break;
         }
-        else if (strncmp(section->name, Util::Abi::AmdGpuCommentName, sizeof(Util::Abi::AmdGpuCommentName) - 1) == 0)
-        {
-            auto name = section->name;
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 475
-            if (strncmp(name, Util::Abi::AmdGpuCommentAmdIlName, sizeof(Util::Abi::AmdGpuCommentAmdIlName) - 1) == 0)
-#else
-            if (strncmp(name, ".AMDGPU.comment.amdil", sizeof(".AMDGPU.comment.amdil") - 1) == 0)
-#endif
-            {
-                // Output text based sections
-                out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
-
-                std::vector<ElfSymbol> symbols;
-                reader.GetSymbolsBySectionIndex(secIdx, symbols);
-                unsigned symIdx = 0;
-                unsigned startPos = 0;
-                unsigned endPos = 0;
-                while (startPos < section->secHead.shSize)
-                {
-                    if (symIdx < symbols.size())
-                        endPos = static_cast<unsigned>(symbols[symIdx].value);
-                    else
-                        endPos = static_cast<unsigned>(section->secHead.shSize);
-
-                    outputText(section->data, startPos, endPos, out);
-                    out << "\n";
-
-                    if (symIdx < symbols.size())
-                    {
-                        out << "    " << symbols[symIdx].pSymName
-                            << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size;
-                        MetroHash::Hash hash = {};
-                        MetroHash64::Hash(
-                            reinterpret_cast<const uint8_t*>(
-                                voidPtrInc(section->data, static_cast<size_t>(symbols[symIdx].value))),
-                            symbols[symIdx].size,
-                            hash.bytes);
-                        uint64_t hashCode64 = MetroHash::compact64(&hash);
-                        snprintf(formatBuf, sizeof(formatBuf), " hash = 0x%016" PRIX64 ")\n", hashCode64);
-                        out << formatBuf;
-                    }
-                    ++symIdx;
-                    startPos = endPos;
-                }
-            }
-            else
-            {
-                // Output text based sections
-                out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
-
-                outputText(section->data, 0, static_cast<unsigned>(section->secHead.shSize), out);
-            }
+        default: {
+          if (static_cast<unsigned>(node->type) == NtAmdAmdgpuIsa) {
+            out << "    IsaVersion                   (name = " << node->name << "  size = " << node->descSize << ")\n";
+            auto desc = section->data + offset + noteHeaderSize + noteNameSize;
+            outputText(desc, 0, node->descSize, out);
+            out << "\n";
+          } else {
+            out << "    Unknown(" << (unsigned)node->type << ")                (name = " << node->name
+                << "  size = " << node->descSize << ")\n";
+            auto desc = section->data + offset + noteHeaderSize + noteNameSize;
+            outputBinary(desc, 0, node->descSize, out);
+          }
+          break;
         }
+        }
+        offset += noteHeaderSize + noteNameSize + alignTo(node->descSize, sizeof(unsigned));
+        assert(offset <= section->secHead.shSize);
+      }
+    } else if (strcmp(section->name, RelocName) == 0) {
+      // Output .reloc section
+      out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
+      const unsigned relocCount = reader.getRelocationCount();
+      for (unsigned i = 0; i < relocCount; ++i) {
+        ElfReloc reloc = {};
+        reader.getRelocation(i, &reloc);
+        ElfSymbol elfSym = {};
+        reader.getSymbol(reloc.symIdx, &elfSym);
+        auto length = snprintf(formatBuf, sizeof(formatBuf), "    %-35s", elfSym.pSymName);
+        (void(length)); // unused
+        out << "#" << i << "    " << formatBuf << "    offset = " << reloc.offset << "\n";
+      }
+    } else if (strncmp(section->name, AmdGpuConfigName, sizeof(AmdGpuConfigName) - 1) == 0) {
+      // Output .AMDGPU.config section
+      const unsigned configCount = static_cast<unsigned>(section->secHead.shSize / sizeof(unsigned) / 2);
+      const unsigned *config = reinterpret_cast<const unsigned *>(section->data);
+      out << section->name << " (" << configCount << " registers)\n";
+
+      for (unsigned i = 0; i < configCount; ++i) {
+        const char *regName = PipelineDumper::getRegisterNameString(config[2 * i] / 4);
+        auto length = snprintf(formatBuf, sizeof(formatBuf), "        %-45s = 0x%08X\n", regName, config[2 * i + 1]);
+        (void(length)); // unused
+        out << formatBuf;
+      }
+    } else if (strncmp(section->name, AmdGpuDisasmName, sizeof(AmdGpuDisasmName) - 1) == 0 ||
+               strncmp(section->name, AmdGpuCsdataName, sizeof(AmdGpuCsdataName) - 1) == 0 ||
+               strncmp(section->name, CommentName, sizeof(CommentName) - 1) == 0) {
+      // Output text based sections
+      out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
+
+      std::vector<ElfSymbol> symbols;
+      reader.GetSymbolsBySectionIndex(secIdx, symbols);
+      unsigned symIdx = 0;
+      unsigned startPos = 0;
+      unsigned endPos = 0;
+      while (startPos < section->secHead.shSize) {
+        if (symIdx < symbols.size())
+          endPos = static_cast<unsigned>(symbols[symIdx].value);
         else
-        {
-            // Output binary based sections
-            out << (section->name[0] == 0 ? "(null)" : section->name)
-                << " (size = " << section->secHead.shSize << " bytes)\n";
+          endPos = static_cast<unsigned>(section->secHead.shSize);
 
-            std::vector<ElfSymbol> symbols;
-            reader.GetSymbolsBySectionIndex(secIdx, symbols);
-
-            unsigned symIdx = 0;
-            unsigned startPos = 0;
-            unsigned endPos = 0;
-
-            while (startPos < section->secHead.shSize)
-            {
-                if (symIdx < symbols.size())
-                    endPos = static_cast<unsigned>(symbols[symIdx].value);
-                else
-                    endPos = static_cast<unsigned>(section->secHead.shSize);
-
-                outputBinary(section->data, startPos, endPos, out);
-
-                if (symIdx < symbols.size())
-                {
-                    out << "    " << symbols[symIdx].pSymName
-                        << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size;
-
-                    MetroHash::Hash hash = {};
-                    MetroHash64::Hash(
-                        reinterpret_cast<const uint8_t*>(
-                            voidPtrInc(section->data, static_cast<size_t>(symbols[symIdx].value))),
-                        symbols[symIdx].size,
-                        hash.bytes);
-                    uint64_t hashCode64 = MetroHash::compact64(&hash);
-                    snprintf(formatBuf, sizeof(formatBuf), " hash = 0x%016" PRIX64 ")\n", hashCode64);
-                    out << formatBuf;
-                }
-                ++symIdx;
-                startPos = endPos;
-            }
-        }
+        outputText(section->data, startPos, endPos, out);
         out << "\n";
-    }
 
-    return out;
+        if (symIdx < symbols.size()) {
+          out << "    " << symbols[symIdx].pSymName << " (offset = " << symbols[symIdx].value
+              << "  size = " << symbols[symIdx].size;
+          MetroHash::Hash hash = {};
+          MetroHash64::Hash(
+              reinterpret_cast<const uint8_t *>(voidPtrInc(section->data, static_cast<size_t>(symbols[symIdx].value))),
+              symbols[symIdx].size, hash.bytes);
+          uint64_t hashCode64 = MetroHash::compact64(&hash);
+          snprintf(formatBuf, sizeof(formatBuf), " hash = 0x%016" PRIX64 ")\n", hashCode64);
+          out << formatBuf;
+        }
+        ++symIdx;
+        startPos = endPos;
+      }
+    } else if (strncmp(section->name, Util::Abi::AmdGpuCommentName, sizeof(Util::Abi::AmdGpuCommentName) - 1) == 0) {
+      auto name = section->name;
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 475
+      if (strncmp(name, Util::Abi::AmdGpuCommentAmdIlName, sizeof(Util::Abi::AmdGpuCommentAmdIlName) - 1) == 0)
+#else
+      if (strncmp(name, ".AMDGPU.comment.amdil", sizeof(".AMDGPU.comment.amdil") - 1) == 0)
+#endif
+      {
+        // Output text based sections
+        out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
+
+        std::vector<ElfSymbol> symbols;
+        reader.GetSymbolsBySectionIndex(secIdx, symbols);
+        unsigned symIdx = 0;
+        unsigned startPos = 0;
+        unsigned endPos = 0;
+        while (startPos < section->secHead.shSize) {
+          if (symIdx < symbols.size())
+            endPos = static_cast<unsigned>(symbols[symIdx].value);
+          else
+            endPos = static_cast<unsigned>(section->secHead.shSize);
+
+          outputText(section->data, startPos, endPos, out);
+          out << "\n";
+
+          if (symIdx < symbols.size()) {
+            out << "    " << symbols[symIdx].pSymName << " (offset = " << symbols[symIdx].value
+                << "  size = " << symbols[symIdx].size;
+            MetroHash::Hash hash = {};
+            MetroHash64::Hash(reinterpret_cast<const uint8_t *>(
+                                  voidPtrInc(section->data, static_cast<size_t>(symbols[symIdx].value))),
+                              symbols[symIdx].size, hash.bytes);
+            uint64_t hashCode64 = MetroHash::compact64(&hash);
+            snprintf(formatBuf, sizeof(formatBuf), " hash = 0x%016" PRIX64 ")\n", hashCode64);
+            out << formatBuf;
+          }
+          ++symIdx;
+          startPos = endPos;
+        }
+      } else {
+        // Output text based sections
+        out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
+
+        outputText(section->data, 0, static_cast<unsigned>(section->secHead.shSize), out);
+      }
+    } else {
+      // Output binary based sections
+      out << (section->name[0] == 0 ? "(null)" : section->name) << " (size = " << section->secHead.shSize
+          << " bytes)\n";
+
+      std::vector<ElfSymbol> symbols;
+      reader.GetSymbolsBySectionIndex(secIdx, symbols);
+
+      unsigned symIdx = 0;
+      unsigned startPos = 0;
+      unsigned endPos = 0;
+
+      while (startPos < section->secHead.shSize) {
+        if (symIdx < symbols.size())
+          endPos = static_cast<unsigned>(symbols[symIdx].value);
+        else
+          endPos = static_cast<unsigned>(section->secHead.shSize);
+
+        outputBinary(section->data, startPos, endPos, out);
+
+        if (symIdx < symbols.size()) {
+          out << "    " << symbols[symIdx].pSymName << " (offset = " << symbols[symIdx].value
+              << "  size = " << symbols[symIdx].size;
+
+          MetroHash::Hash hash = {};
+          MetroHash64::Hash(
+              reinterpret_cast<const uint8_t *>(voidPtrInc(section->data, static_cast<size_t>(symbols[symIdx].value))),
+              symbols[symIdx].size, hash.bytes);
+          uint64_t hashCode64 = MetroHash::compact64(&hash);
+          snprintf(formatBuf, sizeof(formatBuf), " hash = 0x%016" PRIX64 ")\n", hashCode64);
+          out << formatBuf;
+        }
+        ++symIdx;
+        startPos = endPos;
+      }
+    }
+    out << "\n";
+  }
+
+  return out;
 }
 
 // =====================================================================================================================
 // Assistant macros for pipeline dump
-#define CASE_CLASSENUM_TO_STRING(TYPE, ENUM) \
-    case TYPE::ENUM: string = #ENUM; break;
-#define CASE_ENUM_TO_STRING(ENUM) \
-    case ENUM: string = #ENUM; break;
+#define CASE_CLASSENUM_TO_STRING(TYPE, ENUM)                                                                           \
+  case TYPE::ENUM:                                                                                                     \
+    string = #ENUM;                                                                                                    \
+    break;
+#define CASE_ENUM_TO_STRING(ENUM)                                                                                      \
+  case ENUM:                                                                                                           \
+    string = #ENUM;                                                                                                    \
+    break;
 
 // =====================================================================================================================
 // Translates enum "VkVertexInputRate" to string and output to ostream.
 //
 // @param [out] out : Output stream
 // @param inputRate : Vertex input rate
-std::ostream& operator<<(
-    std::ostream&       out,
-    VkVertexInputRate  inputRate)
-{
-    const char* string = nullptr;
-    switch (inputRate)
-    {
+std::ostream &operator<<(std::ostream &out, VkVertexInputRate inputRate) {
+  const char *string = nullptr;
+  switch (inputRate) {
     CASE_ENUM_TO_STRING(VK_VERTEX_INPUT_RATE_VERTEX)
     CASE_ENUM_TO_STRING(VK_VERTEX_INPUT_RATE_INSTANCE)
-        break;
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
-    return out << string;
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+  return out << string;
 }
 
 // =====================================================================================================================
@@ -1786,11 +1494,8 @@ std::ostream& operator<<(
 //
 // @param [out] out : Output stream
 // @param type : Resource map node type
-std::ostream& operator<<(
-    std::ostream&           out,
-    ResourceMappingNodeType type)
-{
-    return out << getResourceMappingNodeTypeName(type);
+std::ostream &operator<<(std::ostream &out, ResourceMappingNodeType type) {
+  return out << getResourceMappingNodeTypeName(type);
 }
 
 // =====================================================================================================================
@@ -1798,26 +1503,22 @@ std::ostream& operator<<(
 //
 // @param [out] out : Output stream
 // @param subgroupSizing : NGG sub-group sizing type
-std::ostream& operator<<(
-    std::ostream&           out,
-    NggSubgroupSizingType   subgroupSizing)
-{
-    const char* string = nullptr;
-    switch (subgroupSizing)
-    {
+std::ostream &operator<<(std::ostream &out, NggSubgroupSizingType subgroupSizing) {
+  const char *string = nullptr;
+  switch (subgroupSizing) {
     CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, Auto)
     CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, MaximumSize)
     CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, HalfSize)
     CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, OptimizeForVerts)
     CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, OptimizeForPrims)
     CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, Explicit)
-        break;
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
 
-    return out << string;
+  return out << string;
 }
 
 // =====================================================================================================================
@@ -1825,22 +1526,18 @@ std::ostream& operator<<(
 //
 // @param [out] out : Output stream
 // @param compactMode : NGG compaction mode
-std::ostream& operator<<(
-    std::ostream&   out,
-    NggCompactMode  compactMode)
-{
-    const char* string = nullptr;
-    switch (compactMode)
-    {
+std::ostream &operator<<(std::ostream &out, NggCompactMode compactMode) {
+  const char *string = nullptr;
+  switch (compactMode) {
     CASE_ENUM_TO_STRING(NggCompactSubgroup)
     CASE_ENUM_TO_STRING(NggCompactVertices)
-        break;
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
 
-    return out << string;
+  return out << string;
 }
 
 // =====================================================================================================================
@@ -1848,25 +1545,21 @@ std::ostream& operator<<(
 //
 // @param [out] out : Output stream
 // @param waveBreakSize : Wave break size
-std::ostream& operator<<(
-    std::ostream&   out,
-    WaveBreakSize   waveBreakSize)
-{
-    const char* string = nullptr;
-    switch (waveBreakSize)
-    {
+std::ostream &operator<<(std::ostream &out, WaveBreakSize waveBreakSize) {
+  const char *string = nullptr;
+  switch (waveBreakSize) {
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, None)
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _8x8)
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _16x16)
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _32x32)
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, DrawTime)
-        break;
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
 
-    return out << string;
+  return out << string;
 }
 
 // =====================================================================================================================
@@ -1874,23 +1567,19 @@ std::ostream& operator<<(
 //
 // @param [out] out : Output stream
 // @param shadowDescriptorTableUsage : Shadow descriptor table setting
-std::ostream& operator<<(
-    std::ostream&              out,
-    ShadowDescriptorTableUsage shadowDescriptorTableUsage)
-{
-    const char* string = nullptr;
-    switch (shadowDescriptorTableUsage)
-    {
+std::ostream &operator<<(std::ostream &out, ShadowDescriptorTableUsage shadowDescriptorTableUsage) {
+  const char *string = nullptr;
+  switch (shadowDescriptorTableUsage) {
     CASE_CLASSENUM_TO_STRING(ShadowDescriptorTableUsage, Auto)
     CASE_CLASSENUM_TO_STRING(ShadowDescriptorTableUsage, Enable)
     CASE_CLASSENUM_TO_STRING(ShadowDescriptorTableUsage, Disable)
-        break;
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
 
-    return out << string;
+  return out << string;
 }
 
 // =====================================================================================================================
@@ -1898,13 +1587,9 @@ std::ostream& operator<<(
 //
 // @param [out] out : Output stream
 // @param topology : Primitive topology
-std::ostream& operator<<(
-    std::ostream&       out,
-    VkPrimitiveTopology topology)
-{
-    const char* string = nullptr;
-    switch (topology)
-    {
+std::ostream &operator<<(std::ostream &out, VkPrimitiveTopology topology) {
+  const char *string = nullptr;
+  switch (topology) {
     CASE_ENUM_TO_STRING(VK_PRIMITIVE_TOPOLOGY_POINT_LIST)
     CASE_ENUM_TO_STRING(VK_PRIMITIVE_TOPOLOGY_LINE_LIST)
     CASE_ENUM_TO_STRING(VK_PRIMITIVE_TOPOLOGY_LINE_STRIP)
@@ -1917,13 +1602,13 @@ std::ostream& operator<<(
     CASE_ENUM_TO_STRING(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY)
     CASE_ENUM_TO_STRING(VK_PRIMITIVE_TOPOLOGY_PATCH_LIST)
     CASE_ENUM_TO_STRING(VK_PRIMITIVE_TOPOLOGY_MAX_ENUM)
-        break;
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
 
-    return out << string;
+  return out << string;
 }
 
 // =====================================================================================================================
@@ -1931,25 +1616,21 @@ std::ostream& operator<<(
 //
 // @param [out] out : Output stream
 // @param polygonMode : Rendering mode
-std::ostream& operator<<(
-    std::ostream&       out,
-    VkPolygonMode       polygonMode)
-{
-    const char* string = nullptr;
-    switch (polygonMode)
-    {
+std::ostream &operator<<(std::ostream &out, VkPolygonMode polygonMode) {
+  const char *string = nullptr;
+  switch (polygonMode) {
     CASE_ENUM_TO_STRING(VK_POLYGON_MODE_FILL)
     CASE_ENUM_TO_STRING(VK_POLYGON_MODE_LINE)
     CASE_ENUM_TO_STRING(VK_POLYGON_MODE_POINT)
     CASE_ENUM_TO_STRING(VK_POLYGON_MODE_FILL_RECTANGLE_NV)
     CASE_ENUM_TO_STRING(VK_POLYGON_MODE_MAX_ENUM)
-        break;
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
 
-    return out << string;
+  return out << string;
 }
 
 // =====================================================================================================================
@@ -1957,25 +1638,21 @@ std::ostream& operator<<(
 //
 // @param [out] out : Output stream
 // @param cullMode : Culling mode
-std::ostream& operator<<(
-    std::ostream&       out,
-    VkCullModeFlagBits  cullMode)
-{
-    const char* string = nullptr;
-    switch (cullMode)
-    {
+std::ostream &operator<<(std::ostream &out, VkCullModeFlagBits cullMode) {
+  const char *string = nullptr;
+  switch (cullMode) {
     CASE_ENUM_TO_STRING(VK_CULL_MODE_NONE)
     CASE_ENUM_TO_STRING(VK_CULL_MODE_FRONT_BIT)
     CASE_ENUM_TO_STRING(VK_CULL_MODE_BACK_BIT)
     CASE_ENUM_TO_STRING(VK_CULL_MODE_FRONT_AND_BACK)
     CASE_ENUM_TO_STRING(VK_CULL_MODE_FLAG_BITS_MAX_ENUM)
-        break;
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
 
-    return out << string;
+  return out << string;
 }
 
 // =====================================================================================================================
@@ -1983,23 +1660,19 @@ std::ostream& operator<<(
 //
 // @param [out] out : Output stream
 // @param frontFace : Front facing orientation
-std::ostream& operator<<(
-    std::ostream&       out,
-    VkFrontFace         frontFace)
-{
-    const char* string = nullptr;
-    switch (frontFace)
-    {
+std::ostream &operator<<(std::ostream &out, VkFrontFace frontFace) {
+  const char *string = nullptr;
+  switch (frontFace) {
     CASE_ENUM_TO_STRING(VK_FRONT_FACE_COUNTER_CLOCKWISE)
     CASE_ENUM_TO_STRING(VK_FRONT_FACE_CLOCKWISE)
     CASE_ENUM_TO_STRING(VK_FRONT_FACE_MAX_ENUM)
-        break;
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
 
-    return out << string;
+  return out << string;
 }
 
 // =====================================================================================================================
@@ -2007,13 +1680,9 @@ std::ostream& operator<<(
 //
 // @param [out] out : Output stream
 // @param format : Resource format
-std::ostream& operator<<(
-    std::ostream&       out,
-    VkFormat            format)
-{
-    const char* string = nullptr;
-    switch (format)
-    {
+std::ostream &operator<<(std::ostream &out, VkFormat format) {
+  const char *string = nullptr;
+  switch (format) {
     CASE_ENUM_TO_STRING(VK_FORMAT_UNDEFINED)
     CASE_ENUM_TO_STRING(VK_FORMAT_R4G4_UNORM_PACK8)
     CASE_ENUM_TO_STRING(VK_FORMAT_R4G4B4A4_UNORM_PACK16)
@@ -2207,12 +1876,12 @@ std::ostream& operator<<(
     CASE_ENUM_TO_STRING(VK_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG)
     CASE_ENUM_TO_STRING(VK_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG)
     CASE_ENUM_TO_STRING(VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG)
-        break;
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
-    return out << string;
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+  return out << string;
 }
 
-} // Vkgc
+} // namespace Vkgc

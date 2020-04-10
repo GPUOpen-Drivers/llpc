@@ -41,35 +41,29 @@ using namespace llvm;
 // @param retTy : Return type of the callee
 // @param args : Arguments to pass to the callee
 // @param attribs : Function attributes
-CallInst* BuilderBase::createNamedCall(
-    StringRef                     funcName,
-    Type*                         retTy,
-    ArrayRef<Value *>             args,
-    ArrayRef<Attribute::AttrKind> attribs)
-{
-    Module* module = GetInsertBlock()->getParent()->getParent();
-    Function* func = dyn_cast_or_null<Function>(module->getFunction(funcName));
-    if (!func)
-    {
-        SmallVector<Type*, 8> argTys;
-        argTys.reserve(args.size());
-        for (auto arg : args)
-            argTys.push_back(arg->getType());
+CallInst *BuilderBase::createNamedCall(StringRef funcName, Type *retTy, ArrayRef<Value *> args,
+                                       ArrayRef<Attribute::AttrKind> attribs) {
+  Module *module = GetInsertBlock()->getParent()->getParent();
+  Function *func = dyn_cast_or_null<Function>(module->getFunction(funcName));
+  if (!func) {
+    SmallVector<Type *, 8> argTys;
+    argTys.reserve(args.size());
+    for (auto arg : args)
+      argTys.push_back(arg->getType());
 
-        auto funcTy = FunctionType::get(retTy, argTys, false);
-        func = Function::Create(funcTy, GlobalValue::ExternalLinkage, funcName, module);
+    auto funcTy = FunctionType::get(retTy, argTys, false);
+    func = Function::Create(funcTy, GlobalValue::ExternalLinkage, funcName, module);
 
-        func->setCallingConv(CallingConv::C);
-        func->addFnAttr(Attribute::NoUnwind);
+    func->setCallingConv(CallingConv::C);
+    func->addFnAttr(Attribute::NoUnwind);
 
-        for (auto attrib : attribs)
-            func->addFnAttr(attrib);
-    }
+    for (auto attrib : attribs)
+      func->addFnAttr(attrib);
+  }
 
-    auto call = CreateCall(func, args);
-    call->setCallingConv(CallingConv::C);
-    call->setAttributes(func->getAttributes());
+  auto call = CreateCall(func, args);
+  call->setCallingConv(CallingConv::C);
+  call->setAttributes(func->getAttributes());
 
-    return call;
+  return call;
 }
-

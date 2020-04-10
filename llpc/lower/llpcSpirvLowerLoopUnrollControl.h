@@ -32,29 +32,27 @@
 
 #include "llpcSpirvLower.h"
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering operations for loop unroll control
-class SpirvLowerLoopUnrollControl: public SpirvLower
-{
+class SpirvLowerLoopUnrollControl : public SpirvLower {
 public:
-    SpirvLowerLoopUnrollControl();
-    SpirvLowerLoopUnrollControl(unsigned forceLoopUnrollCount);
+  SpirvLowerLoopUnrollControl();
+  SpirvLowerLoopUnrollControl(unsigned forceLoopUnrollCount);
 
-    virtual bool runOnModule(llvm::Module& module);
+  virtual bool runOnModule(llvm::Module &module);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    SpirvLowerLoopUnrollControl(const SpirvLowerLoopUnrollControl&) = delete;
-    SpirvLowerLoopUnrollControl& operator=(const SpirvLowerLoopUnrollControl&) = delete;
+  SpirvLowerLoopUnrollControl(const SpirvLowerLoopUnrollControl &) = delete;
+  SpirvLowerLoopUnrollControl &operator=(const SpirvLowerLoopUnrollControl &) = delete;
 
-    unsigned m_forceLoopUnrollCount;  // Forced loop unroll count
-    bool m_disableLicm; // Disable LLVM LICM pass
+  unsigned m_forceLoopUnrollCount; // Forced loop unroll count
+  bool m_disableLicm;              // Disable LLVM LICM pass
 };
 
-} // Llpc
+} // namespace Llpc
