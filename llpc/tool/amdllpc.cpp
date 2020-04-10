@@ -427,9 +427,7 @@ static Result init(
         // Build new arguments, starting with those supplied in command line
         std::vector<const char*> newArgs;
         for (int i = 0; i < argc; ++i)
-        {
             newArgs.push_back(argv[i]);
-        }
 
         static const size_t DefaultOptionCount = sizeof(DefaultOptions) / (2 * sizeof(DefaultOptions[0]));
         for (unsigned optionIdx = 0; optionIdx != DefaultOptionCount; ++optionIdx)
@@ -451,9 +449,7 @@ static Result init(
             }
 
             if (found == false)
-            {
                 newArgs.push_back(option);
-            }
             else if (optionIdx == 0) // Find option -gfxip
             {
                 size_t argLen = strlen(arg);
@@ -521,9 +517,7 @@ static Result init(
             //   3. If AMD_SHADER_DISK_CACHE_PATH and XDG_CACHE_HOME both not set,
             //      use "$HOME/.cache".
             if (envString == nullptr)
-            {
                 envString = getenv("XDG_CACHE_HOME");
-            }
 
             if (envString == nullptr)
             {
@@ -543,9 +537,7 @@ static Result init(
                          "-shader-cache-file-dir=%s", envString);
             }
             else
-            {
                 strncpy(shaderCacheFileDirOption, "-shader-cache-file-dir=.", sizeof(shaderCacheFileDirOption));
-            }
             newArgs.push_back(shaderCacheFileDirOption);
         }
 
@@ -614,9 +606,7 @@ static void cleanupCompileInfo(
         // NOTE: We do not have to free SPIR-V binary for pipeline info file.
         // It will be freed when we close the VFX doc.
         if (compileInfo->pipelineInfoFile == nullptr)
-        {
             delete[] reinterpret_cast<const char*>(compileInfo->shaderModuleDatas[i].spirvBin.pCode);
-        }
 
         free(compileInfo->shaderModuleDatas[i].shaderBuf);
     }
@@ -624,9 +614,7 @@ static void cleanupCompileInfo(
     free(compileInfo->pipelineBuf);
 
     if (compileInfo->pipelineInfoFile)
-    {
         Vfx::vfxCloseDoc(compileInfo->pipelineInfoFile);
-    }
 
     memset(compileInfo, 0, sizeof(*compileInfo));
 }
@@ -656,14 +644,10 @@ static bool isSpirvTextFile(
     size_t extPos = fileName.find_last_of(".");
     std::string extName;
     if (extPos != std::string::npos)
-    {
         extName = fileName.substr(extPos, fileName.size() - extPos);
-    }
 
     if ((extName.empty() == false) && (extName == LlpcExt::SpirvText))
-    {
         isSpirvText = true;
-    }
 
     return isSpirvText;
 }
@@ -678,14 +662,10 @@ static bool isSpirvBinaryFile(
     size_t extPos = fileName.find_last_of(".");
     std::string extName;
     if (extPos != std::string::npos)
-    {
         extName = fileName.substr(extPos, fileName.size() - extPos);
-    }
 
     if ((extName.empty() == false) && (extName == LlpcExt::SpirvBin))
-    {
         isSpirvBin = true;
-    }
 
     return isSpirvBin;
 }
@@ -700,14 +680,10 @@ static bool isPipelineInfoFile(
     size_t extPos = fileName.find_last_of(".");
     std::string extName;
     if (extPos != std::string::npos)
-    {
         extName = fileName.substr(extPos, fileName.size() - extPos);
-    }
 
     if ((extName.empty() == false) && (extName == LlpcExt::PipelineInfo))
-    {
         isPipelineInfo = true;
-    }
 
     return isPipelineInfo;
 }
@@ -722,14 +698,10 @@ static bool isLlvmIrFile(
     size_t extPos = fileName.find_last_of(".");
     std::string extName;
     if (extPos != std::string::npos)
-    {
         extName = fileName.substr(extPos, fileName.size() - extPos);
-    }
 
     if ((extName.empty() == false) && (extName == LlpcExt::LlvmIr))
-    {
         isLlvmIr = true;
-    }
 
     return isLlvmIr;
 }
@@ -1045,9 +1017,7 @@ static Result checkAutoLayoutCompatibleFunc(
             bool                        checkAutoLayoutCompatible = compileInfo->checkAutoLayoutCompatible;
 
             if (compileInfo->shaderModuleDatas[i].shaderStage != Vkgc::ShaderStageFragment)
-            {
                 checkAutoLayoutCompatible = false;
-            }
             const ShaderModuleBuildOut* shaderOut  = &(compileInfo->shaderModuleDatas[i].shaderOut);
 
             if (shaderInfo->pEntryTarget == nullptr)
@@ -1069,13 +1039,9 @@ static Result checkAutoLayoutCompatibleFunc(
                                  true);
                 if (checkShaderInfoComptible(shaderInfo, shaderInfoCopy.userDataNodeCount, shaderInfoCopy.pUserDataNodes) &&
                     checkPipelineStateCompatible(compiler, pipelineInfo, &pipelineInfoCopy, ParsedGfxIp))
-                {
                     outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " hitted\n";
-                }
                 else
-                {
                     outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " failed to hit\n";
-                }
                 outs().flush();
             }
         }
@@ -1106,13 +1072,9 @@ static Result checkAutoLayoutCompatibleFunc(
                              userDataOffset,
                              true);
             if (checkShaderInfoComptible(shaderInfo, shaderInfoCopy.userDataNodeCount, shaderInfoCopy.pUserDataNodes))
-            {
                 outs() << "Auto Layout compute shader in " << compileInfo->fileNames << " hitted\n";
-            }
             else
-            {
                 outs() << "Auto Layout compute shader in " << compileInfo->fileNames << " failed to hit\n";
-            }
             outs().flush();
         }
     }
@@ -1178,9 +1140,7 @@ static Result buildPipeline(
 
         // NOTE: If number of patch control points is not specified, we set it to 3.
         if (pipelineInfo->iaState.patchControlPoints == 0)
-        {
             pipelineInfo->iaState.patchControlPoints = 3;
-        }
 
         pipelineInfo->options.robustBufferAccess = RobustBufferAccess;
 
@@ -1323,30 +1283,20 @@ static Result outputElf(
         // values of the options "-filetype" and "-emit-llvm".
         const char* ext = ".s";
         if (isElfBinary(pipelineBin->pCode, pipelineBin->codeSize))
-        {
             ext = ".elf";
-        }
         else if (isLlvmBitcode(pipelineBin->pCode, pipelineBin->codeSize))
-        {
             ext = ".bc";
-        }
         else if (isIsaText(pipelineBin->pCode, pipelineBin->codeSize))
-        {
             ext = ".s";
-        }
         else
-        {
             ext = ".ll";
-        }
         outFileName = sys::path::filename(firstInFile);
         sys::path::replace_extension(outFileName, ext);
     }
 
     FILE* outFile = stdout;
     if (outFileName != "-")
-    {
         outFile = fopen(outFileName.c_str(), "wb");
-    }
 
     if (outFile == nullptr)
     {
@@ -1357,14 +1307,10 @@ static Result outputElf(
     if (result == Result::Success)
     {
         if (fwrite(pipelineBin->pCode, 1, pipelineBin->codeSize, outFile) != pipelineBin->codeSize)
-        {
             result = Result::ErrorUnavailable;
-        }
 
         if ((outFile != stdout) && (fclose(outFile) != 0))
-        {
             result = Result::ErrorUnavailable;
-        }
 
         if (result != Result::Success)
         {
@@ -1433,13 +1379,9 @@ static Result processPipeline(
         {
             // SPIR-V assembly text or SPIR-V binary
             if (isSpirvTextFile(inFile))
-            {
                 result = assembleSpirv(inFile, spvBinFile);
-            }
             else
-            {
                 spvBinFile = inFile;
-            }
 
             BinaryData spvBin = {};
 
@@ -1474,9 +1416,7 @@ static Result processPipeline(
             {
                 char log[1024] = {};
                 if (InitSpvGen() == false)
-                {
                     errs() << "Warning: Failed to load SPVGEN -- cannot validate SPIR-V\n";
-                }
                 else
                 {
                     if (spvValidateSpirv(spvBin.codeSize, spvBin.pCode, sizeof(log), log) == false)
@@ -1491,16 +1431,12 @@ static Result processPipeline(
             {
                 // NOTE: If the entry target is not specified, we set it to the one gotten from SPIR-V binary.
                 if (EntryTarget.empty())
-                {
                     EntryTarget.setValue(ShaderModuleHelper::getEntryPointNameFromSpirvBinary(&spvBin));
-                }
 
                 unsigned stageMask = ShaderModuleHelper::getStageMaskFromSpirvBinary(&spvBin, EntryTarget.c_str());
 
                 if ((stageMask & compileInfo.stageMask) != 0)
-                {
                     break;
-                }
                 else if (stageMask != 0)
                 {
                     for (unsigned stage = ShaderStageVertex; stage < ShaderStageCount; ++stage)
@@ -1569,9 +1505,7 @@ static Result processPipeline(
                         {
                             if ((target == 0) ||
                                 (compileInfo.gfxPipelineInfo.cbState.target[target].format != VK_FORMAT_UNDEFINED))
-                            {
                                 compileInfo.gfxPipelineInfo.cbState.target[target].format = VK_FORMAT_R8G8B8A8_SRGB;
-                            }
                         }
                     }
 
@@ -1667,9 +1601,7 @@ static Result processPipeline(
                 }
 
                 if (compileInfo.stageMask & shaderStageToMask(static_cast<ShaderStage>(shaderStage)))
-                {
                     break;
-                }
             }
 
             if (result == Result::Success)
@@ -1696,18 +1628,14 @@ static Result processPipeline(
 
             // NOTE: If the entry target is not specified, we set it to GLSL default ("main").
             if (EntryTarget.empty())
-            {
                 EntryTarget.setValue("main");
-            }
 
             ShaderStage stage = ShaderStageInvalid;
             result = compileGlsl(inFile, &stage, spvBinFile);
             if (result == Result::Success)
             {
                 if (compileInfo.stageMask & shaderStageToMask(static_cast<ShaderStage>(stage)))
-                {
                     break;
-                }
 
                 compileInfo.stageMask |= shaderStageToMask(stage);
                 ::ShaderModuleData shaderModuleData = {};
@@ -1733,9 +1661,7 @@ static Result processPipeline(
         // Build shader modules
         //
         if ((result == Result::Success) && (compileInfo.stageMask != 0))
-        {
             result = buildShaderModules(compiler, &compileInfo);
-        }
 
         //
         // Build pipeline
@@ -1745,9 +1671,7 @@ static Result processPipeline(
             compileInfo.fileNames = fileNames.c_str();
             result = buildPipeline(compiler, &compileInfo);
             if (result == Result::Success)
-            {
                 result = outputElf(&compileInfo, OutFile, inFiles[0]);
-            }
         }
     }
     //
@@ -1910,9 +1834,7 @@ int main(
             {
                 unsigned nextFile = 0;
                 for (; result == Result::Success && nextFile < inFiles.size();)
-                {
                     result = processPipeline(compiler, inFiles, nextFile, &nextFile);
-                }
             }
         }
     }

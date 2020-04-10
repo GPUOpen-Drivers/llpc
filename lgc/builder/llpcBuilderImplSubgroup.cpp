@@ -116,9 +116,7 @@ Value* BuilderImplSubgroup::CreateSubgroupAllEqual(
     Value* compare = CreateSubgroupBroadcastFirst(value, instName);
 
     if (type->isFPOrFPVectorTy())
-    {
         compare = CreateFCmpOEQ(compare, value);
-    }
     else
     {
         assert(type->isIntOrIntVectorTy());
@@ -130,16 +128,12 @@ Value* BuilderImplSubgroup::CreateSubgroupAllEqual(
         Value* result = CreateExtractElement(compare, getInt32(0));
 
         for (unsigned i = 1, compCount = type->getVectorNumElements(); i < compCount; i++)
-        {
             result = CreateAnd(result, CreateExtractElement(compare, i));
-        }
 
         return CreateSubgroupAll(result, wqm, instName);
     }
     else
-    {
         return CreateSubgroupAll(compare, wqm, instName);
-    }
 }
 
 // =====================================================================================================================
@@ -239,9 +233,7 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotBitCount(
     const Twine& instName) // [in] Name to give final instruction.
 {
     if (getShaderSubgroupSize() <= 32)
-    {
         return CreateUnaryIntrinsic(Intrinsic::ctpop, CreateExtractElement(value, getInt32(0)));
-    }
     else
     {
         Value* result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<unsigned>{ 0, 1 });
@@ -270,9 +262,7 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotExclusiveBitCount(
     const Twine& instName) // [in] Name to give final instruction.
 {
     if (getShaderSubgroupSize() <= 32)
-    {
         return CreateSubgroupMbcnt(CreateExtractElement(value, getInt32(0)), "");
-    }
     else
     {
         Value* result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<unsigned>{ 0, 1 });
@@ -907,13 +897,9 @@ Value* BuilderImplSubgroup::CreateSubgroupQuadSwapHorizontal(
     const Twine& instName) // [in] Name to give final instruction.
 {
     if (supportDpp())
-    {
         return createDppMov(value, DppCtrl::DppQuadPerm1032, 0xF, 0xF, false);
-    }
     else
-    {
         return createDsSwizzle(value, getDsSwizzleQuadMode(1, 0, 3, 2));
-    }
 }
 
 // =====================================================================================================================
@@ -923,13 +909,9 @@ Value* BuilderImplSubgroup::CreateSubgroupQuadSwapVertical(
     const Twine& instName) // [in] Name to give final instruction.
 {
     if (supportDpp())
-    {
         return createDppMov(value, DppCtrl::DppQuadPerm2301, 0xF, 0xF, false);
-    }
     else
-    {
         return createDsSwizzle(value, getDsSwizzleQuadMode(2, 3, 0, 1));
-    }
 }
 
 // =====================================================================================================================
@@ -939,13 +921,9 @@ Value* BuilderImplSubgroup::CreateSubgroupQuadSwapDiagonal(
     const Twine& instName) // [in] Name to give final instruction.
 {
     if (supportDpp())
-    {
         return createDppMov(value, DppCtrl::DppQuadPerm0123, 0xF, 0xF, false);
-    }
     else
-    {
         return createDsSwizzle(value, getDsSwizzleQuadMode(3, 2, 1, 0));
-    }
 }
 
 // =====================================================================================================================
@@ -1018,13 +996,9 @@ Value* BuilderImplSubgroup::CreateSubgroupMbcnt(
     CallInst* const mbcntLo = CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, { maskLow, getInt32(0) });
 
     if (getShaderSubgroupSize() <= 32)
-    {
         return mbcntLo;
-    }
     else
-    {
         return CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, { maskHigh, mbcntLo });
-    }
 }
 
 // =====================================================================================================================
@@ -1045,21 +1019,13 @@ Value* BuilderImplSubgroup::createGroupArithmeticIdentity(
         return ConstantFP::get(type, 1.0);
     case GroupArithOp::SMin:
         if (type->isIntOrIntVectorTy(8))
-        {
             return ConstantInt::get(type, INT8_MAX, true);
-        }
         else if (type->isIntOrIntVectorTy(16))
-        {
             return ConstantInt::get(type, INT16_MAX, true);
-        }
         else if (type->isIntOrIntVectorTy(32))
-        {
             return ConstantInt::get(type, INT32_MAX, true);
-        }
         else if (type->isIntOrIntVectorTy(64))
-        {
             return ConstantInt::get(type, INT64_MAX, true);
-        }
         else
         {
             llvm_unreachable("Should never be called!");
@@ -1071,21 +1037,13 @@ Value* BuilderImplSubgroup::createGroupArithmeticIdentity(
         return ConstantFP::getInfinity(type, false);
     case GroupArithOp::SMax:
         if (type->isIntOrIntVectorTy(8))
-        {
             return ConstantInt::get(type, INT8_MIN, true);
-        }
         else if (type->isIntOrIntVectorTy(16))
-        {
             return ConstantInt::get(type, INT16_MIN, true);
-        }
         else if (type->isIntOrIntVectorTy(32))
-        {
             return ConstantInt::get(type, INT32_MIN, true);
-        }
         else if (type->isIntOrIntVectorTy(64))
-        {
             return ConstantInt::get(type, INT64_MIN, true);
-        }
         else
         {
             llvm_unreachable("Should never be called!");
@@ -1415,13 +1373,9 @@ Value* BuilderImplSubgroup::createThreadMask()
 
     Value* threadMask = nullptr;
     if (getShaderSubgroupSize() <= 32)
-    {
         threadMask = CreateShl(getInt32(1), threadId);
-    }
     else
-    {
         threadMask = CreateShl(getInt64(1), CreateZExtOrTrunc(threadId, getInt64Ty()));
-    }
 
     return threadMask;
 }
@@ -1472,9 +1426,7 @@ Value* BuilderImplSubgroup::createGroupBallot(
 
     // If we have a 32-bit subgroup size, we need to turn the 32-bit ballot result into a 64-bit result.
     if (getShaderSubgroupSize() <= 32)
-    {
         result = CreateZExt(result, getInt64Ty(), "");
-    }
 
     return result;
 }

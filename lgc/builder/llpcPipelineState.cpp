@@ -102,9 +102,7 @@ Module* PipelineState::link(
     {
         Module* module = modules[stage];
         if (module == nullptr)
-        {
             continue;
-        }
         anyModule = module;
 
         // If this is a link of shader modules from earlier separate shader compiles, then the modes are
@@ -132,18 +130,14 @@ Module* PipelineState::link(
 
     // If the front-end was using a BuilderRecorder, record pipeline state into IR metadata.
     if (m_noReplayer == false)
-    {
         record(anyModule);
-    }
 
     // If there is only one shader, just change the name on its module and return it.
     Module* pipelineModule = nullptr;
     for (auto module : modules)
     {
         if (pipelineModule == nullptr)
-        {
             pipelineModule = module;
-        }
         else if (module != nullptr)
         {
             pipelineModule = nullptr;
@@ -152,9 +146,7 @@ Module* PipelineState::link(
     }
 
     if (pipelineModule != nullptr)
-    {
         pipelineModule->setModuleIdentifier("llpcPipeline");
-    }
     else
     {
         // Create an empty module then link each shader module into it. We record pipeline state into IR
@@ -175,9 +167,7 @@ Module* PipelineState::link(
                 // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
                 // linked into pipeline module.
                 if (linker.linkInModule(std::unique_ptr<Module>(modules[shaderIndex])))
-                {
                     result = false;
-                }
             }
         }
 
@@ -228,16 +218,12 @@ void PipelineState::generate(
     PipelineStateWrapper* pipelineStateWrapper = new PipelineStateWrapper(getBuilderContext());
     patchPassMgr->add(pipelineStateWrapper);
     if (m_noReplayer)
-    {
         pipelineStateWrapper->setPipelineState(this);
-    }
 
     // Get a BuilderReplayer pass if needed.
     ModulePass* replayerPass = nullptr;
     if (m_noReplayer == false)
-    {
         replayerPass = createBuilderReplayer(this);
-    }
 
     // Patching.
     Patch::addPasses(this,
@@ -325,9 +311,7 @@ void PipelineState::readShaderStageMask(
             auto shaderStage = getShaderStageFromFunction(&func);
 
             if (shaderStage != ShaderStageInvalid)
-            {
                 m_stageMask |= 1 << shaderStage;
-            }
         }
     }
 }
@@ -337,21 +321,13 @@ void PipelineState::readShaderStageMask(
 ShaderStage PipelineState::getLastVertexProcessingStage() const
 {
     if (m_stageMask & shaderStageToMask(ShaderStageCopyShader))
-    {
         return ShaderStageCopyShader;
-    }
     if (m_stageMask & shaderStageToMask(ShaderStageGeometry))
-    {
         return ShaderStageGeometry;
-    }
     if (m_stageMask & shaderStageToMask(ShaderStageTessEval))
-    {
         return ShaderStageTessEval;
-    }
     if (m_stageMask & shaderStageToMask(ShaderStageVertex))
-    {
         return ShaderStageVertex;
-    }
     return ShaderStageInvalid;
 }
 
@@ -362,9 +338,7 @@ ShaderStage PipelineState::getPrevShaderStage(
     ) const
 {
     if (shaderStage == ShaderStageCompute)
-    {
         return ShaderStageInvalid;
-    }
 
     if (shaderStage == ShaderStageCopyShader)
     {
@@ -395,9 +369,7 @@ ShaderStage PipelineState::getNextShaderStage(
     ) const
 {
     if (shaderStage == ShaderStageCompute)
-    {
         return ShaderStageInvalid;
-    }
 
     if (shaderStage == ShaderStageCopyShader)
     {
@@ -440,9 +412,7 @@ void PipelineState::setShaderOptions(
     const ShaderOptions&  options)  // [in] Shader options
 {
     if (m_shaderOptions.size() <= stage)
-    {
         m_shaderOptions.resize(stage + 1);
-    }
     m_shaderOptions[stage] = options;
 }
 
@@ -452,9 +422,7 @@ const ShaderOptions& PipelineState::getShaderOptions(
     ShaderStage           stage)    // Shader stage
 {
     if (m_shaderOptions.size() <= stage)
-    {
         m_shaderOptions.resize(stage + 1);
-    }
     return m_shaderOptions[stage];
 }
 
@@ -486,9 +454,7 @@ void PipelineState::readOptions(
                                     getShaderStageAbbreviation(static_cast<ShaderStage>(stage))).str();
         auto namedMetaNode = module->getNamedMetadata(metadataName);
         if ((namedMetaNode == nullptr) || (namedMetaNode->getNumOperands() == 0))
-        {
             continue;
-        }
         m_shaderOptions.resize(stage + 1);
         readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), m_shaderOptions[stage]);
     }
@@ -505,9 +471,7 @@ void PipelineState::setUserDataNodes(
     for (auto& node : nodes)
     {
         if (node.type == ResourceNodeType::DescriptorTableVaPtr)
-        {
             nodeCount += node.innerTable.size();
-        }
     }
     assert(m_allocUserDataNodes == nullptr);
     m_allocUserDataNodes = std::make_unique<ResourceNode[]>(nodeCount);
@@ -556,9 +520,7 @@ void PipelineState::recordUserDataNodes(
     if (m_userDataNodes.empty())
     {
         if (auto userDataMetaNode = module->getNamedMetadata(UserDataMetadataName))
-        {
             module->eraseNamedMetadata(userDataMetaNode);
-        }
         return;
     }
 
@@ -620,9 +582,7 @@ void PipelineState::recordUserDataTable(
                     // The descriptor is either a sampler (<4 x i32>) or converting sampler (<8 x i32>).
                     unsigned samplerDescriptorSize = 4;
                     if (node.type == ResourceNodeType::DescriptorYCbCrSampler)
-                    {
                         samplerDescriptorSize = 8;
-                    }
                     unsigned elemCount = node.immutableValue->getType()->getArrayNumElements();
                     for (unsigned elemIdx = 0; elemIdx != elemCount; ++elemIdx)
                     {
@@ -652,9 +612,7 @@ void PipelineState::readUserDataNodes(
     // Find the named metadata node.
     auto userDataMetaNode = module->getNamedMetadata(UserDataMetadataName);
     if (userDataMetaNode == nullptr)
-    {
         return;
-    }
 
     // Prepare to read the resource nodes from the named MD node. We allocate a single buffer, with the
     // outer table at the start, and inner tables allocated from the end backwards.
@@ -743,9 +701,7 @@ void PipelineState::readUserDataNodes(
             // Move on to next node to write in table.
             ++nextNode;
             if (endThisInnerTable == nullptr)
-            {
                 nextOuterNode = nextNode;
-            }
         }
         // See if we have reached the end of the inner table.
         if (nextNode == endThisInnerTable)
@@ -788,9 +744,7 @@ std::pair<const ResourceNode*, const ResourceNode*> PipelineState::findResourceN
                          (nodeType == ResourceNodeType::DescriptorResource ||
                           nodeType == ResourceNodeType::DescriptorTexelBuffer ||
                           nodeType == ResourceNodeType::DescriptorSampler)))
-                    {
                         return { &node, &innerNode };
-                    }
                 }
             }
         }
@@ -803,9 +757,7 @@ std::pair<const ResourceNode*, const ResourceNode*> PipelineState::findResourceN
                  (nodeType == ResourceNodeType::DescriptorResource ||
                   nodeType == ResourceNodeType::DescriptorTexelBuffer ||
                   nodeType == ResourceNodeType::DescriptorSampler)))
-            {
                 return { &node, &node };
-            }
         }
     }
     return { nullptr, nullptr };
@@ -828,9 +780,7 @@ ResourceNodeType PipelineState::getResourceTypeFromName(
     for (unsigned type = 0; ; ++type)
     {
         if (typeNames[type] == typeName)
-        {
             return static_cast<ResourceNodeType>(type);
-        }
     }
 }
 
@@ -870,9 +820,7 @@ const VertexInputDescription* PipelineState::findVertexInputDescription(
     for (auto& inputDesc : m_vertexInputDescriptions)
     {
         if (inputDesc.location == location)
-        {
             return &inputDesc;
-        }
     }
     return nullptr;
 }
@@ -885,9 +833,7 @@ void PipelineState::recordVertexInputDescriptions(
     if (m_vertexInputDescriptions.empty())
     {
         if (auto vertexInputsMetaNode = module->getNamedMetadata(VertexInputsMetadataName))
-        {
             module->eraseNamedMetadata(vertexInputsMetaNode);
-        }
         return;
     }
 
@@ -896,9 +842,7 @@ void PipelineState::recordVertexInputDescriptions(
     vertexInputsMetaNode->clearOperands();
 
     for (const VertexInputDescription& input : m_vertexInputDescriptions)
-    {
         vertexInputsMetaNode->addOperand(getArrayOfInt32MetaNode(getContext(), input, /*atLeastOneValue=*/true));
-    }
 }
 
 // =====================================================================================================================
@@ -911,9 +855,7 @@ void PipelineState::readVertexInputDescriptions(
     // Find the named metadata node.
     auto vertexInputsMetaNode = module->getNamedMetadata(VertexInputsMetadataName);
     if (vertexInputsMetaNode == nullptr)
-    {
         return;
-    }
 
     // Read the nodes.
     unsigned nodeCount = vertexInputsMetaNode->getNumOperands();
@@ -956,9 +898,7 @@ void PipelineState::recordColorExportState(
     if (m_colorExportFormats.empty())
     {
         if (auto exportFormatsMetaNode = module->getNamedMetadata(ColorExportFormatsMetadataName))
-        {
             module->eraseNamedMetadata(exportFormatsMetaNode);
-        }
     }
     else
     {
@@ -970,9 +910,7 @@ void PipelineState::recordColorExportState(
         // - N metadata nodes for N color targets, each one containing
         // { dfmt, nfmt, blendEnable, blendSrcAlphaToColor }
         for (const ColorExportFormat& target : m_colorExportFormats)
-        {
             exportFormatsMetaNode->addOperand(getArrayOfInt32MetaNode(getContext(), target, /*atLeastOneValue=*/true));
-        }
     }
 
     setNamedMetadataToArrayOfInt32(module, m_colorExportState, ColorExportStateMetadataName);
@@ -1092,18 +1030,14 @@ unsigned PipelineState::getShaderWaveSize(
 
         unsigned waveSizeOption = getShaderOptions(stage).waveSize;
         if (waveSizeOption != 0)
-        {
             waveSize = waveSizeOption;
-        }
 
         if ((stage == ShaderStageGeometry) && (hasShaderStage(ShaderStageGeometry) == false))
         {
             // NOTE: For NGG, GS could be absent and VS/TES acts as part of it in the merged shader.
             // In such cases, we check the property of VS or TES.
             if (hasShaderStage(ShaderStageTessEval))
-            {
                 return getShaderWaveSize(ShaderStageTessEval);
-            }
             return getShaderWaveSize(ShaderStageVertex);
         }
 
@@ -1112,9 +1046,7 @@ unsigned PipelineState::getShaderWaveSize(
         {
             unsigned subgroupSize = getShaderOptions(stage).subgroupSize;
             if (subgroupSize != 0)
-            {
                 waveSize = subgroupSize;
-            }
         }
 
         assert((waveSize == 32) || (waveSize == 64));
@@ -1129,9 +1061,7 @@ ResourceUsage* PipelineState::getShaderResourceUsage(
     ShaderStage shaderStage)  // Shader stage
 {
     if (shaderStage == ShaderStageCopyShader)
-    {
         shaderStage = ShaderStageGeometry;
-    }
 
     auto& resUsage = MutableArrayRef<std::unique_ptr<ResourceUsage>>(m_resourceUsage)[shaderStage];
     if (!resUsage)
@@ -1148,9 +1078,7 @@ InterfaceData* PipelineState::getShaderInterfaceData(
     ShaderStage shaderStage)  // Shader stage
 {
     if (shaderStage == ShaderStageCopyShader)
-    {
         shaderStage = ShaderStageGeometry;
-    }
 
     auto& intfData = MutableArrayRef<std::unique_ptr<InterfaceData>>(m_interfaceData)[shaderStage];
     if (!intfData)
@@ -1270,13 +1198,9 @@ const char* PipelineState::getShaderStageAbbreviation(
     ShaderStage shaderStage)  // Shader stage
 {
     if (shaderStage == ShaderStageCopyShader)
-    {
         return "COPY";
-    }
     if (shaderStage > ShaderStageCompute)
-    {
         return "Bad";
-    }
 
     static const char* ShaderStageAbbrs[] = { "VS", "TCS", "TES", "GS", "FS", "CS" };
     return ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];

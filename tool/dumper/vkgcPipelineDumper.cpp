@@ -136,9 +136,7 @@ void* VKAPI_CALL IPipelineDumper::BeginPipelineDump(
 {
     MetroHash::Hash hash = {};
     if (pipelineInfo.pComputeInfo != nullptr)
-    {
         hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo.pComputeInfo, false);
-    }
     else
     {
         assert(pipelineInfo.pGraphicsInfo != nullptr);
@@ -266,21 +264,13 @@ std::string PipelineDumper::getPipelineInfoFileName(
         const char* fileNamePrefix = nullptr;
         if (pipelineInfo.pGraphicsInfo->tes.pModuleData != nullptr &&
             pipelineInfo.pGraphicsInfo->gs.pModuleData != nullptr)
-        {
              fileNamePrefix = "PipelineGsTess";
-        }
         else if (pipelineInfo.pGraphicsInfo->gs.pModuleData != nullptr)
-        {
              fileNamePrefix = "PipelineGs";
-        }
         else if (pipelineInfo.pGraphicsInfo->tes.pModuleData != nullptr)
-        {
              fileNamePrefix = "PipelineTess";
-        }
         else
-        {
             fileNamePrefix = "PipelineVsFs";
-        }
 
         auto length = snprintf(fileName, 64, "%s_0x%016" PRIX64, fileNamePrefix, hashCode64);
         (void(length)); // unused
@@ -307,9 +297,7 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
     {
         uint64_t hash64 = MetroHash::compact64(hash);
         if (hash64 != dumpOptions->filterPipelineDumpByHash)
-        {
             disableLog = true;
-        }
     }
 
     if (disableLog == false)
@@ -319,30 +307,22 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
         if (dumpOptions->filterPipelineDumpByType & PipelineDumpFilterCs)
         {
             if (dumpFileName.find("Cs") != std::string::npos)
-            {
                 disableLog = true;
-            }
         }
         if (dumpOptions->filterPipelineDumpByType & PipelineDumpFilterGs)
         {
             if (dumpFileName.find("Gs") != std::string::npos)
-            {
                 disableLog = true;
-            }
         }
         if (dumpOptions->filterPipelineDumpByType & PipelineDumpFilterTess)
         {
             if (dumpFileName.find("Tess") != std::string::npos)
-            {
                 disableLog = true;
-            }
         }
         if (dumpOptions->filterPipelineDumpByType & PipelineDumpFilterVsPs)
         {
             if (dumpFileName.find("VsFs") != std::string::npos)
-            {
                 disableLog = true;
-            }
         }
     }
 
@@ -391,9 +371,7 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
                 FileNames.insert(dumpFileName);
             }
             else
-            {
                 enableDump = false;
-            }
         }
 
         // Open dump file
@@ -413,14 +391,10 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
         if (dumpFile != nullptr)
         {
             if (pipelineInfo.pComputeInfo)
-            {
                 dumpComputePipelineInfo(&dumpFile->dumpFile, dumpOptions->pDumpDir, pipelineInfo.pComputeInfo);
-            }
 
             if (pipelineInfo.pGraphicsInfo)
-            {
                 dumpGraphicsPipelineInfo(&dumpFile->dumpFile, dumpOptions->pDumpDir, pipelineInfo.pGraphicsInfo);
-            }
 
         }
     }
@@ -514,9 +488,7 @@ void PipelineDumper::dumpPipelineShaderInfo(
     dumpFile << "[" << getShaderStageAbbreviation(stage) << "Info]\n";
     // Output entry point
     if (shaderInfo->pEntryTarget != nullptr)
-    {
          dumpFile << "entryPoint = " << shaderInfo->pEntryTarget << "\n";
-    }
 
     // Output specialize info
     if (shaderInfo->pSpecializationInfo)
@@ -532,18 +504,12 @@ void PipelineDumper::dumpPipelineShaderInfo(
         for (unsigned i = 0; i < (specializationInfo->dataSize + sizeof(unsigned) - 1) / sizeof(unsigned); ++i)
         {
             if ((i % 8) == 0)
-            {
                 dumpFile << "specConst.uintData = ";
-            }
             dumpFile << data[i];
             if ((i % 8) == 7)
-            {
                 dumpFile << "\n";
-            }
             else
-            {
                 dumpFile << ", ";
-            }
         }
         dumpFile << "\n";
     }
@@ -565,9 +531,7 @@ void PipelineDumper::dumpPipelineShaderInfo(
                     (descriptorRangeValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler) ? 8 : 4;
 
                 for (unsigned k = 0; k < descriptorSizeInDw -1; ++k)
-                {
                      dumpFile << descriptorRangeValue->pValue[k] << ", ";
-                }
                 dumpFile << descriptorRangeValue->pValue[descriptorSizeInDw - 1] << "\n";
             }
         }
@@ -629,9 +593,7 @@ void PipelineDumper::DumpSpirvBinary(
     // Open dumpfile
     std::ofstream dumpFile(pathName.c_str(), std::ios_base::binary | std::ios_base::out);
     if (dumpFile.bad() == false)
-    {
         dumpFile.write(reinterpret_cast<const char*>(spirvBin->pCode), spirvBin->codeSize);
-    }
 }
 
 // =====================================================================================================================
@@ -676,9 +638,7 @@ void PipelineDumper::DumpPipelineExtraInfo(
     const std::string*            str)                     // [in] Extra info string
 {
     if (dumpFile != nullptr)
-    {
         dumpFile->dumpFile << *str;
-    }
 }
 
 // =====================================================================================================================
@@ -856,9 +816,7 @@ void PipelineDumper::dumpGraphicsPipelineInfo(
     {
         const PipelineShaderInfo* shaderInfo = shaderInfos[stage];
         if (shaderInfo->pModuleData == nullptr)
-        {
             continue;
-        }
         dumpPipelineShaderInfo(shaderInfo, *dumpFile);
     }
 
@@ -917,9 +875,7 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(
     }
 
     if (stage == ShaderStageFragment || stage == ShaderStageInvalid)
-    {
         updateHashForFragmentState(pipeline, &hasher);
-    }
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
@@ -1101,9 +1057,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(
                 sizeof(moduleData->hash));
         }
         else
-        {
             hasher->Update(moduleData->hash);
-        }
 
         size_t entryNameLen = 0;
         if (shaderInfo->pEntryTarget)
@@ -1113,9 +1067,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(
             hasher->Update(reinterpret_cast<const uint8_t*>(shaderInfo->pEntryTarget), entryNameLen);
         }
         else
-        {
             hasher->Update(entryNameLen);
-        }
 
         auto specializationInfo = shaderInfo->pSpecializationInfo;
         unsigned mapEntryCount = specializationInfo ? specializationInfo->mapEntryCount : 0;
@@ -1223,9 +1175,7 @@ void PipelineDumper::updateHashForResourceMappingNode(
     case ResourceMappingNodeType::DescriptorTableVaPtr:
         {
             for (unsigned i = 0; i < userDataNode->tablePtr.nodeCount; ++i)
-            {
                 updateHashForResourceMappingNode(&userDataNode->tablePtr.pNext[i], false, hasher);
-            }
             break;
         }
     case ResourceMappingNodeType::IndirectUserDataVaPtr:
@@ -1241,9 +1191,7 @@ void PipelineDumper::updateHashForResourceMappingNode(
     case ResourceMappingNodeType::PushConst:
         {
             if (isRootNode == false)
-            {
                 hasher->Update(userDataNode->srdRange);
-            }
             break;
         }
     default:
@@ -1280,9 +1228,7 @@ void outputText(
         }
 
         if (lastChar != 0)
-        {
             out << static_cast<char>(lastChar);
-        }
         // Restore last character
         const_cast<uint8_t*>(data)[endPos - 1] = lastChar;
     }
@@ -1313,13 +1259,9 @@ void outputBinary(
         out << formatBuf;
 
         if (i % 8 == 7)
-        {
             out << "\n";
-        }
         else
-        {
             out << " ";
-        }
     }
 
     if ((endPos > startPos) && (endPos - startPos) % sizeof(unsigned))
@@ -1334,9 +1276,7 @@ void outputBinary(
     }
 
     if ((dwordCount % 8) != 0)
-    {
         out << "\n";
-    }
 }
 
 // =====================================================================================================================
@@ -1449,21 +1389,15 @@ OStream& operator<<(
                                     node->getString().size(),
                                     out);
                                 if (msgIterStatus == MsgPackIteratorMapKey)
-                                {
                                     out << ": ";
-                                }
                                 break;
                             }
                         case msgpack::Type::Array:
                             {
                                 if (msgIterStatus == MsgPackIteratorArray)
-                                {
                                     out << "[ ";
-                                }
                                 else
-                                {
                                     out << "]";
-                                }
                                 break;
                             }
                         case msgpack::Type::Map:
@@ -1472,18 +1406,12 @@ OStream& operator<<(
                                 {
                                     out << "\n";
                                         for (unsigned i = 0; i < reader.getMsgMapLevel(); ++i)
-                                        {
                                             out << "    ";
-                                        }
                                 }
                                 else if (msgIterStatus == MsgPackIteratorMapBegin)
-                                {
                                     out << "{";
-                                }
                                 else
-                                {
                                     out << "}";
-                                }
                                 break;
                             }
                         case msgpack::Type::Float:
@@ -1582,13 +1510,9 @@ OStream& operator<<(
             while (startPos < section->secHead.shSize)
             {
                 if (symIdx < symbols.size())
-                {
                     endPos = static_cast<unsigned>(symbols[symIdx].value);
-                }
                 else
-                {
                     endPos = static_cast<unsigned>(section->secHead.shSize);
-                }
 
                 outputText(section->data, startPos, endPos, out);
                 out << "\n";
@@ -1631,13 +1555,9 @@ OStream& operator<<(
                 while (startPos < section->secHead.shSize)
                 {
                     if (symIdx < symbols.size())
-                    {
                         endPos = static_cast<unsigned>(symbols[symIdx].value);
-                    }
                     else
-                    {
                         endPos = static_cast<unsigned>(section->secHead.shSize);
-                    }
 
                     outputText(section->data, startPos, endPos, out);
                     out << "\n";
@@ -1684,13 +1604,9 @@ OStream& operator<<(
             while (startPos < section->secHead.shSize)
             {
                 if (symIdx < symbols.size())
-                {
                     endPos = static_cast<unsigned>(symbols[symIdx].value);
-                }
                 else
-                {
                     endPos = static_cast<unsigned>(section->secHead.shSize);
-                }
 
                 outputBinary(section->data, startPos, endPos, out);
 

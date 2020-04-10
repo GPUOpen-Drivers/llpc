@@ -102,18 +102,14 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
     {
         auto shaderOptions = &(m_context->getPipelineShaderInfo(m_shaderStage)->options);
         if (shaderOptions->forceLoopUnrollCount > 0)
-        {
             m_forceLoopUnrollCount = shaderOptions->forceLoopUnrollCount;
-        }
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
         m_disableLicm = shaderOptions->disableLicm | llvm::cl::DisableLicm;
 #endif
     }
 
     if ((m_forceLoopUnrollCount == 0) && (m_disableLicm == false))
-    {
         return false;
-    }
 
     if ((m_shaderStage == ShaderStageTessControl) ||
         (m_shaderStage == ShaderStageTessEval) ||
@@ -133,9 +129,7 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
             if ((loopMetaNode == nullptr) ||
                 (loopMetaNode->getOperand(0) != loopMetaNode) ||
                 ((loopMetaNode->getNumOperands() != 1) && (m_disableLicm == false)))
-            {
                 continue;
-            }
 
             if (m_forceLoopUnrollCount && (loopMetaNode->getNumOperands() <= 1))
             {

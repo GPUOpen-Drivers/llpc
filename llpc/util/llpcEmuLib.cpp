@@ -57,9 +57,7 @@ void EmuLib::addArchive(
     auto& archive = m_archives.back();
     auto index = m_archives.size() - 1;
     for (auto& symbol : archive.archive->symbols())
-    {
         m_symbolIndices.insert(std::make_pair(symbol.getName(), index));
-    }
 }
 
 // =====================================================================================================================
@@ -80,9 +78,7 @@ Function* EmuLib::getFunction(
         {
             // Function is already in the function map.
             if (nativeOnly && (funcMapIt->second.isNative == false))
-            {
                 return nullptr;
-            }
             return funcMapIt->second.function;
         }
         // Find the function in the symbol table of the archive.
@@ -130,9 +126,7 @@ Function* EmuLib::getFunction(
             // NOTE: It is to pass CTS floating point control test. If input is constant, LLVM inline pass will do
             // constant folding for this function, and it will causes floating point control doesn't work correctly.
             if (libFunc.getName().startswith(gSPIRVName::UnpackHalf2x16))
-            {
                 nonNativeFuncs.insert(&libFunc);
-            }
         }
 
         // Add the new module's defined functions to the function map for this archive.
@@ -171,9 +165,7 @@ Function* EmuLib::getFunction(
                 }
 
                 if ((libFunc.getName() == funcName) && ((nativeOnly == false) || isNative))
-                {
                     requestedFunc = &libFunc;
-                }
             }
         }
         // Add new module to our modules list.

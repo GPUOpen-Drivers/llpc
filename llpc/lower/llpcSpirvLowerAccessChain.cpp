@@ -88,9 +88,7 @@ void SpirvLowerAccessChain::visitGetElementPtrInst(
     const unsigned addrSpace = getElemPtrInst.getType()->getPointerAddressSpace();
     if ((addrSpace == SPIRAS_Private) ||
         (addrSpace == SPIRAS_Input) || (addrSpace == SPIRAS_Output))
-    {
         tryToCoalesceChain(&getElemPtrInst, addrSpace);
-    }
 }
 
 // =====================================================================================================================
@@ -127,9 +125,7 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::tryToCoalesceChain(
         }
         auto pConst = dyn_cast<ConstantExpr>(next);
         if ((pConst == nullptr) || (pConst->getOpcode() != Instruction::GetElementPtr))
-        {
             break;
-        }
         ptrVal = cast<User>(next);
     }
 
@@ -145,13 +141,9 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::tryToCoalesceChain(
             ptrVal = chainedInsts.top();
             chainedInsts.pop();
             if (blockPtr == nullptr)
-            {
                 blockPtr = ptrVal->getOperand(0);
-            }
             for (unsigned i = startOperand; i != ptrVal->getNumOperands(); ++i)
-            {
                 idxs.push_back(ptrVal->getOperand(i));
-            }
             // NOTE: For subsequent "getelementptr" instructions/constants, we skip the first two operands. The first
             // operand is the pointer value from which the element pointer is constructed. And the second one is always
             // 0 to dereference the pointer value.
@@ -159,9 +151,7 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::tryToCoalesceChain(
 
             auto inst = dyn_cast<GetElementPtrInst>(ptrVal);
             if (inst != nullptr)
-            {
                 removedInsts.push(inst);
-            }
         }
         while (chainedInsts.empty() == false);
 
@@ -183,9 +173,7 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::tryToCoalesceChain(
                     operand = UndefValue::get(operand->getType());
                 }
                 else
-                {
                     inst->eraseFromParent();
-                }
             }
             removedInsts.pop();
         }

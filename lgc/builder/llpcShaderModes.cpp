@@ -78,9 +78,7 @@ bool ShaderModes::getAnyUseSubgroupSize()
     for (const auto& commonShaderMode : m_commonShaderModes)
     {
         if (commonShaderMode.useSubgroupSize)
-        {
             return true;
-        }
     }
     return false;
 }
@@ -110,21 +108,13 @@ const TessellationMode& ShaderModes::getTessellationMode()
 {
     // Ensure defaults are correctly set the first time the middle-end uses TessellationMode.
     if (m_tessellationMode.outputVertices == 0)
-    {
         m_tessellationMode.outputVertices = MaxTessPatchVertices;
-    }
     if (m_tessellationMode.vertexSpacing == VertexSpacing::Unknown)
-    {
         m_tessellationMode.vertexSpacing = VertexSpacing::Equal;
-    }
     if (m_tessellationMode.vertexOrder == VertexOrder::Unknown)
-    {
         m_tessellationMode.vertexOrder = VertexOrder::Ccw;
-    }
     if (m_tessellationMode.primitiveMode == PrimitiveMode::Unknown)
-    {
         m_tessellationMode.primitiveMode = PrimitiveMode::Triangles;
-    }
     return m_tessellationMode;
 }
 
@@ -208,9 +198,7 @@ void ShaderModes::readModesFromShader(
 {
     // Bail if any modes have been set, which would mean that this is a full pipeline compile.
     if (m_anySet)
-    {
         return;
-    }
 
     // First the common state.
     std::string metadataName = std::string(CommonShaderModeMetadataPrefix) +

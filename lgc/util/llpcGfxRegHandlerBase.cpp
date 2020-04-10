@@ -54,9 +54,7 @@ void GfxRegHandlerBase::setRegister(
 
         // Resize to specific number of DWORDs
         for (unsigned i = 0; i < count; i++)
-        {
             m_dwords.push_back(nullptr);
-        }
     }
     else
     {
@@ -101,9 +99,7 @@ Value* GfxRegHandlerBase::getBits(
     const BitsInfo& bitsInfo)    // [in] The BitsInfo of data
 {
     if (bitsInfo.count == 32)
-    {
         return getDword(bitsInfo.index);
-    }
 
     extractDwordIfNecessary(bitsInfo.index);
 
@@ -131,9 +127,7 @@ void GfxRegHandlerBase::setBits(
         setDword(bitsInfo.index, dwordsNew);
     }
     else
-    {
         setDword(bitsInfo.index, newBits);
-    }
 }
 
 // =====================================================================================================================

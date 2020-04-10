@@ -84,9 +84,7 @@ void SpirvLowerTranslator::translateSpirvToLlvm(
     assert(moduleData->binType == BinaryType::Spirv);
     const BinaryData* spirvBin = &moduleData->binCode;
     if (ShaderModuleHelper::optimizeSpirv(spirvBin, &optimizedSpirvBin) == Result::Success)
-    {
         spirvBin = &optimizedSpirvBin;
-    }
 
     std::string spirvCode(static_cast<const char*>(spirvBin->pCode), spirvBin->codeSize);
     std::istringstream spirvStream(spirvCode);
@@ -143,9 +141,7 @@ void SpirvLowerTranslator::translateSpirvToLlvm(
     for (auto& func : *module)
     {
         if (func.empty())
-        {
             continue;
-        }
 
         if (func.getDLLStorageClass() == GlobalValue::DLLExportStorageClass)
         {

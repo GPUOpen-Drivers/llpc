@@ -430,9 +430,7 @@ const char* PipelineDumper::getRegisterNameString(
     {
         const auto& regEntry = PipelineDumperRegs[idx];
         if (regEntry.number == regNumber)
-        {
             return regEntry.name;
-        }
     }
     return "";
 }

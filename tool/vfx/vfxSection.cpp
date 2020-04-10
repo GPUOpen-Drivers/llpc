@@ -248,9 +248,7 @@ bool Section::getMemberType(
             result = true;
 
             if (valueType != nullptr)
-            {
                 *valueType = m_memberTable[i].memberType;
-            }
 
             break;
         }
@@ -281,14 +279,10 @@ bool Section::isSection(
         {
             result = true;
             if (output != nullptr)
-            {
                 *output = m_memberTable[i].isSection;
-            }
 
             if (type != nullptr)
-            {
                 *type = m_memberTable[i].memberType;
-            }
             break;
         }
     }
@@ -313,9 +307,7 @@ void Section::printSelf(
         for (unsigned i = 0; i < m_tableSize; ++i)
         {
             if (m_memberTable[i].memberName != nullptr)
-            {
                 continue;
-            }
             for (unsigned arrayIndex = 0; arrayIndex < m_memberTable[i].arrayMaxSize; ++arrayIndex)
             {
                 if (m_memberTable[i].isSection)
@@ -331,9 +323,7 @@ void Section::printSelf(
                                            &dummyMsg))
                     {
                         if (subObj->m_isActive == true)
-                        {
                             subObj->printSelf(level + 1);
-                        }
                     }
                 }
                 else
@@ -388,13 +378,9 @@ void Section::printSelf(
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
                                 {
                                     if (iufValue->props.isHex == true)
-                                    {
                                         printf(" 0x%x", iufValue->iVec4[j]);
-                                    }
                                     else
-                                    {
                                         printf(" %d", iufValue->iVec4[j]);
-                                    }
                                 }
                                 printf("\n");
                             }
@@ -411,13 +397,9 @@ void Section::printSelf(
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
                                 {
                                     if (iufValue->props.isHex == true)
-                                    {
                                         printf(" 0x%" PRIx64, iufValue->i64Vec2[j]);
-                                    }
                                     else
-                                    {
                                         printf(" %" PRId64, iufValue->i64Vec2[j]);
-                                    }
                                 }
                                 printf("\n");
                             }
@@ -432,9 +414,7 @@ void Section::printSelf(
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
-                                {
                                     printf(" %.3f", iufValue->fVec4[j]);
-                                }
                                 printf("\n");
                             }
                             break;
@@ -448,9 +428,7 @@ void Section::printSelf(
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
-                                {
                                     printf(" %.3fhf", iufValue->f16Vec4[j].GetValue());
-                                }
                                 printf("\n");
                             }
                             break;
@@ -464,9 +442,7 @@ void Section::printSelf(
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
-                                {
                                     printf(" %.3f", iufValue->dVec2[j]);
-                                }
                                 printf("\n");
                             }
                             break;
@@ -481,9 +457,7 @@ void Section::printSelf(
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned i = 0; i < intBufData->size(); ++i)
-                                {
                                     printf(" 0x%x", (*intBufData)[i]);
-                                }
                                 printf("\n");
                             }
 
@@ -675,9 +649,7 @@ SectionType Section::getSectionType(
     SectionType type = SectionTypeUnset;
     auto it = m_sectionInfo.find(sectionName);
     if (it != m_sectionInfo.end())
-    {
         type = it->second.type;
-    }
     return type;
 }
 
@@ -740,9 +712,7 @@ bool Section::readFile(
     std::string path;
     auto separatorIndex = docFilename.find_last_of("/\\");
     if (separatorIndex != std::string::npos)
-    {
         path = docFilename.substr(0, separatorIndex + 1);
-    }
     path += fileName;
 
     // Open file
@@ -771,9 +741,7 @@ bool Section::readFile(
         memcpy(&(*binaryData)[0], data, readSize);
     }
     else
-    {
         *textData = data;
-    }
 
     // Clean up
     delete[] data;
@@ -809,14 +777,10 @@ bool SectionShader::compileGlsl(
     fileList[0] = &fileName;
     int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
     if ((m_shaderType == Hlsl) || (m_shaderType == HlslFile))
-    {
         compileOption |= SpvGenOptionReadHlsl;
-    }
     const char* entryPoint = nullptr;
     if (shaderInfo != nullptr)
-    {
         entryPoint = reinterpret_cast<const SectionShaderInfo*>(shaderInfo)->getEntryPoint();
-    }
     bool compileResult = spvCompileAndLinkProgramEx(1,
                                                    &stage,
                                                    &sourceStringCount,
@@ -841,9 +805,7 @@ bool SectionShader::compileGlsl(
     }
 
     if (program)
-    {
         spvDestroyProgram(program);
-    }
 
     return result;
 }
@@ -922,9 +884,7 @@ bool SectionShader::compileShader(
         {
             result = readFile(docFilename, m_fileName, false, &m_spvBin, &m_shaderSource, errorMsg);
             if (result)
-            {
                 compileGlsl(shaderInfo, errorMsg);
-            }
             break;
         }
     case SpirvAsm:
@@ -936,9 +896,7 @@ bool SectionShader::compileShader(
         {
             result = readFile(docFilename, m_fileName, false, &m_spvBin, &m_shaderSource, errorMsg);
             if (result)
-            {
                 assembleSpirv(errorMsg);
-            }
             break;
         }
     case SpirvFile:

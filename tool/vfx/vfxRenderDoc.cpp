@@ -69,9 +69,7 @@ VfxRenderStatePtr RenderDocument::getDocument()
 {
     // Section "Result"
     if (m_sections[SectionTypeResult].size() > 0)
-    {
         reinterpret_cast<SectionResult*>(m_sections[SectionTypeResult][0])->getSubState(m_renderState.result);
-    }
 
     // Section "BufferView"s
     m_renderState.numBufferView = static_cast<unsigned>(m_sections[SectionTypeBufferView].size());
@@ -95,9 +93,7 @@ VfxRenderStatePtr RenderDocument::getDocument()
             getSubState(m_renderState.drawState);
     }
     else
-    {
         SectionDrawState::initDrawState(m_renderState.drawState);
-    }
 
     // Section "ImageView"s
     m_renderState.numImageView = static_cast<unsigned>(m_sections[SectionTypeImageView].size());

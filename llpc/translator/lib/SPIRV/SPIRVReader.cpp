@@ -399,9 +399,8 @@ private:
   void recordRemappedTypeElements(SPIRVType *bt, unsigned from, unsigned to) {
     auto& elements = m_remappedTypeElements[bt];
 
-    if (elements.size() <= from) {
+    if (elements.size() <= from)
       elements.resize(from + 1, 0);
-    }
 
     elements[from] = to;
   }
@@ -437,9 +436,8 @@ private:
   // its store size is calculated and added to the cache.
   uint64_t getTypeStoreSize(Type* const t) {
     auto it = m_typeToStoreSize.find(t);
-    if (it != m_typeToStoreSize.end()) {
+    if (it != m_typeToStoreSize.end())
       return it->second;
-    }
 
     const uint64_t calculatedSize = m_m->getDataLayout().getTypeStoreSize(t);
     m_typeToStoreSize[t] = calculatedSize;
@@ -546,9 +544,8 @@ Value *SPIRVToLLVM::getTranslatedValue(SPIRVValue *bv) {
 void SPIRVToLLVM::setAttrByCalledFunc(CallInst *call) {
   Function *f = call->getCalledFunction();
   assert(f);
-  if (f->isIntrinsic()) {
+  if (f->isIntrinsic())
     return;
-  }
   call->setCallingConv(f->getCallingConv());
   call->setAttributes(f->getAttributes());
 }
@@ -624,13 +621,9 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeBool>(
     const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
 {
     if (isParentPointer)
-    {
         return getBuilder()->getInt32Ty();
-    }
     else
-    {
         return getBuilder()->getInt1Ty();
-    }
 }
 
 // =====================================================================================================================
@@ -731,9 +724,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
         const unsigned padding = static_cast<unsigned>(matrixStride - storeSize);
 
         if (padding > 0)
-        {
             memberTypes.push_back(getPadType(padding));
-        }
 
         const StringRef typeName = isColumnMajor ? "llpc.matrix.column" : "llpc.matrix.row";
 
@@ -781,9 +772,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(
                                            { getBuilder()->getImageDescPtrTy(), getBuilder()->getFmaskDescPtrTy() });
                 }
                 if (static_cast<SPIRVTypeImage*>(spvElementType)->getDescriptor().Dim == DimBuffer)
-                {
                     return getBuilder()->getTexelBufferDescPtrTy();
-                }
                 return getBuilder()->getImageDescPtrTy();
             }
         case OpTypeSampler:
@@ -797,9 +786,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(
                 Type* imagePtrTy = getBuilder()->getImageDescPtrTy();
                 SPIRVTypeImage* spvImageTy = static_cast<SPIRVTypeSampledImage*>(spvElementType)->getImageType();
                 if (spvImageTy->getDescriptor().Dim == DimBuffer)
-                {
                     imagePtrTy = getBuilder()->getTexelBufferDescPtrTy();
-                }
                 else if (spvImageTy->getDescriptor().MS)
                 {
                     imagePtrTy = StructType::get(*m_context,
@@ -923,17 +910,11 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
         {
             // First order by offsets.
             if (std::get<1>(left) < std::get<1>(right))
-            {
                 return true;
-            }
             else if (std::get<1>(left) > std::get<1>(right))
-            {
                 return false;
-            }
             else
-            {
                 return std::get<0>(left) < std::get<0>(right);
-            }
         });
 
     SPIRVWord lastIndex = 0;
@@ -977,9 +958,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
                 const unsigned padding = static_cast<unsigned>(offset - lastValidByte);
 
                 if (padding > 0)
-                {
                     memberTypes.push_back(getPadType(padding));
-                }
             }
 
             recordRemappedTypeElements(spvStructType, index, memberTypes.size());
@@ -997,9 +976,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
 
         // If our member is a matrix, check that only one of the specifiers is declared.
         if (isExplicitlyLaidOut && (memberMatrixStride > 0))
-        {
             assert(memberIsColumnMajor ^ spvStructType->hasMemberDecorate(index, DecorationRowMajor));
-        }
 
         Type* const memberType = transType(spvMemberType,
                                             memberMatrixStride,
@@ -1016,9 +993,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
 
     StructType* structType = nullptr;
     if (spvStructType->isLiteral())
-    {
         structType = StructType::get(*m_context, memberTypes, isPacked);
-    }
     else
     {
         structType = StructType::create(*m_context, spvStructType->getName());
@@ -1047,13 +1022,9 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(
 
     // If the vector is in a pointer, we need to use an array to represent it because of LLVMs data layout rules.
     if (isExplicitlyLaidOut)
-    {
         return ArrayType::get(compType, spvType->getVectorComponentCount());
-    }
     else
-    {
         return VectorType::get(compType, spvType->getVectorComponentCount());
-    }
 }
 
 Type *SPIRVToLLVM::transType(
@@ -1183,17 +1154,14 @@ bool SPIRVToLLVM::isSPIRVCmpInstTransToLLVMInst(SPIRVInstruction *bi) const {
 void SPIRVToLLVM::setName(llvm::Value *v, SPIRVValue *bv) {
   auto name = bv->getName();
 
-  if (name.empty()) {
+  if (name.empty())
     return;
-  }
 
-  if (v->hasName()) {
+  if (v->hasName())
     return;
-  }
 
-  if (v->getType()->isVoidTy()) {
+  if (v->getType()->isVoidTy())
     return;
-  }
 
   v->setName(name);
 }
@@ -1269,9 +1237,8 @@ Value *SPIRVToLLVM::transValue(SPIRVValue *bv, Function *f, BasicBlock *bb,
   bv->validate();
 
   auto v = transValueWithoutDecoration(bv, f, bb, createPlaceHolder);
-  if (!v) {
+  if (!v)
     return nullptr;
-  }
   setName(v, bv);
   if (!transDecoration(bv, v)) {
     assert(0 && "trans decoration fail");
@@ -1413,9 +1380,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
     for (Function& func : m_m->functions())
     {
         if (func.getName().startswith(SpirvLaunderRowMajor) == false)
-        {
             continue;
-        }
 
         // Remember to remove the function later.
         valuesToRemove.push_back(&func);
@@ -1468,9 +1433,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
                     // Add all the users of this bitcast to the worklist for processing.
                     for (User* const user : bitCast->users())
-                    {
                         workList.push_back(user);
-                    }
                 }
                 else if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(value))
                 {
@@ -1490,9 +1453,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                     SmallVector<Value*, 8> indices;
 
                     for (Value* const index : getElemPtr->indices())
-                    {
                         indices.push_back(index);
-                    }
 
                     // Check that the first index is always zero.
                     assert(isa<ConstantInt>(indices[0]) && cast<ConstantInt>(indices[0])->isZero());
@@ -1501,9 +1462,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
                     // If the GEP is just pointing at the base object, just update the value map.
                     if (indices.size() == 1)
-                    {
                         valueMap[getElemPtr] = remappedValue;
-                    }
                     else if (remappedValue->getType()->isPointerTy())
                     {
                         // If the value is a pointer type, we are indexing into the original matrix.
@@ -1511,9 +1470,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                         Value* rowSplat = UndefValue::get(VectorType::get(getBuilder()->getInt32Ty(), rowCount));
 
                         for (unsigned i = 0; i < rowCount; i++)
-                        {
                             rowSplat = getBuilder()->CreateInsertElement(rowSplat, getBuilder()->getInt32(i), i);
-                        }
 
                         Value* const columnSplat = getBuilder()->CreateVectorSplat(rowCount, indices[1]);
 
@@ -1527,13 +1484,9 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
                         // Check if we are loading a scalar element of the matrix or not.
                         if (indices.size() > 2)
-                        {
                             valueMap[getElemPtr] = getBuilder()->CreateExtractElement(newGetElemPtr, indices[2]);
-                        }
                         else
-                        {
                             valueMap[getElemPtr] = newGetElemPtr;
-                        }
                     }
                     else
                     {
@@ -1545,9 +1498,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
                     // Add all the users of this GEP to the worklist for processing.
                     for (User* const user : getElemPtr->users())
-                    {
                         workList.push_back(user);
-                    }
                 }
                 else if (LoadInst* const load = dyn_cast<LoadInst>(value))
                 {
@@ -1577,9 +1528,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                             newLoadElem->setSyncScopeID(load->getSyncScopeID());
 
                             if (load->getMetadata(LLVMContext::MD_nontemporal))
-                            {
                                 transNonTemporalMetadata(newLoadElem);
-                            }
 
                             newLoad = getBuilder()->CreateInsertElement(newLoad, newLoadElem, i);
                         }
@@ -1615,9 +1564,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                             newLoadElem->setSyncScopeID(load->getSyncScopeID());
 
                             if (load->getMetadata(LLVMContext::MD_nontemporal))
-                            {
                                 transNonTemporalMetadata(newLoadElem);
-                            }
 
                             newLoad = getBuilder()->CreateInsertValue(newLoad, newLoadElem, i);
                         }
@@ -1633,9 +1580,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                         newLoad->setSyncScopeID(load->getSyncScopeID());
 
                         if (load->getMetadata(LLVMContext::MD_nontemporal))
-                        {
                             transNonTemporalMetadata(newLoad);
-                        }
 
                         load->replaceAllUsesWith(newLoad);
                     }
@@ -1661,13 +1606,9 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                             Value* storeValueElem = store->getValueOperand();
 
                             if (storeValueElem->getType()->isArrayTy())
-                            {
                                 storeValueElem = getBuilder()->CreateExtractValue(storeValueElem, i);
-                            }
                             else
-                            {
                                 storeValueElem = getBuilder()->CreateExtractElement(storeValueElem, i);
-                            }
 
                             Value* const pointerElem = getBuilder()->CreateExtractElement(pointer, i);
 
@@ -1679,9 +1620,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                             newStoreElem->setSyncScopeID(store->getSyncScopeID());
 
                             if (store->getMetadata(LLVMContext::MD_nontemporal))
-                            {
                                 transNonTemporalMetadata(newStoreElem);
-                            }
                         }
                     }
                     else if (isTypeWithPadRowMajorMatrix(pointer->getType()->getPointerElementType()))
@@ -1746,9 +1685,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                             newStoreElem->setSyncScopeID(store->getSyncScopeID());
 
                             if (store->getMetadata(LLVMContext::MD_nontemporal))
-                            {
                                 transNonTemporalMetadata(newStoreElem);
-                            }
                         }
                     }
                     else
@@ -1762,15 +1699,11 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                         newStore->setSyncScopeID(store->getSyncScopeID());
 
                         if (store->getMetadata(LLVMContext::MD_nontemporal))
-                        {
                             transNonTemporalMetadata(newStore);
-                        }
                     }
                 }
                 else
-                {
                     llvm_unreachable("Should never be called!");
-                }
             }
         }
     }
@@ -1792,9 +1725,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
             func->eraseFromParent();
         }
         else
-        {
             llvm_unreachable("Should never be called!");
-        }
     }
 
     return changed;
@@ -1912,9 +1843,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
         Value* load = UndefValue::get(StructType::get(m_m->getContext(), memberTypes));
 
         for (unsigned i = 0, memberCount = spvType->getStructMemberCount(); i < memberCount; i++)
-        {
             load = getBuilder()->CreateInsertValue(load, memberLoads[i], i);
-        }
 
         return load;
     }
@@ -1938,9 +1867,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
             indices.push_back(getBuilder()->getInt32(i));
 
             if (needsPad)
-            {
                 indices.push_back(zero);
-            }
 
             Value* elementLoadPointer = getBuilder()->CreateGEP(loadPointer, indices);
 
@@ -1969,34 +1896,24 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
                                               getScalarBlockLayout();
 
             if (scalarBlockLayout == false)
-            {
                 alignmentType = vectorType;
-            }
         }
 
         LoadInst* const load = getBuilder()->CreateLoad(loadPointer, isVolatile);
         load->setAlignment(MaybeAlign(m_m->getDataLayout().getABITypeAlignment(alignmentType)));
 
         if (isCoherent)
-        {
             load->setAtomic(AtomicOrdering::Unordered);
-        }
 
         if (isNonTemporal)
-        {
             transNonTemporalMetadata(load);
-        }
 
         // If the load was a bool or vector of bool, need to truncate the result.
         if (spvType->isTypeBool() ||
            (spvType->isTypeVector() && spvType->getVectorComponentType()->isTypeBool()))
-        {
             return getBuilder()->CreateTruncOrBitCast(load, transType(spvType));
-        }
         else
-        {
             return load;
-        }
     }
 }
 
@@ -2037,14 +1954,10 @@ void SPIRVToLLVM::addStoreInstRecursively(
         store->setAlignment(MaybeAlign(alignment));
 
         if (isCoherent)
-        {
             store->setAtomic(AtomicOrdering::Unordered);
-        }
 
         if (isNonTemporal)
-        {
             transNonTemporalMetadata(store);
-        }
 
         return;
     }
@@ -2090,9 +2003,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
             indices.push_back(getBuilder()->getInt32(i));
 
             if (needsPad)
-            {
                 indices.push_back(zero);
-            }
 
             Value* const elementStorePointer = getBuilder()->CreateGEP(storePointer, indices);
             Value* const elementStoreValue = getBuilder()->CreateExtractValue(storeValue, i);
@@ -2118,9 +2029,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
             storeType = storeValue->getType();
         }
         else
-        {
             storeType = transType(spvType);
-        }
 
         // Vectors are represented as arrays in memory, so we need to cast the array to a vector before storing.
         if (spvType->isTypeVector())
@@ -2132,23 +2041,17 @@ void SPIRVToLLVM::addStoreInstRecursively(
                                               getScalarBlockLayout();
 
             if (scalarBlockLayout == false)
-            {
                 alignmentType = storeType;
-            }
         }
 
         StoreInst* const store = getBuilder()->CreateStore(storeValue, storePointer, isVolatile);
         store->setAlignment(MaybeAlign(m_m->getDataLayout().getABITypeAlignment(alignmentType)));
 
         if (isCoherent)
-        {
             store->setAtomic(AtomicOrdering::Unordered);
-        }
 
         if (isNonTemporal)
-        {
             transNonTemporalMetadata(store);
-        }
     }
 }
 
@@ -2176,9 +2079,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
 
         // First run through the final LLVM type and create undef's for the members
         for (unsigned i = 0, memberCount = constMembers.size(); i < memberCount; i++)
-        {
             constMembers[i] = UndefValue::get(storeType->getStructElementType(i));
-        }
 
         // Then run through the SPIR-V type and set the non-undef members to actual constants.
         for (unsigned i = 0, memberCount = spvType->getStructMemberCount(); i < memberCount; i++)
@@ -2212,9 +2113,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
             indices.push_back(getBuilder()->getInt32(i));
 
             if (needsPad)
-            {
                 indices.push_back(zero);
-            }
 
             Type* const elementStoreType = GetElementPtrInst::getIndexedType(storeType, indices);
             Constant* const constElement = buildConstStoreRecursively(spvElementType,
@@ -2222,13 +2121,9 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
                                                                        constStoreValue->getAggregateElement(i));
 
             if (needsPad)
-            {
                 constElements[i] = ConstantExpr::getInsertValue(constElements[i], constElement, 0);
-            }
             else
-            {
                 constElements[i] = constElement;
-            }
         }
 
         return ConstantArray::get(cast<ArrayType>(storeType), constElements);
@@ -2238,9 +2133,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
         // If the store was a bool or vector of bool, need to zext the storing value.
         if (spvType->isTypeBool() ||
            (spvType->isTypeVector() && spvType->getVectorComponentType()->isTypeBool()))
-        {
             constStoreValue = ConstantExpr::getZExtOrBitCast(constStoreValue, storeType);
-        }
 
         // If the LLVM type is a not a vector, we need to change the constant into an array.
         if (spvType->isTypeVector() && (storeType->isVectorTy() == false))
@@ -2250,9 +2143,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
             SmallVector<Constant*, 8> constElements(storeType->getArrayNumElements(), nullptr);
 
             for (unsigned i = 0, compCount = spvType->getVectorComponentCount(); i < compCount; i++)
-            {
                 constElements[i] = constStoreValue->getAggregateElement(i);
-            }
 
             return ConstantArray::get(cast<ArrayType>(storeType), constElements);
         }
@@ -2296,25 +2187,15 @@ static AtomicOrdering transMemorySemantics(
     const unsigned semantics = static_cast<unsigned>(spvMemorySemantics->getZExtIntValue());
 
     if (semantics & MemorySemanticsSequentiallyConsistentMask)
-    {
         return AtomicOrdering::SequentiallyConsistent;
-    }
     else if (semantics & MemorySemanticsAcquireReleaseMask)
-    {
         return AtomicOrdering::AcquireRelease;
-    }
     else if (semantics & MemorySemanticsAcquireMask)
-    {
         return AtomicOrdering::Acquire;
-    }
     else if (semantics & MemorySemanticsReleaseMask)
-    {
         return AtomicOrdering::Release;
-    }
     else if (semantics & (MemorySemanticsMakeAvailableKHRMask | MemorySemanticsMakeVisibleKHRMask))
-    {
         return AtomicOrdering::Monotonic;
-    }
 
     return AtomicOrdering::Monotonic;
 }
@@ -2700,9 +2581,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
         const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
 
         if (isSystemScope)
-        {
             isCoherent = true;
-        }
     }
 
     if (spvCopyMemory->getMemoryAccessMask(false) & MemoryAccessMakePointerAvailableKHRMask)
@@ -2714,9 +2593,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
         const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
 
         if (isSystemScope)
-        {
             isCoherent = true;
-        }
     }
 
     bool isNonTemporal = spvCopyMemory->SPIRVMemoryAccess::isNonTemporal(true);
@@ -2797,9 +2674,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
         const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
 
         if (isSystemScope)
-        {
             isCoherent = true;
-        }
     }
 
     const bool isNonTemporal = spvLoad->SPIRVMemoryAccess::isNonTemporal(true);
@@ -2832,9 +2707,7 @@ Value* SPIRVToLLVM::transLoadImage(
     {
         Value* samplerPtr = base;
         if (typeOpcode == OpTypeSampledImage)
-        {
             samplerPtr = getBuilder()->CreateExtractValue(base, 1);
-        }
         sampler = getBuilder()->CreateLoadDescFromPtr(samplerPtr);
     }
 
@@ -2850,9 +2723,7 @@ Value* SPIRVToLLVM::transLoadImage(
             multisampled = static_cast<SPIRVTypeSampledImage*>(spvLoadedType)->getImageType()->getDescriptor().MS;
         }
         else
-        {
             multisampled = static_cast<SPIRVTypeImage*>(spvLoadedType)->getDescriptor().MS;
-        }
 
         if (multisampled)
         {
@@ -2867,20 +2738,14 @@ Value* SPIRVToLLVM::transLoadImage(
             image = getBuilder()->CreateInsertValue(image, fmask, 1);
         }
         else
-        {
             image = getBuilder()->CreateLoadDescFromPtr(imagePtr);
-        }
     }
 
     // Return image or sampler, or join them together in a struct.
     if (image == nullptr)
-    {
         return sampler;
-    }
     if (sampler == nullptr)
-    {
         return image;
-    }
 
     Value* result = UndefValue::get(StructType::get(*m_context, { image->getType(), sampler->getType() }));
     result = getBuilder()->CreateInsertValue(result, image, uint64_t(0));
@@ -2895,9 +2760,7 @@ Value* SPIRVToLLVM::transImagePointer(
 {
     if ((spvImagePtr->getOpCode() != OpVariable) ||
         (static_cast<SPIRVTypePointer*>(spvImagePtr->getType())->getStorageClass() != StorageClassUniformConstant))
-    {
         return transValue(spvImagePtr, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
-    }
 
     // For an image/sampler/sampledimage pointer that is a UniformConstant OpVariable, we need to materialize it by
     // generating the code to get the descriptor pointer(s).
@@ -2908,31 +2771,21 @@ Value* SPIRVToLLVM::transImagePointer(
     Value* descPtr = nullptr;
     SPIRVType* spvImageTy = spvImagePtr->getType()->getPointerElementType();
     while ((spvImageTy->getOpCode() == OpTypeArray) || (spvImageTy->getOpCode() == OpTypeRuntimeArray))
-    {
         spvImageTy = spvImageTy->getArrayElementType();
-    }
 
     if (spvImageTy->getOpCode() == OpTypeSampler)
-    {
         return getBuilder()->CreateGetSamplerDescPtr(descriptorSet, binding);
-    }
 
     bool isSampledImage = (spvImageTy->getOpCode() == OpTypeSampledImage);
     if (isSampledImage)
-    {
         spvImageTy = static_cast<SPIRVTypeSampledImage*>(spvImageTy)->getImageType();
-    }
     assert(spvImageTy->getOpCode() == OpTypeImage);
 
     auto desc = &static_cast<SPIRVTypeImage*>(spvImageTy)->getDescriptor();
     if (desc->Dim == DimBuffer)
-    {
         descPtr = getBuilder()->CreateGetTexelBufferDescPtr(descriptorSet, binding);
-    }
     else
-    {
         descPtr = getBuilder()->CreateGetImageDescPtr(descriptorSet, binding);
-    }
 
     if (desc->MS)
     {
@@ -2999,9 +2852,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
         const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
 
         if (isSystemScope)
-        {
             isCoherent = true;
-        }
     }
 
     const bool isNonTemporal = spvStore->SPIRVMemoryAccess::isNonTemporal(false);
@@ -3088,9 +2939,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
         SPIRVType* spvUltimateElementType = spvAccessChain->getBase()->getType()->getPointerElementType();
         while ((spvUltimateElementType->getOpCode() == OpTypeArray) ||
                (spvUltimateElementType->getOpCode() == OpTypeRuntimeArray))
-        {
             spvUltimateElementType = spvUltimateElementType->getArrayElementType();
-        }
 
         switch (spvUltimateElementType->getOpCode())
         {
@@ -3114,9 +2963,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
     truncConstantIndex(indices, getBuilder()->GetInsertBlock());
 
     if (spvAccessChain->hasPtrIndex() == false)
-    {
         indices.insert(indices.begin(), getBuilder()->getInt32(0));
-    }
 
     SPIRVType* const spvBaseType = spvAccessChain->getBase()->getType();
     Type* const basePointeeType = base->getType()->getPointerElementType();
@@ -3143,9 +2990,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
         bool isDone = false;
 
         if (spvAccessType->isTypeForwardPointer())
-        {
             spvAccessType = static_cast<SPIRVTypeForwardPointer*>(spvAccessType)->getPointer();
-        }
 
         switch (spvAccessType->getOpCode())
         {
@@ -3171,9 +3016,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
                     const auto pair = std::make_pair(spvAccessType, memberIndex);
 
                     if (m_overlappingStructTypeWorkaroundMap.count(pair) > 0)
-                    {
                         splits.push_back(std::make_pair(i + 1, m_overlappingStructTypeWorkaroundMap[pair]));
-                    }
                 }
 
                 // Move the type we are looking at down into the member.
@@ -3209,9 +3052,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
 
                 // If we have a row major matrix, we need to split the access chain here to handle it.
                 if (isBufferBlockPointer && isTypeWithPadRowMajorMatrix(indexedType))
-                {
                     splits.push_back(std::make_pair(i, nullptr));
-                }
                 else if (indexedType->getArrayElementType()->isStructTy())
                 {
                     // If the type of the element is a struct we had to add padding to align, so need a further index.
@@ -3238,9 +3079,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
         }
 
         if (isDone)
-        {
             break;
-        }
     }
 
     if (isBufferBlockPointer)
@@ -3249,9 +3088,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
 
         // If we have a row major matrix, we need to split the access chain here to handle it.
         if (isTypeWithPadRowMajorMatrix(indexedType))
-        {
             splits.push_back(std::make_pair(indices.size(), nullptr));
-        }
     }
 
     if (splits.size() > 0)
@@ -3265,19 +3102,13 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
 
             // Get the pointer to our row major matrix first.
             if (spvAccessChain->isInBounds())
-            {
                 newBase = getBuilder()->CreateInBoundsGEP(newBase, frontIndices);
-            }
             else
-            {
                 newBase = getBuilder()->CreateGEP(newBase, frontIndices);
-            }
 
             // Matrix splits are identified by having a nullptr as the .second of the pair.
             if (split.second == nullptr)
-            {
                 newBase = createLaunderRowMajorMatrix(newBase);
-            }
             else
             {
                 Type* const bitCastType = split.second->getPointerTo(newBase->getType()->getPointerAddressSpace());
@@ -3291,33 +3122,23 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
             indices[index++] = getBuilder()->getInt32(0);
 
             for (Value* const indexVal : indexArray.slice(split.first))
-            {
                 indices[index++] = indexVal;
-            }
 
             indices.resize(index);
         }
 
         // Do the final index if we have one.
         if (spvAccessChain->isInBounds())
-        {
             return getBuilder()->CreateInBoundsGEP(newBase, indices);
-        }
         else
-        {
             return getBuilder()->CreateGEP(newBase, indices);
-        }
     }
     else
     {
         if (spvAccessChain->isInBounds())
-        {
             return getBuilder()->CreateInBoundsGEP(base, indices);
-        }
         else
-        {
             return getBuilder()->CreateGEP(base, indices);
-        }
     }
 }
 
@@ -3332,9 +3153,7 @@ Value* SPIRVToLLVM::transOpAccessChainForImage(
     Value* base = transImagePointer(spvAccessChain->getBase());
 
     if (spvIndices.empty())
-    {
         return base;
-    }
 
     bool isNonUniform = spvIndices[0]->hasDecorate(DecorationNonUniformEXT);
     Value* index = transValue(spvIndices[0], getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
@@ -3383,9 +3202,7 @@ Value* SPIRVToLLVM::indexDescPtr(
             Value* ptr1 = getBuilder()->CreateExtractValue(base, 1);
             SPIRVType* spvElementType0 = nullptr;
             if (typeOpcode == OpTypeSampledImage)
-            {
                 spvElementType0 = static_cast<SPIRVTypeSampledImage*>(spvElementType)->getImageType();
-            }
             ptr0 = indexDescPtr(ptr0,
                                  index,
                                  isNonUniform,
@@ -4310,9 +4127,7 @@ Constant* SPIRVToLLVM::transInitializer(
     SPIRVType* const spvType = spvValue->getType();
 
     if ((spvValue->getOpCode() == OpConstantNull) && type->isAggregateType())
-    {
         return ConstantAggregateZero::get(type);
-    }
 
     if (spvType->isTypeStruct())
     {
@@ -4398,9 +4213,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
     {
         SPIRVType* spvElementType = spvVarType;
         while ((spvElementType->getOpCode() == OpTypeArray) || (spvElementType->getOpCode() == OpTypeRuntimeArray))
-        {
             spvElementType = spvElementType->getArrayElementType();
-        }
         switch (spvElementType->getOpCode())
         {
         case OpTypeImage:
@@ -4422,13 +4235,9 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
 
     // If the type has an initializer, re-create the SPIR-V initializer in LLVM.
     if (spvInitializer != nullptr)
-    {
         initializer = transInitializer(spvInitializer, varType);
-    }
     else if (storageClass == SPIRVStorageClassKind::StorageClassWorkgroup)
-    {
         initializer = UndefValue::get(varType);
-    }
 
     if (storageClass == StorageClassFunction)
     {
@@ -4437,9 +4246,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
         Value* const var = getBuilder()->CreateAlloca(varType, nullptr, spvVar->getName());
 
         if (initializer != nullptr)
-        {
             getBuilder()->CreateStore(initializer, var);
-        }
 
         return var;
     }
@@ -4460,9 +4267,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
 
             // Skip through arrays of descriptors to get to the descriptor block type.
             while (spvBlockDecoratedType->isTypeArray())
-            {
                 spvBlockDecoratedType = spvBlockDecoratedType->getArrayElementType();
-            }
 
             assert(spvBlockDecoratedType->isTypeStruct());
 
@@ -4477,9 +4282,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
     }
 
     if (spvVar->hasDecorate(DecorationNonWritable))
-    {
         readOnly = true;
-    }
     else if (spvVarType->isTypeStruct())
     {
         // glslang has a bug where it'll output NonWritable on struct member types instead of the memory object
@@ -4496,9 +4299,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
         }
 
         if (allReadOnly)
-        {
             readOnly = true;
-        }
     }
 
     unsigned addrSpace = ptrType->getPointerAddressSpace();
@@ -4522,16 +4323,12 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
         // The pass will change constant store operations to initializerand this
         // is disallowed in backend compiler.
         if (!globalVar->hasName())
-        {
             globalVar->setName("lds");
-        }
     }
 
     SPIRVBuiltinVariableKind builtinKind;
     if (spvVar->isBuiltin(&builtinKind))
-    {
         m_builtinGvMap[globalVar] = builtinKind;
-    }
 
     return globalVar;
 }
@@ -4708,9 +4505,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f,
     if (bTy->isTypePointer() && bTy->getPointerStorageClass() == spv::StorageClassWorkgroup) {
       auto nullPtrAsInt = getBuilder()->getInt32(0xFFFFFFFF);
       nullPtr = getBuilder()->CreateIntToPtr(nullPtrAsInt, nullPtrTy);
-    } else {
+    } else
       nullPtr = Constant::getNullValue(nullPtrTy);
-    }
     return mapValue(bv, nullPtr);
   }
 
@@ -4944,9 +4740,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f,
           assert(literals.size() <= 2 &&
                  "Number of literals should not be more then two");
           uint64_t literal = uint64_t(literals.at(0));
-          if (literals.size() == 2) {
+          if (literals.size() == 2)
             literal += uint64_t(literals.at(1)) << 32;
-          }
 
           auto successor = cast<BasicBlock>(transValue(label, f, bb));
           ls->addCase(ConstantInt::get(dyn_cast<IntegerType>(select->getType()),
@@ -5000,9 +4795,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f,
     auto cc = static_cast<SPIRVCompositeConstruct *>(bv);
     auto constituents = transValue(cc->getConstituents(), f, bb);
     std::vector<Constant *> cv;
-    for (const auto &i : constituents) {
+    for (const auto &i : constituents)
       cv.push_back(dyn_cast<Constant>(i));
-    }
     switch (bv->getType()->getOpCode()) {
     case OpTypeVector: {
       auto vecTy = transType(cc->getType());
@@ -5033,9 +4827,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f,
     case OpTypeStruct: {
       auto ccTy = transType(cc->getType());
       Value *v = UndefValue::get(ccTy);
-      for (size_t i = 0, e = constituents.size(); i < e; ++i) {
+      for (size_t i = 0, e = constituents.size(); i < e; ++i)
         v = InsertValueInst::Create(v, constituents[i], i, "", bb);
-      }
       return mapValue(bv, v);
     }
     case OpTypeMatrix: {
@@ -5045,9 +4838,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f,
       auto matTy = ArrayType::get(matClmTy, matCount);
 
       Value* v = UndefValue::get(matTy);
-      for (unsigned i = 0, e = constituents.size(); i < e; ++i) {
+      for (unsigned i = 0, e = constituents.size(); i < e; ++i)
           v = InsertValueInst::Create(v, constituents[i], i, "", bb);
-      }
       return mapValue(bv, v);
       }
     default:
@@ -5776,12 +5568,10 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f,
 
   default: {
     auto oc = bv->getOpCode();
-    if (isSPIRVCmpInstTransToLLVMInst(static_cast<SPIRVInstruction *>(bv))) {
-      return mapValue(bv, transCmpInst(bv, bb, f));
-    } else if (isBinaryShiftLogicalBitwiseOpCode(oc) ||
-                isLogicalOpCode(oc)) {
-      return mapValue(bv, transShiftLogicalBitwiseInst(bv, bb, f));
-    } else if (isCvtOpCode(oc)) {
+    if (isSPIRVCmpInstTransToLLVMInst(static_cast<SPIRVInstruction *>(bv)))
+      return mapValue(bv, transCmpInst(bv, bb, f)); else if (isBinaryShiftLogicalBitwiseOpCode(oc) ||
+                isLogicalOpCode(oc))
+      return mapValue(bv, transShiftLogicalBitwiseInst(bv, bb, f)); else if (isCvtOpCode(oc)) {
       Value *inst = transConvertInst(bv, f, bb);
       return mapValue(bv, inst);
     }
@@ -5888,9 +5678,8 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
   }
 
   // Creating all basic blocks before creating instructions.
-  for (size_t i = 0, e = bf->getNumBasicBlock(); i != e; ++i) {
+  for (size_t i = 0, e = bf->getNumBasicBlock(); i != e; ++i)
     transValue(bf->getBasicBlock(i), f, nullptr);
-  }
 
   // Set name for entry block
   if (f->getEntryBlock().getName().empty())
@@ -6282,9 +6071,8 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *bi,
     }
 
     // NonPrivateTexelKHR (0x400)
-    if (mask & ImageOperandsNonPrivateTexelKHRMask) {
+    if (mask & ImageOperandsNonPrivateTexelKHRMask)
       mask &= ~ImageOperandsNonPrivateTexelKHRMask;
-    }
 
     // VolatileTexelKHR (0x800)
     if (mask & ImageOperandsVolatileTexelKHRMask) {
@@ -6300,9 +6088,8 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *bi,
     }
 
     // ZeroExtend (0x2000)
-    if (mask & ImageOperandsZeroExtendMask) {
+    if (mask & ImageOperandsZeroExtendMask)
       mask &= ~ImageOperandsZeroExtendMask;
-    }
 #endif
 
     assert(!mask && "Unknown image operand");
@@ -7446,9 +7233,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       }
 
       SPIRVWord index = SPIRVID_INVALID;
-      if (bv->hasDecorate(DecorationIndex, 0, &index)) {
+      if (bv->hasDecorate(DecorationIndex, 0, &index))
           inOutDec.Index = index;
-      }
 
       SPIRVWord builtIn = SPIRVID_INVALID;
       if (bv->hasDecorate(DecorationBuiltIn, 0, &builtIn)) {
@@ -7777,9 +7563,8 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt,
   }
 
   SPIRVWord index = SPIRVID_INVALID;
-  if (bt->hasDecorate(DecorationIndex, 0, &index)) {
+  if (bt->hasDecorate(DecorationIndex, 0, &index))
       inOutDec.Index = index;
-  }
 
   SPIRVWord builtIn = SPIRVID_INVALID;
   if (bt->hasDecorate(DecorationBuiltIn, 0, &builtIn)) {
@@ -8209,11 +7994,9 @@ Constant * SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt,
       // Workaround SPIR-V 1.0 bug where sometimes structs had illegal overlap
       // in their struct offsets.
       if ((m_bm->getSPIRVVersion() == SpvVersion10) &&
-          (remappedIdx == UINT32_MAX)) {
-        memberDec.Offset = UINT32_MAX;
-      } else {
+          (remappedIdx == UINT32_MAX))
+        memberDec.Offset = UINT32_MAX; else
         memberDec.Offset = sl->getElementOffset(remappedIdx);
-      }
 
       if (bt->hasMemberDecorate(memberIdx, DecorationMatrixStride,
                                 0, &memberMatrixStride))
@@ -8703,9 +8486,8 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst,
 
   case GLSLstd450Length: {
     // Get length of vector.
-    if (!isa<VectorType>(args[0]->getType())) {
+    if (!isa<VectorType>(args[0]->getType()))
       return getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, args[0]);
-    }
     Value *dot = getBuilder()->CreateDotProduct(args[0], args[0]);
     return getBuilder()->CreateUnaryIntrinsic(Intrinsic::sqrt, dot);
   }
@@ -8713,9 +8495,8 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst,
   case GLSLstd450Distance: {
     // Get distance between two points.
     Value *diff = getBuilder()->CreateFSub(args[0], args[1]);
-    if (!isa<VectorType>(diff->getType())) {
+    if (!isa<VectorType>(diff->getType()))
       return getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, diff);
-    }
     Value *dot = getBuilder()->CreateDotProduct(diff, diff);
     return getBuilder()->CreateUnaryIntrinsic(Intrinsic::sqrt, dot);
   }
@@ -9026,9 +8807,8 @@ Instruction *SPIRVToLLVM::transBarrierFence(SPIRVInstruction *mb,
     SPIRVWord memScope = getIntVal(ctlB->getMemScope());
 
     barrier = transBarrier(bb, execScope, memSema, memScope);
-  } else {
+  } else
     llvm_unreachable("Invalid instruction");
-  }
 
   if (barrier) {
     setName(barrier, mb);

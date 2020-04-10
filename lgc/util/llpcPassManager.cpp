@@ -96,9 +96,7 @@ static const PassInfo* getPassInfo(
     StringRef passName)   // Short name of pass
 {
     if (passName.empty())
-    {
         return nullptr;
-    }
 
     const PassRegistry& passRegistry = *PassRegistry::getPassRegistry();
     const PassInfo* passInfo = passRegistry.getPassInfo(passName);
@@ -132,9 +130,7 @@ PassManagerImpl::PassManagerImpl()
     PassManager()
 {
     if (cl::DumpCfgAfter.empty() == false)
-    {
         m_dumpCfgAfter = getPassIdFromName(cl::DumpCfgAfter);
-    }
 
     m_jumpThreading = getPassIdFromName("jump-threading");
     m_printModule = getPassIdFromName("print-module");
@@ -147,17 +143,13 @@ void PassManagerImpl::add(
 {
     // Do not add any passes after calling stop(), except immutable passes.
     if (m_stopped && (pass->getAsImmutablePass() == nullptr))
-    {
         return;
-    }
 
     AnalysisID passId = pass->getPassID();
 
     // Skip the jump threading pass as it interacts really badly with the structurizer.
     if (passId == m_jumpThreading)
-    {
         return;
-    }
 
     if ((passId != m_printModule) && (m_passIndex != nullptr))
     {
@@ -173,9 +165,7 @@ void PassManagerImpl::add(
         }
 
         if (cl::DumpPassName)
-        {
             LLPC_OUTS("Pass[" << passIndex << "] = " << pass->getPassName() << "\n");
-        }
     }
 
     // Add the pass to the superclass pass manager.

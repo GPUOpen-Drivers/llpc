@@ -95,9 +95,7 @@ void ShaderCacheManager::releaseShaderCacheObject(
     for (; cacheIt != endIt; ++cacheIt)
     {
         if ((*cacheIt).get() == shaderCachePtr.get())
-        {
             break;
-        }
     }
 
     assert(cacheIt != endIt);

@@ -324,9 +324,7 @@ void BuilderRecorder::recordShaderModes(
     Module* module)    // [in/out] Module to record into
 {
     if ((m_pipelineState == nullptr) && m_shaderModes)
-    {
         m_shaderModes->record(module);
-    }
 }
 
 // =====================================================================================================================
@@ -335,13 +333,9 @@ void BuilderRecorder::recordShaderModes(
 ShaderModes* BuilderRecorder::getShaderModes()
 {
     if (m_pipelineState)
-    {
         return m_pipelineState->getShaderModes();
-    }
     if (!m_shaderModes)
-    {
         m_shaderModes.reset(new ShaderModes());
-    }
     return &*m_shaderModes;
 }
 
@@ -730,9 +724,7 @@ Value* BuilderRecorder::CreateExtractExponent(
 {
     Type* resultTy = getInt32Ty();
     if (value->getType()->getScalarType()->isHalfTy())
-    {
         resultTy = getInt16Ty();
-    }
     resultTy = getConditionallyVectorizedTy(resultTy, value->getType());
     return record(Opcode::ExtractExponent, resultTy, value, instName);
 }
@@ -1136,9 +1128,7 @@ Value* BuilderRecorder::CreateImageLoad(
     args.push_back(imageDesc);
     args.push_back(coord);
     if (mipLevel != nullptr)
-    {
         args.push_back(mipLevel);
-    }
     return record(Opcode::ImageLoad, resultTy, args, instName);
 }
 
@@ -1179,9 +1169,7 @@ Value* BuilderRecorder::CreateImageStore(
     args.push_back(imageDesc);
     args.push_back(coord);
     if (mipLevel != nullptr)
-    {
         args.push_back(mipLevel);
-    }
     return record(Opcode::ImageStore, nullptr, args, instName);
 }
 
@@ -1201,9 +1189,7 @@ Value* BuilderRecorder::CreateImageSample(
     for (unsigned i = 0; i != address.size(); ++i)
     {
         if (address[i] != nullptr)
-        {
             addressMask |= 1U << i;
-        }
     }
 
     SmallVector<Value*, 8> args;
@@ -1215,9 +1201,7 @@ Value* BuilderRecorder::CreateImageSample(
     for (unsigned i = 0; i != address.size(); ++i)
     {
         if (address[i] != nullptr)
-        {
             args.push_back(address[i]);
-        }
     }
     return record(Opcode::ImageSample, resultTy, args, instName);
 }
@@ -1238,9 +1222,7 @@ Value* BuilderRecorder::CreateImageGather(
     for (unsigned i = 0; i != address.size(); ++i)
     {
         if (address[i] != nullptr)
-        {
             addressMask |= 1U << i;
-        }
     }
 
     SmallVector<Value*, 8> args;
@@ -1252,9 +1234,7 @@ Value* BuilderRecorder::CreateImageGather(
     for (unsigned i = 0; i != address.size(); ++i)
     {
         if (address[i] != nullptr)
-        {
             args.push_back(address[i]);
-        }
     }
     return record(Opcode::ImageGather, resultTy, args, instName);
 }
@@ -1346,9 +1326,7 @@ Value* BuilderRecorder::CreateImageQuerySize(
     unsigned compCount = getImageQuerySizeComponentCount(dim);
     Type* resultTy = getInt32Ty();
     if (compCount > 1)
-    {
         resultTy = VectorType::get(resultTy, compCount);
-    }
     return record(Opcode::ImageQuerySize, resultTy, { getInt32(dim), getInt32(flags), imageDesc, lod }, instName);
 }
 
@@ -1493,13 +1471,9 @@ Value* BuilderRecorder::CreateReadBuiltInInput(
     if (index != nullptr)
     {
         if (isa<ArrayType>(resultTy))
-        {
             resultTy = resultTy->getArrayElementType();
-        }
         else
-        {
             resultTy = resultTy->getVectorElementType();
-        }
     }
     return record(Opcode::ReadBuiltInInput,
                   resultTy,
@@ -1528,13 +1502,9 @@ Value* BuilderRecorder::CreateReadBuiltInOutput(
     if (index != nullptr)
     {
         if (isa<ArrayType>(resultTy))
-        {
             resultTy = resultTy->getArrayElementType();
-        }
         else
-        {
             resultTy = resultTy->getVectorElementType();
-        }
     }
     return record(Opcode::ReadBuiltInOutput,
                   resultTy,
@@ -1916,9 +1886,7 @@ Instruction* BuilderRecorder::record(
             getTypeName(resultTy, mangledNameStream);
         }
         else
-        {
             resultTy = Type::getVoidTy(getContext());
-        }
     }
 
     // See if the declaration already exists in the module.
@@ -1934,9 +1902,7 @@ Instruction* BuilderRecorder::record(
         func->setMetadata(opcodeMetaKindId, funcMeta);
         func->addFnAttr(Attribute::NoUnwind);
         for (auto attrib : attribs)
-        {
             func->addFnAttr(attrib);
-        }
     }
 
     // Create the call.

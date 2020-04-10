@@ -337,27 +337,19 @@ Value* VertexFetch::run(
 
     // NOTE: If we could not find vertex input info matching this location, just return undefined value.
     if (description == nullptr)
-    {
         return UndefValue::get(inputTy);
-    }
 
     auto vbDesc = loadVertexBufferDescriptor(description->binding, insertPos);
 
     Value* vbIndex = nullptr;
     if (description->inputRate == VertexInputRateVertex)
-    {
         vbIndex = getVertexIndex(); // Use vertex index
-    }
     else
     {
         if (description->inputRate == VertexInputRateNone)
-        {
             vbIndex = m_baseInstance;
-        }
         else if (description->inputRate == VertexInputRateInstance)
-        {
             vbIndex = getInstanceIndex(); // Use instance index
-        }
         else
         {
             // There is a divisor.
@@ -499,9 +491,7 @@ Value* VertexFetch::run(
                 alpha = new BitCastInst(alpha, Type::getInt32Ty(*m_context), "", insertPos);
             }
             else
-            {
                 llvm_unreachable("Should never be called!");
-            }
 
             // Insert alpha channel: %vf0 = insertelement %vf0, %a, 3
             vertexFetches[0] = InsertElementInst::Create(vertexFetches[0],
@@ -571,9 +561,7 @@ Value* VertexFetch::run(
         // %vf = shufflevector %vf0, %vf1, <0, 1, 2, 3, 4, 5, ...>
         shuffleMask.clear();
         for (unsigned i = 0; i < 4 + compCount; ++i)
-        {
             shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), i));
-        }
         vertexFetch = new ShuffleVectorInst(vertexFetches[0],
                                              vertexFetches[1],
                                              ConstantVector::get(shuffleMask),
@@ -581,9 +569,7 @@ Value* VertexFetch::run(
                                              insertPos);
     }
     else
-    {
         vertexFetch = vertexFetches[0];
-    }
 
     // Finalize vertex fetch
     Type* basicTy = inputTy->isVectorTy() ? inputTy->getVectorElementType() : inputTy;
@@ -596,17 +582,11 @@ Value* VertexFetch::run(
     if (basicTy->isIntegerTy())
     {
         if (bitWidth == 8)
-        {
             defaults = m_fetchDefaults.int8;
-        }
         else if (bitWidth == 16)
-        {
             defaults = m_fetchDefaults.int16;
-        }
         else if (bitWidth == 32)
-        {
             defaults = m_fetchDefaults.int32;
-        }
         else
         {
             assert(bitWidth == 64);
@@ -616,13 +596,9 @@ Value* VertexFetch::run(
     else if (basicTy->isFloatingPointTy())
     {
         if (bitWidth == 16)
-        {
             defaults = m_fetchDefaults.float16;
-        }
         else if (bitWidth == 32)
-        {
             defaults = m_fetchDefaults.float32;
-        }
         else
         {
             assert(bitWidth == 64);
@@ -630,9 +606,7 @@ Value* VertexFetch::run(
         }
     }
     else
-    {
         llvm_unreachable("Should never be called!");
-    }
 
     const unsigned defaultCompCount = defaults->getType()->getVectorNumElements();
     std::vector<Value*> defaultValues(defaultCompCount);
@@ -651,9 +625,7 @@ Value* VertexFetch::run(
     std::vector<Value*> fetchValues(fetchCompCount);
 
     if (fetchCompCount == 1)
-    {
         fetchValues[0] = vertexFetch;
-    }
     else
     {
         for (unsigned i = 0; i < fetchCompCount; ++i)
@@ -678,13 +650,9 @@ Value* VertexFetch::run(
     for (unsigned i = 0; i < vertexCompCount; i++)
     {
         if (compIdx + i < fetchCompCount)
-        {
             vertexValues[i] = fetchValues[compIdx + i];
-        }
         else if (compIdx + i < defaultCompCount)
-        {
             vertexValues[i] = defaultValues[compIdx + i];
-        }
         else
         {
             llvm_unreachable("Should never be called!");
@@ -693,9 +661,7 @@ Value* VertexFetch::run(
     }
 
     if (vertexCompCount == 1)
-    {
         vertex = vertexValues[0];
-    }
     else
     {
         Type* vertexTy = VectorType::get(Type::getInt32Ty(*m_context), vertexCompCount);
@@ -978,9 +944,7 @@ void VertexFetch::addVertexFetchInst(
             *ppFetch = new ShuffleVectorInst(fetch, fetch, ConstantVector::get(shuffleMask), "", insertPos);
         }
         else
-        {
             *ppFetch = fetch;
-        }
     }
     else
     {
@@ -1102,9 +1066,7 @@ bool VertexFetch::needPatchA2S(
         if ((inputDesc->nfmt == BufNumFormatSnorm) ||
             (inputDesc->nfmt == BufNumFormatSscaled) ||
             (inputDesc->nfmt == BufNumFormatSint))
-        {
             needPatch = (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9);
-        }
     }
 
     return needPatch;

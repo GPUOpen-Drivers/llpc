@@ -89,13 +89,9 @@ bool PatchLoadScalarizer::runOnFunction(
     // If the function is not a valid shader stage, or the optimization is disabled, bail.
     m_scalarThreshold = 0;
     if (shaderStage != ShaderStageInvalid)
-    {
         m_scalarThreshold = pipelineState->getShaderOptions(shaderStage).loadScalarizerThreshold;
-    }
     if (m_scalarThreshold == 0)
-    {
         return false;
-    }
 
     m_builder.reset(new IRBuilder<>(function.getContext()));
 
@@ -143,9 +139,7 @@ void PatchLoadScalarizer::visitLoadInst(
         unsigned compCount = loadTy->getNumElements();
 
         if (compCount > m_scalarThreshold)
-        {
             return;
-        }
 
         Type* compTy = loadTy->getVectorElementType();
         uint64_t compSize = loadInst.getModule()->getDataLayout().getTypeStoreSize(compTy);
@@ -180,9 +174,7 @@ void PatchLoadScalarizer::visitLoadInst(
                                                          loadInst.getName() + ".ii" + Twine(i));
 
             for (auto metaNode : allMetaNodes)
-            {
                 dyn_cast<Instruction>(loadComps[i])->setMetadata(metaNode.first, metaNode.second);
-            }
         }
 
         for (unsigned i = 0; i < compCount; i++)

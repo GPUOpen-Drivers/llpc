@@ -200,9 +200,7 @@ void PatchEntryPointMutate::processShader()
     }
 
     if (shaderOptions->unrollThreshold != 0)
-    {
         builder.addAttribute("amdgpu-unroll-threshold", std::to_string(shaderOptions->unrollThreshold));
-    }
     else
     {
         // use a default unroll threshold of 700
@@ -215,18 +213,14 @@ void PatchEntryPointMutate::processShader()
     // NOTE: Remove "readnone" attribute for entry-point. If GS is emtry, this attribute will allow
     // LLVM optimization to remove sendmsg(GS_DONE). It is unexpected.
     if (entryPoint->hasFnAttribute(Attribute::ReadNone))
-    {
         entryPoint->removeFnAttr(Attribute::ReadNone);
-    }
 
     // Update attributes of new entry-point
     for (auto arg = entryPoint->arg_begin(), end = entryPoint->arg_end(); arg != end; ++arg)
     {
         auto argIdx = arg->getArgNo();
         if (inRegMask & (1ull << argIdx))
-        {
             arg->addAttr(Attribute::InReg);
-        }
     }
 
     // Remove original entry-point
@@ -268,22 +262,14 @@ bool PatchEntryPointMutate::isResourceNodeActive(
                                        (hasGs ? ShaderStageGeometry : ShaderStageInvalid);
             }
             else if (shaderStage1 == ShaderStageTessControl)
-            {
                 shaderStage2 = ShaderStageVertex;
-            }
             else if (shaderStage1 == ShaderStageTessEval)
-            {
                 shaderStage2 = hasGs ? ShaderStageGeometry : ShaderStageInvalid;
-            }
             else if (shaderStage1 == ShaderStageGeometry)
-            {
                 shaderStage2 = hasTs ? ShaderStageTessEval : ShaderStageVertex;
-            }
 
             if (shaderStage2 != ShaderStageInvalid)
-            {
                 resUsage2 = m_pipelineState->getShaderResourceUsage(shaderStage2);
-            }
         }
     }
 
@@ -291,9 +277,7 @@ bool PatchEntryPointMutate::isResourceNodeActive(
     {
         active = (resUsage1->pushConstSizeInBytes > 0);
         if ((active == false) && (resUsage2 != nullptr))
-        {
             active = (resUsage2->pushConstSizeInBytes > 0);
-        }
     }
     else if (node->type == ResourceNodeType::DescriptorTableVaPtr)
     {
@@ -313,9 +297,7 @@ bool PatchEntryPointMutate::isResourceNodeActive(
         active = true;
     }
     else if (node->type == ResourceNodeType::StreamOutTableVaPtr)
-    {
         active = true;
-    }
     else
     {
         assert((node->type != ResourceNodeType::DescriptorTableVaPtr) &&
@@ -327,9 +309,7 @@ bool PatchEntryPointMutate::isResourceNodeActive(
 
         active = (resUsage1->descPairs.find(descPair.u64All) != resUsage1->descPairs.end());
         if ((active == false) && (resUsage2 != nullptr))
-        {
             active = (resUsage2->descPairs.find(descPair.u64All) != resUsage2->descPairs.end());
-        }
     }
 
     return active;
@@ -387,18 +367,14 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
             {
                 // Only the vertex shader needs a vertex buffer table.
                 if (m_shaderStage == ShaderStageVertex)
-                {
                     reserveVbTable = true;
-                }
                 else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9)
                 {
                     // On GFX9+, the shader stage that the vertex shader is merged in to needs a vertex buffer
                     // table, to ensure that the merged shader gets one.
                     if ((m_shaderStage == ShaderStageTessControl) ||
                         ((m_shaderStage == ShaderStageGeometry) && (m_hasTs == false)))
-                    {
                         reserveVbTable = true;
-                    }
                 }
                 continue;
             }
@@ -409,26 +385,20 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
                 if ((m_pipelineState->getShaderStageMask() &
                      (shaderStageToMask(ShaderStageFragment) - shaderStageToMask(m_shaderStage))) ==
                     shaderStageToMask(m_shaderStage))
-                {
                     reserveStreamOutTable = true;
-                }
                 else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9)
                 {
                     // On GFX9+, the shader stage that the last shader is merged in to needs a stream out
                     // table, to ensure that the merged shader gets one.
                     if ((m_shaderStage == ShaderStageTessEval) ||
                         ((m_shaderStage == ShaderStageVertex) && (m_hasTs == false)))
-                    {
                         reserveStreamOutTable = true;
-                    }
                 }
                 continue;
             }
 
             if (isResourceNodeActive(node, true) == false)
-            {
                 continue;
-            }
 
             switch (node->type)
             {
@@ -463,21 +433,15 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
     case ShaderStageTessControl:
         {
             if (enableMultiView)
-            {
                 availUserDataCount -= 1;
-            }
 
             // Reserve register for "IndirectUserDataVaPtr"
             if (reserveVbTable)
-            {
                 availUserDataCount -= 1;
-            }
 
             // Reserve for stream-out table
             if (reserveStreamOutTable)
-            {
                 availUserDataCount -= 1;
-            }
 
             // NOTE: On GFX9+, Vertex shader (LS) and tessellation control shader (HS) are merged into a single shader.
             // The user data count of tessellation control shader should be same as vertex shader.
@@ -485,19 +449,13 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
             if ((m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) &&
                 (m_shaderStage == ShaderStageTessControl) &&
                 (m_pipelineState->getShaderStageMask() & shaderStageToMask(ShaderStageVertex)))
-            {
                 currResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
-            }
 
             if (currResUsage->builtInUsage.vs.baseVertex || currResUsage->builtInUsage.vs.baseInstance)
-            {
                 availUserDataCount -= 2;
-            }
 
             if (currResUsage->builtInUsage.vs.drawIndex)
-            {
                 availUserDataCount -= 1;
-            }
 
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
@@ -513,15 +471,11 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
     case ShaderStageTessEval:
         {
             if (enableMultiView)
-            {
                 availUserDataCount -= 1;
-            }
 
             // Reserve for stream-out table
             if (reserveStreamOutTable)
-            {
                 availUserDataCount -= 1;
-            }
 
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior (TES is in NGG primitive shader).
@@ -536,9 +490,7 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
     case ShaderStageGeometry:
         {
             if (enableMultiView)
-            {
                 availUserDataCount -= 1;
-            }
 
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior. i.e. GS is GFX8
@@ -561,9 +513,7 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
         {
             // Emulate gl_NumWorkGroups via user data registers
             if (builtInUsage.cs.numWorkgroups)
-            {
                 availUserDataCount -= 2;
-            }
             break;
         }
     default:
@@ -641,19 +591,13 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
 
         // "IndirectUserDataVaPtr" can't be spilled, it is treated as internal user data
         if (node->type == ResourceNodeType::IndirectUserDataVaPtr)
-        {
             continue;
-        }
 
         if (node->type == ResourceNodeType::StreamOutTableVaPtr)
-        {
             continue;
-        }
 
         if (isResourceNodeActive(node, true) == false)
-        {
             continue;
-        }
 
         if (useFixedLayout)
         {
@@ -695,9 +639,7 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
                         intfData->userDataMap[userDataIdx] = DescRelocMagic | node->innerTable[0].set;
                     }
                     else
-                    {
                         intfData->userDataMap[userDataIdx] = node->offsetInDwords;
-                    }
 
                     ++userDataIdx;
                     break;
@@ -712,9 +654,7 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
                 // via the spill table, rather than directly placed in sgprs.
                 assert(needSpill);
                 if (intfData->spillTable.offsetInDwords == InvalidValue)
-                {
                     intfData->spillTable.offsetInDwords = node->offsetInDwords;
-                }
                 break;
 
             case ResourceNodeType::PushConst:
@@ -722,9 +662,7 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
                 {
                     argTys.push_back(VectorType::get(Type::getInt32Ty(*m_context), node->sizeInDwords));
                     for (unsigned j = 0; j < node->sizeInDwords; ++j)
-                    {
                         intfData->userDataMap[userDataIdx + j] = node->offsetInDwords + j;
-                    }
                     userDataIdx += node->sizeInDwords;
                     break;
                 }
@@ -736,9 +674,7 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
             }
         }
         else if (needSpill && (intfData->spillTable.offsetInDwords == InvalidValue))
-        {
             intfData->spillTable.offsetInDwords = node->offsetInDwords;
-        }
     }
 
     // Internal user data

@@ -113,16 +113,12 @@ bool PatchDescriptorLoad::runOnModule(
     {
         if (func.isDeclaration() && (func.getName().startswith(lgcName::DescriptorGetPtrPrefix) ||
                                      func.getName().startswith(lgcName::DescriptorIndex)))
-        {
             deadDescFuncs.push_back(&func);
-        }
     }
     for (Function* func : deadDescFuncs)
     {
         while (func->use_empty() == false)
-        {
             func->use_begin()->set(UndefValue::get(func->getType()));
-        }
         func->eraseFromParent();
     }
 
@@ -147,13 +143,9 @@ void PatchDescriptorLoad::processDescriptorGetPtr(
     auto resType = ResourceNodeType::DescriptorResource;
     bool shadow = false;
     if (descPtrCallName.startswith(lgcName::DescriptorGetTexelBufferPtr))
-    {
         resType = ResourceNodeType::DescriptorTexelBuffer;
-    }
     else if (descPtrCallName.startswith(lgcName::DescriptorGetSamplerPtr))
-    {
         resType = ResourceNodeType::DescriptorSampler;
-    }
     else if (descPtrCallName.startswith(lgcName::DescriptorGetFmaskPtr))
     {
         shadow = m_pipelineSysValues.get(m_entryPoint)->isShadowDescTableEnabled();
@@ -208,9 +200,7 @@ Value* PatchDescriptorLoad::getDescPtrAndStride(
     case ResourceNodeType::DescriptorTexelBuffer:
         byteSize = DescriptorSizeBuffer;
         if ((node != nullptr) && (node->type == ResourceNodeType::DescriptorBufferCompact))
-        {
             byteSize = DescriptorSizeBufferCompact;
-        }
         stride = builder.getInt32(byteSize / 4);
         break;
     case ResourceNodeType::DescriptorSampler:
@@ -350,9 +340,7 @@ Value* PatchDescriptorLoad::getDescPtr(
         unsigned offsetInDwords = node->offsetInDwords;
         if ((resType == ResourceNodeType::DescriptorSampler) &&
             (node->type == ResourceNodeType::DescriptorCombinedTexture))
-        {
             offsetInDwords += DescriptorSizeResource / 4;
-        }
         offset = builder.getInt32(offsetInDwords);
     }
     descPtr = builder.CreateBitCast(descPtr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
@@ -417,9 +405,7 @@ void PatchDescriptorLoad::visitCallInst(
 {
     auto callee = callInst.getCalledFunction();
     if (callee == nullptr)
-    {
         return;
-    }
 
     StringRef mangledName = callee->getName();
 
@@ -451,9 +437,7 @@ void PatchDescriptorLoad::visitCallInst(
         {
             Value* desc = m_pipelineSysValues.get(m_entryPoint)->getSpilledPushConstTablePtr();
             if (desc->getType() != callInst.getType())
-            {
                 desc = new BitCastInst(desc, callInst.getType(), "", &callInst);
-            }
             callInst.replaceAllUsesWith(desc);
         }
         m_descLoadCalls.push_back(&callInst);
@@ -497,13 +481,9 @@ Value* PatchDescriptorLoad::loadBufferDescriptor(
     // Handle the special cases. First get a pointer to the global/per-shader table as pointer to i8.
     Value* descPtr = nullptr;
     if (descSet == InternalResourceTable)
-    {
         descPtr = m_pipelineSysValues.get(m_entryPoint)->getInternalGlobalTablePtr();
-    }
     else if (descSet == InternalPerShaderTable)
-    {
         descPtr = m_pipelineSysValues.get(m_entryPoint)->getInternalPerShaderTablePtr();
-    }
     if (descPtr != nullptr)
     {
         // "binding" gives the offset, in units of v4i32 descriptors.
@@ -575,9 +555,7 @@ Value* PatchDescriptorLoad::loadBufferDescriptor(
     // Add on the index.
     unsigned dwordStride = DescriptorSizeBuffer / 4;
     if ((node != nullptr) && (node->type == ResourceNodeType::DescriptorBufferCompact))
-    {
         dwordStride = DescriptorSizeBufferCompact / 4;
-    }
     arrayOffset = builder.CreateMul(arrayOffset, builder.getInt32(dwordStride));
     descPtr = builder.CreateGEP(builder.getInt32Ty(), descPtr, arrayOffset);
 
@@ -734,9 +712,7 @@ Value* PatchDescriptorLoad::buildBufferCompactDesc(
                                             insertPoint);
     }
     else
-    {
         llvm_unreachable("Not implemented!");
-    }
 
     return bufDesc;
 }

@@ -148,9 +148,7 @@ ShaderCache::~ShaderCache()
 void ShaderCache::Destroy()
 {
     if (m_onDiskFile.isOpen())
-    {
         m_onDiskFile.close();
-    }
     resetRuntimeCache();
 }
 
@@ -159,15 +157,11 @@ void ShaderCache::Destroy()
 void ShaderCache::resetRuntimeCache()
 {
     for (auto indexMap : m_shaderIndexMap)
-    {
         delete indexMap.second;
-    }
     m_shaderIndexMap.clear();
 
     for (auto allocIt : m_allocationList)
-    {
         delete[] allocIt.first;
-    }
     m_allocationList.clear();
 
     m_totalShaders   = 0;
@@ -308,9 +302,7 @@ Result ShaderCache::init(
         if ((auxCreateInfo->shaderCacheMode == ShaderCacheEnableRuntime) && (createInfo->initialDataSize > 0))
         {
             if (loadCacheFromBlob(createInfo->pInitialData, createInfo->initialDataSize) != Result::Success)
-            {
                 resetRuntimeCache();
-            }
         }
         // If we're in on-disk mode try to load the cache from file.
         else if ((auxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDisk) ||
@@ -333,19 +325,13 @@ Result ShaderCache::init(
                 if (cacheFileExists)
                 {
                     if (auxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDiskReadOnly)
-                    {
                         result = m_onDiskFile.open(m_fileFullPath, (FileAccessRead | FileAccessBinary));
-                    }
                     else
-                    {
                         result = m_onDiskFile.open(m_fileFullPath, (FileAccessReadUpdate | FileAccessBinary));
-                    }
                 }
                 else
                 // Create the storage file if it does not exist
-                {
                     result = m_onDiskFile.open(m_fileFullPath, (FileAccessRead | FileAccessAppend | FileAccessBinary));
-                }
             }
 
             Result loadResult = Result::ErrorUnknown;
@@ -357,30 +343,22 @@ Result ShaderCache::init(
                     loadResult = loadCacheFromFile();
                     if ((auxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDiskReadOnly) &&
                         (loadResult == Result::Success))
-                    {
                         m_onDiskFile.close();
-                    }
                 }
                 else
-                {
                     resetCacheFile();
-                }
             }
 
             // Either the file is new or had invalid data so we need to reset the index hash map and release
             // any memory allocated
             if (loadResult != Result::Success)
-            {
                 resetRuntimeCache();
-            }
         }
 
         unlockCacheMap(false);
     }
     else
-    {
         m_disableCache = true;
-    }
 
     return result;
 }
@@ -417,9 +395,7 @@ Result ShaderCache::buildFileName(
         length = snprintf(hashedFileName, MaxFilePathLen, "%s%s", cacheFilePath, CacheFileSubPath);
         std::error_code errCode = sys::fs::create_directories(hashedFileName);
         if (!errCode)
-        {
             result = Result::Success;
-        }
     }
 
     return result;
@@ -484,9 +460,7 @@ ShaderEntryState ShaderCache::findShader(
     }
 
     if (index == nullptr)
-    {
         mapResult = Result::ErrorUnavailable;
-    }
 
     if (mapResult == Result::Success)
     {
@@ -516,9 +490,7 @@ ShaderEntryState ShaderCache::findShader(
                     index->dataBlob = getCacheSpace(index->header.size);
 
                     if (index->dataBlob == nullptr)
-                    {
                         extResult = Result::ErrorOutOfMemory;
-                    }
                     else
                     {
                         extResult =
@@ -628,9 +600,7 @@ void ShaderCache::insertShader(
         index->dataBlob   = getCacheSpace(index->header.size);
 
         if (index->dataBlob == nullptr)
-        {
             result = Result::ErrorOutOfMemory;
-        }
         else
         {
             ++m_totalShaders;
@@ -673,9 +643,7 @@ void ShaderCache::insertShader(
 
             // Finally, update the file if necessary.
             if (m_onDiskFile.isOpen())
-            {
                 addShaderToFile(index);
-            }
         }
     }
 
@@ -799,14 +767,10 @@ Result ShaderCache::loadCacheFromFile()
 
             // If we didn't read the correct number of bytes then something went wrong and we should return a failure
             if (bytesRead != dataSize)
-            {
                 result = Result::ErrorUnknown;
-            }
         }
         else
-        {
             result = Result::ErrorOutOfMemory;
-        }
     }
 
     if (result == Result::Success)
@@ -852,9 +816,7 @@ Result ShaderCache::loadCacheFromBlob(
             result = populateIndexMap(dataMem, dataSize);
         }
         else
-        {
             result = Result::ErrorOutOfMemory;
-        }
     }
 
     return result;
@@ -902,9 +864,7 @@ Result ShaderCache::populateIndexMap(
             }
         }
         else
-        {
             result = Result::ErrorUnknown;
-        }
 
         // Move to next entry in cache
         header = static_cast<ShaderHeader*>(voidPtrInc(header, header->size));
@@ -953,16 +913,12 @@ Result ShaderCache::validateAndLoadHeader(
         m_shaderDataEnd = header->shaderDataEnd;
     }
     else
-    {
         result = Result::ErrorUnknown;
-    }
 
     // Make sure the shader data end value is correct. It's ok for there to be unused space at the end of the file, but
     // if the shaderDataEnd is beyond the end of the file we have a problem.
     if ((result == Result::Success) && (m_shaderDataEnd > dataSourceSize))
-    {
         result = Result::ErrorUnknown;
-    }
 
     return result;
 }

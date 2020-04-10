@@ -330,9 +330,7 @@ bool Section::getPtrOf(
     unsigned   arrayMaxSize = 0;
 
     if (isWriteAccess == true)
-    {
         setActive(true);
-    }
     // Search section member
     for (unsigned i = 0; i < m_tableSize; ++i)
     {
@@ -369,9 +367,7 @@ bool Section::getPtrOf(
             // Member is dynamic array, cast to std::vector
             std::vector<TValue>* memberVector = reinterpret_cast<std::vector<TValue>*>(memberAddr);
             if (memberVector->size() <= arrayIndex)
-            {
                 memberVector->resize(arrayIndex + 1);
-            }
             *ptrOut = &((*memberVector)[arrayIndex]);
         }
         else
@@ -400,9 +396,7 @@ bool Section::set(
     result = getPtrOf(lineNum, memberName, true, arrayIndex, &memberPtr, &dummyMsg);
     VFX_ASSERT(result == true);
     if (result == true)
-    {
         *memberPtr = *value;
-    }
 
     return result;
 };
@@ -504,9 +498,7 @@ public:
         for (unsigned i = 0; i < MaxResultCount; ++i)
         {
             if (m_result[i].isActive())
-            {
                 m_result[i].getSubState(state.result[state.numResult++]);
-            }
         }
     }
 
@@ -577,9 +569,7 @@ public:
         for (unsigned i = 0; i < MaxResultCount; ++i)
         {
             if (m_specConst[i].isActive())
-            {
                 m_specConst[i].getSubState(state.specConst[state.numSpecConst++]);
-            }
         }
     }
 
@@ -695,18 +685,14 @@ public:
         for (unsigned i = 0; i < MaxVertexBufferBindingCount; ++i)
         {
             if (m_vbBinding[i].isActive())
-            {
                 m_vbBinding[i].getSubState(state.vbBinding[state.numVbBinding++]);
-            }
         }
 
         state.numAttribute = 0;
         for (unsigned i = 0; i < MaxVertexAttributeCount; ++i)
         {
             if (m_attribute[i].isActive())
-            {
                 m_attribute[i].getSubState(state.attribute[state.numAttribute++]);
-            }
         }
     }
 
@@ -990,9 +976,7 @@ public:
         for (unsigned i = 0; i < MaxPushConstRangCount; ++i)
         {
             if (m_pushConstRange[i].isActive())
-            {
                 m_pushConstRange[i].getSubState(state.pushConstRange[state.numPushConstRange++]);
-            }
         }
     };
 
@@ -1287,9 +1271,7 @@ public:
     void getSubState(const std::string& docFilename, SubState& state, std::string* errorMsg)
     {
         for (unsigned i = 0; i < Vkgc::MaxColorTargets; ++i)
-        {
             m_colorBuffer[i].getSubState(m_state.colorBuffer[i]);
-        }
         m_options.getSubState(m_state.options);
         m_nggState.getSubState(m_state.nggState);
         state = m_state;
@@ -1462,19 +1444,13 @@ public:
         m_vkDivisors.resize(m_divisor.size());
 
         for (unsigned i = 0; i < m_attribute.size(); ++i)
-        {
             m_attribute[i].getSubState(m_vkAttributes[i]);
-        }
 
         for (unsigned i = 0; i < m_binding.size(); ++i)
-        {
             m_binding[i].getSubState(m_vkBindings[i]);
-        }
 
         for (unsigned i = 0; i < m_divisor.size(); ++i)
-        {
             m_divisor[i].getSubState(m_vkDivisors[i]);
-        }
 
         state.vertexAttributeDescriptionCount = static_cast<unsigned>(m_vkAttributes.size());
         state.vertexBindingDescriptionCount = static_cast<unsigned>(m_vkBindings.size());
@@ -1572,17 +1548,13 @@ public:
             state.mapEntryCount = static_cast<unsigned>(m_mapEntry.size());
             m_vkMapEntries.resize(state.mapEntryCount);
             for (unsigned i = 0; i < m_vkMapEntries.size(); ++i)
-            {
                 m_mapEntry[i].getSubState(m_vkMapEntries[i]);
-            }
             state.pMapEntries = &m_vkMapEntries[0];
             state.dataSize = m_bufMem.size();
             state.pData = &m_bufMem[0];
         }
         else
-        {
             memset(&state, 0, sizeof(SubState));
-        }
     }
 
 private:
@@ -1690,9 +1662,7 @@ public:
         {
             m_nextNodeBuf.resize(m_next.size());
             for (unsigned i = 0; i < m_next.size(); ++i)
-            {
                 m_next[i].getSubState(m_nextNodeBuf[i]);
-            }
             m_state.tablePtr.pNext = &m_nextNodeBuf[0];
             m_state.tablePtr.nodeCount = static_cast<unsigned>(m_nextNodeBuf.size());
         }
@@ -1746,9 +1716,7 @@ public:
         {
             m_descriptorRangeValues.resize(m_descriptorRangeValue.size());
             for (unsigned i = 0; i < m_descriptorRangeValue.size(); ++i)
-            {
                 m_descriptorRangeValue[i].getSubState(m_descriptorRangeValues[i]);
-            }
             state.descriptorRangeValueCount = static_cast<unsigned>(m_descriptorRangeValue.size());
             state.pDescriptorRangeValues = &m_descriptorRangeValues[0];
         }
@@ -1758,9 +1726,7 @@ public:
             state.userDataNodeCount = static_cast<unsigned>(m_userDataNode.size());
             m_userDataNodes.resize(state.userDataNodeCount);
             for (unsigned i = 0; i< state.userDataNodeCount; ++i)
-            {
                 m_userDataNode[i].getSubState(m_userDataNodes[i]);
-            }
             state.pUserDataNodes = &m_userDataNodes[0];
         }
     };

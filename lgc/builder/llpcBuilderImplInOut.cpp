@@ -150,9 +150,7 @@ Value* BuilderImplInOut::readGenericInputOutput(
             args.push_back(elemIdx);
             args.push_back((vertexIndex != nullptr) ? vertexIndex : getInt32(InvalidValue));
             if (isOutput)
-            {
                 baseCallName = lgcName::OutputImportGeneric;
-            }
             break;
         }
 
@@ -353,20 +351,14 @@ void BuilderImplInOut::markGenericInputOutputUsage(
         if (getBuilderContext()->buildingRelocatableElf())
         {
             if (m_shaderStage == ShaderStageVertex && isOutput)
-            {
                 keepAllLocations = true;
-            }
             if (m_shaderStage == ShaderStageFragment && !isOutput)
-            {
                 keepAllLocations = true;
-            }
         }
         unsigned startLocation = (keepAllLocations ? 0 : location);
         // Non-GS-output case.
         for (unsigned i = startLocation; i < location + locationCount; ++i)
-        {
             (*inOutLocMap)[i] = InvalidValue;
-        }
     }
     else
     {
@@ -451,13 +443,9 @@ void BuilderImplInOut::markFsOutputType(
     {
         // Integer type
         if (bitWidth == 8)
-        {
             basicTy = signedness ? BasicType::Int8 : BasicType::Uint8;
-        }
         else if (bitWidth == 16)
-        {
             basicTy = signedness ? BasicType::Int16 : BasicType::Uint16;
-        }
         else
         {
             assert(bitWidth == 32);
@@ -468,9 +456,7 @@ void BuilderImplInOut::markFsOutputType(
     {
         // Floating-point type
         if (bitWidth == 16)
-        {
             basicTy = BasicType::Float16;
-        }
         else
         {
             assert(bitWidth == 32);
@@ -478,9 +464,7 @@ void BuilderImplInOut::markFsOutputType(
         }
     }
     else
-    {
         llvm_unreachable("Should never be called!");
-    }
 
     auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
     resUsage->inOutUsage.fs.outputTypes[location] = basicTy;
@@ -528,23 +512,15 @@ Value* BuilderImplInOut::modifyAuxInterpValue(
         {
             // Generate code to evaluate the I,J coordinates.
             if (inputInfo.getInterpLoc() == InOutInfo::InterpLocSample)
-            {
                 auxInterpValue = readBuiltIn(false, BuiltInSamplePosOffset, {}, auxInterpValue, nullptr, "");
-            }
             if (inputInfo.getInterpMode() == InOutInfo::InterpModeNoPersp)
-            {
                 auxInterpValue = evalIjOffsetNoPersp(auxInterpValue);
-            }
             else
-            {
                 auxInterpValue = evalIjOffsetSmooth(auxInterpValue);
-            }
         }
     }
     else
-    {
         assert(inputInfo.getInterpMode() == InOutInfo::InterpModeCustom);
-    }
     return auxInterpValue;
 }
 
@@ -629,9 +605,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
     auto stagesAfterThisOneMask = -shaderStageToMask(static_cast<ShaderStage>(m_shaderStage + 1));
     if ((getPipelineState()->getShaderStageMask() & ~shaderStageToMask(ShaderStageFragment) &
           ~shaderStageToMask(ShaderStageCopyShader) & stagesAfterThisOneMask) != 0)
-    {
         return nullptr;
-    }
 
     // Mark the usage of the XFB buffer.
     auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
@@ -729,31 +703,21 @@ Value* BuilderImplInOut::readBuiltIn(
     // Mark usage.
     unsigned arraySize = inOutInfo.getArraySize();
     if (auto constIndex = dyn_cast_or_null<ConstantInt>(index))
-    {
         arraySize = constIndex->getZExtValue() + 1;
-    }
 
     if (isOutput == false)
-    {
         markBuiltInInputUsage(builtIn, arraySize);
-    }
     else
-    {
         markBuiltInOutputUsage(builtIn, arraySize, InvalidValue);
-    }
 
     // Get the built-in type.
     Type* resultTy = getBuiltInTy(builtIn, inOutInfo);
     if (index != nullptr)
     {
         if (isa<ArrayType>(resultTy))
-        {
             resultTy = resultTy->getArrayElementType();
-        }
         else
-        {
             resultTy = resultTy->getVectorElementType();
-        }
     }
 
     // Handle the subgroup mask built-ins directly.
@@ -766,9 +730,7 @@ Value* BuilderImplInOut::readBuiltIn(
         Value* result = nullptr;
         Value* localInvocationId = readBuiltIn(false, BuiltInSubgroupLocalInvocationId, {}, nullptr, nullptr, "");
         if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64)
-        {
             localInvocationId = CreateZExt(localInvocationId, getInt64Ty());
-        }
 
         switch (builtIn)
         {
@@ -800,9 +762,7 @@ Value* BuilderImplInOut::readBuiltIn(
             result = CreateBitCast(result, resultTy);
         }
         else
-        {
             result = CreateInsertElement(ConstantInt::getNullValue(resultTy), result, uint64_t(0));
-        }
         result->setName(instName);
         return result;
     }
@@ -850,13 +810,9 @@ Value* BuilderImplInOut::readBuiltIn(
                               &*GetInsertPoint());
 
     if (instName.isTriviallyEmpty())
-    {
         result->setName(getBuiltInName(builtIn));
-    }
     else
-    {
         result->setName(instName);
-    }
 
     return result;
 }
@@ -876,9 +832,7 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
     unsigned streamId = outputInfo.hasStreamId() ? outputInfo.getStreamId() : InvalidValue;
     unsigned arraySize = outputInfo.getArraySize();
     if (auto constIndex = dyn_cast_or_null<ConstantInt>(index))
-    {
         arraySize = constIndex->getZExtValue() + 1;
-    }
     markBuiltInOutputUsage(builtIn, arraySize, streamId);
 
 #ifndef NDEBUG
@@ -887,13 +841,9 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
     if (index != nullptr)
     {
         if (isa<ArrayType>(expectedTy))
-        {
             expectedTy = expectedTy->getArrayElementType();
-        }
         else
-        {
             expectedTy = expectedTy->getVectorElementType();
-        }
     }
     assert((expectedTy == valueToWrite->getType()) ||
                 (((builtIn == BuiltInClipDistance) || (builtIn == BuiltInCullDistance)) &&
@@ -1097,13 +1047,9 @@ void BuilderImplInOut::markBuiltInInputUsage(
                 // be marked as used.
                 usage.fs.smooth = true;
                 if (getPipelineState()->getRasterizerState().perSampleShading)
-                {
                     usage.fs.sample = true;
-                }
                 else
-                {
                     usage.fs.center = true;
-                }
                 break;
             case BuiltInPrimitiveId: usage.fs.primitiveId = true; break;
             case BuiltInSampleId:
@@ -1265,9 +1211,7 @@ void BuilderImplInOut::markBuiltInOutputUsage(
             }
             // Collect raster stream ID for the export of built-ins
             if (streamId != InvalidValue)
-            {
                 getPipelineState()->getShaderResourceUsage(m_shaderStage)->inOutUsage.gs.rasterStream = streamId;
-            }
             break;
         }
 

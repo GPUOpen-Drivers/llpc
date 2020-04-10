@@ -120,9 +120,7 @@ BuilderContext* BuilderContext::Create(
 
     std::string mcpuName = codegen::getMCPU(); // -mcpu setting from llvm/CodeGen/CommandFlags.h
     if (gpuName == "")
-    {
         gpuName = mcpuName;
-    }
 
     builderContext->m_targetInfo = new TargetInfo;
     if (builderContext->m_targetInfo->setTargetInfo(gpuName) == false)
@@ -182,9 +180,7 @@ Builder* BuilderContext::createBuilder(
     bool        useBuilderRecorder) // true to use BuilderRecorder, false to use BuilderImpl
 {
     if ((pipeline == nullptr) || useBuilderRecorder)
-    {
         return new BuilderRecorder(this, pipeline);
-    }
     return new BuilderImpl(this, pipeline);
 }
 
@@ -223,9 +219,7 @@ void BuilderContext::addTargetPasses(
 {
     // Start timer for codegen passes.
     if (codeGenTimer != nullptr)
-    {
         passMgr.add(createStartStopTimer(codeGenTimer, true));
-    }
 
     // Dump the module just before codegen.
     if (raw_ostream* outs = getLgcOuts())
@@ -236,9 +230,7 @@ void BuilderContext::addTargetPasses(
     }
 
     if (EmitLlvm && EmitLlvmBc)
-    {
         report_fatal_error("-emit-llvm conflicts with -emit-llvm-bc");
-    }
 
     if (EmitLlvm)
     {
@@ -264,14 +256,10 @@ void BuilderContext::addTargetPasses(
     (void(&codegen::InitTargetOptionsFromCodeGenFlags)); // unused
 
     if (getTargetMachine()->addPassesToEmitFile(passMgr, outStream, nullptr, codegen::getFileType()))
-    {
         report_fatal_error("Target machine cannot emit a file of this type");
-    }
 
     // Stop timer for codegen passes.
     if (codeGenTimer != nullptr)
-    {
         passMgr.add(createStartStopTimer(codeGenTimer, false));
-    }
 }
 

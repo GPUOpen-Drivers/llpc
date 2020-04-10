@@ -78,9 +78,7 @@ NggPrimShader::NggPrimShader(
 NggPrimShader::~NggPrimShader()
 {
     if (m_ldsManager != nullptr)
-    {
         delete m_ldsManager;
-    }
 }
 
 // =====================================================================================================================
@@ -194,16 +192,12 @@ FunctionType* NggPrimShader::generatePrimShaderEntryPointType(
         if (hasTs)
         {
             if (m_hasTes)
-            {
                 userDataCount = tesIntfData->userDataCount;
-            }
         }
         else
         {
             if (m_hasVs)
-            {
                 userDataCount = vsIntfData->userDataCount;
-            }
         }
     }
 
@@ -256,9 +250,7 @@ Function* NggPrimShader::generatePrimShaderEntryPoint(
     {
         auto argIdx = arg.getArgNo();
         if (inRegMask & (1ull << argIdx))
-        {
             arg.addAttr(Attribute::InReg);
-        }
     }
 
     auto arg = entryPoint->arg_begin();
@@ -1210,9 +1202,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(
                 assert(clipCullDistance.size() < MaxClipCullDistanceCount);
 
                 for (unsigned i = clipDistanceCount; i < clipDistanceCount + cullDistanceCount; ++i)
-                {
                     cullDistance.push_back(clipCullDistance[i]);
-                }
 
                 // Calculate the sign mask for cull distance
                 Value* signMask = m_builder->getInt32(0);
@@ -1369,9 +1359,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(
 
             Value* primCountAcc = nullptr;
             if (vertexCompact)
-            {
                 primCountAcc = threadValid;
-            }
             else
             {
                 auto hasSurviveDraw = m_builder->CreateICmpNE(drawCount, m_builder->getInt32(0));
@@ -1406,9 +1394,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(
             m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
             if (vertexCompact)
-            {
                 m_builder->CreateBr(readThreadCountBlock);
-            }
             else
             {
                 auto firstThreadInWave =
@@ -1519,23 +1505,17 @@ void NggPrimShader::constructPrimShaderWithoutGs(
 
                     // Write patch ID to LDS
                     if (resUsage->builtInUsage.tes.primitiveId)
-                    {
                         writePerThreadDataToLds(patchId, compactThreadIdInSubrgoup, LdsRegionCompactPatchId);
-                    }
                 }
                 else
                 {
                     // Write vertex ID to LDS
                     if (resUsage->builtInUsage.vs.vertexIndex)
-                    {
                         writePerThreadDataToLds(vertexId, compactThreadIdInSubrgoup, LdsRegionCompactVertexId);
-                    }
 
                     // Write instance ID to LDS
                     if (resUsage->builtInUsage.vs.instanceIndex)
-                    {
                         writePerThreadDataToLds(instanceId, compactThreadIdInSubrgoup, LdsRegionCompactInstanceId);
-                    }
 
                     // Write primitive ID to LDS
                     if (resUsage->builtInUsage.vs.primitiveId)
@@ -1677,9 +1657,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(
             for (const auto& expData : expDataSet)
             {
                 if ((expData.target >= EXP_TARGET_POS_0) && (expData.target <= EXP_TARGET_POS_4))
-                {
                     ++expPosCount;
-                }
             }
 
             doEarlyExit(fullyCulledThreadCount, expPosCount);
@@ -2155,9 +2133,7 @@ void NggPrimShader::constructPrimShaderWithGs(
         auto nullPrimVal = m_builder->getInt32(NullPrim);
         Value* nullPrims = UndefValue::get(VectorType::get(m_builder->getInt32Ty(), maxOutPrims));
         for (unsigned i = 0; i < maxOutPrims; ++i)
-        {
             nullPrims = m_builder->CreateInsertElement(nullPrims, nullPrimVal, i);
-        }
 
         m_ldsManager->writeValueToLds(nullPrims, ldsOffset);
 
@@ -2631,9 +2607,7 @@ Value* NggPrimShader::doCulling(
 
     // Skip culling if it is not requested
     if (enableCulling() == false)
-    {
         return cullFlag;
-    }
 
     auto esGsOffset0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                                     m_builder->getInt32Ty(),
@@ -2681,33 +2655,23 @@ Value* NggPrimShader::doCulling(
 
     // Handle backface culling
     if (m_nggControl->enableBackfaceCulling)
-    {
         cullFlag = doBackfaceCulling(module, cullFlag, vertex[0], vertex[1], vertex[2]);
-    }
 
     // Handle frustum culling
     if (m_nggControl->enableFrustumCulling)
-    {
         cullFlag = doFrustumCulling(module, cullFlag, vertex[0], vertex[1], vertex[2]);
-    }
 
     // Handle box filter culling
     if (m_nggControl->enableBoxFilterCulling)
-    {
         cullFlag = doBoxFilterCulling(module, cullFlag, vertex[0], vertex[1], vertex[2]);
-    }
 
     // Handle sphere culling
     if (m_nggControl->enableSphereCulling)
-    {
         cullFlag = doSphereCulling(module, cullFlag, vertex[0], vertex[1], vertex[2]);
-    }
 
     // Handle small primitive filter culling
     if (m_nggControl->enableSmallPrimFilter)
-    {
         cullFlag = doSmallPrimFilterCulling(module, cullFlag, vertex[0], vertex[1], vertex[2]);
-    }
 
     // Handle cull distance culling
     if (m_nggControl->enableCullDistanceCulling)
@@ -2968,9 +2932,7 @@ void NggPrimShader::doEarlyExit(
         }
     }
     else
-    {
         m_builder->CreateRetVoid();
-    }
 }
 
 // =====================================================================================================================
@@ -3110,9 +3072,7 @@ void NggPrimShader::runEsOrEsVariant(
         relVertexId   = (arg + 6);
         // NOTE: VS primitive ID for NGG is specially obtained, not simply from system VGPR.
         if (m_nggFactor.primitiveId != nullptr)
-        {
             vsPrimitiveId = m_nggFactor.primitiveId;
-        }
         instanceId    = (arg + 8);
     }
 
@@ -3145,9 +3105,7 @@ void NggPrimShader::runEsOrEsVariant(
 
             std::vector<unsigned> shuffleMask;
             for (unsigned i = 0; i < userDataSize; ++i)
-            {
                 shuffleMask.push_back(userDataIdx + i);
-            }
 
             userDataIdx += userDataSize;
 
@@ -3174,9 +3132,7 @@ void NggPrimShader::runEsOrEsVariant(
         }
 
         if (m_hasGs)
-        {
             args.push_back(esGsOffset);
-        }
 
         // Set up system value VGPRs
         args.push_back(tessCoordX);
@@ -3188,9 +3144,7 @@ void NggPrimShader::runEsOrEsVariant(
     {
         // Set up system value SGPRs
         if (m_hasGs)
-        {
             args.push_back(esGsOffset);
-        }
 
         // Set up system value VGPRs
         args.push_back(vertexId);
@@ -3280,9 +3234,7 @@ Function* NggPrimShader::mutateEsToVariant(
                 if ((doExp && (expPos || expParam)) ||
                     (doPosExp && expPos)            ||
                     (doParamExp && expParam))
-                {
                     ++expCount;
-                }
             }
         }
     }
@@ -3305,9 +3257,7 @@ Function* NggPrimShader::mutateEsToVariant(
 
     Argument* variantArg = esEntryVariant->arg_begin();
     for (Argument &arg : esEntryPoint->args())
-    {
         valueMap[&arg] = variantArg++;
-    }
 
     SmallVector<ReturnInst*, 8> retInsts;
     CloneFunctionInto(esEntryVariant, esEntryPoint, valueMap, false, retInsts);
@@ -3381,9 +3331,7 @@ Function* NggPrimShader::mutateEsToVariant(
 
                     Value* expValue = UndefValue::get(VectorType::get(Type::getFloatTy(*m_context), 4));
                     for (unsigned i = 0; i < 4; ++i)
-                    {
                         expValue = m_builder->CreateInsertElement(expValue, expValues[i], i);
-                    }
 
                     if (expPos)
                     {
@@ -3403,9 +3351,7 @@ Function* NggPrimShader::mutateEsToVariant(
 
     // Set "done" flag for last position export
     if (lastExport != InvalidValue)
-    {
         expDataSet[lastExport].doneFlag = true;
-    }
 
     // Construct exported data
     unsigned i = 0;
@@ -3544,9 +3490,7 @@ Value* NggPrimShader::runGsVariant(
 
             std::vector<unsigned> shuffleMask;
             for (unsigned i = 0; i < userDataSize; ++i)
-            {
                 shuffleMask.push_back(userDataIdx + i);
-            }
 
             userDataIdx += userDataSize;
 
@@ -3617,9 +3561,7 @@ Function* NggPrimShader::mutateGsToVariant(
 
     Argument* variantArg = gsEntryVariant->arg_begin();
     for (Argument &arg : gsEntryPoint->args())
-    {
         valueMap[&arg] = variantArg++;
-    }
 
     SmallVector<ReturnInst*, 8> retInsts;
     CloneFunctionInto(gsEntryVariant, gsEntryPoint, valueMap, false, retInsts);
@@ -3963,23 +3905,17 @@ void NggPrimShader::exportGsOutput(
             assert(bitWidth == 16);
             Type* castTy = m_builder->getInt16Ty();
             if (outputTy->isVectorTy())
-            {
                 castTy = VectorType::get(m_builder->getInt16Ty(), outputTy->getVectorNumElements());
-            }
             output = m_builder->CreateBitCast(output, castTy);
         }
 
         Type* extTy = m_builder->getInt32Ty();
         if (outputTy->isVectorTy())
-        {
             extTy = VectorType::get(m_builder->getInt32Ty(), outputTy->getVectorNumElements());
-        }
         output = m_builder->CreateZExt(output, extTy);
     }
     else
-    {
         assert((bitWidth == 32) || (bitWidth == 64));
-    }
 
     // gsVsRingOffset = threadIdInSubgroup * gsVsRingItemSize +
     //                  outVertcounter * vertexSize +
@@ -4074,9 +4010,7 @@ void NggPrimShader::processGsEmit(
 {
     auto gsEmitHandler = module->getFunction(lgcName::NggGsEmit);
     if (gsEmitHandler == nullptr)
-    {
         gsEmitHandler = createGsEmitHandler(module, streamId);
-    }
 
     m_builder->CreateCall(gsEmitHandler,
                            {
@@ -4103,9 +4037,7 @@ void NggPrimShader::processGsCut(
 {
     auto gsCutHandler = module->getFunction(lgcName::NggGsCut);
     if (gsCutHandler == nullptr)
-    {
         gsCutHandler = createGsCutHandler(module, streamId);
-    }
 
     m_builder->CreateCall(gsCutHandler,
                            {
@@ -4222,9 +4154,7 @@ Function* NggPrimShader::createGsEmitHandler(
 
         // Flip vertex ordering only for triangle strip
         if (geometryMode.outputPrimitive == OutputPrimitives::TriangleStrip)
-        {
             flipVertOrder = m_builder->CreateLoad(flipVertOrderPtr);
-        }
 
         // emitCounter++
         emitCounter = m_builder->CreateAdd(emitCounter, m_builder->getInt32(1));
@@ -4256,16 +4186,12 @@ Function* NggPrimShader::createGsEmitHandler(
             // vertexId1 = vertexId - (outVertsPerPrim - 1) = vertexId0 + 1
             Value* vertexId1 = nullptr;
             if (outVertsPerPrim > 1)
-            {
                 vertexId1 = m_builder->CreateAdd(vertexId0, m_builder->getInt32(1));
-            }
 
             // vertexId2 = vertexId - (outVertsPerPrim - 2) = vertexId0 + 2
             Value* vertexId2 = nullptr;
             if (outVertsPerPrim > 2)
-            {
                 vertexId2 = m_builder->CreateAdd(vertexId0, m_builder->getInt32(2));
-            }
 
             // Primitive data layout [31:0]
             //   [31]    = null primitive flag
@@ -4274,9 +4200,7 @@ Function* NggPrimShader::createGsEmitHandler(
             //   [8:0]   = vertexId0 (in bytes)
             Value* primData = nullptr;
             if (outVertsPerPrim == 1)
-            {
                 primData = vertexId0;
-            }
             else if (outVertsPerPrim == 2)
             {
                 primData = m_builder->CreateShl(vertexId1, 10);
@@ -4298,9 +4222,7 @@ Function* NggPrimShader::createGsEmitHandler(
                 primData = m_builder->CreateSelect(flipVertOrder, primDataFlip, primData);
             }
             else
-            {
                 llvm_unreachable("Should never be called!");
-            }
 
             const unsigned maxOutPrims = resUsage->inOutUsage.gs.calcFactor.primAmpFactor;
 
@@ -4617,9 +4539,7 @@ void NggPrimShader::reviseOutputPrimitiveData(
 
     Value* newPrimData = nullptr;
     if (outVertsPerPrim == 1)
-    {
         newPrimData = vertexId0;
-    }
     else if (outVertsPerPrim == 2)
     {
         newPrimData = m_builder->CreateShl(vertexId1, 10);
@@ -4633,9 +4553,7 @@ void NggPrimShader::reviseOutputPrimitiveData(
         newPrimData = m_builder->CreateOr(newPrimData, vertexId0);
     }
     else
-    {
         llvm_unreachable("Should never be called!");
-    }
 
     auto isNullPrim = m_builder->CreateICmpEQ(primData, m_builder->getInt32(NullPrim));
     newPrimData = m_builder->CreateSelect(isNullPrim, m_builder->getInt32(NullPrim), newPrimData);
@@ -4656,13 +4574,9 @@ Value* NggPrimShader::readPerThreadDataFromLds(
 
     Value* ldsOffset = nullptr;
     if (sizeInBytes > 1)
-    {
         ldsOffset = m_builder->CreateMul(threadId, m_builder->getInt32(sizeInBytes));
-    }
     else
-    {
         ldsOffset = threadId;
-    }
     ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
 
     return m_ldsManager->readValueFromLds(readDataTy, ldsOffset);
@@ -4682,13 +4596,9 @@ void NggPrimShader::writePerThreadDataToLds(
 
     Value* ldsOffset = nullptr;
     if (sizeInBytes > 1)
-    {
         ldsOffset = m_builder->CreateMul(threadId, m_builder->getInt32(sizeInBytes));
-    }
     else
-    {
         ldsOffset = threadId;
-    }
     ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
 
     m_ldsManager->writeValueToLds(writeData, ldsOffset);
@@ -4707,9 +4617,7 @@ Value* NggPrimShader::doBackfaceCulling(
 
     auto backfaceCuller = module->getFunction(lgcName::NggCullingBackface);
     if (backfaceCuller == nullptr)
-    {
         backfaceCuller = createBackfaceCuller(module);
-    }
 
     unsigned regOffset = 0;
 
@@ -4722,9 +4630,7 @@ Value* NggPrimShader::doBackfaceCulling(
         paSuScModeCntl = fetchCullingControlRegister(module, regOffset);
     }
     else
-    {
         paSuScModeCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paSuScModeCntl);
-    }
 
     // Get register PA_CL_VPORT_XSCALE
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, viewportStateCb);
@@ -4763,9 +4669,7 @@ Value* NggPrimShader::doFrustumCulling(
 
     auto frustumCuller = module->getFunction(lgcName::NggCullingFrustum);
     if (frustumCuller == nullptr)
-    {
         frustumCuller = createFrustumCuller(module);
-    }
 
     unsigned regOffset = 0;
 
@@ -4778,9 +4682,7 @@ Value* NggPrimShader::doFrustumCulling(
         paClClipCntl = fetchCullingControlRegister(module, regOffset);
     }
     else
-    {
         paClClipCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClClipCntl);
-    }
 
     // Get register PA_CL_GB_HORZ_DISC_ADJ
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
@@ -4818,9 +4720,7 @@ Value* NggPrimShader::doBoxFilterCulling(
 
     auto boxFilterCuller = module->getFunction(lgcName::NggCullingBoxFilter);
     if (boxFilterCuller == nullptr)
-    {
         boxFilterCuller = createBoxFilterCuller(module);
-    }
 
     unsigned regOffset = 0;
 
@@ -4836,9 +4736,7 @@ Value* NggPrimShader::doBoxFilterCulling(
         paClClipCntl = fetchCullingControlRegister(module, regOffset);
     }
     else
-    {
         paClClipCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClClipCntl);
-    }
 
     // Get register PA_CL_GB_HORZ_DISC_ADJ
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
@@ -4877,9 +4775,7 @@ Value* NggPrimShader::doSphereCulling(
 
     auto sphereCuller = module->getFunction(lgcName::NggCullingSphere);
     if (sphereCuller == nullptr)
-    {
         sphereCuller = createSphereCuller(module);
-    }
 
     unsigned regOffset = 0;
 
@@ -4895,9 +4791,7 @@ Value* NggPrimShader::doSphereCulling(
         paClClipCntl = fetchCullingControlRegister(module, regOffset);
     }
     else
-    {
         paClClipCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClClipCntl);
-    }
 
     // Get register PA_CL_GB_HORZ_DISC_ADJ
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
@@ -4936,9 +4830,7 @@ Value* NggPrimShader::doSmallPrimFilterCulling(
 
     auto smallPrimFilterCuller = module->getFunction(lgcName::NggCullingSmallPrimFilter);
     if (smallPrimFilterCuller == nullptr)
-    {
         smallPrimFilterCuller = createSmallPrimFilterCuller(module);
-    }
 
     unsigned regOffset = 0;
 
@@ -4981,9 +4873,7 @@ Value* NggPrimShader::doCullDistanceCulling(
 
     auto cullDistanceCuller = module->getFunction(lgcName::NggCullingCullDistance);
     if (cullDistanceCuller == nullptr)
-    {
         cullDistanceCuller = createCullDistanceCuller(module);
-    }
 
     // Do cull distance culling
     return m_builder->CreateCall(cullDistanceCuller,
@@ -5003,9 +4893,7 @@ Value* NggPrimShader::fetchCullingControlRegister(
 {
     auto fetchCullingRegister = module->getFunction(lgcName::NggCullingFetchReg);
     if (fetchCullingRegister == nullptr)
-    {
         fetchCullingRegister = createFetchCullingRegister(module);
-    }
 
     return m_builder->CreateCall(fetchCullingRegister,
                                   {
@@ -6677,9 +6565,7 @@ Value* NggPrimShader::doSubgroupBallot(
                                                  });
 
     if (waveSize == 32)
-    {
         ballot = m_builder->CreateZExt(ballot, m_builder->getInt64Ty());
-    }
 
     return ballot;
 }
@@ -6778,9 +6664,7 @@ Value* NggPrimShader::doSubgroupInclusiveAdd(
 
     // Combine broadcast of 31 with the top two rows only.
     if (waveSize == 64)
-    {
         result = m_builder->CreateAdd(result, maskedBroadcast);
-    }
 
     if (ppWwmResult != nullptr)
     {

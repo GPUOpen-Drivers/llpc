@@ -153,18 +153,14 @@ bool PatchCopyShader::runOnModule(
     auto insertPos = module.getFunctionList().end();
     auto fsEntryPoint = pipelineShaders->getEntryPoint(ShaderStageFragment);
     if (fsEntryPoint != nullptr)
-    {
         insertPos = fsEntryPoint->getIterator();
-    }
     module.getFunctionList().insert(insertPos, entryPoint);
 
     // Make the args "inreg" (passed in SGPR) as appropriate.
     for (unsigned i = 0; i < sizeof(argInReg) / sizeof(argInReg[0]); ++i)
     {
         if (argInReg[i])
-        {
             entryPoint->arg_begin()[i].addAttr(Attribute::InReg);
-        }
     }
 
     // Create ending basic block, and terminate it with return.
@@ -192,13 +188,9 @@ bool PatchCopyShader::runOnModule(
     }
 
     if (m_pipelineState->isGsOnChip())
-    {
         m_lds = Patch::getLdsVariable(m_pipelineState, &module);
-    }
     else
-    {
         m_gsVsRingBufDesc = loadGsVsRingBufferDescriptor(builder);
-    }
 
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
@@ -210,9 +202,7 @@ bool PatchCopyShader::runOnModule(
         {
             outputStreamCount++;
             if(outputStreamId == InvalidValue)
-            {
                 outputStreamId = i;
-            }
         }
     }
 
@@ -308,9 +298,7 @@ void PatchCopyShader::collectGsGenericOutputInfo(
             {
                 auto callInst = dyn_cast<CallInst>(user);
                 if ((callInst == nullptr) || (callInst->getParent()->getParent() != gsEntryPoint))
-                {
                     continue;
-                }
 
                 assert(callInst->getNumArgOperands() == 4);
                 Value* output = callInst->getOperand(callInst->getNumArgOperands() - 1); // Last argument
@@ -326,9 +314,7 @@ void PatchCopyShader::collectGsGenericOutputInfo(
 
                 auto locMapIt = resUsage->inOutUsage.outputLocMap.find(outLocInfo.u32All);
                 if (locMapIt == resUsage->inOutUsage.outputLocMap.end())
-                {
                     continue;
-                }
 
                 unsigned location = locMapIt->second;
                 const unsigned compIdx = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
@@ -376,9 +362,7 @@ void PatchCopyShader::exportOutput(
 
         unsigned byteSize = 0;
         for (unsigned i = 0; i < 4; ++i)
-        {
             byteSize += byteSizeMap.second[i];
-        }
 
         assert(byteSize % 4 == 0);
         unsigned dwordSize = byteSize / 4;
@@ -391,14 +375,10 @@ void PatchCopyShader::exportOutput(
     std::vector<std::pair<BuiltInKind, Type*>> builtInPairs;
 
     if (builtInUsage.position)
-    {
         builtInPairs.push_back(std::make_pair(BuiltInPosition, VectorType::get(builder.getFloatTy(), 4)));
-    }
 
     if (builtInUsage.pointSize)
-    {
         builtInPairs.push_back(std::make_pair(BuiltInPointSize, builder.getFloatTy()));
-    }
 
     if (builtInUsage.clipDistance > 0)
     {
@@ -413,9 +393,7 @@ void PatchCopyShader::exportOutput(
     }
 
     if (builtInUsage.primitiveId)
-    {
         builtInPairs.push_back(std::make_pair(BuiltInPrimitiveId, builder.getInt32Ty()));
-    }
 
     const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
     if (builtInUsage.layer || enableMultiView)
@@ -426,9 +404,7 @@ void PatchCopyShader::exportOutput(
     }
 
     if (builtInUsage.viewportIndex)
-    {
         builtInPairs.push_back(std::make_pair(BuiltInViewportIndex, builder.getInt32Ty()));
-    }
 
     for (auto& builtInPair : builtInPairs)
     {
@@ -559,13 +535,9 @@ Value* PatchCopyShader::loadValueFromGsVsRing(
                                                      });
 
             if (loadTy->isArrayTy())
-            {
                 loadValue = builder.CreateInsertValue(loadValue, loadElem, i);
-            }
             else if (loadTy->isVectorTy())
-            {
                 loadValue = builder.CreateInsertElement(loadValue, loadElem, i);
-            }
             else
             {
                 assert(elemCount == 1);

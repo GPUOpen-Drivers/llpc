@@ -51,9 +51,7 @@ const char* getShaderStageName(
     const char* name = nullptr;
 
     if (shaderStage == ShaderStageCopyShader)
-    {
         name = "copy";
-    }
     else if (shaderStage < ShaderStageCount)
     {
         static const char* ShaderStageNames[] =
@@ -69,9 +67,7 @@ const char* getShaderStageName(
         name = ShaderStageNames[static_cast<unsigned>(shaderStage)];
     }
     else
-    {
         name = "bad";
-    }
 
     return name;
 }

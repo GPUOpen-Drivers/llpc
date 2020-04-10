@@ -85,13 +85,9 @@ bool StartStopTimer::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
     if (m_starting)
-    {
         m_timer->startTimer();
-    }
     else
-    {
         m_timer->stopTimer();
-    }
     return false;
 }
 

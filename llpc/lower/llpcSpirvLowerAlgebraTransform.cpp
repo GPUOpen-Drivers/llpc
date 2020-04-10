@@ -125,9 +125,7 @@ bool SpirvLowerAlgebraTransform::runOnModule(
                     (inst->getNumOperands() == 0) ||
                     (destType->isFPOrFPVectorTy() == false) ||
                     (isa<Constant>(inst->getOperand(0))== false))
-                {
                     continue;
-                }
 
                 // ConstantProp instruction if trivially constant.
                 if (Constant* constVal = ConstantFoldInstruction(inst, dataLayout, &targetLibInfo))
@@ -140,16 +138,12 @@ bool SpirvLowerAlgebraTransform::runOnModule(
                     {
                         // Replace denorm value with zero
                         if (constVal->isFiniteNonZeroFP() && (constVal->isNormalFP() == false))
-                        {
                             constVal = ConstantFP::get(destType, 0.0);
-                        }
                     }
 
                     inst->replaceAllUsesWith(constVal);
                     if (isInstructionTriviallyDead(inst, &targetLibInfo))
-                    {
                         inst->eraseFromParent();
-                    }
 
                     m_changed = true;
                     continue;
@@ -159,9 +153,7 @@ bool SpirvLowerAlgebraTransform::runOnModule(
     }
 
     if (m_enableFloatOpt)
-    {
         visit(m_module);
-    }
 
     return m_changed;
 }
@@ -193,9 +185,7 @@ void SpirvLowerAlgebraTransform::visitUnaryOperator(
     UnaryOperator& unaryOp)  // [in] Unary operator instruction
 {
     if (unaryOp.getOpcode() == Instruction::FNeg)
-    {
         flushDenormIfNeeded(&unaryOp);
-    }
 }
 
 // =====================================================================================================================
@@ -250,9 +240,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
 
             auto one = ConstantFP::get(Type::getHalfTy(*m_context), 1.0);
             if (auto vecTy = dyn_cast<VectorType>(destTy))
-            {
                 one = ConstantVector::getSplat(vecTy->getElementCount(), one);
-            }
 
             // -trunc(x * 1/y)
             Value* trunc = BinaryOperator::CreateFDiv(one, src2, "", &binaryOp);
@@ -281,44 +269,32 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
             if (binaryOp.getFastMathFlags().noNaNs())
             {
                 if (src1IsConstZero)
-                {
                     dest = src2;
-                }
                 else if (src2IsConstZero)
-                {
                     dest = src1;
-                }
             }
             break;
         case Instruction::FMul:
             if (binaryOp.getFastMathFlags().noNaNs())
             {
                 if (src1IsConstZero)
-                {
                     dest = src1;
-                }
                 else if (src2IsConstZero)
-                {
                     dest = src2;
-                }
             }
             break;
         case Instruction::FDiv:
             if (binaryOp.getFastMathFlags().noNaNs())
             {
                 if (src1IsConstZero && (src2IsConstZero == false))
-                {
                     dest = src1;
-                }
             }
             break;
         case Instruction::FSub:
             if (binaryOp.getFastMathFlags().noNaNs())
             {
                 if (src2IsConstZero)
-                {
                     dest = src1;
-                }
             }
             break;
         default:
@@ -387,9 +363,7 @@ void SpirvLowerAlgebraTransform::visitCallInst(
             valueWritten = callInst.getOperand(0);
         }
         if (builtIn == lgc::BuiltInPosition)
-        {
             disableFastMath(valueWritten);
-        }
     }
 }
 
@@ -437,16 +411,12 @@ bool SpirvLowerAlgebraTransform::isOperandNoContract(
             auto fastMathFlags = inst->getFastMathFlags();
             bool allowContract = fastMathFlags.allowContract();
             if (fastMathFlags.any() && (allowContract == false))
-            {
                 return true;
-            }
         }
 
         for (auto opIt = inst->op_begin(), end = inst->op_end();
             opIt != end; ++opIt)
-        {
             return isOperandNoContract(*opIt);
-        }
     }
     return false;
 }

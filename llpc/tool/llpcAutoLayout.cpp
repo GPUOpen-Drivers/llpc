@@ -87,9 +87,7 @@ static unsigned getTypeDataSize(
         {
             unsigned totalSize = 0;
             for (unsigned memberIdx = 0; memberIdx < ty->getStructMemberCount(); ++memberIdx)
-            {
                 totalSize += getTypeDataSize(ty->getStructMemberType(memberIdx));
-            }
             return totalSize;
         }
     default:
@@ -158,13 +156,9 @@ bool checkShaderInfoComptible(
     bool hit = false;
 
     if (autoLayoutUserDataNodeCount == 0)
-    {
         hit = true;
-    }
     else if ((shaderInfo->pDescriptorRangeValues != nullptr) || (shaderInfo->pSpecializationInfo->dataSize != 0))
-    {
         hit = false;
-    }
     else if (shaderInfo->userDataNodeCount >= autoLayoutUserDataNodeCount)
     {
         for (unsigned n = 0; n < autoLayoutUserDataNodeCount; ++n)
@@ -221,9 +215,7 @@ bool checkShaderInfoComptible(
                             }
                         }
                         else
-                        {
                             break;
-                        }
                     }
                     if (hitNode == false)
                     {
@@ -231,9 +223,7 @@ bool checkShaderInfoComptible(
                         break;
                     }
                     else
-                    {
                         hit = true;
-                    }
                 }
                 else
                 {
@@ -344,15 +334,11 @@ void doAutoLayoutDesc(
         if ((entryPoint != nullptr) &&
             (entryPoint->getExecModel() == SPIRVExecutionModelKind(shaderStage)) &&
             (entryPoint->getName() == shaderInfo->pEntryTarget))
-        {
             break;
-        }
         func = nullptr;
     }
     if (entryPoint == nullptr)
-    {
         return;
-    }
 
     // Shader stage specific processing
     auto inOuts = entryPoint->getInOuts();
@@ -372,19 +358,13 @@ void doAutoLayoutDesc(
                 {
                     auto varElemTy = var->getType()->getPointerElementType();
                     if (varElemTy->getOpCode() == OpTypeArray)
-                    {
                         varElemTy = varElemTy->getArrayElementType();
-                    }
 
                     if (varElemTy->getOpCode() == OpTypeMatrix)
-                    {
                         varElemTy = varElemTy->getMatrixColumnType();
-                    }
 
                     if (varElemTy->getOpCode() == OpTypeVector)
-                    {
                         varElemTy = varElemTy->getVectorComponentType();
-                    }
 
                     VkFormat format = VK_FORMAT_UNDEFINED;
                     switch (varElemTy->getOpCode())
@@ -472,29 +452,17 @@ void doAutoLayoutDesc(
         // Set primitive topology
         auto topology = VkPrimitiveTopology(0);
         if (func->getExecutionMode(ExecutionModeInputPoints))
-        {
             topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-        }
         else if (func->getExecutionMode(ExecutionModeInputLines))
-        {
             topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-        }
         else if (func->getExecutionMode(ExecutionModeInputLinesAdjacency))
-        {
             topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
-        }
         else if (func->getExecutionMode(ExecutionModeTriangles))
-        {
             topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-        }
         else if (func->getExecutionMode(ExecutionModeInputTrianglesAdjacency))
-        {
             topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY;
-        }
         else
-        {
             llvm_unreachable("Should never be called!");
-        }
         pipelineInfo->iaState.topology = topology;
     }
     else if (shaderStage == ShaderStageFragment)
@@ -504,15 +472,11 @@ void doAutoLayoutDesc(
         {
             auto var = static_cast<SPIRVVariable*>(module->getValue(varId));
             if (var->getStorageClass() != StorageClassOutput)
-            {
                 continue;
-            }
 
             SPIRVWord location = SPIRVID_INVALID;
             if (var->hasDecorate(DecorationLocation, 0, &location) == false)
-            {
                 continue;
-            }
 
             SPIRVType* varElemTy = var->getType()->getPointerElementType();
             unsigned elemCount = 1;
@@ -761,9 +725,7 @@ void doAutoLayoutDesc(
                     // and a DescriptorSampler can use the same set/binding, in which case it is
                     // DescriptorCombinedTexture.
                     if (node->type == ResourceMappingNodeType::Unknown)
-                    {
                         node->type = nodeType;
-                    }
                     else if (node->type != nodeType)
                     {
                         {
@@ -801,9 +763,7 @@ void doAutoLayoutDesc(
         for (auto& node : resNodeSet.nodes)
         {
             if (checkAutoLayoutCompatible)
-            {
                 node.offsetInDwords = node.srdRange.binding * OffsetStrideInDwords;
-            }
             else
             {
                 node.offsetInDwords = offsetInDwords;
@@ -817,9 +777,7 @@ void doAutoLayoutDesc(
     topLevelCount += 3; // Allow one for push consts, one for XFB and one for vertex buffer.
     unsigned resNodeCount = topLevelCount;
     for (const auto& resNodeSet : resNodeSets)
-    {
         resNodeCount += resNodeSet.second.nodes.size();
-    }
     auto resNodes = new ResourceMappingNode[resNodeCount];
     auto nextTable = resNodes + topLevelCount;
     auto resNode = resNodes;
@@ -834,9 +792,7 @@ void doAutoLayoutDesc(
         resNode->tablePtr.nodeCount = resNodeSet.second.nodes.size();
         resNode->tablePtr.pNext = nextTable;
         for (auto& resNode : resNodeSet.second.nodes)
-        {
             *nextTable++ = resNode;
-        }
         ++resNode;
     }
 

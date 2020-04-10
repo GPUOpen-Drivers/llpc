@@ -80,9 +80,7 @@ bool SpirvLowerInstMetaRemove::runOnModule(
     for (auto& namedMdNode : m_module->getNamedMDList())
     {
         if (namedMdNode.getName().startswith(gSPIRVMD::Prefix))
-        {
             nodesToRemove.push_back(&namedMdNode);
-        }
     }
     for (NamedMDNode* namedMdNode : nodesToRemove)
     {
@@ -100,9 +98,7 @@ void SpirvLowerInstMetaRemove::visitCallInst(
 {
     auto callee = callInst.getCalledFunction();
     if (callee == nullptr)
-    {
         return;
-    }
 
     auto mangledName = callee->getName();
     if (mangledName.startswith(gSPIRVName::NonUniform))

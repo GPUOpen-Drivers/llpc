@@ -266,21 +266,15 @@ public:
         while ((values.empty() == false) && (values.back() == 0))
         {
             if ((values.size() == 1) && atLeastOneValue)
-            {
                 break;
-            }
             values = values.slice(0, values.size() - 1);
         }
         if (values.empty())
-        {
             return nullptr;
-        }
 
         llvm::SmallVector<llvm::Metadata*, 8> operands;
         for (unsigned value : values)
-        {
             operands.push_back(llvm::ConstantAsMetadata::get(builder.getInt32(value)));
-        }
         return llvm::MDNode::get(context, operands);
     }
 
@@ -297,9 +291,7 @@ public:
         if (arrayMetaNode == nullptr)
         {
             if (auto namedMetaNode = module->getNamedMetadata(metaName))
-            {
                 module->eraseNamedMetadata(namedMetaNode);
-            }
             return;
         }
 
@@ -318,9 +310,7 @@ public:
         llvm::MutableArrayRef<unsigned> values(reinterpret_cast<unsigned*>(&value), sizeof(value) / sizeof(unsigned));
         unsigned count = std::min(metaNode->getNumOperands(), unsigned(values.size()));
         for (unsigned index = 0; index < count; ++index)
-        {
             values[index] = llvm::mdconst::dyn_extract<llvm::ConstantInt>(metaNode->getOperand(index))->getZExtValue();
-        }
         return count;
     }
 
@@ -335,9 +325,7 @@ public:
     {
         auto namedMetaNode = module->getNamedMetadata(metaName);
         if ((namedMetaNode == nullptr) || (namedMetaNode->getNumOperands() == 0))
-        {
             return 0;
-        }
         return readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), value);
     }
 
