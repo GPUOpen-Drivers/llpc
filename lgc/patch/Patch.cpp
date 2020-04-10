@@ -168,7 +168,7 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
 
   // Patch buffer operations (must be after optimizations)
   passMgr.add(createPatchBufferOp());
-  passMgr.add(createInstructionCombiningPass(false, 2));
+  passMgr.add(createInstructionCombiningPass(2));
 
   // Fully prepare the pipeline ABI (must be after optimizations)
   passMgr.add(createPatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
@@ -186,7 +186,7 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
     passMgr.add(createGlobalDCEPass());
     passMgr.add(createPromoteMemoryToRegisterPass());
     passMgr.add(createAggressiveDCEPass());
-    passMgr.add(createInstructionCombiningPass(false));
+    passMgr.add(createInstructionCombiningPass());
     passMgr.add(createCFGSimplificationPass());
 
     // Stop timer for optimization passes and restart timer for patching passes.
@@ -226,7 +226,6 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
   // Set up standard optimization passes.
   if (!cl::UseLlvmOpt) {
     unsigned optLevel = 3;
-    bool expensiveCombines = false;
     bool disableGvnLoadPre = true;
 
     passMgr.add(createForceFunctionAttrsLegacyPass());
@@ -234,7 +233,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createCalledValuePropagationPass());
     passMgr.add(createGlobalOptimizerPass());
     passMgr.add(createPromoteMemoryToRegisterPass());
-    passMgr.add(createInstructionCombiningPass(expensiveCombines, 5));
+    passMgr.add(createInstructionCombiningPass(5));
     passMgr.add(createPatchPeepholeOpt());
     passMgr.add(createInstSimplifyLegacyPass());
     passMgr.add(createCFGSimplificationPass());
@@ -244,7 +243,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createCorrelatedValuePropagationPass());
     passMgr.add(createCFGSimplificationPass());
     passMgr.add(createAggressiveInstCombinerPass());
-    passMgr.add(createInstructionCombiningPass(expensiveCombines, 3));
+    passMgr.add(createInstructionCombiningPass(3));
     passMgr.add(createPatchPeepholeOpt());
     passMgr.add(createInstSimplifyLegacyPass());
     passMgr.add(createCFGSimplificationPass());
@@ -252,7 +251,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createLoopRotatePass());
     passMgr.add(createLICMPass());
     passMgr.add(createCFGSimplificationPass());
-    passMgr.add(createInstructionCombiningPass(expensiveCombines, 2));
+    passMgr.add(createInstructionCombiningPass(2));
     passMgr.add(createIndVarSimplifyPass());
     passMgr.add(createLoopIdiomPass());
     passMgr.add(createLoopDeletionPass());
@@ -266,7 +265,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createGVNPass(disableGvnLoadPre));
     passMgr.add(createSCCPPass());
     passMgr.add(createBitTrackingDCEPass());
-    passMgr.add(createInstructionCombiningPass(expensiveCombines, 2));
+    passMgr.add(createInstructionCombiningPass(2));
     passMgr.add(createPatchPeepholeOpt());
     passMgr.add(createCorrelatedValuePropagationPass());
     passMgr.add(createAggressiveDCEPass());
@@ -278,7 +277,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createPatchPeepholeOpt(true));
     passMgr.add(createInstSimplifyLegacyPass());
     passMgr.add(createLoopUnrollPass(optLevel));
-    passMgr.add(createInstructionCombiningPass(expensiveCombines, 2));
+    passMgr.add(createInstructionCombiningPass(2));
     passMgr.add(createLICMPass());
     passMgr.add(createStripDeadPrototypesPass());
     passMgr.add(createGlobalDCEPass());
