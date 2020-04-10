@@ -36,7 +36,7 @@ namespace Vkgc
 {
 
 // Invalid value
-static const uint32_t InvalidValue  = ~0u;
+static const unsigned InvalidValue  = ~0u;
 
 // Gets name string of the abbreviation for the specified shader stage.
 const char* GetShaderStageAbbreviation(ShaderStage shaderStage, bool upper = false);

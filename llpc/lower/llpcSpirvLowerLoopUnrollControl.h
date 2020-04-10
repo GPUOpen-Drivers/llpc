@@ -41,7 +41,7 @@ class SpirvLowerLoopUnrollControl: public SpirvLower
 {
 public:
     SpirvLowerLoopUnrollControl();
-    SpirvLowerLoopUnrollControl(uint32_t forceLoopUnrollCount);
+    SpirvLowerLoopUnrollControl(unsigned forceLoopUnrollCount);
 
     virtual bool runOnModule(llvm::Module& module);
 
@@ -53,7 +53,7 @@ private:
     SpirvLowerLoopUnrollControl(const SpirvLowerLoopUnrollControl&) = delete;
     SpirvLowerLoopUnrollControl& operator=(const SpirvLowerLoopUnrollControl&) = delete;
 
-    uint32_t m_forceLoopUnrollCount;  // Forced loop unroll count
+    unsigned m_forceLoopUnrollCount;  // Forced loop unroll count
     bool m_disableLicm; // Disable LLVM LICM pass
 };
 

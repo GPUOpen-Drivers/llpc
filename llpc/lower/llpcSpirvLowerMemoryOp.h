@@ -74,8 +74,8 @@ private:
     SpirvLowerMemoryOp& operator=(const SpirvLowerMemoryOp&) = delete;
 
     bool NeedExpandDynamicIndex(llvm::GetElementPtrInst* pGetElemPtr,
-                                uint32_t*                pOperandIndex,
-                                uint32_t*                pDynIndexBound) const;
+                                unsigned*                pOperandIndex,
+                                unsigned*                pDynIndexBound) const;
     void ExpandLoadInst(llvm::LoadInst*                          pLoadInst,
                         llvm::ArrayRef<llvm::GetElementPtrInst*> getElemPtrs,
                         llvm::Value*                             pDynIndex);

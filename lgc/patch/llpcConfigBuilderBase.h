@@ -49,13 +49,13 @@ namespace lgc
 class PipelineState;
 
 // Invalid metadata key and value which shouldn't be exported to ELF.
-constexpr uint32_t InvalidMetadataKey   = 0xFFFFFFFF;
-constexpr uint32_t InvalidMetadataValue = 0xBAADBEEF;
+constexpr unsigned InvalidMetadataKey   = 0xFFFFFFFF;
+constexpr unsigned InvalidMetadataValue = 0xBAADBEEF;
 
 struct PalMetadataNoteEntry
 {
-    uint32_t key;
-    uint32_t value;
+    unsigned key;
+    unsigned value;
 };
 
 // =====================================================================================================================
@@ -69,26 +69,26 @@ public:
     void WritePalMetadata();
 
 protected:
-    void AddApiHwShaderMapping(ShaderStage apiStage, uint32_t hwStages);
+    void AddApiHwShaderMapping(ShaderStage apiStage, unsigned hwStages);
 
-    uint32_t SetShaderHash(ShaderStage apiStage);
-    void SetNumAvailSgprs(Util::Abi::HardwareStage hwStage, uint32_t value);
-    void SetNumAvailVgprs(Util::Abi::HardwareStage hwStage, uint32_t value);
+    unsigned SetShaderHash(ShaderStage apiStage);
+    void SetNumAvailSgprs(Util::Abi::HardwareStage hwStage, unsigned value);
+    void SetNumAvailVgprs(Util::Abi::HardwareStage hwStage, unsigned value);
     void SetUsesViewportArrayIndex(bool useViewportIndex);
     void SetPsUsesUavs(bool value);
     void SetPsWritesUavs(bool value);
     void SetPsWritesDepth(bool value);
-    void SetEsGsLdsByteSize(uint32_t value);
+    void SetEsGsLdsByteSize(unsigned value);
     void SetCalcWaveBreakSizeAtDrawTime(bool value);
-    void SetWaveFrontSize(Util::Abi::HardwareStage hwStage, uint32_t value);
+    void SetWaveFrontSize(Util::Abi::HardwareStage hwStage, unsigned value);
     void SetApiName(const char* pValue);
     void SetPipelineType(Util::Abi::PipelineType value);
-    void SetLdsSizeByteSize(Util::Abi::HardwareStage hwStage, uint32_t value);
-    void SetEsGsLdsSize(uint32_t value);
-    uint32_t SetupFloatingPointMode(ShaderStage shaderStage);
+    void SetLdsSizeByteSize(Util::Abi::HardwareStage hwStage, unsigned value);
+    void SetEsGsLdsSize(unsigned value);
+    unsigned SetupFloatingPointMode(ShaderStage shaderStage);
 
     void AppendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config);
-    void AppendConfig(uint32_t key, uint32_t value);
+    void AppendConfig(unsigned key, unsigned value);
 
     template<typename T>
     void AppendConfig(const T& config)
@@ -114,12 +114,12 @@ protected:
     bool                            m_hasTes;             // Whether the pipeline has tessellation evaluation shader
     bool                            m_hasGs;              // Whether the pipeline has geometry shader
 
-    uint32_t                        m_userDataLimit;      // User data limit for shaders seen so far
-    uint32_t                        m_spillThreshold;     // Spill threshold for shaders seen so far
+    unsigned                        m_userDataLimit;      // User data limit for shaders seen so far
+    unsigned                        m_spillThreshold;     // Spill threshold for shaders seen so far
 
 private:
     // Get the MsgPack map node for the specified API shader in the ".shaders" map
-    llvm::msgpack::MapDocNode GetApiShaderNode(uint32_t apiStage);
+    llvm::msgpack::MapDocNode GetApiShaderNode(unsigned apiStage);
     // Get the MsgPack map node for the specified HW shader in the ".hardware_stages" map
     llvm::msgpack::MapDocNode GetHwShaderNode(Util::Abi::HardwareStage hwStage);
     // Set USER_DATA_LIMIT (called once for the whole pipeline)
@@ -135,7 +135,7 @@ private:
     llvm::msgpack::MapDocNode                 m_apiShaderNodes[ShaderStageNativeStageCount];
                                                                 // MsgPack map node for each API shader's node in
                                                                 //  ".shaders"
-    llvm::msgpack::MapDocNode                 m_hwShaderNodes[uint32_t(Util::Abi::HardwareStage::Count)];
+    llvm::msgpack::MapDocNode                 m_hwShaderNodes[unsigned(Util::Abi::HardwareStage::Count)];
                                                                 // MsgPack map node for each HW shader's node in
                                                                 //  ".hardware_stages"
 

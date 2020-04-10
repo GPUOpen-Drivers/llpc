@@ -162,13 +162,13 @@ static cl::opt<bool> NggAlwaysUsePrimShaderTable(
     cl::init(true));
 
 // -ngg-compact-mode: NGG compaction mode (NGG)
-static cl::opt<uint32_t> NggCompactionMode(
+static cl::opt<unsigned> NggCompactionMode(
     "ngg-compaction-mode",
     cl::desc("Compaction mode after culling operations (NGG):\n"
              "0: Compaction is based on the whole sub-group\n"
              "1: Compaction is based on vertices"),
     cl::value_desc("mode"),
-    cl::init(static_cast<uint32_t>(NggCompactVertices)));
+    cl::init(static_cast<unsigned>(NggCompactVertices)));
 
 // -ngg-enable-fast-launch-rate: enable the hardware to launch subgroups of work at a faster rate (NGG)
 static cl::opt<bool> NggEnableFastLaunchRate(
@@ -219,14 +219,14 @@ static cl::opt<bool> NggEnableCullDistanceCulling(
     cl::init(false));
 
 // -ngg-backface-exponent: control backface culling algorithm (NGG, 1 ~ UINT32_MAX, 0 disables it)
-static cl::opt<uint32_t> NggBackfaceExponent(
+static cl::opt<unsigned> NggBackfaceExponent(
     "ngg-backface-exponent",
     cl::desc("Control backface culling algorithm (NGG)"),
     cl::value_desc("exp"),
     cl::init(0));
 
 // -ngg-subgroup-sizing: NGG sub-group sizing type (NGG)
-static cl::opt<uint32_t> NggSubgroupSizing(
+static cl::opt<unsigned> NggSubgroupSizing(
     "ngg-subgroup-sizing",
     cl::desc("NGG sub-group sizing type (NGG):\n"
              "0: Sub-group size is allocated as optimally determined\n"
@@ -236,17 +236,17 @@ static cl::opt<uint32_t> NggSubgroupSizing(
              "4: Sub-group size is optimized for primitive thread utilization\n"
              "5: Sub-group size is allocated based on explicitly-specified vertsPerSubgroup and primsPerSubgroup"),
     cl::value_desc("sizing"),
-    cl::init(static_cast<uint32_t>(NggSubgroupSizingType::Auto)));
+    cl::init(static_cast<unsigned>(NggSubgroupSizingType::Auto)));
 
 // -ngg-prims-per-subgroup: preferred numberof GS primitives to pack into a primitive shader sub-group (NGG)
-static cl::opt<uint32_t> NggPrimsPerSubgroup(
+static cl::opt<unsigned> NggPrimsPerSubgroup(
     "ngg-prims-per-subgroup",
     cl::desc("Preferred numberof GS primitives to pack into a primitive shader sub-group (NGG)"),
     cl::value_desc("prims"),
     cl::init(256));
 
 // -ngg-verts-per-subgroup: preferred number of vertices consumed by a primitive shader sub-group (NGG)
-static cl::opt<uint32_t> NggVertsPerSubgroup(
+static cl::opt<unsigned> NggVertsPerSubgroup(
     "ngg-verts-per-subgroup",
     cl::desc("Preferred number of vertices consumed by a primitive shader sub-group (NGG)"),
     cl::value_desc("verts"),
@@ -275,7 +275,7 @@ extern opt<bool> DisableNullFragShader;
 extern opt<bool> EnableTimerProfile;
 
 // -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
-static opt<uint32_t> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
+static opt<unsigned> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
                                               desc("Filter which types of pipeline dump are disabled\n"
                                                    "0x00 - Always enable pipeline logging\n"
                                                    "0x01 - Disable logging for CS pipelines\n"
@@ -397,7 +397,7 @@ static ShaderStage SourceLangToShaderStage(
 // =====================================================================================================================
 // Performs initialization work for LLPC standalone tool.
 static Result Init(
-    int32_t      argc,          // Count of arguments
+    int      argc,          // Count of arguments
     char*        argv[],        // [in] List of arguments
     ICompiler**  ppCompiler)    // [out] Created LLPC compiler object
 {
@@ -426,24 +426,24 @@ static Result Init(
 
         // Build new arguments, starting with those supplied in command line
         std::vector<const char*> newArgs;
-        for (int32_t i = 0; i < argc; ++i)
+        for (int i = 0; i < argc; ++i)
         {
             newArgs.push_back(argv[i]);
         }
 
         static const size_t defaultOptionCount = sizeof(defaultOptions) / (2 * sizeof(defaultOptions[0]));
-        for (uint32_t optionIdx = 0; optionIdx != defaultOptionCount; ++optionIdx)
+        for (unsigned optionIdx = 0; optionIdx != defaultOptionCount; ++optionIdx)
         {
             const char* pName = defaultOptions[2 * optionIdx];
             const char* pOption = defaultOptions[2 * optionIdx + 1];
             size_t nameLen = strlen(pName);
             bool found = false;
             const char* pArg = nullptr;
-            for (int32_t i = 1; i < argc; ++i)
+            for (int i = 1; i < argc; ++i)
             {
                 pArg = argv[i];
                 if ((strncmp(pArg, pName, nameLen) == 0) &&
-                    ((pArg[nameLen] == '\0') || (pArg[nameLen] == '=') || (isdigit((int32_t)pArg[nameLen]))))
+                    ((pArg[nameLen] == '\0') || (pArg[nameLen] == '=') || (isdigit((int)pArg[nameLen]))))
                 {
                     found = true;
                     break;
@@ -460,14 +460,14 @@ static Result Init(
                 if ((argLen > nameLen) && pArg[nameLen] == '=')
                 {
                     // Extract tokens of graphics IP version info (delimiter is ".")
-                    const uint32_t len = argLen - nameLen - 1;
+                    const unsigned len = argLen - nameLen - 1;
                     char* pGfxIp = new char[len + 1];
                     memcpy(pGfxIp, &pArg[nameLen + 1], len);
                     pGfxIp[len] = '\0';
 
                     char* tokens[3] = {}; // Format: major.minor.step
                     char* pToken = std::strtok(pGfxIp, ".");
-                    for (uint32_t i = 0; (i < 3) && (pToken != nullptr); ++i)
+                    for (unsigned i = 0; (i < 3) && (pToken != nullptr); ++i)
                     {
                         tokens[i] = pToken;
                         pToken = std::strtok(nullptr, ".");
@@ -486,7 +486,7 @@ static Result Init(
         size_t nameLen = strlen(pName);
         bool found = false;
         const char* pArg = nullptr;
-        for (int32_t i = 1; i < argc; ++i)
+        for (int i = 1; i < argc; ++i)
         {
             pArg = argv[i];
             if ((strncmp(pArg, pName, nameLen) == 0) &&
@@ -500,7 +500,7 @@ static Result Init(
         if (found == false)
         {
             // Initialize the path for shader cache
-            constexpr uint32_t MaxFilePathLen = 512;
+            constexpr unsigned MaxFilePathLen = 512;
             char               shaderCacheFileDirOption[MaxFilePathLen];
 
             // Initialize the root path of cache files
@@ -609,7 +609,7 @@ static Result InitCompileInfo(
 static void CleanupCompileInfo(
     CompileInfo* pCompileInfo)  // [in,out] Compilation info of LLPC standalone tool
 {
-    for (uint32_t i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
+    for (unsigned i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
     {
         // NOTE: We do not have to free SPIR-V binary for pipeline info file.
         // It will be freed when we close the VFX doc.
@@ -830,7 +830,7 @@ static Result CompileGlsl(
         LLPC_OUTS(pGlslText);
         LLPC_OUTS("\n\n");
 
-        int32_t sourceStringCount = 1;
+        int sourceStringCount = 1;
         const char*const* sourceList[1] = {};
         const char* pFileName = inFilename.c_str();
         const char* const* fileList[1]  = { &pFileName };
@@ -855,8 +855,8 @@ static Result CompileGlsl(
 
         if (compileResult)
         {
-            const uint32_t* pSpvBin = nullptr;
-            uint32_t binSize = spvGetSpirvBinaryFromProgram(pProgram, 0, &pSpvBin);
+            const unsigned* pSpvBin = nullptr;
+            unsigned binSize = spvGetSpirvBinaryFromProgram(pProgram, 0, &pSpvBin);
             fwrite(pSpvBin, 1, binSize, pOutFile);
 
             textSize = binSize * 10 + 1024;
@@ -930,8 +930,8 @@ static Result AssembleSpirv(
         size_t realSize = fread(pSpvText, 1, textSize, pInFile);
         pSpvText[realSize] = '\0';
 
-        int32_t binSize = realSize * 4 + 1024; // Estimated SPIR-V binary size
-        uint32_t* pSpvBin = new uint32_t[binSize / sizeof(uint32_t)];
+        int binSize = realSize * 4 + 1024; // Estimated SPIR-V binary size
+        unsigned* pSpvBin = new unsigned[binSize / sizeof(unsigned)];
         assert(pSpvBin != nullptr);
 
         const char* pLog = nullptr;
@@ -990,7 +990,7 @@ static Result BuildShaderModules(
 {
     Result result = Result::Success;
 
-    for (uint32_t i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
+    for (unsigned i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
     {
         ShaderModuleBuildInfo* pShaderInfo = &(pCompileInfo->shaderModuleDatas[i].shaderInfo);
         ShaderModuleBuildOut* pShaderOut = &(pCompileInfo->shaderModuleDatas[i].shaderOut);
@@ -1037,8 +1037,8 @@ static Result CheckAutoLayoutCompatibleFunc(
             &pPipelineInfo->fs,
         };
 
-        uint32_t userDataOffset = 0;
-        for (uint32_t i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
+        unsigned userDataOffset = 0;
+        for (unsigned i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
         {
 
             PipelineShaderInfo*         pShaderInfo = shaderInfos[pCompileInfo->shaderModuleDatas[i].shaderStage];
@@ -1097,7 +1097,7 @@ static Result CheckAutoLayoutCompatibleFunc(
 
         if (pCompileInfo->checkAutoLayoutCompatible)
         {
-            uint32_t userDataOffset = 0;
+            unsigned userDataOffset = 0;
             PipelineShaderInfo shaderInfoCopy = *pShaderInfo;
             DoAutoLayoutDesc(ShaderStageCompute,
                              pCompileInfo->shaderModuleDatas[0].spirvBin,
@@ -1145,8 +1145,8 @@ static Result BuildPipeline(
             &pPipelineInfo->fs,
         };
 
-        uint32_t userDataOffset = 0;
-        for (uint32_t i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
+        unsigned userDataOffset = 0;
+        for (unsigned i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
         {
 
             PipelineShaderInfo*         pShaderInfo = shaderInfos[pCompileInfo->shaderModuleDatas[i].shaderStage];
@@ -1247,7 +1247,7 @@ static Result BuildPipeline(
         // If not compiling from pipeline, lay out user data now.
         if (pCompileInfo->doAutoLayout)
         {
-            uint32_t userDataOffset = 0;
+            unsigned userDataOffset = 0;
             DoAutoLayoutDesc(ShaderStageCompute,
                              pCompileInfo->shaderModuleDatas[0].spirvBin,
                              nullptr,
@@ -1394,7 +1394,7 @@ extern "C" void LlpcSignalAbortHandler(
 static void EnableMemoryLeakDetection()
 {
    // Retrieve the state of CRT debug reporting:
-   int32_t dbgFlag = _CrtSetDbgFlag( _CRTDBG_REPORT_FLAG );
+   int dbgFlag = _CrtSetDbgFlag( _CRTDBG_REPORT_FLAG );
 
    // Append custom flags to enable memory leak checks:
    dbgFlag |= _CRTDBG_LEAK_CHECK_DF;
@@ -1410,8 +1410,8 @@ static void EnableMemoryLeakDetection()
 static Result processPipeline(
     ICompiler*            pCompiler,   // [in] LLPC context
     ArrayRef<std::string> inFiles,     // Input filename(s)
-    uint32_t              startFile,   // Index of the starting file name being processed in the file name array
-    uint32_t*             pNextFile)   // [out] Index of next file name being processed in the file name array
+    unsigned              startFile,   // Index of the starting file name being processed in the file name array
+    unsigned*             pNextFile)   // [out] Index of next file name being processed in the file name array
 {
     Result result = Result::Success;
     CompileInfo compileInfo = {};
@@ -1424,7 +1424,7 @@ static Result processPipeline(
     //
     // Translate sources to SPIR-V binary
     //
-    for (uint32_t i = startFile; (i < inFiles.size()) && (result == Result::Success); ++i)
+    for (unsigned i = startFile; (i < inFiles.size()) && (result == Result::Success); ++i)
     {
         const std::string& inFile = inFiles[i];
         std::string spvBinFile;
@@ -1456,7 +1456,7 @@ static Result processPipeline(
                     else
                     {
                         // Disassemble SPIR-V code
-                        uint32_t textSize = spvBin.codeSize * 10 + 1024;
+                        unsigned textSize = spvBin.codeSize * 10 + 1024;
                         char* pSpvText = new char[textSize];
                         assert(pSpvText != nullptr);
                         memset(pSpvText, 0, textSize);
@@ -1495,7 +1495,7 @@ static Result processPipeline(
                     EntryTarget.setValue(ShaderModuleHelper::GetEntryPointNameFromSpirvBinary(&spvBin));
                 }
 
-                uint32_t stageMask = ShaderModuleHelper::GetStageMaskFromSpirvBinary(&spvBin, EntryTarget.c_str());
+                unsigned stageMask = ShaderModuleHelper::GetStageMaskFromSpirvBinary(&spvBin, EntryTarget.c_str());
 
                 if ((stageMask & compileInfo.stageMask) != 0)
                 {
@@ -1503,7 +1503,7 @@ static Result processPipeline(
                 }
                 else if (stageMask != 0)
                 {
-                    for (uint32_t stage = ShaderStageVertex; stage < ShaderStageCount; ++stage)
+                    for (unsigned stage = ShaderStageVertex; stage < ShaderStageCount; ++stage)
                     {
                         if (stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
                         {
@@ -1565,7 +1565,7 @@ static Result processPipeline(
                         // NOTE: When this option is enabled, we set color attachment format to
                         // R8G8B8A8_SRGB for color target 0. Also, for other color targets, if the
                         // formats are not UNDEFINED, we set them to R8G8B8A8_SRGB as well.
-                        for (uint32_t target = 0; target < MaxColorTargets; ++target)
+                        for (unsigned target = 0; target < MaxColorTargets; ++target)
                         {
                             if ((target == 0) ||
                                 (compileInfo.gfxPipelineInfo.cbState.target[target].format != VK_FORMAT_UNDEFINED))
@@ -1580,7 +1580,7 @@ static Result processPipeline(
                         LLPC_OUTS("Failed to load SPVGEN -- cannot disassemble and validate SPIR-V\n");
                     }
 
-                    for (uint32_t stage = 0; stage < pPipelineState->numStages; ++stage)
+                    for (unsigned stage = 0; stage < pPipelineState->numStages; ++stage)
                     {
                         if (pPipelineState->stages[stage].dataSize > 0)
                         {
@@ -1594,8 +1594,8 @@ static Result processPipeline(
 
                             if (spvDisassembleSpirv != nullptr)
                             {
-                                uint32_t binSize =  pPipelineState->stages[stage].dataSize;
-                                uint32_t textSize = binSize * 10 + 1024;
+                                unsigned binSize =  pPipelineState->stages[stage].dataSize;
+                                unsigned textSize = binSize * 10 + 1024;
                                 char* pSpvText = new char[textSize];
                                 assert(pSpvText != nullptr);
                                 memset(pSpvText, 0, textSize);
@@ -1609,7 +1609,7 @@ static Result processPipeline(
                     }
 
                     bool isGraphics = (compileInfo.stageMask & ShaderStageToMask(ShaderStageCompute)) ? false : true;
-                    for (uint32_t i = 0; i < compileInfo.shaderModuleDatas.size(); ++i)
+                    for (unsigned i = 0; i < compileInfo.shaderModuleDatas.size(); ++i)
                     {
                         compileInfo.shaderModuleDatas[i].shaderInfo.options.pipelineOptions = isGraphics ?
                                                                             compileInfo.gfxPipelineInfo.options :
@@ -1799,8 +1799,8 @@ void findAllMatchFiles(
 // Main function of LLPC standalone tool, entry-point.
 //
 // Returns 0 if successful. Other numeric values indicate failure.
-int32_t main(
-    int32_t argc,       // Count of arguments
+int main(
+    int argc,       // Count of arguments
     char*   argv[])     // [in] List of arguments
 {
     Result result = Result::Success;
@@ -1835,11 +1835,11 @@ int32_t main(
 
     if (IsPipelineInfoFile(InFiles[0]) || IsLlvmIrFile(InFiles[0]))
     {
-        uint32_t nextFile = 0;
+        unsigned nextFile = 0;
 
         // The first input file is a pipeline file or LLVM IR file. Assume they all are, and compile each one
         // separately but in the same context.
-        for (uint32_t i = 0; (i < InFiles.size()) && (result == Result::Success); ++i)
+        for (unsigned i = 0; (i < InFiles.size()) && (result == Result::Success); ++i)
         {
 #ifdef WIN_OS
             if (InFiles[i].find_last_of("*?") != std::string::npos)
@@ -1853,7 +1853,7 @@ int32_t main(
                 }
                 else
                 {
-                    for (uint32_t j = 0; (j < matchFiles.size()) && (result == Result::Success); ++j)
+                    for (unsigned j = 0; (j < matchFiles.size()) && (result == Result::Success); ++j)
                     {
                         result = processPipeline(compiler, matchFiles[j], 0, &nextFile);
                     }
@@ -1882,8 +1882,8 @@ int32_t main(
             }
             else
             {
-                uint32_t nextFile = 0;
-                for (uint32_t i = 0; (i < matchFiles.size()) && (result == Result::Success); ++i)
+                unsigned nextFile = 0;
+                for (unsigned i = 0; (i < matchFiles.size()) && (result == Result::Success); ++i)
                 {
                     result = processPipeline(compiler, matchFiles[i], 0, &nextFile);
                 }
@@ -1908,7 +1908,7 @@ int32_t main(
 
             if (result == Result::Success)
             {
-                uint32_t nextFile = 0;
+                unsigned nextFile = 0;
                 for (; result == Result::Success && nextFile < inFiles.size();)
                 {
                     result = processPipeline(compiler, inFiles, nextFile, &nextFile);

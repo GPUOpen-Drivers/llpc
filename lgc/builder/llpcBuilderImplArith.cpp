@@ -817,7 +817,7 @@ Value* BuilderImplArith::CreateCrossProduct(
 
     Value* pLeft = UndefValue::get(pX->getType());
     Value* pRight = UndefValue::get(pX->getType());
-    for (uint32_t idx = 0; idx != 3; ++idx)
+    for (unsigned idx = 0; idx != 3; ++idx)
     {
         pLeft = CreateInsertElement(pLeft,
                                     CreateFMul(CreateExtractElement(pX, (idx + 1) % 3),
@@ -1182,7 +1182,7 @@ Value* BuilderImplArith::CreateIsNaN(
 // BuilderImplArith.
 Value* BuilderImplArith::CreateCallAmdgcnClass(
     Value*        pValue,     // [in] Input value
-    uint32_t      flags,      // Flags for what class(es) to check for
+    unsigned      flags,      // Flags for what class(es) to check for
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
     Value* pResult = Scalarize(pValue,

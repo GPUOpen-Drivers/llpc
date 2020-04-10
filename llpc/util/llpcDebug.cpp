@@ -107,7 +107,7 @@ bool EnableErrs()
 // CAUTION: The behavior isn't changed if app outputs logs to STDOUT or STDERR directly.
 void redirectLogOutput(
     bool              restoreToDefault,   // Restore the default behavior of outs() and errs() if it is true
-    uint32_t          optionCount,        // Count of compilation-option strings
+    unsigned          optionCount,        // Count of compilation-option strings
     const char*const* pOptions)            // [in] An array of compilation-option strings
 {
     static raw_fd_ostream* pDbgFile = nullptr;
@@ -140,7 +140,7 @@ void redirectLogOutput(
             // NOTE: Checks whether errs() is needed in compiliation
             // Until now, option -debug, -debug-only and -print-* need use debug output
             bool needDebugOut = ::llvm::DebugFlag;
-            for (uint32_t i = 1; (needDebugOut == false) && (i < optionCount); ++i)
+            for (unsigned i = 1; (needDebugOut == false) && (i < optionCount); ++i)
             {
                 StringRef option = pOptions[i];
                 if (option.startswith("-debug") || option.startswith("-print"))

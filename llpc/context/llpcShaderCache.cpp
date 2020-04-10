@@ -242,7 +242,7 @@ Result ShaderCache::Serialize(
 // =====================================================================================================================
 // Merges the shader data of source shader caches into this shader cache.
 Result ShaderCache::Merge(
-    uint32_t             srcCacheCount,  // Count of input source shader caches
+    unsigned             srcCacheCount,  // Count of input source shader caches
     const IShaderCache** ppSrcCaches)    // [in] Input shader caches
 {
     // Merge function is supposed to be called by client created shader caches, which are always runtime mode.
@@ -252,7 +252,7 @@ Result ShaderCache::Merge(
 
     LockCacheMap(false);
 
-    for (uint32_t i = 0; i < srcCacheCount; i++)
+    for (unsigned i = 0; i < srcCacheCount; i++)
     {
         ShaderCache* pSrcCache = static_cast<ShaderCache*>(const_cast<IShaderCache*>(ppSrcCaches[i]));
         pSrcCache->LockCacheMap(true);
@@ -397,13 +397,13 @@ Result ShaderCache::BuildFileName(
     // The file name is constructed by taking the executable file name, appending the client string, device ID and
     // GPU index then hashing the result.
     char hashedFileName[MaxFilePathLen];
-    int32_t length = snprintf(hashedFileName, MaxFilePathLen, "%s.%s.%u.%u.%u", pExecutableName,
+    int length = snprintf(hashedFileName, MaxFilePathLen, "%s.%s.%u.%u.%u", pExecutableName,
              ClientStr,
              gfxIp.major,
              gfxIp.minor,
              gfxIp.stepping);
 
-    const uint32_t nameHash = djbHash(hashedFileName, 0);
+    const unsigned nameHash = djbHash(hashedFileName, 0);
     length = snprintf(hashedFileName, MaxFilePathLen, "%08x.bin", nameHash);
 
     // Combine the base path, the sub-path and the file name to get the fully qualified path to the cache file
@@ -744,14 +744,14 @@ void ShaderCache::AddShaderToFile(
     // and the shaderDataEnd.
 
     // Calculate the header offsets, then write the relavent data to the file.
-    const uint32_t shaderCountOffset = offsetof(struct ShaderCacheSerializedHeader, shaderCount);
-    const uint32_t dataEndOffset     = offsetof(struct ShaderCacheSerializedHeader, shaderDataEnd);
+    const unsigned shaderCountOffset = offsetof(struct ShaderCacheSerializedHeader, shaderCount);
+    const unsigned dataEndOffset     = offsetof(struct ShaderCacheSerializedHeader, shaderDataEnd);
 
     m_onDiskFile.Seek(shaderCountOffset, true);
     m_onDiskFile.Write(&m_totalShaders, sizeof(size_t));
 
     // Write the new shader data at the current end of the data section
-    m_onDiskFile.Seek(static_cast<uint32_t>(m_shaderDataEnd), true);
+    m_onDiskFile.Seek(static_cast<unsigned>(m_shaderDataEnd), true);
     m_onDiskFile.Write(pIndex->pDataBlob, pIndex->header.size);
 
     // Then update the data end value and write it out to the file.
@@ -874,7 +874,7 @@ Result ShaderCache::PopulateIndexMap(
     // take the hit each time we add shader data to the file.
     auto* pHeader = static_cast<ShaderHeader*>(pDataStart);
 
-    for (uint32_t shader = 0; ((shader < m_totalShaders) && (result == Result::Success)); ++shader)
+    for (unsigned shader = 0; ((shader < m_totalShaders) && (result == Result::Success)); ++shader)
     {
         // Guard against buffer overruns.
         assert(VoidPtrDiff(pHeader, pDataStart) <= dataSize);
@@ -920,7 +920,7 @@ uint64_t ShaderCache::CalculateCrc(
     size_t         numBytes)      // Data size in bytes
 {
     uint64_t crc = CrcInitialValue;
-    for (uint32_t byte = 0; byte < numBytes; ++byte)
+    for (unsigned byte = 0; byte < numBytes; ++byte)
     {
         uint8_t tableIndex = static_cast<uint8_t>(crc >> (CrcWidth - 8)) & 0xFF;
         crc = (crc << 8) ^ CrcLookup[tableIndex] ^ pData[byte];

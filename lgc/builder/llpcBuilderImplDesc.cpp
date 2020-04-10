@@ -43,8 +43,8 @@ using namespace llvm;
 // =====================================================================================================================
 // Create a load of a buffer descriptor.
 Value* BuilderImplDesc::CreateLoadBufferDesc(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
+    unsigned      descSet,          // Descriptor set
+    unsigned      binding,          // Descriptor binding
     Value*        pDescIndex,       // [in] Descriptor index
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
     bool          isWritten,        // Whether the buffer is (or might be) written to
@@ -135,8 +135,8 @@ Value* BuilderImplDesc::CreateLoadDescFromPtr(
 // =====================================================================================================================
 // Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
 Value* BuilderImplDesc::CreateGetSamplerDescPtr(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
+    unsigned      descSet,          // Descriptor set
+    unsigned      binding,          // Descriptor binding
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
@@ -156,8 +156,8 @@ Value* BuilderImplDesc::CreateGetSamplerDescPtr(
 // =====================================================================================================================
 // Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
 Value* BuilderImplDesc::CreateGetImageDescPtr(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
+    unsigned      descSet,          // Descriptor set
+    unsigned      binding,          // Descriptor binding
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
@@ -177,8 +177,8 @@ Value* BuilderImplDesc::CreateGetImageDescPtr(
 // =====================================================================================================================
 // Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
 Value* BuilderImplDesc::CreateGetTexelBufferDescPtr(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
+    unsigned      descSet,          // Descriptor set
+    unsigned      binding,          // Descriptor binding
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
@@ -198,8 +198,8 @@ Value* BuilderImplDesc::CreateGetTexelBufferDescPtr(
 // =====================================================================================================================
 // Create a pointer to F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
 Value* BuilderImplDesc::CreateGetFmaskDescPtr(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
+    unsigned      descSet,          // Descriptor set
+    unsigned      binding,          // Descriptor binding
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
@@ -225,7 +225,7 @@ Value* BuilderImplDesc::CreateLoadPushConstantsPtr(
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     // Remember the size of push constants.
-    uint32_t pushConstSize = GetInsertPoint()->getModule()->getDataLayout().getTypeStoreSize(pPushConstantsTy);
+    unsigned pushConstSize = GetInsertPoint()->getModule()->getDataLayout().getTypeStoreSize(pPushConstantsTy);
     ResourceUsage* pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
     assert((pResUsage->pushConstSizeInBytes == 0) || (pResUsage->pushConstSizeInBytes == pushConstSize));
     pResUsage->pushConstSizeInBytes = pushConstSize;

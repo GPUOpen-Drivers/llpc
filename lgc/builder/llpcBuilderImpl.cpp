@@ -74,10 +74,10 @@ Value* BuilderImplBase::CreateDotProduct(
         return pProduct;
     }
 
-    const uint32_t compCount = pProduct->getType()->getVectorNumElements();
+    const unsigned compCount = pProduct->getType()->getVectorNumElements();
     Value* pScalar = CreateExtractElement(pProduct, uint64_t(0));
 
-    for (uint32_t i = 1; i < compCount; ++i)
+    for (unsigned i = 1; i < compCount; ++i)
     {
         pScalar = CreateFAdd(pScalar, CreateExtractElement(pProduct, i));
     }
@@ -183,7 +183,7 @@ BranchInst* BuilderImplBase::CreateIf(
 // This does not use the current insert point; new code is inserted before and after pNonUniformInst.
 Instruction* BuilderImplBase::CreateWaterfallLoop(
     Instruction*        pNonUniformInst,    // [in] The instruction to put in a waterfall loop
-    ArrayRef<uint32_t>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to be uniform
+    ArrayRef<unsigned>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to be uniform
     const Twine&        instName)           // [in] Name to give instruction(s)
 {
     assert(operandIdxs.empty() == false);
@@ -191,7 +191,7 @@ Instruction* BuilderImplBase::CreateWaterfallLoop(
     // For each non-uniform input, try and trace back through a descriptor load to find the non-uniform index
     // used in it. If that fails, we just use the operand value as the index.
     SmallVector<Value*, 2> nonUniformIndices;
-    for (uint32_t operandIdx : operandIdxs)
+    for (unsigned operandIdx : operandIdxs)
     {
         Value* pNonUniformVal = pNonUniformInst->getOperand(operandIdx);
         if (auto pCall = dyn_cast<CallInst>(pNonUniformVal))
@@ -229,7 +229,7 @@ Instruction* BuilderImplBase::CreateWaterfallLoop(
         }
         auto pWaterfallIndexTy = StructType::get(getContext(), indexTys);
         pWaterfallIndex = UndefValue::get(pWaterfallIndexTy);
-        for (uint32_t structIndex = 0; structIndex < nonUniformIndices.size(); ++structIndex)
+        for (unsigned structIndex = 0; structIndex < nonUniformIndices.size(); ++structIndex)
         {
             pWaterfallIndex = CreateInsertValue(pWaterfallIndex, nonUniformIndices[structIndex], structIndex);
         }
@@ -243,7 +243,7 @@ Instruction* BuilderImplBase::CreateWaterfallLoop(
                                              instName);
 
     // Scalarize each non-uniform operand of the instruction.
-    for (uint32_t operandIdx : operandIdxs)
+    for (unsigned operandIdx : operandIdxs)
     {
         Value* pDesc = pNonUniformInst->getOperand(operandIdx);
         auto pDescTy = pDesc->getType();
@@ -327,7 +327,7 @@ Value* BuilderImplBase::Scalarize(
         Value* pResult0 = callback(CreateExtractElement(pValue, uint64_t(0)));
         Value* pResult = UndefValue::get(VectorType::get(pResult0->getType(), pVecTy->getNumElements()));
         pResult = CreateInsertElement(pResult, pResult0, uint64_t(0));
-        for (uint32_t idx = 1, end = pVecTy->getNumElements(); idx != end; ++idx)
+        for (unsigned idx = 1, end = pVecTy->getNumElements(); idx != end; ++idx)
         {
             pResult = CreateInsertElement(pResult, callback(CreateExtractElement(pValue, idx)), idx);
         }
@@ -346,7 +346,7 @@ Value* BuilderImplBase::ScalarizeInPairs(
 {
     if (auto pVecTy = dyn_cast<VectorType>(pValue->getType()))
     {
-        Value* pInComps = CreateShuffleVector(pValue, pValue, ArrayRef<uint32_t>{ 0, 1 });
+        Value* pInComps = CreateShuffleVector(pValue, pValue, ArrayRef<unsigned>{ 0, 1 });
         Value* pResultComps = callback(pInComps);
         Value* pResult = UndefValue::get(VectorType::get(pResultComps->getType()->getScalarType(),
                                                          pVecTy->getNumElements()));
@@ -356,9 +356,9 @@ Value* BuilderImplBase::ScalarizeInPairs(
             pResult = CreateInsertElement(pResult, CreateExtractElement(pResultComps, 1), 1);
         }
 
-        for (uint32_t idx = 2, end = pVecTy->getNumElements(); idx < end; idx += 2)
+        for (unsigned idx = 2, end = pVecTy->getNumElements(); idx < end; idx += 2)
         {
-            uint32_t indices[2] = { idx, idx + 1 };
+            unsigned indices[2] = { idx, idx + 1 };
             pInComps = CreateShuffleVector(pValue, pValue, indices);
             pResultComps = callback(pInComps);
             pResult = CreateInsertElement(pResult, CreateExtractElement(pResultComps, uint64_t(0)), idx);
@@ -391,7 +391,7 @@ Value* BuilderImplBase::Scalarize(
                                    CreateExtractElement(pValue1, uint64_t(0)));
         Value* pResult = UndefValue::get(VectorType::get(pResult0->getType(), pVecTy->getNumElements()));
         pResult = CreateInsertElement(pResult, pResult0, uint64_t(0));
-        for (uint32_t idx = 1, end = pVecTy->getNumElements(); idx != end; ++idx)
+        for (unsigned idx = 1, end = pVecTy->getNumElements(); idx != end; ++idx)
         {
             pResult = CreateInsertElement(pResult,
                                           callback(CreateExtractElement(pValue0, idx),
@@ -419,7 +419,7 @@ Value* BuilderImplBase::Scalarize(
                                    CreateExtractElement(pValue2, uint64_t(0)));
         Value* pResult = UndefValue::get(VectorType::get(pResult0->getType(), pVecTy->getNumElements()));
         pResult = CreateInsertElement(pResult, pResult0, uint64_t(0));
-        for (uint32_t idx = 1, end = pVecTy->getNumElements(); idx != end; ++idx)
+        for (unsigned idx = 1, end = pVecTy->getNumElements(); idx != end; ++idx)
         {
             pResult = CreateInsertElement(pResult,
                                           callback(CreateExtractElement(pValue0, idx),

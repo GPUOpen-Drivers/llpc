@@ -633,7 +633,7 @@ void PatchBufferOp::visitInsertElementInst(
 void PatchBufferOp::visitLoadInst(
     LoadInst& loadInst) // [in] The instruction
 {
-    const uint32_t addrSpace = loadInst.getPointerAddressSpace();
+    const unsigned addrSpace = loadInst.getPointerAddressSpace();
 
     if (addrSpace == ADDR_SPACE_CONST)
     {
@@ -704,8 +704,8 @@ void PatchBufferOp::visitMemCpyInst(
     Value* const pDest = memCpyInst.getArgOperand(0);
     Value* const pSrc = memCpyInst.getArgOperand(1);
 
-    const uint32_t destAddrSpace = pDest->getType()->getPointerAddressSpace();
-    const uint32_t srcAddrSpace = pSrc->getType()->getPointerAddressSpace();
+    const unsigned destAddrSpace = pDest->getType()->getPointerAddressSpace();
+    const unsigned srcAddrSpace = pSrc->getType()->getPointerAddressSpace();
 
     // If either of the address spaces are fat pointers.
     if ((destAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER) ||
@@ -724,8 +724,8 @@ void PatchBufferOp::visitMemMoveInst(
     Value* const pDest = memMoveInst.getArgOperand(0);
     Value* const pSrc = memMoveInst.getArgOperand(1);
 
-    const uint32_t destAddrSpace = pDest->getType()->getPointerAddressSpace();
-    const uint32_t srcAddrSpace = pSrc->getType()->getPointerAddressSpace();
+    const unsigned destAddrSpace = pDest->getType()->getPointerAddressSpace();
+    const unsigned srcAddrSpace = pSrc->getType()->getPointerAddressSpace();
 
     // If either of the address spaces are not fat pointers, bail.
     if ((destAddrSpace != ADDR_SPACE_BUFFER_FAT_POINTER) &&
@@ -736,8 +736,8 @@ void PatchBufferOp::visitMemMoveInst(
 
     m_pBuilder->SetInsertPoint(&memMoveInst);
 
-    const uint32_t destAlignment = memMoveInst.getParamAlignment(0);
-    const uint32_t srcAlignment = memMoveInst.getParamAlignment(1);
+    const unsigned destAlignment = memMoveInst.getParamAlignment(0);
+    const unsigned srcAlignment = memMoveInst.getParamAlignment(1);
 
     // We assume LLVM is not introducing variable length mem moves.
     ConstantInt* const pLength = dyn_cast<ConstantInt>(memMoveInst.getArgOperand(2));
@@ -785,7 +785,7 @@ void PatchBufferOp::visitMemSetInst(
 {
     Value* const pDest = memSetInst.getArgOperand(0);
 
-    const uint32_t destAddrSpace = pDest->getType()->getPointerAddressSpace();
+    const unsigned destAddrSpace = pDest->getType()->getPointerAddressSpace();
 
     // If the address spaces is a fat pointer.
     if (destAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER)
@@ -816,7 +816,7 @@ void PatchBufferOp::visitPHINode(
 
     SmallVector<Value*, 8> incomings;
 
-    for (uint32_t i = 0, incomingValueCount = phiNode.getNumIncomingValues(); i < incomingValueCount; i++)
+    for (unsigned i = 0, incomingValueCount = phiNode.getNumIncomingValues(); i < incomingValueCount; i++)
     {
         // PHIs require us to insert new incomings in the preceeding basic blocks.
         m_pBuilder->SetInsertPoint(phiNode.getIncomingBlock(i)->getTerminator());
@@ -855,7 +855,7 @@ void PatchBufferOp::visitPHINode(
 
         for (BasicBlock* const pBlock : phiNode.blocks())
         {
-            const int32_t blockIndex = phiNode.getBasicBlockIndex(pBlock);
+            const int blockIndex = phiNode.getBasicBlockIndex(pBlock);
             assert(blockIndex >= 0);
 
             Value* const pIncomingBufferDesc = m_replacementMap[incomings[blockIndex]].first;
@@ -894,7 +894,7 @@ void PatchBufferOp::visitPHINode(
 
     for (BasicBlock* const pBlock : phiNode.blocks())
     {
-        const int32_t blockIndex = phiNode.getBasicBlockIndex(pBlock);
+        const int blockIndex = phiNode.getBasicBlockIndex(pBlock);
         assert(blockIndex >= 0);
 
         Value* pIncomingIndex = m_replacementMap[incomings[blockIndex]].second;
@@ -1073,13 +1073,13 @@ void PatchBufferOp::PostVisitMemCpyInst(
     Value* const pDest = memCpyInst.getArgOperand(0);
     Value* const pSrc = memCpyInst.getArgOperand(1);
 
-    const uint32_t destAddrSpace = pDest->getType()->getPointerAddressSpace();
-    const uint32_t srcAddrSpace = pSrc->getType()->getPointerAddressSpace();
+    const unsigned destAddrSpace = pDest->getType()->getPointerAddressSpace();
+    const unsigned srcAddrSpace = pSrc->getType()->getPointerAddressSpace();
 
     m_pBuilder->SetInsertPoint(&memCpyInst);
 
-    const uint32_t destAlignment = memCpyInst.getParamAlignment(0);
-    const uint32_t srcAlignment = memCpyInst.getParamAlignment(1);
+    const unsigned destAlignment = memCpyInst.getParamAlignment(0);
+    const unsigned srcAlignment = memCpyInst.getParamAlignment(1);
 
     ConstantInt* const pLengthConstant = dyn_cast<ConstantInt>(memCpyInst.getArgOperand(2));
 
@@ -1095,12 +1095,12 @@ void PatchBufferOp::PostVisitMemCpyInst(
         // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
         // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
         // 2. Worst case we have to load/store a single byte per loop.
-        uint32_t stride = (pLengthConstant == nullptr) ? 1 : 16;
+        unsigned stride = (pLengthConstant == nullptr) ? 1 : 16;
 
         while (stride != 1)
         {
             // We only care about DWORD alignment (4 bytes) so clamp the max check here to that.
-            const uint32_t minStride = std::min(stride, 4u);
+            const unsigned minStride = std::min(stride, 4u);
             if ((destAlignment >= minStride) && (srcAlignment >= minStride) && ((constantLength % stride) == 0))
             {
                 break;
@@ -1225,13 +1225,13 @@ void PatchBufferOp::PostVisitMemSetInst(
 {
     Value* const pDest = memSetInst.getArgOperand(0);
 
-    const uint32_t destAddrSpace = pDest->getType()->getPointerAddressSpace();
+    const unsigned destAddrSpace = pDest->getType()->getPointerAddressSpace();
 
     m_pBuilder->SetInsertPoint(&memSetInst);
 
     Value* const pValue = memSetInst.getArgOperand(1);
 
-    const uint32_t destAlignment = memSetInst.getParamAlignment(0);
+    const unsigned destAlignment = memSetInst.getParamAlignment(0);
 
     ConstantInt* const pLengthConstant = dyn_cast<ConstantInt>(memSetInst.getArgOperand(2));
 
@@ -1247,12 +1247,12 @@ void PatchBufferOp::PostVisitMemSetInst(
         // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
         // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
         // 2. Worst case we have to load/store a single byte per loop.
-        uint32_t stride = (pLengthConstant == nullptr) ? 1 : 16;
+        unsigned stride = (pLengthConstant == nullptr) ? 1 : 16;
 
         while (stride != 1)
         {
             // We only care about DWORD alignment (4 bytes) so clamp the max check here to that.
-            const uint32_t minStride = std::min(stride, 4u);
+            const unsigned minStride = std::min(stride, 4u);
             if ((destAlignment >= minStride) && ((constantLength % stride) == 0))
             {
                 break;
@@ -1428,7 +1428,7 @@ Value* PatchBufferOp::GetBaseAddressFromBufferDesc(
     // Get the base address of our buffer by extracting the two components with the 48-bit address, and masking.
     Value* pBaseAddr = m_pBuilder->CreateShuffleVector(pBufferDesc,
                                                        UndefValue::get(pDescType),
-                                                       ArrayRef<uint32_t>{ 0, 1 });
+                                                       ArrayRef<unsigned>{ 0, 1 });
     Value* const pBaseAddrMask = ConstantVector::get({
                                                         m_pBuilder->getInt32(0xFFFFFFFF),
                                                         m_pBuilder->getInt32(0xFFFF)
@@ -1461,7 +1461,7 @@ void PatchBufferOp::CopyMetadata(
         return;
     }
 
-    SmallVector<std::pair<uint32_t, MDNode*>, 8> allMetaNodes;
+    SmallVector<std::pair<unsigned, MDNode*>, 8> allMetaNodes;
     pSrcInst->getAllMetadata(allMetaNodes);
 
     for (auto metaNode : allMetaNodes)
@@ -1540,7 +1540,7 @@ Value* PatchBufferOp::ReplaceLoadStore(
     Type* pType = nullptr;
     Value* pPointerOperand = nullptr;
     AtomicOrdering ordering = AtomicOrdering::NotAtomic;
-    uint32_t alignment = 0;
+    unsigned alignment = 0;
     SyncScope::ID syncScopeID = 0;
 
     if (isLoad)
@@ -1566,7 +1566,7 @@ Value* PatchBufferOp::ReplaceLoadStore(
 
     const DataLayout& dataLayout = m_pBuilder->GetInsertBlock()->getModule()->getDataLayout();
 
-    const uint32_t bytesToHandle = static_cast<uint32_t>(dataLayout.getTypeStoreSize(pType));
+    const unsigned bytesToHandle = static_cast<unsigned>(dataLayout.getTypeStoreSize(pType));
 
     if (alignment == 0)
     {
@@ -1644,7 +1644,7 @@ Value* PatchBufferOp::ReplaceLoadStore(
 
     SmallVector<Value*, 8> parts;
     Type* pSmallestType = nullptr;
-    uint32_t smallestByteSize = 4;
+    unsigned smallestByteSize = 4;
 
     if ((alignment < 2) || ((bytesToHandle & 0x1) != 0))
     {
@@ -1683,18 +1683,18 @@ Value* PatchBufferOp::ReplaceLoadStore(
     }
 
     // The index in pStoreValue which we use next
-    uint32_t storeIndex = 0;
+    unsigned storeIndex = 0;
 
-    uint32_t remainingBytes = bytesToHandle;
+    unsigned remainingBytes = bytesToHandle;
     while (remainingBytes > 0)
     {
-        const uint32_t offset = bytesToHandle - remainingBytes;
+        const unsigned offset = bytesToHandle - remainingBytes;
         Value* pOffsetVal = (offset == 0) ?
                                pBaseIndex :
                                m_pBuilder->CreateAdd(pBaseIndex, m_pBuilder->getInt32(offset));
 
         Type* pIntAccessType = nullptr;
-        uint32_t accessSize = 0;
+        unsigned accessSize = 0;
 
         // Handle the greatest possible size
         if (alignment >= 4 && remainingBytes >= 4)
@@ -1762,7 +1762,7 @@ Value* PatchBufferOp::ReplaceLoadStore(
             }
             else
             {
-                uint32_t intrinsicID = Intrinsic::amdgcn_raw_buffer_load;
+                unsigned intrinsicID = Intrinsic::amdgcn_raw_buffer_load;
                 if (ordering != AtomicOrdering::NotAtomic)
                     intrinsicID = Intrinsic::amdgcn_raw_atomic_buffer_load;
                 pPart = m_pBuilder->CreateIntrinsic(intrinsicID,
@@ -1778,10 +1778,10 @@ Value* PatchBufferOp::ReplaceLoadStore(
         else
         {
             // Store
-            uint32_t compCount = accessSize / smallestByteSize;
+            unsigned compCount = accessSize / smallestByteSize;
             pPart = UndefValue::get(VectorType::get(pSmallestType, compCount));
 
-            for (uint32_t i = 0; i < compCount; i++)
+            for (unsigned i = 0; i < compCount; i++)
             {
                 Value* const pStoreElem = m_pBuilder->CreateExtractElement(pStoreValue, storeIndex++);
                 pPart = m_pBuilder->CreateInsertElement(pPart, pStoreElem, i);
@@ -1821,12 +1821,12 @@ Value* PatchBufferOp::ReplaceLoadStore(
             // And create an undef vector whose total size is the number of bytes we loaded.
             pNewInst = UndefValue::get(VectorType::get(pSmallestType, bytesToHandle / smallestByteSize));
 
-            uint32_t index = 0;
+            unsigned index = 0;
 
             for (Value* pPart : parts)
             {
                 // Get the byte size of our load part.
-                const uint32_t byteSize = static_cast<uint32_t>(dataLayout.getTypeStoreSize(pPart->getType()));
+                const unsigned byteSize = static_cast<unsigned>(dataLayout.getTypeStoreSize(pPart->getType()));
 
                 // Bitcast it to a vector of the smallest load type.
                 VectorType* const pCastType = VectorType::get(pSmallestType, byteSize / smallestByteSize);
@@ -1834,7 +1834,7 @@ Value* PatchBufferOp::ReplaceLoadStore(
                 CopyMetadata(pPart, &pInst);
 
                 // Run through the elements of our bitcasted type and insert them into the main load.
-                for (uint32_t i = 0, compCount = static_cast<uint32_t>(pCastType->getNumElements()); i < compCount; i++)
+                for (unsigned i = 0, compCount = static_cast<unsigned>(pCastType->getNumElements()); i < compCount; i++)
                 {
                     Value* const pElem = m_pBuilder->CreateExtractElement(pPart, i);
                     CopyMetadata(pElem, &pInst);
@@ -1907,7 +1907,7 @@ Value* PatchBufferOp::ReplaceICmp(
         Value* const pBufferDescEqual = m_pBuilder->CreateICmpEQ(bufferDescs[0], bufferDescs[1]);
 
         pBufferDescICmp = m_pBuilder->CreateExtractElement(pBufferDescEqual, static_cast<uint64_t>(0));
-        for (uint32_t i = 1; i < 4; ++i)
+        for (unsigned i = 1; i < 4; ++i)
         {
             Value* pBufferDescElemEqual = m_pBuilder->CreateExtractElement(pBufferDescEqual, i);
             pBufferDescICmp = m_pBuilder->CreateAnd(pBufferDescICmp, pBufferDescElemEqual);

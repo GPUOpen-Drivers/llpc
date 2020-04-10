@@ -78,10 +78,10 @@ protected:
     GfxRegHandler(Builder* pBuilder, llvm::Value* pReg);
 
     // Common function for getting the current value for the hardware register
-    llvm::Value* GetRegCommon(uint32_t regId);
+    llvm::Value* GetRegCommon(unsigned regId);
 
     // Common function for setting the current value for the hardware register
-    void SetRegCommon(uint32_t regId, llvm::Value* pVal)
+    void SetRegCommon(unsigned regId, llvm::Value* pVal)
     {
         SetBits(m_pBitsInfo[regId], pVal);
         // It is assumed the register is being modified
@@ -89,10 +89,10 @@ protected:
     }
 
     // Get combined data from two seperate DWORDs
-    llvm::Value* GetRegCombine(uint32_t regIdLo, uint32_t regIdHi);
+    llvm::Value* GetRegCombine(unsigned regIdLo, unsigned regIdHi);
 
     // Set data into two seperate DWORDs
-    void SetRegCombine(uint32_t regIdLo, uint32_t regIdHi, llvm::Value* pReg);
+    void SetRegCombine(unsigned regIdLo, unsigned regIdHi, llvm::Value* pReg);
 
     // Get current value state for the hardware register
     const BitsState* GetBitsState() { return m_pBitsState; }
@@ -134,7 +134,7 @@ public:
     void SetReg(SqSampRegs regId, llvm::Value* pRegValue);
 
 private:
-    BitsState m_pBitsState[static_cast<uint32_t>(SqSampRegs::Count)];
+    BitsState m_pBitsState[static_cast<unsigned>(SqSampRegs::Count)];
 };
 
 // SqImgRsrcRegisters ID
@@ -173,7 +173,7 @@ public:
     void SetReg(SqRsrcRegs regId, llvm::Value* pRegValue);
 
 private:
-    BitsState m_pBitsState[static_cast<uint32_t>(SqRsrcRegs::Count)];
+    BitsState m_pBitsState[static_cast<unsigned>(SqRsrcRegs::Count)];
 };
 
 } // lgc

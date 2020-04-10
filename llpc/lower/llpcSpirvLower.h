@@ -94,7 +94,7 @@ llvm::ModulePass* CreateSpirvLowerConstImmediateStore();
 llvm::ModulePass* CreateSpirvLowerMemoryOp();
 llvm::ModulePass* CreateSpirvLowerGlobal();
 llvm::ModulePass* CreateSpirvLowerInstMetaRemove();
-llvm::ModulePass* CreateSpirvLowerLoopUnrollControl(uint32_t forceLoopUnrollCount);
+llvm::ModulePass* CreateSpirvLowerLoopUnrollControl(unsigned forceLoopUnrollCount);
 llvm::ModulePass* CreateSpirvLowerResourceCollect(bool collectDetailUsage);
 llvm::ModulePass* CreateSpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo* pShaderInfo);
 
@@ -118,7 +118,7 @@ public:
                           ShaderStage                 stage,
                           llvm::legacy::PassManager&  passMgr,
                           llvm::Timer*                pLowerTimer,
-                          uint32_t                    forceLoopUnrollCount);
+                          unsigned                    forceLoopUnrollCount);
 
     static void RemoveConstantExpr(Context* pContext, llvm::GlobalVariable* pGlobal);
     static void ReplaceConstWithInsts(Context* pContext, llvm::Constant* const pConstVal);

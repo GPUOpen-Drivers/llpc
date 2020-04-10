@@ -39,11 +39,11 @@ void DoAutoLayoutDesc(Llpc::ShaderStage                 shaderStage,
                       Llpc::BinaryData                  spirvBin,
                       Llpc::GraphicsPipelineBuildInfo*  pPipelineInfo,
                       Llpc::PipelineShaderInfo*         pShaderInfo,
-                      uint32_t&                         topLevelOffset,
+                      unsigned&                         topLevelOffset,
                       bool                              checkAutoLayoutCompatible);
 
 bool CheckShaderInfoComptible(Llpc::PipelineShaderInfo*        pShaderInfo,
-                              uint32_t                         autoLayoutUserDataNodeCount,
+                              unsigned                         autoLayoutUserDataNodeCount,
                               const Llpc::ResourceMappingNode* pAutoLayoutUserDataNodes);
 
 bool CheckPipelineStateCompatible(const Llpc::ICompiler*            pCompiler,

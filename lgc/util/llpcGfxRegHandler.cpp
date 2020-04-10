@@ -47,7 +47,7 @@ GfxRegHandler::GfxRegHandler(
 // =====================================================================================================================
 // Common function for getting the current value for the hardware register
 Value* GfxRegHandler::GetRegCommon(
-    uint32_t regId) // The register ID, which is the index of BitsInfo and BitsState
+    unsigned regId) // The register ID, which is the index of BitsInfo and BitsState
 {
     // Under two condition, we need to fetch the range of bits
     //  - The register has not being initialized
@@ -71,8 +71,8 @@ Value* GfxRegHandler::GetRegCommon(
 // Note: The return type is one DWORD, it doesn't support two DWORDs for now.
 // TODO: Expand to support 2-DWORDs combination result.
 Value* GfxRegHandler::GetRegCombine(
-    uint32_t regIdLo, // The ID of low part register
-    uint32_t regIdHi) // Reg ID of high part register
+    unsigned regIdLo, // The ID of low part register
+    unsigned regIdHi) // Reg ID of high part register
 {
     Value* pRegValueLo = GetRegCommon(regIdLo);
     Value* pRegValueHi = GetRegCommon(regIdHi);
@@ -83,8 +83,8 @@ Value* GfxRegHandler::GetRegCombine(
 // Set register value into two seperate DWORDs
 // Note: The input pRegValue only supports one DWORD
 void GfxRegHandler::SetRegCombine(
-    uint32_t regIdLo,   // The ID of low part register
-    uint32_t regIdHi,   // Reg ID of high part register
+    unsigned regIdLo,   // The ID of low part register
+    unsigned regIdHi,   // Reg ID of high part register
     Value*   pRegValue) // [in] Data used for setting
 {
     Value* pRegValueLo = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
@@ -102,7 +102,7 @@ void GfxRegHandler::SetRegCombine(
 // =====================================================================================================================
 // SqImgSampReg Bits infomation look up table (Gfx9-10)
 // Refer to imported/chip/gfx9/gfx9_plus_merged_registers.h : SQ_IMG_SAMP_WORD
-static constexpr BitsInfo SqImgSampRegBitsGfx9[static_cast<uint32_t>(SqSampRegs::Count)] =
+static constexpr BitsInfo SqImgSampRegBitsGfx9[static_cast<unsigned>(SqSampRegs::Count)] =
 {
     { 0, 30, 2 }, // FilterMode
     { 2, 20, 2 }, // XyMagFilter
@@ -143,7 +143,7 @@ Value* SqImgSampRegHandler::GetReg(
     case SqSampRegs::FilterMode:
     case SqSampRegs::xyMagFilter:
     case SqSampRegs::xyMinFilter:
-        return GetRegCommon(static_cast<uint32_t>(regId));
+        return GetRegCommon(static_cast<unsigned>(regId));
     default:
         // TODO: More will be implemented.
         llvm_unreachable("Not implemented!");
@@ -163,7 +163,7 @@ void SqImgSampRegHandler::SetReg(
     case SqSampRegs::FilterMode:
     case SqSampRegs::xyMagFilter:
     case SqSampRegs::xyMinFilter:
-        SetRegCommon(static_cast<uint32_t>(regId), pRegValue);
+        SetRegCommon(static_cast<unsigned>(regId), pRegValue);
         break;
     default:
         llvm_unreachable("Set \"IsTileOpt\" is not allowed!");
@@ -174,7 +174,7 @@ void SqImgSampRegHandler::SetReg(
 // =====================================================================================================================
 // SqImgSampReg Bits infomation look up table (Gfx9)
 // Refer to imported/chip/gfx9/gfx9_plus_merged_registers.h : SQ_IMG_RSRC_WORD
-static constexpr BitsInfo SqImgRsrcRegBitsGfx9[static_cast<uint32_t>(SqRsrcRegs::Count)] =
+static constexpr BitsInfo SqImgRsrcRegBitsGfx9[static_cast<unsigned>(SqRsrcRegs::Count)] =
 {
     { 0,  0, 32 }, // BaseAddress
     { 1,  0,  8 }, // BaseAddressHi
@@ -193,7 +193,7 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx9[static_cast<uint32_t>(SqRsrcRegs:
 // =====================================================================================================================
 // SqImgSampReg Bits infomation look up table (Gfx10)
 // TODO: update comment when the registers file is available
-static constexpr BitsInfo SqImgRsrcRegBitsGfx10[static_cast<uint32_t>(SqRsrcRegs::Count)] =
+static constexpr BitsInfo SqImgRsrcRegBitsGfx10[static_cast<unsigned>(SqRsrcRegs::Count)] =
 {
     { 0,  0, 32 }, // BaseAddress
     { 1,  0,  8 }, // BaseAddressHi
@@ -247,25 +247,25 @@ Value* SqImgRsrcRegHandler::GetReg(
     case SqRsrcRegs::DstSelXYZW:
     case SqRsrcRegs::Depth:
     case SqRsrcRegs::BcSwizzle:
-        return GetRegCommon(static_cast<uint32_t>(regId));
+        return GetRegCommon(static_cast<unsigned>(regId));
     case SqRsrcRegs::Height:
     case SqRsrcRegs::Pitch:
-        return m_pBuilder->CreateAdd(GetRegCommon(static_cast<uint32_t>(regId)), m_pOne);
+        return m_pBuilder->CreateAdd(GetRegCommon(static_cast<unsigned>(regId)), m_pOne);
     case SqRsrcRegs::Width:
         switch (m_pGfxIpVersion->major)
         {
         case 9:
-            return m_pBuilder->CreateAdd(GetRegCommon(static_cast<uint32_t>(regId)), m_pOne);
+            return m_pBuilder->CreateAdd(GetRegCommon(static_cast<unsigned>(regId)), m_pOne);
         case 10:
-            return m_pBuilder->CreateAdd(GetRegCombine(static_cast<uint32_t>(SqRsrcRegs::WidthLo),
-                                                       static_cast<uint32_t>(SqRsrcRegs::WidthHi)),
+            return m_pBuilder->CreateAdd(GetRegCombine(static_cast<unsigned>(SqRsrcRegs::WidthLo),
+                                                       static_cast<unsigned>(SqRsrcRegs::WidthHi)),
                                                        m_pOne);
         default:
             llvm_unreachable("GFX IP is not supported!");
             break;
         }
     case SqRsrcRegs::IsTileOpt:
-        return m_pBuilder->CreateICmpNE(GetRegCommon(static_cast<uint32_t>(regId)), m_pBuilder->getInt32(0));
+        return m_pBuilder->CreateICmpNE(GetRegCommon(static_cast<unsigned>(regId)), m_pBuilder->getInt32(0));
     default:
         // TODO: More will be implemented.
         llvm_unreachable("Not implemented!");
@@ -287,21 +287,21 @@ void SqImgRsrcRegHandler::SetReg(
     case SqRsrcRegs::DstSelXYZW:
     case SqRsrcRegs::Depth:
     case SqRsrcRegs::BcSwizzle:
-        SetRegCommon(static_cast<uint32_t>(regId), pRegValue);
+        SetRegCommon(static_cast<unsigned>(regId), pRegValue);
         break;
     case SqRsrcRegs::Height:
     case SqRsrcRegs::Pitch:
-        SetRegCommon(static_cast<uint32_t>(regId), m_pBuilder->CreateSub(pRegValue, m_pOne));
+        SetRegCommon(static_cast<unsigned>(regId), m_pBuilder->CreateSub(pRegValue, m_pOne));
         break;
     case SqRsrcRegs::Width:
         switch (m_pGfxIpVersion->major)
         {
         case 9:
-            SetRegCommon(static_cast<uint32_t>(regId), m_pBuilder->CreateSub(pRegValue, m_pOne));
+            SetRegCommon(static_cast<unsigned>(regId), m_pBuilder->CreateSub(pRegValue, m_pOne));
             break;
         case 10:
-            SetRegCombine(static_cast<uint32_t>(SqRsrcRegs::WidthLo),
-                          static_cast<uint32_t>(SqRsrcRegs::WidthHi),
+            SetRegCombine(static_cast<unsigned>(SqRsrcRegs::WidthLo),
+                          static_cast<unsigned>(SqRsrcRegs::WidthHi),
                           m_pBuilder->CreateSub(pRegValue, m_pOne));
             break;
         default:

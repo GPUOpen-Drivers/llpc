@@ -136,14 +136,14 @@ PsRegConfig::PsRegConfig()
 
 // =====================================================================================================================
 // Gets the starting register ID of SPI_PS_INPUT_CNTL.
-uint32_t PsRegConfig::GetPsInputCntlStart()
+unsigned PsRegConfig::GetPsInputCntlStart()
 {
     return mmSPI_PS_INPUT_CNTL_0;
 }
 
 // =====================================================================================================================
 // Gets the starting register ID of SPI_SHADER_USER_DATA_PS.
-uint32_t PsRegConfig::GetPsUserDataStart()
+unsigned PsRegConfig::GetPsUserDataStart()
 {
     return mmSPI_SHADER_USER_DATA_PS_0;
 }

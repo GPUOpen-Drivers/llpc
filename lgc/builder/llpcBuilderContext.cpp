@@ -112,7 +112,7 @@ void BuilderContext::Initialize()
 BuilderContext* BuilderContext::Create(
     LLVMContext&  context,              // [in] LLVM context to give each Builder
     StringRef     gpuName,              // LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
-    uint32_t      palAbiVersion)        // PAL pipeline ABI version to compile for
+    unsigned      palAbiVersion)        // PAL pipeline ABI version to compile for
 {
     assert(Initialized && "Must call BuilderContext::Initialize before BuilderContext::Create");
 
@@ -152,7 +152,7 @@ BuilderContext* BuilderContext::Create(
 // =====================================================================================================================
 BuilderContext::BuilderContext(
     LLVMContext&  context,              // [in] LLVM context to give each Builder
-    uint32_t      palAbiVersion)        // PAL pipeline ABI version to compile for
+    unsigned      palAbiVersion)        // PAL pipeline ABI version to compile for
     :
     m_context(context)
 {

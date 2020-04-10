@@ -65,7 +65,7 @@ const char* GetShaderStageAbbreviation(
                 "CS",
             };
 
-            pAbbr = ShaderStageAbbrs[static_cast<uint32_t>(shaderStage)];
+            pAbbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
         }
         else
         {
@@ -79,7 +79,7 @@ const char* GetShaderStageAbbreviation(
                 "Cs",
             };
 
-            pAbbr = ShaderStageAbbrs[static_cast<uint32_t>(shaderStage)];
+            pAbbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
         }
     }
     else

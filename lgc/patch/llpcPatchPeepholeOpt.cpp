@@ -125,7 +125,7 @@ void PatchPeepholeOpt::visitBitCast(
     }
 
     // First run through the thing we are bit casting and see if there are multiple bit casts we can combine.
-    uint32_t numCombinableUsers = 0;
+    unsigned numCombinableUsers = 0;
 
     for (User* const pUser : bitCast.getOperand(0)->users())
     {
@@ -272,12 +272,12 @@ void PatchPeepholeOpt::visitBitCast(
         }
 
         // Push the bit cast to each of the PHI's incoming values instead.
-        const uint32_t numIncomings = pPhiNode->getNumIncomingValues();
+        const unsigned numIncomings = pPhiNode->getNumIncomingValues();
 
         PHINode* const pNewPhiNode = PHINode::Create(bitCast.getDestTy(), numIncomings, pPhiNode->getName(), pPhiNode);
 
         // Loop through each incoming edge to the PHI node.
-        for (uint32_t incomingIndex = 0; incomingIndex < numIncomings; incomingIndex++)
+        for (unsigned incomingIndex = 0; incomingIndex < numIncomings; incomingIndex++)
         {
             Value* const pIncoming = pPhiNode->getIncomingValue(incomingIndex);
 
@@ -390,9 +390,9 @@ void PatchPeepholeOpt::visitICmp(
 
     for (Instruction* const pInst : instsWithOpsToReplace)
     {
-        const uint32_t numOperands = pInst->getNumOperands();
+        const unsigned numOperands = pInst->getNumOperands();
 
-        for (uint32_t operandIndex = 0; operandIndex < numOperands; operandIndex++)
+        for (unsigned operandIndex = 0; operandIndex < numOperands; operandIndex++)
         {
             if (&iCmp == pInst->getOperand(operandIndex))
             {
@@ -455,7 +455,7 @@ void PatchPeepholeOpt::visitExtractElement(
         pNextVector = pNextInsertElement->getOperand(0);
     }
 
-    uint32_t numCombinableUsers = 0;
+    unsigned numCombinableUsers = 0;
 
     for (User* const pUser : pVector->users())
     {
@@ -566,7 +566,7 @@ void PatchPeepholeOpt::visitPHINode(
         return;
     }
 
-    const uint32_t numIncomings = phiNode.getNumIncomingValues();
+    const unsigned numIncomings = phiNode.getNumIncomingValues();
 
     // Only care about vector PHI nodes whose element size is at least 32 bits.
     if (phiNode.getType()->isVectorTy() && (phiNode.getType()->getScalarSizeInBits() >= 32))
@@ -581,7 +581,7 @@ void PatchPeepholeOpt::visitPHINode(
         Type* const pType = phiNode.getType();
 
         // The number of elements in the vector type (which will result in N new scalar PHI nodes).
-        const uint32_t numElements = pType->getVectorNumElements();
+        const unsigned numElements = pType->getVectorNumElements();
 
         // The element type of the vector.
         Type* const pElementType = pType->getVectorElementType();
@@ -589,7 +589,7 @@ void PatchPeepholeOpt::visitPHINode(
         Value* pResult = UndefValue::get(pType);
 
         // Loop through each element of the vector.
-        for (uint32_t elementIndex = 0; elementIndex < numElements; elementIndex++)
+        for (unsigned elementIndex = 0; elementIndex < numElements; elementIndex++)
         {
             // We create a new name that is "old name".N, where N is the index of element into the original vector.
             ConstantInt* const pElementIndexVal = ConstantInt::get(pInt32Type, elementIndex, false);
@@ -608,7 +608,7 @@ void PatchPeepholeOpt::visitPHINode(
             incomingPairMap.reserve(numIncomings);
 
             // Loop through each incoming edge to the PHI node.
-            for (uint32_t incomingIndex = 0; incomingIndex < numIncomings; incomingIndex++)
+            for (unsigned incomingIndex = 0; incomingIndex < numIncomings; incomingIndex++)
             {
                 Value* const pIncoming = phiNode.getIncomingValue(incomingIndex);
 
@@ -659,7 +659,7 @@ void PatchPeepholeOpt::visitPHINode(
     // Optimize PHI nodes that have incoming values that are identical in their parent blocks.
     Instruction* pPrevIncomingInst = nullptr;
 
-    for (uint32_t incomingIndex = 0; incomingIndex < numIncomings; incomingIndex++)
+    for (unsigned incomingIndex = 0; incomingIndex < numIncomings; incomingIndex++)
     {
         Instruction* const pIncomingInst = dyn_cast<Instruction>(phiNode.getIncomingValue(incomingIndex));
 
@@ -719,9 +719,9 @@ void PatchPeepholeOpt::visitPHINode(
         {
             bool subPhiNodeOptimizable = true;
 
-            const uint32_t numSubIncomings = pSubPhiNode->getNumIncomingValues();
+            const unsigned numSubIncomings = pSubPhiNode->getNumIncomingValues();
 
-            for (uint32_t subIncomingIndex = 0; subIncomingIndex < numSubIncomings; subIncomingIndex++)
+            for (unsigned subIncomingIndex = 0; subIncomingIndex < numSubIncomings; subIncomingIndex++)
             {
                 Value* const pIncoming = pSubPhiNode->getIncomingValue(subIncomingIndex);
 
@@ -785,7 +785,7 @@ void PatchPeepholeOpt::visitPHINode(
                         continue;
                     }
 
-                    for (uint32_t subIncomingIndex = 0; subIncomingIndex < numSubIncomings; subIncomingIndex++)
+                    for (unsigned subIncomingIndex = 0; subIncomingIndex < numSubIncomings; subIncomingIndex++)
                     {
                         if (pSubPhiNode->getIncomingBlock(subIncomingIndex) !=
                             pOtherSubPhiNode->getIncomingBlock(subIncomingIndex))
@@ -828,9 +828,9 @@ void PatchPeepholeOpt::visitPHINode(
         // We optimize this by sinking the binary operator and instead make the PHI node pass %c down:
         //   %o = phi [%c, %foo], [0, %bar]
         //   %p = add %b, %o
-        for (uint32_t incomingIndex = 0; incomingIndex < numIncomings; incomingIndex++)
+        for (unsigned incomingIndex = 0; incomingIndex < numIncomings; incomingIndex++)
         {
-            const uint32_t otherIncomingIndex = (incomingIndex + 1) % 2;
+            const unsigned otherIncomingIndex = (incomingIndex + 1) % 2;
 
             Value* const pIncoming = phiNode.getIncomingValue(incomingIndex);
             Value* const pOtherIncoming = phiNode.getIncomingValue(otherIncomingIndex);

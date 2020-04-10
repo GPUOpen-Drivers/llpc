@@ -83,7 +83,7 @@ const TargetInfo& PipelineState::GetTargetInfo() const
 
 // =====================================================================================================================
 // Get PAL pipeline ABI version
-uint32_t PipelineState::GetPalAbiVersion() const
+unsigned PipelineState::GetPalAbiVersion() const
 {
     return GetBuilderContext()->GetPalAbiVersion();
 }
@@ -96,9 +96,9 @@ Module* PipelineState::Link(
 {
     // Processing for each shader module before linking.
     IRBuilder<> builder(GetContext());
-    uint32_t metaKindId = GetContext().getMDKindID(lgcName::ShaderStageMetadata);
+    unsigned metaKindId = GetContext().getMDKindID(lgcName::ShaderStageMetadata);
     Module* pAnyModule = nullptr;
-    for (uint32_t stage = 0; stage < modules.size(); ++stage)
+    for (unsigned stage = 0; stage < modules.size(); ++stage)
     {
         Module* pModule = modules[stage];
         if (pModule == nullptr)
@@ -168,7 +168,7 @@ Module* PipelineState::Link(
 
         Linker linker(*pPipelineModule);
 
-        for (uint32_t shaderIndex = 0; shaderIndex < modules.size(); ++shaderIndex)
+        for (unsigned shaderIndex = 0; shaderIndex < modules.size(); ++shaderIndex)
         {
             if (modules[shaderIndex] != nullptr)
             {
@@ -202,7 +202,7 @@ void PipelineState::Generate(
     Pipeline::CheckShaderCacheFunc  checkShaderCacheFunc, // Function to check shader cache in graphics pipeline
     ArrayRef<Timer*>                timers)               // Timers for: patch passes, llvm optimizations, codegen
 {
-    uint32_t passIndex = 1000;
+    unsigned passIndex = 1000;
     Timer* pPatchTimer = (timers.size() >= 1) ? timers[0] : nullptr;
     Timer* pOptTimer = (timers.size() >= 2) ? timers[1] : nullptr;
     Timer* pCodeGenTimer = (timers.size() >= 3) ? timers[2] : nullptr;
@@ -376,7 +376,7 @@ ShaderStage PipelineState::GetPrevShaderStage(
 
     ShaderStage prevStage = ShaderStageInvalid;
 
-    for (int32_t stage = shaderStage - 1; stage >= 0; --stage)
+    for (int stage = shaderStage - 1; stage >= 0; --stage)
     {
         if ((m_stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage))) != 0)
         {
@@ -409,7 +409,7 @@ ShaderStage PipelineState::GetNextShaderStage(
 
     ShaderStage nextStage = ShaderStageInvalid;
 
-    for (uint32_t stage = shaderStage + 1; stage < ShaderStageGfxCount; ++stage)
+    for (unsigned stage = shaderStage + 1; stage < ShaderStageGfxCount; ++stage)
     {
         if ((m_stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage))) != 0)
         {
@@ -466,7 +466,7 @@ void PipelineState::RecordOptions(
     Module* pModule)    // [in/out] Module to record metadata into
 {
     SetNamedMetadataToArrayOfInt32(pModule, m_options, OptionsMetadataName);
-    for (uint32_t stage = 0; stage != m_shaderOptions.size(); ++stage)
+    for (unsigned stage = 0; stage != m_shaderOptions.size(); ++stage)
     {
         std::string metadataName = (Twine(OptionsMetadataName) + "." +
                                     GetShaderStageAbbreviation(static_cast<ShaderStage>(stage))).str();
@@ -480,7 +480,7 @@ void PipelineState::ReadOptions(
     Module* pModule)    // [in] Module to read metadata from
 {
     ReadNamedMetadataArrayOfInt32(pModule, OptionsMetadataName, m_options);
-    for (uint32_t stage = 0; stage != ShaderStageCompute + 1; ++stage)
+    for (unsigned stage = 0; stage != ShaderStageCompute + 1; ++stage)
     {
         std::string metadataName = (Twine(OptionsMetadataName) + "." +
                                     GetShaderStageAbbreviation(static_cast<ShaderStage>(stage))).str();
@@ -501,7 +501,7 @@ void PipelineState::SetUserDataNodes(
                                         // duration of this call.
 {
     // Count how many entries in total and allocate the buffer.
-    uint32_t nodeCount = nodes.size();
+    unsigned nodeCount = nodes.size();
     for (auto& node : nodes)
     {
         if (node.type == ResourceNodeType::DescriptorTableVaPtr)
@@ -527,7 +527,7 @@ void PipelineState::SetUserDataNodesTable(
     ResourceNode*                 pDestTable,         // [out] Where to write nodes
     ResourceNode*&                pDestInnerTable)    // [in/out] End of space available for inner tables
 {
-    for (uint32_t idx = 0; idx != nodes.size(); ++idx)
+    for (unsigned idx = 0; idx != nodes.size(); ++idx)
     {
         auto& node = nodes[idx];
         auto& destNode = pDestTable[idx];
@@ -618,16 +618,16 @@ void PipelineState::RecordUserDataTable(
                     // Maybe it is a problem with the IR linker when metadata contains a non-ConstantData constant.
                     // So we write the individual ConstantInts instead.
                     // The descriptor is either a sampler (<4 x i32>) or converting sampler (<8 x i32>).
-                    uint32_t SamplerDescriptorSize = 4;
+                    unsigned SamplerDescriptorSize = 4;
                     if (node.type == ResourceNodeType::DescriptorYCbCrSampler)
                     {
                         SamplerDescriptorSize = 8;
                     }
-                    uint32_t elemCount = node.pImmutableValue->getType()->getArrayNumElements();
-                    for (uint32_t elemIdx = 0; elemIdx != elemCount; ++elemIdx)
+                    unsigned elemCount = node.pImmutableValue->getType()->getArrayNumElements();
+                    for (unsigned elemIdx = 0; elemIdx != elemCount; ++elemIdx)
                     {
                         Constant* pVectorValue = ConstantExpr::getExtractValue(node.pImmutableValue, elemIdx);
-                        for (uint32_t compIdx = 0; compIdx != SamplerDescriptorSize; ++compIdx)
+                        for (unsigned compIdx = 0; compIdx != SamplerDescriptorSize; ++compIdx)
                         {
                             operands.push_back(ConstantAsMetadata::get(
                                                       ConstantExpr::getExtractElement(pVectorValue,
@@ -658,7 +658,7 @@ void PipelineState::ReadUserDataNodes(
 
     // Prepare to read the resource nodes from the named MD node. We allocate a single buffer, with the
     // outer table at the start, and inner tables allocated from the end backwards.
-    uint32_t totalNodeCount = pUserDataMetaNode->getNumOperands();
+    unsigned totalNodeCount = pUserDataMetaNode->getNumOperands();
     m_allocUserDataNodes = std::make_unique<ResourceNode[]>(totalNodeCount);
 
     ResourceNode* pNextOuterNode = m_allocUserDataNodes.get();
@@ -667,7 +667,7 @@ void PipelineState::ReadUserDataNodes(
     ResourceNode* pEndThisInnerTable = nullptr;
 
     // Read the nodes.
-    for (uint32_t nodeIndex = 0; nodeIndex < totalNodeCount; ++nodeIndex)
+    for (unsigned nodeIndex = 0; nodeIndex < totalNodeCount; ++nodeIndex)
     {
         MDNode* pMetadataNode = pUserDataMetaNode->getOperand(nodeIndex);
         // Operand 0: node type
@@ -682,7 +682,7 @@ void PipelineState::ReadUserDataNodes(
         if (pNextNode->type == ResourceNodeType::DescriptorTableVaPtr)
         {
             // Operand 3: number of nodes in inner table
-            uint32_t innerNodeCount =
+            unsigned innerNodeCount =
                   mdconst::dyn_extract<ConstantInt>(pMetadataNode->getOperand(3))->getZExtValue();
             // Go into inner table.
             assert(pEndThisInnerTable == nullptr);
@@ -714,20 +714,20 @@ void PipelineState::ReadUserDataNodes(
                 {
                     // Operand 5 onward: immutable descriptor constant
                     // The descriptor is either a sampler (<4 x i32>) or converting sampler (<8 x i32>).
-                    static const uint32_t OperandStartIdx = 5;
-                    uint32_t SamplerDescriptorSize = 4;
+                    static const unsigned OperandStartIdx = 5;
+                    unsigned SamplerDescriptorSize = 4;
                     if (pNextNode->type == ResourceNodeType::DescriptorYCbCrSampler)
                     {
                         SamplerDescriptorSize = 8;
                         m_haveConvertingSampler = true;
                     }
 
-                    uint32_t elemCount = (pMetadataNode->getNumOperands() - OperandStartIdx) / SamplerDescriptorSize;
+                    unsigned elemCount = (pMetadataNode->getNumOperands() - OperandStartIdx) / SamplerDescriptorSize;
                     SmallVector<Constant*, 8> descriptors;
-                    for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
+                    for (unsigned elemIdx = 0; elemIdx < elemCount; ++elemIdx)
                     {
                         SmallVector<Constant*, 8> compValues;
-                        for (uint32_t compIdx = 0; compIdx < SamplerDescriptorSize; ++compIdx)
+                        for (unsigned compIdx = 0; compIdx < SamplerDescriptorSize; ++compIdx)
                         {
                             compValues.push_back(mdconst::dyn_extract<ConstantInt>(
                                   pMetadataNode->getOperand(
@@ -768,8 +768,8 @@ void PipelineState::ReadUserDataNodes(
 // node that contains it (or is equal to it).
 std::pair<const ResourceNode*, const ResourceNode*> PipelineState::FindResourceNode(
     ResourceNodeType   nodeType,   // Type of the resource mapping node
-    uint32_t           descSet,    // ID of descriptor set
-    uint32_t           binding     // ID of descriptor binding
+    unsigned           descSet,    // ID of descriptor set
+    unsigned           binding     // ID of descriptor binding
     ) const
 {
     for (const ResourceNode& node : GetUserDataNodes())
@@ -816,7 +816,7 @@ std::pair<const ResourceNode*, const ResourceNode*> PipelineState::FindResourceN
 MDString* PipelineState::GetResourceTypeName(
     ResourceNodeType type)   // Resource mapping node type
 {
-    return GetResourceTypeNames()[static_cast<uint32_t>(type)];
+    return GetResourceTypeNames()[static_cast<unsigned>(type)];
 }
 
 // =====================================================================================================================
@@ -825,7 +825,7 @@ ResourceNodeType PipelineState::GetResourceTypeFromName(
     MDString* pTypeName)  // [in] Name of resource type as MDString
 {
     auto typeNames = GetResourceTypeNames();
-    for (uint32_t type = 0; ; ++type)
+    for (unsigned type = 0; ; ++type)
     {
         if (typeNames[type] == pTypeName)
         {
@@ -841,7 +841,7 @@ ArrayRef<MDString*> PipelineState::GetResourceTypeNames()
 {
     if (m_resourceNodeTypeNames[0] == nullptr)
     {
-        for (uint32_t type = 0; type < static_cast<uint32_t>(ResourceNodeType::Count); ++type)
+        for (unsigned type = 0; type < static_cast<unsigned>(ResourceNodeType::Count); ++type)
         {
             m_resourceNodeTypeNames[type] =
                MDString::get(GetContext(), GetResourceNodeTypeName(static_cast<ResourceNodeType>(type)));
@@ -864,7 +864,7 @@ void PipelineState::SetVertexInputDescriptions(
 // Find vertex input description for the given location.
 // Returns nullptr if location not found.
 const VertexInputDescription* PipelineState::FindVertexInputDescription(
-    uint32_t location    // Location
+    unsigned location    // Location
 ) const
 {
     for (auto& inputDesc : m_vertexInputDescriptions)
@@ -916,8 +916,8 @@ void PipelineState::ReadVertexInputDescriptions(
     }
 
     // Read the nodes.
-    uint32_t nodeCount = pVertexInputsMetaNode->getNumOperands();
-    for (uint32_t nodeIndex = 0; nodeIndex < nodeCount; ++nodeIndex)
+    unsigned nodeCount = pVertexInputsMetaNode->getNumOperands();
+    for (unsigned nodeIndex = 0; nodeIndex < nodeCount; ++nodeIndex)
     {
         m_vertexInputDescriptions.push_back({});
         ReadArrayOfInt32MetaNode(pVertexInputsMetaNode->getOperand(nodeIndex), m_vertexInputDescriptions.back());
@@ -938,7 +938,7 @@ void PipelineState::SetColorExportState(
 // =====================================================================================================================
 // Get format for one color export
 const ColorExportFormat& PipelineState::GetColorExportFormat(
-    uint32_t location)    // Export location
+    unsigned location)    // Export location
 {
     if (location >= m_colorExportFormats.size())
     {
@@ -989,7 +989,7 @@ void PipelineState::ReadColorExportState(
     if (pExportFormatsMetaNode != nullptr)
     {
         // Read the color target nodes.
-        for (uint32_t nodeIndex = 0; nodeIndex < pExportFormatsMetaNode->getNumOperands(); ++nodeIndex)
+        for (unsigned nodeIndex = 0; nodeIndex < pExportFormatsMetaNode->getNumOperands(); ++nodeIndex)
         {
             m_colorExportFormats.push_back({});
             ReadArrayOfInt32MetaNode(pExportFormatsMetaNode->getOperand(nodeIndex), m_colorExportFormats.back());
@@ -1059,7 +1059,7 @@ bool PipelineState::IsTessOffChip()
 // Gets wave size for the specified shader stage
 //
 // NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.
-uint32_t PipelineState::GetShaderWaveSize(
+unsigned PipelineState::GetShaderWaveSize(
     ShaderStage stage)  // Shader stage
 {
     if (stage == ShaderStageCopyShader)
@@ -1070,7 +1070,7 @@ uint32_t PipelineState::GetShaderWaveSize(
 
     assert(stage <= ShaderStageCompute);
 
-    uint32_t waveSize = GetTargetInfo().GetGpuProperty().waveSize;
+    unsigned waveSize = GetTargetInfo().GetGpuProperty().waveSize;
 
     if (GetTargetInfo().GetGfxIpVersion().major >= 10)
     {
@@ -1090,7 +1090,7 @@ uint32_t PipelineState::GetShaderWaveSize(
             waveSize = 64;
         }
 
-        uint32_t waveSizeOption = GetShaderOptions(stage).waveSize;
+        unsigned waveSizeOption = GetShaderOptions(stage).waveSize;
         if (waveSizeOption != 0)
         {
             waveSize = waveSizeOption;
@@ -1110,7 +1110,7 @@ uint32_t PipelineState::GetShaderWaveSize(
         // If subgroup size is used in any shader in the pipeline, use the specified subgroup size as wave size.
         if (GetShaderModes()->GetAnyUseSubgroupSize())
         {
-            uint32_t subgroupSize = GetShaderOptions(stage).subgroupSize;
+            unsigned subgroupSize = GetShaderOptions(stage).subgroupSize;
             if (subgroupSize != 0)
             {
                 waveSize = subgroupSize;
@@ -1220,7 +1220,7 @@ void PipelineState::InitShaderResourceUsage(
     }
     else if (shaderStage == ShaderStageFragment)
     {
-        for (uint32_t i = 0; i < MaxColorTargets; ++i)
+        for (unsigned i = 0; i < MaxColorTargets; ++i)
         {
             pResUsage->inOutUsage.fs.expFmts[i] = EXP_FORMAT_ZERO;
             pResUsage->inOutUsage.fs.outputTypes[i] = BasicType::Unknown;
@@ -1256,9 +1256,9 @@ void PipelineState::InitShaderInterfaceData(
 // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
 // type. Only the number of elements of the type is significant.
 // This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.
-uint32_t PipelineState::ComputeExportFormat(
+unsigned PipelineState::ComputeExportFormat(
     Type*     pOutputTy,  // [in] Color output type
-    uint32_t  location)   // Location
+    unsigned  location)   // Location
 {
     std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(this, nullptr));
     return fragColorExport->ComputeExportFormat(pOutputTy, location);
@@ -1279,7 +1279,7 @@ const char* PipelineState::GetShaderStageAbbreviation(
     }
 
     static const char* ShaderStageAbbrs[] = { "VS", "TCS", "TES", "GS", "FS", "CS" };
-    return ShaderStageAbbrs[static_cast<uint32_t>(shaderStage)];
+    return ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
 }
 
 // =====================================================================================================================

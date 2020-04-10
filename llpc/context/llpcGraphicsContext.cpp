@@ -65,7 +65,7 @@ GraphicsContext::GraphicsContext(
         &pPipelineInfo->fs,
     };
 
-    for (uint32_t stage = 0; stage < ShaderStageGfxCount; ++stage)
+    for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage)
     {
         if (shaderInfo[stage]->pModuleData != nullptr)
         {
@@ -130,7 +130,7 @@ const PipelineShaderInfo* GraphicsContext::GetPipelineShaderInfo(
 // Does user data node merging for all shader stages
 void GraphicsContext::DoUserDataNodeMerge()
 {
-    uint32_t stageMask = GetShaderStageMask();
+    unsigned stageMask = GetShaderStageMask();
     SmallVector<ResourceMappingNode, 8> allNodes;
 
     // No need to merge if there is only one shader stage.
@@ -140,7 +140,7 @@ void GraphicsContext::DoUserDataNodeMerge()
     }
 
     // Collect user data nodes from all shader stages into one big table.
-    for (uint32_t stage = 0; stage < ShaderStageNativeStageCount; ++stage)
+    for (unsigned stage = 0; stage < ShaderStageNativeStageCount; ++stage)
     {
         if ((stageMask >> stage) & 1)
         {
@@ -158,7 +158,7 @@ void GraphicsContext::DoUserDataNodeMerge()
 
     // Collect descriptor range values (immutable descriptors) from all shader stages into one big table.
     SmallVector<DescriptorRangeValue, 8> allRangeValues;
-    for (uint32_t stage = 0; stage < ShaderStageNativeStageCount; ++stage)
+    for (unsigned stage = 0; stage < ShaderStageNativeStageCount; ++stage)
     {
         if ((stageMask >> stage) & 1)
         {
@@ -194,7 +194,7 @@ void GraphicsContext::DoUserDataNodeMerge()
         while (rangeValues.empty() == false)
         {
             // Find the next block of duplicate rangeValues.
-            uint32_t duplicateCount = 1;
+            unsigned duplicateCount = 1;
             for (; duplicateCount != rangeValues.size(); ++duplicateCount)
             {
                 if ((rangeValues[0].set != rangeValues[duplicateCount].set) || (rangeValues[0].binding != rangeValues[duplicateCount].binding))
@@ -207,7 +207,7 @@ void GraphicsContext::DoUserDataNodeMerge()
                             "Descriptor range value merge conflict: arraySize");
                 assert((memcmp(rangeValues[0].pValue,
                                     rangeValues[duplicateCount].pValue,
-                                    rangeValues[0].arraySize * sizeof(uint32_t)) == 0) &&
+                                    rangeValues[0].arraySize * sizeof(unsigned)) == 0) &&
                             "Descriptor range value merge conflict: value");
             }
 
@@ -218,7 +218,7 @@ void GraphicsContext::DoUserDataNodeMerge()
     }
 
     // Point each shader stage at the merged user data nodes and descriptor range values.
-    for (uint32_t stage = 0; stage < ShaderStageNativeStageCount; ++stage)
+    for (unsigned stage = 0; stage < ShaderStageNativeStageCount; ++stage)
     {
         if ((stageMask >> stage) & 1)
         {
@@ -255,7 +255,7 @@ ArrayRef<ResourceMappingNode> GraphicsContext::MergeUserDataNodeTable(
     while (nodes.empty() == false)
     {
         // Find the next block of duplicate nodes.
-        uint32_t duplicatesCount = 1;
+        unsigned duplicatesCount = 1;
         for (; duplicatesCount != nodes.size(); ++duplicatesCount)
         {
             if (nodes[0].offsetInDwords != nodes[duplicatesCount].offsetInDwords)
@@ -287,7 +287,7 @@ ArrayRef<ResourceMappingNode> GraphicsContext::MergeUserDataNodeTable(
             // Merge the inner tables too. First collect nodes from all inner tables.
             SmallVector<ResourceMappingNode, 8> allInnerNodes;
 
-            for (uint32_t i = 0; i != duplicatesCount; ++i)
+            for (unsigned i = 0; i != duplicatesCount; ++i)
             {
                 const auto& node = nodes[0];
                 ArrayRef<ResourceMappingNode> innerTable(node.tablePtr.pNext, node.tablePtr.nodeCount);

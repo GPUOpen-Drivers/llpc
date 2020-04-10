@@ -267,7 +267,7 @@ void SpirvLowerGlobal::visitCallInst(
         {
             // Translate interpolation functions to LLPC intrinsic calls
             auto pLoadSrc = callInst.getArgOperand(0);
-            uint32_t interpLoc = InterpLocUnknown;
+            unsigned interpLoc = InterpLocUnknown;
             Value* pAuxInterpValue = nullptr;
 
             if (mangledName.startswith(gSPIRVName::InterpolateAtCentroid))
@@ -332,7 +332,7 @@ void SpirvLowerGlobal::visitLoadInst(
     LoadInst& loadInst) // [in] "Load" instruction
 {
     Value* pLoadSrc = loadInst.getOperand(0);
-    const uint32_t addrSpace = pLoadSrc->getType()->getPointerAddressSpace();
+    const unsigned addrSpace = pLoadSrc->getType()->getPointerAddressSpace();
 
     if ((addrSpace != SPIRAS_Input) && (addrSpace != SPIRAS_Output))
     {
@@ -385,7 +385,7 @@ void SpirvLowerGlobal::visitLoadInst(
         // The root of the GEP should always be the global variable.
         assert(pInOut != nullptr);
 
-        uint32_t operandIdx = 0;
+        unsigned operandIdx = 0;
 
         auto pInOutTy = pInOut->getType()->getContainedType(0);
 
@@ -408,7 +408,7 @@ void SpirvLowerGlobal::visitLoadInst(
 
             if (inOutMeta.IsBuiltIn)
             {
-                uint32_t builtInId = inOutMeta.Value;
+                unsigned builtInId = inOutMeta.Value;
                 isVertexIdx = ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
                                (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
                                (builtInId == spv::BuiltInPointSize)    ||
@@ -470,7 +470,7 @@ void SpirvLowerGlobal::visitLoadInst(
             // If the input/output is arrayed, the outermost dimension might for vertex indexing
             if (inOutMeta.IsBuiltIn)
             {
-                uint32_t builtInId = inOutMeta.Value;
+                unsigned builtInId = inOutMeta.Value;
                 hasVertexIdx = ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
                                 (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
                                 (builtInId == spv::BuiltInPointSize)    ||
@@ -490,8 +490,8 @@ void SpirvLowerGlobal::visitLoadInst(
             auto pElemTy = pInOutTy->getArrayElementType();
             auto pElemMeta = cast<Constant>(pInOutMetaVal->getOperand(1));
 
-            const uint32_t elemCount = pInOutTy->getArrayNumElements();
-            for (uint32_t i = 0; i < elemCount; ++i)
+            const unsigned elemCount = pInOutTy->getArrayNumElements();
+            for (unsigned i = 0; i < elemCount; ++i)
             {
                 Value* pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
                 auto pElemValue = AddCallInstForInOutImport(pElemTy,
@@ -534,7 +534,7 @@ void SpirvLowerGlobal::visitStoreInst(
     Value* pStoreValue = storeInst.getOperand(0);
     Value* pStoreDest  = storeInst.getOperand(1);
 
-    const uint32_t addrSpace = pStoreDest->getType()->getPointerAddressSpace();
+    const unsigned addrSpace = pStoreDest->getType()->getPointerAddressSpace();
 
     if ((addrSpace != SPIRAS_Input) && (addrSpace != SPIRAS_Output))
     {
@@ -580,7 +580,7 @@ void SpirvLowerGlobal::visitStoreInst(
             pOutput = dyn_cast<GlobalVariable>(pCurrGetElemPtr->getPointerOperand());
         }
 
-        uint32_t operandIdx = 0;
+        unsigned operandIdx = 0;
 
         auto pOutputTy = pOutput->getType()->getContainedType(0);
 
@@ -602,7 +602,7 @@ void SpirvLowerGlobal::visitStoreInst(
 
             if (outputMeta.IsBuiltIn)
             {
-                uint32_t builtInId = outputMeta.Value;
+                unsigned builtInId = outputMeta.Value;
                 isVertexIdx = ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
                                (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
                                (builtInId == spv::BuiltInPointSize)    ||
@@ -659,7 +659,7 @@ void SpirvLowerGlobal::visitStoreInst(
 
             if (outputMeta.IsBuiltIn)
             {
-                uint32_t builtInId = outputMeta.Value;
+                unsigned builtInId = outputMeta.Value;
                 hasVertexIdx = ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
                                 (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
                                 (builtInId == spv::BuiltInPointSize)    ||
@@ -677,8 +677,8 @@ void SpirvLowerGlobal::visitStoreInst(
             assert(pOutputy->isArrayTy());
             auto pElemMeta = cast<Constant>(pOutputMetaVal->getOperand(1));
 
-            const uint32_t elemCount = pOutputy->getArrayNumElements();
-            for (uint32_t i = 0; i < elemCount; ++i)
+            const unsigned elemCount = pOutputy->getArrayNumElements();
+            for (unsigned i = 0; i < elemCount; ++i)
             {
                 auto pElemValue = ExtractValueInst::Create(pStoreValue, { i }, "", &storeInst);
                 Value* pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
@@ -977,7 +977,7 @@ void SpirvLowerGlobal::LowerOutput()
         {
             for (auto pEmitCall : m_emitCalls)
             {
-                uint32_t emitStreamId = 0;
+                unsigned emitStreamId = 0;
 
                 auto mangledName = pEmitCall->getCalledFunction()->getName();
                 if (mangledName.startswith(gSPIRVName::EmitStreamVertex))
@@ -1007,7 +1007,7 @@ void SpirvLowerGlobal::LowerOutput()
     // Replace the Emit(Stream)Vertex calls with builder code.
     for (auto pEmitCall : m_emitCalls)
     {
-        uint32_t emitStreamId = (pEmitCall->getNumArgOperands() != 0) ?
+        unsigned emitStreamId = (pEmitCall->getNumArgOperands() != 0) ?
                                 cast<ConstantInt>(pEmitCall->getArgOperand(0))->getZExtValue() : 0;
         m_pBuilder->SetInsertPoint(pEmitCall);
         m_pBuilder->CreateEmitVertex(emitStreamId);
@@ -1142,17 +1142,17 @@ void SpirvLowerGlobal::LowerInOutInPlace()
 // Inserts LLVM call instruction to import input/output.
 Value* SpirvLowerGlobal::AddCallInstForInOutImport(
     Type*        pInOutTy,          // [in] Type of value imported from input/output
-    uint32_t     addrSpace,         // Address space
+    unsigned     addrSpace,         // Address space
     Constant*    pInOutMetaVal,        // [in] Metadata of this input/output
     Value*       pLocOffset,        // [in] Relative location offset, passed from aggregate type
-    uint32_t     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
+    unsigned     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
                                     //   For an array built-in with a variable index, this is the array size.
     Value*       pElemIdx,          // [in] Element index used for element indexing, valid for tessellation shader
                                     // (usually, it is vector component index, for built-in input/output, it could be
                                     // element index of scalar array)
     Value*       pVertexIdx,        // [in] Input array outermost index used for vertex indexing, valid for
                                     // tessellation shader and geometry shader
-    uint32_t     interpLoc,         // Interpolation location, valid for fragment shader (use "InterpLocUnknown" as
+    unsigned     interpLoc,         // Interpolation location, valid for fragment shader (use "InterpLocUnknown" as
                                     // don't-care value)
     Value*       pAuxInterpValue,   // [in] Auxiliary value of interpolation (valid for fragment shader)
                                     //   - Value is sample ID for "InterpLocSample"
@@ -1173,7 +1173,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         assert(pElemIdx == nullptr);
 
         assert(pInOutMetaVal->getNumOperands() == 4);
-        uint32_t stride = cast<ConstantInt>(pInOutMetaVal->getOperand(0))->getZExtValue();
+        unsigned stride = cast<ConstantInt>(pInOutMetaVal->getOperand(0))->getZExtValue();
         inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaVal->getOperand(2))->getZExtValue();
         inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaVal->getOperand(3))->getZExtValue();
 
@@ -1181,7 +1181,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         {
             assert(pLocOffset == nullptr);
 
-            uint32_t builtInId = inOutMeta.Value;
+            unsigned builtInId = inOutMeta.Value;
 
             if ((pVertexIdx == nullptr) && (m_shaderStage == ShaderStageGeometry) &&
                 ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
@@ -1202,7 +1202,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                 auto pElemTy   = pInOutTy->getArrayElementType();
 
                 const uint64_t elemCount = pInOutTy->getArrayNumElements();
-                for (uint32_t idx = 0; idx < elemCount; ++idx)
+                for (unsigned idx = 0; idx < elemCount; ++idx)
                 {
                     // Handle array elements recursively
                     pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), idx);
@@ -1254,7 +1254,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
             {
                 // NOTE: We are handling vertex indexing of generic inputs of geometry shader. For tessellation shader,
                 // vertex indexing is handled by "load"/"store" instruction lowering.
-                for (uint32_t idx = 0; idx < elemCount; ++idx)
+                for (unsigned idx = 0; idx < elemCount; ++idx)
                 {
                     pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), idx);
                     auto pElem = AddCallInstForInOutImport(pElemTy,
@@ -1278,7 +1278,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                     pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
                 }
 
-                for (uint32_t idx = 0; idx < elemCount; ++idx)
+                for (unsigned idx = 0; idx < elemCount; ++idx)
                 {
                     // Handle array elements recursively
 
@@ -1312,7 +1312,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         assert(pElemIdx == nullptr);
 
         const uint64_t memberCount = pInOutTy->getStructNumElements();
-        for (uint32_t memberIdx = 0; memberIdx < memberCount; ++memberIdx)
+        for (unsigned memberIdx = 0; memberIdx < memberCount; ++memberIdx)
         {
             // Handle structure member recursively
             auto pMemberTy = pInOutTy->getStructElementType(memberIdx);
@@ -1378,7 +1378,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         }
         else
         {
-            uint32_t idx = inOutMeta.Component;
+            unsigned idx = inOutMeta.Component;
             assert(inOutMeta.Component <= 3);
             if (pInOutTy->getScalarSizeInBits() == 64)
             {
@@ -1442,16 +1442,16 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
     Value*       pOutputValue,      // [in] Value exported to output
     Constant*    pOutputMetaVal,       // [in] Metadata of this output
     Value*       pLocOffset,        // [in] Relative location offset, passed from aggregate type
-    uint32_t     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
+    unsigned     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
                                     //   For an array built-in with a variable index, this is the array size.
-    uint32_t     xfbOffsetAdjust,   // Adjustment of transform feedback offset (for array type)
-    uint32_t     xfbBufferAdjust,   // Adjustment of transform feedback buffer ID (for array type, default is 0)
+    unsigned     xfbOffsetAdjust,   // Adjustment of transform feedback offset (for array type)
+    unsigned     xfbBufferAdjust,   // Adjustment of transform feedback buffer ID (for array type, default is 0)
     Value*       pElemIdx,          // [in] Element index used for element indexing, valid for tessellation control
                                     //   shader (usually, it is vector component index, for built-in input/output, it
                                     //   could be element index of scalar array)
     Value*       pVertexIdx,        // [in] Output array outermost index used for vertex indexing, valid for
                                     //   tessellation control shader
-    uint32_t     emitStreamId,      // ID of emitted vertex stream, valid for geometry shader (0xFFFFFFFF for others)
+    unsigned     emitStreamId,      // ID of emitted vertex stream, valid for geometry shader (0xFFFFFFFF for others)
     Instruction* pInsertPos)        // [in] Where to insert this call
 {
     Type* pOutputTy = pOutputValue->getType();
@@ -1459,7 +1459,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
     ShaderInOutMetadata outputMeta = {};
 
     // NOTE: This special flag is just to check if we need output header of transform feedback info.
-    static uint32_t enableXfb = false;
+    static unsigned enableXfb = false;
 
     if (pOutputTy->isArrayTy())
     {
@@ -1467,7 +1467,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         assert(pElemIdx == nullptr);
 
         assert(pOutputMetaVal->getNumOperands() == 4);
-        uint32_t stride = cast<ConstantInt>(pOutputMetaVal->getOperand(0))->getZExtValue();
+        unsigned stride = cast<ConstantInt>(pOutputMetaVal->getOperand(0))->getZExtValue();
 
         outputMeta.U64All[0] = cast<ConstantInt>(pOutputMetaVal->getOperand(2))->getZExtValue();
         outputMeta.U64All[1] = cast<ConstantInt>(pOutputMetaVal->getOperand(3))->getZExtValue();
@@ -1504,7 +1504,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 const uint64_t elemCount = pOutputTy->getArrayNumElements();
                 const uint64_t byteSize = pElemTy->getScalarSizeInBits() / 8;
 
-                for (uint32_t idx = 0; idx < elemCount; ++idx)
+                for (unsigned idx = 0; idx < elemCount; ++idx)
                 {
                     // Handle array elements recursively
 		  auto pElem = ExtractValueInst::Create(pOutputValue, { idx }, "", pInsertPos);
@@ -1549,7 +1549,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             auto pElemMeta = cast<Constant>(pOutputMetaVal->getOperand(1));
 
             const uint64_t elemCount = pOutputTy->getArrayNumElements();
-            for (uint32_t idx = 0; idx < elemCount; ++idx)
+            for (unsigned idx = 0; idx < elemCount; ++idx)
             {
                 // Handle array elements recursively
 	      Value* pElem = ExtractValueInst::Create(pOutputValue, { idx }, "", pInsertPos);
@@ -1559,7 +1559,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
 
                 if (pLocOffsetConst != nullptr)
                 {
-                    uint32_t locOffset = pLocOffsetConst->getZExtValue();
+                    unsigned locOffset = pLocOffsetConst->getZExtValue();
                     pElemLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), locOffset + stride * idx);
                 }
                 else
@@ -1595,7 +1595,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         assert(pElemIdx == nullptr);
 
         const uint64_t memberCount = pOutputTy->getStructNumElements();
-        for (uint32_t memberIdx = 0; memberIdx < memberCount; ++memberIdx)
+        for (unsigned memberIdx = 0; memberIdx < memberCount; ++memberIdx)
         {
             // Handle structure member recursively
             auto pMemberMeta = cast<Constant>(pOutputMetaVal->getOperand(memberIdx));
@@ -1673,11 +1673,11 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             return;
         }
 
-        uint32_t location = outputMeta.Value + outputMeta.Index;
+        unsigned location = outputMeta.Value + outputMeta.Index;
         assert(((outputMeta.Index == 1) && (outputMeta.Value == 0)) || (outputMeta.Index == 0));
         assert(pOutputTy->isSingleValueType());
 
-        uint32_t idx = outputMeta.Component;
+        unsigned idx = outputMeta.Component;
         assert(outputMeta.Component <= 3);
         if (pOutputTy->getScalarSizeInBits() == 64)
         {
@@ -1732,14 +1732,14 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
 // Inserts instructions to load value from input/ouput member.
 Value* SpirvLowerGlobal::LoadInOutMember(
     Type*                      pInOutTy,        // [in] Type of this input/output member
-    uint32_t                   addrSpace,       // Address space
+    unsigned                   addrSpace,       // Address space
     const std::vector<Value*>& indexOperands,   // [in] Index operands
-    uint32_t                   operandIdx,      // Index of the index operand in processing
-    uint32_t                   maxLocOffset,    // Max+1 location offset if variable index has been encountered
+    unsigned                   operandIdx,      // Index of the index operand in processing
+    unsigned                   maxLocOffset,    // Max+1 location offset if variable index has been encountered
     Constant*                  pInOutMetaVal,      // [in] Metadata of this input/output member
     Value*                     pLocOffset,      // [in] Relative location offset of this input/output member
     Value*                     pVertexIdx,      // [in] Input array outermost index used for vertex indexing
-    uint32_t                   interpLoc,       // Interpolation location, valid for fragment shader
+    unsigned                   interpLoc,       // Interpolation location, valid for fragment shader
                                                 // (use "InterpLocUnknown" as don't-care value)
     Value*                     pAuxInterpValue, // [in] Auxiliary value of interpolation (valid for fragment shader):
                                                 //   - Sample ID for "InterpLocSample"
@@ -1789,7 +1789,7 @@ Value* SpirvLowerGlobal::LoadInOutMember(
                 }
 
                 // elemLocOffset = locOffset + stride * elemIdx
-                uint32_t stride = cast<ConstantInt>(pInOutMetaVal->getOperand(0))->getZExtValue();
+                unsigned stride = cast<ConstantInt>(pInOutMetaVal->getOperand(0))->getZExtValue();
                 auto pElemIdx = indexOperands[operandIdx + 1];
                 Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext),
                                                                                    stride),
@@ -1822,7 +1822,7 @@ Value* SpirvLowerGlobal::LoadInOutMember(
         else if (pInOutTy->isStructTy())
         {
             // Structure type
-            uint32_t memberIdx = cast<ConstantInt>(indexOperands[operandIdx + 1])->getZExtValue();
+            unsigned memberIdx = cast<ConstantInt>(indexOperands[operandIdx + 1])->getZExtValue();
 
             auto pMemberTy = pInOutTy->getStructElementType(memberIdx);
             auto pMemberMeta = cast<Constant>(pInOutMetaVal->getOperand(memberIdx));
@@ -1885,8 +1885,8 @@ void SpirvLowerGlobal::StoreOutputMember(
     Type*                      pOutputTy,       // [in] Type of this output member
     Value*                     pStoreValue,     // [in] Value stored to output member
     const std::vector<Value*>& indexOperands,   // [in] Index operands
-    uint32_t                   operandIdx,      // Index of the index operand in processing
-    uint32_t                   maxLocOffset,    // Max+1 location offset if variable index has been encountered
+    unsigned                   operandIdx,      // Index of the index operand in processing
+    unsigned                   maxLocOffset,    // Max+1 location offset if variable index has been encountered
     Constant*                  pOutputMetaVal,     // [in] Metadata of this output member
     Value*                     pLocOffset,      // [in] Relative location offset of this output member
     Value*                     pVertexIdx,      // [in] Input array outermost index used for vertex indexing
@@ -1933,7 +1933,7 @@ void SpirvLowerGlobal::StoreOutputMember(
                 }
 
                 // elemLocOffset = locOffset + stride * elemIdx
-                uint32_t stride = cast<ConstantInt>(pOutputMetaVal->getOperand(0))->getZExtValue();
+                unsigned stride = cast<ConstantInt>(pOutputMetaVal->getOperand(0))->getZExtValue();
                 auto pElemIdx = indexOperands[operandIdx + 1];
                 Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext),
                                                                                    stride),
@@ -1964,7 +1964,7 @@ void SpirvLowerGlobal::StoreOutputMember(
         else if (pOutputTy->isStructTy())
         {
             // Structure type
-            uint32_t memberIdx = cast<ConstantInt>(indexOperands[operandIdx + 1])->getZExtValue();
+            unsigned memberIdx = cast<ConstantInt>(indexOperands[operandIdx + 1])->getZExtValue();
 
             auto pMemberTy = pOutputTy->getStructElementType(memberIdx);
             auto pMemberMeta = cast<Constant>(pOutputMetaVal->getOperand(memberIdx));
@@ -2034,8 +2034,8 @@ void SpirvLowerGlobal::LowerBufferBlock()
         MDNode* const pResMetaNode = global.getMetadata(gSPIRVMD::Resource);
         assert(pResMetaNode != nullptr);
 
-        const uint32_t descSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0))->getZExtValue();
-        const uint32_t binding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1))->getZExtValue();
+        const unsigned descSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0))->getZExtValue();
+        const unsigned binding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1))->getZExtValue();
 
         SmallVector<Constant*, 8> constantUsers;
 
@@ -2385,7 +2385,7 @@ void SpirvLowerGlobal::CleanupReturnBlock()
 // =====================================================================================================================
 // Interpolates an element of the input.
 void SpirvLowerGlobal::InterpolateInputElement(
-    uint32_t        interpLoc,          // [in] Interpolation location, valid for fragment shader
+    unsigned        interpLoc,          // [in] Interpolation location, valid for fragment shader
                                         // (use "InterpLocUnknown" as don't-care value)
     Value*          pAuxInterpValue,    // [in] Auxiliary value of interpolation (valid for fragment shader):
                                         //   - Sample ID for "InterpLocSample"
@@ -2396,11 +2396,11 @@ void SpirvLowerGlobal::InterpolateInputElement(
     GetElementPtrInst* pGetElemPtr = cast<GetElementPtrInst>(callInst.getArgOperand(0));
 
     std::vector<Value*> indexOperands;
-    for (uint32_t i = 0, indexOperandCount = pGetElemPtr->getNumIndices(); i < indexOperandCount; ++i)
+    for (unsigned i = 0, indexOperandCount = pGetElemPtr->getNumIndices(); i < indexOperandCount; ++i)
     {
         indexOperands.push_back(ToInt32Value(pGetElemPtr->getOperand(1 + i), &callInst));
     }
-    uint32_t operandIdx = 0;
+    unsigned operandIdx = 0;
 
     auto pInput = cast<GlobalVariable>(pGetElemPtr->getPointerOperand());
     auto pInputTy = pInput->getType()->getContainedType(0);
@@ -2434,15 +2434,15 @@ void SpirvLowerGlobal::InterpolateInputElement(
                                          "",
                                          &*(m_pEntryPoint->begin()->getFirstInsertionPt()));
 
-        std::vector<uint32_t> arraySizes;
-        std::vector<uint32_t> indexOperandIdxs;
-        uint32_t flattenElemCount = 1;
+        std::vector<unsigned> arraySizes;
+        std::vector<unsigned> indexOperandIdxs;
+        unsigned flattenElemCount = 1;
         auto pElemTy = pInputTy;
-        for (uint32_t i = 1, indexOperandCount = indexOperands.size(); i < indexOperandCount; ++i)
+        for (unsigned i = 1, indexOperandCount = indexOperands.size(); i < indexOperandCount; ++i)
         {
             if (isa<ConstantInt>(indexOperands[i]))
             {
-                uint32_t index = (cast<ConstantInt>(indexOperands[i]))->getZExtValue();
+                unsigned index = (cast<ConstantInt>(indexOperands[i]))->getZExtValue();
                 pElemTy = pElemTy->getContainedType(index);
             }
             else
@@ -2454,10 +2454,10 @@ void SpirvLowerGlobal::InterpolateInputElement(
             }
         }
 
-        const uint32_t arraySizeCount = arraySizes.size();
-        SmallVector<uint32_t, 4> elemStrides;
+        const unsigned arraySizeCount = arraySizes.size();
+        SmallVector<unsigned, 4> elemStrides;
         elemStrides.resize(arraySizeCount, 1);
-        for (uint32_t i = arraySizeCount - 1; i > 0; --i)
+        for (unsigned i = arraySizeCount - 1; i > 0; --i)
         {
             elemStrides[i - 1] = arraySizes[i] * elemStrides[i];
         }
@@ -2465,12 +2465,12 @@ void SpirvLowerGlobal::InterpolateInputElement(
         std::vector<Value*> newIndexOperands = indexOperands;
         Value* pInterpValue = UndefValue::get(pInterpValueTy);
 
-        for (uint32_t elemIdx = 0; elemIdx < flattenElemCount; ++elemIdx)
+        for (unsigned elemIdx = 0; elemIdx < flattenElemCount; ++elemIdx)
         {
-            uint32_t flattenElemIdx = elemIdx;
-            for (uint32_t arraySizeIdx = 0; arraySizeIdx < arraySizeCount; ++arraySizeIdx)
+            unsigned flattenElemIdx = elemIdx;
+            for (unsigned arraySizeIdx = 0; arraySizeIdx < arraySizeCount; ++arraySizeIdx)
             {
-                uint32_t index = flattenElemIdx / elemStrides[arraySizeIdx];
+                unsigned index = flattenElemIdx / elemStrides[arraySizeIdx];
                 flattenElemIdx = flattenElemIdx - index * elemStrides[arraySizeIdx];
                 newIndexOperands[indexOperandIdxs[arraySizeIdx]] = ConstantInt::get(Type::getInt32Ty(*m_pContext),
                                                                                     index,
@@ -2489,7 +2489,7 @@ void SpirvLowerGlobal::InterpolateInputElement(
                                               pAuxInterpValue,
                                               &callInst);
 
-            std::vector<uint32_t> idxs;
+            std::vector<unsigned> idxs;
             for (auto indexIt = newIndexOperands.begin() + 1; indexIt != newIndexOperands.end(); ++indexIt)
             {
                 idxs.push_back((cast<ConstantInt>(*indexIt))->getZExtValue());
@@ -2520,7 +2520,7 @@ Value* SpirvLowerGlobal::ToInt32Value(
     assert(isa<IntegerType>(pValue->getType()));
     auto pValueTy = cast<IntegerType>(pValue->getType());
 
-    const uint32_t bitWidth = pValueTy->getBitWidth();
+    const unsigned bitWidth = pValueTy->getBitWidth();
     if (bitWidth > 32)
     {
         // Truncated to i32 type

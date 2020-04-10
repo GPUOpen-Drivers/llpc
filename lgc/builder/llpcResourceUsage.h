@@ -38,10 +38,10 @@
 namespace lgc
 {
 
-static const uint32_t  MaxColorTargets = 8;
+static const unsigned  MaxColorTargets = 8;
 
 /// Represents the base data type
-enum class BasicType : uint32_t
+enum class BasicType : unsigned
 {
     Unknown = 0,          // Unknown
     Float,                // Float
@@ -62,8 +62,8 @@ union DescriptorPair
 {
     struct
     {
-        uint32_t descSet;  // ID of descriptor set
-        uint32_t binding;  // ID of descriptor binding
+        unsigned descSet;  // ID of descriptor set
+        unsigned binding;  // ID of descriptor binding
     };
     uint64_t u64All;
 };
@@ -77,11 +77,11 @@ union GsOutLocInfo
 {
     struct
     {
-        uint32_t location  : 16;    // Location of the output
-        uint32_t isBuiltIn : 1;     // Whether location is actually built-in ID
-        uint32_t streamId  : 2;     // Output vertex stream ID
+        unsigned location  : 16;    // Location of the output
+        unsigned isBuiltIn : 1;     // Whether location is actually built-in ID
+        unsigned streamId  : 2;     // Output vertex stream ID
     };
-    uint32_t  u32All;
+    unsigned  u32All;
 };
 
 // Represents transform feedback output info
@@ -89,18 +89,18 @@ union XfbOutInfo
 {
     struct
     {
-        uint32_t xfbBuffer      : 2;   // Transform feedback buffer
-        uint32_t xfbOffset      : 16;  // Transform feedback offset
-        uint32_t xfbExtraOffset : 13;  // Transform feedback extra offset
-        uint32_t is16bit        : 1;   // Whether it is 16-bit data for transform feedback
+        unsigned xfbBuffer      : 2;   // Transform feedback buffer
+        unsigned xfbOffset      : 16;  // Transform feedback offset
+        unsigned xfbExtraOffset : 13;  // Transform feedback extra offset
+        unsigned is16bit        : 1;   // Whether it is 16-bit data for transform feedback
     };
-    uint32_t u32All;
+    unsigned u32All;
 };
 
 // Represents interpolation info of fragment shader input
 struct FsInterpInfo
 {
-    uint32_t loc;           // Mapped input location (tightly packed)
+    unsigned loc;           // Mapped input location (tightly packed)
     bool     flat;          // Whether it is "flat" interpolation
     bool     custom;        // Whether it is "custom" interpolation
     bool     is16bit;       // Whether it is 16-bit interpolation
@@ -110,7 +110,7 @@ struct FsInterpInfo
 static const FsInterpInfo InvalidFsInterpInfo = { InvalidValue, false, false, false };
 
 // Enumerate the workgroup layout options.
-enum class WorkgroupLayout : uint32_t
+enum class WorkgroupLayout : unsigned
 {
     Unknown = 0,   // ?x?
     Linear,        // 4x1
@@ -124,12 +124,12 @@ enum class WorkgroupLayout : uint32_t
 struct ResourceUsage
 {
     std::unordered_set<uint64_t> descPairs;           // Pairs of descriptor set/binding
-    uint32_t                   pushConstSizeInBytes;  // Push constant size (in bytes)
+    unsigned                   pushConstSizeInBytes;  // Push constant size (in bytes)
     bool                       resourceWrite;         // Whether shader does resource-write operations (UAV)
     bool                       resourceRead;          // Whether shader does resource-read operrations (UAV)
     bool                       perShaderTable;        // Whether per shader stage table is used
-    uint32_t                   numSgprsAvailable;     // Number of available SGPRs
-    uint32_t                   numVgprsAvailable;     // Number of available VGPRs
+    unsigned                   numSgprsAvailable;     // Number of available SGPRs
+    unsigned                   numVgprsAvailable;     // Number of available VGPRs
     bool                       useImages;             // Whether images are used
 
     // Usage of built-ins
@@ -142,21 +142,21 @@ struct ResourceUsage
             struct
             {
                 // Input
-                uint32_t vertexIndex          : 1;      // Whether gl_VertexIndex is used
-                uint32_t instanceIndex        : 1;      // Whether gl_InstanceIndex is used
-                uint32_t baseVertex           : 1;      // Whether gl_BaseVertex is used
-                uint32_t baseInstance         : 1;      // Whether gl_BaseInstance is used
-                uint32_t drawIndex            : 1;      // Whether gl_DrawID is used
-                uint32_t primitiveId          : 1;      // Whether an implicit gl_PrimitiveID is required
-                uint32_t viewIndex            : 1;      // Whether gl_ViewIndex is used
+                unsigned vertexIndex          : 1;      // Whether gl_VertexIndex is used
+                unsigned instanceIndex        : 1;      // Whether gl_InstanceIndex is used
+                unsigned baseVertex           : 1;      // Whether gl_BaseVertex is used
+                unsigned baseInstance         : 1;      // Whether gl_BaseInstance is used
+                unsigned drawIndex            : 1;      // Whether gl_DrawID is used
+                unsigned primitiveId          : 1;      // Whether an implicit gl_PrimitiveID is required
+                unsigned viewIndex            : 1;      // Whether gl_ViewIndex is used
                 // Output
-                uint32_t pointSize            : 1;      // Whether gl_PointSize is used
-                uint32_t position             : 1;      // Whether gl_Position is used
-                uint32_t clipDistance         : 4;      // Array size of gl_ClipDistance[] (0 means unused)
-                uint32_t cullDistance         : 4;      // Array size of gl_CullDistance[] (0 means unused)
-                uint32_t viewportIndex        : 1;      // Whether gl_ViewportIndex is used
-                uint32_t layer                : 1;      // Whether gl_Layer is used
-                uint32_t reserved20           : 1;
+                unsigned pointSize            : 1;      // Whether gl_PointSize is used
+                unsigned position             : 1;      // Whether gl_Position is used
+                unsigned clipDistance         : 4;      // Array size of gl_ClipDistance[] (0 means unused)
+                unsigned cullDistance         : 4;      // Array size of gl_CullDistance[] (0 means unused)
+                unsigned viewportIndex        : 1;      // Whether gl_ViewportIndex is used
+                unsigned layer                : 1;      // Whether gl_Layer is used
+                unsigned reserved20           : 1;
 
                 uint64_t unused               : 44;
             } vs;
@@ -165,20 +165,20 @@ struct ResourceUsage
             struct
             {
                 // Input
-                uint32_t pointSizeIn          : 1;      // Whether gl_in[].gl_PointSize is used
-                uint32_t positionIn           : 1;      // Whether gl_in[].gl_Position is used
-                uint32_t clipDistanceIn       : 4;      // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
-                uint32_t cullDistanceIn       : 4;      // Array size of gl_in[].gl_CullDistance[] (0 means unused)
-                uint32_t patchVertices        : 1;      // Whether gl_PatchVerticesIn is used
-                uint32_t primitiveId          : 1;      // Whether gl_PrimitiveID is used
-                uint32_t invocationId         : 1;      // Whether gl_InvocationID is used
+                unsigned pointSizeIn          : 1;      // Whether gl_in[].gl_PointSize is used
+                unsigned positionIn           : 1;      // Whether gl_in[].gl_Position is used
+                unsigned clipDistanceIn       : 4;      // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
+                unsigned cullDistanceIn       : 4;      // Array size of gl_in[].gl_CullDistance[] (0 means unused)
+                unsigned patchVertices        : 1;      // Whether gl_PatchVerticesIn is used
+                unsigned primitiveId          : 1;      // Whether gl_PrimitiveID is used
+                unsigned invocationId         : 1;      // Whether gl_InvocationID is used
                 // Output
-                uint32_t pointSize            : 1;      // Whether gl_out[].gl_PointSize is used
-                uint32_t position             : 1;      // Whether gl_out[].gl_Position is used
-                uint32_t clipDistance         : 4;      // Array size of gl_out[].gl_ClipDistance[] (0 means unused)
-                uint32_t cullDistance         : 4;      // Array size of gl_out[].gl_CullDistance[] (0 means unused)
-                uint32_t tessLevelOuter       : 1;      // Whether gl_TessLevelOuter[] is used
-                uint32_t tessLevelInner       : 1;      // Whether gl_TessLevelInner[] is used
+                unsigned pointSize            : 1;      // Whether gl_out[].gl_PointSize is used
+                unsigned position             : 1;      // Whether gl_out[].gl_Position is used
+                unsigned clipDistance         : 4;      // Array size of gl_out[].gl_ClipDistance[] (0 means unused)
+                unsigned cullDistance         : 4;      // Array size of gl_out[].gl_CullDistance[] (0 means unused)
+                unsigned tessLevelOuter       : 1;      // Whether gl_TessLevelOuter[] is used
+                unsigned tessLevelInner       : 1;      // Whether gl_TessLevelInner[] is used
 
                 uint64_t unused               : 39;
             } tcs;
@@ -187,24 +187,24 @@ struct ResourceUsage
             struct
             {
                 // Input
-                uint32_t pointSizeIn          : 1;      // Whether gl_in[].gl_PointSize is used
-                uint32_t positionIn           : 1;      // Whether gl_in[].gl_Position is used
-                uint32_t clipDistanceIn       : 4;      // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
-                uint32_t cullDistanceIn       : 4;      // Array size of gl_in[].gl_CullDistance[] (0 means unused)
-                uint32_t patchVertices        : 1;      // Whether gl_PatchVerticesIn is used
-                uint32_t primitiveId          : 1;      // Whether gl_PrimitiveID is used
-                uint32_t tessCoord            : 1;      // Whether gl_TessCoord is used
-                uint32_t tessLevelOuter       : 1;      // Whether gl_TessLevelOuter[] is used
-                uint32_t tessLevelInner       : 1;      // Whether gl_TessLevelInner[] is used
-                uint32_t viewIndex            : 1;      // Whether gl_ViewIndex is used
+                unsigned pointSizeIn          : 1;      // Whether gl_in[].gl_PointSize is used
+                unsigned positionIn           : 1;      // Whether gl_in[].gl_Position is used
+                unsigned clipDistanceIn       : 4;      // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
+                unsigned cullDistanceIn       : 4;      // Array size of gl_in[].gl_CullDistance[] (0 means unused)
+                unsigned patchVertices        : 1;      // Whether gl_PatchVerticesIn is used
+                unsigned primitiveId          : 1;      // Whether gl_PrimitiveID is used
+                unsigned tessCoord            : 1;      // Whether gl_TessCoord is used
+                unsigned tessLevelOuter       : 1;      // Whether gl_TessLevelOuter[] is used
+                unsigned tessLevelInner       : 1;      // Whether gl_TessLevelInner[] is used
+                unsigned viewIndex            : 1;      // Whether gl_ViewIndex is used
                 // Output
-                uint32_t pointSize            : 1;      // Whether gl_PointSize is used
-                uint32_t position             : 1;      // Whether gl_Position is used
-                uint32_t clipDistance         : 4;      // Array size gl_ClipDistance[] (0 means unused)
-                uint32_t cullDistance         : 4;      // Array size gl_CullDistance[] (0 means unused)
-                uint32_t viewportIndex        : 1;      // Whether gl_ViewportIndex is used
-                uint32_t layer                : 1;      // Whether gl_Layer is used
-                uint32_t reserved28           : 1;
+                unsigned pointSize            : 1;      // Whether gl_PointSize is used
+                unsigned position             : 1;      // Whether gl_Position is used
+                unsigned clipDistance         : 4;      // Array size gl_ClipDistance[] (0 means unused)
+                unsigned cullDistance         : 4;      // Array size gl_CullDistance[] (0 means unused)
+                unsigned viewportIndex        : 1;      // Whether gl_ViewportIndex is used
+                unsigned layer                : 1;      // Whether gl_Layer is used
+                unsigned reserved28           : 1;
 
                 uint64_t unused               : 35;
             } tes;
@@ -213,22 +213,22 @@ struct ResourceUsage
             struct
             {
                 // Input
-                uint32_t pointSizeIn          : 1;      // Whether gl_in[].gl_PointSize is used
-                uint32_t positionIn           : 1;      // Whether gl_in[].gl_Position is used
-                uint32_t clipDistanceIn       : 4;      // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
-                uint32_t cullDistanceIn       : 4;      // Array size of gl_in[].gl_CullDistance[] (0 means unused)
-                uint32_t primitiveIdIn        : 1;      // Whether gl_PrimitiveIDIn is used
-                uint32_t invocationId         : 1;      // Whether gl_InvocationID is used
-                uint32_t viewIndex            : 1;      // Whether gl_ViewIndex is used
+                unsigned pointSizeIn          : 1;      // Whether gl_in[].gl_PointSize is used
+                unsigned positionIn           : 1;      // Whether gl_in[].gl_Position is used
+                unsigned clipDistanceIn       : 4;      // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
+                unsigned cullDistanceIn       : 4;      // Array size of gl_in[].gl_CullDistance[] (0 means unused)
+                unsigned primitiveIdIn        : 1;      // Whether gl_PrimitiveIDIn is used
+                unsigned invocationId         : 1;      // Whether gl_InvocationID is used
+                unsigned viewIndex            : 1;      // Whether gl_ViewIndex is used
                 // Output
-                uint32_t pointSize            : 1;      // Whether gl_PointSize is used
-                uint32_t position             : 1;      // Whether gl_Position is used
-                uint32_t clipDistance         : 4;      // Array size gl_ClipDistance[] (0 means unused)
-                uint32_t cullDistance         : 4;      // Array size gl_CullDistance[] (0 means unused)
-                uint32_t primitiveId          : 1;      // Whether gl_PrimitiveID is used
-                uint32_t viewportIndex        : 1;      // Whether gl_ViewportIndex is used
-                uint32_t layer                : 1;      // Whether gl_Layer is used
-                uint32_t reserved26           : 1;
+                unsigned pointSize            : 1;      // Whether gl_PointSize is used
+                unsigned position             : 1;      // Whether gl_Position is used
+                unsigned clipDistance         : 4;      // Array size gl_ClipDistance[] (0 means unused)
+                unsigned cullDistance         : 4;      // Array size gl_CullDistance[] (0 means unused)
+                unsigned primitiveId          : 1;      // Whether gl_PrimitiveID is used
+                unsigned viewportIndex        : 1;      // Whether gl_ViewportIndex is used
+                unsigned layer                : 1;      // Whether gl_Layer is used
+                unsigned reserved26           : 1;
 
                 uint64_t unused               : 37;
             } gs;
@@ -237,42 +237,42 @@ struct ResourceUsage
             struct
             {
                 // Interpolation
-                uint32_t smooth               : 1;      // Whether "smooth" qualifier is used
-                uint32_t noperspective        : 1;      // Whether "noperspective" qualifier is used
-                uint32_t flat                 : 1;      // Whether "flat" qualifier is used
-                uint32_t centroid             : 1;      // Whether "centroid" qualifier is used
-                uint32_t sample               : 1;      // Whether "sample" qualifier is used
-                uint32_t center               : 1;      // Whether location qualifiers are not used (default: "center")
-                uint32_t pullMode             : 1;      // Whether pull mode interpolation is used
-                uint32_t custom               : 1;      // Whether custom interpolation is used
+                unsigned smooth               : 1;      // Whether "smooth" qualifier is used
+                unsigned noperspective        : 1;      // Whether "noperspective" qualifier is used
+                unsigned flat                 : 1;      // Whether "flat" qualifier is used
+                unsigned centroid             : 1;      // Whether "centroid" qualifier is used
+                unsigned sample               : 1;      // Whether "sample" qualifier is used
+                unsigned center               : 1;      // Whether location qualifiers are not used (default: "center")
+                unsigned pullMode             : 1;      // Whether pull mode interpolation is used
+                unsigned custom               : 1;      // Whether custom interpolation is used
                 // Input
-                uint32_t fragCoord            : 1;      // Whether gl_FragCoord is used
-                uint32_t frontFacing          : 1;      // Whether gl_FrontFacing is used
-                uint32_t clipDistance         : 4;      // Array size of gl_ClipDistance[] (0 means unused)
-                uint32_t cullDistance         : 4;      // Array size of gl_CullDistance[] (0 means unused)
-                uint32_t pointCoord           : 1;      // Whether gl_PointCoord is used
-                uint32_t primitiveId          : 1;      // Whether gl_PrimitiveID is used
-                uint32_t sampleId             : 1;      // Whether gl_SampleID is used
-                uint32_t samplePosition       : 1;      // Whether gl_SamplePosition is used
-                uint32_t sampleMaskIn         : 1;      // Whether gl_SampleMaskIn[] is used
-                uint32_t layer                : 1;      // Whether gl_Layer is used
-                uint32_t viewportIndex        : 1;      // Whether gl_ViewportIndex is used
-                uint32_t helperInvocation     : 1;      // Whether gl_HelperInvocation is used
-                uint32_t viewIndex            : 1;      // Whether gl_ViewIndex is used
-                uint32_t baryCoordNoPersp     : 1;      // Whether gl_BaryCoordNoPersp is used (AMD extension)
-                uint32_t baryCoordNoPerspCentroid: 1;   // Whether gl_BaryCoordNoPerspCentroid is used (AMD extension)
-                uint32_t baryCoordNoPerspSample  : 1;   // Whether gl_BaryCoordNoPerspSample is used (AMD extension)
-                uint32_t baryCoordSmooth      : 1;      // Whether gl_BaryCoordSmooth is used (AMD extension)
-                uint32_t baryCoordSmoothCentroid : 1;   // Whether gl_BaryCoordSmoothCentroid is used (AMD extension)
-                uint32_t baryCoordSmoothSample: 1;      // Whether gl_BaryCoordSmoothSample is used (AMD extension)
-                uint32_t baryCoordPullModel   : 1;      // Whether gl_BaryCoordPullModel is used (AMD extension)
+                unsigned fragCoord            : 1;      // Whether gl_FragCoord is used
+                unsigned frontFacing          : 1;      // Whether gl_FrontFacing is used
+                unsigned clipDistance         : 4;      // Array size of gl_ClipDistance[] (0 means unused)
+                unsigned cullDistance         : 4;      // Array size of gl_CullDistance[] (0 means unused)
+                unsigned pointCoord           : 1;      // Whether gl_PointCoord is used
+                unsigned primitiveId          : 1;      // Whether gl_PrimitiveID is used
+                unsigned sampleId             : 1;      // Whether gl_SampleID is used
+                unsigned samplePosition       : 1;      // Whether gl_SamplePosition is used
+                unsigned sampleMaskIn         : 1;      // Whether gl_SampleMaskIn[] is used
+                unsigned layer                : 1;      // Whether gl_Layer is used
+                unsigned viewportIndex        : 1;      // Whether gl_ViewportIndex is used
+                unsigned helperInvocation     : 1;      // Whether gl_HelperInvocation is used
+                unsigned viewIndex            : 1;      // Whether gl_ViewIndex is used
+                unsigned baryCoordNoPersp     : 1;      // Whether gl_BaryCoordNoPersp is used (AMD extension)
+                unsigned baryCoordNoPerspCentroid: 1;   // Whether gl_BaryCoordNoPerspCentroid is used (AMD extension)
+                unsigned baryCoordNoPerspSample  : 1;   // Whether gl_BaryCoordNoPerspSample is used (AMD extension)
+                unsigned baryCoordSmooth      : 1;      // Whether gl_BaryCoordSmooth is used (AMD extension)
+                unsigned baryCoordSmoothCentroid : 1;   // Whether gl_BaryCoordSmoothCentroid is used (AMD extension)
+                unsigned baryCoordSmoothSample: 1;      // Whether gl_BaryCoordSmoothSample is used (AMD extension)
+                unsigned baryCoordPullModel   : 1;      // Whether gl_BaryCoordPullModel is used (AMD extension)
                 // Output
-                uint32_t fragDepth            : 1;      // Whether gl_FragDepth is used
-                uint32_t sampleMask           : 1;      // Whether gl_SampleMask[] is used
-                uint32_t fragStencilRef       : 1;      // Whether gl_FragStencilRef is used
+                unsigned fragDepth            : 1;      // Whether gl_FragDepth is used
+                unsigned sampleMask           : 1;      // Whether gl_SampleMask[] is used
+                unsigned fragStencilRef       : 1;      // Whether gl_FragStencilRef is used
                 // Statements
-                uint32_t discard              : 1;      // Whether "discard" statement is used
-                uint32_t runAtSampleRate      : 1;      // Whether fragment shader run at sample rate
+                unsigned discard              : 1;      // Whether "discard" statement is used
+                unsigned runAtSampleRate      : 1;      // Whether fragment shader run at sample rate
 
                 uint64_t unused               : 32;
             } fs;
@@ -281,13 +281,13 @@ struct ResourceUsage
             struct
             {
                 // Workgroup layout
-                uint32_t workgroupLayout        : 2;      // The layout of the workgroup
+                unsigned workgroupLayout        : 2;      // The layout of the workgroup
                 // Input
-                uint32_t numWorkgroups          : 1;      // Whether gl_NumWorkGroups is used
-                uint32_t localInvocationId      : 1;      // Whether gl_LocalInvocationID is used
-                uint32_t workgroupId            : 1;      // Whether gl_WorkGroupID is used
-                uint32_t numSubgroups           : 1;      // Whether gl_NumSubgroups is used
-                uint32_t subgroupId             : 1;      // Whether gl_SubgroupID is used
+                unsigned numWorkgroups          : 1;      // Whether gl_NumWorkGroups is used
+                unsigned localInvocationId      : 1;      // Whether gl_LocalInvocationID is used
+                unsigned workgroupId            : 1;      // Whether gl_WorkGroupID is used
+                unsigned numSubgroups           : 1;      // Whether gl_NumSubgroups is used
+                unsigned subgroupId             : 1;      // Whether gl_SubgroupID is used
 
                 uint64_t unused                 : 57;
             } cs;
@@ -303,14 +303,14 @@ struct ResourceUsage
         {
             struct
             {
-                uint32_t subgroupSize              : 1;  // Whether gl_SubGroupSize is used
-                uint32_t subgroupLocalInvocationId : 1;  // Whether gl_SubGroupInvocation is used
-                uint32_t subgroupEqMask            : 1;  // Whether gl_SubGroupEqMask is used
-                uint32_t subgroupGeMask            : 1;  // Whether gl_SubGroupGeMask is used
-                uint32_t subgroupGtMask            : 1;  // Whether gl_SubGroupGtMask is used
-                uint32_t subgroupLeMask            : 1;  // Whether gl_SubGroupLeMask is used
-                uint32_t subgroupLtMask            : 1;  // Whether gl_SubGroupLtMask is used
-                uint32_t deviceIndex               : 1;  // Whether gl_DeviceIndex is used
+                unsigned subgroupSize              : 1;  // Whether gl_SubGroupSize is used
+                unsigned subgroupLocalInvocationId : 1;  // Whether gl_SubGroupInvocation is used
+                unsigned subgroupEqMask            : 1;  // Whether gl_SubGroupEqMask is used
+                unsigned subgroupGeMask            : 1;  // Whether gl_SubGroupGeMask is used
+                unsigned subgroupGtMask            : 1;  // Whether gl_SubGroupGtMask is used
+                unsigned subgroupLeMask            : 1;  // Whether gl_SubGroupLeMask is used
+                unsigned subgroupLtMask            : 1;  // Whether gl_SubGroupLtMask is used
+                unsigned deviceIndex               : 1;  // Whether gl_DeviceIndex is used
 
                 uint64_t unused                    : 56;
             } common;
@@ -327,75 +327,75 @@ struct ResourceUsage
     struct
     {
         // Map from shader specified locations to tightly packed locations
-        std::map<uint32_t, uint32_t> inputLocMap;
-        std::map<uint32_t, uint32_t> outputLocMap;
+        std::map<unsigned, unsigned> inputLocMap;
+        std::map<unsigned, unsigned> outputLocMap;
 
         // The original and new InOutLocations for shader cache
-        std::map<uint32_t, uint32_t> inOutLocMap;
+        std::map<unsigned, unsigned> inOutLocMap;
 
-        std::map<uint32_t, uint32_t> perPatchInputLocMap;
-        std::map<uint32_t, uint32_t> perPatchOutputLocMap;
+        std::map<unsigned, unsigned> perPatchInputLocMap;
+        std::map<unsigned, unsigned> perPatchOutputLocMap;
 
         // Map from built-in IDs to specially assigned locations
-        std::map<uint32_t, uint32_t> builtInInputLocMap;
-        std::map<uint32_t, uint32_t> builtInOutputLocMap;
+        std::map<unsigned, unsigned> builtInInputLocMap;
+        std::map<unsigned, unsigned> builtInOutputLocMap;
 
-        std::map<uint32_t, uint32_t> perPatchBuiltInInputLocMap;
-        std::map<uint32_t, uint32_t> perPatchBuiltInOutputLocMap;
+        std::map<unsigned, unsigned> perPatchBuiltInInputLocMap;
+        std::map<unsigned, unsigned> perPatchBuiltInOutputLocMap;
 
         // Transform feedback strides
-        uint32_t xfbStrides[MaxTransformFeedbackBuffers];
+        unsigned xfbStrides[MaxTransformFeedbackBuffers];
 
         // Transform feedback enablement
         bool enableXfb;
 
         // Stream to transform feedback buffers
-        uint32_t streamXfbBuffers[MaxGsStreams];
+        unsigned streamXfbBuffers[MaxGsStreams];
 
         // Count of mapped location for inputs/outputs (including those special locations to which the built-ins
         // are mapped)
-        uint32_t    inputMapLocCount;
-        uint32_t    outputMapLocCount;
-        uint32_t    perPatchInputMapLocCount;
-        uint32_t    perPatchOutputMapLocCount;
+        unsigned    inputMapLocCount;
+        unsigned    outputMapLocCount;
+        unsigned    perPatchInputMapLocCount;
+        unsigned    perPatchOutputMapLocCount;
 
-        uint32_t    expCount;   // Export count (number of "exp" instructions) for generic outputs
+        unsigned    expCount;   // Export count (number of "exp" instructions) for generic outputs
 
         struct
         {
             struct
             {
-                uint32_t inVertexStride;                // Stride of vertices of input patch (in DWORD, correspond to
+                unsigned inVertexStride;                // Stride of vertices of input patch (in DWORD, correspond to
                                                         // "lsStride")
-                uint32_t outVertexStride;               // Stride of vertices of output patch (in DWORD, correspond to
+                unsigned outVertexStride;               // Stride of vertices of output patch (in DWORD, correspond to
                                                         // "hsCpStride")
-                uint32_t patchCountPerThreadGroup;      // Count of patches per thread group (in DWORD, correspond to
+                unsigned patchCountPerThreadGroup;      // Count of patches per thread group (in DWORD, correspond to
                                                         // "hsNumPatch")
                 // On-chip caculation factors
                 struct
                 {
-                    uint32_t outPatchStart;                 // Offset into LDS where vertices of output patches start
+                    unsigned outPatchStart;                 // Offset into LDS where vertices of output patches start
                                                             // (in DWORD, correspond to "hsOutputBase")
-                    uint32_t patchConstStart;               // Offset into LDS where patch constants start (in DWORD,
+                    unsigned patchConstStart;               // Offset into LDS where patch constants start (in DWORD,
                                                             // correspond to "patchConstBase")
                 } onChip;
 
                 // Off-chip caculation factors
                 struct
                 {
-                    uint32_t outPatchStart;                 // Offset into LDS where vertices of output patches start
+                    unsigned outPatchStart;                 // Offset into LDS where vertices of output patches start
                                                             // (in DWORD, correspond to "hsOutputBase")
-                    uint32_t patchConstStart;               // Offset into LDS where patch constants start (in DWORD,
+                    unsigned patchConstStart;               // Offset into LDS where patch constants start (in DWORD,
                                                             // correspond to "patchConstBase")
                 } offChip;
 
-                uint32_t inPatchSize;                   // size of an input patch size (in DWORD)
+                unsigned inPatchSize;                   // size of an input patch size (in DWORD)
 
-                uint32_t outPatchSize;                  // Size of an output patch output (in DWORD, correspond to
+                unsigned outPatchSize;                  // Size of an output patch output (in DWORD, correspond to
                                                         // "patchOutputSize")
 
-                uint32_t patchConstSize;                // Size of an output patch constants (in DWORD)
-                uint32_t tessFactorStride;              // Size of tess factor stride (in DWORD)
+                unsigned patchConstSize;                // Size of an output patch constants (in DWORD)
+                unsigned tessFactorStride;              // Size of tess factor stride (in DWORD)
 
             } calcFactor;
         } tcs;
@@ -404,33 +404,33 @@ struct ResourceUsage
         {
             // Map from IDs of built-in outputs to locations of generic outputs (used by copy shader to export built-in
             // outputs to fragment shader, always from vertex stream 0)
-            std::unordered_map<uint32_t, uint32_t> builtInOutLocs;
+            std::unordered_map<unsigned, unsigned> builtInOutLocs;
 
             // Map from tightly packed locations to byte sizes of generic outputs (used by copy shader to
             // export generic outputs to fragment shader, always from vertex stream 0):
             //   <location, <component, byteSize>>
-            std::unordered_map<uint32_t, std::vector<uint32_t>> genericOutByteSizes[MaxGsStreams];
+            std::unordered_map<unsigned, std::vector<unsigned>> genericOutByteSizes[MaxGsStreams];
 
             // Map from output location to the transform feedback info
-            std::map<uint32_t, uint32_t> xfbOutsInfo;
+            std::map<unsigned, unsigned> xfbOutsInfo;
 
             // ID of the vertex stream sent to rasterizor
-            uint32_t rasterStream;
+            unsigned rasterStream;
 
             struct
             {
-                uint32_t esGsRingItemSize;          // Size of each vertex written to the ES -> GS Ring.
-                uint32_t gsVsRingItemSize;          // Size of each primitive written to the GS -> VS Ring.
-                uint32_t esVertsPerSubgroup;        // Number of vertices ES exports.
-                uint32_t gsPrimsPerSubgroup;        // Number of prims GS exports.
-                uint32_t esGsLdsSize;               // ES -> GS ring LDS size (GS in)
-                uint32_t gsOnChipLdsSize;           // Total LDS size for GS on-chip mode.
-                uint32_t inputVertices;             // Number of GS input vertices
-                uint32_t primAmpFactor;             // GS primitive amplification factor
+                unsigned esGsRingItemSize;          // Size of each vertex written to the ES -> GS Ring.
+                unsigned gsVsRingItemSize;          // Size of each primitive written to the GS -> VS Ring.
+                unsigned esVertsPerSubgroup;        // Number of vertices ES exports.
+                unsigned gsPrimsPerSubgroup;        // Number of prims GS exports.
+                unsigned esGsLdsSize;               // ES -> GS ring LDS size (GS in)
+                unsigned gsOnChipLdsSize;           // Total LDS size for GS on-chip mode.
+                unsigned inputVertices;             // Number of GS input vertices
+                unsigned primAmpFactor;             // GS primitive amplification factor
                 bool     enableMaxVertOut;          // Whether to allow each GS instance to emit maximum vertices (NGG)
             } calcFactor;
 
-            uint32_t    outLocCount[MaxGsStreams];
+            unsigned    outLocCount[MaxGsStreams];
         } gs;
 
         struct
@@ -441,12 +441,12 @@ struct ResourceUsage
             // NOTE: This collected info is used to revise the calculated CB shader channel mask. Hardware requires
             // the targets of fragment color export (MRTs) to be tightly packed while the CB shader channel masks
             // should correspond to original shader specified targets.
-            uint32_t outputOrigLocs[MaxColorTargets];
+            unsigned outputOrigLocs[MaxColorTargets];
 
             std::vector<FsInterpInfo> interpInfo;       // Array of interpolation info
             ExportFormat expFmts[MaxColorTargets];      // Shader export formats
             BasicType    outputTypes[MaxColorTargets];  // Array of basic types of fragment outputs
-            uint32_t     cbShaderMask;                  // CB shader channel mask (correspond to register CB_SHADER_MASK)
+            unsigned     cbShaderMask;                  // CB shader channel mask (correspond to register CB_SHADER_MASK)
             bool         dummyExport;                   // Control to generate fragment shader dummy export
             bool         isNullFs;                      // Is null FS, so should set final cbShaderMask to 0
         } fs;
@@ -456,10 +456,10 @@ struct ResourceUsage
 // Represents stream-out data
 struct StreamOutData
 {
-    uint32_t tablePtr;                                    // Table pointer for stream-out
-    uint32_t streamInfo;                                  // Stream-out info (ID, vertex count, enablement)
-    uint32_t writeIndex;                                  // Write index for stream-out
-    uint32_t streamOffsets[MaxTransformFeedbackBuffers];  // Stream-out Offset
+    unsigned tablePtr;                                    // Table pointer for stream-out
+    unsigned streamInfo;                                  // Stream-out info (ID, vertex count, enablement)
+    unsigned writeIndex;                                  // Write index for stream-out
+    unsigned streamOffsets[MaxTransformFeedbackBuffers];  // Stream-out Offset
 };
 
 // Represents interface data used by shader stages
@@ -467,28 +467,28 @@ struct StreamOutData
 // NOTE: All fields must be initialized in InitShaderInterfaceData().
 struct InterfaceData
 {
-    static const uint32_t MaxDescTableCount  = 64; // Must greater than (vk::MaxDynamicDescriptors +
+    static const unsigned MaxDescTableCount  = 64; // Must greater than (vk::MaxDynamicDescriptors +
                                                    // vk::MaxDescriptorSets + special descriptors)
-    static const uint32_t MaxUserDataCount   = 32; // Max count of allowed user data (consider GFX IP version info)
-    static const uint32_t MaxSpillTableSize  = 512;
-    static const uint32_t MaxDynDescCount    = 32;
-    static const uint32_t MaxEsGsOffsetCount = 6;
-    static const uint32_t MaxCsUserDataCount = 10;
-    static const uint32_t CsStartUserData     = 2;
-    static const uint32_t UserDataUnmapped = InvalidValue;
+    static const unsigned MaxUserDataCount   = 32; // Max count of allowed user data (consider GFX IP version info)
+    static const unsigned MaxSpillTableSize  = 512;
+    static const unsigned MaxDynDescCount    = 32;
+    static const unsigned MaxEsGsOffsetCount = 6;
+    static const unsigned MaxCsUserDataCount = 10;
+    static const unsigned CsStartUserData     = 2;
+    static const unsigned UserDataUnmapped = InvalidValue;
 
-    uint32_t                    userDataCount;                    // User data count
-    uint32_t                    userDataMap[MaxUserDataCount];    // User data map (from SGPR No. to API logical ID)
+    unsigned                    userDataCount;                    // User data count
+    unsigned                    userDataMap[MaxUserDataCount];    // User data map (from SGPR No. to API logical ID)
 
     struct
     {
-        uint32_t                resNodeIdx;                       // Resource node index for push constant
+        unsigned                resNodeIdx;                       // Resource node index for push constant
     } pushConst;
 
     struct
     {
-        uint32_t                sizeInDwords;                     // Spill table size in dwords
-        uint32_t                offsetInDwords;                   // Start offset of Spill table
+        unsigned                sizeInDwords;                     // Spill table size in dwords
+        unsigned                offsetInDwords;                   // Start offset of Spill table
     } spillTable;
 
     // Usage of user data registers for internal-use variables
@@ -499,39 +499,39 @@ struct InterfaceData
             // Vertex shader
             struct
             {
-                uint32_t baseVertex;                // Base vertex
-                uint32_t baseInstance;              // Base instance
-                uint32_t drawIndex;                 // Draw index
-                uint32_t vbTablePtr;                // Pointer of vertex buffer table
-                uint32_t viewIndex;                 // View Index
-                uint32_t streamOutTablePtr;         // Pointer of stream-out buffer table
-                uint32_t esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode (for GFX9 and NGG)
+                unsigned baseVertex;                // Base vertex
+                unsigned baseInstance;              // Base instance
+                unsigned drawIndex;                 // Draw index
+                unsigned vbTablePtr;                // Pointer of vertex buffer table
+                unsigned viewIndex;                 // View Index
+                unsigned streamOutTablePtr;         // Pointer of stream-out buffer table
+                unsigned esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode (for GFX9 and NGG)
             } vs;
 
             struct
             {
-                uint32_t viewIndex;                 // View Index
-                uint32_t streamOutTablePtr;         // Pointer of stream-out buffer table
-                uint32_t esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode (for NGG)
+                unsigned viewIndex;                 // View Index
+                unsigned streamOutTablePtr;         // Pointer of stream-out buffer table
+                unsigned esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode (for NGG)
             } tes;
 
             // Geometry shader
             struct
             {
-                uint32_t esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode (for GFX8 and NGG)
-                uint32_t viewIndex;                 // View Index
-                uint32_t copyShaderEsGsLdsSize;     // ES -> GS ring LDS size (for copy shader)
-                uint32_t copyShaderStreamOutTable;  // Stream-out table (for copy shader)
+                unsigned esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode (for GFX8 and NGG)
+                unsigned viewIndex;                 // View Index
+                unsigned copyShaderEsGsLdsSize;     // ES -> GS ring LDS size (for copy shader)
+                unsigned copyShaderStreamOutTable;  // Stream-out table (for copy shader)
             } gs;
 
             // Compute shader
             struct
             {
-                uint32_t numWorkgroupsPtr;          // Pointer of NumWorkGroups
+                unsigned numWorkgroupsPtr;          // Pointer of NumWorkGroups
             } cs;
         };
 
-        uint32_t spillTable;                        // Spill table user data map
+        unsigned spillTable;                        // Spill table user data map
 
     } userDataUsage;
 
@@ -543,100 +543,100 @@ struct InterfaceData
             // Vertex shader
             struct
             {
-                uint32_t baseVertex;                // Base vertex
-                uint32_t baseInstance;              // Base instance
-                uint32_t vertexId;                  // Vertex ID
-                uint32_t relVertexId;               // Relative vertex ID (index of vertex within thread group)
-                uint32_t instanceId;                // Instance ID
-                uint32_t drawIndex;                 // Draw index
-                uint32_t primitiveId;               // Primitive ID
-                uint32_t viewIndex;                 // View Index
-                uint32_t vbTablePtr;                // Pointer of vertex buffer table
-                uint32_t esGsOffset;                // ES-GS ring buffer offset
+                unsigned baseVertex;                // Base vertex
+                unsigned baseInstance;              // Base instance
+                unsigned vertexId;                  // Vertex ID
+                unsigned relVertexId;               // Relative vertex ID (index of vertex within thread group)
+                unsigned instanceId;                // Instance ID
+                unsigned drawIndex;                 // Draw index
+                unsigned primitiveId;               // Primitive ID
+                unsigned viewIndex;                 // View Index
+                unsigned vbTablePtr;                // Pointer of vertex buffer table
+                unsigned esGsOffset;                // ES-GS ring buffer offset
                 StreamOutData streamOutData;        // Stream-out Data
             } vs;
 
             // Tessellation control shader
             struct
             {
-                uint32_t patchId;               // Patch ID
-                uint32_t relPatchId;            // Relative patch ID (control point ID included)
-                uint32_t tfBufferBase;          // Base offset of tessellation factor(TF) buffer
-                uint32_t offChipLdsBase;        // Base offset of off-chip LDS buffer
+                unsigned patchId;               // Patch ID
+                unsigned relPatchId;            // Relative patch ID (control point ID included)
+                unsigned tfBufferBase;          // Base offset of tessellation factor(TF) buffer
+                unsigned offChipLdsBase;        // Base offset of off-chip LDS buffer
             } tcs;
 
             // Tessellation evaluation shader
             struct
             {
-                uint32_t tessCoordX;          // X channel of gl_TessCoord (U)
-                uint32_t tessCoordY;          // Y channel of gl_TessCoord (V)
-                uint32_t relPatchId;          // Relative patch id
-                uint32_t patchId;             // Patch ID
-                uint32_t esGsOffset;          // ES-GS ring buffer offset
-                uint32_t offChipLdsBase;      // Base offset of off-chip LDS buffer
-                uint32_t viewIndex;           // View Index
+                unsigned tessCoordX;          // X channel of gl_TessCoord (U)
+                unsigned tessCoordY;          // Y channel of gl_TessCoord (V)
+                unsigned relPatchId;          // Relative patch id
+                unsigned patchId;             // Patch ID
+                unsigned esGsOffset;          // ES-GS ring buffer offset
+                unsigned offChipLdsBase;      // Base offset of off-chip LDS buffer
+                unsigned viewIndex;           // View Index
                 StreamOutData streamOutData;  // Stream-out Data
             } tes;
 
             // Geometry shader
             struct
             {
-                uint32_t gsVsOffset;                        // GS -> VS ring offset
-                uint32_t waveId;                            // GS wave ID
-                uint32_t esGsOffsets[MaxEsGsOffsetCount];   // ES -> GS ring offset
-                uint32_t primitiveId;                       // Primitive ID
-                uint32_t invocationId;                      // Invocation ID
-                uint32_t viewIndex;                         // View Index
+                unsigned gsVsOffset;                        // GS -> VS ring offset
+                unsigned waveId;                            // GS wave ID
+                unsigned esGsOffsets[MaxEsGsOffsetCount];   // ES -> GS ring offset
+                unsigned primitiveId;                       // Primitive ID
+                unsigned invocationId;                      // Invocation ID
+                unsigned viewIndex;                         // View Index
                 StreamOutData streamOutData;                // Stream-out Data
             } gs;
 
             // Fragment shader
             struct
             {
-                uint32_t primMask;                  // Primitive mask
+                unsigned primMask;                  // Primitive mask
 
                 // Perspective interpolation (I/J)
                 struct
                 {
-                    uint32_t sample;                // Sample
-                    uint32_t center;                // Center
-                    uint32_t centroid;              // Centroid
-                    uint32_t pullMode;              // Pull-mode
+                    unsigned sample;                // Sample
+                    unsigned center;                // Center
+                    unsigned centroid;              // Centroid
+                    unsigned pullMode;              // Pull-mode
                 } perspInterp;
 
                 // Linear interpolation (I/J)
                 struct
                 {
-                    uint32_t sample;                // Sample
-                    uint32_t center;                // Center
-                    uint32_t centroid;              // Centroid
+                    unsigned sample;                // Sample
+                    unsigned center;                // Center
+                    unsigned centroid;              // Centroid
                 } linearInterp;
 
                 // FragCoord
                 struct
                 {
-                    uint32_t x;                     // X channel
-                    uint32_t y;                     // Y channel
-                    uint32_t z;                     // Z channel
-                    uint32_t w;                     // W channel
+                    unsigned x;                     // X channel
+                    unsigned y;                     // Y channel
+                    unsigned z;                     // Z channel
+                    unsigned w;                     // W channel
                 } fragCoord;
 
-                uint32_t frontFacing;               // FrontFacing
-                uint32_t ancillary;                 // Ancillary
-                uint32_t sampleCoverage;            // Sample coverage
+                unsigned frontFacing;               // FrontFacing
+                unsigned ancillary;                 // Ancillary
+                unsigned sampleCoverage;            // Sample coverage
             } fs;
 
             // Compute shader
             struct
             {
-                uint32_t numWorkgroupsPtr;          // Pointer of NumWorkGroups
-                uint32_t localInvocationId;         // LocalInvocationID
-                uint32_t workgroupId;               // WorkGroupID
+                unsigned numWorkgroupsPtr;          // Pointer of NumWorkGroups
+                unsigned localInvocationId;         // LocalInvocationID
+                unsigned workgroupId;               // WorkGroupID
             } cs;
         };
 
-        uint32_t resNodeValues[MaxDescTableCount];  // Resource node values
-        uint32_t spillTable;                        // Spill table
+        unsigned resNodeValues[MaxDescTableCount];  // Resource node values
+        unsigned spillTable;                        // Spill table
         bool     initialized;                       // Whether entryArgIdxs has been initialized
                                                     //   by PatchEntryPointMutate
     } entryArgIdxs;

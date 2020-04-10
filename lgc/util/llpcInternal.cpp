@@ -110,7 +110,7 @@ void GetTypeName(
         if (pStructTy->getNumElements() != 0)
         {
             GetTypeName(pStructTy->getElementType(0), nameStream);
-            for (uint32_t i = 1; i < pStructTy->getNumElements(); ++i)
+            for (unsigned i = 1; i < pStructTy->getNumElements(); ++i)
             {
                 nameStream << ",";
                 GetTypeName(pStructTy->getElementType(i), nameStream);
@@ -200,7 +200,7 @@ ShaderStage GetShaderStageFromFunction(
 // =====================================================================================================================
 // Gets the shader stage from the specified calling convention.
 ShaderStage GetShaderStageFromCallingConv(
-    uint32_t        stageMask,  // Shader stage mask for the pipeline
+    unsigned        stageMask,  // Shader stage mask for the pipeline
     CallingConv::ID callConv)   // Calling convention
 {
     ShaderStage shaderStage = ShaderStageInvalid;
@@ -245,7 +245,7 @@ ShaderStage GetShaderStageFromCallingConv(
 // Gets the argument from the specified function according to the argument index.
 Value* GetFunctionArgument(
     Function*     pFunc,    // [in] LLVM function
-    uint32_t      idx,      // Index of the query argument
+    unsigned      idx,      // Index of the query argument
     const Twine&  name)     // Name to give the argument if currently empty
 {
     Argument* pArg = &pFunc->arg_begin()[idx];
@@ -275,8 +275,8 @@ bool CanBitCast(
         if ((pCompTy1->isFloatingPointTy() || pCompTy1->isIntegerTy()) &&
             (pCompTy2->isFloatingPointTy() || pCompTy2->isIntegerTy()))
         {
-            const uint32_t compCount1 = pTy1->isVectorTy() ? pTy1->getVectorNumElements() : 1;
-            const uint32_t compCount2 = pTy2->isVectorTy() ? pTy2->getVectorNumElements() : 1;
+            const unsigned compCount1 = pTy1->isVectorTy() ? pTy1->getVectorNumElements() : 1;
+            const unsigned compCount2 = pTy2->isVectorTy() ? pTy2->getVectorNumElements() : 1;
 
             valid = (compCount1 * pCompTy1->getScalarSizeInBits() == compCount2 * pCompTy2->getScalarSizeInBits());
         }
@@ -294,7 +294,7 @@ bool IsDontCareValue(
 
     if (isa<ConstantInt>(pValue))
     {
-        isDontCare = (static_cast<uint32_t>(cast<ConstantInt>(pValue)->getZExtValue()) == InvalidValue);
+        isDontCare = (static_cast<unsigned>(cast<ConstantInt>(pValue)->getZExtValue()) == InvalidValue);
     }
 
     return isDontCare;

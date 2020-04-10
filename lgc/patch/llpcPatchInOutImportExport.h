@@ -81,140 +81,140 @@ private:
     void ProcessShader();
 
     llvm::Value* PatchVsGenericInputImport(llvm::Type*        pInputTy,
-                                           uint32_t           location,
-                                           uint32_t           compIdx,
+                                           unsigned           location,
+                                           unsigned           compIdx,
                                            llvm::Instruction* pInsertPos);
     llvm::Value* PatchTcsGenericInputImport(llvm::Type*        pInputTy,
-                                            uint32_t           location,
+                                            unsigned           location,
                                             llvm::Value*       pLocOffset,
                                             llvm::Value*       pCompIdx,
                                             llvm::Value*       pVertexIdx,
                                             llvm::Instruction* pInsertPos);
     llvm::Value* PatchTesGenericInputImport(llvm::Type*        pInputTy,
-                                            uint32_t           location,
+                                            unsigned           location,
                                             llvm::Value*       pLocOffset,
                                             llvm::Value*       pCompIdx,
                                             llvm::Value*       pVertexIdx,
                                             llvm::Instruction* pInsertPos);
     llvm::Value* PatchGsGenericInputImport(llvm::Type*        pInputTy,
-                                           uint32_t           location,
-                                           uint32_t           compIdx,
+                                           unsigned           location,
+                                           unsigned           compIdx,
                                            llvm::Value*       pVertexIdx,
                                            llvm::Instruction* pInsertPos);
     llvm::Value* PatchFsGenericInputImport(llvm::Type*        pInputTy,
-                                           uint32_t           location,
+                                           unsigned           location,
                                            llvm::Value*             pLocOffset,
                                            llvm::Value*             pCompIdx,
                                            llvm::Value*             pAuxInterpValue,
-                                           uint32_t           interpMode,
-                                           uint32_t           interpLoc,
+                                           unsigned           interpMode,
+                                           unsigned           interpLoc,
                                            llvm::Instruction* pInsertPos);
 
     llvm::Value* PatchTcsGenericOutputImport(llvm::Type*        pOutputTy,
-                                             uint32_t           location,
+                                             unsigned           location,
                                              llvm::Value*       pLocOffset,
                                              llvm::Value*       pCompIdx,
                                              llvm::Value*       pVertexIdx,
                                              llvm::Instruction* pInsertPos);
 
     void PatchVsGenericOutputExport(llvm::Value*       pOutput,
-                                    uint32_t           location,
-                                    uint32_t           compIdx,
+                                    unsigned           location,
+                                    unsigned           compIdx,
                                     llvm::Instruction* pInsertPos);
     void PatchTcsGenericOutputExport(llvm::Value*       pOutput,
-                                     uint32_t           location,
+                                     unsigned           location,
                                      llvm::Value*       pLocOffset,
                                      llvm::Value*       pCompIdx,
                                      llvm::Value*       pVertexIdx,
                                      llvm::Instruction* pInsertPos);
     void PatchTesGenericOutputExport(llvm::Value*       pOutput,
-                                     uint32_t           location,
-                                     uint32_t           compIdx,
+                                     unsigned           location,
+                                     unsigned           compIdx,
                                      llvm::Instruction* pInsertPos);
     void PatchGsGenericOutputExport(llvm::Value*       pOutput,
-                                    uint32_t           location,
-                                    uint32_t           compIdx,
-                                    uint32_t           streamId,
+                                    unsigned           location,
+                                    unsigned           compIdx,
+                                    unsigned           streamId,
                                     llvm::Instruction* pInsertPos);
     void PatchFsGenericOutputExport(llvm::Value*       pOutput,
-                                    uint32_t           location,
-                                    uint32_t           compIdx,
+                                    unsigned           location,
+                                    unsigned           compIdx,
                                     llvm::Instruction* pInsertPos);
 
-    llvm::Value* PatchVsBuiltInInputImport(llvm::Type* pInputTy, uint32_t builtInId, llvm::Instruction* pInsertPos);
+    llvm::Value* PatchVsBuiltInInputImport(llvm::Type* pInputTy, unsigned builtInId, llvm::Instruction* pInsertPos);
     llvm::Value* PatchTcsBuiltInInputImport(llvm::Type*        pInputTy,
-                                            uint32_t           builtInId,
+                                            unsigned           builtInId,
                                             llvm::Value*       pElemIdx,
                                             llvm::Value*       pVertexIdx,
                                             llvm::Instruction* pInsertPos);
     llvm::Value* PatchTesBuiltInInputImport(llvm::Type*        pInputTy,
-                                            uint32_t           builtInId,
+                                            unsigned           builtInId,
                                             llvm::Value*       pElemIdx,
                                             llvm::Value*       pVertexIdx,
                                             llvm::Instruction* pInsertPos);
     llvm::Value* PatchGsBuiltInInputImport(llvm::Type*        pInputTy,
-                                           uint32_t           builtInId,
+                                           unsigned           builtInId,
                                            llvm::Value*       pVertexIdx,
                                            llvm::Instruction* pInsertPos);
     llvm::Value* PatchFsBuiltInInputImport(llvm::Type*        pInputTy,
-                                           uint32_t           builtInId,
+                                           unsigned           builtInId,
                                            llvm::Value*             pSampleId,
                                            llvm::Instruction* pInsertPos);
     llvm::Value* GetSamplePosOffset(llvm::Type* pInputTy, llvm::Value* pSampleId, llvm::Instruction* pInsertPos);
     llvm::Value* GetSamplePosition(llvm::Type* pInputTy, llvm::Instruction* pInsertPos);
-    llvm::Value* PatchCsBuiltInInputImport(llvm::Type* pInputTy, uint32_t builtInId, llvm::Instruction* pInsertPos);
+    llvm::Value* PatchCsBuiltInInputImport(llvm::Type* pInputTy, unsigned builtInId, llvm::Instruction* pInsertPos);
     llvm::Value* GetGlobalInvocationId(llvm::Type* pInputTy, llvm::Instruction* pInsertPos);
     llvm::Value* GetLocalInvocationIndex(llvm::Type* pInputTy, llvm::Instruction* pInsertPos);
     llvm::Value* GetSubgroupId(llvm::Type* pInputTy, llvm::Instruction* pInsertPos);
 
     llvm::Value* PatchTcsBuiltInOutputImport(llvm::Type*        pOutputTy,
-                                             uint32_t           builtInId,
+                                             unsigned           builtInId,
                                              llvm::Value*       pElemIdx,
                                              llvm::Value*       pVertexIdx,
                                              llvm::Instruction* pInsertPos);
 
-    void PatchVsBuiltInOutputExport(llvm::Value* pOutput, uint32_t builtInId, llvm::Instruction* pInsertPos);
+    void PatchVsBuiltInOutputExport(llvm::Value* pOutput, unsigned builtInId, llvm::Instruction* pInsertPos);
     void PatchTcsBuiltInOutputExport(llvm::Value*       pOutput,
-                                     uint32_t           builtInId,
+                                     unsigned           builtInId,
                                      llvm::Value*       pElemIdx,
                                      llvm::Value*       pVertexIdx,
                                      llvm::Instruction* pInsertPos);
-    void PatchTesBuiltInOutputExport(llvm::Value* pOutput, uint32_t builtInId, llvm::Instruction* pInsertPos);
+    void PatchTesBuiltInOutputExport(llvm::Value* pOutput, unsigned builtInId, llvm::Instruction* pInsertPos);
     void PatchGsBuiltInOutputExport(llvm::Value*       pOutput,
-                                    uint32_t           builtInId,
-                                    uint32_t           streamId,
+                                    unsigned           builtInId,
+                                    unsigned           streamId,
                                     llvm::Instruction* pInsertPos);
-    void PatchFsBuiltInOutputExport(llvm::Value* pOutput, uint32_t builtInId, llvm::Instruction* pInsertPos);
+    void PatchFsBuiltInOutputExport(llvm::Value* pOutput, unsigned builtInId, llvm::Instruction* pInsertPos);
 
-    void PatchCopyShaderGenericOutputExport(llvm::Value* pOutput, uint32_t location, llvm::Instruction* pInsertPos);
-    void PatchCopyShaderBuiltInOutputExport(llvm::Value* pOutput, uint32_t builtInId, llvm::Instruction* pInsertPos);
+    void PatchCopyShaderGenericOutputExport(llvm::Value* pOutput, unsigned location, llvm::Instruction* pInsertPos);
+    void PatchCopyShaderBuiltInOutputExport(llvm::Value* pOutput, unsigned builtInId, llvm::Instruction* pInsertPos);
 
     void PatchXfbOutputExport(llvm::Value*       pOutput,
-                              uint32_t           xfbBuffer,
-                              uint32_t           xfbOffset,
-                              uint32_t           locOffset,
+                              unsigned           xfbBuffer,
+                              unsigned           xfbOffset,
+                              unsigned           locOffset,
                               llvm::Instruction* pInsertPos);
 
     void StoreValueToStreamOutBuffer(llvm::Value*       pStoreValue,
-                                     uint32_t           xfbBuffer,
-                                     uint32_t           xfbOffset,
-                                     uint32_t           xfbStride,
+                                     unsigned           xfbBuffer,
+                                     unsigned           xfbOffset,
+                                     unsigned           xfbStride,
                                      llvm::Value*       pStreamOutBufDesc,
                                      llvm::Instruction* pInsertPos);
 
-    void CreateStreamOutBufferStoreFunction(llvm::Value*  pStoreValue, uint32_t xfbStrde, std::string& funcName);
+    void CreateStreamOutBufferStoreFunction(llvm::Value*  pStoreValue, unsigned xfbStrde, std::string& funcName);
 
-    uint32_t CombineBufferStore(const std::vector<llvm::Value*>& storeValues,
-                                  uint32_t                         startIdx,
-                                  uint32_t                         valueOffset,
+    unsigned CombineBufferStore(const std::vector<llvm::Value*>& storeValues,
+                                  unsigned                         startIdx,
+                                  unsigned                         valueOffset,
                                   llvm::Value*                     pBufDesc,
                                   llvm::Value*                     pStoreOffset,
                                   llvm::Value*                     pBufBase,
                                   CoherentFlag                     coherent,
                                   llvm::Instruction*               pInsertPos);
 
-    uint32_t CombineBufferLoad(std::vector<llvm::Value*>& loadValues,
-                                 uint32_t                   startIdx,
+    unsigned CombineBufferLoad(std::vector<llvm::Value*>& loadValues,
+                                 unsigned                   startIdx,
                                  llvm::Value*               pBufDesc,
                                  llvm::Value*               pLoadOffset,
                                  llvm::Value*               pBufBase,
@@ -222,35 +222,35 @@ private:
                                  llvm::Instruction*         pInsertPos);
 
     void StoreValueToEsGsRing(llvm::Value*        pStoreValue,
-                              uint32_t            location,
-                              uint32_t            compIdx,
+                              unsigned            location,
+                              unsigned            compIdx,
                               llvm::Instruction*  pInsertPos);
 
     llvm::Value* LoadValueFromEsGsRing(llvm::Type*         pLoadType,
-                                       uint32_t            location,
-                                       uint32_t            compIdx,
+                                       unsigned            location,
+                                       unsigned            compIdx,
                                        llvm::Value*        pVertexIdx,
                                        llvm::Instruction*  pInsertPos);
 
     void StoreValueToGsVsRing(llvm::Value*        pStoreValue,
-                              uint32_t            location,
-                              uint32_t            compIdx,
-                              uint32_t            streamId,
+                              unsigned            location,
+                              unsigned            compIdx,
+                              unsigned            streamId,
                               llvm::Instruction*  pInsertPos);
 
-    llvm::Value* CalcEsGsRingOffsetForOutput(uint32_t           location,
-                                             uint32_t           compIdx,
+    llvm::Value* CalcEsGsRingOffsetForOutput(unsigned           location,
+                                             unsigned           compIdx,
                                              llvm::Value*       pEsGsOffset,
                                              llvm::Instruction* pInsertPos);
 
-    llvm::Value* CalcEsGsRingOffsetForInput(uint32_t           location,
-                                            uint32_t           compIdx,
+    llvm::Value* CalcEsGsRingOffsetForInput(unsigned           location,
+                                            unsigned           compIdx,
                                             llvm::Value*       pVertexIdx,
                                             llvm::Instruction* pInsertPos);
 
-    llvm::Value* CalcGsVsRingOffsetForOutput(uint32_t           location,
-                                             uint32_t           compIdx,
-                                             uint32_t           streamId,
+    llvm::Value* CalcGsVsRingOffsetForOutput(unsigned           location,
+                                             unsigned           compIdx,
+                                             unsigned           streamId,
                                              llvm::Value*       pVertexIdx,
                                              llvm::Value*       pGsVsOffset,
                                              llvm::Instruction* pInsertPos);
@@ -266,44 +266,44 @@ private:
 
     void CreateTessBufferStoreFunction();
 
-    uint32_t CalcPatchCountPerThreadGroup(uint32_t inVertexCount,
-                                          uint32_t inVertexStride,
-                                          uint32_t outVertexCount,
-                                          uint32_t outVertexStride,
-                                          uint32_t patchConstCount,
-                                          uint32_t tessFactorStride) const;
+    unsigned CalcPatchCountPerThreadGroup(unsigned inVertexCount,
+                                          unsigned inVertexStride,
+                                          unsigned outVertexCount,
+                                          unsigned outVertexStride,
+                                          unsigned patchConstCount,
+                                          unsigned tessFactorStride) const;
 
     llvm::Value* CalcLdsOffsetForVsOutput(llvm::Type*        pOutputTy,
-                                          uint32_t           location,
-                                          uint32_t           compIdx,
+                                          unsigned           location,
+                                          unsigned           compIdx,
                                           llvm::Instruction* pInsertPos);
 
     llvm::Value* CalcLdsOffsetForTcsInput(llvm::Type*        pInputTy,
-                                          uint32_t           location,
+                                          unsigned           location,
                                           llvm::Value*       pLocOffset,
                                           llvm::Value*       pCompIdx,
                                           llvm::Value*       pVertexIdx,
                                           llvm::Instruction* pInsertPos);
 
     llvm::Value* CalcLdsOffsetForTcsOutput(llvm::Type*        pOutputTy,
-                                           uint32_t           location,
+                                           unsigned           location,
                                            llvm::Value*       pLocOffset,
                                            llvm::Value*       pCompIdx,
                                            llvm::Value*       pVertexIdx,
                                            llvm::Instruction* pInsertPos);
 
     llvm::Value* CalcLdsOffsetForTesInput(llvm::Type*        pInputTy,
-                                          uint32_t           location,
+                                          unsigned           location,
                                           llvm::Value*       pLocOffset,
                                           llvm::Value*       pCompIdx,
                                           llvm::Value*       pVertexIdx,
                                           llvm::Instruction* pInsertPos);
 
     void AddExportInstForGenericOutput(llvm::Value*       pOutput,
-                                       uint32_t           location,
-                                       uint32_t           compIdx,
+                                       unsigned           location,
+                                       unsigned           compIdx,
                                        llvm::Instruction* pInsertPos);
-    void AddExportInstForBuiltInOutput(llvm::Value* pOutput, uint32_t builtInId, llvm::Instruction* pInsertPos);
+    void AddExportInstForBuiltInOutput(llvm::Value* pOutput, unsigned builtInId, llvm::Instruction* pInsertPos);
 
     llvm::Value* AdjustCentroidIJ(llvm::Value* pCentroidIJ, llvm::Value* pCenterIJ, llvm::Instruction* pInsertPos);
 
@@ -349,7 +349,7 @@ private:
     std::vector<llvm::CallInst*> m_exportCalls; // List of "call" instructions to export outputs
     PipelineState*          m_pPipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
 
-    std::set<uint32_t>       m_expLocs; // The locations that already have an export instruction for the vertex shader.
+    std::set<unsigned>       m_expLocs; // The locations that already have an export instruction for the vertex shader.
 };
 
 } // lgc

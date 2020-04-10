@@ -130,7 +130,7 @@ Value* Builder::CreateMapToInt32(
     Type* const pType = mappedArgs[0]->getType();
 
     // Check the massage types all match.
-    for (uint32_t i = 1; i < mappedArgs.size(); i++)
+    for (unsigned i = 1; i < mappedArgs.size(); i++)
     {
         assert(mappedArgs[i]->getType() == pType);
     }
@@ -138,11 +138,11 @@ Value* Builder::CreateMapToInt32(
     if (mappedArgs[0]->getType()->isVectorTy())
     {
         // For vectors we extract each vector component and map them individually.
-        const uint32_t compCount = pType->getVectorNumElements();
+        const unsigned compCount = pType->getVectorNumElements();
 
         SmallVector<Value*, 4> results;
 
-        for (uint32_t i = 0; i < compCount; i++)
+        for (unsigned i = 0; i < compCount; i++)
         {
             SmallVector<Value*, 4> newMappedArgs;
 
@@ -156,7 +156,7 @@ Value* Builder::CreateMapToInt32(
 
         Value* pResult = UndefValue::get(VectorType::get(results[0]->getType(), compCount));
 
-        for (uint32_t i = 0; i < compCount; i++)
+        for (unsigned i = 0; i < compCount; i++)
         {
             pResult = CreateInsertElement(pResult, results[i], i);
         }
@@ -202,7 +202,7 @@ Value* Builder::CreateMapToInt32(
 
         Value* pResult = UndefValue::get(castMappedArgs[0]->getType());
 
-        for (uint32_t i = 0; i < 2; i++)
+        for (unsigned i = 0; i < 2; i++)
         {
             SmallVector<Value*, 4> newMappedArgs;
 
@@ -252,8 +252,8 @@ Type* Builder::GetTransposedMatrixTy(
     Type* const pColumnVectorType = pMatrixType->getArrayElementType();
     assert(pColumnVectorType->isVectorTy());
 
-    const uint32_t columnCount = pMatrixType->getArrayNumElements();
-    const uint32_t rowCount = pColumnVectorType->getVectorNumElements();
+    const unsigned columnCount = pMatrixType->getArrayNumElements();
+    const unsigned rowCount = pColumnVectorType->getVectorNumElements();
 
     return ArrayType::get(VectorType::get(pColumnVectorType->getVectorElementType(), columnCount), rowCount);
 }
@@ -333,7 +333,7 @@ Type* Builder::GetBuiltInTy(
     BuiltInKind   builtIn,            // Built-in kind
     InOutInfo     inOutInfo)          // Extra input/output info (shader-defined array size)
 {
-    enum TypeCode: uint32_t
+    enum TypeCode: unsigned
     {
         a2f32,
         a4f32,
@@ -352,7 +352,7 @@ Type* Builder::GetBuiltInTy(
         a4v3f32
     };
 
-    uint32_t arraySize = inOutInfo.GetArraySize();
+    unsigned arraySize = inOutInfo.GetArraySize();
     TypeCode typeCode = TypeCode::i32;
     switch (builtIn)
     {
@@ -436,7 +436,7 @@ Constant* Builder::Get180OverPi(
 // Get a constant of FP or vector of FP type for the value 1/(2^n - 1)
 Constant* Builder::GetOneOverPower2MinusOne(
     Type*     pTy,  // [in] FP scalar or vector type
-    uint32_t  n)    // Power of two to use
+    unsigned  n)    // Power of two to use
 {
     // We could calculate this here, using knowledge that 1(2^n - 1) in binary has a repeating bit pattern
     // of {n-1 zeros, 1 one}. But instead we just special case the values of n that we know are

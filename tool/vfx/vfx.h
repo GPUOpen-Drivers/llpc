@@ -51,20 +51,20 @@ namespace Vfx
 
 // =====================================================================================================================
 // Common definition of VfxParser
-static const uint32_t ShaderStageCount = 6;             // Number of shader stages in Vulkan
-static const uint32_t NativeShaderStageCount = 6;       // Number of native shader stages in Vulkan
-static const uint32_t MaxSectionCount = 16;             // Max section count
-static const uint32_t MaxBindingCount = 16;             // Max binding count
-static const uint32_t MaxResultCount = 16;              // Max result count
-static const uint32_t MaxPushConstRangCount = 16;       // Max push const range count
-static const uint32_t MaxVertexBufferBindingCount = 16; // Max vertex buffer binding count
-static const uint32_t MaxVertexAttributeCount = 32;     // Max vertex attribute count
-static const uint32_t MaxSpecConstantCount = 32;        // Max spec constant count
-static const uint32_t VfxSizeOfVec4        = 16;        // Ehe size of vec4
-static const uint32_t VfxInvalidValue      = 0xFFFFFFFF; // Invalid value
-static const uint32_t VfxVertexBufferSetId = 0xFFFFFFFE; // Vertex bufer set id
-static const uint32_t VfxIndexBufferSetId  = 0xFFFFFFFD; // Index buffer set id
-static const uint32_t VfxDynamicArrayId    = 0xFFFFFFFC; // Dynamic array id
+static const unsigned ShaderStageCount = 6;             // Number of shader stages in Vulkan
+static const unsigned NativeShaderStageCount = 6;       // Number of native shader stages in Vulkan
+static const unsigned MaxSectionCount = 16;             // Max section count
+static const unsigned MaxBindingCount = 16;             // Max binding count
+static const unsigned MaxResultCount = 16;              // Max result count
+static const unsigned MaxPushConstRangCount = 16;       // Max push const range count
+static const unsigned MaxVertexBufferBindingCount = 16; // Max vertex buffer binding count
+static const unsigned MaxVertexAttributeCount = 32;     // Max vertex attribute count
+static const unsigned MaxSpecConstantCount = 32;        // Max spec constant count
+static const unsigned VfxSizeOfVec4        = 16;        // Ehe size of vec4
+static const unsigned VfxInvalidValue      = 0xFFFFFFFF; // Invalid value
+static const unsigned VfxVertexBufferSetId = 0xFFFFFFFE; // Vertex bufer set id
+static const unsigned VfxIndexBufferSetId  = 0xFFFFFFFD; // Index buffer set id
+static const unsigned VfxDynamicArrayId    = 0xFFFFFFFC; // Dynamic array id
 static const size_t MaxKeyBufSize   = 256;  // Buffer size to parse a key-value pair key in VFX file.
 static const size_t MaxLineBufSize  = 65536;  // Buffer size to parse a line in VFX file.
 
@@ -83,10 +83,10 @@ static const size_t MaxLineBufSize  = 65536;  // Buffer size to parse a line in 
 
 namespace Math
 {
-    inline uint32_t Absu(
-        int32_t number)
+    inline unsigned Absu(
+        int number)
     {
-        return static_cast<uint32_t>(abs(number));
+        return static_cast<unsigned>(abs(number));
     }
 }
 
@@ -97,17 +97,17 @@ union Float32Bits
     struct
     {
 #ifdef qLittleEndian
-        uint32_t mantissa : 23;
-        uint32_t exp      : 8;
-        uint32_t sign     : 1;
+        unsigned mantissa : 23;
+        unsigned exp      : 8;
+        unsigned sign     : 1;
 #else
-        uint32_t sign     : 1;
-        uint32_t exp      : 8;
-        uint32_t mantissa : 23;
+        unsigned sign     : 1;
+        unsigned exp      : 8;
+        unsigned mantissa : 23;
 #endif
     };                  // Bit fields
 
-    uint32_t u32All;    // 32-bit binary value
+    unsigned u32All;    // 32-bit binary value
 };
 
 // =====================================================================================================================
@@ -139,7 +139,7 @@ public:
     Float32() { m_bits.u32All = 0; }
 
     // Constructor, initializes our VfxFloat32 with numeric float value
-    Float32(float value) { m_bits.u32All = *reinterpret_cast<uint32_t*>(&value); }
+    Float32(float value) { m_bits.u32All = *reinterpret_cast<unsigned*>(&value); }
 
     // Constructor, initializes our VfxFloat32 with another VfxFloat32
     Float32(const Float32& other)
@@ -185,7 +185,7 @@ public:
     void FromFloat32(float value)
     {
         const Float32 f32(value);
-        const int32_t exp = f32.GetBits().exp - 127 + 1;
+        const int exp = f32.GetBits().exp - 127 + 1;
 
         m_bits.sign = f32.GetBits().sign;
 
@@ -219,7 +219,7 @@ public:
             {
                 // Denormalized (exponent = 0, mantissa = abs(int(value * 2^24))
                 m_bits.exp      = 0;
-                m_bits.mantissa = Math::Absu(static_cast<int32_t>(value * (1u << 24)));
+                m_bits.mantissa = Math::Absu(static_cast<int>(value * (1u << 24)));
             }
             else
             {
@@ -227,11 +227,11 @@ public:
                 m_bits.exp = exp + 14;
                 if (exp <= 11)
                 {
-                    m_bits.mantissa = Math::Absu(static_cast<int32_t>(value * (1u << (11 - exp))));
+                    m_bits.mantissa = Math::Absu(static_cast<int>(value * (1u << (11 - exp))));
                 }
                 else
                 {
-                    m_bits.mantissa = Math::Absu(static_cast<int32_t>(value / (1u << (exp - 11))));
+                    m_bits.mantissa = Math::Absu(static_cast<int>(value / (1u << (exp - 11))));
                 }
             }
         }
@@ -315,8 +315,8 @@ typedef struct IUFValue_
 {
     union
     {
-    int32_t     iVec4[4];
-    uint32_t    uVec4[4];
+    int     iVec4[4];
+    unsigned    uVec4[4];
     int64_t     i64Vec2[2];
     float       fVec4[4];
     Float16     f16Vec4[4];
@@ -324,7 +324,7 @@ typedef struct IUFValue_
     };
     struct
     {
-        uint32_t length     : 16;
+        unsigned length     : 16;
         bool     isInt64    : 1;
         bool     isFloat    : 1;
         bool     isFloat16  : 1;
@@ -338,13 +338,13 @@ typedef struct IUFValue_
 struct ShaderSource
 {
     Vkgc::ShaderStage     stage;      // Shader stage
-    uint32_t              dataSize;   // Size of the shader binary data
+    unsigned              dataSize;   // Size of the shader binary data
     uint8_t*              pData;      // Shader binary data
 };
 
 // =====================================================================================================================
 // Enumerates the type of ResultItem's resultSource
-enum ResultSource : uint32_t
+enum ResultSource : unsigned
 {
     ResultSourceColor             = 0,
     ResultSourceDepthStencil      = 1,
@@ -354,7 +354,7 @@ enum ResultSource : uint32_t
 
 // =====================================================================================================================
 // Enumerates the type of ResultItem's compareMethod
-enum ResultCompareMethod : uint32_t
+enum ResultCompareMethod : unsigned
 {
     ResultCompareMethodEqual     = 0,
     ResultCompareMethodNotEqual  = 1,
@@ -363,7 +363,7 @@ enum ResultCompareMethod : uint32_t
 
 // =====================================================================================================================
 // Enumerates the type of Sampler's dataPattern
-enum SamplerPattern : uint32_t
+enum SamplerPattern : unsigned
 {
     SamplerNearest,
     SamplerLinear,
@@ -373,7 +373,7 @@ enum SamplerPattern : uint32_t
 
 // =====================================================================================================================
 // Enumerates the type of ImageView's dataPattern
-enum ImagePattern :uint32_t
+enum ImagePattern :unsigned
 {
     ImageCheckBoxUnorm,
     ImageCheckBoxFloat,
@@ -408,7 +408,7 @@ struct ResultItem
 // Represents Result section.
 struct TestResult
 {
-    uint32_t   numResult;               // Number of valid result items
+    unsigned   numResult;               // Number of valid result items
     ResultItem result[MaxResultCount];  // Whole test results
 };
 
@@ -428,7 +428,7 @@ struct SpecConstItem
 // Represents specializaton constants for one shader stage.
 struct SpecConst
 {
-    uint32_t       numSpecConst;                     // Number of specialization constants
+    unsigned       numSpecConst;                     // Number of specialization constants
     SpecConstItem  specConst[MaxSpecConstantCount];  // All specialization constants
 };
 
@@ -438,8 +438,8 @@ struct SpecConst
 // NOTE: deprecated!!
 struct VertrexBufferBinding
 {
-    uint32_t          binding;      // Where to get the result value (Color, DepthStencil, Buffer)
-    uint32_t          strideInBytes;// Buffer binding if resultSource is buffer
+    unsigned          binding;      // Where to get the result value (Color, DepthStencil, Buffer)
+    unsigned          strideInBytes;// Buffer binding if resultSource is buffer
     VkVertexInputRate stepRate;     // Offset of result value
 };
 
@@ -449,10 +449,10 @@ struct VertrexBufferBinding
 // NOTE: deprecated!!
 struct VertexAttribute
 {
-    uint32_t binding;           // Attribute binding
+    unsigned binding;           // Attribute binding
     VkFormat format;            // Attribute format
-    uint32_t location;          // Attribute location
-    uint32_t offsetInBytes;     // Attribute offset
+    unsigned location;          // Attribute location
+    unsigned offsetInBytes;     // Attribute offset
 };
 
 // =====================================================================================================================
@@ -461,9 +461,9 @@ struct VertexAttribute
 // NOTE: deprecated!!
 struct VertexState
 {
-    uint32_t             numVbBinding;                            // Number of vertex input bindings
+    unsigned             numVbBinding;                            // Number of vertex input bindings
     VertrexBufferBinding vbBinding[MaxVertexBufferBindingCount];  // All vertex input bindings
-    uint32_t             numAttribute;                            // Number of vertex input attributes
+    unsigned             numAttribute;                            // Number of vertex input attributes
     VertexAttribute      attribute[MaxVertexAttributeCount];      // All vertex input attributes
 };
 
@@ -473,9 +473,9 @@ struct BufferView
 {
     IUFValue           binding;       // Binding of this view, consist of set, binding, arrayIndex
     VkDescriptorType   descriptorType;// Descriptor type of this view
-    uint32_t           size;          // Size of this buffer view, assume same size for the buffer
+    unsigned           size;          // Size of this buffer view, assume same size for the buffer
     VkFormat           format;        // VkFormat of this view
-    uint32_t           dataSize;      // Data size in bytes
+    unsigned           dataSize;      // Data size in bytes
     uint8_t*           pData;         // Buffer data
 };
 
@@ -488,8 +488,8 @@ struct ImageView
     IUFValue           size;          // Size of this image
     VkImageViewType    viewType;      // Image view type, enum type is VkImageViewType
     ImagePattern       dataPattern;   // Image data pattern
-    uint32_t           samples;       // Number of image samples, only 1 is supportted now
-    uint32_t           mipmap;        // Whether this image has mipmap
+    unsigned           samples;       // Number of image samples, only 1 is supportted now
+    unsigned           mipmap;        // Whether this image has mipmap
 };
 
 // =====================================================================================================================
@@ -505,32 +505,32 @@ struct Sampler
 // Represents one push constant range
 struct PushConstRange
 {
-    uint32_t                     start;         // Push constant range start
-    uint32_t                     length;        // Push constant range length
-    uint32_t                     dataSize;      // Data size in byte
-    uint32_t*                    pData;         // Push constant data
+    unsigned                     start;         // Push constant range start
+    unsigned                     length;        // Push constant range length
+    unsigned                     dataSize;      // Data size in byte
+    unsigned*                    pData;         // Push constant data
 };
 
 // =====================================================================================================================
 // Represents DrawState section
 struct DrawState
 {
-    uint32_t              instance;                                 // Instance count for draw array
-    uint32_t              vertex;                                   // Vertex count for draw array
-    uint32_t              firstInstance;                            // First instance in draw array
-    uint32_t              firstVertex;                              // First vertex in draw array
-    uint32_t              index;                                    // Index count for draw index
-    uint32_t              firstIndex;                               // First index in draw index
-    uint32_t              vertexOffset;                             // Vertex offset in draw index
+    unsigned              instance;                                 // Instance count for draw array
+    unsigned              vertex;                                   // Vertex count for draw array
+    unsigned              firstInstance;                            // First instance in draw array
+    unsigned              firstVertex;                              // First vertex in draw array
+    unsigned              index;                                    // Index count for draw index
+    unsigned              firstIndex;                               // First index in draw index
+    unsigned              vertexOffset;                             // Vertex offset in draw index
     VkPrimitiveTopology   topology;                                 // Primitive topology
     VkPolygonMode         polygonMode;                              // Triangle rendering mode
     VkCullModeFlags       cullMode;                                 // Fragment culling mode
     VkFrontFace           frontFace;                                // Front-facing triangle orientation
-    uint32_t              depthBiasEnable;                          // Whether to bias fragment depth values
-    uint32_t              patchControlPoints;                       // Patch control points
+    unsigned              depthBiasEnable;                          // Whether to bias fragment depth values
+    unsigned              patchControlPoints;                       // Patch control points
     IUFValue              dispatch;                                 // Dispatch dimension
-    uint32_t              width;                                    // Window width
-    uint32_t              height;                                   // Window height
+    unsigned              width;                                    // Window width
+    unsigned              height;                                   // Window height
     float                 lineWidth;                                // Line width
     IUFValue              viewport;                                 // Viewport dimension
     SpecConst             vs;                                       // Vertex shader's spec constant
@@ -539,7 +539,7 @@ struct DrawState
     SpecConst             gs;                                       // Geometry shader's spec constant
     SpecConst             fs;                                       // Fragment shader's spec constant
     SpecConst             cs;                                       // Compute shader shader's spec constant
-    uint32_t              numPushConstRange;                        // Number of push constant range
+    unsigned              numPushConstRange;                        // Number of push constant range
     PushConstRange        pushConstRange[MaxPushConstRangCount];    // Pipeline push constant ranges
 };
 
@@ -547,10 +547,10 @@ struct DrawState
 // Represents the state of ColorBuffer.
 struct ColorBuffer
 {
-    uint32_t channelWriteMask;        // Write mask to specify destination channels
+    unsigned channelWriteMask;        // Write mask to specify destination channels
     VkFormat format;                  // The format of color buffer
-    uint32_t blendEnable;             // Whether the blend is enabled on this color buffer
-    uint32_t blendSrcAlphaToColor;    // Whether source alpha is blended to color channels for this target at draw time
+    unsigned blendEnable;             // Whether the blend is enabled on this color buffer
+    unsigned blendSrcAlphaToColor;    // Whether source alpha is blended to color channels for this target at draw time
 };
 
 // =====================================================================================================================
@@ -561,20 +561,20 @@ struct GraphicsPipelineState
     VkPolygonMode        polygonMode;         // Triangle rendering mode
     VkCullModeFlags      cullMode;            // Fragment culling mode
     VkFrontFace          frontFace;           // Front-facing triangle orientation
-    uint32_t             depthBiasEnable;     // Whether to bias fragment depth values
-    uint32_t    patchControlPoints;           // Patch control points
-    uint32_t    deviceIndex;                  // Device index for device group
-    uint32_t    disableVertexReuse;           // Disable reusing vertex shader output for indexed draws
-    uint32_t    depthClipEnable;              // Enable clipping based on Z coordinate
-    uint32_t    rasterizerDiscardEnable;      // Kill all rasterized pixels
-    uint32_t    perSampleShading;             // Enable per sample shading
-    uint32_t    numSamples;                   // Number of coverage samples used when rendering with this pipeline
-    uint32_t    samplePatternIdx;             // Index into the currently bound MSAA sample pattern table
-    uint32_t    usrClipPlaneMask;             // Mask to indicate the enabled user defined clip planes
-    uint32_t    alphaToCoverageEnable;        // Enable alpha to coverage
-    uint32_t    dualSourceBlendEnable;        // Blend state bound at draw time will use a dual source blend mode
-    uint32_t    switchWinding;                // reverse the TCS declared output primitive vertex order
-    uint32_t    enableMultiView;              // Whether to enable multi-view support
+    unsigned             depthBiasEnable;     // Whether to bias fragment depth values
+    unsigned    patchControlPoints;           // Patch control points
+    unsigned    deviceIndex;                  // Device index for device group
+    unsigned    disableVertexReuse;           // Disable reusing vertex shader output for indexed draws
+    unsigned    depthClipEnable;              // Enable clipping based on Z coordinate
+    unsigned    rasterizerDiscardEnable;      // Kill all rasterized pixels
+    unsigned    perSampleShading;             // Enable per sample shading
+    unsigned    numSamples;                   // Number of coverage samples used when rendering with this pipeline
+    unsigned    samplePatternIdx;             // Index into the currently bound MSAA sample pattern table
+    unsigned    usrClipPlaneMask;             // Mask to indicate the enabled user defined clip planes
+    unsigned    alphaToCoverageEnable;        // Enable alpha to coverage
+    unsigned    dualSourceBlendEnable;        // Blend state bound at draw time will use a dual source blend mode
+    unsigned    switchWinding;                // reverse the TCS declared output primitive vertex order
+    unsigned    enableMultiView;              // Whether to enable multi-view support
     Vkgc::PipelineOptions options;            // Pipeline options
 
     Vkgc::NggState nggState;                  // NGG state
@@ -586,7 +586,7 @@ struct GraphicsPipelineState
 // Represents ComputePipelineState section.
 struct ComputePipelineState
 {
-    uint32_t              deviceIndex;        // Device index for device group
+    unsigned              deviceIndex;        // Device index for device group
     Vkgc::PipelineOptions options;            // Pipeline options
 };
 
@@ -596,15 +596,15 @@ struct ComputePipelineState
 // Represents the content of RenderDocument.
 struct VfxRenderState
 {
-    uint32_t          version;                                  // Render state version
+    unsigned          version;                                  // Render state version
     Vfx::TestResult   result;                                   // Section "Result"
-    uint32_t          numBufferView;                            // Number of section "BufferView"
+    unsigned          numBufferView;                            // Number of section "BufferView"
     Vfx::BufferView   bufferView[Vfx::MaxSectionCount];         // Section "BufferView"
     Vfx::VertexState  vertexState;                              // Section "VertexState"
     Vfx::DrawState    drawState;                                // Section "DrawState"
-    uint32_t          numImageView;                             // Number of section "ImageView"
+    unsigned          numImageView;                             // Number of section "ImageView"
     Vfx::ImageView    imageView[Vfx::MaxSectionCount];          // Section "ImageView"
-    uint32_t          numSampler;                               // Number of section "Sampler"
+    unsigned          numSampler;                               // Number of section "Sampler"
     Vfx::Sampler      sampler[Vfx::MaxSectionCount];            // Section "Sampler"
     Vfx::ShaderSource stages[Vfx::ShaderStageCount];            // Shader source sections
 };
@@ -618,11 +618,11 @@ enum VfxPipelineType
 // Represents the content of PipelineDoucment.
 struct VfxPipelineState
 {
-    uint32_t                    version;                          // Pipeline state version
+    unsigned                    version;                          // Pipeline state version
     VfxPipelineType             pipelineType;                     // Pipeline type
     Vkgc::GraphicsPipelineBuildInfo   gfxPipelineInfo;            // Vkgc graphics pipeline build info
     Vkgc::ComputePipelineBuildInfo    compPipelineInfo;           // Vkgc compute pipeline build info
-    uint32_t                    numStages;                        // Number of shader source sections
+    unsigned                    numStages;                        // Number of shader source sections
     Vfx::ShaderSource*          stages;                           // Shader source sections
 };
 

@@ -47,13 +47,13 @@ void GfxRegHandlerBase::SetRegister(
 
     if (auto pVectorTy = dyn_cast<VectorType>(pNewRegister->getType()))
     {
-        uint32_t count = pVectorTy->getNumElements();
+        unsigned count = pVectorTy->getNumElements();
 
         // Clear previously stored DWORDs
         m_dwords.clear();
 
         // Resize to specific number of DWORDs
-        for (uint32_t i = 0; i < count; i++)
+        for (unsigned i = 0; i < count; i++)
         {
             m_dwords.push_back(nullptr);
         }
@@ -73,10 +73,10 @@ void GfxRegHandlerBase::SetRegister(
 //   - Overwrite DWORDs in <n x i32> register if marked as dirty
 Value* GfxRegHandlerBase::GetRegister()
 {
-    uint32_t dirtyMask = m_dirtyDwords;
+    unsigned dirtyMask = m_dirtyDwords;
 
     // Overwrite if the specific DWORD is being masked as dirty
-    for (uint32_t i = 0; dirtyMask > 0; dirtyMask >>= 1)
+    for (unsigned i = 0; dirtyMask > 0; dirtyMask >>= 1)
     {
         if (dirtyMask & 1)
         {
@@ -140,13 +140,13 @@ void GfxRegHandlerBase::SetBits(
 // Return new DWORD which is replaced [offset, offset + count) with pNewBits
 Value* GfxRegHandlerBase::ReplaceBits(
     Value*   pDword,   // [in] Target DWORD
-    uint32_t offset,   // The first bit to be replaced
-    uint32_t count,    // The number of bits should be replaced
+    unsigned offset,   // The first bit to be replaced
+    unsigned count,    // The number of bits should be replaced
     Value*   pNewBits) // [in] The new bits to replace specified ones
 {
     // mask = ((1 << count) - 1) << offset
     // Result = (pDword & ~mask)|((pNewBits << offset) & mask)
-    uint32_t maskBits = ((1 << count) - 1) << offset;
+    unsigned maskBits = ((1 << count) - 1) << offset;
     Value* pMask = m_pBuilder->getInt32(maskBits);
     Value* pNotMask = m_pBuilder->getInt32(~maskBits);
     Value* pBeginBit = m_pBuilder->getInt32(offset);

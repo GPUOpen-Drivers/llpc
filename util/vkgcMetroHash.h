@@ -41,7 +41,7 @@ struct Hash
 {
     union
     {
-        uint32_t dwords[4]; // Output hash in dwords.
+        unsigned dwords[4]; // Output hash in dwords.
         uint8_t  bytes[16]; // Output hash in bytes.
     };
 };
@@ -62,7 +62,7 @@ inline uint64_t Compact64(const Hash* pHash)
 // Takes input parameter pHash, which is 128-bit hash to be compacted.
 //
 // Returns 32-bit hash value based on the inputted 128-bit hash.
-inline uint32_t Compact32(const Hash* pHash)
+inline unsigned Compact32(const Hash* pHash)
 {
     return pHash->dwords[3] ^ pHash->dwords[2] ^ pHash->dwords[1] ^ pHash->dwords[0];
 }
@@ -72,9 +72,9 @@ inline uint32_t Compact32(const Hash* pHash)
 // Takes input parameter hash, which is 64-bit hash to be compacted.
 //
 // Returns 32-bit hash value based on the inputted 64-bit hash.
-inline uint32_t Compact32(uint64_t hash)
+inline unsigned Compact32(uint64_t hash)
 {
-    return static_cast<uint32_t>(hash) ^ static_cast<uint32_t>(hash >> 32);
+    return static_cast<unsigned>(hash) ^ static_cast<unsigned>(hash >> 32);
 }
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
@@ -83,10 +83,10 @@ inline uint32_t Compact32(uint64_t hash)
 // Takes input parameter ShaderHash, which is a struct consisting of 2 quad words to be compacted.
 //
 // Returns 32-bit hash value based on the input 128-bit hash.
-inline uint32_t Compact32(Vkgc::ShaderHash hash)
+inline unsigned Compact32(Vkgc::ShaderHash hash)
 {
-    return (static_cast<uint32_t>(hash.lower) ^ static_cast<uint32_t>(hash.lower >> 32)
-        ^ static_cast<uint32_t>(hash.upper) ^ static_cast<uint32_t>(hash.upper >> 32));
+    return (static_cast<unsigned>(hash.lower) ^ static_cast<unsigned>(hash.lower >> 32)
+        ^ static_cast<unsigned>(hash.upper) ^ static_cast<unsigned>(hash.upper >> 32));
 }
 #endif
 

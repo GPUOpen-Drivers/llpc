@@ -55,13 +55,13 @@ public:
     virtual const void* GetPipelineBuildInfo() const { return m_pPipelineInfo; }
 
     // Gets the mask of active shader stages bound to this pipeline
-    virtual uint32_t GetShaderStageMask() const { return ShaderStageToMask(ShaderStageCompute); }
+    virtual unsigned GetShaderStageMask() const { return ShaderStageToMask(ShaderStageCompute); }
 
     // Sets the mask of active shader stages bound to this pipeline
-    void SetShaderStageMask(uint32_t mask) { assert(mask == GetShaderStageMask()); }
+    void SetShaderStageMask(unsigned mask) { assert(mask == GetShaderStageMask()); }
 
     // Gets the count of active shader stages
-    virtual uint32_t GetActiveShaderStageCount() const { return 1; }
+    virtual unsigned GetActiveShaderStageCount() const { return 1; }
 
     // Does user data node merging for all shader stages
     virtual void DoUserDataNodeMerge() { }

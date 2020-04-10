@@ -110,7 +110,7 @@ struct PipelineDumpFile
 
     std::ofstream dumpFile;       // File object for .pipe file
     std::ofstream binaryFile;     // File object for ELF binary
-    uint32_t      binaryIndex;    // ELF Binary index
+    unsigned      binaryIndex;    // ELF Binary index
     std::string   binaryFileName; // File name of binary file
 };
 
@@ -357,8 +357,8 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
          // Build dump file name
         if (pDumpOptions->dumpDuplicatePipelines)
         {
-            uint32_t index = 0;
-            int32_t result = 0;
+            unsigned index = 0;
+            int result = 0;
             while (result != -1)
             {
                 dumpPathName = pDumpOptions->pDumpDir;
@@ -465,8 +465,8 @@ void PipelineDumper::DumpResourceMappingNode(
     case ResourceMappingNodeType::DescriptorTableVaPtr:
         {
             char prefixBuf[256];
-            int32_t length = 0;
-            for (uint32_t i = 0; i < pUserDataNode->tablePtr.nodeCount; ++i)
+            int length = 0;
+            for (unsigned i = 0; i < pUserDataNode->tablePtr.nodeCount; ++i)
             {
                 length = snprintf(prefixBuf, 256, "%s.next[%u]", pPrefix, i);
                 DumpResourceMappingNode(pUserDataNode->tablePtr.pNext + i, prefixBuf, dumpFile);
@@ -522,14 +522,14 @@ void PipelineDumper::DumpPipelineShaderInfo(
     if (pShaderInfo->pSpecializationInfo)
     {
         auto pSpecializationInfo = pShaderInfo->pSpecializationInfo;
-        for (uint32_t i = 0; i < pSpecializationInfo->mapEntryCount; ++i)
+        for (unsigned i = 0; i < pSpecializationInfo->mapEntryCount; ++i)
         {
             dumpFile << "specConst.mapEntry[" << i << "].constantID = " << pSpecializationInfo->pMapEntries[i].constantID << "\n";
             dumpFile << "specConst.mapEntry[" << i << "].offset = " << pSpecializationInfo->pMapEntries[i].offset << "\n";
             dumpFile << "specConst.mapEntry[" << i << "].size = " << pSpecializationInfo->pMapEntries[i].size << "\n";
         }
-        const uint32_t* pData = reinterpret_cast<const uint32_t*>(pSpecializationInfo->pData);
-        for (uint32_t i = 0; i < (pSpecializationInfo->dataSize + sizeof(uint32_t) - 1) / sizeof(uint32_t); ++i)
+        const unsigned* pData = reinterpret_cast<const unsigned*>(pSpecializationInfo->pData);
+        for (unsigned i = 0; i < (pSpecializationInfo->dataSize + sizeof(unsigned) - 1) / sizeof(unsigned); ++i)
         {
             if ((i % 8) == 0)
             {
@@ -551,20 +551,20 @@ void PipelineDumper::DumpPipelineShaderInfo(
     // Output descriptor range value
     if (pShaderInfo->descriptorRangeValueCount > 0)
     {
-        for (uint32_t i = 0; i < pShaderInfo->descriptorRangeValueCount; ++i)
+        for (unsigned i = 0; i < pShaderInfo->descriptorRangeValueCount; ++i)
         {
             auto pDescriptorRangeValue = &pShaderInfo->pDescriptorRangeValues[i];
             dumpFile << "descriptorRangeValue[" << i << "].type = " << pDescriptorRangeValue->type << "\n";
             dumpFile << "descriptorRangeValue[" << i << "].set = " << pDescriptorRangeValue->set << "\n";
             dumpFile << "descriptorRangeValue[" << i << "].binding = " << pDescriptorRangeValue->binding << "\n";
             dumpFile << "descriptorRangeValue[" << i << "].arraySize = " << pDescriptorRangeValue->arraySize << "\n";
-            for (uint32_t j = 0; j < pDescriptorRangeValue->arraySize; ++j)
+            for (unsigned j = 0; j < pDescriptorRangeValue->arraySize; ++j)
             {
                 dumpFile << "descriptorRangeValue[" << i << "].uintData = ";
-                const uint32_t DescriptorSizeInDw =
+                const unsigned DescriptorSizeInDw =
                     (pDescriptorRangeValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler) ? 8 : 4;
 
-                for (uint32_t k = 0; k < DescriptorSizeInDw -1; ++k)
+                for (unsigned k = 0; k < DescriptorSizeInDw -1; ++k)
                 {
                      dumpFile << pDescriptorRangeValue->pValue[k] << ", ";
                 }
@@ -578,7 +578,7 @@ void PipelineDumper::DumpPipelineShaderInfo(
     if (pShaderInfo->userDataNodeCount > 0)
     {
         char prefixBuff[64];
-        for (uint32_t i = 0; i < pShaderInfo->userDataNodeCount; ++i)
+        for (unsigned i = 0; i < pShaderInfo->userDataNodeCount; ++i)
         {
             auto pUserDataNode = &pShaderInfo->pUserDataNodes[i];
             auto length = snprintf(prefixBuff, 64, "userDataNode[%u]", i);
@@ -757,7 +757,7 @@ void PipelineDumper::DumpGraphicsStateInfo(
     dumpFile << "perSampleShading = " << pPipelineInfo->rsState.perSampleShading << "\n";
     dumpFile << "numSamples = " << pPipelineInfo->rsState.numSamples << "\n";
     dumpFile << "samplePatternIdx = " << pPipelineInfo->rsState.samplePatternIdx << "\n";
-    dumpFile << "usrClipPlaneMask = " << static_cast<uint32_t>(pPipelineInfo->rsState.usrClipPlaneMask) << "\n";
+    dumpFile << "usrClipPlaneMask = " << static_cast<unsigned>(pPipelineInfo->rsState.usrClipPlaneMask) << "\n";
     dumpFile << "polygonMode = " << pPipelineInfo->rsState.polygonMode << "\n";
     dumpFile << "cullMode = " << static_cast<VkCullModeFlagBits>(pPipelineInfo->rsState.cullMode) << "\n";
     dumpFile << "frontFace = " << pPipelineInfo->rsState.frontFace << "\n";
@@ -765,13 +765,13 @@ void PipelineDumper::DumpGraphicsStateInfo(
     dumpFile << "alphaToCoverageEnable = " << pPipelineInfo->cbState.alphaToCoverageEnable << "\n";
     dumpFile << "dualSourceBlendEnable = " << pPipelineInfo->cbState.dualSourceBlendEnable << "\n";
 
-    for (uint32_t i = 0; i < MaxColorTargets; ++i)
+    for (unsigned i = 0; i < MaxColorTargets; ++i)
     {
         if (pPipelineInfo->cbState.target[i].format != VK_FORMAT_UNDEFINED)
         {
             auto pCbTarget = &pPipelineInfo->cbState.target[i];
             dumpFile << "colorBuffer[" << i << "].format = " << pCbTarget->format << "\n";
-            dumpFile << "colorBuffer[" << i << "].channelWriteMask = " << static_cast<uint32_t>(pCbTarget->channelWriteMask) << "\n";
+            dumpFile << "colorBuffer[" << i << "].channelWriteMask = " << static_cast<unsigned>(pCbTarget->channelWriteMask) << "\n";
             dumpFile << "colorBuffer[" << i << "].blendEnable = " << pCbTarget->blendEnable << "\n";
             dumpFile << "colorBuffer[" << i << "].blendSrcAlphaToColor = " << pCbTarget->blendSrcAlphaToColor << "\n";
         }
@@ -803,7 +803,7 @@ void PipelineDumper::DumpGraphicsStateInfo(
         (pPipelineInfo->pVertexInput->vertexBindingDescriptionCount > 0))
     {
         dumpFile << "[VertexInputState]\n";
-        for (uint32_t i = 0; i < pPipelineInfo->pVertexInput->vertexBindingDescriptionCount; ++i)
+        for (unsigned i = 0; i < pPipelineInfo->pVertexInput->vertexBindingDescriptionCount; ++i)
         {
             auto pBinding = &pPipelineInfo->pVertexInput->pVertexBindingDescriptions[i];
             dumpFile << "binding[" << i << "].binding = " << pBinding->binding << "\n";
@@ -811,7 +811,7 @@ void PipelineDumper::DumpGraphicsStateInfo(
             dumpFile << "binding[" << i << "].inputRate = " << pBinding->inputRate << "\n";
         }
 
-        for (uint32_t i = 0; i < pPipelineInfo->pVertexInput->vertexAttributeDescriptionCount; ++i)
+        for (unsigned i = 0; i < pPipelineInfo->pVertexInput->vertexAttributeDescriptionCount; ++i)
         {
             auto pAttrib = &pPipelineInfo->pVertexInput->pVertexAttributeDescriptions[i];
             dumpFile << "attribute[" << i << "].location = " << pAttrib->location << "\n";
@@ -824,7 +824,7 @@ void PipelineDumper::DumpGraphicsStateInfo(
             VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT,
             pPipelineInfo->pVertexInput->pNext);
 
-        for (uint32_t i = 0; pDivisorState != nullptr && i < pDivisorState->vertexBindingDivisorCount; ++i)
+        for (unsigned i = 0; pDivisorState != nullptr && i < pDivisorState->vertexBindingDivisorCount; ++i)
         {
             auto pDivisor = &pDivisorState->pVertexBindingDivisors[i];
             dumpFile << "divisor[" << i << "].binding = " << pDivisor->binding << "\n";
@@ -852,7 +852,7 @@ void PipelineDumper::DumpGraphicsPipelineInfo(
         &pPipelineInfo->fs,
     };
 
-    for (uint32_t stage = 0; stage < ShaderStageGfxCount; ++stage)
+    for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage)
     {
         const PipelineShaderInfo* pShaderInfo = shaderInfos[stage];
         if (pShaderInfo->pModuleData == nullptr)
@@ -874,7 +874,7 @@ void PipelineDumper::DumpGraphicsPipelineInfo(
 MetroHash::Hash PipelineDumper::GenerateHashForGraphicsPipeline(
     const GraphicsPipelineBuildInfo* pPipeline,   // [in] Info to build a graphics pipeline
     bool                            isCacheHash,  // TRUE if the hash is used by shader cache
-    uint32_t                        stage)        // [in] The stage for which we are building the hash.
+    unsigned                        stage)        // [in] The stage for which we are building the hash.
                                                   // ShaderStageInvalid if building for the entire pipeline.
 {
     MetroHash64 hasher;
@@ -972,7 +972,7 @@ void PipelineDumper::UpdateHashForVertexInputState(
         auto pVertexDivisor = FindVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
             VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT,
             pVertexInput->pNext);
-        uint32_t divisorCount = (pVertexDivisor != nullptr) ? pVertexDivisor->vertexBindingDivisorCount : 0;
+        unsigned divisorCount = (pVertexDivisor != nullptr) ? pVertexDivisor->vertexBindingDivisorCount : 0;
         pHasher->Update(divisorCount);
         if (divisorCount > 0)
         {
@@ -1070,7 +1070,7 @@ void PipelineDumper::UpdateHashForFragmentState(
     auto pCbState = &pPipeline->cbState;
     pHasher->Update(pCbState->alphaToCoverageEnable);
     pHasher->Update(pCbState->dualSourceBlendEnable);
-    for (uint32_t i = 0; i < MaxColorTargets; ++i)
+    for (unsigned i = 0; i < MaxColorTargets; ++i)
     {
         if (pCbState->target[i].format != VK_FORMAT_UNDEFINED)
         {
@@ -1118,7 +1118,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
         }
 
         auto pSpecializationInfo = pShaderInfo->pSpecializationInfo;
-        uint32_t mapEntryCount = pSpecializationInfo ? pSpecializationInfo->mapEntryCount : 0;
+        unsigned mapEntryCount = pSpecializationInfo ? pSpecializationInfo->mapEntryCount : 0;
         pHasher->Update(mapEntryCount);
         if (mapEntryCount > 0)
         {
@@ -1132,7 +1132,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
         pHasher->Update(pShaderInfo->descriptorRangeValueCount);
         if (pShaderInfo->descriptorRangeValueCount > 0)
         {
-            for (uint32_t i = 0; i < pShaderInfo->descriptorRangeValueCount; ++i)
+            for (unsigned i = 0; i < pShaderInfo->descriptorRangeValueCount; ++i)
             {
                 auto pDescriptorRangeValue = &pShaderInfo->pDescriptorRangeValues[i];
                 pHasher->Update(pDescriptorRangeValue->type);
@@ -1145,7 +1145,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
                 // The second part of DescriptorRangeValue is YCbCrMetaData, which is 4 DWORDS.
                 // The hasher should be updated when the content changes, this is because YCbCrMetaData
                 // is engaged in pipeline compiling.
-                const uint32_t descriptorSize =
+                const unsigned descriptorSize =
                     (pDescriptorRangeValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler) ? 16 : 32;
 
                 pHasher->Update(reinterpret_cast<const uint8_t*>(pDescriptorRangeValue->pValue),
@@ -1156,7 +1156,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
         pHasher->Update(pShaderInfo->userDataNodeCount);
         if (pShaderInfo->userDataNodeCount > 0)
         {
-            for (uint32_t i = 0; i < pShaderInfo->userDataNodeCount; ++i)
+            for (unsigned i = 0; i < pShaderInfo->userDataNodeCount; ++i)
             {
                 auto pUserDataNode = &pShaderInfo->pUserDataNodes[i];
                 UpdateHashForResourceMappingNode(pUserDataNode, true, pHasher);
@@ -1222,7 +1222,7 @@ void PipelineDumper::UpdateHashForResourceMappingNode(
         }
     case ResourceMappingNodeType::DescriptorTableVaPtr:
         {
-            for (uint32_t i = 0; i < pUserDataNode->tablePtr.nodeCount; ++i)
+            for (unsigned i = 0; i < pUserDataNode->tablePtr.nodeCount; ++i)
             {
                 UpdateHashForResourceMappingNode(&pUserDataNode->tablePtr.pNext[i], false, pHasher);
             }
@@ -1259,8 +1259,8 @@ void PipelineDumper::UpdateHashForResourceMappingNode(
 template <class OStream>
 void outputText(
     const uint8_t* pData,    // [in] Text data
-    uint32_t       startPos, // Starting position
-    uint32_t       endPos,   // End position
+    unsigned       startPos, // Starting position
+    unsigned       endPos,   // End position
     OStream&       out)      // [out] Output stream
 {
     if (endPos > startPos)
@@ -1293,14 +1293,14 @@ void outputText(
 template<class OStream>
 void outputBinary(
     const uint8_t* pData,     // [in] Binary data
-    uint32_t       startPos,  // Starting position
-    uint32_t       endPos,    // End position
+    unsigned       startPos,  // Starting position
+    unsigned       endPos,    // End position
     OStream&       out)       // [out] Output stream
 {
-    const uint32_t* pStartData = reinterpret_cast<const uint32_t*>(pData + startPos);
-    int32_t dwordCount = (endPos - startPos) / sizeof(uint32_t);
+    const unsigned* pStartData = reinterpret_cast<const unsigned*>(pData + startPos);
+    int dwordCount = (endPos - startPos) / sizeof(unsigned);
     char formatBuf[256];
-    for (int32_t i = 0; i < dwordCount; ++i)
+    for (int i = 0; i < dwordCount; ++i)
     {
         size_t length = 0;
         if (i % 8 == 0)
@@ -1322,10 +1322,10 @@ void outputBinary(
         }
     }
 
-    if ((endPos > startPos) && (endPos - startPos) % sizeof(uint32_t))
+    if ((endPos > startPos) && (endPos - startPos) % sizeof(unsigned))
     {
-        int32_t padPos = dwordCount * sizeof(uint32_t);
-        for (int32_t i = padPos; i < endPos; ++i)
+        int padPos = dwordCount * sizeof(unsigned);
+        for (int i = padPos; i < endPos; ++i)
         {
             auto length = snprintf(formatBuf, sizeof(formatBuf), "%02X", pData[i]);
             (void(length)); // unused
@@ -1346,13 +1346,13 @@ OStream& operator<<(
     OStream&          out,      // [out] Output stream
     ElfReader<Elf>&   reader)   // [in] ELF object
 {
-    uint32_t sectionCount = reader.getSectionCount();
+    unsigned sectionCount = reader.getSectionCount();
     char formatBuf[256];
 
-    for (uint32_t sortIdx = 0; sortIdx < sectionCount; ++sortIdx)
+    for (unsigned sortIdx = 0; sortIdx < sectionCount; ++sortIdx)
     {
         typename ElfReader<Elf>::SectionBuffer* pSection = nullptr;
-        uint32_t secIdx = 0;
+        unsigned secIdx = 0;
         Result result = reader.getSectionDataBySortingIndex(sortIdx, &secIdx, &pSection);
         assert(result == Result::Success);
         (void(result)); // unused
@@ -1367,15 +1367,15 @@ OStream& operator<<(
         {
             // Output .note section
             out << pSection->pName << " (size = " << pSection->secHead.sh_size << " bytes)\n";
-            uint32_t offset = 0;
-            const uint32_t noteHeaderSize = sizeof(NoteHeader) - 8;
+            unsigned offset = 0;
+            const unsigned noteHeaderSize = sizeof(NoteHeader) - 8;
             while (offset < pSection->secHead.sh_size)
             {
                 const NoteHeader* pNode = reinterpret_cast<const NoteHeader*>(pSection->pData + offset);
-                const uint32_t noteNameSize = alignTo(pNode->nameSize, 4);
-                switch (static_cast<uint32_t>(pNode->type))
+                const unsigned noteNameSize = alignTo(pNode->nameSize, 4);
+                switch (static_cast<unsigned>(pNode->type))
                 {
-                case static_cast<uint32_t>(Util::Abi::PipelineAbiNoteType::HsaIsa):
+                case static_cast<unsigned>(Util::Abi::PipelineAbiNoteType::HsaIsa):
                 {
                     out << "    HsaIsa                       (name = "
                         << pNode->name << "  size = " << pNode->descSize << ")\n";
@@ -1390,7 +1390,7 @@ OStream& operator<<(
                         << pGpu->gfxipStepping << "\n";
                     break;
                 }
-                case static_cast<uint32_t>(Util::Abi::PipelineAbiNoteType::AbiMinorVersion):
+                case static_cast<unsigned>(Util::Abi::PipelineAbiNoteType::AbiMinorVersion):
                 {
                     out << "    AbiMinorVersion              (name = "
                         << pNode->name << "  size = " << pNode->descSize << ")\n";
@@ -1400,7 +1400,7 @@ OStream& operator<<(
                     out << "        minor = " << pCodeVersion->minorVersion << "\n";
                     break;
                 }
-                case static_cast<uint32_t>(Util::Abi::PipelineAbiNoteType::PalMetadata):
+                case static_cast<unsigned>(Util::Abi::PipelineAbiNoteType::PalMetadata):
                 {
                     out << "    PalMetadata                  (name = "
                         << pNode->name << "  size = " << pNode->descSize << ")\n";
@@ -1420,7 +1420,7 @@ OStream& operator<<(
                             {
                                 if (msgIterStatus == MsgPackIteratorMapKey)
                                 {
-                                    uint32_t regId = static_cast<uint32_t>(pNode->getUInt());
+                                    unsigned regId = static_cast<unsigned>(pNode->getUInt());
                                     const char* pRegName = PipelineDumper::getRegisterNameString(regId);
 
                                     auto length = snprintf(formatBuf,
@@ -1471,7 +1471,7 @@ OStream& operator<<(
                                 if (msgIterStatus == MsgPackIteratorMapPair)
                                 {
                                     out << "\n";
-                                        for (uint32_t i = 0; i < reader.getMsgMapLevel(); ++i)
+                                        for (unsigned i = 0; i < reader.getMsgMapLevel(); ++i)
                                         {
                                             out << "    ";
                                         }
@@ -1513,7 +1513,7 @@ OStream& operator<<(
                 }
                 default:
                 {
-                    if (static_cast<uint32_t>(pNode->type) == NT_AMD_AMDGPU_ISA)
+                    if (static_cast<unsigned>(pNode->type) == NT_AMD_AMDGPU_ISA)
                     {
                         out << "    IsaVersion                   (name = "
                             << pNode->name << "  size = " << pNode->descSize << ")\n";
@@ -1523,7 +1523,7 @@ OStream& operator<<(
                     }
                     else
                     {
-                        out << "    Unknown(" << (uint32_t)pNode->type << ")                (name = "
+                        out << "    Unknown(" << (unsigned)pNode->type << ")                (name = "
                             << pNode->name << "  size = " << pNode->descSize << ")\n";
                         auto pDesc = pSection->pData + offset + noteHeaderSize + noteNameSize;
                         outputBinary(pDesc, 0, pNode->descSize, out);
@@ -1531,7 +1531,7 @@ OStream& operator<<(
                     break;
                 }
                 }
-                offset += noteHeaderSize + noteNameSize + alignTo(pNode->descSize, sizeof(uint32_t));
+                offset += noteHeaderSize + noteNameSize + alignTo(pNode->descSize, sizeof(unsigned));
                 assert(offset <= pSection->secHead.sh_size);
             }
         }
@@ -1539,8 +1539,8 @@ OStream& operator<<(
         {
             // Output .reloc section
             out << pSection->pName << " (size = " << pSection->secHead.sh_size << " bytes)\n";
-            const uint32_t relocCount = reader.getRelocationCount();
-            for (uint32_t i = 0; i < relocCount; ++i)
+            const unsigned relocCount = reader.getRelocationCount();
+            for (unsigned i = 0; i < relocCount; ++i)
             {
                 ElfReloc reloc = {};
                 reader.getRelocation(i, &reloc);
@@ -1555,11 +1555,11 @@ OStream& operator<<(
         else if (strncmp(pSection->pName, AmdGpuConfigName, sizeof(AmdGpuConfigName) - 1) == 0)
         {
             // Output .AMDGPU.config section
-            const uint32_t configCount = static_cast<uint32_t>(pSection->secHead.sh_size / sizeof(uint32_t) / 2);
-            const uint32_t* pConfig = reinterpret_cast<const uint32_t*>(pSection->pData);
+            const unsigned configCount = static_cast<unsigned>(pSection->secHead.sh_size / sizeof(unsigned) / 2);
+            const unsigned* pConfig = reinterpret_cast<const unsigned*>(pSection->pData);
             out << pSection->pName << " (" << configCount << " registers)\n";
 
-            for (uint32_t i = 0; i < configCount; ++i)
+            for (unsigned i = 0; i < configCount; ++i)
             {
                 const char* pRegName = PipelineDumper::getRegisterNameString(pConfig[2 * i] / 4);
                 auto length = snprintf(formatBuf, sizeof(formatBuf), "        %-45s = 0x%08X\n", pRegName, pConfig[2 * i + 1]);
@@ -1576,18 +1576,18 @@ OStream& operator<<(
 
             std::vector<ElfSymbol> symbols;
             reader.GetSymbolsBySectionIndex(secIdx, symbols);
-            uint32_t symIdx = 0;
-            uint32_t startPos = 0;
-            uint32_t endPos = 0;
+            unsigned symIdx = 0;
+            unsigned startPos = 0;
+            unsigned endPos = 0;
             while (startPos < pSection->secHead.sh_size)
             {
                 if (symIdx < symbols.size())
                 {
-                    endPos = static_cast<uint32_t>(symbols[symIdx].value);
+                    endPos = static_cast<unsigned>(symbols[symIdx].value);
                 }
                 else
                 {
-                    endPos = static_cast<uint32_t>(pSection->secHead.sh_size);
+                    endPos = static_cast<unsigned>(pSection->secHead.sh_size);
                 }
 
                 outputText(pSection->pData, startPos, endPos, out);
@@ -1625,18 +1625,18 @@ OStream& operator<<(
 
                 std::vector<ElfSymbol> symbols;
                 reader.GetSymbolsBySectionIndex(secIdx, symbols);
-                uint32_t symIdx = 0;
-                uint32_t startPos = 0;
-                uint32_t endPos = 0;
+                unsigned symIdx = 0;
+                unsigned startPos = 0;
+                unsigned endPos = 0;
                 while (startPos < pSection->secHead.sh_size)
                 {
                     if (symIdx < symbols.size())
                     {
-                        endPos = static_cast<uint32_t>(symbols[symIdx].value);
+                        endPos = static_cast<unsigned>(symbols[symIdx].value);
                     }
                     else
                     {
-                        endPos = static_cast<uint32_t>(pSection->secHead.sh_size);
+                        endPos = static_cast<unsigned>(pSection->secHead.sh_size);
                     }
 
                     outputText(pSection->pData, startPos, endPos, out);
@@ -1665,7 +1665,7 @@ OStream& operator<<(
                 // Output text based sections
                 out << pSection->pName << " (size = " << pSection->secHead.sh_size << " bytes)\n";
 
-                outputText(pSection->pData, 0, static_cast<uint32_t>(pSection->secHead.sh_size), out);
+                outputText(pSection->pData, 0, static_cast<unsigned>(pSection->secHead.sh_size), out);
             }
         }
         else
@@ -1677,19 +1677,19 @@ OStream& operator<<(
             std::vector<ElfSymbol> symbols;
             reader.GetSymbolsBySectionIndex(secIdx, symbols);
 
-            uint32_t symIdx = 0;
-            uint32_t startPos = 0;
-            uint32_t endPos = 0;
+            unsigned symIdx = 0;
+            unsigned startPos = 0;
+            unsigned endPos = 0;
 
             while (startPos < pSection->secHead.sh_size)
             {
                 if (symIdx < symbols.size())
                 {
-                    endPos = static_cast<uint32_t>(symbols[symIdx].value);
+                    endPos = static_cast<unsigned>(symbols[symIdx].value);
                 }
                 else
                 {
-                    endPos = static_cast<uint32_t>(pSection->secHead.sh_size);
+                    endPos = static_cast<unsigned>(pSection->secHead.sh_size);
                 }
 
                 outputBinary(pSection->pData, startPos, endPos, out);

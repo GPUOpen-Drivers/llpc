@@ -38,7 +38,7 @@ namespace Llpc
 
 // Enumerates access modes that may be required on an opened file. Can be bitwise ORed together to specify multiple
 // simultaneous modes.
-enum FileAccessMode : uint32_t
+enum FileAccessMode : unsigned
 {
     FileAccessRead   = 0x1,         ///< Read access.
     FileAccessWrite  = 0x2,         ///< Write access.
@@ -60,7 +60,7 @@ public:
     static size_t GetFileSize(const char* pFilename);
     static bool Exists(const char* pFilename);
 
-    Result Open(const char* pFilename, uint32_t accessFlags);
+    Result Open(const char* pFilename, unsigned accessFlags);
     void Close();
     Result Write(const void* pBuffer, size_t bufferSize);
     Result Read(void* pBuffer, size_t bufferSize, size_t* pBytesRead);
@@ -69,7 +69,7 @@ public:
     Result VPrintf(const char* pFormatStr, va_list argList);
     Result Flush() const;
     void Rewind();
-    void Seek(int32_t offset, bool fromOrigin);
+    void Seek(int offset, bool fromOrigin);
 
     // Returns true if the file is presently open.
     bool IsOpen() const { return (m_fileHandle != nullptr); }

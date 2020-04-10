@@ -62,13 +62,13 @@ static cl::opt<bool> IncludeLlvmIr("include-llvm-ir",
                                    cl::init(false));
 
 // -vgpr-limit: maximum VGPR limit for this shader
-static cl::opt<uint32_t> VgprLimit("vgpr-limit", cl::desc("Maximum VGPR limit for this shader"), cl::init(0));
+static cl::opt<unsigned> VgprLimit("vgpr-limit", cl::desc("Maximum VGPR limit for this shader"), cl::init(0));
 
 // -sgpr-limit: maximum SGPR limit for this shader
-static cl::opt<uint32_t> SgprLimit("sgpr-limit", cl::desc("Maximum SGPR limit for this shader"), cl::init(0));
+static cl::opt<unsigned> SgprLimit("sgpr-limit", cl::desc("Maximum SGPR limit for this shader"), cl::init(0));
 
 // -waves-per-eu: the maximum number of waves per EU for this shader
-static cl::opt<uint32_t> WavesPerEu("waves-per-eu",
+static cl::opt<unsigned> WavesPerEu("waves-per-eu",
                                     cl::desc("Maximum number of waves per EU for this shader"),
                                     cl::init(0));
 
@@ -78,7 +78,7 @@ static cl::opt<bool> EnableScalarLoad("enable-load-scalarizer",
                                       cl::init(false));
 
 // The max threshold of load scalarizer.
-static const uint32_t MaxScalarThreshold = 0xFFFFFFFF;
+static const unsigned MaxScalarThreshold = 0xFFFFFFFF;
 
 // -scalar-threshold: Set the vector size threshold for load scalarizer.
 static cl::opt<unsigned> ScalarThreshold("scalar-threshold",
@@ -207,7 +207,7 @@ void PipelineContext::SetPipelineState(
     Pipeline*    pPipeline) const   // [in/out] Middle-end pipeline object
 {
     // Give the shader stage mask to the middle-end.
-    uint32_t stageMask = GetShaderStageMask();
+    unsigned stageMask = GetShaderStageMask();
     pPipeline->SetShaderStageMask(stageMask);
 
     // Give the pipeline options to the middle-end.
@@ -306,8 +306,8 @@ void PipelineContext::SetOptionsInPipeline(
     pPipeline->SetOptions(options);
 
     // Give the shader options (including the hash) to the middle-end.
-    uint32_t stageMask = GetShaderStageMask();
-    for (uint32_t stage = 0; stage <= ShaderStageCompute; ++stage)
+    unsigned stageMask = GetShaderStageMask();
+    for (unsigned stage = 0; stage <= ShaderStageCompute; ++stage)
     {
         if (stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
         {
@@ -409,7 +409,7 @@ void PipelineContext::SetUserDataInPipeline(
     Pipeline*    pPipeline) const   // [in/out] Middle-end pipeline object
 {
     const PipelineShaderInfo* pShaderInfo = nullptr;
-    uint32_t stageMask = GetShaderStageMask();
+    unsigned stageMask = GetShaderStageMask();
     {
         pShaderInfo = GetPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
     }
@@ -427,7 +427,7 @@ void PipelineContext::SetUserDataInPipeline(
     }
 
     // Count how many user data nodes we have, and allocate the buffer.
-    uint32_t nodeCount = nodes.size();
+    unsigned nodeCount = nodes.size();
     for (auto& node : nodes)
     {
         if (node.type == ResourceMappingNodeType::DescriptorTableVaPtr)
@@ -458,7 +458,7 @@ void PipelineContext::SetUserDataNodesTable(
     ResourceNode*                 pDestTable,             // [out] Where to write nodes
     ResourceNode*&                pDestInnerTable) const  // [in/out] End of space available for inner tables
 {
-    for (uint32_t idx = 0; idx != nodes.size(); ++idx)
+    for (unsigned idx = 0; idx != nodes.size(); ++idx)
     {
         auto& node = nodes[idx];
         auto& destNode = pDestTable[idx];
@@ -537,7 +537,7 @@ void PipelineContext::SetUserDataNodesTable(
                 destNode.binding = node.srdRange.binding;
                 destNode.pImmutableValue = nullptr;
 
-                auto it = immutableNodesMap.find(std::pair<uint32_t, uint32_t>(destNode.set, destNode.binding));
+                auto it = immutableNodesMap.find(std::pair<unsigned, unsigned>(destNode.set, destNode.binding));
                 if (it != immutableNodesMap.end())
                 {
                     // This set/binding is (or contains) an immutable value. The value can only be a sampler, so we
@@ -549,18 +549,18 @@ void PipelineContext::SetUserDataNodesTable(
 
                     if (immutableNode.arraySize != 0)
                     {
-                        const uint32_t samplerDescriptorSize =
+                        const unsigned samplerDescriptorSize =
                             (node.type != ResourceMappingNodeType::DescriptorYCbCrSampler) ? 4 : 8;
 
-                        for (uint32_t compIdx = 0; compIdx < immutableNode.arraySize; ++compIdx)
+                        for (unsigned compIdx = 0; compIdx < immutableNode.arraySize; ++compIdx)
                         {
                             Constant* compValues[8] = {};
-                            for (uint32_t i = 0; i < samplerDescriptorSize; ++i)
+                            for (unsigned i = 0; i < samplerDescriptorSize; ++i)
                             {
                                 compValues[i] =
                                     builder.getInt32(immutableNode.pValue[compIdx * samplerDescriptorSize + i]);
                             }
-                            for (uint32_t i = samplerDescriptorSize; i < 8; ++i)
+                            for (unsigned i = samplerDescriptorSize; i < 8; ++i)
                             {
                                 compValues[i] = builder.getInt32(0);
                             }
@@ -629,10 +629,10 @@ void PipelineContext::SetVertexInputDescriptions(
 
     // Gather the bindings.
     SmallVector<VertexInputDescription, 8> bindings;
-    for (uint32_t i = 0; i < pVertexInput->vertexBindingDescriptionCount; ++i)
+    for (unsigned i = 0; i < pVertexInput->vertexBindingDescriptionCount; ++i)
     {
         auto pBinding = &pVertexInput->pVertexBindingDescriptions[i];
-        uint32_t idx = pBinding->binding;
+        unsigned idx = pBinding->binding;
         if (idx >= bindings.size())
         {
             bindings.resize(idx + 1);
@@ -658,7 +658,7 @@ void PipelineContext::SetVertexInputDescriptions(
         pVertexInput->pNext);
     if (pVertexDivisor)
     {
-        for (uint32_t i = 0;i < pVertexDivisor->vertexBindingDivisorCount; ++i)
+        for (unsigned i = 0;i < pVertexDivisor->vertexBindingDivisorCount; ++i)
         {
             auto pDivisor = &pVertexDivisor->pVertexBindingDivisors[i];
             if (pDivisor->binding <= bindings.size())
@@ -670,7 +670,7 @@ void PipelineContext::SetVertexInputDescriptions(
 
     // Gather the vertex inputs.
     SmallVector<VertexInputDescription, 8> descriptions;
-    for (uint32_t i = 0; i < pVertexInput->vertexAttributeDescriptionCount; ++i)
+    for (unsigned i = 0; i < pVertexInput->vertexAttributeDescriptionCount; ++i)
     {
         auto pAttrib = &pVertexInput->pVertexAttributeDescriptions[i];
         if (pAttrib->binding >= bindings.size())
@@ -718,7 +718,7 @@ void PipelineContext::SetColorExportState(
     state.alphaToCoverageEnable = cbState.alphaToCoverageEnable;
     state.dualSourceBlendEnable = cbState.dualSourceBlendEnable;
 
-    for (uint32_t targetIndex = 0; targetIndex < MaxColorTargets; ++targetIndex)
+    for (unsigned targetIndex = 0; targetIndex < MaxColorTargets; ++targetIndex)
     {
         if (cbState.target[targetIndex].format != VK_FORMAT_UNDEFINED)
         {
@@ -750,8 +750,8 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::MapVkFormat(
 #endif
         BufDataFormat  dfmt;
         BufNumFormat   nfmt;
-        uint32_t       validVertexFormat :1;
-        uint32_t       validExportFormat  :1;
+        unsigned       validVertexFormat :1;
+        unsigned       validExportFormat  :1;
     }
     formatTable[] =
     {

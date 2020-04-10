@@ -303,7 +303,7 @@ VertexFetch::VertexFetch(
     union
     {
         float    f;
-        uint32_t u32;
+        unsigned u32;
     } floatOne = { 1.0f };
     auto pFloatOneVal = ConstantInt::get(Type::getInt32Ty(*m_pContext), floatOne.u32);
     m_fetchDefaults.pFloat32 = ConstantVector::get({ pZero, pZero, pZero, pFloatOneVal });
@@ -312,7 +312,7 @@ VertexFetch::VertexFetch(
     union
     {
         double   d;
-        uint32_t u32[2];
+        unsigned u32[2];
     } doubleOne = { 1.0 };
     auto pDoubleOne0 = ConstantInt::get(Type::getInt32Ty(*m_pContext), doubleOne.u32[0]);
     auto pDoubleOne1 = ConstantInt::get(Type::getInt32Ty(*m_pContext), doubleOne.u32[1]);
@@ -326,8 +326,8 @@ VertexFetch::VertexFetch(
 // Executes vertex fetch operations based on the specified vertex input type and its location.
 Value* VertexFetch::Run(
     Type*        pInputTy,      // [in] Type of vertex input
-    uint32_t     location,      // Location of vertex input
-    uint32_t     compIdx,       // Index used for vector element indexing
+    unsigned     location,      // Location of vertex input
+    unsigned     compIdx,       // Index used for vector element indexing
     Instruction* pInsertPos)    // [in] Where to insert vertex fetch instructions
 {
     Value* pVertex = nullptr;
@@ -516,8 +516,8 @@ Value* VertexFetch::Run(
     const bool secondFetch = NeedSecondVertexFetch(pDescription);
     if (secondFetch)
     {
-        uint32_t numChannels = formatInfo.numChannels;
-        uint32_t dfmt = formatInfo.dfmt;
+        unsigned numChannels = formatInfo.numChannels;
+        unsigned dfmt = formatInfo.dfmt;
 
         if (pDescription->dfmt == BufDataFormat64_64_64)
         {
@@ -545,7 +545,7 @@ Value* VertexFetch::Run(
         assert((vertexFetches[0] != nullptr) && (vertexFetches[1] != nullptr));
         assert(vertexFetches[0]->getType()->getVectorNumElements() == 4);
 
-        uint32_t compCount = vertexFetches[1]->getType()->getVectorNumElements();
+        unsigned compCount = vertexFetches[1]->getType()->getVectorNumElements();
         assert((compCount == 2) || (compCount == 4)); // Should be <2 x i32> or <4 x i32>
 
         if (compCount == 2)
@@ -570,7 +570,7 @@ Value* VertexFetch::Run(
 
         // %vf = shufflevector %vf0, %vf1, <0, 1, 2, 3, 4, 5, ...>
         shuffleMask.clear();
-        for (uint32_t i = 0; i < 4 + compCount; ++i)
+        for (unsigned i = 0; i < 4 + compCount; ++i)
         {
             shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), i));
         }
@@ -587,7 +587,7 @@ Value* VertexFetch::Run(
 
     // Finalize vertex fetch
     Type* pBasicTy = pInputTy->isVectorTy() ? pInputTy->getVectorElementType() : pInputTy;
-    const uint32_t bitWidth = pBasicTy->getScalarSizeInBits();
+    const unsigned bitWidth = pBasicTy->getScalarSizeInBits();
     assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
     // Get default fetch values
@@ -634,10 +634,10 @@ Value* VertexFetch::Run(
         llvm_unreachable("Should never be called!");
     }
 
-    const uint32_t defaultCompCount = pDefaults->getType()->getVectorNumElements();
+    const unsigned defaultCompCount = pDefaults->getType()->getVectorNumElements();
     std::vector<Value*> defaultValues(defaultCompCount);
 
-    for (uint32_t i = 0; i < defaultValues.size(); ++i)
+    for (unsigned i = 0; i < defaultValues.size(); ++i)
     {
         defaultValues[i] = ExtractElementInst::Create(pDefaults,
                                                       ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
@@ -646,7 +646,7 @@ Value* VertexFetch::Run(
     }
 
     // Get vertex fetch values
-    const uint32_t fetchCompCount = pVertexFetch->getType()->isVectorTy() ?
+    const unsigned fetchCompCount = pVertexFetch->getType()->isVectorTy() ?
                                         pVertexFetch->getType()->getVectorNumElements() : 1;
     std::vector<Value*> fetchValues(fetchCompCount);
 
@@ -656,7 +656,7 @@ Value* VertexFetch::Run(
     }
     else
     {
-        for (uint32_t i = 0; i < fetchCompCount; ++i)
+        for (unsigned i = 0; i < fetchCompCount; ++i)
         {
             fetchValues[i] = ExtractElementInst::Create(pVertexFetch,
                                                         ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
@@ -666,8 +666,8 @@ Value* VertexFetch::Run(
     }
 
     // Construct vertex fetch results
-    const uint32_t inputCompCount = pInputTy->isVectorTy() ? pInputTy->getVectorNumElements() : 1;
-    const uint32_t vertexCompCount = inputCompCount * ((bitWidth == 64) ? 2 : 1);
+    const unsigned inputCompCount = pInputTy->isVectorTy() ? pInputTy->getVectorNumElements() : 1;
+    const unsigned vertexCompCount = inputCompCount * ((bitWidth == 64) ? 2 : 1);
 
     std::vector<Value*> vertexValues(vertexCompCount);
 
@@ -675,7 +675,7 @@ Value* VertexFetch::Run(
     compIdx *= ((bitWidth == 64) ? 2 : 1);
 
     // Vertex input might take values from vertex fetch values or default fetch values
-    for (uint32_t i = 0; i < vertexCompCount; i++)
+    for (unsigned i = 0; i < vertexCompCount; i++)
     {
         if (compIdx + i < fetchCompCount)
         {
@@ -701,7 +701,7 @@ Value* VertexFetch::Run(
         Type* pVertexTy = VectorType::get(Type::getInt32Ty(*m_pContext), vertexCompCount);
         pVertex = UndefValue::get(pVertexTy);
 
-        for (uint32_t i = 0; i < vertexCompCount; ++i)
+        for (unsigned i = 0; i < vertexCompCount; ++i)
         {
             pVertex = InsertElementInst::Create(pVertex,
                                                 vertexValues[i],
@@ -793,7 +793,7 @@ VertexFormatInfo VertexFetch::GetVertexFormatInfo(
 // =====================================================================================================================
 // Gets component info from table according to vertex buffer data format.
 const VertexCompFormatInfo* VertexFetch::GetVertexComponentFormatInfo(
-    uint32_t dfmt) // Date format of vertex buffer
+    unsigned dfmt) // Date format of vertex buffer
 {
     assert(dfmt < sizeof(m_vertexCompFormatInfo) / sizeof(m_vertexCompFormatInfo[0]));
     return &m_vertexCompFormatInfo[dfmt];
@@ -801,19 +801,19 @@ const VertexCompFormatInfo* VertexFetch::GetVertexComponentFormatInfo(
 
 // =====================================================================================================================
 // Maps separate buffer data and numeric formats to the combined buffer format
-uint32_t VertexFetch::MapVertexFormat(
-    uint32_t dfmt,  // Data format
-    uint32_t nfmt   // Numeric format
+unsigned VertexFetch::MapVertexFormat(
+    unsigned dfmt,  // Data format
+    unsigned nfmt   // Numeric format
     ) const
 {
     assert(dfmt < 16);
     assert(nfmt < 8);
-    uint32_t format = 0;
+    unsigned format = 0;
 
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
     if (gfxIp.major >= 10)
     {
-        uint32_t index = (dfmt * 8) + nfmt;
+        unsigned index = (dfmt * 8) + nfmt;
         assert(index < sizeof(m_vertexFormatMap) / sizeof(m_vertexFormatMap[0]));
         format = m_vertexFormatMap[index];
     }
@@ -830,7 +830,7 @@ uint32_t VertexFetch::MapVertexFormat(
 // =====================================================================================================================
 // Loads vertex descriptor based on the specified vertex input location.
 Value* VertexFetch::LoadVertexBufferDescriptor(
-    uint32_t     binding,       // ID of vertex buffer binding
+    unsigned     binding,       // ID of vertex buffer binding
     Instruction* pInsertPos     // [in] Where to insert instructions
     ) const
 {
@@ -854,13 +854,13 @@ Value* VertexFetch::LoadVertexBufferDescriptor(
 // Inserts instructions to do vertex fetch operations.
 void VertexFetch::AddVertexFetchInst(
     Value*       pVbDesc,       // [in] Vertex buffer descriptor
-    uint32_t     numChannels,   // Valid number of channels
+    unsigned     numChannels,   // Valid number of channels
     bool         is16bitFetch,  // Whether it is 16-bit vertex fetch
     Value*       pVbIndex,      // [in] Index of vertex fetch in buffer
-    uint32_t     offset,        // Vertex attribute offset (in bytes)
-    uint32_t     stride,        // Vertex attribute stride (in bytes)
-    uint32_t     dfmt,          // Date format of vertex buffer
-    uint32_t     nfmt,          // Numeric format of vertex buffer
+    unsigned     offset,        // Vertex attribute offset (in bytes)
+    unsigned     stride,        // Vertex attribute stride (in bytes)
+    unsigned     dfmt,          // Date format of vertex buffer
+    unsigned     nfmt,          // Numeric format of vertex buffer
     Instruction* pInsertPos,    // [in] Where to insert instructions
     Value**      ppFetch        // [out] Destination of vertex fetch
     ) const
@@ -989,11 +989,11 @@ void VertexFetch::AddVertexFetchInst(
         assert(numChannels == pFormatInfo->compCount);
 
         Value* compVbIndices[4]  = {};
-        uint32_t compOffsets[4] = {};
+        unsigned compOffsets[4] = {};
 
-        for (uint32_t i = 0; i < pFormatInfo->compCount; ++i)
+        for (unsigned i = 0; i < pFormatInfo->compCount; ++i)
         {
-            uint32_t compOffset = offset + i * pFormatInfo->compByteSize;
+            unsigned compOffset = offset + i * pFormatInfo->compByteSize;
 
             // NOTE: If the vertex attribute per-component offset is greater than vertex attribute stride, we have
             // to adjust both vertex buffer index and vertex per-component offset accordingly. Otherwise, vertex
@@ -1018,7 +1018,7 @@ void VertexFetch::AddVertexFetchInst(
         Value* pFetch = UndefValue::get(pFetchTy);
 
         // Do vertex per-component fetches
-        for (uint32_t i = 0; i < pFormatInfo->compCount; ++i)
+        for (unsigned i = 0; i < pFormatInfo->compCount; ++i)
         {
             Value* args[] = {
                 pVbDesc,                                                          // rsrc

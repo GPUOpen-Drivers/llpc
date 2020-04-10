@@ -58,13 +58,13 @@ FragColorExport::FragColorExport(
 // Executes fragment color export operations based on the specified output type and its location.
 Value* FragColorExport::Run(
     Value*       pOutput,       // [in] Fragment color output
-    uint32_t     location,      // Location of fragment color output
+    unsigned     location,      // Location of fragment color output
     Instruction* pInsertPos)    // [in] Where to insert fragment color export instructions
 {
     auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment);
 
     Type* pOutputTy = pOutput->getType();
-    const uint32_t origLoc = pResUsage->inOutUsage.fs.outputOrigLocs[location];
+    const unsigned origLoc = pResUsage->inOutUsage.fs.outputOrigLocs[location];
 
     ExportFormat expFmt = EXP_FORMAT_ZERO;
     if (m_pPipelineState->GetColorExportState().dualSourceBlendEnable)
@@ -84,14 +84,14 @@ Value* FragColorExport::Run(
         pResUsage->inOutUsage.fs.cbShaderMask &= ~(0xF << (4 * origLoc));
     }
 
-    const uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
+    const unsigned bitWidth = pOutputTy->getScalarSizeInBits();
     BasicType outputType = pResUsage->inOutUsage.fs.outputTypes[origLoc];
     const bool signedness = ((outputType == BasicType::Int8) ||
                              (outputType == BasicType::Int16) ||
                              (outputType == BasicType::Int));
 
     auto pCompTy = pOutputTy->isVectorTy() ? pOutputTy->getVectorElementType() : pOutputTy;
-    uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
+    unsigned compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
 
     Value* comps[4] = { nullptr };
     if (compCount == 1)
@@ -100,7 +100,7 @@ Value* FragColorExport::Run(
     }
     else
     {
-        for (uint32_t i = 0; i < compCount; ++i)
+        for (unsigned i = 0; i < compCount; ++i)
         {
             comps[i] = ExtractElementInst::Create(pOutput,
                                                   ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
@@ -173,12 +173,12 @@ Value* FragColorExport::Run(
         }
     case EXP_FORMAT_32_ABGR:
        {
-            for (uint32_t i = 0; i < compCount; ++i)
+            for (unsigned i = 0; i < compCount; ++i)
             {
                 comps[i] = ConvertToFloat(comps[i], signedness, pInsertPos);
             }
 
-            for (uint32_t i = compCount; i < 4; ++i)
+            for (unsigned i = compCount; i < 4; ++i)
             {
                 comps[i] = pUndefFloat;
             }
@@ -194,7 +194,7 @@ Value* FragColorExport::Run(
 
                 // Cast i8 to float16
                 assert(pCompTy->isIntegerTy());
-                for (uint32_t i = 0; i < compCount; ++i)
+                for (unsigned i = 0; i < compCount; ++i)
                 {
                     if (signedness)
                     {
@@ -211,7 +211,7 @@ Value* FragColorExport::Run(
                     comps[i] = new BitCastInst(comps[i], Type::getHalfTy(*m_pContext), "", pInsertPos);
                 }
 
-                for (uint32_t i = compCount; i < 4; ++i)
+                for (unsigned i = compCount; i < 4; ++i)
                 {
                     comps[i] = pUndefFloat16;
                 }
@@ -223,14 +223,14 @@ Value* FragColorExport::Run(
                 if (pCompTy->isIntegerTy())
                 {
                     // Cast i16 to float16
-                    for (uint32_t i = 0; i < compCount; ++i)
+                    for (unsigned i = 0; i < compCount; ++i)
                     {
                         // %comp = bitcast i16 %comp to half
                         comps[i] = new BitCastInst(comps[i], Type::getHalfTy(*m_pContext), "", pInsertPos);
                     }
                 }
 
-                for (uint32_t i = compCount; i < 4; ++i)
+                for (unsigned i = compCount; i < 4; ++i)
                 {
                     comps[i] = pUndefFloat16;
                 }
@@ -240,14 +240,14 @@ Value* FragColorExport::Run(
                 if (pCompTy->isIntegerTy())
                 {
                     // Cast i32 to float
-                    for (uint32_t i = 0; i < compCount; ++i)
+                    for (unsigned i = 0; i < compCount; ++i)
                     {
                         // %comp = bitcast i32 %comp to float
                         comps[i] = new BitCastInst(comps[i], Type::getFloatTy(*m_pContext), "", pInsertPos);
                     }
                 }
 
-                for (uint32_t i = compCount; i < 4; ++i)
+                for (unsigned i = compCount; i < 4; ++i)
                 {
                     comps[i] = pUndefFloat;
                 }
@@ -285,7 +285,7 @@ Value* FragColorExport::Run(
             comprExp = true;
             needPack = true;
 
-            for (uint32_t i = 0; i < compCount; ++i)
+            for (unsigned i = 0; i < compCount; ++i)
             {
                 // Convert the components to float value if necessary
                 comps[i] = ConvertToFloat(comps[i], signedness, pInsertPos);
@@ -302,7 +302,7 @@ Value* FragColorExport::Run(
             StringRef funcName = (expFmt == EXP_FORMAT_SNORM16_ABGR) ?
                 ("llvm.amdgcn.cvt.pknorm.i16") : ("llvm.amdgcn.cvt.pknorm.u16");
 
-            for (uint32_t i = 0; i < compCount; i += 2)
+            for (unsigned i = 0; i < compCount; i += 2)
             {
                 Value* pPackedComps = EmitCall(funcName,
                                                VectorType::get(Type::getInt16Ty(*m_pContext), 2),
@@ -327,7 +327,7 @@ Value* FragColorExport::Run(
 
             }
 
-            for (uint32_t i = compCount; i < 4; ++i)
+            for (unsigned i = compCount; i < 4; ++i)
             {
                 comps[i] = pUndefFloat16;
             }
@@ -340,7 +340,7 @@ Value* FragColorExport::Run(
             comprExp = true;
             needPack = true;
 
-            for (uint32_t i = 0; i < compCount; ++i)
+            for (unsigned i = 0; i < compCount; ++i)
             {
                 // Convert the components to int value if necessary
                 comps[i] = ConvertToInt(comps[i], signedness, pInsertPos);
@@ -357,7 +357,7 @@ Value* FragColorExport::Run(
             StringRef funcName = (expFmt == EXP_FORMAT_SINT16_ABGR) ?
                 ("llvm.amdgcn.cvt.pk.i16") : ("llvm.amdgcn.cvt.pk.u16");
 
-            for (uint32_t i = 0; i < compCount; i += 2)
+            for (unsigned i = 0; i < compCount; i += 2)
             {
                 Value* pPackedComps = EmitCall(funcName,
                                                VectorType::get(Type::getInt16Ty(*m_pContext), 2),
@@ -381,7 +381,7 @@ Value* FragColorExport::Run(
                                                             pInsertPos);
             }
 
-            for (uint32_t i = compCount; i < 4; ++i)
+            for (unsigned i = compCount; i < 4; ++i)
             {
                 comps[i] = pUndefFloat16;
             }
@@ -480,12 +480,12 @@ Value* FragColorExport::Run(
 // for SPI_SHADER_COL_FORMAT.
 ExportFormat FragColorExport::ComputeExportFormat(
     Type*    pOutputTy,  // [in] Type of fragment data output
-    uint32_t location    // Location of fragment data output
+    unsigned location    // Location of fragment data output
     ) const
 {
     GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
     auto pGpuWorkarounds = &m_pPipelineState->GetTargetInfo().GetGpuWorkarounds();
-    uint32_t outputMask = pOutputTy->isVectorTy() ? (1 << pOutputTy->getVectorNumElements()) - 1 : 1;
+    unsigned outputMask = pOutputTy->isVectorTy() ? (1 << pOutputTy->getVectorNumElements()) - 1 : 1;
     const auto pCbState = &m_pPipelineState->GetColorExportState();
     const auto pTarget = &m_pPipelineState->GetColorExportFormat(location);
     // NOTE: Alpha-to-coverage only takes effect for outputs from color target 0.
@@ -506,7 +506,7 @@ ExportFormat FragColorExport::ComputeExportFormat(
         isFloatFormat = true;
     }
 
-    const uint32_t maxCompBitCount = GetMaxComponentBitCount(pTarget->dfmt);
+    const unsigned maxCompBitCount = GetMaxComponentBitCount(pTarget->dfmt);
 
     const bool formatHasAlpha = HasAlpha(pTarget->dfmt);
     const bool alphaExport = ((outputMask == 0xF) &&
@@ -618,7 +618,7 @@ CompSetting FragColorExport::ComputeCompSetting(
 
 // =====================================================================================================================
 // Get the number of channels
-uint32_t FragColorExport::GetNumChannels(
+unsigned FragColorExport::GetNumChannels(
     BufDataFormat dfmt) // Color attachment data format
 {
     switch (dfmt)
@@ -693,7 +693,7 @@ bool FragColorExport::HasAlpha(
 
 // =====================================================================================================================
 // Gets the maximum bit-count of any component in specified color attachment format.
-uint32_t FragColorExport::GetMaxComponentBitCount(
+unsigned FragColorExport::GetMaxComponentBitCount(
     BufDataFormat dfmt) // Color attachment data format
 {
     switch (dfmt)
@@ -757,7 +757,7 @@ Value* FragColorExport::ConvertToFloat(
     Type* pValueTy = pValue->getType();
     assert(pValueTy->isFloatingPointTy() || pValueTy->isIntegerTy()); // Should be floating-point/integer scalar
 
-    const uint32_t bitWidth = pValueTy->getScalarSizeInBits();
+    const unsigned bitWidth = pValueTy->getScalarSizeInBits();
     if (bitWidth == 8)
     {
         assert(pValueTy->isIntegerTy());
@@ -824,7 +824,7 @@ Value* FragColorExport::ConvertToInt(
     Type* pValueTy = pValue->getType();
     assert(pValueTy->isFloatingPointTy() || pValueTy->isIntegerTy()); // Should be floating-point/integer scalar
 
-    const uint32_t bitWidth = pValueTy->getScalarSizeInBits();
+    const unsigned bitWidth = pValueTy->getScalarSizeInBits();
     if (bitWidth == 8)
     {
         assert(pValueTy->isIntegerTy());

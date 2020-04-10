@@ -53,7 +53,7 @@ struct ShaderHeader
 };
 
 // Enum defining the states a shader cache entry can be in
-enum class ShaderEntryState : uint32_t
+enum class ShaderEntryState : unsigned
 {
     New         = 0,    // Initial state
     Compiling   = 1,    // An entry was created and must be compiled/populated by the caller
@@ -121,7 +121,7 @@ struct ShaderCacheSerializedHeader
     size_t              shaderDataEnd; // Offset to the end of shader data
 };
 
-constexpr uint32_t MaxFilePathLen = 256;
+constexpr unsigned MaxFilePathLen = 256;
 
 typedef void* CacheEntryHandle;
 
@@ -139,7 +139,7 @@ public:
 
     virtual Result Serialize(void* pBlob, size_t* pSize);
 
-    virtual Result Merge(uint32_t srcCacheCount, const IShaderCache** ppSrcCaches);
+    virtual Result Merge(unsigned srcCacheCount, const IShaderCache** ppSrcCaches);
 
     ShaderEntryState FindShader(MetroHash::Hash   hash,
                                 bool              allocateOnMiss,
@@ -206,7 +206,7 @@ private:
     char            m_fileFullPath[MaxFilePathLen]; // Full path/filename of the shader cache on-disk file
 
     std::list<std::pair<uint8_t*, size_t> > m_allocationList;  // Memory allcoated by GetCacheSpace
-    uint32_t                 m_serializedSize;      // Serialized byte size of whole shader cache
+    unsigned                 m_serializedSize;      // Serialized byte size of whole shader cache
     std::mutex               m_conditionMutex;      // Mutex that will be used with the condition variable
     std::condition_variable  m_conditionVariable;   // Condition variable that will be used to wait compile finish
     const void*              m_pClientData;         // Client data that will be used by function GetValue and StoreValue

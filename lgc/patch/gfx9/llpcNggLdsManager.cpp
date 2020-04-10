@@ -51,11 +51,11 @@ namespace lgc
 
 // =====================================================================================================================
 // Initialize static members
-const uint32_t NggLdsManager::LdsRegionSizes[LdsRegionCount] =
+const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] =
 {
     // LDS region size for ES-only
 
-    // 1 DWORD (uint32_t) per thread
+    // 1 DWORD (unsigned) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionDistribPrimId
     // 4 DWORDs (vec4) per thread
     SizeOfVec4 * Gfx9::NggMaxThreadsPerSubgroup,                      // LdsRegionPosData
@@ -65,34 +65,34 @@ const uint32_t NggLdsManager::LdsRegionSizes[LdsRegionCount] =
     SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword,         // LdsRegionPrimCountInWaves
     // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group
     SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword,         // LdsRegionVertCountInWaves
-    // 1 DWORD (uint32_t) per thread
+    // 1 DWORD (unsigned) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionCullDistance
     // 1 BYTE (uint8_t) per thread
     Gfx9::NggMaxThreadsPerSubgroup,                                   // LdsRegionVertThreadIdMap
-    // 1 DWORD (uint32_t) per thread
+    // 1 DWORD (unsigned) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionCompactVertexId
-    // 1 DWORD (uint32_t) per thread
+    // 1 DWORD (unsigned) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionCompactInstanceId
-    // 1 DWORD (uint32_t) per thread
+    // 1 DWORD (unsigned) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionCompactPrimId
-    // 1 DWORD (uint32_t) per thread
+    // 1 DWORD (unsigned) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionCompactTessCoordX
-    // 1 DWORD (uint32_t) per thread
+    // 1 DWORD (unsigned) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionCompactTessCoordY
-    // 1 DWORD (uint32_t) per thread
+    // 1 DWORD (unsigned) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionCompactPatchId
-    // 1 DWORD (uint32_t) per thread
+    // 1 DWORD (unsigned) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionCompactRelPatchId
 
     // LDS region size for ES-GS
 
     // ES-GS ring size is dynamically calculated (don't use it)
     InvalidValue,                                                      // LdsRegionEsGsRing
-    // 1 DWORD (uint32_t) per thread
+    // 1 DWORD (unsigned) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                      // LdsRegionOutPrimData
     // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group (4 GS streams)
     MaxGsStreams * (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword),   // LdsRegionOutVertCountInWaves
-    // 1 DWORD (uint32_t) per thread
+    // 1 DWORD (unsigned) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                      // LdsRegionOutVertOffset
     // GS-VS ring size is dynamically calculated (don't use it)
     InvalidValue,                                                      // LdsRegionGsVsRing
@@ -142,7 +142,7 @@ NggLdsManager::NggLdsManager(
     const auto pNggControl = m_pPipelineState->GetNggControl();
     assert(pNggControl->enableNgg);
 
-    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
+    const unsigned stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasGs = (stageMask & ShaderStageToMask(ShaderStageGeometry));
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
@@ -177,15 +177,15 @@ NggLdsManager::NggLdsManager(
 
         // NOTE: We round ES-GS LDS size to 4-DWORD alignment. This is for later LDS read/write operations of mutilple
         // DWORDs (such as DS128).
-        const uint32_t esGsRingLdsSize = alignTo(calcFactor.esGsLdsSize, 4u) * SizeOfDword;
-        const uint32_t gsVsRingLdsSize = calcFactor.gsOnChipLdsSize * SizeOfDword - esGsRingLdsSize -
+        const unsigned esGsRingLdsSize = alignTo(calcFactor.esGsLdsSize, 4u) * SizeOfDword;
+        const unsigned gsVsRingLdsSize = calcFactor.gsOnChipLdsSize * SizeOfDword - esGsRingLdsSize -
                                          CalcGsExtraLdsSize(m_pPipelineState);
 
-        uint32_t ldsRegionStart = 0;
+        unsigned ldsRegionStart = 0;
 
-        for (uint32_t region = LdsRegionGsBeginRange; region <= LdsRegionGsEndRange; ++region)
+        for (unsigned region = LdsRegionGsBeginRange; region <= LdsRegionGsEndRange; ++region)
         {
-            uint32_t ldsRegionSize = LdsRegionSizes[region];
+            unsigned ldsRegionSize = LdsRegionSizes[region];
 
             if (region == LdsRegionOutVertOffset)
             {
@@ -245,8 +245,8 @@ NggLdsManager::NggLdsManager(
             //                            | Tesscoord X | Tesscoord Y | Patch ID    | Relative patch ID | (TES)
             //                            +-------------+-------------+-------------+-------------------+
             //
-            uint32_t ldsRegionStart = 0;
-            for (uint32_t region = LdsRegionEsBeginRange; region <= LdsRegionEsEndRange; ++region)
+            unsigned ldsRegionStart = 0;
+            for (unsigned region = LdsRegionEsBeginRange; region <= LdsRegionEsEndRange; ++region)
             {
                 // NOTE: For NGG non pass-through mode, primitive ID region is overlapped with position data.
                 if (region == LdsRegionDistribPrimId)
@@ -302,7 +302,7 @@ NggLdsManager::NggLdsManager(
 
 // =====================================================================================================================
 // Calculates ES extra LDS size.
-uint32_t NggLdsManager::CalcEsExtraLdsSize(
+unsigned NggLdsManager::CalcEsExtraLdsSize(
     PipelineState* pPipelineState)  // [in] Pipeline state
 {
     const auto pNggControl = pPipelineState->GetNggControl();
@@ -311,7 +311,7 @@ uint32_t NggLdsManager::CalcEsExtraLdsSize(
         return 0;
     }
 
-    const uint32_t stageMask = pPipelineState->GetShaderStageMask();
+    const unsigned stageMask = pPipelineState->GetShaderStageMask();
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
     if (hasGs)
@@ -323,7 +323,7 @@ uint32_t NggLdsManager::CalcEsExtraLdsSize(
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
 
-    uint32_t esExtraLdsSize = 0;
+    unsigned esExtraLdsSize = 0;
 
     if (pNggControl->passthroughMode)
     {
@@ -339,7 +339,7 @@ uint32_t NggLdsManager::CalcEsExtraLdsSize(
     }
     else
     {
-        for (uint32_t region = LdsRegionEsBeginRange; region <= LdsRegionEsEndRange; ++region)
+        for (unsigned region = LdsRegionEsBeginRange; region <= LdsRegionEsEndRange; ++region)
         {
             // NOTE: For NGG non pass-through mode, primitive ID region is overlapped with position data.
             if (region == LdsRegionDistribPrimId)
@@ -389,7 +389,7 @@ uint32_t NggLdsManager::CalcEsExtraLdsSize(
 
 // =====================================================================================================================
 // Calculates GS extra LDS size (used for operations other than ES-GS ring and GS-VS ring read/write).
-uint32_t NggLdsManager::CalcGsExtraLdsSize(
+unsigned NggLdsManager::CalcGsExtraLdsSize(
     PipelineState* pPipelineState)  // [in] Pipeline state
 {
     const auto pNggControl = pPipelineState->GetNggControl();
@@ -398,7 +398,7 @@ uint32_t NggLdsManager::CalcGsExtraLdsSize(
         return 0;
     }
 
-    const uint32_t stageMask = pPipelineState->GetShaderStageMask();
+    const unsigned stageMask = pPipelineState->GetShaderStageMask();
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
     if (hasGs == false)
     {
@@ -406,7 +406,7 @@ uint32_t NggLdsManager::CalcGsExtraLdsSize(
         return 0;
     }
 
-    uint32_t gsExtraLdsSize = LdsRegionSizes[LdsRegionOutPrimData] + LdsRegionSizes[LdsRegionOutVertCountInWaves];
+    unsigned gsExtraLdsSize = LdsRegionSizes[LdsRegionOutPrimData] + LdsRegionSizes[LdsRegionOutVertCountInWaves];
 
     return gsExtraLdsSize;
 }
@@ -421,11 +421,11 @@ Value* NggLdsManager::ReadValueFromLds(
     assert(m_pLds != nullptr);
     assert(pReadTy->isIntOrIntVectorTy() || pReadTy->isFPOrFPVectorTy());
 
-    const uint32_t readBits = pReadTy->getPrimitiveSizeInBits();
+    const unsigned readBits = pReadTy->getPrimitiveSizeInBits();
 
-    uint32_t bitWidth = 0;
-    uint32_t compCount = 0;
-    uint32_t alignment = 4;
+    unsigned bitWidth = 0;
+    unsigned compCount = 0;
+    unsigned alignment = 4;
 
     if (readBits % 128 == 0)
     {
@@ -466,7 +466,7 @@ Value* NggLdsManager::ReadValueFromLds(
     auto pLds = ConstantExpr::getBitCast(m_pLds,
                     PointerType::get(Type::getInt8Ty(*m_pContext), m_pLds->getType()->getPointerAddressSpace()));
 
-    for (uint32_t i = 0; i < compCount; ++i)
+    for (unsigned i = 0; i < compCount; ++i)
     {
         Value* pLoadPtr = m_pBuilder->CreateGEP(pLds, pLdsOffset);
         if (bitWidth != 8)
@@ -511,11 +511,11 @@ void NggLdsManager::WriteValueToLds(
     auto pWriteTy = pWriteValue->getType();
     assert(pWriteTy->isIntOrIntVectorTy() || pWriteTy->isFPOrFPVectorTy());
 
-    const uint32_t writeBits = pWriteTy->getPrimitiveSizeInBits();
+    const unsigned writeBits = pWriteTy->getPrimitiveSizeInBits();
 
-    uint32_t bitWidth = 0;
-    uint32_t compCount = 0;
-    uint32_t alignment = 4;
+    unsigned bitWidth = 0;
+    unsigned compCount = 0;
+    unsigned alignment = 4;
 
     if (writeBits % 128 == 0)
     {
@@ -561,7 +561,7 @@ void NggLdsManager::WriteValueToLds(
     auto pLds = ConstantExpr::getBitCast(m_pLds,
                   PointerType::get(Type::getInt8Ty(*m_pContext), m_pLds->getType()->getPointerAddressSpace()));
 
-    for (uint32_t i = 0; i < compCount; ++i)
+    for (unsigned i = 0; i < compCount; ++i)
     {
         Value* pStorePtr = m_pBuilder->CreateGEP(pLds, pLdsOffset);
         if (bitWidth != 8)

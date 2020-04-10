@@ -41,14 +41,14 @@ namespace Util
 namespace Abi
 {
 
-constexpr uint32_t PipelineMetadataMajorVersion = 2;  // Pipeline Metadata Major Version
-constexpr uint32_t PipelineMetadataMinorVersion = 3;  // Pipeline Metadata Minor Version
+constexpr unsigned PipelineMetadataMajorVersion = 2;  // Pipeline Metadata Major Version
+constexpr unsigned PipelineMetadataMinorVersion = 3;  // Pipeline Metadata Minor Version
 
-constexpr uint32_t PipelineMetadataBase = 0x10000000; // Pipeline Metadata base value to be OR'd with the
+constexpr unsigned PipelineMetadataBase = 0x10000000; // Pipeline Metadata base value to be OR'd with the
                                                       //  PipelineMetadataEntry value when saving to ELF.
 
 // Pipeline category.
-enum PipelineType : uint32_t
+enum PipelineType : unsigned
 {
     VsPs = 0,
     Gs,
@@ -60,7 +60,7 @@ enum PipelineType : uint32_t
 };
 
 // Hardware shader stage
-enum class HardwareStage : uint32_t
+enum class HardwareStage : unsigned
 {
     Ls = 0, ///< Hardware LS stage
     Hs,     ///< Hardware hS stage
@@ -73,15 +73,15 @@ enum class HardwareStage : uint32_t
 };
 
 // Used to represent hardware shader stage.
-enum HardwareStageFlagBits : uint32_t
+enum HardwareStageFlagBits : unsigned
 {
-    HwShaderLs = (1 << static_cast<uint32_t>(HardwareStage::Ls)),
-    HwShaderHs = (1 << static_cast<uint32_t>(HardwareStage::Hs)),
-    HwShaderEs = (1 << static_cast<uint32_t>(HardwareStage::Es)),
-    HwShaderGs = (1 << static_cast<uint32_t>(HardwareStage::Gs)),
-    HwShaderVs = (1 << static_cast<uint32_t>(HardwareStage::Vs)),
-    HwShaderPs = (1 << static_cast<uint32_t>(HardwareStage::Ps)),
-    HwShaderCs = (1 << static_cast<uint32_t>(HardwareStage::Cs)),
+    HwShaderLs = (1 << static_cast<unsigned>(HardwareStage::Ls)),
+    HwShaderHs = (1 << static_cast<unsigned>(HardwareStage::Hs)),
+    HwShaderEs = (1 << static_cast<unsigned>(HardwareStage::Es)),
+    HwShaderGs = (1 << static_cast<unsigned>(HardwareStage::Gs)),
+    HwShaderVs = (1 << static_cast<unsigned>(HardwareStage::Vs)),
+    HwShaderPs = (1 << static_cast<unsigned>(HardwareStage::Ps)),
+    HwShaderCs = (1 << static_cast<unsigned>(HardwareStage::Cs)),
 };
 
 namespace PalCodeObjectMetadataKey
@@ -139,7 +139,7 @@ namespace ShaderMetadataKey
 
 /// User data entries can map to physical user data registers.  UserDataMapping describes the
 /// content of the registers.
-enum class UserDataMapping : uint32_t
+enum class UserDataMapping : unsigned
 {
     GlobalTable       = 0x10000000, // 32-bit pointer to GPU memory containing the global internal table.
     PerShaderTable    = 0x10000001, // 32-bit pointer to GPU memory containing the per-shader internal table.

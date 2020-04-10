@@ -238,11 +238,11 @@ public:
 
   void updateBuilderDebugLoc(SPIRVValue *BV, Function *F);
 
-  Type *transType(SPIRVType *BT, uint32_t MatrixStride = 0,
+  Type *transType(SPIRVType *BT, unsigned MatrixStride = 0,
     bool ColumnMajor = true, bool ParentIsPointer = false,
     bool ExplicitlyLaidOut = false);
   template<spv::Op> Type* transTypeWithOpcode(SPIRVType *BT,
-    uint32_t MatrixStride, bool ColumnMajor, bool ParentIsPointer,
+    unsigned MatrixStride, bool ColumnMajor, bool ParentIsPointer,
     bool ExplicitlyLaidOut);
   std::vector<Type *> transTypeVector(const std::vector<SPIRVType *> &);
   bool translate(ExecutionModel EntryExecModel, const char *EntryName);
@@ -267,7 +267,7 @@ public:
   bool checkContains64BitType(SPIRVType *BT);
   Constant *buildShaderInOutMetadata(SPIRVType *BT, ShaderInOutDecorate &InOutDec, Type *&MetaTy);
   Constant *buildShaderBlockMetadata(SPIRVType* BT, ShaderBlockDecorate &BlockDec, Type *&MDTy);
-  uint32_t calcShaderBlockSize(SPIRVType *BT, uint32_t BlockSize, uint32_t MatrixStride, bool IsRowMajor);
+  unsigned calcShaderBlockSize(SPIRVType *BT, unsigned BlockSize, unsigned MatrixStride, bool IsRowMajor);
   Value *transGLSLExtInst(SPIRVExtInst *ExtInst, BasicBlock *BB);
   Value *flushDenorm(Value *Val);
   Value *transTrinaryMinMaxExtInst(SPIRVExtInst *ExtInst, BasicBlock *BB);
@@ -357,7 +357,7 @@ public:
   typedef DenseMap<SPIRVValue *, Value *> SPIRVBlockToLLVMStructMap;
   typedef DenseMap<SPIRVFunction *, Function *> SPIRVToLLVMFunctionMap;
   typedef DenseMap<GlobalVariable *, SPIRVBuiltinVariableKind> BuiltinVarMap;
-  typedef DenseMap<SPIRVType *, SmallVector<uint32_t, 8>> RemappedTypeElementsMap;
+  typedef DenseMap<SPIRVType *, SmallVector<unsigned, 8>> RemappedTypeElementsMap;
 
   // A SPIRV value may be translated to a load instruction of a placeholder
   // global variable. This map records load instruction of these placeholders
@@ -381,11 +381,11 @@ private:
   SPIRVBlockToLLVMStructMap BlockMap;
   SPIRVToLLVMPlaceholderMap PlaceholderMap;
   SPIRVToLLVMDbgTran DbgTran;
-  std::map<std::string, uint32_t> MangleNameToIndex;
+  std::map<std::string, unsigned> MangleNameToIndex;
   RemappedTypeElementsMap RemappedTypeElements;
   DenseMap<Type *, bool> TypesWithPadMap;
   DenseMap<Type*, uint64_t> TypeToStoreSize;
-  DenseMap<std::pair<SPIRVType*, uint32_t>, Type *> OverlappingStructTypeWorkaroundMap;
+  DenseMap<std::pair<SPIRVType*, unsigned>, Type *> OverlappingStructTypeWorkaroundMap;
   DenseMap<std::pair<BasicBlock*, BasicBlock*>, unsigned> BlockPredecessorToCount;
   const ShaderModuleUsage* ModuleUsage;
 
@@ -396,7 +396,7 @@ private:
     return T;
   }
 
-  void recordRemappedTypeElements(SPIRVType *BT, uint32_t From, uint32_t To) {
+  void recordRemappedTypeElements(SPIRVType *BT, unsigned From, unsigned To) {
     auto& Elements = RemappedTypeElements[BT];
 
     if (Elements.size() <= From) {
@@ -410,13 +410,13 @@ private:
     return RemappedTypeElements.count(BT) > 0;
   }
 
-  uint32_t lookupRemappedTypeElements(SPIRVType *BT, uint32_t From) {
+  unsigned lookupRemappedTypeElements(SPIRVType *BT, unsigned From) {
     assert(RemappedTypeElements.count(BT) > 0);
     assert(RemappedTypeElements[BT].size() > From);
     return RemappedTypeElements[BT][From];
   }
 
-  Type *getPadType(uint32_t bytes) {
+  Type *getPadType(unsigned bytes) {
     return ArrayType::get(getBuilder()->getInt8Ty(), bytes);
   }
 
@@ -573,7 +573,7 @@ Type *SPIRVToLLVM::transFPType(SPIRVType *T) {
 // '<element>[length]' -> 'struct { <element>, <padding bytes> }[length]'.
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(
     SPIRVType* const pSpvType,            // [in] The type.
-    const uint32_t   matrixStride,        // The matrix stride (can be 0).
+    const unsigned   matrixStride,        // The matrix stride (can be 0).
     const bool       isColumnMajor,       // Whether the matrix is column major.
     const bool       isParentPointer,     // If the parent is a pointer type.
     const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
@@ -596,7 +596,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(
     {
         assert(arrayStride >= storeSize);
 
-        const uint32_t padding = static_cast<uint32_t>(arrayStride - storeSize);
+        const unsigned padding = static_cast<unsigned>(arrayStride - storeSize);
 
         paddedArray = padding > 0;
 
@@ -618,7 +618,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(
 // because boolean values in memory are represented as i32.
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeBool>(
     SPIRVType* const pSpvType,            // [in] The type.
-    const uint32_t   matrixStride,        // The matrix stride (can be 0).
+    const unsigned   matrixStride,        // The matrix stride (can be 0).
     const bool       isColumnMajor,       // Whether the matrix is column major.
     const bool       isParentPointer,     // If the parent is a pointer type.
     const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
@@ -637,7 +637,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeBool>(
 // Translate an "OpTypeForwardPointer".
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(
     SPIRVType* const pSpvType,            // [in] The type.
-    const uint32_t   matrixStride,        // The matrix stride (can be 0).
+    const unsigned   matrixStride,        // The matrix stride (can be 0).
     const bool       isColumnMajor,       // Whether the matrix is column major.
     const bool       isParentPointer,     // If the parent is a pointer type.
     const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
@@ -652,7 +652,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(
     StructType* const pPointeeType = StructType::create(*Context);
 
     // Then we need to map our forward pointer itself, because the struct we are pointing to could use the pointer.
-    const uint32_t addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
+    const unsigned addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
     Type* const pType = mapType(pSpvType, PointerType::get(pPointeeType, addrSpace));
 
     const bool isBufferBlockPointer = (storageClass == StorageClassStorageBuffer) ||
@@ -677,14 +677,14 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(
 // explicitly laid out and may contain manually placed padding bytes after the column elements.
 template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
     SPIRVType* const pSpvType,            // [in] The type.
-    uint32_t         matrixStride,        // The matrix stride (can be 0).
+    unsigned         matrixStride,        // The matrix stride (can be 0).
     const bool       isColumnMajor,       // Whether the matrix is column major.
     const bool       isParentPointer,     // If the parent is a pointer type.
     const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
 {
     Type* pColumnType = nullptr;
 
-    uint32_t columnCount = pSpvType->getMatrixColumnCount();
+    unsigned columnCount = pSpvType->getMatrixColumnCount();
 
     // If the matrix is not explicitly laid out or is column major, just translate the column type.
     if ((isParentPointer == false) || isColumnMajor)
@@ -728,7 +728,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
         const uint64_t storeSize = getTypeStoreSize(pColumnType);
         assert(matrixStride >= storeSize);
 
-        const uint32_t padding = static_cast<uint32_t>(matrixStride - storeSize);
+        const unsigned padding = static_cast<unsigned>(matrixStride - storeSize);
 
         if (padding > 0)
         {
@@ -751,7 +751,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
 // because boolean values in memory are represented as i32, and special handling for images and samplers.
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(
     SPIRVType* const pSpvType,            // [in] The type.
-    const uint32_t   matrixStride,        // The matrix stride (can be 0).
+    const unsigned   matrixStride,        // The matrix stride (can be 0).
     const bool       isColumnMajor,       // Whether the matrix is column major.
     const bool       isParentPointer,     // If the parent is a pointer type.
     const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
@@ -836,7 +836,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(
 // '<element>[length]' -> 'struct { <element>, <padding bytes> }[length]'.
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(
     SPIRVType* const pSpvType,            // [in] The type.
-    const uint32_t   matrixStride,        // The matrix stride (can be 0).
+    const unsigned   matrixStride,        // The matrix stride (can be 0).
     const bool       isColumnMajor,       // Whether the matrix is column major.
     const bool       isParentPointer,     // If the parent is a pointer type.
     const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
@@ -860,7 +860,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(
     {
         assert(arrayStride >= storeSize);
 
-        const uint32_t padding = static_cast<uint32_t>(arrayStride - storeSize);
+        const unsigned padding = static_cast<unsigned>(arrayStride - storeSize);
 
         paddedArray = padding > 0;
 
@@ -883,7 +883,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(
 // before the first struct element!).
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
     SPIRVType* const pSpvType,            // [in] The type.
-    const uint32_t   matrixStride,        // The matrix stride (can be 0).
+    const unsigned   matrixStride,        // The matrix stride (can be 0).
     const bool       isColumnMajor,       // Whether the matrix is column major.
     const bool       isParentPointer,     // If the parent is a pointer type.
     const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
@@ -974,7 +974,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
             }
             else
             {
-                const uint32_t padding = static_cast<uint32_t>(offset - lastValidByte);
+                const unsigned padding = static_cast<unsigned>(offset - lastValidByte);
 
                 if (padding > 0)
                 {
@@ -1034,7 +1034,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
 // or scalar block layout. We translate these arrays back to vectors before load/store operations.
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(
     SPIRVType* const pSpvType,            // [in] The type.
-    const uint32_t   matrixStride,        // The matrix stride (can be 0).
+    const unsigned   matrixStride,        // The matrix stride (can be 0).
     const bool       isColumnMajor,       // Whether the matrix is column major.
     const bool       isParentPointer,     // If the parent is a pointer type.
     const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
@@ -1057,7 +1057,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(
 }
 
 Type *SPIRVToLLVM::transType(
-  SPIRVType *T, uint32_t MatrixStride, bool ColumnMajor,
+  SPIRVType *T, unsigned MatrixStride, bool ColumnMajor,
   bool ParentIsPointer, bool ExplicitlyLaidOut) {
   // If the type is not a sub-part of a pointer or it is a forward pointer, we can look in the map.
   if ((ParentIsPointer == false) || T->isTypeForwardPointer()) {
@@ -1433,8 +1433,8 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
             Type* const pDestType = pCall->getType()->getPointerElementType();
             assert(pDestType->isArrayTy());
 
-            const uint32_t columnCount = pDestType->getArrayNumElements();
-            const uint32_t rowCount = pDestType->getArrayElementType()->getArrayNumElements();
+            const unsigned columnCount = pDestType->getArrayNumElements();
+            const unsigned rowCount = pDestType->getArrayElementType()->getArrayNumElements();
 
             Type* const pMatrixElementType = pDestType->getArrayElementType()->getArrayElementType();
 
@@ -1510,7 +1510,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                         Value* const pRemappedValueSplat = getBuilder()->CreateVectorSplat(rowCount, pRemappedValue);
                         Value* pRowSplat = UndefValue::get(VectorType::get(getBuilder()->getInt32Ty(), rowCount));
 
-                        for (uint32_t i = 0; i < rowCount; i++)
+                        for (unsigned i = 0; i < rowCount; i++)
                         {
                             pRowSplat = getBuilder()->CreateInsertElement(pRowSplat, getBuilder()->getInt32(i), i);
                         }
@@ -1567,7 +1567,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
                         Value* pNewLoad = UndefValue::get(pLoad->getType());
 
-                        for (uint32_t i = 0; i < pPointerType->getVectorNumElements(); i++)
+                        for (unsigned i = 0; i < pPointerType->getVectorNumElements(); i++)
                         {
                             Value* const pPointerElem = getBuilder()->CreateExtractElement(pPointer, i);
 
@@ -1593,7 +1593,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                         Value* pNewLoad = UndefValue::get(pNewLoadType);
 
                         // If we are loading a full row major matrix, need to load the rows and then transpose.
-                        for (uint32_t i = 0; i < rowCount; i++)
+                        for (unsigned i = 0; i < rowCount; i++)
                         {
                             Value* pPointerElem = getBuilder()->CreateGEP(pPointer,
                                                                      {
@@ -1605,7 +1605,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                             assert(pCastType->isArrayTy());
                             pCastType = VectorType::get(pCastType->getArrayElementType(),
                                                         pCastType->getArrayNumElements());
-                            const uint32_t addrSpace = pPointerElem->getType()->getPointerAddressSpace();
+                            const unsigned addrSpace = pPointerElem->getType()->getPointerAddressSpace();
                             pCastType = pCastType->getPointerTo(addrSpace);
                             pPointerElem = getBuilder()->CreateBitCast(pPointerElem, pCastType);
 
@@ -1656,7 +1656,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                         Type* const pPointerType = pPointer->getType();
                         assert(pPointerType->isVectorTy());
 
-                        for (uint32_t i = 0; i < pPointerType->getVectorNumElements(); i++)
+                        for (unsigned i = 0; i < pPointerType->getVectorNumElements(); i++)
                         {
                             Value* pStoreValueElem = pStore->getValueOperand();
 
@@ -1692,8 +1692,8 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                         Type* const pStoreElementType = pStoreType->getArrayElementType();
                         if (pStoreElementType->isArrayTy())
                         {
-                            const uint32_t columnCount = pStoreType->getArrayNumElements();
-                            const uint32_t rowCount = pStoreElementType->getArrayNumElements();
+                            const unsigned columnCount = pStoreType->getArrayNumElements();
+                            const unsigned rowCount = pStoreElementType->getArrayNumElements();
 
                             Type* const pColumnType = VectorType::get(pStoreElementType->getArrayElementType(),
                                                                       rowCount);
@@ -1701,11 +1701,11 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
                             Value* pMatrix = UndefValue::get(pMatrixType);
 
-                            for (uint32_t column = 0, e = pStoreType->getArrayNumElements(); column < e; column++)
+                            for (unsigned column = 0, e = pStoreType->getArrayNumElements(); column < e; column++)
                             {
                                 Value* pColumnVal = UndefValue::get(pColumnType);
 
-                                for (uint32_t row = 0; row < rowCount; row++)
+                                for (unsigned row = 0; row < rowCount; row++)
                                 {
                                     Value* const pElement = getBuilder()->CreateExtractValue(pStoreValue, { column, row });
                                     pColumnVal = getBuilder()->CreateInsertElement(pColumnVal, pElement, row);
@@ -1720,7 +1720,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                         pStoreValue = getBuilder()->CreateTransposeMatrix(pStoreValue);
 
                         // If we are storing a full row major matrix, need to transpose then store the rows.
-                        for (uint32_t i = 0; i < rowCount; i++)
+                        for (unsigned i = 0; i < rowCount; i++)
                         {
                             Value* pPointerElem = getBuilder()->CreateGEP(pPointer,
                                                                      {
@@ -1732,7 +1732,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                             assert(pCastType->isArrayTy());
                             pCastType = VectorType::get(pCastType->getArrayElementType(),
                                                         pCastType->getArrayNumElements());
-                            const uint32_t addrSpace = pPointerElem->getType()->getPointerAddressSpace();
+                            const unsigned addrSpace = pPointerElem->getType()->getPointerAddressSpace();
                             pCastType = pCastType->getPointerTo(addrSpace);
                             pPointerElem = getBuilder()->CreateBitCast(pPointerElem, pCastType);
 
@@ -1879,9 +1879,9 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
         SmallVector<Value*, 8> memberLoads;
         SmallVector<Type*, 8> memberTypes;
 
-        for (uint32_t i = 0, memberCount = pSpvType->getStructMemberCount(); i < memberCount; i++)
+        for (unsigned i = 0, memberCount = pSpvType->getStructMemberCount(); i < memberCount; i++)
         {
-            const uint32_t memberIndex = needsPad ? lookupRemappedTypeElements(pSpvType, i) : i;
+            const unsigned memberIndex = needsPad ? lookupRemappedTypeElements(pSpvType, i) : i;
 
             Value* pMemberLoadPointer = getBuilder()->CreateGEP(pLoadPointer,
                                                            {
@@ -1911,7 +1911,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
 
         Value* pLoad = UndefValue::get(StructType::get(M->getContext(), memberTypes));
 
-        for (uint32_t i = 0, memberCount = pSpvType->getStructMemberCount(); i < memberCount; i++)
+        for (unsigned i = 0, memberCount = pSpvType->getStructMemberCount(); i < memberCount; i++)
         {
             pLoad = getBuilder()->CreateInsertValue(pLoad, memberLoads[i], i);
         }
@@ -1931,7 +1931,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
 
         Value* pLoad = UndefValue::get(ArrayType::get(pElementType, pLoadType->getArrayNumElements()));
 
-        for (uint32_t i = 0, elementCount = pLoadType->getArrayNumElements(); i < elementCount; i++)
+        for (unsigned i = 0, elementCount = pLoadType->getArrayNumElements(); i < elementCount; i++)
         {
             SmallVector<Value*, 3> indices;
             indices.push_back(pZero);
@@ -2021,7 +2021,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
         pStoreType = pStorePointer->getType()->getPointerElementType();
     }
 
-    const uint32_t alignment = M->getDataLayout().getABITypeAlignment(pStoreType);
+    const unsigned alignment = M->getDataLayout().getABITypeAlignment(pStoreType);
 
     // Special case if we are storing a constant value, we build up a modified constant, and store that - but only if
     // the alignment is greater than 1 (if the constant is storing an entire structure, because we have to use packed
@@ -2057,9 +2057,9 @@ void SPIRVToLLVM::addStoreInstRecursively(
         // For structs we lookup the mapping of the elements and use it to map the values.
         const bool needsPad = isRemappedTypeElements(pSpvType);
 
-        for (uint32_t i = 0, memberCount = pSpvType->getStructMemberCount(); i < memberCount; i++)
+        for (unsigned i = 0, memberCount = pSpvType->getStructMemberCount(); i < memberCount; i++)
         {
-            const uint32_t memberIndex = needsPad ? lookupRemappedTypeElements(pSpvType, i) : i;
+            const unsigned memberIndex = needsPad ? lookupRemappedTypeElements(pSpvType, i) : i;
             Value* const pMemberStorePointer = getBuilder()->CreateGEP(pStorePointer,
                                                                   {
                                                                       pZero,
@@ -2083,7 +2083,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
                                            pSpvType->getArrayElementType() :
                                            pSpvType->getMatrixColumnType();
 
-        for (uint32_t i = 0, elementCount = pStoreType->getArrayNumElements(); i < elementCount; i++)
+        for (unsigned i = 0, elementCount = pStoreType->getArrayNumElements(); i < elementCount; i++)
         {
             SmallVector<Value*, 3> indices;
             indices.push_back(pZero);
@@ -2162,7 +2162,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
     assert(pStorePointerType->isPointerTy());
     Type* const pStoreType = pStorePointerType->getPointerElementType();
 
-    const uint32_t addrSpace = pStorePointerType->getPointerAddressSpace();
+    const unsigned addrSpace = pStorePointerType->getPointerAddressSpace();
 
     Constant* const pZero = getBuilder()->getInt32(0);
 
@@ -2175,15 +2175,15 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
         SmallVector<Constant*, 8> constMembers(pStoreType->getStructNumElements(), nullptr);
 
         // First run through the final LLVM type and create undef's for the members
-        for (uint32_t i = 0, memberCount = constMembers.size(); i < memberCount; i++)
+        for (unsigned i = 0, memberCount = constMembers.size(); i < memberCount; i++)
         {
             constMembers[i] = UndefValue::get(pStoreType->getStructElementType(i));
         }
 
         // Then run through the SPIR-V type and set the non-undef members to actual constants.
-        for (uint32_t i = 0, memberCount = pSpvType->getStructMemberCount(); i < memberCount; i++)
+        for (unsigned i = 0, memberCount = pSpvType->getStructMemberCount(); i < memberCount; i++)
         {
-            const uint32_t memberIndex = needsPad ? lookupRemappedTypeElements(pSpvType, i) : i;
+            const unsigned memberIndex = needsPad ? lookupRemappedTypeElements(pSpvType, i) : i;
             Constant* indices[] = { pZero, getBuilder()->getInt32(memberIndex) };
             Type* const pMemberStoreType = GetElementPtrInst::getIndexedType(pStoreType, indices);
             constMembers[memberIndex] = buildConstStoreRecursively(pSpvType->getStructMemberType(i),
@@ -2205,7 +2205,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
                                            pSpvType->getArrayElementType() :
                                            pSpvType->getMatrixColumnType();
 
-        for (uint32_t i = 0, elementCount = pStoreType->getArrayNumElements(); i < elementCount; i++)
+        for (unsigned i = 0, elementCount = pStoreType->getArrayNumElements(); i < elementCount; i++)
         {
             SmallVector<Value*, 3> indices;
             indices.push_back(pZero);
@@ -2249,7 +2249,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
 
             SmallVector<Constant*, 8> constElements(pStoreType->getArrayNumElements(), nullptr);
 
-            for (uint32_t i = 0, compCount = pSpvType->getVectorComponentCount(); i < compCount; i++)
+            for (unsigned i = 0, compCount = pSpvType->getVectorComponentCount(); i < compCount; i++)
             {
                 constElements[i] = pConstStoreValue->getAggregateElement(i);
             }
@@ -2267,7 +2267,7 @@ static SyncScope::ID transScope(
     LLVMContext&               context,   // [in] The LLVM context.
     const SPIRVConstant* const pSpvScope) // [in] The scope to translate.
 {
-    const uint32_t scope = static_cast<uint32_t>(pSpvScope->getZExtIntValue());
+    const unsigned scope = static_cast<unsigned>(pSpvScope->getZExtIntValue());
 
     switch (scope)
     {
@@ -2293,7 +2293,7 @@ static AtomicOrdering transMemorySemantics(
     const SPIRVConstant* const pSpvMemorySemantics, // [in] The semantics to translate.
     const bool                 isAtomicRMW)         // Is the memory semantic from an atomic rmw operation.
 {
-    const uint32_t semantics = static_cast<uint32_t>(pSpvMemorySemantics->getZExtIntValue());
+    const unsigned semantics = static_cast<unsigned>(pSpvMemorySemantics->getZExtIntValue());
 
     if (semantics & MemorySemanticsSequentiallyConsistentMask)
     {
@@ -2365,7 +2365,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicLoad>(
 
     LoadInst* const pLoad = getBuilder()->CreateLoad(pLoadPointer);
 
-    const uint32_t loadAlignment = static_cast<uint32_t>(M->getDataLayout().getTypeSizeInBits(pLoad->getType()) / 8);
+    const unsigned loadAlignment = static_cast<unsigned>(M->getDataLayout().getTypeSizeInBits(pLoad->getType()) / 8);
     pLoad->setAlignment(MaybeAlign(loadAlignment));
     pLoad->setAtomic(ordering, scope);
 
@@ -2400,7 +2400,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicStore>(
     StoreInst* const pStore = getBuilder()->CreateStore(pStoreValue, pStorePointer);
 
     const uint64_t storeSizeInBits = M->getDataLayout().getTypeSizeInBits(pStoreValue->getType());
-    const uint32_t storeAlignment = static_cast<uint32_t>(storeSizeInBits / 8);
+    const unsigned storeAlignment = static_cast<unsigned>(storeSizeInBits / 8);
     pStore->setAlignment(MaybeAlign(storeAlignment));
     pStore->setAtomic(ordering, scope);
 
@@ -2695,7 +2695,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
     {
         SPIRVWord spvId = pSpvCopyMemory->getMakeVisibleScope(true);
         SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
-        const uint32_t scope = pSpvScope->getZExtIntValue();
+        const unsigned scope = pSpvScope->getZExtIntValue();
 
         const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
 
@@ -2709,7 +2709,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
     {
         SPIRVWord spvId = pSpvCopyMemory->getMakeAvailableScope(false);
         SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
-        const uint32_t scope = pSpvScope->getZExtIntValue();
+        const unsigned scope = pSpvScope->getZExtIntValue();
 
         const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
 
@@ -2792,7 +2792,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
     {
         SPIRVWord spvId = pSpvLoad->getMakeVisibleScope(true);
         SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
-        const uint32_t scope = pSpvScope->getZExtIntValue();
+        const unsigned scope = pSpvScope->getZExtIntValue();
 
         const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
 
@@ -2994,7 +2994,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
     {
         SPIRVWord spvId = pSpvStore->getMakeAvailableScope(false);
         SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
-        const uint32_t scope = pSpvScope->getZExtIntValue();
+        const unsigned scope = pSpvScope->getZExtIntValue();
 
         const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
 
@@ -3040,7 +3040,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpEndPrimitive>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpEndStreamPrimitive>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    uint32_t streamId = static_cast<SPIRVConstant*>(static_cast<SPIRVInstTemplateBase*>(pSpvValue)->getOpValue(0))->
+    unsigned streamId = static_cast<SPIRVConstant*>(static_cast<SPIRVInstTemplateBase*>(pSpvValue)->getOpValue(0))->
           getZExtIntValue();
     return getBuilder()->CreateEndPrimitive(streamId);
 }
@@ -3057,19 +3057,19 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(
     Value* const pStruct = transValue(pSpvStruct, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
     assert(pStruct->getType()->isPointerTy() && pStruct->getType()->getPointerElementType()->isStructTy());
 
-    const uint32_t memberIndex = pSpvArrayLength->getMemberIndex();
-    const uint32_t remappedMemberIndex = lookupRemappedTypeElements(pSpvStruct->getType()->getPointerElementType(),
+    const unsigned memberIndex = pSpvArrayLength->getMemberIndex();
+    const unsigned remappedMemberIndex = lookupRemappedTypeElements(pSpvStruct->getType()->getPointerElementType(),
                                                                     memberIndex);
 
     Value* const pBufferLength = getBuilder()->CreateGetBufferDescLength(pStruct);
 
     StructType* const pStructType = cast<StructType>(pStruct->getType()->getPointerElementType());
     const StructLayout* const pStructLayout = M->getDataLayout().getStructLayout(pStructType);
-    const uint32_t offset = static_cast<uint32_t>(pStructLayout->getElementOffset(remappedMemberIndex));
+    const unsigned offset = static_cast<unsigned>(pStructLayout->getElementOffset(remappedMemberIndex));
     Value* const pOffsetVal = getBuilder()->getInt32(offset);
 
     Type* const pMemberType = pStructType->getStructElementType(remappedMemberIndex)->getArrayElementType();
-    const uint32_t stride = static_cast<uint32_t>(M->getDataLayout().getTypeSizeInBits(pMemberType) / 8);
+    const unsigned stride = static_cast<unsigned>(M->getDataLayout().getTypeSizeInBits(pMemberType) / 8);
 
     return getBuilder()->CreateUDiv(getBuilder()->CreateSub(pBufferLength, pOffsetVal), getBuilder()->getInt32(stride));
 }
@@ -3125,7 +3125,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
 
     // Records where (if at all) we have to split our indices - only required when going through a row_major matrix or
     // if we indexing into a struct that has partially overlapping offsets (normally occurs with HLSL cbuffer packing).
-    SmallVector<std::pair<uint32_t, Type*>, 4> splits;
+    SmallVector<std::pair<unsigned, Type*>, 4> splits;
 
     const SPIRVStorageClassKind storageClass = pSpvBaseType->getPointerStorageClass();
 
@@ -3138,7 +3138,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
     // the correct data. We explicitly lay out our data in memory, which means because Vulkan has more powerful layout
     // options to producers than LLVM can model, we have had to insert manual padding into LLVM types to model this.
     // This loop will ensure that all padding is skipped in indexing.
-    for (uint32_t i = 0; i < indices.size(); i++)
+    for (unsigned i = 0; i < indices.size(); i++)
     {
         bool isDone = false;
 
@@ -3285,7 +3285,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
             }
 
             // Lastly we remove the indices that we have already processed from the list of indices.
-            uint32_t index = 0;
+            unsigned index = 0;
 
             // Always need at least a single index in back.
             indices[index++] = getBuilder()->getInt32(0);
@@ -4328,9 +4328,9 @@ Constant* SPIRVToLLVM::transInitializer(
 
         Constant* pStructInitializer = UndefValue::get(pType);
 
-        for (uint32_t i = 0, memberCount = spvMembers.size(); i < memberCount; i++)
+        for (unsigned i = 0, memberCount = spvMembers.size(); i < memberCount; i++)
         {
-            const uint32_t memberIndex = needsPad ? lookupRemappedTypeElements(pSpvType, i) : i;
+            const unsigned memberIndex = needsPad ? lookupRemappedTypeElements(pSpvType, i) : i;
 
             Constant* const pInitializer = transInitializer(spvMembers[i], pType->getStructElementType(memberIndex));
 
@@ -4351,7 +4351,7 @@ Constant* SPIRVToLLVM::transInitializer(
 
         Constant* pArrayInitializer = UndefValue::get(pType);
 
-        for (uint32_t i = 0, elementCount = spvElements.size(); i < elementCount; i++)
+        for (unsigned i = 0, elementCount = spvElements.size(); i < elementCount; i++)
         {
             if (needsPad)
             {
@@ -4486,7 +4486,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
         // declarations it was meant to. Workaround this by checking that if all the struct members are non-writable,
         // make the global variable constant.
         bool allReadOnly = true;
-        for (uint32_t i = 0; i < pSpvVarType->getStructMemberCount(); i++)
+        for (unsigned i = 0; i < pSpvVarType->getStructMemberCount(); i++)
         {
             if (pSpvVarType->hasMemberDecorate(i, DecorationNonWritable) == false)
             {
@@ -4501,7 +4501,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
         }
     }
 
-    uint32_t addrSpace = pPtrType->getPointerAddressSpace();
+    unsigned addrSpace = pPtrType->getPointerAddressSpace();
     string varName = pSpvVar->getName();
 
     GlobalVariable* const pGlobalVar = new GlobalVariable(*M,
@@ -4822,7 +4822,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     setFastMathFlags(BV);
   }
 
-  switch (static_cast<uint32_t>(BV->getOpCode())) {
+  switch (static_cast<unsigned>(BV->getOpCode())) {
   case OpBranch: {
     auto BR = static_cast<SPIRVBranch *>(BV);
     auto Successor = cast<BasicBlock>(transValue(BR->getTargetLabel(), F, BB));
@@ -5007,13 +5007,13 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     case OpTypeVector: {
       auto VecTy = transType(CC->getType());
       Value* V = UndefValue::get(VecTy);
-      for (uint32_t Idx = 0, I = 0, E = Constituents.size(); I < E; ++I) {
+      for (unsigned Idx = 0, I = 0, E = Constituents.size(); I < E; ++I) {
         if (Constituents[I]->getType()->isVectorTy()) {
           // NOTE: It is allowed to construct a vector from several "smaller"
           // scalars or vectors, such as vec4 = (vec2, vec2) or vec4 = (float,
           // vec3).
           auto CompCount = Constituents[I]->getType()->getVectorNumElements();
-          for (uint32_t J = 0; J < CompCount; ++J) {
+          for (unsigned J = 0; J < CompCount; ++J) {
             auto Comp = ExtractElementInst::Create(Constituents[I],
                           ConstantInt::get(*Context, APInt(32, J)),
                           "", BB);
@@ -5045,7 +5045,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
       auto MatTy = ArrayType::get(MatClmTy, MatCount);
 
       Value* V = UndefValue::get(MatTy);
-      for (uint32_t I = 0, E = Constituents.size(); I < E; ++I) {
+      for (unsigned I = 0, E = Constituents.size(); I < E; ++I) {
           V = InsertValueInst::Create(V, Constituents[I], I, "", BB);
       }
       return mapValue(BV, V);
@@ -5799,7 +5799,7 @@ void SPIRVToLLVM::truncConstantIndex(std::vector<Value*> &Indices, BasicBlock* B
   // To simplify the logic, for constant index,
   // If constant is less than UINT32_MAX , translate all constant index to int32
   // Otherwise for non constant int, try convert them to int32
-  for (uint32_t I = 0; I < Indices.size(); ++I) {
+  for (unsigned I = 0; I < Indices.size(); ++I) {
     auto Index = Indices[I];
     auto Int32Ty = Type::getInt32Ty(*Context);
     if (isa<ConstantInt>(Index)) {
@@ -6027,7 +6027,7 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *Desc) {
                           : lgc::Builder::Dim2DArrayMsaa;
   }
   if (!Desc->Arrayed) {
-    switch (static_cast<uint32_t>(Desc->Dim)) {
+    switch (static_cast<unsigned>(Desc->Dim)) {
     case Dim1D:
       return lgc::Builder::Dim1D;
     case DimBuffer:
@@ -6046,7 +6046,7 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *Desc) {
       break;
     }
   } else {
-    switch (static_cast<uint32_t>(Desc->Dim)) {
+    switch (static_cast<unsigned>(Desc->Dim)) {
     case Dim1D:
       return lgc::Builder::Dim1DArray;
     case DimBuffer:
@@ -7077,7 +7077,7 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
     if (OC == OpSpecConstant ||
         OC == OpSpecConstantTrue ||
         OC == OpSpecConstantFalse) {
-      uint32_t SpecId = SPIRVID_INVALID;
+      unsigned SpecId = SPIRVID_INVALID;
       BV->hasDecorate(DecorationSpecId, 0, &SpecId);
       // assert(SpecId != SPIRVID_INVALID);
       if (SpecConstMap.find(SpecId) != SpecConstMap.end()) {
@@ -7589,8 +7589,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       assert(PushConstTy->isTypeStruct());
 
       // Build push constant specific metadata
-      uint32_t PushConstSize = 0;
-      uint32_t MatrixStride = SPIRVID_INVALID;
+      unsigned PushConstSize = 0;
+      unsigned MatrixStride = SPIRVID_INVALID;
       bool IsRowMajor = false;
       PushConstSize = calcShaderBlockSize(
         PushConstTy, PushConstSize, MatrixStride, IsRowMajor);
@@ -7700,19 +7700,19 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
 }
 
 // Calculates shader block size
-uint32_t SPIRVToLLVM::calcShaderBlockSize(SPIRVType *BT, uint32_t BlockSize,
-                                          uint32_t MatrixStride,
+unsigned SPIRVToLLVM::calcShaderBlockSize(SPIRVType *BT, unsigned BlockSize,
+                                          unsigned MatrixStride,
                                           bool IsRowMajor) {
   if (BT->isTypeStruct()) {
     if (BT->getStructMemberCount() == 0)
       BlockSize = 0;
     else {
       // Find member with max offset
-      uint32_t MemberIdxWithMaxOffset = 0;
-      uint32_t MaxOffset = 0;
-      for (uint32_t MemberIdx = 0; MemberIdx < BT->getStructMemberCount();
+      unsigned MemberIdxWithMaxOffset = 0;
+      unsigned MaxOffset = 0;
+      for (unsigned MemberIdx = 0; MemberIdx < BT->getStructMemberCount();
           ++MemberIdx) {
-        uint32_t Offset = 0;
+        unsigned Offset = 0;
         if (BT->hasMemberDecorate(MemberIdx, DecorationOffset, 0, &Offset)) {
           if (Offset > MaxOffset) {
             MaxOffset = Offset;
@@ -7722,7 +7722,7 @@ uint32_t SPIRVToLLVM::calcShaderBlockSize(SPIRVType *BT, uint32_t BlockSize,
           llvm_unreachable("Missing offset decoration");
       }
 
-      uint32_t MemberMatrixStride = MatrixStride;
+      unsigned MemberMatrixStride = MatrixStride;
       BT->hasMemberDecorate(MemberIdxWithMaxOffset, DecorationMatrixStride, 0,
           &MemberMatrixStride);
 
@@ -7738,24 +7738,24 @@ uint32_t SPIRVToLLVM::calcShaderBlockSize(SPIRVType *BT, uint32_t BlockSize,
     }
   } else if (BT->isTypeArray() || BT->isTypeMatrix()) {
     if (BT->isTypeArray()) {
-      uint32_t ArrayStride = 0;
+      unsigned ArrayStride = 0;
       if (!BT->hasDecorate(DecorationArrayStride, 0, &ArrayStride))
         llvm_unreachable("Missing array stride decoration");
-      uint32_t NumElems = BT->getArrayLength();
+      unsigned NumElems = BT->getArrayLength();
       BlockSize += NumElems * ArrayStride;
     } else {
       assert(MatrixStride != SPIRVID_INVALID);
-      uint32_t NumVectors =
+      unsigned NumVectors =
         IsRowMajor ? BT->getMatrixColumnType()->getVectorComponentCount() :
           BT->getMatrixColumnCount();
       BlockSize += NumVectors * MatrixStride;
     }
   } else if (BT->isTypeVector()) {
-    uint32_t SizeInBytes = BT->getVectorComponentType()->getBitWidth() / 8;
-    uint32_t NumComps = BT->getVectorComponentCount();
+    unsigned SizeInBytes = BT->getVectorComponentType()->getBitWidth() / 8;
+    unsigned NumComps = BT->getVectorComponentCount();
     BlockSize += SizeInBytes * NumComps;
   } else if (BT->isTypeScalar()) {
-    uint32_t SizeInBytes = BT->getBitWidth() / 8;
+    unsigned SizeInBytes = BT->getBitWidth() / 8;
     BlockSize += SizeInBytes;
   } else if (BT->isTypeForwardPointer()) {
     // Forward pointers in shader blocks are always 64-bit.
@@ -7869,8 +7869,8 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       assert(Width <= 64 * 4);
 
       InOutDec.Value.Loc += (Width <= 32 * 4) ? 1 : 2;
-      uint32_t Alignment = 32;
-      uint32_t BaseStride = 4; // Strides in (BYTES)
+      unsigned Alignment = 32;
+      unsigned BaseStride = 4; // Strides in (BYTES)
       InOutDec.XfbExtraOffset +=
         (((Width + Alignment - 1) / Alignment) * BaseStride);
     }
@@ -7895,14 +7895,14 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     // Build element metadata
     auto ElemTy = BT->isTypeArray() ? BT->getArrayElementType() :
                                       BT->getMatrixColumnType();
-    uint32_t NumElems = BT->isTypeArray() ? BT->getArrayLength() :
+    unsigned NumElems = BT->isTypeArray() ? BT->getArrayLength() :
                                             BT->getMatrixColumnCount();
 
-    uint32_t StartLoc = InOutDec.Value.Loc;
+    unsigned StartLoc = InOutDec.Value.Loc;
 
     bool AlignTo64Bit = checkContains64BitType(ElemTy);
 
-    uint32_t StartXfbExtraOffset = InOutDec.XfbExtraOffset;
+    unsigned StartXfbExtraOffset = InOutDec.XfbExtraOffset;
     // Align StartXfbExtraOffset to 64-bit (8 bytes)
     if (AlignTo64Bit)
       StartXfbExtraOffset = roundUpToMultiple(
@@ -7919,9 +7919,9 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     InOutDec.IsBlockArray = ElemTy->hasDecorate(DecorationBlock) ||
                             ElemDec.IsBlockArray; // Multi-dimension array
 
-    uint32_t Stride = ElemDec.Value.Loc - StartLoc;
+    unsigned Stride = ElemDec.Value.Loc - StartLoc;
 
-    uint32_t XfbArrayStride = 0;
+    unsigned XfbArrayStride = 0;
     if (InOutDec.IsBlockArray) {
       // NOTE: For block array, each block array element is handled within its
       // own capture buffer. The transform feedback array stride is the flatten
@@ -7993,8 +7993,8 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     std::vector<Constant *> MemberMDValues;
 
     // Build metadata for each structure member
-    uint32_t XfbExtraOffset = InOutDec.XfbExtraOffset;
-    uint32_t StructXfbExtraOffset = 0;
+    unsigned XfbExtraOffset = InOutDec.XfbExtraOffset;
+    unsigned StructXfbExtraOffset = 0;
     auto NumMembers = BT->getStructMemberCount();
 
     // Get Block starting transform feedback offset,
@@ -8128,7 +8128,7 @@ Constant * SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *BT,
     auto Int32Ty = Type::getInt32Ty(*Context);
     auto Int64Ty = Type::getInt64Ty(*Context);
 
-    uint32_t  Stride = 0;
+    unsigned  Stride = 0;
     SPIRVType *ElemTy = nullptr;
     ShaderBlockMetadata BlockMD = {};
     if (BT->isTypeArray()) {
@@ -8192,14 +8192,14 @@ Constant * SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *BT,
     std::vector<Constant *> MemberMDValues;
 
     // Build metadata for each structure member
-    uint32_t NumMembers = BT->getStructMemberCount();
-    for (uint32_t MemberIdx = 0; MemberIdx < NumMembers; ++MemberIdx) {
+    unsigned NumMembers = BT->getStructMemberCount();
+    for (unsigned MemberIdx = 0; MemberIdx < NumMembers; ++MemberIdx) {
       SPIRVWord MemberMatrixStride = 0;
 
       // Check member decorations
       auto MemberDec = BlockDec; // Inherit from parent
 
-      const uint32_t RemappedIdx = lookupRemappedTypeElements(BT, MemberIdx);
+      const unsigned RemappedIdx = lookupRemappedTypeElements(BT, MemberIdx);
       const DataLayout &DL = M->getDataLayout();
       Type *const Ty = transType(BT, 0, false, true, true);
       assert(Ty->isStructTy());

@@ -42,7 +42,7 @@ namespace Llpc
 // Opens a file stream for read, write or append access.
 Result File::Open(
     const char*  filename,     // [in] Name of file to open
-    uint32_t     accessFlags)  // ORed mask of FileAccessMode values describing how the file will be used
+    unsigned     accessFlags)  // ORed mask of FileAccessMode values describing how the file will be used
 {
     Result result = Result::Success;
 
@@ -239,7 +239,7 @@ Result File::ReadLine(
 
         while (bytesRead < bufferSize)
         {
-            int32_t c = getc(m_fileHandle);
+            int c = getc(m_fileHandle);
             if (c == '\n')
             {
                 result = Result::Success;
@@ -348,13 +348,13 @@ void File::Rewind()
 // =====================================================================================================================
 // Sets the file position to the beginning of the file.
 void File::Seek(
-    int32_t offset,         // Number of bytes to offset
+    int offset,         // Number of bytes to offset
     bool   fromOrigin)      // If true, the seek will be relative to the file origin;
                             // if false, it will be from the current position
 {
     if (m_fileHandle != nullptr)
     {
-        int32_t ret = fseek(m_fileHandle, offset, fromOrigin ? SEEK_SET : SEEK_CUR);
+        int ret = fseek(m_fileHandle, offset, fromOrigin ? SEEK_SET : SEEK_CUR);
 
         assert(ret == 0);
         (void(ret)); // unused
@@ -368,7 +368,7 @@ size_t File::GetFileSize(
 {
     // ...however, on other compilers, they are named 'stat' (no underbar).
     struct stat fileStatus = {};
-    const int32_t result = stat(filename, &fileStatus);
+    const int result = stat(filename, &fileStatus);
     // If the function call to retrieve file status information fails (returns 0), then the file does not exist (or is
     // inaccessible in some other manner).
     return (result == 0) ? fileStatus.st_size : 0;
@@ -381,7 +381,7 @@ bool File::Exists(
 {
     // ...however, on other compilers, they are named 'stat' (no underbar).
     struct stat fileStatus = {};
-    const int32_t result = stat(filename, &fileStatus);
+    const int result = stat(filename, &fileStatus);
     // If the function call to retrieve file status information fails (returns -1), then the file does not exist (or is
     // inaccessible in some other manner).
     return (result != -1);

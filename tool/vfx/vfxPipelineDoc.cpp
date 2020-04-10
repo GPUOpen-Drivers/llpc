@@ -40,7 +40,7 @@ namespace Vfx
 {
 // =====================================================================================================================
 // Max section count for PipelineDocument
-uint32_t PipelineDocument::m_MaxSectionCount[SectionTypeNameNum] =
+unsigned PipelineDocument::m_MaxSectionCount[SectionTypeNameNum] =
 {
     0,                     // SectionTypeUnset
     0,                     // SectionTypeResult
@@ -71,7 +71,7 @@ uint32_t PipelineDocument::m_MaxSectionCount[SectionTypeNameNum] =
 // =====================================================================================================================
 // Checks whether the input version is supportted.
 bool PipelineDocument::CheckVersion(
-    uint32_t ver)        // Version
+    unsigned ver)        // Version
 {
     bool result = true;
 
@@ -118,7 +118,7 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
 
         pGfxPipelineInfo->cbState.alphaToCoverageEnable   = graphicState.alphaToCoverageEnable ? true : false;
         pGfxPipelineInfo->cbState.dualSourceBlendEnable   = graphicState.dualSourceBlendEnable ? true : false;
-        for (uint32_t i = 0; i < MaxColorTargets; ++i)
+        for (unsigned i = 0; i < MaxColorTargets; ++i)
         {
             pGfxPipelineInfo->cbState.target[i].format = graphicState.colorBuffer[i].format;
             pGfxPipelineInfo->cbState.target[i].channelWriteMask =
@@ -169,7 +169,7 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
         m_shaderSources.resize(NativeShaderStageCount);
         m_pipelineState.numStages = NativeShaderStageCount;
         m_pipelineState.stages = &m_shaderSources[0];
-        for (uint32_t i = 0; i < NativeShaderStageCount; ++i)
+        for (unsigned i = 0; i < NativeShaderStageCount; ++i)
         {
             // shader section
             if (m_sections[SectionTypeVertexShader + i].size() > 0)
@@ -195,7 +195,7 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
 // Validates whether sections in this document are valid.
 bool PipelineDocument::Validate()
 {
-    uint32_t stageMask = 0;
+    unsigned stageMask = 0;
     for (size_t i = 0; i < m_sectionList.size(); ++i)
     {
         auto sectionType = m_sectionList[i]->GetSectionType();
@@ -222,14 +222,14 @@ bool PipelineDocument::Validate()
             }
         }
     }
-    const uint32_t GraphicsStageMask = (
+    const unsigned GraphicsStageMask = (
         (1 << SpvGenStageVertex) |
         (1 << SpvGenStageTessControl) |
         (1 << SpvGenStageTessEvaluation) |
         (1 << SpvGenStageGeometry) |
         (1 << SpvGenStageFragment)
         );
-    const uint32_t ComputeStageMask = (1 << SpvGenStageCompute);
+    const unsigned ComputeStageMask = (1 << SpvGenStageCompute);
 
     if (((stageMask & GraphicsStageMask) && (stageMask & ComputeStageMask))
         )

@@ -52,11 +52,11 @@ namespace lgc
 // Helper macros to operate registers
 
 // Defines fields: register ID (byte-based) and its value
-#define DEF_REG(_reg)               uint32_t _reg##_ID; reg##_reg _reg##_VAL;
+#define DEF_REG(_reg)               unsigned _reg##_ID; reg##_reg _reg##_VAL;
 
 // Defines GFX-dependent fields: register ID (byte-based) and its value
-#define DEF_REG_ID(_reg)            uint32_t            _reg##_ID;
-#define DEF_REG_VAL(_reg)           struct { uint32_t u32All; } _reg##_VAL;
+#define DEF_REG_ID(_reg)            unsigned            _reg##_ID;
+#define DEF_REG_VAL(_reg)           struct { unsigned u32All; } _reg##_VAL;
 
 // Initializes register ID and its value
 #define INIT_REG(_reg)            { _reg##_ID = mm##_reg; _reg##_VAL.u32All = 0; }
@@ -183,41 +183,41 @@ namespace lgc
 #define SET_REG_GFX10_1_PLUS_FIELD(_stage, _reg, _field, _val)  (_stage)->_reg##_VAL.gfx101Plus._field = (_val);
 
 // Preferred number of GS primitives per ES thread.
-constexpr uint32_t GsPrimsPerEsThread = 256;
+constexpr unsigned GsPrimsPerEsThread = 256;
 
 // Preferred number of GS threads per VS thread.
-constexpr uint32_t GsThreadsPerVsThread = 2;
+constexpr unsigned GsThreadsPerVsThread = 2;
 
 // Preferred number of GS threads per subgroup.
-constexpr uint32_t MaxGsThreadsPerSubgroup = 256;
+constexpr unsigned MaxGsThreadsPerSubgroup = 256;
 
 // Max number of threads per subgroup in NGG mode.
-constexpr uint32_t NggMaxThreadsPerSubgroup = 256;
+constexpr unsigned NggMaxThreadsPerSubgroup = 256;
 
 // Max number of waves per subgroup in NGG mode.
-constexpr uint32_t NggMaxWavesPerSubgroup = NggMaxThreadsPerSubgroup / 32;
+constexpr unsigned NggMaxWavesPerSubgroup = NggMaxThreadsPerSubgroup / 32;
 
 // Max size of primitives per subgroup for adjacency primitives or when GS instancing is used. This restriction is
 // applicable only when onchip GS is used.
-constexpr uint32_t OnChipGsMaxPrimPerSubgroup    = 255;
-constexpr uint32_t OnChipGsMaxPrimPerSubgroupAdj = 127;
-constexpr uint32_t OnChipGsMaxEsVertsPerSubgroup = 255;
+constexpr unsigned OnChipGsMaxPrimPerSubgroup    = 255;
+constexpr unsigned OnChipGsMaxPrimPerSubgroupAdj = 127;
+constexpr unsigned OnChipGsMaxEsVertsPerSubgroup = 255;
 
 // Default value for the maximum LDS size per GS subgroup, in DWORD's.
-constexpr uint32_t DefaultLdsSizePerSubgroup = 8192;
+constexpr unsigned DefaultLdsSizePerSubgroup = 8192;
 
-constexpr uint32_t EsVertsOffchipGsOrTess = 250;
-constexpr uint32_t GsPrimsOffchipGsOrTess = 126;
+constexpr unsigned EsVertsOffchipGsOrTess = 250;
+constexpr unsigned GsPrimsOffchipGsOrTess = 126;
 
 // The register headers don't specify an enum for the values of VGT_GS_MODE.ONCHIP.
-enum VGT_GS_MODE_ONCHIP_TYPE : uint32_t
+enum VGT_GS_MODE_ONCHIP_TYPE : unsigned
 {
     VGT_GS_MODE_ONCHIP_OFF         = 1,
     VGT_GS_MODE_ONCHIP_ON          = 3,
 };
 
 // The register headers don't specify an enum for the values of PA_STEREO_CNTL.STEREO_MODE.
-enum StereoMode : uint32_t
+enum StereoMode : unsigned
 {
     SHADER_STEREO_X                = 0,
     STATE_STEREO_X                 = 1,
@@ -545,9 +545,9 @@ struct CsRegConfig
 };
 
 // Map from register ID to its name string
-static std::unordered_map<uint32_t, const char*>    RegNameMap;
-static std::unordered_map<uint32_t, const char*>    RegNameMapGfx9;  // GFX9 specific
-static std::unordered_map<uint32_t, const char*>    RegNameMapGfx10; // GFX10 specific
+static std::unordered_map<unsigned, const char*>    RegNameMap;
+static std::unordered_map<unsigned, const char*>    RegNameMapGfx9;  // GFX9 specific
+static std::unordered_map<unsigned, const char*>    RegNameMapGfx10; // GFX10 specific
 
 // Adds entries to register name map.
 void InitRegisterNameMap(GfxIpVersion gfxIp);

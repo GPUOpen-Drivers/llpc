@@ -73,7 +73,7 @@ using Vkgc::WaveBreakSize;
 using Vkgc::ResourceNodeData;
 using Vkgc::FsOutInfo;
 
-static const uint32_t  MaxViewports = 16;
+static const unsigned  MaxViewports = 16;
 static const char      VkIcdName[]     = "amdvlk";
 
 /// Represents per shader module options.
@@ -164,7 +164,7 @@ public:
     /// @returns Success if data of source shader caches was merged successfully, OutOfMemory if the internal allocator
     ///          memory cannot be allocated.
     virtual Result Merge(
-        uint32_t             srcCacheCount,
+        unsigned             srcCacheCount,
         const IShaderCache** ppSrcCaches) = 0;
 
     /// Frees all resources associated with this object.
@@ -191,7 +191,7 @@ public:
     ///
     /// @returns Result::Success if successful. Other return codes indicate failure.
     static Result VKAPI_CALL Create(GfxIpVersion      gfxIp,
-                                    uint32_t          optionCount,
+                                    unsigned          optionCount,
                                     const char*const* options,
                                     ICompiler**       ppCompiler);
 
@@ -210,8 +210,8 @@ public:
     /// param [in] pTarget                  Color target including color buffer format
     /// param [in] enableAlphaToCoverage    Whether enable AlphaToCoverage
     ///
-    /// @return uint32_t type casted from fragment shader export format.
-    virtual uint32_t ConvertColorBufferFormatToExportFormat(const ColorTarget*  pTarget,
+    /// @return unsigned type casted from fragment shader export format.
+    virtual unsigned ConvertColorBufferFormatToExportFormat(const ColorTarget*  pTarget,
                                                             const bool          enableAlphaToCoverage) const = 0;
 
     /// Build shader module from the specified info.

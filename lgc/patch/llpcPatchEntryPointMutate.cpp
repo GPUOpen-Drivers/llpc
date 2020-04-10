@@ -95,14 +95,14 @@ bool PatchEntryPointMutate::runOnModule(
 
     m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
 
-    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
+    const unsigned stageMask = m_pPipelineState->GetShaderStageMask();
     m_hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                              ShaderStageToMask(ShaderStageTessEval))) != 0);
     m_hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
     // Process each shader in turn, but not the copy shader.
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
-    for (uint32_t shaderStage = ShaderStageVertex; shaderStage < ShaderStageNativeStageCount; ++shaderStage)
+    for (unsigned shaderStage = ShaderStageVertex; shaderStage < ShaderStageNativeStageCount; ++shaderStage)
     {
         m_pEntryPoint = pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
         if (m_pEntryPoint != nullptr)
@@ -174,8 +174,8 @@ void PatchEntryPointMutate::ProcessShader()
     auto pShaderOptions = &m_pPipelineState->GetShaderOptions(m_shaderStage);
     auto pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
 
-    uint32_t vgprLimit = pShaderOptions->vgprLimit;
-    uint32_t sgprLimit = pShaderOptions->sgprLimit;
+    unsigned vgprLimit = pShaderOptions->vgprLimit;
+    unsigned sgprLimit = pShaderOptions->sgprLimit;
 
     if (vgprLimit != 0)
     {
@@ -252,7 +252,7 @@ bool PatchEntryPointMutate::IsResourceNodeActive(
         // NOTE: For LS-HS/ES-GS merged shader, resource mapping nodes of the two shader stages are merged as a whole.
         // So we have to check activeness of both shader stages at the same time. Here, we determine the second shader
        // stage and get its resource usage accordingly.
-        uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
+        unsigned stageMask = m_pPipelineState->GetShaderStageMask();
         const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                             ShaderStageToMask(ShaderStageTessEval))) != 0);
         const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
@@ -298,7 +298,7 @@ bool PatchEntryPointMutate::IsResourceNodeActive(
     else if (pNode->type == ResourceNodeType::DescriptorTableVaPtr)
     {
         // Check if any contained descriptor node is active
-        for (uint32_t i = 0; i < pNode->innerTable.size(); ++i)
+        for (unsigned i = 0; i < pNode->innerTable.size(); ++i)
         {
             if (IsResourceNodeActive(&pNode->innerTable[i], false))
             {
@@ -341,7 +341,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     uint64_t* pInRegMask  // [out] "Inreg" bit mask for the arguments
     ) const
 {
-    uint32_t userDataIdx = 0;
+    unsigned userDataIdx = 0;
     std::vector<Type*> argTys;
 
     auto userDataNodes = m_pPipelineState->GetUserDataNodes();
@@ -366,10 +366,10 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     entryArgIdxs.initialized = true;
 
     // Estimated available user data count
-    uint32_t maxUserDataCount = m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount;
-    uint32_t availUserDataCount = maxUserDataCount - userDataIdx;
-    uint32_t requiredRemappedUserDataCount = 0; // Maximum required user data
-    uint32_t requiredUserDataCount = 0;         // Maximum required user data without remapping
+    unsigned maxUserDataCount = m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount;
+    unsigned availUserDataCount = maxUserDataCount - userDataIdx;
+    unsigned requiredRemappedUserDataCount = 0; // Maximum required user data
+    unsigned requiredUserDataCount = 0;         // Maximum required user data without remapping
     bool useFixedLayout = (m_shaderStage == ShaderStageCompute);
     bool reserveVbTable = false;
     bool reserveStreamOutTable = false;
@@ -378,7 +378,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
     if (userDataNodes.size() > 0)
     {
-        for (uint32_t i = 0; i < userDataNodes.size(); ++i)
+        for (unsigned i = 0; i < userDataNodes.size(); ++i)
         {
             auto pNode = &userDataNodes[i];
              // NOTE: Per PAL request, the value of IndirectTableEntry is the node offset + 1.
@@ -594,7 +594,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     // Allocate register for stream-out buffer table
     if (reserveStreamOutTable)
     {
-        for (uint32_t i = 0; i < userDataNodes.size(); ++i)
+        for (unsigned i = 0; i < userDataNodes.size(); ++i)
         {
             auto pNode = &userDataNodes[i];
             if (pNode->type == ResourceNodeType::StreamOutTableVaPtr)
@@ -634,8 +634,8 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     }
 
     // Descriptor table and vertex buffer table
-    uint32_t actualAvailUserDataCount = 0;
-    for (uint32_t i = 0; i < userDataNodes.size(); ++i)
+    unsigned actualAvailUserDataCount = 0;
+    for (unsigned i = 0; i < userDataNodes.size(); ++i)
     {
         auto pNode = &userDataNodes[i];
 
@@ -721,7 +721,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             case ResourceNodeType::DescriptorBufferCompact:
                 {
                     argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), pNode->sizeInDwords));
-                    for (uint32_t j = 0; j < pNode->sizeInDwords; ++j)
+                    for (unsigned j = 0; j < pNode->sizeInDwords; ++j)
                     {
                         pIntfData->userDataMap[userDataIdx + j] = pNode->offsetInDwords + j;
                     }
@@ -796,7 +796,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 ++userDataIdx;
             }
 
-            for (uint32_t i = 0; i < userDataNodes.size(); ++i)
+            for (unsigned i = 0; i < userDataNodes.size(); ++i)
             {
                 auto pNode = &userDataNodes[i];
                 if (pNode->type == ResourceNodeType::IndirectUserDataVaPtr)
@@ -954,7 +954,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     entryArgIdxs.vs.streamOutData.writeIndex = argTys.size();
                     argTys.push_back(Type::getInt32Ty(*m_pContext)); // Stream-out write Index
 
-                    for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
+                    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i)
                     {
                         if (xfbStrides[i] > 0)
                         {
@@ -1034,7 +1034,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     entryArgIdxs.tes.streamOutData.writeIndex = argTys.size();
                     argTys.push_back(Type::getInt32Ty(*m_pContext)); // Stream-out write Index
 
-                    for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
+                    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i)
                     {
                         if (xfbStrides[i] > 0)
                         {

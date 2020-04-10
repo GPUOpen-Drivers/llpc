@@ -102,8 +102,8 @@ void SpirvLower::ReplaceConstWithInsts(
         // If the instruction is a phi node, we have to insert the new instructions in the correct predecessor.
         if (PHINode* const pPhiNode = dyn_cast<PHINode>(pInst))
         {
-            const uint32_t incomingValueCount = pPhiNode->getNumIncomingValues();
-            for (uint32_t i = 0; i < incomingValueCount; i++)
+            const unsigned incomingValueCount = pPhiNode->getNumIncomingValues();
+            for (unsigned i = 0; i < incomingValueCount; i++)
             {
                 if (pPhiNode->getIncomingValue(i) == pConstVal)
                 {
@@ -125,7 +125,7 @@ void SpirvLower::ReplaceConstWithInsts(
         else if (ConstantVector* const pConstVector = dyn_cast<ConstantVector>(pConstVal))
         {
             Value* pResultValue = UndefValue::get(pConstVector->getType());
-            for (uint32_t i = 0; i < pConstVector->getNumOperands(); i++)
+            for (unsigned i = 0; i < pConstVector->getNumOperands(); i++)
             {
                 // Have to not use the builder here because it will constant fold and we are trying to undo that now!
                 Instruction* const pInsertPos = InsertElementInst::Create(pResultValue,
@@ -174,7 +174,7 @@ void SpirvLower::AddPasses(
     ShaderStage           stage,                  // Shader stage
     legacy::PassManager&  passMgr,                // [in/out] Pass manager to add passes to
     llvm::Timer*          pLowerTimer,            // [in] Timer to time lower passes with, nullptr if not timing
-    uint32_t              forceLoopUnrollCount)   // 0 or force loop unroll count
+    unsigned              forceLoopUnrollCount)   // 0 or force loop unroll count
 {
     // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
     pContext->GetBuilderContext()->PreparePassManager(&passMgr);

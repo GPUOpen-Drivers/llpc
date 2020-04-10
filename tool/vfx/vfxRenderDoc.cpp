@@ -35,7 +35,7 @@ namespace Vfx
 {
 // =====================================================================================================================
 // Max section count for RenderDocument
-uint32_t RenderDocument::m_MaxSectionCount[SectionTypeNameNum] =
+unsigned RenderDocument::m_MaxSectionCount[SectionTypeNameNum] =
 {
     0,                     // SectionTypeUnset
     1,                     // SectionTypeResult
@@ -74,8 +74,8 @@ VfxRenderStatePtr RenderDocument::GetDocument()
     }
 
     // Section "BufferView"s
-    m_renderState.numBufferView = static_cast<uint32_t>(m_sections[SectionTypeBufferView].size());
-    for (uint32_t i = 0; i < m_renderState.numBufferView; ++i)
+    m_renderState.numBufferView = static_cast<unsigned>(m_sections[SectionTypeBufferView].size());
+    for (unsigned i = 0; i < m_renderState.numBufferView; ++i)
     {
         reinterpret_cast<SectionBufferView*>(m_sections[SectionTypeBufferView][i])->
             GetSubState(m_renderState.bufferView[i]);
@@ -100,23 +100,23 @@ VfxRenderStatePtr RenderDocument::GetDocument()
     }
 
     // Section "ImageView"s
-    m_renderState.numImageView = static_cast<uint32_t>(m_sections[SectionTypeImageView].size());
-    for (uint32_t i = 0; i < m_renderState.numImageView; ++i)
+    m_renderState.numImageView = static_cast<unsigned>(m_sections[SectionTypeImageView].size());
+    for (unsigned i = 0; i < m_renderState.numImageView; ++i)
     {
         reinterpret_cast<SectionImageView*>(m_sections[SectionTypeImageView][i])->
             GetSubState(m_renderState.imageView[i]);
     }
 
     // Section "Sampler"s
-    m_renderState.numSampler = static_cast<uint32_t>(m_sections[SectionTypeSampler].size());
-    for (uint32_t i = 0; i < m_renderState.numSampler; ++i)
+    m_renderState.numSampler = static_cast<unsigned>(m_sections[SectionTypeSampler].size());
+    for (unsigned i = 0; i < m_renderState.numSampler; ++i)
     {
         reinterpret_cast<SectionSampler*>(m_sections[SectionTypeSampler][i])->
             GetSubState(m_renderState.sampler[i]);
     }
 
     // Shader sections
-    for (uint32_t i = 0; i < ShaderStageCount; ++i)
+    for (unsigned i = 0; i < ShaderStageCount; ++i)
     {
         if (m_sections[SectionTypeVertexShader + i].size() > 0)
         {

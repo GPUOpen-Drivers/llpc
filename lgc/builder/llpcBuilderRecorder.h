@@ -64,7 +64,7 @@ public:
     BuilderRecorderMetadataKinds() {}
     BuilderRecorderMetadataKinds(llvm::LLVMContext& context);
 
-    uint32_t        m_opcodeMetaKindId;                         // Cached metadata kinds for opcode
+    unsigned        m_opcodeMetaKindId;                         // Cached metadata kinds for opcode
 };
 
 // =====================================================================================================================
@@ -77,7 +77,7 @@ class BuilderRecorder final : public Builder, BuilderRecorderMetadataKinds
 
 public:
     // llpc.call.* opcodes
-    enum Opcode : uint32_t
+    enum Opcode : unsigned
     {
         // NOP
         Nop = 0,
@@ -337,8 +337,8 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations
 
-    llvm::Value* CreateLoadBufferDesc(uint32_t      descSet,
-                                uint32_t      binding,
+    llvm::Value* CreateLoadBufferDesc(unsigned      descSet,
+                                unsigned      binding,
                                 llvm::Value*        pDescIndex,
                                 bool          isNonUniform,
                                 bool          isWritten,
@@ -353,20 +353,20 @@ public:
     llvm::Value* CreateLoadDescFromPtr(llvm::Value*        pDescPtr,
                                  const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateGetSamplerDescPtr(uint32_t      descSet,
-                                   uint32_t      binding,
+    llvm::Value* CreateGetSamplerDescPtr(unsigned      descSet,
+                                   unsigned      binding,
                                    const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateGetImageDescPtr(uint32_t      descSet,
-                                 uint32_t      binding,
+    llvm::Value* CreateGetImageDescPtr(unsigned      descSet,
+                                 unsigned      binding,
                                  const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateGetTexelBufferDescPtr(uint32_t      descSet,
-                                       uint32_t      binding,
+    llvm::Value* CreateGetTexelBufferDescPtr(unsigned      descSet,
+                                       unsigned      binding,
                                        const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateGetFmaskDescPtr(uint32_t      descSet,
-                                 uint32_t      binding,
+    llvm::Value* CreateGetFmaskDescPtr(unsigned      descSet,
+                                 unsigned      binding,
                                  const llvm::Twine&  instName) override final;
 
     llvm::Value* CreateLoadPushConstantsPtr(llvm::Type*         pPushConstantsTy,
@@ -380,8 +380,8 @@ public:
 
     // Create an image load.
     llvm::Value* CreateImageLoad(llvm::Type*               pResultTy,
-                           uint32_t            dim,
-                           uint32_t            flags,
+                           unsigned            dim,
+                           unsigned            flags,
                            llvm::Value*              pImageDesc,
                            llvm::Value*              pCoord,
                            llvm::Value*              pMipLevel,
@@ -389,8 +389,8 @@ public:
 
     // Create an image load with F-mask.
     llvm::Value* CreateImageLoadWithFmask(llvm::Type*                   pResultTy,
-                                    uint32_t                dim,
-                                    uint32_t                flags,
+                                    unsigned                dim,
+                                    unsigned                flags,
                                     llvm::Value*                  pImageDesc,
                                     llvm::Value*                  pFmaskDesc,
                                     llvm::Value*                  pCoord,
@@ -399,8 +399,8 @@ public:
 
     // Create an image store.
     llvm::Value* CreateImageStore(llvm::Value*           pTexel,
-                            uint32_t         dim,
-                            uint32_t         flags,
+                            unsigned         dim,
+                            unsigned         flags,
                             llvm::Value*           pImageDesc,
                             llvm::Value*           pCoord,
                             llvm::Value*           pMipLevel,
@@ -408,8 +408,8 @@ public:
 
     // Create an image sample.
     llvm::Value* CreateImageSample(llvm::Type*             pResultTy,
-                             uint32_t          dim,
-                             uint32_t          flags,
+                             unsigned          dim,
+                             unsigned          flags,
                              llvm::Value*            pImageDesc,
                              llvm::Value*            pSamplerDesc,
                              llvm::ArrayRef<llvm::Value*>  address,
@@ -417,17 +417,17 @@ public:
 
     // Create an image gather.
     llvm::Value* CreateImageGather(llvm::Type*             pResultTy,
-                             uint32_t          dim,
-                             uint32_t          flags,
+                             unsigned          dim,
+                             unsigned          flags,
                              llvm::Value*            pImageDesc,
                              llvm::Value*            pSamplerDesc,
                              llvm::ArrayRef<llvm::Value*>  address,
                              const llvm::Twine&      instName = "") override final;
 
     // Create an image atomic operation other than compare-and-swap.
-    llvm::Value* CreateImageAtomic(uint32_t         atomicOp,
-                             uint32_t         dim,
-                             uint32_t         flags,
+    llvm::Value* CreateImageAtomic(unsigned         atomicOp,
+                             unsigned         dim,
+                             unsigned         flags,
                              llvm::AtomicOrdering   ordering,
                              llvm::Value*           pImageDesc,
                              llvm::Value*           pCoord,
@@ -435,8 +435,8 @@ public:
                              const llvm::Twine&     instName = "") override final;
 
     // Create an image atomic compare-and-swap.
-    llvm::Value* CreateImageAtomicCompareSwap(uint32_t        dim,
-                                        uint32_t        flags,
+    llvm::Value* CreateImageAtomicCompareSwap(unsigned        dim,
+                                        unsigned        flags,
                                         llvm::AtomicOrdering  ordering,
                                         llvm::Value*          pImageDesc,
                                         llvm::Value*          pCoord,
@@ -445,28 +445,28 @@ public:
                                         const llvm::Twine&    instName = "") override final;
 
     // Create a query of the number of mipmap levels in an image. Returns an i32 value.
-    llvm::Value* CreateImageQueryLevels(uint32_t                dim,
-                                  uint32_t                flags,
+    llvm::Value* CreateImageQueryLevels(unsigned                dim,
+                                  unsigned                flags,
                                   llvm::Value*                  pImageDesc,
                                   const llvm::Twine&            instName = "") override final;
 
     // Create a query of the number of samples in an image. Returns an i32 value.
-    llvm::Value* CreateImageQuerySamples(uint32_t                dim,
-                                   uint32_t                flags,
+    llvm::Value* CreateImageQuerySamples(unsigned                dim,
+                                   unsigned                flags,
                                    llvm::Value*                  pImageDesc,
                                    const llvm::Twine&            instName = "") override final;
 
     // Create a query of size of an image at the specified LOD
-    llvm::Value* CreateImageQuerySize(uint32_t          dim,
-                                uint32_t          flags,
+    llvm::Value* CreateImageQuerySize(unsigned          dim,
+                                unsigned          flags,
                                 llvm::Value*            pImageDesc,
                                 llvm::Value*            pLod,
                                 const llvm::Twine&      instName = "") override final;
 
     // Create a get of the LOD that would be used for an image sample with the given coordinates
     // and implicit LOD.
-    llvm::Value* CreateImageGetLod(uint32_t          dim,
-                             uint32_t          flags,
+    llvm::Value* CreateImageGetLod(unsigned          dim,
+                             unsigned          flags,
                              llvm::Value*            pImageDesc,
                              llvm::Value*            pSamplerDesc,
                              llvm::Value*            pCoord,
@@ -477,39 +477,39 @@ public:
 
     // Create a read of (part of) a user input value.
     llvm::Value* CreateReadGenericInput(llvm::Type*         pResultTy,
-                                  uint32_t      location,
+                                  unsigned      location,
                                   llvm::Value*        pLocationOffset,
                                   llvm::Value*        pElemIdx,
-                                  uint32_t      locationCount,
+                                  unsigned      locationCount,
                                   InOutInfo     inputInfo,
                                   llvm::Value*        pVertexIndex,
                                   const llvm::Twine&  instName = "") override final;
 
     // Create a read of (part of) a user output value.
     llvm::Value* CreateReadGenericOutput(llvm::Type*         pResultTy,
-                                   uint32_t      location,
+                                   unsigned      location,
                                    llvm::Value*        pLocationOffset,
                                    llvm::Value*        pElemIdx,
-                                   uint32_t      locationCount,
+                                   unsigned      locationCount,
                                    InOutInfo     outputInfo,
                                    llvm::Value*        pVertexIndex,
                                    const llvm::Twine&  instName = "") override final;
 
     // Create a write of (part of) a user output value.
     llvm::Instruction* CreateWriteGenericOutput(llvm::Value*        pValueToWrite,
-                                          uint32_t      location,
+                                          unsigned      location,
                                           llvm::Value*        pLocationOffset,
                                           llvm::Value*        pElemIdx,
-                                          uint32_t      locationCount,
+                                          unsigned      locationCount,
                                           InOutInfo     outputInfo,
                                           llvm::Value*        pVertexIndex) override final;
 
     // Create a write to an XFB (transform feedback / streamout) buffer.
     llvm::Instruction* CreateWriteXfbOutput(llvm::Value*        pValueToWrite,
                                       bool          isBuiltIn,
-                                      uint32_t      location,
-                                      uint32_t      xfbBuffer,
-                                      uint32_t      xfbStride,
+                                      unsigned      location,
+                                      unsigned      xfbBuffer,
+                                      unsigned      xfbStride,
                                       llvm::Value*        pXfbOffset,
                                       InOutInfo     outputInfo) override final;
 
@@ -539,10 +539,10 @@ public:
 
     // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
     // the current output primitive in the specified output-primitive stream.
-    llvm::Instruction* CreateEmitVertex(uint32_t streamId) override final;
+    llvm::Instruction* CreateEmitVertex(unsigned streamId) override final;
 
     // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
-    llvm::Instruction* CreateEndPrimitive(uint32_t streamId) override final;
+    llvm::Instruction* CreateEndPrimitive(unsigned streamId) override final;
 
     // Create a workgroup control barrier.
     llvm::Instruction* CreateBarrier() override final;

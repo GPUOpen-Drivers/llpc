@@ -57,13 +57,13 @@ public:
     virtual const void* GetPipelineBuildInfo() const { return m_pPipelineInfo; }
 
     // Gets the mask of active shader stages bound to this pipeline
-    virtual uint32_t GetShaderStageMask() const { return m_stageMask; }
+    virtual unsigned GetShaderStageMask() const { return m_stageMask; }
 
     // Gets the mask of active shader stages bound to this pipeline
-    void SetShaderStageMask(uint32_t mask) { m_stageMask = mask; }
+    void SetShaderStageMask(unsigned mask) { m_stageMask = mask; }
 
     // Gets the count of active shader stages
-    virtual uint32_t GetActiveShaderStageCount() const { return m_activeStageCount; }
+    virtual unsigned GetActiveShaderStageCount() const { return m_activeStageCount; }
 
     virtual void DoUserDataNodeMerge();
 
@@ -81,8 +81,8 @@ private:
 
     const GraphicsPipelineBuildInfo*    m_pPipelineInfo; // Info to build a graphics pipeline
 
-    uint32_t m_stageMask; // Mask of active shader stages bound to this graphics pipeline
-    uint32_t m_activeStageCount;    // Count of active shader stages
+    unsigned m_stageMask; // Mask of active shader stages bound to this graphics pipeline
+    unsigned m_activeStageCount;    // Count of active shader stages
 
     bool            m_gsOnChip;    // Whether to enable GS on-chip mode
 

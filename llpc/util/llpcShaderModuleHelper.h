@@ -39,20 +39,20 @@ namespace Llpc
 // Represents the special header of SPIR-V token stream (the first DWORD).
 struct SpirvHeader
 {
-    uint32_t    magicNumber;        // Magic number of SPIR-V module
-    uint32_t    spvVersion;         // SPIR-V version number
-    uint32_t    genMagicNumber;     // Generator's magic number
-    uint32_t    idBound;            // Upbound (X) of all IDs used in SPIR-V (0 < ID < X)
-    uint32_t    reserved;           // Reserved word
+    unsigned    magicNumber;        // Magic number of SPIR-V module
+    unsigned    spvVersion;         // SPIR-V version number
+    unsigned    genMagicNumber;     // Generator's magic number
+    unsigned    idBound;            // Upbound (X) of all IDs used in SPIR-V (0 < ID < X)
+    unsigned    reserved;           // Reserved word
 };
 
 // Represents the information of one shader entry in ShaderModuleData
 struct ShaderModuleEntry
 {
-    uint32_t    entryNameHash[4];   // Hash code of entry name
-    uint32_t    entryOffset;        // Byte offset of the entry data in the binCode of ShaderModuleData
-    uint32_t    entrySize;          // Byte size of the entry data
-    uint32_t    passIndex;          // Indices of passes, It is only for internal debug.
+    unsigned    entryNameHash[4];   // Hash code of entry name
+    unsigned    entryOffset;        // Byte offset of the entry data in the binCode of ShaderModuleData
+    unsigned    entrySize;          // Byte size of the entry data
+    unsigned    passIndex;          // Indices of passes, It is only for internal debug.
 };
 
 // Represents the name map <stage, name> of shader entry-point
@@ -71,11 +71,11 @@ public:
         const BinaryData*             pSpvBinCode,
         ShaderModuleUsage*            pShaderModuleUsage,
         std::vector<ShaderEntryName>& shaderEntryNames,
-        uint32_t*                     pDebugInfoSize);
+        unsigned*                     pDebugInfoSize);
 
     static void TrimSpirvDebugInfo(
         const BinaryData* pSpvBin,
-        uint32_t          bufferSize,
+        unsigned          bufferSize,
         void*             pTrimSpvBin);
 
     static Result OptimizeSpirv(
@@ -84,7 +84,7 @@ public:
 
     static void CleanOptimizedSpirv(BinaryData* pSpirvBin);
 
-    static uint32_t GetStageMaskFromSpirvBinary(
+    static unsigned GetStageMaskFromSpirvBinary(
         const BinaryData* pSpvBin,
         const char*       pEntryName);
 

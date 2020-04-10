@@ -87,7 +87,7 @@ Function* PipelineShaders::GetEntryPoint(
     ShaderStage shaderStage     // Shader stage
     ) const
 {
-    assert((uint32_t)shaderStage < ShaderStageCountInternal);
+    assert((unsigned)shaderStage < ShaderStageCountInternal);
     return m_entryPoints[shaderStage];
 }
 

@@ -85,7 +85,7 @@ enum NggLdsRegionType
 };
 
 // Size of a DWORD
-static const uint32_t SizeOfDword = sizeof(uint32_t);
+static const unsigned SizeOfDword = sizeof(unsigned);
 
 // =====================================================================================================================
 // Represents the manager doing shader merge operations.
@@ -94,13 +94,13 @@ class NggLdsManager
 public:
     NggLdsManager(llvm::Module* pModule, PipelineState* pPipelineState, llvm::IRBuilder<>* pBuilder);
 
-    static uint32_t CalcEsExtraLdsSize(PipelineState* pPipelineState);
-    static uint32_t CalcGsExtraLdsSize(PipelineState* pPipelineState);
+    static unsigned CalcEsExtraLdsSize(PipelineState* pPipelineState);
+    static unsigned CalcGsExtraLdsSize(PipelineState* pPipelineState);
 
     // Gets the LDS starting offset for the specified region
-    uint32_t GetLdsRegionStart(NggLdsRegionType region) const
+    unsigned GetLdsRegionStart(NggLdsRegionType region) const
     {
-        uint32_t regionStart = m_ldsRegionStart[region];
+        unsigned regionStart = m_ldsRegionStart[region];
         assert(regionStart != InvalidValue);
         return regionStart;
     }
@@ -117,7 +117,7 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    static const uint32_t LdsRegionSizes[LdsRegionCount];  // LDS sizes for all LDS region types (in BYTEs)
+    static const unsigned LdsRegionSizes[LdsRegionCount];  // LDS sizes for all LDS region types (in BYTEs)
     static const char*    LdsRegionNames[LdsRegionCount];  // Name strings for all LDS region types
 
     PipelineState*  m_pPipelineState; // Pipeline state
@@ -125,9 +125,9 @@ private:
 
     llvm::GlobalValue*  m_pLds;     // Global variable to model NGG LDS
 
-    uint32_t        m_ldsRegionStart[LdsRegionCount]; // Start LDS offsets for all available LDS region types (in BYTEs)
+    unsigned        m_ldsRegionStart[LdsRegionCount]; // Start LDS offsets for all available LDS region types (in BYTEs)
 
-    uint32_t        m_waveCountInSubgroup; // Wave count in sub-group
+    unsigned        m_waveCountInSubgroup; // Wave count in sub-group
 
     llvm::IRBuilder<>*  m_pBuilder; // LLVM IR builder
 };

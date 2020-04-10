@@ -120,7 +120,7 @@ void CodeGenManager::SetupTargetFeatures(
             {
                 // Set the work group size
                 const auto& csBuiltInUsage = pPipelineState->GetShaderModes()->GetComputeShaderMode();
-                uint32_t flatWorkGroupSize =
+                unsigned flatWorkGroupSize =
                     csBuiltInUsage.workgroupSizeX * csBuiltInUsage.workgroupSizeY * csBuiltInUsage.workgroupSizeZ;
                 auto flatWorkGroupSizeString = std::to_string(flatWorkGroupSize);
                 builder.addAttribute("amdgpu-flat-work-group-size",
@@ -136,7 +136,7 @@ void CodeGenManager::SetupTargetFeatures(
             if (gfxIp.major >= 10)
             {
                 // Setup wavefront size per shader stage
-                uint32_t waveSize = pPipelineState->GetShaderWaveSize(shaderStage);
+                unsigned waveSize = pPipelineState->GetShaderWaveSize(shaderStage);
 
                 targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
 

@@ -59,7 +59,7 @@ llvm::ModulePass* CreatePipelineStateClearer();
 // Represents NGG (implicit primitive shader) control settings (valid for GFX10+)
 
 // Enumerates compaction modes after culling operations for NGG primitive shader.
-enum NggCompactMode : uint32_t
+enum NggCompactMode : unsigned
 {
     NggCompactSubgroup,             // Compaction is based on the whole sub-group
     NggCompactVertices,             // Compaction is based on vertices
@@ -84,7 +84,7 @@ struct NggControl
     bool    enableCullDistanceCulling;  // Enable culling when "cull distance" exports are present
 
     /// Following fields are used for NGG tuning
-    uint32_t backfaceExponent;          // Value from 1 to UINT32_MAX that will cause the backface culling
+    unsigned backfaceExponent;          // Value from 1 to UINT32_MAX that will cause the backface culling
                                         // algorithm to ignore area calculations that are less than
                                         // (10 ^ -(backfaceExponent)) / abs(w0 * w1 * w2)
                                         // Only valid if the NGG backface culler is enabled.
@@ -92,10 +92,10 @@ struct NggControl
 
     NggSubgroupSizing subgroupSizing;   // NGG sub-group sizing type
 
-    uint32_t primsPerSubgroup;          // Preferred number of GS primitives to pack into a primitive shader
+    unsigned primsPerSubgroup;          // Preferred number of GS primitives to pack into a primitive shader
                                         // sub-group
 
-    uint32_t vertsPerSubgroup;          // Preferred number of vertices consumed by a primitive shader sub-group
+    unsigned vertsPerSubgroup;          // Preferred number of vertices consumed by a primitive shader sub-group
 
     bool                            passthroughMode;      // Whether NGG passthrough mode is enabled
     Util::Abi::PrimShaderCbLayout   primShaderTable;      // Primitive shader table (only some registers are used)
@@ -119,7 +119,7 @@ public:
     void SetUserDataNodes(llvm::ArrayRef<ResourceNode> nodes) override final;
 
     // Set shader stage mask
-    void SetShaderStageMask(uint32_t mask) override final { m_stageMask = mask; }
+    void SetShaderStageMask(unsigned mask) override final { m_stageMask = mask; }
 
     // Set and get per-pipeline options
     void SetOptions(const Options& options) override final { m_options = options; }
@@ -129,7 +129,7 @@ public:
     void SetShaderOptions(ShaderStage stage, const ShaderOptions& options) override final;
 
     // Set device index
-    void SetDeviceIndex(uint32_t deviceIndex) override final { m_deviceIndex = deviceIndex; }
+    void SetDeviceIndex(unsigned deviceIndex) override final { m_deviceIndex = deviceIndex; }
 
     // Set vertex input descriptions
     void SetVertexInputDescriptions(llvm::ArrayRef<VertexInputDescription> inputs) override final;
@@ -154,7 +154,7 @@ public:
 
     // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
     // type. Only the number of elements of the type is significant.
-    uint32_t ComputeExportFormat(llvm::Type* pOutputTy, uint32_t location) override final;
+    unsigned ComputeExportFormat(llvm::Type* pOutputTy, unsigned location) override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Other methods
@@ -164,7 +164,7 @@ public:
 
     // Accessors for context information
     const TargetInfo& GetTargetInfo() const;
-    uint32_t GetPalAbiVersion() const;
+    unsigned GetPalAbiVersion() const;
 
     // Clear the pipeline state IR metadata.
     void Clear(llvm::Module* pModule);
@@ -173,7 +173,7 @@ public:
     void Record(llvm::Module* pModule);
 
     // Accessors for shader stage mask
-    uint32_t GetShaderStageMask() const { return m_stageMask; }
+    unsigned GetShaderStageMask() const { return m_stageMask; }
     bool HasShaderStage(ShaderStage stage) const { return (GetShaderStageMask() >> stage) & 1; }
     bool IsGraphics() const;
     ShaderStage GetLastVertexProcessingStage() const;
@@ -191,8 +191,8 @@ public:
 
     // Find the resource node for the given set,binding
     std::pair<const ResourceNode*, const ResourceNode*> FindResourceNode(ResourceNodeType  nodeType,
-                                                                         uint32_t          descSet,
-                                                                         uint32_t          binding) const;
+                                                                         unsigned          descSet,
+                                                                         unsigned          binding) const;
 
     // Return whether we have a converting sampler in the user data nodes.
     bool HaveConvertingSampler() const { return m_haveConvertingSampler; }
@@ -203,14 +203,14 @@ public:
 
     // Accessors for vertex input descriptions.
     llvm::ArrayRef<VertexInputDescription> GetVertexInputDescriptions() const { return m_vertexInputDescriptions; }
-    const VertexInputDescription* FindVertexInputDescription(uint32_t location) const;
+    const VertexInputDescription* FindVertexInputDescription(unsigned location) const;
 
     // Accessors for color export state
-    const ColorExportFormat& GetColorExportFormat(uint32_t location);
+    const ColorExportFormat& GetColorExportFormat(unsigned location);
     const ColorExportState& GetColorExportState() { return m_colorExportState; }
 
     // Accessors for pipeline state
-    uint32_t GetDeviceIndex() const { return m_deviceIndex; }
+    unsigned GetDeviceIndex() const { return m_deviceIndex; }
     const InputAssemblyState& GetInputAssemblyState() const { return m_inputAssemblyState; }
     const ViewportState& GetViewportState() const { return m_viewportState; }
     const RasterizerState& GetRasterizerState() const { return m_rasterizerState; }
@@ -228,7 +228,7 @@ public:
     bool IsGsOnChip() const { return m_gsOnChip; }
 
     // Gets wave size for the specified shader stage
-    uint32_t GetShaderWaveSize(ShaderStage stage);
+    unsigned GetShaderWaveSize(ShaderStage stage);
 
     // Get NGG control settings
     NggControl* GetNggControl() { return &m_nggControl; }
@@ -261,7 +261,7 @@ public:
         bool                atLeastOneValue)  // True to generate node with one value even if all values are zero
     {
         llvm::IRBuilder<> builder(context);
-        llvm::ArrayRef<uint32_t> values(reinterpret_cast<const uint32_t*>(&value), sizeof(value) / sizeof(uint32_t));
+        llvm::ArrayRef<unsigned> values(reinterpret_cast<const unsigned*>(&value), sizeof(value) / sizeof(unsigned));
 
         while ((values.empty() == false) && (values.back() == 0))
         {
@@ -277,7 +277,7 @@ public:
         }
 
         llvm::SmallVector<llvm::Metadata*, 8> operands;
-        for (uint32_t value : values)
+        for (unsigned value : values)
         {
             operands.push_back(llvm::ConstantAsMetadata::get(builder.getInt32(value)));
         }
@@ -311,13 +311,13 @@ public:
     // Read an array of i32 values out of a metadata node, writing into any type.
     // Returns the number of i32s read.
     template<typename T>
-    static uint32_t ReadArrayOfInt32MetaNode(
+    static unsigned ReadArrayOfInt32MetaNode(
         llvm::MDNode*                   pMetaNode,  // Metadata node to read from
         T&                        value)      // [out] Value to write into (caller must zero initialize)
     {
-        llvm::MutableArrayRef<uint32_t> values(reinterpret_cast<uint32_t*>(&value), sizeof(value) / sizeof(uint32_t));
-        uint32_t count = std::min(pMetaNode->getNumOperands(), unsigned(values.size()));
-        for (uint32_t index = 0; index < count; ++index)
+        llvm::MutableArrayRef<unsigned> values(reinterpret_cast<unsigned*>(&value), sizeof(value) / sizeof(unsigned));
+        unsigned count = std::min(pMetaNode->getNumOperands(), unsigned(values.size()));
+        for (unsigned index = 0; index < count; ++index)
         {
             values[index] = llvm::mdconst::dyn_extract<llvm::ConstantInt>(pMetaNode->getOperand(index))->getZExtValue();
         }
@@ -328,7 +328,7 @@ public:
     // writing into any type.
     // Returns the number of i32s read.
     template<typename T>
-    static uint32_t ReadNamedMetadataArrayOfInt32(
+    static unsigned ReadNamedMetadataArrayOfInt32(
         llvm::Module*                   pModule,    // [in] IR module to look in
         llvm::StringRef                 metaName,   // Name for named metadata node
         T&                        value)      // [out] Value to write into (caller must zero initialize)
@@ -382,19 +382,19 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
     bool                            m_noReplayer = false;               // True if no BuilderReplayer needed
-    uint32_t                        m_stageMask = 0;                    // Mask of active shader stages
+    unsigned                        m_stageMask = 0;                    // Mask of active shader stages
     Options                         m_options = {};                     // Per-pipeline options
     std::vector<ShaderOptions>      m_shaderOptions;                    // Per-shader options
     std::unique_ptr<ResourceNode[]> m_allocUserDataNodes;               // Allocated buffer for user data
     llvm::ArrayRef<ResourceNode>          m_userDataNodes;                    // Top-level user data node table
     bool                            m_haveConvertingSampler = false;    // Whether we have a converting sampler
-    llvm::MDString*                       m_resourceNodeTypeNames[uint32_t(ResourceNodeType::Count)] = {};
+    llvm::MDString*                       m_resourceNodeTypeNames[unsigned(ResourceNodeType::Count)] = {};
                                                                         // Cached MDString for each resource node type
 
     bool                            m_gsOnChip = false;                 // Whether to use GS on-chip mode
     NggControl                      m_nggControl = {};                  // NGG control settings
     ShaderModes                     m_shaderModes;                      // Shader modes for this pipeline
-    uint32_t                        m_deviceIndex = 0;                  // Device index
+    unsigned                        m_deviceIndex = 0;                  // Device index
     std::vector<VertexInputDescription>
                                     m_vertexInputDescriptions;          // Vertex input descriptions
     llvm::SmallVector<ColorExportFormat, 8>

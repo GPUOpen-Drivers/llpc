@@ -65,9 +65,9 @@ class PipelineState;
 struct ElfDataEntry
 {
     const void* pData;           // Data in the section
-    uint32_t    offset;          // Offset of the data
-    uint32_t    size;            // Size of the data
-    uint32_t    padSize;         // Padding size of the data
+    unsigned    offset;          // Offset of the data
+    unsigned    size;            // Size of the data
+    unsigned    padSize;         // Padding size of the data
     const char* pSymName;        // Name of associated ELF symbol
 };
 

@@ -105,15 +105,15 @@
 namespace Vkgc
 {
 
-static const uint32_t  Version = LLPC_INTERFACE_MAJOR_VERSION;
-static const uint32_t  InternalDescriptorSetId = static_cast<uint32_t>(-1);
-static const uint32_t  MaxColorTargets = 8;
+static const unsigned  Version = LLPC_INTERFACE_MAJOR_VERSION;
+static const unsigned  InternalDescriptorSetId = static_cast<unsigned>(-1);
+static const unsigned  MaxColorTargets = 8;
 
 // Forward declarations
 class IShaderCache;
 
 /// Enumerates result codes of LLPC operations.
-enum class Result : int32_t
+enum class Result : int
 {
     /// The operation completed successfully
     Success                         = 0x00000000,
@@ -136,7 +136,7 @@ enum class Result : int32_t
 };
 
 /// Represents the base data type
-enum class BasicType : uint32_t
+enum class BasicType : unsigned
 {
     Unknown = 0,          ///< Unknown
     Float,                ///< Float
@@ -153,7 +153,7 @@ enum class BasicType : uint32_t
 };
 
 /// Enumerates LLPC shader stages.
-enum ShaderStage : uint32_t
+enum ShaderStage : unsigned
 {
     ShaderStageVertex = 0,                                ///< Vertex shader
     ShaderStageTessControl,                               ///< Tessellation control shader
@@ -171,7 +171,7 @@ enum ShaderStage : uint32_t
 };
 
 /// Enumerates the function of a particular node in a shader's resource mapping graph.
-enum class ResourceMappingNodeType : uint32_t
+enum class ResourceMappingNodeType : unsigned
 {
     Unknown,                        ///< Invalid type
     DescriptorResource,             ///< Generic descriptor: resource, including texture resource, image, input
@@ -201,8 +201,8 @@ struct ResourceMappingNode
 {
     ResourceMappingNodeType     type;   ///< Type of this node
 
-    uint32_t    sizeInDwords;   ///< Size of this node in DWORD
-    uint32_t    offsetInDwords; ///< Offset of this node (from the beginning of the resource mapping table) in DWORD
+    unsigned    sizeInDwords;   ///< Size of this node in DWORD
+    unsigned    offsetInDwords; ///< Offset of this node (from the beginning of the resource mapping table) in DWORD
 
     union
     {
@@ -210,20 +210,20 @@ struct ResourceMappingNode
         /// DescriptorTexelBuffer, DescriptorBuffer and DescriptorBufferCompact)
         struct
         {
-            uint32_t                    set;         ///< Descriptor set
-            uint32_t                    binding;     ///< Descriptor binding
+            unsigned                    set;         ///< Descriptor set
+            unsigned                    binding;     ///< Descriptor binding
         } srdRange;
         /// Info for hierarchical nodes (DescriptorTableVaPtr)
         struct
         {
-            uint32_t                    nodeCount;  ///< Number of entries in the "pNext" array
+            unsigned                    nodeCount;  ///< Number of entries in the "pNext" array
             const ResourceMappingNode*  pNext;      ///< Array of node structures describing the next hierarchical
                                                     ///  level of mapping
         } tablePtr;
         /// Info for hierarchical nodes (IndirectUserDataVaPtr)
         struct
         {
-            uint32_t                    sizeInDwords; ///< Size of the pointed table in DWORDS
+            unsigned                    sizeInDwords; ///< Size of the pointed table in DWORDS
         } userDataPtr;
     };
 };
@@ -232,19 +232,19 @@ struct ResourceMappingNode
 struct DescriptorRangeValue
 {
     ResourceMappingNodeType type;       ///< Type of this resource mapping node (currently, only sampler is supported)
-    uint32_t                set;        ///< ID of descriptor set
-    uint32_t                binding;    ///< ID of descriptor binding
-    uint32_t                arraySize;  ///< Element count for arrayed binding
-    const uint32_t*         pValue;     ///< Static SRDs
+    unsigned                set;        ///< ID of descriptor set
+    unsigned                binding;    ///< ID of descriptor binding
+    unsigned                arraySize;  ///< Element count for arrayed binding
+    const unsigned*         pValue;     ///< Static SRDs
 };
 
 /// Represents graphics IP version info. See https://llvm.org/docs/AMDGPUUsage.html#processors for more
 /// details.
 struct GfxIpVersion
 {
-    uint32_t        major;              ///< Major version
-    uint32_t        minor;              ///< Minor version
-    uint32_t        stepping;           ///< Stepping info
+    unsigned        major;              ///< Major version
+    unsigned        minor;              ///< Minor version
+    unsigned        stepping;           ///< Stepping info
 };
 
 /// Represents shader binary data.
@@ -255,7 +255,7 @@ struct BinaryData
 };
 
 /// Values for shadowDescriptorTableUsage pipeline option.
-enum class ShadowDescriptorTableUsage : uint32_t
+enum class ShadowDescriptorTableUsage : unsigned
 {
     Auto     = 0,  ///< Use 0 for auto setting so null initialized structures default to auto.
     Enable   = 1,
@@ -275,14 +275,14 @@ struct PipelineOptions
                                    ///  the out of bounds accesses will be skipped with this setting.
 
     ShadowDescriptorTableUsage shadowDescriptorTableUsage;    ///< Controls shadow descriptor table.
-    uint32_t                   shadowDescriptorTablePtrHigh;  ///< Sets high part of VA ptr for shadow descriptor table.
+    unsigned                   shadowDescriptorTablePtrHigh;  ///< Sets high part of VA ptr for shadow descriptor table.
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
 typedef void* (VKAPI_CALL *OutputAllocFunc)(void* pInstance, void* pUserData, size_t size);
 
 /// Enumerates types of shader binary.
-enum class BinaryType : uint32_t
+enum class BinaryType : unsigned
 {
     Unknown = 0,  ///< Invalid type
     Spirv,        ///< SPIR-V binary
@@ -295,9 +295,9 @@ enum class BinaryType : uint32_t
 struct ResourceNodeData
 {
     ResourceMappingNodeType type;       ///< Type of this resource mapping node
-    uint32_t                set;        ///< ID of descriptor set
-    uint32_t                binding;    ///< ID of descriptor binding
-    uint32_t                arraySize;  ///< Element count for arrayed binding
+    unsigned                set;        ///< ID of descriptor set
+    unsigned                binding;    ///< ID of descriptor binding
+    unsigned                arraySize;  ///< Element count for arrayed binding
 };
 
 /// Represents the information of one shader entry in ShaderModuleExtraData
@@ -306,9 +306,9 @@ struct ShaderModuleEntryData
     ShaderStage             stage;              ///< Shader stage
     const char*             pEntryName;         ///< Shader entry name
     void*                   pShaderEntry;       ///< Private shader module entry info
-    uint32_t                resNodeDataCount;   ///< Resource node data count
+    unsigned                resNodeDataCount;   ///< Resource node data count
     const ResourceNodeData* pResNodeDatas;      ///< Resource node data array
-    uint32_t                pushConstSize;      ///< Push constant size in byte
+    unsigned                pushConstSize;      ///< Push constant size in byte
 };
 
 /// Represents usage info of a shader module
@@ -325,35 +325,35 @@ struct ShaderModuleUsage
 /// Represents common part of shader module data
 struct ShaderModuleData
 {
-    uint32_t         hash[4];       ///< Shader hash code
+    unsigned         hash[4];       ///< Shader hash code
     BinaryType       binType;       ///< Shader binary type
     BinaryData       binCode;       ///< Shader binary data
-    uint32_t         cacheHash[4];  ///< Hash code for calculate pipeline cache key
+    unsigned         cacheHash[4];  ///< Hash code for calculate pipeline cache key
     ShaderModuleUsage usage;        ///< Usage info of a shader module
 };
 
 /// Represents fragment shader output info
 struct FsOutInfo
 {
-    uint32_t    location;       ///< Output location in resource layout
-    uint32_t    index;          ///< Output index in resource layout
+    unsigned    location;       ///< Output location in resource layout
+    unsigned    index;          ///< Output index in resource layout
     BasicType   basicType;      ///< Output data type
-    uint32_t    componentCount; ///< Count of components of output data
+    unsigned    componentCount; ///< Count of components of output data
 };
 
 /// Represents extended output of building a shader module (taking extra data info)
 struct ShaderModuleDataEx
 {
     ShaderModuleData        common;         ///< Shader module common data
-    uint32_t                codeOffset;     ///< Binary offset of binCode in ShaderModuleDataEx
-    uint32_t                entryOffset;    ///< Shader entry offset in ShaderModuleDataEx
-    uint32_t                resNodeOffset;  ///< Resource node offset in ShaderModuleDataEX
-    uint32_t                fsOutInfoOffset;///< FsOutInfo offset in ShaderModuleDataEX
+    unsigned                codeOffset;     ///< Binary offset of binCode in ShaderModuleDataEx
+    unsigned                entryOffset;    ///< Shader entry offset in ShaderModuleDataEx
+    unsigned                resNodeOffset;  ///< Resource node offset in ShaderModuleDataEX
+    unsigned                fsOutInfoOffset;///< FsOutInfo offset in ShaderModuleDataEX
     struct
     {
-        uint32_t              fsOutInfoCount;           ///< Count of fragment shader output
+        unsigned              fsOutInfoCount;           ///< Count of fragment shader output
         const FsOutInfo*      pFsOutInfos;              ///< Fragment output info array
-        uint32_t              entryCount;              ///< Shader entry count in the module
+        unsigned              entryCount;              ///< Shader entry count in the module
         ShaderModuleEntryData entryDatas[1];           ///< Array of all shader entries in this module
     } extra;                              ///< Represents extra part of shader module data
 };
@@ -362,7 +362,7 @@ struct ShaderModuleDataEx
 struct PipelineDumpOptions
 {
     const char* pDumpDir;                  ///< Pipeline dump directory
-    uint32_t    filterPipelineDumpByType;  ///< Filter which types of pipeline dump are enabled
+    unsigned    filterPipelineDumpByType;  ///< Filter which types of pipeline dump are enabled
     uint64_t    filterPipelineDumpByHash;  ///< Only dump the pipeline with this compiler hash if non-zero
     bool        dumpDuplicatePipelines;    ///< If TRUE, duplicate pipelines will be dumped to a file with a
                                            ///  numeric suffix attached
@@ -370,7 +370,7 @@ struct PipelineDumpOptions
 
 /// If next available quad falls outside tile aligned region of size defined by this enumeration the SC will force end
 /// of vector in the SC to shader wavefront.
-enum class WaveBreakSize : uint32_t
+enum class WaveBreakSize : unsigned
 {
     None     = 0x0,        ///< No wave break by region
     _8x8     = 0x1,        ///< Outside a 8x8 pixel region
@@ -380,7 +380,7 @@ enum class WaveBreakSize : uint32_t
 };
 
 /// Enumerates various sizing options of sub-group size for NGG primitive shader.
-enum class NggSubgroupSizingType : uint32_t
+enum class NggSubgroupSizingType : unsigned
 {
     Auto,                           ///< Sub-group size is allocated as optimally determined
     MaximumSize,                    ///< Sub-group size is allocated to the maximum allowable size by the hardware
@@ -393,7 +393,7 @@ enum class NggSubgroupSizingType : uint32_t
 };
 
 /// Enumerates compaction modes after culling operations for NGG primitive shader.
-enum NggCompactMode : uint32_t
+enum NggCompactMode : unsigned
 {
     NggCompactSubgroup,             ///< Compaction is based on the whole sub-group
     NggCompactVertices,             ///< Compaction is based on vertices
@@ -418,7 +418,7 @@ struct NggState
     bool    enableCullDistanceCulling;  ///< Enable culling when "cull distance" exports are present
 
     /// Following fields are used for NGG tuning
-    uint32_t backfaceExponent;          ///< Value from 1 to UINT32_MAX that will cause the backface culling
+    unsigned backfaceExponent;          ///< Value from 1 to UINT32_MAX that will cause the backface culling
                                         ///  algorithm to ignore area calculations that are less than
                                         ///  (10 ^ -(backfaceExponent)) / abs(w0 * w1 * w2)
                                         ///  Only valid if the NGG backface culler is enabled.
@@ -426,10 +426,10 @@ struct NggState
 
     NggSubgroupSizingType subgroupSizing;   ///< NGG sub-group sizing type
 
-    uint32_t primsPerSubgroup;          ///< Preferred number of GS primitives to pack into a primitive shader
+    unsigned primsPerSubgroup;          ///< Preferred number of GS primitives to pack into a primitive shader
                                         ///  sub-group
 
-    uint32_t vertsPerSubgroup;          ///< Preferred number of vertices consumed by a primitive shader sub-group
+    unsigned vertsPerSubgroup;          ///< Preferred number of vertices consumed by a primitive shader sub-group
 };
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
@@ -466,24 +466,24 @@ struct PipelineShaderOptions
                          ///  in case the PS kills pixels.  Only valid for pixel shaders.
     /// Maximum VGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
     /// of this value and whatever the target GPU supports. To effectively disable this limit, set this to UINT_MAX.
-    uint32_t  vgprLimit;
+    unsigned  vgprLimit;
 
     /// Maximum SGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
     /// of this value and whatever the target GPU supports. To effectively disable this limit, set this to UINT_MAX.
-    uint32_t  sgprLimit;
+    unsigned  sgprLimit;
 
     /// Overrides the number of CS thread-groups which the GPU will launch per compute-unit. This throttles the
     /// shader, which can sometimes enable more graphics shader work to complete in parallel. A value of zero
     /// disables limiting the number of thread-groups to launch. This field is ignored for graphics shaders.
-    uint32_t  maxThreadGroupsPerComputeUnit;
+    unsigned  maxThreadGroupsPerComputeUnit;
 
-    uint32_t      waveSize;      ///< Control the number of threads per wavefront (GFX10+)
+    unsigned      waveSize;      ///< Control the number of threads per wavefront (GFX10+)
     bool          wgpMode;       ///< Whether to choose WGP mode or CU mode (GFX10+)
     WaveBreakSize waveBreakSize; ///< Size of region to force the end of a wavefront (GFX10+).
                                  ///  Only valid for fragment shaders.
 
     /// Force loop unroll count. "0" means using default value; "1" means disabling loop unroll.
-    uint32_t  forceLoopUnrollCount;
+    unsigned  forceLoopUnrollCount;
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
     /// Enable LLPC load scalarizer optimization.
@@ -501,10 +501,10 @@ struct PipelineShaderOptions
     bool      disableLicm;
 #endif
     /// Default unroll threshold for LLVM.
-    uint32_t  unrollThreshold;
+    unsigned  unrollThreshold;
 
     /// The threshold for load scalarizer.
-    uint32_t  scalarThreshold;
+    unsigned  scalarThreshold;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
@@ -514,47 +514,47 @@ struct SamplerYCbCrConversionMetaData
     {
         struct
         {                                            ///< e.g R12X4G12X4_UNORM_2PACK16
-            uint32_t channelBitsR               : 5; ///< channelBitsR = 12
-            uint32_t channelBitsG               : 5; ///< channelBitsG = 12
-            uint32_t channelBitsB               : 5; ///< channelBitsB =  0
-            uint32_t                            :17;
+            unsigned channelBitsR               : 5; ///< channelBitsR = 12
+            unsigned channelBitsG               : 5; ///< channelBitsG = 12
+            unsigned channelBitsB               : 5; ///< channelBitsB =  0
+            unsigned                            :17;
         } bitDepth;
         struct
         {
-            uint32_t                            :15; ///< VkComponentSwizzle, e.g
-            uint32_t swizzleR                   : 3; ///< swizzleR = VK_COMPONENT_SWIZZLE_R(3)
-            uint32_t swizzleG                   : 3; ///< swizzleG = VK_COMPONENT_SWIZZLE_G(4)
-            uint32_t swizzleB                   : 3; ///< swizzleB = VK_COMPONENT_SWIZZLE_B(5)
-            uint32_t swizzleA                   : 3; ///< swizzleA = VK_COMPONENT_SWIZZLE_A(6)
-            uint32_t                            : 5;
+            unsigned                            :15; ///< VkComponentSwizzle, e.g
+            unsigned swizzleR                   : 3; ///< swizzleR = VK_COMPONENT_SWIZZLE_R(3)
+            unsigned swizzleG                   : 3; ///< swizzleG = VK_COMPONENT_SWIZZLE_G(4)
+            unsigned swizzleB                   : 3; ///< swizzleB = VK_COMPONENT_SWIZZLE_B(5)
+            unsigned swizzleA                   : 3; ///< swizzleA = VK_COMPONENT_SWIZZLE_A(6)
+            unsigned                            : 5;
         } componentMapping;
         struct
         {
-            uint32_t                            :27;
-            uint32_t yCbCrModel                 : 3; ///< RGB_IDENTITY(0), ycbcr_identity(1),
+            unsigned                            :27;
+            unsigned yCbCrModel                 : 3; ///< RGB_IDENTITY(0), ycbcr_identity(1),
                                                      ///  _709(2),_601(3),_2020(4)
-            uint32_t yCbCrRange                 : 1; ///< ITU_FULL(0), ITU_NARROW(0)
-            uint32_t forceExplicitReconstruct   : 1; ///< Disable(0), Enable(1)
+            unsigned yCbCrRange                 : 1; ///< ITU_FULL(0), ITU_NARROW(0)
+            unsigned forceExplicitReconstruct   : 1; ///< Disable(0), Enable(1)
         };
-        uint32_t u32All;
+        unsigned u32All;
     } word0;
 
     union
     {
         struct
         {
-            uint32_t planes                     : 2; ///< Number of planes, normally from 1 to 3
-            uint32_t lumaFilter                 : 1; ///< FILTER_NEAREST(0) or FILTER_LINEAR(1)
-            uint32_t chromaFilter               : 1; ///< FILTER_NEAREST(0) or FILTER_LINEAR(1)
-            uint32_t xChromaOffset              : 1; ///< COSITED_EVEN(0) or MIDPOINT(1)
-            uint32_t yChromaOffset              : 1; ///< COSITED_EVEN(0) or MIDPOINT(1)
-            uint32_t xSubSampled                : 1; ///< true(1) or false(0)
-            uint32_t ySubSampled                : 1; ///< true(1) or false(0)
-            uint32_t tileOptimal                : 1; ///< true(1) or false(0)
-            uint32_t dstSelXYZW                 :12; ///< dst selection Swizzle
-            uint32_t undefined                  :11;
+            unsigned planes                     : 2; ///< Number of planes, normally from 1 to 3
+            unsigned lumaFilter                 : 1; ///< FILTER_NEAREST(0) or FILTER_LINEAR(1)
+            unsigned chromaFilter               : 1; ///< FILTER_NEAREST(0) or FILTER_LINEAR(1)
+            unsigned xChromaOffset              : 1; ///< COSITED_EVEN(0) or MIDPOINT(1)
+            unsigned yChromaOffset              : 1; ///< COSITED_EVEN(0) or MIDPOINT(1)
+            unsigned xSubSampled                : 1; ///< true(1) or false(0)
+            unsigned ySubSampled                : 1; ///< true(1) or false(0)
+            unsigned tileOptimal                : 1; ///< true(1) or false(0)
+            unsigned dstSelXYZW                 :12; ///< dst selection Swizzle
+            unsigned undefined                  :11;
         };
-        uint32_t u32All;
+        unsigned u32All;
     } word1;
 
     union
@@ -562,22 +562,22 @@ struct SamplerYCbCrConversionMetaData
         /// For YUV formats, bitCount may not equal to bitDepth, where bitCount >= bitDepth
         struct
         {
-            uint32_t xBitCount                  : 6; ///< Bit count for x channel
-            uint32_t yBitCount                  : 6; ///< Bit count for y channel
-            uint32_t zBitCount                  : 6; ///< Bit count for z channel
-            uint32_t wBitCount                  : 6; ///< Bit count for w channel
-            uint32_t undefined                  : 8;
+            unsigned xBitCount                  : 6; ///< Bit count for x channel
+            unsigned yBitCount                  : 6; ///< Bit count for y channel
+            unsigned zBitCount                  : 6; ///< Bit count for z channel
+            unsigned wBitCount                  : 6; ///< Bit count for w channel
+            unsigned undefined                  : 8;
         } bitCounts;
-        uint32_t u32All;
+        unsigned u32All;
     } word2;
 
     union
     {
         struct
         {
-            uint32_t sqImgRsrcWord1             : 32; ///< Reconstructed sqImgRsrcWord1
+            unsigned sqImgRsrcWord1             : 32; ///< Reconstructed sqImgRsrcWord1
         };
-        uint32_t u32All;
+        unsigned u32All;
     } word3;
 };
 
@@ -588,10 +588,10 @@ struct PipelineShaderInfo
     const VkSpecializationInfo*     pSpecializationInfo;    ///< Specialization constant info
     const char*                     pEntryTarget;           ///< Name of the target entry point (for multi-entry)
     ShaderStage                     entryStage;             ///< Shader stage of the target entry point
-    uint32_t                        descriptorRangeValueCount; ///< Count of static descriptors
+    unsigned                        descriptorRangeValueCount; ///< Count of static descriptors
     DescriptorRangeValue*           pDescriptorRangeValues;    ///< An array of static descriptors
 
-    uint32_t                        userDataNodeCount;      ///< Count of user data nodes
+    unsigned                        userDataNodeCount;      ///< Count of user data nodes
 
     /// User data nodes, providing the root-level mapping of descriptors in user-data entries (physical registers or
     /// GPU memory) to resources referenced in this pipeline shader.
@@ -632,9 +632,9 @@ struct GraphicsPipelineBuildInfo
     struct
     {
         VkPrimitiveTopology  topology;           ///< Primitive topology
-        uint32_t             patchControlPoints; ///< Number of control points per patch (valid when the topology is
+        unsigned             patchControlPoints; ///< Number of control points per patch (valid when the topology is
                                                  ///  "patch")
-        uint32_t             deviceIndex;        ///< Device index for device group
+        unsigned             deviceIndex;        ///< Device index for device group
         bool                 disableVertexReuse; ///< Disable reusing vertex shader output for indexed draws
         bool                 switchWinding ;     ///< Whether to reverse vertex ordering for tessellation
         bool                 enableMultiView;    ///< Whether to enable multi-view support
@@ -652,8 +652,8 @@ struct GraphicsPipelineBuildInfo
         bool    innerCoverage;                  ///< Related to conservative rasterization.  Must be false if
                                                 ///  conservative rasterization is disabled.
         bool    perSampleShading;               ///< Enable per sample shading
-        uint32_t  numSamples;                   ///< Number of coverage samples used when rendering with this pipeline
-        uint32_t  samplePatternIdx;             ///< Index into the currently bound MSAA sample pattern table that
+        unsigned  numSamples;                   ///< Number of coverage samples used when rendering with this pipeline
+        unsigned  samplePatternIdx;             ///< Index into the currently bound MSAA sample pattern table that
                                                 ///  matches the sample pattern used by the rasterizer when rendering
                                                 ///  with this pipeline.
         uint8_t   usrClipPlaneMask;             ///< Mask to indicate the enabled user defined clip planes
@@ -684,7 +684,7 @@ struct ComputePipelineBuildInfo
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     IShaderCache*       pShaderCache;         ///< Shader cache, used to search for the compiled shader data
 #endif
-    uint32_t            deviceIndex;          ///< Device index for device group
+    unsigned            deviceIndex;          ///< Device index for device group
     PipelineShaderInfo  cs;                   ///< Compute shader
     PipelineOptions     options;              ///< Per pipeline tuning options
 };

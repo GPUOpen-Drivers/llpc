@@ -46,7 +46,7 @@ struct VertexFormatInfo
 {
     BufNumFormat    nfmt;           // Numeric format of vertex buffer
     BufDataFormat   dfmt;           // Data format of vertex buffer
-    uint32_t        numChannels;    // Valid number of channels
+    unsigned        numChannels;    // Valid number of channels
 };
 
 // Represents vertex component info corresponding to to vertex data format (BufDataFormat).
@@ -56,9 +56,9 @@ struct VertexFormatInfo
 // attribute stride, etc..)
 struct VertexCompFormatInfo
 {
-    uint32_t        vertexByteSize; // Byte size of the vertex
-    uint32_t        compByteSize;   // Byte size of each individual component
-    uint32_t        compCount;      // Component count
+    unsigned        vertexByteSize; // Byte size of the vertex
+    unsigned        compByteSize;   // Byte size of each individual component
+    unsigned        compCount;      // Component count
     BufDataFmt      compDfmt;       // Equivalent data format of each component
 };
 
@@ -71,7 +71,7 @@ public:
 
     static VertexFormatInfo GetVertexFormatInfo(const VertexInputDescription* pDescription);
 
-    llvm::Value* Run(llvm::Type* pInputTy, uint32_t location, uint32_t compIdx, llvm::Instruction* pInsertPos);
+    llvm::Value* Run(llvm::Type* pInputTy, unsigned location, unsigned compIdx, llvm::Instruction* pInsertPos);
 
     // Gets variable corresponding to vertex index
     llvm::Value* GetVertexIndex() { return m_pVertexIndex; }
@@ -84,20 +84,20 @@ private:
     VertexFetch(const VertexFetch&) = delete;
     VertexFetch& operator=(const VertexFetch&) = delete;
 
-    static const VertexCompFormatInfo* GetVertexComponentFormatInfo(uint32_t dfmt);
+    static const VertexCompFormatInfo* GetVertexComponentFormatInfo(unsigned dfmt);
 
-    uint32_t MapVertexFormat(uint32_t dfmt, uint32_t nfmt) const;
+    unsigned MapVertexFormat(unsigned dfmt, unsigned nfmt) const;
 
-    llvm::Value* LoadVertexBufferDescriptor(uint32_t binding, llvm::Instruction* pInsertPos) const;
+    llvm::Value* LoadVertexBufferDescriptor(unsigned binding, llvm::Instruction* pInsertPos) const;
 
     void AddVertexFetchInst(llvm::Value*       pVbDesc,
-                            uint32_t           numChannels,
+                            unsigned           numChannels,
                             bool               is16bitFetch,
                             llvm::Value*       pVbIndex,
-                            uint32_t           offset,
-                            uint32_t           stride,
-                            uint32_t           dfmt,
-                            uint32_t           nfmt,
+                            unsigned           offset,
+                            unsigned           stride,
+                            unsigned           dfmt,
+                            unsigned           nfmt,
                             llvm::Instruction* pInsertPos,
                             llvm::Value**      ppFetch) const;
 

@@ -39,31 +39,31 @@ namespace lgc
 // details.
 struct GfxIpVersion
 {
-    uint32_t        major;              // Major version
-    uint32_t        minor;              // Minor version
-    uint32_t        stepping;           // Stepping info
+    unsigned        major;              // Major version
+    unsigned        minor;              // Minor version
+    unsigned        stepping;           // Stepping info
 };
 
 // Represents the properties of GPU device.
 struct GpuProperty
 {
-    uint32_t numShaderEngines;                  // Number of shader engines present
-    uint32_t waveSize;                          // Wavefront size
-    uint32_t ldsSizePerCu;                      // LDS size per compute unit
-    uint32_t ldsSizePerThreadGroup;             // LDS size per thread group
-    uint32_t gsOnChipDefaultPrimsPerSubgroup;   // Default target number of primitives per subgroup for GS on-chip mode.
-    uint32_t gsOnChipDefaultLdsSizePerSubgroup; // Default value for the maximum LDS size per subgroup for
-    uint32_t gsOnChipMaxLdsSize;                // Max LDS size used by GS on-chip mode (in DWORDs)
-    uint32_t ldsSizeDwordGranularityShift;      // Amount of bits used to shift the LDS_SIZE register field
+    unsigned numShaderEngines;                  // Number of shader engines present
+    unsigned waveSize;                          // Wavefront size
+    unsigned ldsSizePerCu;                      // LDS size per compute unit
+    unsigned ldsSizePerThreadGroup;             // LDS size per thread group
+    unsigned gsOnChipDefaultPrimsPerSubgroup;   // Default target number of primitives per subgroup for GS on-chip mode.
+    unsigned gsOnChipDefaultLdsSizePerSubgroup; // Default value for the maximum LDS size per subgroup for
+    unsigned gsOnChipMaxLdsSize;                // Max LDS size used by GS on-chip mode (in DWORDs)
+    unsigned ldsSizeDwordGranularityShift;      // Amount of bits used to shift the LDS_SIZE register field
 
     //TODO: Setup gsPrimBufferDepth from hardware config option, will be done in another change.
-    uint32_t gsPrimBufferDepth;     // Comes from the hardware GPU__GC__GSPRIM_BUFF_DEPTH configuration option
+    unsigned gsPrimBufferDepth;     // Comes from the hardware GPU__GC__GSPRIM_BUFF_DEPTH configuration option
 
-    uint32_t maxUserDataCount;                  // Max allowed count of user data SGPRs
-    uint32_t tessOffChipLdsBufferSize;          // Off-chip Tess Buffer Size
-    uint32_t maxSgprsAvailable;                 // Number of max available SGPRs
-    uint32_t maxVgprsAvailable;                 // Number of max available VGPRs
-    uint32_t tessFactorBufferSizePerSe;         // Size of the tessellation-factor buffer per SE, in DWORDs.
+    unsigned maxUserDataCount;                  // Max allowed count of user data SGPRs
+    unsigned tessOffChipLdsBufferSize;          // Off-chip Tess Buffer Size
+    unsigned maxSgprsAvailable;                 // Number of max available SGPRs
+    unsigned maxVgprsAvailable;                 // Number of max available VGPRs
+    unsigned tessFactorBufferSizePerSe;         // Size of the tessellation-factor buffer per SE, in DWORDs.
     bool     supportShaderPowerProfiling;       // Hardware supports Shader Profiling for Power
     bool     supportSpiPrefPriority;            // Hardware supports SPI shader preference priority
 };
@@ -75,64 +75,64 @@ struct WorkaroundFlags
     {
         struct
         {
-            uint32_t  cbNoLt16BitIntClamp               :  1;
-            uint32_t  miscLoadBalancePerWatt            :  1;
-            uint32_t  miscSpiSgprsNum                   :  1;
-            uint32_t  shader8b16bLocalWriteCorruption   :  1;
-            uint32_t  shaderCoalesceStore               :  1;
-            uint32_t  shaderEstimateRegisterUsage       :  1;
-            uint32_t  shaderReadlaneSmrd                :  1;
-            uint32_t  shaderSmemBufferAddrClamp         :  1;
-            uint32_t  shaderSpiBarrierMgmt              :  1;
+            unsigned  cbNoLt16BitIntClamp               :  1;
+            unsigned  miscLoadBalancePerWatt            :  1;
+            unsigned  miscSpiSgprsNum                   :  1;
+            unsigned  shader8b16bLocalWriteCorruption   :  1;
+            unsigned  shaderCoalesceStore               :  1;
+            unsigned  shaderEstimateRegisterUsage       :  1;
+            unsigned  shaderReadlaneSmrd                :  1;
+            unsigned  shaderSmemBufferAddrClamp         :  1;
+            unsigned  shaderSpiBarrierMgmt              :  1;
 
-            uint32_t  shaderSpiCsRegAllocFragmentation  :  1;
-            uint32_t  shaderVcczScalarReadBranchFailure :  1;
-            uint32_t  shaderZExport                     :  1;
+            unsigned  shaderSpiCsRegAllocFragmentation  :  1;
+            unsigned  shaderVcczScalarReadBranchFailure :  1;
+            unsigned  shaderZExport                     :  1;
             // Pre-GFX9 hardware doesn't support min/max denorm flush, we insert extra fmul with 1.0 to flush the denorm value
-            uint32_t  shaderMinMaxFlushDenorm           :  1;
-            uint32_t  reserved                          : 19;
+            unsigned  shaderMinMaxFlushDenorm           :  1;
+            unsigned  reserved                          : 19;
         };
-        uint32_t  u32All;
+        unsigned  u32All;
     } gfx6;
 
     union
     {
         struct
         {
-            uint32_t  fixCacheLineStraddling       :  1;
-            uint32_t  fixLsVgprInput               :  1;
-            uint32_t  shaderImageGatherInstFix     :  1;
-            uint32_t  treat1dImagesAs2d            :  1;
-            uint32_t  reserved                     : 28;
+            unsigned  fixCacheLineStraddling       :  1;
+            unsigned  fixLsVgprInput               :  1;
+            unsigned  shaderImageGatherInstFix     :  1;
+            unsigned  treat1dImagesAs2d            :  1;
+            unsigned  reserved                     : 28;
         };
-        uint32_t  u32All;
+        unsigned  u32All;
     } gfx9;
 
     union
     {
         struct
         {
-            uint32_t  disableI32ModToI16Mod        :  1;
+            unsigned  disableI32ModToI16Mod        :  1;
 
-            uint32_t  waTessFactorBufferSizeLimitGeUtcl1Underflow :  1;
-            uint32_t  waTessIncorrectRelativeIndex :  1;
-            uint32_t  waShaderInstPrefetch123      :  1;
-            uint32_t  waShaderInstPrefetch0        :  1;
-            uint32_t  nggTessDegeneratePrims       :  1;
-            uint32_t  waDidtThrottleVmem           :  1;
-            uint32_t  waLdsVmemNotWaitingVmVsrc    :  1;
-            uint32_t  waNsaCannotBeLastInClause    :  1;
-            uint32_t  waNsaAndClauseCanHang        :  1;
-            uint32_t  waNsaCannotFollowWritelane   :  1;
-            uint32_t  waThrottleInMultiDwordNsa    :  1;
-            uint32_t  waSmemFollowedByVopc         :  1;
-            uint32_t  waNggCullingNoEmptySubgroups :  1;
-            uint32_t  waShaderInstPrefetchFwd64    :  1;
-            uint32_t  waWarFpAtomicDenormHazard    :  1;
-            uint32_t  waNggDisabled                :  1;
-            uint32_t  reserved                     : 15;
+            unsigned  waTessFactorBufferSizeLimitGeUtcl1Underflow :  1;
+            unsigned  waTessIncorrectRelativeIndex :  1;
+            unsigned  waShaderInstPrefetch123      :  1;
+            unsigned  waShaderInstPrefetch0        :  1;
+            unsigned  nggTessDegeneratePrims       :  1;
+            unsigned  waDidtThrottleVmem           :  1;
+            unsigned  waLdsVmemNotWaitingVmVsrc    :  1;
+            unsigned  waNsaCannotBeLastInClause    :  1;
+            unsigned  waNsaAndClauseCanHang        :  1;
+            unsigned  waNsaCannotFollowWritelane   :  1;
+            unsigned  waThrottleInMultiDwordNsa    :  1;
+            unsigned  waSmemFollowedByVopc         :  1;
+            unsigned  waNggCullingNoEmptySubgroups :  1;
+            unsigned  waShaderInstPrefetchFwd64    :  1;
+            unsigned  waWarFpAtomicDenormHazard    :  1;
+            unsigned  waNggDisabled                :  1;
+            unsigned  reserved                     : 15;
         };
-        uint32_t u32All;
+        unsigned u32All;
     } gfx10;
 };
 

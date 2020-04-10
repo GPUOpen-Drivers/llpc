@@ -89,11 +89,11 @@ ConfigBuilderBase::~ConfigBuilderBase()
 ///                      @ref Util::Abi::HardwareStageFlagBits.
 void ConfigBuilderBase::AddApiHwShaderMapping(
     ShaderStage apiStage,
-    uint32_t hwStages)
+    unsigned hwStages)
 {
     auto hwMappingNode = GetApiShaderNode(apiStage)[Util::Abi::ShaderMetadataKey::HardwareMapping]
                             .getArray(true);
-    for (uint32_t hwStage = 0; hwStage < uint32_t(Util::Abi::HardwareStage::Count); ++hwStage)
+    for (unsigned hwStage = 0; hwStage < unsigned(Util::Abi::HardwareStage::Count); ++hwStage)
     {
         if (hwStages & (1 << hwStage))
         {
@@ -105,7 +105,7 @@ void ConfigBuilderBase::AddApiHwShaderMapping(
 // =====================================================================================================================
 // Get the MsgPack map node for the specified API shader in the ".shaders" map
 msgpack::MapDocNode ConfigBuilderBase::GetApiShaderNode(
-    uint32_t apiStage)  // API shader stage
+    unsigned apiStage)  // API shader stage
 {
     if (m_apiShaderNodes[apiStage].isEmpty())
     {
@@ -120,22 +120,22 @@ msgpack::MapDocNode ConfigBuilderBase::GetApiShaderNode(
 msgpack::MapDocNode ConfigBuilderBase::GetHwShaderNode(
     Util::Abi::HardwareStage hwStage)   // Hardware shader stage
 {
-    if (m_hwShaderNodes[uint32_t(hwStage)].isEmpty())
+    if (m_hwShaderNodes[unsigned(hwStage)].isEmpty())
     {
-        m_hwShaderNodes[uint32_t(hwStage)] = m_pipelineNode[Util::Abi::PipelineMetadataKey::HardwareStages]
-                                                .getMap(true)[HwStageNames[uint32_t(hwStage)]].getMap(true);
+        m_hwShaderNodes[unsigned(hwStage)] = m_pipelineNode[Util::Abi::PipelineMetadataKey::HardwareStages]
+                                                .getMap(true)[HwStageNames[unsigned(hwStage)]].getMap(true);
     }
-    return m_hwShaderNodes[uint32_t(hwStage)];
+    return m_hwShaderNodes[unsigned(hwStage)];
 }
 
 // =====================================================================================================================
 // Set an API shader's hash in metadata. Returns a 32-bit value derived from the hash that is used as
 // a shader checksum for performance profiling where applicable.
-uint32_t ConfigBuilderBase::SetShaderHash(
+unsigned ConfigBuilderBase::SetShaderHash(
     ShaderStage   apiStage) // API shader stage
 {
     const ShaderOptions& shaderOptions = m_pPipelineState->GetShaderOptions(apiStage);
-    auto hashNode = GetApiShaderNode(uint32_t(apiStage))[Util::Abi::ShaderMetadataKey::ApiShaderHash].getArray(true);
+    auto hashNode = GetApiShaderNode(unsigned(apiStage))[Util::Abi::ShaderMetadataKey::ApiShaderHash].getArray(true);
     hashNode[0] = hashNode.getDocument()->getNode(shaderOptions.hash[0]);
     hashNode[1] = hashNode.getDocument()->getNode(shaderOptions.hash[1]);
     return shaderOptions.hash[0] >> 32 ^ shaderOptions.hash[0] ^ shaderOptions.hash[1] >> 32 ^ shaderOptions.hash[1];
@@ -145,7 +145,7 @@ uint32_t ConfigBuilderBase::SetShaderHash(
 // Set *S_NUM_AVAIL_SGPRS for given hardware shader stage
 void ConfigBuilderBase::SetNumAvailSgprs(
     Util::Abi::HardwareStage hwStage, // Hardware shader stage
-    uint32_t value)                   // Number of available SGPRs
+    unsigned value)                   // Number of available SGPRs
 {
     auto hwShaderNode = GetHwShaderNode(hwStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::SgprLimit] = hwShaderNode.getDocument()->getNode(value);
@@ -155,7 +155,7 @@ void ConfigBuilderBase::SetNumAvailSgprs(
 // Set *S_NUM_AVAIL_VGPRS for given hardware shader stage
 void ConfigBuilderBase::SetNumAvailVgprs(
     Util::Abi::HardwareStage hwStage, // Hardware shader stage
-    uint32_t value)                   // Number of available VGPRs
+    unsigned value)                   // Number of available VGPRs
 {
     auto hwShaderNode = GetHwShaderNode(hwStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::VgprLimit] = hwShaderNode.getDocument()->getNode(value);
@@ -220,7 +220,7 @@ void ConfigBuilderBase::SetPsWritesDepth(
 // =====================================================================================================================
 // Set ES_GS_LDS_BYTE_SIZE
 void ConfigBuilderBase::SetEsGsLdsByteSize(
-    uint32_t value)   // Value to set
+    unsigned value)   // Value to set
 {
     m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = m_document->getNode(value);
 }
@@ -237,7 +237,7 @@ void ConfigBuilderBase::SetCalcWaveBreakSizeAtDrawTime(
 // Set hardware stage wavefront
 void ConfigBuilderBase::SetWaveFrontSize(
     Util::Abi::HardwareStage hwStage,   // Hardware shader stage
-    uint32_t                 value)     // Value to set
+    unsigned                 value)     // Value to set
 {
     if (m_pPipelineState->GetPalAbiVersion() >= 495)
     {
@@ -293,7 +293,7 @@ void ConfigBuilderBase::SetPipelineType(
 // Set LDS byte size for given hardware shader stage
 void ConfigBuilderBase::SetLdsSizeByteSize(
     Util::Abi::HardwareStage hwStage, // Hardware shader stage
-    uint32_t                 value)   // Value to set
+    unsigned                 value)   // Value to set
 {
     if (value == 0)
     {
@@ -307,7 +307,7 @@ void ConfigBuilderBase::SetLdsSizeByteSize(
 // =====================================================================================================================
 // Set ES-GS LDS byte size
 void ConfigBuilderBase::SetEsGsLdsSize(
-    uint32_t value) // Value to set
+    unsigned value) // Value to set
 {
     if (value == 0)
     {
@@ -347,7 +347,7 @@ void ConfigBuilderBase::SetPipelineHash()
 ///
 /// @param [in] key The metadata key (usually a register address).
 /// @param [in] value The metadata value.
-void ConfigBuilderBase::AppendConfig(uint32_t key, uint32_t value)
+void ConfigBuilderBase::AppendConfig(unsigned key, unsigned value)
 {
     assert(key != InvalidMetadataKey);
 
@@ -363,7 +363,7 @@ void ConfigBuilderBase::AppendConfig(uint32_t key, uint32_t value)
 /// @param [in] config The array of register metadata entries.
 void ConfigBuilderBase::AppendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config)
 {
-    uint32_t count = 0;
+    unsigned count = 0;
 
     for (const auto &entry : config)
     {
@@ -371,7 +371,7 @@ void ConfigBuilderBase::AppendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config
             ++count;
     }
 
-    uint32_t idx = m_config.size();
+    unsigned idx = m_config.size();
     m_config.resize(idx + count);
 
     for (const auto &entry : config)
@@ -421,7 +421,7 @@ void ConfigBuilderBase::WritePalMetadata()
 
 // =====================================================================================================================
 // Sets up floating point mode from the specified floating point control flags.
-uint32_t ConfigBuilderBase::SetupFloatingPointMode(
+unsigned ConfigBuilderBase::SetupFloatingPointMode(
     ShaderStage shaderStage)    // Shader stage
 {
     FloatMode floatMode = {};
@@ -433,23 +433,23 @@ uint32_t ConfigBuilderBase::SetupFloatingPointMode(
         // The HW rounding mode values happen to be one less than the FpRoundMode value, other than
         // FpRoundMode::DontCare, which we map to a default value.
         floatMode.bits.fp16fp64RoundMode = (shaderMode.fp16RoundMode != FpRoundMode::DontCare) ?
-                                           static_cast<uint32_t>(shaderMode.fp16RoundMode) - 1 :
+                                           static_cast<unsigned>(shaderMode.fp16RoundMode) - 1 :
                                            (shaderMode.fp64RoundMode != FpRoundMode::DontCare) ?
-                                           static_cast<uint32_t>(shaderMode.fp64RoundMode) - 1 :
+                                           static_cast<unsigned>(shaderMode.fp64RoundMode) - 1 :
                                            FP_ROUND_TO_NEAREST_EVEN;
         floatMode.bits.fp32RoundMode = (shaderMode.fp32RoundMode != FpRoundMode::DontCare) ?
-                                       static_cast<uint32_t>(shaderMode.fp32RoundMode) - 1 :
+                                       static_cast<unsigned>(shaderMode.fp32RoundMode) - 1 :
                                        FP_ROUND_TO_NEAREST_EVEN;
 
         // The denorm modes happen to be one less than the FpDenormMode value, other than
         // FpDenormMode::DontCare, which we map to a default value.
         floatMode.bits.fp16fp64DenormMode = (shaderMode.fp16DenormMode != FpDenormMode::DontCare) ?
-                                            static_cast<uint32_t>(shaderMode.fp16DenormMode) - 1 :
+                                            static_cast<unsigned>(shaderMode.fp16DenormMode) - 1 :
                                             (shaderMode.fp64DenormMode != FpDenormMode::DontCare) ?
-                                            static_cast<uint32_t>(shaderMode.fp64DenormMode) - 1 :
+                                            static_cast<unsigned>(shaderMode.fp64DenormMode) - 1 :
                                             FP_DENORM_FLUSH_NONE;
         floatMode.bits.fp32DenormMode = (shaderMode.fp32DenormMode != FpDenormMode::DontCare) ?
-                                        static_cast<uint32_t>(shaderMode.fp32DenormMode) - 1 :
+                                        static_cast<unsigned>(shaderMode.fp32DenormMode) - 1 :
                                         FP_DENORM_FLUSH_IN_OUT;
     }
     return floatMode.u32All;

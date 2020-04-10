@@ -66,9 +66,9 @@ private:
     BuilderReplayer(const BuilderReplayer&) = delete;
     BuilderReplayer& operator=(const BuilderReplayer&) = delete;
 
-    void ReplayCall(uint32_t opcode, CallInst* pCall);
+    void ReplayCall(unsigned opcode, CallInst* pCall);
 
-    Value* ProcessCall(uint32_t opcode, CallInst* pCall);
+    Value* ProcessCall(unsigned opcode, CallInst* pCall);
 
     std::unique_ptr<Builder>                m_pBuilder;                         // The LLPC builder that the builder
                                                                                 //  calls are being replayed on.
@@ -135,7 +135,7 @@ bool BuilderReplayer::runOnModule(
         }
 
         const ConstantAsMetadata* const pMetaConst = cast<ConstantAsMetadata>(pFuncMeta->getOperand(0));
-        uint32_t opcode = cast<ConstantInt>(pMetaConst->getValue())->getZExtValue();
+        unsigned opcode = cast<ConstantInt>(pMetaConst->getValue())->getZExtValue();
 
         SmallVector<CallInst*, 8> callsToRemove;
 
@@ -163,7 +163,7 @@ bool BuilderReplayer::runOnModule(
 // =====================================================================================================================
 // Replay a recorded builder call.
 void BuilderReplayer::ReplayCall(
-    uint32_t  opcode,   // The builder call opcode
+    unsigned  opcode,   // The builder call opcode
     CallInst* pCall)    // [in] The builder call to process
 {
     // Change shader stage if necessary.
@@ -214,7 +214,7 @@ void BuilderReplayer::ReplayCall(
 // Returns the replacement value, or nullptr in the case that we do not want the caller to replace uses of
 // pCall with the new value.
 Value* BuilderReplayer::ProcessCall(
-    uint32_t  opcode,   // The builder call opcode
+    unsigned  opcode,   // The builder call opcode
     CallInst* pCall)    // [in] The builder call to process
 {
     // Set builder fast math flags from the recorded call.
@@ -551,8 +551,8 @@ Value* BuilderReplayer::ProcessCall(
     // Replayer implementations of BuilderImplImage methods
     case BuilderRecorder::Opcode::ImageLoad:
         {
-            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
-            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();
+            unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
             Value* pImageDesc = args[2];
             Value* pCoord = args[3];
             Value* pMipLevel = (args.size() > 4) ? &*args[4] : nullptr;
@@ -561,8 +561,8 @@ Value* BuilderReplayer::ProcessCall(
 
     case BuilderRecorder::Opcode::ImageLoadWithFmask:
         {
-            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
-            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();
+            unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
             Value* pImageDesc = args[2];
             Value* pFmaskDesc = args[3];
             Value* pCoord = args[4];
@@ -579,8 +579,8 @@ Value* BuilderReplayer::ProcessCall(
     case BuilderRecorder::Opcode::ImageStore:
         {
             Value* pTexel = args[0];
-            uint32_t dim = cast<ConstantInt>(args[1])->getZExtValue();
-            uint32_t flags = cast<ConstantInt>(args[2])->getZExtValue();
+            unsigned dim = cast<ConstantInt>(args[1])->getZExtValue();
+            unsigned flags = cast<ConstantInt>(args[2])->getZExtValue();
             Value* pImageDesc = args[3];
             Value* pCoord = args[4];
             Value* pMipLevel = (args.size() > 5) ? &*args[5] : nullptr;
@@ -589,15 +589,15 @@ Value* BuilderReplayer::ProcessCall(
 
     case BuilderRecorder::Opcode::ImageSample:
         {
-            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
-            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();
+            unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
             Value* pImageDesc = args[2];
             Value* pSamplerDesc = args[3];
-            uint32_t argsMask = cast<ConstantInt>(args[4])->getZExtValue();
+            unsigned argsMask = cast<ConstantInt>(args[4])->getZExtValue();
             SmallVector<Value*, Builder::ImageAddressCount> address;
             address.resize(Builder::ImageAddressCount);
             args = args.slice(5);
-            for (uint32_t i = 0; i != Builder::ImageAddressCount; ++i)
+            for (unsigned i = 0; i != Builder::ImageAddressCount; ++i)
             {
                 if ((argsMask >> i) & 1)
                 {
@@ -610,15 +610,15 @@ Value* BuilderReplayer::ProcessCall(
 
     case BuilderRecorder::Opcode::ImageGather:
         {
-            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
-            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();
+            unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
             Value* pImageDesc = args[2];
             Value* pSamplerDesc = args[3];
-            uint32_t argsMask = cast<ConstantInt>(args[4])->getZExtValue();
+            unsigned argsMask = cast<ConstantInt>(args[4])->getZExtValue();
             SmallVector<Value*, Builder::ImageAddressCount> address;
             address.resize(Builder::ImageAddressCount);
             args = args.slice(5);
-            for (uint32_t i = 0; i != Builder::ImageAddressCount; ++i)
+            for (unsigned i = 0; i != Builder::ImageAddressCount; ++i)
             {
                 if ((argsMask >> i) & 1)
                 {
@@ -636,9 +636,9 @@ Value* BuilderReplayer::ProcessCall(
 
     case BuilderRecorder::Opcode::ImageAtomic:
         {
-            uint32_t atomicOp = cast<ConstantInt>(args[0])->getZExtValue();
-            uint32_t dim = cast<ConstantInt>(args[1])->getZExtValue();
-            uint32_t flags = cast<ConstantInt>(args[2])->getZExtValue();
+            unsigned atomicOp = cast<ConstantInt>(args[0])->getZExtValue();
+            unsigned dim = cast<ConstantInt>(args[1])->getZExtValue();
+            unsigned flags = cast<ConstantInt>(args[2])->getZExtValue();
             auto ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(args[3])->getZExtValue());
             Value* pImageDesc = args[4];
             Value* pCoord = args[5];
@@ -648,8 +648,8 @@ Value* BuilderReplayer::ProcessCall(
 
     case BuilderRecorder::Opcode::ImageAtomicCompareSwap:
         {
-            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
-            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();
+            unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
             auto ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(args[2])->getZExtValue());
             Value* pImageDesc = args[3];
             Value* pCoord = args[4];
@@ -666,24 +666,24 @@ Value* BuilderReplayer::ProcessCall(
 
     case BuilderRecorder::Opcode::ImageQueryLevels:
         {
-            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
-            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();
+            unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
             Value* pImageDesc = args[2];
             return m_pBuilder->CreateImageQueryLevels(dim, flags, pImageDesc);
         }
 
     case BuilderRecorder::Opcode::ImageQuerySamples:
         {
-            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
-            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();
+            unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
             Value* pImageDesc = args[2];
             return m_pBuilder->CreateImageQuerySamples(dim, flags, pImageDesc);
         }
 
     case BuilderRecorder::Opcode::ImageQuerySize:
         {
-            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
-            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();
+            unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
             Value* pImageDesc = args[2];
             Value* pLod = args[3];
             return m_pBuilder->CreateImageQuerySize(dim, flags, pImageDesc, pLod);
@@ -691,8 +691,8 @@ Value* BuilderReplayer::ProcessCall(
 
     case BuilderRecorder::Opcode::ImageGetLod:
         {
-            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
-            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();
+            unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
             Value* pImageDesc = args[2];
             Value* pSamplerDesc = args[3];
             Value* pCoord = args[4];

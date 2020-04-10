@@ -96,7 +96,7 @@ void SpirvLowerTranslator::TranslateSpirvToLlvm(
     // Build specialization constant map
     if (pShaderInfo->pSpecializationInfo != nullptr)
     {
-        for (uint32_t i = 0; i < pShaderInfo->pSpecializationInfo->mapEntryCount; ++i)
+        for (unsigned i = 0; i < pShaderInfo->pSpecializationInfo->mapEntryCount; ++i)
         {
             SPIRV::SPIRVSpecConstEntry specConstEntry  = {};
             auto pMapEntry = &pShaderInfo->pSpecializationInfo->pMapEntries[i];

@@ -39,9 +39,9 @@ namespace lgc
 // General bits info for indexed DWORD
 struct BitsInfo
 {
-    uint32_t index;
-    uint32_t offset;
-    uint32_t count;
+    unsigned index;
+    unsigned offset;
+    unsigned count;
 };
 
 // =====================================================================================================================
@@ -64,20 +64,20 @@ protected:
     }
 
     // Return new DWORD with replacing the specific range of bits in old DWORD
-    llvm::Value* ReplaceBits(llvm::Value* pDword, uint32_t offset, uint32_t count, llvm::Value* pNewBits);
+    llvm::Value* ReplaceBits(llvm::Value* pDword, unsigned offset, unsigned count, llvm::Value* pNewBits);
 
     // Return the size of registered DWORDs
-    inline uint32_t GetDwordsCount() { return m_dwords.size(); }
+    inline unsigned GetDwordsCount() { return m_dwords.size(); }
 
     // Get indexed DWORD
-    inline llvm::Value* GetDword(uint32_t index)
+    inline llvm::Value* GetDword(unsigned index)
     {
         ExtractDwordIfNecessary(index);
         return m_dwords[index];
     }
 
     // Set indexed DWORD
-    inline void SetDword(uint32_t index, llvm::Value* pDword)
+    inline void SetDword(unsigned index, llvm::Value* pDword)
     {
         // Set the whole 32bits data
         m_dwords[index] = pDword;
@@ -86,7 +86,7 @@ protected:
     }
 
     // Return if the specific DWORD is modified or not
-    inline bool IsDwordModified(uint32_t index)
+    inline bool IsDwordModified(unsigned index)
     {
         return (m_dirtyDwords & (1 << index));
     }
@@ -99,7 +99,7 @@ protected:
 
 private:
     // Load indexed DWORD from <n x i32> vector, if the specific DWORD is nullptr
-    inline void ExtractDwordIfNecessary(uint32_t index)
+    inline void ExtractDwordIfNecessary(unsigned index)
     {
         if (m_dwords[index] == nullptr)
         {
@@ -120,7 +120,7 @@ private:
     llvm::Value* m_pReg;
 
     // Bit-mask of dwords whose value was changed but is not yet reflected in m_pReg.
-    uint32_t m_dirtyDwords;
+    unsigned m_dirtyDwords;
 };
 
 } // lgc

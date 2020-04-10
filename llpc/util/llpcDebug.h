@@ -55,7 +55,7 @@ bool EnableErrs();
 // Redirects the output of logs, It affects the behavior of llvm::outs(), dbgs() and errs().
 void redirectLogOutput(
     bool              restoreToDefault,
-    uint32_t          optionCount,
+    unsigned          optionCount,
     const char*const* pOptions);
 
 // Enable/disable the output for debugging.
