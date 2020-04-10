@@ -364,7 +364,7 @@ bool TargetInfo::setTargetInfo(
             break;
         }
     }
-    if (setTargetInfoFunc == nullptr)
+    if (!setTargetInfoFunc )
         return false;   // Target not supported
 
     // Set up TargetInfo.gfxIp from the GPU name. This is the inverse of what happens to encode the

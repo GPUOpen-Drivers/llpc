@@ -162,7 +162,7 @@ void ConfigBuilderBase::setNumAvailVgprs(
 void ConfigBuilderBase::setUsesViewportArrayIndex(
     bool value)   // Value to set
 {
-    if (value == false)
+    if (!value)
         return; // Optional
 
     m_pipelineNode[Util::Abi::PipelineMetadataKey::UsesViewportArrayIndex] = m_document->getNode(value);
@@ -173,7 +173,7 @@ void ConfigBuilderBase::setUsesViewportArrayIndex(
 void ConfigBuilderBase::setPsUsesUavs(
     bool value)   // Value to set
 {
-    if (value == false)
+    if (!value)
         return; // Optional
 
     getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::UsesUavs] =
@@ -185,7 +185,7 @@ void ConfigBuilderBase::setPsUsesUavs(
 void ConfigBuilderBase::setPsWritesUavs(
     bool value)   // Value to set
 {
-    if (value == false)
+    if (!value)
         return; // Optional
 
     getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesUavs] =
@@ -198,7 +198,7 @@ void ConfigBuilderBase::setPsWritesUavs(
 void ConfigBuilderBase::setPsWritesDepth(
     bool value)   // Value to set
 {
-    if (value == false)
+    if (!value)
         return; // Optional
 
     getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesDepth] =

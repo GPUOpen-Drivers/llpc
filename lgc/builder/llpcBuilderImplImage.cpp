@@ -950,7 +950,7 @@ Value* BuilderImplImage::CreateImageLoad(
         args.push_back(getInt32(dmask));
         args.insert(args.end(), coords.begin(), coords.end());
 
-        if (mipLevel != nullptr)
+        if (mipLevel )
             args.push_back(mipLevel);
         imageDescArgIndex = args.size();
         args.push_back(imageDesc);
@@ -958,7 +958,7 @@ Value* BuilderImplImage::CreateImageLoad(
         args.push_back(getInt32(((flags & ImageFlagCoherent) ? 1 : 0) | ((flags & ImageFlagVolatile) ? 2 : 0)));
 
         // Get the intrinsic ID from the load intrinsic ID table and call it.
-        auto table = (mipLevel != nullptr) ? &ImageLoadMipIntrinsicTable[0] : &ImageLoadIntrinsicTable[0];
+        auto table = (mipLevel ) ? &ImageLoadMipIntrinsicTable[0] : &ImageLoadIntrinsicTable[0];
         result = CreateIntrinsic(table[dim],
                                   { intrinsicDataTy, coords[0]->getType() },
                                   args,
@@ -1143,7 +1143,7 @@ Value* BuilderImplImage::CreateImageStore(
         args.push_back(texel);
         args.push_back(getInt32(dmask));
         args.insert(args.end(), coords.begin(), coords.end());
-        if (mipLevel != nullptr)
+        if (mipLevel )
             args.push_back(mipLevel);
         imageDescArgIndex = args.size();
         args.push_back(imageDesc);
@@ -1151,7 +1151,7 @@ Value* BuilderImplImage::CreateImageStore(
         args.push_back(getInt32(((flags & ImageFlagCoherent) ? 1 : 0) | ((flags & ImageFlagVolatile) ? 2 : 0)));
 
         // Get the intrinsic ID from the store intrinsic ID table and call it.
-        auto table = (mipLevel != nullptr) ? &ImageStoreMipIntrinsicTable[0] : &ImageStoreIntrinsicTable[0];
+        auto table = (mipLevel ) ? &ImageStoreMipIntrinsicTable[0] : &ImageStoreIntrinsicTable[0];
         imageStore = CreateIntrinsic(table[dim],
                                { texelTy, coords[0]->getType() },
                                args,
@@ -1330,14 +1330,14 @@ Value* BuilderImplImage::CreateImageGather(
 
     Value* result = nullptr;
     Value* addrOffset = address[ImageAddressIdxOffset];
-    if ((addrOffset != nullptr) && isa<ArrayType>(addrOffset->getType()))
+    if ((addrOffset ) && isa<ArrayType>(addrOffset->getType()))
     {
         // We implement a gather with independent offsets (SPIR-V ConstantOffsets) as four separate gathers.
         Value* residency = nullptr;
         SmallVector<Value*, ImageAddressCount> modifiedAddress;
         modifiedAddress.insert(modifiedAddress.begin(), address.begin(), address.end());
         auto gatherStructTy = dyn_cast<StructType>(gatherTy);
-        result = UndefValue::get((gatherStructTy != nullptr) ? gatherStructTy->getElementType(0) : gatherTy);
+        result = UndefValue::get((gatherStructTy ) ? gatherStructTy->getElementType(0) : gatherTy);
         for (unsigned index = 0; index < 4; ++index)
         {
             modifiedAddress[ImageAddressIdxOffset] = CreateExtractValue(addrOffset, index);
@@ -1350,14 +1350,14 @@ Value* BuilderImplImage::CreateImageGather(
                                                            modifiedAddress,
                                                            instName,
                                                            false);
-            if (gatherStructTy != nullptr)
+            if (gatherStructTy )
             {
                 residency = CreateExtractValue(singleResult, 1);
                 singleResult = CreateExtractValue(singleResult, 0);
             }
             result = CreateInsertElement(result, CreateExtractElement(singleResult, 3), index);
         }
-        if (residency != nullptr)
+        if (residency )
         {
             result = CreateInsertValue(UndefValue::get(gatherTy), result, 0);
             result = CreateInsertValue(result, residency, 1);
@@ -1377,7 +1377,7 @@ Value* BuilderImplImage::CreateImageGather(
                                           false);
     }
 
-    if (needDescPatch != nullptr)
+    if (needDescPatch )
     {
         // For integer gather on pre-GFX9, post-process the result.
         result = postprocessIntegerImageGather(needDescPatch, flags, imageDesc, texelTy, result);
@@ -1537,7 +1537,7 @@ Value* BuilderImplImage::CreateImageSampleGather(
     unsigned addressMask = 0;
     for (unsigned i = 0; i != ImageAddressCount; ++i)
     {
-        unsigned addressMaskBit = (address[i] != nullptr) ? 1 : 0;
+        unsigned addressMaskBit = (address[i] ) ? 1 : 0;
         addressMask |= addressMaskBit << i;
     }
     addressMask &= ~(1U << ImageAddressIdxProjective);
@@ -1547,7 +1547,7 @@ Value* BuilderImplImage::CreateImageSampleGather(
     SmallVector<Value*, 4> coords;
     SmallVector<Value*, 6> derivatives;
     Value* projective = address[ImageAddressIdxProjective];
-    if (projective != nullptr)
+    if (projective )
         projective = CreateFDiv(ConstantFP::get(projective->getType(), 1.0), projective);
 
     dim = prepareCoordinate(dim,
@@ -1565,12 +1565,12 @@ Value* BuilderImplImage::CreateImageSampleGather(
 
     // Dmask.
     unsigned dmask = 15;
-    if (address[ImageAddressIdxZCompare] != nullptr)
+    if (address[ImageAddressIdxZCompare] )
         dmask = 1;
-    else if (isSample == false)
+    else if (!isSample)
     {
         dmask = 1;
-        if (address[ImageAddressIdxZCompare] == nullptr)
+        if (!address[ImageAddressIdxZCompare] )
             dmask = 1U << cast<ConstantInt>(address[ImageAddressIdxComponent])->getZExtValue();
     }
     args.push_back(getInt32(dmask));
@@ -1612,13 +1612,13 @@ Value* BuilderImplImage::CreateImageSampleGather(
     // ZCompare (dref)
     if (Value* zCompareVal = address[ImageAddressIdxZCompare])
     {
-        if (projective != nullptr)
+        if (projective )
             zCompareVal = CreateFMul(zCompareVal, projective);
         args.push_back(zCompareVal);
     }
 
     // Grad (explicit derivatives)
-    if (derivatives.empty() == false)
+    if (!derivatives.empty())
     {
         args.insert(args.end(), derivatives.begin(), derivatives.end());
         overloadTys.push_back(derivatives[0]->getType());
@@ -1674,7 +1674,7 @@ Value* BuilderImplImage::CreateImageSampleGather(
         nonUniformArgIndexes.push_back(imageDescArgIndex);
     if (flags & ImageFlagNonUniformSampler)
         nonUniformArgIndexes.push_back(imageDescArgIndex + 1);
-    if (nonUniformArgIndexes.empty() == false)
+    if (!nonUniformArgIndexes.empty())
         imageOp = createWaterfallLoop(imageOp, nonUniformArgIndexes);
     return imageOp;
 }
@@ -1894,7 +1894,7 @@ Value* BuilderImplImage::CreateImageQuerySize(
                                              { CreateExtractElement(imageDesc, 1), getInt32(16), getInt32(14) });
             numRecords = CreateUDiv(numRecords, stride);
         }
-        if (instName.isTriviallyEmpty() == false)
+        if (!instName.isTriviallyEmpty())
             numRecords->setName(instName);
         return numRecords;
     }
@@ -1992,7 +1992,7 @@ Value* BuilderImplImage::CreateImageGetLod(
     if (flags & ImageFlagNonUniformSampler)
         nonUniformArgIndexes.push_back(imageDescArgIndex + 1);
 
-    if (nonUniformArgIndexes.empty() == false)
+    if (!nonUniformArgIndexes.empty())
         result = createWaterfallLoop(result, nonUniformArgIndexes);
     return result;
 }
@@ -2048,7 +2048,7 @@ unsigned BuilderImplImage::prepareCoordinate(
 
     // Divide the projective value into each component.
     // (We need to do this before we add an extra component for GFX9+.)
-    if (projective != nullptr)
+    if (projective )
     {
         for (unsigned i = 0; i != outCoords.size(); ++i)
             outCoords[i] = CreateFMul(outCoords[i], projective);
@@ -2063,7 +2063,7 @@ unsigned BuilderImplImage::prepareCoordinate(
     {
         Value* extraComponent = getInt32(0);
         needExtraDerivativeDim = true;
-        if (coordScalarTy->isIntegerTy() == false)
+        if (!coordScalarTy->isIntegerTy())
             extraComponent = ConstantFP::get(coordScalarTy, 0.5);
 
         if (dim == Dim2D)
@@ -2078,7 +2078,7 @@ unsigned BuilderImplImage::prepareCoordinate(
     if (coordScalarTy->isIntegerTy())
     {
         // Integer components (image load/store/atomic).
-        assert((derivativeX == nullptr) && (derivativeY == nullptr));
+        assert((!derivativeX ) && (!derivativeY ));
 
         if (dim == DimCubeArray)
         {
@@ -2135,7 +2135,7 @@ unsigned BuilderImplImage::prepareCoordinate(
     }
 
     // Push the derivative components.
-    if (derivativeX != nullptr)
+    if (derivativeX )
     {
         // Derivatives by X
         if (auto vectorDerivativeXTy = dyn_cast<VectorType>(derivativeX->getType()))
@@ -2295,17 +2295,17 @@ void BuilderImplImage::combineCubeArrayFaceAndSlice(
         switch (index)
         {
         case 2:
-            face = (face == nullptr) ? insert->getOperand(1) : face;
+            face = (!face ) ? insert->getOperand(1) : face;
             break;
         case 3:
-            slice = (slice == nullptr) ? insert->getOperand(1) : slice;
+            slice = (!slice ) ? insert->getOperand(1) : slice;
             break;
         }
         partialCoord = insert->getOperand(0);
     }
 
     Value* combined = nullptr;
-    if ((face != nullptr) && (slice != nullptr))
+    if ((face ) && (slice ))
     {
         if (auto sliceDiv = dyn_cast<BinaryOperator>(slice))
         {
@@ -2324,7 +2324,7 @@ void BuilderImplImage::combineCubeArrayFaceAndSlice(
         }
     }
 
-    if (combined == nullptr)
+    if (!combined )
     {
         // We did not find the div and rem generated by the frontend to separate the face and slice.
         face = coords[2];

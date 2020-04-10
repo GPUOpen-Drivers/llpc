@@ -123,8 +123,8 @@ bool SpirvLowerAlgebraTransform::runOnModule(
                 auto destType = inst->getType();
                 if (inst->use_empty() ||
                     (inst->getNumOperands() == 0) ||
-                    (destType->isFPOrFPVectorTy() == false) ||
-                    (isa<Constant>(inst->getOperand(0))== false))
+                    (!destType->isFPOrFPVectorTy()) ||
+                    (!isa<Constant>(inst->getOperand(0))))
                     continue;
 
                 // ConstantProp instruction if trivially constant.
@@ -137,7 +137,7 @@ bool SpirvLowerAlgebraTransform::runOnModule(
                         (destType->isDoubleTy() && m_fp64DenormFlush))
                     {
                         // Replace denorm value with zero
-                        if (constVal->isFiniteNonZeroFP() && (constVal->isNormalFP() == false))
+                        if (constVal->isFiniteNonZeroFP() && (!constVal->isNormalFP()))
                             constVal = ConstantFP::get(destType, 0.0);
                     }
 
@@ -286,7 +286,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
         case Instruction::FDiv:
             if (binaryOp.getFastMathFlags().noNaNs())
             {
-                if (src1IsConstZero && (src2IsConstZero == false))
+                if (src1IsConstZero && (!src2IsConstZero))
                     dest = src1;
             }
             break;
@@ -301,7 +301,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
             break;
         }
 
-        if (dest != nullptr)
+        if (dest )
         {
             binaryOp.replaceAllUsesWith(dest);
             binaryOp.dropAllReferences();
@@ -312,7 +312,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
     }
 
     // Replace FDIV x, y with FDIV 1.0, y; MUL x if it isn't optimized
-    if ((opCode == Instruction::FDiv) && (dest == nullptr) && (src1 != nullptr) && (src2 != nullptr))
+    if ((opCode == Instruction::FDiv) && (!dest ) && (src1 ) && (src2 ))
     {
         Constant* one = ConstantFP::get(binaryOp.getType(), 1.0);
         if (src1 != one)
@@ -410,7 +410,7 @@ bool SpirvLowerAlgebraTransform::isOperandNoContract(
         {
             auto fastMathFlags = inst->getFastMathFlags();
             bool allowContract = fastMathFlags.allowContract();
-            if (fastMathFlags.any() && (allowContract == false))
+            if (fastMathFlags.any() && (!allowContract))
                 return true;
         }
 
@@ -435,7 +435,7 @@ void SpirvLowerAlgebraTransform::disableFastMath(
     }
 
     auto it = workSet.begin();
-    while (workSet.empty() == false)
+    while (!workSet.empty())
     {
         if (isa<FPMathOperator>(*it))
         {

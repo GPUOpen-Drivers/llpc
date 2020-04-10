@@ -323,7 +323,7 @@ BuilderRecorder::BuilderRecorder(
 void BuilderRecorder::recordShaderModes(
     Module* module)    // [in/out] Module to record into
 {
-    if ((m_pipelineState == nullptr) && m_shaderModes)
+    if ((!m_pipelineState ) && m_shaderModes)
         m_shaderModes->record(module);
 }
 
@@ -1127,7 +1127,7 @@ Value* BuilderRecorder::CreateImageLoad(
     args.push_back(getInt32(flags));
     args.push_back(imageDesc);
     args.push_back(coord);
-    if (mipLevel != nullptr)
+    if (mipLevel )
         args.push_back(mipLevel);
     return record(Opcode::ImageLoad, resultTy, args, instName);
 }
@@ -1168,7 +1168,7 @@ Value* BuilderRecorder::CreateImageStore(
     args.push_back(getInt32(flags));
     args.push_back(imageDesc);
     args.push_back(coord);
-    if (mipLevel != nullptr)
+    if (mipLevel )
         args.push_back(mipLevel);
     return record(Opcode::ImageStore, nullptr, args, instName);
 }
@@ -1188,7 +1188,7 @@ Value* BuilderRecorder::CreateImageSample(
     unsigned addressMask = 0;
     for (unsigned i = 0; i != address.size(); ++i)
     {
-        if (address[i] != nullptr)
+        if (address[i] )
             addressMask |= 1U << i;
     }
 
@@ -1200,7 +1200,7 @@ Value* BuilderRecorder::CreateImageSample(
     args.push_back(getInt32(addressMask));
     for (unsigned i = 0; i != address.size(); ++i)
     {
-        if (address[i] != nullptr)
+        if (address[i] )
             args.push_back(address[i]);
     }
     return record(Opcode::ImageSample, resultTy, args, instName);
@@ -1221,7 +1221,7 @@ Value* BuilderRecorder::CreateImageGather(
     unsigned addressMask = 0;
     for (unsigned i = 0; i != address.size(); ++i)
     {
-        if (address[i] != nullptr)
+        if (address[i] )
             addressMask |= 1U << i;
     }
 
@@ -1233,7 +1233,7 @@ Value* BuilderRecorder::CreateImageGather(
     args.push_back(getInt32(addressMask));
     for (unsigned i = 0; i != address.size(); ++i)
     {
-        if (address[i] != nullptr)
+        if (address[i] )
             args.push_back(address[i]);
     }
     return record(Opcode::ImageGather, resultTy, args, instName);
@@ -1368,7 +1368,7 @@ Value* BuilderRecorder::CreateReadGenericInput(
                       elemIdx,
                       getInt32(locationCount),
                       getInt32(inputInfo.getData()),
-                      (vertexIndex != nullptr) ? vertexIndex : UndefValue::get(getInt32Ty()),
+                      (vertexIndex ) ? vertexIndex : UndefValue::get(getInt32Ty()),
                   },
                   instName,
                   Attribute::ReadOnly);
@@ -1394,7 +1394,7 @@ Value* BuilderRecorder::CreateReadGenericOutput(
                       elemIdx,
                       getInt32(locationCount),
                       getInt32(outputInfo.getData()),
-                      (vertexIndex != nullptr) ? vertexIndex : UndefValue::get(getInt32Ty()),
+                      (vertexIndex ) ? vertexIndex : UndefValue::get(getInt32Ty()),
                   },
                   instName,
                   Attribute::ReadOnly);
@@ -1425,7 +1425,7 @@ Instruction* BuilderRecorder::CreateWriteGenericOutput(
                       elemIdx,
                       getInt32(locationCount),
                       getInt32(outputInfo.getData()),
-                      (vertexIndex != nullptr) ? vertexIndex : UndefValue::get(getInt32Ty()),
+                      (vertexIndex ) ? vertexIndex : UndefValue::get(getInt32Ty()),
                   },
                   "",
                   {});
@@ -1468,7 +1468,7 @@ Value* BuilderRecorder::CreateReadBuiltInInput(
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
     Type* resultTy = getBuiltInTy(builtIn, inputInfo);
-    if (index != nullptr)
+    if (index )
     {
         if (isa<ArrayType>(resultTy))
             resultTy = resultTy->getArrayElementType();
@@ -1480,8 +1480,8 @@ Value* BuilderRecorder::CreateReadBuiltInInput(
                   {
                       getInt32(builtIn),
                       getInt32(inputInfo.getData()),
-                      (vertexIndex != nullptr) ? vertexIndex : UndefValue::get(getInt32Ty()),
-                      (index != nullptr) ? index : UndefValue::get(getInt32Ty()),
+                      (vertexIndex ) ? vertexIndex : UndefValue::get(getInt32Ty()),
+                      (index ) ? index : UndefValue::get(getInt32Ty()),
                   },
                   instName,
                   Attribute::ReadOnly);
@@ -1499,7 +1499,7 @@ Value* BuilderRecorder::CreateReadBuiltInOutput(
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
     Type* resultTy = getBuiltInTy(builtIn, outputInfo);
-    if (index != nullptr)
+    if (index )
     {
         if (isa<ArrayType>(resultTy))
             resultTy = resultTy->getArrayElementType();
@@ -1511,8 +1511,8 @@ Value* BuilderRecorder::CreateReadBuiltInOutput(
                   {
                       getInt32(builtIn),
                       getInt32(outputInfo.getData()),
-                      (vertexIndex != nullptr) ? vertexIndex : UndefValue::get(getInt32Ty()),
-                      (index != nullptr) ? index : UndefValue::get(getInt32Ty()),
+                      (vertexIndex ) ? vertexIndex : UndefValue::get(getInt32Ty()),
+                      (index ) ? index : UndefValue::get(getInt32Ty()),
                   },
                   instName,
                   Attribute::ReadOnly);
@@ -1533,8 +1533,8 @@ Instruction* BuilderRecorder::CreateWriteBuiltInOutput(
                       valueToWrite,
                       getInt32(builtIn),
                       getInt32(outputInfo.getData()),
-                      (vertexIndex != nullptr) ? vertexIndex : UndefValue::get(getInt32Ty()),
-                      (index != nullptr) ? index : UndefValue::get(getInt32Ty()),
+                      (vertexIndex ) ? vertexIndex : UndefValue::get(getInt32Ty()),
+                      (index ) ? index : UndefValue::get(getInt32Ty()),
                   },
                   "");
 }
@@ -1880,7 +1880,7 @@ Instruction* BuilderRecorder::record(
         raw_string_ostream mangledNameStream(mangledName);
         mangledNameStream << BuilderCallPrefix;
         mangledNameStream << getCallName(opcode);
-        if (resultTy != nullptr)
+        if (resultTy )
         {
             mangledNameStream << ".";
             getTypeName(resultTy, mangledNameStream);
@@ -1892,7 +1892,7 @@ Instruction* BuilderRecorder::record(
     // See if the declaration already exists in the module.
     Module* const module = GetInsertBlock()->getModule();
     Function* func = dyn_cast_or_null<Function>(module->getFunction(mangledName));
-    if (func == nullptr)
+    if (!func )
     {
         // Does not exist. Create it as a varargs function.
         auto funcTy = FunctionType::get(resultTy, {}, true);

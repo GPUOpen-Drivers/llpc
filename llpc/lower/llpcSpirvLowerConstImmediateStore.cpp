@@ -78,7 +78,7 @@ bool SpirvLowerConstImmediateStore::runOnModule(
     {
         if (auto func = dyn_cast<Function>(&*funcIt))
         {
-            if (func->empty() == false)
+            if (!func->empty())
                 processAllocaInsts(func);
         }
     }
@@ -104,7 +104,7 @@ void SpirvLowerConstImmediateStore::processAllocaInsts(
             {
                 // Got an "alloca" instruction of aggregate type.
                 auto storeInst = findSingleStore(allocaInst);
-                if ((storeInst != nullptr) && isa<Constant>(storeInst->getValueOperand()))
+                if ((storeInst ) && isa<Constant>(storeInst->getValueOperand()))
                 {
                     // Got an aggregate "alloca" with a single store to the whole type.
                     // Do the optimization.
@@ -137,8 +137,8 @@ StoreInst* SpirvLowerConstImmediateStore::findSingleStore(
             auto user = cast<Instruction>(useIt->getUser());
             if (auto storeInst = dyn_cast<StoreInst>(user))
             {
-                if ((pointer == storeInst->getValueOperand()) || (storeInstFound != nullptr)
-                      || isOuterPointer == false)
+                if ((pointer == storeInst->getValueOperand()) || (storeInstFound )
+                      || !isOuterPointer)
                 {
                     // Pointer escapes by being stored, or we have already found a "store"
                     // instruction, or this is a partial "store" instruction.
@@ -148,7 +148,7 @@ StoreInst* SpirvLowerConstImmediateStore::findSingleStore(
             }
             else if (auto getElemPtrInst = dyn_cast<GetElementPtrInst>(user))
                 pointers.push_back(getElemPtrInst);
-            else if (isa<LoadInst>(user) == false)
+            else if (!isa<LoadInst>(user))
             {
                 // Pointer escapes by being used in some way other than "load/store/getelementptr".
                 return nullptr;
@@ -195,7 +195,7 @@ void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(
         auto allocaInst = allocaToGlobalMap.back().first;
         auto global = allocaToGlobalMap.back().second;
         allocaToGlobalMap.pop_back();
-        while (allocaInst->use_empty() == false)
+        while (!allocaInst->use_empty())
         {
             auto useIt = allocaInst->use_begin();
             if (auto origGetElemPtrInst = dyn_cast<GetElementPtrInst>(useIt->getUser()))
@@ -222,7 +222,7 @@ void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(
                 *useIt = global;
         }
         // Visit next map pair.
-    } while (allocaToGlobalMap.empty() == false);
+    } while (!allocaToGlobalMap.empty());
     storeInst->eraseFromParent();
 }
 

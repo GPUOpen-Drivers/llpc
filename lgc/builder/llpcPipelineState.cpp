@@ -101,7 +101,7 @@ Module* PipelineState::link(
     for (unsigned stage = 0; stage < modules.size(); ++stage)
     {
         Module* module = modules[stage];
-        if (module == nullptr)
+        if (!module )
             continue;
         anyModule = module;
 
@@ -114,7 +114,7 @@ Module* PipelineState::link(
         auto stageMetaNode = MDNode::get(getContext(), { ConstantAsMetadata::get(builder.getInt32(stage)) });
         for (Function& func : *module)
         {
-            if (func.isDeclaration() == false)
+            if (!func.isDeclaration())
             {
                 func.setMetadata(metaKindId, stageMetaNode);
                 if (func.getLinkage() != GlobalValue::InternalLinkage)
@@ -129,23 +129,23 @@ Module* PipelineState::link(
     }
 
     // If the front-end was using a BuilderRecorder, record pipeline state into IR metadata.
-    if (m_noReplayer == false)
+    if (!m_noReplayer)
         record(anyModule);
 
     // If there is only one shader, just change the name on its module and return it.
     Module* pipelineModule = nullptr;
     for (auto module : modules)
     {
-        if (pipelineModule == nullptr)
+        if (!pipelineModule )
             pipelineModule = module;
-        else if (module != nullptr)
+        else if (module )
         {
             pipelineModule = nullptr;
             break;
         }
     }
 
-    if (pipelineModule != nullptr)
+    if (pipelineModule )
         pipelineModule->setModuleIdentifier("llpcPipeline");
     else
     {
@@ -162,7 +162,7 @@ Module* PipelineState::link(
 
         for (unsigned shaderIndex = 0; shaderIndex < modules.size(); ++shaderIndex)
         {
-            if (modules[shaderIndex] != nullptr)
+            if (modules[shaderIndex] )
             {
                 // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
                 // linked into pipeline module.
@@ -171,7 +171,7 @@ Module* PipelineState::link(
             }
         }
 
-        if (result == false)
+        if (!result)
         {
             delete pipelineModule;
             pipelineModule = nullptr;
@@ -222,7 +222,7 @@ void PipelineState::generate(
 
     // Get a BuilderReplayer pass if needed.
     ModulePass* replayerPass = nullptr;
-    if (m_noReplayer == false)
+    if (!m_noReplayer)
         replayerPass = createBuilderReplayer(this);
 
     // Patching.
@@ -306,7 +306,7 @@ void PipelineState::readShaderStageMask(
     m_stageMask = 0;
     for (auto& func : *module)
     {
-        if ((func.empty() == false) && (func.getLinkage() != GlobalValue::InternalLinkage))
+        if ((!func.empty()) && (func.getLinkage() != GlobalValue::InternalLinkage))
         {
             auto shaderStage = getShaderStageFromFunction(&func);
 
@@ -453,7 +453,7 @@ void PipelineState::readOptions(
         std::string metadataName = (Twine(OptionsMetadataName) + "." +
                                     getShaderStageAbbreviation(static_cast<ShaderStage>(stage))).str();
         auto namedMetaNode = module->getNamedMetadata(metadataName);
-        if ((namedMetaNode == nullptr) || (namedMetaNode->getNumOperands() == 0))
+        if ((!namedMetaNode ) || (namedMetaNode->getNumOperands() == 0))
             continue;
         m_shaderOptions.resize(stage + 1);
         readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), m_shaderOptions[stage]);
@@ -573,7 +573,7 @@ void PipelineState::recordUserDataTable(
                 operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.set)));
                 // Operand 4: binding
                 operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.binding)));
-                if (node.immutableValue != nullptr)
+                if (node.immutableValue )
                 {
                     // Operand 5 onwards: immutable descriptor constant.
                     // Writing the constant array directly does not seem to work, as it does not survive IR linking.
@@ -611,7 +611,7 @@ void PipelineState::readUserDataNodes(
 {
     // Find the named metadata node.
     auto userDataMetaNode = module->getNamedMetadata(UserDataMetadataName);
-    if (userDataMetaNode == nullptr)
+    if (!userDataMetaNode )
         return;
 
     // Prepare to read the resource nodes from the named MD node. We allocate a single buffer, with the
@@ -643,7 +643,7 @@ void PipelineState::readUserDataNodes(
             unsigned innerNodeCount =
                   mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
             // Go into inner table.
-            assert(endThisInnerTable == nullptr);
+            assert(!endThisInnerTable );
             endThisInnerTable = endNextInnerTable;
             endNextInnerTable -= innerNodeCount;
             nextNode = endNextInnerTable;
@@ -700,7 +700,7 @@ void PipelineState::readUserDataNodes(
             }
             // Move on to next node to write in table.
             ++nextNode;
-            if (endThisInnerTable == nullptr)
+            if (!endThisInnerTable )
                 nextOuterNode = nextNode;
         }
         // See if we have reached the end of the inner table.
@@ -789,7 +789,7 @@ ResourceNodeType PipelineState::getResourceTypeFromName(
 // data nodes.
 ArrayRef<MDString*> PipelineState::getResourceTypeNames()
 {
-    if (m_resourceNodeTypeNames[0] == nullptr)
+    if (!m_resourceNodeTypeNames[0] )
     {
         for (unsigned type = 0; type < static_cast<unsigned>(ResourceNodeType::Count); ++type)
         {
@@ -854,7 +854,7 @@ void PipelineState::readVertexInputDescriptions(
 
     // Find the named metadata node.
     auto vertexInputsMetaNode = module->getNamedMetadata(VertexInputsMetadataName);
-    if (vertexInputsMetaNode == nullptr)
+    if (!vertexInputsMetaNode )
         return;
 
     // Read the nodes.
@@ -924,7 +924,7 @@ void PipelineState::readColorExportState(
     m_colorExportFormats.clear();
 
     auto exportFormatsMetaNode = module->getNamedMetadata(ColorExportFormatsMetadataName);
-    if (exportFormatsMetaNode != nullptr)
+    if (exportFormatsMetaNode )
     {
         // Read the color target nodes.
         for (unsigned nodeIndex = 0; nodeIndex < exportFormatsMetaNode->getNumOperands(); ++nodeIndex)
@@ -1032,7 +1032,7 @@ unsigned PipelineState::getShaderWaveSize(
         if (waveSizeOption != 0)
             waveSize = waveSizeOption;
 
-        if ((stage == ShaderStageGeometry) && (hasShaderStage(ShaderStageGeometry) == false))
+        if ((stage == ShaderStageGeometry) && (!hasShaderStage(ShaderStageGeometry)))
         {
             // NOTE: For NGG, GS could be absent and VS/TES acts as part of it in the merged shader.
             // In such cases, we check the property of VS or TES.
@@ -1246,7 +1246,7 @@ const char* PipelineState::getResourceNodeTypeName(
 PipelineState* PipelineStateWrapper::getPipelineState(
     Module* module)  // [in] IR module
 {
-    if (m_pipelineState == nullptr)
+    if (!m_pipelineState )
     {
         m_allocatedPipelineState.reset(new PipelineState(m_builderContext));
         m_pipelineState = &*m_allocatedPipelineState;

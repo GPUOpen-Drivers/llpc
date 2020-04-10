@@ -73,7 +73,7 @@ inline const T* findVkStructInChain(
     };
 
     const VkStructHeader* structHeader = reinterpret_cast<const VkStructHeader*>(next);
-    while(structHeader != nullptr)
+    while(structHeader )
     {
         if (structHeader->type == type)
             break;

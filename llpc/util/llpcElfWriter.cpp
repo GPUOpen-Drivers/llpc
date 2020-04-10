@@ -116,7 +116,7 @@ void ElfWriter<Elf>::mergeSection(
     std::string prefix2;
 
     // Build prefix1 if it is needed
-    if (pPrefixString1 != nullptr)
+    if (pPrefixString1 )
     {
         if (strncmp(reinterpret_cast<const char*>(pSection1->data),
                     pPrefixString1,
@@ -128,7 +128,7 @@ void ElfWriter<Elf>::mergeSection(
     }
 
     // Build appendPrefixString if it is needed
-    if (pPrefixString2 != nullptr)
+    if (pPrefixString2 )
     {
         if (strncmp(reinterpret_cast<const char*>(pSection2->data + section2Offset),
                     pPrefixString2,
@@ -461,7 +461,7 @@ void ElfWriter<Elf>::assembleNotes()
 
     delete[] noteSection->data;
     uint8_t* data = new uint8_t[std::max(noteSize, noteHeaderSize)];
-    assert(data != nullptr);
+    assert(data );
     noteSection->data = data;
     noteSection->secHead.shSize = noteSize;
 
@@ -526,7 +526,7 @@ void ElfWriter<Elf>::assembleSymbols()
     auto symSectionSize = sizeof(typename Elf::Symbol) * symbolCount;
     auto symbolSection = &m_sections[m_symSecIdx];
 
-    if (symbolSection->data == nullptr)
+    if (!symbolSection->data )
         symbolSection->data = new uint8_t[symSectionSize];
     else if (symSectionSize > symbolSection->secHead.shSize)
     {
@@ -587,7 +587,7 @@ template<class Elf>
 void ElfWriter<Elf>::writeToBuffer(
     ElfPackage* pElf)   // [in] Output buffer to write ELF data
 {
-    assert(pElf != nullptr);
+    assert(pElf );
 
     // Update offsets and size values
     assembleNotes();
@@ -830,7 +830,7 @@ void ElfWriter<Elf>::updateElfBinary(
     ElfNote metaNote = {};
     metaNote = getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
 
-    assert(metaNote.data != nullptr);
+    assert(metaNote.data );
     ElfNote newMetaNote = {};
     updateMetaNote(pContext, &metaNote, &newMetaNote);
     setNote(&newMetaNote);
@@ -894,14 +894,14 @@ void ElfWriter<Elf>::mergeElfBinary(
         if (strcmp(symbol->pSymName, fragmentIsaSymbolName) == 0)
             nonFragmentIsaSymbol = symbol;
 
-        if (nonFragmentIsaSymbol == nullptr)
+        if (!nonFragmentIsaSymbol )
             continue;
 
         // Reset all symbols after _amdgpu_ps_main
         symbol->secIdx = InvalidValue;
     }
 
-    size_t isaOffset = (nonFragmentIsaSymbol == nullptr) ?
+    size_t isaOffset = (!nonFragmentIsaSymbol ) ?
                        alignTo(nonFragmentTextSection->secHead.shSize, 0x100) :
                        nonFragmentIsaSymbol->value;
     for (auto& fragmentSymbol : fragmentSymbols)
@@ -921,7 +921,7 @@ void ElfWriter<Elf>::mergeElfBinary(
             setSection(nonFragmentSecIndex, &newSection);
         }
 
-        if (fragmentIsaSymbol == nullptr)
+        if (!fragmentIsaSymbol )
             continue;
 
         // Update fragment shader related symbols
@@ -950,9 +950,9 @@ void ElfWriter<Elf>::mergeElfBinary(
     const ElfSectionBuffer<Elf64::SectionHeader>* nonFragmentDisassemblySection = nullptr;
     reader.getSectionDataBySectionIndex(fragmentDisassemblySecIndex, &fragmentDisassemblySection);
     getSectionDataBySectionIndex(nonFragmentDisassemblySecIndex, &nonFragmentDisassemblySection);
-    if (nonFragmentDisassemblySection != nullptr)
+    if (nonFragmentDisassemblySection )
     {
-        assert(fragmentDisassemblySection != nullptr);
+        assert(fragmentDisassemblySection );
         // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
         // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
         // for all section data.
@@ -965,13 +965,13 @@ void ElfWriter<Elf>::mergeElfBinary(
         const_cast<uint8_t*>(fragmentDisassemblySectionEnd)[0] = lastChar;
 
         auto fragmentDisassemblyOffset =
-            (fragmentDisassembly == nullptr) ?
+            (!fragmentDisassembly ) ?
             0 :
             (fragmentDisassembly - reinterpret_cast<const char*>(fragmentDisassemblySection->data));
 
         auto disassemblyEnd = strstr(reinterpret_cast<const char*>(nonFragmentDisassemblySection->data),
                                      fragmentIsaSymbolName);
-        auto disassemblySize = (disassemblyEnd == nullptr) ?
+        auto disassemblySize = (!disassemblyEnd ) ?
                               nonFragmentDisassemblySection->secHead.shSize :
                               disassemblyEnd - reinterpret_cast<const char*>(nonFragmentDisassemblySection->data);
 
@@ -996,9 +996,9 @@ void ElfWriter<Elf>::mergeElfBinary(
     reader.getSectionDataBySectionIndex(fragmentLlvmIrSecIndex, &fragmentLlvmIrSection);
     getSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &nonFragmentLlvmIrSection);
 
-    if (nonFragmentLlvmIrSection != nullptr)
+    if (nonFragmentLlvmIrSection )
     {
-        assert(fragmentLlvmIrSection != nullptr);
+        assert(fragmentLlvmIrSection );
 
         // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
         // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
@@ -1012,13 +1012,13 @@ void ElfWriter<Elf>::mergeElfBinary(
         const_cast<uint8_t*>(fragmentLlvmIrSectionEnd)[0] = lastChar;
 
         auto fragmentLlvmIrOffset =
-            (fragmentLlvmIrStart == nullptr) ?
+            (!fragmentLlvmIrStart ) ?
             0 :
             (fragmentLlvmIrStart - reinterpret_cast<const char*>(fragmentLlvmIrSection->data));
 
         auto llvmIrEnd = strstr(reinterpret_cast<const char*>(nonFragmentLlvmIrSection->data),
                                  fragmentIsaSymbolName);
-        auto llvmIrSize = (llvmIrEnd == nullptr) ?
+        auto llvmIrSize = (!llvmIrEnd ) ?
                           nonFragmentLlvmIrSection->secHead.shSize :
                           llvmIrEnd - reinterpret_cast<const char*>(nonFragmentLlvmIrSection->data);
 
@@ -1037,7 +1037,7 @@ void ElfWriter<Elf>::mergeElfBinary(
     ElfNote nonFragmentMetaNote = {};
     nonFragmentMetaNote = getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
 
-    assert(nonFragmentMetaNote.data != nullptr);
+    assert(nonFragmentMetaNote.data );
     ElfNote fragmentMetaNote = {};
     ElfNote newMetaNote = {};
     fragmentMetaNote = reader.getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);

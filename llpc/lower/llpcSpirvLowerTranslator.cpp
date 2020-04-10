@@ -92,7 +92,7 @@ void SpirvLowerTranslator::translateSpirvToLlvm(
     SPIRV::SPIRVSpecConstMap specConstMap;
     ShaderStage entryStage = shaderInfo->entryStage;
     // Build specialization constant map
-    if (shaderInfo->pSpecializationInfo != nullptr)
+    if (shaderInfo->pSpecializationInfo )
     {
         for (unsigned i = 0; i < shaderInfo->pSpecializationInfo->mapEntryCount; ++i)
         {
@@ -106,14 +106,14 @@ void SpirvLowerTranslator::translateSpirvToLlvm(
 
     Context* context = static_cast<Context*>(&module->getContext());
 
-    if (readSpirv(context->getBuilder(),
+    if (!readSpirv(context->getBuilder(),
                   &(moduleData->usage),
                   spirvStream,
                   convertToExecModel(entryStage),
                   shaderInfo->pEntryTarget,
                   specConstMap,
                   module,
-                  errMsg) == false)
+                  errMsg))
     {
         report_fatal_error(Twine("Failed to translate SPIR-V to LLVM (") +
                            getShaderStageName(static_cast<ShaderStage>(entryStage)) + " shader): " +

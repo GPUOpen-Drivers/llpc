@@ -46,9 +46,9 @@ Result File::open(
 {
     Result result = Result::Success;
 
-    if (m_fileHandle != nullptr)
+    if (m_fileHandle )
         result = Result::ErrorUnavailable;
-    else if (filename == nullptr)
+    else if (!filename )
         result = Result::ErrorInvalidPointer;
     else
     {
@@ -116,7 +116,7 @@ Result File::open(
         {
             // Just use the traditional fopen.
             m_fileHandle = fopen(filename, &fileMode[0]);
-            if (m_fileHandle == nullptr)
+            if (!m_fileHandle )
                 result = Result::ErrorUnknown;
         }
     }
@@ -128,7 +128,7 @@ Result File::open(
 // Closes the file handle if still open.
 void File::close()
 {
-    if (m_fileHandle != nullptr)
+    if (m_fileHandle )
     {
         fclose(m_fileHandle);
         m_fileHandle = nullptr;
@@ -143,9 +143,9 @@ Result File::write(
 {
     Result result = Result::Success;
 
-    if (m_fileHandle == nullptr)
+    if (!m_fileHandle )
         result = Result::ErrorUnavailable;
-    else if (buffer == nullptr)
+    else if (!buffer )
         result = Result::ErrorInvalidPointer;
     else if (bufferSize == 0)
         result = Result::ErrorInvalidValue;
@@ -167,9 +167,9 @@ Result File::read(
 {
     Result result = Result::Success;
 
-    if (m_fileHandle == nullptr)
+    if (!m_fileHandle )
         result = Result::ErrorUnavailable;
-    else if (buffer == nullptr)
+    else if (!buffer )
         result = Result::ErrorInvalidPointer;
     else if (bufferSize == 0)
         result = Result::ErrorInvalidValue;
@@ -180,7 +180,7 @@ Result File::read(
         if (bytesRead != bufferSize)
             result = Result::ErrorUnknown;
 
-        if (bytesReadOut != nullptr)
+        if (bytesReadOut )
             *bytesReadOut = bytesRead;
     }
 
@@ -196,9 +196,9 @@ Result File::readLine(
 {
     Result result = Result::ErrorInvalidValue;
 
-    if (m_fileHandle == nullptr)
+    if (!m_fileHandle )
         result = Result::ErrorUnavailable;
-    else if (buffer == nullptr)
+    else if (!buffer )
         result = Result::ErrorInvalidPointer;
     else if (bufferSize == 0)
         result = Result::ErrorInvalidValue;
@@ -224,7 +224,7 @@ Result File::readLine(
             bytesRead++;
         }
 
-        if (bytesReadOut != nullptr)
+        if (bytesReadOut )
             *bytesReadOut = bytesRead;
     }
 
@@ -240,7 +240,7 @@ Result File::printf(
 {
     Result result = Result::ErrorUnavailable;
 
-    if (m_fileHandle != nullptr)
+    if (m_fileHandle )
     {
         va_list argList;
         va_start(argList, formatStr);
@@ -265,7 +265,7 @@ Result File::vPrintf(
 {
     Result result = Result::ErrorUnavailable;
 
-    if (m_fileHandle != nullptr)
+    if (m_fileHandle )
     {
         // Just use the traditional vfprintf.
         if (vfprintf(m_fileHandle, formatStr, argList) >= 0)
@@ -283,7 +283,7 @@ Result File::flush() const
 {
     Result result = Result::Success;
 
-    if (m_fileHandle == nullptr)
+    if (!m_fileHandle )
         result = Result::ErrorUnavailable;
     else
         fflush(m_fileHandle);
@@ -295,7 +295,7 @@ Result File::flush() const
 // Sets the file position to the beginning of the file.
 void File::rewind()
 {
-    if (m_fileHandle != nullptr)
+    if (m_fileHandle )
         ::rewind(m_fileHandle);
 }
 
@@ -306,7 +306,7 @@ void File::seek(
     bool   fromOrigin)      // If true, the seek will be relative to the file origin;
                             // if false, it will be from the current position
 {
-    if (m_fileHandle != nullptr)
+    if (m_fileHandle )
     {
         int ret = fseek(m_fileHandle, offset, fromOrigin ? SEEK_SET : SEEK_CUR);
 

@@ -64,23 +64,23 @@ namespace Gfx6
 // Builds PAL metadata for pipeline.
 void ConfigBuilder::buildPalMetadata()
 {
-    if (m_pipelineState->isGraphics() == false)
+    if (!m_pipelineState->isGraphics())
         buildPipelineCsRegConfig();
     else
     {
         const bool hasTs = (m_hasTcs || m_hasTes);
 
-        if ((hasTs == false) && (m_hasGs == false))
+        if ((!hasTs) && (!m_hasGs))
         {
             // VS-FS pipeline
             buildPipelineVsFsRegConfig();
         }
-        else if (hasTs && (m_hasGs == false))
+        else if (hasTs && (!m_hasGs))
         {
             // VS-TS-FS pipeline
             buildPipelineVsTsFsRegConfig();
         }
-        else if ((hasTs == false) && m_hasGs)
+        else if ((!hasTs) && m_hasGs)
         {
             // VS-GS-FS pipeline
             buildPipelineVsGsFsRegConfig();
@@ -452,7 +452,7 @@ void ConfigBuilder::buildVsRegConfig(
     SET_REG(&pConfig->vsRegs, VGT_STRMOUT_BUFFER_CONFIG, streamBufferConfig);
 
     uint8_t usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
-    bool depthClipDisable = (m_pipelineState->getViewportState().depthClipEnable == false);
+    bool depthClipDisable = (!static_cast<bool>(m_pipelineState->getViewportState().depthClipEnable));
     bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
     bool disableVertexReuse = m_pipelineState->getInputAssemblyState().disableVertexReuse;
 

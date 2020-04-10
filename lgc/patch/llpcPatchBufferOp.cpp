@@ -125,16 +125,16 @@ bool PatchBufferOp::runOnFunction(
     }
     m_postVisitInsts.clear();
 
-    const bool changed = (m_replacementMap.empty() == false);
+    const bool changed = (!m_replacementMap.empty());
 
     for (auto& replaceMap : m_replacementMap)
     {
         Instruction* const inst = dyn_cast<Instruction>(replaceMap.first);
 
-        if (inst == nullptr)
+        if (!inst )
             continue;
 
-        if (isa<StoreInst>(inst) == false)
+        if (!isa<StoreInst>(inst))
             inst->replaceAllUsesWith(UndefValue::get(inst->getType()));
 
         inst->eraseFromParent();
@@ -169,7 +169,7 @@ void PatchBufferOp::visitAtomicCmpXchgInst(
     copyMetadata(baseIndex, &atomicCmpXchgInst);
 
     // If our buffer descriptor is divergent or is not a 32-bit integer, need to handle it differently.
-    if ((m_divergenceSet.count(bufferDesc) > 0) || (storeType->isIntegerTy(32) == false))
+    if ((m_divergenceSet.count(bufferDesc) > 0) || (!storeType->isIntegerTy(32)))
     {
         Value* const baseAddr = getBaseAddressFromBufferDesc(bufferDesc);
 
@@ -257,7 +257,7 @@ void PatchBufferOp::visitAtomicCmpXchgInst(
 
         // NOTE: If we have a strong compare exchange, LLVM optimization will always set the compare result to "Equal".
         // Thus, we have to correct this behaviour and do the comparison by ourselves.
-        if (atomicCmpXchgInst.isWeak() == false)
+        if (!atomicCmpXchgInst.isWeak())
         {
             Value* const valueEqual = m_builder->CreateICmpEQ(atomicCall, atomicCmpXchgInst.getCompareOperand());
             copyMetadata(valueEqual, &atomicCmpXchgInst);
@@ -420,7 +420,7 @@ void PatchBufferOp::visitBitCastInst(
     Type* const destType = bitCastInst.getType();
 
     // If the type is not a pointer type, bail.
-    if (destType->isPointerTy() == false)
+    if (!destType->isPointerTy())
         return;
 
     // If the pointer is not a fat pointer, bail.
@@ -447,13 +447,13 @@ void PatchBufferOp::visitCallInst(
     Function* const calledFunc = callInst.getCalledFunction();
 
     // If the call does not have a called function, bail.
-    if (calledFunc == nullptr)
+    if (!calledFunc )
         return;
 
     const StringRef callName(calledFunc->getName());
 
     // If the call is not a late intrinsic call we need to replace, bail.
-    if (callName.startswith(lgcName::LaterCallPrefix) == false)
+    if (!callName.startswith(lgcName::LaterCallPrefix))
         return;
 
     m_builder->SetInsertPoint(&callInst);
@@ -494,7 +494,7 @@ void PatchBufferOp::visitExtractElementInst(
     PointerType* const pointerType = dyn_cast<PointerType>(extractElementInst.getType());
 
     // If the extract element is not extracting a pointer, bail.
-    if (pointerType == nullptr)
+    if (!pointerType )
         return;
 
     // If the type we are GEPing into is not a fat pointer, bail.
@@ -547,13 +547,13 @@ void PatchBufferOp::visitInsertElementInst(
     Type* const type = insertElementInst.getType();
 
     // If the type is not a vector, bail.
-    if (type->isVectorTy() == false)
+    if (!type->isVectorTy())
         return;
 
     PointerType* const pointerType = dyn_cast<PointerType>(type->getVectorElementType());
 
     // If the extract element is not extracting from a vector of pointers, bail.
-    if (pointerType == nullptr)
+    if (!pointerType )
         return;
 
     // If the type we are GEPing into is not a fat pointer, bail.
@@ -592,7 +592,7 @@ void PatchBufferOp::visitLoadInst(
         Type* const loadType = loadInst.getType();
 
         // If the load is not a pointer type, bail.
-        if (loadType->isPointerTy() == false)
+        if (!loadType->isPointerTy())
             return;
 
         // If the address space of the loaded pointer is not a buffer fat pointer, bail.
@@ -681,7 +681,7 @@ void PatchBufferOp::visitMemMoveInst(
 
     // We assume LLVM is not introducing variable length mem moves.
     ConstantInt* const length = dyn_cast<ConstantInt>(memMoveInst.getArgOperand(2));
-    assert(length != nullptr);
+    assert(length );
 
     // Get a vector type that is the length of the memmove.
     VectorType* const memoryType = VectorType::get(m_builder->getInt8Ty(), length->getZExtValue());
@@ -739,7 +739,7 @@ void PatchBufferOp::visitPHINode(
     Type* const type = phiNode.getType();
 
     // If the type is not a pointer type, bail.
-    if (type->isPointerTy() == false)
+    if (!type->isPointerTy())
         return;
 
     // If the pointer is not a fat pointer, bail.
@@ -762,7 +762,7 @@ void PatchBufferOp::visitPHINode(
     {
         Value* const incomingBufferDesc = m_replacementMap[incoming].first;
 
-        if (bufferDesc == nullptr)
+        if (!bufferDesc )
             bufferDesc = incomingBufferDesc;
         else if (bufferDesc != incomingBufferDesc)
         {
@@ -774,7 +774,7 @@ void PatchBufferOp::visitPHINode(
     m_builder->SetInsertPoint(&phiNode);
 
     // If the buffer descriptor was null, it means the PHI is changing the buffer descriptor, and we need a new PHI.
-    if (bufferDesc == nullptr)
+    if (!bufferDesc )
     {
         PHINode* const newPhiNode = m_builder->CreatePHI(VectorType::get(Type::getInt32Ty(*m_context), 4),
                                                            incomings.size());
@@ -821,7 +821,7 @@ void PatchBufferOp::visitPHINode(
 
         Value* incomingIndex = m_replacementMap[incomings[blockIndex]].second;
 
-        if (incomingIndex == nullptr)
+        if (!incomingIndex )
         {
             if (Instruction* const inst = dyn_cast<Instruction>(incomings[blockIndex]))
             {
@@ -844,7 +844,7 @@ void PatchBufferOp::visitSelectInst(
     Type* const destType = selectInst.getType();
 
     // If the type is not a pointer type, bail.
-    if (destType->isPointerTy() == false)
+    if (!destType->isPointerTy())
         return;
 
     // If the pointer is not a fat pointer, bail.
@@ -866,10 +866,10 @@ void PatchBufferOp::visitSelectInst(
         // If the buffer descriptors are the same, then no select needed.
         bufferDesc = bufferDesc1;
     }
-    else if ((bufferDesc1 == nullptr) || (bufferDesc2 == nullptr))
+    else if ((!bufferDesc1 ) || (!bufferDesc2 ))
     {
         // Select the non-nullptr buffer descriptor
-        bufferDesc = bufferDesc1 != nullptr ? bufferDesc1 : bufferDesc2;
+        bufferDesc = bufferDesc1 ? bufferDesc1 : bufferDesc2;
     }
     else
     {
@@ -923,7 +923,7 @@ void PatchBufferOp::visitICmpInst(
     Type* const type = icmpInst.getOperand(0)->getType();
 
     // If the type is not a pointer type, bail.
-    if (type->isPointerTy() == false)
+    if (!type->isPointerTy())
         return;
 
     // If the pointer is not a fat pointer, bail.
@@ -948,7 +948,7 @@ void PatchBufferOp::visitPtrToIntInst(
     Type* const type = ptrToIntInst.getOperand(0)->getType();
 
     // If the type is not a pointer type, bail.
-    if (type->isPointerTy() == false)
+    if (!type->isPointerTy())
         return;
 
     // If the pointer is not a fat pointer, bail.
@@ -987,19 +987,19 @@ void PatchBufferOp::postVisitMemCpyInst(
 
     ConstantInt* const lengthConstant = dyn_cast<ConstantInt>(memCpyInst.getArgOperand(2));
 
-    const uint64_t constantLength = (lengthConstant != nullptr) ? lengthConstant->getZExtValue() : 0;
+    const uint64_t constantLength = (lengthConstant ) ? lengthConstant->getZExtValue() : 0;
 
     // NOTE: If we do not have a constant length, or the constant length is bigger than the minimum we require to
     // generate a loop, we make a loop to handle the memcpy instead. If we did not generate a loop here for any
     // constant-length memcpy with a large number of bytes would generate thousands of load/store instructions that
     // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
-    if ((lengthConstant == nullptr) || (constantLength > MinMemOpLoopBytes))
+    if ((!lengthConstant ) || (constantLength > MinMemOpLoopBytes))
     {
         // NOTE: We want to perform our memcpy operation on the greatest stride of bytes possible (load/storing up to
         // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
         // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
         // 2. Worst case we have to load/store a single byte per loop.
-        unsigned stride = (lengthConstant == nullptr) ? 1 : 16;
+        unsigned stride = (!lengthConstant ) ? 1 : 16;
 
         while (stride != 1)
         {
@@ -1125,19 +1125,19 @@ void PatchBufferOp::postVisitMemSetInst(
 
     ConstantInt* const lengthConstant = dyn_cast<ConstantInt>(memSetInst.getArgOperand(2));
 
-    const uint64_t constantLength = (lengthConstant != nullptr) ? lengthConstant->getZExtValue() : 0;
+    const uint64_t constantLength = (lengthConstant ) ? lengthConstant->getZExtValue() : 0;
 
     // NOTE: If we do not have a constant length, or the constant length is bigger than the minimum we require to
     // generate a loop, we make a loop to handle the memcpy instead. If we did not generate a loop here for any
     // constant-length memcpy with a large number of bytes would generate thousands of load/store instructions that
     // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
-    if ((lengthConstant == nullptr) || (constantLength > MinMemOpLoopBytes))
+    if ((!lengthConstant ) || (constantLength > MinMemOpLoopBytes))
     {
         // NOTE: We want to perform our memset operation on the greatest stride of bytes possible (load/storing up to
         // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
         // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
         // 2. Worst case we have to load/store a single byte per loop.
-        unsigned stride = (lengthConstant == nullptr) ? 1 : 16;
+        unsigned stride = (!lengthConstant ) ? 1 : 16;
 
         while (stride != 1)
         {
@@ -1276,7 +1276,7 @@ Value* PatchBufferOp::getPointerOperandAsInst(
     }
 
     ConstantExpr* const constExpr = dyn_cast<ConstantExpr>(value);
-    assert(constExpr != nullptr);
+    assert(constExpr );
 
     Instruction* const newInst = m_builder->Insert(constExpr->getAsInstruction());
 
@@ -1324,13 +1324,13 @@ void PatchBufferOp::copyMetadata(
     Instruction* const destInst = dyn_cast<Instruction>(dest);
 
     // If the destination is not an instruction, bail.
-    if (destInst == nullptr)
+    if (!destInst )
         return;
 
     const Instruction* const srcInst = dyn_cast<Instruction>(src);
 
     // If the source is not an instruction, bail.
-    if (srcInst == nullptr)
+    if (!srcInst )
         return;
 
     SmallVector<std::pair<unsigned, MDNode*>, 8> allMetaNodes;
@@ -1372,7 +1372,7 @@ bool PatchBufferOp::removeUsersForInvariantStarts(
             IntrinsicInst* const intrinsic = dyn_cast<IntrinsicInst>(user);
 
             // If the user isn't an intrinsic, bail.
-            if (intrinsic == nullptr)
+            if (!intrinsic )
                 continue;
 
             // If the intrinsic is not an invariant load, bail.
@@ -1398,9 +1398,9 @@ Value* PatchBufferOp::replaceLoadStore(
     StoreInst* const storeInst = dyn_cast<StoreInst>(&inst);
 
     // Either load instruction or store instruction is valid (not both)
-    assert((loadInst == nullptr) != (storeInst == nullptr));
+    assert((!loadInst ) != (!storeInst ));
 
-    bool isLoad = loadInst != nullptr;
+    bool isLoad = loadInst ;
     Type* type = nullptr;
     Value* pointerOperand = nullptr;
     AtomicOrdering ordering = AtomicOrdering::NotAtomic;
@@ -1591,7 +1591,7 @@ Value* PatchBufferOp::replaceLoadStore(
             intAccessType = Type::getInt8Ty(*m_context);
             accessSize = 1;
         }
-        assert(intAccessType != nullptr);
+        assert(intAccessType );
         assert(accessSize != 0);
 
         Value* part = nullptr;
@@ -1699,7 +1699,7 @@ Value* PatchBufferOp::replaceLoadStore(
                 }
             }
         }
-        assert(newInst != nullptr);
+        assert(newInst );
 
         if (type->isPointerTy())
         {
@@ -1754,9 +1754,9 @@ Value* PatchBufferOp::replaceICmp(
     assert((iCmpInst->getPredicate() == ICmpInst::ICMP_EQ) || (iCmpInst->getPredicate() == ICmpInst::ICMP_NE));
 
     Value* bufferDescICmp = m_builder->getFalse();
-    if ((bufferDescs[0] == nullptr) && (bufferDescs[1] == nullptr))
+    if ((!bufferDescs[0] ) && (!bufferDescs[1] ))
         bufferDescICmp = m_builder->getTrue();
-    else if ((bufferDescs[0] != nullptr) && (bufferDescs[1] != nullptr))
+    else if ((bufferDescs[0] ) && (bufferDescs[1] ))
     {
         Value* const bufferDescEqual = m_builder->CreateICmpEQ(bufferDescs[0], bufferDescs[1]);
 

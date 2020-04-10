@@ -103,14 +103,14 @@ bool PatchIntrinsicSimplify::runOnFunction(
     for (Function& otherFunc : m_module->functions())
     {
         // Skip non intrinsics.
-        if (otherFunc.isIntrinsic() == false)
+        if (!otherFunc.isIntrinsic())
             continue;
 
         for (Value* const user : otherFunc.users())
         {
             IntrinsicInst* const intrinsicCall = dyn_cast<IntrinsicInst>(user);
 
-            if (intrinsicCall == nullptr)
+            if (!intrinsicCall )
                 continue;
 
             // Skip calls not from our own function.
@@ -128,7 +128,7 @@ bool PatchIntrinsicSimplify::runOnFunction(
         Value* const simplifiedValue = simplify(*intrinsicCall);
 
         // We did not simplify the intrinsic call.
-        if (simplifiedValue == nullptr)
+        if (!simplifiedValue )
             continue;
 
         changed = true;
@@ -159,7 +159,7 @@ bool PatchIntrinsicSimplify::canSafelyConvertTo16Bit(
         APFloat floatValue(constFloat->getValueAPF());
         bool losesInfo = true;
         floatValue.convert(APFloat::IEEEhalf(), APFloat::rmTowardZero, &losesInfo);
-        return (losesInfo == false);
+        return (!losesInfo);
     }
     else if (isa<FPExtInst>(&value) || isa<SExtInst>(&value) || isa<ZExtInst>(&value))
     {
@@ -171,7 +171,7 @@ bool PatchIntrinsicSimplify::canSafelyConvertTo16Bit(
     else
     {
         // Bail out if the type is not able to be used in scalar evolution.
-        if (m_scalarEvolution->isSCEVable(valueTy) == false)
+        if (!m_scalarEvolution->isSCEVable(valueTy))
             return false;
 
         const SCEV* const scev = m_scalarEvolution->getSCEV(&value);
@@ -219,7 +219,7 @@ Value* PatchIntrinsicSimplify::simplifyImage(
     {
         Value* const coord = intrinsicCall.getOperand(operandIndex);
         // If the values are not derived from 16-bit values, we cannot optimize.
-        if (canSafelyConvertTo16Bit(*coord) == false)
+        if (!canSafelyConvertTo16Bit(*coord))
             return nullptr;
 
         assert(operandIndex == coordOperandIndices[0]
@@ -233,7 +233,7 @@ Value* PatchIntrinsicSimplify::simplifyImage(
                                                            intrinsicCall.getIntrinsicID(),
                                                            {intrinsicCall.getType(), coordType});
 
-    assert(intrinsic != nullptr);
+    assert(intrinsic );
 
     SmallVector<Value*, 8> args(intrinsicCall.arg_operands());
 
@@ -261,13 +261,13 @@ Value* PatchIntrinsicSimplify::simplifyTrigonometric(
     BinaryOperator* const binOp = dyn_cast<BinaryOperator>(intrinsicCall.getOperand(0));
 
     // If the clamped value was not a binary operator, bail.
-    if (binOp == nullptr)
+    if (!binOp )
         return nullptr;
 
     ConstantFP* const constMultiplicator = dyn_cast<ConstantFP>(binOp->getOperand(1));
 
     // If the multiplicator was not a constant, bail.
-    if (constMultiplicator == nullptr)
+    if (!constMultiplicator )
         return nullptr;
 
     APFloat multiplicator(constMultiplicator->getValueAPF());
@@ -325,7 +325,7 @@ Value* PatchIntrinsicSimplify::simplifyTrigonometric(
                                                            intrinsicId,
                                                            {intrinsicType, intrinsicType});
 
-    assert(intrinsic != nullptr);
+    assert(intrinsic );
 
     Value* leftOperand = binOp->getOperand(0);
 
@@ -335,7 +335,7 @@ Value* PatchIntrinsicSimplify::simplifyTrigonometric(
         Function* const fractIntrinsic = Intrinsic::getDeclaration(m_module,
                                                            Intrinsic::amdgcn_fract,
                                                            {intrinsicType, intrinsicType});
-        assert(fractIntrinsic != nullptr);
+        assert(fractIntrinsic );
 
         CallInst* const fractCall = CallInst::Create(fractIntrinsic, leftOperand, "", &intrinsicCall);
         leftOperand = fractCall;

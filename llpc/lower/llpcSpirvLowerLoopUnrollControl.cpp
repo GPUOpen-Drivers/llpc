@@ -98,7 +98,7 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
 
     SpirvLower::init(&module);
 
-    if (m_context->getPipelineContext() != nullptr)
+    if (m_context->getPipelineContext() )
     {
         auto shaderOptions = &(m_context->getPipelineShaderInfo(m_shaderStage)->options);
         if (shaderOptions->forceLoopUnrollCount > 0)
@@ -108,7 +108,7 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
 #endif
     }
 
-    if ((m_forceLoopUnrollCount == 0) && (m_disableLicm == false))
+    if ((m_forceLoopUnrollCount == 0) && (!m_disableLicm))
         return false;
 
     if ((m_shaderStage == ShaderStageTessControl) ||
@@ -126,9 +126,9 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
         {
             auto terminator = block.getTerminator();
             MDNode* loopMetaNode = terminator->getMetadata("llvm.loop");
-            if ((loopMetaNode == nullptr) ||
+            if ((!loopMetaNode ) ||
                 (loopMetaNode->getOperand(0) != loopMetaNode) ||
-                ((loopMetaNode->getNumOperands() != 1) && (m_disableLicm == false)))
+                ((loopMetaNode->getNumOperands() != 1) && (!m_disableLicm)))
                 continue;
 
             if (m_forceLoopUnrollCount && (loopMetaNode->getNumOperands() <= 1))

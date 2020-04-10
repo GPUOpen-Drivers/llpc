@@ -162,7 +162,7 @@ void addTypeMangling(
     }
 
     raw_string_ostream nameStream(name);
-    if ((returnTy != nullptr) && (returnTy->isVoidTy() == false))
+    if ((returnTy ) && (!returnTy->isVoidTy()))
     {
         nameStream << ".";
         getTypeName(returnTy, nameStream);
@@ -182,7 +182,7 @@ ShaderStage getShaderStageFromFunction(
 {
     // Check for the metadata that is added by the builder. This works in the patch phase.
     MDNode* stageMetaNode = func->getMetadata(lgcName::ShaderStageMetadata);
-    if (stageMetaNode != nullptr)
+    if (stageMetaNode )
         return ShaderStage(mdconst::dyn_extract<ConstantInt>(stageMetaNode->getOperand(0))->getZExtValue());
     return ShaderStageInvalid;
 }
@@ -239,7 +239,7 @@ Value* getFunctionArgument(
     const Twine&  name)     // Name to give the argument if currently empty
 {
     Argument* arg = &func->arg_begin()[idx];
-    if ((name.isTriviallyEmpty() == false) && (arg->getName() == ""))
+    if ((!name.isTriviallyEmpty()) && (arg->getName() == ""))
         arg->setName(name);
     return arg;
 }

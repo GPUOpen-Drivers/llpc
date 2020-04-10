@@ -72,7 +72,7 @@ public:
     void seek(int offset, bool fromOrigin);
 
     // Returns true if the file is presently open.
-    bool isOpen() const { return (m_fileHandle != nullptr); }
+    bool isOpen() const { return (m_fileHandle ); }
     // Gets handle of the file
     const std::FILE* getHandle() const { return m_fileHandle; }
 

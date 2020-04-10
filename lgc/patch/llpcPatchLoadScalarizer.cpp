@@ -97,7 +97,7 @@ bool PatchLoadScalarizer::runOnFunction(
 
     visit(function);
 
-    const bool changed = (m_instsToErase.empty() == false);
+    const bool changed = (!m_instsToErase.empty());
 
     for (Instruction* const inst : m_instsToErase)
     {
@@ -117,7 +117,7 @@ void PatchLoadScalarizer::visitLoadInst(
     const unsigned addrSpace = loadInst.getPointerAddressSpace();
     auto loadTy = dyn_cast<VectorType>(loadInst.getType());
 
-    if (loadTy != nullptr)
+    if (loadTy )
     {
         // This optimization will try to scalarize the load inst. The pattern is like:
         //    %loadValue = load <4 x float>, <4 x float> addrspace(7)* %loadPtr, align 16

@@ -184,9 +184,9 @@ void SpirvLowerMemoryOp::visitGetElementPtrInst(
             auto loadInst = dyn_cast<LoadInst>(user);
             auto storeInst = dyn_cast<StoreInst>(user);
 
-            if (loadInst != nullptr)
+            if (loadInst )
                 expandLoadInst(loadInst, getElemPtrs, dynIndex);
-            else if (storeInst != nullptr)
+            else if (storeInst )
                 recordStoreExpandInfo(storeInst, getElemPtrs, dynIndex);
             else
                 llvm_unreachable("Should never be called!");
@@ -220,7 +220,7 @@ bool SpirvLowerMemoryOp::needExpandDynamicIndex(
     for (unsigned i = 1, operandCount = getElemPtr->getNumOperands(); allowExpand && (i < operandCount); ++i)
     {
         auto index = getElemPtr->getOperand(i);
-        if (isa<Constant>(index) == false)
+        if (!isa<Constant>(index))
         {
             // Find the operand that represents a dynamic index
             if (operandIndex == InvalidValue)
@@ -230,7 +230,7 @@ bool SpirvLowerMemoryOp::needExpandDynamicIndex(
                 needExpand = true;
 
                 auto indexedTy = getElemPtr->getIndexedType(ptrVal->getType()->getPointerElementType(), idxs);
-                if (indexedTy != nullptr)
+                if (indexedTy )
                 {
                     // Check the upper bound of dynamic index
                     if (isa<ArrayType>(indexedTy))
@@ -277,7 +277,7 @@ bool SpirvLowerMemoryOp::needExpandDynamicIndex(
         // Skip expand if the user of "getelementptr" is neither "load" nor "store"
         for (auto user : getElemPtr->users())
         {
-            if ((isa<LoadInst>(user) == false) && (isa<StoreInst>(user) == false))
+            if ((!isa<LoadInst>(user)) && (!isa<StoreInst>(user)))
             {
                 allowExpand = false;
                 break;

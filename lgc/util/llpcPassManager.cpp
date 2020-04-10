@@ -100,7 +100,7 @@ static const PassInfo* getPassInfo(
 
     const PassRegistry& passRegistry = *PassRegistry::getPassRegistry();
     const PassInfo* passInfo = passRegistry.getPassInfo(passName);
-    if (passInfo == nullptr)
+    if (!passInfo )
     {
         report_fatal_error(Twine('\"') + Twine(passName) +
                            Twine("\" pass is not registered."));
@@ -129,7 +129,7 @@ PassManagerImpl::PassManagerImpl()
     :
     PassManager()
 {
-    if (cl::DumpCfgAfter.empty() == false)
+    if (!cl::DumpCfgAfter.empty())
         m_dumpCfgAfter = getPassIdFromName(cl::DumpCfgAfter);
 
     m_jumpThreading = getPassIdFromName("jump-threading");
@@ -142,7 +142,7 @@ void PassManagerImpl::add(
     Pass* pass)    // [in] Pass to add to the pass manager
 {
     // Do not add any passes after calling stop(), except immutable passes.
-    if (m_stopped && (pass->getAsImmutablePass() == nullptr))
+    if (m_stopped && (!pass->getAsImmutablePass() ))
         return;
 
     AnalysisID passId = pass->getPassID();
@@ -151,7 +151,7 @@ void PassManagerImpl::add(
     if (passId == m_jumpThreading)
         return;
 
-    if ((passId != m_printModule) && (m_passIndex != nullptr))
+    if ((passId != m_printModule) && (m_passIndex ))
     {
         unsigned passIndex = (*m_passIndex)++;
 

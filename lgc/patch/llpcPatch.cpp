@@ -98,11 +98,11 @@ void Patch::addPasses(
                                          // Callback function to check shader cache
 {
     // Start timer for patching passes.
-    if (patchTimer != nullptr)
+    if (patchTimer )
         passMgr.add(BuilderContext::createStartStopTimer(patchTimer, true));
 
     // If using BuilderRecorder rather than BuilderImpl, replay the Builder calls now
-    if (replayerPass != nullptr)
+    if (replayerPass )
         passMgr.add(replayerPass);
 
     if (raw_ostream* outs = getLgcOuts())
@@ -147,7 +147,7 @@ void Patch::addPasses(
     checkShaderCachePass->setCallbackFunction(checkShaderCacheFunc);
 
     // Stop timer for patching passes and start timer for optimization passes.
-    if (patchTimer != nullptr)
+    if (patchTimer )
     {
         passMgr.add(BuilderContext::createStartStopTimer(patchTimer, false));
         passMgr.add(BuilderContext::createStartStopTimer(optTimer, true));
@@ -161,11 +161,11 @@ void Patch::addPasses(
     // Need to run a first promote mem 2 reg to remove alloca's whose only args are lifetimes
     passMgr.add(createPromoteMemoryToRegisterPass());
 
-    if (cl::DisablePatchOpt == false)
+    if (!cl::DisablePatchOpt)
         addOptimizationPasses(passMgr);
 
     // Stop timer for optimization passes and restart timer for patching passes.
-    if (patchTimer != nullptr)
+    if (patchTimer )
     {
         passMgr.add(BuilderContext::createStartStopTimer(optTimer, false));
         passMgr.add(BuilderContext::createStartStopTimer(patchTimer, true));
@@ -182,7 +182,7 @@ void Patch::addPasses(
         ((pipelineState->getOptions().nggFlags & NggFlagDisable) == 0))
     {
         // Stop timer for patching passes and restart timer for optimization passes.
-        if (patchTimer != nullptr)
+        if (patchTimer )
         {
             passMgr.add(BuilderContext::createStartStopTimer(patchTimer, false));
             passMgr.add(BuilderContext::createStartStopTimer(optTimer, true));
@@ -197,7 +197,7 @@ void Patch::addPasses(
         passMgr.add(createCFGSimplificationPass());
 
         // Stop timer for optimization passes and restart timer for patching passes.
-        if (patchTimer != nullptr)
+        if (patchTimer )
         {
             passMgr.add(BuilderContext::createStartStopTimer(optTimer, false));
             passMgr.add(BuilderContext::createStartStopTimer(patchTimer, true));
@@ -215,7 +215,7 @@ void Patch::addPasses(
         passMgr.add(createPatchLlvmIrInclusion());
 
     // Stop timer for patching passes.
-    if (patchTimer != nullptr)
+    if (patchTimer )
         passMgr.add(BuilderContext::createStartStopTimer(patchTimer, false));
 
     // Dump the result
@@ -233,7 +233,7 @@ void Patch::addOptimizationPasses(
     legacy::PassManager&  passMgr)  // [in/out] Pass manager to add passes to
 {
     // Set up standard optimization passes.
-    if (cl::UseLlvmOpt == false)
+    if (!cl::UseLlvmOpt)
     {
         unsigned optLevel = 3;
         bool expensiveCombines = false;
@@ -360,7 +360,7 @@ GlobalVariable* Patch::getLdsVariable(
 
     // See if this module already has LDS.
     auto oldLds = module->getNamedValue("lds");
-    if (oldLds != nullptr)
+    if (oldLds )
     {
         // We already have LDS.
         return cast<GlobalVariable>(oldLds);

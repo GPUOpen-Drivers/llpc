@@ -67,7 +67,7 @@ GraphicsContext::GraphicsContext(
 
     for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage)
     {
-        if (shaderInfo[stage]->pModuleData != nullptr)
+        if (shaderInfo[stage]->pModuleData )
         {
             m_stageMask |= shaderStageToMask(static_cast<ShaderStage>(stage));
             ++m_activeStageCount;
@@ -176,14 +176,14 @@ void GraphicsContext::doUserDataNodeMerge()
                   return left.binding < right.binding;
               });
 
-    if (allRangeValues.empty() == false)
+    if (!allRangeValues.empty())
     {
         // Create a new table with merged duplicates.
         m_allocDescriptorRangeValues = std::make_unique<SmallVector<DescriptorRangeValue, 8>>();
         auto &mergedRangeValues = *m_allocDescriptorRangeValues;
         ArrayRef<DescriptorRangeValue> rangeValues = allRangeValues;
 
-        while (rangeValues.empty() == false)
+        while (!rangeValues.empty())
         {
             // Find the next block of duplicate rangeValues.
             unsigned duplicateCount = 1;
@@ -242,7 +242,7 @@ ArrayRef<ResourceMappingNode> GraphicsContext::mergeUserDataNodeTable(
     auto& mergedNodes = *m_allocUserDataNodes.back();
     ArrayRef<ResourceMappingNode> nodes = allNodes;
 
-    while (nodes.empty() == false)
+    while (!nodes.empty())
     {
         // Find the next block of duplicate nodes.
         unsigned duplicatesCount = 1;

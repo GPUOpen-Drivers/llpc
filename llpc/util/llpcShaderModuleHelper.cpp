@@ -367,7 +367,7 @@ const char* ShaderModuleHelper::getEntryPointNameFromSpirvBinary(
             codePos += wordCount;
         }
 
-        if (entryName == nullptr)
+        if (!entryName )
         {
             LLPC_ERRS("Entry-point not found\n");
             entryName = "";

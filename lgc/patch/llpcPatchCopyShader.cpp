@@ -116,7 +116,7 @@ bool PatchCopyShader::runOnModule(
     m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
     auto pipelineShaders = &getAnalysis<PipelineShaders>();
     auto gsEntryPoint = pipelineShaders->getEntryPoint(ShaderStageGeometry);
-    if (gsEntryPoint == nullptr)
+    if (!gsEntryPoint )
     {
         // No geometry shader -- copy shader not required.
         return false;
@@ -152,7 +152,7 @@ bool PatchCopyShader::runOnModule(
 
     auto insertPos = module.getFunctionList().end();
     auto fsEntryPoint = pipelineShaders->getEntryPoint(ShaderStageFragment);
-    if (fsEntryPoint != nullptr)
+    if (fsEntryPoint )
         insertPos = fsEntryPoint->getIterator();
     module.getFunctionList().insert(insertPos, entryPoint);
 
@@ -297,7 +297,7 @@ void PatchCopyShader::collectGsGenericOutputInfo(
             for (auto user : func.users())
             {
                 auto callInst = dyn_cast<CallInst>(user);
-                if ((callInst == nullptr) || (callInst->getParent()->getParent() != gsEntryPoint))
+                if ((!callInst ) || (callInst->getParent()->getParent() != gsEntryPoint))
                     continue;
 
                 assert(callInst->getNumArgOperands() == 4);
@@ -322,7 +322,7 @@ void PatchCopyShader::collectGsGenericOutputInfo(
                 unsigned compCount = 1;
                 auto compTy = outputTy;
                 auto outputVecTy = dyn_cast<VectorType>(outputTy);
-                if (outputVecTy != nullptr)
+                if (outputVecTy )
                 {
                     compCount = outputVecTy->getNumElements();
                     compTy = outputVecTy->getElementType();
@@ -420,7 +420,7 @@ void PatchCopyShader::exportOutput(
     }
 
     // Generate dummy gl_position vec4(0, 0, 0, 1) for the rasterization stream if transform feeback is enabled
-    if (resUsage->inOutUsage.enableXfb && (builtInUsage.position == false))
+    if (resUsage->inOutUsage.enableXfb && (!static_cast<bool>(builtInUsage.position)))
     {
         auto zero = ConstantFP::get(builder.getFloatTy(), 0.0);
         auto one = ConstantFP::get(builder.getFloatTy(), 1.0);
@@ -503,7 +503,7 @@ Value* PatchCopyShader::loadValueFromGsVsRing(
 
     if (m_pipelineState->isGsOnChip())
     {
-        assert(m_lds != nullptr);
+        assert(m_lds );
 
         Value* ringOffset = calcGsVsRingOffsetForInput(location, 0, streamId, builder);
         Value* loadPtr = builder.CreateGEP(m_lds, { builder.getInt32(0), ringOffset });
@@ -514,7 +514,7 @@ Value* PatchCopyShader::loadValueFromGsVsRing(
     }
     else
     {
-        assert(m_gsVsRingBufDesc != nullptr);
+        assert(m_gsVsRingBufDesc );
 
         CoherentFlag coherent = {};
         coherent.bits.glc = true;

@@ -104,7 +104,7 @@ bool PatchResourceCollect::runOnModule(
     for (int shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage)
     {
         m_entryPoint = m_pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
-        if (m_entryPoint != nullptr)
+        if (m_entryPoint )
         {
             m_shaderStage = static_cast<ShaderStage>(shaderStage);
             processShader();
@@ -215,17 +215,17 @@ void PatchResourceCollect::setNggControl()
             nggControl.passthroughMode = false;
         else
         {
-            nggControl.passthroughMode = (nggControl.enableVertexReuse == false) &&
-                                           (nggControl.enableBackfaceCulling == false) &&
-                                           (nggControl.enableFrustumCulling == false) &&
-                                           (nggControl.enableBoxFilterCulling == false) &&
-                                           (nggControl.enableSphereCulling == false) &&
-                                           (nggControl.enableSmallPrimFilter == false) &&
-                                           (nggControl.enableCullDistanceCulling == false);
+            nggControl.passthroughMode = (!nggControl.enableVertexReuse) &&
+                                           (!nggControl.enableBackfaceCulling) &&
+                                           (!nggControl.enableFrustumCulling) &&
+                                           (!nggControl.enableBoxFilterCulling) &&
+                                           (!nggControl.enableSphereCulling) &&
+                                           (!nggControl.enableSmallPrimFilter) &&
+                                           (!nggControl.enableCullDistanceCulling);
         }
 
         // NOTE: Further check if we have to turn on pass-through mode forcibly.
-        if (nggControl.passthroughMode == false)
+        if (!nggControl.passthroughMode)
         {
             // NOTE: Further check if pass-through mode should be enabled
             const auto topology = m_pipelineState->getInputAssemblyState().topology;
@@ -387,7 +387,7 @@ void PatchResourceCollect::buildNggCullingControlRegister(
     paClClipCntl.bits.dxClipSpaceDef = true;
     paClClipCntl.bits.dxLinearAttrClipEna = true;
 
-    if (vpState.depthClipEnable == false)
+    if (!static_cast<bool>(vpState.depthClipEnable))
     {
         paClClipCntl.bits.zclipNearDisable = true;
         paClClipCntl.bits.zclipFarDisable  = true;
@@ -625,14 +625,14 @@ bool PatchResourceCollect::checkGsOnChipValidity()
             const unsigned vertsPerPrimitive = getVerticesPerPrimitive();
 
             const bool needsLds = (hasGs ||
-                                   (nggControl->passthroughMode == false) ||
+                                   (!nggControl->passthroughMode) ||
                                    (esExtraLdsSize > 0) || (gsExtraLdsSize > 0));
 
             unsigned esVertsPerSubgroup = 0;
             unsigned gsPrimsPerSubgroup = 0;
 
             // It is expected that regular launch NGG will be the most prevalent, so handle its logic first.
-            if (nggControl->enableFastLaunch == false)
+            if (!nggControl->enableFastLaunch)
             {
                 // The numbers below come from hardware guidance and most likely require further tuning.
                 switch (nggControl->subgroupSizing)
@@ -939,7 +939,7 @@ bool PatchResourceCollect::checkGsOnChipValidity()
                                                                          gsVsRingItemSizeOnChip :
                                                                          gsVsRingItemSize;
 
-            if ((m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) && hasTs && (gsOnChip == false))
+            if ((m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) && hasTs && (!gsOnChip))
             {
                 unsigned esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
                 unsigned onChipGsLdsMagicSize = alignTo((esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
@@ -1093,7 +1093,7 @@ void PatchResourceCollect::processShader()
     visit(m_entryPoint);
 
     // Disable push constant if not used
-    if (m_hasPushConstOp == false)
+    if (!m_hasPushConstOp)
         m_resUsage->pushConstSizeInBytes = 0;
 
     clearInactiveInput();
@@ -1179,7 +1179,7 @@ void PatchResourceCollect::visitCallInst(
     CallInst& callInst) // [in] "Call" instruction
 {
     auto callee = callInst.getCalledFunction();
-    if (callee == nullptr)
+    if (!callee )
         return;
 
     bool isDeadCall = callInst.user_empty();
@@ -1391,7 +1391,7 @@ void PatchResourceCollect::visitCallInst(
             {
                 // Location offset is constant
                 auto bitWidth = outputTy->getScalarSizeInBits();
-                if ((bitWidth == 64) && (isa<ConstantInt>(compIdx) == false))
+                if ((bitWidth == 64) && (!isa<ConstantInt>(compIdx)))
                 {
                     // NOTE: If vector component index is not constant and it is vector component addressing for
                     // 64-bit vector, we treat this as dynamic indexing.
@@ -1424,7 +1424,7 @@ void PatchResourceCollect::visitCallInst(
 
     if (canPackInOut())
     {
-        if ((m_shaderStage == ShaderStageFragment) && (isDeadCall == false))
+        if ((m_shaderStage == ShaderStageFragment) && (!isDeadCall))
         {
             // Collect LocationSpans according to each FS' input call
             bool isInput = m_locationMapManager->addSpan(&callInst);
@@ -1448,7 +1448,7 @@ void PatchResourceCollect::clearInactiveInput()
 {
     bool buildingRelocatableElf = m_pipelineState->getBuilderContext()->buildingRelocatableElf();
     // Clear those inactive generic inputs, remove them from location mappings
-    if (m_pipelineState->isGraphics() && (m_hasDynIndexedInput == false) && (m_shaderStage != ShaderStageTessEval)
+    if (m_pipelineState->isGraphics() && (!m_hasDynIndexedInput) && (m_shaderStage != ShaderStageTessEval)
         && !buildingRelocatableElf)
     {
         // TODO: Here, we keep all generic inputs of tessellation evaluation shader. This is because corresponding
@@ -1824,7 +1824,7 @@ void PatchResourceCollect::matchGenericInOut()
                     outputXfb = inOutUsage.gs.xfbOutsInfo.find(outLocInfo) != inOutUsage.gs.xfbOutsInfo.end();
                 }
 
-                if ((nextInLocMap.find(loc) == nextInLocMap.end()) && (outputXfb == false))
+                if ((nextInLocMap.find(loc) == nextInLocMap.end()) && (!outputXfb))
                 {
                     if (m_hasDynIndexedOutput || (m_importedOutputLocs.find(loc) != m_importedOutputLocs.end()))
                     {
@@ -1897,7 +1897,7 @@ void PatchResourceCollect::matchGenericInOut()
     LLPC_OUTS("// LLPC location input/output mapping results (" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
               << " shader)\n\n");
     unsigned nextMapLoc = 0;
-    if (inLocMap.empty() == false)
+    if (!inLocMap.empty())
     {
         assert(inOutUsage.inputMapLocCount == 0);
         for (auto& locMap : inLocMap)
@@ -1913,7 +1913,7 @@ void PatchResourceCollect::matchGenericInOut()
         LLPC_OUTS("\n");
     }
 
-    if (outLocMap.empty() == false)
+    if (!outLocMap.empty())
     {
         auto& outOrigLocs = inOutUsage.fs.outputOrigLocs;
         if (m_shaderStage == ShaderStageFragment)
@@ -1966,7 +1966,7 @@ void PatchResourceCollect::matchGenericInOut()
         LLPC_OUTS("\n");
     }
 
-    if (perPatchInLocMap.empty() == false)
+    if (!perPatchInLocMap.empty())
     {
         nextMapLoc = 0;
         assert(inOutUsage.perPatchInputMapLocCount == 0);
@@ -1981,7 +1981,7 @@ void PatchResourceCollect::matchGenericInOut()
         LLPC_OUTS("\n");
     }
 
-    if (perPatchOutLocMap.empty() == false)
+    if (!perPatchOutLocMap.empty())
     {
         nextMapLoc = 0;
         assert(inOutUsage.perPatchOutputMapLocCount == 0);
@@ -2839,7 +2839,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
     LLPC_OUTS("===============================================================================\n");
     LLPC_OUTS("// LLPC builtin-to-generic mapping results (" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
               << " shader)\n\n");
-    if (inOutUsage.builtInInputLocMap.empty() == false)
+    if (!inOutUsage.builtInInputLocMap.empty())
     {
         for (const auto& builtInMap : inOutUsage.builtInInputLocMap)
         {
@@ -2852,7 +2852,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
         LLPC_OUTS("\n");
     }
 
-    if (inOutUsage.builtInOutputLocMap.empty() == false)
+    if (!inOutUsage.builtInOutputLocMap.empty())
     {
         for (const auto& builtInMap : inOutUsage.builtInOutputLocMap)
         {
@@ -2877,7 +2877,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
         LLPC_OUTS("\n");
     }
 
-    if (inOutUsage.perPatchBuiltInInputLocMap.empty() == false)
+    if (!inOutUsage.perPatchBuiltInInputLocMap.empty())
     {
         for (const auto& builtInMap : inOutUsage.perPatchBuiltInInputLocMap)
         {
@@ -2890,7 +2890,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
         LLPC_OUTS("\n");
     }
 
-    if (inOutUsage.perPatchBuiltInOutputLocMap.empty() == false)
+    if (!inOutUsage.perPatchBuiltInOutputLocMap.empty())
     {
         for (const auto& builtInMap : inOutUsage.perPatchBuiltInOutputLocMap)
         {
@@ -3049,7 +3049,7 @@ void PatchResourceCollect::reviseInputImportCalls()
         // Re-write the input import call by using the new InOutLocation
         SmallVector<Value*, 5> args;
         std::string callName;
-        if (isInterpolant == false)
+        if (!isInterpolant)
         {
             args.push_back(builder.getInt32(newInLoc->locationInfo.location));
             args.push_back(builder.getInt32(newInLoc->locationInfo.component));
@@ -3124,7 +3124,7 @@ void PatchResourceCollect::reassembleOutputExportCalls()
 
         const InOutLocation* newInLoc = nullptr;
         const bool isFound = m_locationMapManager->findMap(origOutLoc, newInLoc);
-        if (isFound == false)
+        if (!isFound)
             continue;
 
         auto& components = packedComponents[newInLoc->locationInfo.location];
@@ -3145,7 +3145,7 @@ void PatchResourceCollect::reassembleOutputExportCalls()
         unsigned compCount = 0;
         for (auto comp : components)
         {
-            if (comp != nullptr)
+            if (comp )
                 ++compCount;
         }
 
@@ -3493,7 +3493,7 @@ void InOutLocationMapManager::buildLocationMap()
         {
             const auto& prevSpan = *(--spanIt);
             ++spanIt;
-            if ((isCompatible(prevSpan, *spanIt) == false) || (compIdx == 3))
+            if ((!isCompatible(prevSpan, *spanIt)) || (compIdx == 3))
             {
                 ++consectiveLocation;
                 compIdx = 0;

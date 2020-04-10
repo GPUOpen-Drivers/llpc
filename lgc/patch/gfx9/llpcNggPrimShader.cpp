@@ -77,7 +77,7 @@ NggPrimShader::NggPrimShader(
 // =====================================================================================================================
 NggPrimShader::~NggPrimShader()
 {
-    if (m_ldsManager != nullptr)
+    if (m_ldsManager )
         delete m_ldsManager;
 }
 
@@ -91,10 +91,10 @@ Function* NggPrimShader::generate(
     assert(m_gfxIp.major >= 10);
 
     // ES and GS could not be null at the same time
-    assert(((esEntryPoint == nullptr) && (gsEntryPoint == nullptr)) == false);
+    assert(((!esEntryPoint ) && (!gsEntryPoint )) == false);
 
     Module* module = nullptr;
-    if (esEntryPoint != nullptr)
+    if (esEntryPoint )
     {
         module = esEntryPoint->getParent();
         esEntryPoint->setName(lgcName::NggEsEntryPoint);
@@ -103,7 +103,7 @@ Function* NggPrimShader::generate(
         esEntryPoint->addFnAttr(Attribute::AlwaysInline);
     }
 
-    if (gsEntryPoint != nullptr)
+    if (gsEntryPoint )
     {
         module = gsEntryPoint->getParent();
         gsEntryPoint->setName(lgcName::NggGsEntryPoint);
@@ -111,7 +111,7 @@ Function* NggPrimShader::generate(
         gsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
         gsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
-        assert(copyShaderEntryPoint != nullptr); // Copy shader must be present
+        assert(copyShaderEntryPoint ); // Copy shader must be present
         copyShaderEntryPoint->setName(lgcName::NggCopyShaderEntryPoint);
         copyShaderEntryPoint->setCallingConv(CallingConv::C);
         copyShaderEntryPoint->setLinkage(GlobalValue::InternalLinkage);
@@ -119,8 +119,8 @@ Function* NggPrimShader::generate(
     }
 
     // Create NGG LDS manager
-    assert(module != nullptr);
-    assert(m_ldsManager == nullptr);
+    assert(module );
+    assert(!m_ldsManager );
     m_ldsManager = new NggLdsManager(module, m_pipelineState, m_builder.get());
 
     return generatePrimShaderEntryPoint(module);
@@ -1115,7 +1115,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(
         {
             m_builder->SetInsertPoint(writePosDataBlock);
 
-            separateExp = (resUsage->resourceWrite == false); // No resource writing
+            separateExp = (!resUsage->resourceWrite); // No resource writing
 
             // NOTE: For vertex compaction, we have to run ES for twice (get vertex position data and
             // get other exported data).
@@ -1520,7 +1520,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(
                     // Write primitive ID to LDS
                     if (resUsage->builtInUsage.vs.primitiveId)
                     {
-                        assert(m_nggFactor.primitiveId != nullptr);
+                        assert(m_nggFactor.primitiveId );
                         writePerThreadDataToLds(m_nggFactor.primitiveId,
                                                 compactThreadIdInSubrgoup,
                                                 LdsRegionCompactPrimId);
@@ -1782,7 +1782,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(
             m_builder->SetInsertPoint(expVertParamBlock);
 
             // NOTE: For vertex compaction, ES must have been run in ".expVertPos" block.
-            if (vertexCompact == false)
+            if (!vertexCompact)
             {
                 if (separateExp)
                 {
@@ -2606,7 +2606,7 @@ Value* NggPrimShader::doCulling(
     Value* cullFlag = m_builder->getFalse();
 
     // Skip culling if it is not requested
-    if (enableCulling() == false)
+    if (!enableCulling())
         return cullFlag;
 
     auto esGsOffset0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
@@ -2834,7 +2834,7 @@ void NggPrimShader::doPrimitiveExport(
 
         if (vertexCompact)
         {
-            assert(cullFlag != nullptr); // Must not be null
+            assert(cullFlag ); // Must not be null
             const auto nullPrimVal = m_builder->getInt32(NullPrim);
             primData = m_builder->CreateSelect(cullFlag, nullPrimVal, primData);
         }
@@ -2949,7 +2949,7 @@ void NggPrimShader::runEsOrEsVariant(
     BasicBlock*           insertAtEnd)     // [in] Where to insert instructions
 {
     const bool hasTs = (m_hasTcs || m_hasTes);
-    if (((hasTs && m_hasTes) || ((hasTs == false) && m_hasVs)) == false)
+    if (((hasTs && m_hasTes) || ((!hasTs) && m_hasVs)) == false)
     {
         // No TES (tessellation is enabled) or VS (tessellation is disabled), don't have to run
         return;
@@ -2960,10 +2960,10 @@ void NggPrimShader::runEsOrEsVariant(
     Function* esEntry = nullptr;
     if (runEsVariant)
     {
-        assert(expDataSet != nullptr);
+        assert(expDataSet );
         esEntry = mutateEsToVariant(module, entryName, *expDataSet); // Mutate ES to variant
 
-        if (esEntry == nullptr)
+        if (!esEntry )
         {
             // ES variant is NULL, don't have to run
             return;
@@ -2972,7 +2972,7 @@ void NggPrimShader::runEsOrEsVariant(
     else
     {
         esEntry = module->getFunction(lgcName::NggEsEntryPoint);
-        assert(esEntry != nullptr);
+        assert(esEntry );
     }
 
     // Call ES entry
@@ -3071,7 +3071,7 @@ void NggPrimShader::runEsOrEsVariant(
         vertexId      = (arg + 5);
         relVertexId   = (arg + 6);
         // NOTE: VS primitive ID for NGG is specially obtained, not simply from system VGPR.
-        if (m_nggFactor.primitiveId != nullptr)
+        if (m_nggFactor.primitiveId )
             vsPrimitiveId = m_nggFactor.primitiveId;
         instanceId    = (arg + 8);
     }
@@ -3202,7 +3202,7 @@ Function* NggPrimShader::mutateEsToVariant(
     assert(expDataSet.empty());
 
     const auto esEntryPoint = module->getFunction(lgcName::NggEsEntryPoint);
-    assert(esEntryPoint != nullptr);
+    assert(esEntryPoint );
 
     const bool doExp      = (entryName == lgcName::NggEsEntryVariant);
     const bool doPosExp   = (entryName == lgcName::NggEsEntryVariantPos);
@@ -3218,7 +3218,7 @@ Function* NggPrimShader::mutateEsToVariant(
             for (auto user : func.users())
             {
                 CallInst* const call = dyn_cast<CallInst>(user);
-                assert(call != nullptr);
+                assert(call );
 
                 if (call->getParent()->getParent() != esEntryPoint)
                 {
@@ -3271,7 +3271,7 @@ Function* NggPrimShader::mutateEsToVariant(
     for (BasicBlock& block : *esEntryVariant)
     {
         auto retInst = dyn_cast<ReturnInst>(block.getTerminator());
-        if (retInst != nullptr)
+        if (retInst )
         {
             retInst->dropAllReferences();
             retInst->eraseFromParent();
@@ -3294,7 +3294,7 @@ Function* NggPrimShader::mutateEsToVariant(
             for (auto user : func.users())
             {
                 CallInst* const call = dyn_cast<CallInst>(user);
-                assert(call != nullptr);
+                assert(call );
 
                 if (call->getParent()->getParent() != esEntryVariant)
                 {
@@ -3543,7 +3543,7 @@ Function* NggPrimShader::mutateGsToVariant(
     assert(m_hasGs); // GS must be present
 
     auto gsEntryPoint = module->getFunction(lgcName::NggGsEntryPoint);
-    assert(gsEntryPoint != nullptr);
+    assert(gsEntryPoint );
 
     // Clone new entry-point
     auto resultTy = StructType::get(*m_context,
@@ -3661,7 +3661,7 @@ Function* NggPrimShader::mutateGsToVariant(
             for (auto user : func.users())
             {
                 CallInst* const call = dyn_cast<CallInst>(user);
-                assert(call != nullptr);
+                assert(call );
                 m_builder->SetInsertPoint(call);
 
                 assert(call->getNumArgOperands() == 4);
@@ -3683,7 +3683,7 @@ Function* NggPrimShader::mutateGsToVariant(
             for (auto user : func.users())
             {
                 CallInst* const call = dyn_cast<CallInst>(user);
-                assert(call != nullptr);
+                assert(call );
                 m_builder->SetInsertPoint(call);
 
                 uint64_t message = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
@@ -3798,7 +3798,7 @@ void NggPrimShader::runCopyShader(
                 for (auto user : func.users())
                 {
                     CallInst* const call = dyn_cast<CallInst>(user);
-                    assert(call != nullptr);
+                    assert(call );
                     m_builder->SetInsertPoint(call);
 
                     assert(call->getNumArgOperands() == 3);
@@ -4009,7 +4009,7 @@ void NggPrimShader::processGsEmit(
     Value*   flipVertOrderPtr)             // [in,out] Pointer to flags indicating whether to flip vertex ordering
 {
     auto gsEmitHandler = module->getFunction(lgcName::NggGsEmit);
-    if (gsEmitHandler == nullptr)
+    if (!gsEmitHandler )
         gsEmitHandler = createGsEmitHandler(module, streamId);
 
     m_builder->CreateCall(gsEmitHandler,
@@ -4036,7 +4036,7 @@ void NggPrimShader::processGsCut(
     Value*   flipVertOrderPtr)             // [in,out] Pointer to flags indicating whether to flip vertex ordering
 {
     auto gsCutHandler = module->getFunction(lgcName::NggGsCut);
-    if (gsCutHandler == nullptr)
+    if (!gsCutHandler )
         gsCutHandler = createGsCutHandler(module, streamId);
 
     m_builder->CreateCall(gsCutHandler,
@@ -4616,7 +4616,7 @@ Value* NggPrimShader::doBackfaceCulling(
     assert(m_nggControl->enableBackfaceCulling);
 
     auto backfaceCuller = module->getFunction(lgcName::NggCullingBackface);
-    if (backfaceCuller == nullptr)
+    if (!backfaceCuller )
         backfaceCuller = createBackfaceCuller(module);
 
     unsigned regOffset = 0;
@@ -4668,7 +4668,7 @@ Value* NggPrimShader::doFrustumCulling(
     assert(m_nggControl->enableFrustumCulling);
 
     auto frustumCuller = module->getFunction(lgcName::NggCullingFrustum);
-    if (frustumCuller == nullptr)
+    if (!frustumCuller )
         frustumCuller = createFrustumCuller(module);
 
     unsigned regOffset = 0;
@@ -4719,7 +4719,7 @@ Value* NggPrimShader::doBoxFilterCulling(
     assert(m_nggControl->enableBoxFilterCulling);
 
     auto boxFilterCuller = module->getFunction(lgcName::NggCullingBoxFilter);
-    if (boxFilterCuller == nullptr)
+    if (!boxFilterCuller )
         boxFilterCuller = createBoxFilterCuller(module);
 
     unsigned regOffset = 0;
@@ -4774,7 +4774,7 @@ Value* NggPrimShader::doSphereCulling(
     assert(m_nggControl->enableSphereCulling);
 
     auto sphereCuller = module->getFunction(lgcName::NggCullingSphere);
-    if (sphereCuller == nullptr)
+    if (!sphereCuller )
         sphereCuller = createSphereCuller(module);
 
     unsigned regOffset = 0;
@@ -4829,7 +4829,7 @@ Value* NggPrimShader::doSmallPrimFilterCulling(
     assert(m_nggControl->enableSmallPrimFilter);
 
     auto smallPrimFilterCuller = module->getFunction(lgcName::NggCullingSmallPrimFilter);
-    if (smallPrimFilterCuller == nullptr)
+    if (!smallPrimFilterCuller )
         smallPrimFilterCuller = createSmallPrimFilterCuller(module);
 
     unsigned regOffset = 0;
@@ -4872,7 +4872,7 @@ Value* NggPrimShader::doCullDistanceCulling(
     assert(m_nggControl->enableCullDistanceCulling);
 
     auto cullDistanceCuller = module->getFunction(lgcName::NggCullingCullDistance);
-    if (cullDistanceCuller == nullptr)
+    if (!cullDistanceCuller )
         cullDistanceCuller = createCullDistanceCuller(module);
 
     // Do cull distance culling
@@ -4892,7 +4892,7 @@ Value* NggPrimShader::fetchCullingControlRegister(
     unsigned    regOffset)      // Register offset in the primitive shader table (in BYTEs)
 {
     auto fetchCullingRegister = module->getFunction(lgcName::NggCullingFetchReg);
-    if (fetchCullingRegister == nullptr)
+    if (!fetchCullingRegister )
         fetchCullingRegister = createFetchCullingRegister(module);
 
     return m_builder->CreateCall(fetchCullingRegister,
@@ -6666,7 +6666,7 @@ Value* NggPrimShader::doSubgroupInclusiveAdd(
     if (waveSize == 64)
         result = m_builder->CreateAdd(result, maskedBroadcast);
 
-    if (ppWwmResult != nullptr)
+    if (ppWwmResult )
     {
         // Return the result in WWM section (optional)
         *ppWwmResult = result;

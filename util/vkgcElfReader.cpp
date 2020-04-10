@@ -82,7 +82,7 @@ Result ElfReader<Elf>::ReadFromBuffer(
     const void* pBuffer,   // [in] Input ELF data buffer
     size_t*     pBufSize)  // [out] Size of the given read buffer (determined from the ELF header)
 {
-    assert(pBuffer != nullptr);
+    assert(pBuffer );
 
     Result result = Result::Success;
 
@@ -126,7 +126,7 @@ Result ElfReader<Elf>::ReadFromBuffer(
             const unsigned sectionDataOffset = static_cast<unsigned>(sectionHeader->shOffset);
             auto buf = new SectionBuffer;
 
-            result = (buf != nullptr) ? Result::Success : Result::ErrorOutOfMemory;
+            result = (buf ) ? Result::Success : Result::ErrorOutOfMemory;
 
             if (result == Result::Success)
             {
@@ -485,7 +485,7 @@ bool ElfReader<Elf>::getNextMsgNode()
     }
 
     // Post check for end visit map or array element
-    if ((m_iteratorStack.size() > 0) && (skipPostCheck == false))
+    if ((m_iteratorStack.size() > 0) && (!skipPostCheck))
     {
         auto nextIter = &m_iteratorStack.back();
         if (nextIter->status == MsgPackIteratorMapPair)

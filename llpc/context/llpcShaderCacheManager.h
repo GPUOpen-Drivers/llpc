@@ -56,7 +56,7 @@ public:
     // Get the global ShaderCacheManager object
     static ShaderCacheManager* getShaderCacheManager()
     {
-        if (m_manager == nullptr)
+        if (!m_manager )
             m_manager = new ShaderCacheManager();
         return m_manager;
     }

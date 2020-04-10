@@ -448,7 +448,7 @@ static Result init(
                 }
             }
 
-            if (found == false)
+            if (!found)
                 newArgs.push_back(option);
             else if (optionIdx == 0) // Find option -gfxip
             {
@@ -463,15 +463,15 @@ static Result init(
 
                     char* tokens[3] = {}; // Format: major.minor.step
                     char* token = std::strtok(gfxIp, ".");
-                    for (unsigned i = 0; (i < 3) && (token != nullptr); ++i)
+                    for (unsigned i = 0; (i < 3) && (token ); ++i)
                     {
                         tokens[i] = token;
                         token = std::strtok(nullptr, ".");
                     }
 
-                    ParsedGfxIp.major    = (tokens[0] != nullptr) ? std::strtoul(tokens[0], nullptr, 10) : 0;
-                    ParsedGfxIp.minor    = (tokens[1] != nullptr) ? std::strtoul(tokens[1], nullptr, 10) : 0;
-                    ParsedGfxIp.stepping = (tokens[2] != nullptr) ? std::strtoul(tokens[2], nullptr, 10) : 0;
+                    ParsedGfxIp.major    = (tokens[0] ) ? std::strtoul(tokens[0], nullptr, 10) : 0;
+                    ParsedGfxIp.minor    = (tokens[1] ) ? std::strtoul(tokens[1], nullptr, 10) : 0;
+                    ParsedGfxIp.stepping = (tokens[2] ) ? std::strtoul(tokens[2], nullptr, 10) : 0;
 
                     delete[] gfxIp;
                 }
@@ -493,7 +493,7 @@ static Result init(
             }
         }
 
-        if (found == false)
+        if (!found)
         {
             // Initialize the path for shader cache
             constexpr unsigned maxFilePathLen = 512;
@@ -516,13 +516,13 @@ static Result init(
             //   2. Find XDG_CACHE_HOME.
             //   3. If AMD_SHADER_DISK_CACHE_PATH and XDG_CACHE_HOME both not set,
             //      use "$HOME/.cache".
-            if (envString == nullptr)
+            if (!envString )
                 envString = getenv("XDG_CACHE_HOME");
 
-            if (envString == nullptr)
+            if (!envString )
             {
                 envString = getenv("HOME");
-                if (envString != nullptr)
+                if (envString )
                 {
                     snprintf(shaderCacheFileRootDir, sizeof(shaderCacheFileRootDir),
                         "%s/.cache", envString);
@@ -531,7 +531,7 @@ static Result init(
             }
 #endif
 
-            if (envString != nullptr)
+            if (envString )
             {
                 snprintf(shaderCacheFileDirOption, sizeof(shaderCacheFileDirOption),
                          "-shader-cache-file-dir=%s", envString);
@@ -551,7 +551,7 @@ static Result init(
     if ((result == Result::Success) && (SpvGenDir != ""))
     {
         // -spvgen-dir option: preload spvgen from the given directory
-        if (InitSpvGen(SpvGenDir.c_str()) == false)
+        if (!InitSpvGen(SpvGenDir.c_str()))
         {
             LLPC_ERRS("Failed to load SPVGEN from specified directory\n");
             result = Result::ErrorUnavailable;
@@ -605,7 +605,7 @@ static void cleanupCompileInfo(
     {
         // NOTE: We do not have to free SPIR-V binary for pipeline info file.
         // It will be freed when we close the VFX doc.
-        if (compileInfo->pipelineInfoFile == nullptr)
+        if (!compileInfo->pipelineInfoFile )
             delete[] reinterpret_cast<const char*>(compileInfo->shaderModuleDatas[i].spirvBin.pCode);
 
         free(compileInfo->shaderModuleDatas[i].shaderBuf);
@@ -646,7 +646,7 @@ static bool isSpirvTextFile(
     if (extPos != std::string::npos)
         extName = fileName.substr(extPos, fileName.size() - extPos);
 
-    if ((extName.empty() == false) && (extName == LlpcExt::SpirvText))
+    if ((!extName.empty()) && (extName == LlpcExt::SpirvText))
         isSpirvText = true;
 
     return isSpirvText;
@@ -664,7 +664,7 @@ static bool isSpirvBinaryFile(
     if (extPos != std::string::npos)
         extName = fileName.substr(extPos, fileName.size() - extPos);
 
-    if ((extName.empty() == false) && (extName == LlpcExt::SpirvBin))
+    if ((!extName.empty()) && (extName == LlpcExt::SpirvBin))
         isSpirvBin = true;
 
     return isSpirvBin;
@@ -682,7 +682,7 @@ static bool isPipelineInfoFile(
     if (extPos != std::string::npos)
         extName = fileName.substr(extPos, fileName.size() - extPos);
 
-    if ((extName.empty() == false) && (extName == LlpcExt::PipelineInfo))
+    if ((!extName.empty()) && (extName == LlpcExt::PipelineInfo))
         isPipelineInfo = true;
 
     return isPipelineInfo;
@@ -700,7 +700,7 @@ static bool isLlvmIrFile(
     if (extPos != std::string::npos)
         extName = fileName.substr(extPos, fileName.size() - extPos);
 
-    if ((extName.empty() == false) && (extName == LlpcExt::LlvmIr))
+    if ((!extName.empty()) && (extName == LlpcExt::LlvmIr))
         isLlvmIr = true;
 
     return isLlvmIr;
@@ -715,7 +715,7 @@ static Result getSpirvBinaryFromFile(
     Result result = Result::Success;
 
     FILE* binFile = fopen(spvBinFile.c_str(), "rb");
-    if (binFile == nullptr)
+    if (!binFile )
     {
         LLPC_ERRS("Fails to open SPIR-V binary file: " << spvBinFile << "\n");
         result = Result::ErrorUnavailable;
@@ -728,7 +728,7 @@ static Result getSpirvBinaryFromFile(
         fseek(binFile, 0, SEEK_SET);
 
         char* bin= new char[binSize];
-        assert(bin != nullptr);
+        assert(bin );
         memset(bin, 0, binSize);
         binSize = fread(bin, 1, binSize, binFile);
 
@@ -748,7 +748,7 @@ static Result compileGlsl(
     ShaderStage*       stage,      // [out] Shader stage
     std::string&       outFilename) // [out] Output filename, SPIR-V binary
 {
-    if (InitSpvGen() == false)
+    if (!InitSpvGen())
     {
         LLPC_ERRS("Failed to load SPVGEN -- cannot compile GLSL\n");
         return Result::ErrorUnavailable;
@@ -766,7 +766,7 @@ static Result compileGlsl(
     *stage = sourceLangToShaderStage(lang);
 
     FILE* inFile = fopen(inFilename.c_str(), "r");
-    if (inFile == nullptr)
+    if (!inFile )
     {
         LLPC_ERRS("Fails to open input file: " << inFilename << "\n");
         result = Result::ErrorUnavailable;
@@ -778,7 +778,7 @@ static Result compileGlsl(
         outFilename = sys::path::filename(inFilename).str() + LlpcExt::SpirvBin;
 
         outFile = fopen(outFilename.c_str(), "wb");
-        if (outFile == nullptr)
+        if (!outFile )
         {
             LLPC_ERRS("Fails to open output file: " << outFilename << "\n");
             result = Result::ErrorUnavailable;
@@ -792,7 +792,7 @@ static Result compileGlsl(
         fseek(inFile, 0, SEEK_SET);
 
         char* glslText = new char[textSize + 1];
-        assert(glslText != nullptr);
+        assert(glslText );
         memset(glslText, 0, textSize + 1);
         auto readSize = fread(glslText, 1, textSize, inFile);
         glslText[readSize] = 0;
@@ -833,7 +833,7 @@ static Result compileGlsl(
 
             textSize = binSize * 10 + 1024;
             char* spvText = new char[textSize];
-            assert(spvText != nullptr);
+            assert(spvText );
             memset(spvText, 0, textSize);
             LLPC_OUTS("\nSPIR-V disassembly: " << outFilename << "\n");
             spvDisassembleSpirv(binSize, spvBin, textSize, spvText);
@@ -861,7 +861,7 @@ static Result assembleSpirv(
     const std::string& inFilename,  // [in] Input filename, SPIR-V assembly text
     std::string&       outFilename) // [out] Output filename, SPIR-V binary
 {
-    if (InitSpvGen() == false)
+    if (!InitSpvGen())
     {
         LLPC_ERRS("Failed to load SPVGEN -- cannot assemble SPIR-V assembler source\n");
         return Result::ErrorUnavailable;
@@ -870,7 +870,7 @@ static Result assembleSpirv(
     Result result = Result::Success;
 
     FILE* inFile = fopen(inFilename.c_str(), "r");
-    if (inFile == nullptr)
+    if (!inFile )
     {
         LLPC_ERRS("Fails to open input file: " << inFilename << "\n");
         result = Result::ErrorUnavailable;
@@ -882,7 +882,7 @@ static Result assembleSpirv(
         outFilename = sys::path::stem(sys::path::filename(inFilename)).str() + LlpcExt::SpirvBin;
 
         outFile = fopen(outFilename.c_str(), "wb");
-        if (outFile == nullptr)
+        if (!outFile )
         {
             LLPC_ERRS("Fails to open output file: " << outFilename << "\n");
             result = Result::ErrorUnavailable;
@@ -896,7 +896,7 @@ static Result assembleSpirv(
         fseek(inFile, 0, SEEK_SET);
 
         char* spvText = new char[textSize + 1];
-        assert(spvText != nullptr);
+        assert(spvText );
         memset(spvText, 0, textSize + 1);
 
         size_t realSize = fread(spvText, 1, textSize, inFile);
@@ -904,7 +904,7 @@ static Result assembleSpirv(
 
         int binSize = realSize * 4 + 1024; // Estimated SPIR-V binary size
         unsigned* spvBin = new unsigned[binSize / sizeof(unsigned)];
-        assert(spvBin != nullptr);
+        assert(spvBin );
 
         const char* log = nullptr;
         binSize = spvAssembleSpirv(spvText, binSize, spvBin, &log);
@@ -993,7 +993,7 @@ static Result checkAutoLayoutCompatibleFunc(
 {
     Result result = Result::Success;
 
-    bool isGraphics = (compileInfo->stageMask & (shaderStageToMask(ShaderStageCompute) -1)) ? true : false;
+    bool isGraphics = (compileInfo->stageMask & (shaderStageToMask(ShaderStageCompute) -1)) != 0;
     if (isGraphics)
     {
         // Build graphics pipeline
@@ -1020,7 +1020,7 @@ static Result checkAutoLayoutCompatibleFunc(
                 checkAutoLayoutCompatible = false;
             const ShaderModuleBuildOut* shaderOut  = &(compileInfo->shaderModuleDatas[i].shaderOut);
 
-            if (shaderInfo->pEntryTarget == nullptr)
+            if (!shaderInfo->pEntryTarget )
             {
                 // If entry target is not specified, use the one from command line option
                 shaderInfo->pEntryTarget = EntryTarget.c_str();
@@ -1053,7 +1053,7 @@ static Result checkAutoLayoutCompatibleFunc(
         PipelineShaderInfo*         shaderInfo = &pipelineInfo->cs;
         const ShaderModuleBuildOut* shaderOut  = &compileInfo->shaderModuleDatas[0].shaderOut;
 
-        if (shaderInfo->pEntryTarget == nullptr)
+        if (!shaderInfo->pEntryTarget )
         {
             // If entry target is not specified, use the one from command line option
             shaderInfo->pEntryTarget = EntryTarget.c_str();
@@ -1090,7 +1090,7 @@ static Result buildPipeline(
 {
     Result result = Result::Success;
 
-    bool isGraphics = (compileInfo->stageMask & (shaderStageToMask(ShaderStageCompute) -1)) ? true : false;
+    bool isGraphics = (compileInfo->stageMask & (shaderStageToMask(ShaderStageCompute) -1)) != 0;
     if (isGraphics)
     {
         // Build graphics pipeline
@@ -1114,7 +1114,7 @@ static Result buildPipeline(
             PipelineShaderInfo*         shaderInfo = shaderInfos[compileInfo->shaderModuleDatas[i].shaderStage];
             const ShaderModuleBuildOut* shaderOut  = &(compileInfo->shaderModuleDatas[i].shaderOut);
 
-            if (shaderInfo->pEntryTarget == nullptr)
+            if (!shaderInfo->pEntryTarget )
             {
                 // If entry target is not specified, use the one from command line option
                 shaderInfo->pEntryTarget = EntryTarget.c_str();
@@ -1195,7 +1195,7 @@ static Result buildPipeline(
         PipelineShaderInfo*         shaderInfo = &pipelineInfo->cs;
         const ShaderModuleBuildOut* shaderOut  = &compileInfo->shaderModuleDatas[0].shaderOut;
 
-        if (shaderInfo->pEntryTarget == nullptr)
+        if (!shaderInfo->pEntryTarget )
         {
             // If entry target is not specified, use the one from command line option
             shaderInfo->pEntryTarget = EntryTarget.c_str();
@@ -1298,7 +1298,7 @@ static Result outputElf(
     if (outFileName != "-")
         outFile = fopen(outFileName.c_str(), "wb");
 
-    if (outFile == nullptr)
+    if (!outFile )
     {
         LLPC_ERRS("Failed to open output file: " << outFileName << "\n");
         result = Result::ErrorUnavailable;
@@ -1391,7 +1391,7 @@ static Result processPipeline(
 
                 if (result == Result::Success)
                 {
-                    if (InitSpvGen() == false)
+                    if (!InitSpvGen())
                     {
                         LLPC_OUTS("Failed to load SPVGEN -- no SPIR-V disassembler available\n");
                     }
@@ -1400,7 +1400,7 @@ static Result processPipeline(
                         // Disassemble SPIR-V code
                         unsigned textSize = spvBin.codeSize * 10 + 1024;
                         char* spvText = new char[textSize];
-                        assert(spvText != nullptr);
+                        assert(spvText );
                         memset(spvText, 0, textSize);
 
                         LLPC_OUTS("\nSPIR-V disassembly for " << inFile << "\n");
@@ -1415,11 +1415,11 @@ static Result processPipeline(
             if ((result == Result::Success) && Validate)
             {
                 char log[1024] = {};
-                if (InitSpvGen() == false)
+                if (!InitSpvGen())
                     errs() << "Warning: Failed to load SPVGEN -- cannot validate SPIR-V\n";
                 else
                 {
-                    if (spvValidateSpirv(spvBin.codeSize, spvBin.pCode, sizeof(log), log) == false)
+                    if (!spvValidateSpirv(spvBin.codeSize, spvBin.pCode, sizeof(log), log))
                     {
                         LLPC_ERRS("Fails to validate SPIR-V: \n" << log << "\n");
                         result = Result::ErrorInvalidShader;
@@ -1489,7 +1489,7 @@ static Result processPipeline(
                     LLPC_OUTS("===============================================================================\n");
                     LLPC_OUTS("// Pipeline file info for " << inFile << " \n\n");
 
-                    if ((log != nullptr) && (strlen(log) > 0))
+                    if ((log ) && (strlen(log) > 0))
                     {
                         LLPC_OUTS("Pipeline file parse warning:\n" << log << "\n");
                     }
@@ -1509,7 +1509,7 @@ static Result processPipeline(
                         }
                     }
 
-                    if (EnableOuts() && (InitSpvGen() == false))
+                    if (EnableOuts() && (!InitSpvGen()))
                     {
                         LLPC_OUTS("Failed to load SPVGEN -- cannot disassemble and validate SPIR-V\n");
                     }
@@ -1526,12 +1526,12 @@ static Result processPipeline(
                             compileInfo.shaderModuleDatas.push_back(shaderModuleData);
                             compileInfo.stageMask |= shaderStageToMask(pipelineState->stages[stage].stage);
 
-                            if (spvDisassembleSpirv != nullptr)
+                            if (spvDisassembleSpirv )
                             {
                                 unsigned binSize =  pipelineState->stages[stage].dataSize;
                                 unsigned textSize = binSize * 10 + 1024;
                                 char* spvText = new char[textSize];
-                                assert(spvText != nullptr);
+                                assert(spvText );
                                 memset(spvText, 0, textSize);
                                 LLPC_OUTS("\nSPIR-V disassembly for " <<
                                           getShaderStageName(pipelineState->stages[stage].stage) << " shader module:\n");
@@ -1542,7 +1542,7 @@ static Result processPipeline(
                         }
                     }
 
-                    bool isGraphics = (compileInfo.stageMask & shaderStageToMask(ShaderStageCompute)) ? false : true;
+                    bool isGraphics = (compileInfo.stageMask & shaderStageToMask(ShaderStageCompute)) == 0;
                     for (unsigned i = 0; i < compileInfo.shaderModuleDatas.size(); ++i)
                     {
                         compileInfo.shaderModuleDatas[i].shaderInfo.options.pipelineOptions = isGraphics ?
@@ -1571,7 +1571,7 @@ static Result processPipeline(
             // Load LLVM IR
             std::unique_ptr<Module> module =
                 parseAssemblyFile(inFile, errDiag, context, nullptr, false);
-            if (module.get() == nullptr)
+            if (!module.get() )
             {
                 std::string errMsg;
                 raw_string_ostream errStream(errMsg);
@@ -1650,7 +1650,7 @@ static Result processPipeline(
         *nextFile = i + 1;
     }
 
-    if ((result == Result::Success) && (compileInfo.checkAutoLayoutCompatible == true))
+    if ((result == Result::Success) && (compileInfo.checkAutoLayoutCompatible))
     {
         compileInfo.fileNames = fileNames.c_str();
         result = checkAutoLayoutCompatibleFunc(compiler, &compileInfo);

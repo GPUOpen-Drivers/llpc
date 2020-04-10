@@ -135,11 +135,11 @@ void* VKAPI_CALL IPipelineDumper::BeginPipelineDump(
     )
 {
     MetroHash::Hash hash = {};
-    if (pipelineInfo.pComputeInfo != nullptr)
+    if (pipelineInfo.pComputeInfo )
         hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo.pComputeInfo, false);
     else
     {
-        assert(pipelineInfo.pGraphicsInfo != nullptr);
+        assert(pipelineInfo.pGraphicsInfo );
         hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo.pGraphicsInfo, false);
     }
 
@@ -253,21 +253,21 @@ std::string PipelineDumper::getPipelineInfoFileName(
 {
     uint64_t        hashCode64 = MetroHash::compact64(hash);
     char            fileName[64] = {};
-    if (pipelineInfo.pComputeInfo != nullptr)
+    if (pipelineInfo.pComputeInfo )
     {
         auto length = snprintf(fileName, 64, "PipelineCs_0x%016" PRIX64, hashCode64);
         (void(length)); // unused
     }
     else
     {
-        assert(pipelineInfo.pGraphicsInfo != nullptr);
+        assert(pipelineInfo.pGraphicsInfo );
         const char* fileNamePrefix = nullptr;
-        if (pipelineInfo.pGraphicsInfo->tes.pModuleData != nullptr &&
-            pipelineInfo.pGraphicsInfo->gs.pModuleData != nullptr)
+        if (pipelineInfo.pGraphicsInfo->tes.pModuleData &&
+            pipelineInfo.pGraphicsInfo->gs.pModuleData )
              fileNamePrefix = "PipelineGsTess";
-        else if (pipelineInfo.pGraphicsInfo->gs.pModuleData != nullptr)
+        else if (pipelineInfo.pGraphicsInfo->gs.pModuleData )
              fileNamePrefix = "PipelineGs";
-        else if (pipelineInfo.pGraphicsInfo->tes.pModuleData != nullptr)
+        else if (pipelineInfo.pGraphicsInfo->tes.pModuleData )
              fileNamePrefix = "PipelineTess";
         else
             fileNamePrefix = "PipelineVsFs";
@@ -300,7 +300,7 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
             disableLog = true;
     }
 
-    if (disableLog == false)
+    if (!disableLog)
     {
         // Filter pipeline type
         dumpFileName = getPipelineInfoFileName(pipelineInfo, hash);
@@ -326,7 +326,7 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
         }
     }
 
-    if (disableLog == false)
+    if (!disableLog)
     {
         bool enableDump = true;
         SDumpMutex.lock();
@@ -388,7 +388,7 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
         SDumpMutex.unlock();
 
         // Dump pipeline input info
-        if (dumpFile != nullptr)
+        if (dumpFile )
         {
             if (pipelineInfo.pComputeInfo)
                 dumpComputePipelineInfo(&dumpFile->dumpFile, dumpOptions->pDumpDir, pipelineInfo.pComputeInfo);
@@ -487,7 +487,7 @@ void PipelineDumper::dumpPipelineShaderInfo(
 
     dumpFile << "[" << getShaderStageAbbreviation(stage) << "Info]\n";
     // Output entry point
-    if (shaderInfo->pEntryTarget != nullptr)
+    if (shaderInfo->pEntryTarget )
          dumpFile << "entryPoint = " << shaderInfo->pEntryTarget << "\n";
 
     // Output specialize info
@@ -592,7 +592,7 @@ void PipelineDumper::DumpSpirvBinary(
 
     // Open dumpfile
     std::ofstream dumpFile(pathName.c_str(), std::ios_base::binary | std::ios_base::out);
-    if (dumpFile.bad() == false)
+    if (!dumpFile.bad())
         dumpFile.write(reinterpret_cast<const char*>(spirvBin->pCode), spirvBin->codeSize);
 }
 
@@ -603,7 +603,7 @@ void PipelineDumper::DumpPipelineBinary(
     GfxIpVersion                     gfxIp,                  // Graphics IP version info
     const BinaryData*                pipelineBin)           // [in] Pipeline binary (ELF)
 {
-    if (dumpFile != nullptr)
+    if (dumpFile )
     {
         ElfReader<Elf64> reader(gfxIp);
         size_t codeSize = pipelineBin->codeSize;
@@ -623,7 +623,7 @@ void PipelineDumper::DumpPipelineBinary(
         }
         dumpFile->binaryIndex++;
         dumpFile->binaryFile.open(binaryFileName.c_str(), std::ostream::out | std::ostream::binary);
-        if (dumpFile->binaryFile.bad() == false)
+        if (!dumpFile->binaryFile.bad())
         {
             dumpFile->binaryFile.write(reinterpret_cast<const char*>(pipelineBin->pCode), pipelineBin->codeSize);
             dumpFile->binaryFile.close();
@@ -637,7 +637,7 @@ void PipelineDumper::DumpPipelineExtraInfo(
     PipelineDumpFile*             dumpFile,               // [in] Directory of pipeline dump
     const std::string*            str)                     // [in] Extra info string
 {
-    if (dumpFile != nullptr)
+    if (dumpFile )
         dumpFile->dumpFile << *str;
 }
 
@@ -784,7 +784,7 @@ void PipelineDumper::dumpGraphicsStateInfo(
             VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT,
             pipelineInfo->pVertexInput->pNext);
 
-        for (unsigned i = 0; divisorState != nullptr && i < divisorState->vertexBindingDivisorCount; ++i)
+        for (unsigned i = 0; divisorState && i < divisorState->vertexBindingDivisorCount; ++i)
         {
             auto divisor = &divisorState->pVertexBindingDivisors[i];
             dumpFile << "divisor[" << i << "].binding = " << divisor->binding << "\n";
@@ -815,7 +815,7 @@ void PipelineDumper::dumpGraphicsPipelineInfo(
     for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage)
     {
         const PipelineShaderInfo* shaderInfo = shaderInfos[stage];
-        if (shaderInfo->pModuleData == nullptr)
+        if (!shaderInfo->pModuleData )
             continue;
         dumpPipelineShaderInfo(shaderInfo, *dumpFile);
     }
@@ -913,7 +913,7 @@ void PipelineDumper::updateHashForVertexInputState(
     const VkPipelineVertexInputStateCreateInfo* vertexInput,  // [in] Vertex input state
     MetroHash64*                                hasher)       // [in,out] Haher to generate hash code
 {
-    if ((vertexInput != nullptr) && (vertexInput->vertexBindingDescriptionCount > 0))
+    if ((vertexInput ) && (vertexInput->vertexBindingDescriptionCount > 0))
     {
         hasher->Update(vertexInput->vertexBindingDescriptionCount);
         hasher->Update(reinterpret_cast<const uint8_t*>(vertexInput->pVertexBindingDescriptions),
@@ -928,7 +928,7 @@ void PipelineDumper::updateHashForVertexInputState(
         auto vertexDivisor = findVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
             VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT,
             vertexInput->pNext);
-        unsigned divisorCount = (vertexDivisor != nullptr) ? vertexDivisor->vertexBindingDivisorCount : 0;
+        unsigned divisorCount = (vertexDivisor ) ? vertexDivisor->vertexBindingDivisorCount : 0;
         hasher->Update(divisorCount);
         if (divisorCount > 0)
         {
@@ -961,16 +961,16 @@ void PipelineDumper::updateHashForNonFragmentState(
     auto nggState = &pipeline->nggState;
     bool enableNgg = nggState->enableNgg;
     bool passthroughMode =
-        (nggState->enableVertexReuse == false) &&
-        (nggState->enableBackfaceCulling == false) &&
-        (nggState->enableFrustumCulling == false) &&
-        (nggState->enableBoxFilterCulling == false) &&
-        (nggState->enableSphereCulling == false) &&
-        (nggState->enableSmallPrimFilter == false) &&
-        (nggState->enableCullDistanceCulling == false);
+        (!nggState->enableVertexReuse) &&
+        (!nggState->enableBackfaceCulling) &&
+        (!nggState->enableFrustumCulling) &&
+        (!nggState->enableBoxFilterCulling) &&
+        (!nggState->enableSphereCulling) &&
+        (!nggState->enableSmallPrimFilter) &&
+        (!nggState->enableCullDistanceCulling);
 
-    bool updateHashFromRs = (isCacheHash == false);
-    updateHashFromRs |= (enableNgg && (passthroughMode == false));
+    bool updateHashFromRs = (!isCacheHash);
+    updateHashFromRs |= (enableNgg && (!passthroughMode));
 
     if (updateHashFromRs)
     {
@@ -1190,7 +1190,7 @@ void PipelineDumper::updateHashForResourceMappingNode(
         }
     case ResourceMappingNodeType::PushConst:
         {
-            if (isRootNode == false)
+            if (!isRootNode)
                 hasher->Update(userDataNode->srdRange);
             break;
         }

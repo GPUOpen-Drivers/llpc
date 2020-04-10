@@ -217,7 +217,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(
                 auto lsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
                 auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessControl);
 
-                if (hsEntryPoint != nullptr)
+                if (hsEntryPoint )
                 {
                     auto lsHsEntryPoint = shaderMerger.generateLsHsEntryPoint(lsEntryPoint, hsEntryPoint);
                     lsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
@@ -229,7 +229,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(
 
             if (enableNgg)
             {
-                if (gsEntryPoint != nullptr)
+                if (gsEntryPoint )
                 {
                     auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageCopyShader);
                     auto primShaderEntryPoint =
@@ -239,7 +239,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(
             }
             else
             {
-                if (gsEntryPoint != nullptr)
+                if (gsEntryPoint )
                 {
                     auto esGsEntryPoint = shaderMerger.generateEsGsEntryPoint(esEntryPoint, gsEntryPoint);
                     esGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
@@ -256,7 +256,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(
                 auto lsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
                 auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessControl);
 
-                if (hsEntryPoint != nullptr)
+                if (hsEntryPoint )
                 {
                     auto lsHsEntryPoint = shaderMerger.generateLsHsEntryPoint(lsEntryPoint, hsEntryPoint);
                     lsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
@@ -268,7 +268,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(
                 // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
                 auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessEval);
 
-                if (esEntryPoint != nullptr)
+                if (esEntryPoint )
                 {
                     auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, nullptr, nullptr);
                     primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
@@ -285,7 +285,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(
 
             if (enableNgg)
             {
-                if (gsEntryPoint != nullptr)
+                if (gsEntryPoint )
                 {
                     auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageCopyShader);
                     auto primShaderEntryPoint =
@@ -295,7 +295,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(
             }
             else
             {
-                if (gsEntryPoint != nullptr)
+                if (gsEntryPoint )
                 {
                     auto esGsEntryPoint = shaderMerger.generateEsGsEntryPoint(esEntryPoint, gsEntryPoint);
                     esGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
@@ -311,7 +311,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(
             {
                 // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
                 auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
-                if (esEntryPoint != nullptr)
+                if (esEntryPoint )
                 {
                     auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, nullptr, nullptr);
                     primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
@@ -330,7 +330,7 @@ void PatchPreparePipelineAbi::setCallingConv(
     CallingConv::ID callingConv)  // Calling convention to set it to
 {
     auto entryPoint = m_pipelineShaders->getEntryPoint(shaderStage);
-    if (entryPoint != nullptr)
+    if (entryPoint )
         entryPoint->setCallingConv(callingConv);
 }
 
@@ -341,7 +341,7 @@ void PatchPreparePipelineAbi::setAbiEntryNames(
 {
     for (auto& func : module)
     {
-        if (func.empty() == false)
+        if (!func.empty())
         {
             auto callingConv = func.getCallingConv();
             const char* entryName = nullptr;

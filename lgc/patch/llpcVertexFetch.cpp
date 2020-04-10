@@ -336,7 +336,7 @@ Value* VertexFetch::run(
     const VertexInputDescription* description = m_pipelineState->findVertexInputDescription(location);
 
     // NOTE: If we could not find vertex input info matching this location, just return undefined value.
-    if (description == nullptr)
+    if (!description )
         return UndefValue::get(inputTy);
 
     auto vbDesc = loadVertexBufferDescriptor(description->binding, insertPos);
@@ -532,7 +532,7 @@ Value* VertexFetch::run(
     {
         // NOTE: If we performs vertex fetch operations twice, we have to coalesce result values of the two
         // fetch operations and generate a combined one.
-        assert((vertexFetches[0] != nullptr) && (vertexFetches[1] != nullptr));
+        assert((vertexFetches[0] ) && (vertexFetches[1] ));
         assert(vertexFetches[0]->getType()->getVectorNumElements() == 4);
 
         unsigned compCount = vertexFetches[1]->getType()->getVectorNumElements();

@@ -102,30 +102,30 @@ VfxPipelineStatePtr PipelineDocument::getDocument()
         gfxPipelineInfo->iaState.topology                = graphicState.topology;
         gfxPipelineInfo->iaState.patchControlPoints      = graphicState.patchControlPoints;
         gfxPipelineInfo->iaState.deviceIndex             = graphicState.deviceIndex;
-        gfxPipelineInfo->iaState.disableVertexReuse      = graphicState.disableVertexReuse ? true : false;
-        gfxPipelineInfo->iaState.switchWinding           = graphicState.switchWinding ? true : false;
-        gfxPipelineInfo->iaState.enableMultiView         = graphicState.enableMultiView ? true : false;
-        gfxPipelineInfo->vpState.depthClipEnable         = graphicState.depthClipEnable ? true : false;
-        gfxPipelineInfo->rsState.rasterizerDiscardEnable = graphicState.rasterizerDiscardEnable ? true : false;
-        gfxPipelineInfo->rsState.perSampleShading        = graphicState.perSampleShading ? true : false;
+        gfxPipelineInfo->iaState.disableVertexReuse      = graphicState.disableVertexReuse != 0;
+        gfxPipelineInfo->iaState.switchWinding           = graphicState.switchWinding != 0;
+        gfxPipelineInfo->iaState.enableMultiView         = graphicState.enableMultiView != 0;
+        gfxPipelineInfo->vpState.depthClipEnable         = graphicState.depthClipEnable != 0;
+        gfxPipelineInfo->rsState.rasterizerDiscardEnable = graphicState.rasterizerDiscardEnable != 0;
+        gfxPipelineInfo->rsState.perSampleShading        = graphicState.perSampleShading != 0;
         gfxPipelineInfo->rsState.numSamples              = graphicState.numSamples;
         gfxPipelineInfo->rsState.samplePatternIdx        = graphicState.samplePatternIdx;
         gfxPipelineInfo->rsState.usrClipPlaneMask        = static_cast<uint8_t>(graphicState.usrClipPlaneMask);
         gfxPipelineInfo->rsState.polygonMode             = graphicState.polygonMode;
         gfxPipelineInfo->rsState.cullMode                = graphicState.cullMode;
         gfxPipelineInfo->rsState.frontFace               = graphicState.frontFace;
-        gfxPipelineInfo->rsState.depthBiasEnable         = graphicState.depthBiasEnable ? true : false;
+        gfxPipelineInfo->rsState.depthBiasEnable         = graphicState.depthBiasEnable != 0;
 
-        gfxPipelineInfo->cbState.alphaToCoverageEnable   = graphicState.alphaToCoverageEnable ? true : false;
-        gfxPipelineInfo->cbState.dualSourceBlendEnable   = graphicState.dualSourceBlendEnable ? true : false;
+        gfxPipelineInfo->cbState.alphaToCoverageEnable   = graphicState.alphaToCoverageEnable != 0;
+        gfxPipelineInfo->cbState.dualSourceBlendEnable   = graphicState.dualSourceBlendEnable != 0;
         for (unsigned i = 0; i < MaxColorTargets; ++i)
         {
             gfxPipelineInfo->cbState.target[i].format = graphicState.colorBuffer[i].format;
             gfxPipelineInfo->cbState.target[i].channelWriteMask =
                 static_cast<uint8_t>(graphicState.colorBuffer[i].channelWriteMask);
-            gfxPipelineInfo->cbState.target[i].blendEnable = graphicState.colorBuffer[i].blendEnable ? true : false;
+            gfxPipelineInfo->cbState.target[i].blendEnable = graphicState.colorBuffer[i].blendEnable != 0;
             gfxPipelineInfo->cbState.target[i].blendSrcAlphaToColor =
-                graphicState.colorBuffer[i].blendSrcAlphaToColor ? true : false;
+                graphicState.colorBuffer[i].blendSrcAlphaToColor != 0;
         }
 
         gfxPipelineInfo->options = graphicState.options;

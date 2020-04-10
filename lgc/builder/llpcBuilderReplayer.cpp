@@ -119,13 +119,13 @@ bool BuilderReplayer::runOnModule(
     for (auto& func : module)
     {
         // Skip non-declarations that are definitely not LLPC intrinsics.
-        if (func.isDeclaration() == false)
+        if (!func.isDeclaration())
             continue;
 
         const MDNode* const funcMeta = func.getMetadata(opcodeMetaKindId);
 
         // Skip builder calls that do not have the correct metadata to identify the opcode.
-        if (funcMeta == nullptr)
+        if (!funcMeta )
         {
             // If the function had the llpc builder call prefix, it means the metadata was not encoded correctly.
             assert(func.getName().startswith(BuilderCallPrefix) == false);
@@ -137,7 +137,7 @@ bool BuilderReplayer::runOnModule(
 
         SmallVector<CallInst*, 8> callsToRemove;
 
-        while (func.use_empty() == false)
+        while (!func.use_empty())
         {
             CallInst* const call = dyn_cast<CallInst>(func.use_begin()->getUser());
 
@@ -188,7 +188,7 @@ void BuilderReplayer::replayCall(
     Value* newValue = processCall(opcode, call);
 
     // Replace uses of the call with the new value, take the name, remove the old call.
-    if (newValue != nullptr)
+    if (newValue )
     {
         LLVM_DEBUG(dbgs() << "  replacing with: " << *newValue << "\n");
         call->replaceAllUsesWith(newValue);

@@ -41,7 +41,7 @@ Value* BuilderImplMatrix::CreateTransposeMatrix(
     Value* const matrix,  // [in] Matrix to transpose.
     const Twine& instName) // [in] Name to give final instruction
 {
-    assert(matrix != nullptr);
+    assert(matrix );
 
     Type* const matrixType = matrix->getType();
     assert(matrixType->isArrayTy());
@@ -149,7 +149,7 @@ Value* BuilderImplMatrix::CreateMatrixTimesVector(
         SmallVector<unsigned, 4> shuffleMask(rowCount, i);
         auto partialResult = CreateShuffleVector(vector, vector, shuffleMask);
         partialResult = CreateFMul(CreateExtractValue(matrix, i), partialResult);
-        if (result != nullptr)
+        if (result )
             result = CreateFAdd(result, partialResult);
         else
             result = partialResult;
@@ -261,7 +261,7 @@ Value* BuilderImplMatrix::determinant(
             result = CreateFSub(result, subdeterminant);
         else
         {
-            if (result == nullptr)
+            if (!result )
                 result = subdeterminant;
             else
                 result = CreateFAdd(result, subdeterminant);

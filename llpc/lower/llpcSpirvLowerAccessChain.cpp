@@ -124,7 +124,7 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::tryToCoalesceChain(
             continue;
         }
         auto pConst = dyn_cast<ConstantExpr>(next);
-        if ((pConst == nullptr) || (pConst->getOpcode() != Instruction::GetElementPtr))
+        if ((!pConst ) || (pConst->getOpcode() != Instruction::GetElementPtr))
             break;
         ptrVal = cast<User>(next);
     }
@@ -140,7 +140,7 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::tryToCoalesceChain(
         {
             ptrVal = chainedInsts.top();
             chainedInsts.pop();
-            if (blockPtr == nullptr)
+            if (!blockPtr )
                 blockPtr = ptrVal->getOperand(0);
             for (unsigned i = startOperand; i != ptrVal->getNumOperands(); ++i)
                 idxs.push_back(ptrVal->getOperand(i));
@@ -150,17 +150,17 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::tryToCoalesceChain(
             startOperand = 2;
 
             auto inst = dyn_cast<GetElementPtrInst>(ptrVal);
-            if (inst != nullptr)
+            if (inst )
                 removedInsts.push(inst);
         }
-        while (chainedInsts.empty() == false);
+        while (!chainedInsts.empty());
 
         // Create the coalesced "getelementptr" instruction (do combining)
         coalescedGetElemPtr = GetElementPtrInst::Create(nullptr, blockPtr, idxs, "", getElemPtr);
         getElemPtr->replaceAllUsesWith(coalescedGetElemPtr);
 
         // Remove dead "getelementptr" instructions where possible.
-        while (removedInsts.empty() == false)
+        while (!removedInsts.empty())
         {
             GetElementPtrInst* inst = removedInsts.top();
             if (inst->user_empty())

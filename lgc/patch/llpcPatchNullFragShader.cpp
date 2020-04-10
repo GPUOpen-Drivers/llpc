@@ -118,7 +118,7 @@ bool PatchNullFragShader::runOnModule(
     const bool hasTes = pipelineState->hasShaderStage(ShaderStageTessEval);
     const bool hasGs = pipelineState->hasShaderStage(ShaderStageGeometry);
     const bool hasFs = pipelineState->hasShaderStage(ShaderStageFragment);
-    if (hasCs || hasFs || ((hasVs == false) && (hasTes == false) && (hasGs == false)))
+    if (hasCs || hasFs || ((!hasVs) && (!hasTes) && (!hasGs)))
     {
         // This is an incomplete graphics pipeline from the amdllpc command-line tool, or a compute pipeline, or a
         // graphics pipeline that already has a fragment shader. A null fragment shader is not required.
