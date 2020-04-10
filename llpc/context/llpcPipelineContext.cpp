@@ -99,12 +99,12 @@ namespace Llpc
 // =====================================================================================================================
 PipelineContext::PipelineContext(
     GfxIpVersion           gfxIp,           // Graphics IP version info
-    MetroHash::Hash*       pPipelineHash,   // [in] Pipeline hash code
-    MetroHash::Hash*       pCacheHash)      // [in] Cache hash code
+    MetroHash::Hash*       pipelineHash,   // [in] Pipeline hash code
+    MetroHash::Hash*       cacheHash)      // [in] Cache hash code
     :
     m_gfxIp(gfxIp),
-    m_pipelineHash(*pPipelineHash),
-    m_cacheHash(*pCacheHash)
+    m_pipelineHash(*pipelineHash),
+    m_cacheHash(*cacheHash)
 {
 
 }
@@ -116,7 +116,7 @@ PipelineContext::~PipelineContext()
 
 // =====================================================================================================================
 // Gets the name string of GPU target according to graphics IP version info.
-void PipelineContext::GetGpuNameString(
+void PipelineContext::getGpuNameString(
     GfxIpVersion  gfxIp,    // Graphics IP version info
     std::string&  gpuName)  // [out] LLVM GPU name
 {
@@ -140,55 +140,55 @@ void PipelineContext::GetGpuNameString(
 
 // =====================================================================================================================
 // Gets the name string of the abbreviation for GPU target according to graphics IP version info.
-const char* PipelineContext::GetGpuNameAbbreviation(
+const char* PipelineContext::getGpuNameAbbreviation(
     GfxIpVersion gfxIp)  // Graphics IP version info
 {
-    const char* pNameAbbr = nullptr;
+    const char* nameAbbr = nullptr;
     switch (gfxIp.major)
     {
     case 6:
-        pNameAbbr = "SI";
+        nameAbbr = "SI";
         break;
     case 7:
-        pNameAbbr = "CI";
+        nameAbbr = "CI";
         break;
     case 8:
-        pNameAbbr = "VI";
+        nameAbbr = "VI";
         break;
     case 9:
-        pNameAbbr = "GFX9";
+        nameAbbr = "GFX9";
         break;
     default:
-        pNameAbbr = "UNKNOWN";
+        nameAbbr = "UNKNOWN";
         break;
     }
 
-    return pNameAbbr;
+    return nameAbbr;
 }
 
 // =====================================================================================================================
 // Gets the hash code of input shader with specified shader stage.
-ShaderHash PipelineContext::GetShaderHashCode(
+ShaderHash PipelineContext::getShaderHashCode(
     ShaderStage stage       // Shader stage
 ) const
 {
-    auto pShaderInfo = GetPipelineShaderInfo(stage);
-    assert(pShaderInfo != nullptr);
+    auto shaderInfo = getPipelineShaderInfo(stage);
+    assert(shaderInfo != nullptr);
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
-    if((pShaderInfo->options.clientHash.upper != 0) &&
-       (pShaderInfo->options.clientHash.lower != 0))
+    if((shaderInfo->options.clientHash.upper != 0) &&
+       (shaderInfo->options.clientHash.lower != 0))
     {
-        return pShaderInfo->options.clientHash;
+        return shaderInfo->options.clientHash;
     }
     else
     {
         ShaderHash hash = {};
-        const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
+        const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo->pModuleData);
 
-        if(pModuleData != nullptr)
+        if(moduleData != nullptr)
         {
-            hash.lower = MetroHash::Compact64(reinterpret_cast<const MetroHash::Hash*>(&pModuleData->hash));
+            hash.lower = MetroHash::compact64(reinterpret_cast<const MetroHash::Hash*>(&moduleData->hash));
             hash.upper = 0;
         }
         return hash;
@@ -203,48 +203,48 @@ ShaderHash PipelineContext::GetShaderHashCode(
 
 // =====================================================================================================================
 // Set pipeline state in Pipeline object for middle-end
-void PipelineContext::SetPipelineState(
-    Pipeline*    pPipeline) const   // [in/out] Middle-end pipeline object
+void PipelineContext::setPipelineState(
+    Pipeline*    pipeline) const   // [in/out] Middle-end pipeline object
 {
     // Give the shader stage mask to the middle-end.
-    unsigned stageMask = GetShaderStageMask();
-    pPipeline->SetShaderStageMask(stageMask);
+    unsigned stageMask = getShaderStageMask();
+    pipeline->setShaderStageMask(stageMask);
 
     // Give the pipeline options to the middle-end.
-    SetOptionsInPipeline(pPipeline);
+    setOptionsInPipeline(pipeline);
 
     // Give the user data nodes to the middle-end.
-    SetUserDataInPipeline(pPipeline);
+    setUserDataInPipeline(pipeline);
 
-    if (IsGraphics())
+    if (isGraphics())
     {
         // Set vertex input descriptions to the middle-end.
-        SetVertexInputDescriptions(pPipeline);
+        setVertexInputDescriptions(pipeline);
 
         // Give the color export state to the middle-end.
-        SetColorExportState(pPipeline);
+        setColorExportState(pipeline);
 
         // Give the graphics pipeline state to the middle-end.
-        SetGraphicsStateInPipeline(pPipeline);
+        setGraphicsStateInPipeline(pipeline);
     }
     else
     {
-        pPipeline->SetDeviceIndex(static_cast<const ComputePipelineBuildInfo*>(GetPipelineBuildInfo())->deviceIndex);
+        pipeline->setDeviceIndex(static_cast<const ComputePipelineBuildInfo*>(getPipelineBuildInfo())->deviceIndex);
     }
 }
 
 // =====================================================================================================================
 // Give the pipeline options to the middle-end.
-void PipelineContext::SetOptionsInPipeline(
-    Pipeline*    pPipeline) const   // [in/out] Middle-end pipeline object
+void PipelineContext::setOptionsInPipeline(
+    Pipeline*    pipeline) const   // [in/out] Middle-end pipeline object
 {
     Options options = {};
-    options.hash[0] = GetPiplineHashCode();
-    options.hash[1] = GetCacheHashCode();
+    options.hash[0] = getPiplineHashCode();
+    options.hash[1] = getCacheHashCode();
 
-    options.includeDisassembly = (cl::EnablePipelineDump || EnableOuts() || GetPipelineOptions()->includeDisassembly);
-    options.reconfigWorkgroupLayout = GetPipelineOptions()->reconfigWorkgroupLayout;
-    options.includeIr = (IncludeLlvmIr || GetPipelineOptions()->includeIr);
+    options.includeDisassembly = (cl::EnablePipelineDump || EnableOuts() || getPipelineOptions()->includeDisassembly);
+    options.reconfigWorkgroupLayout = getPipelineOptions()->reconfigWorkgroupLayout;
+    options.includeIr = (IncludeLlvmIr || getPipelineOptions()->includeIr);
 
     static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Vkgc::ShadowDescriptorTableUsage::Auto) ==
                                                           lgc::ShadowDescriptorTableUsage::Auto, "mismatch");
@@ -253,14 +253,14 @@ void PipelineContext::SetOptionsInPipeline(
     static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Vkgc::ShadowDescriptorTableUsage::Disable) ==
                                                           lgc::ShadowDescriptorTableUsage::Disable, "mismatch");
     options.shadowDescriptorTableUsage =
-          static_cast<lgc::ShadowDescriptorTableUsage>(GetPipelineOptions()->shadowDescriptorTableUsage);
-    options.shadowDescriptorTablePtrHigh = GetPipelineOptions()->shadowDescriptorTablePtrHigh;
+          static_cast<lgc::ShadowDescriptorTableUsage>(getPipelineOptions()->shadowDescriptorTableUsage);
+    options.shadowDescriptorTablePtrHigh = getPipelineOptions()->shadowDescriptorTablePtrHigh;
 
-    if (IsGraphics() && (GetGfxIpVersion().major >= 10))
+    if (isGraphics() && (getGfxIpVersion().major >= 10))
     {
         // Only set NGG options for a GFX10+ graphics pipeline.
-        auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo());
-        const auto& nggState = pPipelineInfo->nggState;
+        auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo());
+        const auto& nggState = pipelineInfo->nggState;
         if (nggState.enableNgg == false)
         {
             options.nggFlags |= NggFlagDisable;
@@ -303,17 +303,17 @@ void PipelineContext::SetOptionsInPipeline(
         }
     }
 
-    pPipeline->SetOptions(options);
+    pipeline->setOptions(options);
 
     // Give the shader options (including the hash) to the middle-end.
-    unsigned stageMask = GetShaderStageMask();
+    unsigned stageMask = getShaderStageMask();
     for (unsigned stage = 0; stage <= ShaderStageCompute; ++stage)
     {
-        if (stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
+        if (stageMask & shaderStageToMask(static_cast<ShaderStage>(stage)))
         {
             ShaderOptions shaderOptions = {};
 
-            ShaderHash hash = GetShaderHashCode(static_cast<ShaderStage>(stage));
+            ShaderHash hash = getShaderHashCode(static_cast<ShaderStage>(stage));
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
             // 128-bit hash
             shaderOptions.hash[0] = hash.lower;
@@ -323,41 +323,41 @@ void PipelineContext::SetOptionsInPipeline(
             shaderOptions.hash[0] = hash;
 #endif
 
-            const PipelineShaderInfo* pShaderInfo = GetPipelineShaderInfo(static_cast<ShaderStage>(stage));
-            shaderOptions.trapPresent = pShaderInfo->options.trapPresent;
-            shaderOptions.debugMode = pShaderInfo->options.debugMode;
-            shaderOptions.allowReZ = pShaderInfo->options.allowReZ;
+            const PipelineShaderInfo* shaderInfo = getPipelineShaderInfo(static_cast<ShaderStage>(stage));
+            shaderOptions.trapPresent = shaderInfo->options.trapPresent;
+            shaderOptions.debugMode = shaderInfo->options.debugMode;
+            shaderOptions.allowReZ = shaderInfo->options.allowReZ;
 
-            if ((pShaderInfo->options.vgprLimit != 0) && (pShaderInfo->options.vgprLimit != UINT_MAX))
+            if ((shaderInfo->options.vgprLimit != 0) && (shaderInfo->options.vgprLimit != UINT_MAX))
             {
-                shaderOptions.vgprLimit = pShaderInfo->options.vgprLimit;
+                shaderOptions.vgprLimit = shaderInfo->options.vgprLimit;
             }
             else
             {
                 shaderOptions.vgprLimit = VgprLimit;
             }
 
-            if ((pShaderInfo->options.sgprLimit != 0) && (pShaderInfo->options.sgprLimit != UINT_MAX))
+            if ((shaderInfo->options.sgprLimit != 0) && (shaderInfo->options.sgprLimit != UINT_MAX))
             {
-                shaderOptions.sgprLimit = pShaderInfo->options.sgprLimit;
+                shaderOptions.sgprLimit = shaderInfo->options.sgprLimit;
             }
             else
             {
                 shaderOptions.sgprLimit = SgprLimit;
             }
 
-            if (pShaderInfo->options.maxThreadGroupsPerComputeUnit != 0)
+            if (shaderInfo->options.maxThreadGroupsPerComputeUnit != 0)
             {
-                shaderOptions.maxThreadGroupsPerComputeUnit = pShaderInfo->options.maxThreadGroupsPerComputeUnit;
+                shaderOptions.maxThreadGroupsPerComputeUnit = shaderInfo->options.maxThreadGroupsPerComputeUnit;
             }
             else
             {
                 shaderOptions.maxThreadGroupsPerComputeUnit = WavesPerEu;
             }
 
-            shaderOptions.waveSize = pShaderInfo->options.waveSize;
-            shaderOptions.wgpMode = pShaderInfo->options.wgpMode;
-            if (pShaderInfo->options.allowVaryWaveSize == false)
+            shaderOptions.waveSize = shaderInfo->options.waveSize;
+            shaderOptions.wgpMode = shaderInfo->options.wgpMode;
+            if (shaderInfo->options.allowVaryWaveSize == false)
             {
                 // allowVaryWaveSize is disabled, so use -subgroup-size (default 64) to override the wave
                 // size for a shader that uses gl_SubgroupSize.
@@ -371,7 +371,7 @@ void PipelineContext::SetOptionsInPipeline(
             static_assert(static_cast<WaveBreak>(WaveBreakSize::_16x16) == WaveBreak::_16x16, "mismatch");
             static_assert(static_cast<WaveBreak>(WaveBreakSize::_32x32) == WaveBreak::_32x32, "mismatch");
             static_assert(static_cast<WaveBreak>(WaveBreakSize::DrawTime) == WaveBreak::DrawTime, "mismatch");
-            shaderOptions.waveBreakSize = static_cast<WaveBreak>(pShaderInfo->options.waveBreakSize);
+            shaderOptions.waveBreakSize = static_cast<WaveBreak>(shaderInfo->options.waveBreakSize);
 
             shaderOptions.loadScalarizerThreshold = 0;
             if (EnableScalarLoad)
@@ -379,11 +379,11 @@ void PipelineContext::SetOptionsInPipeline(
                 shaderOptions.loadScalarizerThreshold = ScalarThreshold;
             }
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-            if (pShaderInfo->options.enableLoadScalarizer)
+            if (shaderInfo->options.enableLoadScalarizer)
             {
-                if (pShaderInfo->options.scalarThreshold != 0)
+                if (shaderInfo->options.scalarThreshold != 0)
                 {
-                    shaderOptions.loadScalarizerThreshold = pShaderInfo->options.scalarThreshold;
+                    shaderOptions.loadScalarizerThreshold = shaderInfo->options.scalarThreshold;
                 }
                 else
                 {
@@ -392,11 +392,11 @@ void PipelineContext::SetOptionsInPipeline(
             }
 #endif
 
-            shaderOptions.useSiScheduler = EnableSiScheduler || pShaderInfo->options.useSiScheduler;
-            shaderOptions.updateDescInElf = pShaderInfo->options.updateDescInElf;
-            shaderOptions.unrollThreshold = pShaderInfo->options.unrollThreshold;
+            shaderOptions.useSiScheduler = EnableSiScheduler || shaderInfo->options.useSiScheduler;
+            shaderOptions.updateDescInElf = shaderInfo->options.updateDescInElf;
+            shaderOptions.unrollThreshold = shaderInfo->options.unrollThreshold;
 
-            pPipeline->SetShaderOptions(GetLgcShaderStage(static_cast<ShaderStage>(stage)), shaderOptions);
+            pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), shaderOptions);
         }
     }
 }
@@ -405,19 +405,19 @@ void PipelineContext::SetOptionsInPipeline(
 // Give the user data nodes and descriptor range values to the middle-end.
 // The user data nodes have been merged so they are the same in each shader stage. Get them from
 // the first active stage.
-void PipelineContext::SetUserDataInPipeline(
-    Pipeline*    pPipeline) const   // [in/out] Middle-end pipeline object
+void PipelineContext::setUserDataInPipeline(
+    Pipeline*    pipeline) const   // [in/out] Middle-end pipeline object
 {
-    const PipelineShaderInfo* pShaderInfo = nullptr;
-    unsigned stageMask = GetShaderStageMask();
+    const PipelineShaderInfo* shaderInfo = nullptr;
+    unsigned stageMask = getShaderStageMask();
     {
-        pShaderInfo = GetPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
+        shaderInfo = getPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
     }
 
     // Translate the resource nodes into the LGC format expected by Pipeline::SetUserDataNodes.
-    ArrayRef<ResourceMappingNode> nodes(pShaderInfo->pUserDataNodes, pShaderInfo->userDataNodeCount);
-    ArrayRef<DescriptorRangeValue> descriptorRangeValues(pShaderInfo->pDescriptorRangeValues,
-                                                         pShaderInfo->descriptorRangeValueCount);
+    ArrayRef<ResourceMappingNode> nodes(shaderInfo->pUserDataNodes, shaderInfo->userDataNodeCount);
+    ArrayRef<DescriptorRangeValue> descriptorRangeValues(shaderInfo->pDescriptorRangeValues,
+                                                         shaderInfo->descriptorRangeValueCount);
 
     // First, create a map of immutable nodes.
     ImmutableNodesMap immutableNodesMap;
@@ -438,30 +438,30 @@ void PipelineContext::SetUserDataInPipeline(
     auto allocUserDataNodes = std::make_unique<ResourceNode[]>(nodeCount);
 
     // Copy nodes in.
-    ResourceNode* pDestTable = allocUserDataNodes.get();
-    ResourceNode* pDestInnerTable = pDestTable + nodeCount;
-    auto userDataNodes = ArrayRef<ResourceNode>(pDestTable, nodes.size());
-    SetUserDataNodesTable(pPipeline->GetContext(), nodes, immutableNodesMap, pDestTable, pDestInnerTable);
-    assert(pDestInnerTable == pDestTable + nodes.size());
+    ResourceNode* destTable = allocUserDataNodes.get();
+    ResourceNode* destInnerTable = destTable + nodeCount;
+    auto userDataNodes = ArrayRef<ResourceNode>(destTable, nodes.size());
+    setUserDataNodesTable(pipeline->getContext(), nodes, immutableNodesMap, destTable, destInnerTable);
+    assert(destInnerTable == destTable + nodes.size());
 
     // Give the table to the LGC Pipeline interface.
-    pPipeline->SetUserDataNodes(userDataNodes);
+    pipeline->setUserDataNodes(userDataNodes);
 }
 
 // =====================================================================================================================
 // Set one user data table, and its inner tables. Used by SetUserDataInPipeline above, and recursively calls
 // itself for an inner table. This translates from a Vkgc ResourceMappingNode to an LGC ResourceNode.
-void PipelineContext::SetUserDataNodesTable(
+void PipelineContext::setUserDataNodesTable(
     LLVMContext&                  context,                // LLVM context
     ArrayRef<ResourceMappingNode> nodes,                  // The resource mapping nodes
     const ImmutableNodesMap&      immutableNodesMap,      // [in] Map of immutable nodes
-    ResourceNode*                 pDestTable,             // [out] Where to write nodes
-    ResourceNode*&                pDestInnerTable) const  // [in/out] End of space available for inner tables
+    ResourceNode*                 destTable,             // [out] Where to write nodes
+    ResourceNode*&                destInnerTable) const  // [in/out] End of space available for inner tables
 {
     for (unsigned idx = 0; idx != nodes.size(); ++idx)
     {
         auto& node = nodes[idx];
-        auto& destNode = pDestTable[idx];
+        auto& destNode = destTable[idx];
 
         destNode.sizeInDwords = node.sizeInDwords;
         destNode.offsetInDwords = node.offsetInDwords;
@@ -472,13 +472,13 @@ void PipelineContext::SetUserDataNodesTable(
             {
                 // Process an inner table.
                 destNode.type = ResourceNodeType::DescriptorTableVaPtr;
-                pDestInnerTable -= node.tablePtr.nodeCount;
-                destNode.innerTable = ArrayRef<ResourceNode>(pDestInnerTable, node.tablePtr.nodeCount);
-                SetUserDataNodesTable(context,
+                destInnerTable -= node.tablePtr.nodeCount;
+                destNode.innerTable = ArrayRef<ResourceNode>(destInnerTable, node.tablePtr.nodeCount);
+                setUserDataNodesTable(context,
                                       ArrayRef<ResourceMappingNode>(node.tablePtr.pNext, node.tablePtr.nodeCount),
                                       immutableNodesMap,
-                                      pDestInnerTable,
-                                      pDestInnerTable);
+                                      destInnerTable,
+                                      destInnerTable);
                 break;
             }
         case ResourceMappingNodeType::IndirectUserDataVaPtr:
@@ -535,7 +535,7 @@ void PipelineContext::SetUserDataNodesTable(
 
                 destNode.set = node.srdRange.set;
                 destNode.binding = node.srdRange.binding;
-                destNode.pImmutableValue = nullptr;
+                destNode.immutableValue = nullptr;
 
                 auto it = immutableNodesMap.find(std::pair<unsigned, unsigned>(destNode.set, destNode.binding));
                 if (it != immutableNodesMap.end())
@@ -566,7 +566,7 @@ void PipelineContext::SetUserDataNodesTable(
                             }
                             values.push_back(ConstantVector::get(compValues));
                         }
-                        destNode.pImmutableValue = ConstantArray::get(ArrayType::get(values[0]->getType(),
+                        destNode.immutableValue = ConstantArray::get(ArrayType::get(values[0]->getType(),
                                                                                      values.size()),
                                                                       values);
                     }
@@ -579,12 +579,12 @@ void PipelineContext::SetUserDataNodesTable(
 
 // =====================================================================================================================
 // Give the graphics pipeline state to the middle-end.
-void PipelineContext::SetGraphicsStateInPipeline(
-    Pipeline*    pPipeline   // [in/out] Middle-end pipeline object
+void PipelineContext::setGraphicsStateInPipeline(
+    Pipeline*    pipeline   // [in/out] Middle-end pipeline object
 ) const
 {
-    const auto& inputIaState = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo())->iaState;
-    pPipeline->SetDeviceIndex(inputIaState.deviceIndex);
+    const auto& inputIaState = static_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo())->iaState;
+    pipeline->setDeviceIndex(inputIaState.deviceIndex);
 
     InputAssemblyState inputAssemblyState = {};
     // PrimitiveTopology happens to have the same values as the corresponding Vulkan enum.
@@ -594,11 +594,11 @@ void PipelineContext::SetGraphicsStateInPipeline(
     inputAssemblyState.switchWinding = inputIaState.switchWinding;
     inputAssemblyState.enableMultiView = inputIaState.enableMultiView;
 
-    const auto& inputVpState = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo())->vpState;
+    const auto& inputVpState = static_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo())->vpState;
     ViewportState viewportState = {};
     viewportState.depthClipEnable = inputVpState.depthClipEnable;
 
-    const auto& inputRsState = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo())->rsState;
+    const auto& inputRsState = static_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo())->rsState;
     RasterizerState rasterizerState = {};
     rasterizerState.rasterizerDiscardEnable = inputRsState.rasterizerDiscardEnable;
     rasterizerState.innerCoverage = inputRsState.innerCoverage;
@@ -612,34 +612,34 @@ void PipelineContext::SetGraphicsStateInPipeline(
     rasterizerState.frontFaceClockwise = (inputRsState.frontFace != VK_FRONT_FACE_COUNTER_CLOCKWISE);
     rasterizerState.depthBiasEnable = inputRsState.depthBiasEnable;
 
-    pPipeline->SetGraphicsState(inputAssemblyState, viewportState, rasterizerState);
+    pipeline->setGraphicsState(inputAssemblyState, viewportState, rasterizerState);
 }
 
 // =====================================================================================================================
 // Set vertex input descriptions in middle-end Pipeline object
-void PipelineContext::SetVertexInputDescriptions(
-    Pipeline*   pPipeline   // [in] Pipeline object
+void PipelineContext::setVertexInputDescriptions(
+    Pipeline*   pipeline   // [in] Pipeline object
 ) const
 {
-    auto pVertexInput = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo())->pVertexInput;
-    if (pVertexInput == nullptr)
+    auto vertexInput = static_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo())->pVertexInput;
+    if (vertexInput == nullptr)
     {
         return;
     }
 
     // Gather the bindings.
     SmallVector<VertexInputDescription, 8> bindings;
-    for (unsigned i = 0; i < pVertexInput->vertexBindingDescriptionCount; ++i)
+    for (unsigned i = 0; i < vertexInput->vertexBindingDescriptionCount; ++i)
     {
-        auto pBinding = &pVertexInput->pVertexBindingDescriptions[i];
-        unsigned idx = pBinding->binding;
+        auto binding = &vertexInput->pVertexBindingDescriptions[i];
+        unsigned idx = binding->binding;
         if (idx >= bindings.size())
         {
             bindings.resize(idx + 1);
         }
-        bindings[idx].binding = pBinding->binding;
-        bindings[idx].stride = pBinding->stride;
-        switch (pBinding->inputRate)
+        bindings[idx].binding = binding->binding;
+        bindings[idx].stride = binding->stride;
+        switch (binding->inputRate)
         {
         case VK_VERTEX_INPUT_RATE_VERTEX:
             bindings[idx].inputRate = VertexInputRateVertex;
@@ -653,65 +653,65 @@ void PipelineContext::SetVertexInputDescriptions(
     }
 
     // Check for divisors.
-    auto pVertexDivisor = FindVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
+    auto vertexDivisor = findVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT,
-        pVertexInput->pNext);
-    if (pVertexDivisor)
+        vertexInput->pNext);
+    if (vertexDivisor)
     {
-        for (unsigned i = 0;i < pVertexDivisor->vertexBindingDivisorCount; ++i)
+        for (unsigned i = 0;i < vertexDivisor->vertexBindingDivisorCount; ++i)
         {
-            auto pDivisor = &pVertexDivisor->pVertexBindingDivisors[i];
-            if (pDivisor->binding <= bindings.size())
+            auto divisor = &vertexDivisor->pVertexBindingDivisors[i];
+            if (divisor->binding <= bindings.size())
             {
-                bindings[pDivisor->binding].inputRate = pDivisor->divisor;
+                bindings[divisor->binding].inputRate = divisor->divisor;
             }
         }
     }
 
     // Gather the vertex inputs.
     SmallVector<VertexInputDescription, 8> descriptions;
-    for (unsigned i = 0; i < pVertexInput->vertexAttributeDescriptionCount; ++i)
+    for (unsigned i = 0; i < vertexInput->vertexAttributeDescriptionCount; ++i)
     {
-        auto pAttrib = &pVertexInput->pVertexAttributeDescriptions[i];
-        if (pAttrib->binding >= bindings.size())
+        auto attrib = &vertexInput->pVertexAttributeDescriptions[i];
+        if (attrib->binding >= bindings.size())
         {
             continue;
         }
-        auto pBinding = &bindings[pAttrib->binding];
-        if (pBinding->binding != pAttrib->binding)
+        auto binding = &bindings[attrib->binding];
+        if (binding->binding != attrib->binding)
         {
             continue;
         }
 
         auto dfmt = BufDataFormatInvalid;
         auto nfmt = BufNumFormatUnorm;
-        std::tie(dfmt, nfmt) = MapVkFormat(pAttrib->format, /*isColorExport=*/false);
+        std::tie(dfmt, nfmt) = mapVkFormat(attrib->format, /*isColorExport=*/false);
 
         if (dfmt != BufDataFormatInvalid)
         {
             descriptions.push_back({
-                                      pAttrib->location,
-                                      pAttrib->binding,
-                                      pAttrib->offset,
-                                      pBinding->stride,
+                                      attrib->location,
+                                      attrib->binding,
+                                      attrib->offset,
+                                      binding->stride,
                                       dfmt,
                                       nfmt,
-                                      pBinding->inputRate,
+                                      binding->inputRate,
                                    });
         }
     }
 
     // Give the vertex input descriptions to the middle-end Pipeline object.
-    pPipeline->SetVertexInputDescriptions(descriptions);
+    pipeline->setVertexInputDescriptions(descriptions);
 }
 
 // =====================================================================================================================
 // Set color export state in middle-end Pipeline object
-void PipelineContext::SetColorExportState(
-    Pipeline*          pPipeline   // [in] Pipeline object
+void PipelineContext::setColorExportState(
+    Pipeline*          pipeline   // [in] Pipeline object
 ) const
 {
-    const auto& cbState = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo())->cbState;
+    const auto& cbState = static_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo())->cbState;
     ColorExportState state = {};
     SmallVector<ColorExportFormat, MaxColorTargets> formats;
 
@@ -724,7 +724,7 @@ void PipelineContext::SetColorExportState(
         {
             auto dfmt = BufDataFormatInvalid;
             auto nfmt = BufNumFormatUnorm;
-            std::tie(dfmt, nfmt) = MapVkFormat(cbState.target[targetIndex].format, true);
+            std::tie(dfmt, nfmt) = mapVkFormat(cbState.target[targetIndex].format, true);
             formats.resize(targetIndex + 1);
             formats[targetIndex].dfmt = dfmt;
             formats[targetIndex].nfmt = nfmt;
@@ -733,13 +733,13 @@ void PipelineContext::SetColorExportState(
         }
     }
 
-    pPipeline->SetColorExportState(formats, state);
+    pipeline->setColorExportState(formats, state);
 }
 
 // =====================================================================================================================
 // Map a VkFormat to a {BufDataFormat, BufNumFormat}. Returns BufDataFormatInvalid if the
 // VkFormat is not supported for vertex input.
-std::pair<BufDataFormat, BufNumFormat> PipelineContext::MapVkFormat(
+std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(
     VkFormat  format,         // Vulkan API format code
     bool      isColorExport)  // True for looking up color export format, false for vertex input format
 {
@@ -753,7 +753,7 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::MapVkFormat(
         unsigned       validVertexFormat :1;
         unsigned       validExportFormat  :1;
     }
-    formatTable[] =
+    FormatTable[] =
     {
 #ifndef NDEBUG
 #define INVALID_FORMAT_ENTRY(format) \
@@ -957,14 +957,14 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::MapVkFormat(
 
     BufDataFormat dfmt = BufDataFormatInvalid;
     BufNumFormat nfmt = BufNumFormatUnorm;
-    if (format < ArrayRef<FormatEntry>(formatTable).size())
+    if (format < ArrayRef<FormatEntry>(FormatTable).size())
     {
-        assert(format == formatTable[format].format);
-        if ((isColorExport && formatTable[format].validExportFormat) ||
-            ((isColorExport == false) && formatTable[format].validVertexFormat))
+        assert(format == FormatTable[format].format);
+        if ((isColorExport && FormatTable[format].validExportFormat) ||
+            ((isColorExport == false) && FormatTable[format].validVertexFormat))
         {
-            dfmt = formatTable[format].dfmt;
-            nfmt = formatTable[format].nfmt;
+            dfmt = FormatTable[format].dfmt;
+            nfmt = FormatTable[format].nfmt;
         }
     }
     return { dfmt, nfmt };

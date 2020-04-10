@@ -216,7 +216,7 @@ struct ResourceNode
         {
             unsigned            set;                  // Descriptor set
             unsigned            binding;              // Binding
-            llvm::Constant*           pImmutableValue;      // Array of vectors of i32 constants for immutable value
+            llvm::Constant*           immutableValue;      // Array of vectors of i32 constants for immutable value
         };
 
         // Info for DescriptorTableVaPtr
@@ -234,7 +234,7 @@ struct ImmutableDescriptor
     unsigned                set;        ///< ID of descriptor set
     unsigned                binding;    ///< ID of descriptor binding
     unsigned                arraySize;  ///< Element count for arrayed binding
-    const unsigned*         pValue;     ///< Static SRDs
+    const unsigned*         value;     ///< Static SRDs
 };
 
 // =====================================================================================================================
@@ -544,30 +544,30 @@ struct ComputeShaderMode
 class Pipeline
 {
 public:
-    Pipeline(BuilderContext* pBuilderContext)
-        : m_pBuilderContext(pBuilderContext)
+    Pipeline(BuilderContext* builderContext)
+        : m_builderContext(builderContext)
     {}
 
     virtual ~Pipeline() {}
 
     // Get BuilderContext
-    BuilderContext* GetBuilderContext() const { return m_pBuilderContext; }
+    BuilderContext* getBuilderContext() const { return m_builderContext; }
 
     // Get LLVMContext
-    llvm::LLVMContext& GetContext() const;
+    llvm::LLVMContext& getContext() const;
 
     // -----------------------------------------------------------------------------------------------------------------
     // State setting methods
 
     // Set the shader stage mask
-    virtual void SetShaderStageMask(unsigned mask) = 0;
+    virtual void setShaderStageMask(unsigned mask) = 0;
 
     // Set and get per-pipeline options
-    virtual void SetOptions(const Options& options) = 0;
-    virtual const Options& GetOptions() = 0;
+    virtual void setOptions(const Options& options) = 0;
+    virtual const Options& getOptions() = 0;
 
     // Set per-shader options
-    virtual void SetShaderOptions(ShaderStage stage, const ShaderOptions& options) = 0;
+    virtual void setShaderOptions(ShaderStage stage, const ShaderOptions& options) = 0;
 
     // Set the resource mapping nodes for the pipeline. "nodes" describes the user data
     // supplied to the shader as a hierarchical table (max two levels) of descriptors.
@@ -577,27 +577,27 @@ public:
     //
     // If using a BuilderImpl, this method must be called before any Create* methods.
     // If using a BuilderRecorder, it can be delayed until after linking.
-    virtual void SetUserDataNodes(
+    virtual void setUserDataNodes(
         llvm::ArrayRef<ResourceNode>          nodes) = 0;       // The resource mapping nodes. Only used for the duration
                                                           //  of the call; the call copies the nodes.
 
     // Set device index.
-    virtual void SetDeviceIndex(unsigned deviceIndex) = 0;
+    virtual void setDeviceIndex(unsigned deviceIndex) = 0;
 
     // Set vertex input descriptions. Each location referenced in a call to CreateReadGenericInput in the
     // vertex shader must have a corresponding description provided here.
-    virtual void SetVertexInputDescriptions(llvm::ArrayRef<VertexInputDescription> inputs) = 0;
+    virtual void setVertexInputDescriptions(llvm::ArrayRef<VertexInputDescription> inputs) = 0;
 
     // Set color export state.
     // The client should always zero-initialize the ColorExportState struct before setting it up, in case future
     // versions add more fields. A local struct variable can be zero-initialized with " = {}".
-    virtual void SetColorExportState(
+    virtual void setColorExportState(
         llvm::ArrayRef<ColorExportFormat> formats,          // Array of ColorExportFormat structs
         const ColorExportState&     exportState) = 0; // [in] Color export flags
 
     // Set graphics state (input-assembly, viewport, rasterizer).
     // The front-end should zero-initialize each struct with "= {}" in case future changes add new fields.
-    virtual void SetGraphicsState(const InputAssemblyState& iaState,
+    virtual void setGraphicsState(const InputAssemblyState& iaState,
                                   const ViewportState&      vpState,
                                   const RasterizerState&    rsState) = 0;
 
@@ -611,7 +611,7 @@ public:
     // Before calling this, each shader module needs to have one global function for the shader
     // entrypoint, then all other functions with internal linkage.
     // Returns the pipeline module, or nullptr on link failure.
-    virtual llvm::Module* Link(
+    virtual llvm::Module* link(
         llvm::ArrayRef<llvm::Module*> modules) = 0; // Array of modules indexed by shader stage, with nullptr entry
                                         //  for any stage not present in the pipeline
 
@@ -619,7 +619,7 @@ public:
     // Returns the updated shader stage mask, allowing the client to decide not to compile shader stages
     // that got a hit in the cache.
     typedef std::function<unsigned(
-        const llvm::Module*               pModule,      // [in] Module
+        const llvm::Module*               module,      // [in] Module
         unsigned                    stageMask,    // Shader stage mask
         llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes   // Per-stage hash of in/out usage
     )> CheckShaderCacheFunc;
@@ -629,7 +629,7 @@ public:
     // Output is written to outStream.
     // Like other Builder methods, on error, this calls report_fatal_error, which you can catch by setting
     // a diagnostic handler with LLVMContext::setDiagnosticHandler.
-    virtual void Generate(
+    virtual void generate(
         std::unique_ptr<llvm::Module>   pipelineModule,       // IR pipeline module
         llvm::raw_pwrite_stream&        outStream,            // [in/out] Stream to write ELF or IR disassembly output
         CheckShaderCacheFunc      checkShaderCacheFunc, // Function to check shader cache in graphics pipeline
@@ -641,10 +641,10 @@ public:
     // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
     // type. Only the number of elements of the type is significant.
     // This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.
-    virtual unsigned ComputeExportFormat(llvm::Type* pOutputTy, unsigned location) = 0;
+    virtual unsigned computeExportFormat(llvm::Type* outputTy, unsigned location) = 0;
 
 private:
-    BuilderContext*                 m_pBuilderContext;                  // Builder context
+    BuilderContext*                 m_builderContext;                  // Builder context
 };
 
 } // lgc

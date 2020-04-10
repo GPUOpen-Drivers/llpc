@@ -41,15 +41,15 @@ namespace Vkgc
 
 // =====================================================================================================================
 // Gets name string of the abbreviation for the specified shader stage
-const char* GetShaderStageAbbreviation(
+const char* getShaderStageAbbreviation(
     ShaderStage shaderStage,  // Shader stage
     bool        upper)        // Whether to use uppercase for the abbreviation (default is lowercase)
 {
-    const char* pAbbr = nullptr;
+    const char* abbr = nullptr;
 
     if (shaderStage == ShaderStageCopyShader)
     {
-        pAbbr = upper ? "COPY" : "Copy";
+        abbr = upper ? "COPY" : "Copy";
     }
     else if (shaderStage < ShaderStageCount)
     {
@@ -65,7 +65,7 @@ const char* GetShaderStageAbbreviation(
                 "CS",
             };
 
-            pAbbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
+            abbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
         }
         else
         {
@@ -79,20 +79,20 @@ const char* GetShaderStageAbbreviation(
                 "Cs",
             };
 
-            pAbbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
+            abbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
         }
     }
     else
     {
-        pAbbr = "Bad";
+        abbr = "Bad";
     }
 
-    return pAbbr;
+    return abbr;
 }
 
 // =====================================================================================================================
 // Create directory.
-bool CreateDirectory(
+bool createDirectory(
     const char* dir)  // [in] the path of directory
 {
     int result = mkdir(dir, S_IRWXU);
@@ -106,7 +106,7 @@ bool CreateDirectory(
 
 // =====================================================================================================================
 // Translate enum "ResourceMappingNodeType" to string
-const char* GetResourceMappingNodeTypeName(
+const char* getResourceMappingNodeTypeName(
     ResourceMappingNodeType type)  // Resource map node type
 {
     const char* string = nullptr;

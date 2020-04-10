@@ -68,7 +68,7 @@ public:
     // allowed to call it again after that. It must also be called before LLVM command-line processing, so
     // that you can use a pass name in an option such as -print-after. If multiple concurrent compiles are
     // possible, this should be called in a thread-safe way.
-    static void Initialize();
+    static void initialize();
 
     // Create the BuilderContext. Returns nullptr on failure to recognize the AMDGPU target whose name is specified
     static BuilderContext* Create(
@@ -79,47 +79,47 @@ public:
     ~BuilderContext();
 
     // Get LLVM context
-    llvm::LLVMContext& GetContext() const { return m_context; }
+    llvm::LLVMContext& getContext() const { return m_context; }
 
     // Get the target machine.
-    llvm::TargetMachine* GetTargetMachine() const { return m_pTargetMachine; }
+    llvm::TargetMachine* getTargetMachine() const { return m_targetMachine; }
 
     // Get targetinfo
-    const TargetInfo& GetTargetInfo() const { return *m_pTargetInfo; }
+    const TargetInfo& getTargetInfo() const { return *m_targetInfo; }
 
     // Get the PAL pipeline ABI version to compile for
-    unsigned GetPalAbiVersion() const { return m_palAbiVersion; }
+    unsigned getPalAbiVersion() const { return m_palAbiVersion; }
 
     // Create a Pipeline object for a pipeline compile
-    Pipeline* CreatePipeline();
+    Pipeline* createPipeline();
 
     // Create a Builder object. For a shader compile (pPipelineState is nullptr), useBuilderRecorder is ignored
     // because it always uses BuilderRecorder.
-    Builder* CreateBuilder(
-        Pipeline*  pPipeline,           // [in] Pipeline object for pipeline compile, nullptr for shader compile
+    Builder* createBuilder(
+        Pipeline*  pipeline,           // [in] Pipeline object for pipeline compile, nullptr for shader compile
         bool       useBuilderRecorder); // True to use BuilderRecorder, false to use BuilderImpl
 
     // Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not
     // think that we have library functions.
-    void PreparePassManager(
-        llvm::legacy::PassManager*  pPassMgr);  // [in/out] Pass manager
+    void preparePassManager(
+        llvm::legacy::PassManager*  passMgr);  // [in/out] Pass manager
 
     // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
-    void AddTargetPasses(lgc::PassManager& passMgr, llvm::Timer* pCodeGenTimer, llvm::raw_pwrite_stream& outStream);
+    void addTargetPasses(lgc::PassManager& passMgr, llvm::Timer* codeGenTimer, llvm::raw_pwrite_stream& outStream);
 
-    void SetBuildRelocatableElf(bool buildRelocatableElf) { m_buildRelocatableElf = buildRelocatableElf; }
-    bool BuildingRelocatableElf() { return m_buildRelocatableElf; }
+    void setBuildRelocatableElf(bool buildRelocatableElf) { m_buildRelocatableElf = buildRelocatableElf; }
+    bool buildingRelocatableElf() { return m_buildRelocatableElf; }
 
     // Utility method to create a start/stop timer pass
-    static llvm::ModulePass* CreateStartStopTimer(llvm::Timer* pTimer, bool starting);
+    static llvm::ModulePass* createStartStopTimer(llvm::Timer* timer, bool starting);
 
     // Set and get a pointer to the stream used for LLPC_OUTS. This is initially nullptr,
     // signifying no output from LLPC_OUTS. Setting this to a stream means that LLPC_OUTS
     // statements in the middle-end output to that stream, giving a dump of LLVM IR at a
     // few strategic places in the pass flow, as well as information such as input/output
     // mapping.
-    static void SetLlpcOuts(llvm::raw_ostream* pStream) { m_pLlpcOuts = pStream; }
-    static llvm::raw_ostream* GetLgcOuts() { return m_pLlpcOuts; }
+    static void setLlpcOuts(llvm::raw_ostream* stream) { m_llpcOuts = stream; }
+    static llvm::raw_ostream* getLgcOuts() { return m_llpcOuts; }
 
 private:
     BuilderContext() = delete;
@@ -129,10 +129,10 @@ private:
     BuilderContext(llvm::LLVMContext& context, unsigned palAbiVersion);
 
     // -----------------------------------------------------------------------------------------------------------------
-    static llvm::raw_ostream*        m_pLlpcOuts;                   // nullptr or stream for LLPC_OUTS
+    static llvm::raw_ostream*        m_llpcOuts;                   // nullptr or stream for LLPC_OUTS
     llvm::LLVMContext&               m_context;                     // LLVM context
-    llvm::TargetMachine*             m_pTargetMachine = nullptr;    // Target machine
-    TargetInfo*                m_pTargetInfo = nullptr;       // Target info
+    llvm::TargetMachine*             m_targetMachine = nullptr;    // Target machine
+    TargetInfo*                m_targetInfo = nullptr;       // Target info
     bool                       m_buildRelocatableElf = false; // Flag indicating whether we are building relocatable ELF
     unsigned                   m_palAbiVersion = 0xFFFFFFFF;  // PAL pipeline ABI version to compile for
 };

@@ -54,15 +54,15 @@ namespace lgc
 // and its parameters.
 //
 // NOTE: Prefer BuilderBase::CreateNamedCall where possible.
-CallInst* EmitCall(
+CallInst* emitCall(
     StringRef                     funcName,         // Name string of the function
-    Type*                         pRetTy,           // [in] Return type
+    Type*                         retTy,           // [in] Return type
     ArrayRef<Value *>             args,             // [in] Parameters
     ArrayRef<Attribute::AttrKind> attribs,          // Attributes
-    Instruction*                  pInsertPos)       // [in] Where to insert this call
+    Instruction*                  insertPos)       // [in] Where to insert this call
 {
-    BuilderBase builder(pInsertPos);
-    return builder.CreateNamedCall(funcName, pRetTy, args, attribs);
+    BuilderBase builder(insertPos);
+    return builder.createNamedCall(funcName, retTy, args, attribs);
 }
 
 // =====================================================================================================================
@@ -70,70 +70,70 @@ CallInst* EmitCall(
 // type and its parameters.
 //
 // NOTE: Prefer BuilderBase::CreateNamedCall where possible.
-CallInst* EmitCall(
+CallInst* emitCall(
     StringRef                     funcName,         // Name string of the function
-    Type*                         pRetTy,           // [in] Return type
+    Type*                         retTy,           // [in] Return type
     ArrayRef<Value *>             args,             // [in] Parameters
     ArrayRef<Attribute::AttrKind> attribs,          // Attributes
-    BasicBlock*                   pInsertAtEnd)     // [in] Which block to insert this call at the end
+    BasicBlock*                   insertAtEnd)     // [in] Which block to insert this call at the end
 {
-    BuilderBase builder(pInsertAtEnd);
-    return builder.CreateNamedCall(funcName, pRetTy, args, attribs);
+    BuilderBase builder(insertAtEnd);
+    return builder.createNamedCall(funcName, retTy, args, attribs);
 }
 
 // =====================================================================================================================
 // Gets LLVM-style name for type.
-void GetTypeName(
-    Type*         pTy,         // [in] Type to get mangle name
+void getTypeName(
+    Type*         ty,         // [in] Type to get mangle name
     raw_ostream&  nameStream)  // [in,out] Stream to write the type name into
 {
     for (;;)
     {
-        if (auto pPointerTy = dyn_cast<PointerType>(pTy))
+        if (auto pointerTy = dyn_cast<PointerType>(ty))
         {
-            nameStream << "p" << pPointerTy->getAddressSpace();
-            pTy = pPointerTy->getElementType();
+            nameStream << "p" << pointerTy->getAddressSpace();
+            ty = pointerTy->getElementType();
             continue;
         }
-        if (auto pArrayTy = dyn_cast<ArrayType>(pTy))
+        if (auto arrayTy = dyn_cast<ArrayType>(ty))
         {
-            nameStream << "a" << pArrayTy->getNumElements();
-            pTy = pArrayTy->getElementType();
+            nameStream << "a" << arrayTy->getNumElements();
+            ty = arrayTy->getElementType();
             continue;
         }
         break;
     }
 
-    if (auto pStructTy = dyn_cast<StructType>(pTy))
+    if (auto structTy = dyn_cast<StructType>(ty))
     {
         nameStream << "s[";
-        if (pStructTy->getNumElements() != 0)
+        if (structTy->getNumElements() != 0)
         {
-            GetTypeName(pStructTy->getElementType(0), nameStream);
-            for (unsigned i = 1; i < pStructTy->getNumElements(); ++i)
+            getTypeName(structTy->getElementType(0), nameStream);
+            for (unsigned i = 1; i < structTy->getNumElements(); ++i)
             {
                 nameStream << ",";
-                GetTypeName(pStructTy->getElementType(i), nameStream);
+                getTypeName(structTy->getElementType(i), nameStream);
             }
         }
         nameStream << "]";
         return;
     }
 
-    if (auto pVectorTy = dyn_cast<VectorType>(pTy))
+    if (auto vectorTy = dyn_cast<VectorType>(ty))
     {
-        nameStream << "v" << pVectorTy->getNumElements();
-        pTy = pVectorTy->getElementType();
+        nameStream << "v" << vectorTy->getNumElements();
+        ty = vectorTy->getElementType();
     }
-    if (pTy->isFloatingPointTy())
+    if (ty->isFloatingPointTy())
     {
-        nameStream << "f" << pTy->getScalarSizeInBits();
+        nameStream << "f" << ty->getScalarSizeInBits();
     }
-    else if (pTy->isIntegerTy())
+    else if (ty->isIntegerTy())
     {
-        nameStream << "i" << pTy->getScalarSizeInBits();
+        nameStream << "i" << ty->getScalarSizeInBits();
     }
-    else if (pTy->isVoidTy())
+    else if (ty->isVoidTy())
     {
         nameStream << "V";
     }
@@ -145,20 +145,20 @@ void GetTypeName(
 
 // =====================================================================================================================
 // Gets LLVM-style name for type.
-std::string GetTypeName(
-    Type* pTy)  // [in] Type to get mangle name
+std::string getTypeName(
+    Type* ty)  // [in] Type to get mangle name
 {
     std::string name;
     raw_string_ostream nameStream(name);
 
-    GetTypeName(pTy, nameStream);
+    getTypeName(ty, nameStream);
     return nameStream.str();
 }
 
 // =====================================================================================================================
 // Adds LLVM-style type mangling suffix for the specified return type and args to the name.
-void AddTypeMangling(
-    Type*            pReturnTy,     // [in] Return type (could be null)
+void addTypeMangling(
+    Type*            returnTy,     // [in] Return type (could be null)
     ArrayRef<Value*> args,          // Arguments
     std::string&     name)          // [out] String to add mangling to
 {
@@ -170,44 +170,44 @@ void AddTypeMangling(
     }
 
     raw_string_ostream nameStream(name);
-    if ((pReturnTy != nullptr) && (pReturnTy->isVoidTy() == false))
+    if ((returnTy != nullptr) && (returnTy->isVoidTy() == false))
     {
         nameStream << ".";
-        GetTypeName(pReturnTy, nameStream);
+        getTypeName(returnTy, nameStream);
     }
 
-    for (auto pArg : args)
+    for (auto arg : args)
     {
         nameStream << ".";
-        GetTypeName(pArg->getType(), nameStream);
+        getTypeName(arg->getType(), nameStream);
     }
 }
 
 // =====================================================================================================================
 // Gets the shader stage from the specified LLVM function. Returns ShaderStageInvalid if not shader entrypoint.
-ShaderStage GetShaderStageFromFunction(
-    const Function* pFunc)  // [in] LLVM function
+ShaderStage getShaderStageFromFunction(
+    const Function* func)  // [in] LLVM function
 {
     // Check for the metadata that is added by the builder. This works in the patch phase.
-    MDNode* pStageMetaNode = pFunc->getMetadata(lgcName::ShaderStageMetadata);
-    if (pStageMetaNode != nullptr)
+    MDNode* stageMetaNode = func->getMetadata(lgcName::ShaderStageMetadata);
+    if (stageMetaNode != nullptr)
     {
-        return ShaderStage(mdconst::dyn_extract<ConstantInt>(pStageMetaNode->getOperand(0))->getZExtValue());
+        return ShaderStage(mdconst::dyn_extract<ConstantInt>(stageMetaNode->getOperand(0))->getZExtValue());
     }
     return ShaderStageInvalid;
 }
 
 // =====================================================================================================================
 // Gets the shader stage from the specified calling convention.
-ShaderStage GetShaderStageFromCallingConv(
+ShaderStage getShaderStageFromCallingConv(
     unsigned        stageMask,  // Shader stage mask for the pipeline
     CallingConv::ID callConv)   // Calling convention
 {
     ShaderStage shaderStage = ShaderStageInvalid;
 
-    bool hasGs = (stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0;
-    bool hasTs = (((stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0) ||
-                  ((stageMask & ShaderStageToMask(ShaderStageTessEval)) != 0));
+    bool hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry)) != 0;
+    bool hasTs = (((stageMask & shaderStageToMask(ShaderStageTessControl)) != 0) ||
+                  ((stageMask & shaderStageToMask(ShaderStageTessEval)) != 0));
 
     switch (callConv)
     {
@@ -243,42 +243,42 @@ ShaderStage GetShaderStageFromCallingConv(
 
 // =====================================================================================================================
 // Gets the argument from the specified function according to the argument index.
-Value* GetFunctionArgument(
-    Function*     pFunc,    // [in] LLVM function
+Value* getFunctionArgument(
+    Function*     func,    // [in] LLVM function
     unsigned      idx,      // Index of the query argument
     const Twine&  name)     // Name to give the argument if currently empty
 {
-    Argument* pArg = &pFunc->arg_begin()[idx];
-    if ((name.isTriviallyEmpty() == false) && (pArg->getName() == ""))
+    Argument* arg = &func->arg_begin()[idx];
+    if ((name.isTriviallyEmpty() == false) && (arg->getName() == ""))
     {
-        pArg->setName(name);
+        arg->setName(name);
     }
-    return pArg;
+    return arg;
 }
 
 // =====================================================================================================================
 // Checks if one type can be bitcasted to the other (type1 -> type2, valid for scalar or vector type).
-bool CanBitCast(
-    const Type* pTy1,   // [in] One type
-    const Type* pTy2)   // [in] The other type
+bool canBitCast(
+    const Type* ty1,   // [in] One type
+    const Type* ty2)   // [in] The other type
 {
     bool valid = false;
 
-    if (pTy1 == pTy2)
+    if (ty1 == ty2)
     {
         valid = true;
     }
-    else if (pTy1->isSingleValueType() && pTy2->isSingleValueType())
+    else if (ty1->isSingleValueType() && ty2->isSingleValueType())
     {
-        const Type* pCompTy1 = pTy1->isVectorTy() ? pTy1->getVectorElementType() : pTy1;
-        const Type* pCompTy2 = pTy2->isVectorTy() ? pTy2->getVectorElementType() : pTy2;
-        if ((pCompTy1->isFloatingPointTy() || pCompTy1->isIntegerTy()) &&
-            (pCompTy2->isFloatingPointTy() || pCompTy2->isIntegerTy()))
+        const Type* compTy1 = ty1->isVectorTy() ? ty1->getVectorElementType() : ty1;
+        const Type* compTy2 = ty2->isVectorTy() ? ty2->getVectorElementType() : ty2;
+        if ((compTy1->isFloatingPointTy() || compTy1->isIntegerTy()) &&
+            (compTy2->isFloatingPointTy() || compTy2->isIntegerTy()))
         {
-            const unsigned compCount1 = pTy1->isVectorTy() ? pTy1->getVectorNumElements() : 1;
-            const unsigned compCount2 = pTy2->isVectorTy() ? pTy2->getVectorNumElements() : 1;
+            const unsigned compCount1 = ty1->isVectorTy() ? ty1->getVectorNumElements() : 1;
+            const unsigned compCount2 = ty2->isVectorTy() ? ty2->getVectorNumElements() : 1;
 
-            valid = (compCount1 * pCompTy1->getScalarSizeInBits() == compCount2 * pCompTy2->getScalarSizeInBits());
+            valid = (compCount1 * compTy1->getScalarSizeInBits() == compCount2 * compTy2->getScalarSizeInBits());
         }
     }
 
@@ -287,14 +287,14 @@ bool CanBitCast(
 
 // =====================================================================================================================
 // Checks if the specified value actually represents a don't-care value (0xFFFFFFFF).
-bool IsDontCareValue(
-    Value* pValue) // [in] Value to check
+bool isDontCareValue(
+    Value* value) // [in] Value to check
 {
     bool isDontCare = false;
 
-    if (isa<ConstantInt>(pValue))
+    if (isa<ConstantInt>(value))
     {
-        isDontCare = (static_cast<unsigned>(cast<ConstantInt>(pValue)->getZExtValue()) == InvalidValue);
+        isDontCare = (static_cast<unsigned>(cast<ConstantInt>(value)->getZExtValue()) == InvalidValue);
     }
 
     return isDontCare;

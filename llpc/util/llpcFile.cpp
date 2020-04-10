@@ -40,7 +40,7 @@ namespace Llpc
 
 // =====================================================================================================================
 // Opens a file stream for read, write or append access.
-Result File::Open(
+Result File::open(
     const char*  filename,     // [in] Name of file to open
     unsigned     accessFlags)  // ORed mask of FileAccessMode values describing how the file will be used
 {
@@ -132,7 +132,7 @@ Result File::Open(
 
 // =====================================================================================================================
 // Closes the file handle if still open.
-void File::Close()
+void File::close()
 {
     if (m_fileHandle != nullptr)
     {
@@ -143,8 +143,8 @@ void File::Close()
 
 // =====================================================================================================================
 // Writes a stream of bytes to the file.
-Result File::Write(
-    const void* pBuffer,     // [in] Buffer to write to the file
+Result File::write(
+    const void* buffer,     // [in] Buffer to write to the file
     size_t      bufferSize)  // Size of the buffer in bytes
 {
     Result result = Result::Success;
@@ -153,7 +153,7 @@ Result File::Write(
     {
         result = Result::ErrorUnavailable;
     }
-    else if (pBuffer == nullptr)
+    else if (buffer == nullptr)
     {
         result = Result::ErrorInvalidPointer;
     }
@@ -163,7 +163,7 @@ Result File::Write(
     }
     else
     {
-        if (fwrite(pBuffer, 1, bufferSize, m_fileHandle) != bufferSize)
+        if (fwrite(buffer, 1, bufferSize, m_fileHandle) != bufferSize)
         {
             result = Result::ErrorUnknown;
         }
@@ -174,10 +174,10 @@ Result File::Write(
 
 // =====================================================================================================================
 // Reads a stream of bytes from the file.
-Result File::Read(
-    void*   pBuffer,        // [out] Buffer to read the file into
+Result File::read(
+    void*   buffer,        // [out] Buffer to read the file into
     size_t  bufferSize,     // Size of buffer in bytes
-    size_t* pBytesReadOut)  // [out] Number of bytes actually read (can be nullptr)
+    size_t* bytesReadOut)  // [out] Number of bytes actually read (can be nullptr)
 {
     Result result = Result::Success;
 
@@ -185,7 +185,7 @@ Result File::Read(
     {
         result = Result::ErrorUnavailable;
     }
-    else if (pBuffer == nullptr)
+    else if (buffer == nullptr)
     {
         result = Result::ErrorInvalidPointer;
     }
@@ -195,16 +195,16 @@ Result File::Read(
     }
     else
     {
-        const size_t bytesRead = fread(pBuffer, 1, bufferSize, m_fileHandle);
+        const size_t bytesRead = fread(buffer, 1, bufferSize, m_fileHandle);
 
         if (bytesRead != bufferSize)
         {
             result = Result::ErrorUnknown;
         }
 
-        if (pBytesReadOut != nullptr)
+        if (bytesReadOut != nullptr)
         {
-            *pBytesReadOut = bytesRead;
+            *bytesReadOut = bytesRead;
         }
     }
 
@@ -213,10 +213,10 @@ Result File::Read(
 
 // =====================================================================================================================
 // Reads a single line (until the next newline) of bytes from the file.
-Result File::ReadLine(
-    void*   pBuffer,        // [out] Buffer to read the file into
+Result File::readLine(
+    void*   buffer,        // [out] Buffer to read the file into
     size_t  bufferSize,     // Size of buffer in bytes
-    size_t* pBytesReadOut)  // [out] Number of bytes actually read (can be nullptr)
+    size_t* bytesReadOut)  // [out] Number of bytes actually read (can be nullptr)
 {
     Result result = Result::ErrorInvalidValue;
 
@@ -224,7 +224,7 @@ Result File::ReadLine(
     {
         result = Result::ErrorUnavailable;
     }
-    else if (pBuffer == nullptr)
+    else if (buffer == nullptr)
     {
         result = Result::ErrorInvalidPointer;
     }
@@ -235,7 +235,7 @@ Result File::ReadLine(
     else
     {
         size_t bytesRead = 0;
-        char* pCharBuffer = static_cast<char*>(pBuffer);
+        char* charBuffer = static_cast<char*>(buffer);
 
         while (bytesRead < bufferSize)
         {
@@ -250,13 +250,13 @@ Result File::ReadLine(
                 result = Result::ErrorUnknown;
                 break;
             }
-            pCharBuffer[bytesRead] = static_cast<char>(c);
+            charBuffer[bytesRead] = static_cast<char>(c);
             bytesRead++;
         }
 
-        if (pBytesReadOut != nullptr)
+        if (bytesReadOut != nullptr)
         {
-            *pBytesReadOut = bytesRead;
+            *bytesReadOut = bytesRead;
         }
     }
 
@@ -265,7 +265,7 @@ Result File::ReadLine(
 
 // =====================================================================================================================
 // Prints a formatted string to the file.
-Result File::Printf(
+Result File::printf(
     const char* formatStr,   // [in] Printf-style format string
     ...                      // Printf-style argument list
     ) const
@@ -295,7 +295,7 @@ Result File::Printf(
 
 // =====================================================================================================================
 // Prints a formatted string to the file.
-Result File::VPrintf(
+Result File::vPrintf(
     const char* formatStr,   // [in] Printf-style format string
     va_list     argList)     // Pre-started variable argument list
 {
@@ -319,7 +319,7 @@ Result File::VPrintf(
 
 // =====================================================================================================================
 // Flushes pending I/O to the file.
-Result File::Flush() const
+Result File::flush() const
 {
     Result result = Result::Success;
 
@@ -337,7 +337,7 @@ Result File::Flush() const
 
 // =====================================================================================================================
 // Sets the file position to the beginning of the file.
-void File::Rewind()
+void File::rewind()
 {
     if (m_fileHandle != nullptr)
     {
@@ -347,7 +347,7 @@ void File::Rewind()
 
 // =====================================================================================================================
 // Sets the file position to the beginning of the file.
-void File::Seek(
+void File::seek(
     int offset,         // Number of bytes to offset
     bool   fromOrigin)      // If true, the seek will be relative to the file origin;
                             // if false, it will be from the current position
@@ -363,7 +363,7 @@ void File::Seek(
 
 // =====================================================================================================================
 // Returns true if a file with the given name exists.
-size_t File::GetFileSize(
+size_t File::getFileSize(
     const char* filename)     // [in] Name of the file to check
 {
     // ...however, on other compilers, they are named 'stat' (no underbar).
@@ -376,7 +376,7 @@ size_t File::GetFileSize(
 
 // =====================================================================================================================
 // Returns true if a file with the given name exists.
-bool File::Exists(
+bool File::exists(
     const char* filename)      // [in] Name of the file to check
 {
     // ...however, on other compilers, they are named 'stat' (no underbar).

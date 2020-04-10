@@ -39,19 +39,19 @@ namespace Vkgc
 static const unsigned InvalidValue  = ~0u;
 
 // Gets name string of the abbreviation for the specified shader stage.
-const char* GetShaderStageAbbreviation(ShaderStage shaderStage, bool upper = false);
+const char* getShaderStageAbbreviation(ShaderStage shaderStage, bool upper = false);
 
 // Create directory.
-bool CreateDirectory(const char* pDir);
+bool createDirectory(const char* dir);
 
 // Translate enum "ResourceMappingNodeType" to string
-const char* GetResourceMappingNodeTypeName(ResourceMappingNodeType type);
+const char* getResourceMappingNodeTypeName(ResourceMappingNodeType type);
 
 // =====================================================================================================================
 // Increments a pointer by nBytes by first casting it to a uint8_t*.
 //
 // Returns incremented pointer.
-inline void* VoidPtrInc(
+inline void* voidPtrInc(
     const void* p,         // [in] Pointer to be incremented.
     size_t      numBytes)  // Number of bytes to increment the pointer by
 {
@@ -62,30 +62,30 @@ inline void* VoidPtrInc(
 // ===================================================================================
 // Finds the expected structure in Vulkan structure chain with the specified info.
 template<class T>
-inline const T* FindVkStructInChain(
+inline const T* findVkStructInChain(
     VkStructureType type,    // Vulkan structure type
-    const void*     pNext)   // Base pointer of Vulkan structure
+    const void*     next)   // Base pointer of Vulkan structure
 {
     struct VkStructHeader
     {
         VkStructureType type;
-        VkStructHeader* pNext;
+        VkStructHeader* next;
     };
 
-    const VkStructHeader* pStructHeader = reinterpret_cast<const VkStructHeader*>(pNext);
-    while(pStructHeader != nullptr)
+    const VkStructHeader* structHeader = reinterpret_cast<const VkStructHeader*>(next);
+    while(structHeader != nullptr)
     {
-        if (pStructHeader->type == type)
+        if (structHeader->type == type)
         {
             break;
         }
         else
         {
-            pStructHeader = pStructHeader->pNext;
+            structHeader = structHeader->next;
         }
     }
 
-    return reinterpret_cast<const T*>(pStructHeader);
+    return reinterpret_cast<const T*>(structHeader);
 }
 
 } // Vkgc

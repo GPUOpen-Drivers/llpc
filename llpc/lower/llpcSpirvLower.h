@@ -72,7 +72,7 @@ namespace Llpc
 {
 
 // Initialize passes for SPIR-V lowering
-inline static void InitializeLowerPasses(
+inline static void initializeLowerPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
 {
     initializeSpirvLowerAccessChainPass(passRegistry);
@@ -88,51 +88,51 @@ inline static void InitializeLowerPasses(
 
 class Context;
 
-llvm::ModulePass* CreateSpirvLowerAccessChain();
-llvm::ModulePass* CreateSpirvLowerAlgebraTransform(bool enableConstFolding, bool enableFloatOpt);
-llvm::ModulePass* CreateSpirvLowerConstImmediateStore();
-llvm::ModulePass* CreateSpirvLowerMemoryOp();
-llvm::ModulePass* CreateSpirvLowerGlobal();
-llvm::ModulePass* CreateSpirvLowerInstMetaRemove();
-llvm::ModulePass* CreateSpirvLowerLoopUnrollControl(unsigned forceLoopUnrollCount);
-llvm::ModulePass* CreateSpirvLowerResourceCollect(bool collectDetailUsage);
-llvm::ModulePass* CreateSpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo* pShaderInfo);
+llvm::ModulePass* createSpirvLowerAccessChain();
+llvm::ModulePass* createSpirvLowerAlgebraTransform(bool enableConstFolding, bool enableFloatOpt);
+llvm::ModulePass* createSpirvLowerConstImmediateStore();
+llvm::ModulePass* createSpirvLowerMemoryOp();
+llvm::ModulePass* createSpirvLowerGlobal();
+llvm::ModulePass* createSpirvLowerInstMetaRemove();
+llvm::ModulePass* createSpirvLowerLoopUnrollControl(unsigned forceLoopUnrollCount);
+llvm::ModulePass* createSpirvLowerResourceCollect(bool collectDetailUsage);
+llvm::ModulePass* createSpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo* shaderInfo);
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering operations, as the base class.
 class SpirvLower: public llvm::ModulePass
 {
 public:
-    explicit SpirvLower(char& Pid)
+    explicit SpirvLower(char& pid)
         :
-        llvm::ModulePass(Pid),
-        m_pModule(nullptr),
-        m_pContext(nullptr),
+        llvm::ModulePass(pid),
+        m_module(nullptr),
+        m_context(nullptr),
         m_shaderStage(ShaderStageInvalid),
-        m_pEntryPoint(nullptr)
+        m_entryPoint(nullptr)
     {
     }
 
     // Add per-shader lowering passes to pass manager
-    static void AddPasses(Context*                    pContext,
+    static void addPasses(Context*                    context,
                           ShaderStage                 stage,
                           llvm::legacy::PassManager&  passMgr,
-                          llvm::Timer*                pLowerTimer,
+                          llvm::Timer*                lowerTimer,
                           unsigned                    forceLoopUnrollCount);
 
-    static void RemoveConstantExpr(Context* pContext, llvm::GlobalVariable* pGlobal);
-    static void ReplaceConstWithInsts(Context* pContext, llvm::Constant* const pConstVal);
+    static void removeConstantExpr(Context* context, llvm::GlobalVariable* global);
+    static void replaceConstWithInsts(Context* context, llvm::Constant* const constVal);
 
 protected:
-    void Init(llvm::Module* pModule);
+    void init(llvm::Module* module);
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::Module*   m_pModule;      // LLVM module to be run on
-    Context*        m_pContext;     // Associated LLPC context of the LLVM module that passes run on
+    llvm::Module*   m_module;      // LLVM module to be run on
+    Context*        m_context;     // Associated LLPC context of the LLVM module that passes run on
     ShaderStage     m_shaderStage;  // Shader stage
-    llvm::Function* m_pEntryPoint;  // Entry point of input module
-    lgc::Builder*   m_pBuilder;     // LGC builder object
+    llvm::Function* m_entryPoint;  // Entry point of input module
+    lgc::Builder*   m_builder;     // LGC builder object
 
 private:
     SpirvLower() = delete;

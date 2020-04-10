@@ -57,7 +57,7 @@ public:
     virtual void visitUnaryOperator(llvm::UnaryOperator& unaryOp);
     virtual void visitCallInst(llvm::CallInst& callInst);
     virtual void visitFPTruncInst(llvm::FPTruncInst& fptruncInst);
-    void flushDenormIfNeeded(llvm::Instruction *pInst);
+    void flushDenormIfNeeded(llvm::Instruction *inst);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -67,8 +67,8 @@ private:
     SpirvLowerAlgebraTransform(const SpirvLowerAlgebraTransform&) = delete;
     SpirvLowerAlgebraTransform& operator=(const SpirvLowerAlgebraTransform&) = delete;
 
-    bool IsOperandNoContract(llvm::Value* pOperand);
-    void DisableFastMath(llvm::Value* pValue);
+    bool isOperandNoContract(llvm::Value* operand);
+    void disableFastMath(llvm::Value* value);
 
     bool m_enableConstFolding; // Whether enable constant folding in this pass
     bool m_enableFloatOpt;     // Whether enable floating point optimization in this pass

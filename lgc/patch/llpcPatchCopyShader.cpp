@@ -72,26 +72,26 @@ private:
     PatchCopyShader(const PatchCopyShader&) = delete;
     PatchCopyShader& operator=(const PatchCopyShader&) = delete;
 
-    void ExportOutput(unsigned streamId, BuilderBase& builder);
-    void CollectGsGenericOutputInfo(Function* pGsEntryPoint);
+    void exportOutput(unsigned streamId, BuilderBase& builder);
+    void collectGsGenericOutputInfo(Function* gsEntryPoint);
 
-    Value* CalcGsVsRingOffsetForInput(unsigned location, unsigned compIdx, unsigned streamId, BuilderBase& builder);
+    Value* calcGsVsRingOffsetForInput(unsigned location, unsigned compIdx, unsigned streamId, BuilderBase& builder);
 
-    Value* LoadValueFromGsVsRing(Type* pLoadTy, unsigned location, unsigned streamId, BuilderBase& builder);
+    Value* loadValueFromGsVsRing(Type* loadTy, unsigned location, unsigned streamId, BuilderBase& builder);
 
-    Value* LoadGsVsRingBufferDescriptor(BuilderBase& builder);
+    Value* loadGsVsRingBufferDescriptor(BuilderBase& builder);
 
-    void ExportGenericOutput(Value* pOutputValue, unsigned location, unsigned streamId, BuilderBase& builder);
-    void ExportBuiltInOutput(Value* pOutputValue, BuiltInKind builtInId, unsigned streamId, BuilderBase& builder);
+    void exportGenericOutput(Value* outputValue, unsigned location, unsigned streamId, BuilderBase& builder);
+    void exportBuiltInOutput(Value* outputValue, BuiltInKind builtInId, unsigned streamId, BuilderBase& builder);
 
     // -----------------------------------------------------------------------------------------------------------------
 
     // Low part of global internal table pointer
     static const unsigned EntryArgIdxInternalTablePtrLow = 0;
 
-    PipelineState*        m_pPipelineState;             // Pipeline state
-    GlobalVariable*       m_pLds = nullptr;             // Global variable representing LDS
-    Value*                m_pGsVsRingBufDesc = nullptr; // Descriptor for GS-VS ring
+    PipelineState*        m_pipelineState;             // Pipeline state
+    GlobalVariable*       m_lds = nullptr;             // Global variable representing LDS
+    Value*                m_gsVsRingBufDesc = nullptr; // Descriptor for GS-VS ring
 };
 
 char PatchCopyShader::ID = 0;
@@ -100,7 +100,7 @@ char PatchCopyShader::ID = 0;
 
 // =====================================================================================================================
 // Create pass to generate copy shader if required.
-ModulePass* lgc::CreatePatchCopyShader()
+ModulePass* lgc::createPatchCopyShader()
 {
     return new PatchCopyShader();
 }
@@ -112,18 +112,18 @@ bool PatchCopyShader::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Copy-Shader\n");
 
-    Patch::Init(&module);
-    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
-    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
-    auto pGsEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
-    if (pGsEntryPoint == nullptr)
+    Patch::init(&module);
+    m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+    auto pipelineShaders = &getAnalysis<PipelineShaders>();
+    auto gsEntryPoint = pipelineShaders->getEntryPoint(ShaderStageGeometry);
+    if (gsEntryPoint == nullptr)
     {
         // No geometry shader -- copy shader not required.
         return false;
     }
 
     // Gather GS generic export details.
-    CollectGsGenericOutputInfo(pGsEntryPoint);
+    collectGsGenericOutputInfo(gsEntryPoint);
 
     // Create type of new function:
     // define void @copy_shader(
@@ -138,75 +138,75 @@ bool PatchCopyShader::runOnModule(
     //    i32 inreg,  ; Stream offset2
     //    i32 inreg,  ; Stream offset3
     //    i32
-    BuilderBase builder(*m_pContext);
+    BuilderBase builder(*m_context);
 
-    auto pInt32Ty = Type::getInt32Ty(*m_pContext);
-    Type* argTys[] = {  pInt32Ty, pInt32Ty, pInt32Ty, pInt32Ty, pInt32Ty, pInt32Ty,
-                        pInt32Ty, pInt32Ty, pInt32Ty, pInt32Ty, pInt32Ty };
+    auto int32Ty = Type::getInt32Ty(*m_context);
+    Type* argTys[] = {  int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty,
+                        int32Ty, int32Ty, int32Ty, int32Ty, int32Ty };
     bool argInReg[] = { true,   true,   true,   true,   true,   true,
                         true,   true,   true,   true,   false  };
-    auto pEntryPointTy = FunctionType::get(builder.getVoidTy(), argTys, false);
+    auto entryPointTy = FunctionType::get(builder.getVoidTy(), argTys, false);
 
     // Create function for the copy shader entrypoint, and insert it before the FS (if there is one).
-    auto pEntryPoint = Function::Create(pEntryPointTy, GlobalValue::ExternalLinkage, lgcName::CopyShaderEntryPoint);
+    auto entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::CopyShaderEntryPoint);
 
     auto insertPos = module.getFunctionList().end();
-    auto pFsEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStageFragment);
-    if (pFsEntryPoint != nullptr)
+    auto fsEntryPoint = pipelineShaders->getEntryPoint(ShaderStageFragment);
+    if (fsEntryPoint != nullptr)
     {
-        insertPos = pFsEntryPoint->getIterator();
+        insertPos = fsEntryPoint->getIterator();
     }
-    module.getFunctionList().insert(insertPos, pEntryPoint);
+    module.getFunctionList().insert(insertPos, entryPoint);
 
     // Make the args "inreg" (passed in SGPR) as appropriate.
     for (unsigned i = 0; i < sizeof(argInReg) / sizeof(argInReg[0]); ++i)
     {
         if (argInReg[i])
         {
-            pEntryPoint->arg_begin()[i].addAttr(Attribute::InReg);
+            entryPoint->arg_begin()[i].addAttr(Attribute::InReg);
         }
     }
 
     // Create ending basic block, and terminate it with return.
-    auto pEndBlock = BasicBlock::Create(*m_pContext, "", pEntryPoint, nullptr);
-    builder.SetInsertPoint(pEndBlock);
+    auto endBlock = BasicBlock::Create(*m_context, "", entryPoint, nullptr);
+    builder.SetInsertPoint(endBlock);
     builder.CreateRetVoid();
 
     // Create entry basic block
-    auto pEntryBlock = BasicBlock::Create(*m_pContext, "", pEntryPoint, pEndBlock);
-    builder.SetInsertPoint(pEntryBlock);
+    auto entryBlock = BasicBlock::Create(*m_context, "", entryPoint, endBlock);
+    builder.SetInsertPoint(entryBlock);
 
-    auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageCopyShader);
+    auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageCopyShader);
 
     // For GFX6 ~ GFX8, streamOutTable SGPR index value should be less than esGsLdsSize
-    if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major <= 8)
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 8)
     {
-        pIntfData->userDataUsage.gs.copyShaderStreamOutTable = 2;
-        pIntfData->userDataUsage.gs.copyShaderEsGsLdsSize = 3;
+        intfData->userDataUsage.gs.copyShaderStreamOutTable = 2;
+        intfData->userDataUsage.gs.copyShaderEsGsLdsSize = 3;
     }
     // For GFX9+, streamOutTable SGPR index value should be greater than esGsLdsSize
     else
     {
-        pIntfData->userDataUsage.gs.copyShaderStreamOutTable = 3;
-        pIntfData->userDataUsage.gs.copyShaderEsGsLdsSize = 2;
+        intfData->userDataUsage.gs.copyShaderStreamOutTable = 3;
+        intfData->userDataUsage.gs.copyShaderEsGsLdsSize = 2;
     }
 
-    if (m_pPipelineState->IsGsOnChip())
+    if (m_pipelineState->isGsOnChip())
     {
-        m_pLds = Patch::GetLdsVariable(m_pPipelineState, &module);
+        m_lds = Patch::getLdsVariable(m_pipelineState, &module);
     }
     else
     {
-        m_pGsVsRingBufDesc = LoadGsVsRingBufferDescriptor(builder);
+        m_gsVsRingBufDesc = loadGsVsRingBufferDescriptor(builder);
     }
 
-    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
+    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
     unsigned outputStreamCount = 0;
     unsigned outputStreamId = InvalidValue;
     for (int i = 0; i < MaxGsStreams; ++i)
     {
-        if (pResUsage->inOutUsage.gs.outLocCount[i] > 0)
+        if (resUsage->inOutUsage.gs.outLocCount[i] > 0)
         {
             outputStreamCount++;
             if(outputStreamId == InvalidValue)
@@ -216,15 +216,15 @@ bool PatchCopyShader::runOnModule(
         }
     }
 
-    if ((outputStreamCount > 1) && pResUsage->inOutUsage.enableXfb)
+    if ((outputStreamCount > 1) && resUsage->inOutUsage.enableXfb)
     {
         // StreamId = streamInfo[25:24]
-        auto pStreamInfo = GetFunctionArgument(pEntryPoint, CopyShaderUserSgprIdxStreamInfo);
+        auto streamInfo = getFunctionArgument(entryPoint, CopyShaderUserSgprIdxStreamInfo);
 
-        Value* pStreamId = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+        Value* streamId = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                                    builder.getInt32Ty(),
                                                    {
-                                                       pStreamInfo,
+                                                       streamInfo,
                                                        builder.getInt32(24),
                                                        builder.getInt32(2),
                                                    });
@@ -257,91 +257,91 @@ bool PatchCopyShader::runOnModule(
         //
 
         // Add switchInst to entry block
-        auto pSwitchInst = builder.CreateSwitch(pStreamId, pEndBlock, outputStreamCount);
+        auto switchInst = builder.CreateSwitch(streamId, endBlock, outputStreamCount);
 
         for (unsigned streamId = 0; streamId < MaxGsStreams; ++streamId)
         {
-            if (pResUsage->inOutUsage.gs.outLocCount[streamId] > 0)
+            if (resUsage->inOutUsage.gs.outLocCount[streamId] > 0)
             {
                 std::string blockName = ".stream" + std::to_string(streamId);
-                BasicBlock* pStreamBlock = BasicBlock::Create(*m_pContext, blockName, pEntryPoint, pEndBlock);
-                builder.SetInsertPoint(pStreamBlock);
+                BasicBlock* streamBlock = BasicBlock::Create(*m_context, blockName, entryPoint, endBlock);
+                builder.SetInsertPoint(streamBlock);
 
-                pSwitchInst->addCase(builder.getInt32(streamId), pStreamBlock);
+                switchInst->addCase(builder.getInt32(streamId), streamBlock);
 
-                ExportOutput(streamId, builder);
-                builder.CreateBr(pEndBlock);
+                exportOutput(streamId, builder);
+                builder.CreateBr(endBlock);
             }
         }
     }
     else
     {
         outputStreamId = (outputStreamCount == 0) ? 0 : outputStreamId;
-        ExportOutput(outputStreamId, builder);
-        builder.CreateBr(pEndBlock);
+        exportOutput(outputStreamId, builder);
+        builder.CreateBr(endBlock);
     }
 
     // Add execution model metadata to the function.
-    auto pExecModelMeta = ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_pContext),
+    auto execModelMeta = ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_context),
                                                   ShaderStageCopyShader));
-    auto pExecModelMetaNode = MDNode::get(*m_pContext, pExecModelMeta);
-    pEntryPoint->addMetadata(lgcName::ShaderStageMetadata, *pExecModelMetaNode);
+    auto execModelMetaNode = MDNode::get(*m_context, execModelMeta);
+    entryPoint->addMetadata(lgcName::ShaderStageMetadata, *execModelMetaNode);
 
     // Tell pipeline state there is a copy shader.
-    m_pPipelineState->SetShaderStageMask(m_pPipelineState->GetShaderStageMask() | (1U << ShaderStageCopyShader));
+    m_pipelineState->setShaderStageMask(m_pipelineState->getShaderStageMask() | (1U << ShaderStageCopyShader));
 
     return true;
 }
 
 // =====================================================================================================================
 // Collects info for GS generic outputs.
-void PatchCopyShader::CollectGsGenericOutputInfo(
-    Function* pGsEntryPoint)  // [in] Geometry shader entrypoint
+void PatchCopyShader::collectGsGenericOutputInfo(
+    Function* gsEntryPoint)  // [in] Geometry shader entrypoint
 {
-    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
+    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
-    for (auto& func : *pGsEntryPoint->getParent())
+    for (auto& func : *gsEntryPoint->getParent())
     {
         if (func.getName().startswith(lgcName::OutputExportGeneric))
         {
-            for (auto pUser : func.users())
+            for (auto user : func.users())
             {
-                auto pCallInst = dyn_cast<CallInst>(pUser);
-                if ((pCallInst == nullptr) || (pCallInst->getParent()->getParent() != pGsEntryPoint))
+                auto callInst = dyn_cast<CallInst>(user);
+                if ((callInst == nullptr) || (callInst->getParent()->getParent() != gsEntryPoint))
                 {
                     continue;
                 }
 
-                assert(pCallInst->getNumArgOperands() == 4);
-                Value* pOutput = pCallInst->getOperand(pCallInst->getNumArgOperands() - 1); // Last argument
-                auto pOutputTy = pOutput->getType();
+                assert(callInst->getNumArgOperands() == 4);
+                Value* output = callInst->getOperand(callInst->getNumArgOperands() - 1); // Last argument
+                auto outputTy = output->getType();
 
-                unsigned value = cast<ConstantInt>(pCallInst->getOperand(0))->getZExtValue();
-                const unsigned streamId = cast<ConstantInt>(pCallInst->getOperand(2))->getZExtValue();
+                unsigned value = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
+                const unsigned streamId = cast<ConstantInt>(callInst->getOperand(2))->getZExtValue();
 
                 GsOutLocInfo outLocInfo = {};
                 outLocInfo.location  = value;
                 outLocInfo.isBuiltIn = false;
                 outLocInfo.streamId  = streamId;
 
-                auto locMapIt = pResUsage->inOutUsage.outputLocMap.find(outLocInfo.u32All);
-                if (locMapIt == pResUsage->inOutUsage.outputLocMap.end())
+                auto locMapIt = resUsage->inOutUsage.outputLocMap.find(outLocInfo.u32All);
+                if (locMapIt == resUsage->inOutUsage.outputLocMap.end())
                 {
                     continue;
                 }
 
                 unsigned location = locMapIt->second;
-                const unsigned compIdx = cast<ConstantInt>(pCallInst->getOperand(1))->getZExtValue();
+                const unsigned compIdx = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
 
                 unsigned compCount = 1;
-                auto pCompTy = pOutputTy;
-                auto pOutputVecTy = dyn_cast<VectorType>(pOutputTy);
-                if (pOutputVecTy != nullptr)
+                auto compTy = outputTy;
+                auto outputVecTy = dyn_cast<VectorType>(outputTy);
+                if (outputVecTy != nullptr)
                 {
-                    compCount = pOutputVecTy->getNumElements();
-                    pCompTy = pOutputVecTy->getElementType();
+                    compCount = outputVecTy->getNumElements();
+                    compTy = outputVecTy->getElementType();
                 }
-                unsigned bitWidth = pCompTy->getScalarSizeInBits();
+                unsigned bitWidth = compTy->getScalarSizeInBits();
                 // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend
                 // BYTE/WORD to DWORD and store DWORD to GS-VS ring. So for 8-bit/16-bit data type, the actual byte size
                 // is based on number of DWORDs.
@@ -350,7 +350,7 @@ void PatchCopyShader::CollectGsGenericOutputInfo(
 
                 assert(compIdx < 4);
                 auto& genericOutByteSizes =
-                    m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader)->inOutUsage.gs.genericOutByteSizes;
+                    m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader)->inOutUsage.gs.genericOutByteSizes;
                 genericOutByteSizes[streamId][location].resize(4);
                 genericOutByteSizes[streamId][location][compIdx] = byteSize;
             }
@@ -360,13 +360,13 @@ void PatchCopyShader::CollectGsGenericOutputInfo(
 
 // =====================================================================================================================
 // Exports outputs of geometry shader, inserting buffer-load/output-export calls.
-void PatchCopyShader::ExportOutput(
+void PatchCopyShader::exportOutput(
     unsigned        streamId,     // Export output of this stream
     BuilderBase&    builder)      // [in] BuilderBase to use for instruction constructing
 {
-    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
-    auto& builtInUsage = pResUsage->builtInUsage.gs;
-    const auto& genericOutByteSizes = pResUsage->inOutUsage.gs.genericOutByteSizes;
+    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
+    auto& builtInUsage = resUsage->builtInUsage.gs;
+    const auto& genericOutByteSizes = resUsage->inOutUsage.gs.genericOutByteSizes;
 
     // Export generic outputs
     for (auto& byteSizeMap : genericOutByteSizes[streamId])
@@ -382,9 +382,9 @@ void PatchCopyShader::ExportOutput(
 
         assert(byteSize % 4 == 0);
         unsigned dwordSize = byteSize / 4;
-        Value* pOutputValue = LoadValueFromGsVsRing(
+        Value* outputValue = loadValueFromGsVsRing(
             VectorType::get(builder.getFloatTy(), dwordSize), loc, streamId, builder);
-        ExportGenericOutput(pOutputValue, loc, streamId, builder);
+        exportGenericOutput(outputValue, loc, streamId, builder);
     }
 
     // Export built-in outputs
@@ -417,7 +417,7 @@ void PatchCopyShader::ExportOutput(
         builtInPairs.push_back(std::make_pair(BuiltInPrimitiveId, builder.getInt32Ty()));
     }
 
-    const auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
+    const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
     if (builtInUsage.layer || enableMultiView)
     {
         // NOTE: If mult-view is enabled, always export gl_ViewIndex rather than gl_Layer.
@@ -433,90 +433,90 @@ void PatchCopyShader::ExportOutput(
     for (auto& builtInPair : builtInPairs)
     {
         auto builtInId = builtInPair.first;
-        Type* pBuiltInTy = builtInPair.second;
+        Type* builtInTy = builtInPair.second;
 
-        assert(pResUsage->inOutUsage.builtInOutputLocMap.find(builtInId) !=
-            pResUsage->inOutUsage.builtInOutputLocMap.end());
+        assert(resUsage->inOutUsage.builtInOutputLocMap.find(builtInId) !=
+            resUsage->inOutUsage.builtInOutputLocMap.end());
 
-        unsigned loc = pResUsage->inOutUsage.builtInOutputLocMap[builtInId];
-        Value* pOutputValue = LoadValueFromGsVsRing(pBuiltInTy, loc, streamId, builder);
-        ExportBuiltInOutput(pOutputValue, builtInId, streamId, builder);
+        unsigned loc = resUsage->inOutUsage.builtInOutputLocMap[builtInId];
+        Value* outputValue = loadValueFromGsVsRing(builtInTy, loc, streamId, builder);
+        exportBuiltInOutput(outputValue, builtInId, streamId, builder);
     }
 
     // Generate dummy gl_position vec4(0, 0, 0, 1) for the rasterization stream if transform feeback is enabled
-    if (pResUsage->inOutUsage.enableXfb && (builtInUsage.position == false))
+    if (resUsage->inOutUsage.enableXfb && (builtInUsage.position == false))
     {
-        auto pZero = ConstantFP::get(builder.getFloatTy(), 0.0);
-        auto pOne = ConstantFP::get(builder.getFloatTy(), 1.0);
+        auto zero = ConstantFP::get(builder.getFloatTy(), 0.0);
+        auto one = ConstantFP::get(builder.getFloatTy(), 1.0);
 
-        std::vector<Constant*> outputValues = { pZero, pZero, pZero, pOne };
-        ExportBuiltInOutput(ConstantVector::get(outputValues), BuiltInPosition, streamId, builder);
+        std::vector<Constant*> outputValues = { zero, zero, zero, one };
+        exportBuiltInOutput(ConstantVector::get(outputValues), BuiltInPosition, streamId, builder);
     }
 }
 
 // =====================================================================================================================
 // Calculates GS to VS ring offset from input location
-Value* PatchCopyShader::CalcGsVsRingOffsetForInput(
+Value* PatchCopyShader::calcGsVsRingOffsetForInput(
     unsigned        location,    // Output location
     unsigned        compIdx,     // Output component
     unsigned        streamId,    // Output stream ID
     BuilderBase&    builder)     // [in] BuilderBase to use for instruction constructing
 {
-    auto pEntryPoint = builder.GetInsertBlock()->getParent();
-    Value* pVertexOffset = GetFunctionArgument(pEntryPoint, CopyShaderUserSgprIdxVertexOffset);
+    auto entryPoint = builder.GetInsertBlock()->getParent();
+    Value* vertexOffset = getFunctionArgument(entryPoint, CopyShaderUserSgprIdxVertexOffset);
 
-    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
+    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
-    Value* pRingOffset = nullptr;
-    if (m_pPipelineState->IsGsOnChip())
+    Value* ringOffset = nullptr;
+    if (m_pipelineState->isGsOnChip())
     {
         // ringOffset = esGsLdsSize + vertexOffset + location * 4 + compIdx
-        pRingOffset = builder.getInt32(pResUsage->inOutUsage.gs.calcFactor.esGsLdsSize);
-        pRingOffset = builder.CreateAdd(pRingOffset, pVertexOffset);
-        pRingOffset = builder.CreateAdd(pRingOffset, builder.getInt32(location * 4 + compIdx));
+        ringOffset = builder.getInt32(resUsage->inOutUsage.gs.calcFactor.esGsLdsSize);
+        ringOffset = builder.CreateAdd(ringOffset, vertexOffset);
+        ringOffset = builder.CreateAdd(ringOffset, builder.getInt32(location * 4 + compIdx));
     }
     else
     {
-        unsigned outputVertices = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode().outputVertices;
+        unsigned outputVertices = m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices;
 
         // ringOffset = vertexOffset * 4 + (location * 4 + compIdx) * 64 * maxVertices
-        pRingOffset = builder.CreateMul(pVertexOffset, builder.getInt32(4));
-        pRingOffset = builder.CreateAdd(pRingOffset, builder.getInt32((location * 4 + compIdx) * 64 * outputVertices));
+        ringOffset = builder.CreateMul(vertexOffset, builder.getInt32(4));
+        ringOffset = builder.CreateAdd(ringOffset, builder.getInt32((location * 4 + compIdx) * 64 * outputVertices));
     }
 
-    return pRingOffset;
+    return ringOffset;
 }
 
 // =====================================================================================================================
 // Loads value from GS-VS ring (only accept 32-bit scalar, vector, or arry).
-Value* PatchCopyShader::LoadValueFromGsVsRing(
-    Type*           pLoadTy,    // [in] Type of the load value
+Value* PatchCopyShader::loadValueFromGsVsRing(
+    Type*           loadTy,    // [in] Type of the load value
     unsigned        location,   // Output location
     unsigned        streamId,   // Output stream ID
     BuilderBase&    builder)    // [in] BuilderBase to use for instruction constructing
 {
     unsigned elemCount = 1;
-    Type* pElemTy = pLoadTy;
+    Type* elemTy = loadTy;
 
-    if (pLoadTy->isArrayTy())
+    if (loadTy->isArrayTy())
     {
-        elemCount = pLoadTy->getArrayNumElements();
-        pElemTy = pLoadTy->getArrayElementType();
+        elemCount = loadTy->getArrayNumElements();
+        elemTy = loadTy->getArrayElementType();
     }
-    else if (pLoadTy->isVectorTy())
+    else if (loadTy->isVectorTy())
     {
-        elemCount = pLoadTy->getVectorNumElements();
-        pElemTy = pLoadTy->getVectorElementType();
+        elemCount = loadTy->getVectorNumElements();
+        elemTy = loadTy->getVectorElementType();
     }
-    assert(pElemTy->isIntegerTy(32) || pElemTy->isFloatTy()); // Must be 32-bit type
+    assert(elemTy->isIntegerTy(32) || elemTy->isFloatTy()); // Must be 32-bit type
 
-    if (m_pPipelineState->GetNggControl()->enableNgg)
+    if (m_pipelineState->getNggControl()->enableNgg)
     {
         // NOTE: For NGG, importing GS output from GS-VS ring is represented by a call and the call is replaced with
         // real instructions when when NGG primitive shader is generated.
         std::string callName(lgcName::NggGsOutputImport);
-        callName += GetTypeName(pLoadTy);
-        return builder.CreateNamedCall(callName, pLoadTy,
+        callName += getTypeName(loadTy);
+        return builder.createNamedCall(callName, loadTy,
                                        {
                                            builder.getInt32(location),
                                            builder.getInt32(0),
@@ -525,103 +525,103 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
                                        {});
     }
 
-    if (m_pPipelineState->IsGsOnChip())
+    if (m_pipelineState->isGsOnChip())
     {
-        assert(m_pLds != nullptr);
+        assert(m_lds != nullptr);
 
-        Value* pRingOffset = CalcGsVsRingOffsetForInput(location, 0, streamId, builder);
-        Value* pLoadPtr = builder.CreateGEP(m_pLds, { builder.getInt32(0), pRingOffset });
-        pLoadPtr = builder.CreateBitCast(
-            pLoadPtr, PointerType::get(pLoadTy, m_pLds->getType()->getPointerAddressSpace()));
+        Value* ringOffset = calcGsVsRingOffsetForInput(location, 0, streamId, builder);
+        Value* loadPtr = builder.CreateGEP(m_lds, { builder.getInt32(0), ringOffset });
+        loadPtr = builder.CreateBitCast(
+            loadPtr, PointerType::get(loadTy, m_lds->getType()->getPointerAddressSpace()));
 
-        return builder.CreateAlignedLoad(pLoadPtr, MaybeAlign(m_pLds->getAlignment()));
+        return builder.CreateAlignedLoad(loadPtr, MaybeAlign(m_lds->getAlignment()));
     }
     else
     {
-        assert(m_pGsVsRingBufDesc != nullptr);
+        assert(m_gsVsRingBufDesc != nullptr);
 
         CoherentFlag coherent = {};
         coherent.bits.glc = true;
         coherent.bits.slc = true;
 
-        Value* pLoadValue = UndefValue::get(pLoadTy);
+        Value* loadValue = UndefValue::get(loadTy);
 
         for (unsigned i = 0; i < elemCount; ++i)
         {
-            Value* pRingOffset = CalcGsVsRingOffsetForInput(location + i / 4, i % 4, streamId, builder);
-            auto pLoadElem = builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load,
-                                                     pElemTy,
+            Value* ringOffset = calcGsVsRingOffsetForInput(location + i / 4, i % 4, streamId, builder);
+            auto loadElem = builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load,
+                                                     elemTy,
                                                      {
-                                                         m_pGsVsRingBufDesc,
-                                                         pRingOffset,
+                                                         m_gsVsRingBufDesc,
+                                                         ringOffset,
                                                          builder.getInt32(0),                 // soffset
                                                          builder.getInt32(coherent.u32All)    // glc, slc
                                                      });
 
-            if (pLoadTy->isArrayTy())
+            if (loadTy->isArrayTy())
             {
-                pLoadValue = builder.CreateInsertValue(pLoadValue, pLoadElem, i);
+                loadValue = builder.CreateInsertValue(loadValue, loadElem, i);
             }
-            else if (pLoadTy->isVectorTy())
+            else if (loadTy->isVectorTy())
             {
-                pLoadValue = builder.CreateInsertElement(pLoadValue, pLoadElem, i);
+                loadValue = builder.CreateInsertElement(loadValue, loadElem, i);
             }
             else
             {
                 assert(elemCount == 1);
-                pLoadValue = pLoadElem;
+                loadValue = loadElem;
             }
         }
 
-        return pLoadValue;
+        return loadValue;
     }
 }
 
 // =====================================================================================================================
 // Load GS-VS ring buffer descriptor.
-Value* PatchCopyShader::LoadGsVsRingBufferDescriptor(
+Value* PatchCopyShader::loadGsVsRingBufferDescriptor(
     BuilderBase& builder)       // [in] BuilderBase to use for instruction constructing
 {
-    Function* pEntryPoint = builder.GetInsertBlock()->getParent();
-    Value* pInternalTablePtrLow = GetFunctionArgument(pEntryPoint, EntryArgIdxInternalTablePtrLow);
+    Function* entryPoint = builder.GetInsertBlock()->getParent();
+    Value* internalTablePtrLow = getFunctionArgument(entryPoint, EntryArgIdxInternalTablePtrLow);
 
-    Value* pPc = builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
-    pPc = builder.CreateBitCast(pPc, VectorType::get(builder.getInt32Ty(), 2));
+    Value* pc = builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
+    pc = builder.CreateBitCast(pc, VectorType::get(builder.getInt32Ty(), 2));
 
-    auto pInternalTablePtrHigh = builder.CreateExtractElement(pPc, 1);
+    auto internalTablePtrHigh = builder.CreateExtractElement(pc, 1);
 
-    auto pUndef = UndefValue::get(VectorType::get(builder.getInt32Ty(), 2));
-    Value* pInternalTablePtr = builder.CreateInsertElement(pUndef, pInternalTablePtrLow, uint64_t(0));
-    pInternalTablePtr = builder.CreateInsertElement(pInternalTablePtr, pInternalTablePtrHigh, 1);
-    pInternalTablePtr = builder.CreateBitCast(pInternalTablePtr, builder.getInt64Ty());
+    auto undef = UndefValue::get(VectorType::get(builder.getInt32Ty(), 2));
+    Value* internalTablePtr = builder.CreateInsertElement(undef, internalTablePtrLow, uint64_t(0));
+    internalTablePtr = builder.CreateInsertElement(internalTablePtr, internalTablePtrHigh, 1);
+    internalTablePtr = builder.CreateBitCast(internalTablePtr, builder.getInt64Ty());
 
-    auto pGsVsRingBufDescPtr = builder.CreateAdd(pInternalTablePtr,
-                                                 builder.getInt64(SI_DRV_TABLE_VS_RING_IN_OFFS << 4));
+    auto gsVsRingBufDescPtr = builder.CreateAdd(internalTablePtr,
+                                                 builder.getInt64(SiDrvTableVsRingInOffs << 4));
 
-    auto pInt32x4PtrTy = PointerType::get(VectorType::get(builder.getInt32Ty(), 4), ADDR_SPACE_CONST);
-    pGsVsRingBufDescPtr = builder.CreateIntToPtr(pGsVsRingBufDescPtr, pInt32x4PtrTy);
-    cast<Instruction>(pGsVsRingBufDescPtr)->setMetadata(MetaNameUniform,
-                                                        MDNode::get(pGsVsRingBufDescPtr->getContext(), {}));
+    auto int32x4PtrTy = PointerType::get(VectorType::get(builder.getInt32Ty(), 4), ADDR_SPACE_CONST);
+    gsVsRingBufDescPtr = builder.CreateIntToPtr(gsVsRingBufDescPtr, int32x4PtrTy);
+    cast<Instruction>(gsVsRingBufDescPtr)->setMetadata(MetaNameUniform,
+                                                        MDNode::get(gsVsRingBufDescPtr->getContext(), {}));
 
-    auto pGsVsRingBufDesc = builder.CreateLoad(pGsVsRingBufDescPtr);
-    pGsVsRingBufDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(pGsVsRingBufDesc->getContext(), {}));
+    auto gsVsRingBufDesc = builder.CreateLoad(gsVsRingBufDescPtr);
+    gsVsRingBufDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(gsVsRingBufDesc->getContext(), {}));
 
-    return pGsVsRingBufDesc;
+    return gsVsRingBufDesc;
 }
 
 // =====================================================================================================================
 // Exports generic outputs of geometry shader, inserting output-export calls.
-void PatchCopyShader::ExportGenericOutput(
-    Value*       pOutputValue,  // [in] Value exported to output
+void PatchCopyShader::exportGenericOutput(
+    Value*       outputValue,  // [in] Value exported to output
     unsigned     location,      // Location of the output
     unsigned     streamId,      // ID of output vertex stream
     BuilderBase& builder)       // [in] BuilderBase to use for instruction constructing
 {
-    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
-    if (pResUsage->inOutUsage.enableXfb)
+    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
+    if (resUsage->inOutUsage.enableXfb)
     {
-        auto& outLocMap = pResUsage->inOutUsage.outputLocMap;
-        auto& xfbOutsInfo = pResUsage->inOutUsage.gs.xfbOutsInfo;
+        auto& outLocMap = resUsage->inOutUsage.outputLocMap;
+        auto& xfbOutsInfo = resUsage->inOutUsage.gs.xfbOutsInfo;
 
         // Find original location in outLocMap which equals used location in copy shader
         auto locIter = find_if(outLocMap.begin(), outLocMap.end(), [location, streamId]
@@ -635,104 +635,104 @@ void PatchCopyShader::ExportGenericOutput(
         assert(locIter != outLocMap.end());
         if (xfbOutsInfo.find(locIter->first) != xfbOutsInfo.end())
         {
-            XfbOutInfo* pXfbOutInfo = reinterpret_cast<XfbOutInfo*>(&xfbOutsInfo[locIter->first]);
+            XfbOutInfo* xfbOutInfo = reinterpret_cast<XfbOutInfo*>(&xfbOutsInfo[locIter->first]);
 
-            if (pXfbOutInfo->is16bit)
+            if (xfbOutInfo->is16bit)
             {
                 // NOTE: For 16-bit transform feedback output, the value is 32-bit DWORD loaded from GS-VS ring
                 // buffer. The high WORD is always zero while the low WORD contains the data value. We have to
                 // do some casting operations before store it to transform feedback buffer (tightly packed).
-                auto pOutputTy = pOutputValue->getType();
-                assert(pOutputTy->isFPOrFPVectorTy() && (pOutputTy->getScalarSizeInBits() == 32));
+                auto outputTy = outputValue->getType();
+                assert(outputTy->isFPOrFPVectorTy() && (outputTy->getScalarSizeInBits() == 32));
 
-                const unsigned compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
+                const unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() : 1;
                 if (compCount > 1)
                 {
-                    pOutputValue = builder.CreateBitCast(pOutputValue,
+                    outputValue = builder.CreateBitCast(outputValue,
                                                          VectorType::get(builder.getInt32Ty(), compCount));
-                    pOutputValue = builder.CreateTrunc(pOutputValue,
+                    outputValue = builder.CreateTrunc(outputValue,
                                                        VectorType::get(builder.getInt16Ty(), compCount));
-                    pOutputValue = builder.CreateBitCast(pOutputValue,
+                    outputValue = builder.CreateBitCast(outputValue,
                                                          VectorType::get(builder.getHalfTy(), compCount));
                 }
                 else
                 {
-                    pOutputValue = builder.CreateBitCast(pOutputValue, builder.getInt32Ty());
-                    pOutputValue = new TruncInst(pOutputValue, builder.getInt16Ty());
-                    pOutputValue = new BitCastInst(pOutputValue, builder.getHalfTy());
+                    outputValue = builder.CreateBitCast(outputValue, builder.getInt32Ty());
+                    outputValue = new TruncInst(outputValue, builder.getInt16Ty());
+                    outputValue = new BitCastInst(outputValue, builder.getHalfTy());
                 }
 
             }
 
             Value* args[] =
             {
-                builder.getInt32(pXfbOutInfo->xfbBuffer),
-                builder.getInt32(pXfbOutInfo->xfbOffset),
-                builder.getInt32(pXfbOutInfo->xfbExtraOffset),
-                pOutputValue
+                builder.getInt32(xfbOutInfo->xfbBuffer),
+                builder.getInt32(xfbOutInfo->xfbOffset),
+                builder.getInt32(xfbOutInfo->xfbExtraOffset),
+                outputValue
             };
 
             std::string instName(lgcName::OutputExportXfb);
-            AddTypeMangling(nullptr, args, instName);
-            builder.CreateNamedCall(instName, builder.getVoidTy(), args, {});
+            addTypeMangling(nullptr, args, instName);
+            builder.createNamedCall(instName, builder.getVoidTy(), args, {});
         }
     }
 
-    if (pResUsage->inOutUsage.gs.rasterStream == streamId)
+    if (resUsage->inOutUsage.gs.rasterStream == streamId)
     {
-        auto pOutputTy = pOutputValue->getType();
-        assert(pOutputTy->isSingleValueType());
+        auto outputTy = outputValue->getType();
+        assert(outputTy->isSingleValueType());
 
         std::string instName(lgcName::OutputExportGeneric);
-        instName += GetTypeName(pOutputTy);
+        instName += getTypeName(outputTy);
 
-        builder.CreateNamedCall(instName, builder.getVoidTy(), { builder.getInt32(location), pOutputValue }, {});
+        builder.createNamedCall(instName, builder.getVoidTy(), { builder.getInt32(location), outputValue }, {});
     }
 }
 
 // =====================================================================================================================
 // Exports built-in outputs of geometry shader, inserting output-export calls.
-void PatchCopyShader::ExportBuiltInOutput(
-    Value*       pOutputValue,  // [in] Value exported to output
+void PatchCopyShader::exportBuiltInOutput(
+    Value*       outputValue,  // [in] Value exported to output
     BuiltInKind  builtInId,     // ID of the built-in variable
     unsigned     streamId,      // ID of output vertex stream
     BuilderBase& builder)       // [in] BuilderBase to use for instruction constructing
 {
-    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
+    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
-    if (pResUsage->inOutUsage.enableXfb)
+    if (resUsage->inOutUsage.enableXfb)
     {
         GsOutLocInfo outLocInfo = {};
         outLocInfo.location  = builtInId;
         outLocInfo.isBuiltIn = true;
         outLocInfo.streamId  = streamId;
 
-        auto& xfbOutsInfo = pResUsage->inOutUsage.gs.xfbOutsInfo;
+        auto& xfbOutsInfo = resUsage->inOutUsage.gs.xfbOutsInfo;
         auto locIter = xfbOutsInfo.find(outLocInfo.u32All);
         if (locIter != xfbOutsInfo.end())
         {
-            XfbOutInfo* pXfbOutInfo = reinterpret_cast<XfbOutInfo*>(&xfbOutsInfo[locIter->first]);
+            XfbOutInfo* xfbOutInfo = reinterpret_cast<XfbOutInfo*>(&xfbOutsInfo[locIter->first]);
 
             std::string instName(lgcName::OutputExportXfb);
             Value* args[] =
             {
-                builder.getInt32(pXfbOutInfo->xfbBuffer),
-                builder.getInt32(pXfbOutInfo->xfbOffset),
+                builder.getInt32(xfbOutInfo->xfbBuffer),
+                builder.getInt32(xfbOutInfo->xfbOffset),
                 builder.getInt32(0),
-                pOutputValue
+                outputValue
             };
-            AddTypeMangling(nullptr, args, instName);
-            builder.CreateNamedCall(instName, builder.getVoidTy(), args, {});
+            addTypeMangling(nullptr, args, instName);
+            builder.createNamedCall(instName, builder.getVoidTy(), args, {});
         }
     }
 
-    if (pResUsage->inOutUsage.gs.rasterStream == streamId)
+    if (resUsage->inOutUsage.gs.rasterStream == streamId)
     {
         std::string callName = lgcName::OutputExportBuiltIn;
-        callName += BuilderImplInOut::GetBuiltInName(builtInId);
-        Value* args[] = { builder.getInt32(builtInId), pOutputValue };
-        AddTypeMangling(nullptr, args, callName);
-        builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
+        callName += BuilderImplInOut::getBuiltInName(builtInId);
+        Value* args[] = { builder.getInt32(builtInId), outputValue };
+        addTypeMangling(nullptr, args, callName);
+        builder.createNamedCall(callName, builder.getVoidTy(), args, {});
     }
 }
 

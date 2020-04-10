@@ -57,7 +57,7 @@ public:
     // any shader stages. The function takes the LLVM IR module and a per-shader-stage array of input/output
     // usage checksums, and it returns the shader stage mask with bits removed for shader stages that it wants
     // removed.
-    void SetCallbackFunction(Pipeline::CheckShaderCacheFunc callbackFunc)
+    void setCallbackFunction(Pipeline::CheckShaderCacheFunc callbackFunc)
     {
         m_callbackFunc = callbackFunc;
     }

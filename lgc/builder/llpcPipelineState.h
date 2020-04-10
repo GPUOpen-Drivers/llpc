@@ -53,7 +53,7 @@ namespace lgc
 
 class TargetInfo;
 
-llvm::ModulePass* CreatePipelineStateClearer();
+llvm::ModulePass* createPipelineStateClearer();
 
 // =====================================================================================================================
 // Represents NGG (implicit primitive shader) control settings (valid for GFX10+)
@@ -106,8 +106,8 @@ struct NggControl
 class PipelineState final : public Pipeline
 {
 public:
-    PipelineState(BuilderContext* pBuilderContext)
-        : Pipeline(pBuilderContext)
+    PipelineState(BuilderContext* builderContext)
+        : Pipeline(builderContext)
     {}
 
     ~PipelineState() override final {}
@@ -116,137 +116,137 @@ public:
     // Implementations of Pipeline methods exposed to the front-end
 
     // Set the resource mapping nodes for the pipeline
-    void SetUserDataNodes(llvm::ArrayRef<ResourceNode> nodes) override final;
+    void setUserDataNodes(llvm::ArrayRef<ResourceNode> nodes) override final;
 
     // Set shader stage mask
-    void SetShaderStageMask(unsigned mask) override final { m_stageMask = mask; }
+    void setShaderStageMask(unsigned mask) override final { m_stageMask = mask; }
 
     // Set and get per-pipeline options
-    void SetOptions(const Options& options) override final { m_options = options; }
-    const Options& GetOptions() override final { return m_options; }
+    void setOptions(const Options& options) override final { m_options = options; }
+    const Options& getOptions() override final { return m_options; }
 
     // Set per-shader options
-    void SetShaderOptions(ShaderStage stage, const ShaderOptions& options) override final;
+    void setShaderOptions(ShaderStage stage, const ShaderOptions& options) override final;
 
     // Set device index
-    void SetDeviceIndex(unsigned deviceIndex) override final { m_deviceIndex = deviceIndex; }
+    void setDeviceIndex(unsigned deviceIndex) override final { m_deviceIndex = deviceIndex; }
 
     // Set vertex input descriptions
-    void SetVertexInputDescriptions(llvm::ArrayRef<VertexInputDescription> inputs) override final;
+    void setVertexInputDescriptions(llvm::ArrayRef<VertexInputDescription> inputs) override final;
 
     // Set color export state
-    void SetColorExportState(llvm::ArrayRef<ColorExportFormat> formats,
+    void setColorExportState(llvm::ArrayRef<ColorExportFormat> formats,
                              const ColorExportState&     exportState) override final;
 
     // Set graphics state (input-assembly, viewport, rasterizer).
-    void SetGraphicsState(const InputAssemblyState& iaState,
+    void setGraphicsState(const InputAssemblyState& iaState,
                           const ViewportState&      vpState,
                           const RasterizerState&    rsState) override final;
 
     // Link the individual shader modules into a single pipeline module
-    llvm::Module* Link(llvm::ArrayRef<llvm::Module*> modules) override final;
+    llvm::Module* link(llvm::ArrayRef<llvm::Module*> modules) override final;
 
     // Generate pipeline module
-    void Generate(std::unique_ptr<llvm::Module>   pipelineModule,
+    void generate(std::unique_ptr<llvm::Module>   pipelineModule,
                   llvm::raw_pwrite_stream&        outStream,
                   CheckShaderCacheFunc      checkShaderCacheFunc,
                   llvm::ArrayRef<llvm::Timer*>          timers) override final;
 
     // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
     // type. Only the number of elements of the type is significant.
-    unsigned ComputeExportFormat(llvm::Type* pOutputTy, unsigned location) override final;
+    unsigned computeExportFormat(llvm::Type* outputTy, unsigned location) override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Other methods
 
     // Get the embedded ShaderModes object
-    ShaderModes* GetShaderModes() { return &m_shaderModes; }
+    ShaderModes* getShaderModes() { return &m_shaderModes; }
 
     // Accessors for context information
-    const TargetInfo& GetTargetInfo() const;
-    unsigned GetPalAbiVersion() const;
+    const TargetInfo& getTargetInfo() const;
+    unsigned getPalAbiVersion() const;
 
     // Clear the pipeline state IR metadata.
-    void Clear(llvm::Module* pModule);
+    void clear(llvm::Module* module);
 
     // Record pipeline state into IR metadata of specified module.
-    void Record(llvm::Module* pModule);
+    void record(llvm::Module* module);
 
     // Accessors for shader stage mask
-    unsigned GetShaderStageMask() const { return m_stageMask; }
-    bool HasShaderStage(ShaderStage stage) const { return (GetShaderStageMask() >> stage) & 1; }
-    bool IsGraphics() const;
-    ShaderStage GetLastVertexProcessingStage() const;
-    ShaderStage GetPrevShaderStage(ShaderStage shaderStage) const;
-    ShaderStage GetNextShaderStage(ShaderStage shaderStage) const;
+    unsigned getShaderStageMask() const { return m_stageMask; }
+    bool hasShaderStage(ShaderStage stage) const { return (getShaderStageMask() >> stage) & 1; }
+    bool isGraphics() const;
+    ShaderStage getLastVertexProcessingStage() const;
+    ShaderStage getPrevShaderStage(ShaderStage shaderStage) const;
+    ShaderStage getNextShaderStage(ShaderStage shaderStage) const;
 
     // Get per-shader options
-    const ShaderOptions& GetShaderOptions(ShaderStage stage);
+    const ShaderOptions& getShaderOptions(ShaderStage stage);
 
     // Set up the pipeline state from the pipeline module.
-    void ReadState(llvm::Module* pModule);
+    void readState(llvm::Module* module);
 
     // Get user data nodes
-    llvm::ArrayRef<ResourceNode> GetUserDataNodes() const { return m_userDataNodes; }
+    llvm::ArrayRef<ResourceNode> getUserDataNodes() const { return m_userDataNodes; }
 
     // Find the resource node for the given set,binding
-    std::pair<const ResourceNode*, const ResourceNode*> FindResourceNode(ResourceNodeType  nodeType,
+    std::pair<const ResourceNode*, const ResourceNode*> findResourceNode(ResourceNodeType  nodeType,
                                                                          unsigned          descSet,
                                                                          unsigned          binding) const;
 
     // Return whether we have a converting sampler in the user data nodes.
-    bool HaveConvertingSampler() const { return m_haveConvertingSampler; }
+    bool haveConvertingSampler() const { return m_haveConvertingSampler; }
 
     // Set "no replayer" flag, saying that this pipeline is being compiled with a BuilderImpl so does not
     // need a BuilderReplayer pass.
-    void SetNoReplayer() { m_noReplayer = true; }
+    void setNoReplayer() { m_noReplayer = true; }
 
     // Accessors for vertex input descriptions.
-    llvm::ArrayRef<VertexInputDescription> GetVertexInputDescriptions() const { return m_vertexInputDescriptions; }
-    const VertexInputDescription* FindVertexInputDescription(unsigned location) const;
+    llvm::ArrayRef<VertexInputDescription> getVertexInputDescriptions() const { return m_vertexInputDescriptions; }
+    const VertexInputDescription* findVertexInputDescription(unsigned location) const;
 
     // Accessors for color export state
-    const ColorExportFormat& GetColorExportFormat(unsigned location);
-    const ColorExportState& GetColorExportState() { return m_colorExportState; }
+    const ColorExportFormat& getColorExportFormat(unsigned location);
+    const ColorExportState& getColorExportState() { return m_colorExportState; }
 
     // Accessors for pipeline state
-    unsigned GetDeviceIndex() const { return m_deviceIndex; }
-    const InputAssemblyState& GetInputAssemblyState() const { return m_inputAssemblyState; }
-    const ViewportState& GetViewportState() const { return m_viewportState; }
-    const RasterizerState& GetRasterizerState() const { return m_rasterizerState; }
+    unsigned getDeviceIndex() const { return m_deviceIndex; }
+    const InputAssemblyState& getInputAssemblyState() const { return m_inputAssemblyState; }
+    const ViewportState& getViewportState() const { return m_viewportState; }
+    const RasterizerState& getRasterizerState() const { return m_rasterizerState; }
 
     // Determine whether to use off-chip tessellation mode
-    bool IsTessOffChip();
+    bool isTessOffChip();
 
     // Set GS on-chip mode
-    void SetGsOnChip(bool gsOnChip) { m_gsOnChip = gsOnChip; }
+    void setGsOnChip(bool gsOnChip) { m_gsOnChip = gsOnChip; }
 
     // Checks whether GS on-chip mode is enabled
     // NOTE: GS on-chip mode has different meaning for GFX6~8 and GFX9: on GFX6~8, GS on-chip mode means ES -> GS ring
     // and GS -> VS ring are both on-chip; on GFX9, ES -> GS ring is always on-chip, GS on-chip mode means GS -> VS
     // ring is on-chip.
-    bool IsGsOnChip() const { return m_gsOnChip; }
+    bool isGsOnChip() const { return m_gsOnChip; }
 
     // Gets wave size for the specified shader stage
-    unsigned GetShaderWaveSize(ShaderStage stage);
+    unsigned getShaderWaveSize(ShaderStage stage);
 
     // Get NGG control settings
-    NggControl* GetNggControl() { return &m_nggControl; }
+    NggControl* getNggControl() { return &m_nggControl; }
 
     // Gets resource usage of the specified shader stage
-    ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage);
+    ResourceUsage* getShaderResourceUsage(ShaderStage shaderStage);
 
     // Gets interface data of the specified shader stage
-    InterfaceData* GetShaderInterfaceData(ShaderStage shaderStage);
+    InterfaceData* getShaderInterfaceData(ShaderStage shaderStage);
 
     // -----------------------------------------------------------------------------------------------------------------
     // Utility methods
 
     // Gets name string of the abbreviation for the specified shader stage
-    static const char* GetShaderStageAbbreviation(ShaderStage shaderStage);
+    static const char* getShaderStageAbbreviation(ShaderStage shaderStage);
 
     // Translate enum "ResourceNodeType" to string
-    static const char* GetResourceNodeTypeName(ResourceNodeType type);
+    static const char* getResourceNodeTypeName(ResourceNodeType type);
 
     // -----------------------------------------------------------------------------------------------------------------
     // Utility method templates to read and write IR metadata, used by PipelineState and ShaderModes
@@ -255,7 +255,7 @@ public:
     // The array is trimmed to remove trailing zero values. If the whole array would be 0, then this function
     // returns nullptr.
     template<typename T>
-    static llvm::MDNode* GetArrayOfInt32MetaNode(
+    static llvm::MDNode* getArrayOfInt32MetaNode(
         llvm::LLVMContext&        context,          // [in] LLVM context
         const T&            value,            // [in] Value to write as array of i32
         bool                atLeastOneValue)  // True to generate node with one value even if all values are zero
@@ -288,38 +288,38 @@ public:
     // The array is trimmed to remove trailing zero values. If the whole array would be 0, then this function
     // removes the named metadata node (if it existed).
     template<typename T>
-    static void SetNamedMetadataToArrayOfInt32(
-        llvm::Module*             pModule,    // [in/out] IR module to record into
+    static void setNamedMetadataToArrayOfInt32(
+        llvm::Module*             module,    // [in/out] IR module to record into
         const T&            value,      // [in] Value to write as array of i32
         llvm::StringRef           metaName)   // Name for named metadata node
     {
-        llvm::MDNode* pArrayMetaNode = GetArrayOfInt32MetaNode(pModule->getContext(), value, false);
-        if (pArrayMetaNode == nullptr)
+        llvm::MDNode* arrayMetaNode = getArrayOfInt32MetaNode(module->getContext(), value, false);
+        if (arrayMetaNode == nullptr)
         {
-            if (auto pNamedMetaNode = pModule->getNamedMetadata(metaName))
+            if (auto namedMetaNode = module->getNamedMetadata(metaName))
             {
-                pModule->eraseNamedMetadata(pNamedMetaNode);
+                module->eraseNamedMetadata(namedMetaNode);
             }
             return;
         }
 
-        auto pNamedMetaNode = pModule->getOrInsertNamedMetadata(metaName);
-        pNamedMetaNode->clearOperands();
-        pNamedMetaNode->addOperand(pArrayMetaNode);
+        auto namedMetaNode = module->getOrInsertNamedMetadata(metaName);
+        namedMetaNode->clearOperands();
+        namedMetaNode->addOperand(arrayMetaNode);
     }
 
     // Read an array of i32 values out of a metadata node, writing into any type.
     // Returns the number of i32s read.
     template<typename T>
-    static unsigned ReadArrayOfInt32MetaNode(
-        llvm::MDNode*                   pMetaNode,  // Metadata node to read from
+    static unsigned readArrayOfInt32MetaNode(
+        llvm::MDNode*                   metaNode,  // Metadata node to read from
         T&                        value)      // [out] Value to write into (caller must zero initialize)
     {
         llvm::MutableArrayRef<unsigned> values(reinterpret_cast<unsigned*>(&value), sizeof(value) / sizeof(unsigned));
-        unsigned count = std::min(pMetaNode->getNumOperands(), unsigned(values.size()));
+        unsigned count = std::min(metaNode->getNumOperands(), unsigned(values.size()));
         for (unsigned index = 0; index < count; ++index)
         {
-            values[index] = llvm::mdconst::dyn_extract<llvm::ConstantInt>(pMetaNode->getOperand(index))->getZExtValue();
+            values[index] = llvm::mdconst::dyn_extract<llvm::ConstantInt>(metaNode->getOperand(index))->getZExtValue();
         }
         return count;
     }
@@ -328,57 +328,57 @@ public:
     // writing into any type.
     // Returns the number of i32s read.
     template<typename T>
-    static unsigned ReadNamedMetadataArrayOfInt32(
-        llvm::Module*                   pModule,    // [in] IR module to look in
+    static unsigned readNamedMetadataArrayOfInt32(
+        llvm::Module*                   module,    // [in] IR module to look in
         llvm::StringRef                 metaName,   // Name for named metadata node
         T&                        value)      // [out] Value to write into (caller must zero initialize)
     {
-        auto pNamedMetaNode = pModule->getNamedMetadata(metaName);
-        if ((pNamedMetaNode == nullptr) || (pNamedMetaNode->getNumOperands() == 0))
+        auto namedMetaNode = module->getNamedMetadata(metaName);
+        if ((namedMetaNode == nullptr) || (namedMetaNode->getNumOperands() == 0))
         {
             return 0;
         }
-        return ReadArrayOfInt32MetaNode(pNamedMetaNode->getOperand(0), value);
+        return readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), value);
     }
 
 private:
     // Read shaderStageMask from IR
-    void ReadShaderStageMask(llvm::Module* pModule);
+    void readShaderStageMask(llvm::Module* module);
 
     // Options handling
-    void RecordOptions(llvm::Module* pModule);
-    void ReadOptions(llvm::Module* pModule);
+    void recordOptions(llvm::Module* module);
+    void readOptions(llvm::Module* module);
 
     // User data nodes handling
-    void SetUserDataNodesTable(llvm::ArrayRef<ResourceNode>               nodes,
-                               ResourceNode*                        pDestTable,
-                               ResourceNode*&                       pDestInnerTable);
-    void RecordUserDataNodes(llvm::Module* pModule);
-    void RecordUserDataTable(llvm::ArrayRef<ResourceNode> nodes, llvm::NamedMDNode* pUserDataMetaNode);
-    void ReadUserDataNodes(llvm::Module* pModule);
-    llvm::ArrayRef<llvm::MDString*> GetResourceTypeNames();
-    llvm::MDString* GetResourceTypeName(ResourceNodeType type);
-    ResourceNodeType GetResourceTypeFromName(llvm::MDString* pTypeName);
+    void setUserDataNodesTable(llvm::ArrayRef<ResourceNode>               nodes,
+                               ResourceNode*                        destTable,
+                               ResourceNode*&                       destInnerTable);
+    void recordUserDataNodes(llvm::Module* module);
+    void recordUserDataTable(llvm::ArrayRef<ResourceNode> nodes, llvm::NamedMDNode* userDataMetaNode);
+    void readUserDataNodes(llvm::Module* module);
+    llvm::ArrayRef<llvm::MDString*> getResourceTypeNames();
+    llvm::MDString* getResourceTypeName(ResourceNodeType type);
+    ResourceNodeType getResourceTypeFromName(llvm::MDString* typeName);
 
     // Device index handling
-    void RecordDeviceIndex(llvm::Module* pModule);
-    void ReadDeviceIndex(llvm::Module* pModule);
+    void recordDeviceIndex(llvm::Module* module);
+    void readDeviceIndex(llvm::Module* module);
 
     // Vertex input descriptions handling
-    void RecordVertexInputDescriptions(llvm::Module* pModule);
-    void ReadVertexInputDescriptions(llvm::Module* pModule);
+    void recordVertexInputDescriptions(llvm::Module* module);
+    void readVertexInputDescriptions(llvm::Module* module);
 
     // Color export state handling
-    void RecordColorExportState(llvm::Module* pModule);
-    void ReadColorExportState(llvm::Module* pModule);
+    void recordColorExportState(llvm::Module* module);
+    void readColorExportState(llvm::Module* module);
 
     // Graphics state (iastate, vpstate, rsstate) handling
-    void RecordGraphicsState(llvm::Module* pModule);
-    void ReadGraphicsState(llvm::Module* pModule);
+    void recordGraphicsState(llvm::Module* module);
+    void readGraphicsState(llvm::Module* module);
 
     // Initialization of ResourceUsage and InterfaceData.
-    static void InitShaderResourceUsage(ShaderStage shaderStage, ResourceUsage* pResUsage);
-    static void InitShaderInterfaceData(InterfaceData* pIntfData);
+    static void initShaderResourceUsage(ShaderStage shaderStage, ResourceUsage* resUsage);
+    static void initShaderInterfaceData(InterfaceData* intfData);
 
     // -----------------------------------------------------------------------------------------------------------------
     bool                            m_noReplayer = false;               // True if no BuilderReplayer needed
@@ -412,23 +412,23 @@ private:
 class PipelineStateWrapper : public llvm::ImmutablePass
 {
 public:
-    PipelineStateWrapper(BuilderContext* pBuilderContext = nullptr);
+    PipelineStateWrapper(BuilderContext* builderContext = nullptr);
 
     bool doFinalization(llvm::Module& module) override;
 
     // Get (create if necessary) the PipelineState from this wrapper pass.
-    PipelineState* GetPipelineState(llvm::Module* pModule);
+    PipelineState* getPipelineState(llvm::Module* module);
 
     // Set the PipelineState.
-    void SetPipelineState(PipelineState* pPipelineState) { m_pPipelineState = pPipelineState; }
+    void setPipelineState(PipelineState* pipelineState) { m_pipelineState = pipelineState; }
 
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass
 
 private:
-    BuilderContext*                     m_pBuilderContext = nullptr;  // BuilderContext for allocating PipelineState
-    PipelineState*                  m_pPipelineState = nullptr;   // Cached pipeline state
+    BuilderContext*                     m_builderContext = nullptr;  // BuilderContext for allocating PipelineState
+    PipelineState*                  m_pipelineState = nullptr;   // Cached pipeline state
     std::unique_ptr<PipelineState>  m_allocatedPipelineState;     // Pipeline state allocated by this pass
 };
 

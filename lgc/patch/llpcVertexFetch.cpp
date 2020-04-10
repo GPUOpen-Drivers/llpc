@@ -53,7 +53,7 @@ namespace lgc
 }
 
 // Initializes info table of vertex component format map
-const VertexCompFormatInfo VertexFetch::m_vertexCompFormatInfo[] =
+const VertexCompFormatInfo VertexFetch::MVertexCompFormatInfo[] =
 {
     { 0,  0, 0, BUF_DATA_FORMAT_INVALID     }, // BUF_DATA_FORMAT_INVALID
     { 1,  1, 1, BUF_DATA_FORMAT_8           }, // BUF_DATA_FORMAT_8
@@ -72,7 +72,7 @@ const VertexCompFormatInfo VertexFetch::m_vertexCompFormatInfo[] =
     { 16, 4, 4, BUF_DATA_FORMAT_32          }, // BUF_DATA_FORMAT_32_32_32_32
 };
 
-const BufFormat VertexFetch::m_vertexFormatMap[] =
+const BufFormat VertexFetch::MVertexFormatMap[] =
 {
     // BUF_DATA_FORMAT
     //   BUF_NUM_FORMAT_UNORM
@@ -247,57 +247,57 @@ const BufFormat VertexFetch::m_vertexFormatMap[] =
 
 // =====================================================================================================================
 VertexFetch::VertexFetch(
-    Function*           pEntryPoint,      // [in] Entry-point of API vertex shader
-    ShaderSystemValues* pShaderSysValues, // [in] ShaderSystemValues object for getting vertex buffer pointer from
-    PipelineState*      pPipelineState)   // [in] Pipeline state
+    Function*           entryPoint,      // [in] Entry-point of API vertex shader
+    ShaderSystemValues* shaderSysValues, // [in] ShaderSystemValues object for getting vertex buffer pointer from
+    PipelineState*      pipelineState)   // [in] Pipeline state
     :
-    m_pModule(pEntryPoint->getParent()),
-    m_pContext(&m_pModule->getContext()),
-    m_pShaderSysValues(pShaderSysValues),
-    m_pPipelineState(pPipelineState)
+    m_module(entryPoint->getParent()),
+    m_context(&m_module->getContext()),
+    m_shaderSysValues(shaderSysValues),
+    m_pipelineState(pipelineState)
 {
-    assert(GetShaderStageFromFunction(pEntryPoint) == ShaderStageVertex); // Must be vertex shader
+    assert(getShaderStageFromFunction(entryPoint) == ShaderStageVertex); // Must be vertex shader
 
-    auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
-    auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
-    auto pInsertPos = pEntryPoint->begin()->getFirstInsertionPt();
+    auto& entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
+    auto& builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
+    auto insertPos = entryPoint->begin()->getFirstInsertionPt();
 
     // VertexIndex = BaseVertex + VertexID
     if (builtInUsage.vertexIndex)
     {
-        auto pBaseVertex = GetFunctionArgument(pEntryPoint, entryArgIdxs.baseVertex);
-        auto pVertexId   = GetFunctionArgument(pEntryPoint, entryArgIdxs.vertexId);
-        m_pVertexIndex = BinaryOperator::CreateAdd(pBaseVertex, pVertexId, "", &*pInsertPos);
+        auto baseVertex = getFunctionArgument(entryPoint, entryArgIdxs.baseVertex);
+        auto vertexId   = getFunctionArgument(entryPoint, entryArgIdxs.vertexId);
+        m_vertexIndex = BinaryOperator::CreateAdd(baseVertex, vertexId, "", &*insertPos);
     }
 
     // InstanceIndex = BaseInstance + InstanceID
     if (builtInUsage.instanceIndex)
     {
-        m_pBaseInstance = GetFunctionArgument(pEntryPoint, entryArgIdxs.baseInstance);
-        m_pInstanceId   = GetFunctionArgument(pEntryPoint, entryArgIdxs.instanceId);
-        m_pInstanceIndex = BinaryOperator::CreateAdd(m_pBaseInstance, m_pInstanceId, "", &*pInsertPos);
+        m_baseInstance = getFunctionArgument(entryPoint, entryArgIdxs.baseInstance);
+        m_instanceId   = getFunctionArgument(entryPoint, entryArgIdxs.instanceId);
+        m_instanceIndex = BinaryOperator::CreateAdd(m_baseInstance, m_instanceId, "", &*insertPos);
     }
 
     // Initialize default fetch values
-    auto pZero = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
-    auto pOne = ConstantInt::get(Type::getInt32Ty(*m_pContext), 1);
+    auto zero = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
+    auto one = ConstantInt::get(Type::getInt32Ty(*m_context), 1);
 
     // Int8 (0, 0, 0, 1)
-    m_fetchDefaults.pInt8 = ConstantVector::get({ pZero, pZero, pZero, pOne });
+    m_fetchDefaults.int8 = ConstantVector::get({ zero, zero, zero, one });
 
     // Int16 (0, 0, 0, 1)
-    m_fetchDefaults.pInt16 = ConstantVector::get({ pZero, pZero, pZero, pOne });
+    m_fetchDefaults.int16 = ConstantVector::get({ zero, zero, zero, one });
 
     // Int (0, 0, 0, 1)
-    m_fetchDefaults.pInt32 = ConstantVector::get({ pZero, pZero, pZero, pOne });
+    m_fetchDefaults.int32 = ConstantVector::get({ zero, zero, zero, one });
 
     // Int64 (0, 0, 0, 1)
-    m_fetchDefaults.pInt64 = ConstantVector::get({ pZero, pZero, pZero, pZero, pZero, pZero, pZero, pOne });
+    m_fetchDefaults.int64 = ConstantVector::get({ zero, zero, zero, zero, zero, zero, zero, one });
 
     // Float16 (0, 0, 0, 1.0)
     const uint16_t float16One = 0x3C00;
-    auto pFloat16OneVal = ConstantInt::get(Type::getInt32Ty(*m_pContext), float16One);
-    m_fetchDefaults.pFloat16 = ConstantVector::get({ pZero, pZero, pZero, pFloat16OneVal });
+    auto float16OneVal = ConstantInt::get(Type::getInt32Ty(*m_context), float16One);
+    m_fetchDefaults.float16 = ConstantVector::get({ zero, zero, zero, float16OneVal });
 
     // Float (0.0, 0.0, 0.0, 1.0)
     union
@@ -305,8 +305,8 @@ VertexFetch::VertexFetch(
         float    f;
         unsigned u32;
     } floatOne = { 1.0f };
-    auto pFloatOneVal = ConstantInt::get(Type::getInt32Ty(*m_pContext), floatOne.u32);
-    m_fetchDefaults.pFloat32 = ConstantVector::get({ pZero, pZero, pZero, pFloatOneVal });
+    auto floatOneVal = ConstantInt::get(Type::getInt32Ty(*m_context), floatOne.u32);
+    m_fetchDefaults.float32 = ConstantVector::get({ zero, zero, zero, floatOneVal });
 
     // Double (0.0, 0.0, 0.0, 1.0)
     union
@@ -314,86 +314,86 @@ VertexFetch::VertexFetch(
         double   d;
         unsigned u32[2];
     } doubleOne = { 1.0 };
-    auto pDoubleOne0 = ConstantInt::get(Type::getInt32Ty(*m_pContext), doubleOne.u32[0]);
-    auto pDoubleOne1 = ConstantInt::get(Type::getInt32Ty(*m_pContext), doubleOne.u32[1]);
-    m_fetchDefaults.pDouble64 = ConstantVector::get({ pZero, pZero,
-                                                      pZero, pZero,
-                                                      pZero, pZero,
-                                                      pDoubleOne0, pDoubleOne1 });
+    auto doubleOne0 = ConstantInt::get(Type::getInt32Ty(*m_context), doubleOne.u32[0]);
+    auto doubleOne1 = ConstantInt::get(Type::getInt32Ty(*m_context), doubleOne.u32[1]);
+    m_fetchDefaults.double64 = ConstantVector::get({ zero, zero,
+                                                      zero, zero,
+                                                      zero, zero,
+                                                      doubleOne0, doubleOne1 });
 }
 
 // =====================================================================================================================
 // Executes vertex fetch operations based on the specified vertex input type and its location.
-Value* VertexFetch::Run(
-    Type*        pInputTy,      // [in] Type of vertex input
+Value* VertexFetch::run(
+    Type*        inputTy,      // [in] Type of vertex input
     unsigned     location,      // Location of vertex input
     unsigned     compIdx,       // Index used for vector element indexing
-    Instruction* pInsertPos)    // [in] Where to insert vertex fetch instructions
+    Instruction* insertPos)    // [in] Where to insert vertex fetch instructions
 {
-    Value* pVertex = nullptr;
+    Value* vertex = nullptr;
 
     // Get vertex input description for the given location
-    const VertexInputDescription* pDescription = m_pPipelineState->FindVertexInputDescription(location);
+    const VertexInputDescription* description = m_pipelineState->findVertexInputDescription(location);
 
     // NOTE: If we could not find vertex input info matching this location, just return undefined value.
-    if (pDescription == nullptr)
+    if (description == nullptr)
     {
-        return UndefValue::get(pInputTy);
+        return UndefValue::get(inputTy);
     }
 
-    auto pVbDesc = LoadVertexBufferDescriptor(pDescription->binding, pInsertPos);
+    auto vbDesc = loadVertexBufferDescriptor(description->binding, insertPos);
 
-    Value* pVbIndex = nullptr;
-    if (pDescription->inputRate == VertexInputRateVertex)
+    Value* vbIndex = nullptr;
+    if (description->inputRate == VertexInputRateVertex)
     {
-        pVbIndex = GetVertexIndex(); // Use vertex index
+        vbIndex = getVertexIndex(); // Use vertex index
     }
     else
     {
-        if (pDescription->inputRate == VertexInputRateNone)
+        if (description->inputRate == VertexInputRateNone)
         {
-            pVbIndex = m_pBaseInstance;
+            vbIndex = m_baseInstance;
         }
-        else if (pDescription->inputRate == VertexInputRateInstance)
+        else if (description->inputRate == VertexInputRateInstance)
         {
-            pVbIndex = GetInstanceIndex(); // Use instance index
+            vbIndex = getInstanceIndex(); // Use instance index
         }
         else
         {
             // There is a divisor.
-            pVbIndex = BinaryOperator::CreateUDiv(m_pInstanceId,
-                                                  ConstantInt::get(Type::getInt32Ty(*m_pContext),
-                                                                   pDescription->inputRate),
+            vbIndex = BinaryOperator::CreateUDiv(m_instanceId,
+                                                  ConstantInt::get(Type::getInt32Ty(*m_context),
+                                                                   description->inputRate),
                                                   "",
-                                                  pInsertPos);
-            pVbIndex = BinaryOperator::CreateAdd(pVbIndex, m_pBaseInstance, "", pInsertPos);
+                                                  insertPos);
+            vbIndex = BinaryOperator::CreateAdd(vbIndex, m_baseInstance, "", insertPos);
         }
     }
 
     Value* vertexFetches[2] = {}; // Two vertex fetch operations might be required
-    Value* pVertexFetch = nullptr; // Coalesced vector by combining the results of two vertex fetch operations
+    Value* vertexFetch = nullptr; // Coalesced vector by combining the results of two vertex fetch operations
 
-    VertexFormatInfo formatInfo = GetVertexFormatInfo(pDescription);
+    VertexFormatInfo formatInfo = getVertexFormatInfo(description);
 
-    const bool is8bitFetch = (pInputTy->getScalarSizeInBits() == 8);
-    const bool is16bitFetch = (pInputTy->getScalarSizeInBits() == 16);
+    const bool is8bitFetch = (inputTy->getScalarSizeInBits() == 8);
+    const bool is16bitFetch = (inputTy->getScalarSizeInBits() == 16);
 
     // Do the first vertex fetch operation
-    AddVertexFetchInst(pVbDesc,
+    addVertexFetchInst(vbDesc,
                        formatInfo.numChannels,
                        is16bitFetch,
-                       pVbIndex,
-                       pDescription->offset,
-                       pDescription->stride,
+                       vbIndex,
+                       description->offset,
+                       description->stride,
                        formatInfo.dfmt,
                        formatInfo.nfmt,
-                       pInsertPos,
+                       insertPos,
                        &vertexFetches[0]);
 
     // Do post-processing in certain cases
     std::vector<Constant*> shuffleMask;
-    bool postShuffle = NeedPostShuffle(pDescription, shuffleMask);
-    bool patchA2S = NeedPatchA2S(pDescription);
+    bool postShuffle = needPostShuffle(description, shuffleMask);
+    bool patchA2S = needPatchA2S(description);
     if (postShuffle || patchA2S)
     {
         if (postShuffle)
@@ -405,7 +405,7 @@ Value* VertexFetch::Run(
                                                    vertexFetches[0],
                                                    ConstantVector::get(shuffleMask),
                                                    "",
-                                                   pInsertPos);
+                                                   insertPos);
         }
 
         if (patchA2S)
@@ -413,10 +413,10 @@ Value* VertexFetch::Run(
             assert(vertexFetches[0]->getType()->getVectorNumElements() == 4);
 
             // Extract alpha channel: %a = extractelement %vf0, 3
-            Value* pAlpha = ExtractElementInst::Create(vertexFetches[0],
-                                                       ConstantInt::get(Type::getInt32Ty(*m_pContext), 3),
+            Value* alpha = ExtractElementInst::Create(vertexFetches[0],
+                                                       ConstantInt::get(Type::getInt32Ty(*m_context), 3),
                                                        "",
-                                                       pInsertPos);
+                                                       insertPos);
 
             if (formatInfo.nfmt == BufNumFormatSint)
             {
@@ -424,16 +424,16 @@ Value* VertexFetch::Run(
                 // unsigned. We have to manually sign-extend it here by doing a "shl" 30 then an "ashr" 30.
 
                 // %a = shl %a, 30
-                pAlpha = BinaryOperator::CreateShl(pAlpha,
-                                                   ConstantInt::get(Type::getInt32Ty(*m_pContext), 30),
+                alpha = BinaryOperator::CreateShl(alpha,
+                                                   ConstantInt::get(Type::getInt32Ty(*m_context), 30),
                                                    "",
-                                                   pInsertPos);
+                                                   insertPos);
 
                 // %a = ashr %a, 30
-                pAlpha = BinaryOperator::CreateAShr(pAlpha,
-                                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 30),
+                alpha = BinaryOperator::CreateAShr(alpha,
+                                                    ConstantInt::get(Type::getInt32Ty(*m_context), 30),
                                                     "",
-                                                    pInsertPos);
+                                                    insertPos);
             }
             else if (formatInfo.nfmt == BufNumFormatSnorm)
             {
@@ -442,30 +442,30 @@ Value* VertexFetch::Run(
                 // -1.0, -1.0 } respectively.
 
                 // %a = bitcast %a to f32
-                pAlpha = new BitCastInst(pAlpha, Type::getFloatTy(*m_pContext), "", pInsertPos);
+                alpha = new BitCastInst(alpha, Type::getFloatTy(*m_context), "", insertPos);
 
                 // %a = mul %a, 3.0f
-                pAlpha = BinaryOperator::CreateFMul(pAlpha,
-                                                   ConstantFP::get(Type::getFloatTy(*m_pContext), 3.0f),
+                alpha = BinaryOperator::CreateFMul(alpha,
+                                                   ConstantFP::get(Type::getFloatTy(*m_context), 3.0f),
                                                    "",
-                                                   pInsertPos);
+                                                   insertPos);
 
                 // %cond = ugt %a, 1.5f
-                auto pCond = new FCmpInst(pInsertPos,
+                auto cond = new FCmpInst(insertPos,
                                           FCmpInst::FCMP_UGT,
-                                          pAlpha,
-                                          ConstantFP::get(Type::getFloatTy(*m_pContext), 1.5f),
+                                          alpha,
+                                          ConstantFP::get(Type::getFloatTy(*m_context), 1.5f),
                                           "");
 
                 // %a = select %cond, -1.0f, pAlpha
-                pAlpha = SelectInst::Create(pCond,
-                                            ConstantFP::get(Type::getFloatTy(*m_pContext), -1.0f),
-                                            pAlpha,
+                alpha = SelectInst::Create(cond,
+                                            ConstantFP::get(Type::getFloatTy(*m_context), -1.0f),
+                                            alpha,
                                             "",
-                                            pInsertPos);
+                                            insertPos);
 
                 // %a = bitcast %a to i32
-                pAlpha = new BitCastInst(pAlpha, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+                alpha = new BitCastInst(alpha, Type::getInt32Ty(*m_context), "", insertPos);
             }
             else if (formatInfo.nfmt == BufNumFormatSscaled)
             {
@@ -475,28 +475,28 @@ Value* VertexFetch::Run(
                 // "ashr" 30, and finally "sitofp".
 
                // %a = bitcast %a to float
-                pAlpha = new BitCastInst(pAlpha, Type::getFloatTy(*m_pContext), "", pInsertPos);
+                alpha = new BitCastInst(alpha, Type::getFloatTy(*m_context), "", insertPos);
 
                 // %a = fptosi %a to i32
-                pAlpha = new FPToSIInst(pAlpha, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+                alpha = new FPToSIInst(alpha, Type::getInt32Ty(*m_context), "", insertPos);
 
                 // %a = shl %a, 30
-                pAlpha = BinaryOperator::CreateShl(pAlpha,
-                                                   ConstantInt::get(Type::getInt32Ty(*m_pContext), 30),
+                alpha = BinaryOperator::CreateShl(alpha,
+                                                   ConstantInt::get(Type::getInt32Ty(*m_context), 30),
                                                    "",
-                                                   pInsertPos);
+                                                   insertPos);
 
                 // %a = ashr a, 30
-                pAlpha = BinaryOperator::CreateAShr(pAlpha,
-                                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 30),
+                alpha = BinaryOperator::CreateAShr(alpha,
+                                                    ConstantInt::get(Type::getInt32Ty(*m_context), 30),
                                                     "",
-                                                    pInsertPos);
+                                                    insertPos);
 
                 // %a = sitofp %a to float
-                pAlpha = new SIToFPInst(pAlpha, Type::getFloatTy(*m_pContext), "", pInsertPos);
+                alpha = new SIToFPInst(alpha, Type::getFloatTy(*m_context), "", insertPos);
 
                 // %a = bitcast %a to i32
-                pAlpha = new BitCastInst(pAlpha, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+                alpha = new BitCastInst(alpha, Type::getInt32Ty(*m_context), "", insertPos);
             }
             else
             {
@@ -505,36 +505,36 @@ Value* VertexFetch::Run(
 
             // Insert alpha channel: %vf0 = insertelement %vf0, %a, 3
             vertexFetches[0] = InsertElementInst::Create(vertexFetches[0],
-                                                       pAlpha,
-                                                       ConstantInt::get(Type::getInt32Ty(*m_pContext), 3),
+                                                       alpha,
+                                                       ConstantInt::get(Type::getInt32Ty(*m_context), 3),
                                                        "",
-                                                       pInsertPos);
+                                                       insertPos);
         }
     }
 
     // Do the second vertex fetch operation
-    const bool secondFetch = NeedSecondVertexFetch(pDescription);
+    const bool secondFetch = needSecondVertexFetch(description);
     if (secondFetch)
     {
         unsigned numChannels = formatInfo.numChannels;
         unsigned dfmt = formatInfo.dfmt;
 
-        if (pDescription->dfmt == BufDataFormat64_64_64)
+        if (description->dfmt == BufDataFormat64_64_64)
         {
             // Valid number of channels and data format have to be revised
             numChannels = 2;
             dfmt = BUF_DATA_FORMAT_32_32;
         }
 
-        AddVertexFetchInst(pVbDesc,
+        addVertexFetchInst(vbDesc,
                            numChannels,
                            is16bitFetch,
-                           pVbIndex,
-                           pDescription->offset + SizeOfVec4,
-                           pDescription->stride,
+                           vbIndex,
+                           description->offset + SizeOfVec4,
+                           description->stride,
                            dfmt,
                            formatInfo.nfmt,
-                           pInsertPos,
+                           insertPos,
                            &vertexFetches[1]);
     }
 
@@ -556,77 +556,77 @@ Value* VertexFetch::Run(
 
             // %vf1 = shufflevector %vf1, %vf1, <0, 1, undef, undef>
             Constant* shuffleMask[] = {
-                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
-                ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
-                UndefValue::get(Type::getInt32Ty(*m_pContext)),
-                UndefValue::get(Type::getInt32Ty(*m_pContext))
+                ConstantInt::get(Type::getInt32Ty(*m_context), 0),
+                ConstantInt::get(Type::getInt32Ty(*m_context), 1),
+                UndefValue::get(Type::getInt32Ty(*m_context)),
+                UndefValue::get(Type::getInt32Ty(*m_context))
             };
             vertexFetches[1] = new ShuffleVectorInst(vertexFetches[1],
                                                    vertexFetches[1],
                                                    ConstantVector::get(shuffleMask),
                                                    "",
-                                                   pInsertPos);
+                                                   insertPos);
         }
 
         // %vf = shufflevector %vf0, %vf1, <0, 1, 2, 3, 4, 5, ...>
         shuffleMask.clear();
         for (unsigned i = 0; i < 4 + compCount; ++i)
         {
-            shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), i));
+            shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), i));
         }
-        pVertexFetch = new ShuffleVectorInst(vertexFetches[0],
+        vertexFetch = new ShuffleVectorInst(vertexFetches[0],
                                              vertexFetches[1],
                                              ConstantVector::get(shuffleMask),
                                              "",
-                                             pInsertPos);
+                                             insertPos);
     }
     else
     {
-        pVertexFetch = vertexFetches[0];
+        vertexFetch = vertexFetches[0];
     }
 
     // Finalize vertex fetch
-    Type* pBasicTy = pInputTy->isVectorTy() ? pInputTy->getVectorElementType() : pInputTy;
-    const unsigned bitWidth = pBasicTy->getScalarSizeInBits();
+    Type* basicTy = inputTy->isVectorTy() ? inputTy->getVectorElementType() : inputTy;
+    const unsigned bitWidth = basicTy->getScalarSizeInBits();
     assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
     // Get default fetch values
-    Constant* pDefaults = nullptr;
+    Constant* defaults = nullptr;
 
-    if (pBasicTy->isIntegerTy())
+    if (basicTy->isIntegerTy())
     {
         if (bitWidth == 8)
         {
-            pDefaults = m_fetchDefaults.pInt8;
+            defaults = m_fetchDefaults.int8;
         }
         else if (bitWidth == 16)
         {
-            pDefaults = m_fetchDefaults.pInt16;
+            defaults = m_fetchDefaults.int16;
         }
         else if (bitWidth == 32)
         {
-            pDefaults = m_fetchDefaults.pInt32;
+            defaults = m_fetchDefaults.int32;
         }
         else
         {
             assert(bitWidth == 64);
-            pDefaults = m_fetchDefaults.pInt64;
+            defaults = m_fetchDefaults.int64;
         }
     }
-    else if (pBasicTy->isFloatingPointTy())
+    else if (basicTy->isFloatingPointTy())
     {
         if (bitWidth == 16)
         {
-            pDefaults = m_fetchDefaults.pFloat16;
+            defaults = m_fetchDefaults.float16;
         }
         else if (bitWidth == 32)
         {
-            pDefaults = m_fetchDefaults.pFloat32;
+            defaults = m_fetchDefaults.float32;
         }
         else
         {
             assert(bitWidth == 64);
-            pDefaults = m_fetchDefaults.pDouble64;
+            defaults = m_fetchDefaults.double64;
         }
     }
     else
@@ -634,39 +634,39 @@ Value* VertexFetch::Run(
         llvm_unreachable("Should never be called!");
     }
 
-    const unsigned defaultCompCount = pDefaults->getType()->getVectorNumElements();
+    const unsigned defaultCompCount = defaults->getType()->getVectorNumElements();
     std::vector<Value*> defaultValues(defaultCompCount);
 
     for (unsigned i = 0; i < defaultValues.size(); ++i)
     {
-        defaultValues[i] = ExtractElementInst::Create(pDefaults,
-                                                      ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
+        defaultValues[i] = ExtractElementInst::Create(defaults,
+                                                      ConstantInt::get(Type::getInt32Ty(*m_context), i),
                                                       "",
-                                                      pInsertPos);
+                                                      insertPos);
     }
 
     // Get vertex fetch values
-    const unsigned fetchCompCount = pVertexFetch->getType()->isVectorTy() ?
-                                        pVertexFetch->getType()->getVectorNumElements() : 1;
+    const unsigned fetchCompCount = vertexFetch->getType()->isVectorTy() ?
+                                        vertexFetch->getType()->getVectorNumElements() : 1;
     std::vector<Value*> fetchValues(fetchCompCount);
 
     if (fetchCompCount == 1)
     {
-        fetchValues[0] = pVertexFetch;
+        fetchValues[0] = vertexFetch;
     }
     else
     {
         for (unsigned i = 0; i < fetchCompCount; ++i)
         {
-            fetchValues[i] = ExtractElementInst::Create(pVertexFetch,
-                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
+            fetchValues[i] = ExtractElementInst::Create(vertexFetch,
+                                                        ConstantInt::get(Type::getInt32Ty(*m_context), i),
                                                         "",
-                                                        pInsertPos);
+                                                        insertPos);
         }
     }
 
     // Construct vertex fetch results
-    const unsigned inputCompCount = pInputTy->isVectorTy() ? pInputTy->getVectorNumElements() : 1;
+    const unsigned inputCompCount = inputTy->isVectorTy() ? inputTy->getVectorNumElements() : 1;
     const unsigned vertexCompCount = inputCompCount * ((bitWidth == 64) ? 2 : 1);
 
     std::vector<Value*> vertexValues(vertexCompCount);
@@ -688,26 +688,26 @@ Value* VertexFetch::Run(
         else
         {
             llvm_unreachable("Should never be called!");
-            vertexValues[i] = UndefValue::get(Type::getInt32Ty(*m_pContext));
+            vertexValues[i] = UndefValue::get(Type::getInt32Ty(*m_context));
         }
     }
 
     if (vertexCompCount == 1)
     {
-        pVertex = vertexValues[0];
+        vertex = vertexValues[0];
     }
     else
     {
-        Type* pVertexTy = VectorType::get(Type::getInt32Ty(*m_pContext), vertexCompCount);
-        pVertex = UndefValue::get(pVertexTy);
+        Type* vertexTy = VectorType::get(Type::getInt32Ty(*m_context), vertexCompCount);
+        vertex = UndefValue::get(vertexTy);
 
         for (unsigned i = 0; i < vertexCompCount; ++i)
         {
-            pVertex = InsertElementInst::Create(pVertex,
+            vertex = InsertElementInst::Create(vertex,
                                                 vertexValues[i],
-                                                ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
+                                                ConstantInt::get(Type::getInt32Ty(*m_context), i),
                                                 "",
-                                                pInsertPos);
+                                                insertPos);
         }
     }
 
@@ -715,39 +715,39 @@ Value* VertexFetch::Run(
     {
         // NOTE: The vertex fetch results are represented as <n x i32> now. For 8-bit vertex fetch, we have to
         // convert them to <n x i8> and the 24 high bits is truncated.
-        assert(pInputTy->isIntOrIntVectorTy()); // Must be integer type
+        assert(inputTy->isIntOrIntVectorTy()); // Must be integer type
 
-        Type* pVertexTy = pVertex->getType();
-        Type* pTruncTy = Type::getInt8Ty(*m_pContext);
-        pTruncTy = pVertexTy->isVectorTy() ? cast<Type>(VectorType::get(pTruncTy, pVertexTy->getVectorNumElements())) :
-                                             pTruncTy;
-        pVertex = new TruncInst(pVertex, pTruncTy, "", pInsertPos);
+        Type* vertexTy = vertex->getType();
+        Type* truncTy = Type::getInt8Ty(*m_context);
+        truncTy = vertexTy->isVectorTy() ? cast<Type>(VectorType::get(truncTy, vertexTy->getVectorNumElements())) :
+                                             truncTy;
+        vertex = new TruncInst(vertex, truncTy, "", insertPos);
     }
     else if (is16bitFetch)
     {
         // NOTE: The vertex fetch results are represented as <n x i32> now. For 16-bit vertex fetch, we have to
         // convert them to <n x i16> and the 16 high bits is truncated.
-        Type* pVertexTy = pVertex->getType();
-        Type* pTruncTy = Type::getInt16Ty(*m_pContext);
-        pTruncTy = pVertexTy->isVectorTy() ? cast<Type>(VectorType::get(pTruncTy, pVertexTy->getVectorNumElements())) :
-                                             pTruncTy;
-        pVertex = new TruncInst(pVertex, pTruncTy, "", pInsertPos);
+        Type* vertexTy = vertex->getType();
+        Type* truncTy = Type::getInt16Ty(*m_context);
+        truncTy = vertexTy->isVectorTy() ? cast<Type>(VectorType::get(truncTy, vertexTy->getVectorNumElements())) :
+                                             truncTy;
+        vertex = new TruncInst(vertex, truncTy, "", insertPos);
     }
 
-    return pVertex;
+    return vertex;
 }
 
 // =====================================================================================================================
 // Gets info from table according to vertex attribute format.
-VertexFormatInfo VertexFetch::GetVertexFormatInfo(
-    const VertexInputDescription* pInputDesc)    // [in] Vertex input description
+VertexFormatInfo VertexFetch::getVertexFormatInfo(
+    const VertexInputDescription* inputDesc)    // [in] Vertex input description
 {
     VertexFormatInfo info = {
-                                static_cast<BufNumFormat>(pInputDesc->nfmt),
-                                static_cast<BufDataFormat>(pInputDesc->dfmt),
+                                static_cast<BufNumFormat>(inputDesc->nfmt),
+                                static_cast<BufDataFormat>(inputDesc->dfmt),
                                 1
                             };
-    switch (pInputDesc->dfmt)
+    switch (inputDesc->dfmt)
     {
     case BufDataFormat8_8:
     case BufDataFormat16_16:
@@ -792,16 +792,16 @@ VertexFormatInfo VertexFetch::GetVertexFormatInfo(
 
 // =====================================================================================================================
 // Gets component info from table according to vertex buffer data format.
-const VertexCompFormatInfo* VertexFetch::GetVertexComponentFormatInfo(
+const VertexCompFormatInfo* VertexFetch::getVertexComponentFormatInfo(
     unsigned dfmt) // Date format of vertex buffer
 {
-    assert(dfmt < sizeof(m_vertexCompFormatInfo) / sizeof(m_vertexCompFormatInfo[0]));
-    return &m_vertexCompFormatInfo[dfmt];
+    assert(dfmt < sizeof(MVertexCompFormatInfo) / sizeof(MVertexCompFormatInfo[0]));
+    return &MVertexCompFormatInfo[dfmt];
 }
 
 // =====================================================================================================================
 // Maps separate buffer data and numeric formats to the combined buffer format
-unsigned VertexFetch::MapVertexFormat(
+unsigned VertexFetch::mapVertexFormat(
     unsigned dfmt,  // Data format
     unsigned nfmt   // Numeric format
     ) const
@@ -810,12 +810,12 @@ unsigned VertexFetch::MapVertexFormat(
     assert(nfmt < 8);
     unsigned format = 0;
 
-    GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
+    GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
     if (gfxIp.major >= 10)
     {
         unsigned index = (dfmt * 8) + nfmt;
-        assert(index < sizeof(m_vertexFormatMap) / sizeof(m_vertexFormatMap[0]));
-        format = m_vertexFormatMap[index];
+        assert(index < sizeof(MVertexFormatMap) / sizeof(MVertexFormatMap[0]));
+        format = MVertexFormatMap[index];
     }
     else
     {
@@ -829,72 +829,72 @@ unsigned VertexFetch::MapVertexFormat(
 
 // =====================================================================================================================
 // Loads vertex descriptor based on the specified vertex input location.
-Value* VertexFetch::LoadVertexBufferDescriptor(
+Value* VertexFetch::loadVertexBufferDescriptor(
     unsigned     binding,       // ID of vertex buffer binding
-    Instruction* pInsertPos     // [in] Where to insert instructions
+    Instruction* insertPos     // [in] Where to insert instructions
     ) const
 {
     Value* idxs[] = {
-        ConstantInt::get(Type::getInt64Ty(*m_pContext), 0, false),
-        ConstantInt::get(Type::getInt64Ty(*m_pContext), binding, false)
+        ConstantInt::get(Type::getInt64Ty(*m_context), 0, false),
+        ConstantInt::get(Type::getInt64Ty(*m_context), binding, false)
     };
 
-    auto pVbTablePtr = m_pShaderSysValues->GetVertexBufTablePtr();
-    auto pVbDescPtr = GetElementPtrInst::Create(nullptr, pVbTablePtr, idxs, "", pInsertPos);
-    pVbDescPtr->setMetadata(MetaNameUniform, MDNode::get(pVbDescPtr->getContext(), {}));
+    auto vbTablePtr = m_shaderSysValues->getVertexBufTablePtr();
+    auto vbDescPtr = GetElementPtrInst::Create(nullptr, vbTablePtr, idxs, "", insertPos);
+    vbDescPtr->setMetadata(MetaNameUniform, MDNode::get(vbDescPtr->getContext(), {}));
 
-    auto pVbDesc = new LoadInst(pVbDescPtr, "", pInsertPos);
-    pVbDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(pVbDesc->getContext(), {}));
-    pVbDesc->setAlignment(MaybeAlign(16));
+    auto vbDesc = new LoadInst(vbDescPtr, "", insertPos);
+    vbDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(vbDesc->getContext(), {}));
+    vbDesc->setAlignment(MaybeAlign(16));
 
-    return pVbDesc;
+    return vbDesc;
 }
 
 // =====================================================================================================================
 // Inserts instructions to do vertex fetch operations.
-void VertexFetch::AddVertexFetchInst(
-    Value*       pVbDesc,       // [in] Vertex buffer descriptor
+void VertexFetch::addVertexFetchInst(
+    Value*       vbDesc,       // [in] Vertex buffer descriptor
     unsigned     numChannels,   // Valid number of channels
     bool         is16bitFetch,  // Whether it is 16-bit vertex fetch
-    Value*       pVbIndex,      // [in] Index of vertex fetch in buffer
+    Value*       vbIndex,      // [in] Index of vertex fetch in buffer
     unsigned     offset,        // Vertex attribute offset (in bytes)
     unsigned     stride,        // Vertex attribute stride (in bytes)
     unsigned     dfmt,          // Date format of vertex buffer
     unsigned     nfmt,          // Numeric format of vertex buffer
-    Instruction* pInsertPos,    // [in] Where to insert instructions
+    Instruction* insertPos,    // [in] Where to insert instructions
     Value**      ppFetch        // [out] Destination of vertex fetch
     ) const
 {
-    const VertexCompFormatInfo* pFormatInfo = GetVertexComponentFormatInfo(dfmt);
+    const VertexCompFormatInfo* formatInfo = getVertexComponentFormatInfo(dfmt);
 
     // NOTE: If the vertex attribute offset and stride are aligned on data format boundaries, we can do a vertex fetch
     // operation to read the whole vertex. Otherwise, we have to do vertex per-component fetch operations.
-    if ((((offset % pFormatInfo->vertexByteSize) == 0) && ((stride % pFormatInfo->vertexByteSize) == 0)) ||
-        (pFormatInfo->compDfmt == dfmt))
+    if ((((offset % formatInfo->vertexByteSize) == 0) && ((stride % formatInfo->vertexByteSize) == 0)) ||
+        (formatInfo->compDfmt == dfmt))
     {
         // NOTE: If the vertex attribute offset is greater than vertex attribute stride, we have to adjust both vertex
         // buffer index and vertex attribute offset accordingly. Otherwise, vertex fetch might behave unexpectedly.
         if ((stride != 0) && (offset > stride))
         {
-            pVbIndex = BinaryOperator::CreateAdd(pVbIndex,
-                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), offset / stride),
+            vbIndex = BinaryOperator::CreateAdd(vbIndex,
+                                                 ConstantInt::get(Type::getInt32Ty(*m_context), offset / stride),
                                                  "",
-                                                 pInsertPos);
+                                                 insertPos);
             offset = offset % stride;
         }
 
         // Do vertex fetch
         Value* args[] = {
-            pVbDesc,                                                                        // rsrc
-            pVbIndex,                                                                       // vindex
-            ConstantInt::get(Type::getInt32Ty(*m_pContext), offset),                        // offset
-            ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),                             // soffset
-            ConstantInt::get(Type::getInt32Ty(*m_pContext), MapVertexFormat(dfmt, nfmt)),   // dfmt, nfmt
-            ConstantInt::get(Type::getInt32Ty(*m_pContext), 0)                              // glc, slc
+            vbDesc,                                                                        // rsrc
+            vbIndex,                                                                       // vindex
+            ConstantInt::get(Type::getInt32Ty(*m_context), offset),                        // offset
+            ConstantInt::get(Type::getInt32Ty(*m_context), 0),                             // soffset
+            ConstantInt::get(Type::getInt32Ty(*m_context), mapVertexFormat(dfmt, nfmt)),   // dfmt, nfmt
+            ConstantInt::get(Type::getInt32Ty(*m_context), 0)                              // glc, slc
         };
 
         StringRef suffix = "";
-        Type* pFetchTy = nullptr;
+        Type* fetchTy = nullptr;
 
         if (is16bitFetch)
         {
@@ -902,16 +902,16 @@ void VertexFetch::AddVertexFetchInst(
             {
             case 1:
                 suffix = ".f16";
-                pFetchTy = Type::getHalfTy(*m_pContext);
+                fetchTy = Type::getHalfTy(*m_context);
                 break;
             case 2:
                 suffix = ".v2f16";
-                pFetchTy = VectorType::get(Type::getHalfTy(*m_pContext), 2);
+                fetchTy = VectorType::get(Type::getHalfTy(*m_context), 2);
                 break;
             case 3:
             case 4:
                 suffix = ".v4f16";
-                pFetchTy = VectorType::get(Type::getHalfTy(*m_pContext), 4);
+                fetchTy = VectorType::get(Type::getHalfTy(*m_context), 4);
                 break;
             default:
                 llvm_unreachable("Should never be called!");
@@ -924,16 +924,16 @@ void VertexFetch::AddVertexFetchInst(
             {
             case 1:
                 suffix = ".i32";
-                pFetchTy = Type::getInt32Ty(*m_pContext);
+                fetchTy = Type::getInt32Ty(*m_context);
                 break;
             case 2:
                 suffix = ".v2i32";
-                pFetchTy = VectorType::get(Type::getInt32Ty(*m_pContext), 2);
+                fetchTy = VectorType::get(Type::getInt32Ty(*m_context), 2);
                 break;
             case 3:
             case 4:
                 suffix = ".v4i32";
-                pFetchTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4);
+                fetchTy = VectorType::get(Type::getInt32Ty(*m_context), 4);
                 break;
             default:
                 llvm_unreachable("Should never be called!");
@@ -941,29 +941,29 @@ void VertexFetch::AddVertexFetchInst(
             }
         }
 
-        Value* pFetch = EmitCall((Twine("llvm.amdgcn.struct.tbuffer.load") + suffix).str(),
-                                 pFetchTy,
+        Value* fetch = emitCall((Twine("llvm.amdgcn.struct.tbuffer.load") + suffix).str(),
+                                 fetchTy,
                                  args,
                                  {},
-                                 pInsertPos);
+                                 insertPos);
 
         if (is16bitFetch)
         {
             // NOTE: The fetch values are represented by <n x i32>, so we will bitcast the float16 values to
             // int32 eventually.
-            Type* pBitCastTy = Type::getInt16Ty(*m_pContext);
-            pBitCastTy = (numChannels == 1) ? pBitCastTy : VectorType::get(pBitCastTy, numChannels);
-            pFetch = new BitCastInst(pFetch,
-                                        pBitCastTy,
+            Type* bitCastTy = Type::getInt16Ty(*m_context);
+            bitCastTy = (numChannels == 1) ? bitCastTy : VectorType::get(bitCastTy, numChannels);
+            fetch = new BitCastInst(fetch,
+                                        bitCastTy,
                                         "",
-                                        pInsertPos);
+                                        insertPos);
 
-            Type* pZExtTy = Type::getInt32Ty(*m_pContext);
-            pZExtTy = (numChannels == 1) ? pZExtTy : VectorType::get(pZExtTy, numChannels);
-            pFetch = new ZExtInst(pFetch,
-                                    pZExtTy,
+            Type* zExtTy = Type::getInt32Ty(*m_context);
+            zExtTy = (numChannels == 1) ? zExtTy : VectorType::get(zExtTy, numChannels);
+            fetch = new ZExtInst(fetch,
+                                    zExtTy,
                                     "",
-                                    pInsertPos);
+                                    insertPos);
         }
 
         if (numChannels == 3)
@@ -971,29 +971,29 @@ void VertexFetch::AddVertexFetchInst(
             // NOTE: If valid number of channels is 3, the actual fetch type should be revised from <4 x i32>
             // to <3 x i32>.
             Constant* shuffleMask[] = {
-                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
-                ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
-                ConstantInt::get(Type::getInt32Ty(*m_pContext), 2)
+                ConstantInt::get(Type::getInt32Ty(*m_context), 0),
+                ConstantInt::get(Type::getInt32Ty(*m_context), 1),
+                ConstantInt::get(Type::getInt32Ty(*m_context), 2)
             };
-            *ppFetch = new ShuffleVectorInst(pFetch, pFetch, ConstantVector::get(shuffleMask), "", pInsertPos);
+            *ppFetch = new ShuffleVectorInst(fetch, fetch, ConstantVector::get(shuffleMask), "", insertPos);
         }
         else
         {
-            *ppFetch = pFetch;
+            *ppFetch = fetch;
         }
     }
     else
     {
         // NOTE: Here, we split the vertex into its components and do per-component fetches. The expectation
         // is that the vertex per-component fetches always match the hardware requirements.
-        assert(numChannels == pFormatInfo->compCount);
+        assert(numChannels == formatInfo->compCount);
 
         Value* compVbIndices[4]  = {};
         unsigned compOffsets[4] = {};
 
-        for (unsigned i = 0; i < pFormatInfo->compCount; ++i)
+        for (unsigned i = 0; i < formatInfo->compCount; ++i)
         {
-            unsigned compOffset = offset + i * pFormatInfo->compByteSize;
+            unsigned compOffset = offset + i * formatInfo->compByteSize;
 
             // NOTE: If the vertex attribute per-component offset is greater than vertex attribute stride, we have
             // to adjust both vertex buffer index and vertex per-component offset accordingly. Otherwise, vertex
@@ -1001,84 +1001,84 @@ void VertexFetch::AddVertexFetchInst(
             if ((stride != 0) && (compOffset > stride))
             {
                 compVbIndices[i] = BinaryOperator::CreateAdd(
-                                       pVbIndex,
-                                       ConstantInt::get(Type::getInt32Ty(*m_pContext), compOffset / stride),
+                                       vbIndex,
+                                       ConstantInt::get(Type::getInt32Ty(*m_context), compOffset / stride),
                                        "",
-                                       pInsertPos);
+                                       insertPos);
                 compOffsets[i] = compOffset % stride;
             }
             else
             {
-                compVbIndices[i] = pVbIndex;
+                compVbIndices[i] = vbIndex;
                 compOffsets[i] = compOffset;
             }
         }
 
-        Type* pFetchTy = VectorType::get(Type::getInt32Ty(*m_pContext), numChannels);
-        Value* pFetch = UndefValue::get(pFetchTy);
+        Type* fetchTy = VectorType::get(Type::getInt32Ty(*m_context), numChannels);
+        Value* fetch = UndefValue::get(fetchTy);
 
         // Do vertex per-component fetches
-        for (unsigned i = 0; i < pFormatInfo->compCount; ++i)
+        for (unsigned i = 0; i < formatInfo->compCount; ++i)
         {
             Value* args[] = {
-                pVbDesc,                                                          // rsrc
+                vbDesc,                                                          // rsrc
                 compVbIndices[i],                                                 // vindex
-                ConstantInt::get(Type::getInt32Ty(*m_pContext), compOffsets[i]),  // offset
-                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),               // soffset
-                ConstantInt::get(Type::getInt32Ty(*m_pContext),
-                                 MapVertexFormat(pFormatInfo->compDfmt, nfmt)),   // dfmt, nfmt
-                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0)                // glc, slc
+                ConstantInt::get(Type::getInt32Ty(*m_context), compOffsets[i]),  // offset
+                ConstantInt::get(Type::getInt32Ty(*m_context), 0),               // soffset
+                ConstantInt::get(Type::getInt32Ty(*m_context),
+                                 mapVertexFormat(formatInfo->compDfmt, nfmt)),   // dfmt, nfmt
+                ConstantInt::get(Type::getInt32Ty(*m_context), 0)                // glc, slc
             };
 
-            Value* pCompFetch = nullptr;
+            Value* compFetch = nullptr;
             if (is16bitFetch)
             {
-                pCompFetch = EmitCall("llvm.amdgcn.struct.tbuffer.load.f16",
-                                      Type::getHalfTy(*m_pContext),
+                compFetch = emitCall("llvm.amdgcn.struct.tbuffer.load.f16",
+                                      Type::getHalfTy(*m_context),
                                       args,
                                       {},
-                                      pInsertPos);
+                                      insertPos);
 
-                pCompFetch = new BitCastInst(pCompFetch, Type::getInt16Ty(*m_pContext), "", pInsertPos);
-                pCompFetch = new ZExtInst(pCompFetch, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+                compFetch = new BitCastInst(compFetch, Type::getInt16Ty(*m_context), "", insertPos);
+                compFetch = new ZExtInst(compFetch, Type::getInt32Ty(*m_context), "", insertPos);
             }
             else
             {
-                pCompFetch = EmitCall("llvm.amdgcn.struct.tbuffer.load.i32",
-                                      Type::getInt32Ty(*m_pContext),
+                compFetch = emitCall("llvm.amdgcn.struct.tbuffer.load.i32",
+                                      Type::getInt32Ty(*m_context),
                                       args,
                                       {},
-                                      pInsertPos);
+                                      insertPos);
             }
 
-            pFetch = InsertElementInst::Create(pFetch,
-                                               pCompFetch,
-                                               ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
+            fetch = InsertElementInst::Create(fetch,
+                                               compFetch,
+                                               ConstantInt::get(Type::getInt32Ty(*m_context), i),
                                                "",
-                                               pInsertPos);
+                                               insertPos);
         }
 
-        *ppFetch = pFetch;
+        *ppFetch = fetch;
     }
 }
 
 // =====================================================================================================================
 // Checks whether post shuffle is required for vertex fetch oepration.
-bool VertexFetch::NeedPostShuffle(
-    const VertexInputDescription*  pInputDesc,   // [in] Vertex input description
+bool VertexFetch::needPostShuffle(
+    const VertexInputDescription*  inputDesc,   // [in] Vertex input description
     std::vector<Constant*>&        shuffleMask   // [out] Vector shuffle mask
     ) const
 {
     bool needShuffle = false;
 
-    switch (pInputDesc->dfmt)
+    switch (inputDesc->dfmt)
     {
     case BufDataFormat8_8_8_8_Bgra:
     case BufDataFormat2_10_10_10_Bgra:
-        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 2));
-        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 1));
-        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
-        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 3));
+        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 2));
+        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 1));
+        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
+        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 3));
         needShuffle = true;
         break;
     default:
@@ -1090,20 +1090,20 @@ bool VertexFetch::NeedPostShuffle(
 
 // =====================================================================================================================
 // Checks whether patching 2-bit signed alpha channel is required for vertex fetch operation.
-bool VertexFetch::NeedPatchA2S(
-    const VertexInputDescription* pInputDesc    // [in] Vertex input description
+bool VertexFetch::needPatchA2S(
+    const VertexInputDescription* inputDesc    // [in] Vertex input description
     ) const
 {
     bool needPatch = false;
 
-    if ((pInputDesc->dfmt == BufDataFormat2_10_10_10) ||
-        (pInputDesc->dfmt == BufDataFormat2_10_10_10_Bgra))
+    if ((inputDesc->dfmt == BufDataFormat2_10_10_10) ||
+        (inputDesc->dfmt == BufDataFormat2_10_10_10_Bgra))
     {
-        if ((pInputDesc->nfmt == BufNumFormatSnorm) ||
-            (pInputDesc->nfmt == BufNumFormatSscaled) ||
-            (pInputDesc->nfmt == BufNumFormatSint))
+        if ((inputDesc->nfmt == BufNumFormatSnorm) ||
+            (inputDesc->nfmt == BufNumFormatSscaled) ||
+            (inputDesc->nfmt == BufNumFormatSint))
         {
-            needPatch = (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major < 9);
+            needPatch = (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9);
         }
     }
 
@@ -1112,12 +1112,12 @@ bool VertexFetch::NeedPatchA2S(
 
 // =====================================================================================================================
 // Checks whether the second vertex fetch operation is required (particularly for certain 64-bit typed formats).
-bool VertexFetch::NeedSecondVertexFetch(
-    const VertexInputDescription* pInputDesc    // [in] Vertex input description
+bool VertexFetch::needSecondVertexFetch(
+    const VertexInputDescription* inputDesc    // [in] Vertex input description
     ) const
 {
-    return ((pInputDesc->dfmt == BufDataFormat64_64_64) ||
-            (pInputDesc->dfmt == BufDataFormat64_64_64_64));
+    return ((inputDesc->dfmt == BufDataFormat64_64_64) ||
+            (inputDesc->dfmt == BufDataFormat64_64_64_64));
 }
 
 } // lgc

@@ -64,7 +64,7 @@ class PipelineState;
 // Represents data entry in a ELF section, including associated ELF symbols.
 struct ElfDataEntry
 {
-    const void* pData;           // Data in the section
+    const void* data;           // Data in the section
     unsigned    offset;          // Offset of the data
     unsigned    size;            // Size of the data
     unsigned    padSize;         // Padding size of the data
@@ -76,7 +76,7 @@ struct ElfDataEntry
 class CodeGenManager
 {
 public:
-    static void SetupTargetFeatures(PipelineState* pPipelineState, llvm::Module* pModule);
+    static void setupTargetFeatures(PipelineState* pipelineState, llvm::Module* module);
 
 private:
     CodeGenManager() = delete;

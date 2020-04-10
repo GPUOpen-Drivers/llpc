@@ -71,7 +71,7 @@ namespace lgc
 class PatchCheckShaderCache;
 
 // Initialize passes for patching
-inline static void InitializePatchPasses(
+inline static void initializePatchPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
 {
   initializePatchBufferOpPass(passRegistry);
@@ -91,21 +91,21 @@ inline static void InitializePatchPasses(
   initializePatchSetupTargetFeaturesPass(passRegistry);
 }
 
-llvm::FunctionPass* CreatePatchBufferOp();
-PatchCheckShaderCache* CreatePatchCheckShaderCache();
-llvm::ModulePass* CreatePatchCopyShader();
-llvm::ModulePass* CreatePatchDescriptorLoad();
-llvm::ModulePass* CreatePatchEntryPointMutate();
-llvm::ModulePass* CreatePatchInOutImportExport();
-llvm::FunctionPass* CreatePatchIntrinsicSimplify();
-llvm::ModulePass* CreatePatchLlvmIrInclusion();
-llvm::FunctionPass* CreatePatchLoadScalarizer();
-llvm::ModulePass* CreatePatchNullFragShader();
-llvm::FunctionPass* CreatePatchPeepholeOpt(bool enableDiscardOpt = false);
-llvm::ModulePass* CreatePatchPreparePipelineAbi(bool onlySetCallingConvs);
-llvm::ModulePass* CreatePatchPushConstOp();
-llvm::ModulePass* CreatePatchResourceCollect();
-llvm::ModulePass* CreatePatchSetupTargetFeatures();
+llvm::FunctionPass* createPatchBufferOp();
+PatchCheckShaderCache* createPatchCheckShaderCache();
+llvm::ModulePass* createPatchCopyShader();
+llvm::ModulePass* createPatchDescriptorLoad();
+llvm::ModulePass* createPatchEntryPointMutate();
+llvm::ModulePass* createPatchInOutImportExport();
+llvm::FunctionPass* createPatchIntrinsicSimplify();
+llvm::ModulePass* createPatchLlvmIrInclusion();
+llvm::FunctionPass* createPatchLoadScalarizer();
+llvm::ModulePass* createPatchNullFragShader();
+llvm::FunctionPass* createPatchPeepholeOpt(bool enableDiscardOpt = false);
+llvm::ModulePass* createPatchPreparePipelineAbi(bool onlySetCallingConvs);
+llvm::ModulePass* createPatchPushConstOp();
+llvm::ModulePass* createPatchResourceCollect();
+llvm::ModulePass* createPatchSetupTargetFeatures();
 
 class PipelineState;
 
@@ -114,38 +114,38 @@ class PipelineState;
 class Patch: public llvm::ModulePass
 {
 public:
-    explicit Patch(char& Pid)
+    explicit Patch(char& pid)
         :
-        llvm::ModulePass(Pid),
-        m_pModule(nullptr),
-        m_pContext(nullptr),
+        llvm::ModulePass(pid),
+        m_module(nullptr),
+        m_context(nullptr),
         m_shaderStage(ShaderStageInvalid),
-        m_pEntryPoint(nullptr)
+        m_entryPoint(nullptr)
     {
     }
     virtual ~Patch() {}
 
-    static void AddPasses(PipelineState*                  pPipelineState,
+    static void addPasses(PipelineState*                  pipelineState,
                           llvm::legacy::PassManager&      passMgr,
-                          llvm::ModulePass*               pReplayerPass,
-                          llvm::Timer*                    pPatchTimer,
-                          llvm::Timer*                    pOptTimer,
+                          llvm::ModulePass*               replayerPass,
+                          llvm::Timer*                    patchTimer,
+                          llvm::Timer*                    optTimer,
                           Pipeline::CheckShaderCacheFunc  checkShaderCacheFunc);
 
-    static llvm::GlobalVariable* GetLdsVariable(PipelineState* pPipelineState, llvm::Module* pModule);
+    static llvm::GlobalVariable* getLdsVariable(PipelineState* pipelineState, llvm::Module* module);
 
 protected:
-    void Init(llvm::Module* pModule);
+    void init(llvm::Module* module);
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::Module*   m_pModule;      // LLVM module to be run on
-    llvm::LLVMContext*        m_pContext;     // Associated LLVM context of the LLVM module that passes run on
+    llvm::Module*   m_module;      // LLVM module to be run on
+    llvm::LLVMContext*        m_context;     // Associated LLVM context of the LLVM module that passes run on
     ShaderStage     m_shaderStage;  // Shader stage
-    llvm::Function* m_pEntryPoint;  // Entry-point
+    llvm::Function* m_entryPoint;  // Entry-point
 
 private:
-    static void AddOptimizationPasses(llvm::legacy::PassManager& passMgr);
+    static void addOptimizationPasses(llvm::legacy::PassManager& passMgr);
 
     Patch() = delete;
     Patch(const Patch&) = delete;

@@ -63,7 +63,7 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
 
     llvm::SmallVector<llvm::Instruction*, 8>        m_instsToErase;         // Instructions to erase
-    std::unique_ptr<llvm::IRBuilder<>>              m_pBuilder;             // The IRBuilder.
+    std::unique_ptr<llvm::IRBuilder<>>              m_builder;             // The IRBuilder.
     unsigned                                        m_scalarThreshold;      // The threshold for load scalarizer
 };
 

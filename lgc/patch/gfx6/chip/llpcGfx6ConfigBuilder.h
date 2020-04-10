@@ -47,16 +47,16 @@ namespace Gfx6
 class ConfigBuilder : public ConfigBuilderBase
 {
 public:
-    ConfigBuilder(llvm::Module* pModule, PipelineState* pPipelineState)
-        : ConfigBuilderBase(pModule, pPipelineState) {}
+    ConfigBuilder(llvm::Module* module, PipelineState* pipelineState)
+        : ConfigBuilderBase(module, pipelineState) {}
 
-    void BuildPalMetadata();
+    void buildPalMetadata();
 
-    void BuildPipelineVsFsRegConfig();
-    void BuildPipelineVsTsFsRegConfig();
-    void BuildPipelineVsGsFsRegConfig();
-    void BuildPipelineVsTsGsFsRegConfig();
-    void BuildPipelineCsRegConfig();
+    void buildPipelineVsFsRegConfig();
+    void buildPipelineVsTsFsRegConfig();
+    void buildPipelineVsGsFsRegConfig();
+    void buildPipelineVsTsGsFsRegConfig();
+    void buildPipelineCsRegConfig();
 
 private:
     ConfigBuilder() = delete;
@@ -64,37 +64,37 @@ private:
     ConfigBuilder& operator=(const ConfigBuilder&) = delete;
 
     template <typename T>
-    void BuildVsRegConfig(ShaderStage         shaderStage,
-                          T*                  pConfig);
+    void buildVsRegConfig(ShaderStage         shaderStage,
+                          T*                  config);
 
     template <typename T>
-    void BuildHsRegConfig(ShaderStage         shaderStage,
-                          T*                  pConfig);
+    void buildHsRegConfig(ShaderStage         shaderStage,
+                          T*                  config);
 
     template <typename T>
-    void BuildEsRegConfig(ShaderStage         shaderStage,
-                          T*                  pConfig);
+    void buildEsRegConfig(ShaderStage         shaderStage,
+                          T*                  config);
 
     template <typename T>
-    void BuildLsRegConfig(ShaderStage         shaderStage,
-                          T*                  pConfig);
+    void buildLsRegConfig(ShaderStage         shaderStage,
+                          T*                  config);
 
     template <typename T>
-    void BuildGsRegConfig(ShaderStage         shaderStage,
-                          T*                  pConfig);
+    void buildGsRegConfig(ShaderStage         shaderStage,
+                          T*                  config);
 
     template <typename T>
-    void BuildPsRegConfig(ShaderStage         shaderStage,
-                          T*                  pConfig);
+    void buildPsRegConfig(ShaderStage         shaderStage,
+                          T*                  config);
 
-    void BuildCsRegConfig(ShaderStage  shaderStage,
-                          CsRegConfig* pConfig);
+    void buildCsRegConfig(ShaderStage  shaderStage,
+                          CsRegConfig* config);
 
-    void BuildUserDataConfig(ShaderStage shaderStage,
+    void buildUserDataConfig(ShaderStage shaderStage,
                              unsigned    startUserData);
 
     template <typename T>
-    void SetupVgtTfParam(T* pConfig);
+    void setupVgtTfParam(T* config);
 
 };
 

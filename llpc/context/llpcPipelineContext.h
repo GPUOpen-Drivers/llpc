@@ -103,65 +103,65 @@ class PipelineContext
 {
 public:
     PipelineContext(GfxIpVersion           gfxIp,
-                    MetroHash::Hash*       pPipelineHash,
-                    MetroHash::Hash*       pCacheHash);
+                    MetroHash::Hash*       pipelineHash,
+                    MetroHash::Hash*       cacheHash);
     virtual ~PipelineContext();
 
     // Checks whether the pipeline is graphics or compute
-    virtual bool IsGraphics() const = 0;
+    virtual bool isGraphics() const = 0;
 
     // Gets pipeline shader info of the specified shader stage
-    virtual const PipelineShaderInfo* GetPipelineShaderInfo(ShaderStage shaderStage) const = 0;
+    virtual const PipelineShaderInfo* getPipelineShaderInfo(ShaderStage shaderStage) const = 0;
 
     // Gets pipeline build info
-    virtual const void* GetPipelineBuildInfo() const = 0;
+    virtual const void* getPipelineBuildInfo() const = 0;
 
     // Gets the mask of active shader stages bound to this pipeline
-    virtual unsigned GetShaderStageMask() const = 0;
+    virtual unsigned getShaderStageMask() const = 0;
 
     // Sets the mask of active shader stages bound to this pipeline
-    virtual void SetShaderStageMask(unsigned mask) = 0;
+    virtual void setShaderStageMask(unsigned mask) = 0;
 
     // Gets the count of active shader stages
-    virtual unsigned GetActiveShaderStageCount() const = 0;
+    virtual unsigned getActiveShaderStageCount() const = 0;
 
     // Does user data node merge for merged shader
-    virtual void DoUserDataNodeMerge() = 0;
+    virtual void doUserDataNodeMerge() = 0;
 
-    static void GetGpuNameString(GfxIpVersion gfxIp, std::string& gpuName);
-    static const char* GetGpuNameAbbreviation(GfxIpVersion gfxIp);
+    static void getGpuNameString(GfxIpVersion gfxIp, std::string& gpuName);
+    static const char* getGpuNameAbbreviation(GfxIpVersion gfxIp);
 
     // Gets graphics IP version info
-    GfxIpVersion GetGfxIpVersion() const { return m_gfxIp; }
+    GfxIpVersion getGfxIpVersion() const { return m_gfxIp; }
 
     // Gets pipeline hash code
-    uint64_t GetPiplineHashCode() const { return MetroHash::Compact64(&m_pipelineHash); }
-    uint64_t GetCacheHashCode() const { return MetroHash::Compact64(&m_cacheHash); }
+    uint64_t getPiplineHashCode() const { return MetroHash::compact64(&m_pipelineHash); }
+    uint64_t getCacheHashCode() const { return MetroHash::compact64(&m_cacheHash); }
 
-    virtual ShaderHash GetShaderHashCode(ShaderStage stage) const;
+    virtual ShaderHash getShaderHashCode(ShaderStage stage) const;
 
     // Gets per pipeline options
-    virtual const PipelineOptions* GetPipelineOptions() const = 0;
+    virtual const PipelineOptions* getPipelineOptions() const = 0;
 
     // Set pipeline state in lgc::Pipeline object for middle-end
-    void SetPipelineState(lgc::Pipeline* pPipeline) const;
+    void setPipelineState(lgc::Pipeline* pipeline) const;
 
     // Get ShaderFpMode struct for the given shader stage
-    ShaderFpMode& GetShaderFpMode(ShaderStage stage) { return m_shaderFpModes[stage]; }
+    ShaderFpMode& getShaderFpMode(ShaderStage stage) { return m_shaderFpModes[stage]; }
 
     // Map a VkFormat to a {BufDataFormat, BufNumFormat}. Returns BufDataFormatInvalid if the
     // VkFormat is not supported.
-    static std::pair<lgc::BufDataFormat, lgc::BufNumFormat> MapVkFormat(VkFormat format, bool isColorExport);
+    static std::pair<lgc::BufDataFormat, lgc::BufNumFormat> mapVkFormat(VkFormat format, bool isColorExport);
 
 protected:
     // Gets dummy vertex input create info
-    virtual VkPipelineVertexInputStateCreateInfo* GetDummyVertexInputInfo() { return nullptr; }
+    virtual VkPipelineVertexInputStateCreateInfo* getDummyVertexInputInfo() { return nullptr; }
 
     // Gets dummy vertex binding info
-    virtual std::vector<VkVertexInputBindingDescription>* GetDummyVertexBindings() { return nullptr; }
+    virtual std::vector<VkVertexInputBindingDescription>* getDummyVertexBindings() { return nullptr; }
 
     // Gets dummy vertex attribute info
-    virtual std::vector<VkVertexInputAttributeDescription>* GetDummyVertexAttributes() { return nullptr; }
+    virtual std::vector<VkVertexInputAttributeDescription>* getDummyVertexAttributes() { return nullptr; }
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -178,24 +178,24 @@ private:
     typedef std::map<std::pair<unsigned, unsigned>, const DescriptorRangeValue*> ImmutableNodesMap;
 
     // Give the pipeline options to the middle-end.
-    void SetOptionsInPipeline(lgc::Pipeline* pPipeline) const;
+    void setOptionsInPipeline(lgc::Pipeline* pipeline) const;
 
     // Give the user data nodes and descriptor range values to the middle-end.
-    void SetUserDataInPipeline(lgc::Pipeline* pPipeline) const;
-    void SetUserDataNodesTable(llvm::LLVMContext&                   context,
+    void setUserDataInPipeline(lgc::Pipeline* pipeline) const;
+    void setUserDataNodesTable(llvm::LLVMContext&                   context,
                                llvm::ArrayRef<ResourceMappingNode>  nodes,
                                const ImmutableNodesMap&             immutableNodesMap,
-                               lgc::ResourceNode*                   pDestTable,
-                               lgc::ResourceNode*&                  pDestInnerTable) const;
+                               lgc::ResourceNode*                   destTable,
+                               lgc::ResourceNode*&                  destInnerTable) const;
 
     // Give the graphics pipeline state to the middle-end.
-    void SetGraphicsStateInPipeline(lgc::Pipeline* pPipeline) const;
+    void setGraphicsStateInPipeline(lgc::Pipeline* pipeline) const;
 
     // Set vertex input descriptions in middle-end Pipeline
-    void SetVertexInputDescriptions(lgc::Pipeline* pPipeline) const;
+    void setVertexInputDescriptions(lgc::Pipeline* pipeline) const;
 
     // Give the color export state to the middle-end.
-    void SetColorExportState(lgc::Pipeline* pPipeline) const;
+    void setColorExportState(lgc::Pipeline* pipeline) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 

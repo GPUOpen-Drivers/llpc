@@ -335,9 +335,9 @@ struct CompileInfo
     GraphicsPipelineBuildOut    gfxPipelineOut;                 // Output of building graphics pipeline
     ComputePipelineBuildInfo    compPipelineInfo;               // Info to build compute pipeline
     ComputePipelineBuildOut     compPipelineOut;                // Output of building compute pipeline
-    void*                       pPipelineBuf;                   // Alllocation buffer of building pipeline
-    void*                       pPipelineInfoFile;              // VFX-style file containing pipeline info
-    const char*                 pFileNames;                     // Names of input shader source files
+    void*                       pipelineBuf;                   // Alllocation buffer of building pipeline
+    void*                       pipelineInfoFile;              // VFX-style file containing pipeline info
+    const char*                 fileNames;                     // Names of input shader source files
     bool                        doAutoLayout;                   // Whether to auto layout descriptors
     bool                        checkAutoLayoutCompatible;      // Whether to comapre if auto layout descriptors is
                                                                 // same as specified pipeline layout
@@ -345,43 +345,43 @@ struct CompileInfo
 
 // =====================================================================================================================
 // Checks whether the input data is actually a ELF binary
-static bool IsElfBinary(
-    const void* pData,    // [in] Input data to check
+static bool isElfBinary(
+    const void* data,    // [in] Input data to check
     size_t      dataSize) // Size of the input data
 {
     bool isElfBin = false;
     if (dataSize >= sizeof(Elf64::FormatHeader))
     {
-        auto pHeader = reinterpret_cast<const Elf64::FormatHeader*>(pData);
-        isElfBin = pHeader->e_ident32[EI_MAG0] == ElfMagic;
+        auto header = reinterpret_cast<const Elf64::FormatHeader*>(data);
+        isElfBin = header->eIdent32[EI_MAG0] == ElfMagic;
     }
     return isElfBin;
 }
 
 // =====================================================================================================================
 // Checks whether the input data is actually LLVM bitcode
-static bool IsLlvmBitcode(
-    const void* pData,    // [in] Input data to check
+static bool isLlvmBitcode(
+    const void* data,    // [in] Input data to check
     size_t      dataSize) // Size of the input data
 {
     const unsigned char magic[] = { 'B', 'C', 0xC0, 0xDE };
-    return (dataSize >= sizeof magic) && (memcmp(pData, magic, sizeof magic) == 0);
+    return (dataSize >= sizeof magic) && (memcmp(data, magic, sizeof magic) == 0);
 }
 
 // =====================================================================================================================
 // Checks whether the output data is actually ISA assembler text
-static bool IsIsaText(
-    const void* pData,    // [in] Input data to check
+static bool isIsaText(
+    const void* data,    // [in] Input data to check
     size_t      dataSize) // Size of the input data
 {
     // This is called by amdllpc to help distinguish between its three output types of ELF binary, LLVM IR assembler
     // and ISA assembler. Here we use the fact that ISA assembler is the only one that starts with a tab character.
-    return (dataSize != 0) && ((reinterpret_cast<const char*>(pData))[0] == '\t');
+    return (dataSize != 0) && ((reinterpret_cast<const char*>(data))[0] == '\t');
 }
 
 // =====================================================================================================================
 // Translates GLSL source language to corresponding shader stage.
-static ShaderStage SourceLangToShaderStage(
+static ShaderStage sourceLangToShaderStage(
     SpvGenStage sourceLang) // GLSL source language
 {
     static_assert(SpvGenStageVertex         == 0, "Unexpected value!");
@@ -396,7 +396,7 @@ static ShaderStage SourceLangToShaderStage(
 
 // =====================================================================================================================
 // Performs initialization work for LLPC standalone tool.
-static Result Init(
+static Result init(
     int      argc,          // Count of arguments
     char*        argv[],        // [in] List of arguments
     ICompiler**  ppCompiler)    // [out] Created LLPC compiler object
@@ -410,7 +410,7 @@ static Result Init(
         // For each default option that is missing, we add it manually. This code to check whether
         // the same option has been specified is not completely foolproof because it does not know
         // which arguments are not option names.
-        static const char* defaultOptions[] =
+        static const char* DefaultOptions[] =
         {
             // Name                                Option
             "-gfxip",                              "-gfxip=8.0.0",
@@ -431,19 +431,19 @@ static Result Init(
             newArgs.push_back(argv[i]);
         }
 
-        static const size_t defaultOptionCount = sizeof(defaultOptions) / (2 * sizeof(defaultOptions[0]));
-        for (unsigned optionIdx = 0; optionIdx != defaultOptionCount; ++optionIdx)
+        static const size_t DefaultOptionCount = sizeof(DefaultOptions) / (2 * sizeof(DefaultOptions[0]));
+        for (unsigned optionIdx = 0; optionIdx != DefaultOptionCount; ++optionIdx)
         {
-            const char* pName = defaultOptions[2 * optionIdx];
-            const char* pOption = defaultOptions[2 * optionIdx + 1];
-            size_t nameLen = strlen(pName);
+            const char* name = DefaultOptions[2 * optionIdx];
+            const char* option = DefaultOptions[2 * optionIdx + 1];
+            size_t nameLen = strlen(name);
             bool found = false;
-            const char* pArg = nullptr;
+            const char* arg = nullptr;
             for (int i = 1; i < argc; ++i)
             {
-                pArg = argv[i];
-                if ((strncmp(pArg, pName, nameLen) == 0) &&
-                    ((pArg[nameLen] == '\0') || (pArg[nameLen] == '=') || (isdigit((int)pArg[nameLen]))))
+                arg = argv[i];
+                if ((strncmp(arg, name, nameLen) == 0) &&
+                    ((arg[nameLen] == '\0') || (arg[nameLen] == '=') || (isdigit((int)arg[nameLen]))))
                 {
                     found = true;
                     break;
@@ -452,45 +452,45 @@ static Result Init(
 
             if (found == false)
             {
-                newArgs.push_back(pOption);
+                newArgs.push_back(option);
             }
             else if (optionIdx == 0) // Find option -gfxip
             {
-                size_t argLen = strlen(pArg);
-                if ((argLen > nameLen) && pArg[nameLen] == '=')
+                size_t argLen = strlen(arg);
+                if ((argLen > nameLen) && arg[nameLen] == '=')
                 {
                     // Extract tokens of graphics IP version info (delimiter is ".")
                     const unsigned len = argLen - nameLen - 1;
-                    char* pGfxIp = new char[len + 1];
-                    memcpy(pGfxIp, &pArg[nameLen + 1], len);
-                    pGfxIp[len] = '\0';
+                    char* gfxIp = new char[len + 1];
+                    memcpy(gfxIp, &arg[nameLen + 1], len);
+                    gfxIp[len] = '\0';
 
                     char* tokens[3] = {}; // Format: major.minor.step
-                    char* pToken = std::strtok(pGfxIp, ".");
-                    for (unsigned i = 0; (i < 3) && (pToken != nullptr); ++i)
+                    char* token = std::strtok(gfxIp, ".");
+                    for (unsigned i = 0; (i < 3) && (token != nullptr); ++i)
                     {
-                        tokens[i] = pToken;
-                        pToken = std::strtok(nullptr, ".");
+                        tokens[i] = token;
+                        token = std::strtok(nullptr, ".");
                     }
 
                     ParsedGfxIp.major    = (tokens[0] != nullptr) ? std::strtoul(tokens[0], nullptr, 10) : 0;
                     ParsedGfxIp.minor    = (tokens[1] != nullptr) ? std::strtoul(tokens[1], nullptr, 10) : 0;
                     ParsedGfxIp.stepping = (tokens[2] != nullptr) ? std::strtoul(tokens[2], nullptr, 10) : 0;
 
-                    delete[] pGfxIp;
+                    delete[] gfxIp;
                 }
             }
         }
 
-        const char* pName = "-shader-cache-file-dir";
-        size_t nameLen = strlen(pName);
+        const char* name = "-shader-cache-file-dir";
+        size_t nameLen = strlen(name);
         bool found = false;
-        const char* pArg = nullptr;
+        const char* arg = nullptr;
         for (int i = 1; i < argc; ++i)
         {
-            pArg = argv[i];
-            if ((strncmp(pArg, pName, nameLen) == 0) &&
-                ((pArg[nameLen] == '\0') || (pArg[nameLen] == '=')))
+            arg = argv[i];
+            if ((strncmp(arg, name, nameLen) == 0) &&
+                ((arg[nameLen] == '\0') || (arg[nameLen] == '=')))
             {
                 found = true;
                 break;
@@ -500,8 +500,8 @@ static Result Init(
         if (found == false)
         {
             // Initialize the path for shader cache
-            constexpr unsigned MaxFilePathLen = 512;
-            char               shaderCacheFileDirOption[MaxFilePathLen];
+            constexpr unsigned maxFilePathLen = 512;
+            char               shaderCacheFileDirOption[maxFilePathLen];
 
             // Initialize the root path of cache files
             // Steps:
@@ -515,7 +515,7 @@ static Result Init(
                 envString = getenv("LOCALAPPDATA");
             }
 #else
-            char shaderCacheFileRootDir[MaxFilePathLen];
+            char shaderCacheFileRootDir[maxFilePathLen];
 
             //   2. Find XDG_CACHE_HOME.
             //   3. If AMD_SHADER_DISK_CACHE_PATH and XDG_CACHE_HOME both not set,
@@ -571,15 +571,15 @@ static Result Init(
 
 // =====================================================================================================================
 // Performs per-pipeline initialization work for LLPC standalone tool.
-static Result InitCompileInfo(
-    CompileInfo* pCompileInfo)  // [out] Compilation info of LLPC standalone tool
+static Result initCompileInfo(
+    CompileInfo* compileInfo)  // [out] Compilation info of LLPC standalone tool
 {
-    pCompileInfo->gfxIp = ParsedGfxIp;
+    compileInfo->gfxIp = ParsedGfxIp;
 
     // Set NGG control settings
     if (ParsedGfxIp.major >= 10)
     {
-        auto& nggState = pCompileInfo->gfxPipelineInfo.nggState;
+        auto& nggState = compileInfo->gfxPipelineInfo.nggState;
 
         nggState.enableNgg                  = EnableNgg;
         nggState.enableGsUse                = NggEnableGsUse;
@@ -606,49 +606,49 @@ static Result InitCompileInfo(
 
 // =====================================================================================================================
 // Performs cleanup work for LLPC standalone tool.
-static void CleanupCompileInfo(
-    CompileInfo* pCompileInfo)  // [in,out] Compilation info of LLPC standalone tool
+static void cleanupCompileInfo(
+    CompileInfo* compileInfo)  // [in,out] Compilation info of LLPC standalone tool
 {
-    for (unsigned i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
+    for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i)
     {
         // NOTE: We do not have to free SPIR-V binary for pipeline info file.
         // It will be freed when we close the VFX doc.
-        if (pCompileInfo->pPipelineInfoFile == nullptr)
+        if (compileInfo->pipelineInfoFile == nullptr)
         {
-            delete[] reinterpret_cast<const char*>(pCompileInfo->shaderModuleDatas[i].spirvBin.pCode);
+            delete[] reinterpret_cast<const char*>(compileInfo->shaderModuleDatas[i].spirvBin.pCode);
         }
 
-        free(pCompileInfo->shaderModuleDatas[i].shaderBuf);
+        free(compileInfo->shaderModuleDatas[i].shaderBuf);
     }
 
-    free(pCompileInfo->pPipelineBuf);
+    free(compileInfo->pipelineBuf);
 
-    if (pCompileInfo->pPipelineInfoFile)
+    if (compileInfo->pipelineInfoFile)
     {
-        Vfx::vfxCloseDoc(pCompileInfo->pPipelineInfoFile);
+        Vfx::vfxCloseDoc(compileInfo->pipelineInfoFile);
     }
 
-    memset(pCompileInfo, 0, sizeof(*pCompileInfo));
+    memset(compileInfo, 0, sizeof(*compileInfo));
 }
 
 // =====================================================================================================================
 // Callback function to allocate buffer for building shader module and building pipeline.
-void* VKAPI_CALL AllocateBuffer(
-    void*  pInstance,   // [in] Dummy instance object, unused
-    void*  pUserData,   // [in] User data
+void* VKAPI_CALL allocateBuffer(
+    void*  instance,   // [in] Dummy instance object, unused
+    void*  userData,   // [in] User data
     size_t size)        // Requested allocation size
 {
-    void* pAllocBuf = malloc(size);
-    memset(pAllocBuf, 0, size);
+    void* allocBuf = malloc(size);
+    memset(allocBuf, 0, size);
 
-    void** ppOutBuf = reinterpret_cast<void**>(pUserData);
-    *ppOutBuf = pAllocBuf;
-    return pAllocBuf;
+    void** ppOutBuf = reinterpret_cast<void**>(userData);
+    *ppOutBuf = allocBuf;
+    return allocBuf;
 }
 
 // =====================================================================================================================
 // Checks whether the specified file name represents a SPIR-V assembly text file (.spvasm).
-static bool IsSpirvTextFile(
+static bool isSpirvTextFile(
     const std::string& fileName)
 {
     bool isSpirvText = false;
@@ -670,7 +670,7 @@ static bool IsSpirvTextFile(
 
 // =====================================================================================================================
 // Checks whether the specified file name represents a SPIR-V binary file (.spv).
-static bool IsSpirvBinaryFile(
+static bool isSpirvBinaryFile(
     const std::string& fileName) // [in] File name to check
 {
     bool isSpirvBin = false;
@@ -692,7 +692,7 @@ static bool IsSpirvBinaryFile(
 
 // =====================================================================================================================
 // Checks whether the specified file name represents a LLPC pipeline info file (.pipe).
-static bool IsPipelineInfoFile(
+static bool isPipelineInfoFile(
     const std::string& fileName) // [in] File name to check
 {
     bool isPipelineInfo = false;
@@ -714,7 +714,7 @@ static bool IsPipelineInfoFile(
 
 // =====================================================================================================================
 // Checks whether the specified file name represents a LLVM IR file (.ll).
-static bool IsLlvmIrFile(
+static bool isLlvmIrFile(
     const std::string& fileName) // [in] File name to check
 {
     bool isLlvmIr = false;
@@ -736,14 +736,14 @@ static bool IsLlvmIrFile(
 
 // =====================================================================================================================
 // Gets SPIR-V binary codes from the specified binary file.
-static Result GetSpirvBinaryFromFile(
+static Result getSpirvBinaryFromFile(
     const std::string& spvBinFile,  // [in] SPIR-V binary file
-    BinaryData*        pSpvBin)     // [out] SPIR-V binary codes
+    BinaryData*        spvBin)     // [out] SPIR-V binary codes
 {
     Result result = Result::Success;
 
-    FILE* pBinFile = fopen(spvBinFile.c_str(), "rb");
-    if (pBinFile == nullptr)
+    FILE* binFile = fopen(spvBinFile.c_str(), "rb");
+    if (binFile == nullptr)
     {
         LLPC_ERRS("Fails to open SPIR-V binary file: " << spvBinFile << "\n");
         result = Result::ErrorUnavailable;
@@ -751,19 +751,19 @@ static Result GetSpirvBinaryFromFile(
 
     if (result == Result::Success)
     {
-        fseek(pBinFile, 0, SEEK_END);
-        size_t binSize = ftell(pBinFile);
-        fseek(pBinFile, 0, SEEK_SET);
+        fseek(binFile, 0, SEEK_END);
+        size_t binSize = ftell(binFile);
+        fseek(binFile, 0, SEEK_SET);
 
-        char* pBin= new char[binSize];
-        assert(pBin != nullptr);
-        memset(pBin, 0, binSize);
-        binSize = fread(pBin, 1, binSize, pBinFile);
+        char* bin= new char[binSize];
+        assert(bin != nullptr);
+        memset(bin, 0, binSize);
+        binSize = fread(bin, 1, binSize, binFile);
 
-        pSpvBin->codeSize = binSize;
-        pSpvBin->pCode    = pBin;
+        spvBin->codeSize = binSize;
+        spvBin->pCode    = bin;
 
-        fclose(pBinFile);
+        fclose(binFile);
     }
 
     return result;
@@ -771,9 +771,9 @@ static Result GetSpirvBinaryFromFile(
 
 // =====================================================================================================================
 // GLSL compiler, compiles GLSL source text file (input) to SPIR-V binary file (output).
-static Result CompileGlsl(
+static Result compileGlsl(
     const std::string& inFilename,  // [in] Input filename, GLSL source text
-    ShaderStage*       pStage,      // [out] Shader stage
+    ShaderStage*       stage,      // [out] Shader stage
     std::string&       outFilename) // [out] Output filename, SPIR-V binary
 {
     if (InitSpvGen() == false)
@@ -791,22 +791,22 @@ static Result CompileGlsl(
         LLPC_ERRS("File " << inFilename << ": Bad file extension; try -help\n");
         return Result::ErrorInvalidShader;
     }
-    *pStage = SourceLangToShaderStage(lang);
+    *stage = sourceLangToShaderStage(lang);
 
-    FILE* pInFile = fopen(inFilename.c_str(), "r");
-    if (pInFile == nullptr)
+    FILE* inFile = fopen(inFilename.c_str(), "r");
+    if (inFile == nullptr)
     {
         LLPC_ERRS("Fails to open input file: " << inFilename << "\n");
         result = Result::ErrorUnavailable;
     }
 
-    FILE* pOutFile = nullptr;
+    FILE* outFile = nullptr;
     if (result == Result::Success)
     {
         outFilename = sys::path::filename(inFilename).str() + LlpcExt::SpirvBin;
 
-        pOutFile = fopen(outFilename.c_str(), "wb");
-        if (pOutFile == nullptr)
+        outFile = fopen(outFilename.c_str(), "wb");
+        if (outFile == nullptr)
         {
             LLPC_ERRS("Fails to open output file: " << outFilename << "\n");
             result = Result::ErrorUnavailable;
@@ -815,29 +815,29 @@ static Result CompileGlsl(
 
     if (result == Result::Success)
     {
-        fseek(pInFile, 0, SEEK_END);
-        size_t textSize = ftell(pInFile);
-        fseek(pInFile, 0, SEEK_SET);
+        fseek(inFile, 0, SEEK_END);
+        size_t textSize = ftell(inFile);
+        fseek(inFile, 0, SEEK_SET);
 
-        char* pGlslText = new char[textSize + 1];
-        assert(pGlslText != nullptr);
-        memset(pGlslText, 0, textSize + 1);
-        auto readSize = fread(pGlslText, 1, textSize, pInFile);
-        pGlslText[readSize] = 0;
+        char* glslText = new char[textSize + 1];
+        assert(glslText != nullptr);
+        memset(glslText, 0, textSize + 1);
+        auto readSize = fread(glslText, 1, textSize, inFile);
+        glslText[readSize] = 0;
 
         LLPC_OUTS("===============================================================================\n");
         LLPC_OUTS("// GLSL sources: " << inFilename << "\n\n");
-        LLPC_OUTS(pGlslText);
+        LLPC_OUTS(glslText);
         LLPC_OUTS("\n\n");
 
         int sourceStringCount = 1;
         const char*const* sourceList[1] = {};
-        const char* pFileName = inFilename.c_str();
-        const char* const* fileList[1]  = { &pFileName };
-        sourceList[0] = &pGlslText;
+        const char* fileName = inFilename.c_str();
+        const char* const* fileList[1]  = { &fileName };
+        sourceList[0] = &glslText;
 
-        void* pProgram = nullptr;
-        const char* pLog = nullptr;
+        void* program = nullptr;
+        const char* log = nullptr;
         int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
         compileOption |= isHlsl ? SpvGenOptionReadHlsl : 0;
         const char* entryPoints[] = { EntryTarget.c_str() };
@@ -847,37 +847,37 @@ static Result CompileGlsl(
                                                         sourceList,
                                                         fileList,
                                                         isHlsl ? entryPoints : nullptr,
-                                                        &pProgram,
-                                                        &pLog,
+                                                        &program,
+                                                        &log,
                                                         compileOption);
 
         LLPC_OUTS("// GLSL program compile/link log\n");
 
         if (compileResult)
         {
-            const unsigned* pSpvBin = nullptr;
-            unsigned binSize = spvGetSpirvBinaryFromProgram(pProgram, 0, &pSpvBin);
-            fwrite(pSpvBin, 1, binSize, pOutFile);
+            const unsigned* spvBin = nullptr;
+            unsigned binSize = spvGetSpirvBinaryFromProgram(program, 0, &spvBin);
+            fwrite(spvBin, 1, binSize, outFile);
 
             textSize = binSize * 10 + 1024;
-            char* pSpvText = new char[textSize];
-            assert(pSpvText != nullptr);
-            memset(pSpvText, 0, textSize);
+            char* spvText = new char[textSize];
+            assert(spvText != nullptr);
+            memset(spvText, 0, textSize);
             LLPC_OUTS("\nSPIR-V disassembly: " << outFilename << "\n");
-            spvDisassembleSpirv(binSize, pSpvBin, textSize, pSpvText);
-            LLPC_OUTS(pSpvText << "\n");
-            delete[] pSpvText;
+            spvDisassembleSpirv(binSize, spvBin, textSize, spvText);
+            LLPC_OUTS(spvText << "\n");
+            delete[] spvText;
         }
         else
         {
-            LLPC_ERRS("Fail to compile GLSL sources\n\n" << pLog << "\n");
+            LLPC_ERRS("Fail to compile GLSL sources\n\n" << log << "\n");
             result = Result::ErrorInvalidShader;
         }
 
-        delete[] pGlslText;
+        delete[] glslText;
 
-        fclose(pInFile);
-        fclose(pOutFile);
+        fclose(inFile);
+        fclose(outFile);
     }
 
     return result;
@@ -885,7 +885,7 @@ static Result CompileGlsl(
 
 // =====================================================================================================================
 // SPIR-V assembler, converts SPIR-V assembly text file (input) to SPIR-V binary file (output).
-static Result AssembleSpirv(
+static Result assembleSpirv(
     const std::string& inFilename,  // [in] Input filename, SPIR-V assembly text
     std::string&       outFilename) // [out] Output filename, SPIR-V binary
 {
@@ -897,20 +897,20 @@ static Result AssembleSpirv(
 
     Result result = Result::Success;
 
-    FILE* pInFile = fopen(inFilename.c_str(), "r");
-    if (pInFile == nullptr)
+    FILE* inFile = fopen(inFilename.c_str(), "r");
+    if (inFile == nullptr)
     {
         LLPC_ERRS("Fails to open input file: " << inFilename << "\n");
         result = Result::ErrorUnavailable;
     }
 
-    FILE* pOutFile = nullptr;
+    FILE* outFile = nullptr;
     if (result == Result::Success)
     {
         outFilename = sys::path::stem(sys::path::filename(inFilename)).str() + LlpcExt::SpirvBin;
 
-        pOutFile = fopen(outFilename.c_str(), "wb");
-        if (pOutFile == nullptr)
+        outFile = fopen(outFilename.c_str(), "wb");
+        if (outFile == nullptr)
         {
             LLPC_ERRS("Fails to open output file: " << outFilename << "\n");
             result = Result::ErrorUnavailable;
@@ -919,43 +919,43 @@ static Result AssembleSpirv(
 
     if (result == Result::Success)
     {
-        fseek(pInFile, 0, SEEK_END);
-        size_t textSize = ftell(pInFile);
-        fseek(pInFile, 0, SEEK_SET);
+        fseek(inFile, 0, SEEK_END);
+        size_t textSize = ftell(inFile);
+        fseek(inFile, 0, SEEK_SET);
 
-        char* pSpvText = new char[textSize + 1];
-        assert(pSpvText != nullptr);
-        memset(pSpvText, 0, textSize + 1);
+        char* spvText = new char[textSize + 1];
+        assert(spvText != nullptr);
+        memset(spvText, 0, textSize + 1);
 
-        size_t realSize = fread(pSpvText, 1, textSize, pInFile);
-        pSpvText[realSize] = '\0';
+        size_t realSize = fread(spvText, 1, textSize, inFile);
+        spvText[realSize] = '\0';
 
         int binSize = realSize * 4 + 1024; // Estimated SPIR-V binary size
-        unsigned* pSpvBin = new unsigned[binSize / sizeof(unsigned)];
-        assert(pSpvBin != nullptr);
+        unsigned* spvBin = new unsigned[binSize / sizeof(unsigned)];
+        assert(spvBin != nullptr);
 
-        const char* pLog = nullptr;
-        binSize = spvAssembleSpirv(pSpvText, binSize, pSpvBin, &pLog);
+        const char* log = nullptr;
+        binSize = spvAssembleSpirv(spvText, binSize, spvBin, &log);
         if (binSize < 0)
         {
-            LLPC_ERRS("Fails to assemble SPIR-V: \n" << pLog << "\n");
+            LLPC_ERRS("Fails to assemble SPIR-V: \n" << log << "\n");
             result = Result::ErrorInvalidShader;
         }
         else
         {
-            fwrite(pSpvBin, 1, binSize, pOutFile);
+            fwrite(spvBin, 1, binSize, outFile);
 
             LLPC_OUTS("===============================================================================\n");
             LLPC_OUTS("// SPIR-V disassembly: " << inFilename << "\n");
-            LLPC_OUTS(pSpvText);
+            LLPC_OUTS(spvText);
             LLPC_OUTS("\n\n");
         }
 
-        fclose(pInFile);
-        fclose(pOutFile);
+        fclose(inFile);
+        fclose(outFile);
 
-        delete[] pSpvText;
-        delete[] pSpvBin;
+        delete[] spvText;
+        delete[] spvBin;
     }
 
     return result;
@@ -963,16 +963,16 @@ static Result AssembleSpirv(
 
 // =====================================================================================================================
 // Decodes the binary after building a pipeline and outputs the decoded info.
-static Result DecodePipelineBinary(
-    const BinaryData* pPipelineBin, // [in] Pipeline binary
-    CompileInfo*      pCompileInfo, // [in,out] Compilation info of LLPC standalone tool
+static Result decodePipelineBinary(
+    const BinaryData* pipelineBin, // [in] Pipeline binary
+    CompileInfo*      compileInfo, // [in,out] Compilation info of LLPC standalone tool
     bool              isGraphics)   // Whether it is graphics pipeline
 {
     // Ignore failure from ElfReader. It fails if pPipelineBin is not ELF, as happens with
     // -filetype=asm.
-    ElfReader<Elf64> reader(pCompileInfo->gfxIp);
+    ElfReader<Elf64> reader(compileInfo->gfxIp);
     size_t readSize = 0;
-    if (reader.ReadFromBuffer(pPipelineBin->pCode, &readSize) == Result::Success)
+    if (reader.ReadFromBuffer(pipelineBin->pCode, &readSize) == Result::Success)
     {
         LLPC_OUTS("===============================================================================\n");
         LLPC_OUTS("// LLPC final ELF info\n");
@@ -984,27 +984,27 @@ static Result DecodePipelineBinary(
 
 // =====================================================================================================================
 // Builds shader module based on the specified SPIR-V binary.
-static Result BuildShaderModules(
-    const ICompiler* pCompiler,     // [in] LLPC compiler object
-    CompileInfo*     pCompileInfo)  // [in,out] Compilation info of LLPC standalone tool
+static Result buildShaderModules(
+    const ICompiler* compiler,     // [in] LLPC compiler object
+    CompileInfo*     compileInfo)  // [in,out] Compilation info of LLPC standalone tool
 {
     Result result = Result::Success;
 
-    for (unsigned i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
+    for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i)
     {
-        ShaderModuleBuildInfo* pShaderInfo = &(pCompileInfo->shaderModuleDatas[i].shaderInfo);
-        ShaderModuleBuildOut* pShaderOut = &(pCompileInfo->shaderModuleDatas[i].shaderOut);
+        ShaderModuleBuildInfo* shaderInfo = &(compileInfo->shaderModuleDatas[i].shaderInfo);
+        ShaderModuleBuildOut* shaderOut = &(compileInfo->shaderModuleDatas[i].shaderOut);
 
-        pShaderInfo->pInstance = nullptr; // Dummy, unused
-        pShaderInfo->pUserData = &(pCompileInfo->shaderModuleDatas[i].shaderBuf);
-        pShaderInfo->pfnOutputAlloc = AllocateBuffer;
-        pShaderInfo->shaderBin = pCompileInfo->shaderModuleDatas[i].spirvBin;
+        shaderInfo->pInstance = nullptr; // Dummy, unused
+        shaderInfo->pUserData = &(compileInfo->shaderModuleDatas[i].shaderBuf);
+        shaderInfo->pfnOutputAlloc = allocateBuffer;
+        shaderInfo->shaderBin = compileInfo->shaderModuleDatas[i].spirvBin;
 
-        result = pCompiler->BuildShaderModule(pShaderInfo, pShaderOut);
+        result = compiler->BuildShaderModule(shaderInfo, shaderOut);
         if ((result != Result::Success) && (result != Result::Delayed))
         {
             LLPC_ERRS("Fails to build "
-                << GetShaderStageName(pCompileInfo->shaderModuleDatas[i].shaderStage)
+                << getShaderStageName(compileInfo->shaderModuleDatas[i].shaderStage)
                 << " shader module:\n");
             break;
         }
@@ -1015,103 +1015,103 @@ static Result BuildShaderModules(
 
 // =====================================================================================================================
 // Check autolayout compatible.
-static Result CheckAutoLayoutCompatibleFunc(
-    const ICompiler*    pCompiler,          // [in] LLPC compiler object
-    CompileInfo*        pCompileInfo)       // [in,out] Compilation info of LLPC standalone tool
+static Result checkAutoLayoutCompatibleFunc(
+    const ICompiler*    compiler,          // [in] LLPC compiler object
+    CompileInfo*        compileInfo)       // [in,out] Compilation info of LLPC standalone tool
 {
     Result result = Result::Success;
 
-    bool isGraphics = (pCompileInfo->stageMask & (ShaderStageToMask(ShaderStageCompute) -1)) ? true : false;
+    bool isGraphics = (compileInfo->stageMask & (shaderStageToMask(ShaderStageCompute) -1)) ? true : false;
     if (isGraphics)
     {
         // Build graphics pipeline
-        GraphicsPipelineBuildInfo* pPipelineInfo = &pCompileInfo->gfxPipelineInfo;
+        GraphicsPipelineBuildInfo* pipelineInfo = &compileInfo->gfxPipelineInfo;
 
         // Fill pipeline shader info
         PipelineShaderInfo* shaderInfos[ShaderStageGfxCount] =
         {
-            &pPipelineInfo->vs,
-            &pPipelineInfo->tcs,
-            &pPipelineInfo->tes,
-            &pPipelineInfo->gs,
-            &pPipelineInfo->fs,
+            &pipelineInfo->vs,
+            &pipelineInfo->tcs,
+            &pipelineInfo->tes,
+            &pipelineInfo->gs,
+            &pipelineInfo->fs,
         };
 
         unsigned userDataOffset = 0;
-        for (unsigned i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
+        for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i)
         {
 
-            PipelineShaderInfo*         pShaderInfo = shaderInfos[pCompileInfo->shaderModuleDatas[i].shaderStage];
-            bool                        checkAutoLayoutCompatible = pCompileInfo->checkAutoLayoutCompatible;
+            PipelineShaderInfo*         shaderInfo = shaderInfos[compileInfo->shaderModuleDatas[i].shaderStage];
+            bool                        checkAutoLayoutCompatible = compileInfo->checkAutoLayoutCompatible;
 
-            if (pCompileInfo->shaderModuleDatas[i].shaderStage != Vkgc::ShaderStageFragment)
+            if (compileInfo->shaderModuleDatas[i].shaderStage != Vkgc::ShaderStageFragment)
             {
                 checkAutoLayoutCompatible = false;
             }
-            const ShaderModuleBuildOut* pShaderOut  = &(pCompileInfo->shaderModuleDatas[i].shaderOut);
+            const ShaderModuleBuildOut* shaderOut  = &(compileInfo->shaderModuleDatas[i].shaderOut);
 
-            if (pShaderInfo->pEntryTarget == nullptr)
+            if (shaderInfo->pEntryTarget == nullptr)
             {
                 // If entry target is not specified, use the one from command line option
-                pShaderInfo->pEntryTarget = EntryTarget.c_str();
+                shaderInfo->pEntryTarget = EntryTarget.c_str();
             }
-            pShaderInfo->pModuleData  = pShaderOut->pModuleData;
-            pShaderInfo->entryStage = pCompileInfo->shaderModuleDatas[i].shaderStage;
+            shaderInfo->pModuleData  = shaderOut->pModuleData;
+            shaderInfo->entryStage = compileInfo->shaderModuleDatas[i].shaderStage;
             if (checkAutoLayoutCompatible)
             {
-                PipelineShaderInfo shaderInfoCopy = *pShaderInfo;
-                GraphicsPipelineBuildInfo pipelineInfoCopy = *pPipelineInfo;
-                DoAutoLayoutDesc(pCompileInfo->shaderModuleDatas[i].shaderStage,
-                                 pCompileInfo->shaderModuleDatas[i].spirvBin,
+                PipelineShaderInfo shaderInfoCopy = *shaderInfo;
+                GraphicsPipelineBuildInfo pipelineInfoCopy = *pipelineInfo;
+                doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage,
+                                 compileInfo->shaderModuleDatas[i].spirvBin,
                                  &pipelineInfoCopy,
                                  &shaderInfoCopy,
                                  userDataOffset,
                                  true);
-                if (CheckShaderInfoComptible(pShaderInfo, shaderInfoCopy.userDataNodeCount, shaderInfoCopy.pUserDataNodes) &&
-                    CheckPipelineStateCompatible(pCompiler, pPipelineInfo, &pipelineInfoCopy, ParsedGfxIp))
+                if (checkShaderInfoComptible(shaderInfo, shaderInfoCopy.userDataNodeCount, shaderInfoCopy.pUserDataNodes) &&
+                    checkPipelineStateCompatible(compiler, pipelineInfo, &pipelineInfoCopy, ParsedGfxIp))
                 {
-                    outs() << "Auto Layout fragment shader in " << pCompileInfo->pFileNames << " hitted\n";
+                    outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " hitted\n";
                 }
                 else
                 {
-                    outs() << "Auto Layout fragment shader in " << pCompileInfo->pFileNames << " failed to hit\n";
+                    outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " failed to hit\n";
                 }
                 outs().flush();
             }
         }
     }
-    else if (pCompileInfo->stageMask == ShaderStageToMask(ShaderStageCompute))
+    else if (compileInfo->stageMask == shaderStageToMask(ShaderStageCompute))
     {
-        ComputePipelineBuildInfo* pPipelineInfo = &pCompileInfo->compPipelineInfo;
+        ComputePipelineBuildInfo* pipelineInfo = &compileInfo->compPipelineInfo;
 
-        PipelineShaderInfo*         pShaderInfo = &pPipelineInfo->cs;
-        const ShaderModuleBuildOut* pShaderOut  = &pCompileInfo->shaderModuleDatas[0].shaderOut;
+        PipelineShaderInfo*         shaderInfo = &pipelineInfo->cs;
+        const ShaderModuleBuildOut* shaderOut  = &compileInfo->shaderModuleDatas[0].shaderOut;
 
-        if (pShaderInfo->pEntryTarget == nullptr)
+        if (shaderInfo->pEntryTarget == nullptr)
         {
             // If entry target is not specified, use the one from command line option
-            pShaderInfo->pEntryTarget = EntryTarget.c_str();
+            shaderInfo->pEntryTarget = EntryTarget.c_str();
         }
-        pShaderInfo->entryStage = ShaderStageCompute;
-        pShaderInfo->pModuleData  = pShaderOut->pModuleData;
+        shaderInfo->entryStage = ShaderStageCompute;
+        shaderInfo->pModuleData  = shaderOut->pModuleData;
 
-        if (pCompileInfo->checkAutoLayoutCompatible)
+        if (compileInfo->checkAutoLayoutCompatible)
         {
             unsigned userDataOffset = 0;
-            PipelineShaderInfo shaderInfoCopy = *pShaderInfo;
-            DoAutoLayoutDesc(ShaderStageCompute,
-                             pCompileInfo->shaderModuleDatas[0].spirvBin,
+            PipelineShaderInfo shaderInfoCopy = *shaderInfo;
+            doAutoLayoutDesc(ShaderStageCompute,
+                             compileInfo->shaderModuleDatas[0].spirvBin,
                              nullptr,
                              &shaderInfoCopy,
                              userDataOffset,
                              true);
-            if (CheckShaderInfoComptible(pShaderInfo, shaderInfoCopy.userDataNodeCount, shaderInfoCopy.pUserDataNodes))
+            if (checkShaderInfoComptible(shaderInfo, shaderInfoCopy.userDataNodeCount, shaderInfoCopy.pUserDataNodes))
             {
-                outs() << "Auto Layout compute shader in " << pCompileInfo->pFileNames << " hitted\n";
+                outs() << "Auto Layout compute shader in " << compileInfo->fileNames << " hitted\n";
             }
             else
             {
-                outs() << "Auto Layout compute shader in " << pCompileInfo->pFileNames << " failed to hit\n";
+                outs() << "Auto Layout compute shader in " << compileInfo->fileNames << " failed to hit\n";
             }
             outs().flush();
         }
@@ -1122,69 +1122,69 @@ static Result CheckAutoLayoutCompatibleFunc(
 
 // =====================================================================================================================
 // Builds pipeline and do linking.
-static Result BuildPipeline(
-    ICompiler*    pCompiler,        // [in] LLPC compiler object
-    CompileInfo*  pCompileInfo)     // [in,out] Compilation info of LLPC standalone tool
+static Result buildPipeline(
+    ICompiler*    compiler,        // [in] LLPC compiler object
+    CompileInfo*  compileInfo)     // [in,out] Compilation info of LLPC standalone tool
 {
     Result result = Result::Success;
 
-    bool isGraphics = (pCompileInfo->stageMask & (ShaderStageToMask(ShaderStageCompute) -1)) ? true : false;
+    bool isGraphics = (compileInfo->stageMask & (shaderStageToMask(ShaderStageCompute) -1)) ? true : false;
     if (isGraphics)
     {
         // Build graphics pipeline
-        GraphicsPipelineBuildInfo* pPipelineInfo = &pCompileInfo->gfxPipelineInfo;
-        GraphicsPipelineBuildOut*  pPipelineOut  = &pCompileInfo->gfxPipelineOut;
+        GraphicsPipelineBuildInfo* pipelineInfo = &compileInfo->gfxPipelineInfo;
+        GraphicsPipelineBuildOut*  pipelineOut  = &compileInfo->gfxPipelineOut;
 
         // Fill pipeline shader info
         PipelineShaderInfo* shaderInfos[ShaderStageGfxCount] =
         {
-            &pPipelineInfo->vs,
-            &pPipelineInfo->tcs,
-            &pPipelineInfo->tes,
-            &pPipelineInfo->gs,
-            &pPipelineInfo->fs,
+            &pipelineInfo->vs,
+            &pipelineInfo->tcs,
+            &pipelineInfo->tes,
+            &pipelineInfo->gs,
+            &pipelineInfo->fs,
         };
 
         unsigned userDataOffset = 0;
-        for (unsigned i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
+        for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i)
         {
 
-            PipelineShaderInfo*         pShaderInfo = shaderInfos[pCompileInfo->shaderModuleDatas[i].shaderStage];
-            const ShaderModuleBuildOut* pShaderOut  = &(pCompileInfo->shaderModuleDatas[i].shaderOut);
+            PipelineShaderInfo*         shaderInfo = shaderInfos[compileInfo->shaderModuleDatas[i].shaderStage];
+            const ShaderModuleBuildOut* shaderOut  = &(compileInfo->shaderModuleDatas[i].shaderOut);
 
-            if (pShaderInfo->pEntryTarget == nullptr)
+            if (shaderInfo->pEntryTarget == nullptr)
             {
                 // If entry target is not specified, use the one from command line option
-                pShaderInfo->pEntryTarget = EntryTarget.c_str();
+                shaderInfo->pEntryTarget = EntryTarget.c_str();
             }
-            pShaderInfo->pModuleData  = pShaderOut->pModuleData;
-            pShaderInfo->entryStage = pCompileInfo->shaderModuleDatas[i].shaderStage;
+            shaderInfo->pModuleData  = shaderOut->pModuleData;
+            shaderInfo->entryStage = compileInfo->shaderModuleDatas[i].shaderStage;
 
             // If not compiling from pipeline, lay out user data now.
-            if (pCompileInfo->doAutoLayout)
+            if (compileInfo->doAutoLayout)
             {
-                DoAutoLayoutDesc(pCompileInfo->shaderModuleDatas[i].shaderStage,
-                                    pCompileInfo->shaderModuleDatas[i].spirvBin,
-                                    pPipelineInfo,
-                                    pShaderInfo,
+                doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage,
+                                    compileInfo->shaderModuleDatas[i].spirvBin,
+                                    pipelineInfo,
+                                    shaderInfo,
                                     userDataOffset,
                                     false);
             }
         }
 
-        pPipelineInfo->pInstance      = nullptr; // Dummy, unused
-        pPipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
-        pPipelineInfo->pfnOutputAlloc = AllocateBuffer;
+        pipelineInfo->pInstance      = nullptr; // Dummy, unused
+        pipelineInfo->pUserData      = &compileInfo->pipelineBuf;
+        pipelineInfo->pfnOutputAlloc = allocateBuffer;
 
         // NOTE: If number of patch control points is not specified, we set it to 3.
-        if (pPipelineInfo->iaState.patchControlPoints == 0)
+        if (pipelineInfo->iaState.patchControlPoints == 0)
         {
-            pPipelineInfo->iaState.patchControlPoints = 3;
+            pipelineInfo->iaState.patchControlPoints = 3;
         }
 
-        pPipelineInfo->options.robustBufferAccess = RobustBufferAccess;
+        pipelineInfo->options.robustBufferAccess = RobustBufferAccess;
 
-        void* pPipelineDumpHandle = nullptr;
+        void* pipelineDumpHandle = nullptr;
         if (llvm::cl::EnablePipelineDump)
         {
             PipelineDumpOptions dumpOptions = {};
@@ -1194,74 +1194,74 @@ static Result BuildPipeline(
             dumpOptions.dumpDuplicatePipelines   = llvm::cl::DumpDuplicatePipelines;
 
             PipelineBuildInfo localPipelineInfo = {};
-            localPipelineInfo.pGraphicsInfo = pPipelineInfo;
-            pPipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&dumpOptions, localPipelineInfo);
+            localPipelineInfo.pGraphicsInfo = pipelineInfo;
+            pipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&dumpOptions, localPipelineInfo);
         }
 
         if (TimePassesIsEnabled || cl::EnableTimerProfile)
         {
-            auto hash = Vkgc::IPipelineDumper::GetPipelineHash(pPipelineInfo);
+            auto hash = Vkgc::IPipelineDumper::GetPipelineHash(pipelineInfo);
             outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash)
-                   << " Files: " << pCompileInfo->pFileNames << "\n";
+                   << " Files: " << compileInfo->fileNames << "\n";
             outs().flush();
         }
 
-        result = pCompiler->BuildGraphicsPipeline(pPipelineInfo, pPipelineOut, pPipelineDumpHandle);
+        result = compiler->BuildGraphicsPipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
 
         if (result == Result::Success)
         {
             if (llvm::cl::EnablePipelineDump)
             {
                 Vkgc::BinaryData pipelineBinary = {};
-                pipelineBinary.codeSize = pPipelineOut->pipelineBin.codeSize;
-                pipelineBinary.pCode = pPipelineOut->pipelineBin.pCode;
-                Vkgc::IPipelineDumper::DumpPipelineBinary(pPipelineDumpHandle, ParsedGfxIp, &pipelineBinary);
+                pipelineBinary.codeSize = pipelineOut->pipelineBin.codeSize;
+                pipelineBinary.pCode = pipelineOut->pipelineBin.pCode;
+                Vkgc::IPipelineDumper::DumpPipelineBinary(pipelineDumpHandle, ParsedGfxIp, &pipelineBinary);
 
-                Vkgc::IPipelineDumper::EndPipelineDump(pPipelineDumpHandle);
+                Vkgc::IPipelineDumper::EndPipelineDump(pipelineDumpHandle);
             }
 
-            result = DecodePipelineBinary(&pPipelineOut->pipelineBin, pCompileInfo, true);
+            result = decodePipelineBinary(&pipelineOut->pipelineBin, compileInfo, true);
         }
     }
     else
     {
         // Build compute pipeline
-        assert(pCompileInfo->shaderModuleDatas.size() == 1);
-        assert(pCompileInfo->shaderModuleDatas[0].shaderStage == ShaderStageCompute);
+        assert(compileInfo->shaderModuleDatas.size() == 1);
+        assert(compileInfo->shaderModuleDatas[0].shaderStage == ShaderStageCompute);
 
-        ComputePipelineBuildInfo* pPipelineInfo = &pCompileInfo->compPipelineInfo;
-        ComputePipelineBuildOut*  pPipelineOut  = &pCompileInfo->compPipelineOut;
+        ComputePipelineBuildInfo* pipelineInfo = &compileInfo->compPipelineInfo;
+        ComputePipelineBuildOut*  pipelineOut  = &compileInfo->compPipelineOut;
 
-        PipelineShaderInfo*         pShaderInfo = &pPipelineInfo->cs;
-        const ShaderModuleBuildOut* pShaderOut  = &pCompileInfo->shaderModuleDatas[0].shaderOut;
+        PipelineShaderInfo*         shaderInfo = &pipelineInfo->cs;
+        const ShaderModuleBuildOut* shaderOut  = &compileInfo->shaderModuleDatas[0].shaderOut;
 
-        if (pShaderInfo->pEntryTarget == nullptr)
+        if (shaderInfo->pEntryTarget == nullptr)
         {
             // If entry target is not specified, use the one from command line option
-            pShaderInfo->pEntryTarget = EntryTarget.c_str();
+            shaderInfo->pEntryTarget = EntryTarget.c_str();
         }
 
-        pShaderInfo->entryStage = ShaderStageCompute;
-        pShaderInfo->pModuleData  = pShaderOut->pModuleData;
+        shaderInfo->entryStage = ShaderStageCompute;
+        shaderInfo->pModuleData  = shaderOut->pModuleData;
 
         // If not compiling from pipeline, lay out user data now.
-        if (pCompileInfo->doAutoLayout)
+        if (compileInfo->doAutoLayout)
         {
             unsigned userDataOffset = 0;
-            DoAutoLayoutDesc(ShaderStageCompute,
-                             pCompileInfo->shaderModuleDatas[0].spirvBin,
+            doAutoLayoutDesc(ShaderStageCompute,
+                             compileInfo->shaderModuleDatas[0].spirvBin,
                              nullptr,
-                             pShaderInfo,
+                             shaderInfo,
                              userDataOffset,
                              false);
         }
 
-        pPipelineInfo->pInstance      = nullptr; // Dummy, unused
-        pPipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
-        pPipelineInfo->pfnOutputAlloc = AllocateBuffer;
-        pPipelineInfo->options.robustBufferAccess = RobustBufferAccess;
+        pipelineInfo->pInstance      = nullptr; // Dummy, unused
+        pipelineInfo->pUserData      = &compileInfo->pipelineBuf;
+        pipelineInfo->pfnOutputAlloc = allocateBuffer;
+        pipelineInfo->options.robustBufferAccess = RobustBufferAccess;
 
-        void* pPipelineDumpHandle = nullptr;
+        void* pipelineDumpHandle = nullptr;
         if (llvm::cl::EnablePipelineDump)
         {
             PipelineDumpOptions dumpOptions = {};
@@ -1270,33 +1270,33 @@ static Result BuildPipeline(
             dumpOptions.filterPipelineDumpByHash = llvm::cl::FilterPipelineDumpByHash;
             dumpOptions.dumpDuplicatePipelines   = llvm::cl::DumpDuplicatePipelines;
             PipelineBuildInfo localPipelineInfo = {};
-            localPipelineInfo.pComputeInfo = pPipelineInfo;
-            pPipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&dumpOptions, localPipelineInfo);
+            localPipelineInfo.pComputeInfo = pipelineInfo;
+            pipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&dumpOptions, localPipelineInfo);
         }
 
         if (TimePassesIsEnabled || cl::EnableTimerProfile)
         {
-            auto hash = Vkgc::IPipelineDumper::GetPipelineHash(pPipelineInfo);
+            auto hash = Vkgc::IPipelineDumper::GetPipelineHash(pipelineInfo);
             outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash)
-                   << " Files: " << pCompileInfo->pFileNames << "\n";
+                   << " Files: " << compileInfo->fileNames << "\n";
             outs().flush();
         }
 
-        result = pCompiler->BuildComputePipeline(pPipelineInfo, pPipelineOut, pPipelineDumpHandle);
+        result = compiler->BuildComputePipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
 
         if (result == Result::Success)
         {
             if (llvm::cl::EnablePipelineDump)
             {
                 Vkgc::BinaryData pipelineBinary = {};
-                pipelineBinary.codeSize = pPipelineOut->pipelineBin.codeSize;
-                pipelineBinary.pCode = pPipelineOut->pipelineBin.pCode;
-                Vkgc::IPipelineDumper::DumpPipelineBinary(pPipelineDumpHandle, ParsedGfxIp, &pipelineBinary);
+                pipelineBinary.codeSize = pipelineOut->pipelineBin.codeSize;
+                pipelineBinary.pCode = pipelineOut->pipelineBin.pCode;
+                Vkgc::IPipelineDumper::DumpPipelineBinary(pipelineDumpHandle, ParsedGfxIp, &pipelineBinary);
 
-                Vkgc::IPipelineDumper::EndPipelineDump(pPipelineDumpHandle);
+                Vkgc::IPipelineDumper::EndPipelineDump(pipelineDumpHandle);
             }
 
-            result = DecodePipelineBinary(&pPipelineOut->pipelineBin, pCompileInfo, false);
+            result = decodePipelineBinary(&pipelineOut->pipelineBin, compileInfo, false);
         }
     }
 
@@ -1305,50 +1305,50 @@ static Result BuildPipeline(
 
 // =====================================================================================================================
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
-static Result OutputElf(
-    CompileInfo*       pCompileInfo,    // [in] Compilation info of LLPC standalone tool
+static Result outputElf(
+    CompileInfo*       compileInfo,    // [in] Compilation info of LLPC standalone tool
     const std::string& suppliedOutFile, // [in] Name of the file to output ELF binary (specify "" to use base name of
                                         //     first input file with appropriate extension; specify "-" to use stdout)
     StringRef          firstInFile)     // [in] Name of first input file
 {
     Result result = Result::Success;
-    const BinaryData* pPipelineBin = (pCompileInfo->stageMask & ShaderStageToMask(ShaderStageCompute)) ?
-                                         &pCompileInfo->compPipelineOut.pipelineBin :
-                                         &pCompileInfo->gfxPipelineOut.pipelineBin;
+    const BinaryData* pipelineBin = (compileInfo->stageMask & shaderStageToMask(ShaderStageCompute)) ?
+                                         &compileInfo->compPipelineOut.pipelineBin :
+                                         &compileInfo->gfxPipelineOut.pipelineBin;
     SmallString<64> outFileName(suppliedOutFile);
     if (outFileName.empty())
     {
         // NOTE: The output file name was not specified, so we construct a default file name.  We detect the
         // output file type and determine the file extension according to it. We are unable to access the
         // values of the options "-filetype" and "-emit-llvm".
-        const char* pExt = ".s";
-        if (IsElfBinary(pPipelineBin->pCode, pPipelineBin->codeSize))
+        const char* ext = ".s";
+        if (isElfBinary(pipelineBin->pCode, pipelineBin->codeSize))
         {
-            pExt = ".elf";
+            ext = ".elf";
         }
-        else if (IsLlvmBitcode(pPipelineBin->pCode, pPipelineBin->codeSize))
+        else if (isLlvmBitcode(pipelineBin->pCode, pipelineBin->codeSize))
         {
-            pExt = ".bc";
+            ext = ".bc";
         }
-        else if (IsIsaText(pPipelineBin->pCode, pPipelineBin->codeSize))
+        else if (isIsaText(pipelineBin->pCode, pipelineBin->codeSize))
         {
-            pExt = ".s";
+            ext = ".s";
         }
         else
         {
-            pExt = ".ll";
+            ext = ".ll";
         }
         outFileName = sys::path::filename(firstInFile);
-        sys::path::replace_extension(outFileName, pExt);
+        sys::path::replace_extension(outFileName, ext);
     }
 
-    FILE* pOutFile = stdout;
+    FILE* outFile = stdout;
     if (outFileName != "-")
     {
-        pOutFile = fopen(outFileName.c_str(), "wb");
+        outFile = fopen(outFileName.c_str(), "wb");
     }
 
-    if (pOutFile == nullptr)
+    if (outFile == nullptr)
     {
         LLPC_ERRS("Failed to open output file: " << outFileName << "\n");
         result = Result::ErrorUnavailable;
@@ -1356,12 +1356,12 @@ static Result OutputElf(
 
     if (result == Result::Success)
     {
-        if (fwrite(pPipelineBin->pCode, 1, pPipelineBin->codeSize, pOutFile) != pPipelineBin->codeSize)
+        if (fwrite(pipelineBin->pCode, 1, pipelineBin->codeSize, outFile) != pipelineBin->codeSize)
         {
             result = Result::ErrorUnavailable;
         }
 
-        if ((pOutFile != stdout) && (fclose(pOutFile) != 0))
+        if ((outFile != stdout) && (fclose(outFile) != 0))
         {
             result = Result::ErrorUnavailable;
         }
@@ -1408,10 +1408,10 @@ static void EnableMemoryLeakDetection()
 // =====================================================================================================================
 // Process one pipeline.
 static Result processPipeline(
-    ICompiler*            pCompiler,   // [in] LLPC context
+    ICompiler*            compiler,   // [in] LLPC context
     ArrayRef<std::string> inFiles,     // Input filename(s)
     unsigned              startFile,   // Index of the starting file name being processed in the file name array
-    unsigned*             pNextFile)   // [out] Index of next file name being processed in the file name array
+    unsigned*             nextFile)   // [out] Index of next file name being processed in the file name array
 {
     Result result = Result::Success;
     CompileInfo compileInfo = {};
@@ -1419,7 +1419,7 @@ static Result processPipeline(
     compileInfo.doAutoLayout = true;
     compileInfo.checkAutoLayoutCompatible = CheckAutoLayoutCompatible;
 
-    result = InitCompileInfo(&compileInfo);
+    result = initCompileInfo(&compileInfo);
 
     //
     // Translate sources to SPIR-V binary
@@ -1429,12 +1429,12 @@ static Result processPipeline(
         const std::string& inFile = inFiles[i];
         std::string spvBinFile;
 
-        if (IsSpirvTextFile(inFile) || IsSpirvBinaryFile(inFile))
+        if (isSpirvTextFile(inFile) || isSpirvBinaryFile(inFile))
         {
             // SPIR-V assembly text or SPIR-V binary
-            if (IsSpirvTextFile(inFile))
+            if (isSpirvTextFile(inFile))
             {
-                result = AssembleSpirv(inFile, spvBinFile);
+                result = assembleSpirv(inFile, spvBinFile);
             }
             else
             {
@@ -1445,7 +1445,7 @@ static Result processPipeline(
 
             if (result == Result::Success)
             {
-                result = GetSpirvBinaryFromFile(spvBinFile, &spvBin);
+                result = getSpirvBinaryFromFile(spvBinFile, &spvBin);
 
                 if (result == Result::Success)
                 {
@@ -1457,15 +1457,15 @@ static Result processPipeline(
                     {
                         // Disassemble SPIR-V code
                         unsigned textSize = spvBin.codeSize * 10 + 1024;
-                        char* pSpvText = new char[textSize];
-                        assert(pSpvText != nullptr);
-                        memset(pSpvText, 0, textSize);
+                        char* spvText = new char[textSize];
+                        assert(spvText != nullptr);
+                        memset(spvText, 0, textSize);
 
                         LLPC_OUTS("\nSPIR-V disassembly for " << inFile << "\n");
-                        spvDisassembleSpirv(spvBin.codeSize, spvBin.pCode, textSize, pSpvText);
-                        LLPC_OUTS(pSpvText << "\n");
+                        spvDisassembleSpirv(spvBin.codeSize, spvBin.pCode, textSize, spvText);
+                        LLPC_OUTS(spvText << "\n");
 
-                        delete[] pSpvText;
+                        delete[] spvText;
                     }
                 }
             }
@@ -1492,10 +1492,10 @@ static Result processPipeline(
                 // NOTE: If the entry target is not specified, we set it to the one gotten from SPIR-V binary.
                 if (EntryTarget.empty())
                 {
-                    EntryTarget.setValue(ShaderModuleHelper::GetEntryPointNameFromSpirvBinary(&spvBin));
+                    EntryTarget.setValue(ShaderModuleHelper::getEntryPointNameFromSpirvBinary(&spvBin));
                 }
 
-                unsigned stageMask = ShaderModuleHelper::GetStageMaskFromSpirvBinary(&spvBin, EntryTarget.c_str());
+                unsigned stageMask = ShaderModuleHelper::getStageMaskFromSpirvBinary(&spvBin, EntryTarget.c_str());
 
                 if ((stageMask & compileInfo.stageMask) != 0)
                 {
@@ -1505,13 +1505,13 @@ static Result processPipeline(
                 {
                     for (unsigned stage = ShaderStageVertex; stage < ShaderStageCount; ++stage)
                     {
-                        if (stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
+                        if (stageMask & shaderStageToMask(static_cast<ShaderStage>(stage)))
                         {
                             ::ShaderModuleData shaderModuleData = {};
                             shaderModuleData.shaderStage = static_cast<ShaderStage>(stage);
                             shaderModuleData.spirvBin = spvBin;
                             compileInfo.shaderModuleDatas.push_back(shaderModuleData);
-                            compileInfo.stageMask |= ShaderStageToMask(static_cast<ShaderStage>(stage));
+                            compileInfo.stageMask |= shaderStageToMask(static_cast<ShaderStage>(stage));
                             break;
                         }
                     }
@@ -1524,27 +1524,27 @@ static Result processPipeline(
             }
 
         }
-        else if (IsPipelineInfoFile(inFile))
+        else if (isPipelineInfoFile(inFile))
         {
             // NOTE: If the input file is pipeline file, we set the option -disable-null-frag-shader to FALSE
             // unconditionally.
             cl::DisableNullFragShader.setValue(false);
 
-            const char* pLog = nullptr;
+            const char* log = nullptr;
             bool vfxResult = Vfx::vfxParseFile(inFile.c_str(),
                                                0,
                                                nullptr,
                                                VfxDocTypePipeline,
-                                               &compileInfo.pPipelineInfoFile,
-                                               &pLog);
+                                               &compileInfo.pipelineInfoFile,
+                                               &log);
             if (vfxResult)
             {
-                VfxPipelineStatePtr pPipelineState = nullptr;
-                Vfx::vfxGetPipelineDoc(compileInfo.pPipelineInfoFile, &pPipelineState);
+                VfxPipelineStatePtr pipelineState = nullptr;
+                Vfx::vfxGetPipelineDoc(compileInfo.pipelineInfoFile, &pipelineState);
 
-                if (pPipelineState->version != Vkgc::Version)
+                if (pipelineState->version != Vkgc::Version)
                 {
-                    LLPC_ERRS("Version incompatible, SPVGEN::Version = " << pPipelineState->version <<
+                    LLPC_ERRS("Version incompatible, SPVGEN::Version = " << pipelineState->version <<
                               " AMDLLPC::Version = " << Vkgc::Version << "\n");
                     result = Result::ErrorInvalidShader;
                 }
@@ -1553,13 +1553,13 @@ static Result processPipeline(
                     LLPC_OUTS("===============================================================================\n");
                     LLPC_OUTS("// Pipeline file info for " << inFile << " \n\n");
 
-                    if ((pLog != nullptr) && (strlen(pLog) > 0))
+                    if ((log != nullptr) && (strlen(log) > 0))
                     {
-                        LLPC_OUTS("Pipeline file parse warning:\n" << pLog << "\n");
+                        LLPC_OUTS("Pipeline file parse warning:\n" << log << "\n");
                     }
 
-                    compileInfo.compPipelineInfo = pPipelineState->compPipelineInfo;
-                    compileInfo.gfxPipelineInfo = pPipelineState->gfxPipelineInfo;
+                    compileInfo.compPipelineInfo = pipelineState->compPipelineInfo;
+                    compileInfo.gfxPipelineInfo = pipelineState->gfxPipelineInfo;
                     if (IgnoreColorAttachmentFormats)
                     {
                         // NOTE: When this option is enabled, we set color attachment format to
@@ -1580,35 +1580,35 @@ static Result processPipeline(
                         LLPC_OUTS("Failed to load SPVGEN -- cannot disassemble and validate SPIR-V\n");
                     }
 
-                    for (unsigned stage = 0; stage < pPipelineState->numStages; ++stage)
+                    for (unsigned stage = 0; stage < pipelineState->numStages; ++stage)
                     {
-                        if (pPipelineState->stages[stage].dataSize > 0)
+                        if (pipelineState->stages[stage].dataSize > 0)
                         {
                             ::ShaderModuleData shaderModuleData = {};
-                            shaderModuleData.spirvBin.codeSize = pPipelineState->stages[stage].dataSize;
-                            shaderModuleData.spirvBin.pCode = pPipelineState->stages[stage].pData;
-                            shaderModuleData.shaderStage = pPipelineState->stages[stage].stage;
+                            shaderModuleData.spirvBin.codeSize = pipelineState->stages[stage].dataSize;
+                            shaderModuleData.spirvBin.pCode = pipelineState->stages[stage].pData;
+                            shaderModuleData.shaderStage = pipelineState->stages[stage].stage;
 
                             compileInfo.shaderModuleDatas.push_back(shaderModuleData);
-                            compileInfo.stageMask |= ShaderStageToMask(pPipelineState->stages[stage].stage);
+                            compileInfo.stageMask |= shaderStageToMask(pipelineState->stages[stage].stage);
 
                             if (spvDisassembleSpirv != nullptr)
                             {
-                                unsigned binSize =  pPipelineState->stages[stage].dataSize;
+                                unsigned binSize =  pipelineState->stages[stage].dataSize;
                                 unsigned textSize = binSize * 10 + 1024;
-                                char* pSpvText = new char[textSize];
-                                assert(pSpvText != nullptr);
-                                memset(pSpvText, 0, textSize);
+                                char* spvText = new char[textSize];
+                                assert(spvText != nullptr);
+                                memset(spvText, 0, textSize);
                                 LLPC_OUTS("\nSPIR-V disassembly for " <<
-                                          GetShaderStageName(pPipelineState->stages[stage].stage) << " shader module:\n");
-                                spvDisassembleSpirv(binSize, shaderModuleData.spirvBin.pCode, textSize, pSpvText);
-                                LLPC_OUTS(pSpvText << "\n");
-                                delete[] pSpvText;
+                                          getShaderStageName(pipelineState->stages[stage].stage) << " shader module:\n");
+                                spvDisassembleSpirv(binSize, shaderModuleData.spirvBin.pCode, textSize, spvText);
+                                LLPC_OUTS(spvText << "\n");
+                                delete[] spvText;
                             }
                         }
                     }
 
-                    bool isGraphics = (compileInfo.stageMask & ShaderStageToMask(ShaderStageCompute)) ? false : true;
+                    bool isGraphics = (compileInfo.stageMask & shaderStageToMask(ShaderStageCompute)) ? false : true;
                     for (unsigned i = 0; i < compileInfo.shaderModuleDatas.size(); ++i)
                     {
                         compileInfo.shaderModuleDatas[i].shaderInfo.options.pipelineOptions = isGraphics ?
@@ -1618,26 +1618,26 @@ static Result processPipeline(
 
                     fileNames += inFile;
                     fileNames += " ";
-                    *pNextFile = i + 1;
+                    *nextFile = i + 1;
                     compileInfo.doAutoLayout = false;
                     break;
                 }
             }
             else
             {
-                 LLPC_ERRS("Failed to parse input file: " << inFile << "\n" << pLog << "\n");
+                 LLPC_ERRS("Failed to parse input file: " << inFile << "\n" << log << "\n");
                  result = Result::ErrorInvalidShader;
             }
         }
-        else if (IsLlvmIrFile(inFile))
+        else if (isLlvmIrFile(inFile))
         {
             LLVMContext context;
             SMDiagnostic errDiag;
 
             // Load LLVM IR
-            std::unique_ptr<Module> pModule =
+            std::unique_ptr<Module> module =
                 parseAssemblyFile(inFile, errDiag, context, nullptr, false);
-            if (pModule.get() == nullptr)
+            if (module.get() == nullptr)
             {
                 std::string errMsg;
                 raw_string_ostream errStream(errMsg);
@@ -1649,7 +1649,7 @@ static Result processPipeline(
             // Verify LLVM module
             std::string errMsg;
             raw_string_ostream errStream(errMsg);
-            if ((result == Result::Success) && verifyModule(*pModule.get(), &errStream))
+            if ((result == Result::Success) && verifyModule(*module.get(), &errStream))
             {
                 LLPC_ERRS("File " << inFile << " parsed, but fail to verify the module: " << errMsg << "\n");
                 result = Result::ErrorInvalidShader;
@@ -1659,14 +1659,14 @@ static Result processPipeline(
             ShaderStage shaderStage = ShaderStageInvalid;
             if (result == Result::Success)
             {
-                shaderStage = GetShaderStageFromModule(pModule.get());
+                shaderStage = getShaderStageFromModule(module.get());
                 if (shaderStage == ShaderStageInvalid)
                 {
                     LLPC_ERRS("File " << inFile << ": Fail to determine shader stage\n");
                     result = Result::ErrorInvalidShader;
                 }
 
-                if (compileInfo.stageMask & ShaderStageToMask(static_cast<ShaderStage>(shaderStage)))
+                if (compileInfo.stageMask & shaderStageToMask(static_cast<ShaderStage>(shaderStage)))
                 {
                     break;
                 }
@@ -1677,16 +1677,16 @@ static Result processPipeline(
                 // Translate LLVM module to LLVM bitcode
                 llvm::SmallString<1024> bitcodeBuf;
                 raw_svector_ostream bitcodeStream(bitcodeBuf);
-                WriteBitcodeToFile(*pModule.get(), bitcodeStream);
-                void* pCode = new uint8_t[bitcodeBuf.size()];
-                memcpy(pCode, bitcodeBuf.data(), bitcodeBuf.size());
+                WriteBitcodeToFile(*module.get(), bitcodeStream);
+                void* code = new uint8_t[bitcodeBuf.size()];
+                memcpy(code, bitcodeBuf.data(), bitcodeBuf.size());
 
                 ::ShaderModuleData shaderModuledata = {};
                 shaderModuledata.spirvBin.codeSize = bitcodeBuf.size();
-                shaderModuledata.spirvBin.pCode = pCode;
+                shaderModuledata.spirvBin.pCode = code;
                 shaderModuledata.shaderStage = shaderStage;
                 compileInfo.shaderModuleDatas.push_back(shaderModuledata);
-                compileInfo.stageMask |= ShaderStageToMask(static_cast<ShaderStage>(shaderStage));
+                compileInfo.stageMask |= shaderStageToMask(static_cast<ShaderStage>(shaderStage));
                 compileInfo.doAutoLayout = false;
             }
         }
@@ -1701,17 +1701,17 @@ static Result processPipeline(
             }
 
             ShaderStage stage = ShaderStageInvalid;
-            result = CompileGlsl(inFile, &stage, spvBinFile);
+            result = compileGlsl(inFile, &stage, spvBinFile);
             if (result == Result::Success)
             {
-                if (compileInfo.stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
+                if (compileInfo.stageMask & shaderStageToMask(static_cast<ShaderStage>(stage)))
                 {
                     break;
                 }
 
-                compileInfo.stageMask |= ShaderStageToMask(stage);
+                compileInfo.stageMask |= shaderStageToMask(stage);
                 ::ShaderModuleData shaderModuleData = {};
-                result = GetSpirvBinaryFromFile(spvBinFile, &shaderModuleData.spirvBin);
+                result = getSpirvBinaryFromFile(spvBinFile, &shaderModuleData.spirvBin);
                 shaderModuleData.shaderStage = stage;
                 compileInfo.shaderModuleDatas.push_back(shaderModuleData);
             }
@@ -1719,13 +1719,13 @@ static Result processPipeline(
 
         fileNames += inFile;
         fileNames += " ";
-        *pNextFile = i + 1;
+        *nextFile = i + 1;
     }
 
     if ((result == Result::Success) && (compileInfo.checkAutoLayoutCompatible == true))
     {
-        compileInfo.pFileNames = fileNames.c_str();
-        result = CheckAutoLayoutCompatibleFunc(pCompiler, &compileInfo);
+        compileInfo.fileNames = fileNames.c_str();
+        result = checkAutoLayoutCompatibleFunc(compiler, &compileInfo);
     }
     else
     {
@@ -1734,7 +1734,7 @@ static Result processPipeline(
         //
         if ((result == Result::Success) && (compileInfo.stageMask != 0))
         {
-            result = BuildShaderModules(pCompiler, &compileInfo);
+            result = buildShaderModules(compiler, &compileInfo);
         }
 
         //
@@ -1742,18 +1742,18 @@ static Result processPipeline(
         //
         if ((result == Result::Success) && ToLink)
         {
-            compileInfo.pFileNames = fileNames.c_str();
-            result = BuildPipeline(pCompiler, &compileInfo);
+            compileInfo.fileNames = fileNames.c_str();
+            result = buildPipeline(compiler, &compileInfo);
             if (result == Result::Success)
             {
-                result = OutputElf(&compileInfo, OutFile, inFiles[0]);
+                result = outputElf(&compileInfo, OutFile, inFiles[0]);
             }
         }
     }
     //
     // Clean up
     //
-    CleanupCompileInfo(&compileInfo);
+    cleanupCompileInfo(&compileInfo);
 
     return result;
 }
@@ -1817,14 +1817,14 @@ int main(
 #else
     EnablePrettyStackTrace();
     sys::PrintStackTraceOnErrorSignal(argv[0]);
-    PrettyStackTraceProgram X(argc, argv);
+    PrettyStackTraceProgram x(argc, argv);
 
 #ifdef WIN_OS
     signal(SIGABRT, LlpcSignalAbortHandler);
 #endif
 #endif
 
-    result = Init(argc, argv, &compiler);
+    result = init(argc, argv, &compiler);
 
 #ifdef WIN_OS
     if (AssertToMsgBox)
@@ -1833,7 +1833,7 @@ int main(
     }
 #endif
 
-    if (IsPipelineInfoFile(InFiles[0]) || IsLlvmIrFile(InFiles[0]))
+    if (isPipelineInfoFile(InFiles[0]) || isLlvmIrFile(InFiles[0]))
     {
         unsigned nextFile = 0;
 

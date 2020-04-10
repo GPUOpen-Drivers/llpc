@@ -56,9 +56,9 @@ bool EnableErrs();
 void redirectLogOutput(
     bool              restoreToDefault,
     unsigned          optionCount,
-    const char*const* pOptions);
+    const char*const* options);
 
 // Enable/disable the output for debugging.
-void EnableDebugOutput(bool restore);
+void enableDebugOutput(bool restore);
 
 } // Llpc

@@ -72,40 +72,40 @@ private:
     PatchResourceCollect& operator=(const PatchResourceCollect&) = delete;
 
     // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
-    bool CheckGsOnChipValidity();
+    bool checkGsOnChipValidity();
 
     // Sets NGG control settings
-    void SetNggControl();
-    void BuildNggCullingControlRegister(NggControl& nggControl);
-    unsigned GetVerticesPerPrimitive() const;
+    void setNggControl();
+    void buildNggCullingControlRegister(NggControl& nggControl);
+    unsigned getVerticesPerPrimitive() const;
 
-    void ProcessShader();
+    void processShader();
 
-    bool IsVertexReuseDisabled();
+    bool isVertexReuseDisabled();
 
-    void ClearInactiveInput();
-    void ClearInactiveOutput();
+    void clearInactiveInput();
+    void clearInactiveOutput();
 
-    void MatchGenericInOut();
-    void MapBuiltInToGenericInOut();
+    void matchGenericInOut();
+    void mapBuiltInToGenericInOut();
 
-    void MapGsGenericOutput(GsOutLocInfo outLocInfo);
-    void MapGsBuiltInOutput(unsigned builtInId, unsigned elemCount);
+    void mapGsGenericOutput(GsOutLocInfo outLocInfo);
+    void mapGsBuiltInOutput(unsigned builtInId, unsigned elemCount);
 
-    bool CanPackInOut() const;
-    void PackInOutLocation();
-    void ReviseInputImportCalls();
-    void ReassembleOutputExportCalls();
+    bool canPackInOut() const;
+    void packInOutLocation();
+    void reviseInputImportCalls();
+    void reassembleOutputExportCalls();
 
     // Input/output scalarizing
-    void ScalarizeForInOutPacking(llvm::Module* pModule);
-    void ScalarizeGenericInput(llvm::CallInst* pCall);
-    void ScalarizeGenericOutput(llvm::CallInst* pCall);
+    void scalarizeForInOutPacking(llvm::Module* module);
+    void scalarizeGenericInput(llvm::CallInst* call);
+    void scalarizeGenericOutput(llvm::CallInst* call);
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    PipelineShaders*                m_pPipelineShaders;         // Pipeline shaders
-    PipelineState*                  m_pPipelineState;           // Pipeline state
+    PipelineShaders*                m_pipelineShaders;         // Pipeline shaders
+    PipelineState*                  m_pipelineState;           // Pipeline state
 
     std::unordered_set<llvm::CallInst*> m_deadCalls;            // Dead calls
 
@@ -123,8 +123,8 @@ private:
                                                 // for tessellation shader, fragment shader with input interpolation)
     bool            m_hasDynIndexedOutput;      // Whether dynamic indices are used in generic output addressing (valid
                                                 // for tessellation control shader)
-    ResourceUsage*  m_pResUsage;                // Pointer to shader resource usage
-    std::unique_ptr<InOutLocationMapManager> m_pLocationMapManager; // Pointer to InOutLocationMapManager instance
+    ResourceUsage*  m_resUsage;                // Pointer to shader resource usage
+    std::unique_ptr<InOutLocationMapManager> m_locationMapManager; // Pointer to InOutLocationMapManager instance
 };
 
 // Represents the location info of input/output
@@ -156,9 +156,9 @@ union InOutCompatibilityInfo
 // Represents the wrapper of input/output locatoin info, along with handlers
 struct InOutLocation
 {
-    uint16_t AsIndex() const { return locationInfo.u16All; }
+    uint16_t asIndex() const { return locationInfo.u16All; }
 
-    bool operator<(const InOutLocation& rhs) const { return (this->AsIndex() < rhs.AsIndex()); }
+    bool operator<(const InOutLocation& rhs) const { return (this->asIndex() < rhs.asIndex()); }
 
     InOutLocationInfo locationInfo; // The location info of an input or output
 };
@@ -170,20 +170,20 @@ class InOutLocationMapManager
 public:
     InOutLocationMapManager() {}
 
-    bool AddSpan(llvm::CallInst* pCall);
-    void BuildLocationMap();
+    bool addSpan(llvm::CallInst* call);
+    void buildLocationMap();
 
-    bool FindMap(const InOutLocation& originalLocation, const InOutLocation*& pNewLocation);
+    bool findMap(const InOutLocation& originalLocation, const InOutLocation*& newLocation);
 
     struct LocationSpan
     {
-        uint16_t GetCompatibilityKey() const { return compatibilityInfo.u16All; }
+        uint16_t getCompatibilityKey() const { return compatibilityInfo.u16All; }
 
-        unsigned AsIndex() const { return ((GetCompatibilityKey() << 16) | firstLocation.AsIndex()); }
+        unsigned asIndex() const { return ((getCompatibilityKey() << 16) | firstLocation.asIndex()); }
 
-        bool operator==(const LocationSpan& rhs) const { return (this->AsIndex() == rhs.AsIndex()); }
+        bool operator==(const LocationSpan& rhs) const { return (this->asIndex() == rhs.asIndex()); }
 
-        bool operator<(const LocationSpan& rhs) const { return (this->AsIndex() < rhs.AsIndex()); }
+        bool operator<(const LocationSpan& rhs) const { return (this->asIndex() < rhs.asIndex()); }
 
         InOutLocation firstLocation;
         InOutCompatibilityInfo compatibilityInfo;
@@ -195,7 +195,7 @@ private:
 
     bool isCompatible(const LocationSpan& rSpan, const LocationSpan& lSpan) const
     {
-        return rSpan.GetCompatibilityKey() == lSpan.GetCompatibilityKey();
+        return rSpan.getCompatibilityKey() == lSpan.getCompatibilityKey();
     }
 
     std::vector<LocationSpan> m_locationSpans; // Tracks spans of contiguous components in the generic input space

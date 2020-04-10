@@ -55,9 +55,9 @@ public:
         analysisUsage.setPreservesAll();
     }
 
-    llvm::Function* GetEntryPoint(ShaderStage shaderStage) const;
+    llvm::Function* getEntryPoint(ShaderStage shaderStage) const;
 
-    ShaderStage GetShaderStage(const llvm::Function* pFunc) const;
+    ShaderStage getShaderStage(const llvm::Function* func) const;
 
 private:
     PipelineShaders(const PipelineShaders&) = delete;
@@ -69,6 +69,6 @@ private:
     std::map<const llvm::Function*, ShaderStage> m_entryPointMap; // Map from shader entry-point to shader stage.
 };
 
-llvm::ModulePass* CreatePipelineShaders();
+llvm::ModulePass* createPipelineShaders();
 
 } // lgc

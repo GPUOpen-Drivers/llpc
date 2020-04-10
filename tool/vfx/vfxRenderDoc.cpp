@@ -35,7 +35,7 @@ namespace Vfx
 {
 // =====================================================================================================================
 // Max section count for RenderDocument
-unsigned RenderDocument::m_MaxSectionCount[SectionTypeNameNum] =
+unsigned RenderDocument::m_maxSectionCount[SectionTypeNameNum] =
 {
     0,                     // SectionTypeUnset
     1,                     // SectionTypeResult
@@ -65,12 +65,12 @@ unsigned RenderDocument::m_MaxSectionCount[SectionTypeNameNum] =
 
 // =====================================================================================================================
 // Gets RenderDocument content
-VfxRenderStatePtr RenderDocument::GetDocument()
+VfxRenderStatePtr RenderDocument::getDocument()
 {
     // Section "Result"
     if (m_sections[SectionTypeResult].size() > 0)
     {
-        reinterpret_cast<SectionResult*>(m_sections[SectionTypeResult][0])->GetSubState(m_renderState.result);
+        reinterpret_cast<SectionResult*>(m_sections[SectionTypeResult][0])->getSubState(m_renderState.result);
     }
 
     // Section "BufferView"s
@@ -78,25 +78,25 @@ VfxRenderStatePtr RenderDocument::GetDocument()
     for (unsigned i = 0; i < m_renderState.numBufferView; ++i)
     {
         reinterpret_cast<SectionBufferView*>(m_sections[SectionTypeBufferView][i])->
-            GetSubState(m_renderState.bufferView[i]);
+            getSubState(m_renderState.bufferView[i]);
     }
 
     // Section "VertexState"
     if (m_sections[SectionTypeVertexState].size() > 0)
     {
         reinterpret_cast<SectionVertexState*>(m_sections[SectionTypeVertexState][0])->
-            GetSubState(m_renderState.vertexState);
+            getSubState(m_renderState.vertexState);
     }
 
     // Section "DrawState"
     if (m_sections[SectionTypeDrawState].size() > 0)
     {
         reinterpret_cast<SectionDrawState*>(m_sections[SectionTypeDrawState][0])->
-            GetSubState(m_renderState.drawState);
+            getSubState(m_renderState.drawState);
     }
     else
     {
-        SectionDrawState::InitDrawState(m_renderState.drawState);
+        SectionDrawState::initDrawState(m_renderState.drawState);
     }
 
     // Section "ImageView"s
@@ -104,7 +104,7 @@ VfxRenderStatePtr RenderDocument::GetDocument()
     for (unsigned i = 0; i < m_renderState.numImageView; ++i)
     {
         reinterpret_cast<SectionImageView*>(m_sections[SectionTypeImageView][i])->
-            GetSubState(m_renderState.imageView[i]);
+            getSubState(m_renderState.imageView[i]);
     }
 
     // Section "Sampler"s
@@ -112,7 +112,7 @@ VfxRenderStatePtr RenderDocument::GetDocument()
     for (unsigned i = 0; i < m_renderState.numSampler; ++i)
     {
         reinterpret_cast<SectionSampler*>(m_sections[SectionTypeSampler][i])->
-            GetSubState(m_renderState.sampler[i]);
+            getSubState(m_renderState.sampler[i]);
     }
 
     // Shader sections
@@ -121,7 +121,7 @@ VfxRenderStatePtr RenderDocument::GetDocument()
         if (m_sections[SectionTypeVertexShader + i].size() > 0)
         {
             reinterpret_cast<SectionShader*>(m_sections[SectionTypeVertexShader + i][0])->
-                GetSubState(m_renderState.stages[i]);
+                getSubState(m_renderState.stages[i]);
         }
     }
 

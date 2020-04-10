@@ -39,76 +39,76 @@ using namespace llvm;
 
 // =====================================================================================================================
 BuilderImpl::BuilderImpl(
-    BuilderContext* pBuilderContext,  // [in] BuilderContext
-    Pipeline*       pPipeline)        // [in] PipelineState (as public superclass Pipeline)
-    : BuilderImplBase(pBuilderContext),
-      BuilderImplArith(pBuilderContext),
-      BuilderImplDesc(pBuilderContext),
-      BuilderImplImage(pBuilderContext),
-      BuilderImplInOut(pBuilderContext),
-      BuilderImplMatrix(pBuilderContext),
-      BuilderImplMisc(pBuilderContext),
-      BuilderImplSubgroup(pBuilderContext)
+    BuilderContext* builderContext,  // [in] BuilderContext
+    Pipeline*       pipeline)        // [in] PipelineState (as public superclass Pipeline)
+    : BuilderImplBase(builderContext),
+      BuilderImplArith(builderContext),
+      BuilderImplDesc(builderContext),
+      BuilderImplImage(builderContext),
+      BuilderImplInOut(builderContext),
+      BuilderImplMatrix(builderContext),
+      BuilderImplMisc(builderContext),
+      BuilderImplSubgroup(builderContext)
 {
-    m_pPipelineState = reinterpret_cast<PipelineState*>(pPipeline);
-    m_pPipelineState->SetNoReplayer();
+    m_pipelineState = reinterpret_cast<PipelineState*>(pipeline);
+    m_pipelineState->setNoReplayer();
 }
 
 // =====================================================================================================================
 // Get the ShaderModes object.
-ShaderModes* BuilderImplBase::GetShaderModes()
+ShaderModes* BuilderImplBase::getShaderModes()
 {
-    return m_pPipelineState->GetShaderModes();
+    return m_pipelineState->getShaderModes();
 }
 
 // =====================================================================================================================
 // Create scalar from dot product of scalar or vector FP type. (The dot product of two scalars is their product.)
 Value* BuilderImplBase::CreateDotProduct(
-    Value* const pVector1,            // [in] The float vector 1
-    Value* const pVector2,            // [in] The float vector 2
+    Value* const vector1,            // [in] The float vector 1
+    Value* const vector2,            // [in] The float vector 2
     const Twine& instName)            // [in] Name to give instruction(s)
 {
-    Value* pProduct = CreateFMul(pVector1, pVector2);
-    if (isa<VectorType>(pProduct->getType()) == false)
+    Value* product = CreateFMul(vector1, vector2);
+    if (isa<VectorType>(product->getType()) == false)
     {
-        return pProduct;
+        return product;
     }
 
-    const unsigned compCount = pProduct->getType()->getVectorNumElements();
-    Value* pScalar = CreateExtractElement(pProduct, uint64_t(0));
+    const unsigned compCount = product->getType()->getVectorNumElements();
+    Value* scalar = CreateExtractElement(product, uint64_t(0));
 
     for (unsigned i = 1; i < compCount; ++i)
     {
-        pScalar = CreateFAdd(pScalar, CreateExtractElement(pProduct, i));
+        scalar = CreateFAdd(scalar, CreateExtractElement(product, i));
     }
 
-    pScalar->setName(instName);
-    return pScalar;
+    scalar->setName(instName);
+    return scalar;
 }
 
 // =====================================================================================================================
 // Get whether the context we are building in supports DPP operations.
-bool BuilderImplBase::SupportDpp() const
+bool BuilderImplBase::supportDpp() const
 {
-    return GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major >= 8;
+    return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 8;
 }
 
 // =====================================================================================================================
 // Get whether the context we are building in support the bpermute operation.
-bool BuilderImplBase::SupportBPermute() const
+bool BuilderImplBase::supportBPermute() const
 {
-    auto gfxIp = GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major;
+    auto gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion().major;
     auto supportBPermute = (gfxIp == 8) || (gfxIp == 9);
-    auto waveSize = GetPipelineState()->GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent()));
+    auto waveSize = getPipelineState()->getShaderWaveSize(getShaderStageFromFunction(GetInsertBlock()->getParent()));
     supportBPermute = supportBPermute || ((gfxIp == 10) && (waveSize == 32));
     return supportBPermute;
 }
 
 // =====================================================================================================================
 // Get whether the context we are building in supports permute lane DPP operations.
-bool BuilderImplBase::SupportPermLaneDpp() const
+bool BuilderImplBase::supportPermLaneDpp() const
 {
-    return GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major >= 10;
+    return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 10;
 }
 
 // =====================================================================================================================
@@ -118,71 +118,71 @@ bool BuilderImplBase::SupportPermLaneDpp() const
 // afterwards to restore the insert point to where it was just after the endif, and still keep its debug location.
 // The method returns the branch instruction, whose first branch target is the "then" block and second branch
 // target is the "else" block, or "endif" block if no "else" block.
-BranchInst* BuilderImplBase::CreateIf(
-    Value*        pCondition,   // [in] The "if" condition
+BranchInst* BuilderImplBase::createIf(
+    Value*        condition,   // [in] The "if" condition
     bool          wantElse,     // Whether to generate an "else" block
     const Twine&  instName)     // Base of name for new basic blocks
 {
     // Create "if" block and move instructions in current block to it.
-    BasicBlock* pEndIfBlock = GetInsertBlock();
-    BasicBlock* pIfBlock = BasicBlock::Create(getContext(), "", pEndIfBlock->getParent(), pEndIfBlock);
-    pIfBlock->takeName(pEndIfBlock);
-    pEndIfBlock->setName(instName + ".endif");
-    pIfBlock->getInstList().splice(pIfBlock->end(),
-                                   pEndIfBlock->getInstList(),
-                                   pEndIfBlock->begin(),
+    BasicBlock* endIfBlock = GetInsertBlock();
+    BasicBlock* ifBlock = BasicBlock::Create(getContext(), "", endIfBlock->getParent(), endIfBlock);
+    ifBlock->takeName(endIfBlock);
+    endIfBlock->setName(instName + ".endif");
+    ifBlock->getInstList().splice(ifBlock->end(),
+                                   endIfBlock->getInstList(),
+                                   endIfBlock->begin(),
                                    GetInsertPoint());
 
     // Replace non-phi uses of the original block with the new "if" block.
     SmallVector<Use*, 4> nonPhiUses;
-    for (auto& use : pEndIfBlock->uses())
+    for (auto& use : endIfBlock->uses())
     {
         if (isa<PHINode>(use.getUser()) == false)
         {
             nonPhiUses.push_back(&use);
         }
     }
-    for (auto pUse : nonPhiUses)
+    for (auto use : nonPhiUses)
     {
-        pUse->set(pIfBlock);
+        use->set(ifBlock);
     }
 
     // Create "then" and "else" blocks.
-    BasicBlock* pThenBlock = BasicBlock::Create(getContext(),
+    BasicBlock* thenBlock = BasicBlock::Create(getContext(),
                                                 instName + ".then",
-                                                pEndIfBlock->getParent(),
-                                                pEndIfBlock);
-    BasicBlock* pElseBlock = nullptr;
+                                                endIfBlock->getParent(),
+                                                endIfBlock);
+    BasicBlock* elseBlock = nullptr;
     if (wantElse)
     {
-        pElseBlock = BasicBlock::Create(getContext(),
+        elseBlock = BasicBlock::Create(getContext(),
                                         instName + ".else",
-                                        pEndIfBlock->getParent(),
-                                        pEndIfBlock);
+                                        endIfBlock->getParent(),
+                                        endIfBlock);
     }
 
     // Create the branches.
-    BranchInst* pBranch = BranchInst::Create(pThenBlock,
-                                             pElseBlock != nullptr ? pElseBlock : pEndIfBlock,
-                                             pCondition,
-                                             pIfBlock);
-    pBranch->setDebugLoc(getCurrentDebugLocation());
-    BranchInst::Create(pEndIfBlock, pThenBlock)->setDebugLoc(getCurrentDebugLocation());
-    if (pElseBlock != nullptr)
+    BranchInst* branch = BranchInst::Create(thenBlock,
+                                             elseBlock != nullptr ? elseBlock : endIfBlock,
+                                             condition,
+                                             ifBlock);
+    branch->setDebugLoc(getCurrentDebugLocation());
+    BranchInst::Create(endIfBlock, thenBlock)->setDebugLoc(getCurrentDebugLocation());
+    if (elseBlock != nullptr)
     {
-        BranchInst::Create(pEndIfBlock, pElseBlock)->setDebugLoc(getCurrentDebugLocation());
+        BranchInst::Create(endIfBlock, elseBlock)->setDebugLoc(getCurrentDebugLocation());
     }
 
     // Set Builder's insert point to the branch at the end of the "then" block.
-    SetInsertPoint(pThenBlock->getTerminator());
-    return pBranch;
+    SetInsertPoint(thenBlock->getTerminator());
+    return branch;
 }
 
 // =====================================================================================================================
 // Create a waterfall loop containing the specified instruction.
 // This does not use the current insert point; new code is inserted before and after pNonUniformInst.
-Instruction* BuilderImplBase::CreateWaterfallLoop(
-    Instruction*        pNonUniformInst,    // [in] The instruction to put in a waterfall loop
+Instruction* BuilderImplBase::createWaterfallLoop(
+    Instruction*        nonUniformInst,    // [in] The instruction to put in a waterfall loop
     ArrayRef<unsigned>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to be uniform
     const Twine&        instName)           // [in] Name to give instruction(s)
 {
@@ -193,243 +193,243 @@ Instruction* BuilderImplBase::CreateWaterfallLoop(
     SmallVector<Value*, 2> nonUniformIndices;
     for (unsigned operandIdx : operandIdxs)
     {
-        Value* pNonUniformVal = pNonUniformInst->getOperand(operandIdx);
-        if (auto pCall = dyn_cast<CallInst>(pNonUniformVal))
+        Value* nonUniformVal = nonUniformInst->getOperand(operandIdx);
+        if (auto call = dyn_cast<CallInst>(nonUniformVal))
         {
-            if (auto pCalledFunc = pCall->getCalledFunction())
+            if (auto calledFunc = call->getCalledFunction())
             {
-                if (pCalledFunc->getName().startswith(lgcName::DescriptorLoadFromPtr))
+                if (calledFunc->getName().startswith(lgcName::DescriptorLoadFromPtr))
                 {
-                    pCall = dyn_cast<CallInst>(pCall->getArgOperand(0)); // The descriptor pointer
-                    if ((pCall != nullptr) &&
-                        pCall->getCalledFunction()->getName().startswith(lgcName::DescriptorIndex))
+                    call = dyn_cast<CallInst>(call->getArgOperand(0)); // The descriptor pointer
+                    if ((call != nullptr) &&
+                        call->getCalledFunction()->getName().startswith(lgcName::DescriptorIndex))
                     {
-                        pNonUniformVal = pCall->getArgOperand(1); // The index operand
+                        nonUniformVal = call->getArgOperand(1); // The index operand
                     }
                 }
             }
         }
-        nonUniformIndices.push_back(pNonUniformVal);
+        nonUniformIndices.push_back(nonUniformVal);
     }
 
     // Save Builder's insert point, and set it to insert new code just before pNonUniformInst.
     auto savedInsertPoint = saveIP();
-    SetInsertPoint(pNonUniformInst);
+    SetInsertPoint(nonUniformInst);
 
     // Get the waterfall index. If there are two indices (image resource+sampler case), join them into
     // a single struct.
-    Value* pWaterfallIndex = nonUniformIndices[0];
+    Value* waterfallIndex = nonUniformIndices[0];
     if (nonUniformIndices.size() > 1)
     {
         assert(nonUniformIndices.size() == 2);
         SmallVector<Type*, 2> indexTys;
-        for (Value* pNonUniformIndex : nonUniformIndices)
+        for (Value* nonUniformIndex : nonUniformIndices)
         {
-            indexTys.push_back(pNonUniformIndex->getType());
+            indexTys.push_back(nonUniformIndex->getType());
         }
-        auto pWaterfallIndexTy = StructType::get(getContext(), indexTys);
-        pWaterfallIndex = UndefValue::get(pWaterfallIndexTy);
+        auto waterfallIndexTy = StructType::get(getContext(), indexTys);
+        waterfallIndex = UndefValue::get(waterfallIndexTy);
         for (unsigned structIndex = 0; structIndex < nonUniformIndices.size(); ++structIndex)
         {
-            pWaterfallIndex = CreateInsertValue(pWaterfallIndex, nonUniformIndices[structIndex], structIndex);
+            waterfallIndex = CreateInsertValue(waterfallIndex, nonUniformIndices[structIndex], structIndex);
         }
     }
 
     // Start the waterfall loop using the waterfall index.
-    Value* pWaterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin,
-                                             pWaterfallIndex->getType(),
-                                             pWaterfallIndex,
+    Value* waterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin,
+                                             waterfallIndex->getType(),
+                                             waterfallIndex,
                                              nullptr,
                                              instName);
 
     // Scalarize each non-uniform operand of the instruction.
     for (unsigned operandIdx : operandIdxs)
     {
-        Value* pDesc = pNonUniformInst->getOperand(operandIdx);
-        auto pDescTy = pDesc->getType();
-        pDesc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane,
-                                { pDescTy, pDescTy },
-                                { pWaterfallBegin, pDesc },
+        Value* desc = nonUniformInst->getOperand(operandIdx);
+        auto descTy = desc->getType();
+        desc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane,
+                                { descTy, descTy },
+                                { waterfallBegin, desc },
                                 nullptr,
                                 instName);
-        if (pNonUniformInst->getType()->isVoidTy())
+        if (nonUniformInst->getType()->isVoidTy())
         {
             // The buffer/image operation we are waterfalling is a store with no return value. Use
             // llvm.amdgcn.waterfall.last.use on the descriptor.
-            pDesc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_last_use,
-                                    pDescTy,
-                                    { pWaterfallBegin, pDesc },
+            desc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_last_use,
+                                    descTy,
+                                    { waterfallBegin, desc },
                                     nullptr,
                                     instName);
         }
         // Replace the descriptor operand in the buffer/image operation.
-        pNonUniformInst->setOperand(operandIdx, pDesc);
+        nonUniformInst->setOperand(operandIdx, desc);
     }
 
-    Instruction* pResultValue = pNonUniformInst;
+    Instruction* resultValue = nonUniformInst;
 
     // End the waterfall loop (as long as pNonUniformInst is not a store with no result).
-    if (pNonUniformInst->getType()->isVoidTy() == false)
+    if (nonUniformInst->getType()->isVoidTy() == false)
     {
-        SetInsertPoint(pNonUniformInst->getNextNode());
-        SetCurrentDebugLocation(pNonUniformInst->getDebugLoc());
+        SetInsertPoint(nonUniformInst->getNextNode());
+        SetCurrentDebugLocation(nonUniformInst->getDebugLoc());
 
-        Use* pUseOfNonUniformInst = nullptr;
-        Type* pWaterfallEndTy = pResultValue->getType();
-        if (auto pVecTy = dyn_cast<VectorType>(pWaterfallEndTy))
+        Use* useOfNonUniformInst = nullptr;
+        Type* waterfallEndTy = resultValue->getType();
+        if (auto vecTy = dyn_cast<VectorType>(waterfallEndTy))
         {
-            if (pVecTy->getElementType()->isIntegerTy(8))
+            if (vecTy->getElementType()->isIntegerTy(8))
             {
                 // ISel does not like waterfall.end with vector of i8 type, so cast if necessary.
-                assert((pVecTy->getNumElements() % 4) == 0);
-                pWaterfallEndTy = getInt32Ty();
-                if (pVecTy->getNumElements() != 4)
+                assert((vecTy->getNumElements() % 4) == 0);
+                waterfallEndTy = getInt32Ty();
+                if (vecTy->getNumElements() != 4)
                 {
-                    pWaterfallEndTy = VectorType::get(getInt32Ty(), pVecTy->getNumElements() / 4);
+                    waterfallEndTy = VectorType::get(getInt32Ty(), vecTy->getNumElements() / 4);
                 }
-                pResultValue = cast<Instruction>(CreateBitCast(pResultValue, pWaterfallEndTy, instName));
-                pUseOfNonUniformInst = &pResultValue->getOperandUse(0);
+                resultValue = cast<Instruction>(CreateBitCast(resultValue, waterfallEndTy, instName));
+                useOfNonUniformInst = &resultValue->getOperandUse(0);
             }
         }
-        pResultValue = CreateIntrinsic(Intrinsic::amdgcn_waterfall_end,
-                                  pWaterfallEndTy,
-                                  { pWaterfallBegin, pResultValue },
+        resultValue = CreateIntrinsic(Intrinsic::amdgcn_waterfall_end,
+                                  waterfallEndTy,
+                                  { waterfallBegin, resultValue },
                                   nullptr,
                                   instName);
-        if (pUseOfNonUniformInst == nullptr)
+        if (useOfNonUniformInst == nullptr)
         {
-            pUseOfNonUniformInst = &pResultValue->getOperandUse(1);
+            useOfNonUniformInst = &resultValue->getOperandUse(1);
         }
-        if (pWaterfallEndTy != pNonUniformInst->getType())
+        if (waterfallEndTy != nonUniformInst->getType())
         {
-            pResultValue = cast<Instruction>(CreateBitCast(pResultValue, pNonUniformInst->getType(), instName));
+            resultValue = cast<Instruction>(CreateBitCast(resultValue, nonUniformInst->getType(), instName));
         }
 
         // Replace all uses of pNonUniformInst with the result of this code.
-        *pUseOfNonUniformInst = UndefValue::get(pNonUniformInst->getType());
-        pNonUniformInst->replaceAllUsesWith(pResultValue);
-        *pUseOfNonUniformInst = pNonUniformInst;
+        *useOfNonUniformInst = UndefValue::get(nonUniformInst->getType());
+        nonUniformInst->replaceAllUsesWith(resultValue);
+        *useOfNonUniformInst = nonUniformInst;
     }
 
     // Restore Builder's insert point.
     restoreIP(savedInsertPoint);
-    return pResultValue;
+    return resultValue;
 }
 
 // =====================================================================================================================
 // Helper method to scalarize a possibly vector unary operation
-Value* BuilderImplBase::Scalarize(
-    Value*                        pValue,     // [in] Input value
+Value* BuilderImplBase::scalarize(
+    Value*                        value,     // [in] Input value
     std::function<Value*(Value*)> callback)   // [in] Callback function
 {
-    if (auto pVecTy = dyn_cast<VectorType>(pValue->getType()))
+    if (auto vecTy = dyn_cast<VectorType>(value->getType()))
     {
-        Value* pResult0 = callback(CreateExtractElement(pValue, uint64_t(0)));
-        Value* pResult = UndefValue::get(VectorType::get(pResult0->getType(), pVecTy->getNumElements()));
-        pResult = CreateInsertElement(pResult, pResult0, uint64_t(0));
-        for (unsigned idx = 1, end = pVecTy->getNumElements(); idx != end; ++idx)
+        Value* result0 = callback(CreateExtractElement(value, uint64_t(0)));
+        Value* result = UndefValue::get(VectorType::get(result0->getType(), vecTy->getNumElements()));
+        result = CreateInsertElement(result, result0, uint64_t(0));
+        for (unsigned idx = 1, end = vecTy->getNumElements(); idx != end; ++idx)
         {
-            pResult = CreateInsertElement(pResult, callback(CreateExtractElement(pValue, idx)), idx);
+            result = CreateInsertElement(result, callback(CreateExtractElement(value, idx)), idx);
         }
-        return pResult;
+        return result;
     }
-    Value* pResult = callback(pValue);
-    return pResult;
+    Value* result = callback(value);
+    return result;
 }
 
 // =====================================================================================================================
 // Helper method to scalarize in pairs a possibly vector unary operation. The callback function is called
 // with vec2 input, even if the input here is scalar.
-Value* BuilderImplBase::ScalarizeInPairs(
-    Value*                        pValue,     // [in] Input value
+Value* BuilderImplBase::scalarizeInPairs(
+    Value*                        value,     // [in] Input value
     std::function<Value*(Value*)> callback)   // [in] Callback function
 {
-    if (auto pVecTy = dyn_cast<VectorType>(pValue->getType()))
+    if (auto vecTy = dyn_cast<VectorType>(value->getType()))
     {
-        Value* pInComps = CreateShuffleVector(pValue, pValue, ArrayRef<unsigned>{ 0, 1 });
-        Value* pResultComps = callback(pInComps);
-        Value* pResult = UndefValue::get(VectorType::get(pResultComps->getType()->getScalarType(),
-                                                         pVecTy->getNumElements()));
-        pResult = CreateInsertElement(pResult, CreateExtractElement(pResultComps, uint64_t(0)), uint64_t(0));
-        if (pVecTy->getNumElements() > 1)
+        Value* inComps = CreateShuffleVector(value, value, ArrayRef<unsigned>{ 0, 1 });
+        Value* resultComps = callback(inComps);
+        Value* result = UndefValue::get(VectorType::get(resultComps->getType()->getScalarType(),
+                                                         vecTy->getNumElements()));
+        result = CreateInsertElement(result, CreateExtractElement(resultComps, uint64_t(0)), uint64_t(0));
+        if (vecTy->getNumElements() > 1)
         {
-            pResult = CreateInsertElement(pResult, CreateExtractElement(pResultComps, 1), 1);
+            result = CreateInsertElement(result, CreateExtractElement(resultComps, 1), 1);
         }
 
-        for (unsigned idx = 2, end = pVecTy->getNumElements(); idx < end; idx += 2)
+        for (unsigned idx = 2, end = vecTy->getNumElements(); idx < end; idx += 2)
         {
             unsigned indices[2] = { idx, idx + 1 };
-            pInComps = CreateShuffleVector(pValue, pValue, indices);
-            pResultComps = callback(pInComps);
-            pResult = CreateInsertElement(pResult, CreateExtractElement(pResultComps, uint64_t(0)), idx);
+            inComps = CreateShuffleVector(value, value, indices);
+            resultComps = callback(inComps);
+            result = CreateInsertElement(result, CreateExtractElement(resultComps, uint64_t(0)), idx);
             if (idx + 1 < end)
             {
-                pResult = CreateInsertElement(pResult, CreateExtractElement(pResultComps, 1), idx + 1);
+                result = CreateInsertElement(result, CreateExtractElement(resultComps, 1), idx + 1);
             }
         }
-        return pResult;
+        return result;
     }
 
     // For the scalar case, we need to create a vec2.
-    Value* pInComps = UndefValue::get(VectorType::get(pValue->getType(), 2));
-    pInComps = CreateInsertElement(pInComps, pValue, uint64_t(0));
-    pInComps = CreateInsertElement(pInComps, Constant::getNullValue(pValue->getType()), 1);
-    Value* pResult = callback(pInComps);
-    return CreateExtractElement(pResult, uint64_t(0));
+    Value* inComps = UndefValue::get(VectorType::get(value->getType(), 2));
+    inComps = CreateInsertElement(inComps, value, uint64_t(0));
+    inComps = CreateInsertElement(inComps, Constant::getNullValue(value->getType()), 1);
+    Value* result = callback(inComps);
+    return CreateExtractElement(result, uint64_t(0));
 }
 
 // =====================================================================================================================
 // Helper method to scalarize a possibly vector binary operation
-Value* BuilderImplBase::Scalarize(
-    Value*                                pValue0,    // [in] Input value 0
-    Value*                                pValue1,    // [in] Input value 1
+Value* BuilderImplBase::scalarize(
+    Value*                                value0,    // [in] Input value 0
+    Value*                                value1,    // [in] Input value 1
     std::function<Value*(Value*, Value*)> callback)   // [in] Callback function
 {
-    if (auto pVecTy = dyn_cast<VectorType>(pValue0->getType()))
+    if (auto vecTy = dyn_cast<VectorType>(value0->getType()))
     {
-        Value* pResult0 = callback(CreateExtractElement(pValue0, uint64_t(0)),
-                                   CreateExtractElement(pValue1, uint64_t(0)));
-        Value* pResult = UndefValue::get(VectorType::get(pResult0->getType(), pVecTy->getNumElements()));
-        pResult = CreateInsertElement(pResult, pResult0, uint64_t(0));
-        for (unsigned idx = 1, end = pVecTy->getNumElements(); idx != end; ++idx)
+        Value* result0 = callback(CreateExtractElement(value0, uint64_t(0)),
+                                   CreateExtractElement(value1, uint64_t(0)));
+        Value* result = UndefValue::get(VectorType::get(result0->getType(), vecTy->getNumElements()));
+        result = CreateInsertElement(result, result0, uint64_t(0));
+        for (unsigned idx = 1, end = vecTy->getNumElements(); idx != end; ++idx)
         {
-            pResult = CreateInsertElement(pResult,
-                                          callback(CreateExtractElement(pValue0, idx),
-                                                   CreateExtractElement(pValue1, idx)),
+            result = CreateInsertElement(result,
+                                          callback(CreateExtractElement(value0, idx),
+                                                   CreateExtractElement(value1, idx)),
                                           idx);
         }
-        return pResult;
+        return result;
     }
-    Value* pResult = callback(pValue0, pValue1);
-    return pResult;
+    Value* result = callback(value0, value1);
+    return result;
 }
 
 // =====================================================================================================================
 // Helper method to scalarize a possibly vector trinary operation
-Value* BuilderImplBase::Scalarize(
-    Value*                                        pValue0,    // [in] Input value 0
-    Value*                                        pValue1,    // [in] Input value 1
-    Value*                                        pValue2,    // [in] Input value 2
+Value* BuilderImplBase::scalarize(
+    Value*                                        value0,    // [in] Input value 0
+    Value*                                        value1,    // [in] Input value 1
+    Value*                                        value2,    // [in] Input value 2
     std::function<Value*(Value*, Value*, Value*)> callback)   // [in] Callback function
 {
-    if (auto pVecTy = dyn_cast<VectorType>(pValue0->getType()))
+    if (auto vecTy = dyn_cast<VectorType>(value0->getType()))
     {
-        Value* pResult0 = callback(CreateExtractElement(pValue0, uint64_t(0)),
-                                   CreateExtractElement(pValue1, uint64_t(0)),
-                                   CreateExtractElement(pValue2, uint64_t(0)));
-        Value* pResult = UndefValue::get(VectorType::get(pResult0->getType(), pVecTy->getNumElements()));
-        pResult = CreateInsertElement(pResult, pResult0, uint64_t(0));
-        for (unsigned idx = 1, end = pVecTy->getNumElements(); idx != end; ++idx)
+        Value* result0 = callback(CreateExtractElement(value0, uint64_t(0)),
+                                   CreateExtractElement(value1, uint64_t(0)),
+                                   CreateExtractElement(value2, uint64_t(0)));
+        Value* result = UndefValue::get(VectorType::get(result0->getType(), vecTy->getNumElements()));
+        result = CreateInsertElement(result, result0, uint64_t(0));
+        for (unsigned idx = 1, end = vecTy->getNumElements(); idx != end; ++idx)
         {
-            pResult = CreateInsertElement(pResult,
-                                          callback(CreateExtractElement(pValue0, idx),
-                                                   CreateExtractElement(pValue1, idx),
-                                                   CreateExtractElement(pValue2, idx)),
+            result = CreateInsertElement(result,
+                                          callback(CreateExtractElement(value0, idx),
+                                                   CreateExtractElement(value1, idx),
+                                                   CreateExtractElement(value2, idx)),
                                           idx);
         }
-        return pResult;
+        return result;
     }
-    Value* pResult = callback(pValue0, pValue1, pValue2);
-    return pResult;
+    Value* result = callback(value0, value1, value2);
+    return result;
 }
 

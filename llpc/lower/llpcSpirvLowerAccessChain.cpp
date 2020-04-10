@@ -51,7 +51,7 @@ char SpirvLowerAccessChain::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for access chain
-ModulePass* CreateSpirvLowerAccessChain()
+ModulePass* createSpirvLowerAccessChain()
 {
     return new SpirvLowerAccessChain();
 }
@@ -70,10 +70,10 @@ bool SpirvLowerAccessChain::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Access-Chain\n");
 
-    SpirvLower::Init(&module);
+    SpirvLower::init(&module);
 
     // Invoke handling of "getelementptr" instruction
-    visit(m_pModule);
+    visit(m_module);
 
     return true;
 }
@@ -89,7 +89,7 @@ void SpirvLowerAccessChain::visitGetElementPtrInst(
     if ((addrSpace == SPIRAS_Private) ||
         (addrSpace == SPIRAS_Input) || (addrSpace == SPIRAS_Output))
     {
-        TryToCoalesceChain(&getElemPtrInst, addrSpace);
+        tryToCoalesceChain(&getElemPtrInst, addrSpace);
     }
 }
 
@@ -105,32 +105,32 @@ void SpirvLowerAccessChain::visitGetElementPtrInst(
 //
 //      %y = getelementptr %blockType, %blockType addrspace(N)* @block, i32 0, i32 L, i32 M, i32 N
 //
-llvm::GetElementPtrInst* SpirvLowerAccessChain::TryToCoalesceChain(
-    GetElementPtrInst* pGetElemPtr, // [in] "getelementptr" instruction in the bottom to do coalescing
+llvm::GetElementPtrInst* SpirvLowerAccessChain::tryToCoalesceChain(
+    GetElementPtrInst* getElemPtr, // [in] "getelementptr" instruction in the bottom to do coalescing
     unsigned           addrSpace)   // Address space of the pointer value of "getelementptr"
 {
-    GetElementPtrInst* pCoalescedGetElemPtr = pGetElemPtr;
+    GetElementPtrInst* coalescedGetElemPtr = getElemPtr;
 
     std::stack<User*>              chainedInsts; // Order: from top to bottom
     std::stack<GetElementPtrInst*> removedInsts; // Order: from botton to top
 
     // Collect chained "getelementptr" instructions and constants from bottom to top.
-    auto pPtrVal = cast<User>(pGetElemPtr);
+    auto ptrVal = cast<User>(getElemPtr);
     for (;;)
     {
-        chainedInsts.push(pPtrVal);
-        auto pNext = pPtrVal->getOperand(0);
-        if (isa<GetElementPtrInst>(pNext))
+        chainedInsts.push(ptrVal);
+        auto next = ptrVal->getOperand(0);
+        if (isa<GetElementPtrInst>(next))
         {
-            pPtrVal = cast<User>(pNext);
+            ptrVal = cast<User>(next);
             continue;
         }
-        auto pConst = dyn_cast<ConstantExpr>(pNext);
+        auto pConst = dyn_cast<ConstantExpr>(next);
         if ((pConst == nullptr) || (pConst->getOpcode() != Instruction::GetElementPtr))
         {
             break;
         }
-        pPtrVal = cast<User>(pNext);
+        ptrVal = cast<User>(next);
     }
 
     // If there are more than one "getelementptr" instructions/constants, do coalescing
@@ -138,60 +138,60 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::TryToCoalesceChain(
     {
         std::vector<Value*> idxs;
         unsigned startOperand = 1;
-        Value* pBlockPtr = nullptr;
+        Value* blockPtr = nullptr;
 
         do
         {
-            pPtrVal = chainedInsts.top();
+            ptrVal = chainedInsts.top();
             chainedInsts.pop();
-            if (pBlockPtr == nullptr)
+            if (blockPtr == nullptr)
             {
-                pBlockPtr = pPtrVal->getOperand(0);
+                blockPtr = ptrVal->getOperand(0);
             }
-            for (unsigned i = startOperand; i != pPtrVal->getNumOperands(); ++i)
+            for (unsigned i = startOperand; i != ptrVal->getNumOperands(); ++i)
             {
-                idxs.push_back(pPtrVal->getOperand(i));
+                idxs.push_back(ptrVal->getOperand(i));
             }
             // NOTE: For subsequent "getelementptr" instructions/constants, we skip the first two operands. The first
             // operand is the pointer value from which the element pointer is constructed. And the second one is always
             // 0 to dereference the pointer value.
             startOperand = 2;
 
-            auto pInst = dyn_cast<GetElementPtrInst>(pPtrVal);
-            if (pInst != nullptr)
+            auto inst = dyn_cast<GetElementPtrInst>(ptrVal);
+            if (inst != nullptr)
             {
-                removedInsts.push(pInst);
+                removedInsts.push(inst);
             }
         }
         while (chainedInsts.empty() == false);
 
         // Create the coalesced "getelementptr" instruction (do combining)
-        pCoalescedGetElemPtr = GetElementPtrInst::Create(nullptr, pBlockPtr, idxs, "", pGetElemPtr);
-        pGetElemPtr->replaceAllUsesWith(pCoalescedGetElemPtr);
+        coalescedGetElemPtr = GetElementPtrInst::Create(nullptr, blockPtr, idxs, "", getElemPtr);
+        getElemPtr->replaceAllUsesWith(coalescedGetElemPtr);
 
         // Remove dead "getelementptr" instructions where possible.
         while (removedInsts.empty() == false)
         {
-            GetElementPtrInst* pInst = removedInsts.top();
-            if (pInst->user_empty())
+            GetElementPtrInst* inst = removedInsts.top();
+            if (inst->user_empty())
             {
-                if (pInst == pGetElemPtr)
+                if (inst == getElemPtr)
                 {
                     // We cannot remove the current instruction that InstWalker is on. Just stop it using its
                     // pointer operand, and it will be DCEd later.
-                    auto& operand = pInst->getOperandUse(0);
+                    auto& operand = inst->getOperandUse(0);
                     operand = UndefValue::get(operand->getType());
                 }
                 else
                 {
-                    pInst->eraseFromParent();
+                    inst->eraseFromParent();
                 }
             }
             removedInsts.pop();
         }
     }
 
-    return pCoalescedGetElemPtr;
+    return coalescedGetElemPtr;
 }
 
 } // Llpc

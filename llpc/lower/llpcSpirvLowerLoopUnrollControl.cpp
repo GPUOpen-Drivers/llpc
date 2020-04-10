@@ -63,11 +63,11 @@ char SpirvLowerLoopUnrollControl::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for loop unroll control
-ModulePass* CreateSpirvLowerLoopUnrollControl(
+ModulePass* createSpirvLowerLoopUnrollControl(
     unsigned forceLoopUnrollCount)    // Force loop unroll count
 {
-    auto pPass = new SpirvLowerLoopUnrollControl(forceLoopUnrollCount);
-    return pPass;
+    auto pass = new SpirvLowerLoopUnrollControl(forceLoopUnrollCount);
+    return pass;
 }
 
 // =====================================================================================================================
@@ -96,17 +96,17 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Unroll-Control\n");
 
-    SpirvLower::Init(&module);
+    SpirvLower::init(&module);
 
-    if (m_pContext->GetPipelineContext() != nullptr)
+    if (m_context->getPipelineContext() != nullptr)
     {
-        auto pShaderOptions = &(m_pContext->GetPipelineShaderInfo(m_shaderStage)->options);
-        if (pShaderOptions->forceLoopUnrollCount > 0)
+        auto shaderOptions = &(m_context->getPipelineShaderInfo(m_shaderStage)->options);
+        if (shaderOptions->forceLoopUnrollCount > 0)
         {
-            m_forceLoopUnrollCount = pShaderOptions->forceLoopUnrollCount;
+            m_forceLoopUnrollCount = shaderOptions->forceLoopUnrollCount;
         }
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
-        m_disableLicm = pShaderOptions->disableLicm | llvm::cl::DisableLicm;
+        m_disableLicm = shaderOptions->disableLicm | llvm::cl::DisableLicm;
 #endif
     }
 
@@ -128,40 +128,40 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
     {
         for (auto& block : func)
         {
-            auto pTerminator = block.getTerminator();
-            MDNode* pLoopMetaNode = pTerminator->getMetadata("llvm.loop");
-            if ((pLoopMetaNode == nullptr) ||
-                (pLoopMetaNode->getOperand(0) != pLoopMetaNode) ||
-                ((pLoopMetaNode->getNumOperands() != 1) && (m_disableLicm == false)))
+            auto terminator = block.getTerminator();
+            MDNode* loopMetaNode = terminator->getMetadata("llvm.loop");
+            if ((loopMetaNode == nullptr) ||
+                (loopMetaNode->getOperand(0) != loopMetaNode) ||
+                ((loopMetaNode->getNumOperands() != 1) && (m_disableLicm == false)))
             {
                 continue;
             }
 
-            if (m_forceLoopUnrollCount && (pLoopMetaNode->getNumOperands() <= 1))
+            if (m_forceLoopUnrollCount && (loopMetaNode->getNumOperands() <= 1))
             {
                 // We have a loop backedge with !llvm.loop metadata containing just
                 // one operand pointing to itself, meaning that the SPIR-V did not
                 // have an unroll or don't-unroll directive, so we can add the force
                 // unroll count metadata.
                 llvm::Metadata* unrollCountMeta[] = {
-                    MDString::get(*m_pContext, "llvm.loop.unroll.count"),
+                    MDString::get(*m_context, "llvm.loop.unroll.count"),
                     ConstantAsMetadata::get(
-                        ConstantInt::get(Type::getInt32Ty(*m_pContext), m_forceLoopUnrollCount))
+                        ConstantInt::get(Type::getInt32Ty(*m_context), m_forceLoopUnrollCount))
                 };
-                MDNode* pLoopUnrollCountMetaNode = MDNode::get(*m_pContext, unrollCountMeta);
-                pLoopMetaNode = MDNode::concatenate(pLoopMetaNode,
-                                                    MDNode::get(*m_pContext, pLoopUnrollCountMetaNode));
+                MDNode* loopUnrollCountMetaNode = MDNode::get(*m_context, unrollCountMeta);
+                loopMetaNode = MDNode::concatenate(loopMetaNode,
+                                                    MDNode::get(*m_context, loopUnrollCountMetaNode));
 
             }
             if (m_disableLicm)
             {
-                MDNode* pLicmDisableNode = MDNode::get(*m_pContext,
-                                                       MDString::get(*m_pContext, "llvm.licm.disable"));
-                pLoopMetaNode = MDNode::concatenate(pLoopMetaNode,
-                                                    MDNode::get(*m_pContext, pLicmDisableNode));
+                MDNode* licmDisableNode = MDNode::get(*m_context,
+                                                       MDString::get(*m_context, "llvm.licm.disable"));
+                loopMetaNode = MDNode::concatenate(loopMetaNode,
+                                                    MDNode::get(*m_context, licmDisableNode));
             }
-            pLoopMetaNode->replaceOperandWith(0, pLoopMetaNode);
-            pTerminator->setMetadata("llvm.loop", pLoopMetaNode);
+            loopMetaNode->replaceOperandWith(0, loopMetaNode);
+            terminator->setMetadata("llvm.loop", loopMetaNode);
             changed = true;
         }
     }

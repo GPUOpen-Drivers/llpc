@@ -177,7 +177,7 @@ namespace Llpc
 {
 
 llvm::sys::Mutex       Compiler::m_contextPoolMutex;
-std::vector<Context*>* Compiler::m_pContextPool = nullptr;
+std::vector<Context*>* Compiler::m_contextPool = nullptr;
 
 // Enumerates modes used in shader replacement
 enum ShaderReplaceMode
@@ -187,18 +187,18 @@ enum ShaderReplaceMode
     ShaderReplaceShaderPipelineHash = 2, // Replacement based on both shader and pipeline hash
 };
 
-static ManagedStatic<sys::Mutex> s_compilerMutex;
-static MetroHash::Hash s_optionHash = {};
+static ManagedStatic<sys::Mutex> SCompilerMutex;
+static MetroHash::Hash SOptionHash = {};
 
 unsigned Compiler::m_instanceCount = 0;
 unsigned Compiler::m_outRedirectCount = 0;
 
 // =====================================================================================================================
 // Handler for LLVM fatal error.
-static void FatalErrorHandler(
+static void fatalErrorHandler(
     void*               userData,       // [in] An argument which will be passed to the installed error handler
     const std::string&  reason,         // Error reason
-    bool                gen_crash_diag) // Whether diagnostic should be generated
+    bool                genCrashDiag) // Whether diagnostic should be generated
 {
     LLPC_ERRS("LLVM FATAL ERROR: " << reason << "\n");
 #if LLPC_ENABLE_EXCEPTION
@@ -246,27 +246,27 @@ Result VKAPI_CALL ICompiler::Create(
 {
     Result result = Result::Success;
 
-    const char* pClient = options[0];
-    bool ignoreErrors = (strcmp(pClient, VkIcdName) == 0);
+    const char* client = options[0];
+    bool ignoreErrors = (strcmp(client, VkIcdName) == 0);
 
     raw_null_ostream nullStream;
 
-    std::lock_guard<sys::Mutex> lock(*s_compilerMutex);
-    MetroHash::Hash optionHash = Compiler::GenerateHashForCompileOptions(optionCount, options);
+    std::lock_guard<sys::Mutex> lock(*SCompilerMutex);
+    MetroHash::Hash optionHash = Compiler::generateHashForCompileOptions(optionCount, options);
 
     // Initialize passes so they can be referenced by -print-after etc.
-    InitializeLowerPasses(*PassRegistry::getPassRegistry());
-    BuilderContext::Initialize();
+    initializeLowerPasses(*PassRegistry::getPassRegistry());
+    BuilderContext::initialize();
 
     bool parseCmdOption = true;
-    if (Compiler::GetInstanceCount() > 0)
+    if (Compiler::getInstanceCount() > 0)
     {
-        bool isSameOption = memcmp(&optionHash, &s_optionHash, sizeof(optionHash)) == 0;
+        bool isSameOption = memcmp(&optionHash, &SOptionHash, sizeof(optionHash)) == 0;
 
         parseCmdOption = false;
         if (isSameOption == false)
         {
-            if (Compiler::GetOutRedirectCount() == 0)
+            if (Compiler::getOutRedirectCount() == 0)
             {
                 // All compiler instances are destroyed, we can reset LLVM options in safe
                 auto& options = cl::getRegisteredOptions();
@@ -299,14 +299,14 @@ Result VKAPI_CALL ICompiler::Create(
 
     if (result == Result::Success)
     {
-        s_optionHash = optionHash;
-        *ppCompiler = new Compiler(gfxIp, optionCount, options, s_optionHash);
+        SOptionHash = optionHash;
+        *ppCompiler = new Compiler(gfxIp, optionCount, options, SOptionHash);
         assert(*ppCompiler != nullptr);
 
         if (EnableOuts())
         {
             // LLPC_OUTS is enabled. Ensure it is enabled in LGC (the middle-end) too.
-            BuilderContext::SetLlpcOuts(&outs());
+            BuilderContext::setLlpcOuts(&outs());
         }
     }
     else
@@ -322,7 +322,7 @@ Result VKAPI_CALL ICompiler::Create(
 bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
     VkFormat format)   // Vertex attribute format
 {
-    BufDataFormat dfmt = PipelineContext::MapVkFormat(format, false).first;
+    BufDataFormat dfmt = PipelineContext::mapVkFormat(format, false).first;
     return (dfmt != BufDataFormatInvalid);
 }
 
@@ -330,7 +330,7 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
 Compiler::Compiler(
     GfxIpVersion      gfxIp,        // Graphics IP version info
     unsigned          optionCount,  // Count of compilation-option strings
-    const char*const* pOptions,     // [in] An array of compilation-option strings
+    const char*const* options,     // [in] An array of compilation-option strings
     MetroHash::Hash   optionHash)   // Hash code of compilation options
     :
     m_optionHash(optionHash),
@@ -338,24 +338,24 @@ Compiler::Compiler(
 {
     for (unsigned i = 0; i < optionCount; ++i)
     {
-        m_options.push_back(pOptions[i]);
+        m_options.push_back(options[i]);
     }
 
     if (m_outRedirectCount == 0)
     {
-        redirectLogOutput(false, optionCount, pOptions);
+        redirectLogOutput(false, optionCount, options);
     }
 
     if (m_instanceCount == 0)
     {
         // LLVM fatal error handler only can be installed once.
-        install_fatal_error_handler(FatalErrorHandler);
+        install_fatal_error_handler(fatalErrorHandler);
 
         // Initiailze m_pContextPool.
         {
             std::lock_guard<sys::Mutex> lock(m_contextPoolMutex);
 
-            m_pContextPool = new std::vector<Context*>();
+            m_contextPool = new std::vector<Context*>();
         }
     }
 
@@ -366,7 +366,7 @@ Compiler::Compiler(
     auxCreateInfo.shaderCacheMode = static_cast<ShaderCacheMode>(shaderCacheMode);
     auxCreateInfo.gfxIp           = m_gfxIp;
     auxCreateInfo.hash            = m_optionHash;
-    auxCreateInfo.pExecutableName = cl::ExecutableName.c_str();
+    auxCreateInfo.executableName = cl::ExecutableName.c_str();
     auxCreateInfo.cacheFilePath   = cl::ShaderCacheFileDir.c_str();
     if (cl::ShaderCacheFileDir.empty())
     {
@@ -377,7 +377,7 @@ Compiler::Compiler(
 #endif
     }
 
-    m_shaderCache = ShaderCacheManager::GetShaderCacheManager()->GetShaderCacheObject(&createInfo, &auxCreateInfo);
+    m_shaderCache = ShaderCacheManager::getShaderCacheManager()->getShaderCacheObject(&createInfo, &auxCreateInfo);
 
     ++m_instanceCount;
     ++m_outRedirectCount;
@@ -393,24 +393,24 @@ Compiler::~Compiler()
 
         // Keep the max allowed count of contexts that reside in the pool so that we can speed up the creatoin of
         // compiler next time.
-        for (auto it = m_pContextPool->begin(); it != m_pContextPool->end();)
+        for (auto it = m_contextPool->begin(); it != m_contextPool->end();)
         {
-            auto   pContext             = *it;
+            auto   context             = *it;
             size_t maxResidentContexts  = 0;
 
             // This is just a W/A for Teamcity. Setting AMD_RESIDENT_CONTEXTS could reduce more than 40 minutes of
             // CTS running time.
-            char*  pMaxResidentContextsEnv = getenv("AMD_RESIDENT_CONTEXTS");
+            char*  maxResidentContextsEnv = getenv("AMD_RESIDENT_CONTEXTS");
 
-            if (pMaxResidentContextsEnv != nullptr)
+            if (maxResidentContextsEnv != nullptr)
             {
-                maxResidentContexts = strtoul(pMaxResidentContextsEnv, nullptr, 0);
+                maxResidentContexts = strtoul(maxResidentContextsEnv, nullptr, 0);
             }
 
-            if ((pContext->IsInUse() == false) && (m_pContextPool->size() > maxResidentContexts))
+            if ((context->isInUse() == false) && (m_contextPool->size() > maxResidentContexts))
             {
-                it = m_pContextPool->erase(it);
-                delete pContext;
+                it = m_contextPool->erase(it);
+                delete context;
             }
             else
             {
@@ -421,19 +421,19 @@ Compiler::~Compiler()
 
     // Restore default output
     {
-        std::lock_guard<sys::Mutex> lock(*s_compilerMutex);
+        std::lock_guard<sys::Mutex> lock(*SCompilerMutex);
         -- m_outRedirectCount;
         if (m_outRedirectCount == 0)
         {
             redirectLogOutput(true, 0, nullptr);
         }
 
-        ShaderCacheManager::GetShaderCacheManager()->ReleaseShaderCacheObject(m_shaderCache);
+        ShaderCacheManager::getShaderCacheManager()->releaseShaderCacheObject(m_shaderCache);
     }
 
     {
         // s_compilerMutex is managed by ManagedStatic, it can't be accessed after llvm_shutdown
-        std::lock_guard<sys::Mutex> lock(*s_compilerMutex);
+        std::lock_guard<sys::Mutex> lock(*SCompilerMutex);
         -- m_instanceCount;
         if (m_instanceCount == 0)
         {
@@ -443,10 +443,10 @@ Compiler::~Compiler()
 
     if (shutdown)
     {
-        ShaderCacheManager::Shutdown();
+        ShaderCacheManager::shutdown();
         llvm_shutdown();
-        delete m_pContextPool;
-        m_pContextPool = nullptr;
+        delete m_contextPool;
+        m_contextPool = nullptr;
     }
 }
 
@@ -460,17 +460,17 @@ void Compiler::Destroy()
 // =====================================================================================================================
 // Builds shader module from the specified info.
 Result Compiler::BuildShaderModule(
-    const ShaderModuleBuildInfo* pShaderInfo,   // [in] Info to build this shader module
-    ShaderModuleBuildOut*        pShaderOut     // [out] Output of building this shader module
+    const ShaderModuleBuildInfo* shaderInfo,   // [in] Info to build this shader module
+    ShaderModuleBuildOut*        shaderOut     // [out] Output of building this shader module
     ) const
 {
     Result result = Result::Success;
-    void* pAllocBuf = nullptr;
-    const void* pCacheData = nullptr;
+    void* allocBuf = nullptr;
+    const void* cacheData = nullptr;
     size_t allocSize = 0;
     ShaderModuleDataEx moduleDataEx = {};
     // For trimming debug info
-    uint8_t* pTrimmedCode = nullptr;
+    uint8_t* trimmedCode = nullptr;
 
     ElfPackage moduleBinary;
     raw_svector_ostream moduleBinaryStream(moduleBinary);
@@ -485,42 +485,42 @@ Result Compiler::BuildShaderModule(
 
     // Calculate the hash code of input data
     MetroHash::Hash hash = {};
-    MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->shaderBin.pCode),
-        pShaderInfo->shaderBin.codeSize,
+    MetroHash64::Hash(reinterpret_cast<const uint8_t*>(shaderInfo->shaderBin.pCode),
+        shaderInfo->shaderBin.codeSize,
         hash.bytes);
 
     memcpy(moduleDataEx.common.hash, &hash, sizeof(hash));
 
-    TimerProfiler timerProfiler(MetroHash::Compact64(&hash),
+    TimerProfiler timerProfiler(MetroHash::compact64(&hash),
                                 "LLPC ShaderModule",
                                 TimerProfiler::ShaderModuleTimerEnableMask);
 
     // Check the type of input shader binary
-    if (ShaderModuleHelper::IsSpirvBinary(&pShaderInfo->shaderBin))
+    if (ShaderModuleHelper::isSpirvBinary(&shaderInfo->shaderBin))
     {
         unsigned debugInfoSize = 0;
 
         moduleDataEx.common.binType = BinaryType::Spirv;
-        if (ShaderModuleHelper::VerifySpirvBinary(&pShaderInfo->shaderBin) != Result::Success)
+        if (ShaderModuleHelper::verifySpirvBinary(&shaderInfo->shaderBin) != Result::Success)
         {
             LLPC_ERRS("Unsupported SPIR-V instructions are found!\n");
             result = Result::Unsupported;
         }
         if (result == Result::Success)
         {
-            ShaderModuleHelper::CollectInfoFromSpirvBinary(&pShaderInfo->shaderBin, &moduleDataEx.common.usage,
+            ShaderModuleHelper::collectInfoFromSpirvBinary(&shaderInfo->shaderBin, &moduleDataEx.common.usage,
                                                            entryNames, &debugInfoSize);
         }
-        moduleDataEx.common.binCode.codeSize = pShaderInfo->shaderBin.codeSize;
+        moduleDataEx.common.binCode.codeSize = shaderInfo->shaderBin.codeSize;
         if (cl::TrimDebugInfo)
         {
             moduleDataEx.common.binCode.codeSize -= debugInfoSize;
         }
     }
-    else if (ShaderModuleHelper::IsLlvmBitcode(&pShaderInfo->shaderBin))
+    else if (ShaderModuleHelper::isLlvmBitcode(&shaderInfo->shaderBin))
     {
         moduleDataEx.common.binType = BinaryType::LlvmBc;
-        moduleDataEx.common.binCode = pShaderInfo->shaderBin;
+        moduleDataEx.common.binCode = shaderInfo->shaderBin;
     }
     else
     {
@@ -533,20 +533,20 @@ Result Compiler::BuildShaderModule(
         if (cl::EnablePipelineDump)
         {
             PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(),
-                &pShaderInfo->shaderBin,
+                &shaderInfo->shaderBin,
                 &hash);
         }
 
         // Trim debug info
         if (cl::TrimDebugInfo)
         {
-            pTrimmedCode = new uint8_t[moduleDataEx.common.binCode.codeSize];
-            ShaderModuleHelper::TrimSpirvDebugInfo(&pShaderInfo->shaderBin, moduleDataEx.common.binCode.codeSize, pTrimmedCode);
-            moduleDataEx.common.binCode.pCode = pTrimmedCode;
+            trimmedCode = new uint8_t[moduleDataEx.common.binCode.codeSize];
+            ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, moduleDataEx.common.binCode.codeSize, trimmedCode);
+            moduleDataEx.common.binCode.pCode = trimmedCode;
         }
         else
         {
-            moduleDataEx.common.binCode.pCode = pShaderInfo->shaderBin.pCode;
+            moduleDataEx.common.binCode.pCode = shaderInfo->shaderBin.pCode;
         }
 
         // Calculate SPIR-V cache hash
@@ -559,7 +559,7 @@ Result Compiler::BuildShaderModule(
 
         // Do SPIR-V translate & lower if possible
         bool enableOpt = cl::EnableShaderModuleOpt;
-        enableOpt = enableOpt || pShaderInfo->options.enableOpt;
+        enableOpt = enableOpt || shaderInfo->options.enableOpt;
         enableOpt = moduleDataEx.common.usage.useSpecConstant ? false : enableOpt;
 
         if (enableOpt)
@@ -567,17 +567,17 @@ Result Compiler::BuildShaderModule(
             // Check internal cache for shader module build result
             // NOTE: We should not cache non-opt result, we may compile shader module multiple
             // times in async-compile mode.
-            cacheEntryState = m_shaderCache->FindShader(cacheHash, true, &hEntry);
+            cacheEntryState = m_shaderCache->findShader(cacheHash, true, &hEntry);
             if (cacheEntryState == ShaderEntryState::Ready)
             {
-                result = m_shaderCache->RetrieveShader(hEntry, &pCacheData, &allocSize);
+                result = m_shaderCache->retrieveShader(hEntry, &cacheData, &allocSize);
             }
             if (cacheEntryState != ShaderEntryState::Ready)
             {
-                Context* pContext = AcquireContext();
+                Context* context = acquireContext();
 
-                pContext->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
-                pContext->SetBuilder(pContext->GetBuilderContext()->CreateBuilder(nullptr, true));
+                context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
+                context->setBuilder(context->getBuilderContext()->createBuilder(nullptr, true));
 
                 for (unsigned i = 0; i < entryNames.size(); ++i)
                 {
@@ -586,44 +586,44 @@ Result Compiler::BuildShaderModule(
 
                     moduleEntryData.pShaderEntry = &moduleEntry;
                     moduleEntryData.stage = entryNames[i].stage;
-                    moduleEntryData.pEntryName = entryNames[i].pName;
+                    moduleEntryData.pEntryName = entryNames[i].name;
                     moduleEntry.entryOffset = moduleBinary.size();
                     MetroHash::Hash entryNamehash = {};
-                    MetroHash64::Hash(reinterpret_cast<const uint8_t*>(entryNames[i].pName),
-                        strlen(entryNames[i].pName),
+                    MetroHash64::Hash(reinterpret_cast<const uint8_t*>(entryNames[i].name),
+                        strlen(entryNames[i].name),
                         entryNamehash.bytes);
                     memcpy(moduleEntry.entryNameHash, entryNamehash.dwords, sizeof(entryNamehash));
 
                     // Create empty modules and set target machine in each.
-                    Module* pModule = new Module(
-                        (Twine("llpc") + GetShaderStageName(static_cast<ShaderStage>(entryNames[i].stage))).str(),
-                        *pContext);
+                    Module* module = new Module(
+                        (Twine("llpc") + getShaderStageName(static_cast<ShaderStage>(entryNames[i].stage))).str(),
+                        *context);
 
-                    pContext->SetModuleTargetMachine(pModule);
+                    context->setModuleTargetMachine(module);
 
                     unsigned passIndex = 0;
                     std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
-                    lowerPassMgr->SetPassIndex(&passIndex);
+                    lowerPassMgr->setPassIndex(&passIndex);
 
                     // Set the shader stage in the Builder.
-                    pContext->GetBuilder()->SetShaderStage(
-                                              GetLgcShaderStage(static_cast<ShaderStage>(entryNames[i].stage)));
+                    context->getBuilder()->setShaderStage(
+                                              getLgcShaderStage(static_cast<ShaderStage>(entryNames[i].stage)));
 
                     // Start timer for translate.
-                    timerProfiler.AddTimerStartStopPass(&*lowerPassMgr, TimerTranslate, true);
+                    timerProfiler.addTimerStartStopPass(&*lowerPassMgr, TimerTranslate, true);
 
                     // SPIR-V translation, then dump the result.
                     PipelineShaderInfo shaderInfo = {};
                     shaderInfo.pModuleData = &moduleDataEx.common;
                     shaderInfo.entryStage = entryNames[i].stage;
-                    shaderInfo.pEntryTarget = entryNames[i].pName;
-                    lowerPassMgr->add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(entryNames[i].stage),
+                    shaderInfo.pEntryTarget = entryNames[i].name;
+                    lowerPassMgr->add(createSpirvLowerTranslator(static_cast<ShaderStage>(entryNames[i].stage),
                                                                 &shaderInfo));
                     bool collectDetailUsage = ((entryNames[i].stage == ShaderStageFragment) ||
                                                (entryNames[i].stage == ShaderStageCompute)) ? true : false;
-                    auto pResCollectPass = static_cast<SpirvLowerResourceCollect*>(
-                                           CreateSpirvLowerResourceCollect(collectDetailUsage));
-                    lowerPassMgr->add(pResCollectPass);
+                    auto resCollectPass = static_cast<SpirvLowerResourceCollect*>(
+                                           createSpirvLowerResourceCollect(collectDetailUsage));
+                    lowerPassMgr->add(resCollectPass);
                     if (EnableOuts())
                     {
                         lowerPassMgr->add(createPrintModulePass(outs(), "\n"
@@ -632,33 +632,33 @@ Result Compiler::BuildShaderModule(
                     }
 
                     // Stop timer for translate.
-                    timerProfiler.AddTimerStartStopPass(&*lowerPassMgr, TimerTranslate, false);
+                    timerProfiler.addTimerStartStopPass(&*lowerPassMgr, TimerTranslate, false);
 
                     // Per-shader SPIR-V lowering passes.
-                    SpirvLower::AddPasses(pContext,
+                    SpirvLower::addPasses(context,
                                           static_cast<ShaderStage>(entryNames[i].stage),
                                           *lowerPassMgr,
-                                          timerProfiler.GetTimer(TimerLower),
+                                          timerProfiler.getTimer(TimerLower),
                                           cl::ForceLoopUnrollCount);
 
                     lowerPassMgr->add(createBitcodeWriterPass(moduleBinaryStream));
 
                     // Run the passes.
-                    bool success = RunPasses(&*lowerPassMgr, pModule);
+                    bool success = runPasses(&*lowerPassMgr, module);
                     if (success == false)
                     {
                         LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
                         result = Result::ErrorInvalidShader;
-                        delete pModule;
+                        delete module;
                         break;
                     }
 
                     moduleEntry.entrySize = moduleBinary.size() - moduleEntry.entryOffset;
 
                     moduleEntry.passIndex = passIndex;
-                    if (pResCollectPass->DetailUsageValid())
+                    if (resCollectPass->detailUsageValid())
                     {
-                        auto& resNodeDatas = pResCollectPass->GetResourceNodeDatas();
+                        auto& resNodeDatas = resCollectPass->getResourceNodeDatas();
                         moduleEntryData.resNodeDataCount = resNodeDatas.size();
                         for (auto resNodeData : resNodeDatas)
                         {
@@ -670,8 +670,8 @@ Result Compiler::BuildShaderModule(
                             entryResourceNodeDatas[i].push_back(data);
                         }
 
-                        moduleEntryData.pushConstSize = pResCollectPass->GetPushConstSize();
-                        auto& fsOutInfosFromPass = pResCollectPass->GetFsOutInfos();
+                        moduleEntryData.pushConstSize = resCollectPass->getPushConstSize();
+                        auto& fsOutInfosFromPass = resCollectPass->getFsOutInfos();
                         for (auto& fsOutInfo : fsOutInfosFromPass)
                         {
                             fsOutInfos.push_back(fsOutInfo);
@@ -679,7 +679,7 @@ Result Compiler::BuildShaderModule(
                     }
                     moduleEntries.push_back(moduleEntry);
                     moduleEntryDatas.push_back(moduleEntryData);
-                    delete pModule;
+                    delete module;
                 }
 
                 if (result == Result::Success)
@@ -689,7 +689,7 @@ Result Compiler::BuildShaderModule(
                     moduleDataEx.common.binCode.codeSize = moduleBinary.size();
                 }
 
-                pContext->setDiagnosticHandlerCallBack(nullptr);
+                context->setDiagnosticHandlerCallBack(nullptr);
             }
             moduleDataEx.extra.entryCount = entryNames.size();
         }
@@ -699,7 +699,7 @@ Result Compiler::BuildShaderModule(
     unsigned totalNodeCount = 0;
     if (result == Result::Success)
     {
-        if (pShaderInfo->pfnOutputAlloc != nullptr)
+        if (shaderInfo->pfnOutputAlloc != nullptr)
         {
             if (cacheEntryState != ShaderEntryState::Ready)
             {
@@ -715,11 +715,11 @@ Result Compiler::BuildShaderModule(
                     fsOutInfos.size() * sizeof(FsOutInfo);
             }
 
-            pAllocBuf = pShaderInfo->pfnOutputAlloc(pShaderInfo->pInstance,
-                pShaderInfo->pUserData,
+            allocBuf = shaderInfo->pfnOutputAlloc(shaderInfo->pInstance,
+                shaderInfo->pUserData,
                 allocSize);
 
-            result = (pAllocBuf != nullptr) ? Result::Success : Result::ErrorOutOfMemory;
+            result = (allocBuf != nullptr) ? Result::Success : Result::ErrorOutOfMemory;
         }
         else
         {
@@ -732,14 +732,14 @@ Result Compiler::BuildShaderModule(
     {
         // Memory layout of pAllocBuf: ShaderModuleDataEx | ShaderModuleEntryData | ShaderModuleEntry | binCode
         //                             | Resource nodes | FsOutInfo
-        ShaderModuleDataEx* pModuleDataExCopy = reinterpret_cast<ShaderModuleDataEx*>(pAllocBuf);
+        ShaderModuleDataEx* moduleDataExCopy = reinterpret_cast<ShaderModuleDataEx*>(allocBuf);
 
-        ShaderModuleEntryData* pEntryData = &pModuleDataExCopy->extra.entryDatas[0];
+        ShaderModuleEntryData* entryData = &moduleDataExCopy->extra.entryDatas[0];
         if (cacheEntryState != ShaderEntryState::Ready)
         {
             // Copy module data
-            memcpy(pModuleDataExCopy, &moduleDataEx, sizeof(moduleDataEx));
-            pModuleDataExCopy->common.binCode.pCode = nullptr;
+            memcpy(moduleDataExCopy, &moduleDataEx, sizeof(moduleDataEx));
+            moduleDataExCopy->common.binCode.pCode = nullptr;
 
             size_t entryOffset = 0, codeOffset = 0, resNodeOffset = 0, fsOutInfoOffset = 0;
 
@@ -748,63 +748,63 @@ Result Compiler::BuildShaderModule(
             codeOffset = entryOffset + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntry);
             resNodeOffset = codeOffset + moduleDataEx.common.binCode.codeSize;
             fsOutInfoOffset = resNodeOffset + totalNodeCount * sizeof(ResourceNodeData);
-            pModuleDataExCopy->codeOffset = codeOffset;
-            pModuleDataExCopy->entryOffset = entryOffset;
-            pModuleDataExCopy->resNodeOffset   = resNodeOffset;
-            pModuleDataExCopy->fsOutInfoOffset   = fsOutInfoOffset;
+            moduleDataExCopy->codeOffset = codeOffset;
+            moduleDataExCopy->entryOffset = entryOffset;
+            moduleDataExCopy->resNodeOffset   = resNodeOffset;
+            moduleDataExCopy->fsOutInfoOffset   = fsOutInfoOffset;
         }
         else
         {
-            memcpy(pModuleDataExCopy, pCacheData, allocSize);
+            memcpy(moduleDataExCopy, cacheData, allocSize);
         }
 
-        ShaderModuleEntry* pEntry = reinterpret_cast<ShaderModuleEntry*>(VoidPtrInc(pAllocBuf,
-                                                                         pModuleDataExCopy->entryOffset));
-        ResourceNodeData* pResNodeData = reinterpret_cast<ResourceNodeData*>(VoidPtrInc(pAllocBuf,
-                                                                             pModuleDataExCopy->resNodeOffset));
-        FsOutInfo* pFsOutInfo = reinterpret_cast<FsOutInfo*>(VoidPtrInc(pAllocBuf,
-                                                                        pModuleDataExCopy->fsOutInfoOffset));
-        void* pCode = VoidPtrInc(pAllocBuf, pModuleDataExCopy->codeOffset);
+        ShaderModuleEntry* entry = reinterpret_cast<ShaderModuleEntry*>(voidPtrInc(allocBuf,
+                                                                         moduleDataExCopy->entryOffset));
+        ResourceNodeData* resNodeData = reinterpret_cast<ResourceNodeData*>(voidPtrInc(allocBuf,
+                                                                             moduleDataExCopy->resNodeOffset));
+        FsOutInfo* fsOutInfo = reinterpret_cast<FsOutInfo*>(voidPtrInc(allocBuf,
+                                                                        moduleDataExCopy->fsOutInfoOffset));
+        void* code = voidPtrInc(allocBuf, moduleDataExCopy->codeOffset);
 
         if (cacheEntryState != ShaderEntryState::Ready)
         {
             // Copy entry info
             for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i)
             {
-                pEntryData[i] = moduleEntryDatas[i];
+                entryData[i] = moduleEntryDatas[i];
                 // Set module entry pointer
-                pEntryData[i].pShaderEntry = &pEntry[i];
+                entryData[i].pShaderEntry = &entry[i];
                 // Copy module entry
-                memcpy(pEntryData[i].pShaderEntry, &moduleEntries[i], sizeof(ShaderModuleEntry));
+                memcpy(entryData[i].pShaderEntry, &moduleEntries[i], sizeof(ShaderModuleEntry));
                 // Copy resourceNodeData and set resource node pointer
-                memcpy(pResNodeData, &entryResourceNodeDatas[i][0],
+                memcpy(resNodeData, &entryResourceNodeDatas[i][0],
                        moduleEntryDatas[i].resNodeDataCount* sizeof(ResourceNodeData));
-                pEntryData[i].pResNodeDatas = pResNodeData;
-                pEntryData[i].resNodeDataCount = moduleEntryDatas[i].resNodeDataCount;
-                pResNodeData += moduleEntryDatas[i].resNodeDataCount;
+                entryData[i].pResNodeDatas = resNodeData;
+                entryData[i].resNodeDataCount = moduleEntryDatas[i].resNodeDataCount;
+                resNodeData += moduleEntryDatas[i].resNodeDataCount;
             }
 
             // Copy binary code
-            memcpy(pCode, moduleDataEx.common.binCode.pCode, moduleDataEx.common.binCode.codeSize);
+            memcpy(code, moduleDataEx.common.binCode.pCode, moduleDataEx.common.binCode.codeSize);
             // Destory the temporary module code
-            if(pTrimmedCode != nullptr)
+            if(trimmedCode != nullptr)
             {
-                delete[] pTrimmedCode;
-                pTrimmedCode = nullptr;
+                delete[] trimmedCode;
+                trimmedCode = nullptr;
                 moduleDataEx.common.binCode.pCode = nullptr;
             }
 
             // Copy fragment shader output variables
-            pModuleDataExCopy->extra.fsOutInfoCount = fsOutInfos.size();
+            moduleDataExCopy->extra.fsOutInfoCount = fsOutInfos.size();
             if (fsOutInfos.size() > 0)
             {
-                memcpy(pFsOutInfo, &fsOutInfos[0], fsOutInfos.size() * sizeof(FsOutInfo));
+                memcpy(fsOutInfo, &fsOutInfos[0], fsOutInfos.size() * sizeof(FsOutInfo));
             }
             if (cacheEntryState == ShaderEntryState::Compiling)
             {
                 if (hEntry != nullptr)
                 {
-                    m_shaderCache->InsertShader(hEntry, pModuleDataExCopy, allocSize);
+                    m_shaderCache->insertShader(hEntry, moduleDataExCopy, allocSize);
                 }
             }
         }
@@ -813,20 +813,20 @@ Result Compiler::BuildShaderModule(
             // Update the pointers
             for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i)
             {
-                pEntryData[i].pShaderEntry = &pEntry[i];
-                pEntryData[i].pResNodeDatas = pResNodeData;
-                pResNodeData += pEntryData[i].resNodeDataCount;
+                entryData[i].pShaderEntry = &entry[i];
+                entryData[i].pResNodeDatas = resNodeData;
+                resNodeData += entryData[i].resNodeDataCount;
             }
         }
-        pModuleDataExCopy->common.binCode.pCode = pCode;
-        pModuleDataExCopy->extra.pFsOutInfos = pFsOutInfo;
-        pShaderOut->pModuleData = &pModuleDataExCopy->common;
+        moduleDataExCopy->common.binCode.pCode = code;
+        moduleDataExCopy->extra.pFsOutInfos = fsOutInfo;
+        shaderOut->pModuleData = &moduleDataExCopy->common;
     }
     else
     {
         if (hEntry != nullptr)
         {
-            m_shaderCache->ResetShader(hEntry);
+            m_shaderCache->resetShader(hEntry);
         }
     }
 
@@ -836,18 +836,18 @@ Result Compiler::BuildShaderModule(
 // =====================================================================================================================
 // Builds a pipeline by building relocatable elf files and linking them together.  The relocatable elf files will be
 // cached for future use.
-Result Compiler::BuildPipelineWithRelocatableElf(
-    Context*                            pContext,                   // [in] Acquired context
+Result Compiler::buildPipelineWithRelocatableElf(
+    Context*                            context,                   // [in] Acquired context
     ArrayRef<const PipelineShaderInfo*> shaderInfo,                 // Shader info of this pipeline
     unsigned                            forceLoopUnrollCount,       // Force loop unroll count (0 means disable)
-    ElfPackage*                         pPipelineElf)               // [out] Output Elf package
+    ElfPackage*                         pipelineElf)               // [out] Output Elf package
 {
     Result result = Result::Success;
 
     // Merge the user data once for all stages.
-    pContext->GetPipelineContext()->DoUserDataNodeMerge();
-    unsigned originalShaderStageMask = pContext->GetPipelineContext()->GetShaderStageMask();
-    pContext->GetBuilderContext()->SetBuildRelocatableElf(true);
+    context->getPipelineContext()->doUserDataNodeMerge();
+    unsigned originalShaderStageMask = context->getPipelineContext()->getShaderStageMask();
+    context->getBuilderContext()->setBuildRelocatableElf(true);
 
     ElfPackage elf[ShaderStageNativeStageCount];
     for (unsigned stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
@@ -857,23 +857,23 @@ Result Compiler::BuildPipelineWithRelocatableElf(
             continue;
         }
 
-        pContext->GetPipelineContext()->SetShaderStageMask(ShaderStageToMask(static_cast<ShaderStage>(stage)));
+        context->getPipelineContext()->setShaderStageMask(shaderStageToMask(static_cast<ShaderStage>(stage)));
 
         // Check the cache for the relocatable shader for this stage.
         MetroHash::Hash cacheHash = {};
-        IShaderCache* pUserShaderCache = nullptr;
-        if (pContext->IsGraphics())
+        IShaderCache* userShaderCache = nullptr;
+        if (context->isGraphics())
         {
-            auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
-            cacheHash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, true, stage);
+            auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(context->getPipelineBuildInfo());
+            cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, stage);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
             pUserShaderCache = pPipelineInfo->pShaderCache;
 #endif
         }
         else
         {
-            auto pPipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
-            cacheHash = PipelineDumper::GenerateHashForComputePipeline(pPipelineInfo, true);
+            auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo*>(context->getPipelineBuildInfo());
+            cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
             pUserShaderCache = pPipelineInfo->pShaderCache;
 #endif
@@ -882,13 +882,13 @@ Result Compiler::BuildPipelineWithRelocatableElf(
         ShaderEntryState cacheEntryState  = ShaderEntryState::New;
         BinaryData elfBin = {};
 
-        ShaderCache* pShaderCache;
+        ShaderCache* shaderCache;
         CacheEntryHandle hEntry;
-        cacheEntryState = LookUpShaderCaches(pUserShaderCache, &cacheHash, &elfBin, &pShaderCache, &hEntry);
+        cacheEntryState = lookUpShaderCaches(userShaderCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
 
         if (cacheEntryState == ShaderEntryState::Ready) {
-            auto pData = reinterpret_cast<const char*>(elfBin.pCode);
-            elf[stage].assign(pData, pData + elfBin.codeSize);
+            auto data = reinterpret_cast<const char*>(elfBin.pCode);
+            elf[stage].assign(data, data + elfBin.codeSize);
             continue;
         }
 
@@ -905,7 +905,7 @@ Result Compiler::BuildPipelineWithRelocatableElf(
         };
         singleStageShaderInfo[stage] = shaderInfo[stage];
 
-        result = BuildPipelineInternal(pContext, singleStageShaderInfo, forceLoopUnrollCount, &elf[stage]);
+        result = buildPipelineInternal(context, singleStageShaderInfo, forceLoopUnrollCount, &elf[stage]);
 
         // Add the result to the cache.
         if (result == Result::Success)
@@ -913,20 +913,20 @@ Result Compiler::BuildPipelineWithRelocatableElf(
             elfBin.codeSize = elf[stage].size();
             elfBin.pCode = elf[stage].data();
         }
-        UpdateShaderCache((result == Result::Success), &elfBin, pShaderCache, hEntry);
+        updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
     }
-    pContext->GetPipelineContext()->SetShaderStageMask(originalShaderStageMask);
-    pContext->GetBuilderContext()->SetBuildRelocatableElf(false);
+    context->getPipelineContext()->setShaderStageMask(originalShaderStageMask);
+    context->getBuilderContext()->setBuildRelocatableElf(false);
 
     // Link the relocatable shaders into a single pipeline elf file.
-    LinkRelocatableShaderElf(elf, pPipelineElf, pContext);
+    linkRelocatableShaderElf(elf, pipelineElf, context);
 
     return result;
 }
 
 // =====================================================================================================================
 // Returns true if a graphics pipeline can be built out of the given shader info.
-bool Compiler::CanUseRelocatableGraphicsShaderElf(
+bool Compiler::canUseRelocatableGraphicsShaderElf(
     const ArrayRef<const PipelineShaderInfo*>& shaderInfo  // Shader info for the pipeline to be built
     ) const
 {
@@ -953,8 +953,8 @@ bool Compiler::CanUseRelocatableGraphicsShaderElf(
 
     if (useRelocatableShaderElf && shaderInfo[0] != nullptr)
     {
-        const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo[0]->pModuleData);
-        if ((pModuleData != nullptr) && (pModuleData->binType != BinaryType::Spirv))
+        const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo[0]->pModuleData);
+        if ((moduleData != nullptr) && (moduleData->binType != BinaryType::Spirv))
         {
             useRelocatableShaderElf = false;
         }
@@ -962,14 +962,14 @@ bool Compiler::CanUseRelocatableGraphicsShaderElf(
 
     if (useRelocatableShaderElf && cl::RelocatableShaderElfLimit != -1)
     {
-        static unsigned relocatableElfCounter = 0;
-        if (relocatableElfCounter >= cl::RelocatableShaderElfLimit)
+        static unsigned RelocatableElfCounter = 0;
+        if (RelocatableElfCounter >= cl::RelocatableShaderElfLimit)
         {
             useRelocatableShaderElf = false;
         }
         else
         {
-            ++relocatableElfCounter;
+            ++RelocatableElfCounter;
         }
     }
     return useRelocatableShaderElf;
@@ -977,8 +977,8 @@ bool Compiler::CanUseRelocatableGraphicsShaderElf(
 
 // =====================================================================================================================
 // Returns true if a compute pipeline can be built out of the given shader info.
-bool Compiler::CanUseRelocatableComputeShaderElf(
-    const PipelineShaderInfo* pShaderInfo   // Shader info for the pipeline to be built
+bool Compiler::canUseRelocatableComputeShaderElf(
+    const PipelineShaderInfo* shaderInfo   // Shader info for the pipeline to be built
     ) const
 {
     if (!llvm::cl::UseRelocatableShaderElf)
@@ -987,10 +987,10 @@ bool Compiler::CanUseRelocatableComputeShaderElf(
     }
 
     bool useRelocatableShaderElf = true;
-    if (useRelocatableShaderElf && pShaderInfo != nullptr)
+    if (useRelocatableShaderElf && shaderInfo != nullptr)
     {
-        const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
-        if ((pModuleData != nullptr) && (pModuleData->binType != BinaryType::Spirv))
+        const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo->pModuleData);
+        if ((moduleData != nullptr) && (moduleData->binType != BinaryType::Spirv))
         {
             useRelocatableShaderElf = false;
         }
@@ -998,14 +998,14 @@ bool Compiler::CanUseRelocatableComputeShaderElf(
 
     if (useRelocatableShaderElf && cl::RelocatableShaderElfLimit != -1)
     {
-        static unsigned relocatableElfCounter = 0;
-        if (relocatableElfCounter >= cl::RelocatableShaderElfLimit)
+        static unsigned RelocatableElfCounter = 0;
+        if (RelocatableElfCounter >= cl::RelocatableShaderElfLimit)
         {
             useRelocatableShaderElf = false;
         }
         else
         {
-            ++relocatableElfCounter;
+            ++RelocatableElfCounter;
         }
     }
     return useRelocatableShaderElf;
@@ -1013,50 +1013,50 @@ bool Compiler::CanUseRelocatableComputeShaderElf(
 
 // =====================================================================================================================
 // Build pipeline internally -- common code for graphics and compute
-Result Compiler::BuildPipelineInternal(
-    Context*                            pContext,                   // [in] Acquired context
+Result Compiler::buildPipelineInternal(
+    Context*                            context,                   // [in] Acquired context
     ArrayRef<const PipelineShaderInfo*> shaderInfo,                 // [in] Shader info of this pipeline
     unsigned                            forceLoopUnrollCount,       // [in] Force loop unroll count (0 means disable)
-    ElfPackage*                         pPipelineElf)               // [out] Output Elf package
+    ElfPackage*                         pipelineElf)               // [out] Output Elf package
 {
     Result          result = Result::Success;
     unsigned passIndex = 0;
-    const PipelineShaderInfo* pFragmentShaderInfo = nullptr;
-    TimerProfiler timerProfiler(pContext->GetPiplineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
-    bool buildingRelocatableElf = pContext->GetBuilderContext()->BuildingRelocatableElf();
+    const PipelineShaderInfo* fragmentShaderInfo = nullptr;
+    TimerProfiler timerProfiler(context->getPiplineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
+    bool buildingRelocatableElf = context->getBuilderContext()->buildingRelocatableElf();
 
-    pContext->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
+    context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
 
     // Set a couple of pipeline options for front-end use.
     // TODO: The front-end should not be using pipeline options.
-    pContext->SetScalarBlockLayout(pContext->GetPipelineContext()->GetPipelineOptions()->scalarBlockLayout);
-    pContext->SetRobustBufferAccess(pContext->GetPipelineContext()->GetPipelineOptions()->robustBufferAccess);
+    context->setScalarBlockLayout(context->getPipelineContext()->getPipelineOptions()->scalarBlockLayout);
+    context->setRobustBufferAccess(context->getPipelineContext()->getPipelineOptions()->robustBufferAccess);
 
     if (!buildingRelocatableElf)
     {
         // Merge user data for shader stages into one.
-        pContext->GetPipelineContext()->DoUserDataNodeMerge();
+        context->getPipelineContext()->doUserDataNodeMerge();
     }
 
     // Set up middle-end objects.
-    BuilderContext* pBuilderContext = pContext->GetBuilderContext();
-    std::unique_ptr<Pipeline> pipeline(pBuilderContext->CreatePipeline());
-    pContext->GetPipelineContext()->SetPipelineState(&*pipeline);
-    pContext->SetBuilder(pBuilderContext->CreateBuilder(&*pipeline, UseBuilderRecorder));
+    BuilderContext* builderContext = context->getBuilderContext();
+    std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
+    context->getPipelineContext()->setPipelineState(&*pipeline);
+    context->setBuilder(builderContext->createBuilder(&*pipeline, UseBuilderRecorder));
 
     std::unique_ptr<Module> pipelineModule;
 
     // NOTE: If input is LLVM IR, read it now. There is now only ever one IR module representing the
     // whole pipeline.
-    bool IsLlvmBc = false;
-    const PipelineShaderInfo* pShaderInfoEntry = (shaderInfo[0] != nullptr) ? shaderInfo[0] : shaderInfo.back();
-    if (pShaderInfoEntry != nullptr)
+    bool isLlvmBc = false;
+    const PipelineShaderInfo* shaderInfoEntry = (shaderInfo[0] != nullptr) ? shaderInfo[0] : shaderInfo.back();
+    if (shaderInfoEntry != nullptr)
     {
-        const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfoEntry->pModuleData);
-        if ((pModuleData != nullptr) && (pModuleData->binType == BinaryType::LlvmBc))
+        const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfoEntry->pModuleData);
+        if ((moduleData != nullptr) && (moduleData->binType == BinaryType::LlvmBc))
         {
-            IsLlvmBc = true;
-            pipelineModule.reset(pContext->LoadLibary(&pModuleData->binCode).release());
+            isLlvmBc = true;
+            pipelineModule.reset(context->loadLibary(&moduleData->binCode).release());
         }
     }
 
@@ -1069,45 +1069,45 @@ Result Compiler::BuildPipelineInternal(
         unsigned stageSkipMask = 0;
         for (unsigned shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
         {
-            const PipelineShaderInfo* pShaderInfoEntry = shaderInfo[shaderIndex];
-            if ((pShaderInfoEntry == nullptr) || (pShaderInfoEntry->pModuleData == nullptr))
+            const PipelineShaderInfo* shaderInfoEntry = shaderInfo[shaderIndex];
+            if ((shaderInfoEntry == nullptr) || (shaderInfoEntry->pModuleData == nullptr))
             {
                 continue;
             }
 
-            const ShaderModuleDataEx* pModuleDataEx =
-                reinterpret_cast<const ShaderModuleDataEx*>(pShaderInfoEntry->pModuleData);
+            const ShaderModuleDataEx* moduleDataEx =
+                reinterpret_cast<const ShaderModuleDataEx*>(shaderInfoEntry->pModuleData);
 
-            Module* pModule = nullptr;
-            if (pModuleDataEx->common.binType == BinaryType::MultiLlvmBc)
+            Module* module = nullptr;
+            if (moduleDataEx->common.binType == BinaryType::MultiLlvmBc)
             {
-                timerProfiler.StartStopTimer(TimerLoadBc, true);
+                timerProfiler.startStopTimer(TimerLoadBc, true);
 
                 MetroHash::Hash entryNameHash = {};
 
-                assert(pShaderInfoEntry->pEntryTarget != nullptr);
-                MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfoEntry->pEntryTarget),
-                                  strlen(pShaderInfoEntry->pEntryTarget),
+                assert(shaderInfoEntry->pEntryTarget != nullptr);
+                MetroHash64::Hash(reinterpret_cast<const uint8_t*>(shaderInfoEntry->pEntryTarget),
+                                  strlen(shaderInfoEntry->pEntryTarget),
                                   entryNameHash.bytes);
 
                 BinaryData binCode = {};
-                for (unsigned i = 0; i < pModuleDataEx->extra.entryCount; ++i)
+                for (unsigned i = 0; i < moduleDataEx->extra.entryCount; ++i)
                 {
-                    auto pEntryData = &pModuleDataEx->extra.entryDatas[i];
-                    auto pShaderEntry = reinterpret_cast<ShaderModuleEntry*>(pEntryData->pShaderEntry);
-                    if ((pEntryData->stage == pShaderInfoEntry->entryStage) &&
-                        (memcmp(pShaderEntry->entryNameHash, &entryNameHash, sizeof(MetroHash::Hash)) == 0))
+                    auto entryData = &moduleDataEx->extra.entryDatas[i];
+                    auto shaderEntry = reinterpret_cast<ShaderModuleEntry*>(entryData->pShaderEntry);
+                    if ((entryData->stage == shaderInfoEntry->entryStage) &&
+                        (memcmp(shaderEntry->entryNameHash, &entryNameHash, sizeof(MetroHash::Hash)) == 0))
                     {
                         // LLVM bitcode
-                        binCode.codeSize = pShaderEntry->entrySize;
-                        binCode.pCode = VoidPtrInc(pModuleDataEx->common.binCode.pCode, pShaderEntry->entryOffset);
+                        binCode.codeSize = shaderEntry->entrySize;
+                        binCode.pCode = voidPtrInc(moduleDataEx->common.binCode.pCode, shaderEntry->entryOffset);
                         break;
                     }
                 }
 
                 if (binCode.codeSize > 0)
                 {
-                    pModule = pContext->LoadLibary(&binCode).release();
+                    module = context->loadLibary(&binCode).release();
                     stageSkipMask |= (1 << shaderIndex);
                 }
                 else
@@ -1115,46 +1115,46 @@ Result Compiler::BuildPipelineInternal(
                     result = Result::ErrorInvalidShader;
                 }
 
-                 timerProfiler.StartStopTimer(TimerLoadBc, false);
+                 timerProfiler.startStopTimer(TimerLoadBc, false);
             }
             else
             {
-                pModule = new Module((Twine("llpc") +
-                                     GetShaderStageName(pShaderInfoEntry->entryStage)).str() +
-                                     std::to_string(GetModuleIdByIndex(shaderIndex)), *pContext);
+                module = new Module((Twine("llpc") +
+                                     getShaderStageName(shaderInfoEntry->entryStage)).str() +
+                                     std::to_string(getModuleIdByIndex(shaderIndex)), *context);
             }
 
-            modules[shaderIndex] = pModule;
-            pContext->SetModuleTargetMachine(pModule);
+            modules[shaderIndex] = module;
+            context->setModuleTargetMachine(module);
         }
 
         for (unsigned shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
         {
-            const PipelineShaderInfo* pShaderInfoEntry = shaderInfo[shaderIndex];
-            ShaderStage entryStage = (pShaderInfoEntry != nullptr) ? pShaderInfoEntry->entryStage : ShaderStageInvalid;
+            const PipelineShaderInfo* shaderInfoEntry = shaderInfo[shaderIndex];
+            ShaderStage entryStage = (shaderInfoEntry != nullptr) ? shaderInfoEntry->entryStage : ShaderStageInvalid;
 
             if (entryStage == ShaderStageFragment)
             {
-                pFragmentShaderInfo = pShaderInfoEntry;
+                fragmentShaderInfo = shaderInfoEntry;
             }
-            if ((pShaderInfoEntry == nullptr) ||
-                (pShaderInfoEntry->pModuleData == nullptr) ||
-                (stageSkipMask & ShaderStageToMask(entryStage)))
+            if ((shaderInfoEntry == nullptr) ||
+                (shaderInfoEntry->pModuleData == nullptr) ||
+                (stageSkipMask & shaderStageToMask(entryStage)))
             {
                 continue;
             }
 
             std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
-            lowerPassMgr->SetPassIndex(&passIndex);
+            lowerPassMgr->setPassIndex(&passIndex);
 
             // Set the shader stage in the Builder.
-            pContext->GetBuilder()->SetShaderStage(GetLgcShaderStage(entryStage));
+            context->getBuilder()->setShaderStage(getLgcShaderStage(entryStage));
 
             // Start timer for translate.
-            timerProfiler.AddTimerStartStopPass(&*lowerPassMgr, TimerTranslate, true);
+            timerProfiler.addTimerStartStopPass(&*lowerPassMgr, TimerTranslate, true);
 
             // SPIR-V translation, then dump the result.
-            lowerPassMgr->add(CreateSpirvLowerTranslator(entryStage, pShaderInfoEntry));
+            lowerPassMgr->add(createSpirvLowerTranslator(entryStage, shaderInfoEntry));
             if (EnableOuts())
             {
                 lowerPassMgr->add(createPrintModulePass(outs(), "\n"
@@ -1162,10 +1162,10 @@ Result Compiler::BuildPipelineInternal(
                             "// LLPC SPIRV-to-LLVM translation results\n"));
             }
             // Stop timer for translate.
-            timerProfiler.AddTimerStartStopPass(&*lowerPassMgr, TimerTranslate, false);
+            timerProfiler.addTimerStartStopPass(&*lowerPassMgr, TimerTranslate, false);
 
             // Run the passes.
-            bool success = RunPasses(&*lowerPassMgr, modules[shaderIndex]);
+            bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
             if (success == false)
             {
                 LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
@@ -1175,26 +1175,26 @@ Result Compiler::BuildPipelineInternal(
         for (unsigned shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
         {
             // Per-shader SPIR-V lowering passes.
-            const PipelineShaderInfo* pShaderInfoEntry = shaderInfo[shaderIndex];
-            ShaderStage entryStage = (pShaderInfoEntry != nullptr) ? pShaderInfoEntry->entryStage : ShaderStageInvalid;
-            if ((pShaderInfoEntry == nullptr) ||
-                (pShaderInfoEntry->pModuleData == nullptr) ||
-                (stageSkipMask & ShaderStageToMask(entryStage)))
+            const PipelineShaderInfo* shaderInfoEntry = shaderInfo[shaderIndex];
+            ShaderStage entryStage = (shaderInfoEntry != nullptr) ? shaderInfoEntry->entryStage : ShaderStageInvalid;
+            if ((shaderInfoEntry == nullptr) ||
+                (shaderInfoEntry->pModuleData == nullptr) ||
+                (stageSkipMask & shaderStageToMask(entryStage)))
             {
                 continue;
             }
 
-            pContext->GetBuilder()->SetShaderStage(GetLgcShaderStage(entryStage));
+            context->getBuilder()->setShaderStage(getLgcShaderStage(entryStage));
             std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
-            lowerPassMgr->SetPassIndex(&passIndex);
+            lowerPassMgr->setPassIndex(&passIndex);
 
-            SpirvLower::AddPasses(pContext,
+            SpirvLower::addPasses(context,
                                   entryStage,
                                   *lowerPassMgr,
-                                  timerProfiler.GetTimer(TimerLower),
+                                  timerProfiler.getTimer(TimerLower),
                                   forceLoopUnrollCount);
             // Run the passes.
-            bool success = RunPasses(&*lowerPassMgr, modules[shaderIndex]);
+            bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
             if (success == false)
             {
                 LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
@@ -1203,7 +1203,7 @@ Result Compiler::BuildPipelineInternal(
         }
 
         // Link the shader modules into a single pipeline module.
-        pipelineModule.reset(pipeline->Link(modules));
+        pipelineModule.reset(pipeline->link(modules));
         if (pipelineModule == nullptr)
         {
             LLPC_ERRS("Failed to link shader modules into pipeline module\n");
@@ -1212,29 +1212,29 @@ Result Compiler::BuildPipelineInternal(
     }
 
     // Set up function to check shader cache.
-    GraphicsShaderCacheChecker graphicsShaderCacheChecker(this, pContext);
+    GraphicsShaderCacheChecker graphicsShaderCacheChecker(this, context);
 
     Pipeline::CheckShaderCacheFunc checkShaderCacheFunc =
             [&graphicsShaderCacheChecker](
-        const Module*               pModule,      // [in] Module
+        const Module*               module,      // [in] Module
         unsigned                    stageMask,    // Shader stage mask
         ArrayRef<ArrayRef<uint8_t>> stageHashes)  // Per-stage hash of in/out usage
     {
-        return graphicsShaderCacheChecker.Check(pModule, stageMask, stageHashes);
+        return graphicsShaderCacheChecker.check(module, stageMask, stageHashes);
     };
 
     // Only enable per stage cache for full graphic pipeline
-    bool checkPerStageCache = cl::EnablePerStageCache && pContext->IsGraphics() &&
+    bool checkPerStageCache = cl::EnablePerStageCache && context->isGraphics() &&
                               !buildingRelocatableElf &&
-                              (pContext->GetShaderStageMask() &
-                               (ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageFragment)));
+                              (context->getShaderStageMask() &
+                               (shaderStageToMask(ShaderStageVertex) | shaderStageToMask(ShaderStageFragment)));
     if (checkPerStageCache == false)
     {
         checkShaderCacheFunc = nullptr;
     }
 
     // Generate pipeline.
-    raw_svector_ostream elfStream(*pPipelineElf);
+    raw_svector_ostream elfStream(*pipelineElf);
 
     if (result == Result::Success)
     {
@@ -1244,12 +1244,12 @@ Result Compiler::BuildPipelineInternal(
 #endif
         {
             Timer* timers[] = {
-                timerProfiler.GetTimer(TimerPatch),
-                timerProfiler.GetTimer(TimerOpt),
-                timerProfiler.GetTimer(TimerCodeGen),
+                timerProfiler.getTimer(TimerPatch),
+                timerProfiler.getTimer(TimerOpt),
+                timerProfiler.getTimer(TimerCodeGen),
             };
 
-            pipeline->Generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers);
+            pipeline->generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers);
             result = Result::Success;
         }
 #if LLPC_ENABLE_EXCEPTION
@@ -1262,18 +1262,18 @@ Result Compiler::BuildPipelineInternal(
     if (checkPerStageCache)
     {
         // For graphics, update shader caches with results of compile, and merge ELF outputs if necessary.
-        graphicsShaderCacheChecker.UpdateAndMerge(result, pPipelineElf);
+        graphicsShaderCacheChecker.updateAndMerge(result, pipelineElf);
     }
 
     if ((result == Result::Success) &&
-        pFragmentShaderInfo &&
-        pFragmentShaderInfo->options.updateDescInElf &&
-        (pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageFragment)))
+        fragmentShaderInfo &&
+        fragmentShaderInfo->options.updateDescInElf &&
+        (context->getShaderStageMask() & shaderStageToMask(ShaderStageFragment)))
     {
-        graphicsShaderCacheChecker.UpdateRootUserDateOffset(pPipelineElf);
+        graphicsShaderCacheChecker.updateRootUserDateOffset(pipelineElf);
     }
 
-    pContext->setDiagnosticHandlerCallBack(nullptr);
+    context->setDiagnosticHandlerCallBack(nullptr);
 
     return result;
 }
@@ -1282,48 +1282,48 @@ Result Compiler::BuildPipelineInternal(
 // Check shader cache for graphics pipeline, returning mask of which shader stages we want to keep in this compile.
 // This is called from the PatchCheckShaderCache pass (via a lambda in BuildPipelineInternal), to remove
 // shader stages that we don't want because there was a shader cache hit.
-unsigned GraphicsShaderCacheChecker::Check(
-    const Module*               pModule,      // [in] Module
+unsigned GraphicsShaderCacheChecker::check(
+    const Module*               module,      // [in] Module
     unsigned                    stageMask,    // Shader stage mask
     ArrayRef<ArrayRef<uint8_t>> stageHashes)  // Per-stage hash of in/out usage
 {
     // Check per stage shader cache
     MetroHash::Hash fragmentHash = {};
     MetroHash::Hash nonFragmentHash = {};
-    Compiler::BuildShaderCacheHash(m_pContext, stageMask, stageHashes, &fragmentHash, &nonFragmentHash);
+    Compiler::buildShaderCacheHash(m_context, stageMask, stageHashes, &fragmentHash, &nonFragmentHash);
 
-    IShaderCache* pAppCache = nullptr;
+    IShaderCache* appCache = nullptr;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
     pAppCache = pPipelineInfo->pShaderCache;
 #endif
-    if (stageMask & ShaderStageToMask(ShaderStageFragment))
+    if (stageMask & shaderStageToMask(ShaderStageFragment))
     {
-        m_fragmentCacheEntryState = m_pCompiler->LookUpShaderCaches(pAppCache,
+        m_fragmentCacheEntryState = m_compiler->lookUpShaderCaches(appCache,
                                                                     &fragmentHash,
                                                                     &m_fragmentElf,
-                                                                    &m_pFragmentShaderCache,
+                                                                    &m_fragmentShaderCache,
                                                                     &m_hFragmentEntry);
     }
 
-    if (stageMask & ~ShaderStageToMask(ShaderStageFragment))
+    if (stageMask & ~shaderStageToMask(ShaderStageFragment))
     {
-        m_nonFragmentCacheEntryState = m_pCompiler->LookUpShaderCaches(pAppCache,
+        m_nonFragmentCacheEntryState = m_compiler->lookUpShaderCaches(appCache,
                                                                        &nonFragmentHash,
                                                                        &m_nonFragmentElf,
-                                                                       &m_pNonFragmentShaderCache,
+                                                                       &m_nonFragmentShaderCache,
                                                                        &m_hNonFragmentEntry);
     }
 
     if (m_nonFragmentCacheEntryState != ShaderEntryState::Compiling)
     {
         // Remove non-fragment shader stages.
-        stageMask &= ShaderStageToMask(ShaderStageFragment);
+        stageMask &= shaderStageToMask(ShaderStageFragment);
     }
     if (m_fragmentCacheEntryState != ShaderEntryState::Compiling)
     {
         // Remove fragment shader stages.
-        stageMask &= ~ShaderStageToMask(ShaderStageFragment);
+        stageMask &= ~shaderStageToMask(ShaderStageFragment);
     }
 
     return stageMask;
@@ -1331,40 +1331,40 @@ unsigned GraphicsShaderCacheChecker::Check(
 
 // =====================================================================================================================
 // Update root level descriptor offset for graphics pipeline.
-void GraphicsShaderCacheChecker::UpdateRootUserDateOffset(
-    ElfPackage*       pPipelineElf)   // [In, Out] ELF that could be from compile or merged
+void GraphicsShaderCacheChecker::updateRootUserDateOffset(
+    ElfPackage*       pipelineElf)   // [In, Out] ELF that could be from compile or merged
 {
-    ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
+    ElfWriter<Elf64> writer(m_context->getGfxIpVersion());
     // Load ELF binary
-    auto result = writer.ReadFromBuffer(pPipelineElf->data(), pPipelineElf->size());
+    auto result = writer.ReadFromBuffer(pipelineElf->data(), pipelineElf->size());
     assert(result == Result::Success);
     (void(result)); // unused
-    writer.updateElfBinary(m_pContext, pPipelineElf);
+    writer.updateElfBinary(m_context, pipelineElf);
 }
 
 // =====================================================================================================================
 // Update shader caches for graphics pipeline from compile result, and merge ELF outputs if necessary.
-void GraphicsShaderCacheChecker::UpdateAndMerge(
+void GraphicsShaderCacheChecker::updateAndMerge(
     Result            result,         // Result of compile
-    ElfPackage*       pOutputPipelineElf)   // ELF output of compile, updated to merge ELF from shader cache
+    ElfPackage*       outputPipelineElf)   // ELF output of compile, updated to merge ELF from shader cache
 {
     // Update the shader cache if required, with the compiled pipeline or with a failure state.
     if (m_fragmentCacheEntryState == ShaderEntryState::Compiling ||
         m_nonFragmentCacheEntryState == ShaderEntryState::Compiling)
     {
         BinaryData pipelineElf = {};
-        pipelineElf.codeSize = pOutputPipelineElf->size();
-        pipelineElf.pCode = pOutputPipelineElf->data();
+        pipelineElf.codeSize = outputPipelineElf->size();
+        pipelineElf.pCode = outputPipelineElf->data();
 
         if (m_fragmentCacheEntryState == ShaderEntryState::Compiling)
         {
-            m_pCompiler->UpdateShaderCache(result == Result::Success, &pipelineElf, m_pFragmentShaderCache,
+            m_compiler->updateShaderCache(result == Result::Success, &pipelineElf, m_fragmentShaderCache,
                                            m_hFragmentEntry);
         }
 
         if (m_nonFragmentCacheEntryState == ShaderEntryState::Compiling)
         {
-            m_pCompiler->UpdateShaderCache(result == Result::Success, &pipelineElf, m_pNonFragmentShaderCache,
+            m_compiler->updateShaderCache(result == Result::Success, &pipelineElf, m_nonFragmentShaderCache,
                                            m_hNonFragmentEntry);
         }
     }
@@ -1376,8 +1376,8 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
          m_nonFragmentCacheEntryState == ShaderEntryState::Ready))
     {
         // Move the compiled ELF out of the way.
-        ElfPackage compiledPipelineElf = std::move(*pOutputPipelineElf);
-        pOutputPipelineElf->clear();
+        ElfPackage compiledPipelineElf = std::move(*outputPipelineElf);
+        outputPipelineElf->clear();
 
         // Determine where the fragment / non-fragment parts come from (cache or just-compiled).
         BinaryData fragmentElf = {};
@@ -1403,11 +1403,11 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
         }
 
         // Merge and store the result in pPipelineElf
-        ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
+        ElfWriter<Elf64> writer(m_context->getGfxIpVersion());
         auto result = writer.ReadFromBuffer(nonFragmentElf.pCode, nonFragmentElf.codeSize);
         assert(result == Result::Success);
         (void(result)); // unused
-        writer.mergeElfBinary(m_pContext, &fragmentElf, pOutputPipelineElf);
+        writer.mergeElfBinary(m_context, &fragmentElf, outputPipelineElf);
     }
 }
 
@@ -1415,103 +1415,103 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
 // Convert color buffer format to fragment shader export format
 // This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.
 unsigned Compiler::ConvertColorBufferFormatToExportFormat(
-    const ColorTarget*          pTarget,                // [in] GraphicsPipelineBuildInfo
+    const ColorTarget*          target,                // [in] GraphicsPipelineBuildInfo
     const bool                  enableAlphaToCoverage   // whether enalbe AlphaToCoverage
     ) const
 {
-    Context* pContext = AcquireContext();
-    std::unique_ptr<Pipeline> pipeline(pContext->GetBuilderContext()->CreatePipeline());
+    Context* context = acquireContext();
+    std::unique_ptr<Pipeline> pipeline(context->getBuilderContext()->createPipeline());
     ColorExportFormat format = {};
     ColorExportState state = {};
-    std::tie(format.dfmt, format.nfmt) = PipelineContext::MapVkFormat(pTarget->format, true);
-    format.blendEnable = pTarget->blendEnable;
-    format.blendSrcAlphaToColor = pTarget->blendSrcAlphaToColor;
+    std::tie(format.dfmt, format.nfmt) = PipelineContext::mapVkFormat(target->format, true);
+    format.blendEnable = target->blendEnable;
+    format.blendSrcAlphaToColor = target->blendSrcAlphaToColor;
     state.alphaToCoverageEnable = enableAlphaToCoverage;
-    pipeline->SetColorExportState(format, state);
+    pipeline->setColorExportState(format, state);
 
-    Type* pOutputTy = VectorType::get(Type::getFloatTy(*pContext), countPopulation(pTarget->channelWriteMask));
-    unsigned exportFormat = pipeline->ComputeExportFormat(pOutputTy, 0);
+    Type* outputTy = VectorType::get(Type::getFloatTy(*context), countPopulation(target->channelWriteMask));
+    unsigned exportFormat = pipeline->computeExportFormat(outputTy, 0);
 
     pipeline.reset(nullptr);
-    ReleaseContext(pContext);
+    releaseContext(context);
 
     return exportFormat;
 }
 
 // =====================================================================================================================
 // Build graphics pipeline internally
-Result Compiler::BuildGraphicsPipelineInternal(
-    GraphicsContext*                    pGraphicsContext,         // [in] Graphics context this graphics pipeline
+Result Compiler::buildGraphicsPipelineInternal(
+    GraphicsContext*                    graphicsContext,         // [in] Graphics context this graphics pipeline
     ArrayRef<const PipelineShaderInfo*> shaderInfo,               // Shader info of this graphics pipeline
     unsigned                            forceLoopUnrollCount,     // Force loop unroll count (0 means disable)
     bool                                buildingRelocatableElf,   // Build the pipeline by linking relocatable elf
-    ElfPackage*                         pPipelineElf)             // [out] Output Elf package
+    ElfPackage*                         pipelineElf)             // [out] Output Elf package
 {
-    Context* pContext = AcquireContext();
-    pContext->AttachPipelineContext(pGraphicsContext);
+    Context* context = acquireContext();
+    context->attachPipelineContext(graphicsContext);
 
     Result result = Result::Success;
     if (buildingRelocatableElf)
     {
-        result = BuildPipelineWithRelocatableElf(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf);
+        result = buildPipelineWithRelocatableElf(context, shaderInfo, forceLoopUnrollCount, pipelineElf);
     }
     else
     {
-        result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf);
+        result = buildPipelineInternal(context, shaderInfo, forceLoopUnrollCount, pipelineElf);
     }
-    ReleaseContext(pContext);
+    releaseContext(context);
     return result;
 }
 
 // =====================================================================================================================
 // Build graphics pipeline from the specified info.
 Result Compiler::BuildGraphicsPipeline(
-    const GraphicsPipelineBuildInfo* pPipelineInfo,     // [in] Info to build this graphics pipeline
-    GraphicsPipelineBuildOut*        pPipelineOut,      // [out] Output of building this graphics pipeline
-    void*                            pPipelineDumpFile) // [in] Handle of pipeline dump file
+    const GraphicsPipelineBuildInfo* pipelineInfo,     // [in] Info to build this graphics pipeline
+    GraphicsPipelineBuildOut*        pipelineOut,      // [out] Output of building this graphics pipeline
+    void*                            pipelineDumpFile) // [in] Handle of pipeline dump file
 {
     Result           result = Result::Success;
     BinaryData       elfBin = {};
 
     const PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
     {
-        &pPipelineInfo->vs,
-        &pPipelineInfo->tcs,
-        &pPipelineInfo->tes,
-        &pPipelineInfo->gs,
-        &pPipelineInfo->fs,
+        &pipelineInfo->vs,
+        &pipelineInfo->tcs,
+        &pipelineInfo->tes,
+        &pipelineInfo->gs,
+        &pipelineInfo->fs,
     };
 
     for (unsigned i = 0; (i < ShaderStageGfxCount) && (result == Result::Success); ++i)
     {
-        result = ValidatePipelineShaderInfo(shaderInfo[i]);
+        result = validatePipelineShaderInfo(shaderInfo[i]);
     }
 
     MetroHash::Hash cacheHash = {};
     MetroHash::Hash pipelineHash = {};
-    cacheHash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, true);
-    pipelineHash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, false);
+    cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true);
+    pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false);
 
     if ((result == Result::Success) && EnableOuts())
     {
         LLPC_OUTS("===============================================================================\n");
         LLPC_OUTS("// LLPC calculated hash results (graphics pipline)\n\n");
-        LLPC_OUTS("PIPE : " << format("0x%016" PRIX64, MetroHash::Compact64(&pipelineHash)) << "\n");
+        LLPC_OUTS("PIPE : " << format("0x%016" PRIX64, MetroHash::compact64(&pipelineHash)) << "\n");
         for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage)
         {
-            const ShaderModuleData* pModuleData =
+            const ShaderModuleData* moduleData =
                 reinterpret_cast<const ShaderModuleData*>(shaderInfo[stage]->pModuleData);
-            auto pHash = reinterpret_cast<const MetroHash::Hash*>(&pModuleData->hash[0]);
-            if (pModuleData != nullptr)
+            auto hash = reinterpret_cast<const MetroHash::Hash*>(&moduleData->hash[0]);
+            if (moduleData != nullptr)
             {
-                LLPC_OUTS(format("%-4s : ", GetShaderStageAbbreviation(static_cast<ShaderStage>(stage), true)) <<
-                          format("0x%016" PRIX64, MetroHash::Compact64(pHash)) << "\n");
+                LLPC_OUTS(format("%-4s : ", getShaderStageAbbreviation(static_cast<ShaderStage>(stage), true)) <<
+                          format("0x%016" PRIX64, MetroHash::compact64(hash)) << "\n");
             }
         }
         LLPC_OUTS("\n");
     }
 
-    if ((result == Result::Success) && (pPipelineDumpFile != nullptr))
+    if ((result == Result::Success) && (pipelineDumpFile != nullptr))
     {
         std::stringstream strStream;
         strStream << ";Compiler Options: ";
@@ -1520,21 +1520,21 @@ Result Compiler::BuildGraphicsPipeline(
             strStream << option << " ";
         }
         std::string extraInfo = strStream.str();
-        PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pPipelineDumpFile), &extraInfo);
+        PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pipelineDumpFile), &extraInfo);
     }
 
     ShaderEntryState cacheEntryState  = ShaderEntryState::New;
-    bool buildingRelocatableElf = CanUseRelocatableGraphicsShaderElf(shaderInfo);
-    IShaderCache* pAppCache = nullptr;
+    bool buildingRelocatableElf = canUseRelocatableGraphicsShaderElf(shaderInfo);
+    IShaderCache* appCache = nullptr;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     pAppCache = pPipelineInfo->pShaderCache;
 #endif
-    ShaderCache* pShaderCache = nullptr;
+    ShaderCache* shaderCache = nullptr;
     CacheEntryHandle hEntry = nullptr;
 
     if (!buildingRelocatableElf)
     {
-        cacheEntryState = LookUpShaderCaches(pAppCache, &cacheHash, &elfBin, &pShaderCache, &hEntry);
+        cacheEntryState = lookUpShaderCaches(appCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
     }
     else
     {
@@ -1548,10 +1548,10 @@ Result Compiler::BuildGraphicsPipeline(
         unsigned                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
         GraphicsContext graphicsContext(m_gfxIp,
-                                        pPipelineInfo,
+                                        pipelineInfo,
                                         &pipelineHash,
                                         &cacheHash);
-        result = BuildGraphicsPipelineInternal(&graphicsContext,
+        result = buildGraphicsPipelineInternal(&graphicsContext,
                                                shaderInfo,
                                                forceLoopUnrollCount,
                                                buildingRelocatableElf,
@@ -1564,15 +1564,15 @@ Result Compiler::BuildGraphicsPipeline(
         }
 
         if (!buildingRelocatableElf)
-            UpdateShaderCache((result == Result::Success), &elfBin, pShaderCache, hEntry);
+            updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
     }
 
     if (result == Result::Success)
     {
-        void* pAllocBuf = nullptr;
-        if (pPipelineInfo->pfnOutputAlloc != nullptr)
+        void* allocBuf = nullptr;
+        if (pipelineInfo->pfnOutputAlloc != nullptr)
         {
-            pAllocBuf = pPipelineInfo->pfnOutputAlloc(pPipelineInfo->pInstance, pPipelineInfo->pUserData, elfBin.codeSize);
+            allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, elfBin.codeSize);
         }
         else
         {
@@ -1580,11 +1580,11 @@ Result Compiler::BuildGraphicsPipeline(
             result = Result::ErrorInvalidPointer;
         }
 
-        uint8_t* pCode = static_cast<uint8_t*>(pAllocBuf);
-        memcpy(pCode, elfBin.pCode, elfBin.codeSize);
+        uint8_t* code = static_cast<uint8_t*>(allocBuf);
+        memcpy(code, elfBin.pCode, elfBin.codeSize);
 
-        pPipelineOut->pipelineBin.codeSize = elfBin.codeSize;
-        pPipelineOut->pipelineBin.pCode = pCode;
+        pipelineOut->pipelineBin.codeSize = elfBin.codeSize;
+        pipelineOut->pipelineBin.pCode = code;
     }
 
     return result;
@@ -1592,15 +1592,15 @@ Result Compiler::BuildGraphicsPipeline(
 
 // =====================================================================================================================
 // Build compute pipeline internally
-Result Compiler::BuildComputePipelineInternal(
-    ComputeContext*                 pComputeContext,                // [in] Compute context this compute pipeline
-    const ComputePipelineBuildInfo* pPipelineInfo,                  // [in] Pipeline info of this compute pipeline
+Result Compiler::buildComputePipelineInternal(
+    ComputeContext*                 computeContext,                // [in] Compute context this compute pipeline
+    const ComputePipelineBuildInfo* pipelineInfo,                  // [in] Pipeline info of this compute pipeline
     unsigned                        forceLoopUnrollCount,           // Force loop unroll count (0 means disable)
     bool                            buildingRelocatableElf,         // Build the pipeline by linking relocatable elf
-    ElfPackage*                     pPipelineElf)                   // [out] Output Elf package
+    ElfPackage*                     pipelineElf)                   // [out] Output Elf package
 {
-    Context* pContext = AcquireContext();
-    pContext->AttachPipelineContext(pComputeContext);
+    Context* context = acquireContext();
+    context->attachPipelineContext(computeContext);
 
     const PipelineShaderInfo* shaderInfo[ShaderStageNativeStageCount] =
     {
@@ -1609,53 +1609,53 @@ Result Compiler::BuildComputePipelineInternal(
         nullptr,
         nullptr,
         nullptr,
-        &pPipelineInfo->cs,
+        &pipelineInfo->cs,
     };
 
     Result result;
     if (buildingRelocatableElf)
     {
-        result = BuildPipelineWithRelocatableElf(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf);
+        result = buildPipelineWithRelocatableElf(context, shaderInfo, forceLoopUnrollCount, pipelineElf);
     }
     else
     {
-        result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf);
+        result = buildPipelineInternal(context, shaderInfo, forceLoopUnrollCount, pipelineElf);
     }
-    ReleaseContext(pContext);
+    releaseContext(context);
     return result;
 }
 
 // =====================================================================================================================
 // Build compute pipeline from the specified info.
 Result Compiler::BuildComputePipeline(
-    const ComputePipelineBuildInfo* pPipelineInfo,     // [in] Info to build this compute pipeline
-    ComputePipelineBuildOut*        pPipelineOut,      // [out] Output of building this compute pipeline
-    void*                           pPipelineDumpFile) // [in] Handle of pipeline dump file
+    const ComputePipelineBuildInfo* pipelineInfo,     // [in] Info to build this compute pipeline
+    ComputePipelineBuildOut*        pipelineOut,      // [out] Output of building this compute pipeline
+    void*                           pipelineDumpFile) // [in] Handle of pipeline dump file
 {
     BinaryData elfBin = {};
 
-    bool buildingRelocatableElf = CanUseRelocatableComputeShaderElf(&pPipelineInfo->cs);
+    bool buildingRelocatableElf = canUseRelocatableComputeShaderElf(&pipelineInfo->cs);
 
-    Result result = ValidatePipelineShaderInfo(&pPipelineInfo->cs);
+    Result result = validatePipelineShaderInfo(&pipelineInfo->cs);
 
     MetroHash::Hash cacheHash = {};
     MetroHash::Hash pipelineHash = {};
-    cacheHash = PipelineDumper::GenerateHashForComputePipeline(pPipelineInfo, true);
-    pipelineHash = PipelineDumper::GenerateHashForComputePipeline(pPipelineInfo, false);
+    cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true);
+    pipelineHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false);
 
     if ((result == Result::Success) && EnableOuts())
     {
-        const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pPipelineInfo->cs.pModuleData);
-        auto pModuleHash = reinterpret_cast<const MetroHash::Hash*>(&pModuleData->hash[0]);
+        const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(pipelineInfo->cs.pModuleData);
+        auto moduleHash = reinterpret_cast<const MetroHash::Hash*>(&moduleData->hash[0]);
         LLPC_OUTS("\n===============================================================================\n");
         LLPC_OUTS("// LLPC calculated hash results (compute pipline)\n\n");
-        LLPC_OUTS("PIPE : " << format("0x%016" PRIX64, MetroHash::Compact64(&pipelineHash)) << "\n");
-        LLPC_OUTS(format("%-4s : ", GetShaderStageAbbreviation(ShaderStageCompute, true)) <<
-                  format("0x%016" PRIX64, MetroHash::Compact64(pModuleHash)) << "\n");
+        LLPC_OUTS("PIPE : " << format("0x%016" PRIX64, MetroHash::compact64(&pipelineHash)) << "\n");
+        LLPC_OUTS(format("%-4s : ", getShaderStageAbbreviation(ShaderStageCompute, true)) <<
+                  format("0x%016" PRIX64, MetroHash::compact64(moduleHash)) << "\n");
         LLPC_OUTS("\n");
     }
 
-    if ((result == Result::Success) && (pPipelineDumpFile != nullptr))
+    if ((result == Result::Success) && (pipelineDumpFile != nullptr))
     {
         std::stringstream strStream;
         strStream << ";Compiler Options: ";
@@ -1664,20 +1664,20 @@ Result Compiler::BuildComputePipeline(
             strStream << option << " ";
         }
         std::string extraInfo = strStream.str();
-        PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pPipelineDumpFile), &extraInfo);
+        PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pipelineDumpFile), &extraInfo);
     }
 
     ShaderEntryState cacheEntryState  = ShaderEntryState::New;
-    IShaderCache* pAppCache = nullptr;
+    IShaderCache* appCache = nullptr;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     pAppCache = pPipelineInfo->pShaderCache;
 #endif
-    ShaderCache* pShaderCache = nullptr;
+    ShaderCache* shaderCache = nullptr;
     CacheEntryHandle hEntry = nullptr;
 
     if (!buildingRelocatableElf)
     {
-        cacheEntryState = LookUpShaderCaches(pAppCache, &cacheHash, &elfBin, &pShaderCache, &hEntry);
+        cacheEntryState = lookUpShaderCaches(appCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
     }
     else
     {
@@ -1691,12 +1691,12 @@ Result Compiler::BuildComputePipeline(
         unsigned                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
         ComputeContext computeContext(m_gfxIp,
-                                      pPipelineInfo,
+                                      pipelineInfo,
                                       &pipelineHash,
                                       &cacheHash);
 
-        result = BuildComputePipelineInternal(&computeContext,
-                                              pPipelineInfo,
+        result = buildComputePipelineInternal(&computeContext,
+                                              pipelineInfo,
                                               forceLoopUnrollCount,
                                               buildingRelocatableElf,
                                               &candidateElf);
@@ -1708,23 +1708,23 @@ Result Compiler::BuildComputePipeline(
         }
         if (!buildingRelocatableElf)
         {
-            UpdateShaderCache((result == Result::Success), &elfBin, pShaderCache, hEntry);
+            updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
         }
     }
 
     if (result == Result::Success)
     {
-        void* pAllocBuf = nullptr;
-        if (pPipelineInfo->pfnOutputAlloc != nullptr)
+        void* allocBuf = nullptr;
+        if (pipelineInfo->pfnOutputAlloc != nullptr)
         {
-            pAllocBuf = pPipelineInfo->pfnOutputAlloc(pPipelineInfo->pInstance, pPipelineInfo->pUserData, elfBin.codeSize);
-            if (pAllocBuf != nullptr)
+            allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, elfBin.codeSize);
+            if (allocBuf != nullptr)
             {
-                uint8_t* pCode = static_cast<uint8_t*>(pAllocBuf);
-                memcpy(pCode, elfBin.pCode, elfBin.codeSize);
+                uint8_t* code = static_cast<uint8_t*>(allocBuf);
+                memcpy(code, elfBin.pCode, elfBin.codeSize);
 
-                pPipelineOut->pipelineBin.codeSize = elfBin.codeSize;
-                pPipelineOut->pipelineBin.pCode = pCode;
+                pipelineOut->pipelineBin.codeSize = elfBin.codeSize;
+                pipelineOut->pipelineBin.pCode = code;
             }
             else
             {
@@ -1743,9 +1743,9 @@ Result Compiler::BuildComputePipeline(
 
 // =====================================================================================================================
 // Builds hash code from compilation-options
-MetroHash::Hash Compiler::GenerateHashForCompileOptions(
+MetroHash::Hash Compiler::generateHashForCompileOptions(
     unsigned          optionCount,    // Count of compilation-option strings
-    const char*const* pOptions        // [in] An array of compilation-option strings
+    const char*const* options        // [in] An array of compilation-option strings
     )
 {
     // Options which needn't affect compilation results
@@ -1766,7 +1766,7 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
     // Build effecting options
     for (unsigned i = 1; i < optionCount; ++i)
     {
-        StringRef option = pOptions[i] + 1;  // Skip '-' in options
+        StringRef option = options[i] + 1;  // Skip '-' in options
         bool ignore = false;
         for (unsigned j = 0; j < sizeof(IgnoredOptions) / sizeof(IgnoredOptions[0]); ++j)
         {
@@ -1799,44 +1799,44 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
 
 // =====================================================================================================================
 // Checks whether fields in pipeline shader info are valid.
-Result Compiler::ValidatePipelineShaderInfo(
-    const PipelineShaderInfo* pShaderInfo     // [in] Pipeline shader info
+Result Compiler::validatePipelineShaderInfo(
+    const PipelineShaderInfo* shaderInfo     // [in] Pipeline shader info
     ) const
 {
     Result result = Result::Success;
-    ShaderStage shaderStage = (pShaderInfo != nullptr) ? pShaderInfo->entryStage : ShaderStageInvalid;
+    ShaderStage shaderStage = (shaderInfo != nullptr) ? shaderInfo->entryStage : ShaderStageInvalid;
 
-    const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
-    if (pModuleData != nullptr)
+    const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo->pModuleData);
+    if (moduleData != nullptr)
     {
-        if (pModuleData->binType == BinaryType::Spirv)
+        if (moduleData->binType == BinaryType::Spirv)
         {
-            auto pSpirvBin = &pModuleData->binCode;
-            if (pShaderInfo->pEntryTarget != nullptr)
+            auto spirvBin = &moduleData->binCode;
+            if (shaderInfo->pEntryTarget != nullptr)
             {
                 unsigned stageMask =
-                    ShaderModuleHelper::GetStageMaskFromSpirvBinary(pSpirvBin, pShaderInfo->pEntryTarget);
+                    ShaderModuleHelper::getStageMaskFromSpirvBinary(spirvBin, shaderInfo->pEntryTarget);
 
-                if ((stageMask & ShaderStageToMask(shaderStage)) == 0)
+                if ((stageMask & shaderStageToMask(shaderStage)) == 0)
                 {
-                    LLPC_ERRS("Fail to find entry-point " << pShaderInfo->pEntryTarget << " for " <<
-                              GetShaderStageName(shaderStage) << " shader\n");
+                    LLPC_ERRS("Fail to find entry-point " << shaderInfo->pEntryTarget << " for " <<
+                              getShaderStageName(shaderStage) << " shader\n");
                     result = Result::ErrorInvalidShader;
                 }
             }
             else
             {
-                LLPC_ERRS("Missing entry-point name for " << GetShaderStageName(shaderStage) << " shader\n");
+                LLPC_ERRS("Missing entry-point name for " << getShaderStageName(shaderStage) << " shader\n");
                 result = Result::ErrorInvalidShader;
             }
         }
-        else if ((pModuleData->binType == BinaryType::LlvmBc) || (pModuleData->binType == BinaryType::MultiLlvmBc))
+        else if ((moduleData->binType == BinaryType::LlvmBc) || (moduleData->binType == BinaryType::MultiLlvmBc))
         {
             // Do nothing if input is LLVM IR
         }
         else
         {
-            LLPC_ERRS("Invalid shader binary type for " << GetShaderStageName(shaderStage) << " shader\n");
+            LLPC_ERRS("Invalid shader binary type for " << getShaderStageName(shaderStage) << " shader\n");
             result = Result::ErrorInvalidShader;
         }
     }
@@ -1890,45 +1890,45 @@ Result Compiler::CreateShaderCache(
 
 // =====================================================================================================================
 // Acquires a free context from context pool.
-Context* Compiler::AcquireContext() const
+Context* Compiler::acquireContext() const
 {
-    Context* pFreeContext = nullptr;
+    Context* freeContext = nullptr;
 
     std::lock_guard<sys::Mutex> lock(m_contextPoolMutex);
 
     // Try to find a free context from pool first
-    for (auto pContext : *m_pContextPool)
+    for (auto context : *m_contextPool)
     {
-        GfxIpVersion gfxIpVersion = pContext->GetGfxIpVersion();
+        GfxIpVersion gfxIpVersion = context->getGfxIpVersion();
 
-        if ((pContext->IsInUse()   == false) &&
+        if ((context->isInUse()   == false) &&
             (gfxIpVersion.major    == m_gfxIp.major) &&
             (gfxIpVersion.minor    == m_gfxIp.minor) &&
             (gfxIpVersion.stepping == m_gfxIp.stepping))
         {
-            pFreeContext = pContext;
-            pFreeContext->SetInUse(true);
+            freeContext = context;
+            freeContext->setInUse(true);
             break;
         }
     }
 
-    if (pFreeContext == nullptr)
+    if (freeContext == nullptr)
     {
         // Create a new one if we fail to find an available one
-        pFreeContext = new Context(m_gfxIp);
-        pFreeContext->SetInUse(true);
-        m_pContextPool->push_back(pFreeContext);
+        freeContext = new Context(m_gfxIp);
+        freeContext->setInUse(true);
+        m_contextPool->push_back(freeContext);
     }
 
-    assert(pFreeContext != nullptr);
-    return pFreeContext;
+    assert(freeContext != nullptr);
+    return freeContext;
 }
 
 // =====================================================================================================================
 // Run a pass manager's passes on a module, catching any LLVM fatal error and returning a success indication
-bool Compiler::RunPasses(
-    lgc::PassManager* pPassMgr, // [in] Pass manager
-    Module*           pModule   // [in/out] Module
+bool Compiler::runPasses(
+    lgc::PassManager* passMgr, // [in] Pass manager
+    Module*           module   // [in/out] Module
     ) const
 {
     bool success = false;
@@ -1936,7 +1936,7 @@ bool Compiler::RunPasses(
     try
 #endif
     {
-        pPassMgr->run(*pModule);
+        passMgr->run(*module);
         success = true;
     }
 #if LLPC_ENABLE_EXCEPTION
@@ -1950,13 +1950,13 @@ bool Compiler::RunPasses(
 
 // =====================================================================================================================
 // Releases LLPC context.
-void Compiler::ReleaseContext(
-    Context* pContext    // [in] LLPC context
+void Compiler::releaseContext(
+    Context* context    // [in] LLPC context
     ) const
 {
     std::lock_guard<sys::Mutex> lock(m_contextPoolMutex);
-    pContext->Reset();
-    pContext->SetInUse(false);
+    context->reset();
+    context->setInUse(false);
 }
 
 // =====================================================================================================================
@@ -1966,24 +1966,24 @@ void Compiler::ReleaseContext(
 //
 // Upon hit, Ready is returned and pElfBin is filled in. Upon miss, Compiling is returned and ppShaderCache and
 // phEntry are filled in.
-ShaderEntryState Compiler::LookUpShaderCaches(
-    IShaderCache*                    pAppPipelineCache, // [in] App's pipeline cache
-    MetroHash::Hash*                 pCacheHash,        // [in] Hash code of the shader
-    BinaryData*                      pElfBin,           // [out] Pointer to shader data
+ShaderEntryState Compiler::lookUpShaderCaches(
+    IShaderCache*                    appPipelineCache, // [in] App's pipeline cache
+    MetroHash::Hash*                 cacheHash,        // [in] Hash code of the shader
+    BinaryData*                      elfBin,           // [out] Pointer to shader data
     ShaderCache**                    ppShaderCache,     // [out] Shader cache to use
     CacheEntryHandle*                phEntry            // [out] Handle to use
     )
 {
-    ShaderCache* pShaderCache[2];
+    ShaderCache* shaderCache[2];
     unsigned shaderCacheCount = 0;
 
-    pShaderCache[shaderCacheCount++] = m_shaderCache.get();
+    shaderCache[shaderCacheCount++] = m_shaderCache.get();
 
-    if (pAppPipelineCache != nullptr && cl::ShaderCacheMode != ShaderCacheForceInternalCacheOnDisk)
+    if (appPipelineCache != nullptr && cl::ShaderCacheMode != ShaderCacheForceInternalCacheOnDisk)
     {
         // Put the application's cache last so that we prefer adding entries there (only relevant with old
         // client version).
-        pShaderCache[shaderCacheCount++] = static_cast<ShaderCache*>(pAppPipelineCache);
+        shaderCache[shaderCacheCount++] = static_cast<ShaderCache*>(appPipelineCache);
     }
 
     for (unsigned i = 0; i < shaderCacheCount; i++)
@@ -1991,16 +1991,16 @@ ShaderEntryState Compiler::LookUpShaderCaches(
         // Lookup the shader. Allocate on miss when we've reached the last cache.
         bool allocateOnMiss = (i + 1) == shaderCacheCount;
         CacheEntryHandle hCurrentEntry;
-        ShaderEntryState cacheEntryState = pShaderCache[i]->FindShader(*pCacheHash, allocateOnMiss, &hCurrentEntry);
+        ShaderEntryState cacheEntryState = shaderCache[i]->findShader(*cacheHash, allocateOnMiss, &hCurrentEntry);
         if (cacheEntryState == ShaderEntryState::Ready)
         {
-            Result result = pShaderCache[i]->RetrieveShader(hCurrentEntry, &pElfBin->pCode, &pElfBin->codeSize);
+            Result result = shaderCache[i]->retrieveShader(hCurrentEntry, &elfBin->pCode, &elfBin->codeSize);
             if (result == Result::Success)
                 return ShaderEntryState::Ready;
         }
         else if (cacheEntryState == ShaderEntryState::Compiling)
         {
-            *ppShaderCache = pShaderCache[i];
+            *ppShaderCache = shaderCache[i];
             *phEntry = hCurrentEntry;
             return ShaderEntryState::Compiling;
         }
@@ -2015,57 +2015,57 @@ ShaderEntryState Compiler::LookUpShaderCaches(
 
 // =====================================================================================================================
 // Update the shader caches with the given entry handle, based on the "insert" flag.
-void Compiler::UpdateShaderCache(
+void Compiler::updateShaderCache(
     bool                             insert,           // To insert data or reset the shader cache
-    const BinaryData*                pElfBin,          // [in] Pointer to shader data
-    ShaderCache*                     pShaderCache,     // [in] Shader cache to update (may be nullptr for default)
+    const BinaryData*                elfBin,          // [in] Pointer to shader data
+    ShaderCache*                     shaderCache,     // [in] Shader cache to update (may be nullptr for default)
     CacheEntryHandle                 hEntry)           // [in] Handle to update
 {
     if (!hEntry)
         return;
 
-    if (!pShaderCache)
-        pShaderCache = m_shaderCache.get();
+    if (!shaderCache)
+        shaderCache = m_shaderCache.get();
 
     if (insert)
     {
-        assert(pElfBin->codeSize > 0);
-        pShaderCache->InsertShader(hEntry, pElfBin->pCode, pElfBin->codeSize);
+        assert(elfBin->codeSize > 0);
+        shaderCache->insertShader(hEntry, elfBin->pCode, elfBin->codeSize);
     }
     else
     {
-        pShaderCache->ResetShader(hEntry);
+        shaderCache->resetShader(hEntry);
     }
 }
 
 // =====================================================================================================================
 // Builds hash code from input context for per shader stage cache
-void Compiler::BuildShaderCacheHash(
-    Context*                    pContext,           // [in] Acquired context
+void Compiler::buildShaderCacheHash(
+    Context*                    context,           // [in] Acquired context
     unsigned                    stageMask,          // Shader stage mask
     ArrayRef<ArrayRef<uint8_t>> stageHashes,        // Per-stage hash of in/out usage
-    MetroHash::Hash*            pFragmentHash,      // [out] Hash code of fragment shader
-    MetroHash::Hash*            pNonFragmentHash)   // [out] Hash code of all non-fragment shader
+    MetroHash::Hash*            fragmentHash,      // [out] Hash code of fragment shader
+    MetroHash::Hash*            nonFragmentHash)   // [out] Hash code of all non-fragment shader
 {
     MetroHash64 fragmentHasher;
     MetroHash64 nonFragmentHasher;
-    auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
-    auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
+    auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(context->getPipelineBuildInfo());
+    auto pipelineOptions = context->getPipelineContext()->getPipelineOptions();
 
     // Build hash per shader stage
     for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1))
     {
-        if ((stageMask & ShaderStageToMask(stage)) == 0)
+        if ((stageMask & shaderStageToMask(stage)) == 0)
         {
             continue;
         }
 
-        auto pShaderInfo = pContext->GetPipelineShaderInfo(stage);
+        auto shaderInfo = context->getPipelineShaderInfo(stage);
         MetroHash64 hasher;
 
         // Update common shader info
-        PipelineDumper::UpdateHashForPipelineShaderInfo(stage, pShaderInfo, true, &hasher);
-        hasher.Update(pPipelineInfo->iaState.deviceIndex);
+        PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfo, true, &hasher);
+        hasher.Update(pipelineInfo->iaState.deviceIndex);
 
         // Update input/output usage (provided by middle-end caller of this callback).
         hasher.Update(stageHashes[stage].data(), stageHashes[stage].size());
@@ -2073,14 +2073,14 @@ void Compiler::BuildShaderCacheHash(
         // Update vertex input state
         if (stage == ShaderStageVertex)
         {
-            PipelineDumper::UpdateHashForVertexInputState(pPipelineInfo->pVertexInput, &hasher);
+            PipelineDumper::updateHashForVertexInputState(pipelineInfo->pVertexInput, &hasher);
         }
 
         MetroHash::Hash  hash = {};
         hasher.Finalize(hash.bytes);
 
         // Add per stage hash code to fragmentHasher or nonFragmentHaser per shader stage
-        auto shaderHashCode = MetroHash::Compact64(&hash);
+        auto shaderHashCode = MetroHash::compact64(&hash);
         if (stage == ShaderStageFragment)
         {
             fragmentHasher.Update(shaderHashCode);
@@ -2092,87 +2092,87 @@ void Compiler::BuildShaderCacheHash(
     }
 
     // Add addtional pipeline state to final hasher
-    if (stageMask & ShaderStageToMask(ShaderStageFragment))
+    if (stageMask & shaderStageToMask(ShaderStageFragment))
     {
         // Add pipeline options to fragment hash
-        fragmentHasher.Update(pPipelineOptions->includeDisassembly);
-        fragmentHasher.Update(pPipelineOptions->scalarBlockLayout);
-        fragmentHasher.Update(pPipelineOptions->reconfigWorkgroupLayout);
-        fragmentHasher.Update(pPipelineOptions->includeIr);
-        fragmentHasher.Update(pPipelineOptions->robustBufferAccess);
-        PipelineDumper::UpdateHashForFragmentState(pPipelineInfo, &fragmentHasher);
-        fragmentHasher.Finalize(pFragmentHash->bytes);
+        fragmentHasher.Update(pipelineOptions->includeDisassembly);
+        fragmentHasher.Update(pipelineOptions->scalarBlockLayout);
+        fragmentHasher.Update(pipelineOptions->reconfigWorkgroupLayout);
+        fragmentHasher.Update(pipelineOptions->includeIr);
+        fragmentHasher.Update(pipelineOptions->robustBufferAccess);
+        PipelineDumper::updateHashForFragmentState(pipelineInfo, &fragmentHasher);
+        fragmentHasher.Finalize(fragmentHash->bytes);
     }
 
-    if (stageMask & ~ShaderStageToMask(ShaderStageFragment))
+    if (stageMask & ~shaderStageToMask(ShaderStageFragment))
     {
-        PipelineDumper::UpdateHashForNonFragmentState(pPipelineInfo, true, &nonFragmentHasher);
-        nonFragmentHasher.Finalize(pNonFragmentHash->bytes);
+        PipelineDumper::updateHashForNonFragmentState(pipelineInfo, true, &nonFragmentHasher);
+        nonFragmentHasher.Finalize(nonFragmentHash->bytes);
     }
 }
 
 // =====================================================================================================================
 // Link relocatable shader elf file into a pipeline elf file and apply relocations.
-void Compiler::LinkRelocatableShaderElf(
-    ElfPackage* pShaderElfs,   // [in]  An array of pipeline elf packages, indexed by stage, containing relocatable elf
-    ElfPackage* pPipelineElf,  // [out] Elf package containing the pipeline elf
-    Context* pContext)         // [in]  Acquired context
+void Compiler::linkRelocatableShaderElf(
+    ElfPackage* shaderElfs,   // [in]  An array of pipeline elf packages, indexed by stage, containing relocatable elf
+    ElfPackage* pipelineElf,  // [out] Elf package containing the pipeline elf
+    Context* context)         // [in]  Acquired context
 {
-    assert(pShaderElfs[ShaderStageTessControl].empty() && "Cannot link tessellation shaders yet.");
-    assert(pShaderElfs[ShaderStageTessEval].empty() && "Cannot link tessellation shaders yet.");
-    assert(pShaderElfs[ShaderStageGeometry].empty() && "Cannot link geometry shaders yet.");
+    assert(shaderElfs[ShaderStageTessControl].empty() && "Cannot link tessellation shaders yet.");
+    assert(shaderElfs[ShaderStageTessEval].empty() && "Cannot link tessellation shaders yet.");
+    assert(shaderElfs[ShaderStageGeometry].empty() && "Cannot link geometry shaders yet.");
 
     Result result = Result::Success;
     ElfWriter<Elf64> writer(m_gfxIp);
 
-    if (pShaderElfs[ShaderStageCompute].empty())
+    if (shaderElfs[ShaderStageCompute].empty())
     {
         ElfReader<Elf64> vsReader(m_gfxIp);
         ElfReader<Elf64> fsReader(m_gfxIp);
-        if (!pShaderElfs[ShaderStageVertex].empty())
+        if (!shaderElfs[ShaderStageVertex].empty())
         {
-            size_t codeSize = pShaderElfs[ShaderStageVertex].size_in_bytes();
-            result = vsReader.ReadFromBuffer(pShaderElfs[ShaderStageVertex].data(), &codeSize);
+            size_t codeSize = shaderElfs[ShaderStageVertex].size_in_bytes();
+            result = vsReader.ReadFromBuffer(shaderElfs[ShaderStageVertex].data(), &codeSize);
             if (result != Result::Success)
             {
                 return;
             }
         }
 
-        if (!pShaderElfs[ShaderStageFragment].empty())
+        if (!shaderElfs[ShaderStageFragment].empty())
         {
-            size_t codeSize = pShaderElfs[ShaderStageFragment].size_in_bytes();
-            result = fsReader.ReadFromBuffer(pShaderElfs[ShaderStageFragment].data(), &codeSize);
+            size_t codeSize = shaderElfs[ShaderStageFragment].size_in_bytes();
+            result = fsReader.ReadFromBuffer(shaderElfs[ShaderStageFragment].data(), &codeSize);
             if (result != Result::Success)
             {
                 return;
             }
         }
 
-        result = writer.linkGraphicsRelocatableElf({&vsReader, &fsReader}, pContext);
+        result = writer.linkGraphicsRelocatableElf({&vsReader, &fsReader}, context);
     }
     else
     {
         ElfReader<Elf64> csReader(m_gfxIp);
-        size_t codeSize = pShaderElfs[ShaderStageCompute].size_in_bytes();
-        result = csReader.ReadFromBuffer(pShaderElfs[ShaderStageCompute].data(), &codeSize);
+        size_t codeSize = shaderElfs[ShaderStageCompute].size_in_bytes();
+        result = csReader.ReadFromBuffer(shaderElfs[ShaderStageCompute].data(), &codeSize);
         if (result != Result::Success)
         {
             return;
         }
-        result = writer.linkComputeRelocatableElf(csReader, pContext);
+        result = writer.linkComputeRelocatableElf(csReader, context);
     }
 
     if (result != Result::Success)
     {
         return;
     }
-    writer.writeToBuffer(pPipelineElf);
+    writer.writeToBuffer(pipelineElf);
 }
 
 // =====================================================================================================================
 // Convert front-end LLPC shader stage to middle-end LGC shader type
-lgc::ShaderStage GetLgcShaderStage(Llpc::ShaderStage stage)
+lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage)
 {
     switch (stage)
     {

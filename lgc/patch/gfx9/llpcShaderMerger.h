@@ -82,26 +82,26 @@ enum EsGsSpecialSysValue
 class ShaderMerger
 {
 public:
-    ShaderMerger(PipelineState* pPipelineState, PipelineShaders* pPipelineShaders);
+    ShaderMerger(PipelineState* pipelineState, PipelineShaders* pipelineShaders);
 
-    llvm::Function* GenerateLsHsEntryPoint(llvm::Function* pLsEntryPoint, llvm::Function* pHsEntryPoint);
-    llvm::Function* GenerateEsGsEntryPoint(llvm::Function* pEsEntryPoint, llvm::Function* pGsEntryPoint);
-    llvm::Function* BuildPrimShader(llvm::Function* pEsEntryPoint,
-                                    llvm::Function* pGsEntryPoint,
-                                    llvm::Function* pCopyShaderEntryPoint);
+    llvm::Function* generateLsHsEntryPoint(llvm::Function* lsEntryPoint, llvm::Function* hsEntryPoint);
+    llvm::Function* generateEsGsEntryPoint(llvm::Function* esEntryPoint, llvm::Function* gsEntryPoint);
+    llvm::Function* buildPrimShader(llvm::Function* esEntryPoint,
+                                    llvm::Function* gsEntryPoint,
+                                    llvm::Function* copyShaderEntryPoint);
 
 private:
     ShaderMerger() = delete;
     ShaderMerger(const ShaderMerger&) = delete;
     ShaderMerger& operator=(const ShaderMerger&) = delete;
 
-    llvm::FunctionType* GenerateLsHsEntryPointType(uint64_t* pInRegMask) const;
-    llvm::FunctionType* GenerateEsGsEntryPointType(uint64_t* pInRegMask) const;
+    llvm::FunctionType* generateLsHsEntryPointType(uint64_t* inRegMask) const;
+    llvm::FunctionType* generateEsGsEntryPointType(uint64_t* inRegMask) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    PipelineState*    m_pPipelineState;     // Pipeline state
-    llvm::LLVMContext*m_pContext;           // LLVM context
+    PipelineState*    m_pipelineState;     // Pipeline state
+    llvm::LLVMContext*m_context;           // LLVM context
     GfxIpVersion      m_gfxIp;              // Graphics IP version info
 
     NggPrimShader     m_primShader; // Manager of NGG primitive shader

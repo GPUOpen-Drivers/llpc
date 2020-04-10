@@ -41,40 +41,40 @@ class ComputeContext: public PipelineContext
 {
 public:
     ComputeContext(GfxIpVersion                    gfxIp,
-                   const ComputePipelineBuildInfo* pPipelineInfo,
-                   MetroHash::Hash*                pPipelineHash,
-                   MetroHash::Hash*                pCacheHash);
+                   const ComputePipelineBuildInfo* pipelineInfo,
+                   MetroHash::Hash*                pipelineHash,
+                   MetroHash::Hash*                cacheHash);
     virtual ~ComputeContext() {}
 
-    virtual const PipelineShaderInfo* GetPipelineShaderInfo(ShaderStage shaderStage) const;
+    virtual const PipelineShaderInfo* getPipelineShaderInfo(ShaderStage shaderStage) const;
 
     // Checks whether the pipeline is graphics or compute
-    virtual bool IsGraphics() const { return false; }
+    virtual bool isGraphics() const { return false; }
 
     // Gets pipeline build info
-    virtual const void* GetPipelineBuildInfo() const { return m_pPipelineInfo; }
+    virtual const void* getPipelineBuildInfo() const { return m_pipelineInfo; }
 
     // Gets the mask of active shader stages bound to this pipeline
-    virtual unsigned GetShaderStageMask() const { return ShaderStageToMask(ShaderStageCompute); }
+    virtual unsigned getShaderStageMask() const { return shaderStageToMask(ShaderStageCompute); }
 
     // Sets the mask of active shader stages bound to this pipeline
-    void SetShaderStageMask(unsigned mask) { assert(mask == GetShaderStageMask()); }
+    void setShaderStageMask(unsigned mask) { assert(mask == getShaderStageMask()); }
 
     // Gets the count of active shader stages
-    virtual unsigned GetActiveShaderStageCount() const { return 1; }
+    virtual unsigned getActiveShaderStageCount() const { return 1; }
 
     // Does user data node merging for all shader stages
-    virtual void DoUserDataNodeMerge() { }
+    virtual void doUserDataNodeMerge() { }
 
     // Gets per pipeline options
-    virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
+    virtual const PipelineOptions* getPipelineOptions() const { return &m_pipelineInfo->options; }
 
 private:
     ComputeContext() = delete;
     ComputeContext(const ComputeContext&) = delete;
     ComputeContext& operator=(const ComputeContext&) = delete;
 
-    const ComputePipelineBuildInfo*     m_pPipelineInfo; // Info to build a compute pipeline
+    const ComputePipelineBuildInfo*     m_pipelineInfo; // Info to build a compute pipeline
 };
 
 } // Llpc

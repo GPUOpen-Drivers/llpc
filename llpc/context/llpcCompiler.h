@@ -55,7 +55,7 @@ namespace Llpc
 {
 
 using Vkgc::ElfPackage;
-using Vkgc::FindVkStructInChain;
+using Vkgc::findVkStructInChain;
 
 // Forward declaration
 class Compiler;
@@ -68,34 +68,34 @@ class GraphicsContext;
 class GraphicsShaderCacheChecker
 {
 public:
-    GraphicsShaderCacheChecker(Compiler* pCompiler, Context* pContext) :
-        m_pCompiler(pCompiler), m_pContext(pContext)
+    GraphicsShaderCacheChecker(Compiler* compiler, Context* context) :
+        m_compiler(compiler), m_context(context)
     {}
 
     // Check shader caches, returning mask of which shader stages we want to keep in this compile.
-    unsigned Check(const llvm::Module*                     pModule,
+    unsigned check(const llvm::Module*                     module,
                    unsigned                                stageMask,
                    llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes);
 
     // Get cache results.
-    ShaderEntryState GetNonFragmentCacheEntryState() { return m_nonFragmentCacheEntryState; }
-    ShaderEntryState GetFragmentCacheEntryState() { return m_fragmentCacheEntryState; }
+    ShaderEntryState getNonFragmentCacheEntryState() { return m_nonFragmentCacheEntryState; }
+    ShaderEntryState getFragmentCacheEntryState() { return m_fragmentCacheEntryState; }
 
     // Update shader caches with results of compile, and merge ELF outputs if necessary.
-    void UpdateAndMerge(Result result, ElfPackage* pPipelineElf);
-    void UpdateRootUserDateOffset(ElfPackage* pPipelineElf);
+    void updateAndMerge(Result result, ElfPackage* pipelineElf);
+    void updateRootUserDateOffset(ElfPackage* pipelineElf);
 
 private:
-    Compiler* m_pCompiler;
-    Context*  m_pContext;
+    Compiler* m_compiler;
+    Context*  m_context;
 
     ShaderEntryState m_nonFragmentCacheEntryState = ShaderEntryState::New;
-    ShaderCache* m_pNonFragmentShaderCache = nullptr;
+    ShaderCache* m_nonFragmentShaderCache = nullptr;
     CacheEntryHandle m_hNonFragmentEntry = {};
     BinaryData m_nonFragmentElf = {};
 
     ShaderEntryState m_fragmentCacheEntryState = ShaderEntryState::New;
-    ShaderCache* m_pFragmentShaderCache = nullptr;
+    ShaderCache* m_fragmentShaderCache = nullptr;
     CacheEntryHandle m_hFragmentEntry = {};
     BinaryData m_fragmentElf = {};
 };
@@ -105,90 +105,90 @@ private:
 class Compiler: public ICompiler
 {
 public:
-    Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char*const* pOptions, MetroHash::Hash optionHash);
+    Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char*const* options, MetroHash::Hash optionHash);
     ~Compiler();
 
     virtual void VKAPI_CALL Destroy();
 
-    virtual Result BuildShaderModule(const ShaderModuleBuildInfo* pShaderInfo,
-                                     ShaderModuleBuildOut*        pShaderOut) const;
+    virtual Result BuildShaderModule(const ShaderModuleBuildInfo* shaderInfo,
+                                     ShaderModuleBuildOut*        shaderOut) const;
 
-    virtual unsigned ConvertColorBufferFormatToExportFormat(const ColorTarget*  pTarget,
+    virtual unsigned ConvertColorBufferFormatToExportFormat(const ColorTarget*  target,
                                                             const bool          enableAlphaToCoverage) const;
 
-    virtual Result BuildGraphicsPipeline(const GraphicsPipelineBuildInfo* pPipelineInfo,
-                                         GraphicsPipelineBuildOut*        pPipelineOut,
-                                         void*                            pPipelineDumpFile = nullptr);
+    virtual Result BuildGraphicsPipeline(const GraphicsPipelineBuildInfo* pipelineInfo,
+                                         GraphicsPipelineBuildOut*        pipelineOut,
+                                         void*                            pipelineDumpFile = nullptr);
 
-    virtual Result BuildComputePipeline(const ComputePipelineBuildInfo* pPipelineInfo,
-                                        ComputePipelineBuildOut*        pPipelineOut,
-                                        void*                           pPipelineDumpFile = nullptr);
-    Result BuildGraphicsPipelineInternal(GraphicsContext*                          pGraphicsContext,
+    virtual Result BuildComputePipeline(const ComputePipelineBuildInfo* pipelineInfo,
+                                        ComputePipelineBuildOut*        pipelineOut,
+                                        void*                           pipelineDumpFile = nullptr);
+    Result buildGraphicsPipelineInternal(GraphicsContext*                          graphicsContext,
                                          llvm::ArrayRef<const PipelineShaderInfo*> shaderInfo,
                                          unsigned                                  forceLoopUnrollCount,
                                          bool                                      buildingRelocatableElf,
-                                         ElfPackage*                               pPipelineElf);
+                                         ElfPackage*                               pipelineElf);
 
-    Result BuildComputePipelineInternal(ComputeContext*                 pComputeContext,
-                                        const ComputePipelineBuildInfo* pPipelineInfo,
+    Result buildComputePipelineInternal(ComputeContext*                 computeContext,
+                                        const ComputePipelineBuildInfo* pipelineInfo,
                                         unsigned                        forceLoopUnrollCount,
                                         bool                            buildingRelocatableElf,
-                                        ElfPackage*                     pPipelineElf);
+                                        ElfPackage*                     pipelineElf);
 
-    Result BuildPipelineWithRelocatableElf(Context*                                   pContext,
+    Result buildPipelineWithRelocatableElf(Context*                                   context,
                                            llvm::ArrayRef<const PipelineShaderInfo*>  shaderInfo,
                                            unsigned                                   forceLoopUnrollCount,
-                                           ElfPackage*                                pPipelineElf);
+                                           ElfPackage*                                pipelineElf);
 
-    Result BuildPipelineInternal(Context*                                   pContext,
+    Result buildPipelineInternal(Context*                                   context,
                                  llvm::ArrayRef<const PipelineShaderInfo*>  shaderInfo,
                                  unsigned                                   forceLoopUnrollCount,
-                                 ElfPackage*                                pPipelineElf);
+                                 ElfPackage*                                pipelineElf);
 
     // Gets the count of compiler instance.
-    static unsigned GetInstanceCount() { return m_instanceCount; }
+    static unsigned getInstanceCount() { return m_instanceCount; }
 
     // Gets the count of redirect output
-    static unsigned GetOutRedirectCount() { return m_outRedirectCount; }
+    static unsigned getOutRedirectCount() { return m_outRedirectCount; }
 
-    static MetroHash::Hash GenerateHashForCompileOptions(unsigned          optionCount,
-                                                         const char*const* pOptions);
+    static MetroHash::Hash generateHashForCompileOptions(unsigned          optionCount,
+                                                         const char*const* options);
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     virtual Result CreateShaderCache(const ShaderCacheCreateInfo* pCreateInfo, IShaderCache** ppShaderCache);
 #endif
 
-    ShaderEntryState LookUpShaderCaches(IShaderCache*       pAppPipelineCache,
-                                        MetroHash::Hash*    pCacheHash,
-                                        BinaryData*         pElfBin,
+    ShaderEntryState lookUpShaderCaches(IShaderCache*       appPipelineCache,
+                                        MetroHash::Hash*    cacheHash,
+                                        BinaryData*         elfBin,
                                         ShaderCache**       ppShaderCache,
                                         CacheEntryHandle*   phEntry);
 
-    void UpdateShaderCache(bool                insert,
-                           const BinaryData*   pElfBin,
-                           ShaderCache*        pShaderCache,
+    void updateShaderCache(bool                insert,
+                           const BinaryData*   elfBin,
+                           ShaderCache*        shaderCache,
                            CacheEntryHandle    phEntry);
 
-    static void BuildShaderCacheHash(Context*                                 pContext,
+    static void buildShaderCacheHash(Context*                                 context,
                                      unsigned                                 stageMask,
                                      llvm::ArrayRef<llvm::ArrayRef<uint8_t>>  stageHashes,
-                                     MetroHash::Hash*                         pFragmentHash,
-                                     MetroHash::Hash*                         pNonFragmentHash);
+                                     MetroHash::Hash*                         fragmentHash,
+                                     MetroHash::Hash*                         nonFragmentHash);
 
 private:
     Compiler() = delete;
     Compiler(const Compiler&) = delete;
     Compiler& operator=(const Compiler&) = delete;
 
-    Result ValidatePipelineShaderInfo(const PipelineShaderInfo* pShaderInfo) const;
+    Result validatePipelineShaderInfo(const PipelineShaderInfo* shaderInfo) const;
 
-    Context* AcquireContext() const;
-    void ReleaseContext(Context* pContext) const;
+    Context* acquireContext() const;
+    void releaseContext(Context* context) const;
 
-    bool RunPasses(lgc::PassManager* pPassMgr, llvm::Module* pModule) const;
-    void LinkRelocatableShaderElf(ElfPackage *pShaderElfs, ElfPackage* pPipelineElf, Context* pContext);
-    bool CanUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo*>& shaderInfo) const;
-    bool CanUseRelocatableComputeShaderElf(const PipelineShaderInfo* pShaderInfo) const;
+    bool runPasses(lgc::PassManager* passMgr, llvm::Module* module) const;
+    void linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage* pipelineElf, Context* context);
+    bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo*>& shaderInfo) const;
+    bool canUseRelocatableComputeShaderElf(const PipelineShaderInfo* shaderInfo) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -199,10 +199,10 @@ private:
     static unsigned               m_outRedirectCount; // The count of output redirect
     ShaderCachePtr                m_shaderCache;      // Shader cache
     static llvm::sys::Mutex       m_contextPoolMutex; // Mutex for context pool access
-    static std::vector<Context*>* m_pContextPool;      // Context pool
+    static std::vector<Context*>* m_contextPool;      // Context pool
 };
 
 // Convert front-end LLPC shader stage to middle-end LGC shader stage
-lgc::ShaderStage GetLgcShaderStage(ShaderStage stage);
+lgc::ShaderStage getLgcShaderStage(ShaderStage stage);
 
 } // Llpc

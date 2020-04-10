@@ -70,7 +70,7 @@ char PatchEntryPointMutate::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching opertions for entry-point mutation
-ModulePass* CreatePatchEntryPointMutate()
+ModulePass* createPatchEntryPointMutate()
 {
     return new PatchEntryPointMutate();
 }
@@ -91,24 +91,24 @@ bool PatchEntryPointMutate::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Entry-Point-Mutate\n");
 
-    Patch::Init(&module);
+    Patch::init(&module);
 
-    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
-    const unsigned stageMask = m_pPipelineState->GetShaderStageMask();
-    m_hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
-                             ShaderStageToMask(ShaderStageTessEval))) != 0);
-    m_hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+    const unsigned stageMask = m_pipelineState->getShaderStageMask();
+    m_hasTs = ((stageMask & (shaderStageToMask(ShaderStageTessControl) |
+                             shaderStageToMask(ShaderStageTessEval))) != 0);
+    m_hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
 
     // Process each shader in turn, but not the copy shader.
-    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    auto pipelineShaders = &getAnalysis<PipelineShaders>();
     for (unsigned shaderStage = ShaderStageVertex; shaderStage < ShaderStageNativeStageCount; ++shaderStage)
     {
-        m_pEntryPoint = pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
-        if (m_pEntryPoint != nullptr)
+        m_entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
+        if (m_entryPoint != nullptr)
         {
             m_shaderStage = static_cast<ShaderStage>(shaderStage);
-            ProcessShader();
+            processShader();
         }
     }
 
@@ -117,91 +117,91 @@ bool PatchEntryPointMutate::runOnModule(
 
 // =====================================================================================================================
 // Process a single shader
-void PatchEntryPointMutate::ProcessShader()
+void PatchEntryPointMutate::processShader()
 {
     // Create new entry-point from the original one (mutate it)
     // TODO: We should mutate entry-point arguments instead of clone a new entry-point.
     uint64_t inRegMask = 0;
-    FunctionType* pEntryPointTy = GenerateEntryPointType(&inRegMask);
+    FunctionType* entryPointTy = generateEntryPointType(&inRegMask);
 
-    Function* pOrigEntryPoint = m_pEntryPoint;
+    Function* origEntryPoint = m_entryPoint;
 
-    Function* pEntryPoint = Function::Create(pEntryPointTy,
+    Function* entryPoint = Function::Create(entryPointTy,
                                              GlobalValue::ExternalLinkage,
                                              "",
-                                             m_pModule);
-    pEntryPoint->setCallingConv(pOrigEntryPoint->getCallingConv());
-    pEntryPoint->addFnAttr(Attribute::NoUnwind);
-    pEntryPoint->takeName(pOrigEntryPoint);
+                                             m_module);
+    entryPoint->setCallingConv(origEntryPoint->getCallingConv());
+    entryPoint->addFnAttr(Attribute::NoUnwind);
+    entryPoint->takeName(origEntryPoint);
 
     ValueToValueMapTy valueMap;
     SmallVector<ReturnInst*, 8> retInsts;
-    CloneFunctionInto(pEntryPoint, pOrigEntryPoint, valueMap, false, retInsts);
+    CloneFunctionInto(entryPoint, origEntryPoint, valueMap, false, retInsts);
 
     // Set Attributes on cloned function here as some are overwritten during CloneFunctionInto otherwise
     AttrBuilder builder;
     if (m_shaderStage == ShaderStageFragment)
     {
-        auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+        auto& builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
         SpiPsInputAddr spiPsInputAddr = {};
 
-        spiPsInputAddr.bits.PERSP_SAMPLE_ENA     = ((builtInUsage.smooth && builtInUsage.sample) ||
+        spiPsInputAddr.bits.perspSampleEna     = ((builtInUsage.smooth && builtInUsage.sample) ||
                                                     builtInUsage.baryCoordSmoothSample);
-        spiPsInputAddr.bits.PERSP_CENTER_ENA     = ((builtInUsage.smooth && builtInUsage.center) ||
+        spiPsInputAddr.bits.perspCenterEna     = ((builtInUsage.smooth && builtInUsage.center) ||
                                                     builtInUsage.baryCoordSmooth);
-        spiPsInputAddr.bits.PERSP_CENTROID_ENA   = ((builtInUsage.smooth && builtInUsage.centroid) ||
+        spiPsInputAddr.bits.perspCentroidEna   = ((builtInUsage.smooth && builtInUsage.centroid) ||
                                                     builtInUsage.baryCoordSmoothCentroid);
-        spiPsInputAddr.bits.PERSP_PULL_MODEL_ENA = ((builtInUsage.smooth && builtInUsage.pullMode) ||
+        spiPsInputAddr.bits.perspPullModelEna = ((builtInUsage.smooth && builtInUsage.pullMode) ||
                                                     builtInUsage.baryCoordPullModel);
-        spiPsInputAddr.bits.LINEAR_SAMPLE_ENA    = ((builtInUsage.noperspective && builtInUsage.sample) ||
+        spiPsInputAddr.bits.linearSampleEna    = ((builtInUsage.noperspective && builtInUsage.sample) ||
                                                     builtInUsage.baryCoordNoPerspSample);
-        spiPsInputAddr.bits.LINEAR_CENTER_ENA    = ((builtInUsage.noperspective && builtInUsage.center) ||
+        spiPsInputAddr.bits.linearCenterEna    = ((builtInUsage.noperspective && builtInUsage.center) ||
                                                     builtInUsage.baryCoordNoPersp);
-        spiPsInputAddr.bits.LINEAR_CENTROID_ENA  = ((builtInUsage.noperspective && builtInUsage.centroid) ||
+        spiPsInputAddr.bits.linearCentroidEna  = ((builtInUsage.noperspective && builtInUsage.centroid) ||
                                                     builtInUsage.baryCoordNoPerspCentroid);
-        spiPsInputAddr.bits.POS_X_FLOAT_ENA      = builtInUsage.fragCoord;
-        spiPsInputAddr.bits.POS_Y_FLOAT_ENA      = builtInUsage.fragCoord;
-        spiPsInputAddr.bits.POS_Z_FLOAT_ENA      = builtInUsage.fragCoord;
-        spiPsInputAddr.bits.POS_W_FLOAT_ENA      = builtInUsage.fragCoord;
-        spiPsInputAddr.bits.FRONT_FACE_ENA       = builtInUsage.frontFacing;
-        spiPsInputAddr.bits.ANCILLARY_ENA        = builtInUsage.sampleId;
-        spiPsInputAddr.bits.SAMPLE_COVERAGE_ENA  = builtInUsage.sampleMaskIn;
+        spiPsInputAddr.bits.posXFloatEna      = builtInUsage.fragCoord;
+        spiPsInputAddr.bits.posYFloatEna      = builtInUsage.fragCoord;
+        spiPsInputAddr.bits.posZFloatEna      = builtInUsage.fragCoord;
+        spiPsInputAddr.bits.posWFloatEna      = builtInUsage.fragCoord;
+        spiPsInputAddr.bits.frontFaceEna       = builtInUsage.frontFacing;
+        spiPsInputAddr.bits.ancillaryEna        = builtInUsage.sampleId;
+        spiPsInputAddr.bits.sampleCoverageEna  = builtInUsage.sampleMaskIn;
 
         builder.addAttribute("InitialPSInputAddr", std::to_string(spiPsInputAddr.u32All));
     }
 
     // Set VGPR, SGPR, and wave limits
-    auto pShaderOptions = &m_pPipelineState->GetShaderOptions(m_shaderStage);
-    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
+    auto shaderOptions = &m_pipelineState->getShaderOptions(m_shaderStage);
+    auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
-    unsigned vgprLimit = pShaderOptions->vgprLimit;
-    unsigned sgprLimit = pShaderOptions->sgprLimit;
+    unsigned vgprLimit = shaderOptions->vgprLimit;
+    unsigned sgprLimit = shaderOptions->sgprLimit;
 
     if (vgprLimit != 0)
     {
         builder.addAttribute("amdgpu-num-vgpr", std::to_string(vgprLimit));
-        pResUsage->numVgprsAvailable = std::min(vgprLimit, pResUsage->numVgprsAvailable);
+        resUsage->numVgprsAvailable = std::min(vgprLimit, resUsage->numVgprsAvailable);
     }
-    pResUsage->numVgprsAvailable = std::min(pResUsage->numVgprsAvailable,
-                                           m_pPipelineState->GetTargetInfo().GetGpuProperty().maxVgprsAvailable);
+    resUsage->numVgprsAvailable = std::min(resUsage->numVgprsAvailable,
+                                           m_pipelineState->getTargetInfo().getGpuProperty().maxVgprsAvailable);
 
     if (sgprLimit != 0)
     {
         builder.addAttribute("amdgpu-num-sgpr", std::to_string(sgprLimit));
-        pResUsage->numSgprsAvailable = std::min(sgprLimit, pResUsage->numSgprsAvailable);
+        resUsage->numSgprsAvailable = std::min(sgprLimit, resUsage->numSgprsAvailable);
     }
-    pResUsage->numSgprsAvailable = std::min(pResUsage->numSgprsAvailable,
-                                            m_pPipelineState->GetTargetInfo().GetGpuProperty().maxSgprsAvailable);
+    resUsage->numSgprsAvailable = std::min(resUsage->numSgprsAvailable,
+                                            m_pipelineState->getTargetInfo().getGpuProperty().maxSgprsAvailable);
 
-    if (pShaderOptions->maxThreadGroupsPerComputeUnit != 0)
+    if (shaderOptions->maxThreadGroupsPerComputeUnit != 0)
     {
-        std::string wavesPerEu = std::string("0,") + std::to_string(pShaderOptions->maxThreadGroupsPerComputeUnit);
+        std::string wavesPerEu = std::string("0,") + std::to_string(shaderOptions->maxThreadGroupsPerComputeUnit);
         builder.addAttribute("amdgpu-waves-per-eu", wavesPerEu);
     }
 
-    if (pShaderOptions->unrollThreshold != 0)
+    if (shaderOptions->unrollThreshold != 0)
     {
-        builder.addAttribute("amdgpu-unroll-threshold", std::to_string(pShaderOptions->unrollThreshold));
+        builder.addAttribute("amdgpu-unroll-threshold", std::to_string(shaderOptions->unrollThreshold));
     }
     else
     {
@@ -210,52 +210,52 @@ void PatchEntryPointMutate::ProcessShader()
     }
 
     AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
-    pEntryPoint->addAttributes(attribIdx, builder);
+    entryPoint->addAttributes(attribIdx, builder);
 
     // NOTE: Remove "readnone" attribute for entry-point. If GS is emtry, this attribute will allow
     // LLVM optimization to remove sendmsg(GS_DONE). It is unexpected.
-    if (pEntryPoint->hasFnAttribute(Attribute::ReadNone))
+    if (entryPoint->hasFnAttribute(Attribute::ReadNone))
     {
-        pEntryPoint->removeFnAttr(Attribute::ReadNone);
+        entryPoint->removeFnAttr(Attribute::ReadNone);
     }
 
     // Update attributes of new entry-point
-    for (auto pArg = pEntryPoint->arg_begin(), pEnd = pEntryPoint->arg_end(); pArg != pEnd; ++pArg)
+    for (auto arg = entryPoint->arg_begin(), end = entryPoint->arg_end(); arg != end; ++arg)
     {
-        auto argIdx = pArg->getArgNo();
+        auto argIdx = arg->getArgNo();
         if (inRegMask & (1ull << argIdx))
         {
-            pArg->addAttr(Attribute::InReg);
+            arg->addAttr(Attribute::InReg);
         }
     }
 
     // Remove original entry-point
-    pOrigEntryPoint->dropAllReferences();
-    pOrigEntryPoint->eraseFromParent();
+    origEntryPoint->dropAllReferences();
+    origEntryPoint->eraseFromParent();
 }
 
 // =====================================================================================================================
 // Checks whether the specified resource mapping node is active.
-bool PatchEntryPointMutate::IsResourceNodeActive(
-    const ResourceNode* pNode,               // [in] Resource mapping node
+bool PatchEntryPointMutate::isResourceNodeActive(
+    const ResourceNode* node,               // [in] Resource mapping node
     bool isRootNode                          // TRUE if node is in root level
     ) const
 {
     bool active = false;
 
-    const ResourceUsage* pResUsage1 = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
-    const ResourceUsage* pResUsage2 = nullptr;
+    const ResourceUsage* resUsage1 = m_pipelineState->getShaderResourceUsage(m_shaderStage);
+    const ResourceUsage* resUsage2 = nullptr;
 
-    const auto gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
+    const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
     if (gfxIp.major >= 9)
     {
         // NOTE: For LS-HS/ES-GS merged shader, resource mapping nodes of the two shader stages are merged as a whole.
         // So we have to check activeness of both shader stages at the same time. Here, we determine the second shader
        // stage and get its resource usage accordingly.
-        unsigned stageMask = m_pPipelineState->GetShaderStageMask();
-        const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
-                                            ShaderStageToMask(ShaderStageTessEval))) != 0);
-        const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+        unsigned stageMask = m_pipelineState->getShaderStageMask();
+        const bool hasTs = ((stageMask & (shaderStageToMask(ShaderStageTessControl) |
+                                            shaderStageToMask(ShaderStageTessEval))) != 0);
+        const bool hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
 
         if (hasTs || hasGs)
         {
@@ -282,53 +282,53 @@ bool PatchEntryPointMutate::IsResourceNodeActive(
 
             if (shaderStage2 != ShaderStageInvalid)
             {
-                pResUsage2 = m_pPipelineState->GetShaderResourceUsage(shaderStage2);
+                resUsage2 = m_pipelineState->getShaderResourceUsage(shaderStage2);
             }
         }
     }
 
-    if ((pNode->type == ResourceNodeType::PushConst) && isRootNode)
+    if ((node->type == ResourceNodeType::PushConst) && isRootNode)
     {
-        active = (pResUsage1->pushConstSizeInBytes > 0);
-        if ((active == false) && (pResUsage2 != nullptr))
+        active = (resUsage1->pushConstSizeInBytes > 0);
+        if ((active == false) && (resUsage2 != nullptr))
         {
-            active = (pResUsage2->pushConstSizeInBytes > 0);
+            active = (resUsage2->pushConstSizeInBytes > 0);
         }
     }
-    else if (pNode->type == ResourceNodeType::DescriptorTableVaPtr)
+    else if (node->type == ResourceNodeType::DescriptorTableVaPtr)
     {
         // Check if any contained descriptor node is active
-        for (unsigned i = 0; i < pNode->innerTable.size(); ++i)
+        for (unsigned i = 0; i < node->innerTable.size(); ++i)
         {
-            if (IsResourceNodeActive(&pNode->innerTable[i], false))
+            if (isResourceNodeActive(&node->innerTable[i], false))
             {
                 active = true;
                 break;
             }
         }
     }
-    else if (pNode->type == ResourceNodeType::IndirectUserDataVaPtr)
+    else if (node->type == ResourceNodeType::IndirectUserDataVaPtr)
     {
         // NOTE: We assume indirect user data is always active.
         active = true;
     }
-    else if (pNode->type == ResourceNodeType::StreamOutTableVaPtr)
+    else if (node->type == ResourceNodeType::StreamOutTableVaPtr)
     {
         active = true;
     }
     else
     {
-        assert((pNode->type != ResourceNodeType::DescriptorTableVaPtr) &&
-                    (pNode->type != ResourceNodeType::IndirectUserDataVaPtr));
+        assert((node->type != ResourceNodeType::DescriptorTableVaPtr) &&
+                    (node->type != ResourceNodeType::IndirectUserDataVaPtr));
 
         DescriptorPair descPair = {};
-        descPair.descSet = pNode->set;
-        descPair.binding = pNode->binding;
+        descPair.descSet = node->set;
+        descPair.binding = node->binding;
 
-        active = (pResUsage1->descPairs.find(descPair.u64All) != pResUsage1->descPairs.end());
-        if ((active == false) && (pResUsage2 != nullptr))
+        active = (resUsage1->descPairs.find(descPair.u64All) != resUsage1->descPairs.end());
+        if ((active == false) && (resUsage2 != nullptr))
         {
-            active = (pResUsage2->descPairs.find(descPair.u64All) != pResUsage2->descPairs.end());
+            active = (resUsage2->descPairs.find(descPair.u64All) != resUsage2->descPairs.end());
         }
     }
 
@@ -337,36 +337,36 @@ bool PatchEntryPointMutate::IsResourceNodeActive(
 
 // =====================================================================================================================
 // Generates the type for the new entry-point based on already-collected info in LLVM context.
-FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
-    uint64_t* pInRegMask  // [out] "Inreg" bit mask for the arguments
+FunctionType* PatchEntryPointMutate::generateEntryPointType(
+    uint64_t* inRegMask  // [out] "Inreg" bit mask for the arguments
     ) const
 {
     unsigned userDataIdx = 0;
     std::vector<Type*> argTys;
 
-    auto userDataNodes = m_pPipelineState->GetUserDataNodes();
-    auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
-    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
+    auto userDataNodes = m_pipelineState->getUserDataNodes();
+    auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+    auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
     // Global internal table
-    *pInRegMask |= 1ull << argTys.size();
-    argTys.push_back(Type::getInt32Ty(*m_pContext));
+    *inRegMask |= 1ull << argTys.size();
+    argTys.push_back(Type::getInt32Ty(*m_context));
     ++userDataIdx;
 
     // TODO: We need add per shader table per real usage after switch to PAL new interface.
     //if (pResUsage->perShaderTable)
     {
-        *pInRegMask |= 1ull << argTys.size();
-        argTys.push_back(Type::getInt32Ty(*m_pContext));
+        *inRegMask |= 1ull << argTys.size();
+        argTys.push_back(Type::getInt32Ty(*m_context));
         ++userDataIdx;
     }
 
-    auto& builtInUsage = pResUsage->builtInUsage;
-    auto& entryArgIdxs = pIntfData->entryArgIdxs;
+    auto& builtInUsage = resUsage->builtInUsage;
+    auto& entryArgIdxs = intfData->entryArgIdxs;
     entryArgIdxs.initialized = true;
 
     // Estimated available user data count
-    unsigned maxUserDataCount = m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount;
+    unsigned maxUserDataCount = m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
     unsigned availUserDataCount = maxUserDataCount - userDataIdx;
     unsigned requiredRemappedUserDataCount = 0; // Maximum required user data
     unsigned requiredUserDataCount = 0;         // Maximum required user data without remapping
@@ -380,17 +380,17 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     {
         for (unsigned i = 0; i < userDataNodes.size(); ++i)
         {
-            auto pNode = &userDataNodes[i];
+            auto node = &userDataNodes[i];
              // NOTE: Per PAL request, the value of IndirectTableEntry is the node offset + 1.
              // and indirect user data should not be counted in possible spilled user data.
-            if (pNode->type == ResourceNodeType::IndirectUserDataVaPtr)
+            if (node->type == ResourceNodeType::IndirectUserDataVaPtr)
             {
                 // Only the vertex shader needs a vertex buffer table.
                 if (m_shaderStage == ShaderStageVertex)
                 {
                     reserveVbTable = true;
                 }
-                else if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 9)
+                else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9)
                 {
                     // On GFX9+, the shader stage that the vertex shader is merged in to needs a vertex buffer
                     // table, to ensure that the merged shader gets one.
@@ -403,16 +403,16 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 continue;
             }
 
-            if (pNode->type == ResourceNodeType::StreamOutTableVaPtr)
+            if (node->type == ResourceNodeType::StreamOutTableVaPtr)
             {
                 // Only the last shader stage before fragment (ignoring copy shader) needs a stream out table.
-                if ((m_pPipelineState->GetShaderStageMask() &
-                     (ShaderStageToMask(ShaderStageFragment) - ShaderStageToMask(m_shaderStage))) ==
-                    ShaderStageToMask(m_shaderStage))
+                if ((m_pipelineState->getShaderStageMask() &
+                     (shaderStageToMask(ShaderStageFragment) - shaderStageToMask(m_shaderStage))) ==
+                    shaderStageToMask(m_shaderStage))
                 {
                     reserveStreamOutTable = true;
                 }
-                else if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 9)
+                else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9)
                 {
                     // On GFX9+, the shader stage that the last shader is merged in to needs a stream out
                     // table, to ensure that the merged shader gets one.
@@ -425,12 +425,12 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 continue;
             }
 
-            if (IsResourceNodeActive(pNode, true) == false)
+            if (isResourceNodeActive(node, true) == false)
             {
                 continue;
             }
 
-            switch (pNode->type)
+            switch (node->type)
             {
             case ResourceNodeType::DescriptorBuffer:
             case ResourceNodeType::DescriptorResource:
@@ -442,20 +442,20 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 needSpill = true;
                 break;
             case ResourceNodeType::PushConst:
-                pIntfData->pushConst.resNodeIdx = i;
+                intfData->pushConst.resNodeIdx = i;
                 break;
             default:
                 break;
             }
 
-            requiredUserDataCount = std::max(requiredUserDataCount, pNode->offsetInDwords + pNode->sizeInDwords);
-            requiredRemappedUserDataCount += pNode->sizeInDwords;
+            requiredUserDataCount = std::max(requiredUserDataCount, node->offsetInDwords + node->sizeInDwords);
+            requiredRemappedUserDataCount += node->sizeInDwords;
         }
     }
 
-    auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
+    auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
 
-    const bool enableNgg = m_pPipelineState->IsGraphics() ? m_pPipelineState->GetNggControl()->enableNgg : false;
+    const bool enableNgg = m_pipelineState->isGraphics() ? m_pipelineState->getNggControl()->enableNgg : false;
 
     switch (m_shaderStage)
     {
@@ -481,28 +481,28 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
             // NOTE: On GFX9+, Vertex shader (LS) and tessellation control shader (HS) are merged into a single shader.
             // The user data count of tessellation control shader should be same as vertex shader.
-            auto pCurrResUsage = pResUsage;
-            if ((m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 9) &&
+            auto currResUsage = resUsage;
+            if ((m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) &&
                 (m_shaderStage == ShaderStageTessControl) &&
-                (m_pPipelineState->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)))
+                (m_pipelineState->getShaderStageMask() & shaderStageToMask(ShaderStageVertex)))
             {
-                pCurrResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageVertex);
+                currResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
             }
 
-            if (pCurrResUsage->builtInUsage.vs.baseVertex || pCurrResUsage->builtInUsage.vs.baseInstance)
+            if (currResUsage->builtInUsage.vs.baseVertex || currResUsage->builtInUsage.vs.baseInstance)
             {
                 availUserDataCount -= 2;
             }
 
-            if (pCurrResUsage->builtInUsage.vs.drawIndex)
+            if (currResUsage->builtInUsage.vs.drawIndex)
             {
                 availUserDataCount -= 1;
             }
 
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
-            const auto gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
-            if (((gfxIp.major >= 9) && (m_pPipelineState->IsGsOnChip() && cl::InRegEsGsLdsSize)) ||
+            const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+            if (((gfxIp.major >= 9) && (m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize)) ||
                 (enableNgg && (m_hasTs == false)))
             {
                 availUserDataCount -= 1;
@@ -542,7 +542,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior. i.e. GS is GFX8
-            if ((m_pPipelineState->IsGsOnChip() && cl::InRegEsGsLdsSize) || enableNgg)
+            if ((m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize) || enableNgg)
             {
                 // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
                 // with PAL's GS on-chip behavior.
@@ -583,7 +583,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     else
     {
         needSpill |= (requiredRemappedUserDataCount > availUserDataCount - needSpill);
-        pIntfData->spillTable.offsetInDwords = InvalidValue;
+        intfData->spillTable.offsetInDwords = InvalidValue;
         if (needSpill)
         {
             // Spill table need an addtional user data
@@ -596,22 +596,22 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     {
         for (unsigned i = 0; i < userDataNodes.size(); ++i)
         {
-            auto pNode = &userDataNodes[i];
-            if (pNode->type == ResourceNodeType::StreamOutTableVaPtr)
+            auto node = &userDataNodes[i];
+            if (node->type == ResourceNodeType::StreamOutTableVaPtr)
             {
-                assert(pNode->sizeInDwords == 1);
+                assert(node->sizeInDwords == 1);
                 switch (m_shaderStage)
                 {
                 case ShaderStageVertex:
                     {
-                        pIntfData->userDataUsage.vs.streamOutTablePtr = userDataIdx;
-                        pIntfData->entryArgIdxs.vs.streamOutData.tablePtr = argTys.size();
+                        intfData->userDataUsage.vs.streamOutTablePtr = userDataIdx;
+                        intfData->entryArgIdxs.vs.streamOutData.tablePtr = argTys.size();
                         break;
                     }
                 case ShaderStageTessEval:
                     {
-                        pIntfData->userDataUsage.tes.streamOutTablePtr = userDataIdx;
-                        pIntfData->entryArgIdxs.tes.streamOutData.tablePtr = argTys.size();
+                        intfData->userDataUsage.tes.streamOutTablePtr = userDataIdx;
+                        intfData->entryArgIdxs.tes.streamOutData.tablePtr = argTys.size();
                         break;
                     }
                 // Allocate dummpy stream-out register for Geometry shader
@@ -625,8 +625,8 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                         break;
                     }
                 }
-                *pInRegMask |= 1ull << argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext));
+                *inRegMask |= 1ull << argTys.size();
+                argTys.push_back(Type::getInt32Ty(*m_context));
                 ++userDataIdx;
                 break;
             }
@@ -637,20 +637,20 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     unsigned actualAvailUserDataCount = 0;
     for (unsigned i = 0; i < userDataNodes.size(); ++i)
     {
-        auto pNode = &userDataNodes[i];
+        auto node = &userDataNodes[i];
 
         // "IndirectUserDataVaPtr" can't be spilled, it is treated as internal user data
-        if (pNode->type == ResourceNodeType::IndirectUserDataVaPtr)
+        if (node->type == ResourceNodeType::IndirectUserDataVaPtr)
         {
             continue;
         }
 
-        if (pNode->type == ResourceNodeType::StreamOutTableVaPtr)
+        if (node->type == ResourceNodeType::StreamOutTableVaPtr)
         {
             continue;
         }
 
-        if (IsResourceNodeActive(pNode, true) == false)
+        if (isResourceNodeActive(node, true) == false)
         {
             continue;
         }
@@ -661,42 +661,42 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             // entry-point arguments are added once DWORD offsets of user data are not continuous.
            assert(m_shaderStage == ShaderStageCompute);
 
-            while ((userDataIdx < (pNode->offsetInDwords + InterfaceData::CsStartUserData)) &&
+            while ((userDataIdx < (node->offsetInDwords + InterfaceData::CsStartUserData)) &&
                    (userDataIdx < (availUserDataCount + InterfaceData::CsStartUserData)))
             {
-                *pInRegMask |= 1ull << argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext));
+                *inRegMask |= 1ull << argTys.size();
+                argTys.push_back(Type::getInt32Ty(*m_context));
                 ++userDataIdx;
                 ++actualAvailUserDataCount;
             }
         }
 
-        if (actualAvailUserDataCount + pNode->sizeInDwords <= availUserDataCount)
+        if (actualAvailUserDataCount + node->sizeInDwords <= availUserDataCount)
         {
             // User data isn't spilled
             assert(i < InterfaceData::MaxDescTableCount);
-            pIntfData->entryArgIdxs.resNodeValues[i] = argTys.size();
-            *pInRegMask |= 1ull << argTys.size();
-            actualAvailUserDataCount += pNode->sizeInDwords;
-            switch (pNode->type)
+            intfData->entryArgIdxs.resNodeValues[i] = argTys.size();
+            *inRegMask |= 1ull << argTys.size();
+            actualAvailUserDataCount += node->sizeInDwords;
+            switch (node->type)
             {
             case ResourceNodeType::DescriptorTableVaPtr:
                 {
-                    argTys.push_back(Type::getInt32Ty(*m_pContext));
+                    argTys.push_back(Type::getInt32Ty(*m_context));
 
-                    assert(pNode->sizeInDwords == 1);
+                    assert(node->sizeInDwords == 1);
 
-                    auto pShaderOptions = &m_pPipelineState->GetShaderOptions(m_shaderStage);
-                    if (pShaderOptions->updateDescInElf && (m_shaderStage == ShaderStageFragment))
+                    auto shaderOptions = &m_pipelineState->getShaderOptions(m_shaderStage);
+                    if (shaderOptions->updateDescInElf && (m_shaderStage == ShaderStageFragment))
                     {
                         // Put set number to register first, will update offset after merge ELFs
                         // For partial pipeline compile, only fragment shader needs to adjust offset of root descriptor
                         // If there are more individual shader compile in future, we can add more stages here
-                        pIntfData->userDataMap[userDataIdx] = DescRelocMagic | pNode->innerTable[0].set;
+                        intfData->userDataMap[userDataIdx] = DescRelocMagic | node->innerTable[0].set;
                     }
                     else
                     {
-                        pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
+                        intfData->userDataMap[userDataIdx] = node->offsetInDwords;
                     }
 
                     ++userDataIdx;
@@ -711,21 +711,21 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 // Where a descriptor appears in the top-level table, it is accesssed
                 // via the spill table, rather than directly placed in sgprs.
                 assert(needSpill);
-                if (pIntfData->spillTable.offsetInDwords == InvalidValue)
+                if (intfData->spillTable.offsetInDwords == InvalidValue)
                 {
-                    pIntfData->spillTable.offsetInDwords = pNode->offsetInDwords;
+                    intfData->spillTable.offsetInDwords = node->offsetInDwords;
                 }
                 break;
 
             case ResourceNodeType::PushConst:
             case ResourceNodeType::DescriptorBufferCompact:
                 {
-                    argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), pNode->sizeInDwords));
-                    for (unsigned j = 0; j < pNode->sizeInDwords; ++j)
+                    argTys.push_back(VectorType::get(Type::getInt32Ty(*m_context), node->sizeInDwords));
+                    for (unsigned j = 0; j < node->sizeInDwords; ++j)
                     {
-                        pIntfData->userDataMap[userDataIdx + j] = pNode->offsetInDwords + j;
+                        intfData->userDataMap[userDataIdx + j] = node->offsetInDwords + j;
                     }
-                    userDataIdx += pNode->sizeInDwords;
+                    userDataIdx += node->sizeInDwords;
                     break;
                 }
             default:
@@ -735,9 +735,9 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 }
             }
         }
-        else if (needSpill && (pIntfData->spillTable.offsetInDwords == InvalidValue))
+        else if (needSpill && (intfData->spillTable.offsetInDwords == InvalidValue))
         {
-            pIntfData->spillTable.offsetInDwords = pNode->offsetInDwords;
+            intfData->spillTable.offsetInDwords = node->offsetInDwords;
         }
     }
 
@@ -745,18 +745,18 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     if (needSpill && useFixedLayout)
     {
         // Add spill table
-        assert(pIntfData->spillTable.offsetInDwords != InvalidValue);
+        assert(intfData->spillTable.offsetInDwords != InvalidValue);
         assert(userDataIdx <= (InterfaceData::MaxCsUserDataCount + InterfaceData::CsStartUserData));
         while (userDataIdx <= (InterfaceData::MaxCsUserDataCount + InterfaceData::CsStartUserData))
         {
-            *pInRegMask |= 1ull << argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext));
+            *inRegMask |= 1ull << argTys.size();
+            argTys.push_back(Type::getInt32Ty(*m_context));
             ++userDataIdx;
         }
-        pIntfData->userDataUsage.spillTable = userDataIdx - 1;
-        pIntfData->entryArgIdxs.spillTable = argTys.size() - 1;
+        intfData->userDataUsage.spillTable = userDataIdx - 1;
+        intfData->entryArgIdxs.spillTable = argTys.size() - 1;
 
-        pIntfData->spillTable.sizeInDwords = requiredUserDataCount;
+        intfData->spillTable.sizeInDwords = requiredUserDataCount;
     }
 
     switch (m_shaderStage)
@@ -766,72 +766,72 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         {
 	    // NOTE: On GFX9+, Vertex shader (LS) and tessellation control shader (HS) are merged into a single shader.
 	    // The user data count of tessellation control shader should be same as vertex shader.
-            auto pCurrIntfData = pIntfData;
-            auto pCurrResUsage = pResUsage;
+            auto currIntfData = intfData;
+            auto currResUsage = resUsage;
 
-            if ((m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 9) &&
+            if ((m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) &&
                 (m_shaderStage == ShaderStageTessControl) &&
-                (m_pPipelineState->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)))
+                (m_pipelineState->getShaderStageMask() & shaderStageToMask(ShaderStageVertex)))
             {
-                pCurrIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
-                pCurrResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageVertex);
+                currIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+                currResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
             }
 
             // NOTE: The user data to emulate gl_ViewIndex is somewhat common. To make it consistent for GFX9
             // merged shader, we place it prior to any other special user data.
             if (enableMultiView)
             {
-                *pInRegMask |= 1ull << argTys.size();
+                *inRegMask |= 1ull << argTys.size();
                 entryArgIdxs.vs.viewIndex = argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext)); // View Index
-                pCurrIntfData->userDataUsage.vs.viewIndex = userDataIdx;
+                argTys.push_back(Type::getInt32Ty(*m_context)); // View Index
+                currIntfData->userDataUsage.vs.viewIndex = userDataIdx;
                 ++userDataIdx;
             }
 
             if (reserveEsGsLdsSize)
             {
-                *pInRegMask |= 1ull << argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext));
-                pCurrIntfData->userDataUsage.vs.esGsLdsSize = userDataIdx;
+                *inRegMask |= 1ull << argTys.size();
+                argTys.push_back(Type::getInt32Ty(*m_context));
+                currIntfData->userDataUsage.vs.esGsLdsSize = userDataIdx;
                 ++userDataIdx;
             }
 
             for (unsigned i = 0; i < userDataNodes.size(); ++i)
             {
-                auto pNode = &userDataNodes[i];
-                if (pNode->type == ResourceNodeType::IndirectUserDataVaPtr)
+                auto node = &userDataNodes[i];
+                if (node->type == ResourceNodeType::IndirectUserDataVaPtr)
                 {
-                    assert(pNode->sizeInDwords == 1);
-                    pCurrIntfData->userDataUsage.vs.vbTablePtr = userDataIdx;
-                    pCurrIntfData->entryArgIdxs.vs.vbTablePtr = argTys.size();
-                    *pInRegMask |= 1ull << argTys.size();
-                    argTys.push_back(Type::getInt32Ty(*m_pContext));
+                    assert(node->sizeInDwords == 1);
+                    currIntfData->userDataUsage.vs.vbTablePtr = userDataIdx;
+                    currIntfData->entryArgIdxs.vs.vbTablePtr = argTys.size();
+                    *inRegMask |= 1ull << argTys.size();
+                    argTys.push_back(Type::getInt32Ty(*m_context));
                     ++userDataIdx;
                     break;
                 }
             }
 
-            if (pCurrResUsage->builtInUsage.vs.baseVertex || pCurrResUsage->builtInUsage.vs.baseInstance)
+            if (currResUsage->builtInUsage.vs.baseVertex || currResUsage->builtInUsage.vs.baseInstance)
             {
-                *pInRegMask |= 1ull << argTys.size();
+                *inRegMask |= 1ull << argTys.size();
                 entryArgIdxs.vs.baseVertex = argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext)); // Base vertex
-                pCurrIntfData->userDataUsage.vs.baseVertex = userDataIdx;
+                argTys.push_back(Type::getInt32Ty(*m_context)); // Base vertex
+                currIntfData->userDataUsage.vs.baseVertex = userDataIdx;
                 ++userDataIdx;
 
-                *pInRegMask |= 1ull << argTys.size();
+                *inRegMask |= 1ull << argTys.size();
                 entryArgIdxs.vs.baseInstance = argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext)); // Base instance
-                pCurrIntfData->userDataUsage.vs.baseInstance = userDataIdx;
+                argTys.push_back(Type::getInt32Ty(*m_context)); // Base instance
+                currIntfData->userDataUsage.vs.baseInstance = userDataIdx;
                 ++userDataIdx;
             }
 
-            if (pCurrResUsage->builtInUsage.vs.drawIndex)
+            if (currResUsage->builtInUsage.vs.drawIndex)
             {
-                *pInRegMask |= 1ull << argTys.size();
+                *inRegMask |= 1ull << argTys.size();
                 entryArgIdxs.vs.drawIndex = argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext)); // Draw index
-                pCurrIntfData->userDataUsage.vs.drawIndex = userDataIdx;
+                argTys.push_back(Type::getInt32Ty(*m_context)); // Draw index
+                currIntfData->userDataUsage.vs.drawIndex = userDataIdx;
                 ++userDataIdx;
             }
 
@@ -843,18 +843,18 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             // merged shader, we place it prior to any other special user data.
             if (enableMultiView)
             {
-                *pInRegMask |= 1ull << argTys.size();
+                *inRegMask |= 1ull << argTys.size();
                 entryArgIdxs.tes.viewIndex = argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext)); // View Index
-                pIntfData->userDataUsage.tes.viewIndex = userDataIdx;
+                argTys.push_back(Type::getInt32Ty(*m_context)); // View Index
+                intfData->userDataUsage.tes.viewIndex = userDataIdx;
                 ++userDataIdx;
             }
 
             if (reserveEsGsLdsSize)
             {
-                *pInRegMask |= 1ull << argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext));
-                pIntfData->userDataUsage.tes.esGsLdsSize = userDataIdx;
+                *inRegMask |= 1ull << argTys.size();
+                argTys.push_back(Type::getInt32Ty(*m_context));
+                intfData->userDataUsage.tes.esGsLdsSize = userDataIdx;
                 ++userDataIdx;
             }
             break;
@@ -865,18 +865,18 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             // merged shader, we place it prior to any other special user data.
             if (enableMultiView)
             {
-                *pInRegMask |= 1ull << argTys.size();
+                *inRegMask |= 1ull << argTys.size();
                 entryArgIdxs.gs.viewIndex = argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext)); // View Index
-                pIntfData->userDataUsage.gs.viewIndex = userDataIdx;
+                argTys.push_back(Type::getInt32Ty(*m_context)); // View Index
+                intfData->userDataUsage.gs.viewIndex = userDataIdx;
                 ++userDataIdx;
             }
 
             if (reserveEsGsLdsSize)
             {
-                *pInRegMask |= 1ull << argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext));
-                pIntfData->userDataUsage.gs.esGsLdsSize = userDataIdx;
+                *inRegMask |= 1ull << argTys.size();
+                argTys.push_back(Type::getInt32Ty(*m_context));
+                intfData->userDataUsage.gs.esGsLdsSize = userDataIdx;
                 ++userDataIdx;
             }
             break;
@@ -889,17 +889,17 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 // NOTE: Pointer must be placed in even index according to LLVM backend compiler.
                 if ((userDataIdx % 2) != 0)
                 {
-                    *pInRegMask |= 1ull << argTys.size();
-                    argTys.push_back(Type::getInt32Ty(*m_pContext));
+                    *inRegMask |= 1ull << argTys.size();
+                    argTys.push_back(Type::getInt32Ty(*m_context));
                     userDataIdx += 1;
                 }
 
-                auto pNumWorkgroupsPtrTy = PointerType::get(VectorType::get(Type::getInt32Ty(*m_pContext), 3),
+                auto numWorkgroupsPtrTy = PointerType::get(VectorType::get(Type::getInt32Ty(*m_context), 3),
                                                             ADDR_SPACE_CONST);
-                *pInRegMask |= 1ull << argTys.size();
+                *inRegMask |= 1ull << argTys.size();
                 entryArgIdxs.cs.numWorkgroupsPtr = argTys.size();
-                argTys.push_back(pNumWorkgroupsPtrTy); // NumWorkgroupsPtr
-                pIntfData->userDataUsage.cs.numWorkgroupsPtr = userDataIdx;
+                argTys.push_back(numWorkgroupsPtrTy); // NumWorkgroupsPtr
+                intfData->userDataUsage.cs.numWorkgroupsPtr = userDataIdx;
                 userDataIdx += 2;
             }
             break;
@@ -918,18 +918,18 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
     if (needSpill && (useFixedLayout == false))
     {
-        *pInRegMask |= 1ull << argTys.size();
-        pIntfData->entryArgIdxs.spillTable = argTys.size();
-        argTys.push_back(Type::getInt32Ty(*m_pContext));
+        *inRegMask |= 1ull << argTys.size();
+        intfData->entryArgIdxs.spillTable = argTys.size();
+        argTys.push_back(Type::getInt32Ty(*m_context));
 
-        pIntfData->userDataUsage.spillTable = userDataIdx++;
-        pIntfData->spillTable.sizeInDwords = requiredUserDataCount;
+        intfData->userDataUsage.spillTable = userDataIdx++;
+        intfData->spillTable.sizeInDwords = requiredUserDataCount;
     }
-    pIntfData->userDataCount = userDataIdx;
+    intfData->userDataCount = userDataIdx;
 
-    const auto& xfbStrides = pResUsage->inOutUsage.xfbStrides;
+    const auto& xfbStrides = resUsage->inOutUsage.xfbStrides;
 
-    const bool enableXfb = pResUsage->inOutUsage.enableXfb;
+    const bool enableXfb = resUsage->inOutUsage.enableXfb;
 
     // NOTE: Here, we start to add system values, they should be behind user data.
     switch (m_shaderStage)
@@ -938,29 +938,29 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         {
             if (m_hasGs && (m_hasTs == false))   // VS acts as hardware ES
             {
-                *pInRegMask |= 1ull << argTys.size();
+                *inRegMask |= 1ull << argTys.size();
                 entryArgIdxs.vs.esGsOffset = argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset
+                argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offset
             }
             else if ((m_hasGs == false) && (m_hasTs == false))  // VS acts as hardware VS
             {
                 if (enableXfb)  // If output to stream-out buffer
                 {
-                    *pInRegMask |= 1ull << argTys.size();
+                    *inRegMask |= 1ull << argTys.size();
                     entryArgIdxs.vs.streamOutData.streamInfo = argTys.size();
-                    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Stream-out info (ID, vertex count, enablement)
+                    argTys.push_back(Type::getInt32Ty(*m_context)); // Stream-out info (ID, vertex count, enablement)
 
-                    *pInRegMask |= 1ull << argTys.size();
+                    *inRegMask |= 1ull << argTys.size();
                     entryArgIdxs.vs.streamOutData.writeIndex = argTys.size();
-                    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Stream-out write Index
+                    argTys.push_back(Type::getInt32Ty(*m_context)); // Stream-out write Index
 
                     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i)
                     {
                         if (xfbStrides[i] > 0)
                         {
-                            *pInRegMask |= 1ull << argTys.size();
+                            *inRegMask |= 1ull << argTys.size();
                             entryArgIdxs.vs.streamOutData.streamOffsets[i] = argTys.size();
-                            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Stream-out offset
+                            argTys.push_back(Type::getInt32Ty(*m_context)); // Stream-out offset
                         }
                     }
                 }
@@ -968,37 +968,37 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
             // NOTE: The order of these arguments is determined by hardware.
             entryArgIdxs.vs.vertexId = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Vertex ID
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Vertex ID
 
             entryArgIdxs.vs.relVertexId = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Relative vertex ID (auto index)
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Relative vertex ID (auto index)
 
             entryArgIdxs.vs.primitiveId = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Primitive ID
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Primitive ID
 
             entryArgIdxs.vs.instanceId = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Instance ID
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Instance ID
 
             break;
         }
     case ShaderStageTessControl:
         {
-            if (m_pPipelineState->IsTessOffChip())
+            if (m_pipelineState->isTessOffChip())
             {
-                *pInRegMask |= 1ull << argTys.size();
+                *inRegMask |= 1ull << argTys.size();
                 entryArgIdxs.tcs.offChipLdsBase = argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext)); // Off-chip LDS buffer base
+                argTys.push_back(Type::getInt32Ty(*m_context)); // Off-chip LDS buffer base
             }
 
-            *pInRegMask |= 1ull << argTys.size();
+            *inRegMask |= 1ull << argTys.size();
             entryArgIdxs.tcs.tfBufferBase = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // TF buffer base
+            argTys.push_back(Type::getInt32Ty(*m_context)); // TF buffer base
 
             entryArgIdxs.tcs.patchId = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Patch ID
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Patch ID
 
             entryArgIdxs.tcs.relPatchId = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Relative patch ID (control point ID included)
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Relative patch ID (control point ID included)
 
             break;
         }
@@ -1006,170 +1006,170 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         {
             if (m_hasGs)    // TES acts as hardware ES
             {
-                if (m_pPipelineState->IsTessOffChip())
+                if (m_pipelineState->isTessOffChip())
                 {
-                    *pInRegMask |= 1ull << argTys.size();
+                    *inRegMask |= 1ull << argTys.size();
                     entryArgIdxs.tes.offChipLdsBase = argTys.size(); // Off-chip LDS buffer base
-                    argTys.push_back(Type::getInt32Ty(*m_pContext));
+                    argTys.push_back(Type::getInt32Ty(*m_context));
 
-                    *pInRegMask |= 1ull << argTys.size();
-                    argTys.push_back(Type::getInt32Ty(*m_pContext));  // If is_offchip enabled
+                    *inRegMask |= 1ull << argTys.size();
+                    argTys.push_back(Type::getInt32Ty(*m_context));  // If is_offchip enabled
                 }
-                *pInRegMask |= 1ull << argTys.size();
+                *inRegMask |= 1ull << argTys.size();
                 entryArgIdxs.tes.esGsOffset = argTys.size();
-                argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset
+                argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offset
             }
             else  // TES acts as hardware VS
             {
-                if (m_pPipelineState->IsTessOffChip() || enableXfb)
+                if (m_pipelineState->isTessOffChip() || enableXfb)
                 {
-                    *pInRegMask |= 1ull << argTys.size();
+                    *inRegMask |= 1ull << argTys.size();
                     entryArgIdxs.tes.streamOutData.streamInfo = argTys.size();
-                    argTys.push_back(Type::getInt32Ty(*m_pContext));
+                    argTys.push_back(Type::getInt32Ty(*m_context));
                 }
 
                 if (enableXfb)
                 {
-                    *pInRegMask |= 1ull << argTys.size();
+                    *inRegMask |= 1ull << argTys.size();
                     entryArgIdxs.tes.streamOutData.writeIndex = argTys.size();
-                    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Stream-out write Index
+                    argTys.push_back(Type::getInt32Ty(*m_context)); // Stream-out write Index
 
                     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i)
                     {
                         if (xfbStrides[i] > 0)
                         {
-                            *pInRegMask |= 1ull << argTys.size();
+                            *inRegMask |= 1ull << argTys.size();
                             entryArgIdxs.tes.streamOutData.streamOffsets[i] = argTys.size();
-                            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Stream-out offset
+                            argTys.push_back(Type::getInt32Ty(*m_context)); // Stream-out offset
                         }
                     }
                 }
 
-                if (m_pPipelineState->IsTessOffChip()) // Off-chip LDS buffer base
+                if (m_pipelineState->isTessOffChip()) // Off-chip LDS buffer base
                 {
-                    *pInRegMask |= 1ull << argTys.size();
+                    *inRegMask |= 1ull << argTys.size();
                     entryArgIdxs.tes.offChipLdsBase = argTys.size();
-                    argTys.push_back(Type::getInt32Ty(*m_pContext));
+                    argTys.push_back(Type::getInt32Ty(*m_context));
                 }
             }
 
             entryArgIdxs.tes.tessCoordX = argTys.size();
-            argTys.push_back(Type::getFloatTy(*m_pContext)); // X of TessCoord (U)
+            argTys.push_back(Type::getFloatTy(*m_context)); // X of TessCoord (U)
 
             entryArgIdxs.tes.tessCoordY = argTys.size();
-            argTys.push_back(Type::getFloatTy(*m_pContext)); // Y of TessCoord (V)
+            argTys.push_back(Type::getFloatTy(*m_context)); // Y of TessCoord (V)
 
             entryArgIdxs.tes.relPatchId = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Relative patch ID
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Relative patch ID
 
             entryArgIdxs.tes.patchId = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Patch ID
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Patch ID
 
             break;
         }
     case ShaderStageGeometry:
         {
-            *pInRegMask |= 1ull << argTys.size();
+            *inRegMask |= 1ull << argTys.size();
             entryArgIdxs.gs.gsVsOffset = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // GS to VS offset
+            argTys.push_back(Type::getInt32Ty(*m_context)); // GS to VS offset
 
-            *pInRegMask |= 1ull << argTys.size();
+            *inRegMask |= 1ull << argTys.size();
             entryArgIdxs.gs.waveId = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // GS wave ID
+            argTys.push_back(Type::getInt32Ty(*m_context)); // GS wave ID
 
             // TODO: We should make the arguments according to real usage.
             entryArgIdxs.gs.esGsOffsets[0] = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset (vertex 0)
+            argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offset (vertex 0)
 
             entryArgIdxs.gs.esGsOffsets[1] = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset (vertex 1)
+            argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offset (vertex 1)
 
             entryArgIdxs.gs.primitiveId = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Primitive ID
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Primitive ID
 
             entryArgIdxs.gs.esGsOffsets[2] = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset (vertex 2)
+            argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offset (vertex 2)
 
             entryArgIdxs.gs.esGsOffsets[3] = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset (vertex 3)
+            argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offset (vertex 3)
 
             entryArgIdxs.gs.esGsOffsets[4] = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset (vertex 4)
+            argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offset (vertex 4)
 
             entryArgIdxs.gs.esGsOffsets[5] = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset (vertex 5)
+            argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offset (vertex 5)
 
             entryArgIdxs.gs.invocationId = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Invocation ID
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Invocation ID
             break;
         }
     case ShaderStageFragment:
         {
-            *pInRegMask |= 1ull << argTys.size();
+            *inRegMask |= 1ull << argTys.size();
             entryArgIdxs.fs.primMask = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Primitive mask
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Primitive mask
 
             entryArgIdxs.fs.perspInterp.sample = argTys.size();
-            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 2)); // Perspective sample
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_context), 2)); // Perspective sample
 
             entryArgIdxs.fs.perspInterp.center = argTys.size();
-            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 2)); // Perspective center
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_context), 2)); // Perspective center
 
             entryArgIdxs.fs.perspInterp.centroid = argTys.size();
-            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 2)); // Perspective centroid
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_context), 2)); // Perspective centroid
 
             entryArgIdxs.fs.perspInterp.pullMode = argTys.size();
-            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 3)); // Perspective pull-mode
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_context), 3)); // Perspective pull-mode
 
             entryArgIdxs.fs.linearInterp.sample = argTys.size();
-            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 2)); // Linear sample
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_context), 2)); // Linear sample
 
             entryArgIdxs.fs.linearInterp.center = argTys.size();
-            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 2)); // Linear center
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_context), 2)); // Linear center
 
             entryArgIdxs.fs.linearInterp.centroid = argTys.size();
-            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 2)); // Linear centroid
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_context), 2)); // Linear centroid
 
-            argTys.push_back(Type::getFloatTy(*m_pContext)); // Line stipple
+            argTys.push_back(Type::getFloatTy(*m_context)); // Line stipple
 
             entryArgIdxs.fs.fragCoord.x = argTys.size();
-            argTys.push_back(Type::getFloatTy(*m_pContext)); // X of FragCoord
+            argTys.push_back(Type::getFloatTy(*m_context)); // X of FragCoord
 
             entryArgIdxs.fs.fragCoord.y = argTys.size();
-            argTys.push_back(Type::getFloatTy(*m_pContext)); // Y of FragCoord
+            argTys.push_back(Type::getFloatTy(*m_context)); // Y of FragCoord
 
             entryArgIdxs.fs.fragCoord.z = argTys.size();
-            argTys.push_back(Type::getFloatTy(*m_pContext)); // Z of FragCoord
+            argTys.push_back(Type::getFloatTy(*m_context)); // Z of FragCoord
 
             entryArgIdxs.fs.fragCoord.w = argTys.size();
-            argTys.push_back(Type::getFloatTy(*m_pContext)); // W of FragCoord
+            argTys.push_back(Type::getFloatTy(*m_context)); // W of FragCoord
 
             entryArgIdxs.fs.frontFacing = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Front facing
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Front facing
 
             entryArgIdxs.fs.ancillary = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Ancillary
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Ancillary
 
             entryArgIdxs.fs.sampleCoverage = argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Sample coverage
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Sample coverage
 
-            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Fixed X/Y
+            argTys.push_back(Type::getInt32Ty(*m_context)); // Fixed X/Y
 
             break;
         }
     case ShaderStageCompute:
         {
             // Add system values in SGPR
-            *pInRegMask |= 1ull << argTys.size();
+            *inRegMask |= 1ull << argTys.size();
             entryArgIdxs.cs.workgroupId = argTys.size();
-            argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), 3)); // WorkgroupId
+            argTys.push_back(VectorType::get(Type::getInt32Ty(*m_context), 3)); // WorkgroupId
 
-            *pInRegMask |= 1ull << argTys.size();
-            argTys.push_back(Type::getInt32Ty(*m_pContext));  // Multiple dispatch info, include TG_SIZE and etc.
+            *inRegMask |= 1ull << argTys.size();
+            argTys.push_back(Type::getInt32Ty(*m_context));  // Multiple dispatch info, include TG_SIZE and etc.
 
             // Add system value in VGPR
             entryArgIdxs.cs.localInvocationId = argTys.size();
-            argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), 3)); // LocalInvociationId
+            argTys.push_back(VectorType::get(Type::getInt32Ty(*m_context), 3)); // LocalInvociationId
             break;
         }
     default:
@@ -1179,7 +1179,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         }
     }
 
-    return FunctionType::get(Type::getVoidTy(*m_pContext), argTys, false);
+    return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
 }
 
 } // lgc

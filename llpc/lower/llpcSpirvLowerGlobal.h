@@ -64,68 +64,68 @@ private:
     SpirvLowerGlobal(const SpirvLowerGlobal&) = delete;
     SpirvLowerGlobal& operator=(const SpirvLowerGlobal&) = delete;
 
-    void MapGlobalVariableToProxy(llvm::GlobalVariable* pGlobalVar);
-    void MapInputToProxy(llvm::GlobalVariable* pInput);
-    void MapOutputToProxy(llvm::GlobalVariable* pInput);
+    void mapGlobalVariableToProxy(llvm::GlobalVariable* globalVar);
+    void mapInputToProxy(llvm::GlobalVariable* input);
+    void mapOutputToProxy(llvm::GlobalVariable* input);
 
-    void LowerGlobalVar();
-    void LowerInput();
-    void LowerOutput();
-    void LowerInOutInPlace();
-    void LowerBufferBlock();
-    void LowerPushConsts();
+    void lowerGlobalVar();
+    void lowerInput();
+    void lowerOutput();
+    void lowerInOutInPlace();
+    void lowerBufferBlock();
+    void lowerPushConsts();
 
-    void CleanupReturnBlock();
+    void cleanupReturnBlock();
 
-    llvm::Value* AddCallInstForInOutImport(llvm::Type*        pInOutTy,
+    llvm::Value* addCallInstForInOutImport(llvm::Type*        inOutTy,
                                            unsigned           addrSpace,
-                                           llvm::Constant*    pInOutMeta,
-                                           llvm::Value*       pStartLoc,
+                                           llvm::Constant*    inOutMeta,
+                                           llvm::Value*       startLoc,
                                            unsigned           maxLocOffset,
-                                           llvm::Value*       pCompIdx,
-                                           llvm::Value*       pVertexIdx,
+                                           llvm::Value*       compIdx,
+                                           llvm::Value*       vertexIdx,
                                            unsigned           interpLoc,
-                                           llvm::Value*             pInterpInfo,
-                                           llvm::Instruction* pInsertPos);
+                                           llvm::Value*             interpInfo,
+                                           llvm::Instruction* insertPos);
 
-    void AddCallInstForOutputExport(llvm::Value*       pOutputValue,
-                                    llvm::Constant*    pOutputMeta,
-                                    llvm::Value*       pLocOffset,
+    void addCallInstForOutputExport(llvm::Value*       outputValue,
+                                    llvm::Constant*    outputMeta,
+                                    llvm::Value*       locOffset,
                                     unsigned           maxLocOffset,
                                     unsigned           xfbOffsetAdjust,
                                     unsigned           xfbBufferAdjust,
-                                    llvm::Value*       pElemIdx,
-                                    llvm::Value*       pVertexIdx,
+                                    llvm::Value*       elemIdx,
+                                    llvm::Value*       vertexIdx,
                                     unsigned           emitStreamId,
-                                    llvm::Instruction* pInsertPos);
+                                    llvm::Instruction* insertPos);
 
-    llvm::Value* LoadInOutMember(llvm::Type*                      pInOutTy,
+    llvm::Value* loadInOutMember(llvm::Type*                      inOutTy,
                                  unsigned                         addrSpace,
                                  const std::vector<llvm::Value*>& indexOperands,
                                  unsigned                         operandIdx,
                                  unsigned                         maxLocOffset,
-                                 llvm::Constant*                  pInOutMeta,
-                                 llvm::Value*                     pLocOffset,
-                                 llvm::Value*                     pVertexIdx,
+                                 llvm::Constant*                  inOutMeta,
+                                 llvm::Value*                     locOffset,
+                                 llvm::Value*                     vertexIdx,
                                  unsigned                         interpLoc,
-                                 llvm::Value*                     pInterpInfo,
-                                 llvm::Instruction*               pInsertPos);
+                                 llvm::Value*                     interpInfo,
+                                 llvm::Instruction*               insertPos);
 
-    void StoreOutputMember(llvm::Type*                      pOutputTy,
-                           llvm::Value*                     pStoreValue,
+    void storeOutputMember(llvm::Type*                      outputTy,
+                           llvm::Value*                     storeValue,
                            const std::vector<llvm::Value*>& indexOperands,
                            unsigned                         operandIdx,
                            unsigned                         maxLocOffset,
-                           llvm::Constant*                  pOutputMeta,
-                           llvm::Value*                     pLocOffset,
-                           llvm::Value*                     pVertexIdx,
-                           llvm::Instruction*               pInsertPos);
+                           llvm::Constant*                  outputMeta,
+                           llvm::Value*                     locOffset,
+                           llvm::Value*                     vertexIdx,
+                           llvm::Instruction*               insertPos);
 
-    void InterpolateInputElement(unsigned           interpLoc,
-                                 llvm::Value*       pInterpInfo,
+    void interpolateInputElement(unsigned           interpLoc,
+                                 llvm::Value*       interpInfo,
                                  llvm::CallInst&    callInst);
 
-    llvm::Value* ToInt32Value(llvm::Value* pValue, llvm::Instruction* pInsertPos);
+    llvm::Value* toInt32Value(llvm::Value* value, llvm::Instruction* insertPos);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -136,7 +136,7 @@ private:
     // "ordered" (resulting LLVM IR for the patching always be consistent).
     std::list<std::pair<llvm::Value*, llvm::Value*> >  m_outputProxyMap;    // Proxy list for lowering outputs
 
-    llvm::BasicBlock*   m_pRetBlock;    // The return block of entry point
+    llvm::BasicBlock*   m_retBlock;    // The return block of entry point
 
     bool    m_lowerInputInPlace;    // Whether to lower input inplace
     bool    m_lowerOutputInPlace;   // Whether to lower output inplace

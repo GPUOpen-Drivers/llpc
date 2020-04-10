@@ -50,29 +50,29 @@ static cl::opt<unsigned> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
 
 // =====================================================================================================================
 // Initialize this ShaderSystemValues if it was previously uninitialized.
-void ShaderSystemValues::Initialize(
-    PipelineState*  pPipelineState, // [in] Pipeline state
-    Function*       pEntryPoint)    // [in] Shader entrypoint
+void ShaderSystemValues::initialize(
+    PipelineState*  pipelineState, // [in] Pipeline state
+    Function*       entryPoint)    // [in] Shader entrypoint
 {
-    if (m_pEntryPoint == nullptr)
+    if (m_entryPoint == nullptr)
     {
-        m_pEntryPoint = pEntryPoint;
-        m_shaderStage = GetShaderStageFromFunction(pEntryPoint);
-        m_pContext = &pEntryPoint->getParent()->getContext();
-        m_pPipelineState = pPipelineState;
+        m_entryPoint = entryPoint;
+        m_shaderStage = getShaderStageFromFunction(entryPoint);
+        m_context = &entryPoint->getParent()->getContext();
+        m_pipelineState = pipelineState;
 
         assert(m_shaderStage != ShaderStageInvalid);
-        assert(m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.initialized);
+        assert(m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs.initialized);
 
         // Load shadow descriptor table settings from pipeline options.
-        const auto pPipelineOptions = &m_pPipelineState->GetOptions();
-        switch (pPipelineOptions->shadowDescriptorTableUsage)
+        const auto pipelineOptions = &m_pipelineState->getOptions();
+        switch (pipelineOptions->shadowDescriptorTableUsage)
         {
         case ShadowDescriptorTableUsage::Auto: // Use defaults defined in class
             break;
         case ShadowDescriptorTableUsage::Enable:
             m_enableShadowDescTable = true;
-            m_shadowDescTablePtrHigh = pPipelineOptions->shadowDescriptorTablePtrHigh;
+            m_shadowDescTablePtrHigh = pipelineOptions->shadowDescriptorTablePtrHigh;
             break;
         case ShadowDescriptorTableUsage::Disable:
             m_enableShadowDescTable = false;
@@ -97,194 +97,194 @@ void ShaderSystemValues::Initialize(
 
 // =====================================================================================================================
 // Get ES-GS ring buffer descriptor (for VS/TES output or GS input)
-Value* ShaderSystemValues::GetEsGsRingBufDesc()
+Value* ShaderSystemValues::getEsGsRingBufDesc()
 {
-    if (m_pEsGsRingBufDesc == nullptr)
+    if (m_esGsRingBufDesc == nullptr)
     {
         unsigned tableOffset = 0;
         switch (m_shaderStage)
         {
         case ShaderStageVertex:
         case ShaderStageTessEval:
-            tableOffset = SI_DRV_TABLE_ES_RING_OUT_OFFS;
+            tableOffset = SiDrvTableEsRingOutOffs;
             break;
         case ShaderStageGeometry:
-            tableOffset = SI_DRV_TABLE_GS_RING_IN_OFFS;
+            tableOffset = SiDrvTableGsRingInOffs;
             break;
         default:
             llvm_unreachable("Should never be called!");
             break;
         }
 
-        BuilderBase builder(&*m_pEntryPoint->front().getFirstInsertionPt());
-        m_pEsGsRingBufDesc = LoadDescFromDriverTable(tableOffset, builder);
-        if ((m_shaderStage != ShaderStageGeometry) && (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 8))
+        BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+        m_esGsRingBufDesc = loadDescFromDriverTable(tableOffset, builder);
+        if ((m_shaderStage != ShaderStageGeometry) && (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 8))
         {
             // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor for
             // VS/TES output.
-            m_pEsGsRingBufDesc = SetRingBufferDataFormat(m_pEsGsRingBufDesc, BUF_DATA_FORMAT_32, builder);
+            m_esGsRingBufDesc = setRingBufferDataFormat(m_esGsRingBufDesc, BUF_DATA_FORMAT_32, builder);
         }
     }
-    return m_pEsGsRingBufDesc;
+    return m_esGsRingBufDesc;
 }
 
 // =====================================================================================================================
 // Get the descriptor for tessellation factor (TF) buffer (TCS output)
-Value* ShaderSystemValues::GetTessFactorBufDesc()
+Value* ShaderSystemValues::getTessFactorBufDesc()
 {
     assert(m_shaderStage == ShaderStageTessControl);
-    if (m_pTfBufDesc == nullptr)
+    if (m_tfBufDesc == nullptr)
     {
-        BuilderBase builder(&*m_pEntryPoint->front().getFirstInsertionPt());
-        m_pTfBufDesc = LoadDescFromDriverTable(SI_DRV_TABLE_TF_BUFFER_OFFS, builder);
+        BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+        m_tfBufDesc = loadDescFromDriverTable(SiDrvTableTfBufferOffs, builder);
     }
-    return m_pTfBufDesc;
+    return m_tfBufDesc;
 }
 
 // =====================================================================================================================
 // Extract value of primitive ID (TCS)
-Value* ShaderSystemValues::GetPrimitiveId()
+Value* ShaderSystemValues::getPrimitiveId()
 {
     assert(m_shaderStage == ShaderStageTessControl);
-    if (m_pPrimitiveId == nullptr)
+    if (m_primitiveId == nullptr)
     {
-        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
-        m_pPrimitiveId = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.tcs.patchId, "patchId");
+        auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+        m_primitiveId = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tcs.patchId, "patchId");
     }
-    return m_pPrimitiveId;
+    return m_primitiveId;
 }
 
 // =====================================================================================================================
 // Get invocation ID (TCS)
-Value* ShaderSystemValues::GetInvocationId()
+Value* ShaderSystemValues::getInvocationId()
 {
     assert(m_shaderStage == ShaderStageTessControl);
-    if (m_pInvocationId == nullptr)
+    if (m_invocationId == nullptr)
     {
-        auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
+        auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+        auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
         // invocationId = relPatchId[12:8]
         Value* args[] =
         {
-            GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.tcs.relPatchId, "relPatchId"),
-            ConstantInt::get(Type::getInt32Ty(*m_pContext), 8),
-            ConstantInt::get(Type::getInt32Ty(*m_pContext), 5)
+            getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tcs.relPatchId, "relPatchId"),
+            ConstantInt::get(Type::getInt32Ty(*m_context), 8),
+            ConstantInt::get(Type::getInt32Ty(*m_context), 5)
         };
-        m_pInvocationId = EmitCall("llvm.amdgcn.ubfe.i32",
-                                   Type::getInt32Ty(*m_pContext),
+        m_invocationId = emitCall("llvm.amdgcn.ubfe.i32",
+                                   Type::getInt32Ty(*m_context),
                                    args,
                                    Attribute::ReadNone,
-                                   pInsertPos);
+                                   insertPos);
     }
-    return m_pInvocationId;
+    return m_invocationId;
 }
 
 // =====================================================================================================================
 // Get relative patchId (TCS)
-Value* ShaderSystemValues::GetRelativeId()
+Value* ShaderSystemValues::getRelativeId()
 {
     assert(m_shaderStage == ShaderStageTessControl);
-    if (m_pRelativeId == nullptr)
+    if (m_relativeId == nullptr)
     {
-        auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
-        auto pRelPatchId = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.tcs.relPatchId, "relPatchId");
+        auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+        auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+        auto relPatchId = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tcs.relPatchId, "relPatchId");
 
         // relativeId = relPatchId[7:0]
-        m_pRelativeId = BinaryOperator::CreateAnd(pRelPatchId,
-                                                  ConstantInt::get(Type::getInt32Ty(*m_pContext), 0xFF),
+        m_relativeId = BinaryOperator::CreateAnd(relPatchId,
+                                                  ConstantInt::get(Type::getInt32Ty(*m_context), 0xFF),
                                                   "",
-                                                  pInsertPos);
+                                                  insertPos);
     }
-    return m_pRelativeId;
+    return m_relativeId;
 }
 
 // =====================================================================================================================
 // Get offchip LDS descriptor (TCS and TES)
-Value* ShaderSystemValues::GetOffChipLdsDesc()
+Value* ShaderSystemValues::getOffChipLdsDesc()
 {
     assert((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval));
-    if (m_pOffChipLdsDesc == nullptr)
+    if (m_offChipLdsDesc == nullptr)
     {
-        BuilderBase builder(&*m_pEntryPoint->front().getFirstInsertionPt());
-        m_pOffChipLdsDesc = LoadDescFromDriverTable(SI_DRV_TABLE_HS_BUFFER0_OFFS, builder);
+        BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+        m_offChipLdsDesc = loadDescFromDriverTable(SiDrvTableHsBuffeR0Offs, builder);
     }
-    return m_pOffChipLdsDesc;
+    return m_offChipLdsDesc;
 }
 
 // =====================================================================================================================
 // Get tessellated coordinate (TES)
-Value* ShaderSystemValues::GetTessCoord()
+Value* ShaderSystemValues::getTessCoord()
 {
     assert(m_shaderStage == ShaderStageTessEval);
-    if (m_pTessCoord == nullptr)
+    if (m_tessCoord == nullptr)
     {
-        auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
+        auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+        auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
-        Value* pTessCoordX = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.tes.tessCoordX, "tessCoordX");
-        Value* pTessCoordY = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.tes.tessCoordY, "tessCoordY");
-        Value* pTessCoordZ = BinaryOperator::CreateFAdd(pTessCoordX, pTessCoordY, "", pInsertPos);
+        Value* tessCoordX = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tes.tessCoordX, "tessCoordX");
+        Value* tessCoordY = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tes.tessCoordY, "tessCoordY");
+        Value* tessCoordZ = BinaryOperator::CreateFAdd(tessCoordX, tessCoordY, "", insertPos);
 
-        pTessCoordZ = BinaryOperator::CreateFSub(ConstantFP::get(Type::getFloatTy(*m_pContext), 1.0f),
-                                                 pTessCoordZ,
+        tessCoordZ = BinaryOperator::CreateFSub(ConstantFP::get(Type::getFloatTy(*m_context), 1.0f),
+                                                 tessCoordZ,
                                                  "",
-                                                 pInsertPos);
+                                                 insertPos);
 
-        auto primitiveMode = m_pPipelineState->GetShaderModes()->GetTessellationMode().primitiveMode;
-        pTessCoordZ = (primitiveMode == PrimitiveMode::Triangles) ?
-                          pTessCoordZ : ConstantFP::get(Type::getFloatTy(*m_pContext), 0.0f);
+        auto primitiveMode = m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode;
+        tessCoordZ = (primitiveMode == PrimitiveMode::Triangles) ?
+                          tessCoordZ : ConstantFP::get(Type::getFloatTy(*m_context), 0.0f);
 
-        m_pTessCoord = UndefValue::get(VectorType::get(Type::getFloatTy(*m_pContext), 3));
-        m_pTessCoord = InsertElementInst::Create(m_pTessCoord,
-                                                 pTessCoordX,
-                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+        m_tessCoord = UndefValue::get(VectorType::get(Type::getFloatTy(*m_context), 3));
+        m_tessCoord = InsertElementInst::Create(m_tessCoord,
+                                                 tessCoordX,
+                                                 ConstantInt::get(Type::getInt32Ty(*m_context), 0),
                                                  "",
-                                                 pInsertPos);
-        m_pTessCoord = InsertElementInst::Create(m_pTessCoord,
-                                                 pTessCoordY,
-                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
+                                                 insertPos);
+        m_tessCoord = InsertElementInst::Create(m_tessCoord,
+                                                 tessCoordY,
+                                                 ConstantInt::get(Type::getInt32Ty(*m_context), 1),
                                                  "",
-                                                 pInsertPos);
-        m_pTessCoord = InsertElementInst::Create(m_pTessCoord,
-                                                 pTessCoordZ,
-                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
+                                                 insertPos);
+        m_tessCoord = InsertElementInst::Create(m_tessCoord,
+                                                 tessCoordZ,
+                                                 ConstantInt::get(Type::getInt32Ty(*m_context), 2),
                                                  "",
-                                                 pInsertPos);
+                                                 insertPos);
     }
-    return m_pTessCoord;
+    return m_tessCoord;
 }
 
 // =====================================================================================================================
 // Get ES -> GS offsets (GS in)
-Value* ShaderSystemValues::GetEsGsOffsets()
+Value* ShaderSystemValues::getEsGsOffsets()
 {
     assert(m_shaderStage == ShaderStageGeometry);
-    if (m_pEsGsOffsets == nullptr)
+    if (m_esGsOffsets == nullptr)
     {
-        auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
+        auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+        auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
-        m_pEsGsOffsets = UndefValue::get(VectorType::get(Type::getInt32Ty(*m_pContext), 6));
+        m_esGsOffsets = UndefValue::get(VectorType::get(Type::getInt32Ty(*m_context), 6));
         for (unsigned i = 0; i < InterfaceData::MaxEsGsOffsetCount; ++i)
         {
-            auto pEsGsOffset = GetFunctionArgument(m_pEntryPoint,
-                                                   pIntfData->entryArgIdxs.gs.esGsOffsets[i],
+            auto esGsOffset = getFunctionArgument(m_entryPoint,
+                                                   intfData->entryArgIdxs.gs.esGsOffsets[i],
                                                    Twine("esGsOffset") + Twine(i));
-            m_pEsGsOffsets = InsertElementInst::Create(m_pEsGsOffsets,
-                                                       pEsGsOffset,
-                                                       ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
+            m_esGsOffsets = InsertElementInst::Create(m_esGsOffsets,
+                                                       esGsOffset,
+                                                       ConstantInt::get(Type::getInt32Ty(*m_context), i),
                                                        "",
-                                                       pInsertPos);
+                                                       insertPos);
         }
     }
-    return m_pEsGsOffsets;
+    return m_esGsOffsets;
 }
 
 // =====================================================================================================================
 // Get GS -> VS ring buffer descriptor (GS out and copy shader in)
-Value* ShaderSystemValues::GetGsVsRingBufDesc(
+Value* ShaderSystemValues::getGsVsRingBufDesc(
     unsigned streamId)  // Stream ID, always 0 for copy shader
 {
     assert((m_shaderStage == ShaderStageGeometry) || (m_shaderStage == ShaderStageCopyShader));
@@ -294,63 +294,63 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
     }
     if (m_gsVsRingBufDescs[streamId] == nullptr)
     {
-        BuilderBase builder(&*m_pEntryPoint->front().getFirstInsertionPt());
+        BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
 
         if (m_shaderStage == ShaderStageGeometry)
         {
-            const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
+            const auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
             // Geometry shader, using GS-VS ring for output.
-            Value* pDesc = LoadDescFromDriverTable(SI_DRV_TABLE_GS_RING_OUT0_OFFS + streamId, builder);
+            Value* desc = loadDescFromDriverTable(SiDrvTableGsRingOuT0Offs + streamId, builder);
 
             unsigned outLocStart = 0;
             for (int i = 0; i < streamId; ++i)
-                outLocStart += pResUsage->inOutUsage.gs.outLocCount[i];
+                outLocStart += resUsage->inOutUsage.gs.outLocCount[i];
 
             // streamSize[streamId] = outLocCount[streamId] * 4 * sizeof(unsigned)
             // streamOffset = (streamSize[0] + ... + streamSize[streamId - 1]) * 64 * outputVertices
             unsigned baseAddr = outLocStart *
-                                m_pPipelineState->GetShaderModes()->GetGeometryShaderMode().outputVertices
+                                m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices
                 * sizeof(unsigned) * 4 * 64;
 
             // Patch GS-VS ring buffer descriptor base address for GS output
-            Value* pGsVsOutRingBufDescElem0 = builder.CreateExtractElement(pDesc, (uint64_t)0);
-            pGsVsOutRingBufDescElem0 = builder.CreateAdd(pGsVsOutRingBufDescElem0, builder.getInt32(baseAddr));
-            pDesc = builder.CreateInsertElement(pDesc, pGsVsOutRingBufDescElem0, (uint64_t)0);
+            Value* gsVsOutRingBufDescElem0 = builder.CreateExtractElement(desc, (uint64_t)0);
+            gsVsOutRingBufDescElem0 = builder.CreateAdd(gsVsOutRingBufDescElem0, builder.getInt32(baseAddr));
+            desc = builder.CreateInsertElement(desc, gsVsOutRingBufDescElem0, (uint64_t)0);
 
             // Patch GS-VS ring buffer descriptor stride for GS output
-            Value* pGsVsRingBufDescElem1 = builder.CreateExtractElement(pDesc, (uint64_t)1);
+            Value* gsVsRingBufDescElem1 = builder.CreateExtractElement(desc, (uint64_t)1);
 
             // Clear stride in SRD DWORD1
             SqBufRsrcWord1 strideClearMask = {};
             strideClearMask.u32All         = UINT32_MAX;
-            strideClearMask.bits.STRIDE    = 0;
-            pGsVsRingBufDescElem1 = builder.CreateAnd(pGsVsRingBufDescElem1, builder.getInt32(strideClearMask.u32All));
+            strideClearMask.bits.stride    = 0;
+            gsVsRingBufDescElem1 = builder.CreateAnd(gsVsRingBufDescElem1, builder.getInt32(strideClearMask.u32All));
 
             // Calculate and set stride in SRD dword1
-            unsigned gsVsStride = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode().outputVertices *
-                                  pResUsage->inOutUsage.gs.outLocCount[streamId] *
+            unsigned gsVsStride = m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices *
+                                  resUsage->inOutUsage.gs.outLocCount[streamId] *
                                   sizeof(unsigned) * 4;
 
             SqBufRsrcWord1 strideSetValue = {};
-            strideSetValue.bits.STRIDE = gsVsStride;
-            pGsVsRingBufDescElem1 = builder.CreateOr(pGsVsRingBufDescElem1, builder.getInt32(strideSetValue.u32All));
+            strideSetValue.bits.stride = gsVsStride;
+            gsVsRingBufDescElem1 = builder.CreateOr(gsVsRingBufDescElem1, builder.getInt32(strideSetValue.u32All));
 
-            pDesc = builder.CreateInsertElement(pDesc, pGsVsRingBufDescElem1, (uint64_t)1);
+            desc = builder.CreateInsertElement(desc, gsVsRingBufDescElem1, (uint64_t)1);
 
-            if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 8)
+            if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 8)
             {
                 // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor.
-                pDesc = SetRingBufferDataFormat(pDesc, BUF_DATA_FORMAT_32, builder);
+                desc = setRingBufferDataFormat(desc, BUF_DATA_FORMAT_32, builder);
             }
 
-            m_gsVsRingBufDescs[streamId] = pDesc;
+            m_gsVsRingBufDescs[streamId] = desc;
         }
         else
         {
             // Copy shader, using GS-VS ring for input.
             assert(streamId == 0);
-            m_gsVsRingBufDescs[streamId] = LoadDescFromDriverTable(SI_DRV_TABLE_VS_RING_IN_OFFS, builder);
+            m_gsVsRingBufDescs[streamId] = loadDescFromDriverTable(SiDrvTableVsRingInOffs, builder);
         }
     }
     return m_gsVsRingBufDescs[streamId];
@@ -358,7 +358,7 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
 
 // =====================================================================================================================
 // Get pointers to emit counters (GS)
-ArrayRef<Value*> ShaderSystemValues::GetEmitCounterPtr()
+ArrayRef<Value*> ShaderSystemValues::getEmitCounterPtr()
 {
     assert(m_shaderStage == ShaderStageGeometry);
     if (m_emitCounterPtrs.empty())
@@ -366,18 +366,18 @@ ArrayRef<Value*> ShaderSystemValues::GetEmitCounterPtr()
         // TODO: We should only insert those offsets required by the specified input primitive.
 
         // Setup GS emit vertex counter
-        auto& dataLayout = m_pEntryPoint->getParent()->getDataLayout();
-        auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
+        auto& dataLayout = m_entryPoint->getParent()->getDataLayout();
+        auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
         for (int i = 0; i < MaxGsStreams; ++i)
         {
-            auto pEmitCounterPtr = new AllocaInst(Type::getInt32Ty(*m_pContext),
+            auto emitCounterPtr = new AllocaInst(Type::getInt32Ty(*m_context),
                                                   dataLayout.getAllocaAddrSpace(),
                                                   "",
-                                                  pInsertPos);
-            new StoreInst(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
-                          pEmitCounterPtr,
-                          pInsertPos);
-            m_emitCounterPtrs.push_back(pEmitCounterPtr);
+                                                  insertPos);
+            new StoreInst(ConstantInt::get(Type::getInt32Ty(*m_context), 0),
+                          emitCounterPtr,
+                          insertPos);
+            m_emitCounterPtrs.push_back(emitCounterPtr);
         }
     }
     return m_emitCounterPtrs;
@@ -385,7 +385,7 @@ ArrayRef<Value*> ShaderSystemValues::GetEmitCounterPtr()
 
 // =====================================================================================================================
 // Get descriptor table pointer
-Value* ShaderSystemValues::GetDescTablePtr(
+Value* ShaderSystemValues::getDescTablePtr(
     unsigned        descSet)        // Descriptor set ID
 {
     if (m_descTablePtrs.size() <= descSet)
@@ -395,14 +395,14 @@ Value* ShaderSystemValues::GetDescTablePtr(
     if (m_descTablePtrs[descSet] == nullptr)
     {
         // Find the node.
-        unsigned resNodeIdx = FindResourceNodeByDescSet(descSet);
+        unsigned resNodeIdx = findResourceNodeByDescSet(descSet);
         if (resNodeIdx != InvalidValue)
         {
             // Get the 64-bit extended node value.
-            auto pDescTablePtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_pContext), UINT32_MAX),
+            auto descTablePtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_context), UINT32_MAX),
                                                     ADDR_SPACE_CONST);
-            m_descTablePtrs[descSet] = GetExtendedResourceNodeValue(resNodeIdx,
-                                                                    pDescTablePtrTy,
+            m_descTablePtrs[descSet] = getExtendedResourceNodeValue(resNodeIdx,
+                                                                    descTablePtrTy,
                                                                     InvalidValue);
         }
     }
@@ -411,7 +411,7 @@ Value* ShaderSystemValues::GetDescTablePtr(
 
 // =====================================================================================================================
 // Get shadow descriptor table pointer
-Value* ShaderSystemValues::GetShadowDescTablePtr(
+Value* ShaderSystemValues::getShadowDescTablePtr(
     unsigned        descSet)        // Descriptor set ID
 {
     if (m_shadowDescTablePtrs.size() <= descSet)
@@ -421,14 +421,14 @@ Value* ShaderSystemValues::GetShadowDescTablePtr(
     if (m_shadowDescTablePtrs[descSet] == nullptr)
     {
         // Find the node.
-        unsigned resNodeIdx = FindResourceNodeByDescSet(descSet);
+        unsigned resNodeIdx = findResourceNodeByDescSet(descSet);
         if (resNodeIdx != InvalidValue)
         {
             // Get the 64-bit extended node value.
-            auto pDescTablePtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_pContext), UINT32_MAX),
+            auto descTablePtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_context), UINT32_MAX),
                                                     ADDR_SPACE_CONST);
-            m_shadowDescTablePtrs[descSet] = GetExtendedResourceNodeValue(resNodeIdx,
-                                                                          pDescTablePtrTy,
+            m_shadowDescTablePtrs[descSet] = getExtendedResourceNodeValue(resNodeIdx,
+                                                                          descTablePtrTy,
                                                                           m_shadowDescTablePtrHigh);
         }
     }
@@ -437,109 +437,109 @@ Value* ShaderSystemValues::GetShadowDescTablePtr(
 
 // =====================================================================================================================
 // Get internal global table pointer as pointer to i8.
-Value* ShaderSystemValues::GetInternalGlobalTablePtr()
+Value* ShaderSystemValues::getInternalGlobalTablePtr()
 {
-    if (m_pInternalGlobalTablePtr == nullptr)
+    if (m_internalGlobalTablePtr == nullptr)
     {
-        auto pPtrTy = Type::getInt8Ty(*m_pContext)->getPointerTo(ADDR_SPACE_CONST);
+        auto ptrTy = Type::getInt8Ty(*m_context)->getPointerTo(ADDR_SPACE_CONST);
         // Global table is always the first function argument
-        m_pInternalGlobalTablePtr = MakePointer(GetFunctionArgument(m_pEntryPoint, 0, "globalTable"),
-                                                pPtrTy,
+        m_internalGlobalTablePtr = makePointer(getFunctionArgument(m_entryPoint, 0, "globalTable"),
+                                                ptrTy,
                                                 InvalidValue);
     }
-    return m_pInternalGlobalTablePtr;
+    return m_internalGlobalTablePtr;
 }
 
 // =====================================================================================================================
 // Get internal per shader table pointer as pointer to i8.
-Value* ShaderSystemValues::GetInternalPerShaderTablePtr()
+Value* ShaderSystemValues::getInternalPerShaderTablePtr()
 {
-    if (m_pInternalPerShaderTablePtr == nullptr)
+    if (m_internalPerShaderTablePtr == nullptr)
     {
-        auto pPtrTy = Type::getInt8Ty(*m_pContext)->getPointerTo(ADDR_SPACE_CONST);
+        auto ptrTy = Type::getInt8Ty(*m_context)->getPointerTo(ADDR_SPACE_CONST);
         // Per shader table is always the second function argument
-        m_pInternalPerShaderTablePtr = MakePointer(GetFunctionArgument(m_pEntryPoint, 1, "perShaderTable"),
-                                                   pPtrTy,
+        m_internalPerShaderTablePtr = makePointer(getFunctionArgument(m_entryPoint, 1, "perShaderTable"),
+                                                   ptrTy,
                                                    InvalidValue);
     }
-    return m_pInternalPerShaderTablePtr;
+    return m_internalPerShaderTablePtr;
 }
 
 // =====================================================================================================================
 // Get number of workgroups value
-Value* ShaderSystemValues::GetNumWorkgroups()
+Value* ShaderSystemValues::getNumWorkgroups()
 {
-    if (m_pNumWorkgroups == nullptr)
+    if (m_numWorkgroups == nullptr)
     {
-        Instruction* pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
+        Instruction* insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+        auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
-        auto pNumWorkgroupPtr = GetFunctionArgument(m_pEntryPoint,
-                                                    pIntfData->entryArgIdxs.cs.numWorkgroupsPtr,
+        auto numWorkgroupPtr = getFunctionArgument(m_entryPoint,
+                                                    intfData->entryArgIdxs.cs.numWorkgroupsPtr,
                                                     "numWorkgroupsPtr");
-        auto pNumWorkgroups = new LoadInst(pNumWorkgroupPtr, "", pInsertPos);
-        pNumWorkgroups->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(pInsertPos->getContext(), {}));
-        m_pNumWorkgroups = pNumWorkgroups;
+        auto numWorkgroups = new LoadInst(numWorkgroupPtr, "", insertPos);
+        numWorkgroups->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(insertPos->getContext(), {}));
+        m_numWorkgroups = numWorkgroups;
     }
-    return m_pNumWorkgroups;
+    return m_numWorkgroups;
 }
 
 // =====================================================================================================================
 // Get spilled push constant pointer
-Value* ShaderSystemValues::GetSpilledPushConstTablePtr()
+Value* ShaderSystemValues::getSpilledPushConstTablePtr()
 {
-    if (m_pSpilledPushConstTablePtr == nullptr)
+    if (m_spilledPushConstTablePtr == nullptr)
     {
-        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
-        assert(pIntfData->pushConst.resNodeIdx != InvalidValue);
-        assert(pIntfData->entryArgIdxs.spillTable != InvalidValue);
+        auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+        assert(intfData->pushConst.resNodeIdx != InvalidValue);
+        assert(intfData->entryArgIdxs.spillTable != InvalidValue);
 
-        Instruction* pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
+        Instruction* insertPos = &*m_entryPoint->front().getFirstInsertionPt();
 
-        auto pPushConstNode = &m_pPipelineState->GetUserDataNodes()[pIntfData->pushConst.resNodeIdx];
-        unsigned pushConstOffset = pPushConstNode->offsetInDwords * sizeof(unsigned);
+        auto pushConstNode = &m_pipelineState->getUserDataNodes()[intfData->pushConst.resNodeIdx];
+        unsigned pushConstOffset = pushConstNode->offsetInDwords * sizeof(unsigned);
 
-        auto pSpillTablePtrLow = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.spillTable, "spillTable");
-        auto pSpilledPushConstTablePtrLow = BinaryOperator::CreateAdd(pSpillTablePtrLow,
-                                                                      ConstantInt::get(Type::getInt32Ty(*m_pContext),
+        auto spillTablePtrLow = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.spillTable, "spillTable");
+        auto spilledPushConstTablePtrLow = BinaryOperator::CreateAdd(spillTablePtrLow,
+                                                                      ConstantInt::get(Type::getInt32Ty(*m_context),
                                                                                        pushConstOffset),
                                                                       "",
-                                                                      pInsertPos);
-        auto pTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_pContext), InterfaceData::MaxSpillTableSize),
+                                                                      insertPos);
+        auto ty = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_context), InterfaceData::MaxSpillTableSize),
                                                  ADDR_SPACE_CONST);
-        m_pSpilledPushConstTablePtr = MakePointer(pSpilledPushConstTablePtrLow, pTy, InvalidValue);
+        m_spilledPushConstTablePtr = makePointer(spilledPushConstTablePtrLow, ty, InvalidValue);
     }
-    return m_pSpilledPushConstTablePtr;
+    return m_spilledPushConstTablePtr;
 }
 
 // =====================================================================================================================
 // Get vertex buffer table pointer
-Value* ShaderSystemValues::GetVertexBufTablePtr()
+Value* ShaderSystemValues::getVertexBufTablePtr()
 {
-    if (m_pVbTablePtr == nullptr)
+    if (m_vbTablePtr == nullptr)
     {
         // Find the node.
-        auto pVbTableNode = FindResourceNodeByType(ResourceNodeType::IndirectUserDataVaPtr);
-        if (pVbTableNode != nullptr)
+        auto vbTableNode = findResourceNodeByType(ResourceNodeType::IndirectUserDataVaPtr);
+        if (vbTableNode != nullptr)
         {
             // Get the 64-bit extended node value.
-            auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
-            auto pVbTablePtrLow = GetFunctionArgument(m_pEntryPoint,
-                                                      pIntfData->entryArgIdxs.vs.vbTablePtr,
+            auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+            auto vbTablePtrLow = getFunctionArgument(m_entryPoint,
+                                                      intfData->entryArgIdxs.vs.vbTablePtr,
                                                       "vbTablePtr");
             static const unsigned MaxVertexBufferSize = 0x10000000;
-            auto pVbTablePtrTy = PointerType::get(ArrayType::get(VectorType::get(Type::getInt32Ty(*m_pContext), 4),
+            auto vbTablePtrTy = PointerType::get(ArrayType::get(VectorType::get(Type::getInt32Ty(*m_context), 4),
                                                                  MaxVertexBufferSize),
                                                   ADDR_SPACE_CONST);
-            m_pVbTablePtr = MakePointer(pVbTablePtrLow, pVbTablePtrTy, InvalidValue);
+            m_vbTablePtr = makePointer(vbTablePtrLow, vbTablePtrTy, InvalidValue);
         }
     }
-    return m_pVbTablePtr;
+    return m_vbTablePtr;
 }
 
 // =====================================================================================================================
 // Get stream-out buffer descriptor
-Value* ShaderSystemValues::GetStreamOutBufDesc(
+Value* ShaderSystemValues::getStreamOutBufDesc(
     unsigned        xfbBuffer)      // Transform feedback buffer ID
 {
     if (m_streamOutBufDescs.size() <= xfbBuffer)
@@ -549,57 +549,57 @@ Value* ShaderSystemValues::GetStreamOutBufDesc(
 
     if (m_streamOutBufDescs[xfbBuffer] == nullptr)
     {
-        auto pStreamOutTablePtr = GetStreamOutTablePtr();
-        auto pInsertPos = pStreamOutTablePtr->getNextNode();
+        auto streamOutTablePtr = getStreamOutTablePtr();
+        auto insertPos = streamOutTablePtr->getNextNode();
 
         Value* idxs[] =
         {
-            ConstantInt::get(Type::getInt64Ty(*m_pContext), 0),
-            ConstantInt::get(Type::getInt64Ty(*m_pContext), xfbBuffer)
+            ConstantInt::get(Type::getInt64Ty(*m_context), 0),
+            ConstantInt::get(Type::getInt64Ty(*m_context), xfbBuffer)
         };
 
-        auto pStreamOutBufDescPtr = GetElementPtrInst::Create(nullptr, pStreamOutTablePtr, idxs, "", pInsertPos);
-        pStreamOutBufDescPtr->setMetadata(MetaNameUniform, MDNode::get(pStreamOutBufDescPtr->getContext(), {}));
+        auto streamOutBufDescPtr = GetElementPtrInst::Create(nullptr, streamOutTablePtr, idxs, "", insertPos);
+        streamOutBufDescPtr->setMetadata(MetaNameUniform, MDNode::get(streamOutBufDescPtr->getContext(), {}));
 
-        auto pStreamOutBufDesc = new LoadInst(pStreamOutBufDescPtr, "", pInsertPos);
-        pStreamOutBufDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(pStreamOutBufDesc->getContext(), {}));
-        pStreamOutBufDesc->setAlignment(MaybeAlign(16));
+        auto streamOutBufDesc = new LoadInst(streamOutBufDescPtr, "", insertPos);
+        streamOutBufDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(streamOutBufDesc->getContext(), {}));
+        streamOutBufDesc->setAlignment(MaybeAlign(16));
 
-        m_streamOutBufDescs[xfbBuffer] = pStreamOutBufDesc;
+        m_streamOutBufDescs[xfbBuffer] = streamOutBufDesc;
     }
     return m_streamOutBufDescs[xfbBuffer];
 }
 
 // =====================================================================================================================
 // Get stream-out buffer table pointer
-Instruction* ShaderSystemValues::GetStreamOutTablePtr()
+Instruction* ShaderSystemValues::getStreamOutTablePtr()
 {
     assert((m_shaderStage == ShaderStageVertex) ||
                 (m_shaderStage == ShaderStageTessEval) ||
                 (m_shaderStage == ShaderStageCopyShader));
 
-    if (m_pStreamOutTablePtr == nullptr)
+    if (m_streamOutTablePtr == nullptr)
     {
-        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
+        auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
         unsigned entryArgIdx = 0;
 
         if (m_shaderStage != ShaderStageCopyShader)
         {
             // Find the node.
-            auto pNode = FindResourceNodeByType(ResourceNodeType::StreamOutTableVaPtr);
-            if (pNode != nullptr)
+            auto node = findResourceNodeByType(ResourceNodeType::StreamOutTableVaPtr);
+            if (node != nullptr)
             {
                 // Get the SGPR number of the stream-out table pointer.
                 switch (m_shaderStage)
                 {
                 case ShaderStageVertex:
-                    entryArgIdx = pIntfData->entryArgIdxs.vs.streamOutData.tablePtr;
+                    entryArgIdx = intfData->entryArgIdxs.vs.streamOutData.tablePtr;
                     break;
                 case ShaderStageTessEval:
-                    entryArgIdx = pIntfData->entryArgIdxs.tes.streamOutData.tablePtr;
+                    entryArgIdx = intfData->entryArgIdxs.tes.streamOutData.tablePtr;
                     break;
                 case ShaderStageCopyShader:
-                    entryArgIdx = pIntfData->userDataUsage.gs.copyShaderStreamOutTable;
+                    entryArgIdx = intfData->userDataUsage.gs.copyShaderStreamOutTable;
                     break;
                 default:
                     llvm_unreachable("Should never be called!");
@@ -610,42 +610,42 @@ Instruction* ShaderSystemValues::GetStreamOutTablePtr()
         else
         {
             // Special case code for the copy shader.
-            entryArgIdx = pIntfData->userDataUsage.gs.copyShaderStreamOutTable;
+            entryArgIdx = intfData->userDataUsage.gs.copyShaderStreamOutTable;
         }
 
         // Get the 64-bit extended node value.
-        auto pStreamOutTablePtrLow = GetFunctionArgument(m_pEntryPoint, entryArgIdx, "streamOutTable");
-        auto pStreamOutTablePtrTy = PointerType::get(ArrayType::get(VectorType::get(Type::getInt32Ty(*m_pContext), 4),
+        auto streamOutTablePtrLow = getFunctionArgument(m_entryPoint, entryArgIdx, "streamOutTable");
+        auto streamOutTablePtrTy = PointerType::get(ArrayType::get(VectorType::get(Type::getInt32Ty(*m_context), 4),
             MaxTransformFeedbackBuffers), ADDR_SPACE_CONST);
-        m_pStreamOutTablePtr = MakePointer(pStreamOutTablePtrLow, pStreamOutTablePtrTy, InvalidValue);
+        m_streamOutTablePtr = makePointer(streamOutTablePtrLow, streamOutTablePtrTy, InvalidValue);
     }
-    return m_pStreamOutTablePtr;
+    return m_streamOutTablePtr;
 }
 
 // =====================================================================================================================
 // Make 64-bit pointer of specified type from 32-bit int, extending with the specified value, or PC if InvalidValue
-Instruction* ShaderSystemValues::MakePointer(
-    Value*    pLowValue,  // [in] 32-bit int value to extend
-    Type*     pPtrTy,     // [in] Type that result pointer needs to be
+Instruction* ShaderSystemValues::makePointer(
+    Value*    lowValue,  // [in] 32-bit int value to extend
+    Type*     ptrTy,     // [in] Type that result pointer needs to be
     unsigned  highValue)  // Value to use for high part, or InvalidValue to use PC
 {
     // Insert extending code after pLowValue if it is an instruction.
-    Instruction* pInsertPos = nullptr;
-    auto pLowValueInst = dyn_cast<Instruction>(pLowValue);
-    if (pLowValueInst != nullptr)
+    Instruction* insertPos = nullptr;
+    auto lowValueInst = dyn_cast<Instruction>(lowValue);
+    if (lowValueInst != nullptr)
     {
-        pInsertPos = pLowValueInst->getNextNode();
+        insertPos = lowValueInst->getNextNode();
     }
     else
     {
-        pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
+        insertPos = &*m_entryPoint->front().getFirstInsertionPt();
     }
 
-    Value* pExtendedPtrValue = nullptr;
+    Value* extendedPtrValue = nullptr;
     if (highValue == InvalidValue)
     {
         // Use PC.
-        if ((m_pPc == nullptr) || isa<Instruction>(pLowValue))
+        if ((m_pc == nullptr) || isa<Instruction>(lowValue))
         {
             // Either
             // 1. there is no existing code to s_getpc and cast it, or
@@ -654,134 +654,134 @@ Instruction* ShaderSystemValues::MakePointer(
             //    and rely on subsequent CSE to common it up.
             // Insert the s_getpc code at the start of the function, so a later call into here knows it can
             // reuse this PC if its pLowValue is an arg rather than an instruction.
-            auto pPcInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-            Value* pPc = EmitCall("llvm.amdgcn.s.getpc",
-                                  Type::getInt64Ty(*m_pContext),
+            auto pcInsertPos = &*m_entryPoint->front().getFirstInsertionPt();
+            Value* pc = emitCall("llvm.amdgcn.s.getpc",
+                                  Type::getInt64Ty(*m_context),
                                   ArrayRef<Value*>(),
                                   {},
-                                  pPcInsertPos);
-            m_pPc = new BitCastInst(pPc, VectorType::get(Type::getInt32Ty(*m_pContext), 2), "", pInsertPos);
+                                  pcInsertPos);
+            m_pc = new BitCastInst(pc, VectorType::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
         }
         else
         {
-            pInsertPos = m_pPc->getNextNode();
+            insertPos = m_pc->getNextNode();
         }
-        pExtendedPtrValue = m_pPc;
+        extendedPtrValue = m_pc;
     }
     else
     {
         // Use constant highValue value.
         Constant* elements[] =
         {
-            UndefValue::get(pLowValue->getType()),
-            ConstantInt::get(pLowValue->getType(), highValue)
+            UndefValue::get(lowValue->getType()),
+            ConstantInt::get(lowValue->getType(), highValue)
         };
-        pExtendedPtrValue = ConstantVector::get(elements);
+        extendedPtrValue = ConstantVector::get(elements);
     }
-    pExtendedPtrValue = InsertElementInst::Create(pExtendedPtrValue,
-                                          pLowValue,
-                                          ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+    extendedPtrValue = InsertElementInst::Create(extendedPtrValue,
+                                          lowValue,
+                                          ConstantInt::get(Type::getInt32Ty(*m_context), 0),
                                           "",
-                                          pInsertPos);
-    pExtendedPtrValue = CastInst::Create(Instruction::BitCast,
-                                         pExtendedPtrValue,
-                                         Type::getInt64Ty(*m_pContext),
+                                          insertPos);
+    extendedPtrValue = CastInst::Create(Instruction::BitCast,
+                                         extendedPtrValue,
+                                         Type::getInt64Ty(*m_context),
                                          "",
-                                         pInsertPos);
-    return CastInst::Create(Instruction::IntToPtr, pExtendedPtrValue, pPtrTy, "", pInsertPos);
+                                         insertPos);
+    return CastInst::Create(Instruction::IntToPtr, extendedPtrValue, ptrTy, "", insertPos);
 }
 
 // =====================================================================================================================
 // Get 64-bit extended resource node value
-Value* ShaderSystemValues::GetExtendedResourceNodeValue(
+Value* ShaderSystemValues::getExtendedResourceNodeValue(
     unsigned        resNodeIdx,     // Resource node index
-    Type*           pResNodeTy,     // [in] Pointer type of result
+    Type*           resNodeTy,     // [in] Pointer type of result
     unsigned        highValue)      // Value to use for high part, or InvalidValue to use PC
 {
-    return MakePointer(GetResourceNodeValue(resNodeIdx), pResNodeTy, highValue);
+    return makePointer(getResourceNodeValue(resNodeIdx), resNodeTy, highValue);
 }
 
 // =====================================================================================================================
 // Get 32 bit resource node value
-Value* ShaderSystemValues::GetResourceNodeValue(
+Value* ShaderSystemValues::getResourceNodeValue(
     unsigned        resNodeIdx)     // Resource node index
 {
-    auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-    auto pIntfData   = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
-    auto pNode = &m_pPipelineState->GetUserDataNodes()[resNodeIdx];
-    Value* pResNodeValue = nullptr;
+    auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    auto intfData   = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+    auto node = &m_pipelineState->getUserDataNodes()[resNodeIdx];
+    Value* resNodeValue = nullptr;
 
-    if ((pNode->type == ResourceNodeType::IndirectUserDataVaPtr) ||
-        (pNode->type == ResourceNodeType::StreamOutTableVaPtr))
+    if ((node->type == ResourceNodeType::IndirectUserDataVaPtr) ||
+        (node->type == ResourceNodeType::StreamOutTableVaPtr))
     {
         // Do nothing
     }
-    else if ((resNodeIdx < InterfaceData::MaxDescTableCount) && (pIntfData->entryArgIdxs.resNodeValues[resNodeIdx] > 0))
+    else if ((resNodeIdx < InterfaceData::MaxDescTableCount) && (intfData->entryArgIdxs.resNodeValues[resNodeIdx] > 0))
     {
         // Resource node isn't spilled, load its value from function argument
-        pResNodeValue = GetFunctionArgument(m_pEntryPoint,
-                                            pIntfData->entryArgIdxs.resNodeValues[resNodeIdx],
+        resNodeValue = getFunctionArgument(m_entryPoint,
+                                            intfData->entryArgIdxs.resNodeValues[resNodeIdx],
                                             Twine("resNode") + Twine(resNodeIdx));
     }
-    else if (pNode->type != ResourceNodeType::PushConst)
+    else if (node->type != ResourceNodeType::PushConst)
     {
         // Resource node is spilled, load its value from spill table
-        unsigned byteOffset = pNode->offsetInDwords * sizeof(unsigned);
+        unsigned byteOffset = node->offsetInDwords * sizeof(unsigned);
 
         Value* idxs[] =
         {
-          ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
-          ConstantInt::get(Type::getInt32Ty(*m_pContext), byteOffset)
+          ConstantInt::get(Type::getInt32Ty(*m_context), 0),
+          ConstantInt::get(Type::getInt32Ty(*m_context), byteOffset)
         };
-        auto pSpillTablePtr = GetSpillTablePtr();
-        pInsertPos = pSpillTablePtr->getNextNode();
-        auto pElemPtr = GetElementPtrInst::CreateInBounds(pSpillTablePtr, idxs, "", pInsertPos);
+        auto spillTablePtr = getSpillTablePtr();
+        insertPos = spillTablePtr->getNextNode();
+        auto elemPtr = GetElementPtrInst::CreateInBounds(spillTablePtr, idxs, "", insertPos);
 
-        Type* pResNodePtrTy = nullptr;
+        Type* resNodePtrTy = nullptr;
 
-        if  ((pNode->type == ResourceNodeType::DescriptorResource) ||
-             (pNode->type == ResourceNodeType::DescriptorSampler) ||
-             (pNode->type == ResourceNodeType::DescriptorTexelBuffer) ||
-             (pNode->type == ResourceNodeType::DescriptorFmask) ||
-             (pNode->type == ResourceNodeType::DescriptorBuffer) ||
-             (pNode->type == ResourceNodeType::DescriptorBufferCompact))
+        if  ((node->type == ResourceNodeType::DescriptorResource) ||
+             (node->type == ResourceNodeType::DescriptorSampler) ||
+             (node->type == ResourceNodeType::DescriptorTexelBuffer) ||
+             (node->type == ResourceNodeType::DescriptorFmask) ||
+             (node->type == ResourceNodeType::DescriptorBuffer) ||
+             (node->type == ResourceNodeType::DescriptorBufferCompact))
         {
-            pResNodePtrTy = VectorType::get(Type::getInt32Ty(*m_pContext),
-                                            pNode->sizeInDwords)->getPointerTo(ADDR_SPACE_CONST);
+            resNodePtrTy = VectorType::get(Type::getInt32Ty(*m_context),
+                                            node->sizeInDwords)->getPointerTo(ADDR_SPACE_CONST);
         }
         else
         {
-            pResNodePtrTy = Type::getInt32Ty(*m_pContext)->getPointerTo(ADDR_SPACE_CONST);
+            resNodePtrTy = Type::getInt32Ty(*m_context)->getPointerTo(ADDR_SPACE_CONST);
         }
 
-        auto pResNodePtr = BitCastInst::CreatePointerCast(pElemPtr, pResNodePtrTy, "", pInsertPos);
-        pResNodePtr->setMetadata(MetaNameUniform, MDNode::get(pResNodePtr->getContext(), {}));
+        auto resNodePtr = BitCastInst::CreatePointerCast(elemPtr, resNodePtrTy, "", insertPos);
+        resNodePtr->setMetadata(MetaNameUniform, MDNode::get(resNodePtr->getContext(), {}));
 
-        pResNodeValue = new LoadInst(pResNodePtr, "", pInsertPos);
+        resNodeValue = new LoadInst(resNodePtr, "", insertPos);
     }
-    assert(pResNodeValue != nullptr);
-    return pResNodeValue;
+    assert(resNodeValue != nullptr);
+    return resNodeValue;
 }
 
 // =====================================================================================================================
 // Get spill table pointer
-Instruction* ShaderSystemValues::GetSpillTablePtr()
+Instruction* ShaderSystemValues::getSpillTablePtr()
 {
-    if (m_pSpillTablePtr == nullptr)
+    if (m_spillTablePtr == nullptr)
     {
-        auto pIntfData   = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
-        auto pSpillTablePtrLow = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.spillTable, "spillTable");
-        auto pSpillTablePtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_pContext),
+        auto intfData   = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+        auto spillTablePtrLow = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.spillTable, "spillTable");
+        auto spillTablePtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_context),
                                                                 InterfaceData::MaxSpillTableSize),
                                                  ADDR_SPACE_CONST);
-        m_pSpillTablePtr = MakePointer(pSpillTablePtrLow, pSpillTablePtrTy, InvalidValue);
+        m_spillTablePtr = makePointer(spillTablePtrLow, spillTablePtrTy, InvalidValue);
     }
-    return m_pSpillTablePtr;
+    return m_spillTablePtr;
 }
 
 // =====================================================================================================================
 // Load descriptor from driver table
-Instruction* ShaderSystemValues::LoadDescFromDriverTable(
+Instruction* ShaderSystemValues::loadDescFromDriverTable(
     unsigned tableOffset,    // Byte offset in driver table
     BuilderBase& builder)    // Builder to use for insertion
 {
@@ -791,47 +791,47 @@ Instruction* ShaderSystemValues::LoadDescFromDriverTable(
         builder.getInt32(tableOffset),
         builder.getInt32(0),
     };
-    return builder.CreateNamedCall(lgcName::DescriptorLoadBuffer,
-                                   VectorType::get(Type::getInt32Ty(*m_pContext), 4),
+    return builder.createNamedCall(lgcName::DescriptorLoadBuffer,
+                                   VectorType::get(Type::getInt32Ty(*m_context), 4),
                                    args,
                                    {});
 }
 
 // =====================================================================================================================
 // Explicitly set the DATA_FORMAT of ring buffer descriptor.
-Value* ShaderSystemValues::SetRingBufferDataFormat(
-    Value*          pBufDesc,       // [in] Buffer Descriptor
+Value* ShaderSystemValues::setRingBufferDataFormat(
+    Value*          bufDesc,       // [in] Buffer Descriptor
     unsigned        dataFormat,     // Data format
     BuilderBase&    builder         // [in] Builder to use for inserting instructions
     ) const
 {
-    Value* pElem3 = builder.CreateExtractElement(pBufDesc, (uint64_t)3);
+    Value* elem3 = builder.CreateExtractElement(bufDesc, (uint64_t)3);
 
     SqBufRsrcWord3 dataFormatClearMask;
     dataFormatClearMask.u32All = UINT32_MAX;
     // TODO: This code needs to be fixed for gfx10; buffer format is handled differently.
-    dataFormatClearMask.gfx6.DATA_FORMAT = 0;
-    pElem3 = builder.CreateAnd(pElem3, builder.getInt32(dataFormatClearMask.u32All));
+    dataFormatClearMask.gfx6.dataFormat = 0;
+    elem3 = builder.CreateAnd(elem3, builder.getInt32(dataFormatClearMask.u32All));
 
     SqBufRsrcWord3 dataFormatSetValue = {};
-    dataFormatSetValue.gfx6.DATA_FORMAT = dataFormat;
-    pElem3 = builder.CreateOr(pElem3, builder.getInt32(dataFormatSetValue.u32All));
+    dataFormatSetValue.gfx6.dataFormat = dataFormat;
+    elem3 = builder.CreateOr(elem3, builder.getInt32(dataFormatSetValue.u32All));
 
-    return builder.CreateInsertElement(pBufDesc, pElem3, (uint64_t)3);
+    return builder.CreateInsertElement(bufDesc, elem3, (uint64_t)3);
 }
 
 // =====================================================================================================================
 // Find resource node by type
-const ResourceNode* ShaderSystemValues::FindResourceNodeByType(
+const ResourceNode* ShaderSystemValues::findResourceNodeByType(
     ResourceNodeType type)           // Resource node type to find
 {
-    auto userDataNodes = m_pPipelineState->GetUserDataNodes();
+    auto userDataNodes = m_pipelineState->getUserDataNodes();
     for (unsigned i = 0; i < userDataNodes.size(); ++i)
     {
-        auto pNode = &userDataNodes[i];
-        if (pNode->type == type)
+        auto node = &userDataNodes[i];
+        if (node->type == type)
         {
-            return pNode;
+            return node;
         }
     }
     return nullptr;
@@ -839,15 +839,15 @@ const ResourceNode* ShaderSystemValues::FindResourceNodeByType(
 
 // =====================================================================================================================
 // Find resource node by descriptor set ID
-unsigned ShaderSystemValues::FindResourceNodeByDescSet(
+unsigned ShaderSystemValues::findResourceNodeByDescSet(
     unsigned        descSet)        // Descriptor set to find
 {
-    auto userDataNodes = m_pPipelineState->GetUserDataNodes();
+    auto userDataNodes = m_pipelineState->getUserDataNodes();
     for (unsigned i = 0; i < userDataNodes.size(); ++i)
     {
-        auto pNode = &userDataNodes[i];
-        if ((pNode->type == ResourceNodeType::DescriptorTableVaPtr) &&
-              (pNode->innerTable[0].set == descSet))
+        auto node = &userDataNodes[i];
+        if ((node->type == ResourceNodeType::DescriptorTableVaPtr) &&
+              (node->innerTable[0].set == descSet))
         {
             return i;
         }
@@ -857,7 +857,7 @@ unsigned ShaderSystemValues::FindResourceNodeByDescSet(
 
 // =====================================================================================================================
 // Test if shadow descriptor table is enabled
-bool ShaderSystemValues::IsShadowDescTableEnabled() const
+bool ShaderSystemValues::isShadowDescTableEnabled() const
 {
     return m_enableShadowDescTable;
 }

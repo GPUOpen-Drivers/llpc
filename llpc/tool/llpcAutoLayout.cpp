@@ -72,88 +72,88 @@ static const unsigned OffsetStrideInDwords = 12;
 // =====================================================================================================================
 // Get the storage size in bytes of a SPIR-V type.
 // This does not need to be completely accurate, as it is only used to fake up a push constant user data node.
-static unsigned GetTypeDataSize(
-    const SPIRVType*  pTy)  // [in] Type to determine the data size of
+static unsigned getTypeDataSize(
+    const SPIRVType*  ty)  // [in] Type to determine the data size of
 {
-    switch (pTy->getOpCode())
+    switch (ty->getOpCode())
     {
     case OpTypeVector:
-        return GetTypeDataSize(pTy->getVectorComponentType()) * pTy->getVectorComponentCount();
+        return getTypeDataSize(ty->getVectorComponentType()) * ty->getVectorComponentCount();
     case OpTypeMatrix:
-        return GetTypeDataSize(pTy->getMatrixColumnType()) * pTy->getMatrixColumnCount();
+        return getTypeDataSize(ty->getMatrixColumnType()) * ty->getMatrixColumnCount();
     case OpTypeArray:
-        return GetTypeDataSize(pTy->getArrayElementType()) * pTy->getArrayLength();
+        return getTypeDataSize(ty->getArrayElementType()) * ty->getArrayLength();
     case OpTypeStruct:
         {
             unsigned totalSize = 0;
-            for (unsigned memberIdx = 0; memberIdx < pTy->getStructMemberCount(); ++memberIdx)
+            for (unsigned memberIdx = 0; memberIdx < ty->getStructMemberCount(); ++memberIdx)
             {
-                totalSize += GetTypeDataSize(pTy->getStructMemberType(memberIdx));
+                totalSize += getTypeDataSize(ty->getStructMemberType(memberIdx));
             }
             return totalSize;
         }
     default:
-        return (pTy->getBitWidth() + 7) / 8;
+        return (ty->getBitWidth() + 7) / 8;
     }
 }
 
 // =====================================================================================================================
 // Find VaPtr userDataNode with specified set.
-static const ResourceMappingNode* FindDescriptorTableVaPtr(
-    PipelineShaderInfo*         pShaderInfo,                 // [in] Shader info, will have user data nodes added to it
+static const ResourceMappingNode* findDescriptorTableVaPtr(
+    PipelineShaderInfo*         shaderInfo,                 // [in] Shader info, will have user data nodes added to it
     unsigned set)                                            // [in] Accroding this set to find ResourceMappingNode
 {
-    const ResourceMappingNode* pDescriptorTableVaPtr = nullptr;
+    const ResourceMappingNode* descriptorTableVaPtr = nullptr;
 
-    for (unsigned k = 0; k < pShaderInfo->userDataNodeCount; ++k)
+    for (unsigned k = 0; k < shaderInfo->userDataNodeCount; ++k)
     {
-        const ResourceMappingNode* pUserDataNode = &pShaderInfo->pUserDataNodes[k];
+        const ResourceMappingNode* userDataNode = &shaderInfo->pUserDataNodes[k];
 
-        if (pUserDataNode->type == Llpc::ResourceMappingNodeType::DescriptorTableVaPtr)
+        if (userDataNode->type == Llpc::ResourceMappingNodeType::DescriptorTableVaPtr)
         {
-            if (pUserDataNode->tablePtr.pNext[0].srdRange.set == set)
+            if (userDataNode->tablePtr.pNext[0].srdRange.set == set)
             {
-                pDescriptorTableVaPtr = pUserDataNode;
+                descriptorTableVaPtr = userDataNode;
                 break;
             }
         }
     }
 
-    return pDescriptorTableVaPtr;
+    return descriptorTableVaPtr;
 }
 
 // =====================================================================================================================
 // Find userDataNode with specified set and binding. And return Node index.
-static const ResourceMappingNode* FindResourceNode(
-    const ResourceMappingNode* pUserDataNode, // [in] ResourceMappingNode pointer
+static const ResourceMappingNode* findResourceNode(
+    const ResourceMappingNode* userDataNode, // [in] ResourceMappingNode pointer
     unsigned                   nodeCount,     // [in] User data node count
     unsigned                   set,           // [in] find same set in node array
     unsigned                   binding,       // [in] find same binding in node array
     unsigned*                  index)         // [out] Return node position in node array
 {
-    const ResourceMappingNode* pResourceNode = nullptr;
+    const ResourceMappingNode* resourceNode = nullptr;
 
     for (unsigned j = 0; j < nodeCount; ++j)
     {
-        const ResourceMappingNode* pNext = &pUserDataNode[j];
+        const ResourceMappingNode* next = &userDataNode[j];
 
-        if((set == pNext->srdRange.set) && (binding == pNext->srdRange.binding))
+        if((set == next->srdRange.set) && (binding == next->srdRange.binding))
         {
-            pResourceNode = pNext;
+            resourceNode = next;
             *index = j;
             break;
         }
     }
 
-    return pResourceNode;
+    return resourceNode;
 }
 
 // =====================================================================================================================
 // Compare if pAutoLayoutUserDataNodes is subset of pUserDataNodes.
-bool CheckShaderInfoComptible(
-    PipelineShaderInfo*         pShaderInfo,                 // [in/out] Shader info, will have user data nodes added to it
+bool checkShaderInfoComptible(
+    PipelineShaderInfo*         shaderInfo,                 // [in/out] Shader info, will have user data nodes added to it
     unsigned                    autoLayoutUserDataNodeCount, // [in] UserData Node count
-    const ResourceMappingNode*  pAutoLayoutUserDataNodes)    // [in] ResourceMappingNode
+    const ResourceMappingNode*  autoLayoutUserDataNodes)    // [in] ResourceMappingNode
 {
     bool hit = false;
 
@@ -161,43 +161,43 @@ bool CheckShaderInfoComptible(
     {
         hit = true;
     }
-    else if ((pShaderInfo->pDescriptorRangeValues != nullptr) || (pShaderInfo->pSpecializationInfo->dataSize != 0))
+    else if ((shaderInfo->pDescriptorRangeValues != nullptr) || (shaderInfo->pSpecializationInfo->dataSize != 0))
     {
         hit = false;
     }
-    else if (pShaderInfo->userDataNodeCount >= autoLayoutUserDataNodeCount)
+    else if (shaderInfo->userDataNodeCount >= autoLayoutUserDataNodeCount)
     {
         for (unsigned n = 0; n < autoLayoutUserDataNodeCount; ++n)
         {
-            const ResourceMappingNode* pAutoLayoutUserDataNode = &pAutoLayoutUserDataNodes[n];
+            const ResourceMappingNode* autoLayoutUserDataNode = &autoLayoutUserDataNodes[n];
 
             // Multiple levels
-            if (pAutoLayoutUserDataNode->type == Llpc::ResourceMappingNodeType::DescriptorTableVaPtr)
+            if (autoLayoutUserDataNode->type == Llpc::ResourceMappingNodeType::DescriptorTableVaPtr)
             {
-                unsigned set = pAutoLayoutUserDataNode->tablePtr.pNext[0].srdRange.set;
-                const ResourceMappingNode* pUserDataNode = FindDescriptorTableVaPtr(pShaderInfo, set);
+                unsigned set = autoLayoutUserDataNode->tablePtr.pNext[0].srdRange.set;
+                const ResourceMappingNode* userDataNode = findDescriptorTableVaPtr(shaderInfo, set);
 
-                if (pUserDataNode != nullptr)
+                if (userDataNode != nullptr)
                 {
                     bool hitNode = false;
-                    for (unsigned i = 0; i < pAutoLayoutUserDataNode->tablePtr.nodeCount; ++i)
+                    for (unsigned i = 0; i < autoLayoutUserDataNode->tablePtr.nodeCount; ++i)
                     {
-                        const ResourceMappingNode* pAutoLayoutNext = &pAutoLayoutUserDataNode->tablePtr.pNext[i];
+                        const ResourceMappingNode* autoLayoutNext = &autoLayoutUserDataNode->tablePtr.pNext[i];
 
                         unsigned index = 0;
-                        const ResourceMappingNode* pNode = FindResourceNode(
-                                                            pUserDataNode->tablePtr.pNext,
-                                                            pUserDataNode->tablePtr.nodeCount,
-                                                            pAutoLayoutNext->srdRange.set,
-                                                            pAutoLayoutNext->srdRange.binding,
+                        const ResourceMappingNode* node = findResourceNode(
+                                                            userDataNode->tablePtr.pNext,
+                                                            userDataNode->tablePtr.nodeCount,
+                                                            autoLayoutNext->srdRange.set,
+                                                            autoLayoutNext->srdRange.binding,
                                                             &index);
 
-                        if (pNode != nullptr)
+                        if (node != nullptr)
                         {
-                            if ((pAutoLayoutNext->type == pNode->type) &&
-                                (pAutoLayoutNext->sizeInDwords == pNode->sizeInDwords) &&
-                                (pAutoLayoutNext->sizeInDwords <= OffsetStrideInDwords) &&
-                                (pAutoLayoutNext->offsetInDwords == (index * OffsetStrideInDwords)))
+                            if ((autoLayoutNext->type == node->type) &&
+                                (autoLayoutNext->sizeInDwords == node->sizeInDwords) &&
+                                (autoLayoutNext->sizeInDwords <= OffsetStrideInDwords) &&
+                                (autoLayoutNext->offsetInDwords == (index * OffsetStrideInDwords)))
                             {
                                 hitNode = true;
                                 continue;
@@ -206,14 +206,14 @@ bool CheckShaderInfoComptible(
                             {
                                 outs() << "AutoLayoutNode:"
                                        << "\n ->type                    : "
-                                       << format("0x%016" PRIX64, static_cast<unsigned>(pAutoLayoutNext->type))
-                                       << "\n ->sizeInDwords            : " << pAutoLayoutNext->sizeInDwords
-                                       << "\n ->offsetInDwords          : " << pAutoLayoutNext->offsetInDwords;
+                                       << format("0x%016" PRIX64, static_cast<unsigned>(autoLayoutNext->type))
+                                       << "\n ->sizeInDwords            : " << autoLayoutNext->sizeInDwords
+                                       << "\n ->offsetInDwords          : " << autoLayoutNext->offsetInDwords;
 
                                 outs() << "\nShaderInfoNode:"
                                        << "\n ->type                    : "
-                                       << format("0x%016" PRIX64, static_cast<unsigned>(pNode->type))
-                                       << "\n ->sizeInDwords            : " << pNode->sizeInDwords
+                                       << format("0x%016" PRIX64, static_cast<unsigned>(node->type))
+                                       << "\n ->sizeInDwords            : " << node->sizeInDwords
                                        << "\n OffsetStrideInDwords      : " << OffsetStrideInDwords
                                        << "\n index*OffsetStrideInDwords: " << (index * OffsetStrideInDwords) << "\n";
                                 hitNode = false;
@@ -245,13 +245,13 @@ bool CheckShaderInfoComptible(
             else
             {
                 unsigned index = 0;
-                const ResourceMappingNode* pNode = FindResourceNode(
-                                                            pShaderInfo->pUserDataNodes,
-                                                            pShaderInfo->userDataNodeCount,
-                                                            pAutoLayoutUserDataNode->srdRange.set,
-                                                            pAutoLayoutUserDataNode->srdRange.binding,
+                const ResourceMappingNode* node = findResourceNode(
+                                                            shaderInfo->pUserDataNodes,
+                                                            shaderInfo->userDataNodeCount,
+                                                            autoLayoutUserDataNode->srdRange.set,
+                                                            autoLayoutUserDataNode->srdRange.binding,
                                                             &index);
-                if ((pNode != nullptr) && (pAutoLayoutUserDataNode->sizeInDwords == pNode->sizeInDwords))
+                if ((node != nullptr) && (autoLayoutUserDataNode->sizeInDwords == node->sizeInDwords))
                 {
                     hit = true;
                     continue;
@@ -270,29 +270,29 @@ bool CheckShaderInfoComptible(
 
 // =====================================================================================================================
 // Compare if neccessary pipeline state is same.
-bool CheckPipelineStateCompatible(
-        const ICompiler*                  pCompiler,                // [in] LLPC compiler object
-        Llpc::GraphicsPipelineBuildInfo*  pPipelineInfo,            // [in] Graphics pipeline info
-        Llpc::GraphicsPipelineBuildInfo*  pAutoLayoutPipelineInfo,  // [in] layout pipeline info
+bool checkPipelineStateCompatible(
+        const ICompiler*                  compiler,                // [in] LLPC compiler object
+        Llpc::GraphicsPipelineBuildInfo*  pipelineInfo,            // [in] Graphics pipeline info
+        Llpc::GraphicsPipelineBuildInfo*  autoLayoutPipelineInfo,  // [in] layout pipeline info
         Llpc::GfxIpVersion                gfxIp)                    // Graphics IP version
 {
     bool compatible = true;
 
-    auto pCbState = &pPipelineInfo->cbState;
-    auto pAutoLayoutCbState = &pAutoLayoutPipelineInfo->cbState;
+    auto cbState = &pipelineInfo->cbState;
+    auto autoLayoutCbState = &autoLayoutPipelineInfo->cbState;
 
     for (unsigned i = 0; i < MaxColorTargets; ++i)
     {
-        if (pCbState->target[i].format != VK_FORMAT_UNDEFINED)
+        if (cbState->target[i].format != VK_FORMAT_UNDEFINED)
         {
             // NOTE: Alpha-to-coverage only take effect for output from color target 0.
-            const bool enableAlphaToCoverage = pCbState->alphaToCoverageEnable && (i == 0);
-            unsigned exportFormat = pCompiler->ConvertColorBufferFormatToExportFormat(
-                                                            &pCbState->target[i],
+            const bool enableAlphaToCoverage = cbState->alphaToCoverageEnable && (i == 0);
+            unsigned exportFormat = compiler->ConvertColorBufferFormatToExportFormat(
+                                                            &cbState->target[i],
                                                             enableAlphaToCoverage);
-            const bool autoLayoutEnableAlphaToCoverage = pAutoLayoutCbState->alphaToCoverageEnable && (i == 0);
-            unsigned autoLayoutExportFormat = pCompiler->ConvertColorBufferFormatToExportFormat(
-                                                            &pAutoLayoutCbState->target[i],
+            const bool autoLayoutEnableAlphaToCoverage = autoLayoutCbState->alphaToCoverageEnable && (i == 0);
+            unsigned autoLayoutExportFormat = compiler->ConvertColorBufferFormatToExportFormat(
+                                                            &autoLayoutCbState->target[i],
                                                             autoLayoutEnableAlphaToCoverage);
 
             if (exportFormat != autoLayoutExportFormat)
@@ -318,12 +318,12 @@ bool CheckPipelineStateCompatible(
 // Lay out dummy descriptors and other information for one shader stage. This is used when running amdllpc on a single
 // SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be leaked, but that does not
 // matter because we are running a short-lived command-line utility.
-void DoAutoLayoutDesc(
+void doAutoLayoutDesc(
     ShaderStage                 shaderStage,    // Shader stage
     BinaryData                  spirvBin,       // SPIR-V binary
-    GraphicsPipelineBuildInfo*  pPipelineInfo,  // [in/out] Graphics pipeline info, will have dummy information filled
+    GraphicsPipelineBuildInfo*  pipelineInfo,  // [in/out] Graphics pipeline info, will have dummy information filled
                                                 //   in. nullptr if not a graphics pipeline.
-    PipelineShaderInfo*         pShaderInfo,    // [in/out] Shader info, will have user data nodes added to it
+    PipelineShaderInfo*         shaderInfo,    // [in/out] Shader info, will have user data nodes added to it
     unsigned&                   topLevelOffset, // [in/out] User data offset; ensures that multiple shader stages use
                                                 //    disjoint offsets
     bool                        checkAutoLayoutCompatible) // [in] if check AutoLayout Compatiple
@@ -335,64 +335,64 @@ void DoAutoLayoutDesc(
     spirvStream >> *module;
 
     // Find the entry target.
-    SPIRVEntryPoint* pEntryPoint = nullptr;
-    SPIRVFunction* pFunc = nullptr;
+    SPIRVEntryPoint* entryPoint = nullptr;
+    SPIRVFunction* func = nullptr;
     for (unsigned i = 0, funcCount = module->getNumFunctions(); i < funcCount; ++i)
     {
-        pFunc = module->getFunction(i);
-        pEntryPoint = module->getEntryPoint(pFunc->getId());
-        if ((pEntryPoint != nullptr) &&
-            (pEntryPoint->getExecModel() == SPIRVExecutionModelKind(shaderStage)) &&
-            (pEntryPoint->getName() == pShaderInfo->pEntryTarget))
+        func = module->getFunction(i);
+        entryPoint = module->getEntryPoint(func->getId());
+        if ((entryPoint != nullptr) &&
+            (entryPoint->getExecModel() == SPIRVExecutionModelKind(shaderStage)) &&
+            (entryPoint->getName() == shaderInfo->pEntryTarget))
         {
             break;
         }
-        pFunc = nullptr;
+        func = nullptr;
     }
-    if (pEntryPoint == nullptr)
+    if (entryPoint == nullptr)
     {
         return;
     }
 
     // Shader stage specific processing
-    auto inOuts = pEntryPoint->getInOuts();
+    auto inOuts = entryPoint->getInOuts();
     if (shaderStage == ShaderStageVertex)
     {
         // Create dummy vertex info
-        auto pVertexBindings = new std::vector<VkVertexInputBindingDescription>;
-        auto pVertexAttribs = new std::vector<VkVertexInputAttributeDescription>;
+        auto vertexBindings = new std::vector<VkVertexInputBindingDescription>;
+        auto vertexAttribs = new std::vector<VkVertexInputAttributeDescription>;
 
         for (auto varId : ArrayRef<SPIRVWord>(inOuts.first, inOuts.second))
         {
-            auto pVar = static_cast<SPIRVVariable*>(module->getValue(varId));
-            if (pVar->getStorageClass() == StorageClassInput)
+            auto var = static_cast<SPIRVVariable*>(module->getValue(varId));
+            if (var->getStorageClass() == StorageClassInput)
             {
                 SPIRVWord location = SPIRVID_INVALID;
-                if (pVar->hasDecorate(DecorationLocation, 0, &location))
+                if (var->hasDecorate(DecorationLocation, 0, &location))
                 {
-                    auto pVarElemTy = pVar->getType()->getPointerElementType();
-                    if (pVarElemTy->getOpCode() == OpTypeArray)
+                    auto varElemTy = var->getType()->getPointerElementType();
+                    if (varElemTy->getOpCode() == OpTypeArray)
                     {
-                        pVarElemTy = pVarElemTy->getArrayElementType();
+                        varElemTy = varElemTy->getArrayElementType();
                     }
 
-                    if (pVarElemTy->getOpCode() == OpTypeMatrix)
+                    if (varElemTy->getOpCode() == OpTypeMatrix)
                     {
-                        pVarElemTy = pVarElemTy->getMatrixColumnType();
+                        varElemTy = varElemTy->getMatrixColumnType();
                     }
 
-                    if (pVarElemTy->getOpCode() == OpTypeVector)
+                    if (varElemTy->getOpCode() == OpTypeVector)
                     {
-                        pVarElemTy = pVarElemTy->getVectorComponentType();
+                        varElemTy = varElemTy->getVectorComponentType();
                     }
 
                     VkFormat format = VK_FORMAT_UNDEFINED;
-                    switch (pVarElemTy->getOpCode())
+                    switch (varElemTy->getOpCode())
                     {
                     case OpTypeInt:
                         {
-                            bool isSigned = reinterpret_cast<SPIRVTypeInt*>(pVarElemTy)->isSigned();
-                            switch (pVarElemTy->getIntegerBitWidth())
+                            bool isSigned = reinterpret_cast<SPIRVTypeInt*>(varElemTy)->isSigned();
+                            switch (varElemTy->getIntegerBitWidth())
                             {
                             case 8:
                                 format = isSigned ? VK_FORMAT_R8G8B8A8_SINT : VK_FORMAT_R8G8B8A8_UINT;
@@ -411,7 +411,7 @@ void DoAutoLayoutDesc(
                         }
                     case OpTypeFloat:
                         {
-                            switch (pVarElemTy->getFloatBitWidth())
+                            switch (varElemTy->getFloatBitWidth())
                             {
                             case 16:
                                 format = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -443,51 +443,51 @@ void DoAutoLayoutDesc(
                     vertexAttrib.offset     = 0;
                     vertexAttrib.format     = format;
 
-                    pVertexBindings->push_back(vertexBinding);
-                    pVertexAttribs->push_back(vertexAttrib);
+                    vertexBindings->push_back(vertexBinding);
+                    vertexAttribs->push_back(vertexAttrib);
                 }
             }
         }
 
-        auto pVertexInputState = new VkPipelineVertexInputStateCreateInfo;
-        pPipelineInfo->pVertexInput = pVertexInputState;
-        pVertexInputState->sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        pVertexInputState->pNext = nullptr;
-        pVertexInputState->vertexBindingDescriptionCount = pVertexBindings->size();
-        pVertexInputState->pVertexBindingDescriptions = pVertexBindings->data();
-        pVertexInputState->vertexAttributeDescriptionCount = pVertexAttribs->size();
-        pVertexInputState->pVertexAttributeDescriptions = pVertexAttribs->data();
+        auto vertexInputState = new VkPipelineVertexInputStateCreateInfo;
+        pipelineInfo->pVertexInput = vertexInputState;
+        vertexInputState->sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInputState->pNext = nullptr;
+        vertexInputState->vertexBindingDescriptionCount = vertexBindings->size();
+        vertexInputState->pVertexBindingDescriptions = vertexBindings->data();
+        vertexInputState->vertexAttributeDescriptionCount = vertexAttribs->size();
+        vertexInputState->pVertexAttributeDescriptions = vertexAttribs->data();
 
         // Set primitive topology
-        pPipelineInfo->iaState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        pipelineInfo->iaState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     }
     else if ((shaderStage == ShaderStageTessControl) || (shaderStage == ShaderStageTessEval))
     {
         // Set primitive topology and patch control points
-        pPipelineInfo->iaState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-        pPipelineInfo->iaState.patchControlPoints = 3;
+        pipelineInfo->iaState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        pipelineInfo->iaState.patchControlPoints = 3;
     }
     else if (shaderStage == ShaderStageGeometry)
     {
         // Set primitive topology
         auto topology = VkPrimitiveTopology(0);
-        if (pFunc->getExecutionMode(ExecutionModeInputPoints))
+        if (func->getExecutionMode(ExecutionModeInputPoints))
         {
             topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
         }
-        else if (pFunc->getExecutionMode(ExecutionModeInputLines))
+        else if (func->getExecutionMode(ExecutionModeInputLines))
         {
             topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
         }
-        else if (pFunc->getExecutionMode(ExecutionModeInputLinesAdjacency))
+        else if (func->getExecutionMode(ExecutionModeInputLinesAdjacency))
         {
             topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
         }
-        else if (pFunc->getExecutionMode(ExecutionModeTriangles))
+        else if (func->getExecutionMode(ExecutionModeTriangles))
         {
             topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         }
-        else if (pFunc->getExecutionMode(ExecutionModeInputTrianglesAdjacency))
+        else if (func->getExecutionMode(ExecutionModeInputTrianglesAdjacency))
         {
             topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY;
         }
@@ -495,122 +495,122 @@ void DoAutoLayoutDesc(
         {
             llvm_unreachable("Should never be called!");
         }
-        pPipelineInfo->iaState.topology = topology;
+        pipelineInfo->iaState.topology = topology;
     }
     else if (shaderStage == ShaderStageFragment)
     {
         // Set dummy color formats for fragment outputs
         for (auto varId : ArrayRef<SPIRVWord>(inOuts.first, inOuts.second))
         {
-            auto pVar = static_cast<SPIRVVariable*>(module->getValue(varId));
-            if (pVar->getStorageClass() != StorageClassOutput)
+            auto var = static_cast<SPIRVVariable*>(module->getValue(varId));
+            if (var->getStorageClass() != StorageClassOutput)
             {
                 continue;
             }
 
             SPIRVWord location = SPIRVID_INVALID;
-            if (pVar->hasDecorate(DecorationLocation, 0, &location) == false)
+            if (var->hasDecorate(DecorationLocation, 0, &location) == false)
             {
                 continue;
             }
 
-            SPIRVType* pVarElemTy = pVar->getType()->getPointerElementType();
+            SPIRVType* varElemTy = var->getType()->getPointerElementType();
             unsigned elemCount = 1;
-            if (pVarElemTy->getOpCode() == OpTypeVector)
+            if (varElemTy->getOpCode() == OpTypeVector)
             {
-                elemCount = pVarElemTy->getVectorComponentCount();
-                pVarElemTy = pVarElemTy->getVectorComponentType();
+                elemCount = varElemTy->getVectorComponentCount();
+                varElemTy = varElemTy->getVectorComponentType();
             }
-            static const VkFormat undefinedFormatTable[] =
+            static const VkFormat UndefinedFormatTable[] =
             {
                 VK_FORMAT_UNDEFINED,
                 VK_FORMAT_UNDEFINED,
                 VK_FORMAT_UNDEFINED,
                 VK_FORMAT_UNDEFINED,
             };
-            const VkFormat* pFormatTable = undefinedFormatTable;
+            const VkFormat* formatTable = UndefinedFormatTable;
 
-            switch (pVarElemTy->getOpCode())
+            switch (varElemTy->getOpCode())
             {
             case OpTypeInt:
                 {
-                    switch (pVarElemTy->getIntegerBitWidth())
+                    switch (varElemTy->getIntegerBitWidth())
                     {
                     case 8:
                         {
-                            if (reinterpret_cast<SPIRVTypeInt*>(pVarElemTy)->isSigned())
+                            if (reinterpret_cast<SPIRVTypeInt*>(varElemTy)->isSigned())
                             {
-                                static const VkFormat formatTable[] =
+                                static const VkFormat FormatTable[] =
                                 {
                                     VK_FORMAT_R8_SINT,
                                     VK_FORMAT_R8G8_SINT,
                                     VK_FORMAT_R8G8B8_SINT,
                                     VK_FORMAT_R8G8B8A8_SINT,
                                 };
-                                pFormatTable = formatTable;
+                                formatTable = FormatTable;
                             }
                             else
                             {
-                                static const VkFormat formatTable[] =
+                                static const VkFormat FormatTable[] =
                                 {
                                     VK_FORMAT_R8_UINT,
                                     VK_FORMAT_R8G8_UINT,
                                     VK_FORMAT_R8G8B8_UINT,
                                     VK_FORMAT_R8G8B8A8_UINT,
                                 };
-                                pFormatTable = formatTable;
+                                formatTable = FormatTable;
                             }
                             break;
                         }
                     case 16:
                         {
-                            if (reinterpret_cast<SPIRVTypeInt*>(pVarElemTy)->isSigned())
+                            if (reinterpret_cast<SPIRVTypeInt*>(varElemTy)->isSigned())
                             {
-                                static const VkFormat formatTable[] =
+                                static const VkFormat FormatTable[] =
                                 {
                                     VK_FORMAT_R16_SINT,
                                     VK_FORMAT_R16G16_SINT,
                                     VK_FORMAT_R16G16B16_SINT,
                                     VK_FORMAT_R16G16B16A16_SINT,
                                 };
-                                pFormatTable = formatTable;
+                                formatTable = FormatTable;
                             }
                             else
                             {
-                                static const VkFormat formatTable[] =
+                                static const VkFormat FormatTable[] =
                                 {
                                     VK_FORMAT_R16_UINT,
                                     VK_FORMAT_R16G16_UINT,
                                     VK_FORMAT_R16G16B16_UINT,
                                     VK_FORMAT_R16G16B16A16_UINT,
                                 };
-                                pFormatTable = formatTable;
+                                formatTable = FormatTable;
                             }
                             break;
                         }
                     case 32:
                         {
-                            if (reinterpret_cast<SPIRVTypeInt*>(pVarElemTy)->isSigned())
+                            if (reinterpret_cast<SPIRVTypeInt*>(varElemTy)->isSigned())
                             {
-                                static const VkFormat formatTable[] =
+                                static const VkFormat FormatTable[] =
                                 {
                                     VK_FORMAT_R32_SINT,
                                     VK_FORMAT_R32G32_SINT,
                                     VK_FORMAT_R32G32B32_SINT,
                                     VK_FORMAT_R32G32B32A32_SINT,
                                 };
-                                pFormatTable = formatTable;
+                                formatTable = FormatTable;
                             }
                             else
                             {
-                                static const VkFormat formatTable[] =
+                                static const VkFormat FormatTable[] =
                                 {
                                     VK_FORMAT_R32_UINT,
                                     VK_FORMAT_R32G32_UINT,
                                     VK_FORMAT_R32G32B32_UINT,
                                     VK_FORMAT_R32G32B32A32_UINT,
                                 };
-                                pFormatTable = formatTable;
+                                formatTable = FormatTable;
                             }
                             break;
                         }
@@ -620,30 +620,30 @@ void DoAutoLayoutDesc(
 
             case OpTypeFloat:
                 {
-                    switch (pVarElemTy->getFloatBitWidth())
+                    switch (varElemTy->getFloatBitWidth())
                     {
                     case 16:
                         {
-                            static const VkFormat formatTable[] =
+                            static const VkFormat FormatTable[] =
                             {
                                 VK_FORMAT_R16_SFLOAT,
                                 VK_FORMAT_R16G16_SFLOAT,
                                 VK_FORMAT_R16G16B16_SFLOAT,
                                 VK_FORMAT_R16G16B16A16_SFLOAT,
                             };
-                            pFormatTable = formatTable;
+                            formatTable = FormatTable;
                         }
                         break;
                     case 32:
                         {
-                            static const VkFormat formatTable[] =
+                            static const VkFormat FormatTable[] =
                             {
                                 VK_FORMAT_R32_SFLOAT,
                                 VK_FORMAT_R32G32_SFLOAT,
                                 VK_FORMAT_R32G32B32_SFLOAT,
                                 VK_FORMAT_R32G32B32A32_SFLOAT,
                             };
-                            pFormatTable = formatTable;
+                            formatTable = FormatTable;
                         }
                         break;
                     }
@@ -657,13 +657,13 @@ void DoAutoLayoutDesc(
             }
 
             assert(elemCount <= 4);
-            VkFormat format = pFormatTable[elemCount - 1];
+            VkFormat format = formatTable[elemCount - 1];
             assert(format != VK_FORMAT_UNDEFINED);
 
             assert(location < MaxColorTargets);
-            auto pColorTarget = &pPipelineInfo->cbState.target[location];
-            pColorTarget->format = format;
-            pColorTarget->channelWriteMask = (1U << elemCount) - 1;
+            auto colorTarget = &pipelineInfo->cbState.target[location];
+            colorTarget->format = format;
+            colorTarget->channelWriteMask = (1U << elemCount) - 1;
         }
     }
 
@@ -673,8 +673,8 @@ void DoAutoLayoutDesc(
     unsigned pushConstSize = 0;
     for (unsigned i = 0, varCount = module->getNumVariables(); i < varCount; ++i)
     {
-        auto pVar = module->getVariable(i);
-        switch (pVar->getStorageClass())
+        auto var = module->getVariable(i);
+        switch (var->getStorageClass())
         {
         case StorageClassFunction:
             {
@@ -684,8 +684,8 @@ void DoAutoLayoutDesc(
         case StorageClassPushConstant:
             {
                 // Push constant: Get the size of the data and add to the total.
-                auto pVarElemTy = pVar->getType()->getPointerElementType();
-                pushConstSize += (GetTypeDataSize(pVarElemTy) + 3) / 4;
+                auto varElemTy = var->getType()->getPointerElementType();
+                pushConstSize += (getTypeDataSize(varElemTy) + 3) / 4;
                 break;
             }
 
@@ -693,11 +693,11 @@ void DoAutoLayoutDesc(
             {
                 SPIRVWord binding = SPIRVID_INVALID;
                 SPIRVWord descSet = 0;
-                if (pVar->hasDecorate(DecorationBinding, 0, &binding))
+                if (var->hasDecorate(DecorationBinding, 0, &binding))
                 {
                     // Test shaderdb/OpDecorationGroup_TestGroupAndGroupMember_lit.spvasm
                     // defines a variable with a binding but no set. Handle that case.
-                    pVar->hasDecorate(DecorationDescriptorSet, 0, &descSet);
+                    var->hasDecorate(DecorationDescriptorSet, 0, &descSet);
 
                     // Find/create the node entry for this set and binding.
                     ResourceNodeSet& resNodeSet = resNodeSets[descSet];
@@ -708,21 +708,21 @@ void DoAutoLayoutDesc(
                         resNodeSet.nodes.push_back({});
                         resNodeSet.nodes.back().type = ResourceMappingNodeType::Unknown;
                     }
-                    ResourceMappingNode* pNode = &resNodeSet.nodes[nodesIndex];
+                    ResourceMappingNode* node = &resNodeSet.nodes[nodesIndex];
 
                     // Get the element type and array size.
-                    auto pVarElemTy = pVar->getType()->getPointerElementType();
+                    auto varElemTy = var->getType()->getPointerElementType();
                     unsigned arraySize = 1;
-                    while (pVarElemTy->isTypeArray())
+                    while (varElemTy->isTypeArray())
                     {
-                        arraySize *= pVarElemTy->getArrayLength();
-                        pVarElemTy = pVarElemTy->getArrayElementType();
+                        arraySize *= varElemTy->getArrayLength();
+                        varElemTy = varElemTy->getArrayElementType();
                     }
 
                     // Map the SPIR-V opcode to descriptor type and size.
                     ResourceMappingNodeType nodeType;
                     unsigned sizeInDwords;
-                    switch (pVarElemTy->getOpCode())
+                    switch (varElemTy->getOpCode())
                     {
                     case OpTypeSampler:
                         {
@@ -734,8 +734,8 @@ void DoAutoLayoutDesc(
                     case OpTypeImage:
                         {
                             // Image descriptor.
-                            auto pImageType = static_cast<SPIRVTypeImage*>(pVarElemTy);
-                            nodeType = (pImageType->getDescriptor().Dim == spv::DimBuffer) ?
+                            auto imageType = static_cast<SPIRVTypeImage*>(varElemTy);
+                            nodeType = (imageType->getDescriptor().Dim == spv::DimBuffer) ?
                                 ResourceMappingNodeType::DescriptorTexelBuffer :
                                 ResourceMappingNodeType::DescriptorResource;
                             sizeInDwords = 8 * arraySize;
@@ -760,11 +760,11 @@ void DoAutoLayoutDesc(
                     // Check if the node already had a different type set. A DescriptorResource/DescriptorTexelBuffer
                     // and a DescriptorSampler can use the same set/binding, in which case it is
                     // DescriptorCombinedTexture.
-                    if (pNode->type == ResourceMappingNodeType::Unknown)
+                    if (node->type == ResourceMappingNodeType::Unknown)
                     {
-                        pNode->type = nodeType;
+                        node->type = nodeType;
                     }
-                    else if (pNode->type != nodeType)
+                    else if (node->type != nodeType)
                     {
                         {
                             assert((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
@@ -773,20 +773,20 @@ void DoAutoLayoutDesc(
                                          (nodeType == ResourceMappingNodeType::DescriptorSampler));
                         }
                         {
-                            assert((pNode->type == ResourceMappingNodeType::DescriptorCombinedTexture) ||
-                                   (pNode->type == ResourceMappingNodeType::DescriptorResource) ||
-                                   (pNode->type == ResourceMappingNodeType::DescriptorTexelBuffer) ||
-                                   (pNode->type == ResourceMappingNodeType::DescriptorSampler));
+                            assert((node->type == ResourceMappingNodeType::DescriptorCombinedTexture) ||
+                                   (node->type == ResourceMappingNodeType::DescriptorResource) ||
+                                   (node->type == ResourceMappingNodeType::DescriptorTexelBuffer) ||
+                                   (node->type == ResourceMappingNodeType::DescriptorSampler));
                         }
 
-                        pNode->type = ResourceMappingNodeType::DescriptorCombinedTexture;
+                        node->type = ResourceMappingNodeType::DescriptorCombinedTexture;
                         sizeInDwords = 12 * arraySize;
                     }
 
                     // Fill out the rest of the node.
-                    pNode->sizeInDwords = sizeInDwords;
-                    pNode->srdRange.set = descSet;
-                    pNode->srdRange.binding = binding;
+                    node->sizeInDwords = sizeInDwords;
+                    node->srdRange.set = descSet;
+                    node->srdRange.binding = binding;
                 }
                 break;
             }
@@ -820,62 +820,62 @@ void DoAutoLayoutDesc(
     {
         resNodeCount += resNodeSet.second.nodes.size();
     }
-    auto pResNodes = new ResourceMappingNode[resNodeCount];
-    auto pNextTable = pResNodes + topLevelCount;
-    auto pResNode = pResNodes;
+    auto resNodes = new ResourceMappingNode[resNodeCount];
+    auto nextTable = resNodes + topLevelCount;
+    auto resNode = resNodes;
 
     // Add a node for each set.
     for (const auto& resNodeSet : resNodeSets)
     {
-        pResNode->type = ResourceMappingNodeType::DescriptorTableVaPtr;
-        pResNode->sizeInDwords = 1;
-        pResNode->offsetInDwords = topLevelOffset;
-        topLevelOffset += pResNode->sizeInDwords;
-        pResNode->tablePtr.nodeCount = resNodeSet.second.nodes.size();
-        pResNode->tablePtr.pNext = pNextTable;
+        resNode->type = ResourceMappingNodeType::DescriptorTableVaPtr;
+        resNode->sizeInDwords = 1;
+        resNode->offsetInDwords = topLevelOffset;
+        topLevelOffset += resNode->sizeInDwords;
+        resNode->tablePtr.nodeCount = resNodeSet.second.nodes.size();
+        resNode->tablePtr.pNext = nextTable;
         for (auto& resNode : resNodeSet.second.nodes)
         {
-            *pNextTable++ = resNode;
+            *nextTable++ = resNode;
         }
-        ++pResNode;
+        ++resNode;
     }
 
     if (shaderStage == ShaderStageVertex)
     {
         // Add a node for vertex buffer.
-        pResNode->type = ResourceMappingNodeType::IndirectUserDataVaPtr;
-        pResNode->sizeInDwords = 1;
-        pResNode->offsetInDwords = topLevelOffset;
-        topLevelOffset += pResNode->sizeInDwords;
-        pResNode->userDataPtr.sizeInDwords = 256;
-        ++pResNode;
+        resNode->type = ResourceMappingNodeType::IndirectUserDataVaPtr;
+        resNode->sizeInDwords = 1;
+        resNode->offsetInDwords = topLevelOffset;
+        topLevelOffset += resNode->sizeInDwords;
+        resNode->userDataPtr.sizeInDwords = 256;
+        ++resNode;
     }
 
     if ((shaderStage == ShaderStageVertex) || (shaderStage == ShaderStageTessEval) || (shaderStage == ShaderStageGeometry))
     {
         // Add a node for XFB.
-        pResNode->type = ResourceMappingNodeType::StreamOutTableVaPtr;
-        pResNode->sizeInDwords = 1;
-        pResNode->offsetInDwords = topLevelOffset;
-        topLevelOffset += pResNode->sizeInDwords;
-        ++pResNode;
+        resNode->type = ResourceMappingNodeType::StreamOutTableVaPtr;
+        resNode->sizeInDwords = 1;
+        resNode->offsetInDwords = topLevelOffset;
+        topLevelOffset += resNode->sizeInDwords;
+        ++resNode;
     }
 
     if (pushConstSize != 0)
     {
         // Add a node for push consts.
-        pResNode->type = ResourceMappingNodeType::PushConst;
-        pResNode->sizeInDwords = pushConstSize;
-        pResNode->offsetInDwords = topLevelOffset;
-        topLevelOffset += pResNode->sizeInDwords;
-        ++pResNode;
+        resNode->type = ResourceMappingNodeType::PushConst;
+        resNode->sizeInDwords = pushConstSize;
+        resNode->offsetInDwords = topLevelOffset;
+        topLevelOffset += resNode->sizeInDwords;
+        ++resNode;
     }
 
-    assert(pResNode - pResNodes <= topLevelCount);
-    assert(pNextTable - pResNodes <= resNodeCount);
+    assert(resNode - resNodes <= topLevelCount);
+    assert(nextTable - resNodes <= resNodeCount);
 
     // Write pointer/size into PipelineShaderInfo.
-    pShaderInfo->userDataNodeCount = pResNode - pResNodes;
-    pShaderInfo->pUserDataNodes = pResNodes;
+    shaderInfo->userDataNodeCount = resNode - resNodes;
+    shaderInfo->pUserDataNodes = resNodes;
 }
 

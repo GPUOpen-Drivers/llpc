@@ -54,30 +54,30 @@ public:
     ~ShaderCacheManager();
 
     // Get the global ShaderCacheManager object
-    static ShaderCacheManager* GetShaderCacheManager()
+    static ShaderCacheManager* getShaderCacheManager()
     {
-        if (m_pManager == nullptr)
+        if (m_manager == nullptr)
         {
-            m_pManager = new ShaderCacheManager();
+            m_manager = new ShaderCacheManager();
         }
-        return m_pManager;
+        return m_manager;
     }
 
-    static void Shutdown()
+    static void shutdown()
     {
-        delete m_pManager;
-        m_pManager = nullptr;
+        delete m_manager;
+        m_manager = nullptr;
     }
 
-    ShaderCachePtr GetShaderCacheObject(const ShaderCacheCreateInfo*    pCreateInfo,
-                                        const ShaderCacheAuxCreateInfo* pAuxCreateInfo);
+    ShaderCachePtr getShaderCacheObject(const ShaderCacheCreateInfo*    createInfo,
+                                        const ShaderCacheAuxCreateInfo* auxCreateInfo);
 
-    void ReleaseShaderCacheObject(ShaderCachePtr& shaderCachePtr);
+    void releaseShaderCacheObject(ShaderCachePtr& shaderCachePtr);
 
 private:
     std::list<ShaderCachePtr>  m_shaderCaches;    // ShaderCache instances for all GFXIP
 
-    static ShaderCacheManager* m_pManager;              // Static manager
+    static ShaderCacheManager* m_manager;              // Static manager
 };
 
 } // Llpc

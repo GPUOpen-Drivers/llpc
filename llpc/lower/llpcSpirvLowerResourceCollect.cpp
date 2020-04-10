@@ -57,7 +57,7 @@ char SpirvLowerResourceCollect::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering opertions for resource collecting
-ModulePass* CreateSpirvLowerResourceCollect(
+ModulePass* createSpirvLowerResourceCollect(
     bool collectDetailUsage) // Whether to collect detailed usages of resource node datas and FS output infos
 {
     return new SpirvLowerResourceCollect(collectDetailUsage);
@@ -76,15 +76,15 @@ SpirvLowerResourceCollect::SpirvLowerResourceCollect(
 
 // =====================================================================================================================
 // Collect resource node data
-void SpirvLowerResourceCollect::CollectResourceNodeData(
-    const GlobalVariable* pGlobal)       // [in] Global variable to collect resource node data
+void SpirvLowerResourceCollect::collectResourceNodeData(
+    const GlobalVariable* global)       // [in] Global variable to collect resource node data
 {
-    auto pGlobalTy = pGlobal->getType()->getContainedType(0);
+    auto globalTy = global->getType()->getContainedType(0);
 
-    MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::Resource);
-    auto descSet = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
-    auto binding = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(1))->getZExtValue();
-    auto spvOpCode = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(2))->getZExtValue();
+    MDNode* metaNode = global->getMetadata(gSPIRVMD::Resource);
+    auto descSet = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
+    auto binding = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(1))->getZExtValue();
+    auto spvOpCode = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(2))->getZExtValue();
 
     // Map the SPIR-V opcode to descriptor type.
     ResourceMappingNodeType nodeType = ResourceMappingNodeType::Unknown;
@@ -100,8 +100,8 @@ void SpirvLowerResourceCollect::CollectResourceNodeData(
         {
             nodeType = ResourceMappingNodeType::DescriptorResource;
             // Image descriptor.
-            Type* pImageType = pGlobalTy->getPointerElementType();
-            const std::string imageTypeName(pImageType->getStructName());
+            Type* imageType = globalTy->getPointerElementType();
+            const std::string imageTypeName(imageType->getStructName());
             // Format of image opaque type: ...[.SampledImage.<date type><dim>]...
             if (imageTypeName.find(".SampledImage") != std::string::npos)
             {
@@ -134,7 +134,7 @@ void SpirvLowerResourceCollect::CollectResourceNodeData(
 
     nodeData.value.set = descSet;
     nodeData.value.binding = binding;
-    nodeData.value.arraySize = GetFlattenArrayElementCount(pGlobalTy);
+    nodeData.value.arraySize = getFlattenArrayElementCount(globalTy);
     auto result = m_resNodeDatas.insert(std::pair<ResourceNodeDataKey, ResourceMappingNodeType>(nodeData, nodeType));
 
     // Check if the node already had a different pair of node data/type. A DescriptorResource/DescriptorTexelBuffer
@@ -161,53 +161,53 @@ bool SpirvLowerResourceCollect::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Resource-Collect\n");
 
-    SpirvLower::Init(&module);
+    SpirvLower::init(&module);
 
     // Collect unused globals and remove them
     std::unordered_set<GlobalVariable*> removedGlobals;
-    for (auto pGlobal = m_pModule->global_begin(), pEnd = m_pModule->global_end(); pGlobal != pEnd; ++pGlobal)
+    for (auto global = m_module->global_begin(), end = m_module->global_end(); global != end; ++global)
     {
-        if (pGlobal->user_empty())
+        if (global->user_empty())
         {
-            Value* pInitializer = nullptr;
-            if (pGlobal->hasInitializer())
+            Value* initializer = nullptr;
+            if (global->hasInitializer())
             {
-                pInitializer = pGlobal->getInitializer();
+                initializer = global->getInitializer();
             }
 
-            if ((pInitializer == nullptr) || isa<UndefValue>(pInitializer))
+            if ((initializer == nullptr) || isa<UndefValue>(initializer))
             {
-                removedGlobals.insert(&*pGlobal);
+                removedGlobals.insert(&*global);
             }
         }
     }
 
-    for (auto pGlobal : removedGlobals)
+    for (auto global : removedGlobals)
     {
-        pGlobal->dropAllReferences();
-        pGlobal->eraseFromParent();
+        global->dropAllReferences();
+        global->eraseFromParent();
     }
 
     // Collect resource usages from globals
-    for (auto pGlobal = m_pModule->global_begin(), pEnd = m_pModule->global_end(); pGlobal != pEnd; ++pGlobal)
+    for (auto global = m_module->global_begin(), end = m_module->global_end(); global != end; ++global)
     {
-        auto addrSpace = pGlobal->getType()->getAddressSpace();
+        auto addrSpace = global->getType()->getAddressSpace();
         switch (addrSpace)
         {
         case SPIRAS_Constant:
             {
-                if (pGlobal->hasMetadata(gSPIRVMD::PushConst))
+                if (global->hasMetadata(gSPIRVMD::PushConst))
                 {
                     // Push constant
-                    MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::PushConst);
-                    m_pushConstSize = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
+                    MDNode* metaNode = global->getMetadata(gSPIRVMD::PushConst);
+                    m_pushConstSize = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
                 }
                 else
                 {
                     // Only collect resource node data when requested
                     if (m_collectDetailUsage == true)
                     {
-                        CollectResourceNodeData(&*pGlobal);
+                        collectResourceNodeData(&*global);
                     }
                 }
                 break;
@@ -222,20 +222,20 @@ bool SpirvLowerResourceCollect::runOnModule(
         case SPIRAS_Output:
             {
                 // Only collect FS out info when requested.
-                Type* pGlobalTy = pGlobal->getType()->getContainedType(0);
-                if (m_collectDetailUsage == false || pGlobalTy->isSingleValueType() == false)
+                Type* globalTy = global->getType()->getContainedType(0);
+                if (m_collectDetailUsage == false || globalTy->isSingleValueType() == false)
                 {
                     break;
                 }
 
                 FsOutInfo fsOutInfo = {};
-                MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::InOut);
-                auto pMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+                MDNode* metaNode = global->getMetadata(gSPIRVMD::InOut);
+                auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
                 ShaderInOutMetadata inOutMeta = {};
-                Constant* pInOutMetaConst = cast<Constant>(pMeta);
-                inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaConst->getOperand(0))->getZExtValue();
-                inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaConst->getOperand(1))->getZExtValue();
+                Constant* inOutMetaConst = cast<Constant>(meta);
+                inOutMeta.U64All[0] = cast<ConstantInt>(inOutMetaConst->getOperand(0))->getZExtValue();
+                inOutMeta.U64All[1] = cast<ConstantInt>(inOutMetaConst->getOperand(1))->getZExtValue();
 
                 const unsigned location = inOutMeta.Value;
                 const unsigned index = inOutMeta.Index;
@@ -243,11 +243,11 @@ bool SpirvLowerResourceCollect::runOnModule(
                 // Collect basic types of fragment outputs
                 BasicType basicTy = BasicType::Unknown;
 
-                const auto pCompTy = pGlobalTy->isVectorTy() ? pGlobalTy->getVectorElementType() : pGlobalTy;
-                const unsigned bitWidth = pCompTy->getScalarSizeInBits();
+                const auto compTy = globalTy->isVectorTy() ? globalTy->getVectorElementType() : globalTy;
+                const unsigned bitWidth = compTy->getScalarSizeInBits();
                 const bool signedness = (inOutMeta.Signedness != 0);
 
-                if (pCompTy->isIntegerTy())
+                if (compTy->isIntegerTy())
                 {
                     // Integer type
                     if (bitWidth == 8)
@@ -264,7 +264,7 @@ bool SpirvLowerResourceCollect::runOnModule(
                         basicTy = signedness ? BasicType::Int : BasicType::Uint;
                     }
                 }
-                else if (pCompTy->isFloatingPointTy())
+                else if (compTy->isFloatingPointTy())
                 {
                     // Floating-point type
                     if (bitWidth == 16)
@@ -284,7 +284,7 @@ bool SpirvLowerResourceCollect::runOnModule(
 
                 fsOutInfo.location = location;
                 fsOutInfo.location = index;
-                fsOutInfo.componentCount = pGlobalTy->isVectorTy() ? pGlobalTy->getVectorNumElements() : 1;;
+                fsOutInfo.componentCount = globalTy->isVectorTy() ? globalTy->getVectorNumElements() : 1;;
                 fsOutInfo.basicType = basicTy;
                 m_fsOutInfos.push_back(fsOutInfo);
                 break;
@@ -294,7 +294,7 @@ bool SpirvLowerResourceCollect::runOnModule(
                 // Only collect resource node data when requested
                 if (m_collectDetailUsage == true)
                 {
-                    CollectResourceNodeData(&*pGlobal);
+                    collectResourceNodeData(&*global);
                 }
                 break;
             }
@@ -308,7 +308,7 @@ bool SpirvLowerResourceCollect::runOnModule(
 
     if (m_collectDetailUsage)
     {
-        VisitCalls(module);
+        visitCalls(module);
     }
     if (!m_fsOutInfos.empty() || !m_resNodeDatas.empty())
     {
@@ -320,43 +320,43 @@ bool SpirvLowerResourceCollect::runOnModule(
 
 // =====================================================================================================================
 // Gets element count if the specified type is an array (flattened for multi-dimension array).
-unsigned SpirvLowerResourceCollect::GetFlattenArrayElementCount(
-    const Type* pTy // [in] Type to check
+unsigned SpirvLowerResourceCollect::getFlattenArrayElementCount(
+    const Type* ty // [in] Type to check
     ) const
 {
     unsigned elemCount = 1;
 
-    auto pArrayTy = dyn_cast<ArrayType>(pTy);
-    while (pArrayTy != nullptr)
+    auto arrayTy = dyn_cast<ArrayType>(ty);
+    while (arrayTy != nullptr)
     {
-        elemCount *= pArrayTy->getArrayNumElements();
-        pArrayTy = dyn_cast<ArrayType>(pArrayTy->getArrayElementType());
+        elemCount *= arrayTy->getArrayNumElements();
+        arrayTy = dyn_cast<ArrayType>(arrayTy->getArrayElementType());
     }
     return elemCount;
 }
 
 // =====================================================================================================================
 // Gets element type if the specified type is an array (flattened for multi-dimension array).
-const Type* SpirvLowerResourceCollect::GetFlattenArrayElementType(
-    const Type* pTy // [in] Type to check
+const Type* SpirvLowerResourceCollect::getFlattenArrayElementType(
+    const Type* ty // [in] Type to check
     ) const
 {
-    const Type* pElemType = pTy;
+    const Type* elemType = ty;
 
-    auto pArrayTy = dyn_cast<ArrayType>(pTy);
-    while (pArrayTy != nullptr)
+    auto arrayTy = dyn_cast<ArrayType>(ty);
+    while (arrayTy != nullptr)
     {
-        pElemType = pArrayTy->getArrayElementType();
-        pArrayTy = dyn_cast<ArrayType>(pElemType);
+        elemType = arrayTy->getArrayElementType();
+        arrayTy = dyn_cast<ArrayType>(elemType);
     }
-    return pElemType;
+    return elemType;
 }
 
 // =====================================================================================================================
 // Find the specified target call and get the index value from corresponding argument
-Value* SpirvLowerResourceCollect::FindCallAndGetIndexValue(
+Value* SpirvLowerResourceCollect::findCallAndGetIndexValue(
     Module& module,  // [in] LLVM module to be visited
-    CallInst* const pTargetCall)  // [in] Builder call as search target
+    CallInst* const targetCall)  // [in] Builder call as search target
 {
     for (auto& func : module)
     {
@@ -366,29 +366,29 @@ Value* SpirvLowerResourceCollect::FindCallAndGetIndexValue(
             continue;
         }
 
-        const MDNode* const pFuncMeta = func.getMetadata(module.getMDKindID(BuilderCallOpcodeMetadataName));
+        const MDNode* const funcMeta = func.getMetadata(module.getMDKindID(BuilderCallOpcodeMetadataName));
 
         // Skip builder calls that do not have the correct metadata to identify the opcode.
-        if (pFuncMeta == nullptr)
+        if (funcMeta == nullptr)
         {
             // If the function had the LLPC builder call prefix, it means the metadata was not encoded correctly.
             assert(func.getName().startswith(BuilderCallPrefix) == false);
             continue;
         }
 
-        const ConstantAsMetadata* const pMetaConst = cast<ConstantAsMetadata>(pFuncMeta->getOperand(0));
-        unsigned opcode = cast<ConstantInt>(pMetaConst->getValue())->getZExtValue();
+        const ConstantAsMetadata* const metaConst = cast<ConstantAsMetadata>(funcMeta->getOperand(0));
+        unsigned opcode = cast<ConstantInt>(metaConst->getValue())->getZExtValue();
 
         if (opcode == BuilderRecorder::Opcode::IndexDescPtr)
         {
             for (auto useIt = func.use_begin(), useItEnd = func.use_end(); useIt != useItEnd; ++useIt)
             {
-                CallInst* const pCall = dyn_cast<CallInst>(useIt->getUser());
+                CallInst* const call = dyn_cast<CallInst>(useIt->getUser());
 
                 // Get the args.
-                auto args = ArrayRef<Use>(&pCall->getOperandList()[0], pCall->getNumArgOperands());
+                auto args = ArrayRef<Use>(&call->getOperandList()[0], call->getNumArgOperands());
 
-                if (args[0] == pTargetCall)
+                if (args[0] == targetCall)
                 {
                     return args[1];
                 }
@@ -401,7 +401,7 @@ Value* SpirvLowerResourceCollect::FindCallAndGetIndexValue(
 
 // =====================================================================================================================
 // Visit all LLPC builder calls in a module
-void SpirvLowerResourceCollect::VisitCalls(
+void SpirvLowerResourceCollect::visitCalls(
     Module& module)  // [in] LLVM module to be visited
 {
     for (auto& func : module)
@@ -412,25 +412,25 @@ void SpirvLowerResourceCollect::VisitCalls(
             continue;
         }
 
-        const MDNode* const pFuncMeta = func.getMetadata(module.getMDKindID(BuilderCallOpcodeMetadataName));
+        const MDNode* const funcMeta = func.getMetadata(module.getMDKindID(BuilderCallOpcodeMetadataName));
 
         // Skip builder calls that do not have the correct metadata to identify the opcode.
-        if (pFuncMeta == nullptr)
+        if (funcMeta == nullptr)
         {
             // If the function had the llpc builder call prefix, it means the metadata was not encoded correctly.
             assert(func.getName().startswith(BuilderCallPrefix) == false);
             continue;
         }
 
-        const ConstantAsMetadata* const pMetaConst = cast<ConstantAsMetadata>(pFuncMeta->getOperand(0));
-        unsigned opcode = cast<ConstantInt>(pMetaConst->getValue())->getZExtValue();
+        const ConstantAsMetadata* const metaConst = cast<ConstantAsMetadata>(funcMeta->getOperand(0));
+        unsigned opcode = cast<ConstantInt>(metaConst->getValue())->getZExtValue();
 
         for (auto useIt = func.use_begin(), useItEnd = func.use_end(); useIt != useItEnd; ++useIt)
         {
-            CallInst* const pCall = dyn_cast<CallInst>(useIt->getUser());
+            CallInst* const call = dyn_cast<CallInst>(useIt->getUser());
 
             // Get the args.
-            auto args = ArrayRef<Use>(&pCall->getOperandList()[0], pCall->getNumArgOperands());
+            auto args = ArrayRef<Use>(&call->getOperandList()[0], call->getNumArgOperands());
 
             ResourceMappingNodeType nodeType = ResourceMappingNodeType::Unknown;
             switch (opcode)
@@ -463,10 +463,10 @@ void SpirvLowerResourceCollect::VisitCalls(
                 nodeData.value.set = cast<ConstantInt>(args[0])->getZExtValue();
                 nodeData.value.binding = cast<ConstantInt>(args[1])->getZExtValue();
                 nodeData.value.arraySize = 1;
-                auto pIndex = FindCallAndGetIndexValue(module, pCall);
-                if (pIndex != nullptr)
+                auto index = findCallAndGetIndexValue(module, call);
+                if (index != nullptr)
                 {
-                    nodeData.value.arraySize = cast<ConstantInt>(pIndex)->getZExtValue();
+                    nodeData.value.arraySize = cast<ConstantInt>(index)->getZExtValue();
                 }
 
                 auto result = m_resNodeDatas.insert(std::pair<ResourceNodeDataKey, ResourceMappingNodeType>(nodeData, nodeType));

@@ -48,7 +48,7 @@ using namespace object;
 
 // =====================================================================================================================
 // Adds an archive to the emulation library.
-void EmuLib::AddArchive(
+void EmuLib::addArchive(
     MemoryBufferRef buffer) // Buffer required to create the archive
 {
     m_archives.emplace_back(cantFail(Archive::create(buffer), "Failed to parse archive"));
@@ -66,7 +66,7 @@ void EmuLib::AddArchive(
 // Gets a function from the emulation library.
 //
 // Returns nullptr if not found, or if it is not a native function when nativeOnly is true.
-Function* EmuLib::GetFunction(
+Function* EmuLib::getFunction(
     StringRef funcName, // Function name to find
     bool nativeOnly)    // Whether to only find a native function
 {
@@ -83,17 +83,17 @@ Function* EmuLib::GetFunction(
             {
                 return nullptr;
             }
-            return funcMapIt->second.pFunction;
+            return funcMapIt->second.function;
         }
         // Find the function in the symbol table of the archive.
-        auto pChild = cantFail(archive.archive->findSym(funcName), "Failed in archive symbol search");
-        assert(pChild.hasValue());
+        auto child = cantFail(archive.archive->findSym(funcName), "Failed in archive symbol search");
+        assert(child.hasValue());
         // Found the symbol. Get the bitcode for its module.
-        StringRef childBitcode = cantFail(pChild->getBuffer(), "Failed in archive module extraction");
+        StringRef childBitcode = cantFail(child->getBuffer(), "Failed in archive module extraction");
 
         // Parse the bitcode archive member into a Module.
         auto libModule = cantFail(parseBitcodeFile(
-            MemoryBufferRef(childBitcode, ""), *pContext), "Failed to parse archive bitcode");
+            MemoryBufferRef(childBitcode, ""), *m_context), "Failed to parse archive bitcode");
 
         // Find and mark the non-native library functions. A library function is non-native if:
         //   it references llvm.amdgcn.*
@@ -109,20 +109,20 @@ Function* EmuLib::GetFunction(
 
                 if (libFuncName.startswith("llvm.amdgcn."))
                 {
-                    for (auto pUser : libFunc.users())
+                    for (auto user : libFunc.users())
                     {
-                        auto pInst = dyn_cast<Instruction>(pUser);
-                        auto pNonNativeFunc = pInst->getParent()->getParent();
-                        nonNativeFuncs.insert(pNonNativeFunc);
+                        auto inst = dyn_cast<Instruction>(user);
+                        auto nonNativeFunc = inst->getParent()->getParent();
+                        nonNativeFuncs.insert(nonNativeFunc);
                     }
                 }
                 else if (libFuncName.startswith("llpc."))
                 {
-                    for (auto pUser : libFunc.users())
+                    for (auto user : libFunc.users())
                     {
-                        auto pInst = dyn_cast<Instruction>(pUser);
-                        auto pUnknownKindFunc = pInst->getParent()->getParent();
-                        unknownKindFuncs[pUnknownKindFunc].push_back(&libFunc);
+                        auto inst = dyn_cast<Instruction>(user);
+                        auto unknownKindFunc = inst->getParent()->getParent();
+                        unknownKindFuncs[unknownKindFunc].push_back(&libFunc);
                     }
                 }
             }
@@ -136,7 +136,7 @@ Function* EmuLib::GetFunction(
         }
 
         // Add the new module's defined functions to the function map for this archive.
-        Function* pRequestedFunc = nullptr;
+        Function* requestedFunc = nullptr;
         for (auto& libFunc : *libModule)
         {
             if (libFunc.empty() == false)
@@ -158,9 +158,9 @@ Function* EmuLib::GetFunction(
                     else
                     {
                         // Non-native if any referenced unknown kind function is non-native.
-                        for (auto pFunc : funcIt->second)
+                        for (auto func : funcIt->second)
                         {
-                            if (GetFunction(pFunc->getName(), true) == nullptr)
+                            if (getFunction(func->getName(), true) == nullptr)
                             {
                                 isNative = false;
                                 break;
@@ -172,14 +172,14 @@ Function* EmuLib::GetFunction(
 
                 if ((libFunc.getName() == funcName) && ((nativeOnly == false) || isNative))
                 {
-                    pRequestedFunc = &libFunc;
+                    requestedFunc = &libFunc;
                 }
             }
         }
         // Add new module to our modules list.
         m_modules.push_back(std::move(libModule));
 
-        return pRequestedFunc;
+        return requestedFunc;
     }
 
     // Not found in any archive.

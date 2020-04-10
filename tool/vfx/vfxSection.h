@@ -233,32 +233,32 @@ public:
     Section(StrToMemberAddr* addrTable, unsigned tableSize, SectionType type, const char* sectionName);
     virtual ~Section() {}
 
-    static Section* CreateSection(const char* pSectionName);
-    static SectionType GetSectionType(const char* pSectionName);
-    static void InitSectionInfo();
-    static bool ReadFile(const std::string&    docFilename,
+    static Section* createSection(const char* sectionName);
+    static SectionType getSectionType(const char* sectionName);
+    static void initSectionInfo();
+    static bool readFile(const std::string&    docFilename,
                          const std::string&    fileName,
                          bool                  isBinary,
-                         std::vector<uint8_t>* pBinaryData,
-                         std::string*          pTextData,
+                         std::vector<uint8_t>* binaryData,
+                         std::string*          textData,
                          std::string*          errorMsg);
 
-    virtual bool IsShaderSourceSection() { return false;}
+    virtual bool isShaderSourceSection() { return false;}
 
     // Adds a new line to section, it is only valid for non-rule based section
-    virtual void AddLine(const char* pLine) { };
+    virtual void addLine(const char* line) { };
 
     // Gets section type.
-    SectionType GetSectionType() const { return m_sectionType; }
+    SectionType getSectionType() const { return m_sectionType; }
 
-    void* GetMemberAddr(unsigned i)
+    void* getMemberAddr(unsigned i)
     {
-        return reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(this) + m_pMemberTable[i].memberOffset);
+        return reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(this) + m_memberTable[i].memberOffset);
     }
 
-    bool GetMemberType(unsigned lineNum, const char* memberName, MemberType* pValueType, std::string* errorMsg);
+    bool getMemberType(unsigned lineNum, const char* memberName, MemberType* valueType, std::string* errorMsg);
 
-    bool GetPtrOfSubSection(unsigned     lineNum,
+    bool getPtrOfSubSection(unsigned     lineNum,
                             const char*  memberName,
                             MemberType   memberType,
                             bool         isWriteAccess,
@@ -277,37 +277,37 @@ public:
 
     // Sets value to a member array
     template<typename TValue>
-    bool Set(unsigned lineNum, const char* fieldName, unsigned arrayIndex, TValue* pValue);
+    bool set(unsigned lineNum, const char* fieldName, unsigned arrayIndex, TValue* value);
 
     // Sets value to a member
     template<typename TValue>
-    bool Set(unsigned lineNum, const char* fieldName, TValue* pValue)
+    bool set(unsigned lineNum, const char* fieldName, TValue* value)
     {
-        return Set(lineNum, fieldName, 0, pValue);
+        return set(lineNum, fieldName, 0, value);
     };
 
-    bool IsSection(unsigned lineNum, const char* memberName, bool* pOutput, MemberType *pType, std::string* errorMsg);
+    bool isSection(unsigned lineNum, const char* memberName, bool* output, MemberType *type, std::string* errorMsg);
 
     // Has this object been configured in VFX file.
-    bool IsActive() { return m_isActive; }
+    bool isActive() { return m_isActive; }
 
-    void SetActive(bool isActive) { m_isActive = isActive; }
+    void setActive(bool isActive) { m_isActive = isActive; }
 
-    void PrintSelf(unsigned level);
+    void printSelf(unsigned level);
 
-    void SetLineNum(unsigned lineNum) { m_lineNum = lineNum; }
+    void setLineNum(unsigned lineNum) { m_lineNum = lineNum; }
 
-    unsigned GetLineNum() const { return m_lineNum; }
+    unsigned getLineNum() const { return m_lineNum; }
 
 private:
     Section() {};
 
 protected:
     SectionType               m_sectionType;        // Section type
-    const char*               m_pSectionName;       // Section name
+    const char*               m_sectionName;       // Section name
     unsigned                  m_lineNum;            // Line number of this section
 private:
-    StrToMemberAddr*          m_pMemberTable;      // Member address table
+    StrToMemberAddr*          m_memberTable;      // Member address table
     unsigned                  m_tableSize;         // Address table size
     bool                      m_isActive;          // If the scestion is active
     static std::map<std::string, SectionInfo> m_sectionInfo;    //Section info
@@ -325,37 +325,37 @@ bool Section::getPtrOf(
     std::string* errorMsg)         // [out] Error message
 {
     bool        result      = true;
-    void*      pMemberAddr  = reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue));
+    void*      memberAddr  = reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue));
     MemberType memberType   = MemberTypeInt;
     unsigned   arrayMaxSize = 0;
 
     if (isWriteAccess == true)
     {
-        SetActive(true);
+        setActive(true);
     }
     // Search section member
     for (unsigned i = 0; i < m_tableSize; ++i)
     {
-        if (strcmp(memberName, m_pMemberTable[i].memberName) == 0)
+        if (strcmp(memberName, m_memberTable[i].memberName) == 0)
         {
-            pMemberAddr = GetMemberAddr(i);
-            memberType  = m_pMemberTable[i].memberType;
-            if (arrayIndex >= m_pMemberTable[i].arrayMaxSize)
+            memberAddr = getMemberAddr(i);
+            memberType  = m_memberTable[i].memberType;
+            if (arrayIndex >= m_memberTable[i].arrayMaxSize)
             {
                 PARSE_ERROR(*errorMsg,
                             lineNum,
                             "Array access out of bound: %u of %s[%u]",
                             arrayIndex,
                             memberName,
-                            m_pMemberTable[i].arrayMaxSize);
+                            m_memberTable[i].arrayMaxSize);
                 result = false;
             }
-            arrayMaxSize = m_pMemberTable[i].arrayMaxSize;
+            arrayMaxSize = m_memberTable[i].arrayMaxSize;
             break;
         }
     }
 
-    if ((result == true) && (pMemberAddr == reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue))))
+    if ((result == true) && (memberAddr == reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue))))
     {
         PARSE_WARNING(*errorMsg, lineNum, "Invalid member name: %s", memberName);
         result = false;
@@ -367,17 +367,17 @@ bool Section::getPtrOf(
         if (arrayMaxSize == VfxDynamicArrayId)
         {
             // Member is dynamic array, cast to std::vector
-            std::vector<TValue>* pMemberVector = reinterpret_cast<std::vector<TValue>*>(pMemberAddr);
-            if (pMemberVector->size() <= arrayIndex)
+            std::vector<TValue>* memberVector = reinterpret_cast<std::vector<TValue>*>(memberAddr);
+            if (memberVector->size() <= arrayIndex)
             {
-                pMemberVector->resize(arrayIndex + 1);
+                memberVector->resize(arrayIndex + 1);
             }
-            *ptrOut = &((*pMemberVector)[arrayIndex]);
+            *ptrOut = &((*memberVector)[arrayIndex]);
         }
         else
         {
-            TValue* pMember = reinterpret_cast<TValue*>(pMemberAddr);
-            *ptrOut = pMember + arrayIndex;
+            TValue* member = reinterpret_cast<TValue*>(memberAddr);
+            *ptrOut = member + arrayIndex;
         }
     }
 
@@ -387,21 +387,21 @@ bool Section::getPtrOf(
 // =====================================================================================================================
 // Sets value to a member array
 template<typename TValue>
-bool Section::Set(
+bool Section::set(
     unsigned    lineNum,           // Line No.
     const char* memberName,       // [in] Name of section member
     unsigned    arrayIndex,        // Array index
-    TValue*     pValue)            // [in] Value to be set
+    TValue*     value)            // [in] Value to be set
 {
     bool result = false;
-    VFX_ASSERT(pValue != nullptr);
-    TValue* pMemberPtr = nullptr;
+    VFX_ASSERT(value != nullptr);
+    TValue* memberPtr = nullptr;
     std::string dummyMsg;
-    result = getPtrOf(lineNum, memberName, true, arrayIndex, &pMemberPtr, &dummyMsg);
+    result = getPtrOf(lineNum, memberName, true, arrayIndex, &memberPtr, &dummyMsg);
     VFX_ASSERT(result == true);
     if (result == true)
     {
-        *pMemberPtr = *pValue;
+        *memberPtr = *value;
     }
 
     return result;
@@ -415,24 +415,24 @@ public:
     SectionVersion() :
         Section(m_addrTable, MemberCount, SectionTypeVersion, nullptr)
     {
-        version = 0;
+        m_version = 0;
     };
 
     // Setup member name to member offset mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
-        INIT_MEMBER_NAME_TO_ADDR(SectionVersion, version, MemberTypeInt, false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionVersion, m_version, MemberTypeInt, false);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(unsigned& state)  { state = version; };
+    void getSubState(unsigned& state)  { state = m_version; };
 
 private:
     static const unsigned  MemberCount = 1;
     static StrToMemberAddr m_addrTable[MemberCount];
 
-    unsigned               version;            // Document version
+    unsigned               m_version;            // Document version
 };
 // =====================================================================================================================
 // Represents the class that includes data to verify a test result.
@@ -450,7 +450,7 @@ public:
     };
 
     // Setup member name to member offset mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResultItem, resultSource,   MemberTypeEnum,    false);
@@ -465,7 +465,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)  { state = m_state; };
+    void getSubState(SubState& state)  { state = m_state; };
 
 private:
     static const unsigned  MemberCount = 9;
@@ -487,25 +487,25 @@ public:
     };
 
     // Setup member name to member address mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionResult,
-                                       result,
+                                       m_result,
                                        MemberTypeResultItem,
                                        MaxResultCount,
                                        true);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)
+    void getSubState(SubState& state)
     {
         state.numResult = 0;
         for (unsigned i = 0; i < MaxResultCount; ++i)
         {
-            if (result[i].IsActive())
+            if (m_result[i].isActive())
             {
-                result[i].GetSubState(state.result[state.numResult++]);
+                m_result[i].getSubState(state.result[state.numResult++]);
             }
         }
     }
@@ -514,7 +514,7 @@ private:
     static const unsigned  MemberCount = 1;
     static StrToMemberAddr m_addrTable[MemberCount];
 
-    SectionResultItem      result[MaxResultCount]; // section result items
+    SectionResultItem      m_result[MaxResultCount]; // section result items
 };
 
 // =====================================================================================================================
@@ -530,7 +530,7 @@ public:
     };
 
     // Setup member name to member address mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecConstItem, i, MemberTypeIVec4, false);
@@ -539,7 +539,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)  { state = m_state; };
+    void getSubState(SubState& state)  { state = m_state; };
 private:
     static const unsigned     MemberCount = 3;
     static StrToMemberAddr    m_addrTable[MemberCount];
@@ -560,25 +560,25 @@ public:
     };
 
     // Setup member name to member address mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionSpecConst,
-                                       specConst,
+                                       m_specConst,
                                        MemberTypeSpecConstItem,
                                        MaxSpecConstantCount,
                                        true);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)
+    void getSubState(SubState& state)
     {
         state.numSpecConst = 0;
         for (unsigned i = 0; i < MaxResultCount; ++i)
         {
-            if (specConst[i].IsActive())
+            if (m_specConst[i].isActive())
             {
-                specConst[i].GetSubState(state.specConst[state.numSpecConst++]);
+                m_specConst[i].getSubState(state.specConst[state.numSpecConst++]);
             }
         }
     }
@@ -587,7 +587,7 @@ private:
     static const unsigned  MemberCount = 3;
     static StrToMemberAddr m_addrTable[MemberCount];
 
-    SectionSpecConstItem   specConst[MaxSpecConstantCount]; // Spec constant for one shader stage
+    SectionSpecConstItem   m_specConst[MaxSpecConstantCount]; // Spec constant for one shader stage
 };
 
 // =====================================================================================================================
@@ -606,7 +606,7 @@ public:
     };
 
     // Setup member name to member address mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexBufferBinding, binding,       MemberTypeInt,  false);
@@ -615,7 +615,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)  { state = m_state; };
+    void getSubState(SubState& state)  { state = m_state; };
 
 private:
     static const unsigned     MemberCount = 3;
@@ -641,7 +641,7 @@ public:
     };
 
     // Setup member name to member address mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexAttribute, binding,       MemberTypeInt,    false);
@@ -651,7 +651,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)  { state = m_state; };
+    void getSubState(SubState& state)  { state = m_state; };
 
 private:
     static const unsigned  MemberCount = 4;
@@ -673,39 +673,39 @@ public:
     };
 
     // Setup member name to member address mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionVertexState,
-                                       vbBinding,
+                                       m_vbBinding,
                                        MemberTypeVertexBufferBindingItem,
                                        MaxVertexBufferBindingCount,
                                        true);
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionVertexState,
-                                       attribute,
+                                       m_attribute,
                                        MemberTypeVertexAttributeItem,
                                        MaxVertexAttributeCount,
                                        true);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)
+    void getSubState(SubState& state)
     {
         state.numVbBinding = 0;
         for (unsigned i = 0; i < MaxVertexBufferBindingCount; ++i)
         {
-            if (vbBinding[i].IsActive())
+            if (m_vbBinding[i].isActive())
             {
-                vbBinding[i].GetSubState(state.vbBinding[state.numVbBinding++]);
+                m_vbBinding[i].getSubState(state.vbBinding[state.numVbBinding++]);
             }
         }
 
         state.numAttribute = 0;
         for (unsigned i = 0; i < MaxVertexAttributeCount; ++i)
         {
-            if (attribute[i].IsActive())
+            if (m_attribute[i].isActive())
             {
-                attribute[i].GetSubState(state.attribute[state.numAttribute++]);
+                m_attribute[i].getSubState(state.attribute[state.numAttribute++]);
             }
         }
     }
@@ -713,8 +713,8 @@ public:
 private:
     static const unsigned       MemberCount = 2;
     static StrToMemberAddr      m_addrTable[MemberCount];
-    SectionVertexBufferBinding  vbBinding[MaxVertexBufferBindingCount];    // Binding info of all vertex buffers
-    SectionVertexAttribute      attribute[MaxVertexAttributeCount];        // Attribute info of all vertex attributes
+    SectionVertexBufferBinding  m_vbBinding[MaxVertexBufferBindingCount];    // Binding info of all vertex buffers
+    SectionVertexAttribute      m_attribute[MaxVertexAttributeCount];        // Attribute info of all vertex attributes
 };
 
 // =====================================================================================================================
@@ -726,13 +726,13 @@ public:
 
     SectionBufferView() :
         Section(m_addrTable, MemberCount, SectionTypeBufferView, nullptr),
-        intData(&m_bufMem),
-        uintData(&m_bufMem),
-        int64Data(&m_bufMem),
-        uint64Data(&m_bufMem),
-        floatData(&m_bufMem),
-        doubleData(&m_bufMem),
-        float16Data(&m_bufMem)
+        m_intData(&m_bufMem),
+        m_uintData(&m_bufMem),
+        m_int64Data(&m_bufMem),
+        m_uint64Data(&m_bufMem),
+        m_floatData(&m_bufMem),
+        m_doubleData(&m_bufMem),
+        m_float16Data(&m_bufMem)
     {
         memset(&m_state, 0, sizeof(m_state));
         m_state.size     = VfxInvalidValue;
@@ -740,24 +740,24 @@ public:
     };
 
     // Setup member name to member address mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionBufferView, binding,       MemberTypeBinding,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionBufferView, descriptorType,MemberTypeEnum,       false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionBufferView, size,          MemberTypeInt,        false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionBufferView, format,        MemberTypeEnum,       false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       intData,       MemberTypeIArray,     false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       uintData,      MemberTypeUArray,     false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       int64Data,     MemberTypeI64Array,   false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       uint64Data,    MemberTypeU64Array,   false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       floatData,     MemberTypeFArray,     false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       doubleData,    MemberTypeDArray,     false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       float16Data,   MemberTypeF16Array,   false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       m_intData,       MemberTypeIArray,     false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       m_uintData,      MemberTypeUArray,     false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       m_int64Data,     MemberTypeI64Array,   false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       m_uint64Data,    MemberTypeU64Array,   false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       m_floatData,     MemberTypeFArray,     false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       m_doubleData,    MemberTypeDArray,     false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionBufferView,       m_float16Data,   MemberTypeF16Array,   false);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)
+    void getSubState(SubState& state)
     {
         m_state.dataSize = static_cast<unsigned>(m_bufMem.size());
         m_state.pData = m_state.dataSize > 0 ? &m_bufMem[0] : nullptr;
@@ -769,13 +769,13 @@ private:
     static StrToMemberAddr    m_addrTable[MemberCount];
     SubState                  m_state;       // State of BufferView
     std::vector<uint8_t>      m_bufMem;      // Underlying buffer for all data types.
-    std::vector<uint8_t>*     intData;       // Contains int data of this buffer
-    std::vector<uint8_t>*     uintData;      // Contains uint data of this buffer
-    std::vector<uint8_t>*     int64Data;     // Contains int64 data of this buffer
-    std::vector<uint8_t>*     uint64Data;    // Contains uint64 data of this buffer
-    std::vector<uint8_t>*     floatData;     // Contains float data of this buffer
-    std::vector<uint8_t>*     doubleData;    // Contains double data of this buffer
-    std::vector<uint8_t>*     float16Data;   // Contains float16 data of this buffer
+    std::vector<uint8_t>*     m_intData;       // Contains int data of this buffer
+    std::vector<uint8_t>*     m_uintData;      // Contains uint data of this buffer
+    std::vector<uint8_t>*     m_int64Data;     // Contains int64 data of this buffer
+    std::vector<uint8_t>*     m_uint64Data;    // Contains uint64 data of this buffer
+    std::vector<uint8_t>*     m_floatData;     // Contains float data of this buffer
+    std::vector<uint8_t>*     m_doubleData;    // Contains double data of this buffer
+    std::vector<uint8_t>*     m_float16Data;   // Contains float16 data of this buffer
 };
 
 // =====================================================================================================================
@@ -797,7 +797,7 @@ public:
     }
 
     // Setup member name to member address mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionImageView, binding,       MemberTypeBinding,  false);
@@ -810,7 +810,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)  { state = m_state; };
+    void getSubState(SubState& state)  { state = m_state; };
 
 private:
     static const unsigned     MemberCount = 7;
@@ -834,7 +834,7 @@ public:
         m_state.dataPattern = static_cast<SamplerPattern>(VfxInvalidValue);
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSampler, binding,       MemberTypeBinding, false);
@@ -843,7 +843,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)  { state = m_state; };
+    void getSubState(SubState& state)  { state = m_state; };
 
 private:
     static const unsigned     MemberCount = 3;
@@ -861,27 +861,27 @@ public:
 
     SectionPushConstRange() :
         Section(m_addrTable, MemberCount, SectionTypeUnset, "pushConstRange"),
-        intData(&m_bufMem),
-        uintData(&m_bufMem),
-        floatData(&m_bufMem),
-        doubleData(&m_bufMem)
+        m_intData(&m_bufMem),
+        m_uintData(&m_bufMem),
+        m_floatData(&m_bufMem),
+        m_doubleData(&m_bufMem)
     {
     };
 
     // Setup member name to member address mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPushConstRange, start,       MemberTypeInt,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPushConstRange, length,      MemberTypeInt,    false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionPushConstRange,       intData,     MemberTypeIArray, false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionPushConstRange,       uintData,    MemberTypeUArray, false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionPushConstRange,       floatData,   MemberTypeFArray, false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionPushConstRange,       doubleData,  MemberTypeDArray, false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionPushConstRange,       m_intData,     MemberTypeIArray, false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionPushConstRange,       m_uintData,    MemberTypeUArray, false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionPushConstRange,       m_floatData,   MemberTypeFArray, false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionPushConstRange,       m_doubleData,  MemberTypeDArray, false);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)
+    void getSubState(SubState& state)
     {
        m_state.dataSize = static_cast<unsigned>(m_bufMem.size()) * sizeof(unsigned);
        m_state.pData = state.dataSize > 0 ? &m_bufMem[0] : nullptr;
@@ -893,10 +893,10 @@ private:
     static StrToMemberAddr    m_addrTable[MemberCount];
 
     std::vector<unsigned>     m_bufMem;      // Underlying buffer for all data types.
-    std::vector<unsigned>*    intData;       // Contains int data of this push constant range
-    std::vector<unsigned>*    uintData;      // Contains uint data of this push constant range
-    std::vector<unsigned>*    floatData;     // Contains float data of this push constant range
-    std::vector<unsigned>*    doubleData;    // Contains double data of this push constant range
+    std::vector<unsigned>*    m_intData;       // Contains int data of this push constant range
+    std::vector<unsigned>*    m_uintData;      // Contains uint data of this push constant range
+    std::vector<unsigned>*    m_floatData;     // Contains float data of this push constant range
+    std::vector<unsigned>*    m_doubleData;    // Contains double data of this push constant range
     SubState                  m_state;
 };
 
@@ -909,18 +909,18 @@ public:
 
     SectionDrawState() :
         Section(m_addrTable, MemberCount, SectionTypeDrawState, nullptr),
-        vs("vs"),
-        tcs("tcs"),
-        tes("tes"),
-        gs("gs"),
-        fs("fs"),
-        cs("cs")
+        m_vs("vs"),
+        m_tcs("tcs"),
+        m_tes("tes"),
+        m_gs("gs"),
+        m_fs("fs"),
+        m_cs("cs")
     {
-        InitDrawState(m_state);
+        initDrawState(m_state);
     }
 
     // Set initial value for DrawState.
-    static void InitDrawState(SubState& state)
+    static void initDrawState(SubState& state)
     {
         state.dispatch.iVec4[0] = 1;
         state.dispatch.iVec4[1] = 1;
@@ -946,7 +946,7 @@ public:
         state.lineWidth = 1.0f;
     }
     // Setup member name to member address mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, instance,       MemberTypeInt,      false);
@@ -967,31 +967,31 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, height,         MemberTypeInt,      false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, lineWidth,      MemberTypeFloat,    false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, viewport,       MemberTypeIVec4,    false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, vs,   MemberTypeSpecConst, true);
-        INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, tcs,  MemberTypeSpecConst, true);
-        INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, tes,  MemberTypeSpecConst, true);
-        INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, gs,   MemberTypeSpecConst, true);
-        INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, fs,   MemberTypeSpecConst, true);
-        INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, cs,   MemberTypeSpecConst, true);
-        INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionDrawState, pushConstRange, MemberTypePushConstRange, MaxPushConstRangCount, true);
+        INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, m_vs,   MemberTypeSpecConst, true);
+        INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, m_tcs,  MemberTypeSpecConst, true);
+        INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, m_tes,  MemberTypeSpecConst, true);
+        INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, m_gs,   MemberTypeSpecConst, true);
+        INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, m_fs,   MemberTypeSpecConst, true);
+        INIT_MEMBER_NAME_TO_ADDR(SectionDrawState, m_cs,   MemberTypeSpecConst, true);
+        INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionDrawState, m_pushConstRange, MemberTypePushConstRange, MaxPushConstRangCount, true);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)
+    void getSubState(SubState& state)
     {
         state = m_state;
-        vs.GetSubState(state.vs);
-        tcs.GetSubState(state.tcs);
-        tes.GetSubState(state.tes);
-        gs.GetSubState(state.gs);
-        fs.GetSubState(state.fs);
-        cs.GetSubState(state.cs);
+        m_vs.getSubState(state.vs);
+        m_tcs.getSubState(state.tcs);
+        m_tes.getSubState(state.tes);
+        m_gs.getSubState(state.gs);
+        m_fs.getSubState(state.fs);
+        m_cs.getSubState(state.cs);
         state.numPushConstRange = 0;
         for (unsigned i = 0; i < MaxPushConstRangCount; ++i)
         {
-            if (pushConstRange[i].IsActive())
+            if (m_pushConstRange[i].isActive())
             {
-                pushConstRange[i].GetSubState(state.pushConstRange[state.numPushConstRange++]);
+                m_pushConstRange[i].getSubState(state.pushConstRange[state.numPushConstRange++]);
             }
         }
     };
@@ -1000,13 +1000,13 @@ private:
     static const unsigned  MemberCount = 25;
     static StrToMemberAddr m_addrTable[MemberCount];
     SubState               m_state;
-    SectionSpecConst       vs;                                       // Vertex shader's spec constant
-    SectionSpecConst       tcs;                                      // Tessellation control shader's spec constant
-    SectionSpecConst       tes;                                      // Tessellation evaluation shader's spec constant
-    SectionSpecConst       gs;                                       // Geometry shader's spec constant
-    SectionSpecConst       fs;                                       // Fragment shader's spec constant
-    SectionSpecConst       cs;                                       // Compute shader shader's spec constant
-    SectionPushConstRange  pushConstRange[MaxPushConstRangCount];    // Pipeline push constant ranges
+    SectionSpecConst       m_vs;                                       // Vertex shader's spec constant
+    SectionSpecConst       m_tcs;                                      // Tessellation control shader's spec constant
+    SectionSpecConst       m_tes;                                      // Tessellation evaluation shader's spec constant
+    SectionSpecConst       m_gs;                                       // Geometry shader's spec constant
+    SectionSpecConst       m_fs;                                       // Fragment shader's spec constant
+    SectionSpecConst       m_cs;                                       // Compute shader shader's spec constant
+    SectionPushConstRange  m_pushConstRange[MaxPushConstRangCount];    // Pipeline push constant ranges
 };
 
 // =====================================================================================================================
@@ -1023,29 +1023,29 @@ public:
     }
 
     // Setup member name to member address mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
-        INIT_MEMBER_NAME_TO_ADDR(SectionShader, fileName, MemberTypeString, false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionShader, m_fileName, MemberTypeString, false);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    virtual bool IsShaderSourceSection();
+    virtual bool isShaderSourceSection();
 
-    virtual void AddLine(const char* pLine) { shaderSource += pLine; };
+    virtual void addLine(const char* line) { m_shaderSource += line; };
 
-    bool CompileShader(const std::string& docFilename, const Section* pShaderInfo, std::string* errorMsg);
+    bool compileShader(const std::string& docFilename, const Section* shaderInfo, std::string* errorMsg);
 
-    void GetSubState(SubState& state);
+    void getSubState(SubState& state);
 private:
-    bool CompileGlsl(const Section* pShaderInfo, std::string* errorMsg);
-    bool AssembleSpirv(std::string* errorMsg);
+    bool compileGlsl(const Section* shaderInfo, std::string* errorMsg);
+    bool assembleSpirv(std::string* errorMsg);
 
     static const unsigned  MemberCount = 1;
     static StrToMemberAddr m_addrTable[MemberCount];
 
-    std::string          fileName;                // External shader source file name
-    std::string          shaderSource;            // Shader source code
+    std::string          m_fileName;                // External shader source file name
+    std::string          m_shaderSource;            // Shader source code
     ShaderType           m_shaderType;            // Shader type
     std::vector<uint8_t> m_spvBin;                // SPIRV shader binary
 };
@@ -1062,16 +1062,16 @@ public:
     }
 
     // Setup member name to member address mapping.
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
     }
 
-    virtual void AddLine(const char* pLine) { compileLog += pLine; };
+    virtual void addLine(const char* line) { m_compileLog += line; };
 
 private:
     static const unsigned  MemberCount = 1;
     static StrToMemberAddr m_addrTable[MemberCount];
-    std::string            compileLog;            // Compile Log
+    std::string            m_compileLog;            // Compile Log
 };
 
 // =====================================================================================================================
@@ -1088,7 +1088,7 @@ public:
         m_state.channelWriteMask = 0xF;
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, format,               MemberTypeEnum,   false);
@@ -1098,7 +1098,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)  { state = m_state; };
+    void getSubState(SubState& state)  { state = m_state; };
 
 private:
     static const unsigned  MemberCount = 4;
@@ -1120,7 +1120,7 @@ public:
         memset(&m_state, 0, sizeof(m_state));
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeDisassembly, MemberTypeBool, false);
@@ -1133,7 +1133,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state) { state = m_state; };
+    void getSubState(SubState& state) { state = m_state; };
 
 private:
     static const unsigned  MemberCount = 7;
@@ -1155,7 +1155,7 @@ public:
         memset(&m_state, 0, sizeof(m_state));
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, trapPresent, MemberTypeBool, false);
@@ -1185,7 +1185,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state) { state = m_state; };
+    void getSubState(SubState& state) { state = m_state; };
 
 private:
     static const unsigned  MemberCount = 18;
@@ -1207,7 +1207,7 @@ public:
         memset(&m_state, 0, sizeof(m_state));
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableNgg, MemberTypeBool, false);
@@ -1231,7 +1231,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state) { state = m_state; };
+    void getSubState(SubState& state) { state = m_state; };
 
 private:
     static const unsigned  MemberCount = 17;
@@ -1253,7 +1253,7 @@ public:
         memset(&m_state, 0, sizeof(m_state));
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, topology,                MemberTypeEnum, false);
@@ -1274,34 +1274,34 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dualSourceBlendEnable,   MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, switchWinding,           MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableMultiView,         MemberTypeInt, false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, options, MemberTypePipelineOption, true);
-        INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, nggState, MemberTypeNggState, true);
+        INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_options, MemberTypePipelineOption, true);
+        INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_nggState, MemberTypeNggState, true);
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState,
-                                       colorBuffer,
+                                       m_colorBuffer,
                                        MemberTypeColorBufferItem,
                                        Vkgc::MaxColorTargets,
                                        true);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(const std::string& docFilename, SubState& state, std::string* errorMsg)
+    void getSubState(const std::string& docFilename, SubState& state, std::string* errorMsg)
     {
         for (unsigned i = 0; i < Vkgc::MaxColorTargets; ++i)
         {
-            colorBuffer[i].GetSubState(m_state.colorBuffer[i]);
+            m_colorBuffer[i].getSubState(m_state.colorBuffer[i]);
         }
-        options.GetSubState(m_state.options);
-        nggState.GetSubState(m_state.nggState);
+        m_options.getSubState(m_state.options);
+        m_nggState.getSubState(m_state.nggState);
         state = m_state;
     };
 
 private:
-    SectionNggState        nggState;
+    SectionNggState        m_nggState;
     static const unsigned  MemberCount = 22;
     static StrToMemberAddr m_addrTable[MemberCount];
     SubState               m_state;
-    SectionColorBuffer     colorBuffer[Vkgc::MaxColorTargets]; // Color buffer
-    SectionPipelineOption  options;
+    SectionColorBuffer     m_colorBuffer[Vkgc::MaxColorTargets]; // Color buffer
+    SectionPipelineOption  m_options;
 };
 
 // =====================================================================================================================
@@ -1317,17 +1317,17 @@ public:
         memset(&m_state, 0, sizeof(m_state));
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionComputeState, deviceIndex, MemberTypeInt, false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, options, MemberTypePipelineOption, true);
+        INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_options, MemberTypePipelineOption, true);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(const std::string& docFilename, SubState& state, std::string* errorMsg)
+    void getSubState(const std::string& docFilename, SubState& state, std::string* errorMsg)
     {
-        options.GetSubState(m_state.options);
+        m_options.getSubState(m_state.options);
         state = m_state;
     };
 
@@ -1336,7 +1336,7 @@ private:
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
-    SectionPipelineOption  options;
+    SectionPipelineOption  m_options;
 };
 
 // =====================================================================================================================
@@ -1352,7 +1352,7 @@ public:
         memset(&m_state, 0, sizeof(m_state));
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputBinding, binding,   MemberTypeInt,  false);
@@ -1361,7 +1361,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)  { state = m_state; };
+    void getSubState(SubState& state)  { state = m_state; };
 
 private:
     static const unsigned  MemberCount = 3;
@@ -1383,7 +1383,7 @@ public:
         memset(&m_state, 0, sizeof(m_state));
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, location,  MemberTypeInt,    false);
@@ -1393,7 +1393,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)  { state = m_state; };
+    void getSubState(SubState& state)  { state = m_state; };
 
 private:
     static const unsigned  MemberCount = 4;
@@ -1415,7 +1415,7 @@ public:
         memset(&m_state, 0, sizeof(m_state));
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputDivisor, binding,   MemberTypeInt,    false);
@@ -1423,7 +1423,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)  { state = m_state; };
+    void getSubState(SubState& state)  { state = m_state; };
 
 private:
     static const unsigned  MemberCount = 2;
@@ -1446,34 +1446,34 @@ public:
         m_vkDivisorState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT;
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
-        INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, attribute, MemberTypeVertexInputAttributeItem, true);
-        INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, binding,   MemberTypeVertexInputBindingItem,   true);
-        INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, divisor,   MemberTypeVertexInputDivisorItem,   true);
+        INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_attribute, MemberTypeVertexInputAttributeItem, true);
+        INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_binding,   MemberTypeVertexInputBindingItem,   true);
+        INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_divisor,   MemberTypeVertexInputDivisorItem,   true);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)
+    void getSubState(SubState& state)
     {
-        m_vkBindings.resize(binding.size());
-        m_vkAttributes.resize(attribute.size());
-        m_vkDivisors.resize(divisor.size());
+        m_vkBindings.resize(m_binding.size());
+        m_vkAttributes.resize(m_attribute.size());
+        m_vkDivisors.resize(m_divisor.size());
 
-        for (unsigned i = 0; i < attribute.size(); ++i)
+        for (unsigned i = 0; i < m_attribute.size(); ++i)
         {
-            attribute[i].GetSubState(m_vkAttributes[i]);
+            m_attribute[i].getSubState(m_vkAttributes[i]);
         }
 
-        for (unsigned i = 0; i < binding.size(); ++i)
+        for (unsigned i = 0; i < m_binding.size(); ++i)
         {
-            binding[i].GetSubState(m_vkBindings[i]);
+            m_binding[i].getSubState(m_vkBindings[i]);
         }
 
-        for (unsigned i = 0; i < divisor.size(); ++i)
+        for (unsigned i = 0; i < m_divisor.size(); ++i)
         {
-            divisor[i].GetSubState(m_vkDivisors[i]);
+            m_divisor[i].getSubState(m_vkDivisors[i]);
         }
 
         state.vertexAttributeDescriptionCount = static_cast<unsigned>(m_vkAttributes.size());
@@ -1491,9 +1491,9 @@ private:
     static const unsigned  MemberCount = 3;
     static StrToMemberAddr m_addrTable[MemberCount];
 
-    std::vector<SectionVertexInputAttribute>        attribute;       // Vertex input atribute
-    std::vector<SectionVertexInputBinding>          binding;         // Vertex input binding
-    std::vector<SectionVertexInputDivisor>          divisor;         // Vertex input divisor
+    std::vector<SectionVertexInputAttribute>        m_attribute;       // Vertex input atribute
+    std::vector<SectionVertexInputBinding>          m_binding;         // Vertex input binding
+    std::vector<SectionVertexInputDivisor>          m_divisor;         // Vertex input divisor
     std::vector<VkVertexInputBindingDescription>    m_vkBindings;    // Vulkan input binding
     std::vector<VkVertexInputAttributeDescription>  m_vkAttributes;  // Vulkan vertex input atribute
     std::vector<VkVertexInputBindingDivisorDescriptionEXT> m_vkDivisors; // Vulkan vertex input divisor
@@ -1514,7 +1514,7 @@ public:
         memset(&m_state, 0, sizeof(m_state));
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecEntryItem, constantID,  MemberTypeInt, false);
@@ -1523,7 +1523,7 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)  { state = m_state; };
+    void getSubState(SubState& state)  { state = m_state; };
 
 private:
     static const unsigned  MemberCount = 3;
@@ -1542,38 +1542,38 @@ public:
    SectionSpecInfo() :
         Section(m_addrTable, MemberCount, SectionTypeUnset, "specConst")
     {
-         intData = &m_bufMem;
-         uintData = &m_bufMem;
-         int64Data = &m_bufMem;
-         uint64Data = &m_bufMem;
-         floatData = &m_bufMem;
-         doubleData = &m_bufMem;
-         float16Data = &m_bufMem;
+         m_intData = &m_bufMem;
+         m_uintData = &m_bufMem;
+         m_int64Data = &m_bufMem;
+         m_uint64Data = &m_bufMem;
+         m_floatData = &m_bufMem;
+         m_doubleData = &m_bufMem;
+         m_float16Data = &m_bufMem;
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
-        INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionSpecInfo, mapEntry, MemberTypeSpecEntryItem, true);
-        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, intData,       MemberTypeIArray,       false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, uintData,      MemberTypeUArray,       false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, int64Data,     MemberTypeI64Array,     false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, uint64Data,    MemberTypeU64Array,     false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, floatData,     MemberTypeFArray,       false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, doubleData,    MemberTypeDArray,       false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, float16Data,   MemberTypeF16Array,     false);
+        INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionSpecInfo, m_mapEntry, MemberTypeSpecEntryItem, true);
+        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_intData,       MemberTypeIArray,       false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_uintData,      MemberTypeUArray,       false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_int64Data,     MemberTypeI64Array,     false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_uint64Data,    MemberTypeU64Array,     false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_floatData,     MemberTypeFArray,       false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_doubleData,    MemberTypeDArray,       false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_float16Data,   MemberTypeF16Array,     false);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)
+    void getSubState(SubState& state)
     {
-        if (mapEntry.size())
+        if (m_mapEntry.size())
         {
-            state.mapEntryCount = static_cast<unsigned>(mapEntry.size());
+            state.mapEntryCount = static_cast<unsigned>(m_mapEntry.size());
             m_vkMapEntries.resize(state.mapEntryCount);
             for (unsigned i = 0; i < m_vkMapEntries.size(); ++i)
             {
-                mapEntry[i].GetSubState(m_vkMapEntries[i]);
+                m_mapEntry[i].getSubState(m_vkMapEntries[i]);
             }
             state.pMapEntries = &m_vkMapEntries[0];
             state.dataSize = m_bufMem.size();
@@ -1589,14 +1589,14 @@ private:
     static const unsigned  MemberCount = 8;
     static StrToMemberAddr m_addrTable[MemberCount];
 
-    std::vector<SectionSpecEntryItem> mapEntry;
-    std::vector<uint8_t>*       intData;       // Contains int data of this buffer
-    std::vector<uint8_t>*       uintData;      // Contains uint data of this buffer
-    std::vector<uint8_t>*       int64Data;     // Contains int64 data of this buffer
-    std::vector<uint8_t>*       uint64Data;    // Contains uint64 long data of this buffer
-    std::vector<uint8_t>*       floatData;     // Contains float data of this buffer
-    std::vector<uint8_t>*       doubleData;    // Contains double data of this buffer
-    std::vector<uint8_t>*       float16Data;   // Contains float16 data of this buffer
+    std::vector<SectionSpecEntryItem> m_mapEntry;
+    std::vector<uint8_t>*       m_intData;       // Contains int data of this buffer
+    std::vector<uint8_t>*       m_uintData;      // Contains uint data of this buffer
+    std::vector<uint8_t>*       m_int64Data;     // Contains int64 data of this buffer
+    std::vector<uint8_t>*       m_uint64Data;    // Contains uint64 long data of this buffer
+    std::vector<uint8_t>*       m_floatData;     // Contains float data of this buffer
+    std::vector<uint8_t>*       m_doubleData;    // Contains double data of this buffer
+    std::vector<uint8_t>*       m_float16Data;   // Contains float16 data of this buffer
 
     std::vector<uint8_t>                  m_bufMem;       // Buffer memory
     std::vector<VkSpecializationMapEntry> m_vkMapEntries; // Vulkan specialization map entry
@@ -1612,23 +1612,23 @@ public:
     SectionDescriptorRangeValueItem() :
         Section(m_addrTable, MemberCount, SectionTypeUnset, "descriptorRangeValue")
     {
-        intData = &m_bufMem;
-        uintData = &m_bufMem;
+        m_intData = &m_bufMem;
+        m_uintData = &m_bufMem;
         memset(&m_state, 0, sizeof(m_state));
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, type,      MemberTypeEnum, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, set,       MemberTypeInt,  false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, binding,   MemberTypeInt,  false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, arraySize, MemberTypeInt,  false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem,       uintData,  MemberTypeUArray, false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem,       intData,   MemberTypeIArray, false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem,       m_uintData,  MemberTypeUArray, false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem,       m_intData,   MemberTypeIArray, false);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
-    void GetSubState(SubState& state)
+    void getSubState(SubState& state)
     {
         state = m_state;
         state.pValue = m_bufMem.size() > 0 ? (const unsigned *)(&m_bufMem[0]) : nullptr;
@@ -1638,8 +1638,8 @@ private:
     static const unsigned  MemberCount = 6;
     static StrToMemberAddr m_addrTable[MemberCount];
 
-    std::vector<uint8_t>*     intData;
-    std::vector<uint8_t>*     uintData;
+    std::vector<uint8_t>*     m_intData;
+    std::vector<uint8_t>*     m_uintData;
     SubState                  m_state;
     std::vector<uint8_t>      m_bufMem;
 };
@@ -1656,7 +1656,7 @@ public:
         memset(&m_state, 0, sizeof(m_state));
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, type,           MemberTypeEnum, false);
@@ -1673,7 +1673,7 @@ public:
                                                MemberTypeInt,
                                                false);
         INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMappingNode,
-                                          next,
+                                          m_next,
                                           MemberTypeResourceMappingNode,
                                           true);
         INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode,
@@ -1684,14 +1684,14 @@ public:
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)
+    void getSubState(SubState& state)
     {
         if (m_state.type == Vkgc::ResourceMappingNodeType::DescriptorTableVaPtr)
         {
-            m_nextNodeBuf.resize(next.size());
-            for (unsigned i = 0; i < next.size(); ++i)
+            m_nextNodeBuf.resize(m_next.size());
+            for (unsigned i = 0; i < m_next.size(); ++i)
             {
-                next[i].GetSubState(m_nextNodeBuf[i]);
+                m_next[i].getSubState(m_nextNodeBuf[i]);
             }
             m_state.tablePtr.pNext = &m_nextNodeBuf[0];
             m_state.tablePtr.nodeCount = static_cast<unsigned>(m_nextNodeBuf.size());
@@ -1703,7 +1703,7 @@ private:
     static const unsigned                   MemberCount = 7;
     static StrToMemberAddr                  m_addrTable[MemberCount];
 
-    std::vector<SectionResourceMappingNode> next;          // Next rsource mapping node
+    std::vector<SectionResourceMappingNode> m_next;          // Next rsource mapping node
     SubState                                m_state;
     std::vector<SubState>                   m_nextNodeBuf; // Contains next nodes
 };
@@ -1720,61 +1720,61 @@ public:
         memset(&m_state, 0, sizeof(m_state));
     }
 
-    static void InitialAddrTable()
+    static void initialAddrTable()
     {
         StrToMemberAddr* tableItem = m_addrTable;
-        INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, entryPoint,  MemberTypeString, false);
-        INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, specConst,   MemberTypeSpecInfo, true);
-        INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, options, MemberTypeShaderOption, true);
-        INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, descriptorRangeValue, MemberTypeDescriptorRangeValue, true);
-        INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, userDataNode, MemberTypeResourceMappingNode, true);
+        INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, m_entryPoint,  MemberTypeString, false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, m_specConst,   MemberTypeSpecInfo, true);
+        INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, m_options, MemberTypeShaderOption, true);
+        INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, m_descriptorRangeValue, MemberTypeDescriptorRangeValue, true);
+        INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, m_userDataNode, MemberTypeResourceMappingNode, true);
         VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
     }
 
-    void GetSubState(SubState& state)
+    void getSubState(SubState& state)
     {
         memset(&state, 0, sizeof(SubState));
-        state.pEntryTarget = entryPoint.c_str();
+        state.pEntryTarget = m_entryPoint.c_str();
         memcpy(&state.options, &m_state.options, sizeof(m_state.options));
 
-        specConst.GetSubState(m_specializationInfo);
+        m_specConst.getSubState(m_specializationInfo);
         state.pSpecializationInfo = &m_specializationInfo;
 
-        options.GetSubState(state.options);
+        m_options.getSubState(state.options);
 
-        if (descriptorRangeValue.size() > 0)
+        if (m_descriptorRangeValue.size() > 0)
         {
-            m_descriptorRangeValues.resize(descriptorRangeValue.size());
-            for (unsigned i = 0; i < descriptorRangeValue.size(); ++i)
+            m_descriptorRangeValues.resize(m_descriptorRangeValue.size());
+            for (unsigned i = 0; i < m_descriptorRangeValue.size(); ++i)
             {
-                descriptorRangeValue[i].GetSubState(m_descriptorRangeValues[i]);
+                m_descriptorRangeValue[i].getSubState(m_descriptorRangeValues[i]);
             }
-            state.descriptorRangeValueCount = static_cast<unsigned>(descriptorRangeValue.size());
+            state.descriptorRangeValueCount = static_cast<unsigned>(m_descriptorRangeValue.size());
             state.pDescriptorRangeValues = &m_descriptorRangeValues[0];
         }
 
-        if (userDataNode.size() > 0)
+        if (m_userDataNode.size() > 0)
         {
-            state.userDataNodeCount = static_cast<unsigned>(userDataNode.size());
+            state.userDataNodeCount = static_cast<unsigned>(m_userDataNode.size());
             m_userDataNodes.resize(state.userDataNodeCount);
             for (unsigned i = 0; i< state.userDataNodeCount; ++i)
             {
-                userDataNode[i].GetSubState(m_userDataNodes[i]);
+                m_userDataNode[i].getSubState(m_userDataNodes[i]);
             }
             state.pUserDataNodes = &m_userDataNodes[0];
         }
     };
 
-    const char* GetEntryPoint() const { return entryPoint.empty() ? nullptr : entryPoint.c_str(); }
+    const char* getEntryPoint() const { return m_entryPoint.empty() ? nullptr : m_entryPoint.c_str(); }
 private:
     static const unsigned                        MemberCount = 5;
     static StrToMemberAddr                       m_addrTable[MemberCount];
     SubState                                     m_state;
-    SectionSpecInfo                              specConst;               // Specialization constant info
-    SectionShaderOption                          options;                 // Pipeline shader options
-    std::string                                  entryPoint;              // Entry point name
-    std::vector<SectionDescriptorRangeValueItem> descriptorRangeValue;    // Contains descriptor range vuale
-    std::vector<SectionResourceMappingNode>      userDataNode;            // Contains user data node
+    SectionSpecInfo                              m_specConst;               // Specialization constant info
+    SectionShaderOption                          m_options;                 // Pipeline shader options
+    std::string                                  m_entryPoint;              // Entry point name
+    std::vector<SectionDescriptorRangeValueItem> m_descriptorRangeValue;    // Contains descriptor range vuale
+    std::vector<SectionResourceMappingNode>      m_userDataNode;            // Contains user data node
 
     VkSpecializationInfo                         m_specializationInfo;
     std::vector<Vkgc::DescriptorRangeValue>      m_descriptorRangeValues;

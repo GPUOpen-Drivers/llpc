@@ -65,56 +65,56 @@ public:
 
     ~ElfWriter();
 
-    static void mergeSection(const SectionBuffer* pSection1,
+    static void mergeSection(const SectionBuffer* section1,
                              size_t               section1Size,
-                             const char*          pPrefixString1,
-                             const SectionBuffer* pSection2,
+                             const char*          prefixString1,
+                             const SectionBuffer* section2,
                              size_t               section2Offset,
-                             const char*          pPrefixString2,
-                             SectionBuffer*       pNewSection);
+                             const char*          prefixString2,
+                             SectionBuffer*       newSection);
 
-    static void mergeMetaNote(Context*       pContext,
-                              const ElfNote* pNote1,
-                              const ElfNote* pNote2,
-                              ElfNote*       pNewNote);
+    static void mergeMetaNote(Context*       context,
+                              const ElfNote* note1,
+                              const ElfNote* note2,
+                              ElfNote*       newNote);
 
-    static void updateMetaNote(Context*       pContext,
-                               const ElfNote* pNote,
-                               ElfNote*       pNewNote);
+    static void updateMetaNote(Context*       context,
+                               const ElfNote* note,
+                               ElfNote*       newNote);
 
-    Result ReadFromBuffer(const void* pBuffer, size_t bufSize);
+    Result ReadFromBuffer(const void* buffer, size_t bufSize);
     Result copyFromReader(const ElfReader<Elf>& reader);
 
-    void updateElfBinary(Context* pContext, ElfPackage* pPipelineElf);
+    void updateElfBinary(Context* context, ElfPackage* pipelineElf);
 
-    void mergeElfBinary(Context*          pContext,
-                        const BinaryData* pFragmentElf,
-                        ElfPackage*       pPipelineElf);
+    void mergeElfBinary(Context*          context,
+                        const BinaryData* fragmentElf,
+                        ElfPackage*       pipelineElf);
 
     // Gets the section index for the specified section name.
-    int GetSectionIndex(const char* pName) const
+    int GetSectionIndex(const char* name) const
     {
-        auto pEntry = m_map.find(pName);
-        return (pEntry != m_map.end()) ? pEntry->second : InvalidValue;
+        auto entry = m_map.find(name);
+        return (entry != m_map.end()) ? entry->second : InvalidValue;
     }
 
-    void setSection(unsigned secIndex, SectionBuffer* pSection);
+    void setSection(unsigned secIndex, SectionBuffer* section);
 
-    ElfSymbol* getSymbol(const char* pSymbolName);
+    ElfSymbol* getSymbol(const char* symbolName);
 
     ElfNote getNote(Util::Abi::PipelineAbiNoteType noteType);
 
-    void setNote(ElfNote* pNote);
+    void setNote(ElfNote* note);
 
     Result getSectionDataBySectionIndex(unsigned secIdx, const SectionBuffer** ppSectionData) const;
 
     void GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol*>& secSymbols);
 
-    void writeToBuffer(ElfPackage* pElf);
+    void writeToBuffer(ElfPackage* elf);
 
-    Result linkGraphicsRelocatableElf(const llvm::ArrayRef<ElfReader<Elf>*>& relocatableElfs, Context *pContext);
+    Result linkGraphicsRelocatableElf(const llvm::ArrayRef<ElfReader<Elf>*>& relocatableElfs, Context *context);
 
-    Result linkComputeRelocatableElf(const ElfReader<Elf>& relocatableElf, Context* pContext);
+    Result linkComputeRelocatableElf(const ElfReader<Elf>& relocatableElf, Context* context);
 private:
     ElfWriter(const ElfWriter&) = delete;
     ElfWriter& operator=(const ElfWriter&) = delete;

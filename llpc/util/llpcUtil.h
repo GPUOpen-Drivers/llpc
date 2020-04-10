@@ -40,7 +40,7 @@ namespace Llpc
 {
 
 using Vkgc::InvalidValue;
-using Vkgc::VoidPtrInc;
+using Vkgc::voidPtrInc;
 
 // Size of vec4
 static const unsigned SizeOfVec4 = sizeof(float) * 4;
@@ -51,20 +51,20 @@ static const unsigned DescRelocMagicMask    = 0xFFFFFF00;
 static const unsigned DescSetMask           = 0x000000FF;
 
 // Gets the name string of shader stage.
-const char* GetShaderStageName(ShaderStage shaderStage);
+const char* getShaderStageName(ShaderStage shaderStage);
 
 // Translates shader stage to corresponding stage mask.
-unsigned ShaderStageToMask(ShaderStage stage);
+unsigned shaderStageToMask(ShaderStage stage);
 
 // Convert shader stage to the SPIR-V execution model
-spv::ExecutionModel ConvertToExecModel(ShaderStage shaderStage);
+spv::ExecutionModel convertToExecModel(ShaderStage shaderStage);
 
 // Convert SPIR-V execution model to the shader stage
-ShaderStage ConvertToStageShage(unsigned execModel);
+ShaderStage convertToStageShage(unsigned execModel);
 
 // =====================================================================================================================
 // Gets module ID according to the index
-inline unsigned GetModuleIdByIndex(
+inline unsigned getModuleIdByIndex(
     unsigned index)  // Index in stage array
 {
     static const unsigned BaseModuleId = 1;
@@ -75,7 +75,7 @@ inline unsigned GetModuleIdByIndex(
 // Decrements a pointer by nBytes by first casting it to a uint8_t*.
 //
 // Returns decremented pointer.
-inline void* VoidPtrDec(
+inline void* voidPtrDec(
     const void* p,         // [in] Pointer to be decremented.
     size_t      numBytes)  // Number of bytes to decrement the pointer by
 {
@@ -89,7 +89,7 @@ inline void* VoidPtrDec(
 // This function expects the first pointer to not be smaller than the second.
 //
 // Returns Number of bytes between the two pointers.
-inline size_t VoidPtrDiff(
+inline size_t voidPtrDiff(
     const void* p1,  //< [in] First pointer (higher address).
     const void* p2)  //< [in] Second pointer (lower address).
 {
@@ -103,7 +103,7 @@ inline size_t VoidPtrDiff(
 //
 // Returns log2(u)
 template< typename T>
-inline unsigned Log2(
+inline unsigned log2(
     T u)  // Value to compute the logarithm of.
 {
     unsigned logValue = 0;

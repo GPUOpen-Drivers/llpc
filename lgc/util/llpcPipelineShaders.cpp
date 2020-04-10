@@ -44,7 +44,7 @@ char PipelineShaders::ID = 0;
 
 // =====================================================================================================================
 // Create an instance of the pass.
-ModulePass* CreatePipelineShaders()
+ModulePass* createPipelineShaders()
 {
     return new PipelineShaders();
 }
@@ -60,16 +60,16 @@ bool PipelineShaders::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Pipeline-Shaders\n");
 
     m_entryPointMap.clear();
-    for (auto& pEntryPoint : m_entryPoints)
+    for (auto& entryPoint : m_entryPoints)
     {
-        pEntryPoint = nullptr;
+        entryPoint = nullptr;
     }
 
     for (auto& func : module)
     {
         if ((func.empty() == false) && (func.getLinkage() != GlobalValue::InternalLinkage))
         {
-            auto shaderStage = GetShaderStageFromFunction(&func);
+            auto shaderStage = getShaderStageFromFunction(&func);
 
             if (shaderStage != ShaderStageInvalid)
             {
@@ -83,7 +83,7 @@ bool PipelineShaders::runOnModule(
 
 // =====================================================================================================================
 // Get the shader for a particular API shader stage, or nullptr if none
-Function* PipelineShaders::GetEntryPoint(
+Function* PipelineShaders::getEntryPoint(
     ShaderStage shaderStage     // Shader stage
     ) const
 {
@@ -93,11 +93,11 @@ Function* PipelineShaders::GetEntryPoint(
 
 // =====================================================================================================================
 // Get the ABI shader stage for a particular function, or ShaderStageInvalid if not a shader entrypoint.
-ShaderStage PipelineShaders::GetShaderStage(
-    const Function* pFunc  // [in] Function to look up
+ShaderStage PipelineShaders::getShaderStage(
+    const Function* func  // [in] Function to look up
     ) const
 {
-    auto entryMapIt = m_entryPointMap.find(pFunc);
+    auto entryMapIt = m_entryPointMap.find(func);
     if (entryMapIt == m_entryPointMap.end())
     {
         return ShaderStageInvalid;

@@ -63,7 +63,7 @@ char PatchBufferOp::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching for buffer operations
-FunctionPass* CreatePatchBufferOp()
+FunctionPass* createPatchBufferOp()
 {
     return new PatchBufferOp();
 }
@@ -96,39 +96,39 @@ bool PatchBufferOp::runOnFunction(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Buffer-Op\n");
 
-    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(function.getParent());
-    m_pContext = &function.getContext();
-    m_pBuilder.reset(new IRBuilder<>(*m_pContext));
+    m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(function.getParent());
+    m_context = &function.getContext();
+    m_builder.reset(new IRBuilder<>(*m_context));
 
     // Invoke visitation of the target instructions.
-    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    auto pipelineShaders = &getAnalysis<PipelineShaders>();
 
     // If the function is not a valid shader stage, bail.
-    if (pPipelineShaders->GetShaderStage(&function) == ShaderStageInvalid)
+    if (pipelineShaders->getShaderStage(&function) == ShaderStageInvalid)
     {
         return false;
     }
 
-    m_pDivergenceAnalysis = &getAnalysis<LegacyDivergenceAnalysis>();
+    m_divergenceAnalysis = &getAnalysis<LegacyDivergenceAnalysis>();
 
     // To replace the fat pointer uses correctly we need to walk the basic blocks strictly in domination order to avoid
     // visiting a use of a fat pointer before it was actually defined.
     ReversePostOrderTraversal<Function*> traversal(&function);
-    for (BasicBlock* const pBlock : traversal)
+    for (BasicBlock* const block : traversal)
     {
-        visit(*pBlock);
+        visit(*block);
     }
 
     // Some instructions can modify the CFG and thus have to be performed after the normal visitors.
-    for (Instruction* const pInst : m_postVisitInsts)
+    for (Instruction* const inst : m_postVisitInsts)
     {
-        if (MemSetInst* const pMemSet = dyn_cast<MemSetInst>(pInst))
+        if (MemSetInst* const memSet = dyn_cast<MemSetInst>(inst))
         {
-            PostVisitMemSetInst(*pMemSet);
+            postVisitMemSetInst(*memSet);
         }
-        else if (MemCpyInst* const pMemCpy = dyn_cast<MemCpyInst>(pInst))
+        else if (MemCpyInst* const memCpy = dyn_cast<MemCpyInst>(inst))
         {
-            PostVisitMemCpyInst(*pMemCpy);
+            postVisitMemCpyInst(*memCpy);
         }
     }
     m_postVisitInsts.clear();
@@ -137,19 +137,19 @@ bool PatchBufferOp::runOnFunction(
 
     for (auto& replaceMap : m_replacementMap)
     {
-        Instruction* const pInst = dyn_cast<Instruction>(replaceMap.first);
+        Instruction* const inst = dyn_cast<Instruction>(replaceMap.first);
 
-        if (pInst == nullptr)
+        if (inst == nullptr)
         {
             continue;
         }
 
-        if (isa<StoreInst>(pInst) == false)
+        if (isa<StoreInst>(inst) == false)
         {
-            pInst->replaceAllUsesWith(UndefValue::get(pInst->getType()));
+            inst->replaceAllUsesWith(UndefValue::get(inst->getType()));
         }
 
-        pInst->eraseFromParent();
+        inst->eraseFromParent();
     }
 
     m_replacementMap.clear();
@@ -170,52 +170,52 @@ void PatchBufferOp::visitAtomicCmpXchgInst(
         return;
     }
 
-    m_pBuilder->SetInsertPoint(&atomicCmpXchgInst);
+    m_builder->SetInsertPoint(&atomicCmpXchgInst);
 
-    Value* const pPointer = GetPointerOperandAsInst(atomicCmpXchgInst.getPointerOperand());
+    Value* const pointer = getPointerOperandAsInst(atomicCmpXchgInst.getPointerOperand());
 
-    Type* const pStoreType = atomicCmpXchgInst.getNewValOperand()->getType();
+    Type* const storeType = atomicCmpXchgInst.getNewValOperand()->getType();
 
     const bool isSlc = atomicCmpXchgInst.getMetadata(LLVMContext::MD_nontemporal);
 
-    Value* const pBufferDesc = m_replacementMap[pPointer].first;
-    Value* const pBaseIndex = m_pBuilder->CreatePtrToInt(m_replacementMap[pPointer].second, m_pBuilder->getInt32Ty());
-    CopyMetadata(pBaseIndex, &atomicCmpXchgInst);
+    Value* const bufferDesc = m_replacementMap[pointer].first;
+    Value* const baseIndex = m_builder->CreatePtrToInt(m_replacementMap[pointer].second, m_builder->getInt32Ty());
+    copyMetadata(baseIndex, &atomicCmpXchgInst);
 
     // If our buffer descriptor is divergent or is not a 32-bit integer, need to handle it differently.
-    if ((m_divergenceSet.count(pBufferDesc) > 0) || (pStoreType->isIntegerTy(32) == false))
+    if ((m_divergenceSet.count(bufferDesc) > 0) || (storeType->isIntegerTy(32) == false))
     {
-        Value* const pBaseAddr = GetBaseAddressFromBufferDesc(pBufferDesc);
+        Value* const baseAddr = getBaseAddressFromBufferDesc(bufferDesc);
 
         // The 2nd element in the buffer descriptor is the byte bound, we do this to support robust buffer access.
-        Value* const pBound = m_pBuilder->CreateExtractElement(pBufferDesc, 2);
-        Value* const pInBound = m_pBuilder->CreateICmpULT(pBaseIndex, pBound);
-        Value* const pNewBaseIndex = m_pBuilder->CreateSelect(pInBound, pBaseIndex, m_pBuilder->getInt32(0));
+        Value* const bound = m_builder->CreateExtractElement(bufferDesc, 2);
+        Value* const inBound = m_builder->CreateICmpULT(baseIndex, bound);
+        Value* const newBaseIndex = m_builder->CreateSelect(inBound, baseIndex, m_builder->getInt32(0));
 
         // Add on the index to the address.
-        Value* pAtomicPointer = m_pBuilder->CreateGEP(pBaseAddr, pNewBaseIndex);
+        Value* atomicPointer = m_builder->CreateGEP(baseAddr, newBaseIndex);
 
-        pAtomicPointer = m_pBuilder->CreateBitCast(pAtomicPointer, pStoreType->getPointerTo(ADDR_SPACE_GLOBAL));
+        atomicPointer = m_builder->CreateBitCast(atomicPointer, storeType->getPointerTo(ADDR_SPACE_GLOBAL));
 
         const AtomicOrdering successOrdering = atomicCmpXchgInst.getSuccessOrdering();
         const AtomicOrdering failureOrdering = atomicCmpXchgInst.getFailureOrdering();
 
-        Value* const pCompareValue = atomicCmpXchgInst.getCompareOperand();
-        Value* const pNewValue = atomicCmpXchgInst.getNewValOperand();
-        AtomicCmpXchgInst* const pNewAtomicCmpXchg = m_pBuilder->CreateAtomicCmpXchg(pAtomicPointer,
-                                                                                     pCompareValue,
-                                                                                     pNewValue,
+        Value* const compareValue = atomicCmpXchgInst.getCompareOperand();
+        Value* const newValue = atomicCmpXchgInst.getNewValOperand();
+        AtomicCmpXchgInst* const newAtomicCmpXchg = m_builder->CreateAtomicCmpXchg(atomicPointer,
+                                                                                     compareValue,
+                                                                                     newValue,
                                                                                      successOrdering,
                                                                                      failureOrdering);
-        pNewAtomicCmpXchg->setVolatile(atomicCmpXchgInst.isVolatile());
-        pNewAtomicCmpXchg->setSyncScopeID(atomicCmpXchgInst.getSyncScopeID());
-        pNewAtomicCmpXchg->setWeak(atomicCmpXchgInst.isWeak());
-        CopyMetadata(pNewAtomicCmpXchg, &atomicCmpXchgInst);
+        newAtomicCmpXchg->setVolatile(atomicCmpXchgInst.isVolatile());
+        newAtomicCmpXchg->setSyncScopeID(atomicCmpXchgInst.getSyncScopeID());
+        newAtomicCmpXchg->setWeak(atomicCmpXchgInst.isWeak());
+        copyMetadata(newAtomicCmpXchg, &atomicCmpXchgInst);
 
         // Record the atomic instruction so we remember to delete it later.
         m_replacementMap[&atomicCmpXchgInst] = std::make_pair(nullptr, nullptr);
 
-        atomicCmpXchgInst.replaceAllUsesWith(pNewAtomicCmpXchg);
+        atomicCmpXchgInst.replaceAllUsesWith(newAtomicCmpXchg);
     }
     else
     {
@@ -225,9 +225,9 @@ void PatchBufferOp::visitAtomicCmpXchgInst(
         case AtomicOrdering::AcquireRelease:
         case AtomicOrdering::SequentiallyConsistent:
             {
-                FenceInst* const pFence = m_pBuilder->CreateFence(AtomicOrdering::Release,
+                FenceInst* const fence = m_builder->CreateFence(AtomicOrdering::Release,
                                                                   atomicCmpXchgInst.getSyncScopeID());
-                CopyMetadata(pFence, &atomicCmpXchgInst);
+                copyMetadata(fence, &atomicCmpXchgInst);
                 break;
             }
         default:
@@ -236,15 +236,15 @@ void PatchBufferOp::visitAtomicCmpXchgInst(
             }
         }
 
-        Value* const pAtomicCall = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_atomic_cmpswap,
+        Value* const atomicCall = m_builder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_atomic_cmpswap,
                                                                atomicCmpXchgInst.getNewValOperand()->getType(),
                                                                {
                                                                    atomicCmpXchgInst.getNewValOperand(),
                                                                    atomicCmpXchgInst.getCompareOperand(),
-                                                                   pBufferDesc,
-                                                                   pBaseIndex,
-                                                                   m_pBuilder->getInt32(0),
-                                                                   m_pBuilder->getInt32(isSlc ? 1 : 0)
+                                                                   bufferDesc,
+                                                                   baseIndex,
+                                                                   m_builder->getInt32(0),
+                                                                   m_builder->getInt32(isSlc ? 1 : 0)
                                                                });
 
         switch (atomicCmpXchgInst.getSuccessOrdering())
@@ -253,9 +253,9 @@ void PatchBufferOp::visitAtomicCmpXchgInst(
         case AtomicOrdering::AcquireRelease:
         case AtomicOrdering::SequentiallyConsistent:
             {
-                FenceInst* const pFence = m_pBuilder->CreateFence(AtomicOrdering::Acquire,
+                FenceInst* const fence = m_builder->CreateFence(AtomicOrdering::Acquire,
                                                                   atomicCmpXchgInst.getSyncScopeID());
-                CopyMetadata(pFence, &atomicCmpXchgInst);
+                copyMetadata(fence, &atomicCmpXchgInst);
                 break;
             }
         default:
@@ -264,26 +264,26 @@ void PatchBufferOp::visitAtomicCmpXchgInst(
             }
         }
 
-        Value* pResultValue = UndefValue::get(atomicCmpXchgInst.getType());
+        Value* resultValue = UndefValue::get(atomicCmpXchgInst.getType());
 
-        pResultValue = m_pBuilder->CreateInsertValue(pResultValue, pAtomicCall, static_cast<uint64_t>(0));
-        CopyMetadata(pResultValue, &atomicCmpXchgInst);
+        resultValue = m_builder->CreateInsertValue(resultValue, atomicCall, static_cast<uint64_t>(0));
+        copyMetadata(resultValue, &atomicCmpXchgInst);
 
         // NOTE: If we have a strong compare exchange, LLVM optimization will always set the compare result to "Equal".
         // Thus, we have to correct this behaviour and do the comparison by ourselves.
         if (atomicCmpXchgInst.isWeak() == false)
         {
-            Value* const pValueEqual = m_pBuilder->CreateICmpEQ(pAtomicCall, atomicCmpXchgInst.getCompareOperand());
-            CopyMetadata(pValueEqual, &atomicCmpXchgInst);
+            Value* const valueEqual = m_builder->CreateICmpEQ(atomicCall, atomicCmpXchgInst.getCompareOperand());
+            copyMetadata(valueEqual, &atomicCmpXchgInst);
 
-            pResultValue = m_pBuilder->CreateInsertValue(pResultValue, pValueEqual, static_cast<uint64_t>(1));
-            CopyMetadata(pResultValue, &atomicCmpXchgInst);
+            resultValue = m_builder->CreateInsertValue(resultValue, valueEqual, static_cast<uint64_t>(1));
+            copyMetadata(resultValue, &atomicCmpXchgInst);
         }
 
         // Record the atomic instruction so we remember to delete it later.
         m_replacementMap[&atomicCmpXchgInst] = std::make_pair(nullptr, nullptr);
 
-        atomicCmpXchgInst.replaceAllUsesWith(pResultValue);
+        atomicCmpXchgInst.replaceAllUsesWith(resultValue);
     }
 }
 
@@ -298,45 +298,45 @@ void PatchBufferOp::visitAtomicRMWInst(
         return;
     }
 
-    m_pBuilder->SetInsertPoint(&atomicRmwInst);
+    m_builder->SetInsertPoint(&atomicRmwInst);
 
-    Value* const pPointer = GetPointerOperandAsInst(atomicRmwInst.getPointerOperand());
+    Value* const pointer = getPointerOperandAsInst(atomicRmwInst.getPointerOperand());
 
-    Type* const pStoreType = atomicRmwInst.getValOperand()->getType();
+    Type* const storeType = atomicRmwInst.getValOperand()->getType();
 
     const bool isSlc = atomicRmwInst.getMetadata(LLVMContext::MD_nontemporal);
 
-    Value* const pBufferDesc = m_replacementMap[pPointer].first;
-    Value* const pBaseIndex = m_pBuilder->CreatePtrToInt(m_replacementMap[pPointer].second, m_pBuilder->getInt32Ty());
-    CopyMetadata(pBaseIndex, &atomicRmwInst);
+    Value* const bufferDesc = m_replacementMap[pointer].first;
+    Value* const baseIndex = m_builder->CreatePtrToInt(m_replacementMap[pointer].second, m_builder->getInt32Ty());
+    copyMetadata(baseIndex, &atomicRmwInst);
 
     // If our buffer descriptor is divergent, need to handle it differently.
-    if (m_divergenceSet.count(pBufferDesc) > 0)
+    if (m_divergenceSet.count(bufferDesc) > 0)
     {
-        Value* const pBaseAddr = GetBaseAddressFromBufferDesc(pBufferDesc);
+        Value* const baseAddr = getBaseAddressFromBufferDesc(bufferDesc);
 
         // The 2nd element in the buffer descriptor is the byte bound, we do this to support robust buffer access.
-        Value* const pBound = m_pBuilder->CreateExtractElement(pBufferDesc, 2);
-        Value* const pInBound = m_pBuilder->CreateICmpULT(pBaseIndex, pBound);
-        Value* const pNewBaseIndex = m_pBuilder->CreateSelect(pInBound, pBaseIndex, m_pBuilder->getInt32(0));
+        Value* const bound = m_builder->CreateExtractElement(bufferDesc, 2);
+        Value* const inBound = m_builder->CreateICmpULT(baseIndex, bound);
+        Value* const newBaseIndex = m_builder->CreateSelect(inBound, baseIndex, m_builder->getInt32(0));
 
         // Add on the index to the address.
-        Value* pAtomicPointer = m_pBuilder->CreateGEP(pBaseAddr, pNewBaseIndex);
+        Value* atomicPointer = m_builder->CreateGEP(baseAddr, newBaseIndex);
 
-        pAtomicPointer = m_pBuilder->CreateBitCast(pAtomicPointer, pStoreType->getPointerTo(ADDR_SPACE_GLOBAL));
+        atomicPointer = m_builder->CreateBitCast(atomicPointer, storeType->getPointerTo(ADDR_SPACE_GLOBAL));
 
-        AtomicRMWInst* const pNewAtomicRmw = m_pBuilder->CreateAtomicRMW(atomicRmwInst.getOperation(),
-                                                                         pAtomicPointer,
+        AtomicRMWInst* const newAtomicRmw = m_builder->CreateAtomicRMW(atomicRmwInst.getOperation(),
+                                                                         atomicPointer,
                                                                          atomicRmwInst.getValOperand(),
                                                                          atomicRmwInst.getOrdering());
-        pNewAtomicRmw->setVolatile(atomicRmwInst.isVolatile());
-        pNewAtomicRmw->setSyncScopeID(atomicRmwInst.getSyncScopeID());
-        CopyMetadata(pNewAtomicRmw, &atomicRmwInst);
+        newAtomicRmw->setVolatile(atomicRmwInst.isVolatile());
+        newAtomicRmw->setSyncScopeID(atomicRmwInst.getSyncScopeID());
+        copyMetadata(newAtomicRmw, &atomicRmwInst);
 
         // Record the atomic instruction so we remember to delete it later.
         m_replacementMap[&atomicRmwInst] = std::make_pair(nullptr, nullptr);
 
-        atomicRmwInst.replaceAllUsesWith(pNewAtomicRmw);
+        atomicRmwInst.replaceAllUsesWith(newAtomicRmw);
     }
     else
     {
@@ -346,8 +346,8 @@ void PatchBufferOp::visitAtomicRMWInst(
         case AtomicOrdering::AcquireRelease:
         case AtomicOrdering::SequentiallyConsistent:
             {
-                FenceInst* const pFence = m_pBuilder->CreateFence(AtomicOrdering::Release, atomicRmwInst.getSyncScopeID());
-                CopyMetadata(pFence, &atomicRmwInst);
+                FenceInst* const fence = m_builder->CreateFence(AtomicOrdering::Release, atomicRmwInst.getSyncScopeID());
+                copyMetadata(fence, &atomicRmwInst);
                 break;
             }
         default:
@@ -394,16 +394,16 @@ void PatchBufferOp::visitAtomicRMWInst(
             break;
         }
 
-        Value* const pAtomicCall = m_pBuilder->CreateIntrinsic(intrinsic,
-                                                               cast<IntegerType>(pStoreType),
+        Value* const atomicCall = m_builder->CreateIntrinsic(intrinsic,
+                                                               cast<IntegerType>(storeType),
                                                                {
                                                                    atomicRmwInst.getValOperand(),
-                                                                   pBufferDesc,
-                                                                   pBaseIndex,
-                                                                   m_pBuilder->getInt32(0),
-                                                                   m_pBuilder->getInt32(isSlc * 2)
+                                                                   bufferDesc,
+                                                                   baseIndex,
+                                                                   m_builder->getInt32(0),
+                                                                   m_builder->getInt32(isSlc * 2)
                                                                });
-        CopyMetadata(pAtomicCall, &atomicRmwInst);
+        copyMetadata(atomicCall, &atomicRmwInst);
 
         switch (atomicRmwInst.getOrdering())
         {
@@ -411,8 +411,8 @@ void PatchBufferOp::visitAtomicRMWInst(
         case AtomicOrdering::AcquireRelease:
         case AtomicOrdering::SequentiallyConsistent:
             {
-                FenceInst* const pFence = m_pBuilder->CreateFence(AtomicOrdering::Acquire, atomicRmwInst.getSyncScopeID());
-                CopyMetadata(pFence, &atomicRmwInst);
+                FenceInst* const fence = m_builder->CreateFence(AtomicOrdering::Acquire, atomicRmwInst.getSyncScopeID());
+                copyMetadata(fence, &atomicRmwInst);
                 break;
             }
         default:
@@ -424,7 +424,7 @@ void PatchBufferOp::visitAtomicRMWInst(
         // Record the atomic instruction so we remember to delete it later.
         m_replacementMap[&atomicRmwInst] = std::make_pair(nullptr, nullptr);
 
-        atomicRmwInst.replaceAllUsesWith(pAtomicCall);
+        atomicRmwInst.replaceAllUsesWith(atomicCall);
     }
 }
 
@@ -433,30 +433,30 @@ void PatchBufferOp::visitAtomicRMWInst(
 void PatchBufferOp::visitBitCastInst(
     BitCastInst& bitCastInst) // [in] The instruction
 {
-    Type* const pDestType = bitCastInst.getType();
+    Type* const destType = bitCastInst.getType();
 
     // If the type is not a pointer type, bail.
-    if (pDestType->isPointerTy() == false)
+    if (destType->isPointerTy() == false)
     {
         return;
     }
 
     // If the pointer is not a fat pointer, bail.
-    if (pDestType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+    if (destType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     {
         return;
     }
 
-    m_pBuilder->SetInsertPoint(&bitCastInst);
+    m_builder->SetInsertPoint(&bitCastInst);
 
-    Value* const pPointer = GetPointerOperandAsInst(bitCastInst.getOperand(0));
+    Value* const pointer = getPointerOperandAsInst(bitCastInst.getOperand(0));
 
-    Value* const pNewBitCast = m_pBuilder->CreateBitCast(m_replacementMap[pPointer].second,
-                                                         GetRemappedType(bitCastInst.getDestTy()));
+    Value* const newBitCast = m_builder->CreateBitCast(m_replacementMap[pointer].second,
+                                                         getRemappedType(bitCastInst.getDestTy()));
 
-    CopyMetadata(pNewBitCast, pPointer);
+    copyMetadata(newBitCast, pointer);
 
-    m_replacementMap[&bitCastInst] = std::make_pair(m_replacementMap[pPointer].first, pNewBitCast);
+    m_replacementMap[&bitCastInst] = std::make_pair(m_replacementMap[pointer].first, newBitCast);
 }
 
 // =====================================================================================================================
@@ -464,15 +464,15 @@ void PatchBufferOp::visitBitCastInst(
 void PatchBufferOp::visitCallInst(
     CallInst& callInst) // [in] The instruction
 {
-    Function* const pCalledFunc = callInst.getCalledFunction();
+    Function* const calledFunc = callInst.getCalledFunction();
 
     // If the call does not have a called function, bail.
-    if (pCalledFunc == nullptr)
+    if (calledFunc == nullptr)
     {
         return;
     }
 
-    const StringRef callName(pCalledFunc->getName());
+    const StringRef callName(calledFunc->getName());
 
     // If the call is not a late intrinsic call we need to replace, bail.
     if (callName.startswith(lgcName::LaterCallPrefix) == false)
@@ -480,35 +480,35 @@ void PatchBufferOp::visitCallInst(
         return;
     }
 
-    m_pBuilder->SetInsertPoint(&callInst);
+    m_builder->SetInsertPoint(&callInst);
 
     if (callName.equals(lgcName::LateLaunderFatPointer))
     {
-        Constant* const pNullPointer = ConstantPointerNull::get(GetRemappedType(callInst.getType()));
-        m_replacementMap[&callInst] = std::make_pair(callInst.getArgOperand(0), pNullPointer);
+        Constant* const nullPointer = ConstantPointerNull::get(getRemappedType(callInst.getType()));
+        m_replacementMap[&callInst] = std::make_pair(callInst.getArgOperand(0), nullPointer);
 
         // Check for any invariant starts that use the pointer.
-        if (RemoveUsersForInvariantStarts(&callInst))
+        if (removeUsersForInvariantStarts(&callInst))
         {
             m_invariantSet.insert(callInst.getArgOperand(0));
         }
 
         // If the incoming index to the fat pointer launder was divergent, remember it.
-        if (m_pDivergenceAnalysis->isDivergent(callInst.getArgOperand(0)))
+        if (m_divergenceAnalysis->isDivergent(callInst.getArgOperand(0)))
         {
             m_divergenceSet.insert(callInst.getArgOperand(0));
         }
     }
     else if (callName.startswith(lgcName::LateBufferLength))
     {
-        Value* const pPointer = GetPointerOperandAsInst(callInst.getArgOperand(0));
+        Value* const pointer = getPointerOperandAsInst(callInst.getArgOperand(0));
 
         // Extract element 2 which is the NUM_RECORDS field from the buffer descriptor.
-        Value* const pBufferLength = m_pBuilder->CreateExtractElement(m_replacementMap[pPointer].first, 2);
+        Value* const bufferLength = m_builder->CreateExtractElement(m_replacementMap[pointer].first, 2);
         // Record the call instruction so we remember to delete it later.
         m_replacementMap[&callInst] = std::make_pair(nullptr, nullptr);
 
-        callInst.replaceAllUsesWith(pBufferLength);
+        callInst.replaceAllUsesWith(bufferLength);
     }
     else
     {
@@ -521,29 +521,29 @@ void PatchBufferOp::visitCallInst(
 void PatchBufferOp::visitExtractElementInst(
     ExtractElementInst& extractElementInst) // [in] The instruction
 {
-    PointerType* const pPointerType = dyn_cast<PointerType>(extractElementInst.getType());
+    PointerType* const pointerType = dyn_cast<PointerType>(extractElementInst.getType());
 
     // If the extract element is not extracting a pointer, bail.
-    if (pPointerType == nullptr)
+    if (pointerType == nullptr)
     {
         return;
     }
 
     // If the type we are GEPing into is not a fat pointer, bail.
-    if (pPointerType->getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+    if (pointerType->getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     {
         return;
     }
 
-    m_pBuilder->SetInsertPoint(&extractElementInst);
+    m_builder->SetInsertPoint(&extractElementInst);
 
-    Value* const pPointer = GetPointerOperandAsInst(extractElementInst.getVectorOperand());
-    Value* const pIndex = extractElementInst.getIndexOperand();
+    Value* const pointer = getPointerOperandAsInst(extractElementInst.getVectorOperand());
+    Value* const index = extractElementInst.getIndexOperand();
 
-    Value* const pPointerElem = m_pBuilder->CreateExtractElement(m_replacementMap[pPointer].second, pIndex);
-    CopyMetadata(pPointerElem, pPointer);
+    Value* const pointerElem = m_builder->CreateExtractElement(m_replacementMap[pointer].second, index);
+    copyMetadata(pointerElem, pointer);
 
-    m_replacementMap[&extractElementInst] = std::make_pair(m_replacementMap[pPointer].first, pPointerElem);
+    m_replacementMap[&extractElementInst] = std::make_pair(m_replacementMap[pointer].first, pointerElem);
 }
 
 // =====================================================================================================================
@@ -557,26 +557,26 @@ void PatchBufferOp::visitGetElementPtrInst(
         return;
     }
 
-    m_pBuilder->SetInsertPoint(&getElemPtrInst);
+    m_builder->SetInsertPoint(&getElemPtrInst);
 
-    Value* const pPointer = GetPointerOperandAsInst(getElemPtrInst.getPointerOperand());
+    Value* const pointer = getPointerOperandAsInst(getElemPtrInst.getPointerOperand());
 
     SmallVector<Value*, 8> indices(getElemPtrInst.idx_begin(), getElemPtrInst.idx_end());
 
-    Value* pNewGetElemPtr = nullptr;
+    Value* newGetElemPtr = nullptr;
 
     if (getElemPtrInst.isInBounds())
     {
-        pNewGetElemPtr = m_pBuilder->CreateInBoundsGEP(m_replacementMap[pPointer].second, indices);
+        newGetElemPtr = m_builder->CreateInBoundsGEP(m_replacementMap[pointer].second, indices);
     }
     else
     {
-        pNewGetElemPtr = m_pBuilder->CreateGEP(m_replacementMap[pPointer].second, indices);
+        newGetElemPtr = m_builder->CreateGEP(m_replacementMap[pointer].second, indices);
     }
 
-    CopyMetadata(pNewGetElemPtr, pPointer);
+    copyMetadata(newGetElemPtr, pointer);
 
-    m_replacementMap[&getElemPtrInst] = std::make_pair(m_replacementMap[pPointer].first, pNewGetElemPtr);
+    m_replacementMap[&getElemPtrInst] = std::make_pair(m_replacementMap[pointer].first, newGetElemPtr);
 }
 
 // =====================================================================================================================
@@ -584,48 +584,48 @@ void PatchBufferOp::visitGetElementPtrInst(
 void PatchBufferOp::visitInsertElementInst(
     InsertElementInst& insertElementInst) // [in] The instruction
 {
-    Type* const pType = insertElementInst.getType();
+    Type* const type = insertElementInst.getType();
 
     // If the type is not a vector, bail.
-    if (pType->isVectorTy() == false)
+    if (type->isVectorTy() == false)
     {
         return;
     }
 
-    PointerType* const pPointerType = dyn_cast<PointerType>(pType->getVectorElementType());
+    PointerType* const pointerType = dyn_cast<PointerType>(type->getVectorElementType());
 
     // If the extract element is not extracting from a vector of pointers, bail.
-    if (pPointerType == nullptr)
+    if (pointerType == nullptr)
     {
         return;
     }
 
     // If the type we are GEPing into is not a fat pointer, bail.
-    if (pPointerType->getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+    if (pointerType->getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     {
         return;
     }
 
-    m_pBuilder->SetInsertPoint(&insertElementInst);
+    m_builder->SetInsertPoint(&insertElementInst);
 
-    Value* const pPointer = GetPointerOperandAsInst(insertElementInst.getOperand(1));
-    Value* const pIndex = m_replacementMap[pPointer].second;
+    Value* const pointer = getPointerOperandAsInst(insertElementInst.getOperand(1));
+    Value* const index = m_replacementMap[pointer].second;
 
-    Value* pIndexVector = nullptr;
+    Value* indexVector = nullptr;
 
     if (isa<UndefValue>(insertElementInst.getOperand(0)))
     {
-        pIndexVector = UndefValue::get(VectorType::get(pIndex->getType(), pType->getVectorNumElements()));
+        indexVector = UndefValue::get(VectorType::get(index->getType(), type->getVectorNumElements()));
     }
     else
     {
-        pIndexVector = m_replacementMap[GetPointerOperandAsInst(insertElementInst.getOperand(0))].second;
+        indexVector = m_replacementMap[getPointerOperandAsInst(insertElementInst.getOperand(0))].second;
     }
 
-    pIndexVector = m_pBuilder->CreateInsertElement(pIndexVector, pIndex, insertElementInst.getOperand(2));
-    CopyMetadata(pIndexVector, pPointer);
+    indexVector = m_builder->CreateInsertElement(indexVector, index, insertElementInst.getOperand(2));
+    copyMetadata(indexVector, pointer);
 
-    m_replacementMap[&insertElementInst] = std::make_pair(m_replacementMap[pPointer].first, pIndexVector);
+    m_replacementMap[&insertElementInst] = std::make_pair(m_replacementMap[pointer].first, indexVector);
 }
 
 // =====================================================================================================================
@@ -637,18 +637,18 @@ void PatchBufferOp::visitLoadInst(
 
     if (addrSpace == ADDR_SPACE_CONST)
     {
-        m_pBuilder->SetInsertPoint(&loadInst);
+        m_builder->SetInsertPoint(&loadInst);
 
-        Type* const pLoadType = loadInst.getType();
+        Type* const loadType = loadInst.getType();
 
         // If the load is not a pointer type, bail.
-        if (pLoadType->isPointerTy() == false)
+        if (loadType->isPointerTy() == false)
         {
             return;
         }
 
         // If the address space of the loaded pointer is not a buffer fat pointer, bail.
-        if (pLoadType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+        if (loadType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
         {
             return;
         }
@@ -656,43 +656,43 @@ void PatchBufferOp::visitLoadInst(
         assert(loadInst.isVolatile() == false);
         assert(loadInst.getOrdering() == AtomicOrdering::NotAtomic);
 
-        Type* const pCastType = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(ADDR_SPACE_CONST);
+        Type* const castType = VectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(ADDR_SPACE_CONST);
 
-        Value* const pPointer = GetPointerOperandAsInst(loadInst.getPointerOperand());
+        Value* const pointer = getPointerOperandAsInst(loadInst.getPointerOperand());
 
-        Value* const pLoadPointer = m_pBuilder->CreateBitCast(pPointer, pCastType);
+        Value* const loadPointer = m_builder->CreateBitCast(pointer, castType);
 
-        LoadInst* const pNewLoad = m_pBuilder->CreateLoad(pLoadPointer);
-        pNewLoad->setVolatile(loadInst.isVolatile());
-        pNewLoad->setAlignment(MaybeAlign(loadInst.getAlignment()));
-        pNewLoad->setOrdering(loadInst.getOrdering());
-        pNewLoad->setSyncScopeID(loadInst.getSyncScopeID());
-        CopyMetadata(pNewLoad, &loadInst);
+        LoadInst* const newLoad = m_builder->CreateLoad(loadPointer);
+        newLoad->setVolatile(loadInst.isVolatile());
+        newLoad->setAlignment(MaybeAlign(loadInst.getAlignment()));
+        newLoad->setOrdering(loadInst.getOrdering());
+        newLoad->setSyncScopeID(loadInst.getSyncScopeID());
+        copyMetadata(newLoad, &loadInst);
 
-        Constant* const pNullPointer = ConstantPointerNull::get(GetRemappedType(pLoadType));
+        Constant* const nullPointer = ConstantPointerNull::get(getRemappedType(loadType));
 
-        m_replacementMap[&loadInst] = std::make_pair(pNewLoad, pNullPointer);
+        m_replacementMap[&loadInst] = std::make_pair(newLoad, nullPointer);
 
         // If we removed an invariant load, remember that our new load is invariant.
-        if (RemoveUsersForInvariantStarts(&loadInst))
+        if (removeUsersForInvariantStarts(&loadInst))
         {
-            m_invariantSet.insert(pNewLoad);
+            m_invariantSet.insert(newLoad);
         }
 
         // If the original load was divergent, it means we are using descriptor indexing and need to remember it.
-        if (m_pDivergenceAnalysis->isDivergent(&loadInst))
+        if (m_divergenceAnalysis->isDivergent(&loadInst))
         {
-            m_divergenceSet.insert(pNewLoad);
+            m_divergenceSet.insert(newLoad);
         }
     }
     else if (addrSpace == ADDR_SPACE_BUFFER_FAT_POINTER)
     {
-        Value* const pNewLoad = ReplaceLoadStore(loadInst);
+        Value* const newLoad = replaceLoadStore(loadInst);
 
         // Record the load instruction so we remember to delete it later.
         m_replacementMap[&loadInst] = std::make_pair(nullptr, nullptr);
 
-        loadInst.replaceAllUsesWith(pNewLoad);
+        loadInst.replaceAllUsesWith(newLoad);
     }
 }
 
@@ -701,11 +701,11 @@ void PatchBufferOp::visitLoadInst(
 void PatchBufferOp::visitMemCpyInst(
     MemCpyInst& memCpyInst) // [in] The memcpy instruction
 {
-    Value* const pDest = memCpyInst.getArgOperand(0);
-    Value* const pSrc = memCpyInst.getArgOperand(1);
+    Value* const dest = memCpyInst.getArgOperand(0);
+    Value* const src = memCpyInst.getArgOperand(1);
 
-    const unsigned destAddrSpace = pDest->getType()->getPointerAddressSpace();
-    const unsigned srcAddrSpace = pSrc->getType()->getPointerAddressSpace();
+    const unsigned destAddrSpace = dest->getType()->getPointerAddressSpace();
+    const unsigned srcAddrSpace = src->getType()->getPointerAddressSpace();
 
     // If either of the address spaces are fat pointers.
     if ((destAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER) ||
@@ -721,11 +721,11 @@ void PatchBufferOp::visitMemCpyInst(
 void PatchBufferOp::visitMemMoveInst(
     MemMoveInst& memMoveInst) // [in] The memmove instruction
 {
-    Value* const pDest = memMoveInst.getArgOperand(0);
-    Value* const pSrc = memMoveInst.getArgOperand(1);
+    Value* const dest = memMoveInst.getArgOperand(0);
+    Value* const src = memMoveInst.getArgOperand(1);
 
-    const unsigned destAddrSpace = pDest->getType()->getPointerAddressSpace();
-    const unsigned srcAddrSpace = pSrc->getType()->getPointerAddressSpace();
+    const unsigned destAddrSpace = dest->getType()->getPointerAddressSpace();
+    const unsigned srcAddrSpace = src->getType()->getPointerAddressSpace();
 
     // If either of the address spaces are not fat pointers, bail.
     if ((destAddrSpace != ADDR_SPACE_BUFFER_FAT_POINTER) &&
@@ -734,48 +734,48 @@ void PatchBufferOp::visitMemMoveInst(
         return;
     }
 
-    m_pBuilder->SetInsertPoint(&memMoveInst);
+    m_builder->SetInsertPoint(&memMoveInst);
 
     const unsigned destAlignment = memMoveInst.getParamAlignment(0);
     const unsigned srcAlignment = memMoveInst.getParamAlignment(1);
 
     // We assume LLVM is not introducing variable length mem moves.
-    ConstantInt* const pLength = dyn_cast<ConstantInt>(memMoveInst.getArgOperand(2));
-    assert(pLength != nullptr);
+    ConstantInt* const length = dyn_cast<ConstantInt>(memMoveInst.getArgOperand(2));
+    assert(length != nullptr);
 
     // Get a vector type that is the length of the memmove.
-    VectorType* const pMemoryType = VectorType::get(m_pBuilder->getInt8Ty(), pLength->getZExtValue());
+    VectorType* const memoryType = VectorType::get(m_builder->getInt8Ty(), length->getZExtValue());
 
-    PointerType* const pCastDestType = pMemoryType->getPointerTo(destAddrSpace);
-    Value* const pCastDest = m_pBuilder->CreateBitCast(pDest, pCastDestType);
-    CopyMetadata(pCastDest, &memMoveInst);
+    PointerType* const castDestType = memoryType->getPointerTo(destAddrSpace);
+    Value* const castDest = m_builder->CreateBitCast(dest, castDestType);
+    copyMetadata(castDest, &memMoveInst);
 
-    PointerType* const pCastSrcType = pMemoryType->getPointerTo(srcAddrSpace);
-    Value* const pCastSrc = m_pBuilder->CreateBitCast(pSrc, pCastSrcType);
-    CopyMetadata(pCastSrc, &memMoveInst);
+    PointerType* const castSrcType = memoryType->getPointerTo(srcAddrSpace);
+    Value* const castSrc = m_builder->CreateBitCast(src, castSrcType);
+    copyMetadata(castSrc, &memMoveInst);
 
-    LoadInst* const pSrcLoad = m_pBuilder->CreateAlignedLoad(pCastSrc, MaybeAlign(srcAlignment));
-    CopyMetadata(pSrcLoad, &memMoveInst);
+    LoadInst* const srcLoad = m_builder->CreateAlignedLoad(castSrc, MaybeAlign(srcAlignment));
+    copyMetadata(srcLoad, &memMoveInst);
 
-    StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pSrcLoad, pCastDest, MaybeAlign(destAlignment));
-    CopyMetadata(pDestStore, &memMoveInst);
+    StoreInst* const destStore = m_builder->CreateAlignedStore(srcLoad, castDest, MaybeAlign(destAlignment));
+    copyMetadata(destStore, &memMoveInst);
 
     // Record the memmove instruction so we remember to delete it later.
     m_replacementMap[&memMoveInst] = std::make_pair(nullptr, nullptr);
 
     // Visit the load and store instructions to fold away fat pointer load/stores we might have just created.
-    if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastDest))
+    if (BitCastInst* const cast = dyn_cast<BitCastInst>(castDest))
     {
-        visitBitCastInst(*pCast);
+        visitBitCastInst(*cast);
     }
 
-    if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastSrc))
+    if (BitCastInst* const cast = dyn_cast<BitCastInst>(castSrc))
     {
-        visitBitCastInst(*pCast);
+        visitBitCastInst(*cast);
     }
 
-    visitLoadInst(*pSrcLoad);
-    visitStoreInst(*pDestStore);
+    visitLoadInst(*srcLoad);
+    visitStoreInst(*destStore);
 }
 
 // =====================================================================================================================
@@ -783,9 +783,9 @@ void PatchBufferOp::visitMemMoveInst(
 void PatchBufferOp::visitMemSetInst(
     MemSetInst& memSetInst) // [in] The memset instruction
 {
-    Value* const pDest = memSetInst.getArgOperand(0);
+    Value* const dest = memSetInst.getArgOperand(0);
 
-    const unsigned destAddrSpace = pDest->getType()->getPointerAddressSpace();
+    const unsigned destAddrSpace = dest->getType()->getPointerAddressSpace();
 
     // If the address spaces is a fat pointer.
     if (destAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER)
@@ -800,16 +800,16 @@ void PatchBufferOp::visitMemSetInst(
 void PatchBufferOp::visitPHINode(
     PHINode& phiNode) // [in] The phi node
 {
-    Type* const pType = phiNode.getType();
+    Type* const type = phiNode.getType();
 
     // If the type is not a pointer type, bail.
-    if (pType->isPointerTy() == false)
+    if (type->isPointerTy() == false)
     {
         return;
     }
 
     // If the pointer is not a fat pointer, bail.
-    if (pType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+    if (type->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     {
         return;
     }
@@ -819,99 +819,99 @@ void PatchBufferOp::visitPHINode(
     for (unsigned i = 0, incomingValueCount = phiNode.getNumIncomingValues(); i < incomingValueCount; i++)
     {
         // PHIs require us to insert new incomings in the preceeding basic blocks.
-        m_pBuilder->SetInsertPoint(phiNode.getIncomingBlock(i)->getTerminator());
+        m_builder->SetInsertPoint(phiNode.getIncomingBlock(i)->getTerminator());
 
-        incomings.push_back(GetPointerOperandAsInst(phiNode.getIncomingValue(i)));
+        incomings.push_back(getPointerOperandAsInst(phiNode.getIncomingValue(i)));
     }
 
-    Value* pBufferDesc = nullptr;
+    Value* bufferDesc = nullptr;
 
-    for (Value* const pIncoming : incomings)
+    for (Value* const incoming : incomings)
     {
-        Value* const pIncomingBufferDesc = m_replacementMap[pIncoming].first;
+        Value* const incomingBufferDesc = m_replacementMap[incoming].first;
 
-        if (pBufferDesc == nullptr)
+        if (bufferDesc == nullptr)
         {
-            pBufferDesc = pIncomingBufferDesc;
+            bufferDesc = incomingBufferDesc;
         }
-        else if (pBufferDesc != pIncomingBufferDesc)
+        else if (bufferDesc != incomingBufferDesc)
         {
-            pBufferDesc = nullptr;
+            bufferDesc = nullptr;
             break;
         }
     }
 
-    m_pBuilder->SetInsertPoint(&phiNode);
+    m_builder->SetInsertPoint(&phiNode);
 
     // If the buffer descriptor was null, it means the PHI is changing the buffer descriptor, and we need a new PHI.
-    if (pBufferDesc == nullptr)
+    if (bufferDesc == nullptr)
     {
-        PHINode* const pNewPhiNode = m_pBuilder->CreatePHI(VectorType::get(Type::getInt32Ty(*m_pContext), 4),
+        PHINode* const newPhiNode = m_builder->CreatePHI(VectorType::get(Type::getInt32Ty(*m_context), 4),
                                                            incomings.size());
-        CopyMetadata(pNewPhiNode, &phiNode);
+        copyMetadata(newPhiNode, &phiNode);
 
         bool isInvariant = true;
         bool isDivergent = false;
 
-        for (BasicBlock* const pBlock : phiNode.blocks())
+        for (BasicBlock* const block : phiNode.blocks())
         {
-            const int blockIndex = phiNode.getBasicBlockIndex(pBlock);
+            const int blockIndex = phiNode.getBasicBlockIndex(block);
             assert(blockIndex >= 0);
 
-            Value* const pIncomingBufferDesc = m_replacementMap[incomings[blockIndex]].first;
+            Value* const incomingBufferDesc = m_replacementMap[incomings[blockIndex]].first;
 
-            pNewPhiNode->addIncoming(pIncomingBufferDesc, pBlock);
+            newPhiNode->addIncoming(incomingBufferDesc, block);
 
             // If the incoming buffer descriptor is not invariant, the PHI cannot be marked invariant either.
-            if (m_invariantSet.count(pIncomingBufferDesc) == 0)
+            if (m_invariantSet.count(incomingBufferDesc) == 0)
             {
                 isInvariant = false;
             }
 
-            if ((m_divergenceSet.count(pIncomingBufferDesc) > 0) || m_pDivergenceAnalysis->isDivergent(&phiNode))
+            if ((m_divergenceSet.count(incomingBufferDesc) > 0) || m_divergenceAnalysis->isDivergent(&phiNode))
             {
                 isDivergent = true;
             }
         }
 
-        pBufferDesc = pNewPhiNode;
+        bufferDesc = newPhiNode;
 
         if (isInvariant)
         {
-            m_invariantSet.insert(pBufferDesc);
+            m_invariantSet.insert(bufferDesc);
         }
 
         if (isDivergent)
         {
-            m_divergenceSet.insert(pBufferDesc);
+            m_divergenceSet.insert(bufferDesc);
         }
     }
 
-    PHINode* const pNewPhiNode = m_pBuilder->CreatePHI(GetRemappedType(phiNode.getType()), incomings.size());
-    CopyMetadata(pNewPhiNode, &phiNode);
+    PHINode* const newPhiNode = m_builder->CreatePHI(getRemappedType(phiNode.getType()), incomings.size());
+    copyMetadata(newPhiNode, &phiNode);
 
-    m_replacementMap[&phiNode] = std::make_pair(pBufferDesc, pNewPhiNode);
+    m_replacementMap[&phiNode] = std::make_pair(bufferDesc, newPhiNode);
 
-    for (BasicBlock* const pBlock : phiNode.blocks())
+    for (BasicBlock* const block : phiNode.blocks())
     {
-        const int blockIndex = phiNode.getBasicBlockIndex(pBlock);
+        const int blockIndex = phiNode.getBasicBlockIndex(block);
         assert(blockIndex >= 0);
 
-        Value* pIncomingIndex = m_replacementMap[incomings[blockIndex]].second;
+        Value* incomingIndex = m_replacementMap[incomings[blockIndex]].second;
 
-        if (pIncomingIndex == nullptr)
+        if (incomingIndex == nullptr)
         {
-            if (Instruction* const pInst = dyn_cast<Instruction>(incomings[blockIndex]))
+            if (Instruction* const inst = dyn_cast<Instruction>(incomings[blockIndex]))
             {
-                visit(*pInst);
-                pIncomingIndex = m_replacementMap[pInst].second;
+                visit(*inst);
+                incomingIndex = m_replacementMap[inst].second;
             }
         }
 
-        pNewPhiNode->addIncoming(pIncomingIndex, pBlock);
+        newPhiNode->addIncoming(incomingIndex, block);
     }
 
-    m_replacementMap[&phiNode] = std::make_pair(pBufferDesc, pNewPhiNode);
+    m_replacementMap[&phiNode] = std::make_pair(bufferDesc, newPhiNode);
 }
 
 // =====================================================================================================================
@@ -919,70 +919,70 @@ void PatchBufferOp::visitPHINode(
 void PatchBufferOp::visitSelectInst(
     SelectInst& selectInst) // [in] The select instruction
 {
-    Type* const pDestType = selectInst.getType();
+    Type* const destType = selectInst.getType();
 
     // If the type is not a pointer type, bail.
-    if (pDestType->isPointerTy() == false)
+    if (destType->isPointerTy() == false)
     {
         return;
     }
 
     // If the pointer is not a fat pointer, bail.
-    if (pDestType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+    if (destType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     {
         return;
     }
 
-    m_pBuilder->SetInsertPoint(&selectInst);
+    m_builder->SetInsertPoint(&selectInst);
 
-    Value* const pValue1 = GetPointerOperandAsInst(selectInst.getTrueValue());
-    Value* const pValue2 = GetPointerOperandAsInst(selectInst.getFalseValue());
+    Value* const value1 = getPointerOperandAsInst(selectInst.getTrueValue());
+    Value* const value2 = getPointerOperandAsInst(selectInst.getFalseValue());
 
-    Value* const pBufferDesc1 = m_replacementMap[pValue1].first;
-    Value* const pBufferDesc2 = m_replacementMap[pValue2].first;
+    Value* const bufferDesc1 = m_replacementMap[value1].first;
+    Value* const bufferDesc2 = m_replacementMap[value2].first;
 
-    Value* pBufferDesc = nullptr;
+    Value* bufferDesc = nullptr;
 
-    if (pBufferDesc1 == pBufferDesc2)
+    if (bufferDesc1 == bufferDesc2)
     {
         // If the buffer descriptors are the same, then no select needed.
-        pBufferDesc = pBufferDesc1;
+        bufferDesc = bufferDesc1;
     }
-    else if ((pBufferDesc1 == nullptr) || (pBufferDesc2 == nullptr))
+    else if ((bufferDesc1 == nullptr) || (bufferDesc2 == nullptr))
     {
         // Select the non-nullptr buffer descriptor
-        pBufferDesc = pBufferDesc1 != nullptr ? pBufferDesc1 : pBufferDesc2;
+        bufferDesc = bufferDesc1 != nullptr ? bufferDesc1 : bufferDesc2;
     }
     else
     {
         // Otherwise we need to insert a select between the buffer descriptors.
-        pBufferDesc = m_pBuilder->CreateSelect(selectInst.getCondition(), pBufferDesc1, pBufferDesc2);
-        CopyMetadata(pBufferDesc, &selectInst);
+        bufferDesc = m_builder->CreateSelect(selectInst.getCondition(), bufferDesc1, bufferDesc2);
+        copyMetadata(bufferDesc, &selectInst);
 
         // If both incomings are invariant, mark the new select as invariant too.
-        if ((m_invariantSet.count(pBufferDesc1) > 0) && (m_invariantSet.count(pBufferDesc2) > 0))
+        if ((m_invariantSet.count(bufferDesc1) > 0) && (m_invariantSet.count(bufferDesc2) > 0))
         {
-            m_invariantSet.insert(pBufferDesc);
+            m_invariantSet.insert(bufferDesc);
         }
     }
 
-    Value* const pIndex1 = m_replacementMap[pValue1].second;
-    Value* const pIndex2 = m_replacementMap[pValue2].second;
+    Value* const index1 = m_replacementMap[value1].second;
+    Value* const index2 = m_replacementMap[value2].second;
 
-    Value* const pNewSelect = m_pBuilder->CreateSelect(selectInst.getCondition(), pIndex1, pIndex2);
-    CopyMetadata(pNewSelect, &selectInst);
+    Value* const newSelect = m_builder->CreateSelect(selectInst.getCondition(), index1, index2);
+    copyMetadata(newSelect, &selectInst);
 
-    m_replacementMap[&selectInst] = std::make_pair(pBufferDesc, pNewSelect);
+    m_replacementMap[&selectInst] = std::make_pair(bufferDesc, newSelect);
 
     // If either of the incoming buffer descriptors are divergent, mark the new buffer descriptor as divergent too.
-    if ((m_divergenceSet.count(pBufferDesc1) > 0) || (m_divergenceSet.count(pBufferDesc2) > 0))
+    if ((m_divergenceSet.count(bufferDesc1) > 0) || (m_divergenceSet.count(bufferDesc2) > 0))
     {
-        m_divergenceSet.insert(pBufferDesc);
+        m_divergenceSet.insert(bufferDesc);
     }
-    else if (m_pDivergenceAnalysis->isDivergent(&selectInst) && (pBufferDesc1 != pBufferDesc2))
+    else if (m_divergenceAnalysis->isDivergent(&selectInst) && (bufferDesc1 != bufferDesc2))
     {
         // Otherwise is the selection is divergent and the buffer descriptors do not match, mark divergent.
-        m_divergenceSet.insert(pBufferDesc);
+        m_divergenceSet.insert(bufferDesc);
     }
 }
 
@@ -997,7 +997,7 @@ void PatchBufferOp::visitStoreInst(
         return;
     }
 
-    ReplaceLoadStore(storeInst);
+    replaceLoadStore(storeInst);
 
     // Record the store instruction so we remember to delete it later.
     m_replacementMap[&storeInst] = std::make_pair(nullptr, nullptr);
@@ -1008,28 +1008,28 @@ void PatchBufferOp::visitStoreInst(
 void PatchBufferOp::visitICmpInst(
     ICmpInst& icmpInst) // [in] The instuction
 {
-    Type* const pType = icmpInst.getOperand(0)->getType();
+    Type* const type = icmpInst.getOperand(0)->getType();
 
     // If the type is not a pointer type, bail.
-    if (pType->isPointerTy() == false)
+    if (type->isPointerTy() == false)
     {
         return;
     }
 
     // If the pointer is not a fat pointer, bail.
-    if (pType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+    if (type->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     {
         return;
     }
 
-    Value* const pNewICmp = ReplaceICmp(&icmpInst);
+    Value* const newICmp = replaceICmp(&icmpInst);
 
-    CopyMetadata(pNewICmp, &icmpInst);
+    copyMetadata(newICmp, &icmpInst);
 
     // Record the icmp instruction so we remember to delete it later.
     m_replacementMap[&icmpInst] = std::make_pair(nullptr, nullptr);
 
-    icmpInst.replaceAllUsesWith(pNewICmp);
+    icmpInst.replaceAllUsesWith(newICmp);
 }
 
 // =====================================================================================================================
@@ -1037,65 +1037,65 @@ void PatchBufferOp::visitICmpInst(
 void PatchBufferOp::visitPtrToIntInst(
     PtrToIntInst& ptrToIntInst) // [in] The "ptrtoint" instruction
 {
-    Type* const pType = ptrToIntInst.getOperand(0)->getType();
+    Type* const type = ptrToIntInst.getOperand(0)->getType();
 
     // If the type is not a pointer type, bail.
-    if (pType->isPointerTy() == false)
+    if (type->isPointerTy() == false)
     {
         return;
     }
 
     // If the pointer is not a fat pointer, bail.
-    if (pType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+    if (type->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     {
         return;
     }
 
-    m_pBuilder->SetInsertPoint(&ptrToIntInst);
+    m_builder->SetInsertPoint(&ptrToIntInst);
 
-    Value* const pPointer = GetPointerOperandAsInst(ptrToIntInst.getOperand(0));
+    Value* const pointer = getPointerOperandAsInst(ptrToIntInst.getOperand(0));
 
-    Value* const pNewPtrToInt = m_pBuilder->CreatePtrToInt(m_replacementMap[pPointer].second,
+    Value* const newPtrToInt = m_builder->CreatePtrToInt(m_replacementMap[pointer].second,
                                                            ptrToIntInst.getDestTy());
 
-    CopyMetadata(pNewPtrToInt, pPointer);
+    copyMetadata(newPtrToInt, pointer);
 
-    m_replacementMap[&ptrToIntInst] = std::make_pair(m_replacementMap[pPointer].first, pNewPtrToInt);
+    m_replacementMap[&ptrToIntInst] = std::make_pair(m_replacementMap[pointer].first, newPtrToInt);
 
-    ptrToIntInst.replaceAllUsesWith(pNewPtrToInt);
+    ptrToIntInst.replaceAllUsesWith(newPtrToInt);
 }
 
 // =====================================================================================================================
 // Post-process visits "memcpy" instruction.
-void PatchBufferOp::PostVisitMemCpyInst(
+void PatchBufferOp::postVisitMemCpyInst(
     MemCpyInst& memCpyInst) // [in] The memcpy instruction
 {
-    Value* const pDest = memCpyInst.getArgOperand(0);
-    Value* const pSrc = memCpyInst.getArgOperand(1);
+    Value* const dest = memCpyInst.getArgOperand(0);
+    Value* const src = memCpyInst.getArgOperand(1);
 
-    const unsigned destAddrSpace = pDest->getType()->getPointerAddressSpace();
-    const unsigned srcAddrSpace = pSrc->getType()->getPointerAddressSpace();
+    const unsigned destAddrSpace = dest->getType()->getPointerAddressSpace();
+    const unsigned srcAddrSpace = src->getType()->getPointerAddressSpace();
 
-    m_pBuilder->SetInsertPoint(&memCpyInst);
+    m_builder->SetInsertPoint(&memCpyInst);
 
     const unsigned destAlignment = memCpyInst.getParamAlignment(0);
     const unsigned srcAlignment = memCpyInst.getParamAlignment(1);
 
-    ConstantInt* const pLengthConstant = dyn_cast<ConstantInt>(memCpyInst.getArgOperand(2));
+    ConstantInt* const lengthConstant = dyn_cast<ConstantInt>(memCpyInst.getArgOperand(2));
 
-    const uint64_t constantLength = (pLengthConstant != nullptr) ? pLengthConstant->getZExtValue() : 0;
+    const uint64_t constantLength = (lengthConstant != nullptr) ? lengthConstant->getZExtValue() : 0;
 
     // NOTE: If we do not have a constant length, or the constant length is bigger than the minimum we require to
     // generate a loop, we make a loop to handle the memcpy instead. If we did not generate a loop here for any
     // constant-length memcpy with a large number of bytes would generate thousands of load/store instructions that
     // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
-    if ((pLengthConstant == nullptr) || (constantLength > MinMemOpLoopBytes))
+    if ((lengthConstant == nullptr) || (constantLength > MinMemOpLoopBytes))
     {
         // NOTE: We want to perform our memcpy operation on the greatest stride of bytes possible (load/storing up to
         // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
         // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
         // 2. Worst case we have to load/store a single byte per loop.
-        unsigned stride = (pLengthConstant == nullptr) ? 1 : 16;
+        unsigned stride = (lengthConstant == nullptr) ? 1 : 16;
 
         while (stride != 1)
         {
@@ -1109,109 +1109,109 @@ void PatchBufferOp::PostVisitMemCpyInst(
             stride /= 2;
         }
 
-        Type* pCastDestType = nullptr;
-        Type* pCastSrcType = nullptr;
+        Type* castDestType = nullptr;
+        Type* castSrcType = nullptr;
 
         if (stride == 16)
         {
-            pCastDestType = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(destAddrSpace);
-            pCastSrcType = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(srcAddrSpace);
+            castDestType = VectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(destAddrSpace);
+            castSrcType = VectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(srcAddrSpace);
         }
         else
         {
             assert(stride < 8);
-            pCastDestType = m_pBuilder->getIntNTy(stride * 8)->getPointerTo(destAddrSpace);
-            pCastSrcType = m_pBuilder->getIntNTy(stride * 8)->getPointerTo(srcAddrSpace);
+            castDestType = m_builder->getIntNTy(stride * 8)->getPointerTo(destAddrSpace);
+            castSrcType = m_builder->getIntNTy(stride * 8)->getPointerTo(srcAddrSpace);
         }
 
-        Value* pLength = memCpyInst.getArgOperand(2);
+        Value* length = memCpyInst.getArgOperand(2);
 
-        Type* const pLengthType = pLength->getType();
+        Type* const lengthType = length->getType();
 
-        Value* const pIndex = MakeLoop(ConstantInt::get(pLengthType, 0),
-                                       pLength,
-                                       ConstantInt::get(pLengthType, stride),
+        Value* const index = makeLoop(ConstantInt::get(lengthType, 0),
+                                       length,
+                                       ConstantInt::get(lengthType, stride),
                                        &memCpyInst);
 
         // Get the current index into our source pointer.
-        Value* const pSrcPtr = m_pBuilder->CreateGEP(pSrc, pIndex);
-        CopyMetadata(pSrcPtr, &memCpyInst);
+        Value* const srcPtr = m_builder->CreateGEP(src, index);
+        copyMetadata(srcPtr, &memCpyInst);
 
-        Value* const pCastSrc = m_pBuilder->CreateBitCast(pSrcPtr, pCastSrcType);
-        CopyMetadata(pCastSrc, &memCpyInst);
+        Value* const castSrc = m_builder->CreateBitCast(srcPtr, castSrcType);
+        copyMetadata(castSrc, &memCpyInst);
 
         // Perform a load for the value.
-        LoadInst* const pSrcLoad = m_pBuilder->CreateLoad(pCastSrc);
-        CopyMetadata(pSrcLoad, &memCpyInst);
+        LoadInst* const srcLoad = m_builder->CreateLoad(castSrc);
+        copyMetadata(srcLoad, &memCpyInst);
 
         // Get the current index into our destination pointer.
-        Value* const pDestPtr = m_pBuilder->CreateGEP(pDest, pIndex);
-        CopyMetadata(pDestPtr, &memCpyInst);
+        Value* const destPtr = m_builder->CreateGEP(dest, index);
+        copyMetadata(destPtr, &memCpyInst);
 
-        Value* const pCastDest = m_pBuilder->CreateBitCast(pDestPtr, pCastDestType);
-        CopyMetadata(pCastDest, &memCpyInst);
+        Value* const castDest = m_builder->CreateBitCast(destPtr, castDestType);
+        copyMetadata(castDest, &memCpyInst);
 
         // And perform a store for the value at this byte.
-        StoreInst* const pDestStore = m_pBuilder->CreateStore(pSrcLoad, pCastDest);
-        CopyMetadata(pDestStore, &memCpyInst);
+        StoreInst* const destStore = m_builder->CreateStore(srcLoad, castDest);
+        copyMetadata(destStore, &memCpyInst);
 
         // Visit the newly added instructions to turn them into fat pointer variants.
-        if (GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pSrcPtr))
+        if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(srcPtr))
         {
-            visitGetElementPtrInst(*pGetElemPtr);
+            visitGetElementPtrInst(*getElemPtr);
         }
 
-        if (GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pDestPtr))
+        if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(destPtr))
         {
-            visitGetElementPtrInst(*pGetElemPtr);
+            visitGetElementPtrInst(*getElemPtr);
         }
 
-        if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastSrc))
+        if (BitCastInst* const cast = dyn_cast<BitCastInst>(castSrc))
         {
-            visitBitCastInst(*pCast);
+            visitBitCastInst(*cast);
         }
 
-        if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastDest))
+        if (BitCastInst* const cast = dyn_cast<BitCastInst>(castDest))
         {
-            visitBitCastInst(*pCast);
+            visitBitCastInst(*cast);
         }
 
-        visitLoadInst(*pSrcLoad);
+        visitLoadInst(*srcLoad);
 
-        visitStoreInst(*pDestStore);
+        visitStoreInst(*destStore);
     }
     else
     {
         // Get an vector type that is the length of the memcpy.
-        VectorType* const pMemoryType = VectorType::get(m_pBuilder->getInt8Ty(), pLengthConstant->getZExtValue());
+        VectorType* const memoryType = VectorType::get(m_builder->getInt8Ty(), lengthConstant->getZExtValue());
 
-        PointerType* const pCastDestType = pMemoryType->getPointerTo(destAddrSpace);
-        Value* const pCastDest = m_pBuilder->CreateBitCast(pDest, pCastDestType);
-        CopyMetadata(pCastDest, &memCpyInst);
+        PointerType* const castDestType = memoryType->getPointerTo(destAddrSpace);
+        Value* const castDest = m_builder->CreateBitCast(dest, castDestType);
+        copyMetadata(castDest, &memCpyInst);
 
-        PointerType* const pCastSrcType = pMemoryType->getPointerTo(srcAddrSpace);
-        Value* const pCastSrc = m_pBuilder->CreateBitCast(pSrc, pCastSrcType);
-        CopyMetadata(pCastSrc, &memCpyInst);
+        PointerType* const castSrcType = memoryType->getPointerTo(srcAddrSpace);
+        Value* const castSrc = m_builder->CreateBitCast(src, castSrcType);
+        copyMetadata(castSrc, &memCpyInst);
 
-        LoadInst* const pSrcLoad = m_pBuilder->CreateAlignedLoad(pCastSrc, MaybeAlign(srcAlignment));
-        CopyMetadata(pSrcLoad, &memCpyInst);
+        LoadInst* const srcLoad = m_builder->CreateAlignedLoad(castSrc, MaybeAlign(srcAlignment));
+        copyMetadata(srcLoad, &memCpyInst);
 
-        StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pSrcLoad, pCastDest, MaybeAlign(destAlignment));
-        CopyMetadata(pDestStore, &memCpyInst);
+        StoreInst* const destStore = m_builder->CreateAlignedStore(srcLoad, castDest, MaybeAlign(destAlignment));
+        copyMetadata(destStore, &memCpyInst);
 
         // Visit the newly added instructions to turn them into fat pointer variants.
-        if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastDest))
+        if (BitCastInst* const cast = dyn_cast<BitCastInst>(castDest))
         {
-            visitBitCastInst(*pCast);
+            visitBitCastInst(*cast);
         }
 
-        if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastSrc))
+        if (BitCastInst* const cast = dyn_cast<BitCastInst>(castSrc))
         {
-            visitBitCastInst(*pCast);
+            visitBitCastInst(*cast);
         }
 
-        visitLoadInst(*pSrcLoad);
-        visitStoreInst(*pDestStore);
+        visitLoadInst(*srcLoad);
+        visitStoreInst(*destStore);
     }
 
     // Record the memcpy instruction so we remember to delete it later.
@@ -1220,34 +1220,34 @@ void PatchBufferOp::PostVisitMemCpyInst(
 
 // =====================================================================================================================
 // Post-process visits "memset" instruction.
-void PatchBufferOp::PostVisitMemSetInst(
+void PatchBufferOp::postVisitMemSetInst(
     MemSetInst& memSetInst) // [in] The memset instruction
 {
-    Value* const pDest = memSetInst.getArgOperand(0);
+    Value* const dest = memSetInst.getArgOperand(0);
 
-    const unsigned destAddrSpace = pDest->getType()->getPointerAddressSpace();
+    const unsigned destAddrSpace = dest->getType()->getPointerAddressSpace();
 
-    m_pBuilder->SetInsertPoint(&memSetInst);
+    m_builder->SetInsertPoint(&memSetInst);
 
-    Value* const pValue = memSetInst.getArgOperand(1);
+    Value* const value = memSetInst.getArgOperand(1);
 
     const unsigned destAlignment = memSetInst.getParamAlignment(0);
 
-    ConstantInt* const pLengthConstant = dyn_cast<ConstantInt>(memSetInst.getArgOperand(2));
+    ConstantInt* const lengthConstant = dyn_cast<ConstantInt>(memSetInst.getArgOperand(2));
 
-    const uint64_t constantLength = (pLengthConstant != nullptr) ? pLengthConstant->getZExtValue() : 0;
+    const uint64_t constantLength = (lengthConstant != nullptr) ? lengthConstant->getZExtValue() : 0;
 
     // NOTE: If we do not have a constant length, or the constant length is bigger than the minimum we require to
     // generate a loop, we make a loop to handle the memcpy instead. If we did not generate a loop here for any
     // constant-length memcpy with a large number of bytes would generate thousands of load/store instructions that
     // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
-    if ((pLengthConstant == nullptr) || (constantLength > MinMemOpLoopBytes))
+    if ((lengthConstant == nullptr) || (constantLength > MinMemOpLoopBytes))
     {
         // NOTE: We want to perform our memset operation on the greatest stride of bytes possible (load/storing up to
         // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
         // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
         // 2. Worst case we have to load/store a single byte per loop.
-        unsigned stride = (pLengthConstant == nullptr) ? 1 : 16;
+        unsigned stride = (lengthConstant == nullptr) ? 1 : 16;
 
         while (stride != 1)
         {
@@ -1261,119 +1261,119 @@ void PatchBufferOp::PostVisitMemSetInst(
             stride /= 2;
         }
 
-        Type* pCastDestType = nullptr;
+        Type* castDestType = nullptr;
 
         if (stride == 16)
         {
-            pCastDestType = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(destAddrSpace);
+            castDestType = VectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(destAddrSpace);
         }
         else
         {
             assert(stride < 8);
-            pCastDestType = m_pBuilder->getIntNTy(stride * 8)->getPointerTo(destAddrSpace);
+            castDestType = m_builder->getIntNTy(stride * 8)->getPointerTo(destAddrSpace);
         }
 
-        Value* pNewValue = nullptr;
+        Value* newValue = nullptr;
 
-        if (Constant* const pConstVal = dyn_cast<Constant>(pValue))
+        if (Constant* const constVal = dyn_cast<Constant>(value))
         {
-            pNewValue = ConstantVector::getSplat({stride, false}, pConstVal);
-            pNewValue = m_pBuilder->CreateBitCast(pNewValue, pCastDestType->getPointerElementType());
-            CopyMetadata(pNewValue, &memSetInst);
+            newValue = ConstantVector::getSplat({stride, false}, constVal);
+            newValue = m_builder->CreateBitCast(newValue, castDestType->getPointerElementType());
+            copyMetadata(newValue, &memSetInst);
         }
         else
         {
-            Value* const pMemoryPointer = m_pBuilder->CreateAlloca(pCastDestType->getPointerElementType());
-            CopyMetadata(pMemoryPointer, &memSetInst);
+            Value* const memoryPointer = m_builder->CreateAlloca(castDestType->getPointerElementType());
+            copyMetadata(memoryPointer, &memSetInst);
 
-            Type* const pInt8PtrTy = m_pBuilder->getInt8Ty()->getPointerTo(ADDR_SPACE_PRIVATE);
-            Value* const pCastMemoryPointer = m_pBuilder->CreateBitCast(pMemoryPointer, pInt8PtrTy);
-            CopyMetadata(pCastMemoryPointer, &memSetInst);
+            Type* const int8PtrTy = m_builder->getInt8Ty()->getPointerTo(ADDR_SPACE_PRIVATE);
+            Value* const castMemoryPointer = m_builder->CreateBitCast(memoryPointer, int8PtrTy);
+            copyMetadata(castMemoryPointer, &memSetInst);
 
-            Value* const pMemSet = m_pBuilder->CreateMemSet(pCastMemoryPointer,
-                                                            pValue,
+            Value* const memSet = m_builder->CreateMemSet(castMemoryPointer,
+                                                            value,
                                                             stride,
                                                             Align());
-            CopyMetadata(pMemSet, &memSetInst);
+            copyMetadata(memSet, &memSetInst);
 
-            pNewValue = m_pBuilder->CreateLoad(pMemoryPointer);
-            CopyMetadata(pNewValue, &memSetInst);
+            newValue = m_builder->CreateLoad(memoryPointer);
+            copyMetadata(newValue, &memSetInst);
         }
 
-        Value* const pLength = memSetInst.getArgOperand(2);
+        Value* const length = memSetInst.getArgOperand(2);
 
-        Type* const pLengthType = pLength->getType();
+        Type* const lengthType = length->getType();
 
-        Value* const pIndex = MakeLoop(ConstantInt::get(pLengthType, 0),
-                                       pLength,
-                                       ConstantInt::get(pLengthType, stride),
+        Value* const index = makeLoop(ConstantInt::get(lengthType, 0),
+                                       length,
+                                       ConstantInt::get(lengthType, stride),
                                        &memSetInst);
 
         // Get the current index into our destination pointer.
-        Value* const pDestPtr = m_pBuilder->CreateGEP(pDest, pIndex);
-        CopyMetadata(pDestPtr, &memSetInst);
+        Value* const destPtr = m_builder->CreateGEP(dest, index);
+        copyMetadata(destPtr, &memSetInst);
 
-        Value* const pCastDest = m_pBuilder->CreateBitCast(pDestPtr, pCastDestType);
-        CopyMetadata(pCastDest, &memSetInst);
+        Value* const castDest = m_builder->CreateBitCast(destPtr, castDestType);
+        copyMetadata(castDest, &memSetInst);
 
         // And perform a store for the value at this byte.
-        StoreInst* const pDestStore = m_pBuilder->CreateStore(pNewValue, pCastDest);
-        CopyMetadata(pDestStore, &memSetInst);
+        StoreInst* const destStore = m_builder->CreateStore(newValue, castDest);
+        copyMetadata(destStore, &memSetInst);
 
-        if (GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pDestPtr))
+        if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(destPtr))
         {
-            visitGetElementPtrInst(*pGetElemPtr);
+            visitGetElementPtrInst(*getElemPtr);
         }
 
-        if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastDest))
+        if (BitCastInst* const cast = dyn_cast<BitCastInst>(castDest))
         {
-            visitBitCastInst(*pCast);
+            visitBitCastInst(*cast);
         }
 
-        visitStoreInst(*pDestStore);
+        visitStoreInst(*destStore);
     }
     else
     {
         // Get a vector type that is the length of the memset.
-        VectorType* const pMemoryType = VectorType::get(m_pBuilder->getInt8Ty(), pLengthConstant->getZExtValue());
+        VectorType* const memoryType = VectorType::get(m_builder->getInt8Ty(), lengthConstant->getZExtValue());
 
-        Value* pNewValue = nullptr;
+        Value* newValue = nullptr;
 
-        if (Constant* const pConstVal = dyn_cast<Constant>(pValue))
+        if (Constant* const constVal = dyn_cast<Constant>(value))
         {
-            pNewValue = ConstantVector::getSplat(pMemoryType->getVectorElementCount(), pConstVal);
+            newValue = ConstantVector::getSplat(memoryType->getVectorElementCount(), constVal);
         }
         else
         {
-            Value* const pMemoryPointer = m_pBuilder->CreateAlloca(pMemoryType);
-            CopyMetadata(pMemoryPointer, &memSetInst);
+            Value* const memoryPointer = m_builder->CreateAlloca(memoryType);
+            copyMetadata(memoryPointer, &memSetInst);
 
-            Type* const pInt8PtrTy = m_pBuilder->getInt8Ty()->getPointerTo(ADDR_SPACE_PRIVATE);
-            Value* const pCastMemoryPointer = m_pBuilder->CreateBitCast(pMemoryPointer, pInt8PtrTy);
-            CopyMetadata(pCastMemoryPointer, &memSetInst);
+            Type* const int8PtrTy = m_builder->getInt8Ty()->getPointerTo(ADDR_SPACE_PRIVATE);
+            Value* const castMemoryPointer = m_builder->CreateBitCast(memoryPointer, int8PtrTy);
+            copyMetadata(castMemoryPointer, &memSetInst);
 
-            Value* const pMemSet = m_pBuilder->CreateMemSet(pCastMemoryPointer,
-                                                            pValue,
-                                                            pMemoryType->getVectorNumElements(),
+            Value* const memSet = m_builder->CreateMemSet(castMemoryPointer,
+                                                            value,
+                                                            memoryType->getVectorNumElements(),
                                                             Align());
-            CopyMetadata(pMemSet, &memSetInst);
+            copyMetadata(memSet, &memSetInst);
 
-            pNewValue = m_pBuilder->CreateLoad(pMemoryPointer);
-            CopyMetadata(pNewValue, &memSetInst);
+            newValue = m_builder->CreateLoad(memoryPointer);
+            copyMetadata(newValue, &memSetInst);
         }
 
-        PointerType* const pCastDestType = pMemoryType->getPointerTo(destAddrSpace);
-        Value* const pCastDest = m_pBuilder->CreateBitCast(pDest, pCastDestType);
-        CopyMetadata(pCastDest, &memSetInst);
+        PointerType* const castDestType = memoryType->getPointerTo(destAddrSpace);
+        Value* const castDest = m_builder->CreateBitCast(dest, castDestType);
+        copyMetadata(castDest, &memSetInst);
 
-        if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastDest))
+        if (BitCastInst* const cast = dyn_cast<BitCastInst>(castDest))
         {
-            visitBitCastInst(*pCast);
+            visitBitCastInst(*cast);
         }
 
-        StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pNewValue, pCastDest, MaybeAlign(destAlignment));
-        CopyMetadata(pDestStore, &memSetInst);
-        visitStoreInst(*pDestStore);
+        StoreInst* const destStore = m_builder->CreateAlignedStore(newValue, castDest, MaybeAlign(destAlignment));
+        copyMetadata(destStore, &memSetInst);
+        visitStoreInst(*destStore);
     }
 
     // Record the memset instruction so we remember to delete it later.
@@ -1382,91 +1382,91 @@ void PatchBufferOp::PostVisitMemSetInst(
 
 // =====================================================================================================================
 // Get a pointer operand as an instruction.
-Value* PatchBufferOp::GetPointerOperandAsInst(
-    Value* const pValue) // [in] The pointer operand value to get as an instruction.
+Value* PatchBufferOp::getPointerOperandAsInst(
+    Value* const value) // [in] The pointer operand value to get as an instruction.
 {
     // If the value is already an instruction, return it.
-    if (Instruction* const pInst = dyn_cast<Instruction>(pValue))
+    if (Instruction* const inst = dyn_cast<Instruction>(value))
     {
-        return pInst;
+        return inst;
     }
 
     // If the value is a constant (i.e., null pointer), return it.
-    if (isa<Constant>(pValue))
+    if (isa<Constant>(value))
     {
-        Constant* const pNullPointer = ConstantPointerNull::get(GetRemappedType(pValue->getType()));
-        m_replacementMap[pValue] = std::make_pair(nullptr, pNullPointer);
-        return pValue;
+        Constant* const nullPointer = ConstantPointerNull::get(getRemappedType(value->getType()));
+        m_replacementMap[value] = std::make_pair(nullptr, nullPointer);
+        return value;
     }
 
-    ConstantExpr* const pConstExpr = dyn_cast<ConstantExpr>(pValue);
-    assert(pConstExpr != nullptr);
+    ConstantExpr* const constExpr = dyn_cast<ConstantExpr>(value);
+    assert(constExpr != nullptr);
 
-    Instruction* const pNewInst = m_pBuilder->Insert(pConstExpr->getAsInstruction());
+    Instruction* const newInst = m_builder->Insert(constExpr->getAsInstruction());
 
     // Visit the new instruction we made to ensure we remap the value.
-    visit(pNewInst);
+    visit(newInst);
 
     // Check that the new instruction was definitely in the replacement map.
-    assert(m_replacementMap.count(pNewInst) > 0);
+    assert(m_replacementMap.count(newInst) > 0);
 
-    return pNewInst;
+    return newInst;
 }
 
 // =====================================================================================================================
 // Extract the 64-bit address from a buffer descriptor.
-Value* PatchBufferOp::GetBaseAddressFromBufferDesc(
-    Value* const pBufferDesc // [in] The buffer descriptor to extract the address from
+Value* PatchBufferOp::getBaseAddressFromBufferDesc(
+    Value* const bufferDesc // [in] The buffer descriptor to extract the address from
     ) const
 {
-    Type* const pDescType = pBufferDesc->getType();
+    Type* const descType = bufferDesc->getType();
 
-    assert(pDescType->isVectorTy());
-    assert(pDescType->getVectorNumElements() == 4);
-    assert(pDescType->getVectorElementType()->isIntegerTy(32));
+    assert(descType->isVectorTy());
+    assert(descType->getVectorNumElements() == 4);
+    assert(descType->getVectorElementType()->isIntegerTy(32));
 
     // Get the base address of our buffer by extracting the two components with the 48-bit address, and masking.
-    Value* pBaseAddr = m_pBuilder->CreateShuffleVector(pBufferDesc,
-                                                       UndefValue::get(pDescType),
+    Value* baseAddr = m_builder->CreateShuffleVector(bufferDesc,
+                                                       UndefValue::get(descType),
                                                        ArrayRef<unsigned>{ 0, 1 });
-    Value* const pBaseAddrMask = ConstantVector::get({
-                                                        m_pBuilder->getInt32(0xFFFFFFFF),
-                                                        m_pBuilder->getInt32(0xFFFF)
+    Value* const baseAddrMask = ConstantVector::get({
+                                                        m_builder->getInt32(0xFFFFFFFF),
+                                                        m_builder->getInt32(0xFFFF)
                                                      });
-    pBaseAddr = m_pBuilder->CreateAnd(pBaseAddr, pBaseAddrMask);
-    pBaseAddr = m_pBuilder->CreateBitCast(pBaseAddr, m_pBuilder->getInt64Ty());
-    return m_pBuilder->CreateIntToPtr(pBaseAddr, m_pBuilder->getInt8Ty()->getPointerTo(ADDR_SPACE_GLOBAL));
+    baseAddr = m_builder->CreateAnd(baseAddr, baseAddrMask);
+    baseAddr = m_builder->CreateBitCast(baseAddr, m_builder->getInt64Ty());
+    return m_builder->CreateIntToPtr(baseAddr, m_builder->getInt8Ty()->getPointerTo(ADDR_SPACE_GLOBAL));
 }
 
 // =====================================================================================================================
 // Copy all metadata from one value to another.
-void PatchBufferOp::CopyMetadata(
-    Value* const       pDest, // [in/out] The destination to copy metadata onto.
-    const Value* const pSrc   // [in] The source to copy metadata from.
+void PatchBufferOp::copyMetadata(
+    Value* const       dest, // [in/out] The destination to copy metadata onto.
+    const Value* const src   // [in] The source to copy metadata from.
     ) const
 {
-    Instruction* const pDestInst = dyn_cast<Instruction>(pDest);
+    Instruction* const destInst = dyn_cast<Instruction>(dest);
 
     // If the destination is not an instruction, bail.
-    if (pDestInst == nullptr)
+    if (destInst == nullptr)
     {
         return;
     }
 
-    const Instruction* const pSrcInst = dyn_cast<Instruction>(pSrc);
+    const Instruction* const srcInst = dyn_cast<Instruction>(src);
 
     // If the source is not an instruction, bail.
-    if (pSrcInst == nullptr)
+    if (srcInst == nullptr)
     {
         return;
     }
 
     SmallVector<std::pair<unsigned, MDNode*>, 8> allMetaNodes;
-    pSrcInst->getAllMetadata(allMetaNodes);
+    srcInst->getAllMetadata(allMetaNodes);
 
     for (auto metaNode : allMetaNodes)
     {
-        pDestInst->setMetadata(metaNode.first, metaNode.second);
+        destInst->setMetadata(metaNode.first, metaNode.second);
     }
 }
 
@@ -1474,49 +1474,49 @@ void PatchBufferOp::CopyMetadata(
 // Get the remapped type for a fat pointer that is usable in indexing. We use the 32-bit wide constant address space for
 // this, as it means when we convert the GEP to an integer, the GEP can be converted losslessly to a 32-bit integer,
 // which just happens to be what the MUBUF instructions expect.
-PointerType* PatchBufferOp::GetRemappedType(
-    Type* const pType // [in] The type to remap.
+PointerType* PatchBufferOp::getRemappedType(
+    Type* const type // [in] The type to remap.
     ) const
 {
-    assert(pType->isPointerTy());
-    return pType->getPointerElementType()->getPointerTo(ADDR_SPACE_CONST_32BIT);
+    assert(type->isPointerTy());
+    return type->getPointerElementType()->getPointerTo(ADDR_SPACE_CONST_32BIT);
 }
 
 // =====================================================================================================================
 // Remove any users that are invariant starts, returning if any were removed.
-bool PatchBufferOp::RemoveUsersForInvariantStarts(
-    Value* const pValue) // [in] The value to check the users of.
+bool PatchBufferOp::removeUsersForInvariantStarts(
+    Value* const value) // [in] The value to check the users of.
 {
     bool modified = false;
 
-    for (User* const pUser : pValue->users())
+    for (User* const user : value->users())
     {
-        if (BitCastInst* const pBitCast = dyn_cast<BitCastInst>(pUser))
+        if (BitCastInst* const bitCast = dyn_cast<BitCastInst>(user))
         {
             // Remove any users of the bitcast too.
-            if (RemoveUsersForInvariantStarts(pBitCast))
+            if (removeUsersForInvariantStarts(bitCast))
             {
                 modified = true;
             }
         }
         else
         {
-            IntrinsicInst* const pIntrinsic = dyn_cast<IntrinsicInst>(pUser);
+            IntrinsicInst* const intrinsic = dyn_cast<IntrinsicInst>(user);
 
             // If the user isn't an intrinsic, bail.
-            if (pIntrinsic == nullptr)
+            if (intrinsic == nullptr)
             {
                 continue;
             }
 
             // If the intrinsic is not an invariant load, bail.
-            if (pIntrinsic->getIntrinsicID() != Intrinsic::invariant_start)
+            if (intrinsic->getIntrinsicID() != Intrinsic::invariant_start)
             {
                 continue;
             }
 
             // Remember the intrinsic because we will want to delete it.
-            m_replacementMap[pIntrinsic] = std::make_pair(nullptr, nullptr);
+            m_replacementMap[intrinsic] = std::make_pair(nullptr, nullptr);
 
             modified = true;
         }
@@ -1527,107 +1527,107 @@ bool PatchBufferOp::RemoveUsersForInvariantStarts(
 
 // =====================================================================================================================
 // Replace a fat pointer load or store with the required intrinsics.
-Value* PatchBufferOp::ReplaceLoadStore(
-    Instruction& pInst) // [in] The instruction to replace.
+Value* PatchBufferOp::replaceLoadStore(
+    Instruction& inst) // [in] The instruction to replace.
 {
-    LoadInst* const pLoadInst = dyn_cast<LoadInst>(&pInst);
-    StoreInst* const pStoreInst = dyn_cast<StoreInst>(&pInst);
+    LoadInst* const loadInst = dyn_cast<LoadInst>(&inst);
+    StoreInst* const storeInst = dyn_cast<StoreInst>(&inst);
 
     // Either load instruction or store instruction is valid (not both)
-    assert((pLoadInst == nullptr) != (pStoreInst == nullptr));
+    assert((loadInst == nullptr) != (storeInst == nullptr));
 
-    bool isLoad = pLoadInst != nullptr;
-    Type* pType = nullptr;
-    Value* pPointerOperand = nullptr;
+    bool isLoad = loadInst != nullptr;
+    Type* type = nullptr;
+    Value* pointerOperand = nullptr;
     AtomicOrdering ordering = AtomicOrdering::NotAtomic;
     unsigned alignment = 0;
     SyncScope::ID syncScopeID = 0;
 
     if (isLoad)
     {
-        pType = pLoadInst->getType();
-        pPointerOperand = pLoadInst->getPointerOperand();
-        ordering = pLoadInst->getOrdering();
-        alignment = pLoadInst->getAlignment();
-        syncScopeID = pLoadInst->getSyncScopeID();
+        type = loadInst->getType();
+        pointerOperand = loadInst->getPointerOperand();
+        ordering = loadInst->getOrdering();
+        alignment = loadInst->getAlignment();
+        syncScopeID = loadInst->getSyncScopeID();
     }
     else
     {
-        pType = pStoreInst->getValueOperand()->getType();
-        pPointerOperand = pStoreInst->getPointerOperand();
-        ordering = pStoreInst->getOrdering();
-        alignment = pStoreInst->getAlignment();
-        syncScopeID = pStoreInst->getSyncScopeID();
+        type = storeInst->getValueOperand()->getType();
+        pointerOperand = storeInst->getPointerOperand();
+        ordering = storeInst->getOrdering();
+        alignment = storeInst->getAlignment();
+        syncScopeID = storeInst->getSyncScopeID();
     }
 
-    m_pBuilder->SetInsertPoint(&pInst);
+    m_builder->SetInsertPoint(&inst);
 
-    Value* const pPointer = GetPointerOperandAsInst(pPointerOperand);
+    Value* const pointer = getPointerOperandAsInst(pointerOperand);
 
-    const DataLayout& dataLayout = m_pBuilder->GetInsertBlock()->getModule()->getDataLayout();
+    const DataLayout& dataLayout = m_builder->GetInsertBlock()->getModule()->getDataLayout();
 
-    const unsigned bytesToHandle = static_cast<unsigned>(dataLayout.getTypeStoreSize(pType));
+    const unsigned bytesToHandle = static_cast<unsigned>(dataLayout.getTypeStoreSize(type));
 
     if (alignment == 0)
     {
-        alignment = dataLayout.getABITypeAlignment(pType);
+        alignment = dataLayout.getABITypeAlignment(type);
     }
 
     bool isInvariant = false;
     if (isLoad)
     {
-        isInvariant = (m_invariantSet.count(m_replacementMap[pPointer].first) > 0) ||
-                             pLoadInst->getMetadata(LLVMContext::MD_invariant_load);
+        isInvariant = (m_invariantSet.count(m_replacementMap[pointer].first) > 0) ||
+                             loadInst->getMetadata(LLVMContext::MD_invariant_load);
     }
 
-    const bool isSlc = pInst.getMetadata(LLVMContext::MD_nontemporal);
+    const bool isSlc = inst.getMetadata(LLVMContext::MD_nontemporal);
     const bool isGlc = ordering != AtomicOrdering::NotAtomic;
     const bool isDlc = isGlc; // For buffer load on GFX10+, we set DLC = GLC
 
-    Value* const pBufferDesc = m_replacementMap[pPointer].first;
-    Value* const pBaseIndex = m_pBuilder->CreatePtrToInt(m_replacementMap[pPointer].second, m_pBuilder->getInt32Ty());
+    Value* const bufferDesc = m_replacementMap[pointer].first;
+    Value* const baseIndex = m_builder->CreatePtrToInt(m_replacementMap[pointer].second, m_builder->getInt32Ty());
 
     // If our buffer descriptor is divergent, need to handle that differently.
-    if (m_divergenceSet.count(pBufferDesc) > 0)
+    if (m_divergenceSet.count(bufferDesc) > 0)
     {
-        Value* const pBaseAddr = GetBaseAddressFromBufferDesc(pBufferDesc);
+        Value* const baseAddr = getBaseAddressFromBufferDesc(bufferDesc);
 
         // The 2nd element in the buffer descriptor is the byte bound, we do this to support robust buffer access.
-        Value* const pBound = m_pBuilder->CreateExtractElement(pBufferDesc, 2);
-        Value* const pInBound = m_pBuilder->CreateICmpULT(pBaseIndex, pBound);
-        Value* const pNewBaseIndex = m_pBuilder->CreateSelect(pInBound, pBaseIndex, m_pBuilder->getInt32(0));
+        Value* const bound = m_builder->CreateExtractElement(bufferDesc, 2);
+        Value* const inBound = m_builder->CreateICmpULT(baseIndex, bound);
+        Value* const newBaseIndex = m_builder->CreateSelect(inBound, baseIndex, m_builder->getInt32(0));
 
         // Add on the index to the address.
-        Value* pPointer = m_pBuilder->CreateGEP(pBaseAddr, pNewBaseIndex);
+        Value* pointer = m_builder->CreateGEP(baseAddr, newBaseIndex);
 
-        pPointer = m_pBuilder->CreateBitCast(pPointer, pType->getPointerTo(ADDR_SPACE_GLOBAL));
+        pointer = m_builder->CreateBitCast(pointer, type->getPointerTo(ADDR_SPACE_GLOBAL));
 
         if (isLoad)
         {
-            LoadInst* const pNewLoad = m_pBuilder->CreateLoad(pPointer);
-            pNewLoad->setVolatile(pLoadInst->isVolatile());
-            pNewLoad->setAlignment(MaybeAlign(alignment));
-            pNewLoad->setOrdering(ordering);
-            pNewLoad->setSyncScopeID(syncScopeID);
-            CopyMetadata(pNewLoad, pLoadInst);
+            LoadInst* const newLoad = m_builder->CreateLoad(pointer);
+            newLoad->setVolatile(loadInst->isVolatile());
+            newLoad->setAlignment(MaybeAlign(alignment));
+            newLoad->setOrdering(ordering);
+            newLoad->setSyncScopeID(syncScopeID);
+            copyMetadata(newLoad, loadInst);
 
             if (isInvariant)
             {
-                pNewLoad->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_pContext, None));
+                newLoad->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, None));
             }
 
-            return pNewLoad;
+            return newLoad;
         }
         else
         {
-            StoreInst* const pNewStore = m_pBuilder->CreateStore(pStoreInst->getValueOperand(), pPointer);
-            pNewStore->setVolatile(pStoreInst->isVolatile());
-            pNewStore->setAlignment(MaybeAlign(alignment));
-            pNewStore->setOrdering(ordering);
-            pNewStore->setSyncScopeID(syncScopeID);
-            CopyMetadata(pNewStore, pStoreInst);
+            StoreInst* const newStore = m_builder->CreateStore(storeInst->getValueOperand(), pointer);
+            newStore->setVolatile(storeInst->isVolatile());
+            newStore->setAlignment(MaybeAlign(alignment));
+            newStore->setOrdering(ordering);
+            newStore->setSyncScopeID(syncScopeID);
+            copyMetadata(newStore, storeInst);
 
-            return pNewStore;
+            return newStore;
         }
     }
 
@@ -1636,50 +1636,50 @@ Value* PatchBufferOp::ReplaceLoadStore(
     case AtomicOrdering::Release:
     case AtomicOrdering::AcquireRelease:
     case AtomicOrdering::SequentiallyConsistent:
-        m_pBuilder->CreateFence(AtomicOrdering::Release, syncScopeID);
+        m_builder->CreateFence(AtomicOrdering::Release, syncScopeID);
         break;
     default:
         break;
     }
 
     SmallVector<Value*, 8> parts;
-    Type* pSmallestType = nullptr;
+    Type* smallestType = nullptr;
     unsigned smallestByteSize = 4;
 
     if ((alignment < 2) || ((bytesToHandle & 0x1) != 0))
     {
         smallestByteSize = 1;
-        pSmallestType = m_pBuilder->getInt8Ty();
+        smallestType = m_builder->getInt8Ty();
     }
     else if ((alignment < 4) || ((bytesToHandle & 0x3) != 0))
     {
         smallestByteSize = 2;
-        pSmallestType = m_pBuilder->getInt16Ty();
+        smallestType = m_builder->getInt16Ty();
     }
     else
     {
         smallestByteSize = 4;
-        pSmallestType = m_pBuilder->getInt32Ty();
+        smallestType = m_builder->getInt32Ty();
     }
 
     // Load: Create an undef vector whose total size is the number of bytes we
     // loaded.
     // Store: Bitcast our value-to-store to a vector of smallest byte size.
-    Type* const pCastType = VectorType::get(pSmallestType, bytesToHandle / smallestByteSize);
+    Type* const castType = VectorType::get(smallestType, bytesToHandle / smallestByteSize);
 
-    Value* pStoreValue = nullptr;
+    Value* storeValue = nullptr;
     if (!isLoad)
     {
-        pStoreValue = pStoreInst->getValueOperand();
+        storeValue = storeInst->getValueOperand();
 
-        if (pStoreValue->getType()->isPointerTy())
+        if (storeValue->getType()->isPointerTy())
         {
-            pStoreValue = m_pBuilder->CreatePtrToInt(pStoreValue, m_pBuilder->getIntNTy(bytesToHandle * 8));
-            CopyMetadata(pStoreValue, pStoreInst);
+            storeValue = m_builder->CreatePtrToInt(storeValue, m_builder->getIntNTy(bytesToHandle * 8));
+            copyMetadata(storeValue, storeInst);
         }
 
-        pStoreValue = m_pBuilder->CreateBitCast(pStoreValue, pCastType);
-        CopyMetadata(pStoreValue, pStoreInst);
+        storeValue = m_builder->CreateBitCast(storeValue, castType);
+        copyMetadata(storeValue, storeInst);
     }
 
     // The index in pStoreValue which we use next
@@ -1689,11 +1689,11 @@ Value* PatchBufferOp::ReplaceLoadStore(
     while (remainingBytes > 0)
     {
         const unsigned offset = bytesToHandle - remainingBytes;
-        Value* pOffsetVal = (offset == 0) ?
-                               pBaseIndex :
-                               m_pBuilder->CreateAdd(pBaseIndex, m_pBuilder->getInt32(offset));
+        Value* offsetVal = (offset == 0) ?
+                               baseIndex :
+                               m_builder->CreateAdd(baseIndex, m_builder->getInt32(offset));
 
-        Type* pIntAccessType = nullptr;
+        Type* intAccessType = nullptr;
         unsigned accessSize = 0;
 
         // Handle the greatest possible size
@@ -1701,40 +1701,40 @@ Value* PatchBufferOp::ReplaceLoadStore(
         {
             if (remainingBytes >= 16)
             {
-                pIntAccessType = VectorType::get(Type::getInt32Ty(*m_pContext), 4);
+                intAccessType = VectorType::get(Type::getInt32Ty(*m_context), 4);
                 accessSize = 16;
             }
             else if (remainingBytes >= 12 && !isInvariant)
             {
-                pIntAccessType = VectorType::get(Type::getInt32Ty(*m_pContext), 3);
+                intAccessType = VectorType::get(Type::getInt32Ty(*m_context), 3);
                 accessSize = 12;
             }
             else if (remainingBytes >= 8)
             {
-                pIntAccessType = VectorType::get(Type::getInt32Ty(*m_pContext), 2);
+                intAccessType = VectorType::get(Type::getInt32Ty(*m_context), 2);
                 accessSize = 8;
             }
             else
             {
                 // remainingBytes >= 4
-                pIntAccessType = Type::getInt32Ty(*m_pContext);
+                intAccessType = Type::getInt32Ty(*m_context);
                 accessSize = 4;
             }
         }
         else if (alignment >= 2 && remainingBytes >= 2)
         {
-            pIntAccessType = Type::getInt16Ty(*m_pContext);
+            intAccessType = Type::getInt16Ty(*m_context);
             accessSize = 2;
         }
         else
         {
-            pIntAccessType = Type::getInt8Ty(*m_pContext);
+            intAccessType = Type::getInt8Ty(*m_context);
             accessSize = 1;
         }
-        assert(pIntAccessType != nullptr);
+        assert(intAccessType != nullptr);
         assert(accessSize != 0);
 
-        Value* pPart = nullptr;
+        Value* part = nullptr;
 
         CoherentFlag coherent = {};
         coherent.bits.glc = isGlc;
@@ -1745,19 +1745,19 @@ Value* PatchBufferOp::ReplaceLoadStore(
 
         if (isLoad)
         {
-            if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 10)
+            if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10)
             {
                 // TODO For stores?
                 coherent.bits.dlc = isDlc;
             }
             if (isInvariant && accessSize >= 4)
             {
-                pPart = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load,
-                                                    pIntAccessType,
+                part = m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load,
+                                                    intAccessType,
                                                     {
-                                                        pBufferDesc,
-                                                        pOffsetVal,
-                                                        m_pBuilder->getInt32(coherent.u32All)
+                                                        bufferDesc,
+                                                        offsetVal,
+                                                        m_builder->getInt32(coherent.u32All)
                                                     });
             }
             else
@@ -1765,13 +1765,13 @@ Value* PatchBufferOp::ReplaceLoadStore(
                 unsigned intrinsicID = Intrinsic::amdgcn_raw_buffer_load;
                 if (ordering != AtomicOrdering::NotAtomic)
                     intrinsicID = Intrinsic::amdgcn_raw_atomic_buffer_load;
-                pPart = m_pBuilder->CreateIntrinsic(intrinsicID,
-                                                    pIntAccessType,
+                part = m_builder->CreateIntrinsic(intrinsicID,
+                                                    intAccessType,
                                                     {
-                                                        pBufferDesc,
-                                                        pOffsetVal,
-                                                        m_pBuilder->getInt32(0),
-                                                        m_pBuilder->getInt32(coherent.u32All)
+                                                        bufferDesc,
+                                                        offsetVal,
+                                                        m_builder->getInt32(0),
+                                                        m_builder->getInt32(coherent.u32All)
                                                     });
             }
         }
@@ -1779,83 +1779,83 @@ Value* PatchBufferOp::ReplaceLoadStore(
         {
             // Store
             unsigned compCount = accessSize / smallestByteSize;
-            pPart = UndefValue::get(VectorType::get(pSmallestType, compCount));
+            part = UndefValue::get(VectorType::get(smallestType, compCount));
 
             for (unsigned i = 0; i < compCount; i++)
             {
-                Value* const pStoreElem = m_pBuilder->CreateExtractElement(pStoreValue, storeIndex++);
-                pPart = m_pBuilder->CreateInsertElement(pPart, pStoreElem, i);
+                Value* const storeElem = m_builder->CreateExtractElement(storeValue, storeIndex++);
+                part = m_builder->CreateInsertElement(part, storeElem, i);
             }
-            pPart = m_pBuilder->CreateBitCast(pPart, pIntAccessType);
-            CopyMetadata(pPart, &pInst);
-            pPart = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store,
-                                                pIntAccessType,
+            part = m_builder->CreateBitCast(part, intAccessType);
+            copyMetadata(part, &inst);
+            part = m_builder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store,
+                                                intAccessType,
                                                 {
-                                                    pPart,
-                                                    pBufferDesc,
-                                                    pOffsetVal,
-                                                    m_pBuilder->getInt32(0),
-                                                    m_pBuilder->getInt32(coherent.u32All)
+                                                    part,
+                                                    bufferDesc,
+                                                    offsetVal,
+                                                    m_builder->getInt32(0),
+                                                    m_builder->getInt32(coherent.u32All)
                                                 });
         }
 
-        CopyMetadata(pPart, &pInst);
+        copyMetadata(part, &inst);
         if (isLoad)
         {
-            parts.push_back(pPart);
+            parts.push_back(part);
         }
 
         remainingBytes -= accessSize;
     }
 
-    Value* pNewInst = nullptr;
+    Value* newInst = nullptr;
     if (isLoad)
     {
         if (parts.size() == 1)
         {
             // We do not have to create a vector if we did only one load
-            pNewInst = parts.front();
+            newInst = parts.front();
         }
         else
         {
             // And create an undef vector whose total size is the number of bytes we loaded.
-            pNewInst = UndefValue::get(VectorType::get(pSmallestType, bytesToHandle / smallestByteSize));
+            newInst = UndefValue::get(VectorType::get(smallestType, bytesToHandle / smallestByteSize));
 
             unsigned index = 0;
 
-            for (Value* pPart : parts)
+            for (Value* part : parts)
             {
                 // Get the byte size of our load part.
-                const unsigned byteSize = static_cast<unsigned>(dataLayout.getTypeStoreSize(pPart->getType()));
+                const unsigned byteSize = static_cast<unsigned>(dataLayout.getTypeStoreSize(part->getType()));
 
                 // Bitcast it to a vector of the smallest load type.
-                VectorType* const pCastType = VectorType::get(pSmallestType, byteSize / smallestByteSize);
-                pPart = m_pBuilder->CreateBitCast(pPart, pCastType);
-                CopyMetadata(pPart, &pInst);
+                VectorType* const castType = VectorType::get(smallestType, byteSize / smallestByteSize);
+                part = m_builder->CreateBitCast(part, castType);
+                copyMetadata(part, &inst);
 
                 // Run through the elements of our bitcasted type and insert them into the main load.
-                for (unsigned i = 0, compCount = static_cast<unsigned>(pCastType->getNumElements()); i < compCount; i++)
+                for (unsigned i = 0, compCount = static_cast<unsigned>(castType->getNumElements()); i < compCount; i++)
                 {
-                    Value* const pElem = m_pBuilder->CreateExtractElement(pPart, i);
-                    CopyMetadata(pElem, &pInst);
-                    pNewInst = m_pBuilder->CreateInsertElement(pNewInst, pElem, index++);
-                    CopyMetadata(pNewInst, &pInst);
+                    Value* const elem = m_builder->CreateExtractElement(part, i);
+                    copyMetadata(elem, &inst);
+                    newInst = m_builder->CreateInsertElement(newInst, elem, index++);
+                    copyMetadata(newInst, &inst);
                 }
             }
         }
-        assert(pNewInst != nullptr);
+        assert(newInst != nullptr);
 
-        if (pType->isPointerTy())
+        if (type->isPointerTy())
         {
-            pNewInst = m_pBuilder->CreateBitCast(pNewInst, m_pBuilder->getIntNTy(bytesToHandle * 8));
-            CopyMetadata(pNewInst, &pInst);
-            pNewInst = m_pBuilder->CreateIntToPtr(pNewInst, pType);
-            CopyMetadata(pNewInst, &pInst);
+            newInst = m_builder->CreateBitCast(newInst, m_builder->getIntNTy(bytesToHandle * 8));
+            copyMetadata(newInst, &inst);
+            newInst = m_builder->CreateIntToPtr(newInst, type);
+            copyMetadata(newInst, &inst);
         }
         else
         {
-            pNewInst = m_pBuilder->CreateBitCast(pNewInst, pType);
-            CopyMetadata(pNewInst, &pInst);
+            newInst = m_builder->CreateBitCast(newInst, type);
+            copyMetadata(newInst, &inst);
         }
     }
 
@@ -1864,113 +1864,113 @@ Value* PatchBufferOp::ReplaceLoadStore(
     case AtomicOrdering::Acquire:
     case AtomicOrdering::AcquireRelease:
     case AtomicOrdering::SequentiallyConsistent:
-        m_pBuilder->CreateFence(AtomicOrdering::Acquire, syncScopeID);
+        m_builder->CreateFence(AtomicOrdering::Acquire, syncScopeID);
         break;
     default:
         break;
     }
 
-    return pNewInst;
+    return newInst;
 }
 
 // =====================================================================================================================
 // Replace fat pointers icmp with the instruction required to do the icmp.
-Value* PatchBufferOp::ReplaceICmp(
-    ICmpInst* const pICmpInst) // [in] The "icmp" instruction to replace.
+Value* PatchBufferOp::replaceICmp(
+    ICmpInst* const iCmpInst) // [in] The "icmp" instruction to replace.
 {
-    m_pBuilder->SetInsertPoint(pICmpInst);
+    m_builder->SetInsertPoint(iCmpInst);
 
     SmallVector<Value*, 2> bufferDescs;
     SmallVector<Value*, 2> indices;
     for (int i = 0; i < 2; ++i)
     {
-        Value* const pOperand = GetPointerOperandAsInst(pICmpInst->getOperand(i));
-        bufferDescs.push_back(m_replacementMap[pOperand].first);
-        indices.push_back(m_pBuilder->CreatePtrToInt(m_replacementMap[pOperand].second, m_pBuilder->getInt32Ty()));
+        Value* const operand = getPointerOperandAsInst(iCmpInst->getOperand(i));
+        bufferDescs.push_back(m_replacementMap[operand].first);
+        indices.push_back(m_builder->CreatePtrToInt(m_replacementMap[operand].second, m_builder->getInt32Ty()));
     }
 
-    Type* const pBufferDescTy = bufferDescs[0]->getType();
+    Type* const bufferDescTy = bufferDescs[0]->getType();
 
-    assert(pBufferDescTy->isVectorTy());
-    assert(pBufferDescTy->getVectorNumElements() == 4);
-    assert(pBufferDescTy->getVectorElementType()->isIntegerTy(32));
-    (void(pBufferDescTy)); // unused
-    assert((pICmpInst->getPredicate() == ICmpInst::ICMP_EQ) || (pICmpInst->getPredicate() == ICmpInst::ICMP_NE));
+    assert(bufferDescTy->isVectorTy());
+    assert(bufferDescTy->getVectorNumElements() == 4);
+    assert(bufferDescTy->getVectorElementType()->isIntegerTy(32));
+    (void(bufferDescTy)); // unused
+    assert((iCmpInst->getPredicate() == ICmpInst::ICMP_EQ) || (iCmpInst->getPredicate() == ICmpInst::ICMP_NE));
 
-    Value* pBufferDescICmp = m_pBuilder->getFalse();
+    Value* bufferDescICmp = m_builder->getFalse();
     if ((bufferDescs[0] == nullptr) && (bufferDescs[1] == nullptr))
     {
-        pBufferDescICmp = m_pBuilder->getTrue();
+        bufferDescICmp = m_builder->getTrue();
     }
     else if ((bufferDescs[0] != nullptr) && (bufferDescs[1] != nullptr))
     {
-        Value* const pBufferDescEqual = m_pBuilder->CreateICmpEQ(bufferDescs[0], bufferDescs[1]);
+        Value* const bufferDescEqual = m_builder->CreateICmpEQ(bufferDescs[0], bufferDescs[1]);
 
-        pBufferDescICmp = m_pBuilder->CreateExtractElement(pBufferDescEqual, static_cast<uint64_t>(0));
+        bufferDescICmp = m_builder->CreateExtractElement(bufferDescEqual, static_cast<uint64_t>(0));
         for (unsigned i = 1; i < 4; ++i)
         {
-            Value* pBufferDescElemEqual = m_pBuilder->CreateExtractElement(pBufferDescEqual, i);
-            pBufferDescICmp = m_pBuilder->CreateAnd(pBufferDescICmp, pBufferDescElemEqual);
+            Value* bufferDescElemEqual = m_builder->CreateExtractElement(bufferDescEqual, i);
+            bufferDescICmp = m_builder->CreateAnd(bufferDescICmp, bufferDescElemEqual);
         }
     }
 
-    Value* pIndexICmp = m_pBuilder->CreateICmpEQ(indices[0], indices[1]);
+    Value* indexICmp = m_builder->CreateICmpEQ(indices[0], indices[1]);
 
-    Value* pNewICmp = m_pBuilder->CreateAnd(pBufferDescICmp, pIndexICmp);
+    Value* newICmp = m_builder->CreateAnd(bufferDescICmp, indexICmp);
 
-    if (pICmpInst->getPredicate() == ICmpInst::ICMP_NE)
+    if (iCmpInst->getPredicate() == ICmpInst::ICMP_NE)
     {
-        pNewICmp = m_pBuilder->CreateNot(pNewICmp);
+        newICmp = m_builder->CreateNot(newICmp);
     }
 
-    return pNewICmp;
+    return newICmp;
 }
 
 // =====================================================================================================================
 // Make a loop, returning the the value of the loop counter. This modifies the insertion point of the builder.
-Instruction* PatchBufferOp::MakeLoop(
-    Value* const       pLoopStart,  // [in] The start index of the loop.
-    Value* const       pLoopEnd,    // [in] The end index of the loop.
-    Value* const       pLoopStride, // [in] The stride of the loop.
-    Instruction* const pInsertPos)  // [in] The position to insert the loop in the instruction stream.
+Instruction* PatchBufferOp::makeLoop(
+    Value* const       loopStart,  // [in] The start index of the loop.
+    Value* const       loopEnd,    // [in] The end index of the loop.
+    Value* const       loopStride, // [in] The stride of the loop.
+    Instruction* const insertPos)  // [in] The position to insert the loop in the instruction stream.
 {
-    Value* const pInitialCond = m_pBuilder->CreateICmpNE(pLoopStart, pLoopEnd);
+    Value* const initialCond = m_builder->CreateICmpNE(loopStart, loopEnd);
 
-    BasicBlock* const pOrigBlock = pInsertPos->getParent();
+    BasicBlock* const origBlock = insertPos->getParent();
 
-    Instruction* const pTerminator = SplitBlockAndInsertIfThen(pInitialCond, pInsertPos, false);
+    Instruction* const terminator = SplitBlockAndInsertIfThen(initialCond, insertPos, false);
 
-    m_pBuilder->SetInsertPoint(pTerminator);
+    m_builder->SetInsertPoint(terminator);
 
     // Create a phi node for the loop counter.
-    PHINode* const pLoopCounter = m_pBuilder->CreatePHI(pLoopStart->getType(), 2);
-    CopyMetadata(pLoopCounter, pInsertPos);
+    PHINode* const loopCounter = m_builder->CreatePHI(loopStart->getType(), 2);
+    copyMetadata(loopCounter, insertPos);
 
     // Set the loop counter to start value (initialization).
-    pLoopCounter->addIncoming(pLoopStart, pOrigBlock);
+    loopCounter->addIncoming(loopStart, origBlock);
 
     // Calculate the next value of the loop counter by doing loopCounter + loopStride.
-    Value* const pLoopNextValue = m_pBuilder->CreateAdd(pLoopCounter, pLoopStride);
-    CopyMetadata(pLoopNextValue, pInsertPos);
+    Value* const loopNextValue = m_builder->CreateAdd(loopCounter, loopStride);
+    copyMetadata(loopNextValue, insertPos);
 
     // And set the loop counter to the next value.
-    pLoopCounter->addIncoming(pLoopNextValue, pTerminator->getParent());
+    loopCounter->addIncoming(loopNextValue, terminator->getParent());
 
     // Our loop condition is just whether the next value of the loop counter is less than the end value.
-    Value* const pCond = m_pBuilder->CreateICmpULT(pLoopNextValue, pLoopEnd);
-    CopyMetadata(pCond, pInsertPos);
+    Value* const cond = m_builder->CreateICmpULT(loopNextValue, loopEnd);
+    copyMetadata(cond, insertPos);
 
     // And our replacement terminator just branches back to the if body if there is more loop iterations to be done.
-    Instruction* const pNewTerminator = m_pBuilder->CreateCondBr(pCond,
-                                                                 pTerminator->getParent(),
-                                                                 pTerminator->getSuccessor(0));
-    CopyMetadata(pNewTerminator, pInsertPos);
+    Instruction* const newTerminator = m_builder->CreateCondBr(cond,
+                                                                 terminator->getParent(),
+                                                                 terminator->getSuccessor(0));
+    copyMetadata(newTerminator, insertPos);
 
-    pTerminator->eraseFromParent();
+    terminator->eraseFromParent();
 
-    m_pBuilder->SetInsertPoint(pNewTerminator);
+    m_builder->SetInsertPoint(newTerminator);
 
-    return pLoopCounter;
+    return loopCounter;
 }
 
 } // lgc

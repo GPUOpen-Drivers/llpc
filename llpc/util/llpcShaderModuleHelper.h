@@ -59,7 +59,7 @@ struct ShaderModuleEntry
 struct ShaderEntryName
 {
     ShaderStage stage;             // Shader stage
-    const char* pName;             // Entry name
+    const char* name;             // Entry name
 };
 
 // =====================================================================================================================
@@ -67,35 +67,35 @@ struct ShaderEntryName
 class ShaderModuleHelper
 {
 public:
-    static Result CollectInfoFromSpirvBinary(
-        const BinaryData*             pSpvBinCode,
-        ShaderModuleUsage*            pShaderModuleUsage,
+    static Result collectInfoFromSpirvBinary(
+        const BinaryData*             spvBinCode,
+        ShaderModuleUsage*            shaderModuleUsage,
         std::vector<ShaderEntryName>& shaderEntryNames,
-        unsigned*                     pDebugInfoSize);
+        unsigned*                     debugInfoSize);
 
-    static void TrimSpirvDebugInfo(
-        const BinaryData* pSpvBin,
+    static void trimSpirvDebugInfo(
+        const BinaryData* spvBin,
         unsigned          bufferSize,
-        void*             pTrimSpvBin);
+        void*             trimSpvBin);
 
-    static Result OptimizeSpirv(
-        const BinaryData* pSpirvBinIn,
-        BinaryData*       pSpirvBinOut);
+    static Result optimizeSpirv(
+        const BinaryData* spirvBinIn,
+        BinaryData*       spirvBinOut);
 
-    static void CleanOptimizedSpirv(BinaryData* pSpirvBin);
+    static void cleanOptimizedSpirv(BinaryData* spirvBin);
 
-    static unsigned GetStageMaskFromSpirvBinary(
-        const BinaryData* pSpvBin,
-        const char*       pEntryName);
+    static unsigned getStageMaskFromSpirvBinary(
+        const BinaryData* spvBin,
+        const char*       entryName);
 
-    static const char* GetEntryPointNameFromSpirvBinary(
-        const BinaryData* pSpvBin);
+    static const char* getEntryPointNameFromSpirvBinary(
+        const BinaryData* spvBin);
 
-    static Result VerifySpirvBinary(const BinaryData* pSpvBin);
+    static Result verifySpirvBinary(const BinaryData* spvBin);
 
-    static bool IsSpirvBinary(const BinaryData* pShaderBin);
+    static bool isSpirvBinary(const BinaryData* shaderBin);
 
-    static bool IsLlvmBitcode(const BinaryData* pShaderBin);
+    static bool isLlvmBitcode(const BinaryData* shaderBin);
 };
 
 } // Llpc

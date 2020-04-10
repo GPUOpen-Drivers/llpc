@@ -51,12 +51,12 @@ static std::map<std::string, int>& getEnumMap()
 
 // =====================================================================================================================
 // Gets enum value from enum string
-bool GetEnumValue(
-    const char* pString,  // Enum string
+bool getEnumValue(
+    const char* string,  // Enum string
     int&        value)    // [out] Enum value
 {
     bool ret = false;
-    std::map<std::string, int>::iterator it = getEnumMap().find(pString);
+    std::map<std::string, int>::iterator it = getEnumMap().find(string);
     if (it != getEnumMap().end())
     {
         value = it->second;
@@ -70,7 +70,7 @@ bool GetEnumValue(
 
 // =====================================================================================================================
 // Initializes enum convert map
-void InitEnumMap()
+void initEnumMap()
 {
     // Add Vk enums
     ADD_ENUM_MAP(VkPipelineCacheHeaderVersion, VK_PIPELINE_CACHE_HEADER_VERSION_ONE);

@@ -40,7 +40,7 @@ struct PipelineDumperReg
     const char* name;
 };
 
-const PipelineDumperReg pipelineDumperRegs[] =
+const PipelineDumperReg PipelineDumperRegs[] =
 {
     { 0x2C06, "SPI_SHADER_PGM_CHKSUM_PS" },
     { 0x2C07, "SPI_SHADER_PGM_RSRC3_PS" },
@@ -426,9 +426,9 @@ const PipelineDumperReg pipelineDumperRegs[] =
 const char* PipelineDumper::getRegisterNameString(
     unsigned  regNumber)  // Register number
 {
-    for (unsigned idx = 0, end = sizeof(pipelineDumperRegs) / sizeof(pipelineDumperRegs[0]); idx != end; ++idx)
+    for (unsigned idx = 0, end = sizeof(PipelineDumperRegs) / sizeof(PipelineDumperRegs[0]); idx != end; ++idx)
     {
-        const auto& regEntry = pipelineDumperRegs[idx];
+        const auto& regEntry = PipelineDumperRegs[idx];
         if (regEntry.number == regNumber)
         {
             return regEntry.name;

@@ -39,7 +39,7 @@ namespace Llpc
 
 // =====================================================================================================================
 // The global ShaderCacheManager object
-ShaderCacheManager* ShaderCacheManager::m_pManager = nullptr;
+ShaderCacheManager* ShaderCacheManager::m_manager = nullptr;
 
 // =====================================================================================================================
 // Destroy all objects
@@ -57,19 +57,19 @@ ShaderCacheManager::~ShaderCacheManager()
 
 // =====================================================================================================================
 // Get ShaderCache instance with specified create info
-ShaderCachePtr ShaderCacheManager::GetShaderCacheObject(
-    const ShaderCacheCreateInfo*    pCreateInfo,    // [in] Shader cache create info
-    const ShaderCacheAuxCreateInfo* pAuxCreateInfo) // [in] Shader cache auxiliary info (static fields)
+ShaderCachePtr ShaderCacheManager::getShaderCacheObject(
+    const ShaderCacheCreateInfo*    createInfo,    // [in] Shader cache create info
+    const ShaderCacheAuxCreateInfo* auxCreateInfo) // [in] Shader cache auxiliary info (static fields)
 {
-    ShaderCachePtr pShaderCache;
+    ShaderCachePtr shaderCache;
     auto cacheIt = m_shaderCaches.begin();
     auto endIt = m_shaderCaches.end();
 
     for (; cacheIt != endIt; ++cacheIt)
     {
-        if ((*cacheIt)->IsCompatible(pCreateInfo, pAuxCreateInfo))
+        if ((*cacheIt)->isCompatible(createInfo, auxCreateInfo))
         {
-            pShaderCache = (*cacheIt);
+            shaderCache = (*cacheIt);
             break;
         }
     }
@@ -77,17 +77,17 @@ ShaderCachePtr ShaderCacheManager::GetShaderCacheObject(
     // No compatible object is found, create a new one
     if (cacheIt == endIt)
     {
-        pShaderCache = std::make_shared<ShaderCache>();
-        m_shaderCaches.push_back(pShaderCache);
-        pShaderCache->Init(pCreateInfo, pAuxCreateInfo);
+        shaderCache = std::make_shared<ShaderCache>();
+        m_shaderCaches.push_back(shaderCache);
+        shaderCache->init(createInfo, auxCreateInfo);
     }
 
-    return pShaderCache;
+    return shaderCache;
 }
 
 // =====================================================================================================================
 // Release ShaderCache instance
-void ShaderCacheManager::ReleaseShaderCacheObject(
+void ShaderCacheManager::releaseShaderCacheObject(
     ShaderCachePtr& shaderCachePtr)                 // [in] ShaderCache instance to be released
 {
     auto cacheIt = m_shaderCaches.begin();

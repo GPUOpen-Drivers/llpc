@@ -130,8 +130,8 @@ ShaderCache::ShaderCache()
     m_shaderDataEnd(sizeof(ShaderCacheSerializedHeader)),
     m_totalShaders(0),
     m_serializedSize(sizeof(ShaderCacheSerializedHeader)),
-    m_pfnGetValueFunc(nullptr),
-    m_pfnStoreValueFunc(nullptr)
+    m_getValueFunc(nullptr),
+    m_storeValueFunc(nullptr)
 {
     memset(m_fileFullPath, 0, MaxFilePathLen);
     memset(&m_gfxIp, 0, sizeof(m_gfxIp));
@@ -147,16 +147,16 @@ ShaderCache::~ShaderCache()
 // Destruction, does clean-up work.
 void ShaderCache::Destroy()
 {
-    if (m_onDiskFile.IsOpen())
+    if (m_onDiskFile.isOpen())
     {
-        m_onDiskFile.Close();
+        m_onDiskFile.close();
     }
-    ResetRuntimeCache();
+    resetRuntimeCache();
 }
 
 // =====================================================================================================================
 // Resets the runtime shader cache to an empty state. Releases all allocator memory and decommits it back to the OS.
-void ShaderCache::ResetRuntimeCache()
+void ShaderCache::resetRuntimeCache()
 {
     for (auto indexMap : m_shaderIndexMap)
     {
@@ -180,16 +180,16 @@ void ShaderCache::ResetRuntimeCache()
 //
 // NOTE: It is expected that the calling function has not used this shader cache since querying the size
 Result ShaderCache::Serialize(
-    void*   pBlob,    // [out] System memory pointer where the serialized data should be placed
-    size_t* pSize)    // [in,out] Size of the memory pointed to by pBlob. If the value stored in pSize is zero then no
+    void*   blob,    // [out] System memory pointer where the serialized data should be placed
+    size_t* size)    // [in,out] Size of the memory pointed to by pBlob. If the value stored in pSize is zero then no
                       // data will be copied and instead the size required for serialization will be returned in pSize
 {
     Result result = Result::Success;
 
-    if (*pSize == 0)
+    if (*size == 0)
     {
         // Query shader cache serailzied size
-        (*pSize) = m_serializedSize;
+        (*size) = m_serializedSize;
     }
     else
     {
@@ -198,18 +198,18 @@ Result ShaderCache::Serialize(
 
         if (m_serializedSize >= sizeof(ShaderCacheSerializedHeader))
         {
-            if ((pBlob != nullptr) && ((*pSize) >= m_serializedSize))
+            if ((blob != nullptr) && ((*size) >= m_serializedSize))
             {
                 // First construct the header and copy it into the memory provided
                 ShaderCacheSerializedHeader header = {};
                 header.headerSize    = sizeof(ShaderCacheSerializedHeader);
                 header.shaderCount   = m_totalShaders;
                 header.shaderDataEnd = m_shaderDataEnd;
-                GetBuildTime(&header.buildId);
+                getBuildTime(&header.buildId);
 
-                memcpy(pBlob, &header, sizeof(ShaderCacheSerializedHeader));
+                memcpy(blob, &header, sizeof(ShaderCacheSerializedHeader));
 
-                void* pDataDst = VoidPtrInc(pBlob, sizeof(ShaderCacheSerializedHeader));
+                void* dataDst = voidPtrInc(blob, sizeof(ShaderCacheSerializedHeader));
 
                 // Then iterate through all allocators (which hold the backing memory for the shader data)
                 // and copy their contents to the blob.
@@ -218,14 +218,14 @@ Result ShaderCache::Serialize(
                     assert(it.first != nullptr);
 
                     const size_t copySize = it.second;
-                    if (VoidPtrDiff(pDataDst, pBlob) + copySize > (*pSize))
+                    if (voidPtrDiff(dataDst, blob) + copySize > (*size))
                     {
                         result = Result::ErrorUnknown;
                         break;
                     }
 
-                    memcpy(pDataDst, it.first, copySize);
-                    pDataDst = VoidPtrInc(pDataDst, copySize);
+                    memcpy(dataDst, it.first, copySize);
+                    dataDst = voidPtrInc(dataDst, copySize);
                 }
             }
             else
@@ -250,81 +250,81 @@ Result ShaderCache::Merge(
 
     Result result = Result::Success;
 
-    LockCacheMap(false);
+    lockCacheMap(false);
 
     for (unsigned i = 0; i < srcCacheCount; i++)
     {
-        ShaderCache* pSrcCache = static_cast<ShaderCache*>(const_cast<IShaderCache*>(ppSrcCaches[i]));
-        pSrcCache->LockCacheMap(true);
+        ShaderCache* srcCache = static_cast<ShaderCache*>(const_cast<IShaderCache*>(ppSrcCaches[i]));
+        srcCache->lockCacheMap(true);
 
-        for (auto it : pSrcCache->m_shaderIndexMap)
+        for (auto it : srcCache->m_shaderIndexMap)
         {
             uint64_t key = it.first;
 
             auto indexMap = m_shaderIndexMap.find(key);
             if (indexMap == m_shaderIndexMap.end())
             {
-                ShaderIndex* pIndex = nullptr;
-                void* pMem = GetCacheSpace(it.second->header.size);
-                memcpy(pMem, it.second->pDataBlob, it.second->header.size);
+                ShaderIndex* index = nullptr;
+                void* mem = getCacheSpace(it.second->header.size);
+                memcpy(mem, it.second->dataBlob, it.second->header.size);
 
-                pIndex = new ShaderIndex;
-                pIndex->pDataBlob = pMem;
-                pIndex->state = ShaderEntryState::Ready;
-                pIndex->header = it.second->header;
+                index = new ShaderIndex;
+                index->dataBlob = mem;
+                index->state = ShaderEntryState::Ready;
+                index->header = it.second->header;
 
-                m_shaderIndexMap[key] = pIndex;
+                m_shaderIndexMap[key] = index;
                 m_totalShaders++;
             }
         }
-        pSrcCache->UnlockCacheMap(true);
+        srcCache->unlockCacheMap(true);
     }
 
-    UnlockCacheMap(false);
+    unlockCacheMap(false);
 
     return result;
 }
 
 // =====================================================================================================================
 // Initializes the Shader Cache in late stage.
-Result ShaderCache::Init(
-    const ShaderCacheCreateInfo*    pCreateInfo,    // [in] Shader cache create info
-    const ShaderCacheAuxCreateInfo* pAuxCreateInfo) // [in] Shader cache auxiliary info (static fields)
+Result ShaderCache::init(
+    const ShaderCacheCreateInfo*    createInfo,    // [in] Shader cache create info
+    const ShaderCacheAuxCreateInfo* auxCreateInfo) // [in] Shader cache auxiliary info (static fields)
 {
     Result result = Result::Success;
 
-    if (pAuxCreateInfo->shaderCacheMode != ShaderCacheDisable)
+    if (auxCreateInfo->shaderCacheMode != ShaderCacheDisable)
     {
         m_disableCache = false;
-        m_pClientData       = pCreateInfo->pClientData;
-        m_pfnGetValueFunc   = pCreateInfo->pfnGetValueFunc;
-        m_pfnStoreValueFunc = pCreateInfo->pfnStoreValueFunc;
-        m_gfxIp             = pAuxCreateInfo->gfxIp;
-        m_hash              = pAuxCreateInfo->hash;
+        m_clientData       = createInfo->pClientData;
+        m_getValueFunc   = createInfo->pfnGetValueFunc;
+        m_storeValueFunc = createInfo->pfnStoreValueFunc;
+        m_gfxIp             = auxCreateInfo->gfxIp;
+        m_hash              = auxCreateInfo->hash;
 
-        LockCacheMap(false);
+        lockCacheMap(false);
 
         // If we're in runtime mode and the caller provided a data blob, try to load the from that blob.
-        if ((pAuxCreateInfo->shaderCacheMode == ShaderCacheEnableRuntime) && (pCreateInfo->initialDataSize > 0))
+        if ((auxCreateInfo->shaderCacheMode == ShaderCacheEnableRuntime) && (createInfo->initialDataSize > 0))
         {
-            if (LoadCacheFromBlob(pCreateInfo->pInitialData, pCreateInfo->initialDataSize) != Result::Success)
+            if (loadCacheFromBlob(createInfo->pInitialData, createInfo->initialDataSize) != Result::Success)
             {
-                ResetRuntimeCache();
+                resetRuntimeCache();
             }
         }
         // If we're in on-disk mode try to load the cache from file.
-        else if ((pAuxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDisk) ||
-                 (pAuxCreateInfo->shaderCacheMode == ShaderCacheForceInternalCacheOnDisk) ||
-                 (pAuxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDiskReadOnly))
+        else if ((auxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDisk) ||
+                 (auxCreateInfo->shaderCacheMode == ShaderCacheForceInternalCacheOnDisk) ||
+                 (auxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDiskReadOnly))
         {
             // Default to false because the cache file is invalid if it's brand new
             bool cacheFileExists = false;
 
             // Build the cache file name and make required directories if necessary
             // cacheFileValid gets initially set based on whether the file exists.
-            result = BuildFileName(pAuxCreateInfo->pExecutableName,
-                                   pAuxCreateInfo->cacheFilePath,
-                                   pAuxCreateInfo->gfxIp,
+            result = buildFileName(auxCreateInfo->executableName,
+                                   auxCreateInfo->cacheFilePath,
+                                   auxCreateInfo->gfxIp,
                                    &cacheFileExists);
 
             if (result == Result::Success)
@@ -332,19 +332,19 @@ Result ShaderCache::Init(
                 // Open the storage file if it exists
                 if (cacheFileExists)
                 {
-                    if (pAuxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDiskReadOnly)
+                    if (auxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDiskReadOnly)
                     {
-                        result = m_onDiskFile.Open(m_fileFullPath, (FileAccessRead | FileAccessBinary));
+                        result = m_onDiskFile.open(m_fileFullPath, (FileAccessRead | FileAccessBinary));
                     }
                     else
                     {
-                        result = m_onDiskFile.Open(m_fileFullPath, (FileAccessReadUpdate | FileAccessBinary));
+                        result = m_onDiskFile.open(m_fileFullPath, (FileAccessReadUpdate | FileAccessBinary));
                     }
                 }
                 else
                 // Create the storage file if it does not exist
                 {
-                    result = m_onDiskFile.Open(m_fileFullPath, (FileAccessRead | FileAccessAppend | FileAccessBinary));
+                    result = m_onDiskFile.open(m_fileFullPath, (FileAccessRead | FileAccessAppend | FileAccessBinary));
                 }
             }
 
@@ -354,16 +354,16 @@ Result ShaderCache::Init(
             {
                 if (cacheFileExists)
                 {
-                    loadResult = LoadCacheFromFile();
-                    if ((pAuxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDiskReadOnly) &&
+                    loadResult = loadCacheFromFile();
+                    if ((auxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDiskReadOnly) &&
                         (loadResult == Result::Success))
                     {
-                        m_onDiskFile.Close();
+                        m_onDiskFile.close();
                     }
                 }
                 else
                 {
-                    ResetCacheFile();
+                    resetCacheFile();
                 }
             }
 
@@ -371,11 +371,11 @@ Result ShaderCache::Init(
             // any memory allocated
             if (loadResult != Result::Success)
             {
-                ResetRuntimeCache();
+                resetRuntimeCache();
             }
         }
 
-        UnlockCacheMap(false);
+        unlockCacheMap(false);
     }
     else
     {
@@ -388,16 +388,16 @@ Result ShaderCache::Init(
 // =====================================================================================================================
 // Constructs the on disk cache file name and path and puts it in m_fileFullPath. This function also creates any
 // any missing directories in the full path to the cache file.
-Result ShaderCache::BuildFileName(
-    const char*  pExecutableName,     // [in] Name of Executable file
-    const char*  pCacheFilePath,      // [in] Root directory of cache file
+Result ShaderCache::buildFileName(
+    const char*  executableName,     // [in] Name of Executable file
+    const char*  cacheFilePath,      // [in] Root directory of cache file
     GfxIpVersion gfxIp,               // Graphics IP version info
-    bool*        pCacheFileExists)    // [out] Whether cache file exists
+    bool*        cacheFileExists)    // [out] Whether cache file exists
 {
     // The file name is constructed by taking the executable file name, appending the client string, device ID and
     // GPU index then hashing the result.
     char hashedFileName[MaxFilePathLen];
-    int length = snprintf(hashedFileName, MaxFilePathLen, "%s.%s.%u.%u.%u", pExecutableName,
+    int length = snprintf(hashedFileName, MaxFilePathLen, "%s.%s.%u.%u.%u", executableName,
              ClientStr,
              gfxIp.major,
              gfxIp.minor,
@@ -407,14 +407,14 @@ Result ShaderCache::BuildFileName(
     length = snprintf(hashedFileName, MaxFilePathLen, "%08x.bin", nameHash);
 
     // Combine the base path, the sub-path and the file name to get the fully qualified path to the cache file
-    length = snprintf(m_fileFullPath, MaxFilePathLen, "%s%s%s", pCacheFilePath, CacheFileSubPath, hashedFileName);
+    length = snprintf(m_fileFullPath, MaxFilePathLen, "%s%s%s", cacheFilePath, CacheFileSubPath, hashedFileName);
 
-    assert(pCacheFileExists != nullptr);
-    *pCacheFileExists = File::Exists(m_fileFullPath);
+    assert(cacheFileExists != nullptr);
+    *cacheFileExists = File::exists(m_fileFullPath);
     Result result = Result::Success;
-    if (!*pCacheFileExists)
+    if (!*cacheFileExists)
     {
-        length = snprintf(hashedFileName, MaxFilePathLen, "%s%s", pCacheFilePath, CacheFileSubPath);
+        length = snprintf(hashedFileName, MaxFilePathLen, "%s%s", cacheFilePath, CacheFileSubPath);
         std::error_code errCode = sys::fs::create_directories(hashedFileName);
         if (!errCode)
         {
@@ -427,10 +427,10 @@ Result ShaderCache::BuildFileName(
 
 // =====================================================================================================================
 // Resets the contents of the cache file, assumes the shader cache has been locked for writes.
-void ShaderCache::ResetCacheFile()
+void ShaderCache::resetCacheFile()
 {
-    m_onDiskFile.Close();
-    Result fileResult = m_onDiskFile.Open(m_fileFullPath, (FileAccessRead | FileAccessWrite | FileAccessBinary));
+    m_onDiskFile.close();
+    Result fileResult = m_onDiskFile.open(m_fileFullPath, (FileAccessRead | FileAccessWrite | FileAccessBinary));
     assert(fileResult == Result::Success);
     (void(fileResult)); // unused
 
@@ -438,9 +438,9 @@ void ShaderCache::ResetCacheFile()
     header.headerSize    = sizeof(ShaderCacheSerializedHeader);
     header.shaderCount   = 0;
     header.shaderDataEnd = header.headerSize;
-    GetBuildTime(&header.buildId);
+    getBuildTime(&header.buildId);
 
-    m_onDiskFile.Write(&header, header.headerSize);
+    m_onDiskFile.write(&header, header.headerSize);
 }
 
 // =====================================================================================================================
@@ -450,7 +450,7 @@ void ShaderCache::ResetCacheFile()
 //    Ready       - if a matching shader was found and is ready for use
 //    Compiling   - if an entry was created and must be compiled/populated by the caller
 //    Unavailable - if an unrecoverable error was encountered
-ShaderEntryState ShaderCache::FindShader(
+ShaderEntryState ShaderCache::findShader(
     MetroHash::Hash   hash,                    // Hash code of shader
     bool              allocateOnMiss,          // Whether allocate a new entry for new hash
     CacheEntryHandle* phEntry)                 // [out] Handle of shader cache entry
@@ -464,26 +464,26 @@ ShaderEntryState ShaderCache::FindShader(
 
     ShaderEntryState result    = ShaderEntryState::Unavailable;
     bool             existed   = false;
-    ShaderIndex*     pIndex    = nullptr;
+    ShaderIndex*     index    = nullptr;
     Result           mapResult = Result::Success;
     assert(phEntry != nullptr);
 
     bool readOnlyLock = (allocateOnMiss == false);
-    LockCacheMap(readOnlyLock);
-    uint64_t hashKey = MetroHash::Compact64(&hash);
+    lockCacheMap(readOnlyLock);
+    uint64_t hashKey = MetroHash::compact64(&hash);
     auto indexMap = m_shaderIndexMap.find(hashKey);
     if (indexMap != m_shaderIndexMap.end())
     {
         existed = true;
-        pIndex = indexMap->second;
+        index = indexMap->second;
     }
     else if (allocateOnMiss)
     {
-        pIndex = new ShaderIndex;
-        m_shaderIndexMap[hashKey] = pIndex;
+        index = new ShaderIndex;
+        m_shaderIndexMap[hashKey] = index;
     }
 
-    if (pIndex == nullptr)
+    if (index == nullptr)
     {
         mapResult = Result::ErrorUnavailable;
     }
@@ -495,9 +495,9 @@ ShaderEntryState ShaderCache::FindShader(
             // We don't need to hold on to the write lock if we're not the one doing the compile
             if (readOnlyLock == false)
             {
-                UnlockCacheMap(readOnlyLock);
+                unlockCacheMap(readOnlyLock);
                 readOnlyLock = true;
-                LockCacheMap(readOnlyLock);
+                lockCacheMap(readOnlyLock);
             }
         }
         else
@@ -505,24 +505,24 @@ ShaderEntryState ShaderCache::FindShader(
             bool needsInit = true;
 
             // We didn't find the entry in our own hash map, now search the external cache if available
-            if (UseExternalCache())
+            if (useExternalCache())
             {
                 // The first call to the external cache queries the existence and the size of the cached shader.
-                Result extResult = m_pfnGetValueFunc(m_pClientData, hashKey, nullptr, &pIndex->header.size);
+                Result extResult = m_getValueFunc(m_clientData, hashKey, nullptr, &index->header.size);
                 if (extResult == Result::Success)
                 {
                     // An entry was found matching our hash, we should allocate memory to hold the data and call again
-                    assert(pIndex->header.size > 0);
-                    pIndex->pDataBlob = GetCacheSpace(pIndex->header.size);
+                    assert(index->header.size > 0);
+                    index->dataBlob = getCacheSpace(index->header.size);
 
-                    if (pIndex->pDataBlob == nullptr)
+                    if (index->dataBlob == nullptr)
                     {
                         extResult = Result::ErrorOutOfMemory;
                     }
                     else
                     {
                         extResult =
-                            m_pfnGetValueFunc(m_pClientData, hashKey, pIndex->pDataBlob, &pIndex->header.size);
+                            m_getValueFunc(m_clientData, hashKey, index->dataBlob, &index->header.size);
                     }
                 }
 
@@ -531,19 +531,19 @@ ShaderEntryState ShaderCache::FindShader(
                     // We now have a copy of the shader data from the external cache, just need to update the
                     // ShaderIndex. The first item in the data blob is a ShaderHeader, followed by the serialized
                     // data blob for the shader.
-                    const auto*const pHeader = static_cast<const ShaderHeader*>(pIndex->pDataBlob);
-                    assert(pIndex->header.size == pHeader->size);
+                    const auto*const header = static_cast<const ShaderHeader*>(index->dataBlob);
+                    assert(index->header.size == header->size);
 
-                    pIndex->header = (*pHeader);
-                    pIndex->state  = ShaderEntryState::Ready;
+                    index->header = (*header);
+                    index->state  = ShaderEntryState::Ready;
                     needsInit      = false;
                 }
                 else if (extResult == Result::ErrorUnavailable)
                 {
                     // This means the external cache is unavailable and we shouldn't bother using it anymore. To
                     // prevent useless calls we'll zero out the function pointers.
-                    m_pfnGetValueFunc   = nullptr;
-                    m_pfnStoreValueFunc = nullptr;
+                    m_getValueFunc   = nullptr;
+                    m_storeValueFunc = nullptr;
                 }
                 else
                 {
@@ -558,48 +558,48 @@ ShaderEntryState ShaderCache::FindShader(
             if (needsInit)
             {
                 // This is a brand new cache entry so we need to initialize the ShaderIndex.
-                memset(pIndex, 0, sizeof(*pIndex));
-                pIndex->header.key = hashKey;
-                pIndex->state      = ShaderEntryState::New;
+                memset(index, 0, sizeof(*index));
+                index->header.key = hashKey;
+                index->state      = ShaderEntryState::New;
             }
         }   // End if (existed == false)
 
-        if (pIndex->state == ShaderEntryState::Compiling)
+        if (index->state == ShaderEntryState::Compiling)
         {
             // The shader is being compiled by another thread, we should release the lock and wait for it to complete
-            while (pIndex->state == ShaderEntryState::Compiling)
+            while (index->state == ShaderEntryState::Compiling)
             {
-                UnlockCacheMap(readOnlyLock);
+                unlockCacheMap(readOnlyLock);
                 {
                     std::unique_lock<std::mutex> lock(m_conditionMutex);
 
                     m_conditionVariable.wait_for(lock, std::chrono::seconds(1));
                 }
-                LockCacheMap(readOnlyLock);
+                lockCacheMap(readOnlyLock);
             }
             // At this point the shader entry is either Ready, New or something failed. We've already
             // initialized our result code to an error code above, the Ready and New cases are handled below so
             // nothing else to do here.
         }
 
-        if (pIndex->state == ShaderEntryState::Ready)
+        if (index->state == ShaderEntryState::Ready)
         {
             // The shader has been compiled, just verify it has valid data and then return success.
-            assert((pIndex->pDataBlob != nullptr) && (pIndex->header.size != 0));
+            assert((index->dataBlob != nullptr) && (index->header.size != 0));
         }
-        else if (pIndex->state == ShaderEntryState::New)
+        else if (index->state == ShaderEntryState::New)
         {
             // The shader entry is new (or previously failed compilation) and we're the first thread to get a
             // crack at it, move it into the Compiling state
-            pIndex->state = ShaderEntryState::Compiling;
+            index->state = ShaderEntryState::Compiling;
         }
 
         // Return the ShaderIndex as a handle so subsequent calls into the cache can avoid the hash map lookup.
-        (*phEntry) = pIndex;
-        result     = pIndex->state;
+        (*phEntry) = index;
+        result     = index->state;
     }
 
-    UnlockCacheMap(readOnlyLock);
+    unlockCacheMap(readOnlyLock);
 
     return result;
 }
@@ -607,16 +607,16 @@ ShaderEntryState ShaderCache::FindShader(
 // =====================================================================================================================
 // Inserts a new shader into the cache. The new shader is written to the cache file if it is in-use, and will also
 // upload it to the client's external cache if it is in-use.
-void ShaderCache::InsertShader(
+void ShaderCache::insertShader(
     CacheEntryHandle         hEntry,                 // [in] Handle of shader cache entry
-    const void*              pBlob,                  // [in] Shader data
+    const void*              blob,                  // [in] Shader data
     size_t                   shaderSize)             // size of shader data in bytes
 {
-    auto*const pIndex = static_cast<ShaderIndex*>(hEntry);
+    auto*const index = static_cast<ShaderIndex*>(hEntry);
     assert(m_disableCache == false);
-    assert((pIndex != nullptr) && (pIndex->state == ShaderEntryState::Compiling));
+    assert((index != nullptr) && (index->state == ShaderEntryState::Compiling));
 
-    LockCacheMap(false);
+    lockCacheMap(false);
 
     Result result = Result::Success;
 
@@ -624,10 +624,10 @@ void ShaderCache::InsertShader(
     {
         // Allocate space to store the serialized shader and a copy of the header. The header is duplicated in the
         // data to simplify serialize/load.
-        pIndex->header.size = (shaderSize + sizeof(ShaderHeader));
-        pIndex->pDataBlob   = GetCacheSpace(pIndex->header.size);
+        index->header.size = (shaderSize + sizeof(ShaderHeader));
+        index->dataBlob   = getCacheSpace(index->header.size);
 
-        if (pIndex->pDataBlob == nullptr)
+        if (index->dataBlob == nullptr)
         {
             result = Result::ErrorOutOfMemory;
         }
@@ -635,31 +635,31 @@ void ShaderCache::InsertShader(
         {
             ++m_totalShaders;
 
-            auto*const pHeader   = static_cast<ShaderHeader*>(pIndex->pDataBlob);
-            void*const pDataBlob = (pHeader + 1);
+            auto*const header   = static_cast<ShaderHeader*>(index->dataBlob);
+            void*const dataBlob = (header + 1);
 
             // Serialize the shader into an opaque blob of data.
-            memcpy(pDataBlob, pBlob, shaderSize);
+            memcpy(dataBlob, blob, shaderSize);
 
             // Compute a CRC for the serialized data (useful for detecting data corruption), and copy the index's
             // header into the data's header.
-            pIndex->header.crc = CalculateCrc(static_cast<uint8_t*>(pDataBlob), shaderSize);
-            (*pHeader)         = pIndex->header;
+            index->header.crc = calculateCrc(static_cast<uint8_t*>(dataBlob), shaderSize);
+            (*header)         = index->header;
 
-            if (UseExternalCache())
+            if (useExternalCache())
             {
                 // If we're making use of the external shader cache then we need to store the compiled shader data here.
-                Result externalResult = m_pfnStoreValueFunc(m_pClientData,
-                                                            pIndex->header.key,
-                                                            pIndex->pDataBlob,
-                                                            pIndex->header.size);
+                Result externalResult = m_storeValueFunc(m_clientData,
+                                                            index->header.key,
+                                                            index->dataBlob,
+                                                            index->header.size);
                 if (externalResult == Result::ErrorUnavailable)
                 {
                     // This is the only return code we can do anything about. In this case it means the external cache
                     // is not available and we should zero out the function pointers to avoid making useless calls on
                     // subsequent shader compiles.
-                    m_pfnGetValueFunc   = nullptr;
-                    m_pfnStoreValueFunc = nullptr;
+                    m_getValueFunc   = nullptr;
+                    m_storeValueFunc = nullptr;
                 }
                 else
                 {
@@ -669,12 +669,12 @@ void ShaderCache::InsertShader(
             }
 
             // Mark this entry as ready, we'll wake the waiting threads once we release the lock
-            pIndex->state = ShaderEntryState::Ready;
+            index->state = ShaderEntryState::Ready;
 
             // Finally, update the file if necessary.
-            if (m_onDiskFile.IsOpen())
+            if (m_onDiskFile.isOpen())
             {
-                AddShaderToFile(pIndex);
+                addShaderToFile(index);
             }
         }
     }
@@ -685,60 +685,60 @@ void ShaderCache::InsertShader(
         // can do here except give up on adding data. This means we need to set the entry back to New so if another
         // thread is waiting it will be allowed to continue (it will likely just get to this same point, but at least
         // we won't hang or crash).
-        pIndex->state       = ShaderEntryState::New;
-        pIndex->header.size = 0;
-        pIndex->pDataBlob   = nullptr;
+        index->state       = ShaderEntryState::New;
+        index->header.size = 0;
+        index->dataBlob   = nullptr;
     }
 
-    UnlockCacheMap(false);
+    unlockCacheMap(false);
     m_conditionVariable.notify_all();
 }
 
 // =====================================================================================================================
 // Resets cache entry state to new. It is used when shader compile fails.
-void ShaderCache::ResetShader(
+void ShaderCache::resetShader(
     CacheEntryHandle         hEntry)                 // [in] Handle of shader cache entry
 {
-    auto*const pIndex = static_cast<ShaderIndex*>(hEntry);
+    auto*const index = static_cast<ShaderIndex*>(hEntry);
     assert(m_disableCache == false);
-    assert((pIndex != nullptr) && (pIndex->state == ShaderEntryState::Compiling));
-    LockCacheMap(false);
-    pIndex->state       = ShaderEntryState::New;
-    pIndex->header.size = 0;
-    pIndex->pDataBlob   = nullptr;
-    UnlockCacheMap(false);
+    assert((index != nullptr) && (index->state == ShaderEntryState::Compiling));
+    lockCacheMap(false);
+    index->state       = ShaderEntryState::New;
+    index->header.size = 0;
+    index->dataBlob   = nullptr;
+    unlockCacheMap(false);
     m_conditionVariable.notify_all();
 }
 
 // =====================================================================================================================
 // Retrieves the shader from the cache which is identified by the specified entry handle.
-Result ShaderCache::RetrieveShader(
+Result ShaderCache::retrieveShader(
     CacheEntryHandle   hEntry,   // [in] Handle of shader cache entry
     const void**       ppBlob,   // [out] Shader data
-    size_t*            pSize)    // [out] size of shader data in bytes
+    size_t*            size)    // [out] size of shader data in bytes
 {
-    const auto*const pIndex = static_cast<ShaderIndex*>(hEntry);
+    const auto*const index = static_cast<ShaderIndex*>(hEntry);
 
     assert(m_disableCache == false);
-    assert(pIndex != nullptr);
-    assert(pIndex->header.size >= sizeof(ShaderHeader));
+    assert(index != nullptr);
+    assert(index->header.size >= sizeof(ShaderHeader));
 
-    LockCacheMap(true);
+    lockCacheMap(true);
 
-    *ppBlob = VoidPtrInc(pIndex->pDataBlob, sizeof(ShaderHeader));
-    *pSize = pIndex->header.size -  sizeof(ShaderHeader);
+    *ppBlob = voidPtrInc(index->dataBlob, sizeof(ShaderHeader));
+    *size = index->header.size -  sizeof(ShaderHeader);
 
-    UnlockCacheMap(true);
+    unlockCacheMap(true);
 
-    return (*pSize > 0) ? Result::Success : Result::ErrorUnknown;
+    return (*size > 0) ? Result::Success : Result::ErrorUnknown;
 }
 
 // =====================================================================================================================
 // Adds data for a new shader to the on-disk file
-void ShaderCache::AddShaderToFile(
-    const ShaderIndex* pIndex)    // [in] A new shader
+void ShaderCache::addShaderToFile(
+    const ShaderIndex* index)    // [in] A new shader
 {
-    assert(m_onDiskFile.IsOpen());
+    assert(m_onDiskFile.isOpen());
 
     // We only need to update the parts of the file that changed, which is the number of shaders, the new data section,
     // and the shaderDataEnd.
@@ -747,19 +747,19 @@ void ShaderCache::AddShaderToFile(
     const unsigned shaderCountOffset = offsetof(struct ShaderCacheSerializedHeader, shaderCount);
     const unsigned dataEndOffset     = offsetof(struct ShaderCacheSerializedHeader, shaderDataEnd);
 
-    m_onDiskFile.Seek(shaderCountOffset, true);
-    m_onDiskFile.Write(&m_totalShaders, sizeof(size_t));
+    m_onDiskFile.seek(shaderCountOffset, true);
+    m_onDiskFile.write(&m_totalShaders, sizeof(size_t));
 
     // Write the new shader data at the current end of the data section
-    m_onDiskFile.Seek(static_cast<unsigned>(m_shaderDataEnd), true);
-    m_onDiskFile.Write(pIndex->pDataBlob, pIndex->header.size);
+    m_onDiskFile.seek(static_cast<unsigned>(m_shaderDataEnd), true);
+    m_onDiskFile.write(index->dataBlob, index->header.size);
 
     // Then update the data end value and write it out to the file.
-    m_shaderDataEnd += pIndex->header.size;
-    m_onDiskFile.Seek(dataEndOffset, true);
-    m_onDiskFile.Write(&m_shaderDataEnd, sizeof(size_t));
+    m_shaderDataEnd += index->header.size;
+    m_onDiskFile.seek(dataEndOffset, true);
+    m_onDiskFile.write(&m_shaderDataEnd, sizeof(size_t));
 
-    m_onDiskFile.Flush();
+    m_onDiskFile.flush();
 }
 
 // =====================================================================================================================
@@ -768,34 +768,34 @@ void ShaderCache::AddShaderToFile(
 //
 // NOTE: This function assumes that a write lock has already been taken by the calling function and that the on-disk
 // file has been successfully opened and the file position is the beginning of the file.
-Result ShaderCache::LoadCacheFromFile()
+Result ShaderCache::loadCacheFromFile()
 {
-    assert(m_onDiskFile.IsOpen());
+    assert(m_onDiskFile.isOpen());
 
     // Read the header from the file and validate it
     ShaderCacheSerializedHeader header = {};
-    m_onDiskFile.Rewind();
-    m_onDiskFile.Read(&header, sizeof(ShaderCacheSerializedHeader), nullptr);
+    m_onDiskFile.rewind();
+    m_onDiskFile.read(&header, sizeof(ShaderCacheSerializedHeader), nullptr);
 
-    const size_t fileSize = File::GetFileSize(m_fileFullPath);
+    const size_t fileSize = File::getFileSize(m_fileFullPath);
     const size_t dataSize = fileSize - sizeof(ShaderCacheSerializedHeader);
-    Result result = ValidateAndLoadHeader(&header, fileSize);
+    Result result = validateAndLoadHeader(&header, fileSize);
 
-    void* pDataMem = nullptr;
+    void* dataMem = nullptr;
     if (result == Result::Success)
     {
         // The header is valid, so allocate space to fit all of the shader data.
-        pDataMem = GetCacheSpace(dataSize);
+        dataMem = getCacheSpace(dataSize);
     }
 
     if (result == Result::Success)
     {
-        if (pDataMem != nullptr)
+        if (dataMem != nullptr)
         {
             // Read the shader data into the allocated memory.
-            m_onDiskFile.Seek(sizeof(ShaderCacheSerializedHeader), true);
+            m_onDiskFile.seek(sizeof(ShaderCacheSerializedHeader), true);
             size_t bytesRead = 0;
-            result = m_onDiskFile.Read(pDataMem, dataSize, &bytesRead);
+            result = m_onDiskFile.read(dataMem, dataSize, &bytesRead);
 
             // If we didn't read the correct number of bytes then something went wrong and we should return a failure
             if (bytesRead != dataSize)
@@ -812,13 +812,13 @@ Result ShaderCache::LoadCacheFromFile()
     if (result == Result::Success)
     {
         // Now setup the shader index hash map.
-        result = PopulateIndexMap(pDataMem, dataSize);
+        result = populateIndexMap(dataMem, dataSize);
     }
 
     if (result != Result::Success)
     {
         // Something went wrong in loading the file, so reset it
-        ResetCacheFile();
+        resetCacheFile();
     }
 
     return result;
@@ -829,27 +829,27 @@ Result ShaderCache::LoadCacheFromFile()
 // successfully or false if invalid data was found.
 //
 // NOTE: This function assumes that a write lock has already been taken by the calling function.
-Result ShaderCache::LoadCacheFromBlob(
-    const void* pInitialData,       // [in] Initial data of the shader cache
+Result ShaderCache::loadCacheFromBlob(
+    const void* initialData,       // [in] Initial data of the shader cache
     size_t      initialDataSize)    // Size of initial data
 {
-    const auto* pHeader = static_cast<const ShaderCacheSerializedHeader*>(pInitialData);
-    assert(pInitialData != nullptr);
+    const auto* header = static_cast<const ShaderCacheSerializedHeader*>(initialData);
+    assert(initialData != nullptr);
 
     // First verify that the header data is valid
-    Result result = ValidateAndLoadHeader(pHeader, initialDataSize);
+    Result result = validateAndLoadHeader(header, initialDataSize);
 
     if (result == Result::Success)
     {
         // The header appears valid so allocate space for the shader data.
-        const size_t dataSize = initialDataSize - pHeader->headerSize;
-        void* pDataMem = GetCacheSpace(dataSize);
+        const size_t dataSize = initialDataSize - header->headerSize;
+        void* dataMem = getCacheSpace(dataSize);
 
-        if (pDataMem != nullptr)
+        if (dataMem != nullptr)
         {
             // Then copy the data and setup the shader index hash map.
-            memcpy(pDataMem, VoidPtrInc(pInitialData, pHeader->headerSize), dataSize);
-            result = PopulateIndexMap(pDataMem, dataSize);
+            memcpy(dataMem, voidPtrInc(initialData, header->headerSize), dataSize);
+            result = populateIndexMap(dataMem, dataSize);
         }
         else
         {
@@ -863,8 +863,8 @@ Result ShaderCache::LoadCacheFromBlob(
 // =====================================================================================================================
 // Validates shader data (from a file or a blob) by checking the CRCs and adding index hash map entries if successful.
 // Will return a failure if any of the shader data is invalid.
-Result ShaderCache::PopulateIndexMap(
-    void*  pDataStart,    // [in] Start pointer of cached shader data
+Result ShaderCache::populateIndexMap(
+    void*  dataStart,    // [in] Start pointer of cached shader data
     size_t dataSize)      // Shader data size in bytes
 {
     Result result = Result::Success;
@@ -872,33 +872,33 @@ Result ShaderCache::PopulateIndexMap(
     // Iterate through all of the entries to verify the data CRC, zero out the GPU memory pointer/offset and add to the
     // hashmap. We zero out the GPU memory data here because we're already iterating through each entry, rather than
     // take the hit each time we add shader data to the file.
-    auto* pHeader = static_cast<ShaderHeader*>(pDataStart);
+    auto* header = static_cast<ShaderHeader*>(dataStart);
 
     for (unsigned shader = 0; ((shader < m_totalShaders) && (result == Result::Success)); ++shader)
     {
         // Guard against buffer overruns.
-        assert(VoidPtrDiff(pHeader, pDataStart) <= dataSize);
+        assert(voidPtrDiff(header, dataStart) <= dataSize);
 
         // TODO: Add a static function to RelocatableShader to validate the input data.
 
         // The serialized data blob representing each RelocatableShader object immediately follows the header.
-        void*const pDataBlob = (pHeader + 1);
+        void*const dataBlob = (header + 1);
 
         // Verify the CRC
-        const uint64_t crc = CalculateCrc(static_cast<uint8_t*>(pDataBlob), (pHeader->size - sizeof(ShaderHeader)));
+        const uint64_t crc = calculateCrc(static_cast<uint8_t*>(dataBlob), (header->size - sizeof(ShaderHeader)));
 
-        if (crc == pHeader->crc)
+        if (crc == header->crc)
         {
             // It all checks out, so add this shader to the hash map!
-            ShaderIndex* pIndex = nullptr;
-            auto indexMap = m_shaderIndexMap.find(pHeader->key);
+            ShaderIndex* index = nullptr;
+            auto indexMap = m_shaderIndexMap.find(header->key);
             if (indexMap == m_shaderIndexMap.end())
             {
-                pIndex = new ShaderIndex;
-                pIndex->header    = (*pHeader);
-                pIndex->pDataBlob = pHeader;
-                pIndex->state     = ShaderEntryState::Ready;
-                m_shaderIndexMap[pHeader->key] = pIndex;
+                index = new ShaderIndex;
+                index->header    = (*header);
+                index->dataBlob = header;
+                index->state     = ShaderEntryState::Ready;
+                m_shaderIndexMap[header->key] = index;
             }
         }
         else
@@ -907,7 +907,7 @@ Result ShaderCache::PopulateIndexMap(
         }
 
         // Move to next entry in cache
-        pHeader = static_cast<ShaderHeader*>(VoidPtrInc(pHeader, pHeader->size));
+        header = static_cast<ShaderHeader*>(voidPtrInc(header, header->size));
     }
 
     return result;
@@ -915,15 +915,15 @@ Result ShaderCache::PopulateIndexMap(
 
 // =====================================================================================================================
 // Caclulates a 64-bit CRC of the data provided
-uint64_t ShaderCache::CalculateCrc(
-    const uint8_t* pData,         // [in]  Data need generate CRC
+uint64_t ShaderCache::calculateCrc(
+    const uint8_t* data,         // [in]  Data need generate CRC
     size_t         numBytes)      // Data size in bytes
 {
     uint64_t crc = CrcInitialValue;
     for (unsigned byte = 0; byte < numBytes; ++byte)
     {
         uint8_t tableIndex = static_cast<uint8_t>(crc >> (CrcWidth - 8)) & 0xFF;
-        crc = (crc << 8) ^ CrcLookup[tableIndex] ^ pData[byte];
+        crc = (crc << 8) ^ CrcLookup[tableIndex] ^ data[byte];
     }
 
     return crc;
@@ -931,26 +931,26 @@ uint64_t ShaderCache::CalculateCrc(
 
 // =====================================================================================================================
 // Validates the provided header and stores the data contained within it if valid.
-Result ShaderCache::ValidateAndLoadHeader(
-    const ShaderCacheSerializedHeader* pHeader,            // [in] Cache file header
+Result ShaderCache::validateAndLoadHeader(
+    const ShaderCacheSerializedHeader* header,            // [in] Cache file header
     size_t                             dataSourceSize)     // Data size in byte
 {
-    assert(pHeader != nullptr);
+    assert(header != nullptr);
 
     BuildUniqueId buildId;
-    GetBuildTime(&buildId);
+    getBuildTime(&buildId);
 
     Result result = Result::Success;
 
-    if (pHeader->headerSize == sizeof(ShaderCacheSerializedHeader) &&
-        (memcmp(pHeader->buildId.buildDate, buildId.buildDate, sizeof(buildId.buildDate)) == 0) &&
-        (memcmp(pHeader->buildId.buildTime, buildId.buildTime, sizeof(buildId.buildTime)) == 0) &&
-        (memcmp(&pHeader->buildId.gfxIp, &buildId.gfxIp, sizeof(buildId.gfxIp)) == 0) &&
-        (memcmp(&pHeader->buildId.hash, &buildId.hash, sizeof(buildId.hash)) == 0))
+    if (header->headerSize == sizeof(ShaderCacheSerializedHeader) &&
+        (memcmp(header->buildId.buildDate, buildId.buildDate, sizeof(buildId.buildDate)) == 0) &&
+        (memcmp(header->buildId.buildTime, buildId.buildTime, sizeof(buildId.buildTime)) == 0) &&
+        (memcmp(&header->buildId.gfxIp, &buildId.gfxIp, sizeof(buildId.gfxIp)) == 0) &&
+        (memcmp(&header->buildId.hash, &buildId.hash, sizeof(buildId.hash)) == 0))
     {
         // The header appears valid so copy the header data to the runtime cache
-        m_totalShaders  = pHeader->shaderCount;
-        m_shaderDataEnd = pHeader->shaderDataEnd;
+        m_totalShaders  = header->shaderCount;
+        m_shaderDataEnd = header->shaderDataEnd;
     }
     else
     {
@@ -970,7 +970,7 @@ Result ShaderCache::ValidateAndLoadHeader(
 // =====================================================================================================================
 // Allocates memory from the shader cache's linear allocator. This function assumes that a write lock has been taken by
 // the calling function.
-void* ShaderCache::GetCacheSpace(
+void* ShaderCache::getCacheSpace(
     size_t numBytes)    // Allocation size in bytes
 {
     auto p = new uint8_t[numBytes];
@@ -981,28 +981,28 @@ void* ShaderCache::GetCacheSpace(
 
 // =====================================================================================================================
 // Returns the time & date that pipeline.cpp was compiled.
-void ShaderCache::GetBuildTime(
-    BuildUniqueId *pBuildId)  // [out] Unique ID of build info
+void ShaderCache::getBuildTime(
+    BuildUniqueId *buildId)  // [out] Unique ID of build info
 {
-    memset(pBuildId, 0, sizeof(pBuildId[0]));
-    memcpy(&pBuildId->buildDate, __DATE__, std::min(strlen(__DATE__), sizeof(pBuildId->buildDate)));
-    memcpy(&pBuildId->buildTime, __TIME__, std::min(strlen(__TIME__), sizeof(pBuildId->buildTime)));
-    memcpy(&pBuildId->gfxIp, &m_gfxIp, sizeof(m_gfxIp));
-    memcpy(&pBuildId->hash, &m_hash, sizeof(m_hash));
+    memset(buildId, 0, sizeof(buildId[0]));
+    memcpy(&buildId->buildDate, __DATE__, std::min(strlen(__DATE__), sizeof(buildId->buildDate)));
+    memcpy(&buildId->buildTime, __TIME__, std::min(strlen(__TIME__), sizeof(buildId->buildTime)));
+    memcpy(&buildId->gfxIp, &m_gfxIp, sizeof(m_gfxIp));
+    memcpy(&buildId->hash, &m_hash, sizeof(m_hash));
 }
 
 // =====================================================================================================================
 // Check if the shader cache creation info is compatible
-bool ShaderCache::IsCompatible(
-    const ShaderCacheCreateInfo*    pCreateInfo,    // [in] Shader cache create info
-    const ShaderCacheAuxCreateInfo* pAuxCreateInfo) // [in] Shader cache auxiliary info (static fields)
+bool ShaderCache::isCompatible(
+    const ShaderCacheCreateInfo*    createInfo,    // [in] Shader cache create info
+    const ShaderCacheAuxCreateInfo* auxCreateInfo) // [in] Shader cache auxiliary info (static fields)
 {
     // Check hash first
-    bool isCompatible = (memcmp(&(pAuxCreateInfo->hash), &m_hash, sizeof(m_hash)) == 0);
+    bool isCompatible = (memcmp(&(auxCreateInfo->hash), &m_hash, sizeof(m_hash)) == 0);
 
-    return isCompatible && (m_gfxIp.major == pAuxCreateInfo->gfxIp.major) &&
-        (m_gfxIp.minor == pAuxCreateInfo->gfxIp.minor) &&
-        (m_gfxIp.stepping == pAuxCreateInfo->gfxIp.stepping);
+    return isCompatible && (m_gfxIp.major == auxCreateInfo->gfxIp.major) &&
+        (m_gfxIp.minor == auxCreateInfo->gfxIp.minor) &&
+        (m_gfxIp.stepping == auxCreateInfo->gfxIp.stepping);
 }
 
 } // Llpc

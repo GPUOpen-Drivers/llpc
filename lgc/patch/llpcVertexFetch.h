@@ -67,72 +67,72 @@ struct VertexCompFormatInfo
 class VertexFetch
 {
 public:
-    VertexFetch(llvm::Function* pEntrypoint, ShaderSystemValues* pShaderSysValues, PipelineState* pPipelineState);
+    VertexFetch(llvm::Function* entrypoint, ShaderSystemValues* shaderSysValues, PipelineState* pipelineState);
 
-    static VertexFormatInfo GetVertexFormatInfo(const VertexInputDescription* pDescription);
+    static VertexFormatInfo getVertexFormatInfo(const VertexInputDescription* description);
 
-    llvm::Value* Run(llvm::Type* pInputTy, unsigned location, unsigned compIdx, llvm::Instruction* pInsertPos);
+    llvm::Value* run(llvm::Type* inputTy, unsigned location, unsigned compIdx, llvm::Instruction* insertPos);
 
     // Gets variable corresponding to vertex index
-    llvm::Value* GetVertexIndex() { return m_pVertexIndex; }
+    llvm::Value* getVertexIndex() { return m_vertexIndex; }
 
     // Gets variable corresponding to instance index
-    llvm::Value* GetInstanceIndex() { return m_pInstanceIndex; }
+    llvm::Value* getInstanceIndex() { return m_instanceIndex; }
 
 private:
     VertexFetch() = delete;
     VertexFetch(const VertexFetch&) = delete;
     VertexFetch& operator=(const VertexFetch&) = delete;
 
-    static const VertexCompFormatInfo* GetVertexComponentFormatInfo(unsigned dfmt);
+    static const VertexCompFormatInfo* getVertexComponentFormatInfo(unsigned dfmt);
 
-    unsigned MapVertexFormat(unsigned dfmt, unsigned nfmt) const;
+    unsigned mapVertexFormat(unsigned dfmt, unsigned nfmt) const;
 
-    llvm::Value* LoadVertexBufferDescriptor(unsigned binding, llvm::Instruction* pInsertPos) const;
+    llvm::Value* loadVertexBufferDescriptor(unsigned binding, llvm::Instruction* insertPos) const;
 
-    void AddVertexFetchInst(llvm::Value*       pVbDesc,
+    void addVertexFetchInst(llvm::Value*       vbDesc,
                             unsigned           numChannels,
                             bool               is16bitFetch,
-                            llvm::Value*       pVbIndex,
+                            llvm::Value*       vbIndex,
                             unsigned           offset,
                             unsigned           stride,
                             unsigned           dfmt,
                             unsigned           nfmt,
-                            llvm::Instruction* pInsertPos,
+                            llvm::Instruction* insertPos,
                             llvm::Value**      ppFetch) const;
 
-    bool NeedPostShuffle(const VertexInputDescription* pInputDesc,
+    bool needPostShuffle(const VertexInputDescription* inputDesc,
                          std::vector<llvm::Constant*>&          shuffleMask) const;
 
-    bool NeedPatchA2S(const VertexInputDescription* pInputDesc) const;
+    bool needPatchA2S(const VertexInputDescription* inputDesc) const;
 
-    bool NeedSecondVertexFetch(const VertexInputDescription* pInputDesc) const;
+    bool needSecondVertexFetch(const VertexInputDescription* inputDesc) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::Module*       m_pModule;          // LLVM module
-    llvm::LLVMContext*  m_pContext;         // LLVM context
-    ShaderSystemValues* m_pShaderSysValues; // ShaderSystemValues object for getting vertex buffer pointer from
-    PipelineState*      m_pPipelineState;   // Pipeline state
+    llvm::Module*       m_module;          // LLVM module
+    llvm::LLVMContext*  m_context;         // LLVM context
+    ShaderSystemValues* m_shaderSysValues; // ShaderSystemValues object for getting vertex buffer pointer from
+    PipelineState*      m_pipelineState;   // Pipeline state
 
-    llvm::Value*    m_pVertexIndex;     // Vertex index
-    llvm::Value*    m_pInstanceIndex;   // Instance index
-    llvm::Value*    m_pBaseInstance;    // Base instance
-    llvm::Value*    m_pInstanceId;      // Instance ID
+    llvm::Value*    m_vertexIndex;     // Vertex index
+    llvm::Value*    m_instanceIndex;   // Instance index
+    llvm::Value*    m_baseInstance;    // Base instance
+    llvm::Value*    m_instanceId;      // Instance ID
 
-    static const VertexCompFormatInfo   m_vertexCompFormatInfo[];   // Info table of vertex component format
-    static const BufFormat              m_vertexFormatMap[];        // Info table of vertex format mapping
+    static const VertexCompFormatInfo   MVertexCompFormatInfo[];   // Info table of vertex component format
+    static const BufFormat              MVertexFormatMap[];        // Info table of vertex format mapping
 
     // Default values for vertex fetch (<4 x i32> or <8 x i32>)
     struct
     {
-        llvm::Constant*   pInt8;      // < 0, 0, 0, 1 >
-        llvm::Constant*   pInt16;     // < 0, 0, 0, 1 >
-        llvm::Constant*   pInt32;     // < 0, 0, 0, 1 >
-        llvm::Constant*   pInt64;     // < 0, 0, 0, 0, 0, 0, 0, 1 >
-        llvm::Constant*   pFloat16;   // < 0, 0, 0, 0x3C00 >
-        llvm::Constant*   pFloat32;   // < 0, 0, 0, 0x3F800000 >
-        llvm::Constant*   pDouble64;  // < 0, 0, 0, 0, 0, 0, 0, 0x3FF00000 >
+        llvm::Constant*   int8;      // < 0, 0, 0, 1 >
+        llvm::Constant*   int16;     // < 0, 0, 0, 1 >
+        llvm::Constant*   int32;     // < 0, 0, 0, 1 >
+        llvm::Constant*   int64;     // < 0, 0, 0, 0, 0, 0, 0, 1 >
+        llvm::Constant*   float16;   // < 0, 0, 0, 0x3C00 >
+        llvm::Constant*   float32;   // < 0, 0, 0, 0x3F800000 >
+        llvm::Constant*   double64;  // < 0, 0, 0, 0, 0, 0, 0, 0x3FF00000 >
     } m_fetchDefaults;
 };
 

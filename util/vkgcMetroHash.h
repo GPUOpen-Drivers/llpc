@@ -51,10 +51,10 @@ struct Hash
 // Takes input parameter pHash, which is 128-bit hash to be compacted.
 //
 // Returns 64-bit hash value based on the inputted 128-bit hash.
-inline uint64_t Compact64(const Hash* pHash)
+inline uint64_t compact64(const Hash* hash)
 {
-    return (static_cast<uint64_t>(pHash->dwords[3] ^ pHash->dwords[1]) |
-           (static_cast<uint64_t>(pHash->dwords[2] ^ pHash->dwords[0]) << 32));
+    return (static_cast<uint64_t>(hash->dwords[3] ^ hash->dwords[1]) |
+           (static_cast<uint64_t>(hash->dwords[2] ^ hash->dwords[0]) << 32));
 }
 
 // Compacts a 64-bit hash checksum into a 32-bit one by XOR'ing each 32-bit chunk together.
@@ -62,9 +62,9 @@ inline uint64_t Compact64(const Hash* pHash)
 // Takes input parameter pHash, which is 128-bit hash to be compacted.
 //
 // Returns 32-bit hash value based on the inputted 128-bit hash.
-inline unsigned Compact32(const Hash* pHash)
+inline unsigned compact32(const Hash* hash)
 {
-    return pHash->dwords[3] ^ pHash->dwords[2] ^ pHash->dwords[1] ^ pHash->dwords[0];
+    return hash->dwords[3] ^ hash->dwords[2] ^ hash->dwords[1] ^ hash->dwords[0];
 }
 
 // Compacts a 64-bit hash checksum into a 32-bit one by XOR'ing each 32-bit chunk together.
@@ -72,7 +72,7 @@ inline unsigned Compact32(const Hash* pHash)
 // Takes input parameter hash, which is 64-bit hash to be compacted.
 //
 // Returns 32-bit hash value based on the inputted 64-bit hash.
-inline unsigned Compact32(uint64_t hash)
+inline unsigned compact32(uint64_t hash)
 {
     return static_cast<unsigned>(hash) ^ static_cast<unsigned>(hash >> 32);
 }
@@ -83,7 +83,7 @@ inline unsigned Compact32(uint64_t hash)
 // Takes input parameter ShaderHash, which is a struct consisting of 2 quad words to be compacted.
 //
 // Returns 32-bit hash value based on the input 128-bit hash.
-inline unsigned Compact32(Vkgc::ShaderHash hash)
+inline unsigned compact32(Vkgc::ShaderHash hash)
 {
     return (static_cast<unsigned>(hash.lower) ^ static_cast<unsigned>(hash.lower >> 32)
         ^ static_cast<unsigned>(hash.upper) ^ static_cast<unsigned>(hash.upper >> 32));

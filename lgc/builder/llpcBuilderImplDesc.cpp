@@ -45,91 +45,91 @@ using namespace llvm;
 Value* BuilderImplDesc::CreateLoadBufferDesc(
     unsigned      descSet,          // Descriptor set
     unsigned      binding,          // Descriptor binding
-    Value*        pDescIndex,       // [in] Descriptor index
+    Value*        descIndex,       // [in] Descriptor index
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
     bool          isWritten,        // Whether the buffer is (or might be) written to
-    Type* const   pPointeeTy,       // [in] Type that the returned pointer should point to.
+    Type* const   pointeeTy,       // [in] Type that the returned pointer should point to.
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    assert(pPointeeTy != nullptr);
+    assert(pointeeTy != nullptr);
 
-    Instruction* const pInsertPos = &*GetInsertPoint();
-    pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
+    Instruction* const insertPos = &*GetInsertPoint();
+    descIndex = scalarizeIfUniform(descIndex, isNonUniform);
 
     // Mark the shader as reading and writing (if applicable) a resource.
-    auto pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
-    pResUsage->resourceRead = true;
-    pResUsage->resourceWrite |= isWritten;
+    auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
+    resUsage->resourceRead = true;
+    resUsage->resourceWrite |= isWritten;
 
     // TODO: This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
-    auto pBufDescLoadCall = EmitCall(lgcName::DescriptorLoadBuffer,
+    auto bufDescLoadCall = emitCall(lgcName::DescriptorLoadBuffer,
                                      VectorType::get(getInt32Ty(), 4),
                                      {
                                          getInt32(descSet),
                                          getInt32(binding),
-                                         pDescIndex,
+                                         descIndex,
                                      },
                                      {},
-                                     pInsertPos);
-    pBufDescLoadCall->setName(instName);
+                                     insertPos);
+    bufDescLoadCall->setName(instName);
 
-    pBufDescLoadCall = EmitCall(lgcName::LateLaunderFatPointer,
+    bufDescLoadCall = emitCall(lgcName::LateLaunderFatPointer,
                                 getInt8Ty()->getPointerTo(ADDR_SPACE_BUFFER_FAT_POINTER),
-                                pBufDescLoadCall,
+                                bufDescLoadCall,
                                 Attribute::ReadNone,
-                                pInsertPos);
+                                insertPos);
 
-    return CreateBitCast(pBufDescLoadCall, GetBufferDescTy(pPointeeTy));
+    return CreateBitCast(bufDescLoadCall, getBufferDescTy(pointeeTy));
 }
 
 // =====================================================================================================================
 // Add index onto pointer to image/sampler/texelbuffer/F-mask array of descriptors.
 Value* BuilderImplDesc::CreateIndexDescPtr(
-    Value*        pDescPtr,           // [in] Descriptor pointer, as returned by this function or one of
+    Value*        descPtr,           // [in] Descriptor pointer, as returned by this function or one of
                                       //    the CreateGet*DescPtr methods
-    Value*        pIndex,             // [in] Index value
+    Value*        index,             // [in] Index value
     bool          isNonUniform,       // Whether the descriptor index is non-uniform
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
-    if (pIndex != getInt32(0))
+    if (index != getInt32(0))
     {
-        pIndex = ScalarizeIfUniform(pIndex, isNonUniform);
+        index = scalarizeIfUniform(index, isNonUniform);
         std::string name = lgcName::DescriptorIndex;
-        AddTypeMangling(pDescPtr->getType(), {}, name);
-        pDescPtr = EmitCall(name,
-                            pDescPtr->getType(),
+        addTypeMangling(descPtr->getType(), {}, name);
+        descPtr = emitCall(name,
+                            descPtr->getType(),
                             {
-                                pDescPtr,
-                                pIndex,
+                                descPtr,
+                                index,
                             },
                             {},
                             &*GetInsertPoint());
-        pDescPtr->setName(instName);
+        descPtr->setName(instName);
     }
-    return pDescPtr;
+    return descPtr;
 }
 
 // =====================================================================================================================
 // Load image/sampler/texelbuffer/F-mask descriptor from pointer.
 // Returns <8 x i32> descriptor for image or F-mask, or <4 x i32> descriptor for sampler or texel buffer.
 Value* BuilderImplDesc::CreateLoadDescFromPtr(
-    Value*        pDescPtr,           // [in] Descriptor pointer, as returned by CreateIndexDescPtr or one of
+    Value*        descPtr,           // [in] Descriptor pointer, as returned by CreateIndexDescPtr or one of
                                       //    the CreateGet*DescPtr methods
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
     // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
-    GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->useImages = true;
+    getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
 
     // Use llpc.descriptor.load.from.ptr.
     std::string name = lgcName::DescriptorLoadFromPtr;
-    AddTypeMangling(pDescPtr->getType(), {}, name);
-    auto pDesc = CreateNamedCall(name,
-                                 cast<StructType>(pDescPtr->getType())->getElementType(0)->getPointerElementType(),
-                                 pDescPtr,
+    addTypeMangling(descPtr->getType(), {}, name);
+    auto desc = createNamedCall(name,
+                                 cast<StructType>(descPtr->getType())->getElementType(0)->getPointerElementType(),
+                                 descPtr,
                                  {});
-    pDesc->setName(instName);
-    return pDesc;
+    desc->setName(instName);
+    return desc;
 }
 
 // =====================================================================================================================
@@ -141,16 +141,16 @@ Value* BuilderImplDesc::CreateGetSamplerDescPtr(
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
-    auto pDescPtr = EmitCall(lgcName::DescriptorGetSamplerPtr,
-                             GetSamplerDescPtrTy(),
+    auto descPtr = emitCall(lgcName::DescriptorGetSamplerPtr,
+                             getSamplerDescPtrTy(),
                              {
                                  getInt32(descSet),
                                  getInt32(binding),
                              },
                              {},
                              &*GetInsertPoint());
-    pDescPtr->setName(instName);
-    return pDescPtr;
+    descPtr->setName(instName);
+    return descPtr;
 }
 
 // =====================================================================================================================
@@ -162,16 +162,16 @@ Value* BuilderImplDesc::CreateGetImageDescPtr(
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
-    auto pDescPtr = EmitCall(lgcName::DescriptorGetResourcePtr,
-                             GetImageDescPtrTy(),
+    auto descPtr = emitCall(lgcName::DescriptorGetResourcePtr,
+                             getImageDescPtrTy(),
                              {
                                  getInt32(descSet),
                                  getInt32(binding),
                              },
                              {},
                              &*GetInsertPoint());
-    pDescPtr->setName(instName);
-    return pDescPtr;
+    descPtr->setName(instName);
+    return descPtr;
 }
 
 // =====================================================================================================================
@@ -183,16 +183,16 @@ Value* BuilderImplDesc::CreateGetTexelBufferDescPtr(
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
-    auto pDescPtr = EmitCall(lgcName::DescriptorGetTexelBufferPtr,
-                             GetTexelBufferDescPtrTy(),
+    auto descPtr = emitCall(lgcName::DescriptorGetTexelBufferPtr,
+                             getTexelBufferDescPtrTy(),
                              {
                                  getInt32(descSet),
                                  getInt32(binding),
                              },
                              {},
                              &*GetInsertPoint());
-    pDescPtr->setName(instName);
-    return pDescPtr;
+    descPtr->setName(instName);
+    return descPtr;
 }
 
 // =====================================================================================================================
@@ -204,16 +204,16 @@ Value* BuilderImplDesc::CreateGetFmaskDescPtr(
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
-    auto pDescPtr = EmitCall(lgcName::DescriptorGetFmaskPtr,
-                             GetFmaskDescPtrTy(),
+    auto descPtr = emitCall(lgcName::DescriptorGetFmaskPtr,
+                             getFmaskDescPtrTy(),
                              {
                                  getInt32(descSet),
                                  getInt32(binding),
                              },
                              {},
                              &*GetInsertPoint());
-    pDescPtr->setName(instName);
-    return pDescPtr;
+    descPtr->setName(instName);
+    return descPtr;
 }
 
 // =====================================================================================================================
@@ -221,58 +221,58 @@ Value* BuilderImplDesc::CreateGetFmaskDescPtr(
 // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.
 // The type passed must have the correct size for the push constants.
 Value* BuilderImplDesc::CreateLoadPushConstantsPtr(
-    Type*         pPushConstantsTy, // [in] Type of the push constants table that the returned pointer will point to
+    Type*         pushConstantsTy, // [in] Type of the push constants table that the returned pointer will point to
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     // Remember the size of push constants.
-    unsigned pushConstSize = GetInsertPoint()->getModule()->getDataLayout().getTypeStoreSize(pPushConstantsTy);
-    ResourceUsage* pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
-    assert((pResUsage->pushConstSizeInBytes == 0) || (pResUsage->pushConstSizeInBytes == pushConstSize));
-    pResUsage->pushConstSizeInBytes = pushConstSize;
+    unsigned pushConstSize = GetInsertPoint()->getModule()->getDataLayout().getTypeStoreSize(pushConstantsTy);
+    ResourceUsage* resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
+    assert((resUsage->pushConstSizeInBytes == 0) || (resUsage->pushConstSizeInBytes == pushConstSize));
+    resUsage->pushConstSizeInBytes = pushConstSize;
 
-    auto pPushConstantsPtrTy = PointerType::get(pPushConstantsTy, ADDR_SPACE_CONST);
+    auto pushConstantsPtrTy = PointerType::get(pushConstantsTy, ADDR_SPACE_CONST);
     // TODO: This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
     // generate the code directly.
     std::string callName = lgcName::DescriptorLoadSpillTable;
-    AddTypeMangling(pPushConstantsPtrTy, {}, callName);
-    auto pPushConstantsLoadCall = CreateNamedCall(callName, pPushConstantsPtrTy, {}, {});
-    pPushConstantsLoadCall->setName(instName);
-    return pPushConstantsLoadCall;
+    addTypeMangling(pushConstantsPtrTy, {}, callName);
+    auto pushConstantsLoadCall = createNamedCall(callName, pushConstantsPtrTy, {}, {});
+    pushConstantsLoadCall->setName(instName);
+    return pushConstantsLoadCall;
 }
 
 // =====================================================================================================================
 // Scalarize a value (pass it through readfirstlane) if uniform
-Value* BuilderImplDesc::ScalarizeIfUniform(
-    Value*  pValue,       // [in] 32-bit integer value to scalarize
+Value* BuilderImplDesc::scalarizeIfUniform(
+    Value*  value,       // [in] 32-bit integer value to scalarize
     bool    isNonUniform) // Whether value is marked as non-uniform
 {
-    assert(pValue->getType()->isIntegerTy(32));
-    if ((isNonUniform == false) && (isa<Constant>(pValue) == false))
+    assert(value->getType()->isIntegerTy(32));
+    if ((isNonUniform == false) && (isa<Constant>(value) == false))
     {
         // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
-        if (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major > 6)
+        if (getPipelineState()->getTargetInfo().getGfxIpVersion().major > 6)
         {
-            pValue = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pValue);
+            value = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, value);
         }
     }
-    return pValue;
+    return value;
 }
 
 // =====================================================================================================================
 // Create a buffer length query based on the specified descriptor.
 Value* BuilderImplDesc::CreateGetBufferDescLength(
-    Value* const  pBufferDesc,      // [in] The buffer descriptor to query.
+    Value* const  bufferDesc,      // [in] The buffer descriptor to query.
     const Twine&  instName)         // [in] Name to give instruction(s).
 {
     // In future this should become a full LLVM intrinsic, but for now we patch in a late intrinsic that is cleaned up
     // in patch buffer op.
-    Instruction* const pInsertPos = &*GetInsertPoint();
+    Instruction* const insertPos = &*GetInsertPoint();
     std::string callName = lgcName::LateBufferLength;
-    AddTypeMangling(nullptr, pBufferDesc, callName);
-    return EmitCall(callName,
+    addTypeMangling(nullptr, bufferDesc, callName);
+    return emitCall(callName,
                     getInt32Ty(),
-                    pBufferDesc,
+                    bufferDesc,
                     Attribute::ReadNone,
-                    pInsertPos);
+                    insertPos);
 }
 

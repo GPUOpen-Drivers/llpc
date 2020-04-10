@@ -63,50 +63,50 @@ struct PalMetadataNoteEntry
 class ConfigBuilderBase
 {
 public:
-    ConfigBuilderBase(llvm::Module* pModule, PipelineState* pPipelineState);
+    ConfigBuilderBase(llvm::Module* module, PipelineState* pipelineState);
     ~ConfigBuilderBase();
 
-    void WritePalMetadata();
+    void writePalMetadata();
 
 protected:
-    void AddApiHwShaderMapping(ShaderStage apiStage, unsigned hwStages);
+    void addApiHwShaderMapping(ShaderStage apiStage, unsigned hwStages);
 
-    unsigned SetShaderHash(ShaderStage apiStage);
-    void SetNumAvailSgprs(Util::Abi::HardwareStage hwStage, unsigned value);
-    void SetNumAvailVgprs(Util::Abi::HardwareStage hwStage, unsigned value);
-    void SetUsesViewportArrayIndex(bool useViewportIndex);
-    void SetPsUsesUavs(bool value);
-    void SetPsWritesUavs(bool value);
-    void SetPsWritesDepth(bool value);
-    void SetEsGsLdsByteSize(unsigned value);
-    void SetCalcWaveBreakSizeAtDrawTime(bool value);
-    void SetWaveFrontSize(Util::Abi::HardwareStage hwStage, unsigned value);
-    void SetApiName(const char* pValue);
-    void SetPipelineType(Util::Abi::PipelineType value);
-    void SetLdsSizeByteSize(Util::Abi::HardwareStage hwStage, unsigned value);
-    void SetEsGsLdsSize(unsigned value);
-    unsigned SetupFloatingPointMode(ShaderStage shaderStage);
+    unsigned setShaderHash(ShaderStage apiStage);
+    void setNumAvailSgprs(Util::Abi::HardwareStage hwStage, unsigned value);
+    void setNumAvailVgprs(Util::Abi::HardwareStage hwStage, unsigned value);
+    void setUsesViewportArrayIndex(bool useViewportIndex);
+    void setPsUsesUavs(bool value);
+    void setPsWritesUavs(bool value);
+    void setPsWritesDepth(bool value);
+    void setEsGsLdsByteSize(unsigned value);
+    void setCalcWaveBreakSizeAtDrawTime(bool value);
+    void setWaveFrontSize(Util::Abi::HardwareStage hwStage, unsigned value);
+    void setApiName(const char* value);
+    void setPipelineType(Util::Abi::PipelineType value);
+    void setLdsSizeByteSize(Util::Abi::HardwareStage hwStage, unsigned value);
+    void setEsGsLdsSize(unsigned value);
+    unsigned setupFloatingPointMode(ShaderStage shaderStage);
 
-    void AppendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config);
-    void AppendConfig(unsigned key, unsigned value);
+    void appendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config);
+    void appendConfig(unsigned key, unsigned value);
 
     template<typename T>
-    void AppendConfig(const T& config)
+    void appendConfig(const T& config)
     {
         static_assert(T::ContainsPalAbiMetadataOnly,
                       "may only be used with structs that are fully metadata notes");
         static_assert(sizeof(T) % sizeof(PalMetadataNoteEntry) == 0,
                       "T claims to be isPalAbiMetadataOnly, but sizeof contradicts that");
 
-        AppendConfig({reinterpret_cast<const PalMetadataNoteEntry*>(&config),
+        appendConfig({reinterpret_cast<const PalMetadataNoteEntry*>(&config),
                       sizeof(T) / sizeof(PalMetadataNoteEntry)});
     }
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::Module*                   m_pModule;            // LLVM module being processed
-    llvm::LLVMContext*              m_pContext;           // LLVM context
-    PipelineState*                  m_pPipelineState;     // Pipeline state
+    llvm::Module*                   m_module;            // LLVM module being processed
+    llvm::LLVMContext*              m_context;           // LLVM context
+    PipelineState*                  m_pipelineState;     // Pipeline state
     GfxIpVersion                    m_gfxIp;              // Graphics IP version info
 
     bool                            m_hasVs;              // Whether the pipeline has vertex shader
@@ -119,15 +119,15 @@ protected:
 
 private:
     // Get the MsgPack map node for the specified API shader in the ".shaders" map
-    llvm::msgpack::MapDocNode GetApiShaderNode(unsigned apiStage);
+    llvm::msgpack::MapDocNode getApiShaderNode(unsigned apiStage);
     // Get the MsgPack map node for the specified HW shader in the ".hardware_stages" map
-    llvm::msgpack::MapDocNode GetHwShaderNode(Util::Abi::HardwareStage hwStage);
+    llvm::msgpack::MapDocNode getHwShaderNode(Util::Abi::HardwareStage hwStage);
     // Set USER_DATA_LIMIT (called once for the whole pipeline)
-    void SetUserDataLimit();
+    void setUserDataLimit();
     // Set SPILL_THRESHOLD (called once for the whole pipeline)
-    void SetSpillThreshold();
+    void setSpillThreshold();
     // Set PIPELINE_HASH (called once for the whole pipeline)
-    void SetPipelineHash();
+    void setPipelineHash();
 
     // -----------------------------------------------------------------------------------------------------------------
     std::unique_ptr<llvm::msgpack::Document>  m_document;       // The MsgPack document

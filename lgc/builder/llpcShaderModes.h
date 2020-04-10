@@ -43,52 +43,52 @@ class ShaderModes
 {
 public:
     // Set the common shader mode (FP modes) for the given shader stage
-    void SetCommonShaderMode(ShaderStage stage, const CommonShaderMode& commonShaderMode);
+    void setCommonShaderMode(ShaderStage stage, const CommonShaderMode& commonShaderMode);
 
     // Get the common shader modes for the given shader stage
-    const CommonShaderMode& GetCommonShaderMode(ShaderStage stage);
+    const CommonShaderMode& getCommonShaderMode(ShaderStage stage);
 
     // Check if any shader stage has useSubgroupSize set
-    bool GetAnyUseSubgroupSize();
+    bool getAnyUseSubgroupSize();
 
     // Set the tessellation mode. This in fact merges the supplied values with any previously supplied values,
     // to allow the client to call this twice, once for TCS and once for TES.
-    void SetTessellationMode(const TessellationMode& inMode);
+    void setTessellationMode(const TessellationMode& inMode);
 
     // Get the tessellation state.
-    const TessellationMode& GetTessellationMode();
+    const TessellationMode& getTessellationMode();
 
     // Set the geometry shader mode
-    void SetGeometryShaderMode(const GeometryShaderMode& inMode);
+    void setGeometryShaderMode(const GeometryShaderMode& inMode);
 
     // Get the geometry shader mode
-    const GeometryShaderMode& GetGeometryShaderMode();
+    const GeometryShaderMode& getGeometryShaderMode();
 
     // Set the fragment shader mode
-    void SetFragmentShaderMode(const FragmentShaderMode& inMode);
+    void setFragmentShaderMode(const FragmentShaderMode& inMode);
 
     // Get the fragment shader mode
-    const FragmentShaderMode& GetFragmentShaderMode();
+    const FragmentShaderMode& getFragmentShaderMode();
 
     // Set the compute shader mode (workgroup size)
-    void SetComputeShaderMode(const ComputeShaderMode& inMode);
+    void setComputeShaderMode(const ComputeShaderMode& inMode);
 
     // Get the compute shader mode (workgroup size)
-    const ComputeShaderMode& GetComputeShaderMode();
+    const ComputeShaderMode& getComputeShaderMode();
 
     // Clear all modes
-    void Clear();
+    void clear();
 
     // Record modes to IR metadata
-    void Record(llvm::Module* pModule);
+    void record(llvm::Module* module);
 
     // Read shader modes (common and specific) from a shader IR module, but only if no modes have been set
     // in this ShaderModes. This is used to handle the case that the shader module comes from an earlier
     // shader compile, and it had its ShaderModes recorded into IR then.
-    void ReadModesFromShader(llvm::Module* pModule, ShaderStage stage);
+    void readModesFromShader(llvm::Module* module, ShaderStage stage);
 
     // Read shader modes from IR metadata in a pipeline
-    void ReadModesFromPipeline(llvm::Module* pModule);
+    void readModesFromPipeline(llvm::Module* module);
 
 private:
     bool                m_anySet = false;                                 // Whether any Set*Mode method called

@@ -40,7 +40,7 @@ namespace Vfx
 {
 // =====================================================================================================================
 // Max section count for PipelineDocument
-unsigned PipelineDocument::m_MaxSectionCount[SectionTypeNameNum] =
+unsigned PipelineDocument::m_maxSectionCount[SectionTypeNameNum] =
 {
     0,                     // SectionTypeUnset
     0,                     // SectionTypeResult
@@ -70,7 +70,7 @@ unsigned PipelineDocument::m_MaxSectionCount[SectionTypeNameNum] =
 
 // =====================================================================================================================
 // Checks whether the input version is supportted.
-bool PipelineDocument::CheckVersion(
+bool PipelineDocument::checkVersion(
     unsigned ver)        // Version
 {
     bool result = true;
@@ -86,7 +86,7 @@ bool PipelineDocument::CheckVersion(
 
 // =====================================================================================================================
 // Gets PiplineDocument content
-VfxPipelineStatePtr PipelineDocument::GetDocument()
+VfxPipelineStatePtr PipelineDocument::getDocument()
 {
     // Section "Version"
     m_pipelineState.version = Version;
@@ -97,39 +97,39 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
         GraphicsPipelineState graphicState;
         m_pipelineState.pipelineType = VfxPipelineTypeGraphics;
         reinterpret_cast<SectionGraphicsState*>(m_sections[SectionTypeGraphicsState][0])->
-            GetSubState(m_fileName, graphicState, &m_errorMsg);
-        auto pGfxPipelineInfo = &m_pipelineState.gfxPipelineInfo;
-        pGfxPipelineInfo->iaState.topology                = graphicState.topology;
-        pGfxPipelineInfo->iaState.patchControlPoints      = graphicState.patchControlPoints;
-        pGfxPipelineInfo->iaState.deviceIndex             = graphicState.deviceIndex;
-        pGfxPipelineInfo->iaState.disableVertexReuse      = graphicState.disableVertexReuse ? true : false;
-        pGfxPipelineInfo->iaState.switchWinding           = graphicState.switchWinding ? true : false;
-        pGfxPipelineInfo->iaState.enableMultiView         = graphicState.enableMultiView ? true : false;
-        pGfxPipelineInfo->vpState.depthClipEnable         = graphicState.depthClipEnable ? true : false;
-        pGfxPipelineInfo->rsState.rasterizerDiscardEnable = graphicState.rasterizerDiscardEnable ? true : false;
-        pGfxPipelineInfo->rsState.perSampleShading        = graphicState.perSampleShading ? true : false;
-        pGfxPipelineInfo->rsState.numSamples              = graphicState.numSamples;
-        pGfxPipelineInfo->rsState.samplePatternIdx        = graphicState.samplePatternIdx;
-        pGfxPipelineInfo->rsState.usrClipPlaneMask        = static_cast<uint8_t>(graphicState.usrClipPlaneMask);
-        pGfxPipelineInfo->rsState.polygonMode             = graphicState.polygonMode;
-        pGfxPipelineInfo->rsState.cullMode                = graphicState.cullMode;
-        pGfxPipelineInfo->rsState.frontFace               = graphicState.frontFace;
-        pGfxPipelineInfo->rsState.depthBiasEnable         = graphicState.depthBiasEnable ? true : false;
+            getSubState(m_fileName, graphicState, &m_errorMsg);
+        auto gfxPipelineInfo = &m_pipelineState.gfxPipelineInfo;
+        gfxPipelineInfo->iaState.topology                = graphicState.topology;
+        gfxPipelineInfo->iaState.patchControlPoints      = graphicState.patchControlPoints;
+        gfxPipelineInfo->iaState.deviceIndex             = graphicState.deviceIndex;
+        gfxPipelineInfo->iaState.disableVertexReuse      = graphicState.disableVertexReuse ? true : false;
+        gfxPipelineInfo->iaState.switchWinding           = graphicState.switchWinding ? true : false;
+        gfxPipelineInfo->iaState.enableMultiView         = graphicState.enableMultiView ? true : false;
+        gfxPipelineInfo->vpState.depthClipEnable         = graphicState.depthClipEnable ? true : false;
+        gfxPipelineInfo->rsState.rasterizerDiscardEnable = graphicState.rasterizerDiscardEnable ? true : false;
+        gfxPipelineInfo->rsState.perSampleShading        = graphicState.perSampleShading ? true : false;
+        gfxPipelineInfo->rsState.numSamples              = graphicState.numSamples;
+        gfxPipelineInfo->rsState.samplePatternIdx        = graphicState.samplePatternIdx;
+        gfxPipelineInfo->rsState.usrClipPlaneMask        = static_cast<uint8_t>(graphicState.usrClipPlaneMask);
+        gfxPipelineInfo->rsState.polygonMode             = graphicState.polygonMode;
+        gfxPipelineInfo->rsState.cullMode                = graphicState.cullMode;
+        gfxPipelineInfo->rsState.frontFace               = graphicState.frontFace;
+        gfxPipelineInfo->rsState.depthBiasEnable         = graphicState.depthBiasEnable ? true : false;
 
-        pGfxPipelineInfo->cbState.alphaToCoverageEnable   = graphicState.alphaToCoverageEnable ? true : false;
-        pGfxPipelineInfo->cbState.dualSourceBlendEnable   = graphicState.dualSourceBlendEnable ? true : false;
+        gfxPipelineInfo->cbState.alphaToCoverageEnable   = graphicState.alphaToCoverageEnable ? true : false;
+        gfxPipelineInfo->cbState.dualSourceBlendEnable   = graphicState.dualSourceBlendEnable ? true : false;
         for (unsigned i = 0; i < MaxColorTargets; ++i)
         {
-            pGfxPipelineInfo->cbState.target[i].format = graphicState.colorBuffer[i].format;
-            pGfxPipelineInfo->cbState.target[i].channelWriteMask =
+            gfxPipelineInfo->cbState.target[i].format = graphicState.colorBuffer[i].format;
+            gfxPipelineInfo->cbState.target[i].channelWriteMask =
                 static_cast<uint8_t>(graphicState.colorBuffer[i].channelWriteMask);
-            pGfxPipelineInfo->cbState.target[i].blendEnable = graphicState.colorBuffer[i].blendEnable ? true : false;
-            pGfxPipelineInfo->cbState.target[i].blendSrcAlphaToColor =
+            gfxPipelineInfo->cbState.target[i].blendEnable = graphicState.colorBuffer[i].blendEnable ? true : false;
+            gfxPipelineInfo->cbState.target[i].blendSrcAlphaToColor =
                 graphicState.colorBuffer[i].blendSrcAlphaToColor ? true : false;
         }
 
-        pGfxPipelineInfo->options = graphicState.options;
-        pGfxPipelineInfo->nggState = graphicState.nggState;
+        gfxPipelineInfo->options = graphicState.options;
+        gfxPipelineInfo->nggState = graphicState.nggState;
     }
 
     // Section "ComputePipelineState"
@@ -138,18 +138,18 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
         ComputePipelineState computeState;
         m_pipelineState.pipelineType = VfxPipelineTypeCompute;
         reinterpret_cast<SectionComputeState*>(m_sections[SectionTypeComputeState][0])->
-            GetSubState(m_fileName, computeState, &m_errorMsg);
-        auto pComputePipelineInfo = &m_pipelineState.compPipelineInfo;
-        pComputePipelineInfo->deviceIndex = computeState.deviceIndex;
-        pComputePipelineInfo->options     = computeState.options;
-        pComputePipelineInfo->cs.entryStage = Vkgc::ShaderStageCompute;
+            getSubState(m_fileName, computeState, &m_errorMsg);
+        auto computePipelineInfo = &m_pipelineState.compPipelineInfo;
+        computePipelineInfo->deviceIndex = computeState.deviceIndex;
+        computePipelineInfo->options     = computeState.options;
+        computePipelineInfo->cs.entryStage = Vkgc::ShaderStageCompute;
     }
 
     // Section "VertexInputState"
     if (m_sections[SectionTypeVertexInputState].size() > 0)
     {
         reinterpret_cast<SectionVertexInput*>(m_sections[SectionTypeVertexInputState][0])->
-            GetSubState(m_vertexInputState);
+            getSubState(m_vertexInputState);
         m_pipelineState.gfxPipelineInfo.pVertexInput = &m_vertexInputState;
     }
 
@@ -175,14 +175,14 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
             if (m_sections[SectionTypeVertexShader + i].size() > 0)
             {
                 reinterpret_cast<SectionShader*>(m_sections[SectionTypeVertexShader + i][0])->
-                    GetSubState(m_pipelineState.stages[i]);
+                    getSubState(m_pipelineState.stages[i]);
             }
 
             // shader info Section "XXInfo"
             if (m_sections[SectionTypeVertexShaderInfo + i].size() > 0)
             {
                 reinterpret_cast<SectionShaderInfo*>(m_sections[SectionTypeVertexShaderInfo + i][0])->
-                    GetSubState(*(shaderInfo[i]));
+                    getSubState(*(shaderInfo[i]));
                 shaderInfo[i]->entryStage = m_pipelineState.stages[i].stage;
             }
         }
@@ -193,12 +193,12 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
 
 // =====================================================================================================================
 // Validates whether sections in this document are valid.
-bool PipelineDocument::Validate()
+bool PipelineDocument::validate()
 {
     unsigned stageMask = 0;
     for (size_t i = 0; i < m_sectionList.size(); ++i)
     {
-        auto sectionType = m_sectionList[i]->GetSectionType();
+        auto sectionType = m_sectionList[i]->getSectionType();
         if ((sectionType >= SectionTypeVertexShader) &&
             (sectionType < (SectionTypeVertexShader + ShaderStageCount)))
         {
@@ -206,32 +206,32 @@ bool PipelineDocument::Validate()
             stageMask |= (1 << stage);
             if (i == m_sectionList.size())
             {
-                PARSE_ERROR(m_errorMsg, m_sectionList[i]->GetLineNum(), "Fails to find related shader info section!\n");
+                PARSE_ERROR(m_errorMsg, m_sectionList[i]->getLineNum(), "Fails to find related shader info section!\n");
                 return false;
             }
             else
             {
-                auto nextSectionType = m_sectionList[i + 1]->GetSectionType();
+                auto nextSectionType = m_sectionList[i + 1]->getSectionType();
                 if (nextSectionType != (SectionTypeVertexShaderInfo + stage))
                 {
                     PARSE_ERROR(m_errorMsg,
-                                m_sectionList[i + 1]->GetLineNum(),
+                                m_sectionList[i + 1]->getLineNum(),
                                 "Unexpected section type. Shader source and shader info must be in pair!\n");
                     return false;
                 }
             }
         }
     }
-    const unsigned GraphicsStageMask = (
+    const unsigned graphicsStageMask = (
         (1 << SpvGenStageVertex) |
         (1 << SpvGenStageTessControl) |
         (1 << SpvGenStageTessEvaluation) |
         (1 << SpvGenStageGeometry) |
         (1 << SpvGenStageFragment)
         );
-    const unsigned ComputeStageMask = (1 << SpvGenStageCompute);
+    const unsigned computeStageMask = (1 << SpvGenStageCompute);
 
-    if (((stageMask & GraphicsStageMask) && (stageMask & ComputeStageMask))
+    if (((stageMask & graphicsStageMask) && (stageMask & computeStageMask))
         )
     {
         PARSE_ERROR(m_errorMsg,
@@ -240,23 +240,23 @@ bool PipelineDocument::Validate()
         return false;
     }
 
-    if (stageMask & GraphicsStageMask)
+    if (stageMask & graphicsStageMask)
     {
         if (m_sections[SectionTypeComputeState].size() != 0)
         {
             PARSE_ERROR(m_errorMsg,
-                m_sections[SectionTypeComputeState][0]->GetLineNum(),
+                m_sections[SectionTypeComputeState][0]->getLineNum(),
                 "Section ComputePipelineState conflict with graphic shader stages\n");
             return false;
         }
     }
 
-    if (stageMask & ComputeStageMask)
+    if (stageMask & computeStageMask)
     {
         if (m_sections[SectionTypeGraphicsState].size() != 0)
         {
             PARSE_ERROR(m_errorMsg,
-                m_sections[SectionTypeGraphicsState][0]->GetLineNum(),
+                m_sections[SectionTypeGraphicsState][0]->getLineNum(),
                 "Section GraphicsPipelineState conflict with compute shader stages\n");
             return false;
         }

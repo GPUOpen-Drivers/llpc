@@ -44,15 +44,15 @@ public:
         memset(&m_renderState, 0, sizeof(m_renderState));
     };
 
-    virtual unsigned GetMaxSectionCount(SectionType type)
+    virtual unsigned getMaxSectionCount(SectionType type)
     {
-        return m_MaxSectionCount[type];
+        return m_maxSectionCount[type];
     }
 
-    virtual VfxRenderStatePtr GetDocument();
+    virtual VfxRenderStatePtr getDocument();
 
 private:
-    static unsigned m_MaxSectionCount[SectionTypeNameNum]; // Contants max section count for each section type
+    static unsigned m_maxSectionCount[SectionTypeNameNum]; // Contants max section count for each section type
     VfxRenderState  m_renderState;                         // Contants the render state
 };
 
