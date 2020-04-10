@@ -88,12 +88,18 @@ namespace lgc
 
 // =====================================================================================================================
 // Add whole-pipeline patch passes to pass manager
+//
+// @param pipelineState : Pipeline state
+// @param [in/out] passMgr : Pass manager to add passes to
+// @param replayerPass : BuilderReplayer pass, or nullptr if not needed
+// @param patchTimer : Timer to time patch passes with, nullptr if not timing
+// @param optTimer : Timer to time LLVM optimization passes with, nullptr if not timing
 void Patch::addPasses(
-    PipelineState*        pipelineState, // [in] Pipeline state
-    legacy::PassManager&  passMgr,       // [in/out] Pass manager to add passes to
-    ModulePass*           replayerPass, // [in] BuilderReplayer pass, or nullptr if not needed
-    llvm::Timer*          patchTimer,   // [in] Timer to time patch passes with, nullptr if not timing
-    llvm::Timer*          optTimer,     // [in] Timer to time LLVM optimization passes with, nullptr if not timing
+    PipelineState*        pipelineState,
+    legacy::PassManager&  passMgr,
+    ModulePass*           replayerPass,
+    llvm::Timer*          patchTimer,
+    llvm::Timer*          optTimer,
     Pipeline::CheckShaderCacheFunc  checkShaderCacheFunc)
                                          // Callback function to check shader cache
 {
@@ -229,8 +235,10 @@ void Patch::addPasses(
 
 // =====================================================================================================================
 // Add optimization passes to pass manager
+//
+// @param [in/out] passMgr : Pass manager to add passes to
 void Patch::addOptimizationPasses(
-    legacy::PassManager&  passMgr)  // [in/out] Pass manager to add passes to
+    legacy::PassManager&  passMgr)
 {
     // Set up standard optimization passes.
     if (!cl::UseLlvmOpt)
@@ -341,8 +349,10 @@ void Patch::addOptimizationPasses(
 // Initializes the pass according to the specified module.
 //
 // NOTE: This function should be called at the beginning of "runOnModule()".
+//
+// @param module : LLVM module
 void Patch::init(
-    Module* module) // [in] LLVM module
+    Module* module)
 {
     m_module  = module;
     m_context = &m_module->getContext();
@@ -352,9 +362,12 @@ void Patch::init(
 
 // =====================================================================================================================
 // Get or create global variable for LDS.
+//
+// @param pipelineState : Pipeline state
+// @param [in/out] module : Module to get or create LDS in
 GlobalVariable* Patch::getLdsVariable(
-    PipelineState*  pipelineState, // [in] Pipeline state
-    Module*         module)        // [in/out] Module to get or create LDS in
+    PipelineState*  pipelineState,
+    Module*         module)
 {
     auto context = &module->getContext();
 

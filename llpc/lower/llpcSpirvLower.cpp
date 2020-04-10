@@ -65,9 +65,12 @@ namespace Llpc
 {
 // =====================================================================================================================
 // Replace a constant with instructions using a builder.
+//
+// @param context : The context
+// @param [in/out] constVal : The constant to replace with instructions.
 void SpirvLower::replaceConstWithInsts(
-    Context*        context,      // [in] The context
-    Constant* const constVal)     // [in/out] The constant to replace with instructions.
+    Context*        context,
+    Constant* const constVal)
 
 {
     SmallSet<Constant*, 8> otherConsts;
@@ -137,9 +140,12 @@ void SpirvLower::replaceConstWithInsts(
 
 // =====================================================================================================================
 // Removes those constant expressions that reference global variables.
+//
+// @param context : The context
+// @param global : The global variable
 void SpirvLower::removeConstantExpr(
-    Context*        context,   // [in] The context
-    GlobalVariable* global)    // [in] The global variable
+    Context*        context,
+    GlobalVariable* global)
 {
     SmallVector<Constant*, 8> constantUsers;
 
@@ -155,12 +161,18 @@ void SpirvLower::removeConstantExpr(
 
 // =====================================================================================================================
 // Add per-shader lowering passes to pass manager
+//
+// @param context : LLPC context
+// @param stage : Shader stage
+// @param [in/out] passMgr : Pass manager to add passes to
+// @param lowerTimer : Timer to time lower passes with, nullptr if not timing
+// @param forceLoopUnrollCount : 0 or force loop unroll count
 void SpirvLower::addPasses(
-    Context*              context,               // [in] LLPC context
-    ShaderStage           stage,                  // Shader stage
-    legacy::PassManager&  passMgr,                // [in/out] Pass manager to add passes to
-    llvm::Timer*          lowerTimer,            // [in] Timer to time lower passes with, nullptr if not timing
-    unsigned              forceLoopUnrollCount)   // 0 or force loop unroll count
+    Context*              context,
+    ShaderStage           stage,
+    legacy::PassManager&  passMgr,
+    llvm::Timer*          lowerTimer,
+    unsigned              forceLoopUnrollCount)
 {
     // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
     context->getBuilderContext()->preparePassManager(&passMgr);
@@ -232,8 +244,10 @@ void SpirvLower::addPasses(
 // Initializes the pass according to the specified module.
 //
 // NOTE: This function should be called at the beginning of "runOnModule()".
+//
+// @param module : LLVM module
 void SpirvLower::init(
-    Module* module) // [in] LLVM module
+    Module* module)
 {
     m_module  = module;
     m_context = static_cast<Context*>(&m_module->getContext());

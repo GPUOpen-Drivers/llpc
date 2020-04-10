@@ -43,9 +43,12 @@ using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
+//
+// @param [in/out] module : LLVM module
+// @param pipelineState : Pipeline state
 ConfigBuilderBase::ConfigBuilderBase(
-    llvm::Module*   module,        // [in/out] LLVM module
-    PipelineState*  pipelineState) // [in] Pipeline state
+    llvm::Module*   module,
+    PipelineState*  pipelineState)
     :
     m_module(module),
     m_pipelineState(pipelineState),
@@ -100,8 +103,10 @@ void ConfigBuilderBase::addApiHwShaderMapping(
 
 // =====================================================================================================================
 // Get the MsgPack map node for the specified API shader in the ".shaders" map
+//
+// @param apiStage : API shader stage
 msgpack::MapDocNode ConfigBuilderBase::getApiShaderNode(
-    unsigned apiStage)  // API shader stage
+    unsigned apiStage)
 {
     if (m_apiShaderNodes[apiStage].isEmpty())
     {
@@ -113,8 +118,10 @@ msgpack::MapDocNode ConfigBuilderBase::getApiShaderNode(
 
 // =====================================================================================================================
 // Get the MsgPack map node for the specified hardware shader in the ".hardware_stages" map
+//
+// @param hwStage : Hardware shader stage
 msgpack::MapDocNode ConfigBuilderBase::getHwShaderNode(
-    Util::Abi::HardwareStage hwStage)   // Hardware shader stage
+    Util::Abi::HardwareStage hwStage)
 {
     if (m_hwShaderNodes[unsigned(hwStage)].isEmpty())
     {
@@ -127,8 +134,10 @@ msgpack::MapDocNode ConfigBuilderBase::getHwShaderNode(
 // =====================================================================================================================
 // Set an API shader's hash in metadata. Returns a 32-bit value derived from the hash that is used as
 // a shader checksum for performance profiling where applicable.
+//
+// @param apiStage : API shader stage
 unsigned ConfigBuilderBase::setShaderHash(
-    ShaderStage   apiStage) // API shader stage
+    ShaderStage   apiStage)
 {
     const ShaderOptions& shaderOptions = m_pipelineState->getShaderOptions(apiStage);
     auto hashNode = getApiShaderNode(unsigned(apiStage))[Util::Abi::ShaderMetadataKey::ApiShaderHash].getArray(true);
@@ -139,9 +148,12 @@ unsigned ConfigBuilderBase::setShaderHash(
 
 // =====================================================================================================================
 // Set *S_NUM_AVAIL_SGPRS for given hardware shader stage
+//
+// @param hwStage : Hardware shader stage
+// @param value : Number of available SGPRs
 void ConfigBuilderBase::setNumAvailSgprs(
-    Util::Abi::HardwareStage hwStage, // Hardware shader stage
-    unsigned value)                   // Number of available SGPRs
+    Util::Abi::HardwareStage hwStage,
+    unsigned value)
 {
     auto hwShaderNode = getHwShaderNode(hwStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::SgprLimit] = hwShaderNode.getDocument()->getNode(value);
@@ -149,9 +161,12 @@ void ConfigBuilderBase::setNumAvailSgprs(
 
 // =====================================================================================================================
 // Set *S_NUM_AVAIL_VGPRS for given hardware shader stage
+//
+// @param hwStage : Hardware shader stage
+// @param value : Number of available VGPRs
 void ConfigBuilderBase::setNumAvailVgprs(
-    Util::Abi::HardwareStage hwStage, // Hardware shader stage
-    unsigned value)                   // Number of available VGPRs
+    Util::Abi::HardwareStage hwStage,
+    unsigned value)
 {
     auto hwShaderNode = getHwShaderNode(hwStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::VgprLimit] = hwShaderNode.getDocument()->getNode(value);
@@ -159,8 +174,10 @@ void ConfigBuilderBase::setNumAvailVgprs(
 
 // =====================================================================================================================
 // Set USES_VIEWPORT_ARRAY_INDEX
+//
+// @param value : Value to set
 void ConfigBuilderBase::setUsesViewportArrayIndex(
-    bool value)   // Value to set
+    bool value)
 {
     if (!value)
         return; // Optional
@@ -170,8 +187,10 @@ void ConfigBuilderBase::setUsesViewportArrayIndex(
 
 // =====================================================================================================================
 // Set PS_USES_UAVS
+//
+// @param value : Value to set
 void ConfigBuilderBase::setPsUsesUavs(
-    bool value)   // Value to set
+    bool value)
 {
     if (!value)
         return; // Optional
@@ -182,8 +201,10 @@ void ConfigBuilderBase::setPsUsesUavs(
 
 // =====================================================================================================================
 // Set PS_WRITES_UAVS
+//
+// @param value : Value to set
 void ConfigBuilderBase::setPsWritesUavs(
-    bool value)   // Value to set
+    bool value)
 {
     if (!value)
         return; // Optional
@@ -195,8 +216,10 @@ void ConfigBuilderBase::setPsWritesUavs(
 
 // =====================================================================================================================
 // Set PS_WRITES_DEPTH
+//
+// @param value : Value to set
 void ConfigBuilderBase::setPsWritesDepth(
-    bool value)   // Value to set
+    bool value)
 {
     if (!value)
         return; // Optional
@@ -207,25 +230,32 @@ void ConfigBuilderBase::setPsWritesDepth(
 
 // =====================================================================================================================
 // Set ES_GS_LDS_BYTE_SIZE
+//
+// @param value : Value to set
 void ConfigBuilderBase::setEsGsLdsByteSize(
-    unsigned value)   // Value to set
+    unsigned value)
 {
     m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = m_document->getNode(value);
 }
 
 // =====================================================================================================================
 // Set CALC_WAVE_BREAK_SIZE_AT_DRAW_TIME
+//
+// @param value : Value to set
 void ConfigBuilderBase::setCalcWaveBreakSizeAtDrawTime(
-    bool value)   // Value to set
+    bool value)
 {
     m_pipelineNode[Util::Abi::PipelineMetadataKey::CalcWaveBreakSizeAtDrawTime] = m_document->getNode(value);
 }
 
 // =====================================================================================================================
 // Set hardware stage wavefront
+//
+// @param hwStage : Hardware shader stage
+// @param value : Value to set
 void ConfigBuilderBase::setWaveFrontSize(
-    Util::Abi::HardwareStage hwStage,   // Hardware shader stage
-    unsigned                 value)     // Value to set
+    Util::Abi::HardwareStage hwStage,
+    unsigned                 value)
 {
     if (m_pipelineState->getPalAbiVersion() >= 495)
     {
@@ -236,16 +266,20 @@ void ConfigBuilderBase::setWaveFrontSize(
 
 // =====================================================================================================================
 // Set API name
+//
+// @param value : Value to set
 void ConfigBuilderBase::setApiName(
-    const char* value) // [in] Value to set
+    const char* value)
 {
     m_pipelineNode[Util::Abi::PipelineMetadataKey::Api] = m_document->getNode(value);
 }
 
 // =====================================================================================================================
 // Set pipeline type
+//
+// @param value : Value to set
 void ConfigBuilderBase::setPipelineType(
-    Util::Abi::PipelineType value) // Value to set
+    Util::Abi::PipelineType value)
 {
     const char* typeStr = "";
     switch (value)
@@ -279,9 +313,12 @@ void ConfigBuilderBase::setPipelineType(
 
 // =====================================================================================================================
 // Set LDS byte size for given hardware shader stage
+//
+// @param hwStage : Hardware shader stage
+// @param value : Value to set
 void ConfigBuilderBase::setLdsSizeByteSize(
-    Util::Abi::HardwareStage hwStage, // Hardware shader stage
-    unsigned                 value)   // Value to set
+    Util::Abi::HardwareStage hwStage,
+    unsigned                 value)
 {
     if (value == 0)
         return; // Optional
@@ -292,8 +329,10 @@ void ConfigBuilderBase::setLdsSizeByteSize(
 
 // =====================================================================================================================
 // Set ES-GS LDS byte size
+//
+// @param value : Value to set
 void ConfigBuilderBase::setEsGsLdsSize(
-    unsigned value) // Value to set
+    unsigned value)
 {
     if (value == 0)
         return; // Optional
@@ -403,8 +442,10 @@ void ConfigBuilderBase::writePalMetadata()
 
 // =====================================================================================================================
 // Sets up floating point mode from the specified floating point control flags.
+//
+// @param shaderStage : Shader stage
 unsigned ConfigBuilderBase::setupFloatingPointMode(
-    ShaderStage shaderStage)    // Shader stage
+    ShaderStage shaderStage)
 {
     FloatMode floatMode = {};
     floatMode.bits.fp16fp64DenormMode = FP_DENORM_FLUSH_NONE;

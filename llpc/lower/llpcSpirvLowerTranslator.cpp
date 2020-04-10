@@ -46,17 +46,22 @@ char SpirvLowerTranslator::ID = 0;
 
 // =====================================================================================================================
 // Creates the pass of translating SPIR-V to LLVM IR.
+//
+// @param stage : Shader stage
+// @param shaderInfo : Shader info for this shader
 ModulePass* Llpc::createSpirvLowerTranslator(
-    ShaderStage                 stage,        // Shader stage
-    const PipelineShaderInfo*   shaderInfo)  // [in] Shader info for this shader
+    ShaderStage                 stage,
+    const PipelineShaderInfo*   shaderInfo)
 {
     return new SpirvLowerTranslator(stage, shaderInfo);
 }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on (empty on entry)
 bool SpirvLowerTranslator::runOnModule(
-    llvm::Module& module)  // [in,out] LLVM module to be run on (empty on entry)
+    llvm::Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Translator\n");
 
@@ -75,9 +80,12 @@ bool SpirvLowerTranslator::runOnModule(
 
 // =====================================================================================================================
 // Translates SPIR-V binary to machine-independent LLVM module.
+//
+// @param shaderInfo : Specialization info
+// @param [in/out] module : Module to translate into, initially empty
 void SpirvLowerTranslator::translateSpirvToLlvm(
-    const PipelineShaderInfo*   shaderInfo,         // [in] Specialization info
-    Module*                     module)             // [in/out] Module to translate into, initially empty
+    const PipelineShaderInfo*   shaderInfo,
+    Module*                     module)
 {
     BinaryData  optimizedSpirvBin = {};
     const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo->pModuleData);

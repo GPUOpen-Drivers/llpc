@@ -54,9 +54,12 @@ void ShaderModes::clear()
 
 // =====================================================================================================================
 // Set the common shader mode (FP modes) for the given shader stage
+//
+// @param stage : Shader stage
+// @param commonShaderMode : Common shader mode
 void ShaderModes::setCommonShaderMode(
-    ShaderStage             stage,             // Shader stage
-    const CommonShaderMode& commonShaderMode)  // [in] Common shader mode
+    ShaderStage             stage,
+    const CommonShaderMode& commonShaderMode)
 {
     auto modes = MutableArrayRef<CommonShaderMode>(m_commonShaderModes);
     modes[stage] = commonShaderMode;
@@ -65,8 +68,10 @@ void ShaderModes::setCommonShaderMode(
 
 // =====================================================================================================================
 // Get the common shader mode (FP mode) for the given shader stage
+//
+// @param stage : Shader stage
 const CommonShaderMode& ShaderModes::getCommonShaderMode(
-    ShaderStage                       stage)              // Shader stage
+    ShaderStage                       stage)
 {
     return ArrayRef<CommonShaderMode>(m_commonShaderModes)[stage];
 }
@@ -86,8 +91,10 @@ bool ShaderModes::getAnyUseSubgroupSize()
 // =====================================================================================================================
 // Set the tessellation mode. This in fact merges the supplied values with any previously supplied values,
 // to allow the client to call this twice, once for TCS and once for TES.
+//
+// @param inMode : Tessellation mode
 void ShaderModes::setTessellationMode(
-    const TessellationMode& inMode)   // [in] Tessellation mode
+    const TessellationMode& inMode)
 {
     assert(inMode.outputVertices <= MaxTessPatchVertices);
 
@@ -148,8 +155,10 @@ const FragmentShaderMode& ShaderModes::getFragmentShaderMode()
 
 // =====================================================================================================================
 // Set the compute shader mode (workgroup size)
+//
+// @param inMode : Compute shader state
 void ShaderModes::setComputeShaderMode(
-    const ComputeShaderMode& inMode)   // [in] Compute shader state
+    const ComputeShaderMode& inMode)
 {
     // 0 is taken to be 1 in workgroup size.
     m_computeShaderMode.workgroupSizeX = std::max(1U, inMode.workgroupSizeX);
@@ -170,8 +179,10 @@ const ComputeShaderMode& ShaderModes::getComputeShaderMode()
 
 // =====================================================================================================================
 // Record shader modes (common and specific) into IR metadata
+//
+// @param [in/out] module : Module to record the IR metadata in
 void ShaderModes::record(
-    Module* module)    // [in/out] Module to record the IR metadata in
+    Module* module)
 {
     // First the common state.
     for (unsigned stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage)
@@ -192,9 +203,12 @@ void ShaderModes::record(
 // Read shader modes (common and specific) from a shader IR module, but only if no modes have been set
 // in this ShaderModes. This is used to handle the case that the shader module comes from an earlier
 // shader compile, and it had its ShaderModes recorded into IR then.
+//
+// @param module : LLVM module
+// @param stage : Shader stage
 void ShaderModes::readModesFromShader(
-    Module*     module,    // [in] LLVM module
-    ShaderStage stage)      // Shader stage
+    Module*     module,
+    ShaderStage stage)
 {
     // Bail if any modes have been set, which would mean that this is a full pipeline compile.
     if (m_anySet)
@@ -230,8 +244,10 @@ void ShaderModes::readModesFromShader(
 
 // =====================================================================================================================
 // Read shader modes (common and specific) from the pipeline IR module.
+//
+// @param module : LLVM module
 void ShaderModes::readModesFromPipeline(
-    Module* module)    // [in] LLVM module
+    Module* module)
 {
     // First the common state.
     for (unsigned stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage)

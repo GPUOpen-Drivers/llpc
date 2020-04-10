@@ -43,8 +43,10 @@ namespace Llpc
 
 // =====================================================================================================================
 // Gets the entry point (valid for AMD GPU) of a LLVM module.
+//
+// @param module : LLVM module
 Function* getEntryPoint(
-    Module* module) // [in] LLVM module
+    Module* module)
 {
     Function* entryPoint = nullptr;
 
@@ -63,8 +65,10 @@ Function* getEntryPoint(
 
 // =====================================================================================================================
 // Gets the shader stage from the specified single-shader LLVM module.
+//
+// @param module : LLVM module
 ShaderStage getShaderStageFromModule(
-    Module* module)  // [in] LLVM module
+    Module* module)
 {
     Function* func = getEntryPoint(module);
 
@@ -78,9 +82,12 @@ ShaderStage getShaderStageFromModule(
 
 // =====================================================================================================================
 // Set the shader stage to the specified LLVM module entry function.
+//
+// @param module : LLVM module to set shader stage
+// @param shaderStage : Shader stage
 void setShaderStageToModule(
-    Module*     module,        // [in] LLVM module to set shader stage
-    ShaderStage shaderStage)    // Shader stage
+    Module*     module,
+    ShaderStage shaderStage)
 {
     LLVMContext& context = module->getContext();
     Function* func = getEntryPoint(module);

@@ -568,12 +568,18 @@ Type *SPIRVToLLVM::transFPType(SPIRVType *t) {
 // Translate an "OpTypeArray". This contains special handling for arrays in interface storage classes which are
 // explicitly laid out and may contain manually placed padding bytes. If the array needs padding, we map an array like
 // '<element>[length]' -> 'struct { <element>, <padding bytes> }[length]'.
+//
+// @param spvType : The type.
+// @param matrixStride : The matrix stride (can be 0).
+// @param isColumnMajor : Whether the matrix is column major.
+// @param isParentPointer : If the parent is a pointer type.
+// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(
-    SPIRVType* const spvType,            // [in] The type.
-    const unsigned   matrixStride,        // The matrix stride (can be 0).
-    const bool       isColumnMajor,       // Whether the matrix is column major.
-    const bool       isParentPointer,     // If the parent is a pointer type.
-    const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
+    SPIRVType* const spvType,
+    const unsigned   matrixStride,
+    const bool       isColumnMajor,
+    const bool       isParentPointer,
+    const bool       isExplicitlyLaidOut)
 {
     Type* elementType = transType(spvType->getArrayElementType(),
                                    matrixStride,
@@ -613,12 +619,18 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(
 // =====================================================================================================================
 // Translate an "OpTypeBool". This contains special handling for bools in pointers, which we need to map separately
 // because boolean values in memory are represented as i32.
+//
+// @param spvType : The type.
+// @param matrixStride : The matrix stride (can be 0).
+// @param isColumnMajor : Whether the matrix is column major.
+// @param isParentPointer : If the parent is a pointer type.
+// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeBool>(
-    SPIRVType* const spvType,            // [in] The type.
-    const unsigned   matrixStride,        // The matrix stride (can be 0).
-    const bool       isColumnMajor,       // Whether the matrix is column major.
-    const bool       isParentPointer,     // If the parent is a pointer type.
-    const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
+    SPIRVType* const spvType,
+    const unsigned   matrixStride,
+    const bool       isColumnMajor,
+    const bool       isParentPointer,
+    const bool       isExplicitlyLaidOut)
 {
     if (isParentPointer)
         return getBuilder()->getInt32Ty();
@@ -628,12 +640,18 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeBool>(
 
 // =====================================================================================================================
 // Translate an "OpTypeForwardPointer".
+//
+// @param spvType : The type.
+// @param matrixStride : The matrix stride (can be 0).
+// @param isColumnMajor : Whether the matrix is column major.
+// @param isParentPointer : If the parent is a pointer type.
+// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(
-    SPIRVType* const spvType,            // [in] The type.
-    const unsigned   matrixStride,        // The matrix stride (can be 0).
-    const bool       isColumnMajor,       // Whether the matrix is column major.
-    const bool       isParentPointer,     // If the parent is a pointer type.
-    const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
+    SPIRVType* const spvType,
+    const unsigned   matrixStride,
+    const bool       isColumnMajor,
+    const bool       isParentPointer,
+    const bool       isExplicitlyLaidOut)
 {
     SPIRVTypeForwardPointer* const spvForwardPointerType = static_cast<SPIRVTypeForwardPointer*>(spvType);
     const SPIRVStorageClassKind storageClass = spvForwardPointerType->getPointerStorageClass();
@@ -668,12 +686,18 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(
 // =====================================================================================================================
 // Translate an "OpTypeMatrix". This contains special handling for matrices in interface storage classes which are
 // explicitly laid out and may contain manually placed padding bytes after the column elements.
+//
+// @param spvType : The type.
+// @param matrixStride : The matrix stride (can be 0).
+// @param isColumnMajor : Whether the matrix is column major.
+// @param isParentPointer : If the parent is a pointer type.
+// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
 template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
-    SPIRVType* const spvType,            // [in] The type.
-    unsigned         matrixStride,        // The matrix stride (can be 0).
-    const bool       isColumnMajor,       // Whether the matrix is column major.
-    const bool       isParentPointer,     // If the parent is a pointer type.
-    const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
+    SPIRVType* const spvType,
+    unsigned         matrixStride,
+    const bool       isColumnMajor,
+    const bool       isParentPointer,
+    const bool       isExplicitlyLaidOut)
 {
     Type* columnType = nullptr;
 
@@ -740,12 +764,18 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
 // =====================================================================================================================
 // Translate an "OpTypePointer". This contains special handling for pointers to bool, which we need to map separately
 // because boolean values in memory are represented as i32, and special handling for images and samplers.
+//
+// @param spvType : The type.
+// @param matrixStride : The matrix stride (can be 0).
+// @param isColumnMajor : Whether the matrix is column major.
+// @param isParentPointer : If the parent is a pointer type.
+// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(
-    SPIRVType* const spvType,            // [in] The type.
-    const unsigned   matrixStride,        // The matrix stride (can be 0).
-    const bool       isColumnMajor,       // Whether the matrix is column major.
-    const bool       isParentPointer,     // If the parent is a pointer type.
-    const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
+    SPIRVType* const spvType,
+    const unsigned   matrixStride,
+    const bool       isColumnMajor,
+    const bool       isParentPointer,
+    const bool       isExplicitlyLaidOut)
 {
     const SPIRVStorageClassKind storageClass = spvType->getPointerStorageClass();
 
@@ -821,12 +851,18 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(
 // Translate an "OpTypeRuntimeArray". This contains special handling for arrays in interface storage classes which are
 // explicitly laid out and may contain manually placed padding bytes. If the array needs padding, we map an array like
 // '<element>[length]' -> 'struct { <element>, <padding bytes> }[length]'.
+//
+// @param spvType : The type.
+// @param matrixStride : The matrix stride (can be 0).
+// @param isColumnMajor : Whether the matrix is column major.
+// @param isParentPointer : If the parent is a pointer type.
+// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(
-    SPIRVType* const spvType,            // [in] The type.
-    const unsigned   matrixStride,        // The matrix stride (can be 0).
-    const bool       isColumnMajor,       // Whether the matrix is column major.
-    const bool       isParentPointer,     // If the parent is a pointer type.
-    const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
+    SPIRVType* const spvType,
+    const unsigned   matrixStride,
+    const bool       isColumnMajor,
+    const bool       isParentPointer,
+    const bool       isExplicitlyLaidOut)
 {
     Type* elementType = transType(spvType->getArrayElementType(),
                                    matrixStride,
@@ -868,12 +904,18 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(
 // Translate an "OpTypeStruct". This contains special handling for structures in interface storage classes which are
 // explicitly laid out and may contain manually placed padding bytes between any struct elements (including perhaps
 // before the first struct element!).
+//
+// @param spvType : The type.
+// @param matrixStride : The matrix stride (can be 0).
+// @param isColumnMajor : Whether the matrix is column major.
+// @param isParentPointer : If the parent is a pointer type.
+// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
-    SPIRVType* const spvType,            // [in] The type.
-    const unsigned   matrixStride,        // The matrix stride (can be 0).
-    const bool       isColumnMajor,       // Whether the matrix is column major.
-    const bool       isParentPointer,     // If the parent is a pointer type.
-    const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
+    SPIRVType* const spvType,
+    const unsigned   matrixStride,
+    const bool       isColumnMajor,
+    const bool       isParentPointer,
+    const bool       isExplicitlyLaidOut)
 {
     SPIRVTypeStruct* const spvStructType = static_cast<SPIRVTypeStruct*>(spvType);
 
@@ -1007,12 +1049,18 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
 // Translate an "OpTypeVector". Vectors in interface storage classes are laid out using arrays because vectors in our
 // target triple have implicit padding bytes for 3-element vector types, which does not work with relaxed block layout
 // or scalar block layout. We translate these arrays back to vectors before load/store operations.
+//
+// @param spvType : The type.
+// @param matrixStride : The matrix stride (can be 0).
+// @param isColumnMajor : Whether the matrix is column major.
+// @param isParentPointer : If the parent is a pointer type.
+// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(
-    SPIRVType* const spvType,            // [in] The type.
-    const unsigned   matrixStride,        // The matrix stride (can be 0).
-    const bool       isColumnMajor,       // Whether the matrix is column major.
-    const bool       isParentPointer,     // If the parent is a pointer type.
-    const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
+    SPIRVType* const spvType,
+    const unsigned   matrixStride,
+    const bool       isColumnMajor,
+    const bool       isParentPointer,
+    const bool       isExplicitlyLaidOut)
 {
     Type* const compType = transType(spvType->getVectorComponentType(),
                                       matrixStride,
@@ -1750,8 +1798,10 @@ void SPIRVToLLVM::updateBuilderDebugLoc(SPIRVValue *bv, Function *f) {
 
 // =====================================================================================================================
 // Create a call to launder a row major matrix.
+//
+// @param pointerToMatrix : The pointer to matrix to launder.
 Value* SPIRVToLLVM::createLaunderRowMajorMatrix(
-  Value* const pointerToMatrix) // [in] The pointer to matrix to launder.
+  Value* const pointerToMatrix)
 {
     Type* const matrixPointerType = pointerToMatrix->getType();
 
@@ -1782,12 +1832,18 @@ Value* SPIRVToLLVM::createLaunderRowMajorMatrix(
 // =====================================================================================================================
 // Creates a load, taking care for types where we have had to add in explicit pads (structs with offset, arrays, and
 // matrices) to only load the data that is being used. This will recursively step through the pointer to load from.
+//
+// @param spvType : The SPIR-V type of the load.
+// @param loadPointer : The LLVM pointer to load from.
+// @param isVolatile : Is the load volatile?
+// @param isCoherent : Is the load coherent?
+// @param isNonTemporal : Is the load non-temporal?
 Value* SPIRVToLLVM::addLoadInstRecursively(
-    SPIRVType* const spvType,      // [in] The SPIR-V type of the load.
-    Value*           loadPointer,  // [in] The LLVM pointer to load from.
-    bool             isVolatile,    // Is the load volatile?
-    bool             isCoherent,    // Is the load coherent?
-    bool             isNonTemporal) // Is the load non-temporal?
+    SPIRVType* const spvType,
+    Value*           loadPointer,
+    bool             isVolatile,
+    bool             isCoherent,
+    bool             isNonTemporal)
 {
     assert(loadPointer->getType()->isPointerTy());
 
@@ -1920,13 +1976,20 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
 // =====================================================================================================================
 // Creates a store, taking care for types where we have had to add in explicit pads (structs with offset, arrays, and
 // matrices) to only store the data that is being used. This will recursively step through the value to store.
+//
+// @param spvType : The SPIR-V type of the store.
+// @param storePointer : The LLVM pointer to store to.
+// @param storeValue : The LLVM value to store into the pointer.
+// @param isVolatile : Is the store volatile?
+// @param isCoherent : Is the store coherent?
+// @param isNonTemporal : Is the store non-temporal?
 void SPIRVToLLVM::addStoreInstRecursively(
-    SPIRVType* const spvType,      // [in] The SPIR-V type of the store.
-    Value*           storePointer, // [in] The LLVM pointer to store to.
-    Value*           storeValue,   // [in] The LLVM value to store into the pointer.
-    bool             isVolatile,    // Is the store volatile?
-    bool             isCoherent,    // Is the store coherent?
-    bool             isNonTemporal) // Is the store non-temporal?
+    SPIRVType* const spvType,
+    Value*           storePointer,
+    Value*           storeValue,
+    bool             isVolatile,
+    bool             isCoherent,
+    bool             isNonTemporal)
 {
     assert(storePointer->getType()->isPointerTy());
 
@@ -2057,10 +2120,14 @@ void SPIRVToLLVM::addStoreInstRecursively(
 
 // =====================================================================================================================
 // Build a modified constant to store.
+//
+// @param spvType : The SPIR-V type of the store.
+// @param storePointerType : The LLVM pointer to store to.
+// @param constStoreValue : The LLVM constant to store into the pointer.
 Constant* SPIRVToLLVM::buildConstStoreRecursively(
-    SPIRVType* const spvType,          // [in] The SPIR-V type of the store.
-    Type* const      storePointerType, // [in] The LLVM pointer to store to.
-    Constant*        constStoreValue)  // [in] The LLVM constant to store into the pointer.
+    SPIRVType* const spvType,
+    Type* const      storePointerType,
+    Constant*        constStoreValue)
 {
     assert(storePointerType->isPointerTy());
     Type* const storeType = storePointerType->getPointerElementType();
@@ -2154,9 +2221,12 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
 
 // =====================================================================================================================
 // Translate scope from SPIR-V to LLVM.
+//
+// @param context : The LLVM context.
+// @param spvScope : The scope to translate.
 static SyncScope::ID transScope(
-    LLVMContext&               context,   // [in] The LLVM context.
-    const SPIRVConstant* const spvScope) // [in] The scope to translate.
+    LLVMContext&               context,
+    const SPIRVConstant* const spvScope)
 {
     const unsigned scope = static_cast<unsigned>(spvScope->getZExtIntValue());
 
@@ -2180,9 +2250,12 @@ static SyncScope::ID transScope(
 
 // =====================================================================================================================
 // Translate memory semantics from SPIR-V to LLVM.
+//
+// @param spvMemorySemantics : The semantics to translate.
+// @param isAtomicRMW : Is the memory semantic from an atomic rmw operation.
 static AtomicOrdering transMemorySemantics(
-    const SPIRVConstant* const spvMemorySemantics, // [in] The semantics to translate.
-    const bool                 isAtomicRMW)         // Is the memory semantic from an atomic rmw operation.
+    const SPIRVConstant* const spvMemorySemantics,
+    const bool                 isAtomicRMW)
 {
     const unsigned semantics = static_cast<unsigned>(spvMemorySemantics->getZExtIntValue());
 
@@ -2202,9 +2275,12 @@ static AtomicOrdering transMemorySemantics(
 
 // =====================================================================================================================
 // Translate any read-modify-write atomics.
+//
+// @param spvValue : A SPIR-V value.
+// @param binOp : The binary operator.
 Value* SPIRVToLLVM::transAtomicRMW(
-    SPIRVValue* const          spvValue, // [in] A SPIR-V value.
-    const AtomicRMWInst::BinOp binOp)     // The binary operator.
+    SPIRVValue* const          spvValue,
+    const AtomicRMWInst::BinOp binOp)
 {
     SPIRVAtomicInstBase* const spvAtomicInst = static_cast<SPIRVAtomicInstBase*>(spvValue);
 
@@ -2224,8 +2300,10 @@ Value* SPIRVToLLVM::transAtomicRMW(
 
 // =====================================================================================================================
 // Handle OpAtomicLoad.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicLoad>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2255,8 +2333,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicLoad>(
 
 // =====================================================================================================================
 // Handle OpAtomicStore.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicStore>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2290,8 +2370,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicStore>(
 
 // =====================================================================================================================
 // Handle OpAtomicExchange.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicExchange>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2305,8 +2387,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicExchange>(
 
 // =====================================================================================================================
 // Handle OpAtomicIAdd.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIAdd>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2320,8 +2404,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIAdd>(
 
 // =====================================================================================================================
 // Handle OpAtomicISub.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicISub>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2335,8 +2421,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicISub>(
 
 // =====================================================================================================================
 // Handle OpAtomicSMin.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicSMin>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2350,8 +2438,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicSMin>(
 
 // =====================================================================================================================
 // Handle OpAtomicUMin.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicUMin>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2365,8 +2455,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicUMin>(
 
 // =====================================================================================================================
 // Handle OpAtomicSMax.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicSMax>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2380,8 +2472,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicSMax>(
 
 // =====================================================================================================================
 // Handle OpAtomicUMax.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicUMax>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2395,8 +2489,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicUMax>(
 
 // =====================================================================================================================
 // Handle OpAtomicAnd.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicAnd>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2410,8 +2506,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicAnd>(
 
 // =====================================================================================================================
 // Handle OpAtomicOr.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicOr>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2425,8 +2523,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicOr>(
 
 // =====================================================================================================================
 // Handle OpAtomicXor.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicXor>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2440,8 +2540,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicXor>(
 
 // =====================================================================================================================
 // Handle OpAtomicIIncrement.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIIncrement>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2467,8 +2569,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIIncrement>(
 
 // =====================================================================================================================
 // Handle OpAtomicIDecrement.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIDecrement>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2494,8 +2598,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIDecrement>(
 
 // =====================================================================================================================
 // Handle OpAtomicCompareExchange.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchange>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
@@ -2535,8 +2641,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchange>(
 
 // =====================================================================================================================
 // Handle OpCopyMemory.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVCopyMemory* const spvCopyMemory = static_cast<SPIRVCopyMemory*>(spvValue);
 
@@ -2628,8 +2736,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
 
 // =====================================================================================================================
 // Handle OpLoad.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVLoad* const spvLoad = static_cast<SPIRVLoad*>(spvValue);
 
@@ -2694,8 +2804,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
 
 // =====================================================================================================================
 // Translate a load for UniformConstant that is image/sampler/sampledimage
+//
+// @param spvImageLoadPtr : The image/sampler/sampledimage pointer
 Value* SPIRVToLLVM::transLoadImage(
-    SPIRVValue* spvImageLoadPtr)  // [in] The image/sampler/sampledimage pointer
+    SPIRVValue* spvImageLoadPtr)
 {
     SPIRVType* spvLoadedType = spvImageLoadPtr->getType()->getPointerElementType();
     Value* base = transImagePointer(spvImageLoadPtr);
@@ -2755,8 +2867,10 @@ Value* SPIRVToLLVM::transLoadImage(
 
 // =====================================================================================================================
 // Translate image/sampler/sampledimage pointer to IR value
+//
+// @param spvImagePtr : The image/sampler/sampledimage pointer
 Value* SPIRVToLLVM::transImagePointer(
-    SPIRVValue* spvImagePtr)    // [in] The image/sampler/sampledimage pointer
+    SPIRVValue* spvImagePtr)
 {
     if (spvImagePtr->getOpCode() != OpVariable ||
         static_cast<SPIRVTypePointer*>(spvImagePtr->getType())->getStorageClass() != StorageClassUniformConstant)
@@ -2820,8 +2934,10 @@ Value* SPIRVToLLVM::transImagePointer(
 
 // =====================================================================================================================
 // Handle OpStore.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVStore* const spvStore = static_cast<SPIRVStore*>(spvValue);
 
@@ -2880,16 +2996,20 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
 
 // =====================================================================================================================
 // Handle OpEndPrimitive
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpEndPrimitive>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return getBuilder()->CreateEndPrimitive(0);
 }
 
 // =====================================================================================================================
 // Handle OpEndStreamPrimitive
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpEndStreamPrimitive>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     unsigned streamId = static_cast<SPIRVConstant*>(static_cast<SPIRVInstTemplateBase*>(spvValue)->getOpValue(0))->
           getZExtIntValue();
@@ -2898,8 +3018,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpEndStreamPrimitive>(
 
 // =====================================================================================================================
 // Handle OpArrayLength.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVArrayLength* const spvArrayLength = static_cast<SPIRVArrayLength*>(spvValue);
     SPIRVValue* const spvStruct = spvArrayLength->getStruct();
@@ -2927,8 +3049,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(
 
 // =====================================================================================================================
 // Handle OpAccessChain.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVAccessChainBase* const spvAccessChain = static_cast<SPIRVAccessChainBase*>(spvValue);
 
@@ -3144,8 +3268,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
 
 // =====================================================================================================================
 // Handle OpAccessChain for pointer to (array of) image/sampler/sampledimage
+//
+// @param spvAccessChain : The OpAccessChain
 Value* SPIRVToLLVM::transOpAccessChainForImage(
-    SPIRVAccessChainBase* spvAccessChain)          // [in] The OpAccessChain
+    SPIRVAccessChainBase* spvAccessChain)
 {
     SPIRVType* spvElementType = spvAccessChain->getBase()->getType()->getPointerElementType();
     std::vector<SPIRVValue*> spvIndicesVec = spvAccessChain->getIndices();
@@ -3185,11 +3311,16 @@ Value* SPIRVToLLVM::transOpAccessChainForImage(
 // A pointer to sampledimage is in fact a structure containing pointer to image and pointer to sampler.
 // A pointer to image when the image is multisampled is in fact a structure containing pointer to image
 // and pointer to fmask descriptor.
+//
+// @param base : Base pointer to add index to
+// @param index : Index value
+// @param isNonUniform : Whether the index is non-uniform
+// @param spvElementType : Ultimate non-array element type (nullptr means assume single pointer)
 Value* SPIRVToLLVM::indexDescPtr(
-    Value*      base,              // [in] Base pointer to add index to
-    Value*      index,             // [in] Index value
-    bool        isNonUniform,       // Whether the index is non-uniform
-    SPIRVType*  spvElementType)    // Ultimate non-array element type (nullptr means assume single pointer)
+    Value*      base,
+    Value*      index,
+    bool        isNonUniform,
+    SPIRVType*  spvElementType)
 {
     if (spvElementType )
     {
@@ -3222,32 +3353,40 @@ Value* SPIRVToLLVM::indexDescPtr(
 
 // =====================================================================================================================
 // Handle OpInBoundsAccessChain.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpInBoundsAccessChain>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transValueWithOpcode<OpAccessChain>(spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpPtrAccessChain.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpPtrAccessChain>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transValueWithOpcode<OpAccessChain>(spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpInBoundsPtrAccessChain.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpInBoundsPtrAccessChain>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transValueWithOpcode<OpAccessChain>(spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpImage (extract image from sampledimage)
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpImage>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     Value* sampledImage = transValue(static_cast<SPIRVInstTemplateBase*>(spvValue)->getOpValue(0),
                                       getBuilder()->GetInsertBlock()->getParent(),
@@ -3257,8 +3396,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpImage>(
 
 // =====================================================================================================================
 // Handle OpSampledImage (combine image and sampler to create sampledimage)
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSampledImage>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     Value* image = transValue(static_cast<SPIRVInstTemplateBase*>(spvValue)->getOpValue(0),
                                getBuilder()->GetInsertBlock()->getParent(),
@@ -3275,8 +3416,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSampledImage>(
 
 // =====================================================================================================================
 // Handle OpKill.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpKill>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     Value* const kill = getBuilder()->CreateKill();
 
@@ -3298,24 +3441,30 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpKill>(
 
 // =====================================================================================================================
 // Handle OpDemoteToHelperInvocationEXT.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpDemoteToHelperInvocationEXT>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return getBuilder()->CreateDemoteToHelperInvocation();
 }
 
 // =====================================================================================================================
 // Handle OpIsHelperInvocationEXT.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpIsHelperInvocationEXT>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return getBuilder()->CreateIsHelperInvocation();
 }
 
 // =====================================================================================================================
 // Handle OpReadClockKHR.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<spv::OpReadClockKHR>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     SPIRVConstant* const spvScope = static_cast<SPIRVConstant*>(spvInst->getOperands()[0]);
@@ -3339,8 +3488,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<spv::OpReadClockKHR>(
 
 // =====================================================================================================================
 // Handle OpGroupAll.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupAll>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3354,8 +3505,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupAll>(
 
 // =====================================================================================================================
 // Handle OpGroupAny.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupAny>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3369,8 +3522,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupAny>(
 
 // =====================================================================================================================
 // Handle OpGroupBroadcast.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupBroadcast>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3385,80 +3540,100 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupBroadcast>(
 
 // =====================================================================================================================
 // Handle OpGroupIAdd.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupIAdd>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::IAdd, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupFAdd.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupFAdd>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::FAdd, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupSMin.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupSMin>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::SMin, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupUMin.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupUMin>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::UMin, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupFMin.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupFMin>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::FMin, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupSMax.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupSMax>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::SMax, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupUMax.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupUMax>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::UMax, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupFMax.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupFMax>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::FMax, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformElect.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformElect>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return getBuilder()->CreateSubgroupElect();
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformAll.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3472,8 +3647,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformAny.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3487,8 +3664,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformAllEqual.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3502,8 +3681,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformBroadcast.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcast>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3518,8 +3699,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcast>(
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformBroadcastFirst.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcastFirst>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3533,8 +3716,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcastFi
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformBallot.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallot>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3548,8 +3733,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallot>(
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformInverseBallot.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformInverseBallot>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3563,8 +3750,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformInverseBall
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformBallotBitExtract.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitExtract>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3579,8 +3768,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitEx
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformBallotBitCount.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitCount>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3606,8 +3797,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitCo
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformBallotFindLSB.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindLSB>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3621,8 +3814,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindL
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformBallotFindMSB.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindMSB>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3636,8 +3831,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindM
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformShuffle.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffle>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3652,8 +3849,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffle>(
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformShuffleXor.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleXor>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3668,8 +3867,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleXor>
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformShuffleUp.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleUp>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3684,8 +3885,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleUp>(
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformShuffleDown.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleDown>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3700,9 +3903,12 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleDown
 
 // =====================================================================================================================
 // Handle a group arithmetic operation.
+//
+// @param groupArithOp : The group operation.
+// @param spvValue : A SPIR-V value.
 Value* SPIRVToLLVM::transGroupArithOp(
-    Builder::GroupArithOp groupArithOp, // The group operation.
-    SPIRVValue* const           spvValue)  // [in] A SPIR-V value.
+    Builder::GroupArithOp groupArithOp,
+    SPIRVValue* const           spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3733,136 +3939,170 @@ Value* SPIRVToLLVM::transGroupArithOp(
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformIAdd.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformIAdd>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::IAdd, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformFAdd.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformFAdd>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::FAdd, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformIMul.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformIMul>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::IMul, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformFMul.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformFMul>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::FMul, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformSMin.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformSMin>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::SMin, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformUMin.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformUMin>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::UMin, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformFMin.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformFMin>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::FMin, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformSMax.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformSMax>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::SMax, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformUMax.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformUMax>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::UMax, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformFMax.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformFMax>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::FMax, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformBitwiseAnd.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBitwiseAnd>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::And, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformBitwiseOr.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBitwiseOr>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::Or, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformBitwiseXor.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBitwiseXor>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::Xor, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformLogicalAnd.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformLogicalAnd>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::And, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformLogicalOr.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformLogicalOr>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::Or, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformLogicalXor.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformLogicalXor>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::Xor, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformQuadBroadcast.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformQuadBroadcast>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3877,8 +4117,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformQuadBroadca
 
 // =====================================================================================================================
 // Handle OpGroupNonUniformQuadSwap.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformQuadSwap>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3904,8 +4146,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformQuadSwap>(
 
 // =====================================================================================================================
 // Handle OpSubgroupBallotKHR.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupBallotKHR>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3918,8 +4162,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupBallotKHR>(
 
 // =====================================================================================================================
 // Handle OpSubgroupFirstInvocationKHR.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupFirstInvocationKHR>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3932,8 +4178,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupFirstInvocationKHR
 
 // =====================================================================================================================
 // Handle OpSubgroupAllKHR.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllKHR>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3946,8 +4194,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllKHR>(
 
 // =====================================================================================================================
 // Handle OpSubgroupAnyKHR.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAnyKHR>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3960,8 +4210,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAnyKHR>(
 
 // =====================================================================================================================
 // Handle OpSubgroupAllEqualKHR.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllEqualKHR>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3974,8 +4226,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllEqualKHR>(
 
 // =====================================================================================================================
 // Handle OpSubgroupReadInvocationKHR.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupReadInvocationKHR>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -3989,72 +4243,90 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupReadInvocationKHR>
 
 // =====================================================================================================================
 // Handle OpGroupIAddNonUniformAMD.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupIAddNonUniformAMD>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::IAdd, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupFAddNonUniformAMD.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupFAddNonUniformAMD>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::FAdd, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupSMinNonUniformAMD.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupSMinNonUniformAMD>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::SMin, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupUMinNonUniformAMD.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupUMinNonUniformAMD>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::UMin, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupFMinNonUniformAMD.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupFMinNonUniformAMD>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::FMin, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupSMaxNonUniformAMD.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupSMaxNonUniformAMD>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::SMax, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupUMaxNonUniformAMD.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupUMaxNonUniformAMD>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::UMax, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpGroupFMaxNonUniformAMD.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupFMaxNonUniformAMD>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     return transGroupArithOp(Builder::GroupArithOp::FMax, spvValue);
 }
 
 // =====================================================================================================================
 // Handle OpExtInst.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVExtInst* const spvExtInst = static_cast<SPIRVExtInst*>(spvValue);
 
@@ -4120,9 +4392,12 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
 // =====================================================================================================================
 // Translate an initializer. This has special handling for the case where the type to initialize to does not match the
 // type of the initializer, which is common when dealing with interface objects.
+//
+// @param spvValue : The SPIR-V value that is an initializer.
+// @param type : The LLVM type of the initializer.
 Constant* SPIRVToLLVM::transInitializer(
-    SPIRVValue* const spvValue, // [in] The SPIR-V value that is an initializer.
-    Type* const       type)     // [in] The LLVM type of the initializer.
+    SPIRVValue* const spvValue,
+    Type* const       type)
 {
     SPIRVType* const spvType = spvValue->getType();
 
@@ -4202,8 +4477,10 @@ Constant* SPIRVToLLVM::transInitializer(
 
 // =====================================================================================================================
 // Handle OpVariable.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVVariable* const spvVar = static_cast<SPIRVVariable*>(spvValue);
     const SPIRVStorageClassKind storageClass = spvVar->getStorageClass();
@@ -4335,8 +4612,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
 
 // =====================================================================================================================
 // Handle OpTranspose.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpTranspose>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstTemplateBase* const spvTranpose = static_cast<SPIRVInstTemplateBase*>(spvValue);
 
@@ -4348,8 +4627,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpTranspose>(
 
 // =====================================================================================================================
 // Handle OpMatrixTimesScalar.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesScalar>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -4362,8 +4643,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesScalar>(
 
 // =====================================================================================================================
 // Handle OpVectorTimesMatrix.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVectorTimesMatrix>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -4376,8 +4659,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVectorTimesMatrix>(
 
 // =====================================================================================================================
 // Handle OpMatrixTimesVector.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesVector>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -4390,8 +4675,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesVector>(
 
 // =====================================================================================================================
 // Handle OpMatrixTimesMatrix.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesMatrix>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -4404,8 +4691,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesMatrix>(
 
 // =====================================================================================================================
 // Handle OpOuterProduct.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpOuterProduct>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();
@@ -4418,8 +4707,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpOuterProduct>(
 
 // =====================================================================================================================
 // Handle OpDot.
+//
+// @param spvValue : A SPIR-V value.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpDot>(
-    SPIRVValue* const spvValue) // [in] A SPIR-V value.
+    SPIRVValue* const spvValue)
 {
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     std::vector<SPIRVValue*> spvOperands = spvInst->getOperands();

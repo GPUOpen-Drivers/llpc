@@ -50,9 +50,12 @@ static cl::opt<unsigned> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
 
 // =====================================================================================================================
 // Initialize this ShaderSystemValues if it was previously uninitialized.
+//
+// @param pipelineState : Pipeline state
+// @param entryPoint : Shader entrypoint
 void ShaderSystemValues::initialize(
-    PipelineState*  pipelineState, // [in] Pipeline state
-    Function*       entryPoint)    // [in] Shader entrypoint
+    PipelineState*  pipelineState,
+    Function*       entryPoint)
 {
     if (!m_entryPoint )
     {
@@ -280,8 +283,10 @@ Value* ShaderSystemValues::getEsGsOffsets()
 
 // =====================================================================================================================
 // Get GS -> VS ring buffer descriptor (GS out and copy shader in)
+//
+// @param streamId : Stream ID, always 0 for copy shader
 Value* ShaderSystemValues::getGsVsRingBufDesc(
-    unsigned streamId)  // Stream ID, always 0 for copy shader
+    unsigned streamId)
 {
     assert(m_shaderStage == ShaderStageGeometry || m_shaderStage == ShaderStageCopyShader);
     if (m_gsVsRingBufDescs.size() <= streamId)
@@ -379,8 +384,10 @@ ArrayRef<Value*> ShaderSystemValues::getEmitCounterPtr()
 
 // =====================================================================================================================
 // Get descriptor table pointer
+//
+// @param descSet : Descriptor set ID
 Value* ShaderSystemValues::getDescTablePtr(
-    unsigned        descSet)        // Descriptor set ID
+    unsigned        descSet)
 {
     if (m_descTablePtrs.size() <= descSet)
         m_descTablePtrs.resize(descSet + 1);
@@ -403,8 +410,10 @@ Value* ShaderSystemValues::getDescTablePtr(
 
 // =====================================================================================================================
 // Get shadow descriptor table pointer
+//
+// @param descSet : Descriptor set ID
 Value* ShaderSystemValues::getShadowDescTablePtr(
-    unsigned        descSet)        // Descriptor set ID
+    unsigned        descSet)
 {
     if (m_shadowDescTablePtrs.size() <= descSet)
         m_shadowDescTablePtrs.resize(descSet + 1);
@@ -529,8 +538,10 @@ Value* ShaderSystemValues::getVertexBufTablePtr()
 
 // =====================================================================================================================
 // Get stream-out buffer descriptor
+//
+// @param xfbBuffer : Transform feedback buffer ID
 Value* ShaderSystemValues::getStreamOutBufDesc(
-    unsigned        xfbBuffer)      // Transform feedback buffer ID
+    unsigned        xfbBuffer)
 {
     if (m_streamOutBufDescs.size() <= xfbBuffer)
         m_streamOutBufDescs.resize(xfbBuffer + 1);
@@ -612,10 +623,14 @@ Instruction* ShaderSystemValues::getStreamOutTablePtr()
 
 // =====================================================================================================================
 // Make 64-bit pointer of specified type from 32-bit int, extending with the specified value, or PC if InvalidValue
+//
+// @param lowValue : 32-bit int value to extend
+// @param ptrTy : Type that result pointer needs to be
+// @param highValue : Value to use for high part, or InvalidValue to use PC
 Instruction* ShaderSystemValues::makePointer(
-    Value*    lowValue,  // [in] 32-bit int value to extend
-    Type*     ptrTy,     // [in] Type that result pointer needs to be
-    unsigned  highValue)  // Value to use for high part, or InvalidValue to use PC
+    Value*    lowValue,
+    Type*     ptrTy,
+    unsigned  highValue)
 {
     // Insert extending code after pLowValue if it is an instruction.
     Instruction* insertPos = nullptr;
@@ -675,18 +690,24 @@ Instruction* ShaderSystemValues::makePointer(
 
 // =====================================================================================================================
 // Get 64-bit extended resource node value
+//
+// @param resNodeIdx : Resource node index
+// @param resNodeTy : Pointer type of result
+// @param highValue : Value to use for high part, or InvalidValue to use PC
 Value* ShaderSystemValues::getExtendedResourceNodeValue(
-    unsigned        resNodeIdx,     // Resource node index
-    Type*           resNodeTy,     // [in] Pointer type of result
-    unsigned        highValue)      // Value to use for high part, or InvalidValue to use PC
+    unsigned        resNodeIdx,
+    Type*           resNodeTy,
+    unsigned        highValue)
 {
     return makePointer(getResourceNodeValue(resNodeIdx), resNodeTy, highValue);
 }
 
 // =====================================================================================================================
 // Get 32 bit resource node value
+//
+// @param resNodeIdx : Resource node index
 Value* ShaderSystemValues::getResourceNodeValue(
-    unsigned        resNodeIdx)     // Resource node index
+    unsigned        resNodeIdx)
 {
     auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
     auto intfData   = m_pipelineState->getShaderInterfaceData(m_shaderStage);
@@ -761,9 +782,12 @@ Instruction* ShaderSystemValues::getSpillTablePtr()
 
 // =====================================================================================================================
 // Load descriptor from driver table
+//
+// @param tableOffset : Byte offset in driver table
+// @param builder : Builder to use for insertion
 Instruction* ShaderSystemValues::loadDescFromDriverTable(
-    unsigned tableOffset,    // Byte offset in driver table
-    BuilderBase& builder)    // Builder to use for insertion
+    unsigned tableOffset,
+    BuilderBase& builder)
 {
     Value* args[] =
     {
@@ -779,10 +803,14 @@ Instruction* ShaderSystemValues::loadDescFromDriverTable(
 
 // =====================================================================================================================
 // Explicitly set the DATA_FORMAT of ring buffer descriptor.
+//
+// @param bufDesc : Buffer Descriptor
+// @param dataFormat : Data format
+// @param builder : Builder to use for inserting instructions
 Value* ShaderSystemValues::setRingBufferDataFormat(
-    Value*          bufDesc,       // [in] Buffer Descriptor
-    unsigned        dataFormat,     // Data format
-    BuilderBase&    builder         // [in] Builder to use for inserting instructions
+    Value*          bufDesc,
+    unsigned        dataFormat,
+    BuilderBase&    builder
     ) const
 {
     Value* elem3 = builder.CreateExtractElement(bufDesc, (uint64_t)3);
@@ -802,8 +830,10 @@ Value* ShaderSystemValues::setRingBufferDataFormat(
 
 // =====================================================================================================================
 // Find resource node by type
+//
+// @param type : Resource node type to find
 const ResourceNode* ShaderSystemValues::findResourceNodeByType(
-    ResourceNodeType type)           // Resource node type to find
+    ResourceNodeType type)
 {
     auto userDataNodes = m_pipelineState->getUserDataNodes();
     for (unsigned i = 0; i < userDataNodes.size(); ++i)
@@ -817,8 +847,10 @@ const ResourceNode* ShaderSystemValues::findResourceNodeByType(
 
 // =====================================================================================================================
 // Find resource node by descriptor set ID
+//
+// @param descSet : Descriptor set to find
 unsigned ShaderSystemValues::findResourceNodeByDescSet(
-    unsigned        descSet)        // Descriptor set to find
+    unsigned        descSet)
 {
     auto userDataNodes = m_pipelineState->getUserDataNodes();
     for (unsigned i = 0; i < userDataNodes.size(); ++i)

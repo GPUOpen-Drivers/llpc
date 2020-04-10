@@ -867,8 +867,10 @@ static const Intrinsic::ID ImageAtomicIntrinsicTable[][8] =
 
 // =====================================================================================================================
 // Convert an integer or vector of integer type to the equivalent (vector of) half/float/double
+//
+// @param origTy : Original type
 static Type* convertToFloatingPointType(
-    Type* origTy)    // Original type
+    Type* origTy)
 {
     assert(origTy->isIntOrIntVectorTy());
     Type* newTy = origTy;
@@ -890,14 +892,22 @@ static Type* convertToFloatingPointType(
 
 // =====================================================================================================================
 // Create an image load.
+//
+// @param resultTy : Result type
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param coord : Coordinates: scalar or vector i32
+// @param mipLevel : Mipmap level if doing load_mip, otherwise nullptr
+// @param instName : Name to give instruction(s)
 Value* BuilderImplImage::CreateImageLoad(
-    Type*             resultTy,          // [in] Result type
-    unsigned          dim,                // Image dimension
-    unsigned          flags,              // ImageFlag* flags
-    Value*            imageDesc,         // [in] Image descriptor
-    Value*            coord,             // [in] Coordinates: scalar or vector i32
-    Value*            mipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
-    const Twine&      instName)           // [in] Name to give instruction(s)
+    Type*             resultTy,
+    unsigned          dim,
+    unsigned          flags,
+    Value*            imageDesc,
+    Value*            coord,
+    Value*            mipLevel,
+    const Twine&      instName)
 {
     getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceRead = true;
     assert(coord->getType()->getScalarType()->isIntegerTy(32));
@@ -1028,16 +1038,24 @@ Value* BuilderImplImage::CreateImageLoad(
 // the least significant nibble) of fmask_texel_R. If the F-mask descriptor has an invalid format, then it
 // just uses the supplied sample number. The calculated sample is then appended to the supplied coordinates
 // for a normal image load.
+//
+// @param resultTy : Result type
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param fmaskDesc : Fmask descriptor
+// @param coord : Coordinates: scalar or vector i32, exactly right width for given dimension excluding sample
+// @param sampleNum : Sample number, i32
+// @param instName : Name to give instruction(s)
 Value* BuilderImplImage::CreateImageLoadWithFmask(
-    Type*                   resultTy,          // [in] Result type
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    Value*                  imageDesc,         // [in] Image descriptor
-    Value*                  fmaskDesc,         // [in] Fmask descriptor
-    Value*                  coord,             // [in] Coordinates: scalar or vector i32, exactly right
-                                                //    width for given dimension excluding sample
-    Value*                  sampleNum,         // [in] Sample number, i32
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    Type*                   resultTy,
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    Value*                  fmaskDesc,
+    Value*                  coord,
+    Value*                  sampleNum,
+    const Twine&            instName)
 {
     // Load texel from F-mask image.
     unsigned fmaskDim = dim;
@@ -1086,14 +1104,22 @@ Value* BuilderImplImage::CreateImageLoadWithFmask(
 
 // =====================================================================================================================
 // Create an image store.
+//
+// @param texel : Texel value to store; v4i16, v4i32, v4i64, v4f16 or v4f32
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param coord : Coordinates: scalar or vector i32
+// @param mipLevel : Mipmap level if doing load_mip, otherwise nullptr
+// @param instName : Name to give instruction(s)
 Value* BuilderImplImage::CreateImageStore(
-    Value*            texel,             // [in] Texel value to store; v4i16, v4i32, v4i64, v4f16 or v4f32
-    unsigned          dim,                // Image dimension
-    unsigned          flags,              // ImageFlag* flags
-    Value*            imageDesc,         // [in] Image descriptor
-    Value*            coord,             // [in] Coordinates: scalar or vector i32
-    Value*            mipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
-    const Twine&      instName)           // [in] Name to give instruction(s)
+    Value*            texel,
+    unsigned          dim,
+    unsigned          flags,
+    Value*            imageDesc,
+    Value*            coord,
+    Value*            mipLevel,
+    const Twine&      instName)
 {
     getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceWrite = true;
     assert(coord->getType()->getScalarType()->isIntegerTy(32));
@@ -1200,14 +1226,22 @@ Value* BuilderImplImage::CreateImageStore(
 // Create an image sample.
 // The caller supplies all arguments to the image sample op in "address", in the order specified
 // by the indices defined as ImageIndex* below.
+//
+// @param resultTy : Result type
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param samplerDesc : Sampler descriptor
+// @param address : Address and other arguments
+// @param instName : Name to give instruction(s)
 Value* BuilderImplImage::CreateImageSample(
-    Type*                   resultTy,          // [in] Result type
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    Value*                  imageDesc,         // [in] Image descriptor
-    Value*                  samplerDesc,       // [in] Sampler descriptor
-    ArrayRef<Value*>        address,            // Address and other arguments
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    Type*                   resultTy,
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    Value*                  samplerDesc,
+    ArrayRef<Value*>        address,
+    const Twine&            instName)
 {
     Value* coord = address[ImageAddressIdxCoordinate];
     assert(coord->getType()->getScalarType()->isFloatTy() ||
@@ -1277,14 +1311,22 @@ Value* BuilderImplImage::CreateImageSample(
 // Create an image sample with a converting sampler.
 // The caller supplies all arguments to the image sample op in "address", in the order specified
 // by the indices defined as ImageIndex* below.
+//
+// @param resultTy : Result type
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param convertingSamplerDesc : Converting sampler descriptor (v8i32)
+// @param address : Address and other arguments
+// @param instName : Name to give instruction(s)
 Value* BuilderImplImage::CreateImageSampleConvert(
-    Type*                   resultTy,              // [in] Result type
-    unsigned                dim,                    // Image dimension
-    unsigned                flags,                  // ImageFlag* flags
-    Value*                  imageDesc,             // [in] Image descriptor
-    Value*                  convertingSamplerDesc, // [in] Converting sampler descriptor (v8i32)
-    ArrayRef<Value*>        address,                // Address and other arguments
-    const Twine&            instName)               // [in] Name to give instruction(s)
+    Type*                   resultTy,
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    Value*                  convertingSamplerDesc,
+    ArrayRef<Value*>        address,
+    const Twine&            instName)
 {
     llvm_unreachable("Not yet implemented");
 }
@@ -1293,14 +1335,22 @@ Value* BuilderImplImage::CreateImageSampleConvert(
 // Create an image gather.
 // The caller supplies all arguments to the image sample op in "address", in the order specified
 // by the indices defined as ImageIndex* below.
+//
+// @param resultTy : Result type
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param samplerDesc : Sampler descriptor
+// @param address : Address and other arguments
+// @param instName : Name to give instruction(s)
 Value* BuilderImplImage::CreateImageGather(
-    Type*                   resultTy,          // [in] Result type
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    Value*                  imageDesc,         // [in] Image descriptor
-    Value*                  samplerDesc,       // [in] Sampler descriptor
-    ArrayRef<Value*>        address,            // Address and other arguments
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    Type*                   resultTy,
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    Value*                  samplerDesc,
+    ArrayRef<Value*>        address,
+    const Twine&            instName)
 {
     Value* coord = address[ImageAddressIdxCoordinate];
     assert(coord->getType()->getScalarType()->isFloatTy() ||
@@ -1406,10 +1456,14 @@ Value* BuilderImplImage::CreateImageGather(
 // Implement pre-GFX9 integer gather workaround to patch descriptor or coordinate, depending on format in descriptor
 // Returns nullptr for GFX9+, or a bool value that is true if the descriptor was patched or false if the
 // coordinate was modified.
+//
+// @param dim : Image dimension
+// @param [in/out] imageDesc : Image descriptor
+// @param [in/out] coord : Coordinate
 Value* BuilderImplImage::preprocessIntegerImageGather(
-    unsigned  dim,        // Image dimension
-    Value*&   imageDesc, // [in/out] Image descriptor
-    Value*&   coord)     // [in/out] Coordinate
+    unsigned  dim,
+    Value*&   imageDesc,
+    Value*&   coord)
 {
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9)
     {
@@ -1477,12 +1531,18 @@ Value* BuilderImplImage::preprocessIntegerImageGather(
 // =====================================================================================================================
 // Implement pre-GFX9 integer gather workaround to modify result.
 // Returns possibly modified result.
+//
+// @param needDescPatch : Bool value that is true if descriptor was patched
+// @param flags : Flags passed to CreateImageGather
+// @param imageDesc : Image descriptor
+// @param texelTy : Type of returned texel
+// @param result : Returned texel value, or struct containing texel and TFE
 Value* BuilderImplImage::postprocessIntegerImageGather(
-    Value*    needDescPatch,   // [in] Bool value that is true if descriptor was patched
-    unsigned  flags,            // Flags passed to CreateImageGather
-    Value*    imageDesc,       // [in] Image descriptor
-    Type*     texelTy,         // [in] Type of returned texel
-    Value*    result)          // [in] Returned texel value, or struct containing texel and TFE
+    Value*    needDescPatch,
+    unsigned  flags,
+    Value*    imageDesc,
+    Type*     texelTy,
+    Value*    result)
 {
     // Post-processing of result for integer return type.
     // Create the if..endif, where the condition is whether the descriptor was patched. If it was,
@@ -1522,16 +1582,26 @@ Value* BuilderImplImage::postprocessIntegerImageGather(
 // Common code to create an image sample or gather.
 // The caller supplies all arguments to the image sample op in "address", in the order specified
 // by the indices defined as ImageIndex* below.
+//
+// @param resultTy : Result type
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param coord : Coordinates (the one in address is ignored in favor of this one)
+// @param imageDesc : Image descriptor
+// @param samplerDesc : Sampler descriptor
+// @param address : Address and other arguments
+// @param instName : Name to give instruction(s)
+// @param isSample : Is sample rather than gather
 Value* BuilderImplImage::CreateImageSampleGather(
-    Type*                       resultTy,      // [in] Result type
-    unsigned                    dim,            // Image dimension
-    unsigned                    flags,          // ImageFlag* flags
-    Value*                      coord,         // [in] Coordinates (the one in address is ignored in favor of this one)
-    Value*                      imageDesc,     // [in] Image descriptor
-    Value*                      samplerDesc,   // [in] Sampler descriptor
-    ArrayRef<Value*>            address,        // Address and other arguments
-    const Twine&                instName,       // [in] Name to give instruction(s)
-    bool                        isSample)       // Is sample rather than gather
+    Type*                       resultTy,
+    unsigned                    dim,
+    unsigned                    flags,
+    Value*                      coord,
+    Value*                      imageDesc,
+    Value*                      samplerDesc,
+    ArrayRef<Value*>            address,
+    const Twine&                instName,
+    bool                        isSample)
 {
     // Set up the mask of address components provided, for use in searching the intrinsic ID table
     unsigned addressMask = 0;
@@ -1681,15 +1751,24 @@ Value* BuilderImplImage::CreateImageSampleGather(
 
 // =====================================================================================================================
 // Create an image atomic operation other than compare-and-swap.
+//
+// @param atomicOp : Atomic op to create
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param ordering : Atomic ordering
+// @param imageDesc : Image descriptor
+// @param coord : Coordinates: scalar or vector i32
+// @param inputValue : Input value: i32
+// @param instName : Name to give instruction(s)
 Value* BuilderImplImage::CreateImageAtomic(
-    unsigned                atomicOp,           // Atomic op to create
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    AtomicOrdering          ordering,           // Atomic ordering
-    Value*                  imageDesc,         // [in] Image descriptor
-    Value*                  coord,             // [in] Coordinates: scalar or vector i32
-    Value*                  inputValue,        // [in] Input value: i32
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    unsigned                atomicOp,
+    unsigned                dim,
+    unsigned                flags,
+    AtomicOrdering          ordering,
+    Value*                  imageDesc,
+    Value*                  coord,
+    Value*                  inputValue,
+    const Twine&            instName)
 {
     return CreateImageAtomicCommon(atomicOp,
                                    dim,
@@ -1704,15 +1783,24 @@ Value* BuilderImplImage::CreateImageAtomic(
 
 // =====================================================================================================================
 // Create an image atomic compare-and-swap.
+//
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param ordering : Atomic ordering
+// @param imageDesc : Image descriptor
+// @param coord : Coordinates: scalar or vector i32
+// @param inputValue : Input value: i32
+// @param comparatorValue : Value to compare against: i32
+// @param instName : Name to give instruction(s)
 Value* BuilderImplImage::CreateImageAtomicCompareSwap(
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    AtomicOrdering          ordering,           // Atomic ordering
-    Value*                  imageDesc,         // [in] Image descriptor
-    Value*                  coord,             // [in] Coordinates: scalar or vector i32
-    Value*                  inputValue,        // [in] Input value: i32
-    Value*                  comparatorValue,   // [in] Value to compare against: i32
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    unsigned                dim,
+    unsigned                flags,
+    AtomicOrdering          ordering,
+    Value*                  imageDesc,
+    Value*                  coord,
+    Value*                  inputValue,
+    Value*                  comparatorValue,
+    const Twine&            instName)
 {
     return CreateImageAtomicCommon(AtomicOpCompareSwap,
                                    dim,
@@ -1727,16 +1815,26 @@ Value* BuilderImplImage::CreateImageAtomicCompareSwap(
 
 // =====================================================================================================================
 // Common code for CreateImageAtomic and CreateImageAtomicCompareSwap
+//
+// @param atomicOp : Atomic op to create
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param ordering : Atomic ordering
+// @param imageDesc : Image descriptor
+// @param coord : Coordinates: scalar or vector i32
+// @param inputValue : Input value: i32
+// @param comparatorValue : Value to compare against: i32; ignored if not compare-swap
+// @param instName : Name to give instruction(s)
 Value* BuilderImplImage::CreateImageAtomicCommon(
-    unsigned                atomicOp,           // Atomic op to create
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    AtomicOrdering          ordering,           // Atomic ordering
-    Value*                  imageDesc,         // [in] Image descriptor
-    Value*                  coord,             // [in] Coordinates: scalar or vector i32
-    Value*                  inputValue,        // [in] Input value: i32
-    Value*                  comparatorValue,   // [in] Value to compare against: i32; ignored if not compare-swap
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    unsigned                atomicOp,
+    unsigned                dim,
+    unsigned                flags,
+    AtomicOrdering          ordering,
+    Value*                  imageDesc,
+    Value*                  coord,
+    Value*                  inputValue,
+    Value*                  comparatorValue,
+    const Twine&            instName)
 {
     getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceWrite = true;
     assert(coord->getType()->getScalarType()->isIntegerTy(32));
@@ -1825,11 +1923,16 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
 
 // =====================================================================================================================
 // Create a query of the number of mipmap levels in an image. Returns an i32 value.
+//
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor or texel buffer descriptor
+// @param instName : Name to give instruction(s)
 Value* BuilderImplImage::CreateImageQueryLevels(
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    Value*                  imageDesc,         // [in] Image descriptor or texel buffer descriptor
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    const Twine&            instName)
 {
     dim = dim == DimCubeArray ? DimCube : dim;
     Value* zero = getInt32(0);
@@ -1843,11 +1946,16 @@ Value* BuilderImplImage::CreateImageQueryLevels(
 
 // =====================================================================================================================
 // Create a query of the number of samples in an image. Returns an i32 value.
+//
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor or texel buffer descriptor
+// @param instName : Name to give instruction(s)
 Value* BuilderImplImage::CreateImageQuerySamples(
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    Value*                  imageDesc,         // [in] Image descriptor or texel buffer descriptor
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    const Twine&            instName)
 {
     // Extract LAST_LEVEL (SQ_IMG_RSRC_WORD3, [19:16])
     Value* descWord3 = CreateExtractElement(imageDesc, 3);
@@ -1873,12 +1981,18 @@ Value* BuilderImplImage::CreateImageQuerySamples(
 // =====================================================================================================================
 // Create a query of size of an image.
 // Returns an i32 scalar or vector of the width given by GetImageQuerySizeComponentCount.
+//
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor or texel buffer descriptor
+// @param lod : LOD
+// @param instName : Name to give instruction(s)
 Value* BuilderImplImage::CreateImageQuerySize(
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    Value*                  imageDesc,         // [in] Image descriptor or texel buffer descriptor
-    Value*                  lod,               // [in] LOD
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    Value*                  lod,
+    const Twine&            instName)
 {
     if (imageDesc->getType() == getTexelBufferDescTy())
     {
@@ -1936,14 +2050,20 @@ Value* BuilderImplImage::CreateImageQuerySize(
 // Create a get of the LOD that would be used for an image sample with the given coordinates
 // and implicit LOD. Returns a v2f32 containing the layer number and the implicit level of
 // detail relative to the base level.
+//
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param samplerDesc : Sampler descriptor
+// @param coord : Coordinates: scalar or vector f32, exactly right width without array layer
+// @param instName : Name to give instruction(s)
 Value* BuilderImplImage::CreateImageGetLod(
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    Value*                  imageDesc,         // [in] Image descriptor
-    Value*                  samplerDesc,       // [in] Sampler descriptor
-    Value*                  coord,             // [in] Coordinates: scalar or vector f32, exactly right
-                                                //    width without array layer
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    Value*                  samplerDesc,
+    Value*                  coord,
+    const Twine&            instName)
 {
     // Remove array from dimension if any.
     switch (dim)
@@ -1999,8 +2119,10 @@ Value* BuilderImplImage::CreateImageGetLod(
 
 // =====================================================================================================================
 // Change 1D or 1DArray dimension to 2D or 2DArray if needed as a workaround on GFX9+
+//
+// @param dim : Image dimension
 unsigned BuilderImplImage::change1DTo2DIfNeeded(
-    unsigned                  dim)            // Image dimension
+    unsigned                  dim)
 {
     if (getPipelineState()->getTargetInfo().getGpuWorkarounds().gfx9.treat1dImagesAs2d)
     {
@@ -2018,14 +2140,22 @@ unsigned BuilderImplImage::change1DTo2DIfNeeded(
 // Prepare coordinate and explicit derivatives, pushing the separate components into the supplied vectors, and
 // modifying if necessary.
 // Returns possibly modified image dimension.
+//
+// @param dim : Image dimension
+// @param coord : Scalar or vector coordinate value
+// @param projective : Value to multiply into each coordinate component; nullptr if none
+// @param derivativeX : Scalar or vector X derivative value, nullptr if none
+// @param derivativeY : Scalar or vector Y derivative value, nullptr if none
+// @param [out] outCoords : Vector to push coordinate components into
+// @param [out] outDerivatives : Vector to push derivative components into
 unsigned BuilderImplImage::prepareCoordinate(
-    unsigned                  dim,            // Image dimension
-    Value*                    coord,         // [in] Scalar or vector coordinate value
-    Value*                    projective,    // [in] Value to multiply into each coordinate component; nullptr if none
-    Value*                    derivativeX,   // [in] Scalar or vector X derivative value, nullptr if none
-    Value*                    derivativeY,   // [in] Scalar or vector Y derivative value, nullptr if none
-    SmallVectorImpl<Value*>&  outCoords,      // [out] Vector to push coordinate components into
-    SmallVectorImpl<Value*>&  outDerivatives) // [out] Vector to push derivative components into
+    unsigned                  dim,
+    Value*                    coord,
+    Value*                    projective,
+    Value*                    derivativeX,
+    Value*                    derivativeY,
+    SmallVectorImpl<Value*>&  outCoords,
+    SmallVectorImpl<Value*>&  outDerivatives)
 {
     // Push the coordinate components.
     Type* coordTy = coord->getType();
@@ -2280,9 +2410,12 @@ unsigned BuilderImplImage::prepareCoordinate(
 // For a cubearray with integer coordinates, combine the face and slice into a single component.
 // In this case, the frontend may have generated code to separate the
 // face and slice out of a single component, so we look for that code first.
+//
+// @param coord : Coordinate as vector value
+// @param [in/out] coords : Coordinate components
 void BuilderImplImage::combineCubeArrayFaceAndSlice(
-    Value*                    coord,   // [in] Coordinate as vector value
-    SmallVectorImpl<Value*>&  coords)   // [in/out] Coordinate components
+    Value*                    coord,
+    SmallVectorImpl<Value*>&  coords)
 {
     // See if we can find the face and slice components in a chain of insertelements.
     Constant* multiplier = getInt32(6);
@@ -2338,9 +2471,12 @@ void BuilderImplImage::combineCubeArrayFaceAndSlice(
 
 // =====================================================================================================================
 // Patch descriptor with cube dimension for image load/store/atomic for GFX8 and earlier
+//
+// @param desc : Descriptor before patching
+// @param dim : Image dimensions
 Value* BuilderImplImage::patchCubeDescriptor(
-    Value*    desc,  // [in] Descriptor before patching
-    unsigned  dim)    // Image dimensions
+    Value*    desc,
+    unsigned  dim)
 {
     if ((dim != DimCube && dim != DimCubeArray) ||
         getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9)
@@ -2369,10 +2505,14 @@ Value* BuilderImplImage::patchCubeDescriptor(
 
 // =====================================================================================================================
 // Handle cases where we need to add the FragCoord x,y to the coordinate, and use ViewIndex as the z coordinate.
+//
+// @param coord : Coordinate, scalar or vector i32
+// @param flags : Image flags
+// @param [in,out] dim : Image dimension
 Value* BuilderImplImage::handleFragCoordViewIndex(
-    Value*    coord,   // [in] Coordinate, scalar or vector i32
-    unsigned  flags,    // Image flags
-    unsigned& dim)      // [in,out] Image dimension
+    Value*    coord,
+    unsigned  flags,
+    unsigned& dim)
 {
     bool useViewIndex = false;
     if (flags & ImageFlagCheckMultiView)

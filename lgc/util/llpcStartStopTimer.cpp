@@ -72,17 +72,22 @@ char StartStopTimer::ID = 0;
 // =====================================================================================================================
 // Create a start/stop timer pass. This is a static method in BuilderContext, so it can be accessed by
 // the front-end to add to its pass manager.
+//
+// @param timer : The timer to start or stop when the pass is run
+// @param starting : True to start the timer, false to stop it
 ModulePass* BuilderContext::createStartStopTimer(
-    Timer*  timer,   // The timer to start or stop when the pass is run
-    bool    starting) // True to start the timer, false to stop it
+    Timer*  timer,
+    bool    starting)
 {
     return new StartStopTimer(timer, starting);
 }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool StartStopTimer::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     if (m_starting)
         m_timer->startTimer();

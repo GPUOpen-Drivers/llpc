@@ -99,8 +99,10 @@ Document::~Document()
 
 // =====================================================================================================================
 // Creates Vfx document object with specified document type
+//
+// @param type : Document type
 Document* Document::createDocument(
-    VfxDocType type)          // Document type
+    VfxDocType type)
 {
     if (type == VfxDocTypeRender)
         return new RenderDocument;
@@ -110,8 +112,10 @@ Document* Document::createDocument(
 
 // =====================================================================================================================
 // Gets a free section for specified section type
+//
+// @param sectionName : Section name
 Section* Document::getFreeSection(
-    const char* sectionName)      // [in] Section name
+    const char* sectionName)
 {
     Section*    section        = nullptr;
     SectionType type            = Section::getSectionType(sectionName);
@@ -169,8 +173,10 @@ VfxParser::VfxParser()
 
 // =====================================================================================================================
 // Parses a config file line.
+//
+// @param line : Input test config line.
 bool VfxParser::parseLine(
-    char* line)    // [in] Input test config line.
+    char* line)
 {
     bool result = true;
     ++m_currentLineNum;
@@ -197,8 +203,10 @@ bool VfxParser::parseLine(
 
 // =====================================================================================================================
 // Begins a section.
+//
+// @param line : Input test config line.
 bool VfxParser::beginSection(
-    char* line)    // [in] Input test config line.
+    char* line)
 {
     bool result = true;
     VFX_ASSERT(*line == '[');
@@ -307,15 +315,22 @@ bool VfxParser::parseSectionKeyValues()
 
 // =====================================================================================================================
 // Parses a key string to process array access("[]") and member access(".").
+//
+// @param key : Input key string
+// @param lineNum : Line number
+// @param sectionObjectIn : Base section object
+// @param [out] ppSectionObjectOut : Target section object after apply array access and member access in key string.
+// @param [out] memberNameBuffer : Name of the member to be accessed in target section object.
+// @param memberNameBufferSize : Size of member name buffer.
+// @param [out] arrayIndex : Array index applied this member (0 for non array)
 bool VfxParser::parseKey(
-    const char*           key,                 // [in]  Input key string
-    unsigned              lineNum,              // Line number
-    Section*              sectionObjectIn,     // [in]  Base section object
-    Section**             ppSectionObjectOut,   // [out] Target section object after apply array access and member
-                                                //       access in key string.
-    char*                 memberNameBuffer,    // [out] Name of the member to be accessed in target section object.
-    unsigned              memberNameBufferSize, // Size of member name buffer.
-    unsigned*             arrayIndex)          // [out] Array index applied this member (0 for non array)
+    const char*           key,
+    unsigned              lineNum,
+    Section*              sectionObjectIn,
+    Section**             ppSectionObjectOut,
+    char*                 memberNameBuffer,
+    unsigned              memberNameBufferSize,
+    unsigned*             arrayIndex)
 
 {
     bool result = true;
@@ -385,11 +400,16 @@ bool VfxParser::parseKey(
 
 // =====================================================================================================================
 // Parses a key-value pair according to predefined rule.
+//
+// @param key : Input key string
+// @param valueStr : Input value string
+// @param lineNum : Line number
+// @param [out] sectionObject : Key-value map to hold the parse results.
 bool VfxParser::parseKeyValue(
-    char*                         key,           // [in] Input key string
-    char*                         valueStr,         // [in] Input value string
-    unsigned                      lineNum,        // Line number
-    Section*                      sectionObject) // [out] Key-value map to hold the parse results.
+    char*                         key,
+    char*                         valueStr,
+    unsigned                      lineNum,
+    Section*                      sectionObject)
 {
     bool result = false;
 
@@ -581,9 +601,12 @@ void VfxParser::parseSectionShaderSource()
 
 // =====================================================================================================================
 // Parses a VFX config file.
+//
+// @param info : Name of VFX file to parse.
+// @param [out] doc : Parse result
 bool VfxParser::parse(
-    const TestCaseInfo& info,  // [in] Name of VFX file to parse.
-    Document*           doc)  // [out] Parse result
+    const TestCaseInfo& info,
+    Document*           doc)
 {
     bool result = true;
     m_vfxDoc   = doc;
@@ -635,10 +658,14 @@ bool VfxParser::parse(
 
 // =====================================================================================================================
 // Parses an int number from a string.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [out] output : Stores parsed value
 bool parseInt(
-    char*       str,       // [in]  Input string
-    unsigned    lineNum,    // Current line number
-    IUFValue*   output)    // [out] Stores parsed value
+    char*       str,
+    unsigned    lineNum,
+    IUFValue*   output)
 {
     VFX_ASSERT(output );
     bool result = true;
@@ -664,10 +691,14 @@ bool parseInt(
 
 // =====================================================================================================================
 // Parses a float number from a string.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [out] output : Stores parsed value
 bool parseFloat(
-    char*       str,       // [in]  Input string
-    unsigned    lineNum,    // Current line number
-    IUFValue*   output)    // [out] Stores parsed value
+    char*       str,
+    unsigned    lineNum,
+    IUFValue*   output)
 {
     VFX_ASSERT(output );
     bool result = true;
@@ -684,10 +715,14 @@ bool parseFloat(
 
 // =====================================================================================================================
 // Parses a float16 number from a string.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [out] output : Stores parsed value
 bool parseFloat16(
-    char*       str,       // [in]  Input string
-    unsigned    lineNum,    // Current line number
-    IUFValue*   output)    // [out] Stores parsed value
+    char*       str,
+    unsigned    lineNum,
+    IUFValue*   output)
 {
     VFX_ASSERT(output );
     bool result = true;
@@ -708,10 +743,14 @@ bool parseFloat16(
 
 // =====================================================================================================================
 // Parses a double number from a string.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [out] output : Stores parsed value
 bool parseDouble(
-    char*       str,       // [in]  Input string
-    unsigned    lineNum,    // Current line number
-    IUFValue*   output)    // [out] Stores parsed value
+    char*       str,
+    unsigned    lineNum,
+    IUFValue*   output)
 {
     VFX_ASSERT(output );
     bool result = true;
@@ -728,10 +767,14 @@ bool parseDouble(
 
 // =====================================================================================================================
 // Parse a boolean value from a string.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [out] output : Stores parsed value
 bool parseBool(
-    char*       str,       // [in]  Input string
-    unsigned    lineNum,    // Current line number
-    IUFValue*   output,    // [out] Stores parsed value
+    char*       str,
+    unsigned    lineNum,
+    IUFValue*   output,
     std::string* errorMsg)
 {
     VFX_ASSERT(output );
@@ -755,10 +798,14 @@ bool parseBool(
 // =====================================================================================================================
 // Parses a integer vec4 from a string.
 // NOTE: content of pStr will be changed.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [out] output : Stores parsed value
 bool parseIVec4(
-    char*       str,       // [in]  Input string
-    unsigned    lineNum,    // Current line number
-    IUFValue*   output)    // [out] Stores parsed value
+    char*       str,
+    unsigned    lineNum,
+    IUFValue*   output)
 {
     VFX_ASSERT(output );
     bool result = false;
@@ -794,10 +841,14 @@ bool parseIVec4(
 // =====================================================================================================================
 // Parses a int64 vec2 from a string.
 // NOTE: content of pStr will be changed.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [out] output : Stores parsed value
 bool parseI64Vec2(
-    char*       str,       // [in]  Input string
-    unsigned    lineNum,    // Current line number
-    IUFValue*   output)    // [out] Stores parsed value
+    char*       str,
+    unsigned    lineNum,
+    IUFValue*   output)
 {
     VFX_ASSERT(output );
     bool result = false;
@@ -833,10 +884,14 @@ bool parseI64Vec2(
 // =====================================================================================================================
 // Parses a float vec4 from a string.
 // NOTE: content of pStr will be changed.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [out] output : Stores parsed value
 bool parseFVec4(
-    char*       str,       // [in]  Input string
-    unsigned    lineNum,    // Current line number
-    IUFValue*   output)    // [out] Stores parsed value
+    char*       str,
+    unsigned    lineNum,
+    IUFValue*   output)
 {
     VFX_ASSERT(output );
     bool result = false;
@@ -865,10 +920,14 @@ bool parseFVec4(
 // =====================================================================================================================
 // Parses a float16 vec4 from a string.
 // NOTE: content of pStr will be changed.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [out] output : Stores parsed value
 bool parseF16Vec4(
-    char*       str,       // [in]  Input string
-    unsigned    lineNum,    // Current line number
-    IUFValue*   output)    // [out] Stores parsed value
+    char*       str,
+    unsigned    lineNum,
+    IUFValue*   output)
 {
     VFX_ASSERT(output );
     bool result = false;
@@ -901,10 +960,14 @@ bool parseF16Vec4(
 // =====================================================================================================================
 // Parses a double vec2 from a string.
 // NOTE: content of pStr will be changed.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [out] output : Stores parsed value
 bool parseDVec2(
-    char*       str,       // [in]  Input string
-    unsigned    lineNum,    // Current line number
-    IUFValue*   output)    // [out] Stores parsed value
+    char*       str,
+    unsigned    lineNum,
+    IUFValue*   output)
 {
     VFX_ASSERT(output );
     bool result = false;
@@ -933,11 +996,16 @@ bool parseDVec2(
 // =====================================================================================================================
 // Parses an array of comma separated integer values
 // NOTE: content of pStr will be changed.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param isSign : True if it is signed integer
+// @param [in,out] bufMem : Buffer data
 bool parseIArray(
-    char*                  str,       // [in]  Input string
-    unsigned               lineNum,    // Current line number
-    bool                   isSign,     // True if it is signed integer
-    std::vector<uint8_t>&  bufMem)     // [in,out] Buffer data
+    char*                  str,
+    unsigned               lineNum,
+    bool                   isSign,
+    std::vector<uint8_t>&  bufMem)
 {
     bool result = true;
 
@@ -974,11 +1042,16 @@ bool parseIArray(
 // =====================================================================================================================
 // Parses an array of comma separated int64 values
 // NOTE: content of pStr will be changed.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param isSign : True if it is signed integer
+// @param [in,out] bufMem : Buffer data
 bool parseI64Array(
-    char*                  str,       // [in]  Input string
-    unsigned               lineNum,    // Current line number
-    bool                   isSign,     // True if it is signed integer
-    std::vector<uint8_t>&  bufMem)     // [in,out] Buffer data
+    char*                  str,
+    unsigned               lineNum,
+    bool                   isSign,
+    std::vector<uint8_t>&  bufMem)
 {
     bool result = true;
 
@@ -1016,10 +1089,14 @@ bool parseI64Array(
 // =====================================================================================================================
 // Parses an array of comma separated float values
 // NOTE: content of pStr will be changed.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [in,out] bufMem : Buffer data
 bool parseFArray(
-    char*                  str,       // [in]  Input string
-    unsigned               lineNum,    // Current line number
-    std::vector<uint8_t>&  bufMem)     // [in,out] Buffer data
+    char*                  str,
+    unsigned               lineNum,
+    std::vector<uint8_t>&  bufMem)
 {
     bool result = true;
 
@@ -1047,10 +1124,14 @@ bool parseFArray(
 // =====================================================================================================================
 // Parses an array of comma separated float16 values
 // NOTE: content of pStr will be changed.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [in,out] bufMem : Buffer data
 bool parseF16Array(
-    char*                  str,       // [in]  Input string
-    unsigned               lineNum,    // Current line number
-    std::vector<uint8_t>&  bufMem)     // [in,out] Buffer data
+    char*                  str,
+    unsigned               lineNum,
+    std::vector<uint8_t>&  bufMem)
 {
     bool result = true;
 
@@ -1081,10 +1162,14 @@ bool parseF16Array(
 // =====================================================================================================================
 // Parses an array of comma separated double values
 // NOTE: content of pStr will be changed.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [in,out] bufMem : Buffer data
 bool parseDArray(
-    char*               str,          // [in]  Input string
-    unsigned            lineNum,       // Current line number
-    std::vector<uint8_t>& bufMem)      // [in,out] Buffer data
+    char*               str,
+    unsigned            lineNum,
+    std::vector<uint8_t>& bufMem)
 {
     bool result = true;
 
@@ -1112,10 +1197,14 @@ bool parseDArray(
 // =====================================================================================================================
 // Parses binding, it's a integer vec3 from a string.
 // NOTE: content of pStr will be changed.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [out] output : Stores parsed value
 bool parseBinding(
-    char*       str,       // [in]  Input string
-    unsigned    lineNum,    // Current line number
-    IUFValue*   output)    // [out] Stores parsed value
+    char*       str,
+    unsigned    lineNum,
+    IUFValue*   output)
 {
     VFX_ASSERT(output );
     bool result = false;
@@ -1157,11 +1246,16 @@ bool parseBinding(
 
 // =====================================================================================================================
 // Parses a enum string
+//
+// @param enumName : Enum name
+// @param lineNum : Line No.
+// @param [Out] output : Enum value
+// @param [Out] errorMsg : Error message
 bool parseEnumName(
-    char*        enumName,  // Enum name
-    unsigned     lineNum,    // Line No.
-    IUFValue*    output,    // [Out] Enum value
-    std::string* errorMsg)  // [Out] Error message
+    char*        enumName,
+    unsigned     lineNum,
+    IUFValue*    output,
+    std::string* errorMsg)
 {
     bool result = false;
     int value = VfxInvalidValue;
@@ -1179,8 +1273,10 @@ bool parseEnumName(
 
 // =====================================================================================================================
 // Trims space at the beginning of a string.
+//
+// @param str : Input string pointer.
 char * trimStringBeginning(
-    char * str)    // [in] Input string pointer.
+    char * str)
 {
     while (*str)
     {
@@ -1195,8 +1291,10 @@ char * trimStringBeginning(
 // =====================================================================================================================
 // Trims space at the end of a string.
 // NOTE: The function will change the contents of an input string
+//
+// @param str : Input string pointer.
 char * trimStringEnd(
-    char * str)    // [in] Input string pointer.
+    char * str)
 {
     size_t len = strlen(str);
     char *sRev = str + len - 1;
@@ -1218,13 +1316,20 @@ char * trimStringEnd(
 // =====================================================================================================================
 // Parses a key-value pair.
 // NOTE: The function will change the contents of an input string
+//
+// @param line : Input key-value pair.
+// @param lineNum : Current line number.
+// @param delimiter : Key-value splitter.
+// @param [out] ppKey : Key string, a substring of the input.
+// @param [out] ppValue : Value string, a substring of the input.
+// @param [out] errorMsg : Error message
 bool extractKeyAndValue(
-    char*      line,        // [in]  Input key-value pair.
-    unsigned   lineNum,      // Current line number.
-    const char delimiter,    // Key-value splitter.
-    char**     ppKey,        // [out] Key string, a substring of the input.
-    char**     ppValue,      // [out] Value string, a substring of the input.
-    std::string* errorMsg)  // [out] Error message
+    char*      line,
+    unsigned   lineNum,
+    const char delimiter,
+    char**     ppKey,
+    char**     ppValue,
+    std::string* errorMsg)
 {
     bool result = true;
 
@@ -1262,13 +1367,20 @@ bool extractKeyAndValue(
 
 // =====================================================================================================================
 // Parses an array index access in a pair of brackets.
+//
+// @param str : Input string pointer
+// @param lineNum : Line number used to report error
+// @param [out] arrayIndex : Parsed array index result
+// @param [out] ppLBracket : Position of '['
+// @param [out] ppRBracket : Position of ']'
+// @param [out] errorMsg : Error message
 bool parseArrayAccess(
-    char*        str,            // [in]  Input string pointer
-    unsigned     lineNum,         // Line number used to report error
-    unsigned*    arrayIndex,     // [out] Parsed array index result
-    char**       ppLBracket,      // [out] Position of '['
-    char**       ppRBracket,      // [out] Position of ']'
-    std::string* errorMsg)       // [out] Error message
+    char*        str,
+    unsigned     lineNum,
+    unsigned*    arrayIndex,
+    char**       ppLBracket,
+    char**       ppRBracket,
+    std::string* errorMsg)
 {
     bool result = true;
 
@@ -1298,8 +1410,10 @@ bool parseArrayAccess(
 
 // =====================================================================================================================
 // Checks if a string contains array index access, which is a digits string inside a pair of brackets.
+//
+// @param str : Input string pointer
 bool isArrayAccess(
-    const char* str)   // [in] Input string pointer
+    const char* str)
 {
     bool result = true;
 
@@ -1330,9 +1444,12 @@ bool isArrayAccess(
 // =====================================================================================================================
 // Gets one word for a string and return the start position of next word, nullptr is returned if word isn't found
 // in the string
+//
+// @param str : Input string
+// @param [out] wordBuffer : A word from input string
 char * getWordFromString(
-    char* str,           // [in] Input string
-    char* wordBuffer)    // [out] A word from input string
+    char* str,
+    char* wordBuffer)
 {
     char *p    = trimStringBeginning(str);
     char *dst = wordBuffer;
@@ -1347,11 +1464,16 @@ char * getWordFromString(
 // =====================================================================================================================
 // Substitutes marcros for 1 line.
 // Returns false if line length after substitution exceeds MaxLineBufSize
+//
+// @param line : Line string
+// @param lineNum : Line number
+// @param macroDefinition : Map of macro definitions
+// @param maxLineLength : Max line length allowed for the substituted string.
 bool VfxParser::macroSubstituteLine(
-    char*                  line,                 // [in] Line string
-    unsigned               lineNum,               // Line number
-    const MacroDefinition* macroDefinition,      // [in] Map of macro definitions
-    unsigned               maxLineLength)         // Max line length allowed for the substituted string.
+    char*                  line,
+    unsigned               lineNum,
+    const MacroDefinition* macroDefinition,
+    unsigned               maxLineLength)
 {
     bool result = true;
     VFX_ASSERT(macroDefinition );
@@ -1399,13 +1521,20 @@ namespace Vfx
 {
 // =====================================================================================================================
 // Parses input file
+//
+// @param filename : Input file name
+// @param numMacro : Number of marcos
+// @param macros : Marco list, Two strings are a macro, and macro will be extract before parse
+// @param type : Document type
+// @param [out] ppDoc : Document handle
+// @param [out] ppErrorMsg : Error message
 bool VFXAPI vfxParseFile(
-    const char*     filename,      // [in] Input file name
-    unsigned int    numMacro,       // Number of marcos
-    const char*     macros[],      // [in] Marco list, Two strings are a macro, and macro will be extract before parse
-    VfxDocType      type,           // Document type
-    void**          ppDoc,          // [out] Document handle
-    const char**    ppErrorMsg)     // [out] Error message
+    const char*     filename,
+    unsigned int    numMacro,
+    const char*     macros[],
+    VfxDocType      type,
+    void**          ppDoc,
+    const char**    ppErrorMsg)
 {
     VfxParser    parser;
     TestCaseInfo testCase;
@@ -1425,8 +1554,10 @@ bool VFXAPI vfxParseFile(
 
 // =====================================================================================================================
 // Closes document handle
+//
+// @param doc : Document handle
 void VFXAPI vfxCloseDoc(
-    void* doc)    // [in] Document handle
+    void* doc)
 {
     delete reinterpret_cast<Document*>(doc);
 }
@@ -1435,9 +1566,12 @@ void VFXAPI vfxCloseDoc(
 // Gets render document from document handle
 //
 // NOTE: The document contents are not accessable after call vfxCloseDoc
+//
+// @param doc : Document handle
+// @param [out] renderState : Pointer of struct VfxRenderState
 void VFXAPI vfxGetRenderDoc(
-    void*              doc,         // [in] Document handle
-    VfxRenderStatePtr* renderState) // [out] Pointer of struct VfxRenderState
+    void*              doc,
+    VfxRenderStatePtr* renderState)
 {
    *renderState = reinterpret_cast<RenderDocument*>(doc)->getDocument();
 }
@@ -1446,17 +1580,22 @@ void VFXAPI vfxGetRenderDoc(
 // Gets pipeline document from document handle
 //
 // NOTE: The document contents are not accessable after call vfxCloseDoc
+//
+// @param doc : Document handle
+// @param [out] pipelineState : Pointer of struct VfxPipelineState
 void VFXAPI vfxGetPipelineDoc(
-    void*                doc,            // [in] Document handle
-    VfxPipelineStatePtr* pipelineState)  // [out] Pointer of struct VfxPipelineState
+    void*                doc,
+    VfxPipelineStatePtr* pipelineState)
 {
    *pipelineState = reinterpret_cast<PipelineDocument*>(doc)->getDocument();
 }
 
 // =====================================================================================================================
 // Print Document to STDOUT
+//
+// @param doc : Document handle
 void VFXAPI vfxPrintDoc(
-    void*                doc)            // [in] Document handle
+    void*                doc)
 {
    reinterpret_cast<Document*>(doc)->printSelf();
 }

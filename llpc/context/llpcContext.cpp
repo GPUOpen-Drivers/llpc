@@ -62,8 +62,10 @@ namespace Llpc
 {
 
 // =====================================================================================================================
+//
+// @param gfxIp : Graphics IP version info
 Context::Context(
-    GfxIpVersion gfxIp)                     // Graphics IP version info
+    GfxIpVersion gfxIp)
     :
     LLVMContext(),
     m_gfxIp(gfxIp),
@@ -103,8 +105,10 @@ BuilderContext* Context::getBuilderContext()
 
 // =====================================================================================================================
 // Loads library from external LLVM library.
+//
+// @param lib : Bitcodes of external LLVM library
 std::unique_ptr<Module> Context::loadLibary(
-    const BinaryData* lib)     // [in] Bitcodes of external LLVM library
+    const BinaryData* lib)
 {
     auto memBuffer = MemoryBuffer::getMemBuffer(
         StringRef(static_cast<const char*>(lib->pCode), lib->codeSize), "", false);
@@ -133,8 +137,10 @@ std::unique_ptr<Module> Context::loadLibary(
 
 // =====================================================================================================================
 // Sets triple and data layout in specified module from the context's target machine.
+//
+// @param [in/out] module : Module to modify
 void Context::setModuleTargetMachine(
-    Module* module)  // [in/out] Module to modify
+    Module* module)
 {
     TargetMachine* targetMachine = getBuilderContext()->getTargetMachine();
     module->setTargetTriple(targetMachine->getTargetTriple().getTriple());

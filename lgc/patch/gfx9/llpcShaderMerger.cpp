@@ -46,9 +46,12 @@ using namespace llvm;
 using namespace lgc;
 
 // =====================================================================================================================
+//
+// @param pipelineState : Pipeline state
+// @param pipelineShaders : API shaders in the pipeline
 ShaderMerger::ShaderMerger(
-    PipelineState*    pipelineState,   // [in] Pipeline state
-    PipelineShaders*  pipelineShaders) // [in] API shaders in the pipeline
+    PipelineState*    pipelineState,
+    PipelineShaders*  pipelineShaders)
     :
     m_pipelineState(pipelineState),
     m_context(&pipelineState->getContext()),
@@ -66,10 +69,14 @@ ShaderMerger::ShaderMerger(
 
 // =====================================================================================================================
 // Builds LLVM function for hardware primitive shader (NGG).
+//
+// @param esEntryPoint : Entry-point of hardware export shader (ES) (could be null)
+// @param gsEntryPoint : Entry-point of hardware geometry shader (GS) (could be null)
+// @param copyShaderEntryPoint : Entry-point of hardware vertex shader (VS, copy shader) (could be null)
 Function* ShaderMerger::buildPrimShader(
-    Function*  esEntryPoint,           // [in] Entry-point of hardware export shader (ES) (could be null)
-    Function*  gsEntryPoint,           // [in] Entry-point of hardware geometry shader (GS) (could be null)
-    Function*  copyShaderEntryPoint)   // [in] Entry-point of hardware vertex shader (VS, copy shader) (could be null)
+    Function*  esEntryPoint,
+    Function*  gsEntryPoint,
+    Function*  copyShaderEntryPoint)
 {
     NggPrimShader primShader(m_pipelineState);
     return primShader.generate(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
@@ -77,8 +84,10 @@ Function* ShaderMerger::buildPrimShader(
 
 // =====================================================================================================================
 // Generates the type for the new entry-point of LS-HS merged shader.
+//
+// @param [out] inRegMask : "Inreg" bit mask for the arguments
 FunctionType* ShaderMerger::generateLsHsEntryPointType(
-    uint64_t* inRegMask // [out] "Inreg" bit mask for the arguments
+    uint64_t* inRegMask
     ) const
 {
     assert(m_hasVs || m_hasTcs);
@@ -137,9 +146,12 @@ FunctionType* ShaderMerger::generateLsHsEntryPointType(
 
 // =====================================================================================================================
 // Generates the new entry-point for LS-HS merged shader.
+//
+// @param lsEntryPoint : Entry-point of hardware local shader (LS) (could be null)
+// @param hsEntryPoint : Entry-point of hardware hull shader (HS)
 Function* ShaderMerger::generateLsHsEntryPoint(
-    Function* lsEntryPoint,  // [in] Entry-point of hardware local shader (LS) (could be null)
-    Function* hsEntryPoint)  // [in] Entry-point of hardware hull shader (HS)
+    Function* lsEntryPoint,
+    Function* hsEntryPoint)
 {
     if (lsEntryPoint )
     {
@@ -500,8 +512,10 @@ Function* ShaderMerger::generateLsHsEntryPoint(
 
 // =====================================================================================================================
 // Generates the type for the new entry-point of ES-GS merged shader.
+//
+// @param [out] inRegMask : "Inreg" bit mask for the arguments
 FunctionType* ShaderMerger::generateEsGsEntryPointType(
-    uint64_t* inRegMask // [out] "Inreg" bit mask for the arguments
+    uint64_t* inRegMask
     ) const
 {
     assert(m_hasGs);
@@ -600,9 +614,12 @@ FunctionType* ShaderMerger::generateEsGsEntryPointType(
 
 // =====================================================================================================================
 // Generates the new entry-point for ES-GS merged shader.
+//
+// @param esEntryPoint : Entry-point of hardware export shader (ES) (could be null)
+// @param gsEntryPoint : Entry-point of hardware geometry shader (GS)
 Function* ShaderMerger::generateEsGsEntryPoint(
-    Function* esEntryPoint,  // [in] Entry-point of hardware export shader (ES) (could be null)
-    Function* gsEntryPoint)  // [in] Entry-point of hardware geometry shader (GS)
+    Function* esEntryPoint,
+    Function* gsEntryPoint)
 {
     if (esEntryPoint )
     {

@@ -128,8 +128,10 @@ SpirvLowerGlobal::SpirvLowerGlobal()
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool SpirvLowerGlobal::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Global\n");
 
@@ -193,8 +195,10 @@ bool SpirvLowerGlobal::runOnModule(
 
 // =====================================================================================================================
 // Visits "return" instruction.
+//
+// @param retInst : "Ret" instruction
 void SpirvLowerGlobal::visitReturnInst(
-    ReturnInst& retInst)    // [in] "Ret" instruction
+    ReturnInst& retInst)
 {
     // Skip if "return" instructions are not expected to be handled.
     if (!static_cast<bool>(m_instVisitFlags.checkReturn))
@@ -211,8 +215,10 @@ void SpirvLowerGlobal::visitReturnInst(
 
 // =====================================================================================================================
 // Visits "call" instruction.
+//
+// @param callInst : "Call" instruction
 void SpirvLowerGlobal::visitCallInst(
-    CallInst& callInst) // [in] "Call" instruction
+    CallInst& callInst)
 {
     // Skip if "emit" and interpolaton calls are not expected to be handled
     if (!static_cast<bool>(m_instVisitFlags.checkEmitCall) && !static_cast<bool>(m_instVisitFlags.checkInterpCall))
@@ -300,8 +306,10 @@ void SpirvLowerGlobal::visitCallInst(
 
 // =====================================================================================================================
 // Visits "load" instruction.
+//
+// @param loadInst : "Load" instruction
 void SpirvLowerGlobal::visitLoadInst(
-    LoadInst& loadInst) // [in] "Load" instruction
+    LoadInst& loadInst)
 {
     Value* loadSrc = loadInst.getOperand(0);
     const unsigned addrSpace = loadSrc->getType()->getPointerAddressSpace();
@@ -488,8 +496,10 @@ void SpirvLowerGlobal::visitLoadInst(
 
 // =====================================================================================================================
 // Visits "store" instruction.
+//
+// @param storeInst : "Store" instruction
 void SpirvLowerGlobal::visitStoreInst(
-    StoreInst& storeInst) // [in] "Store" instruction
+    StoreInst& storeInst)
 {
     Value* storeValue = storeInst.getOperand(0);
     Value* storeDest  = storeInst.getOperand(1);
@@ -663,8 +673,10 @@ void SpirvLowerGlobal::visitStoreInst(
 
 // =====================================================================================================================
 // Maps the specified global variable to proxy variable.
+//
+// @param globalVar : Global variable to be mapped
 void SpirvLowerGlobal::mapGlobalVariableToProxy(
-    GlobalVariable* globalVar) // [in] Global variable to be mapped
+    GlobalVariable* globalVar)
 {
     const auto& dataLayout = m_module->getDataLayout();
     Type* globalVarTy = globalVar->getType()->getContainedType(0);
@@ -687,8 +699,10 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(
 
 // =====================================================================================================================
 // Maps the specified input to proxy variable.
+//
+// @param input : Input to be mapped
 void SpirvLowerGlobal::mapInputToProxy(
-    GlobalVariable* input) // [in] Input to be mapped
+    GlobalVariable* input)
 {
     // NOTE: For tessellation shader, we do not map inputs to real proxy variables. Instead, we directly replace
     // "load" instructions with import calls in the lowering operation.
@@ -731,8 +745,10 @@ void SpirvLowerGlobal::mapInputToProxy(
 
 // =====================================================================================================================
 // Maps the specified output to proxy variable.
+//
+// @param output : Output to be mapped
 void SpirvLowerGlobal::mapOutputToProxy(
-    GlobalVariable* output) // [in] Output to be mapped
+    GlobalVariable* output)
 {
     auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
 
@@ -1070,25 +1086,28 @@ void SpirvLowerGlobal::lowerInOutInPlace()
 
 // =====================================================================================================================
 // Inserts LLVM call instruction to import input/output.
+//
+// @param inOutTy : Type of value imported from input/output
+// @param addrSpace : Address space
+// @param inOutMetaVal : Metadata of this input/output
+// @param locOffset : Relative location offset, passed from aggregate type
+// @param maxLocOffset : Max+1 location offset if variable index has been encountered. For an array built-in with a variable index, this is the array size.
+// @param elemIdx : Element index used for element indexing, valid for tessellation shader (usually, it is vector component index, for built-in input/output, it could be element index of scalar array)
+// @param vertexIdx : Input array outermost index used for vertex indexing, valid for tessellation shader and geometry shader
+// @param interpLoc : Interpolation location, valid for fragment shader (use "InterpLocUnknown" as don't-care value)
+// @param auxInterpValue : Auxiliary value of interpolation (valid for fragment shader) - Value is sample ID for "InterpLocSample" - Value is offset from the center of the pixel for "InterpLocCenter" - Value is vertex no. (0 ~ 2) for "InterpLocCustom"
+// @param insertPos : Where to insert this call
 Value* SpirvLowerGlobal::addCallInstForInOutImport(
-    Type*        inOutTy,          // [in] Type of value imported from input/output
-    unsigned     addrSpace,         // Address space
-    Constant*    inOutMetaVal,        // [in] Metadata of this input/output
-    Value*       locOffset,        // [in] Relative location offset, passed from aggregate type
-    unsigned     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
-                                    //   For an array built-in with a variable index, this is the array size.
-    Value*       elemIdx,          // [in] Element index used for element indexing, valid for tessellation shader
-                                    // (usually, it is vector component index, for built-in input/output, it could be
-                                    // element index of scalar array)
-    Value*       vertexIdx,        // [in] Input array outermost index used for vertex indexing, valid for
-                                    // tessellation shader and geometry shader
-    unsigned     interpLoc,         // Interpolation location, valid for fragment shader (use "InterpLocUnknown" as
-                                    // don't-care value)
-    Value*       auxInterpValue,   // [in] Auxiliary value of interpolation (valid for fragment shader)
-                                    //   - Value is sample ID for "InterpLocSample"
-                                    //   - Value is offset from the center of the pixel for "InterpLocCenter"
-                                    //   - Value is vertex no. (0 ~ 2) for "InterpLocCustom"
-    Instruction* insertPos)        // [in] Where to insert this call
+    Type*        inOutTy,
+    unsigned     addrSpace,
+    Constant*    inOutMetaVal,
+    Value*       locOffset,
+    unsigned     maxLocOffset,
+    Value*       elemIdx,
+    Value*       vertexIdx,
+    unsigned     interpLoc,
+    Value*       auxInterpValue,
+    Instruction* insertPos)
 {
     assert(addrSpace == SPIRAS_Input ||
                 (addrSpace == SPIRAS_Output && m_shaderStage == ShaderStageTessControl));
@@ -1358,21 +1377,28 @@ Value* SpirvLowerGlobal::addCallInstForInOutImport(
 
 // =====================================================================================================================
 // Inserts LLVM call instruction to export output.
+//
+// @param outputValue : Value exported to output
+// @param outputMetaVal : Metadata of this output
+// @param locOffset : Relative location offset, passed from aggregate type
+// @param maxLocOffset : Max+1 location offset if variable index has been encountered. For an array built-in with a variable index, this is the array size.
+// @param xfbOffsetAdjust : Adjustment of transform feedback offset (for array type)
+// @param xfbBufferAdjust : Adjustment of transform feedback buffer ID (for array type, default is 0)
+// @param elemIdx : Element index used for element indexing, valid for tessellation control shader (usually, it is vector component index, for built-in input/output, it could be element index of scalar array)
+// @param vertexIdx : Output array outermost index used for vertex indexing, valid for tessellation control shader
+// @param emitStreamId : ID of emitted vertex stream, valid for geometry shader (0xFFFFFFFF for others)
+// @param insertPos : Where to insert this call
 void SpirvLowerGlobal::addCallInstForOutputExport(
-    Value*       outputValue,      // [in] Value exported to output
-    Constant*    outputMetaVal,       // [in] Metadata of this output
-    Value*       locOffset,        // [in] Relative location offset, passed from aggregate type
-    unsigned     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
-                                    //   For an array built-in with a variable index, this is the array size.
-    unsigned     xfbOffsetAdjust,   // Adjustment of transform feedback offset (for array type)
-    unsigned     xfbBufferAdjust,   // Adjustment of transform feedback buffer ID (for array type, default is 0)
-    Value*       elemIdx,          // [in] Element index used for element indexing, valid for tessellation control
-                                    //   shader (usually, it is vector component index, for built-in input/output, it
-                                    //   could be element index of scalar array)
-    Value*       vertexIdx,        // [in] Output array outermost index used for vertex indexing, valid for
-                                    //   tessellation control shader
-    unsigned     emitStreamId,      // ID of emitted vertex stream, valid for geometry shader (0xFFFFFFFF for others)
-    Instruction* insertPos)        // [in] Where to insert this call
+    Value*       outputValue,
+    Constant*    outputMetaVal,
+    Value*       locOffset,
+    unsigned     maxLocOffset,
+    unsigned     xfbOffsetAdjust,
+    unsigned     xfbBufferAdjust,
+    Value*       elemIdx,
+    Value*       vertexIdx,
+    unsigned     emitStreamId,
+    Instruction* insertPos)
 {
     Type* outputTy = outputValue->getType();
 
@@ -1644,22 +1670,30 @@ void SpirvLowerGlobal::addCallInstForOutputExport(
 
 // =====================================================================================================================
 // Inserts instructions to load value from input/ouput member.
+//
+// @param inOutTy : Type of this input/output member
+// @param addrSpace : Address space
+// @param indexOperands : Index operands
+// @param operandIdx : Index of the index operand in processing
+// @param maxLocOffset : Max+1 location offset if variable index has been encountered
+// @param inOutMetaVal : Metadata of this input/output member
+// @param locOffset : Relative location offset of this input/output member
+// @param vertexIdx : Input array outermost index used for vertex indexing
+// @param interpLoc : Interpolation location, valid for fragment shader (use "InterpLocUnknown" as don't-care value)
+// @param auxInterpValue : Auxiliary value of interpolation (valid for fragment shader): - Sample ID for "InterpLocSample" - Offset from the center of the pixel for "InterpLocCenter" - Vertex no. (0 ~ 2) for "InterpLocCustom"
+// @param insertPos : Where to insert calculation instructions
 Value* SpirvLowerGlobal::loadInOutMember(
-    Type*                      inOutTy,        // [in] Type of this input/output member
-    unsigned                   addrSpace,       // Address space
-    const std::vector<Value*>& indexOperands,   // [in] Index operands
-    unsigned                   operandIdx,      // Index of the index operand in processing
-    unsigned                   maxLocOffset,    // Max+1 location offset if variable index has been encountered
-    Constant*                  inOutMetaVal,      // [in] Metadata of this input/output member
-    Value*                     locOffset,      // [in] Relative location offset of this input/output member
-    Value*                     vertexIdx,      // [in] Input array outermost index used for vertex indexing
-    unsigned                   interpLoc,       // Interpolation location, valid for fragment shader
-                                                // (use "InterpLocUnknown" as don't-care value)
-    Value*                     auxInterpValue, // [in] Auxiliary value of interpolation (valid for fragment shader):
-                                                //   - Sample ID for "InterpLocSample"
-                                                //   - Offset from the center of the pixel for "InterpLocCenter"
-                                                //   - Vertex no. (0 ~ 2) for "InterpLocCustom"
-    Instruction*               insertPos)      // [in] Where to insert calculation instructions
+    Type*                      inOutTy,
+    unsigned                   addrSpace,
+    const std::vector<Value*>& indexOperands,
+    unsigned                   operandIdx,
+    unsigned                   maxLocOffset,
+    Constant*                  inOutMetaVal,
+    Value*                     locOffset,
+    Value*                     vertexIdx,
+    unsigned                   interpLoc,
+    Value*                     auxInterpValue,
+    Instruction*               insertPos)
 {
     assert(m_shaderStage == ShaderStageTessControl ||
                 m_shaderStage == ShaderStageTessEval ||
@@ -1793,16 +1827,26 @@ Value* SpirvLowerGlobal::loadInOutMember(
 
 // =====================================================================================================================
 // Inserts instructions to store value to ouput member.
+//
+// @param outputTy : Type of this output member
+// @param storeValue : Value stored to output member
+// @param indexOperands : Index operands
+// @param operandIdx : Index of the index operand in processing
+// @param maxLocOffset : Max+1 location offset if variable index has been encountered
+// @param outputMetaVal : Metadata of this output member
+// @param locOffset : Relative location offset of this output member
+// @param vertexIdx : Input array outermost index used for vertex indexing
+// @param insertPos : Where to insert store instructions
 void SpirvLowerGlobal::storeOutputMember(
-    Type*                      outputTy,       // [in] Type of this output member
-    Value*                     storeValue,     // [in] Value stored to output member
-    const std::vector<Value*>& indexOperands,   // [in] Index operands
-    unsigned                   operandIdx,      // Index of the index operand in processing
-    unsigned                   maxLocOffset,    // Max+1 location offset if variable index has been encountered
-    Constant*                  outputMetaVal,     // [in] Metadata of this output member
-    Value*                     locOffset,      // [in] Relative location offset of this output member
-    Value*                     vertexIdx,      // [in] Input array outermost index used for vertex indexing
-    Instruction*               insertPos)      // [in] Where to insert store instructions
+    Type*                      outputTy,
+    Value*                     storeValue,
+    const std::vector<Value*>& indexOperands,
+    unsigned                   operandIdx,
+    unsigned                   maxLocOffset,
+    Constant*                  outputMetaVal,
+    Value*                     locOffset,
+    Value*                     vertexIdx,
+    Instruction*               insertPos)
 {
     assert(m_shaderStage == ShaderStageTessControl);
 
@@ -2242,14 +2286,14 @@ void SpirvLowerGlobal::cleanupReturnBlock()
 
 // =====================================================================================================================
 // Interpolates an element of the input.
+//
+// @param interpLoc : Interpolation location, valid for fragment shader (use "InterpLocUnknown" as don't-care value)
+// @param auxInterpValue : Auxiliary value of interpolation (valid for fragment shader): - Sample ID for "InterpLocSample" - Offset from the center of the pixel for "InterpLocCenter" - Vertex no. (0 ~ 2) for "InterpLocCustom"
+// @param callInst : "Call" instruction
 void SpirvLowerGlobal::interpolateInputElement(
-    unsigned        interpLoc,          // [in] Interpolation location, valid for fragment shader
-                                        // (use "InterpLocUnknown" as don't-care value)
-    Value*          auxInterpValue,    // [in] Auxiliary value of interpolation (valid for fragment shader):
-                                        //   - Sample ID for "InterpLocSample"
-                                        //   - Offset from the center of the pixel for "InterpLocCenter"
-                                        //   - Vertex no. (0 ~ 2) for "InterpLocCustom"
-    CallInst&       callInst)           // [in] "Call" instruction
+    unsigned        interpLoc,
+    Value*          auxInterpValue,
+    CallInst&       callInst)
 {
     GetElementPtrInst* getElemPtr = cast<GetElementPtrInst>(callInst.getArgOperand(0));
 
@@ -2365,9 +2409,12 @@ void SpirvLowerGlobal::interpolateInputElement(
 
 // =====================================================================================================================
 // Translates an integer to 32-bit integer regardless of its initial bit width.
+//
+// @param value : Value to be translated
+// @param insertPos : Where to insert the translation instructions
 Value* SpirvLowerGlobal::toInt32Value(
-    Value*       value,     // [in] Value to be translated
-    Instruction* insertPos) // [in] Where to insert the translation instructions
+    Value*       value,
+    Instruction* insertPos)
 {
     assert(isa<IntegerType>(value->getType()));
     auto valueTy = cast<IntegerType>(value->getType());

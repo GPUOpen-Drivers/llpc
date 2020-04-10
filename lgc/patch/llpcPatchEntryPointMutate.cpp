@@ -86,8 +86,10 @@ PatchEntryPointMutate::PatchEntryPointMutate()
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool PatchEntryPointMutate::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Entry-Point-Mutate\n");
 
@@ -230,9 +232,12 @@ void PatchEntryPointMutate::processShader()
 
 // =====================================================================================================================
 // Checks whether the specified resource mapping node is active.
+//
+// @param node : Resource mapping node
+// @param isRootNode : TRUE if node is in root level
 bool PatchEntryPointMutate::isResourceNodeActive(
-    const ResourceNode* node,               // [in] Resource mapping node
-    bool isRootNode                          // TRUE if node is in root level
+    const ResourceNode* node,
+    bool isRootNode
     ) const
 {
     bool active = false;
@@ -317,8 +322,10 @@ bool PatchEntryPointMutate::isResourceNodeActive(
 
 // =====================================================================================================================
 // Generates the type for the new entry-point based on already-collected info in LLVM context.
+//
+// @param [out] inRegMask : "Inreg" bit mask for the arguments
 FunctionType* PatchEntryPointMutate::generateEntryPointType(
-    uint64_t* inRegMask  // [out] "Inreg" bit mask for the arguments
+    uint64_t* inRegMask
     ) const
 {
     unsigned userDataIdx = 0;

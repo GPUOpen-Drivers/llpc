@@ -42,8 +42,10 @@ using namespace llvm;
 // Generate base address for image planes
 // Note: If input planeCount == 1, it'll generate the base address for plane 0. This function accepts the concept of
 // planeCount rather a specific plane for that the calulation of plane[n+1] is always based on plane[n].
+//
+// @param planeCount : The plane counts
 void YCbCrAddressHandler::genBaseAddress(
-    unsigned planeCount) // The plane counts
+    unsigned planeCount)
 {
     // For YCbCr, the possible plane counts are among 1 and 3.
     assert(planeCount > 0 && planeCount < 4);
@@ -69,9 +71,12 @@ void YCbCrAddressHandler::genBaseAddress(
 
 // =====================================================================================================================
 // Power2Align operation
+//
+// @param x : Value needs to be aligned
+// @param align : Align base
 Value* YCbCrAddressHandler::power2Align(
-    Value*   x,    // [in] Value needs to be aligned
-    unsigned align) // Align base
+    Value*   x,
+    unsigned align)
 {
     // Check if align is a power of 2
     assert(align != 0 && (align & (align - 1)) == 0);
@@ -82,12 +87,18 @@ Value* YCbCrAddressHandler::power2Align(
 
 // =====================================================================================================================
 // Calculate height and pitch
+//
+// @param bits : Channel bits
+// @param bpp : Bits per pixel
+// @param xBitCount : Effective channel bits
+// @param isTileOptimal : Is tiling optimal
+// @param planeNum : Number of planes
 void YCbCrAddressHandler::genHeightAndPitch(
-    unsigned bits,          // Channel bits
-    unsigned bpp,           // Bits per pixel
-    unsigned xBitCount,     // Effective channel bits
-    bool     isTileOptimal, // Is tiling optimal
-    unsigned planeNum)      // Number of planes
+    unsigned bits,
+    unsigned bpp,
+    unsigned xBitCount,
+    bool     isTileOptimal,
+    unsigned planeNum)
 {
     switch (pGfxIp->major)
     {

@@ -45,9 +45,12 @@ namespace lgc
 {
 
 // =====================================================================================================================
+//
+// @param pipelineState : Pipeline state
+// @param module : LLVM module
 FragColorExport::FragColorExport(
-    PipelineState*  pipelineState, // [in] Pipeline state
-    Module*         module)        // [in] LLVM module
+    PipelineState*  pipelineState,
+    Module*         module)
     :
     m_pipelineState(pipelineState),
     m_context(module ? &module->getContext() : nullptr)
@@ -56,10 +59,14 @@ FragColorExport::FragColorExport(
 
 // =====================================================================================================================
 // Executes fragment color export operations based on the specified output type and its location.
+//
+// @param output : Fragment color output
+// @param location : Location of fragment color output
+// @param insertPos : Where to insert fragment color export instructions
 Value* FragColorExport::run(
-    Value*       output,       // [in] Fragment color output
-    unsigned     location,      // Location of fragment color output
-    Instruction* insertPos)    // [in] Where to insert fragment color export instructions
+    Value*       output,
+    unsigned     location,
+    Instruction* insertPos)
 {
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
 
@@ -456,9 +463,12 @@ Value* FragColorExport::run(
 // =====================================================================================================================
 // Determines the shader export format for a particular fragment color output. Value should be used to do programming
 // for SPI_SHADER_COL_FORMAT.
+//
+// @param outputTy : Type of fragment data output
+// @param location : Location of fragment data output
 ExportFormat FragColorExport::computeExportFormat(
-    Type*    outputTy,  // [in] Type of fragment data output
-    unsigned location    // Location of fragment data output
+    Type*    outputTy,
+    unsigned location
     ) const
 {
     GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
@@ -562,8 +572,10 @@ ExportFormat FragColorExport::computeExportFormat(
 
 // =====================================================================================================================
 // This is the helper function for the algorithm to determine the shader export format.
+//
+// @param dfmt : Color attachment data format
 CompSetting FragColorExport::computeCompSetting(
-    BufDataFormat dfmt) // Color attachment data format
+    BufDataFormat dfmt)
 {
     CompSetting compSetting = CompSetting::Invalid;
     switch (getNumChannels(dfmt))
@@ -580,8 +592,10 @@ CompSetting FragColorExport::computeCompSetting(
 
 // =====================================================================================================================
 // Get the number of channels
+//
+// @param dfmt : Color attachment data format
 unsigned FragColorExport::getNumChannels(
-    BufDataFormat dfmt) // Color attachment data format
+    BufDataFormat dfmt)
 {
     switch (dfmt)
     {
@@ -628,8 +642,10 @@ unsigned FragColorExport::getNumChannels(
 
 // =====================================================================================================================
 // Checks whether the alpha channel is present in the specified color attachment format.
+//
+// @param dfmt : Color attachment data format
 bool FragColorExport::hasAlpha(
-    BufDataFormat dfmt) // Color attachment data format
+    BufDataFormat dfmt)
 {
     switch (dfmt)
     {
@@ -655,8 +671,10 @@ bool FragColorExport::hasAlpha(
 
 // =====================================================================================================================
 // Gets the maximum bit-count of any component in specified color attachment format.
+//
+// @param dfmt : Color attachment data format
 unsigned FragColorExport::getMaxComponentBitCount(
-    BufDataFormat dfmt) // Color attachment data format
+    BufDataFormat dfmt)
 {
     switch (dfmt)
     {
@@ -710,10 +728,14 @@ unsigned FragColorExport::getMaxComponentBitCount(
 // =====================================================================================================================
 // Converts an output component value to its floating-point representation. This function is a "helper" in computing
 // the export value based on shader export format.
+//
+// @param value : Output component value
+// @param signedness : Whether the type is signed (valid for integer type)
+// @param insertPos : Where to insert conversion instructions
 Value* FragColorExport::convertToFloat(
-    Value*       value,        // [in] Output component value
-    bool         signedness,    // Whether the type is signed (valid for integer type)
-    Instruction* insertPos     // [in] Where to insert conversion instructions
+    Value*       value,
+    bool         signedness,
+    Instruction* insertPos
     ) const
 {
     Type* valueTy = value->getType();
@@ -777,10 +799,14 @@ Value* FragColorExport::convertToFloat(
 // =====================================================================================================================
 // Converts an output component value to its integer representation. This function is a "helper" in computing the
 // export value based on shader export format.
+//
+// @param value : Output component value
+// @param signedness : Whether the type is signed (valid for integer type)
+// @param insertPos : Where to insert conversion instructions
 Value* FragColorExport::convertToInt(
-    Value*       value,        // [in] Output component value
-    bool         signedness,    // Whether the type is signed (valid for integer type)
-    Instruction* insertPos     // [in] Where to insert conversion instructions
+    Value*       value,
+    bool         signedness,
+    Instruction* insertPos
     ) const
 {
     Type* valueTy = value->getType();

@@ -83,16 +83,20 @@ char BuilderReplayer::ID = 0;
 
 // =====================================================================================================================
 // Create BuilderReplayer pass
+//
+// @param pipeline : Pipeline object
 ModulePass* lgc::createBuilderReplayer(
-    Pipeline*  pipeline)     // [in] Pipeline object
+    Pipeline*  pipeline)
 {
     return new BuilderReplayer(pipeline);
 }
 
 // =====================================================================================================================
 // Constructor
+//
+// @param pipeline : Pipeline object
 BuilderReplayer::BuilderReplayer(
-    Pipeline*  pipeline)       // [in] Pipeline object
+    Pipeline*  pipeline)
     :
     ModulePass(ID),
     BuilderRecorderMetadataKinds(static_cast<LLVMContext&>(pipeline->getContext()))
@@ -101,8 +105,10 @@ BuilderReplayer::BuilderReplayer(
 
 // =====================================================================================================================
 // Run the BuilderReplayer pass on a module
+//
+// @param module : Module to run this pass on
 bool BuilderReplayer::runOnModule(
-    Module& module)   // [in] Module to run this pass on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Running the pass of replaying LLPC builder calls\n");
 
@@ -158,9 +164,12 @@ bool BuilderReplayer::runOnModule(
 
 // =====================================================================================================================
 // Replay a recorded builder call.
+//
+// @param opcode : The builder call opcode
+// @param call : The builder call to process
 void BuilderReplayer::replayCall(
-    unsigned  opcode,   // The builder call opcode
-    CallInst* call)    // [in] The builder call to process
+    unsigned  opcode,
+    CallInst* call)
 {
     // Change shader stage if necessary.
     Function* enclosingFunc = call->getParent()->getParent();
@@ -205,9 +214,12 @@ void BuilderReplayer::replayCall(
 // Process one recorder builder call.
 // Returns the replacement value, or nullptr in the case that we do not want the caller to replace uses of
 // pCall with the new value.
+//
+// @param opcode : The builder call opcode
+// @param call : The builder call to process
 Value* BuilderReplayer::processCall(
-    unsigned  opcode,   // The builder call opcode
-    CallInst* call)    // [in] The builder call to process
+    unsigned  opcode,
+    CallInst* call)
 {
     // Set builder fast math flags from the recorded call.
     if (isa<FPMathOperator>(call))

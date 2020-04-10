@@ -40,9 +40,11 @@ namespace Vkgc
 {
 
 // =====================================================================================================================
+//
+// @param gfxIp : Graphics IP version info
 template<class Elf>
 ElfReader<Elf>::ElfReader(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
     :
     m_gfxIp(gfxIp),
     m_header(),
@@ -77,10 +79,13 @@ ElfReader<Elf>::~ElfReader()
 // + Section Header (h0) [NULL]
 // + Section Header (h1) [.shstrtab]
 // + ...            (h#) [...]
+//
+// @param pBuffer : Input ELF data buffer
+// @param [out] pBufSize : Size of the given read buffer (determined from the ELF header)
 template<class Elf>
 Result ElfReader<Elf>::ReadFromBuffer(
-    const void* pBuffer,   // [in] Input ELF data buffer
-    size_t*     pBufSize)  // [out] Size of the given read buffer (determined from the ELF header)
+    const void* pBuffer,
+    size_t*     pBufSize)
 {
     assert(pBuffer );
 
@@ -155,11 +160,15 @@ Result ElfReader<Elf>::ReadFromBuffer(
 
 // =====================================================================================================================
 // Retrieves the section data for the specified section name, if it exists.
+//
+// @param pName : Name of the section to look for
+// @param [out] sectData : Pointer to section data
+// @param [out] pDataLength : Size of the section data
 template<class Elf>
 Result ElfReader<Elf>::GetSectionData(
-    const char*  pName,       // [in] Name of the section to look for
-    const void** sectData,   // [out] Pointer to section data
-    size_t*      pDataLength  // [out] Size of the section data
+    const char*  pName,
+    const void** sectData,
+    size_t*      pDataLength
     ) const
 {
     Result result = Result::ErrorInvalidValue;
@@ -192,10 +201,13 @@ unsigned ElfReader<Elf>::getSymbolCount() const
 
 // =====================================================================================================================
 // Gets info of the symbol in the symbol table section according to the specified index.
+//
+// @param idx : Symbol index
+// @param [out] pSymbol : Info of the symbol
 template<class Elf>
 void ElfReader<Elf>::getSymbol(
-    unsigned   idx,       // Symbol index
-    ElfSymbol* pSymbol)   // [out] Info of the symbol
+    unsigned   idx,
+    ElfSymbol* pSymbol)
 {
     auto& section = m_sections[m_symSecIdx];
     const char* strTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx]->data);
@@ -225,10 +237,13 @@ unsigned ElfReader<Elf>::getRelocationCount()
 
 // =====================================================================================================================
 // Gets info of the relocation in the relocation section according to the specified index.
+//
+// @param idx : Relocation index
+// @param [out] pReloc : Info of the relocation
 template<class Elf>
 void ElfReader<Elf>::getRelocation(
-    unsigned  idx,      // Relocation index
-    ElfReloc* pReloc)   // [out] Info of the relocation
+    unsigned  idx,
+    ElfReloc* pReloc)
 {
     auto& section = m_sections[m_relocSecIdx];
 
@@ -247,10 +262,13 @@ unsigned ElfReader<Elf>::getSectionCount()
 
 // =====================================================================================================================
 // Gets section data by section index.
+//
+// @param secIdx : Section index
+// @param [out] ppSectionData : Section data
 template<class Elf>
 Result ElfReader<Elf>::getSectionDataBySectionIndex(
-    unsigned           secIdx,          // Section index
-    SectionBuffer**    ppSectionData    // [out] Section data
+    unsigned           secIdx,
+    SectionBuffer**    ppSectionData
     ) const
 {
     Result result = Result::ErrorInvalidValue;
@@ -264,11 +282,15 @@ Result ElfReader<Elf>::getSectionDataBySectionIndex(
 
 // =====================================================================================================================
 // Gets section data by sorting index (ordered map).
+//
+// @param sortIdx : Sorting index
+// @param [out] pSecIdx : Section index
+// @param [out] ppSectionData : Section data
 template<class Elf>
 Result ElfReader<Elf>::getSectionDataBySortingIndex(
-    unsigned           sortIdx,         // Sorting index
-    unsigned*          pSecIdx,         // [out] Section index
-    SectionBuffer**    ppSectionData    // [out] Section data
+    unsigned           sortIdx,
+    unsigned*          pSecIdx,
+    SectionBuffer**    ppSectionData
     ) const
 {
     Result result = Result::ErrorInvalidValue;
@@ -286,10 +308,13 @@ Result ElfReader<Elf>::getSectionDataBySortingIndex(
 
 // =====================================================================================================================
 // Gets all associated symbols by section index.
+//
+// @param secIdx : Section index
+// @param [out] secSymbols : ELF symbols
 template<class Elf>
 void ElfReader<Elf>::GetSymbolsBySectionIndex(
-    unsigned                secIdx,         // Section index
-    std::vector<ElfSymbol>& secSymbols      // [out] ELF symbols
+    unsigned                secIdx,
+    std::vector<ElfSymbol>& secSymbols
     ) const
 {
     if (secIdx < m_sections.size() && m_symSecIdx >= 0)
@@ -326,9 +351,11 @@ void ElfReader<Elf>::GetSymbolsBySectionIndex(
 
 // =====================================================================================================================
 // Checks whether the input name is a valid symbol.
+//
+// @param pSymbolName : Symbol name
 template<class Elf>
 bool ElfReader<Elf>::isValidSymbol(
-    const char* pSymbolName)  // [in] Symbol name
+    const char* pSymbolName)
 {
     auto& section = m_sections[m_symSecIdx];
     const char* strTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx]->data);
@@ -350,9 +377,11 @@ bool ElfReader<Elf>::isValidSymbol(
 
 // =====================================================================================================================
 // Gets note according to note type
+//
+// @param noteType : Note type
 template<class Elf>
 ElfNote ElfReader<Elf>::getNote(
-    Util::Abi::PipelineAbiNoteType noteType // Note type
+    Util::Abi::PipelineAbiNoteType noteType
     ) const
 {
     unsigned noteSecIdx = m_map.at(NoteName);
@@ -381,10 +410,13 @@ ElfNote ElfReader<Elf>::getNote(
 
 // =====================================================================================================================
 // Initialize MsgPack document and related visitor iterators
+//
+// @param pBuffer : Message buffer
+// @param sizeInBytes : Buffer size in bytes
 template<class Elf>
 void ElfReader<Elf>::initMsgPackDocument(
-    const void* pBuffer,       // [in] Message buffer
-    unsigned    sizeInBytes)   // Buffer size in bytes
+    const void* pBuffer,
+    unsigned    sizeInBytes)
 {
     m_document.readFromBlob(StringRef(reinterpret_cast<const char*>(pBuffer), sizeInBytes), false);
 

@@ -68,9 +68,12 @@ ModulePass* createSpirvLowerAlgebraTransform(bool enableConstFolding , bool enab
 }
 
 // =====================================================================================================================
+//
+// @param enableConstFolding : Whether enable constant folding
+// @param enableFloatOpt : Whether enable floating point optimization
 SpirvLowerAlgebraTransform::SpirvLowerAlgebraTransform(
-    bool enableConstFolding, // Whether enable constant folding
-    bool enableFloatOpt)     // Whether enable floating point optimization
+    bool enableConstFolding,
+    bool enableFloatOpt)
     :
     SpirvLower(ID),
     m_enableConstFolding(enableConstFolding),
@@ -81,8 +84,10 @@ SpirvLowerAlgebraTransform::SpirvLowerAlgebraTransform(
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool SpirvLowerAlgebraTransform::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Algebra-Transform\n");
 
@@ -160,8 +165,10 @@ bool SpirvLowerAlgebraTransform::runOnModule(
 
 // =====================================================================================================================
 // Checks desired denormal flush behavior and inserts llvm.canonicalize.
+//
+// @param inst : Instruction to flush denormals if needed
 void SpirvLowerAlgebraTransform::flushDenormIfNeeded(
-    Instruction *inst)  // [in] Instruction to flush denormals if needed
+    Instruction *inst)
 {
     auto destTy = inst->getType();
     if ((destTy->getScalarType()->isHalfTy() && m_fp16DenormFlush) ||
@@ -181,8 +188,10 @@ void SpirvLowerAlgebraTransform::flushDenormIfNeeded(
 
 // =====================================================================================================================
 // Visits unary operator instruction.
+//
+// @param unaryOp : Unary operator instruction
 void SpirvLowerAlgebraTransform::visitUnaryOperator(
-    UnaryOperator& unaryOp)  // [in] Unary operator instruction
+    UnaryOperator& unaryOp)
 {
     if (unaryOp.getOpcode() == Instruction::FNeg)
         flushDenormIfNeeded(&unaryOp);
@@ -190,8 +199,10 @@ void SpirvLowerAlgebraTransform::visitUnaryOperator(
 
 // =====================================================================================================================
 // Visits binary operator instruction.
+//
+// @param binaryOp : Binary operator instruction
 void SpirvLowerAlgebraTransform::visitBinaryOperator(
-    BinaryOperator& binaryOp)  // [in] Binary operator instruction
+    BinaryOperator& binaryOp)
 {
     Instruction::BinaryOps opCode = binaryOp.getOpcode();
 
@@ -334,8 +345,10 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
 
 // =====================================================================================================================
 // Visits call instruction.
+//
+// @param callInst : Call instruction
 void SpirvLowerAlgebraTransform::visitCallInst(
-    CallInst& callInst) // [in] Call instruction
+    CallInst& callInst)
 {
     auto callee = callInst.getCalledFunction();
 
@@ -369,8 +382,10 @@ void SpirvLowerAlgebraTransform::visitCallInst(
 
 // =====================================================================================================================
 // Visits fptrunc instruction.
+//
+// @param fptruncInst : Fptrunc instruction
 void SpirvLowerAlgebraTransform::visitFPTruncInst(
-    FPTruncInst& fptruncInst)   // [in] Fptrunc instruction
+    FPTruncInst& fptruncInst)
 {
     if (m_fp16Rtz)
     {
@@ -399,8 +414,10 @@ void SpirvLowerAlgebraTransform::visitFPTruncInst(
 
 // =====================================================================================================================
 // Recursively finds backward if the FPMathOperator operand does not specifiy "contract" flag.
+//
+// @param operand : Operand to check
 bool SpirvLowerAlgebraTransform::isOperandNoContract(
-    Value *operand)  // [in] Operand to check
+    Value *operand)
 {
     if (isa<BinaryOperator>(operand))
     {
@@ -423,8 +440,10 @@ bool SpirvLowerAlgebraTransform::isOperandNoContract(
 
 // =====================================================================================================================
 // Disable fast math for all values related with the specified value
+//
+// @param value : Value to disable fast math
 void SpirvLowerAlgebraTransform::disableFastMath(
-    Value* value)   // [in] Value to disable fast math
+    Value* value)
 {
     std::set<Instruction*> allValues;
     std::list<Instruction*> workSet;

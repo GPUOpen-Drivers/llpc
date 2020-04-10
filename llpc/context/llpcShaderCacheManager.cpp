@@ -57,9 +57,12 @@ ShaderCacheManager::~ShaderCacheManager()
 
 // =====================================================================================================================
 // Get ShaderCache instance with specified create info
+//
+// @param createInfo : Shader cache create info
+// @param auxCreateInfo : Shader cache auxiliary info (static fields)
 ShaderCachePtr ShaderCacheManager::getShaderCacheObject(
-    const ShaderCacheCreateInfo*    createInfo,    // [in] Shader cache create info
-    const ShaderCacheAuxCreateInfo* auxCreateInfo) // [in] Shader cache auxiliary info (static fields)
+    const ShaderCacheCreateInfo*    createInfo,
+    const ShaderCacheAuxCreateInfo* auxCreateInfo)
 {
     ShaderCachePtr shaderCache;
     auto cacheIt = m_shaderCaches.begin();
@@ -87,8 +90,10 @@ ShaderCachePtr ShaderCacheManager::getShaderCacheObject(
 
 // =====================================================================================================================
 // Release ShaderCache instance
+//
+// @param shaderCachePtr : ShaderCache instance to be released
 void ShaderCacheManager::releaseShaderCacheObject(
-    ShaderCachePtr& shaderCachePtr)                 // [in] ShaderCache instance to be released
+    ShaderCachePtr& shaderCachePtr)
 {
     auto cacheIt = m_shaderCaches.begin();
     auto endIt = m_shaderCaches.end();

@@ -54,12 +54,18 @@ namespace lgc
 // and its parameters.
 //
 // NOTE: Prefer BuilderBase::CreateNamedCall where possible.
+//
+// @param funcName : Name string of the function
+// @param retTy : Return type
+// @param args : Parameters
+// @param attribs : Attributes
+// @param insertPos : Where to insert this call
 CallInst* emitCall(
-    StringRef                     funcName,         // Name string of the function
-    Type*                         retTy,           // [in] Return type
-    ArrayRef<Value *>             args,             // [in] Parameters
-    ArrayRef<Attribute::AttrKind> attribs,          // Attributes
-    Instruction*                  insertPos)       // [in] Where to insert this call
+    StringRef                     funcName,
+    Type*                         retTy,
+    ArrayRef<Value *>             args,
+    ArrayRef<Attribute::AttrKind> attribs,
+    Instruction*                  insertPos)
 {
     BuilderBase builder(insertPos);
     return builder.createNamedCall(funcName, retTy, args, attribs);
@@ -70,12 +76,18 @@ CallInst* emitCall(
 // type and its parameters.
 //
 // NOTE: Prefer BuilderBase::CreateNamedCall where possible.
+//
+// @param funcName : Name string of the function
+// @param retTy : Return type
+// @param args : Parameters
+// @param attribs : Attributes
+// @param insertAtEnd : Which block to insert this call at the end
 CallInst* emitCall(
-    StringRef                     funcName,         // Name string of the function
-    Type*                         retTy,           // [in] Return type
-    ArrayRef<Value *>             args,             // [in] Parameters
-    ArrayRef<Attribute::AttrKind> attribs,          // Attributes
-    BasicBlock*                   insertAtEnd)     // [in] Which block to insert this call at the end
+    StringRef                     funcName,
+    Type*                         retTy,
+    ArrayRef<Value *>             args,
+    ArrayRef<Attribute::AttrKind> attribs,
+    BasicBlock*                   insertAtEnd)
 {
     BuilderBase builder(insertAtEnd);
     return builder.createNamedCall(funcName, retTy, args, attribs);
@@ -83,9 +95,12 @@ CallInst* emitCall(
 
 // =====================================================================================================================
 // Gets LLVM-style name for type.
+//
+// @param ty : Type to get mangle name
+// @param [in,out] nameStream : Stream to write the type name into
 void getTypeName(
-    Type*         ty,         // [in] Type to get mangle name
-    raw_ostream&  nameStream)  // [in,out] Stream to write the type name into
+    Type*         ty,
+    raw_ostream&  nameStream)
 {
     for (;;)
     {
@@ -137,8 +152,10 @@ void getTypeName(
 
 // =====================================================================================================================
 // Gets LLVM-style name for type.
+//
+// @param ty : Type to get mangle name
 std::string getTypeName(
-    Type* ty)  // [in] Type to get mangle name
+    Type* ty)
 {
     std::string name;
     raw_string_ostream nameStream(name);
@@ -149,10 +166,14 @@ std::string getTypeName(
 
 // =====================================================================================================================
 // Adds LLVM-style type mangling suffix for the specified return type and args to the name.
+//
+// @param returnTy : Return type (could be null)
+// @param args : Arguments
+// @param [out] name : String to add mangling to
 void addTypeMangling(
-    Type*            returnTy,     // [in] Return type (could be null)
-    ArrayRef<Value*> args,          // Arguments
-    std::string&     name)          // [out] String to add mangling to
+    Type*            returnTy,
+    ArrayRef<Value*> args,
+    std::string&     name)
 {
     size_t nameLen = name.length();
     if (name[nameLen - 1] == '.')
@@ -177,8 +198,10 @@ void addTypeMangling(
 
 // =====================================================================================================================
 // Gets the shader stage from the specified LLVM function. Returns ShaderStageInvalid if not shader entrypoint.
+//
+// @param func : LLVM function
 ShaderStage getShaderStageFromFunction(
-    const Function* func)  // [in] LLVM function
+    const Function* func)
 {
     // Check for the metadata that is added by the builder. This works in the patch phase.
     MDNode* stageMetaNode = func->getMetadata(lgcName::ShaderStageMetadata);
@@ -189,9 +212,12 @@ ShaderStage getShaderStageFromFunction(
 
 // =====================================================================================================================
 // Gets the shader stage from the specified calling convention.
+//
+// @param stageMask : Shader stage mask for the pipeline
+// @param callConv : Calling convention
 ShaderStage getShaderStageFromCallingConv(
-    unsigned        stageMask,  // Shader stage mask for the pipeline
-    CallingConv::ID callConv)   // Calling convention
+    unsigned        stageMask,
+    CallingConv::ID callConv)
 {
     ShaderStage shaderStage = ShaderStageInvalid;
 
@@ -233,10 +259,14 @@ ShaderStage getShaderStageFromCallingConv(
 
 // =====================================================================================================================
 // Gets the argument from the specified function according to the argument index.
+//
+// @param func : LLVM function
+// @param idx : Index of the query argument
+// @param name : Name to give the argument if currently empty
 Value* getFunctionArgument(
-    Function*     func,    // [in] LLVM function
-    unsigned      idx,      // Index of the query argument
-    const Twine&  name)     // Name to give the argument if currently empty
+    Function*     func,
+    unsigned      idx,
+    const Twine&  name)
 {
     Argument* arg = &func->arg_begin()[idx];
     if (!name.isTriviallyEmpty() && arg->getName() == "")
@@ -246,9 +276,12 @@ Value* getFunctionArgument(
 
 // =====================================================================================================================
 // Checks if one type can be bitcasted to the other (type1 -> type2, valid for scalar or vector type).
+//
+// @param ty1 : One type
+// @param ty2 : The other type
 bool canBitCast(
-    const Type* ty1,   // [in] One type
-    const Type* ty2)   // [in] The other type
+    const Type* ty1,
+    const Type* ty2)
 {
     bool valid = false;
 
@@ -273,8 +306,10 @@ bool canBitCast(
 
 // =====================================================================================================================
 // Checks if the specified value actually represents a don't-care value (0xFFFFFFFF).
+//
+// @param value : Value to check
 bool isDontCareValue(
-    Value* value) // [in] Value to check
+    Value* value)
 {
     bool isDontCare = false;
 

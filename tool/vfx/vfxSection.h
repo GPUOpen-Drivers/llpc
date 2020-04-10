@@ -316,13 +316,20 @@ private:
 // =====================================================================================================================
 // Gets ptr of a member. return true if operation success
 template<typename TValue>
+//
+// @param lineNum : Line No.
+// @param memberName : Member name
+// @param isWriteAccess : True for write
+// @param arrayIndex : Array index
+// @param [out] ptrOut : Pointer of section member
+// @param [out] errorMsg : Error message
 bool Section::getPtrOf(
-    unsigned     lineNum,           // Line No.
-    const char*  memberName,        // [in] Member name
-    bool         isWriteAccess,     // True for write
-    unsigned     arrayIndex,        // Array index
-    TValue**     ptrOut,            // [out] Pointer of section member
-    std::string* errorMsg)         // [out] Error message
+    unsigned     lineNum,
+    const char*  memberName,
+    bool         isWriteAccess,
+    unsigned     arrayIndex,
+    TValue**     ptrOut,
+    std::string* errorMsg)
 {
     bool        result      = true;
     void*      memberAddr  = reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue));
@@ -383,11 +390,16 @@ bool Section::getPtrOf(
 // =====================================================================================================================
 // Sets value to a member array
 template<typename TValue>
+//
+// @param lineNum : Line No.
+// @param memberName : Name of section member
+// @param arrayIndex : Array index
+// @param value : Value to be set
 bool Section::set(
-    unsigned    lineNum,           // Line No.
-    const char* memberName,       // [in] Name of section member
-    unsigned    arrayIndex,        // Array index
-    TValue*     value)            // [in] Value to be set
+    unsigned    lineNum,
+    const char* memberName,
+    unsigned    arrayIndex,
+    TValue*     value)
 {
     bool result = false;
     VFX_ASSERT(value );

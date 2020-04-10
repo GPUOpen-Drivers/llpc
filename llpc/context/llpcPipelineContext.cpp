@@ -97,10 +97,14 @@ namespace Llpc
 {
 
 // =====================================================================================================================
+//
+// @param gfxIp : Graphics IP version info
+// @param pipelineHash : Pipeline hash code
+// @param cacheHash : Cache hash code
 PipelineContext::PipelineContext(
-    GfxIpVersion           gfxIp,           // Graphics IP version info
-    MetroHash::Hash*       pipelineHash,   // [in] Pipeline hash code
-    MetroHash::Hash*       cacheHash)      // [in] Cache hash code
+    GfxIpVersion           gfxIp,
+    MetroHash::Hash*       pipelineHash,
+    MetroHash::Hash*       cacheHash)
     :
     m_gfxIp(gfxIp),
     m_pipelineHash(*pipelineHash),
@@ -116,9 +120,12 @@ PipelineContext::~PipelineContext()
 
 // =====================================================================================================================
 // Gets the name string of GPU target according to graphics IP version info.
+//
+// @param gfxIp : Graphics IP version info
+// @param [out] gpuName : LLVM GPU name
 void PipelineContext::getGpuNameString(
-    GfxIpVersion  gfxIp,    // Graphics IP version info
-    std::string&  gpuName)  // [out] LLVM GPU name
+    GfxIpVersion  gfxIp,
+    std::string&  gpuName)
 {
     // A GfxIpVersion from PAL is three decimal numbers for major, minor and stepping. This function
     // converts that to an LLVM target name, whith is "gfx" followed by the three decimal numbers with
@@ -136,8 +143,10 @@ void PipelineContext::getGpuNameString(
 
 // =====================================================================================================================
 // Gets the name string of the abbreviation for GPU target according to graphics IP version info.
+//
+// @param gfxIp : Graphics IP version info
 const char* PipelineContext::getGpuNameAbbreviation(
-    GfxIpVersion gfxIp)  // Graphics IP version info
+    GfxIpVersion gfxIp)
 {
     const char* nameAbbr = nullptr;
     switch (gfxIp.major)
@@ -164,8 +173,10 @@ const char* PipelineContext::getGpuNameAbbreviation(
 
 // =====================================================================================================================
 // Gets the hash code of input shader with specified shader stage.
+//
+// @param stage : Shader stage
 ShaderHash PipelineContext::getShaderHashCode(
-    ShaderStage stage       // Shader stage
+    ShaderStage stage
 ) const
 {
     auto shaderInfo = getPipelineShaderInfo(stage);
@@ -197,8 +208,10 @@ ShaderHash PipelineContext::getShaderHashCode(
 
 // =====================================================================================================================
 // Set pipeline state in Pipeline object for middle-end
+//
+// @param [in/out] pipeline : Middle-end pipeline object
 void PipelineContext::setPipelineState(
-    Pipeline*    pipeline) const   // [in/out] Middle-end pipeline object
+    Pipeline*    pipeline) const
 {
     // Give the shader stage mask to the middle-end.
     unsigned stageMask = getShaderStageMask();
@@ -227,8 +240,10 @@ void PipelineContext::setPipelineState(
 
 // =====================================================================================================================
 // Give the pipeline options to the middle-end.
+//
+// @param [in/out] pipeline : Middle-end pipeline object
 void PipelineContext::setOptionsInPipeline(
-    Pipeline*    pipeline) const   // [in/out] Middle-end pipeline object
+    Pipeline*    pipeline) const
 {
     Options options = {};
     options.hash[0] = getPiplineHashCode();
@@ -377,8 +392,10 @@ void PipelineContext::setOptionsInPipeline(
 // Give the user data nodes and descriptor range values to the middle-end.
 // The user data nodes have been merged so they are the same in each shader stage. Get them from
 // the first active stage.
+//
+// @param [in/out] pipeline : Middle-end pipeline object
 void PipelineContext::setUserDataInPipeline(
-    Pipeline*    pipeline) const   // [in/out] Middle-end pipeline object
+    Pipeline*    pipeline) const
 {
     const PipelineShaderInfo* shaderInfo = nullptr;
     unsigned stageMask = getShaderStageMask();
@@ -417,12 +434,18 @@ void PipelineContext::setUserDataInPipeline(
 // =====================================================================================================================
 // Set one user data table, and its inner tables. Used by SetUserDataInPipeline above, and recursively calls
 // itself for an inner table. This translates from a Vkgc ResourceMappingNode to an LGC ResourceNode.
+//
+// @param context : LLVM context
+// @param nodes : The resource mapping nodes
+// @param immutableNodesMap : Map of immutable nodes
+// @param [out] destTable : Where to write nodes
+// @param [in/out] destInnerTable : End of space available for inner tables
 void PipelineContext::setUserDataNodesTable(
-    LLVMContext&                  context,                // LLVM context
-    ArrayRef<ResourceMappingNode> nodes,                  // The resource mapping nodes
-    const ImmutableNodesMap&      immutableNodesMap,      // [in] Map of immutable nodes
-    ResourceNode*                 destTable,             // [out] Where to write nodes
-    ResourceNode*&                destInnerTable) const  // [in/out] End of space available for inner tables
+    LLVMContext&                  context,
+    ArrayRef<ResourceMappingNode> nodes,
+    const ImmutableNodesMap&      immutableNodesMap,
+    ResourceNode*                 destTable,
+    ResourceNode*&                destInnerTable) const
 {
     for (unsigned idx = 0; idx != nodes.size(); ++idx)
     {
@@ -539,8 +562,10 @@ void PipelineContext::setUserDataNodesTable(
 
 // =====================================================================================================================
 // Give the graphics pipeline state to the middle-end.
+//
+// @param [in/out] pipeline : Middle-end pipeline object
 void PipelineContext::setGraphicsStateInPipeline(
-    Pipeline*    pipeline   // [in/out] Middle-end pipeline object
+    Pipeline*    pipeline
 ) const
 {
     const auto& inputIaState = static_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo())->iaState;
@@ -577,8 +602,10 @@ void PipelineContext::setGraphicsStateInPipeline(
 
 // =====================================================================================================================
 // Set vertex input descriptions in middle-end Pipeline object
+//
+// @param pipeline : Pipeline object
 void PipelineContext::setVertexInputDescriptions(
-    Pipeline*   pipeline   // [in] Pipeline object
+    Pipeline*   pipeline
 ) const
 {
     auto vertexInput = static_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo())->pVertexInput;
@@ -657,8 +684,10 @@ void PipelineContext::setVertexInputDescriptions(
 
 // =====================================================================================================================
 // Set color export state in middle-end Pipeline object
+//
+// @param pipeline : Pipeline object
 void PipelineContext::setColorExportState(
-    Pipeline*          pipeline   // [in] Pipeline object
+    Pipeline*          pipeline
 ) const
 {
     const auto& cbState = static_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo())->cbState;
@@ -689,9 +718,12 @@ void PipelineContext::setColorExportState(
 // =====================================================================================================================
 // Map a VkFormat to a {BufDataFormat, BufNumFormat}. Returns BufDataFormatInvalid if the
 // VkFormat is not supported for vertex input.
+//
+// @param format : Vulkan API format code
+// @param isColorExport : True for looking up color export format, false for vertex input format
 std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(
-    VkFormat  format,         // Vulkan API format code
-    bool      isColorExport)  // True for looking up color export format, false for vertex input format
+    VkFormat  format,
+    bool      isColorExport)
 {
     static const struct FormatEntry
     {

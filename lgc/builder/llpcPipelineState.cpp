@@ -90,9 +90,10 @@ unsigned PipelineState::getPalAbiVersion() const
 
 // =====================================================================================================================
 // Link shader modules into a pipeline module.
+//
+// @param modules : Array of modules indexed by shader stage, with nullptr entry for any stage not present in the pipeline. Modules are freed.
 Module* PipelineState::link(
-    ArrayRef<Module*> modules)               // Array of modules indexed by shader stage, with nullptr entry
-                                             // for any stage not present in the pipeline. Modules are freed.
+    ArrayRef<Module*> modules)
 {
     // Processing for each shader module before linking.
     IRBuilder<> builder(getContext());
@@ -186,11 +187,16 @@ Module* PipelineState::link(
 // Output is written to outStream.
 // Like other Builder methods, on error, this calls report_fatal_error, which you can catch by setting
 // a diagnostic handler with LLVMContext::setDiagnosticHandler.
+//
+// @param pipelineModule : IR pipeline module
+// @param [in/out] outStream : Stream to write ELF or IR disassembly output
+// @param checkShaderCacheFunc : Function to check shader cache in graphics pipeline
+// @param timers : Timers for: patch passes, llvm optimizations, codegen
 void PipelineState::generate(
-    std::unique_ptr<Module>         pipelineModule,       // IR pipeline module
-    raw_pwrite_stream&              outStream,            // [in/out] Stream to write ELF or IR disassembly output
-    Pipeline::CheckShaderCacheFunc  checkShaderCacheFunc, // Function to check shader cache in graphics pipeline
-    ArrayRef<Timer*>                timers)               // Timers for: patch passes, llvm optimizations, codegen
+    std::unique_ptr<Module>         pipelineModule,
+    raw_pwrite_stream&              outStream,
+    Pipeline::CheckShaderCacheFunc  checkShaderCacheFunc,
+    ArrayRef<Timer*>                timers)
 {
     unsigned passIndex = 1000;
     Timer* patchTimer = timers.size() >= 1 ? timers[0] : nullptr;
@@ -253,8 +259,10 @@ void PipelineState::generate(
 
 // =====================================================================================================================
 // Clear the pipeline state IR metadata.
+//
+// @param [in/out] module : IR module
 void PipelineState::clear(
-    Module* module)    // [in/out] IR module
+    Module* module)
 {
     getShaderModes()->clear();
     m_options = {};
@@ -271,8 +279,10 @@ void PipelineState::clear(
 
 // =====================================================================================================================
 // Record pipeline state into IR metadata of specified module.
+//
+// @param [in/out] module : Module to record the IR metadata in
 void PipelineState::record(
-    Module* module)    // [in/out] Module to record the IR metadata in
+    Module* module)
 {
     getShaderModes()->record(module);
     recordOptions(module);
@@ -285,8 +295,10 @@ void PipelineState::record(
 
 // =====================================================================================================================
 // Set up the pipeline state from the pipeline IR module.
+//
+// @param module : LLVM module
 void PipelineState::readState(
-    Module* module)    // [in] LLVM module
+    Module* module)
 {
     getShaderModes()->readModesFromPipeline(module);
     readShaderStageMask(module);
@@ -300,8 +312,10 @@ void PipelineState::readState(
 
 // =====================================================================================================================
 // Read shaderStageMask from IR. This consists of checking what shader stage functions are present in the IR.
+//
+// @param module : LLVM module
 void PipelineState::readShaderStageMask(
-    Module* module)    // [in] LLVM module
+    Module* module)
 {
     m_stageMask = 0;
     for (auto& func : *module)
@@ -333,8 +347,10 @@ ShaderStage PipelineState::getLastVertexProcessingStage() const
 
 // =====================================================================================================================
 // Gets the previous active shader stage in this pipeline
+//
+// @param shaderStage : Current shader stage
 ShaderStage PipelineState::getPrevShaderStage(
-    ShaderStage shaderStage // Current shader stage
+    ShaderStage shaderStage
     ) const
 {
     if (shaderStage == ShaderStageCompute)
@@ -364,8 +380,10 @@ ShaderStage PipelineState::getPrevShaderStage(
 
 // =====================================================================================================================
 // Gets the next active shader stage in this pipeline
+//
+// @param shaderStage : Current shader stage
 ShaderStage PipelineState::getNextShaderStage(
-    ShaderStage shaderStage // Current shader stage
+    ShaderStage shaderStage
     ) const
 {
     if (shaderStage == ShaderStageCompute)
@@ -407,9 +425,12 @@ bool PipelineState::isGraphics() const
 
 // =====================================================================================================================
 // Set per-shader options
+//
+// @param stage : Shader stage
+// @param options : Shader options
 void PipelineState::setShaderOptions(
-    ShaderStage           stage,    // Shader stage
-    const ShaderOptions&  options)  // [in] Shader options
+    ShaderStage           stage,
+    const ShaderOptions&  options)
 {
     if (m_shaderOptions.size() <= stage)
         m_shaderOptions.resize(stage + 1);
@@ -418,8 +439,10 @@ void PipelineState::setShaderOptions(
 
 // =====================================================================================================================
 // Get per-shader options
+//
+// @param stage : Shader stage
 const ShaderOptions& PipelineState::getShaderOptions(
-    ShaderStage           stage)    // Shader stage
+    ShaderStage           stage)
 {
     if (m_shaderOptions.size() <= stage)
         m_shaderOptions.resize(stage + 1);
@@ -430,8 +453,10 @@ const ShaderOptions& PipelineState::getShaderOptions(
 // Record pipeline and shader options into IR metadata.
 // TODO: The options could be recorded in a more human-readable form, with a string for the option name for each
 // option.
+//
+// @param [in/out] module : Module to record metadata into
 void PipelineState::recordOptions(
-    Module* module)    // [in/out] Module to record metadata into
+    Module* module)
 {
     setNamedMetadataToArrayOfInt32(module, m_options, OptionsMetadataName);
     for (unsigned stage = 0; stage != m_shaderOptions.size(); ++stage)
@@ -444,8 +469,10 @@ void PipelineState::recordOptions(
 
 // =====================================================================================================================
 // Read pipeline and shader options from IR metadata
+//
+// @param module : Module to read metadata from
 void PipelineState::readOptions(
-    Module* module)    // [in] Module to read metadata from
+    Module* module)
 {
     readNamedMetadataArrayOfInt32(module, OptionsMetadataName, m_options);
     for (unsigned stage = 0; stage != ShaderStageCompute + 1; ++stage)
@@ -462,9 +489,10 @@ void PipelineState::readOptions(
 
 // =====================================================================================================================
 // Set the resource nodes for the pipeline.
+//
+// @param nodes : The resource nodes. Copied, so only need to remain valid for the duration of this call.
 void PipelineState::setUserDataNodes(
-    ArrayRef<ResourceNode>   nodes)     // The resource nodes. Copied, so only need to remain valid for the
-                                        // duration of this call.
+    ArrayRef<ResourceNode>   nodes)
 {
     // Count how many entries in total and allocate the buffer.
     unsigned nodeCount = nodes.size();
@@ -486,10 +514,14 @@ void PipelineState::setUserDataNodes(
 
 // =====================================================================================================================
 // Set one user data table, and its inner tables.
+//
+// @param nodes : The source resource nodes to copy
+// @param [out] destTable : Where to write nodes
+// @param [in/out] destInnerTable : End of space available for inner tables
 void PipelineState::setUserDataNodesTable(
-    ArrayRef<ResourceNode>        nodes,              // The source resource nodes to copy
-    ResourceNode*                 destTable,         // [out] Where to write nodes
-    ResourceNode*&                destInnerTable)    // [in/out] End of space available for inner tables
+    ArrayRef<ResourceNode>        nodes,
+    ResourceNode*                 destTable,
+    ResourceNode*&                destInnerTable)
 {
     for (unsigned idx = 0; idx != nodes.size(); ++idx)
     {
@@ -514,8 +546,10 @@ void PipelineState::setUserDataNodesTable(
 // =====================================================================================================================
 // Record user data nodes into IR metadata.
 // Note that this takes a Module* instead of using m_pModule, because it can be called before pipeline linking.
+//
+// @param [in/out] module : Module to record the IR metadata in
 void PipelineState::recordUserDataNodes(
-    Module* module)    // [in/out] Module to record the IR metadata in
+    Module* module)
 {
     if (m_userDataNodes.empty())
     {
@@ -531,9 +565,12 @@ void PipelineState::recordUserDataNodes(
 
 // =====================================================================================================================
 // Record one table of user data nodes into IR metadata, calling itself recursively for inner tables.
+//
+// @param nodes : Table of user data nodes
+// @param userDataMetaNode : IR metadata node to record them into
 void PipelineState::recordUserDataTable(
-    ArrayRef<ResourceNode>  nodes,              // Table of user data nodes
-    NamedMDNode*            userDataMetaNode)  // IR metadata node to record them into
+    ArrayRef<ResourceNode>  nodes,
+    NamedMDNode*            userDataMetaNode)
 {
     IRBuilder<> builder(getContext());
 
@@ -606,8 +643,10 @@ void PipelineState::recordUserDataTable(
 
 // =====================================================================================================================
 // Read user data nodes for the pipeline from IR metadata
+//
+// @param module : LLVM module
 void PipelineState::readUserDataNodes(
-    Module* module)  // [in] LLVM module
+    Module* module)
 {
     // Find the named metadata node.
     auto userDataMetaNode = module->getNamedMetadata(UserDataMetadataName);
@@ -722,10 +761,14 @@ void PipelineState::readUserDataNodes(
 // For other nodeType, only a node of the specified type is returned.
 // Returns {topNode, node} where "node" is the found user data node, and "topNode" is the top-level user data
 // node that contains it (or is equal to it).
+//
+// @param nodeType : Type of the resource mapping node
+// @param descSet : ID of descriptor set
+// @param binding : ID of descriptor binding
 std::pair<const ResourceNode*, const ResourceNode*> PipelineState::findResourceNode(
-    ResourceNodeType   nodeType,   // Type of the resource mapping node
-    unsigned           descSet,    // ID of descriptor set
-    unsigned           binding     // ID of descriptor binding
+    ResourceNodeType   nodeType,
+    unsigned           descSet,
+    unsigned           binding
     ) const
 {
     for (const ResourceNode& node : getUserDataNodes())
@@ -765,16 +808,20 @@ std::pair<const ResourceNode*, const ResourceNode*> PipelineState::findResourceN
 
 // =====================================================================================================================
 // Get the cached MDString for the name of a resource mapping node type, as used in IR metadata for user data nodes.
+//
+// @param type : Resource mapping node type
 MDString* PipelineState::getResourceTypeName(
-    ResourceNodeType type)   // Resource mapping node type
+    ResourceNodeType type)
 {
     return getResourceTypeNames()[static_cast<unsigned>(type)];
 }
 
 // =====================================================================================================================
 // Get the resource mapping node type given its MDString name.
+//
+// @param typeName : Name of resource type as MDString
 ResourceNodeType PipelineState::getResourceTypeFromName(
-    MDString* typeName)  // [in] Name of resource type as MDString
+    MDString* typeName)
 {
     auto typeNames = getResourceTypeNames();
     for (unsigned type = 0; ; ++type)
@@ -803,8 +850,10 @@ ArrayRef<MDString*> PipelineState::getResourceTypeNames()
 // =====================================================================================================================
 // Set vertex input descriptions. Each location referenced in a call to CreateReadGenericInput in the
 // vertex shader must have a corresponding description provided here.
+//
+// @param inputs : Array of vertex input descriptions
 void PipelineState::setVertexInputDescriptions(
-    ArrayRef<VertexInputDescription>  inputs)   // Array of vertex input descriptions
+    ArrayRef<VertexInputDescription>  inputs)
 {
     m_vertexInputDescriptions.clear();
     m_vertexInputDescriptions.insert(m_vertexInputDescriptions.end(), inputs.begin(), inputs.end());
@@ -813,8 +862,10 @@ void PipelineState::setVertexInputDescriptions(
 // =====================================================================================================================
 // Find vertex input description for the given location.
 // Returns nullptr if location not found.
+//
+// @param location : Location
 const VertexInputDescription* PipelineState::findVertexInputDescription(
-    unsigned location    // Location
+    unsigned location
 ) const
 {
     for (auto& inputDesc : m_vertexInputDescriptions)
@@ -827,8 +878,10 @@ const VertexInputDescription* PipelineState::findVertexInputDescription(
 
 // =====================================================================================================================
 // Record vertex input descriptions into IR metadata.
+//
+// @param [in/out] module : Module to record the IR metadata in
 void PipelineState::recordVertexInputDescriptions(
-    Module* module)    // [in/out] Module to record the IR metadata in
+    Module* module)
 {
     if (m_vertexInputDescriptions.empty())
     {
@@ -847,8 +900,10 @@ void PipelineState::recordVertexInputDescriptions(
 
 // =====================================================================================================================
 // Read vertex input descriptions for the pipeline from IR metadata
+//
+// @param module : Module to read
 void PipelineState::readVertexInputDescriptions(
-    Module* module)    // [in] Module to read
+    Module* module)
 {
     m_vertexInputDescriptions.clear();
 
@@ -868,9 +923,12 @@ void PipelineState::readVertexInputDescriptions(
 
 // =====================================================================================================================
 // Set color export state.
+//
+// @param formats : Array of ColorExportFormat structs
+// @param exportState : Color export flags
 void PipelineState::setColorExportState(
-    ArrayRef<ColorExportFormat> formats,      // Array of ColorExportFormat structs
-    const ColorExportState&     exportState)  // [in] Color export flags
+    ArrayRef<ColorExportFormat> formats,
+    const ColorExportState&     exportState)
 {
     m_colorExportFormats.clear();
     m_colorExportFormats.insert(m_colorExportFormats.end(), formats.begin(), formats.end());
@@ -879,8 +937,10 @@ void PipelineState::setColorExportState(
 
 // =====================================================================================================================
 // Get format for one color export
+//
+// @param location : Export location
 const ColorExportFormat& PipelineState::getColorExportFormat(
-    unsigned location)    // Export location
+    unsigned location)
 {
     if (location >= m_colorExportFormats.size())
     {
@@ -892,8 +952,10 @@ const ColorExportFormat& PipelineState::getColorExportFormat(
 
 // =====================================================================================================================
 // Record color export state (including formats) into IR metadata
+//
+// @param [in/out] module : IR module
 void PipelineState::recordColorExportState(
-    Module* module)  // [in/out] IR module
+    Module* module)
 {
     if (m_colorExportFormats.empty())
     {
@@ -918,8 +980,10 @@ void PipelineState::recordColorExportState(
 
 // =====================================================================================================================
 // Read color targets state from IR metadata
+//
+// @param module : IR module
 void PipelineState::readColorExportState(
-    Module* module)  // [in] IR module
+    Module* module)
 {
     m_colorExportFormats.clear();
 
@@ -939,10 +1003,14 @@ void PipelineState::readColorExportState(
 
 // =====================================================================================================================
 // Set graphics state (input-assembly, viewport, rasterizer).
+//
+// @param iaState : Input assembly state
+// @param vpState : Viewport state
+// @param rsState : Rasterizer state
 void PipelineState::setGraphicsState(
-    const InputAssemblyState& iaState,    // [in] Input assembly state
-    const ViewportState&      vpState,    // [in] Viewport state
-    const RasterizerState&    rsState)    // [in] Rasterizer state
+    const InputAssemblyState& iaState,
+    const ViewportState&      vpState,
+    const RasterizerState&    rsState)
 {
     m_inputAssemblyState = iaState;
     m_viewportState = vpState;
@@ -951,24 +1019,30 @@ void PipelineState::setGraphicsState(
 
 // =====================================================================================================================
 // Record device index into the IR metadata
+//
+// @param [in/out] module : IR module to record into
 void PipelineState::recordDeviceIndex(
-    Module* module)    // [in/out] IR module to record into
+    Module* module)
 {
     setNamedMetadataToArrayOfInt32(module, m_deviceIndex, DeviceIndexMetadataName);
 }
 
 // =====================================================================================================================
 // Read device index from the IR metadata
+//
+// @param [in/out] module : IR module to read from
 void PipelineState::readDeviceIndex(
-    Module* module)    // [in/out] IR module to read from
+    Module* module)
 {
     readNamedMetadataArrayOfInt32(module, DeviceIndexMetadataName, m_deviceIndex);
 }
 
 // =====================================================================================================================
 // Record graphics state (iastate, vpstate, rsstate) into the IR metadata
+//
+// @param [in/out] module : IR module to record into
 void PipelineState::recordGraphicsState(
-    Module* module)    // [in/out] IR module to record into
+    Module* module)
 {
     setNamedMetadataToArrayOfInt32(module, m_inputAssemblyState, IaStateMetadataName);
     setNamedMetadataToArrayOfInt32(module, m_viewportState, VpStateMetadataName);
@@ -977,8 +1051,10 @@ void PipelineState::recordGraphicsState(
 
 // =====================================================================================================================
 // Read graphics state (device index, iastate, vpstate, rsstate) from the IR metadata
+//
+// @param [in/out] module : IR module to read from
 void PipelineState::readGraphicsState(
-    Module* module)    // [in/out] IR module to read from
+    Module* module)
 {
     readNamedMetadataArrayOfInt32(module, IaStateMetadataName, m_inputAssemblyState);
     readNamedMetadataArrayOfInt32(module, VpStateMetadataName, m_viewportState);
@@ -997,8 +1073,10 @@ bool PipelineState::isTessOffChip()
 // Gets wave size for the specified shader stage
 //
 // NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.
+//
+// @param stage : Shader stage
 unsigned PipelineState::getShaderWaveSize(
-    ShaderStage stage)  // Shader stage
+    ShaderStage stage)
 {
     if (stage == ShaderStageCopyShader)
     {
@@ -1057,8 +1135,10 @@ unsigned PipelineState::getShaderWaveSize(
 
 // =====================================================================================================================
 // Gets resource usage of the specified shader stage
+//
+// @param shaderStage : Shader stage
 ResourceUsage* PipelineState::getShaderResourceUsage(
-    ShaderStage shaderStage)  // Shader stage
+    ShaderStage shaderStage)
 {
     if (shaderStage == ShaderStageCopyShader)
         shaderStage = ShaderStageGeometry;
@@ -1074,8 +1154,10 @@ ResourceUsage* PipelineState::getShaderResourceUsage(
 
 // =====================================================================================================================
 // Gets interface data of the specified shader stage
+//
+// @param shaderStage : Shader stage
 InterfaceData* PipelineState::getShaderInterfaceData(
-    ShaderStage shaderStage)  // Shader stage
+    ShaderStage shaderStage)
 {
     if (shaderStage == ShaderStageCopyShader)
         shaderStage = ShaderStageGeometry;
@@ -1091,9 +1173,12 @@ InterfaceData* PipelineState::getShaderInterfaceData(
 
 // =====================================================================================================================
 // Initializes resource usage of the specified shader stage.
+//
+// @param shaderStage : Shader stage
+// @param [out] resUsage : Resource usage
 void PipelineState::initShaderResourceUsage(
-    ShaderStage    shaderStage,      // Shader stage
-    ResourceUsage* resUsage)        // [out] Resource usage
+    ShaderStage    shaderStage,
+    ResourceUsage* resUsage)
 {
     memset(&resUsage->builtInUsage, 0, sizeof(resUsage->builtInUsage));
 
@@ -1162,8 +1247,10 @@ void PipelineState::initShaderResourceUsage(
 
 // =====================================================================================================================
 // Initializes interface data of the specified shader stage.
+//
+// @param [out] intfData : Interface data
 void PipelineState::initShaderInterfaceData(
-    InterfaceData* intfData)  // [out] Interface data
+    InterfaceData* intfData)
 {
     intfData->userDataCount = 0;
     memset(intfData->userDataMap, InterfaceData::UserDataUnmapped, sizeof(intfData->userDataMap));
@@ -1184,9 +1271,12 @@ void PipelineState::initShaderInterfaceData(
 // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
 // type. Only the number of elements of the type is significant.
 // This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.
+//
+// @param outputTy : Color output type
+// @param location : Location
 unsigned PipelineState::computeExportFormat(
-    Type*     outputTy,  // [in] Color output type
-    unsigned  location)   // Location
+    Type*     outputTy,
+    unsigned  location)
 {
     std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(this, nullptr));
     return fragColorExport->computeExportFormat(outputTy, location);
@@ -1194,8 +1284,10 @@ unsigned PipelineState::computeExportFormat(
 
 // =====================================================================================================================
 // Gets name string of the abbreviation for the specified shader stage
+//
+// @param shaderStage : Shader stage
 const char* PipelineState::getShaderStageAbbreviation(
-    ShaderStage shaderStage)  // Shader stage
+    ShaderStage shaderStage)
 {
     if (shaderStage == ShaderStageCopyShader)
         return "COPY";
@@ -1213,8 +1305,10 @@ const char* PipelineState::getShaderStageAbbreviation(
 
 // =====================================================================================================================
 // Translate enum "ResourceNodeType" to string
+//
+// @param type : Resource map node type
 const char* PipelineState::getResourceNodeTypeName(
-    ResourceNodeType type)  // Resource map node type
+    ResourceNodeType type)
 {
     const char* string = nullptr;
     switch (type)
@@ -1243,8 +1337,10 @@ const char* PipelineState::getResourceNodeTypeName(
 
 // =====================================================================================================================
 // Get (create if necessary) the PipelineState from this wrapper pass.
+//
+// @param module : IR module
 PipelineState* PipelineStateWrapper::getPipelineState(
-    Module* module)  // [in] IR module
+    Module* module)
 {
     if (!m_pipelineState )
     {
@@ -1285,8 +1381,10 @@ ModulePass* lgc::createPipelineStateClearer()
 
 // =====================================================================================================================
 // Run PipelineStateClearer pass to clear the pipeline state out of the IR
+//
+// @param [in/out] module : IR module
 bool PipelineStateClearer::runOnModule(
-    Module& module)   // [in/out] IR module
+    Module& module)
 {
     auto pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
     pipelineState->clear(&module);
@@ -1301,8 +1399,10 @@ INITIALIZE_PASS(PipelineStateClearer, "llpc-pipeline-state-clearer", "LLPC pipel
 char PipelineStateWrapper::ID = 0;
 
 // =====================================================================================================================
+//
+// @param builderContext : BuilderContext
 PipelineStateWrapper::PipelineStateWrapper(
-    BuilderContext* builderContext)  // [in] BuilderContext
+    BuilderContext* builderContext)
     :
     ImmutablePass(ID),
     m_builderContext(builderContext)
@@ -1311,8 +1411,10 @@ PipelineStateWrapper::PipelineStateWrapper(
 
 // =====================================================================================================================
 // Clean-up of PipelineStateWrapper at end of pass manager run
+//
+// @param module : Module
 bool PipelineStateWrapper::doFinalization(
-    Module& module)     // [in] Module
+    Module& module)
 {
     return false;
 }

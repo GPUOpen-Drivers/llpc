@@ -66,8 +66,10 @@ PatchLoadScalarizer::PatchLoadScalarizer()
 
 // =====================================================================================================================
 // Get the analysis usage of this pass.
+//
+// @param [out] analysisUsage : The analysis usage.
 void PatchLoadScalarizer::getAnalysisUsage(
-    AnalysisUsage& analysisUsage    // [out] The analysis usage.
+    AnalysisUsage& analysisUsage
     ) const
 {
     analysisUsage.addRequired<PipelineStateWrapper>();
@@ -77,8 +79,10 @@ void PatchLoadScalarizer::getAnalysisUsage(
 
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
+//
+// @param [in,out] function : Function that will run this optimization.
 bool PatchLoadScalarizer::runOnFunction(
-    Function& function)     // [in,out] Function that will run this optimization.
+    Function& function)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Load-Scalarizer-Opt\n");
 
@@ -111,8 +115,10 @@ bool PatchLoadScalarizer::runOnFunction(
 
 // =====================================================================================================================
 // Visits "load" instruction.
+//
+// @param loadInst : The instruction
 void PatchLoadScalarizer::visitLoadInst(
-    LoadInst& loadInst) // [in] The instruction
+    LoadInst& loadInst)
 {
     const unsigned addrSpace = loadInst.getPointerAddressSpace();
     auto loadTy = dyn_cast<VectorType>(loadInst.getType());

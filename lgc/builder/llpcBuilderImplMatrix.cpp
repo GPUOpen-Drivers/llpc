@@ -37,9 +37,12 @@ using namespace llvm;
 
 // =====================================================================================================================
 // Create a matrix transpose.
+//
+// @param matrix : Matrix to transpose.
+// @param instName : Name to give final instruction
 Value* BuilderImplMatrix::CreateTransposeMatrix(
-    Value* const matrix,  // [in] Matrix to transpose.
-    const Twine& instName) // [in] Name to give final instruction
+    Value* const matrix,
+    const Twine& instName)
 {
     assert(matrix );
 
@@ -87,10 +90,14 @@ Value* BuilderImplMatrix::CreateTransposeMatrix(
 
 // =====================================================================================================================
 // Create matrix from matrix Times scalar
+//
+// @param matrix : The column major matrix, n x <n x float>
+// @param scalar : The float scalar
+// @param instName : Name to give instruction(s)
 Value* BuilderImplMatrix::CreateMatrixTimesScalar(
-    Value* const matrix,             // [in] The column major matrix, n x <n x float>
-    Value* const scalar,             // [in] The float scalar
-    const Twine& instName)            // [in] Name to give instruction(s)
+    Value* const matrix,
+    Value* const scalar,
+    const Twine& instName)
 {
     Type* const matrixTy = matrix->getType();
     Type* const columnTy = matrixTy->getArrayElementType();
@@ -112,10 +119,14 @@ Value* BuilderImplMatrix::CreateMatrixTimesScalar(
 
 // =====================================================================================================================
 // Create vector from vector Times matrix
+//
+// @param vector : The float vector
+// @param matrix : The column major matrix, n x <n x float>
+// @param instName : Name to give instruction(s)
 Value* BuilderImplMatrix::CreateVectorTimesMatrix(
-    Value* const vector,         // [in] The float vector
-    Value* const matrix,         // [in] The column major matrix, n x <n x float>
-    const Twine& instName)        // [in] Name to give instruction(s)
+    Value* const vector,
+    Value* const matrix,
+    const Twine& instName)
 {
     Type* const matrixTy = matrix->getType();
     Type* const compTy = matrixTy->getArrayElementType()->getVectorElementType();
@@ -135,10 +146,14 @@ Value* BuilderImplMatrix::CreateVectorTimesMatrix(
 
 // =====================================================================================================================
 // Create vector from matrix times vector
+//
+// @param matrix : The column major matrix, n x <n x float>
+// @param vector : The vector
+// @param instName : Name to give instruction(s)
 Value* BuilderImplMatrix::CreateMatrixTimesVector(
-    Value* const matrix,             // [in] The column major matrix, n x <n x float>
-    Value* const vector,             // [in] The vector
-    const Twine& instName)            // [in] Name to give instruction(s)
+    Value* const matrix,
+    Value* const vector,
+    const Twine& instName)
 {
     Type* const columnTy = matrix->getType()->getArrayElementType();
     const unsigned rowCount = columnTy->getVectorNumElements();
@@ -161,10 +176,14 @@ Value* BuilderImplMatrix::CreateMatrixTimesVector(
 
 // =====================================================================================================================
 // Create matrix from matrix times matrix
+//
+// @param matrix1 : The float matrix 1
+// @param matrix2 : The float matrix 2
+// @param instName : Name to give instruction(s)
 Value* BuilderImplMatrix::CreateMatrixTimesMatrix(
-    Value* const matrix1,             // [in] The float matrix 1
-    Value* const matrix2,             // [in] The float matrix 2
-    const Twine& instName)             // [in] Name to give instruction(s)
+    Value* const matrix1,
+    Value* const matrix2,
+    const Twine& instName)
 {
     Type* const mat1ColumnType = matrix1->getType()->getArrayElementType();
     const unsigned mat2ColCount = matrix2->getType()->getArrayNumElements();
@@ -183,10 +202,14 @@ Value* BuilderImplMatrix::CreateMatrixTimesMatrix(
 
 // =====================================================================================================================
 // Create matrix from outer product of vector
+//
+// @param vector1 : The float vector 1
+// @param vector2 : The float vector 2
+// @param instName : Name to give instruction(s)
 Value* BuilderImplMatrix::CreateOuterProduct(
-    Value* const vector1,            // [in] The float vector 1
-    Value* const vector2,            // [in] The float vector 2
-    const Twine& instName)            // [in] Name to give instruction(s)
+    Value* const vector1,
+    Value* const vector2,
+    const Twine& instName)
 {
     const unsigned rowCount = vector1->getType()->getVectorNumElements();
     const unsigned colCount = vector2->getType()->getVectorNumElements();
@@ -206,9 +229,12 @@ Value* BuilderImplMatrix::CreateOuterProduct(
 
 // =====================================================================================================================
 // Create matrix determinant operation. Matrix must be square
+//
+// @param matrix : Matrix
+// @param instName : Name to give instruction(s)
 Value* BuilderImplMatrix::CreateDeterminant(
-    Value* const matrix,     // [in] Matrix
-    const Twine& instName)    // [in] Name to give instruction(s)
+    Value* const matrix,
+    const Twine& instName)
 {
     unsigned order = matrix->getType()->getArrayNumElements();
     assert(matrix->getType()->getArrayElementType()->getVectorNumElements() == order);
@@ -230,9 +256,12 @@ Value* BuilderImplMatrix::CreateDeterminant(
 
 // =====================================================================================================================
 // Helper function for determinant calculation
+//
+// @param elements : Elements of matrix (order*order of them)
+// @param order : Order of matrix
 Value* BuilderImplMatrix::determinant(
-    ArrayRef<Value*>    elements,     // Elements of matrix (order*order of them)
-    unsigned            order)        // Order of matrix
+    ArrayRef<Value*>    elements,
+    unsigned            order)
 {
     if (order == 1)
         return elements[0];
@@ -272,12 +301,18 @@ Value* BuilderImplMatrix::determinant(
 
 // =====================================================================================================================
 // Get submatrix by deleting specified row and column
+//
+// @param matrix : Input matrix (as linearized array of values, order*order of them)
+// @param submatrix : Output matrix (ditto, (order-1)*(order-1) of them)
+// @param order : Order of input matrix
+// @param rowToDelete : Row index to delete
+// @param columnToDelete : Column index to delete
 void BuilderImplMatrix::getSubmatrix(
-    ArrayRef<Value*>        matrix,         // Input matrix (as linearized array of values, order*order of them)
-    MutableArrayRef<Value*> submatrix,      // Output matrix (ditto, (order-1)*(order-1) of them)
-    unsigned                order,          // Order of input matrix
-    unsigned                rowToDelete,    // Row index to delete
-    unsigned                columnToDelete) // Column index to delete
+    ArrayRef<Value*>        matrix,
+    MutableArrayRef<Value*> submatrix,
+    unsigned                order,
+    unsigned                rowToDelete,
+    unsigned                columnToDelete)
 {
     unsigned inElementIdx = 0, outElementIdx = 0;
     for (unsigned columnIdx = 0; columnIdx != order; ++columnIdx)
@@ -294,9 +329,12 @@ void BuilderImplMatrix::getSubmatrix(
 // =====================================================================================================================
 // Create matrix inverse operation. Matrix must be square. Result is undefined if the matrix
 // is singular or poorly conditioned (nearly singular).
+//
+// @param matrix : Matrix
+// @param instName : Name to give instruction(s)
 Value* BuilderImplMatrix::CreateMatrixInverse(
-    Value* const matrix,     // [in] Matrix
-    const Twine& instName)    // [in] Name to give instruction(s)
+    Value* const matrix,
+    const Twine& instName)
 {
     unsigned order = matrix->getType()->getArrayNumElements();
     assert(matrix->getType()->getArrayElementType()->getVectorNumElements() == order);

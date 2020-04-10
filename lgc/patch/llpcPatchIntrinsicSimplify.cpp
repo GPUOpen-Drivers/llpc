@@ -72,8 +72,10 @@ PatchIntrinsicSimplify::PatchIntrinsicSimplify()
 
 // =====================================================================================================================
 // Get the analysis usage.
+//
+// @param [out] analysisUsage : The analysis usage for this pass.
 void PatchIntrinsicSimplify::getAnalysisUsage(
-    AnalysisUsage& analysisUsage // [out] The analysis usage for this pass.
+    AnalysisUsage& analysisUsage
     ) const
 {
     analysisUsage.addRequired<ScalarEvolutionWrapperPass>();
@@ -84,8 +86,10 @@ void PatchIntrinsicSimplify::getAnalysisUsage(
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM function.
+//
+// @param [in,out] func : LLVM function to be run on.
 bool PatchIntrinsicSimplify::runOnFunction(
-    Function& func) // [in,out] LLVM function to be run on.
+    Function& func)
 {
     SmallVector<IntrinsicInst*, 32> candidateCalls;
     bool changed = false;
@@ -143,8 +147,10 @@ bool PatchIntrinsicSimplify::runOnFunction(
 
 // =====================================================================================================================
 // Check if a value is safely derived from a 16-bit value.
+//
+// @param value : The value to check
 bool PatchIntrinsicSimplify::canSafelyConvertTo16Bit(
-    Value& value // [in] The value to check
+    Value& value
     ) const
 {
     Type* valueTy = value.getType();
@@ -185,9 +191,12 @@ bool PatchIntrinsicSimplify::canSafelyConvertTo16Bit(
 
 // =====================================================================================================================
 // Convert a value to 16-bit.
+//
+// @param value : The value to convert
+// @param builder : IRBuilder to use for instruction constructing
 Value* PatchIntrinsicSimplify::convertTo16Bit(
-    Value& value, // [in] The value to convert
-    IRBuilder<>& builder // [in] IRBuilder to use for instruction constructing
+    Value& value,
+    IRBuilder<>& builder
     ) const
 {
     Type* valueTy = value.getType();
@@ -204,9 +213,12 @@ Value* PatchIntrinsicSimplify::convertTo16Bit(
 
 // =====================================================================================================================
 // Simplify image intrinsics.
+//
+// @param intrinsicCall : The intrinsic call to simplify
+// @param coordOperandIndices : Operand indices of image coordinate
 Value* PatchIntrinsicSimplify::simplifyImage(
-    IntrinsicInst& intrinsicCall,     // [in] The intrinsic call to simplify
-    ArrayRef<unsigned>   coordOperandIndices // Operand indices of image coordinate
+    IntrinsicInst& intrinsicCall,
+    ArrayRef<unsigned>   coordOperandIndices
     ) const
 {
     // If we're not on GFX9 or above, bail.
@@ -247,8 +259,10 @@ Value* PatchIntrinsicSimplify::simplifyImage(
 
 // =====================================================================================================================
 // Simplify a trigonometric intrinsic.
+//
+// @param intrinsicCall : The intrinsic call to simplify
 Value* PatchIntrinsicSimplify::simplifyTrigonometric(
-    IntrinsicInst& intrinsicCall // [in] The intrinsic call to simplify
+    IntrinsicInst& intrinsicCall
     ) const
 {
     // The sin and cos function in the hardware are dividing by 2*PI beforehand.
@@ -348,8 +362,10 @@ Value* PatchIntrinsicSimplify::simplifyTrigonometric(
 
 // =====================================================================================================================
 // Check if an intrinsic can be simplified.
+//
+// @param intrinsicCall : The intrinsic call to simplify
 bool PatchIntrinsicSimplify::canSimplify(
-    IntrinsicInst& intrinsicCall // [in] The intrinsic call to simplify
+    IntrinsicInst& intrinsicCall
     ) const
 {
     switch (intrinsicCall.getIntrinsicID())
@@ -373,8 +389,10 @@ bool PatchIntrinsicSimplify::canSimplify(
 
 // =====================================================================================================================
 // Simplify an intrinsic.
+//
+// @param intrinsicCall : The intrinsic call to simplify
 Value* PatchIntrinsicSimplify::simplify(
-    IntrinsicInst& intrinsicCall // [in] The intrinsic call to simplify
+    IntrinsicInst& intrinsicCall
     ) const
 {
     switch (intrinsicCall.getIntrinsicID())

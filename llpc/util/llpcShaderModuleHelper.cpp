@@ -45,11 +45,16 @@ namespace Llpc
 {
 // =====================================================================================================================
 // Collect information from SPIR-V binary
+//
+// @param spvBinCode : SPIR-V binary data
+// @param [out] shaderModuleUsage : Shader module usage info
+// @param [out] shaderEntryNames : Entry names for this shader module
+// @param debugInfoSize : Debug info size
 Result ShaderModuleHelper::collectInfoFromSpirvBinary(
-    const BinaryData*                spvBinCode,           // [in] SPIR-V binary data
-    ShaderModuleUsage*               shaderModuleUsage,    // [out] Shader module usage info
-    std::vector<ShaderEntryName>&    shaderEntryNames,      // [out] Entry names for this shader module
-    unsigned*                        debugInfoSize)        // Debug info size
+    const BinaryData*                spvBinCode,
+    ShaderModuleUsage*               shaderModuleUsage,
+    std::vector<ShaderEntryName>&    shaderEntryNames,
+    unsigned*                        debugInfoSize)
 {
     Result result = Result::Success;
 
@@ -151,10 +156,14 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(
 
 // =====================================================================================================================
 // Removes all debug instructions for SPIR-V binary.
+//
+// @param spvBin : SPIR-V binay code
+// @param bufferSize : Output buffer size in bytes
+// @param [out] trimSpvBin : Trimmed SPIR-V binary code
 void ShaderModuleHelper::trimSpirvDebugInfo(
-    const BinaryData* spvBin,       // [in] SPIR-V binay code
-    unsigned          bufferSize,    // Output buffer size in bytes
-    void*             trimSpvBin)   // [out] Trimmed SPIR-V binary code
+    const BinaryData* spvBin,
+    unsigned          bufferSize,
+    void*             trimSpvBin)
 {
     assert(bufferSize > sizeof(SpirvHeader));
 
@@ -209,9 +218,12 @@ void ShaderModuleHelper::trimSpirvDebugInfo(
 
 // =====================================================================================================================
 // Optimizes SPIR-V binary
+//
+// @param spirvBinIn : Input SPIR-V binary
+// @param [out] spirvBinOut : Optimized SPIR-V binary
 Result ShaderModuleHelper::optimizeSpirv(
-    const BinaryData* spirvBinIn,     // [in] Input SPIR-V binary
-    BinaryData*       spirvBinOut)    // [out] Optimized SPIR-V binary
+    const BinaryData* spirvBinIn,
+    BinaryData*       spirvBinOut)
 {
     bool success = false;
     unsigned optBinSize = 0;
@@ -253,8 +265,10 @@ Result ShaderModuleHelper::optimizeSpirv(
 
 // =====================================================================================================================
 // Cleanup work for SPIR-V binary, freeing the allocated buffer by OptimizeSpirv()
+//
+// @param spirvBin : Optimized SPIR-V binary
 void ShaderModuleHelper::cleanOptimizedSpirv(
-    BinaryData* spirvBin)  // [in] Optimized SPIR-V binary
+    BinaryData* spirvBin)
 {
 #ifdef LLPC_ENABLE_SPIRV_OPT
     if (pSpirvBin->pCode)
@@ -268,9 +282,12 @@ void ShaderModuleHelper::cleanOptimizedSpirv(
 // Gets the shader stage mask from the SPIR-V binary according to the specified entry-point.
 //
 // Returns 0 on error, or the stage mask of the specified entry-point on success.
+//
+// @param spvBin : SPIR-V binary
+// @param entryName : Name of entry-point
 unsigned ShaderModuleHelper::getStageMaskFromSpirvBinary(
-    const BinaryData* spvBin,      // [in] SPIR-V binary
-    const char*       entryName)   // [in] Name of entry-point
+    const BinaryData* spvBin,
+    const char*       entryName)
 {
     unsigned stageMask = 0;
 
@@ -327,8 +344,10 @@ unsigned ShaderModuleHelper::getStageMaskFromSpirvBinary(
 //
 // NOTE: This function is for single entry-point. If the SPIR-V binary contains multiple entry-points, we get the name
 // of the first entry-point and ignore others.
+//
+// @param spvBin : SPIR-V binary
 const char* ShaderModuleHelper::getEntryPointNameFromSpirvBinary(
-    const BinaryData* spvBin) // [in] SPIR-V binary
+    const BinaryData* spvBin)
 {
     const char* entryName = nullptr;
 
@@ -384,8 +403,10 @@ const char* ShaderModuleHelper::getEntryPointNameFromSpirvBinary(
 
 // =====================================================================================================================
 // Verifies if the SPIR-V binary is valid and is supported
+//
+// @param spvBin : SPIR-V binary
 Result ShaderModuleHelper::verifySpirvBinary(
-    const BinaryData* spvBin)  // [in] SPIR-V binary
+    const BinaryData* spvBin)
 {
     Result result = Result::Success;
 
@@ -428,8 +449,10 @@ Result ShaderModuleHelper::verifySpirvBinary(
 
 // =====================================================================================================================
 // Checks whether input binary data is SPIR-V binary
+//
+// @param shaderBin : Shader binary codes
 bool ShaderModuleHelper::isSpirvBinary(
-    const BinaryData* shaderBin)  // [in] Shader binary codes
+    const BinaryData* shaderBin)
 {
     bool isSpvBinary = false;
     if (shaderBin->codeSize > sizeof(SpirvHeader))
@@ -444,8 +467,10 @@ bool ShaderModuleHelper::isSpirvBinary(
 
 // =====================================================================================================================
 // Checks whether input binary data is LLVM bitcode.
+//
+// @param shaderBin : Shader binary codes
 bool ShaderModuleHelper::isLlvmBitcode(
-    const BinaryData* shaderBin)  // [in] Shader binary codes
+    const BinaryData* shaderBin)
 {
     static unsigned BitcodeMagicNumber = 0xDEC04342; // 0x42, 0x43, 0xC0, 0xDE
     bool isLlvmBitcode = false;

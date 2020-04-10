@@ -71,8 +71,10 @@ namespace lgc
 class PatchCheckShaderCache;
 
 // Initialize passes for patching
+//
+// @param passRegistry : Pass registry
 inline static void initializePatchPasses(
-    llvm::PassRegistry& passRegistry)   // Pass registry
+    llvm::PassRegistry& passRegistry)
 {
   initializePatchBufferOpPass(passRegistry);
   initializePatchCheckShaderCachePass(passRegistry);

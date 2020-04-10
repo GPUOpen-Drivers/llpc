@@ -78,8 +78,10 @@ ModulePass* lgc::createPatchSetupTargetFeatures()
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool PatchSetupTargetFeatures::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Setup-Target-Features\n");
 

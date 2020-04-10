@@ -45,9 +45,12 @@ public:
     {
     }
 
+    //
+    // @param stage : Shader stage
+    // @param shaderInfo : Shader info for this shader
     SpirvLowerTranslator(
-        ShaderStage                 stage,        // Shader stage
-        const PipelineShaderInfo*   shaderInfo)  // [in] Shader info for this shader
+        ShaderStage                 stage,
+        const PipelineShaderInfo*   shaderInfo)
         : SpirvLower(ID), m_shaderInfo(shaderInfo)
     {
     }

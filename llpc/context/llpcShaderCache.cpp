@@ -173,10 +173,12 @@ void ShaderCache::resetRuntimeCache()
 // Copies the shader cache data to the memory blob provided by the calling function.
 //
 // NOTE: It is expected that the calling function has not used this shader cache since querying the size
+//
+// @param [out] blob : System memory pointer where the serialized data should be placed
+// @param [in,out] size : Size of the memory pointed to by pBlob. If the value stored in pSize is zero then no data will be copied and instead the size required for serialization will be returned in pSize
 Result ShaderCache::Serialize(
-    void*   blob,    // [out] System memory pointer where the serialized data should be placed
-    size_t* size)    // [in,out] Size of the memory pointed to by pBlob. If the value stored in pSize is zero then no
-                      // data will be copied and instead the size required for serialization will be returned in pSize
+    void*   blob,
+    size_t* size)
 {
     Result result = Result::Success;
 
@@ -235,9 +237,12 @@ Result ShaderCache::Serialize(
 
 // =====================================================================================================================
 // Merges the shader data of source shader caches into this shader cache.
+//
+// @param srcCacheCount : Count of input source shader caches
+// @param ppSrcCaches : Input shader caches
 Result ShaderCache::Merge(
-    unsigned             srcCacheCount,  // Count of input source shader caches
-    const IShaderCache** ppSrcCaches)    // [in] Input shader caches
+    unsigned             srcCacheCount,
+    const IShaderCache** ppSrcCaches)
 {
     // Merge function is supposed to be called by client created shader caches, which are always runtime mode.
     assert(m_fileFullPath[0] == '\0');
@@ -281,9 +286,12 @@ Result ShaderCache::Merge(
 
 // =====================================================================================================================
 // Initializes the Shader Cache in late stage.
+//
+// @param createInfo : Shader cache create info
+// @param auxCreateInfo : Shader cache auxiliary info (static fields)
 Result ShaderCache::init(
-    const ShaderCacheCreateInfo*    createInfo,    // [in] Shader cache create info
-    const ShaderCacheAuxCreateInfo* auxCreateInfo) // [in] Shader cache auxiliary info (static fields)
+    const ShaderCacheCreateInfo*    createInfo,
+    const ShaderCacheAuxCreateInfo* auxCreateInfo)
 {
     Result result = Result::Success;
 
@@ -366,11 +374,16 @@ Result ShaderCache::init(
 // =====================================================================================================================
 // Constructs the on disk cache file name and path and puts it in m_fileFullPath. This function also creates any
 // any missing directories in the full path to the cache file.
+//
+// @param executableName : Name of Executable file
+// @param cacheFilePath : Root directory of cache file
+// @param gfxIp : Graphics IP version info
+// @param [out] cacheFileExists : Whether cache file exists
 Result ShaderCache::buildFileName(
-    const char*  executableName,     // [in] Name of Executable file
-    const char*  cacheFilePath,      // [in] Root directory of cache file
-    GfxIpVersion gfxIp,               // Graphics IP version info
-    bool*        cacheFileExists)    // [out] Whether cache file exists
+    const char*  executableName,
+    const char*  cacheFilePath,
+    GfxIpVersion gfxIp,
+    bool*        cacheFileExists)
 {
     // The file name is constructed by taking the executable file name, appending the client string, device ID and
     // GPU index then hashing the result.
@@ -426,10 +439,14 @@ void ShaderCache::resetCacheFile()
 //    Ready       - if a matching shader was found and is ready for use
 //    Compiling   - if an entry was created and must be compiled/populated by the caller
 //    Unavailable - if an unrecoverable error was encountered
+//
+// @param hash : Hash code of shader
+// @param allocateOnMiss : Whether allocate a new entry for new hash
+// @param [out] phEntry : Handle of shader cache entry
 ShaderEntryState ShaderCache::findShader(
-    MetroHash::Hash   hash,                    // Hash code of shader
-    bool              allocateOnMiss,          // Whether allocate a new entry for new hash
-    CacheEntryHandle* phEntry)                 // [out] Handle of shader cache entry
+    MetroHash::Hash   hash,
+    bool              allocateOnMiss,
+    CacheEntryHandle* phEntry)
 {
     // Early return if shader cache is disabled
     if (m_disableCache)
@@ -579,10 +596,14 @@ ShaderEntryState ShaderCache::findShader(
 // =====================================================================================================================
 // Inserts a new shader into the cache. The new shader is written to the cache file if it is in-use, and will also
 // upload it to the client's external cache if it is in-use.
+//
+// @param hEntry : Handle of shader cache entry
+// @param blob : Shader data
+// @param shaderSize : size of shader data in bytes
 void ShaderCache::insertShader(
-    CacheEntryHandle         hEntry,                 // [in] Handle of shader cache entry
-    const void*              blob,                  // [in] Shader data
-    size_t                   shaderSize)             // size of shader data in bytes
+    CacheEntryHandle         hEntry,
+    const void*              blob,
+    size_t                   shaderSize)
 {
     auto*const index = static_cast<ShaderIndex*>(hEntry);
     assert(m_disableCache == false);
@@ -664,8 +685,10 @@ void ShaderCache::insertShader(
 
 // =====================================================================================================================
 // Resets cache entry state to new. It is used when shader compile fails.
+//
+// @param hEntry : Handle of shader cache entry
 void ShaderCache::resetShader(
-    CacheEntryHandle         hEntry)                 // [in] Handle of shader cache entry
+    CacheEntryHandle         hEntry)
 {
     auto*const index = static_cast<ShaderIndex*>(hEntry);
     assert(m_disableCache == false);
@@ -680,10 +703,14 @@ void ShaderCache::resetShader(
 
 // =====================================================================================================================
 // Retrieves the shader from the cache which is identified by the specified entry handle.
+//
+// @param hEntry : Handle of shader cache entry
+// @param [out] ppBlob : Shader data
+// @param [out] size : size of shader data in bytes
 Result ShaderCache::retrieveShader(
-    CacheEntryHandle   hEntry,   // [in] Handle of shader cache entry
-    const void**       ppBlob,   // [out] Shader data
-    size_t*            size)    // [out] size of shader data in bytes
+    CacheEntryHandle   hEntry,
+    const void**       ppBlob,
+    size_t*            size)
 {
     const auto*const index = static_cast<ShaderIndex*>(hEntry);
 
@@ -703,8 +730,10 @@ Result ShaderCache::retrieveShader(
 
 // =====================================================================================================================
 // Adds data for a new shader to the on-disk file
+//
+// @param index : A new shader
 void ShaderCache::addShaderToFile(
-    const ShaderIndex* index)    // [in] A new shader
+    const ShaderIndex* index)
 {
     assert(m_onDiskFile.isOpen());
 
@@ -793,9 +822,12 @@ Result ShaderCache::loadCacheFromFile()
 // successfully or false if invalid data was found.
 //
 // NOTE: This function assumes that a write lock has already been taken by the calling function.
+//
+// @param initialData : Initial data of the shader cache
+// @param initialDataSize : Size of initial data
 Result ShaderCache::loadCacheFromBlob(
-    const void* initialData,       // [in] Initial data of the shader cache
-    size_t      initialDataSize)    // Size of initial data
+    const void* initialData,
+    size_t      initialDataSize)
 {
     const auto* header = static_cast<const ShaderCacheSerializedHeader*>(initialData);
     assert(initialData );
@@ -825,9 +857,12 @@ Result ShaderCache::loadCacheFromBlob(
 // =====================================================================================================================
 // Validates shader data (from a file or a blob) by checking the CRCs and adding index hash map entries if successful.
 // Will return a failure if any of the shader data is invalid.
+//
+// @param dataStart : Start pointer of cached shader data
+// @param dataSize : Shader data size in bytes
 Result ShaderCache::populateIndexMap(
-    void*  dataStart,    // [in] Start pointer of cached shader data
-    size_t dataSize)      // Shader data size in bytes
+    void*  dataStart,
+    size_t dataSize)
 {
     Result result = Result::Success;
 
@@ -875,9 +910,12 @@ Result ShaderCache::populateIndexMap(
 
 // =====================================================================================================================
 // Caclulates a 64-bit CRC of the data provided
+//
+// @param data : Data need generate CRC
+// @param numBytes : Data size in bytes
 uint64_t ShaderCache::calculateCrc(
-    const uint8_t* data,         // [in]  Data need generate CRC
-    size_t         numBytes)      // Data size in bytes
+    const uint8_t* data,
+    size_t         numBytes)
 {
     uint64_t crc = CrcInitialValue;
     for (unsigned byte = 0; byte < numBytes; ++byte)
@@ -891,9 +929,12 @@ uint64_t ShaderCache::calculateCrc(
 
 // =====================================================================================================================
 // Validates the provided header and stores the data contained within it if valid.
+//
+// @param header : Cache file header
+// @param dataSourceSize : Data size in byte
 Result ShaderCache::validateAndLoadHeader(
-    const ShaderCacheSerializedHeader* header,            // [in] Cache file header
-    size_t                             dataSourceSize)     // Data size in byte
+    const ShaderCacheSerializedHeader* header,
+    size_t                             dataSourceSize)
 {
     assert(header );
 
@@ -926,8 +967,10 @@ Result ShaderCache::validateAndLoadHeader(
 // =====================================================================================================================
 // Allocates memory from the shader cache's linear allocator. This function assumes that a write lock has been taken by
 // the calling function.
+//
+// @param numBytes : Allocation size in bytes
 void* ShaderCache::getCacheSpace(
-    size_t numBytes)    // Allocation size in bytes
+    size_t numBytes)
 {
     auto p = new uint8_t[numBytes];
     m_allocationList.push_back(std::pair<uint8_t*, size_t>(p, numBytes));
@@ -937,8 +980,10 @@ void* ShaderCache::getCacheSpace(
 
 // =====================================================================================================================
 // Returns the time & date that pipeline.cpp was compiled.
+//
+// @param [out] buildId : Unique ID of build info
 void ShaderCache::getBuildTime(
-    BuildUniqueId *buildId)  // [out] Unique ID of build info
+    BuildUniqueId *buildId)
 {
     memset(buildId, 0, sizeof(buildId[0]));
     memcpy(&buildId->buildDate, __DATE__, std::min(strlen(__DATE__), sizeof(buildId->buildDate)));
@@ -949,9 +994,12 @@ void ShaderCache::getBuildTime(
 
 // =====================================================================================================================
 // Check if the shader cache creation info is compatible
+//
+// @param createInfo : Shader cache create info
+// @param auxCreateInfo : Shader cache auxiliary info (static fields)
 bool ShaderCache::isCompatible(
-    const ShaderCacheCreateInfo*    createInfo,    // [in] Shader cache create info
-    const ShaderCacheAuxCreateInfo* auxCreateInfo) // [in] Shader cache auxiliary info (static fields)
+    const ShaderCacheCreateInfo*    createInfo,
+    const ShaderCacheAuxCreateInfo* auxCreateInfo)
 {
     // Check hash first
     bool isCompatible = (memcmp(&(auxCreateInfo->hash), &m_hash, sizeof(m_hash)) == 0);

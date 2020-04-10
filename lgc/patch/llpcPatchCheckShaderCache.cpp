@@ -60,8 +60,11 @@ namespace
 // =====================================================================================================================
 // Stream each map key and value for later inclusion in a hash
 template <class MapType>
-static void streamMapEntries(MapType&     map,    // [in] Map to stream
-                             raw_ostream& stream) // [in/out] Stream to output map entries to
+//
+// @param map : Map to stream
+// @param [in/out] stream : Stream to output map entries to
+static void streamMapEntries(MapType&     map,
+                             raw_ostream& stream)
 {
     size_t mapCount = map.size();
     stream << StringRef(reinterpret_cast<const char*>(&mapCount), sizeof(mapCount));
@@ -83,8 +86,10 @@ PatchCheckShaderCache::PatchCheckShaderCache()
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool PatchCheckShaderCache::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Check-Shader-Cache\n");
 

@@ -116,9 +116,12 @@ struct PipelineDumpFile
 
 // =====================================================================================================================
 // Dumps SPIR-V shader binary to external file.
+//
+// @param dumpDir : Directory of pipeline dump
+// @param spirvBin : SPIR-V binary
 void VKAPI_CALL IPipelineDumper::DumpSpirvBinary(
-    const char*                     dumpDir,   // [in] Directory of pipeline dump
-    const BinaryData*               spirvBin)  // [in] SPIR-V binary
+    const char*                     dumpDir,
+    const BinaryData*               spirvBin)
 {
     MetroHash::Hash hash = {};
     MetroHash64::Hash(reinterpret_cast<const uint8_t*>(spirvBin->pCode),
@@ -129,9 +132,12 @@ void VKAPI_CALL IPipelineDumper::DumpSpirvBinary(
 
 // =====================================================================================================================
 // Begins to dump graphics/compute pipeline info.
+//
+// @param dumpOptions : Pipeline dump options
+// @param pipelineInfo : Info of the pipeline to be built
 void* VKAPI_CALL IPipelineDumper::BeginPipelineDump(
-    const PipelineDumpOptions*         dumpOptions,             // [in] Pipeline dump options
-    PipelineBuildInfo                  pipelineInfo              // Info of the pipeline to be built
+    const PipelineDumpOptions*         dumpOptions,
+    PipelineBuildInfo                  pipelineInfo
     )
 {
     MetroHash::Hash hash = {};
@@ -148,27 +154,36 @@ void* VKAPI_CALL IPipelineDumper::BeginPipelineDump(
 
 // =====================================================================================================================
 // Ends to dump graphics/compute pipeline info.
+//
+// @param dumpFile : The handle of pipeline dump file
 void VKAPI_CALL IPipelineDumper::EndPipelineDump(
-    void* dumpFile)  // [in] The handle of pipeline dump file
+    void* dumpFile)
 {
     PipelineDumper::EndPipelineDump(reinterpret_cast<PipelineDumpFile*>(dumpFile));
 }
 
 // =====================================================================================================================
 // Disassembles pipeline binary and dumps it to pipeline info file.
+//
+// @param dumpFile : The handle of pipeline dump file
+// @param gfxIp : Graphics IP version info
+// @param pipelineBin : Pipeline binary (ELF)
 void VKAPI_CALL IPipelineDumper::DumpPipelineBinary(
-    void*                    dumpFile,    // [in] The handle of pipeline dump file
-    GfxIpVersion             gfxIp,        // Graphics IP version info
-    const BinaryData*        pipelineBin) // [in] Pipeline binary (ELF)
+    void*                    dumpFile,
+    GfxIpVersion             gfxIp,
+    const BinaryData*        pipelineBin)
 {
     PipelineDumper::DumpPipelineBinary(reinterpret_cast<PipelineDumpFile*>(dumpFile), gfxIp, pipelineBin);
 }
 
 // =====================================================================================================================
 // Dump extra info to pipeline file.
+//
+// @param dumpFile : The handle of pipeline dump file
+// @param str : Extra string info to dump
 void VKAPI_CALL IPipelineDumper::DumpPipelineExtraInfo(
-    void*                     dumpFile,   // [in] The handle of pipeline dump file
-    const char*               str)        // [in] Extra string info to dump
+    void*                     dumpFile,
+    const char*               str)
 {
     std::string tmpStr(str);
     PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(dumpFile), &tmpStr);
@@ -176,8 +191,10 @@ void VKAPI_CALL IPipelineDumper::DumpPipelineExtraInfo(
 
 // =====================================================================================================================
 // Gets shader module hash code.
+//
+// @param moduleData : Pointer to the shader module data
 uint64_t VKAPI_CALL IPipelineDumper::GetShaderHash(
-    const void* moduleData)   // [in] Pointer to the shader module data
+    const void* moduleData)
 {
     const ShaderModuleData* shaderModuleData = reinterpret_cast<const ShaderModuleData*>(moduleData);
     return MetroHash::compact64(reinterpret_cast<const MetroHash::Hash*>(&shaderModuleData->hash));
@@ -185,18 +202,24 @@ uint64_t VKAPI_CALL IPipelineDumper::GetShaderHash(
 
 // =====================================================================================================================
 // Calculates graphics pipeline hash code.
+//
+// @param pipelineInfo : Info to build this graphics pipeline
 uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(
-    const GraphicsPipelineBuildInfo* pipelineInfo) // [in] Info to build this graphics pipeline
+    const GraphicsPipelineBuildInfo* pipelineInfo)
 {
     auto hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false);
     return MetroHash::compact64(&hash);
 }
 // =====================================================================================================================
 // Get graphics pipeline name.
+//
+// @param [In] graphicsPipelineInfo : Info to build this graphics pipeline
+// @param [Out] pipeNameOut : The full name of this graphics pipeline
+// @param nameBufSize : Size of the buffer to store pipeline name
 void VKAPI_CALL IPipelineDumper::GetPipelineName(
-    const  GraphicsPipelineBuildInfo* graphicsPipelineInfo,  // [In]  Info to build this graphics pipeline
-    char*                             pipeNameOut,           // [Out] The full name of this graphics pipeline
-    const size_t                      nameBufSize)            // Size of the buffer to store pipeline name
+    const  GraphicsPipelineBuildInfo* graphicsPipelineInfo,
+    char*                             pipeNameOut,
+    const size_t                      nameBufSize)
 {
     auto hash = PipelineDumper::generateHashForGraphicsPipeline(graphicsPipelineInfo, false);
     PipelineBuildInfo pipelineInfo = {};
@@ -209,10 +232,14 @@ void VKAPI_CALL IPipelineDumper::GetPipelineName(
 
 // =====================================================================================================================
 // Get compute pipeline name.
+//
+// @param [In] computePipelineInfo : Info to build this compute pipeline
+// @param [Out] pipeNameOut : The full name of this compute pipeline
+// @param nameBufSize : Size of the buffer to store pipeline name
 void VKAPI_CALL IPipelineDumper::GetPipelineName(
-    const ComputePipelineBuildInfo* computePipelineInfo, // [In]  Info to build this compute pipeline
-    char*                           pipeNameOut,         // [Out] The full name of this compute pipeline
-    const size_t                    nameBufSize)          // Size of the buffer to store pipeline name
+    const ComputePipelineBuildInfo* computePipelineInfo,
+    char*                           pipeNameOut,
+    const size_t                    nameBufSize)
 {
     auto hash = PipelineDumper::generateHashForComputePipeline(computePipelineInfo, false);
     PipelineBuildInfo pipelineInfo = {};
@@ -226,8 +253,10 @@ void VKAPI_CALL IPipelineDumper::GetPipelineName(
 
 // =====================================================================================================================
 // Calculates compute pipeline hash code.
+//
+// @param pipelineInfo : Info to build this compute pipeline
 uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(
-    const ComputePipelineBuildInfo* pipelineInfo) // [in] Info to build this compute pipeline
+    const ComputePipelineBuildInfo* pipelineInfo)
 {
     auto hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false);
     return MetroHash::compact64(&hash);
@@ -235,8 +264,10 @@ uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(
 
 // =====================================================================================================================
 // Gets the file name of SPIR-V binary according the specified shader hash.
+//
+// @param hash : Shader hash code
 std::string PipelineDumper::getSpirvBinaryFileName(
-     const MetroHash::Hash* hash)       // [in] Shader hash code
+     const MetroHash::Hash* hash)
 {
     uint64_t hashCode64 = MetroHash::compact64(hash);
     char     fileName[64] = {};
@@ -247,9 +278,12 @@ std::string PipelineDumper::getSpirvBinaryFileName(
 
 // =====================================================================================================================
 // Gets the file name of pipeline info file according to the specified pipeline build info and pipeline hash.
+//
+// @param pipelineInfo : Info of the pipeline to be built
+// @param hash : Pipeline hash code
 std::string PipelineDumper::getPipelineInfoFileName(
-    PipelineBuildInfo                  pipelineInfo,             // Info of the pipeline to be built
-    const MetroHash::Hash*             hash)                    // [in] Pipeline hash code
+    PipelineBuildInfo                  pipelineInfo,
+    const MetroHash::Hash*             hash)
 {
     uint64_t        hashCode64 = MetroHash::compact64(hash);
     char            fileName[64] = {};
@@ -281,10 +315,14 @@ std::string PipelineDumper::getPipelineInfoFileName(
 
 // =====================================================================================================================
 // Begins to dump graphics/compute pipeline info.
+//
+// @param dumpOptions : Pipeline dump options
+// @param pipelineInfo : Info of the pipeline to be built
+// @param hash : Pipeline hash code
 PipelineDumpFile* PipelineDumper::BeginPipelineDump(
-    const PipelineDumpOptions*         dumpOptions,            // [in] Pipeline dump options
-    PipelineBuildInfo                  pipelineInfo,            // Info of the pipeline to be built
-    const MetroHash::Hash*             hash)                   // [in] Pipeline hash code
+    const PipelineDumpOptions*         dumpOptions,
+    PipelineBuildInfo                  pipelineInfo,
+    const MetroHash::Hash*             hash)
 {
     bool disableLog = false;
     std::string dumpFileName;
@@ -404,18 +442,24 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
 
 // =====================================================================================================================
 // Ends to dump graphics/compute pipeline info.
+//
+// @param dumpFile : Dump file
 void PipelineDumper::EndPipelineDump(
-    PipelineDumpFile* dumpFile) // [in] Dump file
+    PipelineDumpFile* dumpFile)
 {
     delete dumpFile;
 }
 
 // =====================================================================================================================
 // Dumps resource mapping node to dumpFile.
+//
+// @param userDataNode : User data nodes to be dumped
+// @param prefix : Prefix string for each line
+// @param [out] dumpFile : dump file
 void PipelineDumper::dumpResourceMappingNode(
-    const ResourceMappingNode* userDataNode,    // [in] User data nodes to be dumped
-    const char*                prefix,          // [in] Prefix string for each line
-    std::ostream&              dumpFile)         // [out] dump file
+    const ResourceMappingNode* userDataNode,
+    const char*                prefix,
+    std::ostream&              dumpFile)
 {
     dumpFile << prefix << ".type = " << userDataNode->type << "\n";
     dumpFile << prefix << ".offsetInDwords = " << userDataNode->offsetInDwords << "\n";
@@ -472,9 +516,12 @@ void PipelineDumper::dumpResourceMappingNode(
 
 // =====================================================================================================================
 // Dumps pipeline shader info to file.
+//
+// @param shaderInfo : Shader info of specified shader stage
+// @param [out] dumpFile : dump file
 void PipelineDumper::dumpPipelineShaderInfo(
-    const PipelineShaderInfo* shaderInfo, // [in] Shader info of specified shader stage
-    std::ostream&             dumpFile)    // [out] dump file
+    const PipelineShaderInfo* shaderInfo,
+    std::ostream&             dumpFile)
 {
     const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo->pModuleData);
     auto moduleHash = reinterpret_cast<const MetroHash::Hash*>(&moduleData->hash[0]);
@@ -581,10 +628,14 @@ void PipelineDumper::dumpPipelineShaderInfo(
 
 // =====================================================================================================================
 // Dumps SPIR-V shader binary to external file
+//
+// @param dumpDir : Directory of pipeline dump
+// @param spirvBin : SPIR-V binary
+// @param hash : Pipeline hash code
 void PipelineDumper::DumpSpirvBinary(
-    const char*                     dumpDir,     // [in] Directory of pipeline dump
-    const BinaryData*               spirvBin,    // [in] SPIR-V binary
-    MetroHash::Hash*                hash)        // [in] Pipeline hash code
+    const char*                     dumpDir,
+    const BinaryData*               spirvBin,
+    MetroHash::Hash*                hash)
 {
     std::string pathName = dumpDir;
     pathName += "/";
@@ -598,10 +649,14 @@ void PipelineDumper::DumpSpirvBinary(
 
 // =====================================================================================================================
 // Disassembles pipeline binary and dumps it to pipeline info file.
+//
+// @param dumpFile : Directory of pipeline dump
+// @param gfxIp : Graphics IP version info
+// @param pipelineBin : Pipeline binary (ELF)
 void PipelineDumper::DumpPipelineBinary(
-    PipelineDumpFile*                dumpFile,              // [in] Directory of pipeline dump
-    GfxIpVersion                     gfxIp,                  // Graphics IP version info
-    const BinaryData*                pipelineBin)           // [in] Pipeline binary (ELF)
+    PipelineDumpFile*                dumpFile,
+    GfxIpVersion                     gfxIp,
+    const BinaryData*                pipelineBin)
 {
     if (dumpFile )
     {
@@ -633,9 +688,12 @@ void PipelineDumper::DumpPipelineBinary(
 
 // =====================================================================================================================
 // Dump extra info to pipeline file.
+//
+// @param dumpFile : Directory of pipeline dump
+// @param str : Extra info string
 void PipelineDumper::DumpPipelineExtraInfo(
-    PipelineDumpFile*             dumpFile,               // [in] Directory of pipeline dump
-    const std::string*            str)                     // [in] Extra info string
+    PipelineDumpFile*             dumpFile,
+    const std::string*            str)
 {
     if (dumpFile )
         dumpFile->dumpFile << *str;
@@ -643,8 +701,10 @@ void PipelineDumper::DumpPipelineExtraInfo(
 
 // =====================================================================================================================
 // Dumps LLPC version info to file
+//
+// @param [out] dumpFile : dump file
 void PipelineDumper::dumpVersionInfo(
-    std::ostream&                  dumpFile)      // [out] dump file
+    std::ostream&                  dumpFile)
 {
     dumpFile << "[Version]\n";
     dumpFile << "version = " << Version << "\n\n";
@@ -652,10 +712,14 @@ void PipelineDumper::dumpVersionInfo(
 
 // =====================================================================================================================
 // Dumps compute pipeline state info to file.
+//
+// @param pipelineInfo : Info of the graphics pipeline to be built
+// @param dumpDir : Directory of pipeline dump
+// @param [out] dumpFile : dump file
 void PipelineDumper::dumpComputeStateInfo(
-    const ComputePipelineBuildInfo* pipelineInfo,  // [in] Info of the graphics pipeline to be built
-    const char*                     dumpDir,       // [in] Directory of pipeline dump
-    std::ostream&                   dumpFile)       // [out] dump file
+    const ComputePipelineBuildInfo* pipelineInfo,
+    const char*                     dumpDir,
+    std::ostream&                   dumpFile)
 {
     dumpFile << "[ComputePipelineState]\n";
 
@@ -666,9 +730,12 @@ void PipelineDumper::dumpComputeStateInfo(
 
 // =====================================================================================================================
 // Dumps pipeline options to file.
+//
+// @param options : Pipeline options
+// @param [out] dumpFile : dump file
 void PipelineDumper::dumpPipelineOptions(
-    const PipelineOptions*   options,  // [in] Pipeline options
-    std::ostream&            dumpFile)  // [out] dump file
+    const PipelineOptions*   options,
+    std::ostream&            dumpFile)
 {
     dumpFile << "options.includeDisassembly = " << options->includeDisassembly << "\n";
     dumpFile << "options.scalarBlockLayout = " << options->scalarBlockLayout << "\n";
@@ -681,10 +748,14 @@ void PipelineDumper::dumpPipelineOptions(
 
 // =====================================================================================================================
 // Dumps compute pipeline information to file.
+//
+// @param dumpFile : Pipeline dump file
+// @param dumpDir : Directory of pipeline dump
+// @param pipelineInfo : Info of the compute pipeline to be built
 void PipelineDumper::dumpComputePipelineInfo(
-    std::ostream*                   dumpFile,         // [in] Pipeline dump file
-    const char*                     dumpDir,          // [in] Directory of pipeline dump
-    const ComputePipelineBuildInfo* pipelineInfo)     // [in] Info of the compute pipeline to be built
+    std::ostream*                   dumpFile,
+    const char*                     dumpDir,
+    const ComputePipelineBuildInfo* pipelineInfo)
 {
     dumpVersionInfo(*dumpFile);
 
@@ -697,10 +768,14 @@ void PipelineDumper::dumpComputePipelineInfo(
 
 // =====================================================================================================================
 // Dumps graphics pipeline state info to file.
+//
+// @param pipelineInfo : Info of the graphics pipeline to be built
+// @param dumpDir : Directory of pipeline dump
+// @param [out] dumpFile : dump file
 void PipelineDumper::dumpGraphicsStateInfo(
-    const GraphicsPipelineBuildInfo* pipelineInfo, // [in] Info of the graphics pipeline to be built
-    const char*                      dumpDir,      // [in] Directory of pipeline dump
-    std::ostream&                    dumpFile)      // [out] dump file
+    const GraphicsPipelineBuildInfo* pipelineInfo,
+    const char*                      dumpDir,
+    std::ostream&                    dumpFile)
 {
     dumpFile << "[GraphicsPipelineState]\n";
 
@@ -796,10 +871,14 @@ void PipelineDumper::dumpGraphicsStateInfo(
 
 // =====================================================================================================================
 // Dumps graphics pipeline build info to file.
+//
+// @param dumpFile : Pipeline dump file
+// @param dumpDir : Directory of pipeline dump
+// @param pipelineInfo : Info of the graphics pipeline to be built
 void PipelineDumper::dumpGraphicsPipelineInfo(
-    std::ostream*                    dumpFile,       // [in] Pipeline dump file
-    const char*                      dumpDir,        // [in] Directory of pipeline dump
-    const GraphicsPipelineBuildInfo* pipelineInfo)   // [in] Info of the graphics pipeline to be built
+    std::ostream*                    dumpFile,
+    const char*                      dumpDir,
+    const GraphicsPipelineBuildInfo* pipelineInfo)
 {
     dumpVersionInfo(*dumpFile);
     // Dump pipeline
@@ -829,11 +908,14 @@ void PipelineDumper::dumpGraphicsPipelineInfo(
 // Builds hash code from graphics pipline build info.  If stage is a specific stage of the graphics pipeline, then only
 // the portions of the pipeline build info that affect that stage will be included in the hash.  Otherwise, stage must
 // be ShaderStageInvalid, and all values in the build info will be included.
+//
+// @param pipeline : Info to build a graphics pipeline
+// @param isCacheHash : TRUE if the hash is used by shader cache
+// @param stage : The stage for which we are building the hash. ShaderStageInvalid if building for the entire pipeline.
 MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(
-    const GraphicsPipelineBuildInfo* pipeline,   // [in] Info to build a graphics pipeline
-    bool                            isCacheHash,  // TRUE if the hash is used by shader cache
-    unsigned                        stage)        // [in] The stage for which we are building the hash.
-                                                  // ShaderStageInvalid if building for the entire pipeline.
+    const GraphicsPipelineBuildInfo* pipeline,
+    bool                            isCacheHash,
+    unsigned                        stage)
 {
     MetroHash64 hasher;
 
@@ -885,9 +967,12 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(
 
 // =====================================================================================================================
 // Builds hash code from compute pipline build info.
+//
+// @param pipeline : Info to build a compute pipeline
+// @param isCacheHash : TRUE if the hash is used by shader cache
 MetroHash::Hash PipelineDumper::generateHashForComputePipeline(
-    const ComputePipelineBuildInfo* pipeline,   // [in] Info to build a compute pipeline
-    bool                            isCacheHash  // TRUE if the hash is used by shader cache
+    const ComputePipelineBuildInfo* pipeline,
+    bool                            isCacheHash
     )
 {
     MetroHash64 hasher;
@@ -909,9 +994,12 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(
 
 // =====================================================================================================================
 // Updates hash code context for vertex input state
+//
+// @param vertexInput : Vertex input state
+// @param [in,out] hasher : Haher to generate hash code
 void PipelineDumper::updateHashForVertexInputState(
-    const VkPipelineVertexInputStateCreateInfo* vertexInput,  // [in] Vertex input state
-    MetroHash64*                                hasher)       // [in,out] Haher to generate hash code
+    const VkPipelineVertexInputStateCreateInfo* vertexInput,
+    MetroHash64*                                hasher)
 {
     if (vertexInput && vertexInput->vertexBindingDescriptionCount > 0)
     {
@@ -940,10 +1028,14 @@ void PipelineDumper::updateHashForVertexInputState(
 
 // =====================================================================================================================
 // Update hash code from non-fragment pipeline state
+//
+// @param pipeline : Info to build a graphics pipeline
+// @param isCacheHash : TRUE if the hash is used by shader cache
+// @param [in,out] hasher : Hasher to generate hash code
 void PipelineDumper::updateHashForNonFragmentState(
-    const GraphicsPipelineBuildInfo* pipeline,     // [in] Info to build a graphics pipeline
-    bool                             isCacheHash,   // TRUE if the hash is used by shader cache
-    MetroHash64*                     hasher)       // [in,out] Hasher to generate hash code
+    const GraphicsPipelineBuildInfo* pipeline,
+    bool                             isCacheHash,
+    MetroHash64*                     hasher)
 {
     auto iaState = &pipeline->iaState;
     hasher->Update(iaState->topology);
@@ -1013,9 +1105,12 @@ void PipelineDumper::updateHashForNonFragmentState(
 
 // =====================================================================================================================
 // Update hash code from fragment pipeline state
+//
+// @param pipeline : Info to build a graphics pipeline
+// @param [in,out] hasher : Hasher to generate hash code
 void PipelineDumper::updateHashForFragmentState(
-    const GraphicsPipelineBuildInfo* pipeline,     // [in] Info to build a graphics pipeline
-    MetroHash64*                     hasher)       // [in,out] Hasher to generate hash code
+    const GraphicsPipelineBuildInfo* pipeline,
+    MetroHash64*                     hasher)
 {
     auto rsState = &pipeline->rsState;
     hasher->Update(rsState->innerCoverage);
@@ -1040,11 +1135,16 @@ void PipelineDumper::updateHashForFragmentState(
 
 // =====================================================================================================================
 // Updates hash code context for pipeline shader stage.
+//
+// @param stage : shader stage
+// @param shaderInfo : Shader info in specified shader stage
+// @param isCacheHash : TRUE if the hash is used by shader cache
+// @param [in,out] hasher : Haher to generate hash code
 void PipelineDumper::updateHashForPipelineShaderInfo(
-    ShaderStage               stage,           // shader stage
-    const PipelineShaderInfo* shaderInfo,     // [in] Shader info in specified shader stage
-    bool                      isCacheHash,     // TRUE if the hash is used by shader cache
-    MetroHash64*              hasher          // [in,out] Haher to generate hash code
+    ShaderStage               stage,
+    const PipelineShaderInfo* shaderInfo,
+    bool                      isCacheHash,
+    MetroHash64*              hasher
     )
 {
     if (shaderInfo->pModuleData)
@@ -1148,10 +1248,14 @@ void PipelineDumper::updateHashForPipelineShaderInfo(
 // Updates hash code context for resource mapping node.
 //
 // NOTE: This function will be called recusively if node's type is "DescriptorTableVaPtr"
+//
+// @param userDataNode : Resource mapping node
+// @param isRootNode : TRUE if the node is in root level
+// @param [in,out] hasher : Haher to generate hash code
 void PipelineDumper::updateHashForResourceMappingNode(
-    const ResourceMappingNode* userDataNode,    // [in] Resource mapping node
-    bool                       isRootNode,       // TRUE if the node is in root level
-    MetroHash64*               hasher           // [in,out] Haher to generate hash code
+    const ResourceMappingNode* userDataNode,
+    bool                       isRootNode,
+    MetroHash64*               hasher
     )
 {
     hasher->Update(userDataNode->type);
@@ -1205,11 +1309,16 @@ void PipelineDumper::updateHashForResourceMappingNode(
 // =====================================================================================================================
 // Outputs text with specified range to output stream.
 template <class OStream>
+//
+// @param data : Text data
+// @param startPos : Starting position
+// @param endPos : End position
+// @param [out] out : Output stream
 void outputText(
-    const uint8_t* data,    // [in] Text data
-    unsigned       startPos, // Starting position
-    unsigned       endPos,   // End position
-    OStream&       out)      // [out] Output stream
+    const uint8_t* data,
+    unsigned       startPos,
+    unsigned       endPos,
+    OStream&       out)
 {
     if (endPos > startPos)
     {
@@ -1237,11 +1346,16 @@ void outputText(
 // =====================================================================================================================
 // Outputs binary data with specified range to output stream.
 template<class OStream>
+//
+// @param data : Binary data
+// @param startPos : Starting position
+// @param endPos : End position
+// @param [out] out : Output stream
 void outputBinary(
-    const uint8_t* data,     // [in] Binary data
-    unsigned       startPos,  // Starting position
-    unsigned       endPos,    // End position
-    OStream&       out)       // [out] Output stream
+    const uint8_t* data,
+    unsigned       startPos,
+    unsigned       endPos,
+    OStream&       out)
 {
     const unsigned* startData = reinterpret_cast<const unsigned*>(data + startPos);
     int dwordCount = (endPos - startPos) / sizeof(unsigned);
@@ -1282,9 +1396,12 @@ void outputBinary(
 // =====================================================================================================================
 //  Dumps ELF package to out stream
 template<class OStream, class Elf>
+//
+// @param [out] out : Output stream
+// @param reader : ELF object
 OStream& operator<<(
-    OStream&          out,      // [out] Output stream
-    ElfReader<Elf>&   reader)   // [in] ELF object
+    OStream&          out,
+    ElfReader<Elf>&   reader)
 {
     unsigned sectionCount = reader.getSectionCount();
     char formatBuf[256];
@@ -1644,9 +1761,12 @@ OStream& operator<<(
 
 // =====================================================================================================================
 // Translates enum "VkVertexInputRate" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param inputRate : Vertex input rate
 std::ostream& operator<<(
-    std::ostream&       out,        // [out] Output stream
-    VkVertexInputRate  inputRate)   // Vertex input rate
+    std::ostream&       out,
+    VkVertexInputRate  inputRate)
 {
     const char* string = nullptr;
     switch (inputRate)
@@ -1663,18 +1783,24 @@ std::ostream& operator<<(
 
 // =====================================================================================================================
 // Translates enum "ResourceMappingNodeType" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param type : Resource map node type
 std::ostream& operator<<(
-    std::ostream&           out,   // [out] Output stream
-    ResourceMappingNodeType type)  // Resource map node type
+    std::ostream&           out,
+    ResourceMappingNodeType type)
 {
     return out << getResourceMappingNodeTypeName(type);
 }
 
 // =====================================================================================================================
 // Translates enum "NggSubgroupSizingType" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param subgroupSizing : NGG sub-group sizing type
 std::ostream& operator<<(
-    std::ostream&           out,            // [out] Output stream
-    NggSubgroupSizingType   subgroupSizing) // NGG sub-group sizing type
+    std::ostream&           out,
+    NggSubgroupSizingType   subgroupSizing)
 {
     const char* string = nullptr;
     switch (subgroupSizing)
@@ -1696,9 +1822,12 @@ std::ostream& operator<<(
 
 // =====================================================================================================================
 // Translates enum "NggCompactMode" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param compactMode : NGG compaction mode
 std::ostream& operator<<(
-    std::ostream&   out,         // [out] Output stream
-    NggCompactMode  compactMode) // NGG compaction mode
+    std::ostream&   out,
+    NggCompactMode  compactMode)
 {
     const char* string = nullptr;
     switch (compactMode)
@@ -1716,9 +1845,12 @@ std::ostream& operator<<(
 
 // =====================================================================================================================
 // Translates enum "WaveBreakSize" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param waveBreakSize : Wave break size
 std::ostream& operator<<(
-    std::ostream&   out,            // [out] Output stream
-    WaveBreakSize   waveBreakSize)  // Wave break size
+    std::ostream&   out,
+    WaveBreakSize   waveBreakSize)
 {
     const char* string = nullptr;
     switch (waveBreakSize)
@@ -1739,9 +1871,12 @@ std::ostream& operator<<(
 
 // =====================================================================================================================
 // Translates enum "ShadowDescriptorTableUsage" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param shadowDescriptorTableUsage : Shadow descriptor table setting
 std::ostream& operator<<(
-    std::ostream&              out,                         // [out] Output stream
-    ShadowDescriptorTableUsage shadowDescriptorTableUsage)  // Shadow descriptor table setting
+    std::ostream&              out,
+    ShadowDescriptorTableUsage shadowDescriptorTableUsage)
 {
     const char* string = nullptr;
     switch (shadowDescriptorTableUsage)
@@ -1760,9 +1895,12 @@ std::ostream& operator<<(
 
 // =====================================================================================================================
 // Translates enum "VkPrimitiveTopology" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param topology : Primitive topology
 std::ostream& operator<<(
-    std::ostream&       out,       // [out] Output stream
-    VkPrimitiveTopology topology)  // Primitive topology
+    std::ostream&       out,
+    VkPrimitiveTopology topology)
 {
     const char* string = nullptr;
     switch (topology)
@@ -1790,9 +1928,12 @@ std::ostream& operator<<(
 
 // =====================================================================================================================
 // Translates enum "VkPolygonMode" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param polygonMode : Rendering mode
 std::ostream& operator<<(
-    std::ostream&       out,            // [out] Output stream
-    VkPolygonMode       polygonMode)    // Rendering mode
+    std::ostream&       out,
+    VkPolygonMode       polygonMode)
 {
     const char* string = nullptr;
     switch (polygonMode)
@@ -1813,9 +1954,12 @@ std::ostream& operator<<(
 
 // =====================================================================================================================
 // Translates enum "VkCullModeFlagBits" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param cullMode : Culling mode
 std::ostream& operator<<(
-    std::ostream&       out,         // [out] Output stream
-    VkCullModeFlagBits  cullMode)    // Culling mode
+    std::ostream&       out,
+    VkCullModeFlagBits  cullMode)
 {
     const char* string = nullptr;
     switch (cullMode)
@@ -1836,9 +1980,12 @@ std::ostream& operator<<(
 
 // =====================================================================================================================
 // Translates enum "VkFrontFace" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param frontFace : Front facing orientation
 std::ostream& operator<<(
-    std::ostream&       out,         // [out] Output stream
-    VkFrontFace         frontFace)   // Front facing orientation
+    std::ostream&       out,
+    VkFrontFace         frontFace)
 {
     const char* string = nullptr;
     switch (frontFace)
@@ -1857,9 +2004,12 @@ std::ostream& operator<<(
 
 // =====================================================================================================================
 // Translates enum "VkFormat" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param format : Resource format
 std::ostream& operator<<(
-    std::ostream&       out,     // [out] Output stream
-    VkFormat            format)  // Resource format
+    std::ostream&       out,
+    VkFormat            format)
 {
     const char* string = nullptr;
     switch (format)

@@ -63,8 +63,10 @@ char SpirvLowerLoopUnrollControl::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for loop unroll control
+//
+// @param forceLoopUnrollCount : Force loop unroll count
 ModulePass* createSpirvLowerLoopUnrollControl(
-    unsigned forceLoopUnrollCount)    // Force loop unroll count
+    unsigned forceLoopUnrollCount)
 {
     auto pass = new SpirvLowerLoopUnrollControl(forceLoopUnrollCount);
     return pass;
@@ -80,8 +82,10 @@ SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl()
 }
 
 // =====================================================================================================================
+//
+// @param forceLoopUnrollCount : Force loop unroll count
 SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl(
-    unsigned forceLoopUnrollCount)    // Force loop unroll count
+    unsigned forceLoopUnrollCount)
     :
     SpirvLower(ID),
     m_forceLoopUnrollCount(forceLoopUnrollCount),
@@ -91,8 +95,10 @@ SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl(
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool SpirvLowerLoopUnrollControl::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Unroll-Control\n");
 

@@ -87,8 +87,10 @@ PatchResourceCollect::PatchResourceCollect()
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool PatchResourceCollect::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Resource-Collect\n");
 
@@ -332,8 +334,10 @@ void PatchResourceCollect::setNggControl()
 
 // =====================================================================================================================
 // Builds NGG culling-control registers (fill part of compile-time primitive shader table).
+//
+// @param [in/out] nggControl : NggControl struct
 void PatchResourceCollect::buildNggCullingControlRegister(
-    NggControl& nggControl)   // [in/out] NggControl struct
+    NggControl& nggControl)
 {
     const auto& vpState = m_pipelineState->getViewportState();
     const auto& rsState = m_pipelineState->getRasterizerState();
@@ -1175,8 +1179,10 @@ bool PatchResourceCollect::isVertexReuseDisabled()
 
 // =====================================================================================================================
 // Visits "call" instruction.
+//
+// @param callInst : "Call" instruction
 void PatchResourceCollect::visitCallInst(
-    CallInst& callInst) // [in] "Call" instruction
+    CallInst& callInst)
 {
     auto callee = callInst.getCalledFunction();
     if (!callee )
@@ -2917,8 +2923,10 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
 
 // =====================================================================================================================
 // Map locations of generic outputs of geometry shader to tightly packed ones.
+//
+// @param outLocInfo : GS output location info
 void PatchResourceCollect::mapGsGenericOutput(
-    GsOutLocInfo outLocInfo)             // GS output location info
+    GsOutLocInfo outLocInfo)
 {
     assert(m_shaderStage == ShaderStageGeometry);
     unsigned streamId = outLocInfo.streamId;
@@ -2943,9 +2951,12 @@ void PatchResourceCollect::mapGsGenericOutput(
 
 // =====================================================================================================================
 // Map built-in outputs of geometry shader to tightly packed locations.
+//
+// @param builtInId : Built-in ID
+// @param elemCount : Element count of this built-in
 void PatchResourceCollect::mapGsBuiltInOutput(
-    unsigned builtInId,         // Built-in ID
-    unsigned elemCount)         // Element count of this built-in
+    unsigned builtInId,
+    unsigned elemCount)
 {
     assert(m_shaderStage == ShaderStageGeometry);
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
@@ -3196,8 +3207,10 @@ void PatchResourceCollect::reassembleOutputExportCalls()
 
 // =====================================================================================================================
 // Scalarize last vertex processing stage outputs and FS inputs ready for packing.
+//
+// @param [in/out] module : Module
 void PatchResourceCollect::scalarizeForInOutPacking(
-    Module* module)    // [in/out] Module
+    Module* module)
 {
     // First gather the input/output calls that need scalarizing.
     SmallVector<CallInst*, 4> vsOutputCalls;
@@ -3246,8 +3259,10 @@ void PatchResourceCollect::scalarizeForInOutPacking(
 // =====================================================================================================================
 // Scalarize a generic input.
 // This is known to be an FS generic or interpolant input that is either a vector or 64 bit.
+//
+// @param call : Call that represents importing the generic or interpolant input
 void PatchResourceCollect::scalarizeGenericInput(
-    CallInst* call)  // [in] Call that represents importing the generic or interpolant input
+    CallInst* call)
 {
     BuilderBase builder(call->getContext());
     builder.SetInsertPoint(call);
@@ -3362,8 +3377,10 @@ void PatchResourceCollect::scalarizeGenericInput(
 // =====================================================================================================================
 // Scalarize a generic output.
 // This is known to be a last vertex processing stage (VS/TES/GS) generic output that is either a vector or 64 bit.
+//
+// @param call : Call that represents exporting the generic output
 void PatchResourceCollect::scalarizeGenericOutput(
-    CallInst* call)  // [in] Call that represents exporting the generic output
+    CallInst* call)
 {
     BuilderBase builder(call->getContext());
     builder.SetInsertPoint(call);
@@ -3417,8 +3434,10 @@ void PatchResourceCollect::scalarizeGenericOutput(
 
 // =====================================================================================================================
 // Fill the locationSpan container by constructing a LocationSpan from each input import call
+//
+// @param call : Call to process
 bool InOutLocationMapManager::addSpan(
-    CallInst*   call)  // [in] Call to process
+    CallInst*   call)
 {
     auto callee = call->getCalledFunction();
     auto mangledName = callee->getName();
@@ -3522,9 +3541,12 @@ void InOutLocationMapManager::buildLocationMap()
 
 // =====================================================================================================================
 // Output a mapped InOutLocation from a given InOutLocation if the mapping exists
+//
+// @param originalLocation : The original InOutLocation
+// @param [out] newLocation : The new InOutLocation
 bool InOutLocationMapManager::findMap(
-    const InOutLocation& originalLocation,  // [in] The original InOutLocation
-    const InOutLocation*& newLocation)     // [out] The new InOutLocation
+    const InOutLocation& originalLocation,
+    const InOutLocation*& newLocation)
 {
     auto it = m_locationMap.find(originalLocation);
     if (it == m_locationMap.end())

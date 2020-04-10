@@ -68,9 +68,11 @@ static const char* const HwStageNames[] =
 };
 
 // =====================================================================================================================
+//
+// @param gfxIp : Graphics IP version info
 template<class Elf>
 ElfWriter<Elf>::ElfWriter(
-    GfxIpVersion gfxIp)         // Graphics IP version info
+    GfxIpVersion gfxIp)
     :
     m_gfxIp(gfxIp),
     m_textSecIdx(InvalidValue),
@@ -102,15 +104,23 @@ ElfWriter<Elf>::~ElfWriter()
 
 // =====================================================================================================================
 // Merge base section and input section into merged section
+//
+// @param pSection1 : The first section buffer to merge
+// @param section1Size : Byte size of the first section
+// @param pPrefixString1 : Prefix string of the first section's contents
+// @param pSection2 : The second section buffer to merge
+// @param section2Offset : Byte offset of the second section
+// @param pPrefixString2 : Prefix string of the second section's contents
+// @param [out] pNewSection : Merged section
 template<class Elf>
 void ElfWriter<Elf>::mergeSection(
-    const SectionBuffer*    pSection1,          // [in] The first section buffer to merge
-    size_t                  section1Size,       // Byte size of the first section
-    const char*             pPrefixString1,     // [in] Prefix string of the first section's contents
-    const SectionBuffer*    pSection2,          // [in] The second section buffer to merge
-    size_t                  section2Offset,     // Byte offset of the second section
-    const char*             pPrefixString2,     // [in] Prefix string of the second section's contents
-    SectionBuffer*          pNewSection)        // [out] Merged section
+    const SectionBuffer*    pSection1,
+    size_t                  section1Size,
+    const char*             pPrefixString1,
+    const SectionBuffer*    pSection2,
+    size_t                  section2Offset,
+    const char*             pPrefixString2,
+    SectionBuffer*          pNewSection)
 {
     std::string prefix1;
     std::string prefix2;
@@ -201,11 +211,15 @@ public:
 
 // =====================================================================================================================
 // Merges the map item pair from source map to destination map for llvm::msgpack::MapDocNode.
+//
+// @param [in,out] destMap : Destination map
+// @param srcMap : Source map
+// @param key : Key to check in source map
 template<class Elf>
 void ElfWriter<Elf>::mergeMapItem(
-    llvm::msgpack::MapDocNode& destMap,    // [in,out] Destination map
-    llvm::msgpack::MapDocNode& srcMap,     // [in] Source map
-    unsigned                    key)       // Key to check in source map
+    llvm::msgpack::MapDocNode& destMap,
+    llvm::msgpack::MapDocNode& srcMap,
+    unsigned                    key)
 {
     auto srcKeyNode = srcMap.getDocument()->getNode(key);
     auto srcIt = srcMap.find(srcKeyNode);
@@ -228,12 +242,17 @@ void ElfWriter<Elf>::mergeMapItem(
 
 // =====================================================================================================================
 // Merges fragment shader related info for meta notes.
+//
+// @param pContext : The first note section to merge
+// @param pNote1 : The second note section to merge (contain fragment shader info)
+// @param pNote2 : Note section contains fragment shader info
+// @param [out] pNewNote : Merged note section
 template<class Elf>
 void ElfWriter<Elf>::mergeMetaNote(
-    Context*       pContext,       // [in] The first note section to merge
-    const ElfNote* pNote1,         // [in] The second note section to merge (contain fragment shader info)
-    const ElfNote* pNote2,         // [in] Note section contains fragment shader info
-    ElfNote*       pNewNote)       // [out] Merged note section
+    Context*       pContext,
+    const ElfNote* pNote1,
+    const ElfNote* pNote2,
+    ElfNote*       pNewNote)
 {
     msgpack::Document destDocument;
     msgpack::Document srcDocument;
@@ -347,9 +366,11 @@ void ElfWriter<Elf>::mergeMetaNote(
 
 // =====================================================================================================================
 // Gets symbol according to symbol name, and creates a new one if it doesn't exist.
+//
+// @param pSymbolName : Symbol name
 template<class Elf>
 ElfSymbol* ElfWriter<Elf>::getSymbol(
-    const char* pSymbolName)   // [in] Symbol name
+    const char* pSymbolName)
 {
     for (auto& symbol : m_symbols)
     {
@@ -374,9 +395,11 @@ ElfSymbol* ElfWriter<Elf>::getSymbol(
 
 // =====================================================================================================================
 // Gets note according to noteType.
+//
+// @param noteType : Note type
 template<class Elf>
 ElfNote ElfWriter<Elf>::getNote(
-    Util::Abi::PipelineAbiNoteType noteType)  // Note type
+    Util::Abi::PipelineAbiNoteType noteType)
 {
     for (auto& note : m_notes)
     {
@@ -390,9 +413,11 @@ ElfNote ElfWriter<Elf>::getNote(
 
 // =====================================================================================================================
 // Replaces exist note with input note according to input note type.
+//
+// @param pNote : Input note
 template<class Elf>
 void ElfWriter<Elf>::setNote(
-    ElfNote* pNote)   // [in] Input note
+    ElfNote* pNote)
 {
     for (auto& note : m_notes)
     {
@@ -410,10 +435,13 @@ void ElfWriter<Elf>::setNote(
 
 // =====================================================================================================================
 // Replace exist section with input section according to section index
+//
+// @param secIndex : Section index
+// @param pSection : Input section
 template<class Elf>
 void ElfWriter<Elf>::setSection(
-    unsigned          secIndex,   //  Section index
-    SectionBuffer*    pSection)   // [in] Input section
+    unsigned          secIndex,
+    SectionBuffer*    pSection)
 {
     assert(secIndex < m_sections.size());
     assert(pSection->name == m_sections[secIndex].name);
@@ -583,9 +611,11 @@ void ElfWriter<Elf>::calcSectionHeaderOffset()
 // =====================================================================================================================
 // Writes the data out to the given buffer in ELF format. Assumes the buffer has been pre-allocated with adequate
 // space, which can be determined with a call to "GetRequireBufferSizeBytes()".
+//
+// @param pElf : Output buffer to write ELF data
 template<class Elf>
 void ElfWriter<Elf>::writeToBuffer(
-    ElfPackage* pElf)   // [in] Output buffer to write ELF data
+    ElfPackage* pElf)
 {
     assert(pElf );
 
@@ -628,9 +658,11 @@ void ElfWriter<Elf>::writeToBuffer(
 
 // =====================================================================================================================
 // Copies ELF content from a ElfReader.
+//
+// @param reader : The ElfReader to copy from.
 template<class Elf>
 Result ElfWriter<Elf>::copyFromReader(
-    const ElfReader<Elf>& reader)   // The ElfReader to copy from.
+    const ElfReader<Elf>& reader)
 {
     Result result = Result::Success;
     m_header = reader.getHeader();
@@ -707,10 +739,13 @@ Result ElfWriter<Elf>::copyFromReader(
 
 // =====================================================================================================================
 // Reads ELF content from a buffer.
+//
+// @param pBuffer : Buffer to read data from
+// @param bufSize : Size of the buffer
 template<class Elf>
 Result ElfWriter<Elf>::ReadFromBuffer(
-    const void* pBuffer,    // [in] Buffer to read data from
-    size_t      bufSize)    // Size of the buffer
+    const void* pBuffer,
+    size_t      bufSize)
 {
     ElfReader<Elf> reader(m_gfxIp);
     auto result = reader.ReadFromBuffer(pBuffer, &bufSize);
@@ -721,10 +756,13 @@ Result ElfWriter<Elf>::ReadFromBuffer(
 
 // =====================================================================================================================
 // Gets section data by section index.
+//
+// @param secIdx : Section index
+// @param [out] ppSectionData : Section data
 template<class Elf>
 Result ElfWriter<Elf>::getSectionDataBySectionIndex(
-    unsigned                 secIdx,          // Section index
-    const SectionBuffer**    ppSectionData    // [out] Section data
+    unsigned                 secIdx,
+    const SectionBuffer**    ppSectionData
     ) const
 {
     Result result = Result::ErrorInvalidValue;
@@ -738,11 +776,15 @@ Result ElfWriter<Elf>::getSectionDataBySectionIndex(
 
 // =====================================================================================================================
 // Update descriptor offset to USER_DATA in metaNote.
+//
+// @param pContext : context related to ElfNote
+// @param pNote : Note section to update
+// @param [out] pNewNote : new note section
 template<class Elf>
 void ElfWriter<Elf>::updateMetaNote(
-    Context*       pContext,       // [in] context related to ElfNote
-    const ElfNote* pNote,          // [in] Note section to update
-    ElfNote*       pNewNote)       // [out] new note section
+    Context*       pContext,
+    const ElfNote* pNote,
+    ElfNote*       pNewNote)
 {
     msgpack::Document document;
 
@@ -805,10 +847,13 @@ void ElfWriter<Elf>::updateMetaNote(
 
 // =====================================================================================================================
 // Gets all associated symbols by section index.
+//
+// @param secIdx : Section index
+// @param [out] secSymbols : ELF symbols
 template<class Elf>
 void ElfWriter<Elf>::GetSymbolsBySectionIndex(
-    unsigned                secIdx,         // Section index
-    std::vector<ElfSymbol*>& secSymbols)    // [out] ELF symbols
+    unsigned                secIdx,
+    std::vector<ElfSymbol*>& secSymbols)
 {
     unsigned symCount = m_symbols.size();
 
@@ -821,10 +866,13 @@ void ElfWriter<Elf>::GetSymbolsBySectionIndex(
 
 // =====================================================================================================================
 // Update descriptor root offset in ELF binary
+//
+// @param pContext : Pipeline context
+// @param [out] pPipelineElf : Final ELF binary
 template<class Elf>
 void ElfWriter<Elf>::updateElfBinary(
-    Context*          pContext,        // [in] Pipeline context
-    ElfPackage*       pPipelineElf)    // [out] Final ELF binary
+    Context*          pContext,
+    ElfPackage*       pPipelineElf)
 {
     // Merge PAL metadata
     ElfNote metaNote = {};
@@ -840,11 +888,15 @@ void ElfWriter<Elf>::updateElfBinary(
 
 // =====================================================================================================================
 // Merge ELF binary of fragment shader and ELF binary of non-fragment shaders into single ELF binary
+//
+// @param pContext : Pipeline context
+// @param pFragmentElf : ELF binary of fragment shader
+// @param [out] pPipelineElf : Final ELF binary
 template<class Elf>
 void ElfWriter<Elf>::mergeElfBinary(
-    Context*          pContext,        // [in] Pipeline context
-    const BinaryData* pFragmentElf,    // [in] ELF binary of fragment shader
-    ElfPackage*       pPipelineElf)    // [out] Final ELF binary
+    Context*          pContext,
+    const BinaryData* pFragmentElf,
+    ElfPackage*       pPipelineElf)
 {
     auto fragmentIsaSymbolName =
         Util::Abi::PipelineAbiSymbolNameStrings[static_cast<unsigned>(Util::Abi::PipelineSymbolType::PsMainEntry)];
@@ -1077,10 +1129,13 @@ void ElfWriter<Elf>::reinitialize()
 
 // =====================================================================================================================
 // Link the relocatable ELF readers into a pipeline ELF.
+//
+// @param relocatableElfs : An array of relocatable ELF objects
+// @param pContext : Acquired context
 template<class Elf>
 Result ElfWriter<Elf>::linkGraphicsRelocatableElf(
-    const ArrayRef<ElfReader<Elf>*>& relocatableElfs, // An array of relocatable ELF objects
-    Context* pContext)                                // [in] Acquired context
+    const ArrayRef<ElfReader<Elf>*>& relocatableElfs,
+    Context* pContext)
 {
     reinitialize();
     assert(relocatableElfs.size() == 2 && "Can only handle VsPs Shaders for now.");
@@ -1169,10 +1224,13 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(
 
 // =====================================================================================================================
 // Link the compute shader relocatable ELF reader into a pipeline ELF.
+//
+// @param relocatableElf : Relocatable compute shader elf
+// @param context : Acquired context
 template<class Elf>
 Result ElfWriter<Elf>::linkComputeRelocatableElf(
-    const ElfReader<Elf>& relocatableElf,   // [in] Relocatable compute shader elf
-    Context* context)                      // [in] Acquired context
+    const ElfReader<Elf>& relocatableElf,
+    Context* context)
 {
     // Currently nothing to do, just copy the elf.
     copyFromReader(relocatableElf);

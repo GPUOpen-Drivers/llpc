@@ -127,10 +127,14 @@ const char* NggLdsManager::m_ldsRegionNames[LdsRegionCount] =
 };
 
 // =====================================================================================================================
+//
+// @param module : LLVM module
+// @param pipelineState : Pipeline state
+// @param builder : LLVM IR builder
 NggLdsManager::NggLdsManager(
-    Module*             module,        // [in] LLVM module
-    PipelineState*      pipelineState, // [in] Pipeline state
-    IRBuilder<>*        builder)       // [in] LLVM IR builder
+    Module*             module,
+    PipelineState*      pipelineState,
+    IRBuilder<>*        builder)
     :
     m_pipelineState(pipelineState),
     m_context(&pipelineState->getContext()),
@@ -288,8 +292,10 @@ NggLdsManager::NggLdsManager(
 
 // =====================================================================================================================
 // Calculates ES extra LDS size.
+//
+// @param pipelineState : Pipeline state
 unsigned NggLdsManager::calcEsExtraLdsSize(
-    PipelineState* pipelineState)  // [in] Pipeline state
+    PipelineState* pipelineState)
 {
     const auto nggControl = pipelineState->getNggControl();
     if (!nggControl->enableNgg)
@@ -363,8 +369,10 @@ unsigned NggLdsManager::calcEsExtraLdsSize(
 
 // =====================================================================================================================
 // Calculates GS extra LDS size (used for operations other than ES-GS ring and GS-VS ring read/write).
+//
+// @param pipelineState : Pipeline state
 unsigned NggLdsManager::calcGsExtraLdsSize(
-    PipelineState* pipelineState)  // [in] Pipeline state
+    PipelineState* pipelineState)
 {
     const auto nggControl = pipelineState->getNggControl();
     if (!nggControl->enableNgg)
@@ -385,10 +393,14 @@ unsigned NggLdsManager::calcGsExtraLdsSize(
 
 // =====================================================================================================================
 // Reads value from LDS.
+//
+// @param readTy : Type of value read from LDS
+// @param ldsOffset : Start offset to do LDS read operations
+// @param useDs128 : Whether to use 128-bit LDS load, 16-byte alignment is guaranteed by caller
 Value* NggLdsManager::readValueFromLds(
-    Type*        readTy,       // [in] Type of value read from LDS
-    Value*       ldsOffset,    // [in] Start offset to do LDS read operations
-    bool         useDs128)      // Whether to use 128-bit LDS load, 16-byte alignment is guaranteed by caller
+    Type*        readTy,
+    Value*       ldsOffset,
+    bool         useDs128)
 {
     assert(m_lds );
     assert(readTy->isIntOrIntVectorTy() || readTy->isFPOrFPVectorTy());
@@ -461,10 +473,14 @@ Value* NggLdsManager::readValueFromLds(
 
 // =====================================================================================================================
 // Writes value to LDS.
+//
+// @param writeValue : Value written to LDS
+// @param ldsOffset : Start offset to do LDS write operations
+// @param useDs128 : Whether to use 128-bit LDS store, 16-byte alignment is guaranteed by caller
 void NggLdsManager::writeValueToLds(
-    Value*        writeValue,      // [in] Value written to LDS
-    Value*        ldsOffset,       // [in] Start offset to do LDS write operations
-    bool          useDs128)         // Whether to use 128-bit LDS store, 16-byte alignment is guaranteed by caller
+    Value*        writeValue,
+    Value*        ldsOffset,
+    bool          useDs128)
 {
     assert(m_lds );
 
@@ -538,10 +554,14 @@ void NggLdsManager::writeValueToLds(
 
 // =====================================================================================================================
 // Does atomic binary operation with the value stored in LDS.
+//
+// @param atomicOp : Atomic binary operation
+// @param atomicValue : Value to do atomic operation
+// @param ldsOffset : Start offset to do LDS atomic operations
 void NggLdsManager::atomicOpWithLds(
-    AtomicRMWInst::BinOp atomicOp,      // Atomic binary operation
-    Value*               atomicValue,  // [in] Value to do atomic operation
-    Value*               ldsOffset)    // [in] Start offset to do LDS atomic operations
+    AtomicRMWInst::BinOp atomicOp,
+    Value*               atomicValue,
+    Value*               ldsOffset)
 {
     assert(atomicValue->getType()->isIntegerTy(32));
 

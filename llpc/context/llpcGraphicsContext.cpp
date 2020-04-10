@@ -44,11 +44,16 @@ namespace Llpc
 {
 
 // =====================================================================================================================
+//
+// @param gfxIp : Graphics Ip version info
+// @param pipelineInfo : Graphics pipeline build info
+// @param pipelineHash : Pipeline hash code
+// @param cacheHash : Cache hash code
 GraphicsContext::GraphicsContext(
-    GfxIpVersion                     gfxIp,            // Graphics Ip version info
-    const GraphicsPipelineBuildInfo* pipelineInfo,    // [in] Graphics pipeline build info
-    MetroHash::Hash*                 pipelineHash,    // [in] Pipeline hash code
-    MetroHash::Hash*                 cacheHash)       // [in] Cache hash code
+    GfxIpVersion                     gfxIp,
+    const GraphicsPipelineBuildInfo* pipelineInfo,
+    MetroHash::Hash*                 pipelineHash,
+    MetroHash::Hash*                 cacheHash)
     :
     PipelineContext(gfxIp, pipelineHash, cacheHash),
     m_pipelineInfo(pipelineInfo),
@@ -88,8 +93,10 @@ GraphicsContext::~GraphicsContext()
 
 // =====================================================================================================================
 // Gets pipeline shader info of the specified shader stage
+//
+// @param shaderStage : Shader stage
 const PipelineShaderInfo* GraphicsContext::getPipelineShaderInfo(
-    ShaderStage shaderStage // Shader stage
+    ShaderStage shaderStage
     ) const
 {
     if (shaderStage == ShaderStageCopyShader)
@@ -226,8 +233,10 @@ void GraphicsContext::doUserDataNodeMerge()
 
 // =====================================================================================================================
 // Merge user data nodes that have been collected into one big table
+//
+// @param allNodes : Table of nodes
 ArrayRef<ResourceMappingNode> GraphicsContext::mergeUserDataNodeTable(
-    SmallVectorImpl<ResourceMappingNode>& allNodes)   // Table of nodes
+    SmallVectorImpl<ResourceMappingNode>& allNodes)
 {
     // Sort the nodes by offset, so we can spot duplicates.
     std::sort(allNodes.begin(),

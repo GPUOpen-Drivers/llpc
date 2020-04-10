@@ -70,8 +70,10 @@ unsigned PipelineDocument::m_maxSectionCount[SectionTypeNameNum] =
 
 // =====================================================================================================================
 // Checks whether the input version is supportted.
+//
+// @param ver : Version
 bool PipelineDocument::checkVersion(
-    unsigned ver)        // Version
+    unsigned ver)
 {
     bool result = true;
 

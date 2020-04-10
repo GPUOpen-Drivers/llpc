@@ -64,8 +64,10 @@ ShaderStage convertToStageShage(unsigned execModel);
 
 // =====================================================================================================================
 // Gets module ID according to the index
+//
+// @param index : Index in stage array
 inline unsigned getModuleIdByIndex(
-    unsigned index)  // Index in stage array
+    unsigned index)
 {
     static const unsigned BaseModuleId = 1;
     return BaseModuleId + index;
@@ -75,9 +77,12 @@ inline unsigned getModuleIdByIndex(
 // Decrements a pointer by nBytes by first casting it to a uint8_t*.
 //
 // Returns decremented pointer.
+//
+// @param p : Pointer to be decremented.
+// @param numBytes : Number of bytes to decrement the pointer by
 inline void* voidPtrDec(
-    const void* p,         // [in] Pointer to be decremented.
-    size_t      numBytes)  // Number of bytes to decrement the pointer by
+    const void* p,
+    size_t      numBytes)
 {
     void* ptr = const_cast<void*>(p);
     return (static_cast<uint8_t*>(ptr) - numBytes);
@@ -89,9 +94,12 @@ inline void* voidPtrDec(
 // This function expects the first pointer to not be smaller than the second.
 //
 // Returns Number of bytes between the two pointers.
+//
+// @param p1 : First pointer (higher address).
+// @param p2 : Second pointer (lower address).
 inline size_t voidPtrDiff(
-    const void* p1,  //< [in] First pointer (higher address).
-    const void* p2)  //< [in] Second pointer (lower address).
+    const void* p1,
+    const void* p2)
 {
     return (static_cast<const uint8_t*>(p1) - static_cast<const uint8_t*>(p2));
 }
@@ -103,8 +111,10 @@ inline size_t voidPtrDiff(
 //
 // Returns log2(u)
 template< typename T>
+//
+// @param u : Value to compute the logarithm of.
 inline unsigned log2(
-    T u)  // Value to compute the logarithm of.
+    T u)
 {
     unsigned logValue = 0;
 

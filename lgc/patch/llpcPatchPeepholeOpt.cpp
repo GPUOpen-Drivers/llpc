@@ -67,15 +67,19 @@ char PatchPeepholeOpt::ID;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for peephole optimizations.
+//
+// @param enableDiscardOpt : Enable the optimization for "kill" intrinsic
 FunctionPass* createPatchPeepholeOpt(
-    bool enableDiscardOpt) // Enable the optimization for "kill" intrinsic
+    bool enableDiscardOpt)
 {
     return new PatchPeepholeOpt(enableDiscardOpt);
 }
 
 // =====================================================================================================================
+//
+// @param enableDiscardOpt : Enable the optimization for "kill" intrinsic
 PatchPeepholeOpt::PatchPeepholeOpt(
-    bool enableDiscardOpt) // Enable the optimization for "kill" intrinsic
+    bool enableDiscardOpt)
     :
     FunctionPass(ID)
 {
@@ -84,8 +88,10 @@ PatchPeepholeOpt::PatchPeepholeOpt(
 
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
+//
+// @param [in,out] function : Function that we will peephole optimize.
 bool PatchPeepholeOpt::runOnFunction(
-    Function& function // [in,out] Function that we will peephole optimize.
+    Function& function
     )
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Peephole-Opt\n");
@@ -106,8 +112,10 @@ bool PatchPeepholeOpt::runOnFunction(
 
 // =====================================================================================================================
 // Specify what analysis passes this pass depends on.
+//
+// @param [in,out] analysisUsage : The place to record our analysis pass usage requirements.
 void PatchPeepholeOpt::getAnalysisUsage(
-    AnalysisUsage& analysisUsage // [in,out] The place to record our analysis pass usage requirements.
+    AnalysisUsage& analysisUsage
     ) const
 {
     analysisUsage.setPreservesCFG();
@@ -115,8 +123,10 @@ void PatchPeepholeOpt::getAnalysisUsage(
 
 // =====================================================================================================================
 // Visit a bit cast instruction.
+//
+// @param bitCast : The "bitcast" instruction to visit.
 void PatchPeepholeOpt::visitBitCast(
-    BitCastInst& bitCast) // [in] The "bitcast" instruction to visit.
+    BitCastInst& bitCast)
 {
     // If the bit cast has no users, no point trying to optimize it!
     if (bitCast.user_empty())
@@ -303,8 +313,10 @@ void PatchPeepholeOpt::visitBitCast(
 
 // =====================================================================================================================
 // Visit an integer comparison instruction.
+//
+// @param iCmp : The "icmp" instruction to visit.
 void PatchPeepholeOpt::visitICmp(
-    ICmpInst& iCmp) // [in] The "icmp" instruction to visit.
+    ICmpInst& iCmp)
 {
     switch (iCmp.getPredicate())
     {
@@ -368,8 +380,10 @@ void PatchPeepholeOpt::visitICmp(
 
 // =====================================================================================================================
 // Visit an extract element instruction.
+//
+// @param extractElement : The "extractelement" instruction to visit.
 void PatchPeepholeOpt::visitExtractElement(
-    ExtractElementInst& extractElement) // [in] The "extractelement" instruction to visit.
+    ExtractElementInst& extractElement)
 {
     // If the extract has no users, no point trying to optimize it!
     if (extractElement.user_empty())
@@ -495,8 +509,10 @@ void PatchPeepholeOpt::visitExtractElement(
 
 // =====================================================================================================================
 // Visit a PHI node.
+//
+// @param phiNode : The PHI node to visit.
 void PatchPeepholeOpt::visitPHINode(
-    PHINode& phiNode) // [in] The PHI node to visit.
+    PHINode& phiNode)
 {
     // If the PHI has no users, no point trying to optimize it!
     if (phiNode.user_empty())
@@ -817,8 +833,10 @@ void PatchPeepholeOpt::visitPHINode(
 
 // =====================================================================================================================
 // Visits "call" instruction.
+//
+// @param callInst : "Call" instruction
 void PatchPeepholeOpt::visitCallInst(
-    CallInst& callInst) // [in] "Call" instruction
+    CallInst& callInst)
 {
     auto callee = callInst.getCalledFunction();
     if (!callee )
@@ -882,9 +900,12 @@ void PatchPeepholeOpt::visitCallInst(
 
 // =====================================================================================================================
 // Helper function to move an instruction after another.
+//
+// @param move : Instruction to move.
+// @param after : Where to move after.
 void PatchPeepholeOpt::moveAfter(
-    Instruction& move, // [in] Instruction to move.
-    Instruction& after // [in] Where to move after.
+    Instruction& move,
+    Instruction& after
     ) const
 {
     // Special case for if the instruction is a PHI node, we need to move after all other PHIs.
@@ -896,9 +917,12 @@ void PatchPeepholeOpt::moveAfter(
 
 // =====================================================================================================================
 // Helper function to insert an instruction after another.
+//
+// @param insert : Instruction to insert.
+// @param after : Where to insert after.
 void PatchPeepholeOpt::insertAfter(
-    Instruction& insert, // [in] Instruction to insert.
-    Instruction& after   // [in] Where to insert after.
+    Instruction& insert,
+    Instruction& after
     ) const
 {
     // Special case for if the instruction is a PHI node, we need to insert after all other PHIs.

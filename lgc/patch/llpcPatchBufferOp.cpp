@@ -77,8 +77,10 @@ PatchBufferOp::PatchBufferOp()
 
 // =====================================================================================================================
 // Get the analysis usage of this pass.
+//
+// @param [out] analysisUsage : The analysis usage.
 void PatchBufferOp::getAnalysisUsage(
-    AnalysisUsage& analysisUsage // [out] The analysis usage.
+    AnalysisUsage& analysisUsage
     ) const
 {
     analysisUsage.addRequired<LegacyDivergenceAnalysis>();
@@ -91,8 +93,10 @@ void PatchBufferOp::getAnalysisUsage(
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM function.
+//
+// @param [in,out] function : LLVM function to be run on
 bool PatchBufferOp::runOnFunction(
-    Function& function) // [in,out] LLVM function to be run on
+    Function& function)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Buffer-Op\n");
 
@@ -149,8 +153,10 @@ bool PatchBufferOp::runOnFunction(
 
 // =====================================================================================================================
 // Visits "cmpxchg" instruction.
+//
+// @param atomicCmpXchgInst : The instruction
 void PatchBufferOp::visitAtomicCmpXchgInst(
-    AtomicCmpXchgInst& atomicCmpXchgInst) // [in] The instruction
+    AtomicCmpXchgInst& atomicCmpXchgInst)
 {
     // If the type we are doing an atomic operation on is not a fat pointer, bail.
     if (atomicCmpXchgInst.getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
@@ -275,8 +281,10 @@ void PatchBufferOp::visitAtomicCmpXchgInst(
 
 // =====================================================================================================================
 // Visits "atomicrmw" instruction.
+//
+// @param atomicRmwInst : The instruction
 void PatchBufferOp::visitAtomicRMWInst(
-    AtomicRMWInst& atomicRmwInst) // [in] The instruction
+    AtomicRMWInst& atomicRmwInst)
 {
     // If the type we are doing an atomic operation on is not a fat pointer, bail.
     if (atomicRmwInst.getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
@@ -414,8 +422,10 @@ void PatchBufferOp::visitAtomicRMWInst(
 
 // =====================================================================================================================
 // Visits "bitcast" instruction.
+//
+// @param bitCastInst : The instruction
 void PatchBufferOp::visitBitCastInst(
-    BitCastInst& bitCastInst) // [in] The instruction
+    BitCastInst& bitCastInst)
 {
     Type* const destType = bitCastInst.getType();
 
@@ -441,8 +451,10 @@ void PatchBufferOp::visitBitCastInst(
 
 // =====================================================================================================================
 // Visits "call" instruction.
+//
+// @param callInst : The instruction
 void PatchBufferOp::visitCallInst(
-    CallInst& callInst) // [in] The instruction
+    CallInst& callInst)
 {
     Function* const calledFunc = callInst.getCalledFunction();
 
@@ -488,8 +500,10 @@ void PatchBufferOp::visitCallInst(
 
 // =====================================================================================================================
 // Visits "extractelement" instruction.
+//
+// @param extractElementInst : The instruction
 void PatchBufferOp::visitExtractElementInst(
-    ExtractElementInst& extractElementInst) // [in] The instruction
+    ExtractElementInst& extractElementInst)
 {
     PointerType* const pointerType = dyn_cast<PointerType>(extractElementInst.getType());
 
@@ -514,8 +528,10 @@ void PatchBufferOp::visitExtractElementInst(
 
 // =====================================================================================================================
 // Visits "getelementptr" instruction.
+//
+// @param getElemPtrInst : The instruction
 void PatchBufferOp::visitGetElementPtrInst(
-    GetElementPtrInst& getElemPtrInst) // [in] The instruction
+    GetElementPtrInst& getElemPtrInst)
 {
     // If the type we are GEPing into is not a fat pointer, bail.
     if (getElemPtrInst.getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
@@ -541,8 +557,10 @@ void PatchBufferOp::visitGetElementPtrInst(
 
 // =====================================================================================================================
 // Visits "insertelement" instruction.
+//
+// @param insertElementInst : The instruction
 void PatchBufferOp::visitInsertElementInst(
-    InsertElementInst& insertElementInst) // [in] The instruction
+    InsertElementInst& insertElementInst)
 {
     Type* const type = insertElementInst.getType();
 
@@ -580,8 +598,10 @@ void PatchBufferOp::visitInsertElementInst(
 
 // =====================================================================================================================
 // Visits "load" instruction.
+//
+// @param loadInst : The instruction
 void PatchBufferOp::visitLoadInst(
-    LoadInst& loadInst) // [in] The instruction
+    LoadInst& loadInst)
 {
     const unsigned addrSpace = loadInst.getPointerAddressSpace();
 
@@ -640,8 +660,10 @@ void PatchBufferOp::visitLoadInst(
 
 // =====================================================================================================================
 // Visits "memcpy" instruction.
+//
+// @param memCpyInst : The memcpy instruction
 void PatchBufferOp::visitMemCpyInst(
-    MemCpyInst& memCpyInst) // [in] The memcpy instruction
+    MemCpyInst& memCpyInst)
 {
     Value* const dest = memCpyInst.getArgOperand(0);
     Value* const src = memCpyInst.getArgOperand(1);
@@ -660,8 +682,10 @@ void PatchBufferOp::visitMemCpyInst(
 
 // =====================================================================================================================
 // Visits "memmove" instruction.
+//
+// @param memMoveInst : The memmove instruction
 void PatchBufferOp::visitMemMoveInst(
-    MemMoveInst& memMoveInst) // [in] The memmove instruction
+    MemMoveInst& memMoveInst)
 {
     Value* const dest = memMoveInst.getArgOperand(0);
     Value* const src = memMoveInst.getArgOperand(1);
@@ -716,8 +740,10 @@ void PatchBufferOp::visitMemMoveInst(
 
 // =====================================================================================================================
 // Visits "memset" instruction.
+//
+// @param memSetInst : The memset instruction
 void PatchBufferOp::visitMemSetInst(
-    MemSetInst& memSetInst) // [in] The memset instruction
+    MemSetInst& memSetInst)
 {
     Value* const dest = memSetInst.getArgOperand(0);
 
@@ -733,8 +759,10 @@ void PatchBufferOp::visitMemSetInst(
 
 // =====================================================================================================================
 // Visits "phi" instruction.
+//
+// @param phiNode : The phi node
 void PatchBufferOp::visitPHINode(
-    PHINode& phiNode) // [in] The phi node
+    PHINode& phiNode)
 {
     Type* const type = phiNode.getType();
 
@@ -838,8 +866,10 @@ void PatchBufferOp::visitPHINode(
 
 // =====================================================================================================================
 // Visits "select" instruction.
+//
+// @param selectInst : The select instruction
 void PatchBufferOp::visitSelectInst(
-    SelectInst& selectInst) // [in] The select instruction
+    SelectInst& selectInst)
 {
     Type* const destType = selectInst.getType();
 
@@ -902,8 +932,10 @@ void PatchBufferOp::visitSelectInst(
 
 // =====================================================================================================================
 // Visits "store" instruction.
+//
+// @param storeInst : The instruction
 void PatchBufferOp::visitStoreInst(
-    StoreInst& storeInst) // [in] The instruction
+    StoreInst& storeInst)
 {
     // If the address space of the store pointer is not a buffer fat pointer, bail.
     if (storeInst.getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
@@ -917,8 +949,10 @@ void PatchBufferOp::visitStoreInst(
 
 // =====================================================================================================================
 // Visits "icmp" instruction.
+//
+// @param icmpInst : The instuction
 void PatchBufferOp::visitICmpInst(
-    ICmpInst& icmpInst) // [in] The instuction
+    ICmpInst& icmpInst)
 {
     Type* const type = icmpInst.getOperand(0)->getType();
 
@@ -942,8 +976,10 @@ void PatchBufferOp::visitICmpInst(
 
 // =====================================================================================================================
 // Visits "ptrtoint" instruction.
+//
+// @param ptrToIntInst : The "ptrtoint" instruction
 void PatchBufferOp::visitPtrToIntInst(
-    PtrToIntInst& ptrToIntInst) // [in] The "ptrtoint" instruction
+    PtrToIntInst& ptrToIntInst)
 {
     Type* const type = ptrToIntInst.getOperand(0)->getType();
 
@@ -971,8 +1007,10 @@ void PatchBufferOp::visitPtrToIntInst(
 
 // =====================================================================================================================
 // Post-process visits "memcpy" instruction.
+//
+// @param memCpyInst : The memcpy instruction
 void PatchBufferOp::postVisitMemCpyInst(
-    MemCpyInst& memCpyInst) // [in] The memcpy instruction
+    MemCpyInst& memCpyInst)
 {
     Value* const dest = memCpyInst.getArgOperand(0);
     Value* const src = memCpyInst.getArgOperand(1);
@@ -1110,8 +1148,10 @@ void PatchBufferOp::postVisitMemCpyInst(
 
 // =====================================================================================================================
 // Post-process visits "memset" instruction.
+//
+// @param memSetInst : The memset instruction
 void PatchBufferOp::postVisitMemSetInst(
-    MemSetInst& memSetInst) // [in] The memset instruction
+    MemSetInst& memSetInst)
 {
     Value* const dest = memSetInst.getArgOperand(0);
 
@@ -1260,8 +1300,10 @@ void PatchBufferOp::postVisitMemSetInst(
 
 // =====================================================================================================================
 // Get a pointer operand as an instruction.
+//
+// @param value : The pointer operand value to get as an instruction.
 Value* PatchBufferOp::getPointerOperandAsInst(
-    Value* const value) // [in] The pointer operand value to get as an instruction.
+    Value* const value)
 {
     // If the value is already an instruction, return it.
     if (Instruction* const inst = dyn_cast<Instruction>(value))
@@ -1291,8 +1333,10 @@ Value* PatchBufferOp::getPointerOperandAsInst(
 
 // =====================================================================================================================
 // Extract the 64-bit address from a buffer descriptor.
+//
+// @param bufferDesc : The buffer descriptor to extract the address from
 Value* PatchBufferOp::getBaseAddressFromBufferDesc(
-    Value* const bufferDesc // [in] The buffer descriptor to extract the address from
+    Value* const bufferDesc
     ) const
 {
     Type* const descType = bufferDesc->getType();
@@ -1316,9 +1360,12 @@ Value* PatchBufferOp::getBaseAddressFromBufferDesc(
 
 // =====================================================================================================================
 // Copy all metadata from one value to another.
+//
+// @param [in/out] dest : The destination to copy metadata onto.
+// @param src : The source to copy metadata from.
 void PatchBufferOp::copyMetadata(
-    Value* const       dest, // [in/out] The destination to copy metadata onto.
-    const Value* const src   // [in] The source to copy metadata from.
+    Value* const       dest,
+    const Value* const src
     ) const
 {
     Instruction* const destInst = dyn_cast<Instruction>(dest);
@@ -1344,8 +1391,10 @@ void PatchBufferOp::copyMetadata(
 // Get the remapped type for a fat pointer that is usable in indexing. We use the 32-bit wide constant address space for
 // this, as it means when we convert the GEP to an integer, the GEP can be converted losslessly to a 32-bit integer,
 // which just happens to be what the MUBUF instructions expect.
+//
+// @param type : The type to remap.
 PointerType* PatchBufferOp::getRemappedType(
-    Type* const type // [in] The type to remap.
+    Type* const type
     ) const
 {
     assert(type->isPointerTy());
@@ -1354,8 +1403,10 @@ PointerType* PatchBufferOp::getRemappedType(
 
 // =====================================================================================================================
 // Remove any users that are invariant starts, returning if any were removed.
+//
+// @param value : The value to check the users of.
 bool PatchBufferOp::removeUsersForInvariantStarts(
-    Value* const value) // [in] The value to check the users of.
+    Value* const value)
 {
     bool modified = false;
 
@@ -1391,8 +1442,10 @@ bool PatchBufferOp::removeUsersForInvariantStarts(
 
 // =====================================================================================================================
 // Replace a fat pointer load or store with the required intrinsics.
+//
+// @param inst : The instruction to replace.
 Value* PatchBufferOp::replaceLoadStore(
-    Instruction& inst) // [in] The instruction to replace.
+    Instruction& inst)
 {
     LoadInst* const loadInst = dyn_cast<LoadInst>(&inst);
     StoreInst* const storeInst = dyn_cast<StoreInst>(&inst);
@@ -1731,8 +1784,10 @@ Value* PatchBufferOp::replaceLoadStore(
 
 // =====================================================================================================================
 // Replace fat pointers icmp with the instruction required to do the icmp.
+//
+// @param iCmpInst : The "icmp" instruction to replace.
 Value* PatchBufferOp::replaceICmp(
-    ICmpInst* const iCmpInst) // [in] The "icmp" instruction to replace.
+    ICmpInst* const iCmpInst)
 {
     m_builder->SetInsertPoint(iCmpInst);
 
@@ -1780,11 +1835,16 @@ Value* PatchBufferOp::replaceICmp(
 
 // =====================================================================================================================
 // Make a loop, returning the the value of the loop counter. This modifies the insertion point of the builder.
+//
+// @param loopStart : The start index of the loop.
+// @param loopEnd : The end index of the loop.
+// @param loopStride : The stride of the loop.
+// @param insertPos : The position to insert the loop in the instruction stream.
 Instruction* PatchBufferOp::makeLoop(
-    Value* const       loopStart,  // [in] The start index of the loop.
-    Value* const       loopEnd,    // [in] The end index of the loop.
-    Value* const       loopStride, // [in] The stride of the loop.
-    Instruction* const insertPos)  // [in] The position to insert the loop in the instruction stream.
+    Value* const       loopStart,
+    Value* const       loopEnd,
+    Value* const       loopStride,
+    Instruction* const insertPos)
 {
     Value* const initialCond = m_builder->CreateICmpNE(loopStart, loopEnd);
 

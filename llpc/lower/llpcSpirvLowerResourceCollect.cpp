@@ -57,15 +57,19 @@ char SpirvLowerResourceCollect::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering opertions for resource collecting
+//
+// @param collectDetailUsage : Whether to collect detailed usages of resource node datas and FS output infos
 ModulePass* createSpirvLowerResourceCollect(
-    bool collectDetailUsage) // Whether to collect detailed usages of resource node datas and FS output infos
+    bool collectDetailUsage)
 {
     return new SpirvLowerResourceCollect(collectDetailUsage);
 }
 
 // =====================================================================================================================
+//
+// @param collectDetailUsage : Whether to collect detailed usages of resource node datas and FS output infos
 SpirvLowerResourceCollect::SpirvLowerResourceCollect(
-    bool collectDetailUsage) // Whether to collect detailed usages of resource node datas and FS output infos
+    bool collectDetailUsage)
     :
     SpirvLower(ID),
     m_collectDetailUsage(collectDetailUsage),
@@ -76,8 +80,10 @@ SpirvLowerResourceCollect::SpirvLowerResourceCollect(
 
 // =====================================================================================================================
 // Collect resource node data
+//
+// @param global : Global variable to collect resource node data
 void SpirvLowerResourceCollect::collectResourceNodeData(
-    const GlobalVariable* global)       // [in] Global variable to collect resource node data
+    const GlobalVariable* global)
 {
     auto globalTy = global->getType()->getContainedType(0);
 
@@ -156,8 +162,10 @@ void SpirvLowerResourceCollect::collectResourceNodeData(
 }
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool SpirvLowerResourceCollect::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Resource-Collect\n");
 
@@ -298,8 +306,10 @@ bool SpirvLowerResourceCollect::runOnModule(
 
 // =====================================================================================================================
 // Gets element count if the specified type is an array (flattened for multi-dimension array).
+//
+// @param ty : Type to check
 unsigned SpirvLowerResourceCollect::getFlattenArrayElementCount(
-    const Type* ty // [in] Type to check
+    const Type* ty
     ) const
 {
     unsigned elemCount = 1;
@@ -315,8 +325,10 @@ unsigned SpirvLowerResourceCollect::getFlattenArrayElementCount(
 
 // =====================================================================================================================
 // Gets element type if the specified type is an array (flattened for multi-dimension array).
+//
+// @param ty : Type to check
 const Type* SpirvLowerResourceCollect::getFlattenArrayElementType(
-    const Type* ty // [in] Type to check
+    const Type* ty
     ) const
 {
     const Type* elemType = ty;
@@ -332,9 +344,12 @@ const Type* SpirvLowerResourceCollect::getFlattenArrayElementType(
 
 // =====================================================================================================================
 // Find the specified target call and get the index value from corresponding argument
+//
+// @param module : LLVM module to be visited
+// @param targetCall : Builder call as search target
 Value* SpirvLowerResourceCollect::findCallAndGetIndexValue(
-    Module& module,  // [in] LLVM module to be visited
-    CallInst* const targetCall)  // [in] Builder call as search target
+    Module& module,
+    CallInst* const targetCall)
 {
     for (auto& func : module)
     {
@@ -375,8 +390,10 @@ Value* SpirvLowerResourceCollect::findCallAndGetIndexValue(
 
 // =====================================================================================================================
 // Visit all LLPC builder calls in a module
+//
+// @param module : LLVM module to be visited
 void SpirvLowerResourceCollect::visitCalls(
-    Module& module)  // [in] LLVM module to be visited
+    Module& module)
 {
     for (auto& func : module)
     {

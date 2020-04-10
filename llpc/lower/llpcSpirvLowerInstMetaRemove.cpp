@@ -65,8 +65,10 @@ SpirvLowerInstMetaRemove::SpirvLowerInstMetaRemove()
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool SpirvLowerInstMetaRemove::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Inst-Meta-Remove\n");
 
@@ -93,8 +95,10 @@ bool SpirvLowerInstMetaRemove::runOnModule(
 
 // =====================================================================================================================
 // Visits "call" instruction.
+//
+// @param callInst : "Call" instruction
 void SpirvLowerInstMetaRemove::visitCallInst(
-    CallInst& callInst) // [in] "Call" instruction
+    CallInst& callInst)
 {
     auto callee = callInst.getCalledFunction();
     if (!callee )

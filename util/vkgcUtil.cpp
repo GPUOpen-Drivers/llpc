@@ -41,9 +41,12 @@ namespace Vkgc
 
 // =====================================================================================================================
 // Gets name string of the abbreviation for the specified shader stage
+//
+// @param shaderStage : Shader stage
+// @param upper : Whether to use uppercase for the abbreviation (default is lowercase)
 const char* getShaderStageAbbreviation(
-    ShaderStage shaderStage,  // Shader stage
-    bool        upper)        // Whether to use uppercase for the abbreviation (default is lowercase)
+    ShaderStage shaderStage,
+    bool        upper)
 {
     const char* abbr = nullptr;
 
@@ -88,8 +91,10 @@ const char* getShaderStageAbbreviation(
 
 // =====================================================================================================================
 // Create directory.
+//
+// @param dir : the path of directory
 bool createDirectory(
-    const char* dir)  // [in] the path of directory
+    const char* dir)
 {
     int result = mkdir(dir, S_IRWXU);
     return result == 0;
@@ -102,8 +107,10 @@ bool createDirectory(
 
 // =====================================================================================================================
 // Translate enum "ResourceMappingNodeType" to string
+//
+// @param type : Resource map node type
 const char* getResourceMappingNodeTypeName(
-    ResourceMappingNodeType type)  // Resource map node type
+    ResourceMappingNodeType type)
 {
     const char* string = nullptr;
     switch (type)

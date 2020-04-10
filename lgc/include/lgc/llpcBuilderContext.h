@@ -71,10 +71,14 @@ public:
     static void initialize();
 
     // Create the BuilderContext. Returns nullptr on failure to recognize the AMDGPU target whose name is specified
+    //
+    // @param context : LLVM context to use on all compiles
+    // @param gpuName : LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
+    // @param palAbiVersion : PAL pipeline ABI version to compile for
     static BuilderContext* Create(
-        llvm::LLVMContext&  context,               // [in] LLVM context to use on all compiles
-        llvm::StringRef     gpuName,               // LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
-        unsigned      palAbiVersion);        // PAL pipeline ABI version to compile for
+        llvm::LLVMContext&  context,
+        llvm::StringRef     gpuName,
+        unsigned      palAbiVersion);
 
     ~BuilderContext();
 
@@ -95,14 +99,19 @@ public:
 
     // Create a Builder object. For a shader compile (pPipelineState is nullptr), useBuilderRecorder is ignored
     // because it always uses BuilderRecorder.
+    //
+    // @param pipeline : Pipeline object for pipeline compile, nullptr for shader compile
+    // @param useBuilderRecorder : True to use BuilderRecorder, false to use BuilderImpl
     Builder* createBuilder(
-        Pipeline*  pipeline,           // [in] Pipeline object for pipeline compile, nullptr for shader compile
-        bool       useBuilderRecorder); // True to use BuilderRecorder, false to use BuilderImpl
+        Pipeline*  pipeline,
+        bool       useBuilderRecorder);
 
     // Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not
     // think that we have library functions.
+    //
+    // @param [in/out] passMgr : Pass manager
     void preparePassManager(
-        llvm::legacy::PassManager*  passMgr);  // [in/out] Pass manager
+        llvm::legacy::PassManager*  passMgr);
 
     // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
     void addTargetPasses(lgc::PassManager& passMgr, llvm::Timer* codeGenTimer, llvm::raw_pwrite_stream& outStream);

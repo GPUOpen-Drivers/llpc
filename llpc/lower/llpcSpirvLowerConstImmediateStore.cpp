@@ -65,8 +65,10 @@ SpirvLowerConstImmediateStore::SpirvLowerConstImmediateStore()
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool SpirvLowerConstImmediateStore::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Const-Immediate-Store\n");
 
@@ -89,8 +91,10 @@ bool SpirvLowerConstImmediateStore::runOnModule(
 // =====================================================================================================================
 // Processes "alloca" instructions at the beginning of the given non-empty function to see if they
 // can be optimized to a read-only global variable.
+//
+// @param func : Function to process
 void SpirvLowerConstImmediateStore::processAllocaInsts(
-    Function* func)  // [in] Function to process
+    Function* func)
 {
     // NOTE: We only visit the entry block on the basis that SPIR-V translator puts all "alloca"
     // instructions there.
@@ -123,8 +127,10 @@ void SpirvLowerConstImmediateStore::processAllocaInsts(
 //
 // NOTE: This is conservative in that it returns nullptr if the pointer escapes by being used in anything
 // other than "store" (as the pointer), "load" or "getelementptr" instruction.
+//
+// @param allocaInst : The "alloca" instruction to process
 StoreInst* SpirvLowerConstImmediateStore::findSingleStore(
-    AllocaInst* allocaInst)  // [in] The "alloca" instruction to process
+    AllocaInst* allocaInst)
 {
     std::vector<Instruction*> pointers;
     bool isOuterPointer = true;
@@ -172,8 +178,10 @@ StoreInst* SpirvLowerConstImmediateStore::findSingleStore(
 // NOTE: This erases the "store" instruction (so it will not be lowered by a later lowering pass
 // any more) but not the "alloca" or replaced "getelementptr" instruction (they will be removed
 // later by DCE pass).
+//
+// @param storeInst : The single constant store into the "alloca"
 void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(
-    StoreInst* storeInst)  // [in] The single constant store into the "alloca"
+    StoreInst* storeInst)
 {
     auto allocaInst = cast<AllocaInst>(storeInst->getPointerOperand());
     auto global = new GlobalVariable(*m_module,

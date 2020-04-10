@@ -577,9 +577,10 @@ public:
     //
     // If using a BuilderImpl, this method must be called before any Create* methods.
     // If using a BuilderRecorder, it can be delayed until after linking.
+    //
+    // @param nodes : The resource mapping nodes. Only used for the duration of the call; the call copies the nodes.
     virtual void setUserDataNodes(
-        llvm::ArrayRef<ResourceNode>          nodes) = 0;       // The resource mapping nodes. Only used for the duration
-                                                          //  of the call; the call copies the nodes.
+        llvm::ArrayRef<ResourceNode>          nodes) = 0;
 
     // Set device index.
     virtual void setDeviceIndex(unsigned deviceIndex) = 0;
@@ -591,9 +592,12 @@ public:
     // Set color export state.
     // The client should always zero-initialize the ColorExportState struct before setting it up, in case future
     // versions add more fields. A local struct variable can be zero-initialized with " = {}".
+    //
+    // @param formats : Array of ColorExportFormat structs
+    // @param exportState : Color export flags
     virtual void setColorExportState(
-        llvm::ArrayRef<ColorExportFormat> formats,          // Array of ColorExportFormat structs
-        const ColorExportState&     exportState) = 0; // [in] Color export flags
+        llvm::ArrayRef<ColorExportFormat> formats,
+        const ColorExportState&     exportState) = 0;
 
     // Set graphics state (input-assembly, viewport, rasterizer).
     // The front-end should zero-initialize each struct with "= {}" in case future changes add new fields.
@@ -611,9 +615,10 @@ public:
     // Before calling this, each shader module needs to have one global function for the shader
     // entrypoint, then all other functions with internal linkage.
     // Returns the pipeline module, or nullptr on link failure.
+    //
+    // @param modules : Array of modules indexed by shader stage, with nullptr entry for any stage not present in the pipeline
     virtual llvm::Module* link(
-        llvm::ArrayRef<llvm::Module*> modules) = 0; // Array of modules indexed by shader stage, with nullptr entry
-                                        //  for any stage not present in the pipeline
+        llvm::ArrayRef<llvm::Module*> modules) = 0;
 
     // Typedef of function passed in to Generate to check the shader cache.
     // Returns the updated shader stage mask, allowing the client to decide not to compile shader stages
@@ -629,11 +634,16 @@ public:
     // Output is written to outStream.
     // Like other Builder methods, on error, this calls report_fatal_error, which you can catch by setting
     // a diagnostic handler with LLVMContext::setDiagnosticHandler.
+    //
+    // @param pipelineModule : IR pipeline module
+    // @param [in/out] outStream : Stream to write ELF or IR disassembly output
+    // @param checkShaderCacheFunc : Function to check shader cache in graphics pipeline
+    // @param timers : Timers for: patch passes, llvm optimizations, codegen
     virtual void generate(
-        std::unique_ptr<llvm::Module>   pipelineModule,       // IR pipeline module
-        llvm::raw_pwrite_stream&        outStream,            // [in/out] Stream to write ELF or IR disassembly output
-        CheckShaderCacheFunc      checkShaderCacheFunc, // Function to check shader cache in graphics pipeline
-        llvm::ArrayRef<llvm::Timer*>          timers) = 0;          // Timers for: patch passes, llvm optimizations, codegen
+        std::unique_ptr<llvm::Module>   pipelineModule,
+        llvm::raw_pwrite_stream&        outStream,
+        CheckShaderCacheFunc      checkShaderCacheFunc,
+        llvm::ArrayRef<llvm::Timer*>          timers) = 0;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Non-compiling methods

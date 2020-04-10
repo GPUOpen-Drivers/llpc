@@ -38,9 +38,12 @@ using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
+//
+// @param builderContext : BuilderContext
+// @param pipeline : PipelineState (as public superclass Pipeline)
 BuilderImpl::BuilderImpl(
-    BuilderContext* builderContext,  // [in] BuilderContext
-    Pipeline*       pipeline)        // [in] PipelineState (as public superclass Pipeline)
+    BuilderContext* builderContext,
+    Pipeline*       pipeline)
     : BuilderImplBase(builderContext),
       BuilderImplArith(builderContext),
       BuilderImplDesc(builderContext),
@@ -63,10 +66,14 @@ ShaderModes* BuilderImplBase::getShaderModes()
 
 // =====================================================================================================================
 // Create scalar from dot product of scalar or vector FP type. (The dot product of two scalars is their product.)
+//
+// @param vector1 : The float vector 1
+// @param vector2 : The float vector 2
+// @param instName : Name to give instruction(s)
 Value* BuilderImplBase::CreateDotProduct(
-    Value* const vector1,            // [in] The float vector 1
-    Value* const vector2,            // [in] The float vector 2
-    const Twine& instName)            // [in] Name to give instruction(s)
+    Value* const vector1,
+    Value* const vector2,
+    const Twine& instName)
 {
     Value* product = CreateFMul(vector1, vector2);
     if (!isa<VectorType>(product->getType()))
@@ -114,10 +121,14 @@ bool BuilderImplBase::supportPermLaneDpp() const
 // afterwards to restore the insert point to where it was just after the endif, and still keep its debug location.
 // The method returns the branch instruction, whose first branch target is the "then" block and second branch
 // target is the "else" block, or "endif" block if no "else" block.
+//
+// @param condition : The "if" condition
+// @param wantElse : Whether to generate an "else" block
+// @param instName : Base of name for new basic blocks
 BranchInst* BuilderImplBase::createIf(
-    Value*        condition,   // [in] The "if" condition
-    bool          wantElse,     // Whether to generate an "else" block
-    const Twine&  instName)     // Base of name for new basic blocks
+    Value*        condition,
+    bool          wantElse,
+    const Twine&  instName)
 {
     // Create "if" block and move instructions in current block to it.
     BasicBlock* endIfBlock = GetInsertBlock();
@@ -171,10 +182,14 @@ BranchInst* BuilderImplBase::createIf(
 // =====================================================================================================================
 // Create a waterfall loop containing the specified instruction.
 // This does not use the current insert point; new code is inserted before and after pNonUniformInst.
+//
+// @param nonUniformInst : The instruction to put in a waterfall loop
+// @param operandIdxs : The operand index/indices for non-uniform inputs that need to be uniform
+// @param instName : Name to give instruction(s)
 Instruction* BuilderImplBase::createWaterfallLoop(
-    Instruction*        nonUniformInst,    // [in] The instruction to put in a waterfall loop
-    ArrayRef<unsigned>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to be uniform
-    const Twine&        instName)           // [in] Name to give instruction(s)
+    Instruction*        nonUniformInst,
+    ArrayRef<unsigned>  operandIdxs,
+    const Twine&        instName)
 {
     assert(operandIdxs.empty() == false);
 
@@ -296,9 +311,12 @@ Instruction* BuilderImplBase::createWaterfallLoop(
 
 // =====================================================================================================================
 // Helper method to scalarize a possibly vector unary operation
+//
+// @param value : Input value
+// @param callback : Callback function
 Value* BuilderImplBase::scalarize(
-    Value*                        value,     // [in] Input value
-    std::function<Value*(Value*)> callback)   // [in] Callback function
+    Value*                        value,
+    std::function<Value*(Value*)> callback)
 {
     if (auto vecTy = dyn_cast<VectorType>(value->getType()))
     {
@@ -316,9 +334,12 @@ Value* BuilderImplBase::scalarize(
 // =====================================================================================================================
 // Helper method to scalarize in pairs a possibly vector unary operation. The callback function is called
 // with vec2 input, even if the input here is scalar.
+//
+// @param value : Input value
+// @param callback : Callback function
 Value* BuilderImplBase::scalarizeInPairs(
-    Value*                        value,     // [in] Input value
-    std::function<Value*(Value*)> callback)   // [in] Callback function
+    Value*                        value,
+    std::function<Value*(Value*)> callback)
 {
     if (auto vecTy = dyn_cast<VectorType>(value->getType()))
     {
@@ -352,10 +373,14 @@ Value* BuilderImplBase::scalarizeInPairs(
 
 // =====================================================================================================================
 // Helper method to scalarize a possibly vector binary operation
+//
+// @param value0 : Input value 0
+// @param value1 : Input value 1
+// @param callback : Callback function
 Value* BuilderImplBase::scalarize(
-    Value*                                value0,    // [in] Input value 0
-    Value*                                value1,    // [in] Input value 1
-    std::function<Value*(Value*, Value*)> callback)   // [in] Callback function
+    Value*                                value0,
+    Value*                                value1,
+    std::function<Value*(Value*, Value*)> callback)
 {
     if (auto vecTy = dyn_cast<VectorType>(value0->getType()))
     {
@@ -378,11 +403,16 @@ Value* BuilderImplBase::scalarize(
 
 // =====================================================================================================================
 // Helper method to scalarize a possibly vector trinary operation
+//
+// @param value0 : Input value 0
+// @param value1 : Input value 1
+// @param value2 : Input value 2
+// @param callback : Callback function
 Value* BuilderImplBase::scalarize(
-    Value*                                        value0,    // [in] Input value 0
-    Value*                                        value1,    // [in] Input value 1
-    Value*                                        value2,    // [in] Input value 2
-    std::function<Value*(Value*, Value*, Value*)> callback)   // [in] Callback function
+    Value*                                        value0,
+    Value*                                        value1,
+    Value*                                        value2,
+    std::function<Value*(Value*, Value*, Value*)> callback)
 {
     if (auto vecTy = dyn_cast<VectorType>(value0->getType()))
     {

@@ -40,11 +40,16 @@ namespace Llpc
 {
 
 // =====================================================================================================================
+//
+// @param gfxIp : Graphics Ip version info
+// @param pipelineInfo : Compute pipeline build info
+// @param pipelineHash : Pipeline hash code
+// @param cacheHash : Cache hash code
 ComputeContext::ComputeContext(
-    GfxIpVersion                    gfxIp,            // Graphics Ip version info
-    const ComputePipelineBuildInfo* pipelineInfo,    // [in] Compute pipeline build info
-    MetroHash::Hash*                pipelineHash,    // [in] Pipeline hash code
-    MetroHash::Hash*                cacheHash)       // [in] Cache hash code
+    GfxIpVersion                    gfxIp,
+    const ComputePipelineBuildInfo* pipelineInfo,
+    MetroHash::Hash*                pipelineHash,
+    MetroHash::Hash*                cacheHash)
     :
     PipelineContext(gfxIp, pipelineHash, cacheHash),
     m_pipelineInfo(pipelineInfo)
@@ -53,8 +58,10 @@ ComputeContext::ComputeContext(
 
 // =====================================================================================================================
 // Gets pipeline shader info of the specified shader stage
+//
+// @param shaderStage : Shader stage
 const PipelineShaderInfo* ComputeContext::getPipelineShaderInfo(
-    ShaderStage shaderStage // Shader stage
+    ShaderStage shaderStage
     ) const
 {
     assert(shaderStage == ShaderStageCompute);

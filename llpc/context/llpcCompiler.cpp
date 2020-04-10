@@ -195,10 +195,14 @@ unsigned Compiler::m_outRedirectCount = 0;
 
 // =====================================================================================================================
 // Handler for LLVM fatal error.
+//
+// @param userData : An argument which will be passed to the installed error handler
+// @param reason : Error reason
+// @param genCrashDiag : Whether diagnostic should be generated
 static void fatalErrorHandler(
-    void*               userData,       // [in] An argument which will be passed to the installed error handler
-    const std::string&  reason,         // Error reason
-    bool                genCrashDiag) // Whether diagnostic should be generated
+    void*               userData,
+    const std::string&  reason,
+    bool                genCrashDiag)
 {
     LLPC_ERRS("LLVM FATAL ERROR: " << reason << "\n");
 #if LLPC_ENABLE_EXCEPTION
@@ -238,11 +242,16 @@ class LlpcDiagnosticHandler : public llvm::DiagnosticHandler
 
 // =====================================================================================================================
 // Creates LLPC compiler from the specified info.
+//
+// @param gfxIp : Graphics IP version
+// @param optionCount : Count of compilation-option strings
+// @param options : An array of compilation-option strings
+// @param [out] ppCompiler : Pointer to the created LLPC compiler object
 Result VKAPI_CALL ICompiler::Create(
-    GfxIpVersion      gfxIp,        // Graphics IP version
-    unsigned          optionCount,  // Count of compilation-option strings
-    const char*const* options,      // [in] An array of compilation-option strings
-    ICompiler**       ppCompiler)   // [out] Pointer to the created LLPC compiler object
+    GfxIpVersion      gfxIp,
+    unsigned          optionCount,
+    const char*const* options,
+    ICompiler**       ppCompiler)
 {
     Result result = Result::Success;
 
@@ -315,19 +324,26 @@ Result VKAPI_CALL ICompiler::Create(
 
 // =====================================================================================================================
 // Checks whether a vertex attribute format is supported by fetch shader.
+//
+// @param format : Vertex attribute format
 bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
-    VkFormat format)   // Vertex attribute format
+    VkFormat format)
 {
     BufDataFormat dfmt = PipelineContext::mapVkFormat(format, false).first;
     return dfmt != BufDataFormatInvalid;
 }
 
 // =====================================================================================================================
+//
+// @param gfxIp : Graphics IP version info
+// @param optionCount : Count of compilation-option strings
+// @param options : An array of compilation-option strings
+// @param optionHash : Hash code of compilation options
 Compiler::Compiler(
-    GfxIpVersion      gfxIp,        // Graphics IP version info
-    unsigned          optionCount,  // Count of compilation-option strings
-    const char*const* options,     // [in] An array of compilation-option strings
-    MetroHash::Hash   optionHash)   // Hash code of compilation options
+    GfxIpVersion      gfxIp,
+    unsigned          optionCount,
+    const char*const* options,
+    MetroHash::Hash   optionHash)
     :
     m_optionHash(optionHash),
     m_gfxIp(gfxIp)
@@ -443,9 +459,12 @@ void Compiler::Destroy()
 
 // =====================================================================================================================
 // Builds shader module from the specified info.
+//
+// @param shaderInfo : Info to build this shader module
+// @param [out] shaderOut : Output of building this shader module
 Result Compiler::BuildShaderModule(
-    const ShaderModuleBuildInfo* shaderInfo,   // [in] Info to build this shader module
-    ShaderModuleBuildOut*        shaderOut     // [out] Output of building this shader module
+    const ShaderModuleBuildInfo* shaderInfo,
+    ShaderModuleBuildOut*        shaderOut
     ) const
 {
     Result result = Result::Success;
@@ -800,11 +819,16 @@ Result Compiler::BuildShaderModule(
 // =====================================================================================================================
 // Builds a pipeline by building relocatable elf files and linking them together.  The relocatable elf files will be
 // cached for future use.
+//
+// @param context : Acquired context
+// @param shaderInfo : Shader info of this pipeline
+// @param forceLoopUnrollCount : Force loop unroll count (0 means disable)
+// @param [out] pipelineElf : Output Elf package
 Result Compiler::buildPipelineWithRelocatableElf(
-    Context*                            context,                   // [in] Acquired context
-    ArrayRef<const PipelineShaderInfo*> shaderInfo,                 // Shader info of this pipeline
-    unsigned                            forceLoopUnrollCount,       // Force loop unroll count (0 means disable)
-    ElfPackage*                         pipelineElf)               // [out] Output Elf package
+    Context*                            context,
+    ArrayRef<const PipelineShaderInfo*> shaderInfo,
+    unsigned                            forceLoopUnrollCount,
+    ElfPackage*                         pipelineElf)
 {
     Result result = Result::Success;
 
@@ -888,8 +912,10 @@ Result Compiler::buildPipelineWithRelocatableElf(
 
 // =====================================================================================================================
 // Returns true if a graphics pipeline can be built out of the given shader info.
+//
+// @param shaderInfo : Shader info for the pipeline to be built
 bool Compiler::canUseRelocatableGraphicsShaderElf(
-    const ArrayRef<const PipelineShaderInfo*>& shaderInfo  // Shader info for the pipeline to be built
+    const ArrayRef<const PipelineShaderInfo*>& shaderInfo
     ) const
 {
     if (!cl::UseRelocatableShaderElf)
@@ -930,8 +956,10 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(
 
 // =====================================================================================================================
 // Returns true if a compute pipeline can be built out of the given shader info.
+//
+// @param shaderInfo : Shader info for the pipeline to be built
 bool Compiler::canUseRelocatableComputeShaderElf(
-    const PipelineShaderInfo* shaderInfo   // Shader info for the pipeline to be built
+    const PipelineShaderInfo* shaderInfo
     ) const
 {
     if (!llvm::cl::UseRelocatableShaderElf)
@@ -958,11 +986,16 @@ bool Compiler::canUseRelocatableComputeShaderElf(
 
 // =====================================================================================================================
 // Build pipeline internally -- common code for graphics and compute
+//
+// @param context : Acquired context
+// @param shaderInfo : Shader info of this pipeline
+// @param forceLoopUnrollCount : Force loop unroll count (0 means disable)
+// @param [out] pipelineElf : Output Elf package
 Result Compiler::buildPipelineInternal(
-    Context*                            context,                   // [in] Acquired context
-    ArrayRef<const PipelineShaderInfo*> shaderInfo,                 // [in] Shader info of this pipeline
-    unsigned                            forceLoopUnrollCount,       // [in] Force loop unroll count (0 means disable)
-    ElfPackage*                         pipelineElf)               // [out] Output Elf package
+    Context*                            context,
+    ArrayRef<const PipelineShaderInfo*> shaderInfo,
+    unsigned                            forceLoopUnrollCount,
+    ElfPackage*                         pipelineElf)
 {
     Result          result = Result::Success;
     unsigned passIndex = 0;
@@ -1151,9 +1184,13 @@ Result Compiler::buildPipelineInternal(
 
     Pipeline::CheckShaderCacheFunc checkShaderCacheFunc =
             [&graphicsShaderCacheChecker](
-        const Module*               module,      // [in] Module
-        unsigned                    stageMask,    // Shader stage mask
-        ArrayRef<ArrayRef<uint8_t>> stageHashes)  // Per-stage hash of in/out usage
+        const Module*               module,
+        unsigned                    stageMask,
+        ArrayRef<ArrayRef<uint8_t>> stageHashes//
+                                               // @param module : Module
+                                               // @param stageMask : Shader stage mask
+                                               // @param stageHashes : Per-stage hash of in/out usage
+                                               )
     {
         return graphicsShaderCacheChecker.check(module, stageMask, stageHashes);
     };
@@ -1213,10 +1250,14 @@ Result Compiler::buildPipelineInternal(
 // Check shader cache for graphics pipeline, returning mask of which shader stages we want to keep in this compile.
 // This is called from the PatchCheckShaderCache pass (via a lambda in BuildPipelineInternal), to remove
 // shader stages that we don't want because there was a shader cache hit.
+//
+// @param module : Module
+// @param stageMask : Shader stage mask
+// @param stageHashes : Per-stage hash of in/out usage
 unsigned GraphicsShaderCacheChecker::check(
-    const Module*               module,      // [in] Module
-    unsigned                    stageMask,    // Shader stage mask
-    ArrayRef<ArrayRef<uint8_t>> stageHashes)  // Per-stage hash of in/out usage
+    const Module*               module,
+    unsigned                    stageMask,
+    ArrayRef<ArrayRef<uint8_t>> stageHashes)
 {
     // Check per stage shader cache
     MetroHash::Hash fragmentHash = {};
@@ -1262,8 +1303,10 @@ unsigned GraphicsShaderCacheChecker::check(
 
 // =====================================================================================================================
 // Update root level descriptor offset for graphics pipeline.
+//
+// @param [In, Out] pipelineElf : ELF that could be from compile or merged
 void GraphicsShaderCacheChecker::updateRootUserDateOffset(
-    ElfPackage*       pipelineElf)   // [In, Out] ELF that could be from compile or merged
+    ElfPackage*       pipelineElf)
 {
     ElfWriter<Elf64> writer(m_context->getGfxIpVersion());
     // Load ELF binary
@@ -1275,9 +1318,12 @@ void GraphicsShaderCacheChecker::updateRootUserDateOffset(
 
 // =====================================================================================================================
 // Update shader caches for graphics pipeline from compile result, and merge ELF outputs if necessary.
+//
+// @param result : Result of compile
+// @param outputPipelineElf : ELF output of compile, updated to merge ELF from shader cache
 void GraphicsShaderCacheChecker::updateAndMerge(
-    Result            result,         // Result of compile
-    ElfPackage*       outputPipelineElf)   // ELF output of compile, updated to merge ELF from shader cache
+    Result            result,
+    ElfPackage*       outputPipelineElf)
 {
     // Update the shader cache if required, with the compiled pipeline or with a failure state.
     if (m_fragmentCacheEntryState == ShaderEntryState::Compiling ||
@@ -1341,9 +1387,12 @@ void GraphicsShaderCacheChecker::updateAndMerge(
 // =====================================================================================================================
 // Convert color buffer format to fragment shader export format
 // This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.
+//
+// @param target : GraphicsPipelineBuildInfo
+// @param enableAlphaToCoverage : whether enalbe AlphaToCoverage
 unsigned Compiler::ConvertColorBufferFormatToExportFormat(
-    const ColorTarget*          target,                // [in] GraphicsPipelineBuildInfo
-    const bool                  enableAlphaToCoverage   // whether enalbe AlphaToCoverage
+    const ColorTarget*          target,
+    const bool                  enableAlphaToCoverage
     ) const
 {
     Context* context = acquireContext();
@@ -1367,12 +1416,18 @@ unsigned Compiler::ConvertColorBufferFormatToExportFormat(
 
 // =====================================================================================================================
 // Build graphics pipeline internally
+//
+// @param graphicsContext : Graphics context this graphics pipeline
+// @param shaderInfo : Shader info of this graphics pipeline
+// @param forceLoopUnrollCount : Force loop unroll count (0 means disable)
+// @param buildingRelocatableElf : Build the pipeline by linking relocatable elf
+// @param [out] pipelineElf : Output Elf package
 Result Compiler::buildGraphicsPipelineInternal(
-    GraphicsContext*                    graphicsContext,         // [in] Graphics context this graphics pipeline
-    ArrayRef<const PipelineShaderInfo*> shaderInfo,               // Shader info of this graphics pipeline
-    unsigned                            forceLoopUnrollCount,     // Force loop unroll count (0 means disable)
-    bool                                buildingRelocatableElf,   // Build the pipeline by linking relocatable elf
-    ElfPackage*                         pipelineElf)             // [out] Output Elf package
+    GraphicsContext*                    graphicsContext,
+    ArrayRef<const PipelineShaderInfo*> shaderInfo,
+    unsigned                            forceLoopUnrollCount,
+    bool                                buildingRelocatableElf,
+    ElfPackage*                         pipelineElf)
 {
     Context* context = acquireContext();
     context->attachPipelineContext(graphicsContext);
@@ -1388,10 +1443,14 @@ Result Compiler::buildGraphicsPipelineInternal(
 
 // =====================================================================================================================
 // Build graphics pipeline from the specified info.
+//
+// @param pipelineInfo : Info to build this graphics pipeline
+// @param [out] pipelineOut : Output of building this graphics pipeline
+// @param pipelineDumpFile : Handle of pipeline dump file
 Result Compiler::BuildGraphicsPipeline(
-    const GraphicsPipelineBuildInfo* pipelineInfo,     // [in] Info to build this graphics pipeline
-    GraphicsPipelineBuildOut*        pipelineOut,      // [out] Output of building this graphics pipeline
-    void*                            pipelineDumpFile) // [in] Handle of pipeline dump file
+    const GraphicsPipelineBuildInfo* pipelineInfo,
+    GraphicsPipelineBuildOut*        pipelineOut,
+    void*                            pipelineDumpFile)
 {
     Result           result = Result::Success;
     BinaryData       elfBin = {};
@@ -1505,12 +1564,18 @@ Result Compiler::BuildGraphicsPipeline(
 
 // =====================================================================================================================
 // Build compute pipeline internally
+//
+// @param computeContext : Compute context this compute pipeline
+// @param pipelineInfo : Pipeline info of this compute pipeline
+// @param forceLoopUnrollCount : Force loop unroll count (0 means disable)
+// @param buildingRelocatableElf : Build the pipeline by linking relocatable elf
+// @param [out] pipelineElf : Output Elf package
 Result Compiler::buildComputePipelineInternal(
-    ComputeContext*                 computeContext,                // [in] Compute context this compute pipeline
-    const ComputePipelineBuildInfo* pipelineInfo,                  // [in] Pipeline info of this compute pipeline
-    unsigned                        forceLoopUnrollCount,           // Force loop unroll count (0 means disable)
-    bool                            buildingRelocatableElf,         // Build the pipeline by linking relocatable elf
-    ElfPackage*                     pipelineElf)                   // [out] Output Elf package
+    ComputeContext*                 computeContext,
+    const ComputePipelineBuildInfo* pipelineInfo,
+    unsigned                        forceLoopUnrollCount,
+    bool                            buildingRelocatableElf,
+    ElfPackage*                     pipelineElf)
 {
     Context* context = acquireContext();
     context->attachPipelineContext(computeContext);
@@ -1536,10 +1601,14 @@ Result Compiler::buildComputePipelineInternal(
 
 // =====================================================================================================================
 // Build compute pipeline from the specified info.
+//
+// @param pipelineInfo : Info to build this compute pipeline
+// @param [out] pipelineOut : Output of building this compute pipeline
+// @param pipelineDumpFile : Handle of pipeline dump file
 Result Compiler::BuildComputePipeline(
-    const ComputePipelineBuildInfo* pipelineInfo,     // [in] Info to build this compute pipeline
-    ComputePipelineBuildOut*        pipelineOut,      // [out] Output of building this compute pipeline
-    void*                           pipelineDumpFile) // [in] Handle of pipeline dump file
+    const ComputePipelineBuildInfo* pipelineInfo,
+    ComputePipelineBuildOut*        pipelineOut,
+    void*                           pipelineDumpFile)
 {
     BinaryData elfBin = {};
 
@@ -1642,9 +1711,12 @@ Result Compiler::BuildComputePipeline(
 
 // =====================================================================================================================
 // Builds hash code from compilation-options
+//
+// @param optionCount : Count of compilation-option strings
+// @param options : An array of compilation-option strings
 MetroHash::Hash Compiler::generateHashForCompileOptions(
-    unsigned          optionCount,    // Count of compilation-option strings
-    const char*const* options        // [in] An array of compilation-option strings
+    unsigned          optionCount,
+    const char*const* options
     )
 {
     // Options which needn't affect compilation results
@@ -1694,8 +1766,10 @@ MetroHash::Hash Compiler::generateHashForCompileOptions(
 
 // =====================================================================================================================
 // Checks whether fields in pipeline shader info are valid.
+//
+// @param shaderInfo : Pipeline shader info
 Result Compiler::validatePipelineShaderInfo(
-    const PipelineShaderInfo* shaderInfo     // [in] Pipeline shader info
+    const PipelineShaderInfo* shaderInfo
     ) const
 {
     Result result = Result::Success;
@@ -1821,9 +1895,12 @@ Context* Compiler::acquireContext() const
 
 // =====================================================================================================================
 // Run a pass manager's passes on a module, catching any LLVM fatal error and returning a success indication
+//
+// @param passMgr : Pass manager
+// @param [in/out] module : Module
 bool Compiler::runPasses(
-    lgc::PassManager* passMgr, // [in] Pass manager
-    Module*           module   // [in/out] Module
+    lgc::PassManager* passMgr,
+    Module*           module
     ) const
 {
     bool success = false;
@@ -1845,8 +1922,10 @@ bool Compiler::runPasses(
 
 // =====================================================================================================================
 // Releases LLPC context.
+//
+// @param context : LLPC context
 void Compiler::releaseContext(
-    Context* context    // [in] LLPC context
+    Context* context
     ) const
 {
     std::lock_guard<sys::Mutex> lock(m_contextPoolMutex);
@@ -1861,12 +1940,18 @@ void Compiler::releaseContext(
 //
 // Upon hit, Ready is returned and pElfBin is filled in. Upon miss, Compiling is returned and ppShaderCache and
 // phEntry are filled in.
+//
+// @param appPipelineCache : App's pipeline cache
+// @param cacheHash : Hash code of the shader
+// @param [out] elfBin : Pointer to shader data
+// @param [out] ppShaderCache : Shader cache to use
+// @param [out] phEntry : Handle to use
 ShaderEntryState Compiler::lookUpShaderCaches(
-    IShaderCache*                    appPipelineCache, // [in] App's pipeline cache
-    MetroHash::Hash*                 cacheHash,        // [in] Hash code of the shader
-    BinaryData*                      elfBin,           // [out] Pointer to shader data
-    ShaderCache**                    ppShaderCache,     // [out] Shader cache to use
-    CacheEntryHandle*                phEntry            // [out] Handle to use
+    IShaderCache*                    appPipelineCache,
+    MetroHash::Hash*                 cacheHash,
+    BinaryData*                      elfBin,
+    ShaderCache**                    ppShaderCache,
+    CacheEntryHandle*                phEntry
     )
 {
     ShaderCache* shaderCache[2];
@@ -1910,11 +1995,16 @@ ShaderEntryState Compiler::lookUpShaderCaches(
 
 // =====================================================================================================================
 // Update the shader caches with the given entry handle, based on the "insert" flag.
+//
+// @param insert : To insert data or reset the shader cache
+// @param elfBin : Pointer to shader data
+// @param shaderCache : Shader cache to update (may be nullptr for default)
+// @param hEntry : Handle to update
 void Compiler::updateShaderCache(
-    bool                             insert,           // To insert data or reset the shader cache
-    const BinaryData*                elfBin,          // [in] Pointer to shader data
-    ShaderCache*                     shaderCache,     // [in] Shader cache to update (may be nullptr for default)
-    CacheEntryHandle                 hEntry)           // [in] Handle to update
+    bool                             insert,
+    const BinaryData*                elfBin,
+    ShaderCache*                     shaderCache,
+    CacheEntryHandle                 hEntry)
 {
     if (!hEntry)
         return;
@@ -1933,12 +2023,18 @@ void Compiler::updateShaderCache(
 
 // =====================================================================================================================
 // Builds hash code from input context for per shader stage cache
+//
+// @param context : Acquired context
+// @param stageMask : Shader stage mask
+// @param stageHashes : Per-stage hash of in/out usage
+// @param [out] fragmentHash : Hash code of fragment shader
+// @param [out] nonFragmentHash : Hash code of all non-fragment shader
 void Compiler::buildShaderCacheHash(
-    Context*                    context,           // [in] Acquired context
-    unsigned                    stageMask,          // Shader stage mask
-    ArrayRef<ArrayRef<uint8_t>> stageHashes,        // Per-stage hash of in/out usage
-    MetroHash::Hash*            fragmentHash,      // [out] Hash code of fragment shader
-    MetroHash::Hash*            nonFragmentHash)   // [out] Hash code of all non-fragment shader
+    Context*                    context,
+    unsigned                    stageMask,
+    ArrayRef<ArrayRef<uint8_t>> stageHashes,
+    MetroHash::Hash*            fragmentHash,
+    MetroHash::Hash*            nonFragmentHash)
 {
     MetroHash64 fragmentHasher;
     MetroHash64 nonFragmentHasher;
@@ -1998,10 +2094,14 @@ void Compiler::buildShaderCacheHash(
 
 // =====================================================================================================================
 // Link relocatable shader elf file into a pipeline elf file and apply relocations.
+//
+// @param shaderElfs : An array of pipeline elf packages, indexed by stage, containing relocatable elf
+// @param [out] pipelineElf : Elf package containing the pipeline elf
+// @param context : Acquired context
 void Compiler::linkRelocatableShaderElf(
-    ElfPackage* shaderElfs,   // [in]  An array of pipeline elf packages, indexed by stage, containing relocatable elf
-    ElfPackage* pipelineElf,  // [out] Elf package containing the pipeline elf
-    Context* context)         // [in]  Acquired context
+    ElfPackage* shaderElfs,
+    ElfPackage* pipelineElf,
+    Context* context)
 {
     assert(shaderElfs[ShaderStageTessControl].empty() && "Cannot link tessellation shaders yet.");
     assert(shaderElfs[ShaderStageTessEval].empty() && "Cannot link tessellation shaders yet.");

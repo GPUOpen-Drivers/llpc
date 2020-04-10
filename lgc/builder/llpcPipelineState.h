@@ -255,10 +255,14 @@ public:
     // The array is trimmed to remove trailing zero values. If the whole array would be 0, then this function
     // returns nullptr.
     template<typename T>
+    //
+    // @param context : LLVM context
+    // @param value : Value to write as array of i32
+    // @param atLeastOneValue : True to generate node with one value even if all values are zero
     static llvm::MDNode* getArrayOfInt32MetaNode(
-        llvm::LLVMContext&        context,          // [in] LLVM context
-        const T&            value,            // [in] Value to write as array of i32
-        bool                atLeastOneValue)  // True to generate node with one value even if all values are zero
+        llvm::LLVMContext&        context,
+        const T&            value,
+        bool                atLeastOneValue)
     {
         llvm::IRBuilder<> builder(context);
         llvm::ArrayRef<unsigned> values(reinterpret_cast<const unsigned*>(&value), sizeof(value) / sizeof(unsigned));
@@ -282,10 +286,14 @@ public:
     // The array is trimmed to remove trailing zero values. If the whole array would be 0, then this function
     // removes the named metadata node (if it existed).
     template<typename T>
+    //
+    // @param [in/out] module : IR module to record into
+    // @param value : Value to write as array of i32
+    // @param metaName : Name for named metadata node
     static void setNamedMetadataToArrayOfInt32(
-        llvm::Module*             module,    // [in/out] IR module to record into
-        const T&            value,      // [in] Value to write as array of i32
-        llvm::StringRef           metaName)   // Name for named metadata node
+        llvm::Module*             module,
+        const T&            value,
+        llvm::StringRef           metaName)
     {
         llvm::MDNode* arrayMetaNode = getArrayOfInt32MetaNode(module->getContext(), value, false);
         if (!arrayMetaNode )
@@ -303,9 +311,12 @@ public:
     // Read an array of i32 values out of a metadata node, writing into any type.
     // Returns the number of i32s read.
     template<typename T>
+    //
+    // @param metaNode : Metadata node to read from
+    // @param [out] value : Value to write into (caller must zero initialize)
     static unsigned readArrayOfInt32MetaNode(
-        llvm::MDNode*                   metaNode,  // Metadata node to read from
-        T&                        value)      // [out] Value to write into (caller must zero initialize)
+        llvm::MDNode*                   metaNode,
+        T&                        value)
     {
         llvm::MutableArrayRef<unsigned> values(reinterpret_cast<unsigned*>(&value), sizeof(value) / sizeof(unsigned));
         unsigned count = std::min(metaNode->getNumOperands(), unsigned(values.size()));
@@ -318,10 +329,14 @@ public:
     // writing into any type.
     // Returns the number of i32s read.
     template<typename T>
+    //
+    // @param module : IR module to look in
+    // @param metaName : Name for named metadata node
+    // @param [out] value : Value to write into (caller must zero initialize)
     static unsigned readNamedMetadataArrayOfInt32(
-        llvm::Module*                   module,    // [in] IR module to look in
-        llvm::StringRef                 metaName,   // Name for named metadata node
-        T&                        value)      // [out] Value to write into (caller must zero initialize)
+        llvm::Module*                   module,
+        llvm::StringRef                 metaName,
+        T&                        value)
     {
         auto namedMetaNode = module->getNamedMetadata(metaName);
         if (!namedMetaNode || namedMetaNode->getNumOperands() == 0)
