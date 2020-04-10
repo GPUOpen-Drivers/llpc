@@ -90,13 +90,13 @@ bool SpirvLowerAlgebraTransform::runOnModule(
     m_changed = false;
 
     auto& commonShaderMode = m_context->getBuilder()->getCommonShaderMode();
-    m_fp16DenormFlush = (commonShaderMode.fp16DenormMode == FpDenormMode::FlushOut) ||
-                        (commonShaderMode.fp16DenormMode == FpDenormMode::FlushInOut);
-    m_fp32DenormFlush = (commonShaderMode.fp32DenormMode == FpDenormMode::FlushOut) ||
-                        (commonShaderMode.fp32DenormMode == FpDenormMode::FlushInOut);
-    m_fp64DenormFlush = (commonShaderMode.fp64DenormMode == FpDenormMode::FlushOut) ||
-                        (commonShaderMode.fp64DenormMode == FpDenormMode::FlushInOut);
-    m_fp16Rtz = (commonShaderMode.fp16RoundMode == FpRoundMode::Zero);
+    m_fp16DenormFlush = commonShaderMode.fp16DenormMode == FpDenormMode::FlushOut ||
+                        commonShaderMode.fp16DenormMode == FpDenormMode::FlushInOut;
+    m_fp32DenormFlush = commonShaderMode.fp32DenormMode == FpDenormMode::FlushOut ||
+                        commonShaderMode.fp32DenormMode == FpDenormMode::FlushInOut;
+    m_fp64DenormFlush = commonShaderMode.fp64DenormMode == FpDenormMode::FlushOut ||
+                        commonShaderMode.fp64DenormMode == FpDenormMode::FlushInOut;
+    m_fp16Rtz = commonShaderMode.fp16RoundMode == FpRoundMode::Zero;
 
     if (m_enableConstFolding && (m_fp16DenormFlush || m_fp32DenormFlush || m_fp64DenormFlush))
     {
@@ -122,9 +122,9 @@ bool SpirvLowerAlgebraTransform::runOnModule(
                 // Skip Constant folding if it isn't floating point const expression
                 auto destType = inst->getType();
                 if (inst->use_empty() ||
-                    (inst->getNumOperands() == 0) ||
-                    (!destType->isFPOrFPVectorTy()) ||
-                    (!isa<Constant>(inst->getOperand(0))))
+                    inst->getNumOperands() == 0 ||
+                    !destType->isFPOrFPVectorTy() ||
+                    !isa<Constant>(inst->getOperand(0)))
                     continue;
 
                 // ConstantProp instruction if trivially constant.
@@ -137,7 +137,7 @@ bool SpirvLowerAlgebraTransform::runOnModule(
                         (destType->isDoubleTy() && m_fp64DenormFlush))
                     {
                         // Replace denorm value with zero
-                        if (constVal->isFiniteNonZeroFP() && (!constVal->isNormalFP()))
+                        if (constVal->isFiniteNonZeroFP() && !constVal->isNormalFP())
                             constVal = ConstantFP::get(destType, 0.0);
                     }
 
@@ -286,7 +286,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
         case Instruction::FDiv:
             if (binaryOp.getFastMathFlags().noNaNs())
             {
-                if (src1IsConstZero && (!src2IsConstZero))
+                if (src1IsConstZero && !src2IsConstZero)
                     dest = src1;
             }
             break;
@@ -312,7 +312,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
     }
 
     // Replace FDIV x, y with FDIV 1.0, y; MUL x if it isn't optimized
-    if ((opCode == Instruction::FDiv) && (!dest ) && (src1 ) && (src2 ))
+    if (opCode == Instruction::FDiv && !dest && src1 && src2 )
     {
         Constant* one = ConstantFP::get(binaryOp.getType(), 1.0);
         if (src1 != one)
@@ -339,7 +339,7 @@ void SpirvLowerAlgebraTransform::visitCallInst(
 {
     auto callee = callInst.getCalledFunction();
 
-    if (callee->isIntrinsic() && (callee->getIntrinsicID() == Intrinsic::fabs))
+    if (callee->isIntrinsic() && callee->getIntrinsicID() == Intrinsic::fabs)
     {
         // NOTE: FABS will be optimized by backend compiler with sign bit removed via AND.
         flushDenormIfNeeded(&callInst);
@@ -378,7 +378,7 @@ void SpirvLowerAlgebraTransform::visitFPTruncInst(
         auto srcTy = src->getType();
         auto destTy = fptruncInst.getDestTy();
 
-        if ((srcTy->getScalarType()->isDoubleTy()) && (destTy->getScalarType()->isHalfTy()))
+        if (srcTy->getScalarType()->isDoubleTy() && destTy->getScalarType()->isHalfTy())
         {
             // NOTE: doubel -> float16 conversion is done in backend compiler with RTE rounding. Thus, we have to split
             // it with two phases to disable such lowering if we need RTZ rounding.
@@ -410,7 +410,7 @@ bool SpirvLowerAlgebraTransform::isOperandNoContract(
         {
             auto fastMathFlags = inst->getFastMathFlags();
             bool allowContract = fastMathFlags.allowContract();
-            if (fastMathFlags.any() && (!allowContract))
+            if (fastMathFlags.any() && !allowContract)
                 return true;
         }
 

@@ -243,7 +243,7 @@ bool Section::getMemberType(
     bool result = false;
     for (unsigned i = 0; i < m_tableSize; ++i)
     {
-        if ((m_memberTable[i].memberName ) && strcmp(memberName, m_memberTable[i].memberName) == 0)
+        if (m_memberTable[i].memberName && strcmp(memberName, m_memberTable[i].memberName) == 0)
         {
             result = true;
 
@@ -275,7 +275,7 @@ bool Section::isSection(
 
     for (unsigned i = 0; i < m_tableSize; ++i)
     {
-        if ((m_memberTable[i].memberName ) && strcmp(memberName, m_memberTable[i].memberName) == 0)
+        if (m_memberTable[i].memberName && strcmp(memberName, m_memberTable[i].memberName) == 0)
         {
             result = true;
             if (output )
@@ -372,7 +372,7 @@ void Section::printSelf(
                             IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
                             iufValue += arrayIndex;
 
-                            if ((!iufValue->props.isDouble) && (!iufValue->props.isFloat))
+                            if (!iufValue->props.isDouble && !iufValue->props.isFloat)
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
@@ -391,7 +391,7 @@ void Section::printSelf(
                             IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
                             iufValue += arrayIndex;
 
-                            if ((!iufValue->props.isDouble) && (!iufValue->props.isFloat))
+                            if (!iufValue->props.isDouble && !iufValue->props.isFloat)
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
@@ -410,7 +410,7 @@ void Section::printSelf(
                             IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
                             iufValue += arrayIndex;
 
-                            if ((!iufValue->props.isDouble) && (iufValue->props.isFloat))
+                            if (!iufValue->props.isDouble && iufValue->props.isFloat)
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
@@ -424,7 +424,7 @@ void Section::printSelf(
                             IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
                             iufValue += arrayIndex;
 
-                            if ((!iufValue->props.isDouble) && (iufValue->props.isFloat16))
+                            if (!iufValue->props.isDouble && iufValue->props.isFloat16)
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
@@ -438,7 +438,7 @@ void Section::printSelf(
                             IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
                             iufValue += arrayIndex;
 
-                            if ((iufValue->props.isDouble) && (!iufValue->props.isFloat))
+                            if (iufValue->props.isDouble && !iufValue->props.isFloat)
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
@@ -776,7 +776,7 @@ bool SectionShader::compileGlsl(
     sourceList[0] = &glslText;
     fileList[0] = &fileName;
     int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
-    if ((m_shaderType == Hlsl) || (m_shaderType == HlslFile))
+    if (m_shaderType == Hlsl || m_shaderType == HlslFile)
         compileOption |= SpvGenOptionReadHlsl;
     const char* entryPoint = nullptr;
     if (shaderInfo )

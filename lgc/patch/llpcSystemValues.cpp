@@ -114,7 +114,7 @@ Value* ShaderSystemValues::getEsGsRingBufDesc()
 
         BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
         m_esGsRingBufDesc = loadDescFromDriverTable(tableOffset, builder);
-        if ((m_shaderStage != ShaderStageGeometry) && (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 8))
+        if (m_shaderStage != ShaderStageGeometry && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 8)
         {
             // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor for
             // VS/TES output.
@@ -200,7 +200,7 @@ Value* ShaderSystemValues::getRelativeId()
 // Get offchip LDS descriptor (TCS and TES)
 Value* ShaderSystemValues::getOffChipLdsDesc()
 {
-    assert((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval));
+    assert(m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval);
     if (!m_offChipLdsDesc )
     {
         BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
@@ -229,7 +229,7 @@ Value* ShaderSystemValues::getTessCoord()
                                                  insertPos);
 
         auto primitiveMode = m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode;
-        tessCoordZ = (primitiveMode == PrimitiveMode::Triangles) ?
+        tessCoordZ = primitiveMode == PrimitiveMode::Triangles ?
                           tessCoordZ : ConstantFP::get(Type::getFloatTy(*m_context), 0.0f);
 
         m_tessCoord = UndefValue::get(VectorType::get(Type::getFloatTy(*m_context), 3));
@@ -283,7 +283,7 @@ Value* ShaderSystemValues::getEsGsOffsets()
 Value* ShaderSystemValues::getGsVsRingBufDesc(
     unsigned streamId)  // Stream ID, always 0 for copy shader
 {
-    assert((m_shaderStage == ShaderStageGeometry) || (m_shaderStage == ShaderStageCopyShader));
+    assert(m_shaderStage == ShaderStageGeometry || m_shaderStage == ShaderStageCopyShader);
     if (m_gsVsRingBufDescs.size() <= streamId)
         m_gsVsRingBufDescs.resize(streamId + 1);
     if (!m_gsVsRingBufDescs[streamId] )
@@ -562,9 +562,9 @@ Value* ShaderSystemValues::getStreamOutBufDesc(
 // Get stream-out buffer table pointer
 Instruction* ShaderSystemValues::getStreamOutTablePtr()
 {
-    assert((m_shaderStage == ShaderStageVertex) ||
-                (m_shaderStage == ShaderStageTessEval) ||
-                (m_shaderStage == ShaderStageCopyShader));
+    assert(m_shaderStage == ShaderStageVertex ||
+                m_shaderStage == ShaderStageTessEval ||
+                m_shaderStage == ShaderStageCopyShader);
 
     if (!m_streamOutTablePtr )
     {
@@ -629,7 +629,7 @@ Instruction* ShaderSystemValues::makePointer(
     if (highValue == InvalidValue)
     {
         // Use PC.
-        if ((!m_pc ) || isa<Instruction>(lowValue))
+        if (!m_pc || isa<Instruction>(lowValue))
         {
             // Either
             // 1. there is no existing code to s_getpc and cast it, or
@@ -693,12 +693,12 @@ Value* ShaderSystemValues::getResourceNodeValue(
     auto node = &m_pipelineState->getUserDataNodes()[resNodeIdx];
     Value* resNodeValue = nullptr;
 
-    if ((node->type == ResourceNodeType::IndirectUserDataVaPtr) ||
-        (node->type == ResourceNodeType::StreamOutTableVaPtr))
+    if (node->type == ResourceNodeType::IndirectUserDataVaPtr ||
+        node->type == ResourceNodeType::StreamOutTableVaPtr)
     {
         // Do nothing
     }
-    else if ((resNodeIdx < InterfaceData::MaxDescTableCount) && (intfData->entryArgIdxs.resNodeValues[resNodeIdx] > 0))
+    else if (resNodeIdx < InterfaceData::MaxDescTableCount && intfData->entryArgIdxs.resNodeValues[resNodeIdx] > 0)
     {
         // Resource node isn't spilled, load its value from function argument
         resNodeValue = getFunctionArgument(m_entryPoint,
@@ -721,12 +721,12 @@ Value* ShaderSystemValues::getResourceNodeValue(
 
         Type* resNodePtrTy = nullptr;
 
-        if  ((node->type == ResourceNodeType::DescriptorResource) ||
-             (node->type == ResourceNodeType::DescriptorSampler) ||
-             (node->type == ResourceNodeType::DescriptorTexelBuffer) ||
-             (node->type == ResourceNodeType::DescriptorFmask) ||
-             (node->type == ResourceNodeType::DescriptorBuffer) ||
-             (node->type == ResourceNodeType::DescriptorBufferCompact))
+        if  (node->type == ResourceNodeType::DescriptorResource ||
+             node->type == ResourceNodeType::DescriptorSampler ||
+             node->type == ResourceNodeType::DescriptorTexelBuffer ||
+             node->type == ResourceNodeType::DescriptorFmask ||
+             node->type == ResourceNodeType::DescriptorBuffer ||
+             node->type == ResourceNodeType::DescriptorBufferCompact)
         {
             resNodePtrTy = VectorType::get(Type::getInt32Ty(*m_context),
                                             node->sizeInDwords)->getPointerTo(ADDR_SPACE_CONST);
@@ -824,8 +824,8 @@ unsigned ShaderSystemValues::findResourceNodeByDescSet(
     for (unsigned i = 0; i < userDataNodes.size(); ++i)
     {
         auto node = &userDataNodes[i];
-        if ((node->type == ResourceNodeType::DescriptorTableVaPtr) &&
-              (node->innerTable[0].set == descSet))
+        if (node->type == ResourceNodeType::DescriptorTableVaPtr &&
+              node->innerTable[0].set == descSet)
             return i;
     }
     return InvalidValue;

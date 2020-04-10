@@ -52,8 +52,8 @@ Value* GfxRegHandler::getRegCommon(
     // Under two condition, we need to fetch the range of bits
     //  - The register has not being initialized
     //  - The register is being modified
-    if ((!m_bitsState[regId].value ) ||
-        (m_bitsState[regId].isModified))
+    if (!m_bitsState[regId].value ||
+        m_bitsState[regId].isModified)
     {
         // Fetch bits according to BitsInfo
         m_bitsState[regId].value = getBits(m_bitsInfo[regId]);

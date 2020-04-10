@@ -157,14 +157,14 @@ void PatchResourceCollect::setNggControl()
         {
             const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval);
             const auto& builtInUsage = resUsage->builtInUsage.tes;
-            useCullDistance = (builtInUsage.cullDistance > 0);
+            useCullDistance = builtInUsage.cullDistance > 0;
             enableXfb = resUsage->inOutUsage.enableXfb;
         }
         else
         {
             const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
             const auto& builtInUsage = resUsage->builtInUsage.vs;
-            useCullDistance = (builtInUsage.cullDistance > 0);
+            useCullDistance = builtInUsage.cullDistance > 0;
             enableXfb = resUsage->inOutUsage.enableXfb;
         }
     }
@@ -179,7 +179,7 @@ void PatchResourceCollect::setNggControl()
         enableNgg = false;
     }
 
-    if (hasGs && ((options.nggFlags & NggFlagEnableGsUse) == 0))
+    if (hasGs && (options.nggFlags & NggFlagEnableGsUse) == 0)
     {
         // NOTE: NGG used on GS is disabled by default
         enableNgg = false;
@@ -215,13 +215,13 @@ void PatchResourceCollect::setNggControl()
             nggControl.passthroughMode = false;
         else
         {
-            nggControl.passthroughMode = (!nggControl.enableVertexReuse) &&
-                                           (!nggControl.enableBackfaceCulling) &&
-                                           (!nggControl.enableFrustumCulling) &&
-                                           (!nggControl.enableBoxFilterCulling) &&
-                                           (!nggControl.enableSphereCulling) &&
-                                           (!nggControl.enableSmallPrimFilter) &&
-                                           (!nggControl.enableCullDistanceCulling);
+            nggControl.passthroughMode = !nggControl.enableVertexReuse &&
+                                           !nggControl.enableBackfaceCulling &&
+                                           !nggControl.enableFrustumCulling &&
+                                           !nggControl.enableBoxFilterCulling &&
+                                           !nggControl.enableSphereCulling &&
+                                           !nggControl.enableSmallPrimFilter &&
+                                           !nggControl.enableCullDistanceCulling;
         }
 
         // NOTE: Further check if we have to turn on pass-through mode forcibly.
@@ -229,11 +229,11 @@ void PatchResourceCollect::setNggControl()
         {
             // NOTE: Further check if pass-through mode should be enabled
             const auto topology = m_pipelineState->getInputAssemblyState().topology;
-            if ((topology == PrimitiveTopology::PointList) ||
-                (topology == PrimitiveTopology::LineList)  ||
-                (topology == PrimitiveTopology::LineStrip) ||
-                (topology == PrimitiveTopology::LineListWithAdjacency) ||
-                (topology == PrimitiveTopology::LineStripWithAdjacency))
+            if (topology == PrimitiveTopology::PointList ||
+                topology == PrimitiveTopology::LineList ||
+                topology == PrimitiveTopology::LineStrip ||
+                topology == PrimitiveTopology::LineListWithAdjacency ||
+                topology == PrimitiveTopology::LineStripWithAdjacency)
             {
                 // NGG runs in pass-through mode for non-triangle primitives
                 nggControl.passthroughMode = true;
@@ -244,12 +244,12 @@ void PatchResourceCollect::setNggControl()
                 assert(hasTs);
 
                 const auto& tessMode = m_pipelineState->getShaderModes()->getTessellationMode();
-                if (tessMode.pointMode || (tessMode.primitiveMode == PrimitiveMode::Isolines))
+                if (tessMode.pointMode || tessMode.primitiveMode == PrimitiveMode::Isolines)
                     nggControl.passthroughMode = true;
             }
 
             const auto polygonMode = m_pipelineState->getRasterizerState().polygonMode;
-            if ((polygonMode == PolygonModeLine) || (polygonMode == PolygonModePoint))
+            if (polygonMode == PolygonModeLine || polygonMode == PolygonModePoint)
             {
                 // NGG runs in pass-through mode for non-fill polygon mode
                 nggControl.passthroughMode = true;
@@ -350,7 +350,7 @@ void PatchResourceCollect::buildNggCullingControlRegister(
     paSuScModeCntl.bits.polyOffsetBackEnable  = rsState.depthBiasEnable;
     paSuScModeCntl.bits.multiPrimIbEna        = true;
 
-    paSuScModeCntl.bits.polyMode            = (rsState.polygonMode != PolygonModeFill);
+    paSuScModeCntl.bits.polyMode            = rsState.polygonMode != PolygonModeFill;
 
     if (rsState.polygonMode == PolygonModeFill)
     {
@@ -370,8 +370,8 @@ void PatchResourceCollect::buildNggCullingControlRegister(
     else
         llvm_unreachable("Should never be called!");
 
-    paSuScModeCntl.bits.cullFront = ((rsState.cullMode & CullModeFront) != 0);
-    paSuScModeCntl.bits.cullBack  = ((rsState.cullMode & CullModeBack) != 0);
+    paSuScModeCntl.bits.cullFront = (rsState.cullMode & CullModeFront) != 0;
+    paSuScModeCntl.bits.cullBack  = (rsState.cullMode & CullModeBack) != 0;
 
     paSuScModeCntl.bits.face = rsState.frontFaceClockwise;
 
@@ -501,7 +501,7 @@ bool PatchResourceCollect::checkGsOnChipValidity()
 
         // There is a hardware requirement for gsPrimsPerSubgroup * gsInstanceCount to be capped by
         // GsOnChipMaxPrimsPerSubgroup for adjacency primitive or when GS instanceing is used.
-        if (useAdjacency || (gsInstanceCount > 1))
+        if (useAdjacency || gsInstanceCount > 1)
             gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, (Gfx6::GsOnChipMaxPrimsPerSubgroup / gsInstanceCount));
 
         // Compute GS-VS LDS size based on target GS primitives per subgroup
@@ -565,15 +565,15 @@ bool PatchResourceCollect::checkGsOnChipValidity()
         constexpr unsigned gsOffChipDefaultThreshold = 32;
 
         bool disableGsOnChip = DisableGsOnChip;
-        if (hasTs || (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 6))
+        if (hasTs || m_pipelineState->getTargetInfo().getGfxIpVersion().major == 6)
         {
             // GS on-chip is not supportd with tessellation, and is not supportd on GFX6
             disableGsOnChip = true;
         }
 
         if (disableGsOnChip ||
-            ((gsPrimsPerSubgroup * gsInstanceCount) < gsOffChipDefaultThreshold) ||
-            (esVertsPerSubgroup == 0))
+            (gsPrimsPerSubgroup * gsInstanceCount) < gsOffChipDefaultThreshold ||
+            esVertsPerSubgroup == 0)
         {
             gsOnChip = false;
             gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = 0;
@@ -616,7 +616,7 @@ bool PatchResourceCollect::checkGsOnChipValidity()
             // NOTE: Primitive amplification factor must be at least 1. If the maximum number of GS output vertices
             // is too small to form a complete primitive, set the factor to 1.
             unsigned primAmpFactor = 1;
-            if (hasGs && (geometryMode.outputVertices > (outVertsPerPrim - 1)))
+            if (hasGs && geometryMode.outputVertices > (outVertsPerPrim - 1))
             {
                 // primAmpFactor = outputVertices - (outVertsPerPrim - 1)
                 primAmpFactor = geometryMode.outputVertices - (outVertsPerPrim - 1);
@@ -625,8 +625,8 @@ bool PatchResourceCollect::checkGsOnChipValidity()
             const unsigned vertsPerPrimitive = getVerticesPerPrimitive();
 
             const bool needsLds = (hasGs ||
-                                   (!nggControl->passthroughMode) ||
-                                   (esExtraLdsSize > 0) || (gsExtraLdsSize > 0));
+                                   !nggControl->passthroughMode ||
+                                   esExtraLdsSize > 0 || gsExtraLdsSize > 0);
 
             unsigned esVertsPerSubgroup = 0;
             unsigned gsPrimsPerSubgroup = 0;
@@ -642,8 +642,8 @@ bool PatchResourceCollect::checkGsOnChipValidity()
                     gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
                     break;
                 case NggSubgroupSizing::OptimizeForVerts:
-                    esVertsPerSubgroup = (hasTs)             ? 128 : 126;
-                    gsPrimsPerSubgroup = (hasTs || needsLds) ? 192 : Gfx9::NggMaxThreadsPerSubgroup;
+                    esVertsPerSubgroup = hasTs            ? 128 : 126;
+                    gsPrimsPerSubgroup = hasTs || needsLds ? 192 : Gfx9::NggMaxThreadsPerSubgroup;
                     break;
                 case NggSubgroupSizing::OptimizeForPrims:
                     esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
@@ -812,7 +812,7 @@ bool PatchResourceCollect::checkGsOnChipValidity()
 
             // There is a hardware requirement for gsPrimsPerSubgroup * gsInstanceCount to be capped by
             // OnChipGsMaxPrimPerSubgroup for adjacency primitive or when GS instanceing is used.
-            if (useAdjacency || (gsInstanceCount > 1))
+            if (useAdjacency || gsInstanceCount > 1)
                 maxGsPrimsPerSubgroup = (Gfx9::OnChipGsMaxPrimPerSubgroupAdj / gsInstanceCount);
 
             gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, maxGsPrimsPerSubgroup);
@@ -939,7 +939,7 @@ bool PatchResourceCollect::checkGsOnChipValidity()
                                                                          gsVsRingItemSizeOnChip :
                                                                          gsVsRingItemSize;
 
-            if ((m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) && hasTs && (!gsOnChip))
+            if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10 && hasTs && !gsOnChip)
             {
                 unsigned esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
                 unsigned onChipGsLdsMagicSize = alignTo((esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
@@ -1007,7 +1007,7 @@ bool PatchResourceCollect::checkGsOnChipValidity()
     }
     LLPC_OUTS("\n");
 
-    if (gsOnChip || (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9))
+    if (gsOnChip || m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9)
     {
         if (m_pipelineState->getNggControl()->enableNgg)
         {
@@ -1223,7 +1223,7 @@ void PatchResourceCollect::visitCallInst(
 
             auto loc = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
 
-            if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval))
+            if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval)
             {
                 auto locOffset = callInst.getOperand(1);
                 auto compIdx = callInst.getOperand(2);
@@ -1257,7 +1257,7 @@ void PatchResourceCollect::visitCallInst(
                     {
                         // NOTE: For non 64-bit vector/scalar, one location is sufficient regardless of vector component
                         // addressing.
-                        assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+                        assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
                         m_activeInputLocs.insert(loc);
                     }
                 }
@@ -1357,7 +1357,7 @@ void PatchResourceCollect::visitCallInst(
             {
                 // NOTE: For non 64-bit vector/scalar, one location is sufficient regardless of vector component
                 // addressing.
-                assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+                assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
                 m_importedOutputLocs.insert(loc);
             }
         }
@@ -1391,7 +1391,7 @@ void PatchResourceCollect::visitCallInst(
             {
                 // Location offset is constant
                 auto bitWidth = outputTy->getScalarSizeInBits();
-                if ((bitWidth == 64) && (!isa<ConstantInt>(compIdx)))
+                if (bitWidth == 64 && !isa<ConstantInt>(compIdx))
                 {
                     // NOTE: If vector component index is not constant and it is vector component addressing for
                     // 64-bit vector, we treat this as dynamic indexing.
@@ -1424,7 +1424,7 @@ void PatchResourceCollect::visitCallInst(
 
     if (canPackInOut())
     {
-        if ((m_shaderStage == ShaderStageFragment) && (!isDeadCall))
+        if (m_shaderStage == ShaderStageFragment && !isDeadCall)
         {
             // Collect LocationSpans according to each FS' input call
             bool isInput = m_locationMapManager->addSpan(&callInst);
@@ -1434,7 +1434,7 @@ void PatchResourceCollect::visitCallInst(
                 m_deadCalls.insert(&callInst);
             }
         }
-        else if ((m_shaderStage == ShaderStageVertex) && mangledName.startswith(lgcName::OutputExportGeneric))
+        else if (m_shaderStage == ShaderStageVertex && mangledName.startswith(lgcName::OutputExportGeneric))
         {
             m_inOutCalls.push_back(&callInst);
             m_deadCalls.insert(&callInst);
@@ -1448,7 +1448,7 @@ void PatchResourceCollect::clearInactiveInput()
 {
     bool buildingRelocatableElf = m_pipelineState->getBuilderContext()->buildingRelocatableElf();
     // Clear those inactive generic inputs, remove them from location mappings
-    if (m_pipelineState->isGraphics() && (!m_hasDynIndexedInput) && (m_shaderStage != ShaderStageTessEval)
+    if (m_pipelineState->isGraphics() && !m_hasDynIndexedInput && m_shaderStage != ShaderStageTessEval
         && !buildingRelocatableElf)
     {
         // TODO: Here, we keep all generic inputs of tessellation evaluation shader. This is because corresponding
@@ -1496,251 +1496,251 @@ void PatchResourceCollect::clearInactiveInput()
     if (m_shaderStage == ShaderStageVertex)
     {
         if (builtInUsage.vs.drawIndex &&
-            (m_activeInputBuiltIns.find(BuiltInDrawIndex) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInDrawIndex) == m_activeInputBuiltIns.end())
             builtInUsage.vs.drawIndex = false;
     }
     else if (m_shaderStage == ShaderStageTessControl)
     {
         if (builtInUsage.tcs.pointSizeIn &&
-            (m_activeInputBuiltIns.find(BuiltInPointSize) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInPointSize) == m_activeInputBuiltIns.end())
             builtInUsage.tcs.pointSizeIn = false;
 
         if (builtInUsage.tcs.positionIn &&
-            (m_activeInputBuiltIns.find(BuiltInPosition) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInPosition) == m_activeInputBuiltIns.end())
             builtInUsage.tcs.positionIn = false;
 
-        if ((builtInUsage.tcs.clipDistanceIn > 0) &&
-            (m_activeInputBuiltIns.find(BuiltInClipDistance) == m_activeInputBuiltIns.end()))
+        if (builtInUsage.tcs.clipDistanceIn > 0 &&
+            m_activeInputBuiltIns.find(BuiltInClipDistance) == m_activeInputBuiltIns.end())
             builtInUsage.tcs.clipDistanceIn = 0;
 
-        if ((builtInUsage.tcs.cullDistanceIn > 0) &&
-            (m_activeInputBuiltIns.find(BuiltInCullDistance) == m_activeInputBuiltIns.end()))
+        if (builtInUsage.tcs.cullDistanceIn > 0 &&
+            m_activeInputBuiltIns.find(BuiltInCullDistance) == m_activeInputBuiltIns.end())
             builtInUsage.tcs.cullDistanceIn = 0;
 
         if (builtInUsage.tcs.patchVertices &&
-            (m_activeInputBuiltIns.find(BuiltInPatchVertices) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInPatchVertices) == m_activeInputBuiltIns.end())
             builtInUsage.tcs.patchVertices = false;
 
         if (builtInUsage.tcs.primitiveId &&
-            (m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end())
             builtInUsage.tcs.primitiveId = false;
 
         if (builtInUsage.tcs.invocationId &&
-            (m_activeInputBuiltIns.find(BuiltInInvocationId) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInInvocationId) == m_activeInputBuiltIns.end())
             builtInUsage.tcs.invocationId = false;
     }
     else if (m_shaderStage == ShaderStageTessEval)
     {
         if (builtInUsage.tes.pointSizeIn &&
-            (m_activeInputBuiltIns.find(BuiltInPointSize) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInPointSize) == m_activeInputBuiltIns.end())
             builtInUsage.tes.pointSizeIn = false;
 
         if (builtInUsage.tes.positionIn &&
-            (m_activeInputBuiltIns.find(BuiltInPosition) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInPosition) == m_activeInputBuiltIns.end())
             builtInUsage.tes.positionIn = false;
 
-        if ((builtInUsage.tes.clipDistanceIn > 0) &&
-            (m_activeInputBuiltIns.find(BuiltInClipDistance) == m_activeInputBuiltIns.end()))
+        if (builtInUsage.tes.clipDistanceIn > 0 &&
+            m_activeInputBuiltIns.find(BuiltInClipDistance) == m_activeInputBuiltIns.end())
             builtInUsage.tes.clipDistanceIn = 0;
 
-        if ((builtInUsage.tes.cullDistanceIn > 0) &&
-            (m_activeInputBuiltIns.find(BuiltInCullDistance) == m_activeInputBuiltIns.end()))
+        if (builtInUsage.tes.cullDistanceIn > 0 &&
+            m_activeInputBuiltIns.find(BuiltInCullDistance) == m_activeInputBuiltIns.end())
             builtInUsage.tes.cullDistanceIn = 0;
 
         if (builtInUsage.tes.patchVertices &&
-            (m_activeInputBuiltIns.find(BuiltInPatchVertices) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInPatchVertices) == m_activeInputBuiltIns.end())
             builtInUsage.tes.patchVertices = false;
 
         if (builtInUsage.tes.primitiveId &&
-            (m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end())
             builtInUsage.tes.primitiveId = false;
 
         if (builtInUsage.tes.tessCoord &&
-            (m_activeInputBuiltIns.find(BuiltInTessCoord) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInTessCoord) == m_activeInputBuiltIns.end())
             builtInUsage.tes.tessCoord = false;
 
         if (builtInUsage.tes.tessLevelOuter &&
-            (m_activeInputBuiltIns.find(BuiltInTessLevelOuter) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInTessLevelOuter) == m_activeInputBuiltIns.end())
             builtInUsage.tes.tessLevelOuter = false;
 
         if (builtInUsage.tes.tessLevelInner &&
-            (m_activeInputBuiltIns.find(BuiltInTessLevelInner) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInTessLevelInner) == m_activeInputBuiltIns.end())
             builtInUsage.tes.tessLevelInner = false;
     }
     else if (m_shaderStage == ShaderStageGeometry)
     {
         if (builtInUsage.gs.pointSizeIn &&
-            (m_activeInputBuiltIns.find(BuiltInPointSize) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInPointSize) == m_activeInputBuiltIns.end())
             builtInUsage.gs.pointSizeIn = false;
 
         if (builtInUsage.gs.positionIn &&
-            (m_activeInputBuiltIns.find(BuiltInPosition) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInPosition) == m_activeInputBuiltIns.end())
             builtInUsage.gs.positionIn = false;
 
-        if ((builtInUsage.gs.clipDistanceIn > 0) &&
-            (m_activeInputBuiltIns.find(BuiltInClipDistance) == m_activeInputBuiltIns.end()))
+        if (builtInUsage.gs.clipDistanceIn > 0 &&
+            m_activeInputBuiltIns.find(BuiltInClipDistance) == m_activeInputBuiltIns.end())
             builtInUsage.gs.clipDistanceIn = 0;
 
-        if ((builtInUsage.gs.cullDistanceIn > 0) &&
-            (m_activeInputBuiltIns.find(BuiltInCullDistance) == m_activeInputBuiltIns.end()))
+        if (builtInUsage.gs.cullDistanceIn > 0 &&
+            m_activeInputBuiltIns.find(BuiltInCullDistance) == m_activeInputBuiltIns.end())
             builtInUsage.gs.cullDistanceIn = 0;
 
         if (builtInUsage.gs.primitiveIdIn &&
-            (m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end())
             builtInUsage.gs.primitiveIdIn = false;
 
         if (builtInUsage.gs.invocationId &&
-            (m_activeInputBuiltIns.find(BuiltInInvocationId) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInInvocationId) == m_activeInputBuiltIns.end())
             builtInUsage.gs.invocationId = false;
     }
     else if (m_shaderStage == ShaderStageFragment)
     {
         if (builtInUsage.fs.fragCoord &&
-            (m_activeInputBuiltIns.find(BuiltInFragCoord) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInFragCoord) == m_activeInputBuiltIns.end())
             builtInUsage.fs.fragCoord = false;
 
         if (builtInUsage.fs.frontFacing &&
-            (m_activeInputBuiltIns.find(BuiltInFrontFacing) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInFrontFacing) == m_activeInputBuiltIns.end())
             builtInUsage.fs.frontFacing = false;
 
         if (builtInUsage.fs.fragCoord &&
-            (m_activeInputBuiltIns.find(BuiltInFragCoord) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInFragCoord) == m_activeInputBuiltIns.end())
             builtInUsage.fs.fragCoord = false;
 
-        if ((builtInUsage.fs.clipDistance > 0) &&
-            (m_activeInputBuiltIns.find(BuiltInClipDistance) == m_activeInputBuiltIns.end()))
+        if (builtInUsage.fs.clipDistance > 0 &&
+            m_activeInputBuiltIns.find(BuiltInClipDistance) == m_activeInputBuiltIns.end())
             builtInUsage.fs.clipDistance = 0;
 
-        if ((builtInUsage.fs.cullDistance > 0) &&
-            (m_activeInputBuiltIns.find(BuiltInCullDistance) == m_activeInputBuiltIns.end()))
+        if (builtInUsage.fs.cullDistance > 0 &&
+            m_activeInputBuiltIns.find(BuiltInCullDistance) == m_activeInputBuiltIns.end())
             builtInUsage.fs.cullDistance = 0;
 
         if (builtInUsage.fs.pointCoord &&
-            (m_activeInputBuiltIns.find(BuiltInPointCoord) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInPointCoord) == m_activeInputBuiltIns.end())
             builtInUsage.fs.pointCoord = false;
 
         if (builtInUsage.fs.primitiveId &&
-            (m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end())
             builtInUsage.fs.primitiveId = false;
 
         if (builtInUsage.fs.sampleId &&
-            (m_activeInputBuiltIns.find(BuiltInSampleId) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInSampleId) == m_activeInputBuiltIns.end())
             builtInUsage.fs.sampleId = false;
 
         if (builtInUsage.fs.samplePosition &&
-            (m_activeInputBuiltIns.find(BuiltInSamplePosition) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInSamplePosition) == m_activeInputBuiltIns.end())
             builtInUsage.fs.samplePosition = false;
 
         if (builtInUsage.fs.sampleMaskIn &&
-            (m_activeInputBuiltIns.find(BuiltInSampleMask) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInSampleMask) == m_activeInputBuiltIns.end())
             builtInUsage.fs.sampleMaskIn = false;
 
         if (builtInUsage.fs.layer &&
-            (m_activeInputBuiltIns.find(BuiltInLayer) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInLayer) == m_activeInputBuiltIns.end())
             builtInUsage.fs.layer = false;
 
         if (builtInUsage.fs.viewIndex &&
-            (m_activeInputBuiltIns.find(BuiltInViewIndex) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInViewIndex) == m_activeInputBuiltIns.end())
             builtInUsage.fs.viewIndex = false;
 
         if (builtInUsage.fs.viewportIndex &&
-            (m_activeInputBuiltIns.find(BuiltInViewportIndex) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInViewportIndex) == m_activeInputBuiltIns.end())
             builtInUsage.fs.viewportIndex = false;
 
         if (builtInUsage.fs.helperInvocation &&
-            (m_activeInputBuiltIns.find(BuiltInHelperInvocation) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInHelperInvocation) == m_activeInputBuiltIns.end())
             builtInUsage.fs.helperInvocation = false;
 
         if (builtInUsage.fs.baryCoordNoPersp &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordNoPersp) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInBaryCoordNoPersp) == m_activeInputBuiltIns.end())
             builtInUsage.fs.baryCoordNoPersp = false;
 
         if (builtInUsage.fs.baryCoordNoPerspCentroid &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspCentroid) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspCentroid) == m_activeInputBuiltIns.end())
             builtInUsage.fs.baryCoordNoPerspCentroid = false;
 
         if (builtInUsage.fs.baryCoordNoPerspSample &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspSample) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspSample) == m_activeInputBuiltIns.end())
             builtInUsage.fs.baryCoordNoPerspSample = false;
 
         if (builtInUsage.fs.baryCoordSmooth &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordSmooth) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInBaryCoordSmooth) == m_activeInputBuiltIns.end())
             builtInUsage.fs.baryCoordSmooth = false;
 
         if (builtInUsage.fs.baryCoordSmoothCentroid &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordSmoothCentroid) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInBaryCoordSmoothCentroid) == m_activeInputBuiltIns.end())
             builtInUsage.fs.baryCoordSmoothCentroid = false;
 
         if (builtInUsage.fs.baryCoordSmoothSample &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordSmoothSample) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInBaryCoordSmoothSample) == m_activeInputBuiltIns.end())
             builtInUsage.fs.baryCoordNoPerspSample = false;
 
         if (builtInUsage.fs.baryCoordPullModel &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordPullModel) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInBaryCoordPullModel) == m_activeInputBuiltIns.end())
             builtInUsage.fs.baryCoordPullModel = false;
     }
     else if (m_shaderStage == ShaderStageCompute)
     {
         if (builtInUsage.cs.numWorkgroups &&
-            (m_activeInputBuiltIns.find(BuiltInNumWorkgroups) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInNumWorkgroups) == m_activeInputBuiltIns.end())
             builtInUsage.cs.numWorkgroups = false;
 
         if (builtInUsage.cs.localInvocationId &&
-            ((m_activeInputBuiltIns.find(BuiltInLocalInvocationId) == m_activeInputBuiltIns.end()) &&
-                (m_activeInputBuiltIns.find(BuiltInGlobalInvocationId) == m_activeInputBuiltIns.end()) &&
-                (m_activeInputBuiltIns.find(BuiltInLocalInvocationIndex) == m_activeInputBuiltIns.end()) &&
-                (m_activeInputBuiltIns.find(BuiltInSubgroupId) == m_activeInputBuiltIns.end())))
+            (m_activeInputBuiltIns.find(BuiltInLocalInvocationId) == m_activeInputBuiltIns.end() &&
+                m_activeInputBuiltIns.find(BuiltInGlobalInvocationId) == m_activeInputBuiltIns.end() &&
+                m_activeInputBuiltIns.find(BuiltInLocalInvocationIndex) == m_activeInputBuiltIns.end() &&
+                m_activeInputBuiltIns.find(BuiltInSubgroupId) == m_activeInputBuiltIns.end()))
             builtInUsage.cs.localInvocationId = false;
 
         if (builtInUsage.cs.workgroupId &&
-            ((m_activeInputBuiltIns.find(BuiltInWorkgroupId) == m_activeInputBuiltIns.end()) &&
-                (m_activeInputBuiltIns.find(BuiltInGlobalInvocationId) == m_activeInputBuiltIns.end()) &&
-                (m_activeInputBuiltIns.find(BuiltInLocalInvocationIndex) == m_activeInputBuiltIns.end()) &&
-                (m_activeInputBuiltIns.find(BuiltInSubgroupId) == m_activeInputBuiltIns.end())))
+            (m_activeInputBuiltIns.find(BuiltInWorkgroupId) == m_activeInputBuiltIns.end() &&
+                m_activeInputBuiltIns.find(BuiltInGlobalInvocationId) == m_activeInputBuiltIns.end() &&
+                m_activeInputBuiltIns.find(BuiltInLocalInvocationIndex) == m_activeInputBuiltIns.end() &&
+                m_activeInputBuiltIns.find(BuiltInSubgroupId) == m_activeInputBuiltIns.end()))
             builtInUsage.cs.workgroupId = false;
 
         if (builtInUsage.cs.subgroupId &&
-            (m_activeInputBuiltIns.find(BuiltInSubgroupId) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInSubgroupId) == m_activeInputBuiltIns.end())
             builtInUsage.cs.subgroupId = false;
 
         if (builtInUsage.cs.numSubgroups &&
-            (m_activeInputBuiltIns.find(BuiltInNumSubgroups) == m_activeInputBuiltIns.end()))
+            m_activeInputBuiltIns.find(BuiltInNumSubgroups) == m_activeInputBuiltIns.end())
             builtInUsage.cs.numSubgroups = false;
     }
 
     // Check common built-in usage
     if (builtInUsage.common.subgroupSize &&
-        ((m_activeInputBuiltIns.find(BuiltInSubgroupSize) == m_activeInputBuiltIns.end()) &&
-            (m_activeInputBuiltIns.find(BuiltInNumSubgroups) == m_activeInputBuiltIns.end()) &&
-            (m_activeInputBuiltIns.find(BuiltInSubgroupId) == m_activeInputBuiltIns.end())))
+        (m_activeInputBuiltIns.find(BuiltInSubgroupSize) == m_activeInputBuiltIns.end() &&
+            m_activeInputBuiltIns.find(BuiltInNumSubgroups) == m_activeInputBuiltIns.end() &&
+            m_activeInputBuiltIns.find(BuiltInSubgroupId) == m_activeInputBuiltIns.end()))
         builtInUsage.common.subgroupSize = false;
 
     if (builtInUsage.common.subgroupLocalInvocationId &&
-        (m_activeInputBuiltIns.find(BuiltInSubgroupLocalInvocationId) == m_activeInputBuiltIns.end()))
+        m_activeInputBuiltIns.find(BuiltInSubgroupLocalInvocationId) == m_activeInputBuiltIns.end())
         builtInUsage.common.subgroupLocalInvocationId = false;
 
     if (builtInUsage.common.subgroupEqMask &&
-        (m_activeInputBuiltIns.find(BuiltInSubgroupEqMask) == m_activeInputBuiltIns.end()))
+        m_activeInputBuiltIns.find(BuiltInSubgroupEqMask) == m_activeInputBuiltIns.end())
         builtInUsage.common.subgroupEqMask = false;
 
     if (builtInUsage.common.subgroupGeMask &&
-        (m_activeInputBuiltIns.find(BuiltInSubgroupGeMask) == m_activeInputBuiltIns.end()))
+        m_activeInputBuiltIns.find(BuiltInSubgroupGeMask) == m_activeInputBuiltIns.end())
         builtInUsage.common.subgroupGeMask = false;
 
     if (builtInUsage.common.subgroupGtMask &&
-        (m_activeInputBuiltIns.find(BuiltInSubgroupGtMask) == m_activeInputBuiltIns.end()))
+        m_activeInputBuiltIns.find(BuiltInSubgroupGtMask) == m_activeInputBuiltIns.end())
         builtInUsage.common.subgroupGtMask = false;
 
     if (builtInUsage.common.subgroupLeMask &&
-        (m_activeInputBuiltIns.find(BuiltInSubgroupLeMask) == m_activeInputBuiltIns.end()))
+        m_activeInputBuiltIns.find(BuiltInSubgroupLeMask) == m_activeInputBuiltIns.end())
         builtInUsage.common.subgroupLeMask = false;
 
     if (builtInUsage.common.subgroupLtMask &&
-        (m_activeInputBuiltIns.find(BuiltInSubgroupLtMask) == m_activeInputBuiltIns.end()))
+        m_activeInputBuiltIns.find(BuiltInSubgroupLtMask) == m_activeInputBuiltIns.end())
         builtInUsage.common.subgroupLtMask = false;
 
     if (builtInUsage.common.deviceIndex &&
-        (m_activeInputBuiltIns.find(BuiltInDeviceIndex) == m_activeInputBuiltIns.end()))
+        m_activeInputBuiltIns.find(BuiltInDeviceIndex) == m_activeInputBuiltIns.end())
         builtInUsage.common.deviceIndex = false;
 }
 
@@ -1754,31 +1754,31 @@ void PatchResourceCollect::clearInactiveOutput()
         auto& builtInUsage = m_resUsage->builtInUsage.gs;
 
         if (builtInUsage.position &&
-            (m_activeOutputBuiltIns.find(BuiltInPosition) == m_activeOutputBuiltIns.end()))
+            m_activeOutputBuiltIns.find(BuiltInPosition) == m_activeOutputBuiltIns.end())
             builtInUsage.position = false;
 
         if (builtInUsage.pointSize &&
-            (m_activeOutputBuiltIns.find(BuiltInPointSize) == m_activeOutputBuiltIns.end()))
+            m_activeOutputBuiltIns.find(BuiltInPointSize) == m_activeOutputBuiltIns.end())
             builtInUsage.pointSize = false;
 
         if (builtInUsage.clipDistance &&
-            (m_activeOutputBuiltIns.find(BuiltInClipDistance) == m_activeOutputBuiltIns.end()))
+            m_activeOutputBuiltIns.find(BuiltInClipDistance) == m_activeOutputBuiltIns.end())
             builtInUsage.clipDistance = false;
 
         if (builtInUsage.cullDistance &&
-            (m_activeOutputBuiltIns.find(BuiltInCullDistance) == m_activeOutputBuiltIns.end()))
+            m_activeOutputBuiltIns.find(BuiltInCullDistance) == m_activeOutputBuiltIns.end())
             builtInUsage.cullDistance = false;
 
         if (builtInUsage.primitiveId &&
-            (m_activeOutputBuiltIns.find(BuiltInPrimitiveId) == m_activeOutputBuiltIns.end()))
+            m_activeOutputBuiltIns.find(BuiltInPrimitiveId) == m_activeOutputBuiltIns.end())
             builtInUsage.primitiveId = false;
 
         if (builtInUsage.layer &&
-            (m_activeOutputBuiltIns.find(BuiltInLayer) == m_activeOutputBuiltIns.end()))
+            m_activeOutputBuiltIns.find(BuiltInLayer) == m_activeOutputBuiltIns.end())
             builtInUsage.layer = false;
 
         if (builtInUsage.viewportIndex &&
-            (m_activeOutputBuiltIns.find(BuiltInViewportIndex) == m_activeOutputBuiltIns.end()))
+            m_activeOutputBuiltIns.find(BuiltInViewportIndex) == m_activeOutputBuiltIns.end())
             builtInUsage.viewportIndex = false;
     }
 }
@@ -1824,9 +1824,9 @@ void PatchResourceCollect::matchGenericInOut()
                     outputXfb = inOutUsage.gs.xfbOutsInfo.find(outLocInfo) != inOutUsage.gs.xfbOutsInfo.end();
                 }
 
-                if ((nextInLocMap.find(loc) == nextInLocMap.end()) && (!outputXfb))
+                if (nextInLocMap.find(loc) == nextInLocMap.end() && !outputXfb)
                 {
-                    if (m_hasDynIndexedOutput || (m_importedOutputLocs.find(loc) != m_importedOutputLocs.end()))
+                    if (m_hasDynIndexedOutput || m_importedOutputLocs.find(loc) != m_importedOutputLocs.end())
                     {
                         // NOTE: If either dynamic indexing of generic outputs exists or the generic output involve in
                         // output import, we have to mark it as active. The assigned location must not overlap with
@@ -1864,7 +1864,7 @@ void PatchResourceCollect::matchGenericInOut()
                         // NOTE: If either dynamic indexing of generic outputs exists or the generic output involve in
                         // output import, we have to mark it as active. The assigned location must not overlap with
                         // those used by inputs of next shader stage.
-                        if (m_hasDynIndexedOutput || (m_importedOutputLocs.find(loc) != m_importedOutputLocs.end()))
+                        if (m_hasDynIndexedOutput || m_importedOutputLocs.find(loc) != m_importedOutputLocs.end())
                         {
                             assert(m_shaderStage == ShaderStageTessControl);
                             locMap.second = availPerPatchInMapLoc++;
@@ -1905,7 +1905,7 @@ void PatchResourceCollect::matchGenericInOut()
             assert(locMap.second == InvalidValue ||
                         m_pipelineState->getBuilderContext()->buildingRelocatableElf());
             // NOTE: For vertex shader, the input location mapping is actually trivial.
-            locMap.second = (m_shaderStage == ShaderStageVertex) ? locMap.first : nextMapLoc++;
+            locMap.second = m_shaderStage == ShaderStageVertex ? locMap.first : nextMapLoc++;
             inOutUsage.inputMapLocCount = std::max(inOutUsage.inputMapLocCount, locMap.second + 1);
             LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input:  loc = "
                           << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
@@ -1927,7 +1927,7 @@ void PatchResourceCollect::matchGenericInOut()
             if (m_shaderStage == ShaderStageFragment)
             {
                 unsigned location = locMap.first;
-                if (m_pipelineState->getColorExportState().dualSourceBlendEnable && (location == 1))
+                if (m_pipelineState->getColorExportState().dualSourceBlendEnable && location == 1)
                     location = 0;
                 if (m_pipelineState->getColorExportFormat(location).dfmt == BufDataFormatInvalid)
                 {
@@ -2028,7 +2028,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
 
     const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
     auto nextResUsage =
-        (nextStage != ShaderStageInvalid) ? m_pipelineState->getShaderResourceUsage(nextStage) : nullptr;
+        nextStage != ShaderStageInvalid ? m_pipelineState->getShaderResourceUsage(nextStage) : nullptr;
 
     assert(inOutUsage.builtInInputLocMap.empty()); // Should be empty
     assert(inOutUsage.builtInOutputLocMap.empty());
@@ -2135,7 +2135,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
                             nextInOutUsage.builtInInputLocMap.end());
                 const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
-                availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.clipDistanceIn > 4) ? 2u : 1u));
+                availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.clipDistanceIn > 4 ? 2u : 1u));
             }
             else
                 builtInUsage.vs.clipDistance = 0;
@@ -2146,7 +2146,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
                             nextInOutUsage.builtInInputLocMap.end());
                 const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
-                availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.cullDistanceIn > 4) ? 2u : 1u));
+                availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.cullDistanceIn > 4 ? 2u : 1u));
             }
             else
                 builtInUsage.vs.cullDistance = 0;
@@ -2188,7 +2188,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
                             nextInOutUsage.builtInInputLocMap.end());
                 const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
-                availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.clipDistanceIn > 4) ? 2u : 1u));
+                availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.clipDistanceIn > 4 ? 2u : 1u));
             }
             else
                 builtInUsage.vs.clipDistance = 0;
@@ -2199,7 +2199,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
                             nextInOutUsage.builtInInputLocMap.end());
                 const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
-                availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.cullDistanceIn > 4) ? 2u : 1u));
+                availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.cullDistanceIn > 4 ? 2u : 1u));
             }
             else
                 builtInUsage.vs.cullDistance = 0;
@@ -2210,7 +2210,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
         else if (nextStage == ShaderStageInvalid)
         {
             // VS only
-            if ((builtInUsage.vs.clipDistance > 0) || (builtInUsage.vs.cullDistance > 0))
+            if (builtInUsage.vs.clipDistance > 0 || builtInUsage.vs.cullDistance > 0)
             {
                 unsigned mapLoc = availOutMapLoc++;
                 if (builtInUsage.vs.clipDistance + builtInUsage.vs.cullDistance > 4)
@@ -2319,7 +2319,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
                             nextInOutUsage.builtInInputLocMap.end());
                 const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
-                availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.clipDistanceIn > 4) ? 2u : 1u));
+                availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.clipDistanceIn > 4 ? 2u : 1u));
             }
             else
             {
@@ -2335,7 +2335,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
                             nextInOutUsage.builtInInputLocMap.end());
                 const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
-                availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.cullDistanceIn > 4) ? 2u : 1u));
+                availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.cullDistanceIn > 4 ? 2u : 1u));
             }
             else
             {
@@ -2376,30 +2376,30 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
             }
 
             // Revisit built-in outputs and map those unmapped to generic ones
-            if ((inOutUsage.builtInOutputLocMap.find(BuiltInPosition) != inOutUsage.builtInOutputLocMap.end()) &&
-                (inOutUsage.builtInOutputLocMap[BuiltInPosition] == InvalidValue))
+            if (inOutUsage.builtInOutputLocMap.find(BuiltInPosition) != inOutUsage.builtInOutputLocMap.end() &&
+                inOutUsage.builtInOutputLocMap[BuiltInPosition] == InvalidValue)
                 inOutUsage.builtInOutputLocMap[BuiltInPosition] = availOutMapLoc++;
 
-            if ((inOutUsage.builtInOutputLocMap.find(BuiltInPointSize) != inOutUsage.builtInOutputLocMap.end()) &&
-                (inOutUsage.builtInOutputLocMap[BuiltInPointSize] == InvalidValue))
+            if (inOutUsage.builtInOutputLocMap.find(BuiltInPointSize) != inOutUsage.builtInOutputLocMap.end() &&
+                inOutUsage.builtInOutputLocMap[BuiltInPointSize] == InvalidValue)
                 inOutUsage.builtInOutputLocMap[BuiltInPointSize] = availOutMapLoc++;
 
-            if ((inOutUsage.builtInOutputLocMap.find(BuiltInClipDistance) != inOutUsage.builtInOutputLocMap.end()) &&
-                (inOutUsage.builtInOutputLocMap[BuiltInClipDistance] == InvalidValue))
+            if (inOutUsage.builtInOutputLocMap.find(BuiltInClipDistance) != inOutUsage.builtInOutputLocMap.end() &&
+                inOutUsage.builtInOutputLocMap[BuiltInClipDistance] == InvalidValue)
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = availOutMapLoc++;
 
-            if ((inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInOutputLocMap.end()) &&
-                (inOutUsage.builtInOutputLocMap[BuiltInCullDistance] == InvalidValue))
+            if (inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInOutputLocMap.end() &&
+                inOutUsage.builtInOutputLocMap[BuiltInCullDistance] == InvalidValue)
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc++;
 
-            if ((inOutUsage.perPatchBuiltInOutputLocMap.find(BuiltInTessLevelOuter) !=
-                 inOutUsage.perPatchBuiltInOutputLocMap.end()) &&
-                (inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] == InvalidValue))
+            if (inOutUsage.perPatchBuiltInOutputLocMap.find(BuiltInTessLevelOuter) !=
+                 inOutUsage.perPatchBuiltInOutputLocMap.end() &&
+                inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] == InvalidValue)
                 inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = availPerPatchOutMapLoc++;
 
-            if ((inOutUsage.perPatchBuiltInOutputLocMap.find(BuiltInTessLevelInner) !=
-                 inOutUsage.perPatchBuiltInOutputLocMap.end()) &&
-                (inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] == InvalidValue))
+            if (inOutUsage.perPatchBuiltInOutputLocMap.find(BuiltInTessLevelInner) !=
+                 inOutUsage.perPatchBuiltInOutputLocMap.end() &&
+                inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] == InvalidValue)
                 inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = availPerPatchOutMapLoc++;
         }
         else if (nextStage == ShaderStageInvalid)
@@ -2584,7 +2584,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
                             nextInOutUsage.builtInInputLocMap.end());
                 const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
-                availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.clipDistanceIn > 4) ? 2u : 1u));
+                availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.clipDistanceIn > 4 ? 2u : 1u));
             }
             else
                 builtInUsage.tes.clipDistance = 0;
@@ -2595,7 +2595,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
                             nextInOutUsage.builtInInputLocMap.end());
                 const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
-                availOutMapLoc = std::max(availOutMapLoc, mapLoc + ((nextBuiltInUsage.cullDistanceIn > 4) ? 2u : 1u));
+                availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.cullDistanceIn > 4 ? 2u : 1u));
             }
             else
                 builtInUsage.tes.cullDistance = 0;
@@ -2606,7 +2606,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
         else if (nextStage == ShaderStageInvalid)
         {
             // TES only
-            if ((builtInUsage.tes.clipDistance > 0) || (builtInUsage.tes.cullDistance > 0))
+            if (builtInUsage.tes.clipDistance > 0 || builtInUsage.tes.cullDistance > 0)
             {
                 unsigned mapLoc = availOutMapLoc++;
                 if (builtInUsage.tes.clipDistance + builtInUsage.tes.cullDistance > 4)
@@ -2755,7 +2755,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
             // GS only
             unsigned availOutMapLoc = inOutUsage.outputLocMap.size(); // Reset available location
 
-            if ((builtInUsage.gs.clipDistance > 0) || (builtInUsage.gs.cullDistance > 0))
+            if (builtInUsage.gs.clipDistance > 0 || builtInUsage.gs.cullDistance > 0)
             {
                 unsigned mapLoc = availOutMapLoc++;
                 if (builtInUsage.gs.clipDistance + builtInUsage.gs.cullDistance > 4)
@@ -2811,7 +2811,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut()
         if (builtInUsage.fs.viewportIndex)
             inOutUsage.builtInInputLocMap[BuiltInViewportIndex] = availInMapLoc++;
 
-        if ((builtInUsage.fs.clipDistance > 0) || (builtInUsage.fs.cullDistance > 0))
+        if (builtInUsage.fs.clipDistance > 0 || builtInUsage.fs.cullDistance > 0)
         {
             unsigned mapLoc = availInMapLoc++;
             if (builtInUsage.fs.clipDistance + builtInUsage.fs.cullDistance > 4)
@@ -2973,8 +2973,8 @@ bool PatchResourceCollect::canPackInOut() const
     // 1) -pack-in-out option is on
     // 2) It is a VS-FS pipeline
     return PackInOut &&
-           (m_pipelineState->getShaderStageMask() ==
-            (shaderStageToMask(ShaderStageVertex) | shaderStageToMask(ShaderStageFragment)));
+           m_pipelineState->getShaderStageMask() ==
+            (shaderStageToMask(ShaderStageVertex) | shaderStageToMask(ShaderStageFragment));
 }
 
 // =====================================================================================================================
@@ -3153,7 +3153,7 @@ void PatchResourceCollect::reassembleOutputExportCalls()
             break;
 
         // Construct the output vector
-        Value* outValue = (compCount == 1) ? components[0] :
+        Value* outValue = compCount == 1 ? components[0] :
                            UndefValue::get(VectorType::get(builder.getFloatTy(), compCount));
         for (auto compIdx = 0; compIdx < compCount; ++compIdx)
         {
@@ -3214,7 +3214,7 @@ void PatchResourceCollect::scalarizeForInOutPacking(
                 if (m_pipelineShaders->getShaderStage(call->getFunction()) != ShaderStageFragment)
                     continue;
                 // We have a use in FS. See if it needs scalarizing.
-                if (isa<VectorType>(call->getType()) || (call->getType()->getPrimitiveSizeInBits() == 64))
+                if (isa<VectorType>(call->getType()) || call->getType()->getPrimitiveSizeInBits() == 64)
                     fsInputCalls.push_back(call);
             }
         }
@@ -3230,7 +3230,7 @@ void PatchResourceCollect::scalarizeForInOutPacking(
                 // We have a use the last vertex processing stage. See if it needs scalarizing. The output value is
                 // always the final argument.
                 Type* valueTy = call->getArgOperand(call->getNumArgOperands() - 1)->getType();
-                if (isa<VectorType>(valueTy) || (valueTy->getPrimitiveSizeInBits() == 64))
+                if (isa<VectorType>(valueTy) || valueTy->getPrimitiveSizeInBits() == 64)
                     vsOutputCalls.push_back(call);
             }
         }
@@ -3435,10 +3435,10 @@ bool InOutLocationMapManager::addSpan(
         span.compatibilityInfo.halfComponentCount = bitWidth < 64 ? 2 : 4;
 
         span.compatibilityInfo.isFlat =
-            (cast<ConstantInt>(call->getOperand(2))->getZExtValue() == InOutInfo::InterpModeFlat);
+            cast<ConstantInt>(call->getOperand(2))->getZExtValue() == InOutInfo::InterpModeFlat;
         span.compatibilityInfo.is16Bit = false;
         span.compatibilityInfo.isCustom =
-            (cast<ConstantInt>(call->getOperand(2))->getZExtValue() == InOutInfo::InterpModeCustom);
+            cast<ConstantInt>(call->getOperand(2))->getZExtValue() == InOutInfo::InterpModeCustom;
 
         assert(std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end());
         m_locationSpans.push_back(span);
@@ -3461,10 +3461,10 @@ bool InOutLocationMapManager::addSpan(
         span.compatibilityInfo.halfComponentCount = bitWidth < 64 ? 2 : 4;
 
         span.compatibilityInfo.isFlat =
-            (cast<ConstantInt>(call->getOperand(3))->getZExtValue() == InOutInfo::InterpModeFlat);
+            cast<ConstantInt>(call->getOperand(3))->getZExtValue() == InOutInfo::InterpModeFlat;
         span.compatibilityInfo.is16Bit = false;
         span.compatibilityInfo.isCustom =
-            (cast<ConstantInt>(call->getOperand(3))->getZExtValue() == InOutInfo::InterpModeCustom);
+            cast<ConstantInt>(call->getOperand(3))->getZExtValue() == InOutInfo::InterpModeCustom;
 
         if (std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end())
             m_locationSpans.push_back(span);
@@ -3493,7 +3493,7 @@ void InOutLocationMapManager::buildLocationMap()
         {
             const auto& prevSpan = *(--spanIt);
             ++spanIt;
-            if ((!isCompatible(prevSpan, *spanIt)) || (compIdx == 3))
+            if (!isCompatible(prevSpan, *spanIt) || compIdx == 3)
             {
                 ++consectiveLocation;
                 compIdx = 0;

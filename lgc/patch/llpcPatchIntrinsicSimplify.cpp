@@ -159,7 +159,7 @@ bool PatchIntrinsicSimplify::canSafelyConvertTo16Bit(
         APFloat floatValue(constFloat->getValueAPF());
         bool losesInfo = true;
         floatValue.convert(APFloat::IEEEhalf(), APFloat::rmTowardZero, &losesInfo);
-        return (!losesInfo);
+        return !losesInfo;
     }
     else if (isa<FPExtInst>(&value) || isa<SExtInst>(&value) || isa<ZExtInst>(&value))
     {
@@ -176,7 +176,7 @@ bool PatchIntrinsicSimplify::canSafelyConvertTo16Bit(
 
         const SCEV* const scev = m_scalarEvolution->getSCEV(&value);
 
-        if (valueTy->isIntegerTy() && (m_scalarEvolution->getUnsignedRangeMax(scev).ule(UINT16_MAX)))
+        if (valueTy->isIntegerTy() && m_scalarEvolution->getUnsignedRangeMax(scev).ule(UINT16_MAX))
             return true;
     }
 

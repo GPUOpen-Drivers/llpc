@@ -284,7 +284,7 @@ void BuilderImplMatrix::getSubmatrix(
     {
         for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
         {
-            if ((rowIdx != rowToDelete) && (columnIdx != columnToDelete))
+            if (rowIdx != rowToDelete && columnIdx != columnToDelete)
                 submatrix[outElementIdx++] = matrix[inElementIdx];
             ++inElementIdx;
         }
@@ -340,7 +340,7 @@ Value* BuilderImplMatrix::CreateMatrixInverse(
             Value* cofactor = determinant(submatrix, order - 1);
             // Divide by whole matrix determinant, and negate if row+col is odd.
             cofactor = CreateFMul(cofactor,
-                                   (((rowIdx + columnIdx) & 1) != 0) ? negRcpDet : rcpDet);
+                                   ((rowIdx + columnIdx) & 1) != 0 ? negRcpDet : rcpDet);
             // Transpose by placing the cofactor in the transpose position.
             resultElements[rowIdx * order + columnIdx] = cofactor;
         }

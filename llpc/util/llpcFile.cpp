@@ -325,7 +325,7 @@ size_t File::getFileSize(
     const int result = stat(filename, &fileStatus);
     // If the function call to retrieve file status information fails (returns 0), then the file does not exist (or is
     // inaccessible in some other manner).
-    return (result == 0) ? fileStatus.st_size : 0;
+    return result == 0 ? fileStatus.st_size : 0;
 }
 
 // =====================================================================================================================
@@ -338,7 +338,7 @@ bool File::exists(
     const int result = stat(filename, &fileStatus);
     // If the function call to retrieve file status information fails (returns -1), then the file does not exist (or is
     // inaccessible in some other manner).
-    return (result != -1);
+    return result != -1;
 }
 
 } // Llpc

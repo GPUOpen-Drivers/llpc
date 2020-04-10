@@ -263,9 +263,9 @@ public:
         llvm::IRBuilder<> builder(context);
         llvm::ArrayRef<unsigned> values(reinterpret_cast<const unsigned*>(&value), sizeof(value) / sizeof(unsigned));
 
-        while ((!values.empty()) && (values.back() == 0))
+        while (!values.empty() && values.back() == 0)
         {
-            if ((values.size() == 1) && atLeastOneValue)
+            if (values.size() == 1 && atLeastOneValue)
                 break;
             values = values.slice(0, values.size() - 1);
         }
@@ -324,7 +324,7 @@ public:
         T&                        value)      // [out] Value to write into (caller must zero initialize)
     {
         auto namedMetaNode = module->getNamedMetadata(metaName);
-        if ((!namedMetaNode ) || (namedMetaNode->getNumOperands() == 0))
+        if (!namedMetaNode || namedMetaNode->getNumOperands() == 0)
             return 0;
         return readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), value);
     }

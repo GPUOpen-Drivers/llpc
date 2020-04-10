@@ -92,7 +92,7 @@ bool createDirectory(
     const char* dir)  // [in] the path of directory
 {
     int result = mkdir(dir, S_IRWXU);
-    return (result == 0);
+    return result == 0;
 }
 
 // =====================================================================================================================

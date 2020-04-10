@@ -135,7 +135,7 @@ static const ResourceMappingNode* findResourceNode(
     {
         const ResourceMappingNode* next = &userDataNode[j];
 
-        if((set == next->srdRange.set) && (binding == next->srdRange.binding))
+        if(set == next->srdRange.set && binding == next->srdRange.binding)
         {
             resourceNode = next;
             *index = j;
@@ -157,7 +157,7 @@ bool checkShaderInfoComptible(
 
     if (autoLayoutUserDataNodeCount == 0)
         hit = true;
-    else if ((shaderInfo->pDescriptorRangeValues ) || (shaderInfo->pSpecializationInfo->dataSize != 0))
+    else if (shaderInfo->pDescriptorRangeValues || shaderInfo->pSpecializationInfo->dataSize != 0)
         hit = false;
     else if (shaderInfo->userDataNodeCount >= autoLayoutUserDataNodeCount)
     {
@@ -188,10 +188,10 @@ bool checkShaderInfoComptible(
 
                         if (node )
                         {
-                            if ((autoLayoutNext->type == node->type) &&
-                                (autoLayoutNext->sizeInDwords == node->sizeInDwords) &&
-                                (autoLayoutNext->sizeInDwords <= OffsetStrideInDwords) &&
-                                (autoLayoutNext->offsetInDwords == (index * OffsetStrideInDwords)))
+                            if (autoLayoutNext->type == node->type &&
+                                autoLayoutNext->sizeInDwords == node->sizeInDwords &&
+                                autoLayoutNext->sizeInDwords <= OffsetStrideInDwords &&
+                                autoLayoutNext->offsetInDwords == (index * OffsetStrideInDwords))
                             {
                                 hitNode = true;
                                 continue;
@@ -241,7 +241,7 @@ bool checkShaderInfoComptible(
                                                             autoLayoutUserDataNode->srdRange.set,
                                                             autoLayoutUserDataNode->srdRange.binding,
                                                             &index);
-                if ((node ) && (autoLayoutUserDataNode->sizeInDwords == node->sizeInDwords))
+                if (node && autoLayoutUserDataNode->sizeInDwords == node->sizeInDwords)
                 {
                     hit = true;
                     continue;
@@ -276,11 +276,11 @@ bool checkPipelineStateCompatible(
         if (cbState->target[i].format != VK_FORMAT_UNDEFINED)
         {
             // NOTE: Alpha-to-coverage only take effect for output from color target 0.
-            const bool enableAlphaToCoverage = cbState->alphaToCoverageEnable && (i == 0);
+            const bool enableAlphaToCoverage = cbState->alphaToCoverageEnable && i == 0;
             unsigned exportFormat = compiler->ConvertColorBufferFormatToExportFormat(
                                                             &cbState->target[i],
                                                             enableAlphaToCoverage);
-            const bool autoLayoutEnableAlphaToCoverage = autoLayoutCbState->alphaToCoverageEnable && (i == 0);
+            const bool autoLayoutEnableAlphaToCoverage = autoLayoutCbState->alphaToCoverageEnable && i == 0;
             unsigned autoLayoutExportFormat = compiler->ConvertColorBufferFormatToExportFormat(
                                                             &autoLayoutCbState->target[i],
                                                             autoLayoutEnableAlphaToCoverage);
@@ -331,9 +331,9 @@ void doAutoLayoutDesc(
     {
         func = module->getFunction(i);
         entryPoint = module->getEntryPoint(func->getId());
-        if ((entryPoint ) &&
-            (entryPoint->getExecModel() == SPIRVExecutionModelKind(shaderStage)) &&
-            (entryPoint->getName() == shaderInfo->pEntryTarget))
+        if (entryPoint &&
+            entryPoint->getExecModel() == SPIRVExecutionModelKind(shaderStage) &&
+            entryPoint->getName() == shaderInfo->pEntryTarget)
             break;
         func = nullptr;
     }
@@ -441,7 +441,7 @@ void doAutoLayoutDesc(
         // Set primitive topology
         pipelineInfo->iaState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     }
-    else if ((shaderStage == ShaderStageTessControl) || (shaderStage == ShaderStageTessEval))
+    else if (shaderStage == ShaderStageTessControl || shaderStage == ShaderStageTessEval)
     {
         // Set primitive topology and patch control points
         pipelineInfo->iaState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -699,7 +699,7 @@ void doAutoLayoutDesc(
                         {
                             // Image descriptor.
                             auto imageType = static_cast<SPIRVTypeImage*>(varElemTy);
-                            nodeType = (imageType->getDescriptor().Dim == spv::DimBuffer) ?
+                            nodeType = imageType->getDescriptor().Dim == spv::DimBuffer ?
                                 ResourceMappingNodeType::DescriptorTexelBuffer :
                                 ResourceMappingNodeType::DescriptorResource;
                             sizeInDwords = 8 * arraySize;
@@ -729,16 +729,16 @@ void doAutoLayoutDesc(
                     else if (node->type != nodeType)
                     {
                         {
-                            assert((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
-                                         (nodeType == ResourceMappingNodeType::DescriptorResource) ||
-                                         (nodeType == ResourceMappingNodeType::DescriptorTexelBuffer) ||
-                                         (nodeType == ResourceMappingNodeType::DescriptorSampler));
+                            assert(nodeType == ResourceMappingNodeType::DescriptorCombinedTexture ||
+                                         nodeType == ResourceMappingNodeType::DescriptorResource ||
+                                         nodeType == ResourceMappingNodeType::DescriptorTexelBuffer ||
+                                         nodeType == ResourceMappingNodeType::DescriptorSampler);
                         }
                         {
-                            assert((node->type == ResourceMappingNodeType::DescriptorCombinedTexture) ||
-                                   (node->type == ResourceMappingNodeType::DescriptorResource) ||
-                                   (node->type == ResourceMappingNodeType::DescriptorTexelBuffer) ||
-                                   (node->type == ResourceMappingNodeType::DescriptorSampler));
+                            assert(node->type == ResourceMappingNodeType::DescriptorCombinedTexture ||
+                                   node->type == ResourceMappingNodeType::DescriptorResource ||
+                                   node->type == ResourceMappingNodeType::DescriptorTexelBuffer ||
+                                   node->type == ResourceMappingNodeType::DescriptorSampler);
                         }
 
                         node->type = ResourceMappingNodeType::DescriptorCombinedTexture;
@@ -807,7 +807,7 @@ void doAutoLayoutDesc(
         ++resNode;
     }
 
-    if ((shaderStage == ShaderStageVertex) || (shaderStage == ShaderStageTessEval) || (shaderStage == ShaderStageGeometry))
+    if (shaderStage == ShaderStageVertex || shaderStage == ShaderStageTessEval || shaderStage == ShaderStageGeometry)
     {
         // Add a node for XFB.
         resNode->type = ResourceMappingNodeType::StreamOutTableVaPtr;

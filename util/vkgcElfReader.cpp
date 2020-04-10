@@ -92,10 +92,10 @@ Result ElfReader<Elf>::ReadFromBuffer(
     auto header = static_cast<const typename Elf::FormatHeader*>(pBuffer);
 
     // If the identification info isn't the magic number, this isn't a valid file.
-    result = (header->eIdent32[EI_MAG0] == ElfMagic) ?  Result::Success : Result::ErrorInvalidValue;
+    result = header->eIdent32[EI_MAG0] == ElfMagic ?  Result::Success : Result::ErrorInvalidValue;
 
     if (result == Result::Success)
-        result = (header->eMachine == EM_AMDGPU) ? Result::Success : Result::ErrorInvalidValue;
+        result = header->eMachine == EM_AMDGPU ? Result::Success : Result::ErrorInvalidValue;
 
     if (result == Result::Success)
     {
@@ -126,7 +126,7 @@ Result ElfReader<Elf>::ReadFromBuffer(
             const unsigned sectionDataOffset = static_cast<unsigned>(sectionHeader->shOffset);
             auto buf = new SectionBuffer;
 
-            result = (buf ) ? Result::Success : Result::ErrorOutOfMemory;
+            result = buf ? Result::Success : Result::ErrorOutOfMemory;
 
             if (result == Result::Success)
             {
@@ -292,7 +292,7 @@ void ElfReader<Elf>::GetSymbolsBySectionIndex(
     std::vector<ElfSymbol>& secSymbols      // [out] ELF symbols
     ) const
 {
-    if ((secIdx < m_sections.size()) && (m_symSecIdx >= 0))
+    if (secIdx < m_sections.size() && m_symSecIdx >= 0)
     {
         auto& section = m_sections[m_symSecIdx];
         const char* strTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx]->data);
@@ -422,7 +422,7 @@ bool ElfReader<Elf>::getNextMsgNode()
     }
     else if (curIter.status == MsgPackIteratorMapPair)
     {
-        assert((curIter.mapIt->first.isMap() == false) && (curIter.mapIt->first.isArray() == false));
+        assert(curIter.mapIt->first.isMap() == false && curIter.mapIt->first.isArray() == false);
         curIter.status = MsgPackIteratorMapKey;
         m_iteratorStack.push_back(curIter);
     }
@@ -485,7 +485,7 @@ bool ElfReader<Elf>::getNextMsgNode()
     }
 
     // Post check for end visit map or array element
-    if ((m_iteratorStack.size() > 0) && (!skipPostCheck))
+    if (m_iteratorStack.size() > 0 && !skipPostCheck)
     {
         auto nextIter = &m_iteratorStack.back();
         if (nextIter->status == MsgPackIteratorMapPair)

@@ -648,10 +648,10 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(
     const unsigned addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
     Type* const type = mapType(spvType, PointerType::get(pointeeType, addrSpace));
 
-    const bool isBufferBlockPointer = (storageClass == StorageClassStorageBuffer) ||
-                                      (storageClass == StorageClassUniform) ||
-                                      (storageClass == StorageClassPushConstant) ||
-                                      (storageClass == StorageClassPhysicalStorageBufferEXT);
+    const bool isBufferBlockPointer = storageClass == StorageClassStorageBuffer ||
+                                      storageClass == StorageClassUniform ||
+                                      storageClass == StorageClassPushConstant ||
+                                      storageClass == StorageClassPhysicalStorageBufferEXT;
 
     // Finally we translate the struct we are pointing to to create it.
     StructType* const structType = cast<StructType>(transType(spvType->getPointerElementType(),
@@ -680,7 +680,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
     unsigned columnCount = spvType->getMatrixColumnCount();
 
     // If the matrix is not explicitly laid out or is column major, just translate the column type.
-    if ((!isParentPointer) || isColumnMajor)
+    if (!isParentPointer || isColumnMajor)
     {
         columnType = transType(spvType->getMatrixColumnType(),
                                 matrixStride,
@@ -702,7 +702,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
         columnType = ArrayType::get(elementType, columnCount);
         columnCount = spvColumnType->getVectorComponentCount();
 
-        if ((!isColumnMajor) && (matrixStride == 0))
+        if (!isColumnMajor && matrixStride == 0)
         {
             // Targeted for std430 layout
             assert(columnCount == 4);
@@ -732,7 +732,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
     }
 
     Type* const matrixType = ArrayType::get(columnType, columnCount);
-    return (isExplicitlyLaidOut && isPaddedMatrix) ?
+    return isExplicitlyLaidOut && isPaddedMatrix ?
            recordTypeWithPad(matrixType, !isColumnMajor) :
            matrixType;
 }
@@ -753,7 +753,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(
     if (storageClass == StorageClassUniformConstant)
     {
         auto spvElementType = spvType->getPointerElementType();
-        while ((spvElementType->getOpCode() == OpTypeArray) || (spvElementType->getOpCode() == OpTypeRuntimeArray))
+        while (spvElementType->getOpCode() == OpTypeArray || spvElementType->getOpCode() == OpTypeRuntimeArray)
         {
             // Pointer to array (or runtime array) of image/sampler/sampledimage has the same representation as
             // a simple pointer to same image/sampler/sampledimage.
@@ -803,10 +803,10 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(
 
     // Now non-image-related handling.
     const bool explicitlyLaidOut =
-        (storageClass == StorageClassStorageBuffer) ||
-        (storageClass == StorageClassUniform) ||
-        (storageClass == StorageClassPushConstant) ||
-        (storageClass == StorageClassPhysicalStorageBufferEXT);
+        storageClass == StorageClassStorageBuffer ||
+        storageClass == StorageClassUniform ||
+        storageClass == StorageClassPushConstant ||
+        storageClass == StorageClassPhysicalStorageBufferEXT;
 
     Type* const pointeeType = transType(spvType->getPointerElementType(),
                                          matrixStride,
@@ -897,7 +897,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
             const bool nextHasMemberOffset = spvStructType->hasMemberDecorate(i, DecorationOffset, 0, &offset);
 
             // If we did not find a member offset, check that we did not see any member offsets on other members.
-            assert((hasMemberOffset == false) || nextHasMemberOffset);
+            assert(hasMemberOffset == false || nextHasMemberOffset);
 
             hasMemberOffset = nextHasMemberOffset;
         }
@@ -975,7 +975,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
         const bool memberIsColumnMajor = !spvStructType->hasMemberDecorate(index, DecorationRowMajor);
 
         // If our member is a matrix, check that only one of the specifiers is declared.
-        if (isExplicitlyLaidOut && (memberMatrixStride > 0))
+        if (isExplicitlyLaidOut && memberMatrixStride > 0)
             assert(memberIsColumnMajor ^ spvStructType->hasMemberDecorate(index, DecorationRowMajor));
 
         Type* const memberType = transType(spvMemberType,
@@ -1031,7 +1031,7 @@ Type *SPIRVToLLVM::transType(
   SPIRVType *t, unsigned matrixStride, bool columnMajor,
   bool parentIsPointer, bool explicitlyLaidOut) {
   // If the type is not a sub-part of a pointer or it is a forward pointer, we can look in the map.
-  if ((!parentIsPointer) || t->isTypeForwardPointer()) {
+  if (!parentIsPointer || t->isTypeForwardPointer()) {
     auto loc = m_typeMap.find(t);
     if (loc != m_typeMap.end())
       return loc->second;
@@ -1458,7 +1458,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                     // Check that the first index is always zero.
                     assert(isa<ConstantInt>(indices[0]) && cast<ConstantInt>(indices[0])->isZero());
 
-                    assert((indices.size() > 0) && (indices.size() < 4));
+                    assert(indices.size() > 0 && indices.size() < 4);
 
                     // If the GEP is just pointing at the base object, just update the value map.
                     if (indices.size() == 1)
@@ -1733,7 +1733,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
 /// Construct a DebugLoc for the given SPIRVInstruction.
 DebugLoc SPIRVToLLVM::getDebugLoc(SPIRVInstruction *bi, Function *f) {
-  if ((!f ) || (!bi->hasLine()))
+  if (!f || !bi->hasLine())
     return DebugLoc();
   auto line = bi->getLine();
   return DebugLoc::get(
@@ -1801,8 +1801,8 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
 
     Constant* const zero = getBuilder()->getInt32(0);
 
-    if (loadType->isStructTy() && (spvType->getOpCode() != OpTypeSampledImage) &&
-        (spvType->getOpCode() != OpTypeImage))
+    if (loadType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage &&
+        spvType->getOpCode() != OpTypeImage)
     {
         // For structs we lookup the mapping of the elements and use it to reverse map the values.
         const bool needsPad = isRemappedTypeElements(spvType);
@@ -1847,7 +1847,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
 
         return load;
     }
-    else if (loadType->isArrayTy() && (!spvType->isTypeVector()))
+    else if (loadType->isArrayTy() && !spvType->isTypeVector())
     {
         // Matrix and arrays both get here. For both we need to turn [<{element-type, pad}>] into [element-type].
         const bool needsPad = isTypeWithPad(loadType);
@@ -1944,7 +1944,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
     // the alignment is greater than 1 (if the constant is storing an entire structure, because we have to use packed
     // structs to encoded layout information from SPIR-V into LLVM, we can very easily output large stores with align 1
     // that causes problems with the load/store vectorizer and DAG combining).
-    if (isa<Constant>(storeValue) && (alignment > 1))
+    if (isa<Constant>(storeValue) && alignment > 1)
     {
         Constant* const constStoreValue = buildConstStoreRecursively(spvType,
                                                                       storePointer->getType(),
@@ -1964,8 +1964,8 @@ void SPIRVToLLVM::addStoreInstRecursively(
 
     Constant* const zero = getBuilder()->getInt32(0);
 
-    if (storeType->isStructTy() && (spvType->getOpCode() != OpTypeSampledImage) &&
-        (spvType->getOpCode() != OpTypeImage))
+    if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage &&
+        spvType->getOpCode() != OpTypeImage)
     {
         // For structs we lookup the mapping of the elements and use it to map the values.
         const bool needsPad = isRemappedTypeElements(spvType);
@@ -1987,7 +1987,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
                                     isNonTemporal);
         }
     }
-    else if (storeType->isArrayTy() && (!spvType->isTypeVector()))
+    else if (storeType->isArrayTy() && !spvType->isTypeVector())
     {
         // Matrix and arrays both get here. For both we need to turn [element-type] into [<{element-type, pad}>].
         const bool needsPad = isTypeWithPad(storeType);
@@ -2069,8 +2069,8 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
 
     Constant* const zero = getBuilder()->getInt32(0);
 
-    if (storeType->isStructTy() && (spvType->getOpCode() != OpTypeSampledImage) &&
-        (spvType->getOpCode() != OpTypeImage))
+    if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage &&
+        spvType->getOpCode() != OpTypeImage)
     {
         // For structs we lookup the mapping of the elements and use it to map the values.
         const bool needsPad = isRemappedTypeElements(spvType);
@@ -2094,7 +2094,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
 
         return ConstantStruct::get(cast<StructType>(storeType), constMembers);
     }
-    else if (storeType->isArrayTy() && (!spvType->isTypeVector()))
+    else if (storeType->isArrayTy() && !spvType->isTypeVector())
     {
         // Matrix and arrays both get here. For both we need to turn [element-type] into [<{element-type, pad}>].
         const bool needsPad = isTypeWithPad(storeType);
@@ -2136,7 +2136,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
             constStoreValue = ConstantExpr::getZExtOrBitCast(constStoreValue, storeType);
 
         // If the LLVM type is a not a vector, we need to change the constant into an array.
-        if (spvType->isTypeVector() && (!storeType->isVectorTy()))
+        if (spvType->isTypeVector() && !storeType->isVectorTy())
         {
             assert(storeType->isArrayTy());
 
@@ -2578,7 +2578,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
         SPIRVConstant* const spvScope = static_cast<SPIRVConstant*>(m_bm->getValue(spvId));
         const unsigned scope = spvScope->getZExtIntValue();
 
-        const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
+        const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
 
         if (isSystemScope)
             isCoherent = true;
@@ -2590,7 +2590,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
         SPIRVConstant* const spvScope = static_cast<SPIRVConstant*>(m_bm->getValue(spvId));
         const unsigned scope = spvScope->getZExtIntValue();
 
-        const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
+        const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
 
         if (isSystemScope)
             isCoherent = true;
@@ -2671,7 +2671,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
         SPIRVConstant* const spvScope = static_cast<SPIRVConstant*>(m_bm->getValue(spvId));
         const unsigned scope = spvScope->getZExtIntValue();
 
-        const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
+        const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
 
         if (isSystemScope)
             isCoherent = true;
@@ -2758,8 +2758,8 @@ Value* SPIRVToLLVM::transLoadImage(
 Value* SPIRVToLLVM::transImagePointer(
     SPIRVValue* spvImagePtr)    // [in] The image/sampler/sampledimage pointer
 {
-    if ((spvImagePtr->getOpCode() != OpVariable) ||
-        (static_cast<SPIRVTypePointer*>(spvImagePtr->getType())->getStorageClass() != StorageClassUniformConstant))
+    if (spvImagePtr->getOpCode() != OpVariable ||
+        static_cast<SPIRVTypePointer*>(spvImagePtr->getType())->getStorageClass() != StorageClassUniformConstant)
         return transValue(spvImagePtr, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
 
     // For an image/sampler/sampledimage pointer that is a UniformConstant OpVariable, we need to materialize it by
@@ -2770,7 +2770,7 @@ Value* SPIRVToLLVM::transImagePointer(
 
     Value* descPtr = nullptr;
     SPIRVType* spvImageTy = spvImagePtr->getType()->getPointerElementType();
-    while ((spvImageTy->getOpCode() == OpTypeArray) || (spvImageTy->getOpCode() == OpTypeRuntimeArray))
+    while (spvImageTy->getOpCode() == OpTypeArray || spvImageTy->getOpCode() == OpTypeRuntimeArray)
         spvImageTy = spvImageTy->getArrayElementType();
 
     if (spvImageTy->getOpCode() == OpTypeSampler)
@@ -2849,7 +2849,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
         SPIRVConstant* const spvScope = static_cast<SPIRVConstant*>(m_bm->getValue(spvId));
         const unsigned scope = spvScope->getZExtIntValue();
 
-        const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
+        const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
 
         if (isSystemScope)
             isCoherent = true;
@@ -2937,8 +2937,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
           StorageClassUniformConstant)
     {
         SPIRVType* spvUltimateElementType = spvAccessChain->getBase()->getType()->getPointerElementType();
-        while ((spvUltimateElementType->getOpCode() == OpTypeArray) ||
-               (spvUltimateElementType->getOpCode() == OpTypeRuntimeArray))
+        while (spvUltimateElementType->getOpCode() == OpTypeArray ||
+               spvUltimateElementType->getOpCode() == OpTypeRuntimeArray)
             spvUltimateElementType = spvUltimateElementType->getArrayElementType();
 
         switch (spvUltimateElementType->getOpCode())
@@ -2976,10 +2976,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
 
     const SPIRVStorageClassKind storageClass = spvBaseType->getPointerStorageClass();
 
-    const bool isBufferBlockPointer = (storageClass == StorageClassStorageBuffer) ||
-                                      (storageClass == StorageClassUniform) ||
-                                      (storageClass == StorageClassPushConstant) ||
-                                      (storageClass == StorageClassPhysicalStorageBufferEXT);
+    const bool isBufferBlockPointer = storageClass == StorageClassStorageBuffer ||
+                                      storageClass == StorageClassUniform ||
+                                      storageClass == StorageClassPushConstant ||
+                                      storageClass == StorageClassPhysicalStorageBufferEXT;
 
     // Run over the indices of the loop and investigate whether we need to add any additional indices so that we load
     // the correct data. We explicitly lay out our data in memory, which means because Vulkan has more powerful layout
@@ -3194,8 +3194,8 @@ Value* SPIRVToLLVM::indexDescPtr(
     if (spvElementType )
     {
         auto typeOpcode = spvElementType->getOpCode();
-        if ((typeOpcode == OpTypeSampledImage) ||
-            ((typeOpcode == OpTypeImage) && static_cast<SPIRVTypeImage*>(spvElementType)->getDescriptor().MS))
+        if (typeOpcode == OpTypeSampledImage ||
+            (typeOpcode == OpTypeImage && static_cast<SPIRVTypeImage*>(spvElementType)->getDescriptor().MS))
         {
             // These are the two cases that the pointer is in fact a structure containing two pointers.
             Value* ptr0 = getBuilder()->CreateExtractValue(base, uint64_t(0));
@@ -3320,7 +3320,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<spv::OpReadClockKHR>(
     SPIRVInstruction* const spvInst = static_cast<SPIRVInstruction*>(spvValue);
     SPIRVConstant* const spvScope = static_cast<SPIRVConstant*>(spvInst->getOperands()[0]);
     const spv::Scope scope = static_cast<spv::Scope>(spvScope->getZExtIntValue());
-    assert((scope == spv::ScopeDevice) || (scope == spv::ScopeWorkgroup));
+    assert(scope == spv::ScopeDevice || scope == spv::ScopeWorkgroup);
 
     Value* const readClock = getBuilder()->CreateReadClock(scope == spv::ScopeDevice);
 
@@ -4126,7 +4126,7 @@ Constant* SPIRVToLLVM::transInitializer(
 {
     SPIRVType* const spvType = spvValue->getType();
 
-    if ((spvValue->getOpCode() == OpConstantNull) && type->isAggregateType())
+    if (spvValue->getOpCode() == OpConstantNull && type->isAggregateType())
         return ConstantAggregateZero::get(type);
 
     if (spvType->isTypeStruct())
@@ -4139,7 +4139,7 @@ Constant* SPIRVToLLVM::transInitializer(
         // For structs we lookup the mapping of the elements and use it to reverse map the values.
         const bool needsPad = isRemappedTypeElements(spvType);
 
-        assert((needsPad == false) || isRemappedTypeElements(spvType));
+        assert(needsPad == false || isRemappedTypeElements(spvType));
 
         Constant* structInitializer = UndefValue::get(type);
 
@@ -4212,7 +4212,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
     if (storageClass == StorageClassUniformConstant)
     {
         SPIRVType* spvElementType = spvVarType;
-        while ((spvElementType->getOpCode() == OpTypeArray) || (spvElementType->getOpCode() == OpTypeRuntimeArray))
+        while (spvElementType->getOpCode() == OpTypeArray || spvElementType->getOpCode() == OpTypeRuntimeArray)
             spvElementType = spvElementType->getArrayElementType();
         switch (spvElementType->getOpCode())
         {
@@ -4272,7 +4272,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
             assert(spvBlockDecoratedType->isTypeStruct());
 
             readOnly = spvBlockDecoratedType->hasDecorate(DecorationBlock) &&
-                       (storageClass != SPIRVStorageClassKind::StorageClassStorageBuffer);
+                       storageClass != SPIRVStorageClassKind::StorageClassStorageBuffer;
             break;
         }
     default:
@@ -4490,7 +4490,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f,
   case OpConstantFalse:
   case OpSpecConstantTrue:
   case OpSpecConstantFalse: {
-    bool boolVal = (oc == OpConstantTrue || oc == OpSpecConstantTrue) ?
+    bool boolVal = oc == OpConstantTrue || oc == OpSpecConstantTrue ?
                       static_cast<SPIRVConstantTrue *>(bv)->getBoolValue() :
                       static_cast<SPIRVConstantFalse *>(bv)->getBoolValue();
     return boolVal ? mapValue(bv, ConstantInt::getTrue(*m_context)) :
@@ -6853,7 +6853,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel,
   m_enableXfb = m_bm->getCapability().find(
       CapabilityTransformFeedback) != m_bm->getCapability().end();
   m_enableGatherLodNz = m_bm->hasCapability(CapabilityImageGatherBiasLodAMD) &&
-      (entryExecModel == ExecutionModelFragment);
+      entryExecModel == ExecutionModelFragment;
 
   m_dbgTran.createCompileUnit();
   m_dbgTran.addDbgInfoVersion();
@@ -6965,7 +6965,7 @@ bool SPIRVToLLVM::transMetadata() {
       continue;
     SPIRVExecutionModelKind execModel = entryPoint->getExecModel();
 
-    if ((execModel >= ExecutionModelVertex) && (execModel <= ExecutionModelGLCompute)) {
+    if (execModel >= ExecutionModelVertex && execModel <= ExecutionModelGLCompute) {
 
       // Generate metadata for execution modes
       ShaderExecModeMetadata execModeMd = {};
@@ -7183,7 +7183,7 @@ bool SPIRVToLLVM::transMetadata() {
 
 bool SPIRVToLLVM::checkContains64BitType(SPIRVType *bt) {
   if (bt->isTypeScalar())
-    return (bt->getBitWidth() == 64);
+    return bt->getBitWidth() == 64;
   else if (bt->isTypeVector())
    return checkContains64BitType(bt->getVectorComponentType());
   else if (bt->isTypeMatrix())
@@ -7368,7 +7368,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       gv->addMetadata(gSPIRVMD::Block, *blockMdNode);
 
     } else if (bv->getType()->isTypePointer() &&
-        (bv->getType()->getPointerStorageClass() == StorageClassPushConstant)) {
+        bv->getType()->getPointerStorageClass() == StorageClassPushConstant) {
       // Translate decorations of push constants
 
       SPIRVType *pushConstTy = bv->getType()->getPointerElementType();
@@ -7653,7 +7653,7 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt,
         width *= bt->getVectorComponentCount();
       assert(width <= 64 * 4);
 
-      inOutDec.Value.Loc += (width <= 32 * 4) ? 1 : 2;
+      inOutDec.Value.Loc += width <= 32 * 4 ? 1 : 2;
       unsigned alignment = 32;
       unsigned baseStride = 4; // Strides in (BYTES)
       inOutDec.XfbExtraOffset +=
@@ -7993,8 +7993,8 @@ Constant * SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt,
 
       // Workaround SPIR-V 1.0 bug where sometimes structs had illegal overlap
       // in their struct offsets.
-      if ((m_bm->getSPIRVVersion() == SpvVersion10) &&
-          (remappedIdx == UINT32_MAX))
+      if (m_bm->getSPIRVVersion() == SpvVersion10 &&
+          remappedIdx == UINT32_MAX)
         memberDec.Offset = UINT32_MAX; else
         memberDec.Offset = sl->getElementOffset(remappedIdx);
 
@@ -8867,7 +8867,7 @@ bool llvm::readSpirv(Builder *builder, const ShaderModuleUsage *shaderInfo, std:
                      spv::ExecutionModel entryExecModel, const char *entryName,
                      const SPIRVSpecConstMap &specConstMap, Module *m,
                      std::string &errMsg) {
-  assert((entryExecModel != ExecutionModelKernel) && "Not support ExecutionModelKernel");
+  assert(entryExecModel != ExecutionModelKernel && "Not support ExecutionModelKernel");
 
   std::unique_ptr<SPIRVModule> bm(SPIRVModule::createSPIRVModule());
 

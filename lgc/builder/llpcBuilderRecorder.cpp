@@ -323,7 +323,7 @@ BuilderRecorder::BuilderRecorder(
 void BuilderRecorder::recordShaderModes(
     Module* module)    // [in/out] Module to record into
 {
-    if ((!m_pipelineState ) && m_shaderModes)
+    if (!m_pipelineState && m_shaderModes)
         m_shaderModes->record(module);
 }
 
@@ -1024,10 +1024,10 @@ Value* BuilderRecorder::CreateIndexDescPtr(
     bool          isNonUniform,       // Whether the descriptor index is non-uniform
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
-    assert((descPtr->getType() == getImageDescPtrTy()) ||
-                (descPtr->getType() == getSamplerDescPtrTy()) ||
-                (descPtr->getType() == getFmaskDescPtrTy()) ||
-                (descPtr->getType() == getTexelBufferDescPtrTy()));
+    assert(descPtr->getType() == getImageDescPtrTy() ||
+                descPtr->getType() == getSamplerDescPtrTy() ||
+                descPtr->getType() == getFmaskDescPtrTy() ||
+                descPtr->getType() == getTexelBufferDescPtrTy());
     return record(Opcode::IndexDescPtr, descPtr->getType(), { descPtr, index, getInt1(isNonUniform) }, instName);
 }
 
@@ -1039,10 +1039,10 @@ Value* BuilderRecorder::CreateLoadDescFromPtr(
                                       //    the CreateGet*DescPtr methods
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
-    assert((descPtr->getType() == getImageDescPtrTy()) ||
-                (descPtr->getType() == getSamplerDescPtrTy()) ||
-                (descPtr->getType() == getFmaskDescPtrTy()) ||
-                (descPtr->getType() == getTexelBufferDescPtrTy()));
+    assert(descPtr->getType() == getImageDescPtrTy() ||
+                descPtr->getType() == getSamplerDescPtrTy() ||
+                descPtr->getType() == getFmaskDescPtrTy() ||
+                descPtr->getType() == getTexelBufferDescPtrTy());
     return record(Opcode::LoadDescFromPtr,
                   cast<StructType>(descPtr->getType())->getElementType(0)->getPointerElementType(),
                   descPtr,
@@ -1368,7 +1368,7 @@ Value* BuilderRecorder::CreateReadGenericInput(
                       elemIdx,
                       getInt32(locationCount),
                       getInt32(inputInfo.getData()),
-                      (vertexIndex ) ? vertexIndex : UndefValue::get(getInt32Ty()),
+                      vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
                   },
                   instName,
                   Attribute::ReadOnly);
@@ -1394,7 +1394,7 @@ Value* BuilderRecorder::CreateReadGenericOutput(
                       elemIdx,
                       getInt32(locationCount),
                       getInt32(outputInfo.getData()),
-                      (vertexIndex ) ? vertexIndex : UndefValue::get(getInt32Ty()),
+                      vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
                   },
                   instName,
                   Attribute::ReadOnly);
@@ -1425,7 +1425,7 @@ Instruction* BuilderRecorder::CreateWriteGenericOutput(
                       elemIdx,
                       getInt32(locationCount),
                       getInt32(outputInfo.getData()),
-                      (vertexIndex ) ? vertexIndex : UndefValue::get(getInt32Ty()),
+                      vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
                   },
                   "",
                   {});
@@ -1480,8 +1480,8 @@ Value* BuilderRecorder::CreateReadBuiltInInput(
                   {
                       getInt32(builtIn),
                       getInt32(inputInfo.getData()),
-                      (vertexIndex ) ? vertexIndex : UndefValue::get(getInt32Ty()),
-                      (index ) ? index : UndefValue::get(getInt32Ty()),
+                      vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
+                      index ? index : UndefValue::get(getInt32Ty()),
                   },
                   instName,
                   Attribute::ReadOnly);
@@ -1511,8 +1511,8 @@ Value* BuilderRecorder::CreateReadBuiltInOutput(
                   {
                       getInt32(builtIn),
                       getInt32(outputInfo.getData()),
-                      (vertexIndex ) ? vertexIndex : UndefValue::get(getInt32Ty()),
-                      (index ) ? index : UndefValue::get(getInt32Ty()),
+                      vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
+                      index ? index : UndefValue::get(getInt32Ty()),
                   },
                   instName,
                   Attribute::ReadOnly);
@@ -1533,8 +1533,8 @@ Instruction* BuilderRecorder::CreateWriteBuiltInOutput(
                       valueToWrite,
                       getInt32(builtIn),
                       getInt32(outputInfo.getData()),
-                      (vertexIndex ) ? vertexIndex : UndefValue::get(getInt32Ty()),
-                      (index ) ? index : UndefValue::get(getInt32Ty()),
+                      vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
+                      index ? index : UndefValue::get(getInt32Ty()),
                   },
                   "");
 }

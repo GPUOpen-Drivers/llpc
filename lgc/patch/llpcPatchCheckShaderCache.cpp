@@ -169,10 +169,10 @@ bool PatchCheckShaderCache::runOnModule(
     // "Remove" a shader stage by making its entry-point function internal, so it gets removed later.
     for (auto& func : module)
     {
-        if ((!func.empty()) && (func.getLinkage() != GlobalValue::InternalLinkage))
+        if (!func.empty() && func.getLinkage() != GlobalValue::InternalLinkage)
         {
             auto stage = getShaderStageFromFunction(&func);
-            if ((stage != ShaderStageInvalid) && ((shaderStageToMask(stage) & ~modifiedStageMask) != 0))
+            if (stage != ShaderStageInvalid && (shaderStageToMask(stage) & ~modifiedStageMask) != 0)
                 func.setLinkage(GlobalValue::InternalLinkage);
         }
     }

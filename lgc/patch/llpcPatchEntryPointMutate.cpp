@@ -96,9 +96,9 @@ bool PatchEntryPointMutate::runOnModule(
     m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
     const unsigned stageMask = m_pipelineState->getShaderStageMask();
-    m_hasTs = ((stageMask & (shaderStageToMask(ShaderStageTessControl) |
-                             shaderStageToMask(ShaderStageTessEval))) != 0);
-    m_hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
+    m_hasTs = (stageMask & (shaderStageToMask(ShaderStageTessControl) |
+                             shaderStageToMask(ShaderStageTessEval))) != 0;
+    m_hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry)) != 0;
 
     // Process each shader in turn, but not the copy shader.
     auto pipelineShaders = &getAnalysis<PipelineShaders>();
@@ -273,11 +273,11 @@ bool PatchEntryPointMutate::isResourceNodeActive(
         }
     }
 
-    if ((node->type == ResourceNodeType::PushConst) && isRootNode)
+    if (node->type == ResourceNodeType::PushConst && isRootNode)
     {
-        active = (resUsage1->pushConstSizeInBytes > 0);
-        if ((!active) && (resUsage2 ))
-            active = (resUsage2->pushConstSizeInBytes > 0);
+        active = resUsage1->pushConstSizeInBytes > 0;
+        if (!active && resUsage2 )
+            active = resUsage2->pushConstSizeInBytes > 0;
     }
     else if (node->type == ResourceNodeType::DescriptorTableVaPtr)
     {
@@ -300,16 +300,16 @@ bool PatchEntryPointMutate::isResourceNodeActive(
         active = true;
     else
     {
-        assert((node->type != ResourceNodeType::DescriptorTableVaPtr) &&
-                    (node->type != ResourceNodeType::IndirectUserDataVaPtr));
+        assert(node->type != ResourceNodeType::DescriptorTableVaPtr &&
+                    node->type != ResourceNodeType::IndirectUserDataVaPtr);
 
         DescriptorPair descPair = {};
         descPair.descSet = node->set;
         descPair.binding = node->binding;
 
-        active = (resUsage1->descPairs.find(descPair.u64All) != resUsage1->descPairs.end());
-        if ((!active) && (resUsage2 ))
-            active = (resUsage2->descPairs.find(descPair.u64All) != resUsage2->descPairs.end());
+        active = resUsage1->descPairs.find(descPair.u64All) != resUsage1->descPairs.end();
+        if (!active && resUsage2 )
+            active = resUsage2->descPairs.find(descPair.u64All) != resUsage2->descPairs.end();
     }
 
     return active;
@@ -372,8 +372,8 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
                 {
                     // On GFX9+, the shader stage that the vertex shader is merged in to needs a vertex buffer
                     // table, to ensure that the merged shader gets one.
-                    if ((m_shaderStage == ShaderStageTessControl) ||
-                        ((m_shaderStage == ShaderStageGeometry) && (!m_hasTs)))
+                    if (m_shaderStage == ShaderStageTessControl ||
+                        (m_shaderStage == ShaderStageGeometry && !m_hasTs))
                         reserveVbTable = true;
                 }
                 continue;
@@ -390,8 +390,8 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
                 {
                     // On GFX9+, the shader stage that the last shader is merged in to needs a stream out
                     // table, to ensure that the merged shader gets one.
-                    if ((m_shaderStage == ShaderStageTessEval) ||
-                        ((m_shaderStage == ShaderStageVertex) && (!m_hasTs)))
+                    if (m_shaderStage == ShaderStageTessEval ||
+                        (m_shaderStage == ShaderStageVertex && !m_hasTs))
                         reserveStreamOutTable = true;
                 }
                 continue;
@@ -446,8 +446,8 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
             // NOTE: On GFX9+, Vertex shader (LS) and tessellation control shader (HS) are merged into a single shader.
             // The user data count of tessellation control shader should be same as vertex shader.
             auto currResUsage = resUsage;
-            if ((m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) &&
-                (m_shaderStage == ShaderStageTessControl) &&
+            if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
+                m_shaderStage == ShaderStageTessControl &&
                 (m_pipelineState->getShaderStageMask() & shaderStageToMask(ShaderStageVertex)))
                 currResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
 
@@ -460,8 +460,8 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
             const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-            if (((gfxIp.major >= 9) && (m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize)) ||
-                (enableNgg && (!m_hasTs)))
+            if ((gfxIp.major >= 9 && (m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize)) ||
+                (enableNgg && !m_hasTs))
             {
                 availUserDataCount -= 1;
                 reserveEsGsLdsSize = true;
@@ -605,8 +605,8 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
             // entry-point arguments are added once DWORD offsets of user data are not continuous.
            assert(m_shaderStage == ShaderStageCompute);
 
-            while ((userDataIdx < (node->offsetInDwords + InterfaceData::CsStartUserData)) &&
-                   (userDataIdx < (availUserDataCount + InterfaceData::CsStartUserData)))
+            while (userDataIdx < (node->offsetInDwords + InterfaceData::CsStartUserData) &&
+                   userDataIdx < (availUserDataCount + InterfaceData::CsStartUserData))
             {
                 *inRegMask |= 1ull << argTys.size();
                 argTys.push_back(Type::getInt32Ty(*m_context));
@@ -631,7 +631,7 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
                     assert(node->sizeInDwords == 1);
 
                     auto shaderOptions = &m_pipelineState->getShaderOptions(m_shaderStage);
-                    if (shaderOptions->updateDescInElf && (m_shaderStage == ShaderStageFragment))
+                    if (shaderOptions->updateDescInElf && m_shaderStage == ShaderStageFragment)
                     {
                         // Put set number to register first, will update offset after merge ELFs
                         // For partial pipeline compile, only fragment shader needs to adjust offset of root descriptor
@@ -673,7 +673,7 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
                 }
             }
         }
-        else if (needSpill && (intfData->spillTable.offsetInDwords == InvalidValue))
+        else if (needSpill && intfData->spillTable.offsetInDwords == InvalidValue)
             intfData->spillTable.offsetInDwords = node->offsetInDwords;
     }
 
@@ -705,8 +705,8 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
             auto currIntfData = intfData;
             auto currResUsage = resUsage;
 
-            if ((m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) &&
-                (m_shaderStage == ShaderStageTessControl) &&
+            if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
+                m_shaderStage == ShaderStageTessControl &&
                 (m_pipelineState->getShaderStageMask() & shaderStageToMask(ShaderStageVertex)))
             {
                 currIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
@@ -852,7 +852,7 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
         }
     }
 
-    if (needSpill && (!useFixedLayout))
+    if (needSpill && !useFixedLayout)
     {
         *inRegMask |= 1ull << argTys.size();
         intfData->entryArgIdxs.spillTable = argTys.size();
@@ -872,13 +872,13 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
     {
     case ShaderStageVertex:
         {
-            if (m_hasGs && (!m_hasTs))   // VS acts as hardware ES
+            if (m_hasGs && !m_hasTs)   // VS acts as hardware ES
             {
                 *inRegMask |= 1ull << argTys.size();
                 entryArgIdxs.vs.esGsOffset = argTys.size();
                 argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offset
             }
-            else if ((!m_hasGs) && (!m_hasTs))  // VS acts as hardware VS
+            else if (!m_hasGs && !m_hasTs)  // VS acts as hardware VS
             {
                 if (enableXfb)  // If output to stream-out buffer
                 {

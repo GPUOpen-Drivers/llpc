@@ -183,7 +183,7 @@ private:
     void unlockCacheMap(bool readOnly) { m_lock.unlock(); }
 
     bool useExternalCache()
-        { return ((m_getValueFunc ) && (m_storeValueFunc )); }
+        { return m_getValueFunc && m_storeValueFunc ; }
 
     void resetRuntimeCache();
     void getBuildTime(BuildUniqueId *buildId);

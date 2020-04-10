@@ -189,15 +189,15 @@ void GraphicsContext::doUserDataNodeMerge()
             unsigned duplicateCount = 1;
             for (; duplicateCount != rangeValues.size(); ++duplicateCount)
             {
-                if ((rangeValues[0].set != rangeValues[duplicateCount].set) || (rangeValues[0].binding != rangeValues[duplicateCount].binding))
+                if (rangeValues[0].set != rangeValues[duplicateCount].set || rangeValues[0].binding != rangeValues[duplicateCount].binding)
                     break;
-                assert((rangeValues[0].type == rangeValues[duplicateCount].type) &&
+                assert(rangeValues[0].type == rangeValues[duplicateCount].type &&
                             "Descriptor range value merge conflict: type");
-                assert((rangeValues[0].arraySize == rangeValues[duplicateCount].arraySize) &&
+                assert(rangeValues[0].arraySize == rangeValues[duplicateCount].arraySize &&
                             "Descriptor range value merge conflict: arraySize");
-                assert((memcmp(rangeValues[0].pValue,
+                assert(memcmp(rangeValues[0].pValue,
                                     rangeValues[duplicateCount].pValue,
-                                    rangeValues[0].arraySize * sizeof(unsigned)) == 0) &&
+                                    rangeValues[0].arraySize * sizeof(unsigned)) == 0 &&
                             "Descriptor range value merge conflict: value");
             }
 
@@ -250,22 +250,22 @@ ArrayRef<ResourceMappingNode> GraphicsContext::mergeUserDataNodeTable(
         {
             if (nodes[0].offsetInDwords != nodes[duplicatesCount].offsetInDwords)
                 break;
-            assert((nodes[0].type == nodes[duplicatesCount].type) && "User data merge conflict: type");
-            assert((nodes[0].sizeInDwords == nodes[duplicatesCount].sizeInDwords) &&
+            assert(nodes[0].type == nodes[duplicatesCount].type && "User data merge conflict: type");
+            assert(nodes[0].sizeInDwords == nodes[duplicatesCount].sizeInDwords &&
                         "User data merge conflict: size");
-            assert((nodes[0].type != ResourceMappingNodeType::IndirectUserDataVaPtr) &&
+            assert(nodes[0].type != ResourceMappingNodeType::IndirectUserDataVaPtr &&
                         "User data merge conflict: only one shader stage expected to have vertex buffer");
-            assert((nodes[0].type != ResourceMappingNodeType::StreamOutTableVaPtr) &&
+            assert(nodes[0].type != ResourceMappingNodeType::StreamOutTableVaPtr &&
                         "User data merge conflict: only one shader stage expected to have stream out");
             if (nodes[0].type != ResourceMappingNodeType::DescriptorTableVaPtr)
             {
-                assert((nodes[0].srdRange.set == nodes[duplicatesCount].srdRange.set) &&
-                            (nodes[0].srdRange.binding == nodes[duplicatesCount].srdRange.binding) &&
+                assert(nodes[0].srdRange.set == nodes[duplicatesCount].srdRange.set &&
+                            nodes[0].srdRange.binding == nodes[duplicatesCount].srdRange.binding &&
                             "User data merge conflict: set or binding");
             }
         }
 
-        if ((duplicatesCount == 1) || (nodes[0].type != ResourceMappingNodeType::DescriptorTableVaPtr))
+        if (duplicatesCount == 1 || nodes[0].type != ResourceMappingNodeType::DescriptorTableVaPtr)
         {
             // Keep the merged node.
             mergedNodes.push_back(nodes[0]);

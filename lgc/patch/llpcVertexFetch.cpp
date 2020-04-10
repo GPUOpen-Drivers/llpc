@@ -532,11 +532,11 @@ Value* VertexFetch::run(
     {
         // NOTE: If we performs vertex fetch operations twice, we have to coalesce result values of the two
         // fetch operations and generate a combined one.
-        assert((vertexFetches[0] ) && (vertexFetches[1] ));
+        assert(vertexFetches[0] && vertexFetches[1] );
         assert(vertexFetches[0]->getType()->getVectorNumElements() == 4);
 
         unsigned compCount = vertexFetches[1]->getType()->getVectorNumElements();
-        assert((compCount == 2) || (compCount == 4)); // Should be <2 x i32> or <4 x i32>
+        assert(compCount == 2 || compCount == 4); // Should be <2 x i32> or <4 x i32>
 
         if (compCount == 2)
         {
@@ -574,7 +574,7 @@ Value* VertexFetch::run(
     // Finalize vertex fetch
     Type* basicTy = inputTy->isVectorTy() ? inputTy->getVectorElementType() : inputTy;
     const unsigned bitWidth = basicTy->getScalarSizeInBits();
-    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
     // Get default fetch values
     Constant* defaults = nullptr;
@@ -639,12 +639,12 @@ Value* VertexFetch::run(
 
     // Construct vertex fetch results
     const unsigned inputCompCount = inputTy->isVectorTy() ? inputTy->getVectorNumElements() : 1;
-    const unsigned vertexCompCount = inputCompCount * ((bitWidth == 64) ? 2 : 1);
+    const unsigned vertexCompCount = inputCompCount * (bitWidth == 64 ? 2 : 1);
 
     std::vector<Value*> vertexValues(vertexCompCount);
 
     // NOTE: Original component index is based on the basic scalar type.
-    compIdx *= ((bitWidth == 64) ? 2 : 1);
+    compIdx *= (bitWidth == 64 ? 2 : 1);
 
     // Vertex input might take values from vertex fetch values or default fetch values
     for (unsigned i = 0; i < vertexCompCount; i++)
@@ -835,12 +835,12 @@ void VertexFetch::addVertexFetchInst(
 
     // NOTE: If the vertex attribute offset and stride are aligned on data format boundaries, we can do a vertex fetch
     // operation to read the whole vertex. Otherwise, we have to do vertex per-component fetch operations.
-    if ((((offset % formatInfo->vertexByteSize) == 0) && ((stride % formatInfo->vertexByteSize) == 0)) ||
-        (formatInfo->compDfmt == dfmt))
+    if (((offset % formatInfo->vertexByteSize) == 0 && (stride % formatInfo->vertexByteSize) == 0) ||
+        formatInfo->compDfmt == dfmt)
     {
         // NOTE: If the vertex attribute offset is greater than vertex attribute stride, we have to adjust both vertex
         // buffer index and vertex attribute offset accordingly. Otherwise, vertex fetch might behave unexpectedly.
-        if ((stride != 0) && (offset > stride))
+        if (stride != 0 && offset > stride)
         {
             vbIndex = BinaryOperator::CreateAdd(vbIndex,
                                                  ConstantInt::get(Type::getInt32Ty(*m_context), offset / stride),
@@ -918,14 +918,14 @@ void VertexFetch::addVertexFetchInst(
             // NOTE: The fetch values are represented by <n x i32>, so we will bitcast the float16 values to
             // int32 eventually.
             Type* bitCastTy = Type::getInt16Ty(*m_context);
-            bitCastTy = (numChannels == 1) ? bitCastTy : VectorType::get(bitCastTy, numChannels);
+            bitCastTy = numChannels == 1 ? bitCastTy : VectorType::get(bitCastTy, numChannels);
             fetch = new BitCastInst(fetch,
                                         bitCastTy,
                                         "",
                                         insertPos);
 
             Type* zExtTy = Type::getInt32Ty(*m_context);
-            zExtTy = (numChannels == 1) ? zExtTy : VectorType::get(zExtTy, numChannels);
+            zExtTy = numChannels == 1 ? zExtTy : VectorType::get(zExtTy, numChannels);
             fetch = new ZExtInst(fetch,
                                     zExtTy,
                                     "",
@@ -962,7 +962,7 @@ void VertexFetch::addVertexFetchInst(
             // NOTE: If the vertex attribute per-component offset is greater than vertex attribute stride, we have
             // to adjust both vertex buffer index and vertex per-component offset accordingly. Otherwise, vertex
             // fetch might behave unexpectedly.
-            if ((stride != 0) && (compOffset > stride))
+            if (stride != 0 && compOffset > stride)
             {
                 compVbIndices[i] = BinaryOperator::CreateAdd(
                                        vbIndex,
@@ -1060,13 +1060,13 @@ bool VertexFetch::needPatchA2S(
 {
     bool needPatch = false;
 
-    if ((inputDesc->dfmt == BufDataFormat2_10_10_10) ||
-        (inputDesc->dfmt == BufDataFormat2_10_10_10_Bgra))
+    if (inputDesc->dfmt == BufDataFormat2_10_10_10 ||
+        inputDesc->dfmt == BufDataFormat2_10_10_10_Bgra)
     {
-        if ((inputDesc->nfmt == BufNumFormatSnorm) ||
-            (inputDesc->nfmt == BufNumFormatSscaled) ||
-            (inputDesc->nfmt == BufNumFormatSint))
-            needPatch = (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9);
+        if (inputDesc->nfmt == BufNumFormatSnorm ||
+            inputDesc->nfmt == BufNumFormatSscaled ||
+            inputDesc->nfmt == BufNumFormatSint)
+            needPatch = m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9;
     }
 
     return needPatch;
@@ -1078,8 +1078,8 @@ bool VertexFetch::needSecondVertexFetch(
     const VertexInputDescription* inputDesc    // [in] Vertex input description
     ) const
 {
-    return ((inputDesc->dfmt == BufDataFormat64_64_64) ||
-            (inputDesc->dfmt == BufDataFormat64_64_64_64));
+    return inputDesc->dfmt == BufDataFormat64_64_64 ||
+            inputDesc->dfmt == BufDataFormat64_64_64_64;
 }
 
 } // lgc

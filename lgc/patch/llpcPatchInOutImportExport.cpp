@@ -111,13 +111,13 @@ bool PatchInOutImportExport::runOnModule(
     m_pipelineSysValues.initialize(m_pipelineState);
 
     const unsigned stageMask = m_pipelineState->getShaderStageMask();
-    m_hasTs = ((stageMask & (shaderStageToMask(ShaderStageTessControl) |
-                             shaderStageToMask(ShaderStageTessEval))) != 0);
-    m_hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
+    m_hasTs = (stageMask & (shaderStageToMask(ShaderStageTessControl) |
+                             shaderStageToMask(ShaderStageTessEval))) != 0;
+    m_hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry)) != 0;
 
     // Create the global variable that is to model LDS
     // NOTE: ES -> GS ring is always on-chip on GFX9.
-    if (m_hasTs || (m_hasGs && (m_pipelineState->isGsOnChip() || (m_gfxIp.major >= 9))))
+    if (m_hasTs || (m_hasGs && (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9)))
         m_lds = Patch::getLdsVariable(m_pipelineState, m_module);
 
     // Process each shader in turn, in reverse order (because for example VS uses inOutUsage.tcs.calcFactor
@@ -198,7 +198,7 @@ void PatchInOutImportExport::processShader()
     }
 
     // Thread ID will be used in on-chip GS offset calculation (ES -> GS ring is always on-chip on GFX9)
-    bool useThreadId = (m_hasGs && (m_pipelineState->isGsOnChip() || (m_gfxIp.major >= 9)));
+    bool useThreadId = (m_hasGs && (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9));
 
     // Thread ID will also be used for stream-out buffer export
     const bool enableXfb = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
@@ -212,17 +212,17 @@ void PatchInOutImportExport::processShader()
     }
 
     // Initialize calculation factors for tessellation shader
-    if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval))
+    if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval)
     {
         const unsigned stageMask = m_pipelineState->getShaderStageMask();
         const bool hasTcs = ((stageMask & shaderStageToMask(ShaderStageTessControl)) != 0);
 
         auto& calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
-        if ((calcFactor.inVertexStride              == InvalidValue) &&
-            (calcFactor.outVertexStride             == InvalidValue) &&
-            (calcFactor.patchCountPerThreadGroup    == InvalidValue) &&
-            (calcFactor.outPatchSize                == InvalidValue) &&
-            (calcFactor.patchConstSize              == InvalidValue))
+        if (calcFactor.inVertexStride              == InvalidValue &&
+            calcFactor.outVertexStride             == InvalidValue &&
+            calcFactor.patchCountPerThreadGroup    == InvalidValue &&
+            calcFactor.outPatchSize                == InvalidValue &&
+            calcFactor.patchConstSize              == InvalidValue)
         {
             // NOTE: The LDS space is divided to three parts:
             //
@@ -479,8 +479,8 @@ void PatchInOutImportExport::visitCallInst(
             }
             else
             {
-                if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval) ||
-                    ((m_shaderStage == ShaderStageFragment) && isInterpolantInputImport))
+                if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval ||
+                    (m_shaderStage == ShaderStageFragment && isInterpolantInputImport))
                 {
                     // NOTE: If location offset is present and is a constant, we have to add it to the unmapped
                     // location before querying the mapped location. Meanwhile, we have to adjust the location
@@ -706,7 +706,7 @@ void PatchInOutImportExport::visitCallInst(
             case ShaderStageVertex:
                 {
                     // No TS/GS pipeline, VS is the last stage
-                    if ((!m_hasGs) && (!m_hasTs))
+                    if (!m_hasGs && !m_hasTs)
                         patchXfbOutputExport(output, xfbBuffer, xfbOffset, xfbExtraOffset, &callInst);
                     break;
                 }
@@ -918,7 +918,7 @@ void PatchInOutImportExport::visitCallInst(
     else
     {
         // Other calls relevant to input/output import/export
-        if (callee->isIntrinsic() && (callee->getIntrinsicID() == Intrinsic::amdgcn_s_sendmsg))
+        if (callee->isIntrinsic() && callee->getIntrinsicID() == Intrinsic::amdgcn_s_sendmsg)
         {
             // NOTE: Implicitly store the value of gl_ViewIndex to GS-VS ring buffer before emit calls.
             if (m_pipelineState->getInputAssemblyState().enableMultiView)
@@ -941,8 +941,8 @@ void PatchInOutImportExport::visitCallInst(
             unsigned emitStream = InvalidValue;
 
             uint64_t message = cast<ConstantInt>(callInst.getArgOperand(0))->getZExtValue();
-            if ((message == GsEmitStreaM0)|| (message == GsEmitStreaM1) ||
-                (message == GsEmitStreaM2) || (message == GsEmitStreaM3))
+            if (message == GsEmitStreaM0|| message == GsEmitStreaM1 ||
+                message == GsEmitStreaM2 || message == GsEmitStreaM3)
             {
                 // NOTE: MSG[9:8] = STREAM_ID
                 emitStream = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
@@ -976,9 +976,9 @@ void PatchInOutImportExport::visitReturnInst(
     const bool enableXfb = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
 
     // Whether this shader stage has to use "exp" instructions to export outputs
-    const bool useExpInst = (((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval) ||
-                              ((m_shaderStage == ShaderStageCopyShader) && (!enableXfb))) &&
-                             ((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment)));
+    const bool useExpInst = ((m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
+                              (m_shaderStage == ShaderStageCopyShader && !enableXfb)) &&
+                             (nextStage == ShaderStageInvalid || nextStage == ShaderStageFragment));
 
     auto zero  = ConstantFP::get(Type::getFloatTy(*m_context), 0.0);
     auto one   = ConstantFP::get(Type::getFloatTy(*m_context), 1.0);
@@ -1072,12 +1072,12 @@ void PatchInOutImportExport::visitReturnInst(
         }
 
         // Export gl_ClipDistance[] and gl_CullDistance[] before entry-point returns
-        if ((clipDistanceCount > 0) || (cullDistanceCount > 0))
+        if (clipDistanceCount > 0 || cullDistanceCount > 0)
         {
             assert(clipDistanceCount + cullDistanceCount <= MaxClipCullDistanceCount);
 
-            assert((clipDistanceCount == 0) || ((clipDistanceCount > 0) && (m_clipDistance )));
-            assert((cullDistanceCount == 0) || ((cullDistanceCount > 0) && (m_cullDistance )));
+            assert(clipDistanceCount == 0 || (clipDistanceCount > 0 && m_clipDistance ));
+            assert(cullDistanceCount == 0 || (cullDistanceCount > 0 && m_cullDistance ));
 
             // Extract elements of gl_ClipDistance[] and gl_CullDistance[]
             std::vector<Value*> clipDistance;
@@ -1144,7 +1144,7 @@ void PatchInOutImportExport::visitReturnInst(
             }
 
             // NOTE: We have to export gl_ClipDistance[] or gl_CullDistancep[] via generic outputs as well.
-            assert((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment));
+            assert(nextStage == ShaderStageInvalid || nextStage == ShaderStageFragment);
 
             bool hasClipCullExport = true;
             if (nextStage == ShaderStageFragment)
@@ -1152,7 +1152,7 @@ void PatchInOutImportExport::visitReturnInst(
                 const auto& nextBuiltInUsage =
                     m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
 
-                hasClipCullExport = ((nextBuiltInUsage.clipDistance > 0) || (nextBuiltInUsage.cullDistance > 0));
+                hasClipCullExport = (nextBuiltInUsage.clipDistance > 0 || nextBuiltInUsage.cullDistance > 0);
 
                 if (hasClipCullExport)
                 {
@@ -1297,14 +1297,14 @@ void PatchInOutImportExport::visitReturnInst(
             }
         }
         // NOTE: If multi-view is enabled, always do exporting for gl_Layer.
-        if ((m_gfxIp.major <= 8) && enableMultiView)
+        if (m_gfxIp.major <= 8 && enableMultiView)
         {
             assert(m_layer );
             addExportInstForBuiltInOutput(m_layer, BuiltInLayer, insertPos);
         }
 
         // Export gl_Layer and gl_ViewportIndex before entry-point returns
-        if ((m_gfxIp.major >= 9) && (useLayer || useViewportIndex))
+        if (m_gfxIp.major >= 9 && (useLayer || useViewportIndex))
         {
             Value* viewportIndexAndLayer = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
 
@@ -1487,7 +1487,7 @@ void PatchInOutImportExport::visitReturnInst(
     }
     else if (m_shaderStage == ShaderStageGeometry)
     {
-        if ((!m_pipelineState->isGsOnChip()) && (m_gfxIp.major >= 10))
+        if (!m_pipelineState->isGsOnChip() && m_gfxIp.major >= 10)
         {
             // NOTE: This is a workaround because backend compiler does not provide s_waitcnt_vscnt intrinsic, so we
             // use fence release to generate s_waitcnt vmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
@@ -1505,7 +1505,7 @@ void PatchInOutImportExport::visitReturnInst(
     }
     else if (m_shaderStage == ShaderStageFragment)
     {
-        if ((m_fragDepth ) || (m_fragStencilRef ) || (m_sampleMask ))
+        if (m_fragDepth || m_fragStencilRef || m_sampleMask )
         {
             auto& builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
             Value* fragDepth = undef;
@@ -1600,8 +1600,8 @@ void PatchInOutImportExport::visitReturnInst(
 
         // NOTE: GFX10 can allow no dummy export when the fragment shader does not have discard operation
         // or ROV (Raster-ordered views)
-        resUsage->inOutUsage.fs.dummyExport = ((m_gfxIp.major < 10) || resUsage->builtInUsage.fs.discard);
-        if ((!m_lastExport ) && resUsage->inOutUsage.fs.dummyExport)
+        resUsage->inOutUsage.fs.dummyExport = (m_gfxIp.major < 10 || resUsage->builtInUsage.fs.discard);
+        if (!m_lastExport && resUsage->inOutUsage.fs.dummyExport)
         {
             Value* args[] = {
                 ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_MRT_0),  // tgt
@@ -1669,7 +1669,7 @@ Value* PatchInOutImportExport::patchTcsGenericInputImport(
     Value*       vertexIdx,      // [in] Input array outermost index used for vertex indexing
     Instruction* insertPos)      // [in] Where to insert the patch instruction
 {
-    assert((compIdx ) && (vertexIdx ));
+    assert(compIdx && vertexIdx );
 
     auto ldsOffset = calcLdsOffsetForTcsInput(inputTy, location, locOffset, compIdx, vertexIdx, insertPos);
     return readValueFromLds(false, inputTy, ldsOffset, insertPos);
@@ -1715,7 +1715,7 @@ Value* PatchInOutImportExport::patchGsGenericInputImport(
         inputTy = VectorType::get(Type::getFloatTy(*m_context), compCount * 2);
     }
     else
-        assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+        assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
 
     Value* input = loadValueFromEsGsRing(inputTy, location, compIdx, vertexIdx, insertPos);
 
@@ -1750,7 +1750,7 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
     auto& interpInfo = resUsage->inOutUsage.fs.interpInfo;
 
-    const unsigned locCount = (inputTy->getPrimitiveSizeInBits() / 8 > SizeOfVec4) ? 2 : 1;
+    const unsigned locCount = inputTy->getPrimitiveSizeInBits() / 8 > SizeOfVec4 ? 2 : 1;
     while (interpInfo.size() <= location + locCount - 1)
         interpInfo.push_back(InvalidFsInterpInfo);
     interpInfo[location] =
@@ -1780,7 +1780,7 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
     Value* jCoord  = nullptr;
 
     // Not "flat" and "custom" interpolation
-    if ((interpMode != InOutInfo::InterpModeFlat) && (interpMode != InOutInfo::InterpModeCustom))
+    if (interpMode != InOutInfo::InterpModeFlat && interpMode != InOutInfo::InterpModeCustom)
     {
         auto ij = auxInterpValue;
         if (!ij )
@@ -1831,9 +1831,9 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
 
     const unsigned compCout = inputTy->isVectorTy() ? inputTy->getVectorNumElements() : 1;
     const unsigned bitWidth = inputTy->getScalarSizeInBits();
-    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
-    const unsigned numChannels = ((bitWidth == 64) ? 2 : 1) * compCout;
+    const unsigned numChannels = (bitWidth == 64 ? 2 : 1) * compCout;
 
     Type* interpTy = nullptr;
     if (bitWidth == 8)
@@ -1864,9 +1864,9 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
     {
         Value* compValue = nullptr;
 
-        if ((interpMode != InOutInfo::InterpModeFlat) && (interpMode != InOutInfo::InterpModeCustom))
+        if (interpMode != InOutInfo::InterpModeFlat && interpMode != InOutInfo::InterpModeCustom)
         {
-            assert((basicTy->isHalfTy() || basicTy->isFloatTy()) && (numChannels <= 4));
+            assert((basicTy->isHalfTy() || basicTy->isFloatTy()) && numChannels <= 4);
             (void(basicTy)); // unused
 
             if (bitWidth == 16)
@@ -1957,7 +1957,7 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
             Value* args[] = {
                 ConstantInt::get(Type::getInt32Ty(*m_context), interpParam),           // param
                 ConstantInt::get(Type::getInt32Ty(*m_context), i % 4),                 // attr_chan
-                (locOffset ) ?
+                locOffset ?
                     loc :
                     ConstantInt::get(Type::getInt32Ty(*m_context), location + i / 4),  // attr
                 primMask                                                               // m0
@@ -2056,7 +2056,7 @@ void PatchInOutImportExport::patchVsGenericOutputExport(
                 output = new BitCastInst(output, outputTy, "", insertPos);
             }
             else
-                assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+                assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
 
             storeValueToEsGsRing(output, location, compIdx, insertPos);
         }
@@ -2107,7 +2107,7 @@ void PatchInOutImportExport::patchTesGenericOutputExport(
             output = new BitCastInst(output, outputTy, "", insertPos);
         }
         else
-            assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+            assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
 
         storeValueToEsGsRing(output, location, compIdx, insertPos);
     }
@@ -2141,13 +2141,13 @@ void PatchInOutImportExport::patchGsGenericOutputExport(
         output = new BitCastInst(output, outputTy, "", insertPos);
     }
     else
-        assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+        assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
 
     const unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() : 1;
     // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD to DWORD and
     // store DWORD to GS-VS ring. So for 8-bit/16-bit data type, the actual byte size is based on number of DWORDs.
     unsigned byteSize = (outputTy->getScalarSizeInBits() / 8) * compCount;
-    if ((bitWidth == 8) || (bitWidth == 16))
+    if (bitWidth == 8 || bitWidth == 16)
         byteSize *= (32 / bitWidth);
 
     assert(compIdx <= 4);
@@ -2173,7 +2173,7 @@ void PatchInOutImportExport::patchFsGenericOutputExport(
     Type* outputTy = output->getType();
 
     const unsigned bitWidth = outputTy->getScalarSizeInBits();
-    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
+    assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
     (void(bitWidth)); // unused
 
     auto compTy = outputTy->isVectorTy() ? outputTy->getVectorElementType() : outputTy;
@@ -2759,7 +2759,7 @@ Value* PatchInOutImportExport::patchFsBuiltInInputImport(
                 assert(inOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
                             inOutUsage.builtInInputLocMap.end());
                 loc = inOutUsage.builtInInputLocMap[BuiltInClipDistance];
-                locCount = (builtInUsage.clipDistance > 4) ? 2 : 1;
+                locCount = builtInUsage.clipDistance > 4 ? 2 : 1;
                 startChannel = 0;
             }
             else
@@ -2769,7 +2769,7 @@ Value* PatchInOutImportExport::patchFsBuiltInInputImport(
                 assert(inOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
                             inOutUsage.builtInInputLocMap.end());
                 loc = inOutUsage.builtInInputLocMap[BuiltInCullDistance];
-                locCount = (builtInUsage.clipDistance + builtInUsage.cullDistance > 4) ? 2 : 1;
+                locCount = builtInUsage.clipDistance + builtInUsage.cullDistance > 4 ? 2 : 1;
                 startChannel = builtInUsage.clipDistance % 4;
             }
 
@@ -3450,7 +3450,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
             const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
 
             // NOTE: Only last non-fragment shader stage has to export the value of gl_Layer.
-            if ((!m_hasTs) && (!m_hasGs) && (!static_cast<bool>(enableMultiView)))
+            if (!m_hasTs && !m_hasGs && !static_cast<bool>(enableMultiView))
             {
                 if (m_gfxIp.major <= 8)
                     addExportInstForBuiltInOutput(output, builtInId, insertPos);
@@ -3469,7 +3469,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
                 return;
 
             // NOTE: Only last non-fragment shader stage has to export the value of gl_ViewportIndex.
-            if ((!m_hasTs) && (!m_hasGs))
+            if (!m_hasTs && !m_hasGs)
             {
                 if (m_gfxIp.major <= 8)
                     addExportInstForBuiltInOutput(output, builtInId, insertPos);
@@ -3538,8 +3538,8 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(
     case BuiltInClipDistance:
     case BuiltInCullDistance:
         {
-            if (((builtInId == BuiltInClipDistance) && (builtInUsage.clipDistance == 0)) ||
-                ((builtInId == BuiltInCullDistance) && (builtInUsage.cullDistance == 0)))
+            if ((builtInId == BuiltInClipDistance && builtInUsage.clipDistance == 0) ||
+                (builtInId == BuiltInCullDistance && builtInUsage.cullDistance == 0))
                 return;
 
             assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
@@ -3836,7 +3836,7 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(
             const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
 
             // NOTE: Only last non-fragment shader stage has to export the value of gl_Layer.
-            if ((!m_hasGs) && (!static_cast<bool>(enableMultiView)))
+            if (!m_hasGs && !static_cast<bool>(enableMultiView))
             {
                 if (m_gfxIp.major <= 8)
                     addExportInstForBuiltInOutput(output, builtInId, insertPos);
@@ -4006,7 +4006,7 @@ void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(
         {
             const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
 
-            if ((m_gfxIp.major <= 8) && (!static_cast<bool>(enableMultiView)))
+            if (m_gfxIp.major <= 8 && !static_cast<bool>(enableMultiView))
                 addExportInstForBuiltInOutput(output, builtInId, insertPos);
             else
             {
@@ -4045,9 +4045,9 @@ void PatchInOutImportExport::patchXfbOutputExport(
     unsigned      xfbExtraOffset,     // Transform feedback extra offset, passed from aggregate type
     Instruction*  insertPos)         // [in] Where to insert the store instruction
 {
-    assert((m_shaderStage == ShaderStageVertex) ||
-                (m_shaderStage == ShaderStageTessEval) ||
-                (m_shaderStage == ShaderStageCopyShader));
+    assert(m_shaderStage == ShaderStageVertex ||
+                m_shaderStage == ShaderStageTessEval ||
+                m_shaderStage == ShaderStageCopyShader);
 
     Value* streamOutBufDesc = m_pipelineSysValues.get(m_entryPoint)->getStreamOutBufDesc(xfbBuffer);
 
@@ -4068,7 +4068,7 @@ void PatchInOutImportExport::patchXfbOutputExport(
         outputTy = VectorType::get(Type::getFloatTy(*m_context), compCount);
         output = new BitCastInst(output, outputTy, "", insertPos);
     }
-    assert((bitWidth == 16) || (bitWidth == 32));
+    assert(bitWidth == 16 || bitWidth == 32);
 
     if (compCount == 8)
     {
@@ -4145,7 +4145,7 @@ void PatchInOutImportExport::patchXfbOutputExport(
     {
         // 16vec4, 16vec2, 16scalar
         // vec4, vec2, scalar
-        if (outputTy->isVectorTy() && (compCount == 1))
+        if (outputTy->isVectorTy() && compCount == 1)
         {
             // NOTE: We translate vec1 to scalar. SPIR-V translated from DX has such usage.
             output = ExtractElementInst::Create(output,
@@ -4245,7 +4245,7 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(
     assert(compCount <= 4);
 
     const uint64_t bitWidth = storeTy->getScalarSizeInBits();
-    assert((bitWidth == 16) || (bitWidth == 32));
+    assert(bitWidth == 16 || bitWidth == 32);
 
     unsigned format = 0;
     std::string callName = "llvm.amdgcn.struct.tbuffer.store.";
@@ -4256,20 +4256,20 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(
     {
     case 1:
         {
-            formatOprd.bits.dfmt = (bitWidth == 32) ? BUF_DATA_FORMAT_32 : BUF_DATA_FORMAT_16;
-            callName += (bitWidth == 32) ? "f32" : "f16";
+            formatOprd.bits.dfmt = bitWidth == 32 ? BUF_DATA_FORMAT_32 : BUF_DATA_FORMAT_16;
+            callName += bitWidth == 32 ? "f32" : "f16";
             break;
         }
     case 2:
         {
-            formatOprd.bits.dfmt = (bitWidth == 32) ? BUF_DATA_FORMAT_32_32 : BUF_DATA_FORMAT_16_16;
-            callName += (bitWidth == 32) ? "v2f32" : "v2f16";
+            formatOprd.bits.dfmt = bitWidth == 32 ? BUF_DATA_FORMAT_32_32 : BUF_DATA_FORMAT_16_16;
+            callName += bitWidth == 32 ? "v2f32" : "v2f16";
             break;
         }
     case 4:
         {
-            formatOprd.bits.dfmt = (bitWidth == 32) ? BUF_DATA_FORMAT_32_32_32_32 : BUF_DATA_FORMAT_16_16_16_16;
-            callName += (bitWidth == 32) ? "v4f32" : "v4f16";
+            formatOprd.bits.dfmt = bitWidth == 32 ? BUF_DATA_FORMAT_32_32_32_32 : BUF_DATA_FORMAT_16_16_16_16;
+            callName += bitWidth == 32 ? "v4f32" : "v4f16";
             break;
         }
     default:
@@ -4284,11 +4284,11 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(
     if (m_gfxIp.major >= 10)
     {
         if (compCount == 4)
-            format = (bitWidth == 32) ? BUF_FORMAT_32_32_32_32_FLOAT : BUF_FORMAT_16_16_16_16_FLOAT;
+            format = bitWidth == 32 ? BUF_FORMAT_32_32_32_32_FLOAT : BUF_FORMAT_16_16_16_16_FLOAT;
         else if (compCount == 2)
-            format = (bitWidth == 32) ? BUF_FORMAT_32_32_FLOAT : BUF_FORMAT_16_16_FLOAT;
+            format = bitWidth == 32 ? BUF_FORMAT_32_32_FLOAT : BUF_FORMAT_16_16_FLOAT;
         else if (compCount == 1)
-            format = (bitWidth == 32) ? BUF_FORMAT_32_FLOAT : BUF_FORMAT_16_FLOAT;
+            format = bitWidth == 32 ? BUF_FORMAT_32_FLOAT : BUF_FORMAT_16_FLOAT;
         else
             llvm_unreachable("Should never be called!");
     }
@@ -4365,7 +4365,7 @@ unsigned PatchInOutImportExport::combineBufferStore(
     for (; compCount > 0; compCount--)
     {
         // GFX6 does not support 3-component combination
-        if ((m_gfxIp.major == 6) && (compCount == 3))
+        if (m_gfxIp.major == 6 && compCount == 3)
             continue;
 
         if (startIdx + compCount <= storeValues.size())
@@ -4463,7 +4463,7 @@ unsigned PatchInOutImportExport::combineBufferLoad(
     for (; compCount > 0; compCount--)
     {
         // GFX6 does not support 3-component combination
-        if ((m_gfxIp.major == 6) && (compCount == 3))
+        if (m_gfxIp.major == 6 && compCount == 3)
             continue;
 
         if (startIdx + compCount <= loadValues.size())
@@ -4522,11 +4522,11 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(
     assert(compCount <= 4);
 
     const uint64_t bitWidth = storeTy->getScalarSizeInBits();
-    assert((bitWidth == 16) || (bitWidth == 32));
+    assert(bitWidth == 16 || bitWidth == 32);
 
     if (storeTy->isIntOrIntVectorTy())
     {
-        Type* bitCastTy = (bitWidth == 32) ? Type::getFloatTy(*m_context) : Type::getHalfTy(*m_context);
+        Type* bitCastTy = bitWidth == 32 ? Type::getFloatTy(*m_context) : Type::getHalfTy(*m_context);
         if (compCount > 1)
             bitCastTy = VectorType::get(bitCastTy, compCount);
         storeValue = new BitCastInst(storeValue, bitCastTy, "", insertPos);
@@ -4628,7 +4628,7 @@ void PatchInOutImportExport::storeValueToEsGsRing(
 
     const uint64_t bitWidth = elemTy->getScalarSizeInBits();
     assert((elemTy->isFloatingPointTy() || elemTy->isIntegerTy()) &&
-                ((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32)));
+                (bitWidth == 8 || bitWidth == 16 || bitWidth == 32));
 
     if (storeTy->isArrayTy() || storeTy->isVectorTy())
     {
@@ -4653,7 +4653,7 @@ void PatchInOutImportExport::storeValueToEsGsRing(
     }
     else
     {
-        if ((bitWidth == 8) || (bitWidth == 16))
+        if (bitWidth == 8 || bitWidth == 16)
         {
             if (storeTy->isFloatingPointTy())
             {
@@ -4683,7 +4683,7 @@ void PatchInOutImportExport::storeValueToEsGsRing(
 
         auto ringOffset = calcEsGsRingOffsetForOutput(location, compIdx, esGsOffset, insertPos);
 
-        if (m_pipelineState->isGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9+
+        if (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9)   // ES -> GS ring is always on-chip on GFX9+
         {
             Value* idxs[] = {
                 ConstantInt::get(Type::getInt32Ty(*m_context), 0),
@@ -4736,7 +4736,7 @@ Value* PatchInOutImportExport::loadValueFromEsGsRing(
 
     const uint64_t bitWidth = elemTy->getScalarSizeInBits();
     assert((elemTy->isFloatingPointTy() || elemTy->isIntegerTy()) &&
-                ((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32)));
+                (bitWidth == 8 || bitWidth == 16 || bitWidth == 32));
 
     Value* loadValue = UndefValue::get(loadTy);
 
@@ -4768,7 +4768,7 @@ Value* PatchInOutImportExport::loadValueFromEsGsRing(
     else
     {
         Value* ringOffset = calcEsGsRingOffsetForInput(location, compIdx, vertexIdx, insertPos);
-        if (m_pipelineState->isGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
+        if (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9)   // ES -> GS ring is always on-chip on GFX9
         {
             Value* idxs[] = {
                 ConstantInt::get(Type::getInt32Ty(*m_context), 0),
@@ -4851,7 +4851,7 @@ void PatchInOutImportExport::storeValueToGsVsRing(
 
     const unsigned bitWidth = elemTy->getScalarSizeInBits();
     assert((elemTy->isFloatingPointTy() || elemTy->isIntegerTy()) &&
-                ((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32)));
+                (bitWidth == 8 || bitWidth == 16 || bitWidth == 32));
 
     if (m_pipelineState->getNggControl()->enableNgg)
     {
@@ -4891,7 +4891,7 @@ void PatchInOutImportExport::storeValueToGsVsRing(
     }
     else
     {
-        if ((bitWidth == 8) || (bitWidth == 16))
+        if (bitWidth == 8 || bitWidth == 16)
         {
             // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD
             // to DWORD. This is because copy shader does not know the actual data type. It only generates output
@@ -4985,7 +4985,7 @@ Value* PatchInOutImportExport::calcEsGsRingOffsetForOutput(
     Instruction*    insertPos)  // [in] Where to insert the instruction
 {
     Value* ringOffset = nullptr;
-    if (m_pipelineState->isGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
+    if (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9)   // ES -> GS ring is always on-chip on GFX9
     {
         // ringOffset = esGsOffset + threadId * esGsRingItemSize + location * 4 + compIdx
 
@@ -5031,7 +5031,7 @@ Value* PatchInOutImportExport::calcEsGsRingOffsetForInput(
     Value* ringOffset = nullptr;
     auto esGsOffsets = m_pipelineSysValues.get(m_entryPoint)->getEsGsOffsets();
 
-    if (m_pipelineState->isGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
+    if (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9)   // ES -> GS ring is always on-chip on GFX9
     {
         Value* vertexOffset = ExtractElementInst::Create(esGsOffsets,
                                                           vertexIdx,
@@ -5168,17 +5168,17 @@ Value* PatchInOutImportExport::readValueFromLds(
     // Read DWORDs from LDS
     const unsigned compCount = readTy->isVectorTy() ? readTy->getVectorNumElements() : 1;
     const unsigned bitWidth = readTy->getScalarSizeInBits();
-    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
-    const unsigned numChannels = compCount * ((bitWidth == 64) ? 2 : 1);
+    assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
+    const unsigned numChannels = compCount * (bitWidth == 64 ? 2 : 1);
 
     std::vector<Value*> loadValues(numChannels);
 
-    const bool isTcsOutput = (isOutput && (m_shaderStage == ShaderStageTessControl));
-    const bool isTesInput = ((!isOutput) && (m_shaderStage == ShaderStageTessEval));
+    const bool isTcsOutput = (isOutput && m_shaderStage == ShaderStageTessControl);
+    const bool isTesInput = (!isOutput && m_shaderStage == ShaderStageTessEval);
 
     if (m_pipelineState->isTessOffChip() && (isTcsOutput || isTesInput)) // Read from off-chip LDS buffer
     {
-        const auto& offChipLdsBaseArgIdx = (m_shaderStage == ShaderStageTessEval) ?
+        const auto& offChipLdsBaseArgIdx = m_shaderStage == ShaderStageTessEval ?
             m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs.tes.offChipLdsBase :
             m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs.tcs.offChipLdsBase;
 
@@ -5251,9 +5251,9 @@ Value* PatchInOutImportExport::readValueFromLds(
     Value* castValue = nullptr;
     if (numChannels > 1)
     {
-        auto intTy = ((bitWidth == 32) || (bitWidth == 64)) ?
+        auto intTy = bitWidth == 32 || bitWidth == 64 ?
                           Type::getInt32Ty(*m_context) :
-                          ((bitWidth == 16) ? Type::getInt16Ty(*m_context) : Type::getInt8Ty(*m_context));
+                          (bitWidth == 16 ? Type::getInt16Ty(*m_context) : Type::getInt8Ty(*m_context));
         auto castTy = VectorType::get(intTy, numChannels);
         castValue = UndefValue::get(castTy);
 
@@ -5287,14 +5287,14 @@ void PatchInOutImportExport::writeValueToLds(
 
     const unsigned compCout = writeTy->isVectorTy() ? writeTy->getVectorNumElements() : 1;
     const unsigned bitWidth = writeTy->getScalarSizeInBits();
-    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
-    const unsigned numChannels = compCout * ((bitWidth == 64) ? 2 : 1);
+    assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
+    const unsigned numChannels = compCout * (bitWidth == 64 ? 2 : 1);
 
     // Cast write value to <n x i32> vector
-    Type* intTy = ((bitWidth == 32) || (bitWidth == 64)) ?
+    Type* intTy = bitWidth == 32 || bitWidth == 64 ?
                       Type::getInt32Ty(*m_context) :
-                      ((bitWidth == 16) ? Type::getInt16Ty(*m_context) : Type::getInt8Ty(*m_context));
-    Type* castTy = (numChannels > 1) ? cast<Type>(VectorType::get(intTy, numChannels)) : intTy;
+                      (bitWidth == 16 ? Type::getInt16Ty(*m_context) : Type::getInt8Ty(*m_context));
+    Type* castTy = numChannels > 1 ? cast<Type>(VectorType::get(intTy, numChannels)) : intTy;
     Value* castValue = new BitCastInst(writeValue, castTy, "", insertPos);
 
     // Extract store values (DWORDs) from <n x i8>, <n x i16> or <n x i32> vector
@@ -5308,7 +5308,7 @@ void PatchInOutImportExport::writeValueToLds(
                                                         "",
                                                         insertPos);
 
-            if ((bitWidth == 8) || (bitWidth == 16))
+            if (bitWidth == 8 || bitWidth == 16)
                 storeValues[i] = new ZExtInst(storeValues[i], Type::getInt32Ty(*m_context), "", insertPos);
         }
     }
@@ -5316,11 +5316,11 @@ void PatchInOutImportExport::writeValueToLds(
     {
         storeValues[0] = castValue;
 
-        if ((bitWidth == 8) || (bitWidth == 16))
+        if (bitWidth == 8 || bitWidth == 16)
             storeValues[0] = new ZExtInst(storeValues[0], Type::getInt32Ty(*m_context), "", insertPos);
     }
 
-    if (m_pipelineState->isTessOffChip() && (m_shaderStage == ShaderStageTessControl))     // Write to off-chip LDS buffer
+    if (m_pipelineState->isTessOffChip() && m_shaderStage == ShaderStageTessControl)     // Write to off-chip LDS buffer
     {
         auto& entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs.tcs;
 
@@ -5425,7 +5425,7 @@ Value* PatchInOutImportExport::calcTessFactorOffset(
             unsigned elemIdx = cast<ConstantInt>(elemIdxVal)->getZExtValue();
             if (elemIdx < tessFactorCount)
             {
-                if ((primitiveMode == PrimitiveMode::Isolines) && isOuter)
+                if (primitiveMode == PrimitiveMode::Isolines && isOuter)
                 {
                     // NOTE: In case of the isoline,  hardware wants two tessellation factor: the first is detail
                     // TF, the second is density TF. The order is reversed, different from GLSL spec.
@@ -5444,7 +5444,7 @@ Value* PatchInOutImportExport::calcTessFactorOffset(
         else
         {
             // Dynamic element indexing
-            if ((primitiveMode == PrimitiveMode::Isolines) && isOuter)
+            if (primitiveMode == PrimitiveMode::Isolines && isOuter)
             {
                 // NOTE: In case of the isoline,  hardware wants two tessellation factor: the first is detail
                 // TF, the second is density TF. The order is reversed, different from GLSL spec.
@@ -5701,7 +5701,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForVsOutput(
     Value* attribOffset = ConstantInt::get(Type::getInt32Ty(*m_context), location * 4);
 
     const unsigned bitWidth = outputTy->getScalarSizeInBits();
-    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
     if (bitWidth == 64)
     {
@@ -5756,7 +5756,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTcsInput(
     if (compIdx )
     {
         const unsigned bitWidth = inputTy->getScalarSizeInBits();
-        assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+        assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
         if (bitWidth == 64)
         {
@@ -5821,7 +5821,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTcsOutput(
     if (compIdx )
     {
         const unsigned bitWidth = outputTy->getScalarSizeInBits();
-        assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+        assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
         if (bitWidth == 64)
         {
@@ -5910,7 +5910,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTesInput(
     if (compIdx )
     {
         const unsigned bitWidth = inputTy->getScalarSizeInBits();
-        assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+        assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
         if (bitWidth == 64)
         {
@@ -5991,7 +5991,7 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(
 
     // NOTE: Performance analysis shows that 16 patches per thread group is an optimal upper-bound. The value is only
     // an experimental number. For GFX9. 64 is an optimal number instead.
-    const unsigned optimalPatchCountPerThreadGroup = (m_gfxIp.major >= 9) ? 64 : 16;
+    const unsigned optimalPatchCountPerThreadGroup = m_gfxIp.major >= 9 ? 64 : 16;
 
     patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, optimalPatchCountPerThreadGroup);
 
@@ -6065,9 +6065,9 @@ void PatchInOutImportExport::addExportInstForGenericOutput(
 {
     // Check if the shader stage is valid to use "exp" instruction to export output
     const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
-    const bool useExpInst = (((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval) ||
-                              (m_shaderStage == ShaderStageCopyShader)) &&
-                             ((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment)));
+    const bool useExpInst = ((m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
+                              m_shaderStage == ShaderStageCopyShader) &&
+                             (nextStage == ShaderStageInvalid || nextStage == ShaderStageFragment));
     assert(useExpInst);
     (void(useExpInst)); // unused
 
@@ -6077,13 +6077,13 @@ void PatchInOutImportExport::addExportInstForGenericOutput(
 
     const unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() : 1;
     const unsigned bitWidth  = outputTy->getScalarSizeInBits();
-    assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
     // Convert the output value to floating-point export value
     Value* exportInst = nullptr;
-    const unsigned numChannels = (bitWidth == 64) ? compCount * 2 : compCount;
-    unsigned startChannel = (bitWidth == 64) ? compIdx * 2 : compIdx;
-    Type* exportTy = (numChannels > 1) ? VectorType::get(Type::getFloatTy(*m_context), numChannels) :
+    const unsigned numChannels = bitWidth == 64 ? compCount * 2 : compCount;
+    unsigned startChannel = bitWidth == 64 ? compIdx * 2 : compIdx;
+    Type* exportTy = numChannels > 1 ? VectorType::get(Type::getFloatTy(*m_context), numChannels) :
                                           Type::getFloatTy(*m_context);
 
     if (outputTy != exportTy)
@@ -6188,7 +6188,7 @@ void PatchInOutImportExport::addExportInstForGenericOutput(
     {
         // We have to do exporting twice for this output
         assert(startChannel == 0); // Other values are disallowed according to GLSL spec
-        assert((numChannels == 6) || (numChannels == 8));
+        assert(numChannels == 6 || numChannels == 8);
 
         // Do the first exporting
         args.clear();
@@ -6239,9 +6239,9 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(
 {
     // Check if the shader stage is valid to use "exp" instruction to export output
     const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
-    const bool useExpInst = (((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval) ||
-                              (m_shaderStage == ShaderStageCopyShader)) &&
-                             ((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment)));
+    const bool useExpInst = ((m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
+                              m_shaderStage == ShaderStageCopyShader) &&
+                             (nextStage == ShaderStageInvalid || nextStage == ShaderStageFragment));
     assert(useExpInst);
     (void(useExpInst)); // unused
 
@@ -6533,10 +6533,10 @@ WorkgroupLayout PatchInOutImportExport::calculateWorkgroupLayout()
         if (reconfig)
         {
             auto& mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
-            if (((mode.workgroupSizeX % 2) == 0) && ((mode.workgroupSizeY % 2) == 0))
+            if ((mode.workgroupSizeX % 2) == 0 && (mode.workgroupSizeY % 2) == 0)
             {
-                if (((mode.workgroupSizeX > 8) && (mode.workgroupSizeY >= 8)) ||
-                    ((mode.workgroupSizeX >= 8) && (mode.workgroupSizeY > 8)))
+                if ((mode.workgroupSizeX > 8 && mode.workgroupSizeY >= 8) ||
+                    (mode.workgroupSizeX >= 8 && mode.workgroupSizeY > 8))
                 {
                     // If our local size in the X & Y dimensions are greater than 8, we can reconfigure.
                     resUsage.builtInUsage.cs.workgroupLayout = static_cast<unsigned>(WorkgroupLayout::SexagintiQuads);
@@ -6684,7 +6684,7 @@ Value* PatchInOutImportExport::reconfigWorkgroup(
 
     if (offset )
     {
-        if (((mode.workgroupSizeX % 8) == 0) && ((mode.workgroupSizeY % 8) == 0))
+        if ((mode.workgroupSizeX % 8) == 0 && (mode.workgroupSizeY % 8) == 0)
         {
             // Divide by 16.
             div = BinaryOperator::CreateLShr(remainingBits,
@@ -6888,8 +6888,8 @@ Value* PatchInOutImportExport::getInLocalInvocationId(
 
     // If we do not need to configure our workgroup in linear layout and the layout info is not specified, we
     // do the reconfiguration for this workgroup.
-    if ((workgroupLayout != WorkgroupLayout::Unknown) &&
-        (workgroupLayout != WorkgroupLayout::Linear))
+    if (workgroupLayout != WorkgroupLayout::Unknown &&
+        workgroupLayout != WorkgroupLayout::Linear)
         locaInvocatioId = reconfigWorkgroup(locaInvocatioId, insertPos);
     else
     {

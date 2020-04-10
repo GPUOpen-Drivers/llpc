@@ -223,7 +223,7 @@ Value* BuilderImplArith::CreateSMod(
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
     if (divisor->getType()->getScalarType()->isIntegerTy(32) &&
-        (getPipelineState()->getTargetInfo().getGpuWorkarounds().gfx10.disableI32ModToI16Mod))
+        getPipelineState()->getTargetInfo().getGpuWorkarounds().gfx10.disableI32ModToI16Mod)
     {
 
         // NOTE: On some hardware, when the divisor is a literal value and less than 0xFFFF, i32 mod will be
@@ -799,7 +799,7 @@ Value* BuilderImplArith::CreateCrossProduct(
     Value*        y,         // [in] Input value Y
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
-    assert((x->getType() == y->getType()) && (x->getType()->getVectorNumElements() == 3));
+    assert(x->getType() == y->getType() && x->getType()->getVectorNumElements() == 3);
 
     Value* left = UndefValue::get(x->getType());
     Value* right = UndefValue::get(x->getType());
@@ -931,7 +931,7 @@ Value* BuilderImplArith::CreateFClamp(
     // But we can only do this if we do not need NaN preservation.
     Value* result = nullptr;
     if (getFastMathFlags().noNaNs() && (x->getType()->getScalarType()->isFloatTy() ||
-        ((getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9) && x->getType()->getScalarType()->isHalfTy())))
+        (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9 && x->getType()->getScalarType()->isHalfTy())))
     {
         result = scalarize(x,
                             minVal,
@@ -1071,7 +1071,7 @@ Value* BuilderImplArith::CreateFMid3(
     // But we can only do this if we do not need NaN preservation.
     Value* result = nullptr;
     if (getFastMathFlags().noNaNs() && (value1->getType()->getScalarType()->isFloatTy() ||
-        ((getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9) && value1->getType()->getScalarType()->isHalfTy())))
+        (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9 && value1->getType()->getScalarType()->isHalfTy())))
     {
         result = scalarize(value1,
                             value2,
@@ -1326,7 +1326,7 @@ Value* BuilderImplArith::canonicalize(
        destTy->getScalarType()->isFloatTy() ? shaderMode.fp32DenormMode :
        destTy->getScalarType()->isDoubleTy() ? shaderMode.fp64DenormMode :
        FpDenormMode::DontCare;
-    if ((denormMode == FpDenormMode::FlushOut) || (denormMode == FpDenormMode::FlushInOut))
+    if (denormMode == FpDenormMode::FlushOut || denormMode == FpDenormMode::FlushInOut)
     {
         // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
         value = CreateUnaryIntrinsic(Intrinsic::canonicalize, value);

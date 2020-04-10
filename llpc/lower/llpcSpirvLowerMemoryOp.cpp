@@ -127,7 +127,7 @@ void SpirvLowerMemoryOp::visitExtractElementInst(
         auto loadPtr = loadInst->getOperand(0);
         auto addrSpace = loadPtr->getType()->getPointerAddressSpace();
 
-        if ((addrSpace == SPIRAS_Local) || (addrSpace == SPIRAS_Uniform))
+        if (addrSpace == SPIRAS_Local || addrSpace == SPIRAS_Uniform)
         {
             auto srcTy = src->getType();
             auto castTy = ArrayType::get(srcTy->getVectorElementType(), srcTy->getVectorNumElements());
@@ -217,7 +217,7 @@ bool SpirvLowerMemoryOp::needExpandDynamicIndex(
     if (ptrVal->getType()->getPointerAddressSpace() != SPIRAS_Private)
         allowExpand = false;
 
-    for (unsigned i = 1, operandCount = getElemPtr->getNumOperands(); allowExpand && (i < operandCount); ++i)
+    for (unsigned i = 1, operandCount = getElemPtr->getNumOperands(); allowExpand && i < operandCount; ++i)
     {
         auto index = getElemPtr->getOperand(i);
         if (!isa<Constant>(index))
@@ -277,7 +277,7 @@ bool SpirvLowerMemoryOp::needExpandDynamicIndex(
         // Skip expand if the user of "getelementptr" is neither "load" nor "store"
         for (auto user : getElemPtr->users())
         {
-            if ((!isa<LoadInst>(user)) && (!isa<StoreInst>(user)))
+            if (!isa<LoadInst>(user) && !isa<StoreInst>(user))
             {
                 allowExpand = false;
                 break;

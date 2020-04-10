@@ -86,8 +86,8 @@ void SpirvLowerAccessChain::visitGetElementPtrInst(
     // NOTE: Here, we try to coalesce chained "getelementptr" instructions (created from multi-level access chain).
     // Because the metadata is always decorated on top-level pointer value (actually a global variable).
     const unsigned addrSpace = getElemPtrInst.getType()->getPointerAddressSpace();
-    if ((addrSpace == SPIRAS_Private) ||
-        (addrSpace == SPIRAS_Input) || (addrSpace == SPIRAS_Output))
+    if (addrSpace == SPIRAS_Private ||
+        addrSpace == SPIRAS_Input || addrSpace == SPIRAS_Output)
         tryToCoalesceChain(&getElemPtrInst, addrSpace);
 }
 
@@ -124,7 +124,7 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::tryToCoalesceChain(
             continue;
         }
         auto pConst = dyn_cast<ConstantExpr>(next);
-        if ((!pConst ) || (pConst->getOpcode() != Instruction::GetElementPtr))
+        if (!pConst || pConst->getOpcode() != Instruction::GetElementPtr)
             break;
         ptrVal = cast<User>(next);
     }

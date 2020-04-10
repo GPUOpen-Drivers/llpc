@@ -157,7 +157,7 @@ void PatchDescriptorLoad::processDescriptorGetPtr(
     const ResourceNode* topNode = nullptr;
     const ResourceNode* node = nullptr;
     std::tie(topNode, node) = m_pipelineState->findResourceNode(resType, descSet, binding);
-    if ((!node ) && (resType == ResourceNodeType::DescriptorFmask) && shadow)
+    if (!node && resType == ResourceNodeType::DescriptorFmask && shadow)
     {
         std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorResource,
                                                                        descSet,
@@ -199,7 +199,7 @@ Value* PatchDescriptorLoad::getDescPtrAndStride(
     case ResourceNodeType::DescriptorBuffer:
     case ResourceNodeType::DescriptorTexelBuffer:
         byteSize = DescriptorSizeBuffer;
-        if ((node ) && (node->type == ResourceNodeType::DescriptorBufferCompact))
+        if (node && node->type == ResourceNodeType::DescriptorBufferCompact)
             byteSize = DescriptorSizeBufferCompact;
         stride = builder.getInt32(byteSize / 4);
         break;
@@ -246,7 +246,7 @@ Value* PatchDescriptorLoad::getDescPtrAndStride(
     }
 
     Value* descPtr = nullptr;
-    if ((node ) && (node->immutableValue ) && (resType == ResourceNodeType::DescriptorSampler))
+    if (node && node->immutableValue && resType == ResourceNodeType::DescriptorSampler)
     {
         // This is an immutable sampler. Put the immutable value into a static variable and return a pointer
         // to that. For a simple non-variably-indexed immutable sampler not passed through a function call
@@ -305,7 +305,7 @@ Value* PatchDescriptorLoad::getDescPtr(
     Value* descPtr = nullptr;
     // Get the descriptor table pointer.
     auto sysValues = m_pipelineSysValues.get(builder.GetInsertPoint()->getFunction());
-    if ((node ) && (node == topNode))
+    if (node && node == topNode)
     {
         // The descriptor is in the top-level table. Contrary to what used to happen, we just load from
         // the spill table, so we can get a pointer to the descriptor. It gets returned as a pointer
@@ -338,8 +338,8 @@ Value* PatchDescriptorLoad::getDescPtr(
         // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
         // add on the size of the first part.
         unsigned offsetInDwords = node->offsetInDwords;
-        if ((resType == ResourceNodeType::DescriptorSampler) &&
-            (node->type == ResourceNodeType::DescriptorCombinedTexture))
+        if (resType == ResourceNodeType::DescriptorSampler &&
+            node->type == ResourceNodeType::DescriptorCombinedTexture)
             offsetInDwords += DescriptorSizeResource / 4;
         offset = builder.getInt32(offsetInDwords);
     }
@@ -511,7 +511,7 @@ Value* PatchDescriptorLoad::loadBufferDescriptor(
         return UndefValue::get(VectorType::get(builder.getInt32Ty(), 4));
     }
 
-    if ((node == topNode) && (node->type == ResourceNodeType::DescriptorBufferCompact))
+    if (node == topNode && node->type == ResourceNodeType::DescriptorBufferCompact)
     {
         // This is a compact buffer descriptor (only two dwords) in the top-level table. We special-case
         // that to use user data SGPRs directly, if PatchEntryPointMutate managed to fit the value into
@@ -546,7 +546,7 @@ Value* PatchDescriptorLoad::loadBufferDescriptor(
                           /*shadow=*/false,
                           builder);
 
-    if ((node ) && (node->type == ResourceNodeType::PushConst))
+    if (node && node->type == ResourceNodeType::PushConst)
     {
         // Inline buffer.
         return buildInlineBufferDesc(descPtr, builder);
@@ -554,7 +554,7 @@ Value* PatchDescriptorLoad::loadBufferDescriptor(
 
     // Add on the index.
     unsigned dwordStride = DescriptorSizeBuffer / 4;
-    if ((node ) && (node->type == ResourceNodeType::DescriptorBufferCompact))
+    if (node && node->type == ResourceNodeType::DescriptorBufferCompact)
         dwordStride = DescriptorSizeBufferCompact / 4;
     arrayOffset = builder.CreateMul(arrayOffset, builder.getInt32(dwordStride));
     descPtr = builder.CreateGEP(builder.getInt32Ty(), descPtr, arrayOffset);

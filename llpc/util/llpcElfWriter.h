@@ -95,7 +95,7 @@ public:
     int GetSectionIndex(const char* name) const
     {
         auto entry = m_map.find(name);
-        return (entry != m_map.end()) ? entry->second : InvalidValue;
+        return entry != m_map.end() ? entry->second : InvalidValue;
     }
 
     void setSection(unsigned secIndex, SectionBuffer* section);

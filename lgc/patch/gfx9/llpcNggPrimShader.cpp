@@ -91,7 +91,7 @@ Function* NggPrimShader::generate(
     assert(m_gfxIp.major >= 10);
 
     // ES and GS could not be null at the same time
-    assert(((!esEntryPoint ) && (!gsEntryPoint )) == false);
+    assert((!esEntryPoint && !gsEntryPoint ) == false);
 
     Module* module = nullptr;
     if (esEntryPoint )
@@ -161,8 +161,8 @@ FunctionType* NggPrimShader::generatePrimShaderEntryPointType(
                 userDataCount = std::max(tesIntfData->userDataCount, userDataCount);
 
                 assert(tesIntfData->userDataUsage.tes.viewIndex == gsIntfData->userDataUsage.gs.viewIndex);
-                if ((gsIntfData->spillTable.sizeInDwords > 0) &&
-                    (tesIntfData->spillTable.sizeInDwords == 0))
+                if (gsIntfData->spillTable.sizeInDwords > 0 &&
+                    tesIntfData->spillTable.sizeInDwords == 0)
                 {
                     tesIntfData->userDataUsage.spillTable = userDataCount;
                     ++userDataCount;
@@ -177,8 +177,8 @@ FunctionType* NggPrimShader::generatePrimShaderEntryPointType(
                 userDataCount = std::max(vsIntfData->userDataCount, userDataCount);
 
                 assert(vsIntfData->userDataUsage.vs.viewIndex == gsIntfData->userDataUsage.gs.viewIndex);
-                if ((gsIntfData->spillTable.sizeInDwords > 0) &&
-                    (vsIntfData->spillTable.sizeInDwords == 0))
+                if (gsIntfData->spillTable.sizeInDwords > 0 &&
+                    vsIntfData->spillTable.sizeInDwords == 0)
                 {
                     vsIntfData->userDataUsage.spillTable = userDataCount;
                     ++userDataCount;
@@ -339,7 +339,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(
     const bool hasTs = (m_hasTcs || m_hasTes);
 
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
-    assert((waveSize == 32) || (waveSize == 64));
+    assert(waveSize == 32 || waveSize == 64);
 
     const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
 
@@ -1115,11 +1115,11 @@ void NggPrimShader::constructPrimShaderWithoutGs(
         {
             m_builder->SetInsertPoint(writePosDataBlock);
 
-            separateExp = (!resUsage->resourceWrite); // No resource writing
+            separateExp = !resUsage->resourceWrite; // No resource writing
 
             // NOTE: For vertex compaction, we have to run ES for twice (get vertex position data and
             // get other exported data).
-            const auto entryName = (separateExp || vertexCompact) ? lgcName::NggEsEntryVariantPos :
+            const auto entryName = separateExp || vertexCompact ? lgcName::NggEsEntryVariantPos :
                                                                     lgcName::NggEsEntryVariant;
 
             runEsOrEsVariant(module,
@@ -1190,7 +1190,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(
                 // Collect clip/cull distance from exported value
                 for (const auto& expData : expDataSet)
                 {
-                    if ((expData.target == clipCullPos) || (expData.target == clipCullPos + 1))
+                    if (expData.target == clipCullPos || expData.target == clipCullPos + 1)
                     {
                         for (unsigned i = 0; i < 4; ++i)
                         {
@@ -1656,7 +1656,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(
             unsigned expPosCount = 0;
             for (const auto& expData : expDataSet)
             {
-                if ((expData.target >= EXP_TARGET_POS_0) && (expData.target <= EXP_TARGET_POS_4))
+                if (expData.target >= EXP_TARGET_POS_0 && expData.target <= EXP_TARGET_POS_4)
                     ++expPosCount;
             }
 
@@ -1732,7 +1732,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(
 
             for (const auto& expData : expDataSet)
             {
-                if ((expData.target >= EXP_TARGET_POS_0) && (expData.target <= EXP_TARGET_POS_4))
+                if (expData.target >= EXP_TARGET_POS_0 && expData.target <= EXP_TARGET_POS_4)
                 {
                     std::vector<Value*> args;
 
@@ -1800,7 +1800,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(
 
             for (const auto& expData : expDataSet)
             {
-                if ((expData.target >= EXP_TARGET_PARAM_0) && (expData.target <= EXP_TARGET_PARAM_31))
+                if (expData.target >= EXP_TARGET_PARAM_0 && expData.target <= EXP_TARGET_PARAM_31)
                 {
                     std::vector<Value*> args;
 
@@ -1841,7 +1841,7 @@ void NggPrimShader::constructPrimShaderWithGs(
     assert(m_hasGs);
 
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
-    assert((waveSize == 32) || (waveSize == 64));
+    assert(waveSize == 32 || waveSize == 64);
 
     const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
 
@@ -2514,7 +2514,7 @@ void NggPrimShader::initWaveThreadInfo(
     Value* mergedWaveInfo)     // [in] Merged wave info
 {
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
-    assert((waveSize == 32) || (waveSize == 64));
+    assert(waveSize == 32 || waveSize == 64);
 
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, m_builder->getInt64(-1));
 
@@ -2949,7 +2949,7 @@ void NggPrimShader::runEsOrEsVariant(
     BasicBlock*           insertAtEnd)     // [in] Where to insert instructions
 {
     const bool hasTs = (m_hasTcs || m_hasTes);
-    if (((hasTs && m_hasTes) || ((!hasTs) && m_hasVs)) == false)
+    if (((hasTs && m_hasTes) || (!hasTs && m_hasVs)) == false)
     {
         // No TES (tessellation is enabled) or VS (tessellation is disabled), don't have to run
         return;
@@ -3213,7 +3213,7 @@ Function* NggPrimShader::mutateEsToVariant(
 
     for (auto& func : module->functions())
     {
-        if (func.isIntrinsic() && (func.getIntrinsicID() == Intrinsic::amdgcn_exp))
+        if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp)
         {
             for (auto user : func.users())
             {
@@ -3228,8 +3228,8 @@ Function* NggPrimShader::mutateEsToVariant(
 
                 uint8_t expTarget = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
 
-                bool expPos = ((expTarget >= EXP_TARGET_POS_0) && (expTarget <= EXP_TARGET_POS_4));
-                bool expParam = ((expTarget >= EXP_TARGET_PARAM_0) && (expTarget <= EXP_TARGET_PARAM_31));
+                bool expPos = (expTarget >= EXP_TARGET_POS_0 && expTarget <= EXP_TARGET_POS_4);
+                bool expParam = (expTarget >= EXP_TARGET_PARAM_0 && expTarget <= EXP_TARGET_PARAM_31);
 
                 if ((doExp && (expPos || expParam)) ||
                     (doPosExp && expPos)            ||
@@ -3289,7 +3289,7 @@ Function* NggPrimShader::mutateEsToVariant(
     unsigned lastExport = InvalidValue; // Record last position export that needs "done" flag
     for (auto& func : module->functions())
     {
-        if (func.isIntrinsic() && (func.getIntrinsicID() == Intrinsic::amdgcn_exp))
+        if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp)
         {
             for (auto user : func.users())
             {
@@ -3306,8 +3306,8 @@ Function* NggPrimShader::mutateEsToVariant(
 
                 uint8_t expTarget = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
 
-                bool expPos = ((expTarget >= EXP_TARGET_POS_0) && (expTarget <= EXP_TARGET_POS_4));
-                bool expParam = ((expTarget >= EXP_TARGET_PARAM_0) && (expTarget <= EXP_TARGET_PARAM_31));
+                bool expPos = (expTarget >= EXP_TARGET_POS_0 && expTarget <= EXP_TARGET_POS_4);
+                bool expParam = (expTarget >= EXP_TARGET_PARAM_0 && expTarget <= EXP_TARGET_PARAM_31);
 
                 if ((doExp && (expPos || expParam)) ||
                     (doPosExp && expPos) ||
@@ -3626,7 +3626,7 @@ Function* NggPrimShader::mutateGsToVariant(
 
     // Initialize thread ID in wave
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
-    assert((waveSize == 32) || (waveSize == 64));
+    assert(waveSize == 32 || waveSize == 64);
 
     auto threadIdInWave = m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo,
                                                        {},
@@ -3677,7 +3677,7 @@ Function* NggPrimShader::mutateGsToVariant(
                 removeCalls.push_back(call);
             }
         }
-        else if (func.isIntrinsic() && (func.getIntrinsicID() == Intrinsic::amdgcn_s_sendmsg))
+        else if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_s_sendmsg)
         {
             // Handle GS message
             for (auto user : func.users())
@@ -3687,8 +3687,8 @@ Function* NggPrimShader::mutateGsToVariant(
                 m_builder->SetInsertPoint(call);
 
                 uint64_t message = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-                if ((message == GsEmitStreaM0) || (message == GsEmitStreaM1) ||
-                    (message == GsEmitStreaM2) || (message == GsEmitStreaM3))
+                if (message == GsEmitStreaM0 || message == GsEmitStreaM1 ||
+                    message == GsEmitStreaM2 || message == GsEmitStreaM3)
                 {
                     // Handle GS_EMIT, MSG[9:8] = STREAM_ID
                     unsigned streamId = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
@@ -3702,8 +3702,8 @@ Function* NggPrimShader::mutateGsToVariant(
                                  outstandingVertCounterPtrs[streamId],
                                  flipVertOrderPtrs[streamId]);
                 }
-                else if ((message == GsCutStreaM0) || (message == GsCutStreaM1) ||
-                         (message == GsCutStreaM2) || (message == GsCutStreaM3))
+                else if (message == GsCutStreaM0 || message == GsCutStreaM1 ||
+                         message == GsCutStreaM2 || message == GsCutStreaM3)
                 {
                     // Handle GS_CUT, MSG[9:8] = STREAM_ID
                     unsigned streamId = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
@@ -3895,7 +3895,7 @@ void NggPrimShader::exportGsOutput(
     }
 
     const unsigned bitWidth = output->getType()->getScalarSizeInBits();
-    if ((bitWidth == 8) || (bitWidth == 16))
+    if (bitWidth == 8 || bitWidth == 16)
     {
         // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD
         // to DWORD. This is because copy shader does not know the actual data type. It only generates output
@@ -3915,7 +3915,7 @@ void NggPrimShader::exportGsOutput(
         output = m_builder->CreateZExt(output, extTy);
     }
     else
-        assert((bitWidth == 32) || (bitWidth == 64));
+        assert(bitWidth == 32 || bitWidth == 64);
 
     // gsVsRingOffset = threadIdInSubgroup * gsVsRingItemSize +
     //                  outVertcounter * vertexSize +
@@ -3979,7 +3979,7 @@ Value* NggPrimShader::importGsOutput(
     if (origOutputTy != outputTy)
     {
         assert(origOutputTy->isArrayTy() && outputTy->isVectorTy() &&
-                    (origOutputTy->getArrayNumElements() == outputTy->getVectorNumElements()));
+                    origOutputTy->getArrayNumElements() == outputTy->getVectorNumElements());
 
         // <n x Ty> -> [n x Ty]
         const unsigned elemCount = origOutputTy->getArrayNumElements();
@@ -6544,7 +6544,7 @@ Value* NggPrimShader::doSubgroupBallot(
     assert(value->getType()->isIntegerTy(1)); // Should be i1
 
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
-    assert((waveSize == 32) || (waveSize == 64));
+    assert(waveSize == 32 || waveSize == 64);
 
     value = m_builder->CreateSelect(value, m_builder->getInt32(1), m_builder->getInt32(0));
 
@@ -6579,7 +6579,7 @@ Value* NggPrimShader::doSubgroupInclusiveAdd(
     assert(value->getType()->isIntegerTy(32)); // Should be i32
 
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
-    assert((waveSize == 32) || (waveSize == 64));
+    assert(waveSize == 32 || waveSize == 64);
 
     auto inlineAsmTy = FunctionType::get(m_builder->getInt32Ty(), m_builder->getInt32Ty(), false);
     auto inlineAsm = InlineAsm::get(inlineAsmTy, "; %1", "=v,0", true);

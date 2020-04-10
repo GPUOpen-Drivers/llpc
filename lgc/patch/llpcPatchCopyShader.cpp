@@ -206,7 +206,7 @@ bool PatchCopyShader::runOnModule(
         }
     }
 
-    if ((outputStreamCount > 1) && resUsage->inOutUsage.enableXfb)
+    if (outputStreamCount > 1 && resUsage->inOutUsage.enableXfb)
     {
         // StreamId = streamInfo[25:24]
         auto streamInfo = getFunctionArgument(entryPoint, CopyShaderUserSgprIdxStreamInfo);
@@ -266,7 +266,7 @@ bool PatchCopyShader::runOnModule(
     }
     else
     {
-        outputStreamId = (outputStreamCount == 0) ? 0 : outputStreamId;
+        outputStreamId = outputStreamCount == 0 ? 0 : outputStreamId;
         exportOutput(outputStreamId, builder);
         builder.CreateBr(endBlock);
     }
@@ -297,7 +297,7 @@ void PatchCopyShader::collectGsGenericOutputInfo(
             for (auto user : func.users())
             {
                 auto callInst = dyn_cast<CallInst>(user);
-                if ((!callInst ) || (callInst->getParent()->getParent() != gsEntryPoint))
+                if (!callInst || callInst->getParent()->getParent() != gsEntryPoint)
                     continue;
 
                 assert(callInst->getNumArgOperands() == 4);
@@ -331,7 +331,7 @@ void PatchCopyShader::collectGsGenericOutputInfo(
                 // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend
                 // BYTE/WORD to DWORD and store DWORD to GS-VS ring. So for 8-bit/16-bit data type, the actual byte size
                 // is based on number of DWORDs.
-                bitWidth = (bitWidth < 32) ? 32 : bitWidth;
+                bitWidth = bitWidth < 32 ? 32 : bitWidth;
                 unsigned byteSize = bitWidth / 8 * compCount;
 
                 assert(compIdx < 4);
@@ -420,7 +420,7 @@ void PatchCopyShader::exportOutput(
     }
 
     // Generate dummy gl_position vec4(0, 0, 0, 1) for the rasterization stream if transform feeback is enabled
-    if (resUsage->inOutUsage.enableXfb && (!static_cast<bool>(builtInUsage.position)))
+    if (resUsage->inOutUsage.enableXfb && !static_cast<bool>(builtInUsage.position))
     {
         auto zero = ConstantFP::get(builder.getFloatTy(), 0.0);
         auto one = ConstantFP::get(builder.getFloatTy(), 1.0);
@@ -601,7 +601,7 @@ void PatchCopyShader::exportGenericOutput(
         {
             unsigned outLocInfo = outLoc.first;
             bool isStreamId = (reinterpret_cast<GsOutLocInfo*>(&outLocInfo))->streamId == streamId;
-            return ((outLoc.second == location) && isStreamId);
+            return outLoc.second == location && isStreamId;
         });
 
         assert(locIter != outLocMap.end());
@@ -615,7 +615,7 @@ void PatchCopyShader::exportGenericOutput(
                 // buffer. The high WORD is always zero while the low WORD contains the data value. We have to
                 // do some casting operations before store it to transform feedback buffer (tightly packed).
                 auto outputTy = outputValue->getType();
-                assert(outputTy->isFPOrFPVectorTy() && (outputTy->getScalarSizeInBits() == 32));
+                assert(outputTy->isFPOrFPVectorTy() && outputTy->getScalarSizeInBits() == 32);
 
                 const unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() : 1;
                 if (compCount > 1)

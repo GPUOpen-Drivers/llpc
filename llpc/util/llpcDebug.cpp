@@ -140,7 +140,7 @@ void redirectLogOutput(
             // NOTE: Checks whether errs() is needed in compiliation
             // Until now, option -debug, -debug-only and -print-* need use debug output
             bool needDebugOut = ::llvm::DebugFlag;
-            for (unsigned i = 1; (!needDebugOut) && (i < optionCount); ++i)
+            for (unsigned i = 1; !needDebugOut && i < optionCount; ++i)
             {
                 StringRef option = options[i];
                 if (option.startswith("-debug") || option.startswith("-print"))
@@ -164,9 +164,9 @@ void redirectLogOutput(
         }
 
         // Redirect outs() for LLPC_OUTS() and LLPC_ERRS()
-        if ((cl::EnableOuts || cl::EnableErrs) && (!cl::LogFileOuts.empty()))
+        if ((cl::EnableOuts || cl::EnableErrs) && !cl::LogFileOuts.empty())
         {
-            if ((cl::LogFileOuts == cl::LogFileDbgs) && (DbgFile ))
+            if (cl::LogFileOuts == cl::LogFileDbgs && DbgFile )
             {
                  memcpy((void*)OutFileBak, (void*)&outs(), sizeof(raw_fd_ostream));
                  memcpy((void*)&outs(), (void*)DbgFile, sizeof(raw_fd_ostream));

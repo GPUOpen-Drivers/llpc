@@ -79,7 +79,7 @@ void CodeGenManager::setupTargetFeatures(
 
     for (auto func = module->begin(), end = module->end(); func != end; ++func)
     {
-        if ((!func->empty()) && (func->getLinkage() == GlobalValue::ExternalLinkage))
+        if (!func->empty() && func->getLinkage() == GlobalValue::ExternalLinkage)
         {
              std::string targetFeatures(globalFeatures);
              AttrBuilder builder;
@@ -101,7 +101,7 @@ void CodeGenManager::setupTargetFeatures(
                 // NOTE: For NGG primitive shader, enable 128-bit LDS load/store operations to optimize gvec4 data
                 // read/write. This usage must enable the feature of using CI+ additional instructions.
                 const auto nggControl = pipelineState->getNggControl();
-                if (nggControl->enableNgg && (!nggControl->passthroughMode))
+                if (nggControl->enableNgg && !nggControl->passthroughMode)
                     targetFeatures += ",+ci-insts,+enable-ds128";
             }
 
@@ -140,21 +140,21 @@ void CodeGenManager::setupTargetFeatures(
             if (shaderStage != ShaderStageCopyShader)
             {
                 const auto& shaderMode = pipelineState->getShaderModes()->getCommonShaderMode(shaderStage);
-                if ((shaderMode.fp16DenormMode == FpDenormMode::FlushNone) ||
-                    (shaderMode.fp16DenormMode == FpDenormMode::FlushIn) ||
-                    (shaderMode.fp64DenormMode == FpDenormMode::FlushNone) ||
-                    (shaderMode.fp64DenormMode == FpDenormMode::FlushIn))
+                if (shaderMode.fp16DenormMode == FpDenormMode::FlushNone ||
+                    shaderMode.fp16DenormMode == FpDenormMode::FlushIn ||
+                    shaderMode.fp64DenormMode == FpDenormMode::FlushNone ||
+                    shaderMode.fp64DenormMode == FpDenormMode::FlushIn)
                     targetFeatures += ",+fp64-fp16-denormals";
-                else if ((shaderMode.fp16DenormMode == FpDenormMode::FlushOut) ||
-                         (shaderMode.fp16DenormMode == FpDenormMode::FlushInOut) ||
-                         (shaderMode.fp64DenormMode == FpDenormMode::FlushOut) ||
-                         (shaderMode.fp64DenormMode == FpDenormMode::FlushInOut))
+                else if (shaderMode.fp16DenormMode == FpDenormMode::FlushOut ||
+                         shaderMode.fp16DenormMode == FpDenormMode::FlushInOut ||
+                         shaderMode.fp64DenormMode == FpDenormMode::FlushOut ||
+                         shaderMode.fp64DenormMode == FpDenormMode::FlushInOut)
                     targetFeatures += ",-fp64-fp16-denormals";
-                if ((shaderMode.fp32DenormMode == FpDenormMode::FlushNone) ||
-                    (shaderMode.fp32DenormMode == FpDenormMode::FlushIn))
+                if (shaderMode.fp32DenormMode == FpDenormMode::FlushNone ||
+                    shaderMode.fp32DenormMode == FpDenormMode::FlushIn)
                     targetFeatures += ",+fp32-denormals";
-                else if ((shaderMode.fp32DenormMode == FpDenormMode::FlushOut) ||
-                         (shaderMode.fp32DenormMode == FpDenormMode::FlushInOut))
+                else if (shaderMode.fp32DenormMode == FpDenormMode::FlushOut ||
+                         shaderMode.fp32DenormMode == FpDenormMode::FlushInOut)
                     targetFeatures += ",-fp32-denormals";
             }
 

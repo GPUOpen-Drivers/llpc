@@ -142,7 +142,7 @@ void PassManagerImpl::add(
     Pass* pass)    // [in] Pass to add to the pass manager
 {
     // Do not add any passes after calling stop(), except immutable passes.
-    if (m_stopped && (!pass->getAsImmutablePass() ))
+    if (m_stopped && !pass->getAsImmutablePass() )
         return;
 
     AnalysisID passId = pass->getPassID();
@@ -151,7 +151,7 @@ void PassManagerImpl::add(
     if (passId == m_jumpThreading)
         return;
 
-    if ((passId != m_printModule) && (m_passIndex ))
+    if (passId != m_printModule && m_passIndex )
     {
         unsigned passIndex = (*m_passIndex)++;
 

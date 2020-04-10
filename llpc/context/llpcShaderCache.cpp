@@ -188,11 +188,11 @@ Result ShaderCache::Serialize(
     else
     {
         // Do serialize
-        assert(m_shaderDataEnd == m_serializedSize || (m_shaderDataEnd == sizeof(ShaderCacheSerializedHeader)));
+        assert(m_shaderDataEnd == m_serializedSize || m_shaderDataEnd == sizeof(ShaderCacheSerializedHeader));
 
         if (m_serializedSize >= sizeof(ShaderCacheSerializedHeader))
         {
-            if ((blob ) && ((*size) >= m_serializedSize))
+            if (blob && (*size) >= m_serializedSize)
             {
                 // First construct the header and copy it into the memory provided
                 ShaderCacheSerializedHeader header = {};
@@ -299,15 +299,15 @@ Result ShaderCache::init(
         lockCacheMap(false);
 
         // If we're in runtime mode and the caller provided a data blob, try to load the from that blob.
-        if ((auxCreateInfo->shaderCacheMode == ShaderCacheEnableRuntime) && (createInfo->initialDataSize > 0))
+        if (auxCreateInfo->shaderCacheMode == ShaderCacheEnableRuntime && createInfo->initialDataSize > 0)
         {
             if (loadCacheFromBlob(createInfo->pInitialData, createInfo->initialDataSize) != Result::Success)
                 resetRuntimeCache();
         }
         // If we're in on-disk mode try to load the cache from file.
-        else if ((auxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDisk) ||
-                 (auxCreateInfo->shaderCacheMode == ShaderCacheForceInternalCacheOnDisk) ||
-                 (auxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDiskReadOnly))
+        else if (auxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDisk ||
+                 auxCreateInfo->shaderCacheMode == ShaderCacheForceInternalCacheOnDisk ||
+                 auxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDiskReadOnly)
         {
             // Default to false because the cache file is invalid if it's brand new
             bool cacheFileExists = false;
@@ -341,8 +341,8 @@ Result ShaderCache::init(
                 if (cacheFileExists)
                 {
                     loadResult = loadCacheFromFile();
-                    if ((auxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDiskReadOnly) &&
-                        (loadResult == Result::Success))
+                    if (auxCreateInfo->shaderCacheMode == ShaderCacheEnableOnDiskReadOnly &&
+                        loadResult == Result::Success)
                         m_onDiskFile.close();
                 }
                 else
@@ -557,7 +557,7 @@ ShaderEntryState ShaderCache::findShader(
         if (index->state == ShaderEntryState::Ready)
         {
             // The shader has been compiled, just verify it has valid data and then return success.
-            assert((index->dataBlob ) && (index->header.size != 0));
+            assert(index->dataBlob && index->header.size != 0);
         }
         else if (index->state == ShaderEntryState::New)
         {
@@ -586,7 +586,7 @@ void ShaderCache::insertShader(
 {
     auto*const index = static_cast<ShaderIndex*>(hEntry);
     assert(m_disableCache == false);
-    assert((index ) && (index->state == ShaderEntryState::Compiling));
+    assert(index && index->state == ShaderEntryState::Compiling);
 
     lockCacheMap(false);
 
@@ -669,7 +669,7 @@ void ShaderCache::resetShader(
 {
     auto*const index = static_cast<ShaderIndex*>(hEntry);
     assert(m_disableCache == false);
-    assert((index ) && (index->state == ShaderEntryState::Compiling));
+    assert(index && index->state == ShaderEntryState::Compiling);
     lockCacheMap(false);
     index->state       = ShaderEntryState::New;
     index->header.size = 0;
@@ -698,7 +698,7 @@ Result ShaderCache::retrieveShader(
 
     unlockCacheMap(true);
 
-    return (*size > 0) ? Result::Success : Result::ErrorUnknown;
+    return *size > 0 ? Result::Success : Result::ErrorUnknown;
 }
 
 // =====================================================================================================================
@@ -836,7 +836,7 @@ Result ShaderCache::populateIndexMap(
     // take the hit each time we add shader data to the file.
     auto* header = static_cast<ShaderHeader*>(dataStart);
 
-    for (unsigned shader = 0; ((shader < m_totalShaders) && (result == Result::Success)); ++shader)
+    for (unsigned shader = 0; (shader < m_totalShaders && result == Result::Success); ++shader)
     {
         // Guard against buffer overruns.
         assert(voidPtrDiff(header, dataStart) <= dataSize);
@@ -903,10 +903,10 @@ Result ShaderCache::validateAndLoadHeader(
     Result result = Result::Success;
 
     if (header->headerSize == sizeof(ShaderCacheSerializedHeader) &&
-        (memcmp(header->buildId.buildDate, buildId.buildDate, sizeof(buildId.buildDate)) == 0) &&
-        (memcmp(header->buildId.buildTime, buildId.buildTime, sizeof(buildId.buildTime)) == 0) &&
-        (memcmp(&header->buildId.gfxIp, &buildId.gfxIp, sizeof(buildId.gfxIp)) == 0) &&
-        (memcmp(&header->buildId.hash, &buildId.hash, sizeof(buildId.hash)) == 0))
+        memcmp(header->buildId.buildDate, buildId.buildDate, sizeof(buildId.buildDate)) == 0 &&
+        memcmp(header->buildId.buildTime, buildId.buildTime, sizeof(buildId.buildTime)) == 0 &&
+        memcmp(&header->buildId.gfxIp, &buildId.gfxIp, sizeof(buildId.gfxIp)) == 0 &&
+        memcmp(&header->buildId.hash, &buildId.hash, sizeof(buildId.hash)) == 0)
     {
         // The header appears valid so copy the header data to the runtime cache
         m_totalShaders  = header->shaderCount;
@@ -917,7 +917,7 @@ Result ShaderCache::validateAndLoadHeader(
 
     // Make sure the shader data end value is correct. It's ok for there to be unused space at the end of the file, but
     // if the shaderDataEnd is beyond the end of the file we have a problem.
-    if ((result == Result::Success) && (m_shaderDataEnd > dataSourceSize))
+    if (result == Result::Success && m_shaderDataEnd > dataSourceSize)
         result = Result::ErrorUnknown;
 
     return result;
@@ -956,9 +956,9 @@ bool ShaderCache::isCompatible(
     // Check hash first
     bool isCompatible = (memcmp(&(auxCreateInfo->hash), &m_hash, sizeof(m_hash)) == 0);
 
-    return isCompatible && (m_gfxIp.major == auxCreateInfo->gfxIp.major) &&
-        (m_gfxIp.minor == auxCreateInfo->gfxIp.minor) &&
-        (m_gfxIp.stepping == auxCreateInfo->gfxIp.stepping);
+    return isCompatible && m_gfxIp.major == auxCreateInfo->gfxIp.major &&
+        m_gfxIp.minor == auxCreateInfo->gfxIp.minor &&
+        m_gfxIp.stepping == auxCreateInfo->gfxIp.stepping;
 }
 
 } // Llpc

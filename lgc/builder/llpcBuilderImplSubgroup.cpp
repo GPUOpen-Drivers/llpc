@@ -954,7 +954,7 @@ Value* BuilderImplSubgroup::CreateSubgroupSwizzleMask(
     uint8_t orMask = static_cast<uint8_t>(cast<ConstantInt>(constMask->getAggregateElement(1u))->getZExtValue());
     uint8_t xorMask = static_cast<uint8_t>(cast<ConstantInt>(constMask->getAggregateElement(2u))->getZExtValue());
 
-    assert((andMask <= 31) && (orMask <= 31) && (xorMask <= 31));
+    assert(andMask <= 31 && orMask <= 31 && xorMask <= 31);
 
     return createDsSwizzle(value, getDsSwizzleBitMode(xorMask, orMask, andMask));
 }

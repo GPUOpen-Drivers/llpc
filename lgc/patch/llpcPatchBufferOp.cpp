@@ -169,7 +169,7 @@ void PatchBufferOp::visitAtomicCmpXchgInst(
     copyMetadata(baseIndex, &atomicCmpXchgInst);
 
     // If our buffer descriptor is divergent or is not a 32-bit integer, need to handle it differently.
-    if ((m_divergenceSet.count(bufferDesc) > 0) || (!storeType->isIntegerTy(32)))
+    if (m_divergenceSet.count(bufferDesc) > 0 || !storeType->isIntegerTy(32))
     {
         Value* const baseAddr = getBaseAddressFromBufferDesc(bufferDesc);
 
@@ -650,8 +650,8 @@ void PatchBufferOp::visitMemCpyInst(
     const unsigned srcAddrSpace = src->getType()->getPointerAddressSpace();
 
     // If either of the address spaces are fat pointers.
-    if ((destAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER) ||
-        (srcAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER))
+    if (destAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER ||
+        srcAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER)
     {
         // Handling memcpy requires us to modify the CFG, so we need to do it after the initial visit pass.
         m_postVisitInsts.push_back(&memCpyInst);
@@ -670,8 +670,8 @@ void PatchBufferOp::visitMemMoveInst(
     const unsigned srcAddrSpace = src->getType()->getPointerAddressSpace();
 
     // If either of the address spaces are not fat pointers, bail.
-    if ((destAddrSpace != ADDR_SPACE_BUFFER_FAT_POINTER) &&
-        (srcAddrSpace != ADDR_SPACE_BUFFER_FAT_POINTER))
+    if (destAddrSpace != ADDR_SPACE_BUFFER_FAT_POINTER &&
+        srcAddrSpace != ADDR_SPACE_BUFFER_FAT_POINTER)
         return;
 
     m_builder->SetInsertPoint(&memMoveInst);
@@ -796,7 +796,7 @@ void PatchBufferOp::visitPHINode(
             if (m_invariantSet.count(incomingBufferDesc) == 0)
                 isInvariant = false;
 
-            if ((m_divergenceSet.count(incomingBufferDesc) > 0) || m_divergenceAnalysis->isDivergent(&phiNode))
+            if (m_divergenceSet.count(incomingBufferDesc) > 0 || m_divergenceAnalysis->isDivergent(&phiNode))
                 isDivergent = true;
         }
 
@@ -866,7 +866,7 @@ void PatchBufferOp::visitSelectInst(
         // If the buffer descriptors are the same, then no select needed.
         bufferDesc = bufferDesc1;
     }
-    else if ((!bufferDesc1 ) || (!bufferDesc2 ))
+    else if (!bufferDesc1 || !bufferDesc2 )
     {
         // Select the non-nullptr buffer descriptor
         bufferDesc = bufferDesc1 ? bufferDesc1 : bufferDesc2;
@@ -878,7 +878,7 @@ void PatchBufferOp::visitSelectInst(
         copyMetadata(bufferDesc, &selectInst);
 
         // If both incomings are invariant, mark the new select as invariant too.
-        if ((m_invariantSet.count(bufferDesc1) > 0) && (m_invariantSet.count(bufferDesc2) > 0))
+        if (m_invariantSet.count(bufferDesc1) > 0 && m_invariantSet.count(bufferDesc2) > 0)
             m_invariantSet.insert(bufferDesc);
     }
 
@@ -891,9 +891,9 @@ void PatchBufferOp::visitSelectInst(
     m_replacementMap[&selectInst] = std::make_pair(bufferDesc, newSelect);
 
     // If either of the incoming buffer descriptors are divergent, mark the new buffer descriptor as divergent too.
-    if ((m_divergenceSet.count(bufferDesc1) > 0) || (m_divergenceSet.count(bufferDesc2) > 0))
+    if (m_divergenceSet.count(bufferDesc1) > 0 || m_divergenceSet.count(bufferDesc2) > 0)
         m_divergenceSet.insert(bufferDesc);
-    else if (m_divergenceAnalysis->isDivergent(&selectInst) && (bufferDesc1 != bufferDesc2))
+    else if (m_divergenceAnalysis->isDivergent(&selectInst) && bufferDesc1 != bufferDesc2)
     {
         // Otherwise is the selection is divergent and the buffer descriptors do not match, mark divergent.
         m_divergenceSet.insert(bufferDesc);
@@ -987,25 +987,25 @@ void PatchBufferOp::postVisitMemCpyInst(
 
     ConstantInt* const lengthConstant = dyn_cast<ConstantInt>(memCpyInst.getArgOperand(2));
 
-    const uint64_t constantLength = (lengthConstant ) ? lengthConstant->getZExtValue() : 0;
+    const uint64_t constantLength = lengthConstant ? lengthConstant->getZExtValue() : 0;
 
     // NOTE: If we do not have a constant length, or the constant length is bigger than the minimum we require to
     // generate a loop, we make a loop to handle the memcpy instead. If we did not generate a loop here for any
     // constant-length memcpy with a large number of bytes would generate thousands of load/store instructions that
     // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
-    if ((!lengthConstant ) || (constantLength > MinMemOpLoopBytes))
+    if (!lengthConstant || constantLength > MinMemOpLoopBytes)
     {
         // NOTE: We want to perform our memcpy operation on the greatest stride of bytes possible (load/storing up to
         // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
         // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
         // 2. Worst case we have to load/store a single byte per loop.
-        unsigned stride = (!lengthConstant ) ? 1 : 16;
+        unsigned stride = !lengthConstant ? 1 : 16;
 
         while (stride != 1)
         {
             // We only care about DWORD alignment (4 bytes) so clamp the max check here to that.
             const unsigned minStride = std::min(stride, 4u);
-            if ((destAlignment >= minStride) && (srcAlignment >= minStride) && ((constantLength % stride) == 0))
+            if (destAlignment >= minStride && srcAlignment >= minStride && (constantLength % stride) == 0)
                 break;
 
             stride /= 2;
@@ -1125,25 +1125,25 @@ void PatchBufferOp::postVisitMemSetInst(
 
     ConstantInt* const lengthConstant = dyn_cast<ConstantInt>(memSetInst.getArgOperand(2));
 
-    const uint64_t constantLength = (lengthConstant ) ? lengthConstant->getZExtValue() : 0;
+    const uint64_t constantLength = lengthConstant ? lengthConstant->getZExtValue() : 0;
 
     // NOTE: If we do not have a constant length, or the constant length is bigger than the minimum we require to
     // generate a loop, we make a loop to handle the memcpy instead. If we did not generate a loop here for any
     // constant-length memcpy with a large number of bytes would generate thousands of load/store instructions that
     // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
-    if ((!lengthConstant ) || (constantLength > MinMemOpLoopBytes))
+    if (!lengthConstant || constantLength > MinMemOpLoopBytes)
     {
         // NOTE: We want to perform our memset operation on the greatest stride of bytes possible (load/storing up to
         // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
         // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
         // 2. Worst case we have to load/store a single byte per loop.
-        unsigned stride = (!lengthConstant ) ? 1 : 16;
+        unsigned stride = !lengthConstant ? 1 : 16;
 
         while (stride != 1)
         {
             // We only care about DWORD alignment (4 bytes) so clamp the max check here to that.
             const unsigned minStride = std::min(stride, 4u);
-            if ((destAlignment >= minStride) && ((constantLength % stride) == 0))
+            if (destAlignment >= minStride && (constantLength % stride) == 0)
                 break;
 
             stride /= 2;
@@ -1438,7 +1438,7 @@ Value* PatchBufferOp::replaceLoadStore(
     bool isInvariant = false;
     if (isLoad)
     {
-        isInvariant = (m_invariantSet.count(m_replacementMap[pointer].first) > 0) ||
+        isInvariant = m_invariantSet.count(m_replacementMap[pointer].first) > 0 ||
                              loadInst->getMetadata(LLVMContext::MD_invariant_load);
     }
 
@@ -1506,12 +1506,12 @@ Value* PatchBufferOp::replaceLoadStore(
     Type* smallestType = nullptr;
     unsigned smallestByteSize = 4;
 
-    if ((alignment < 2) || ((bytesToHandle & 0x1) != 0))
+    if (alignment < 2 || (bytesToHandle & 0x1) != 0)
     {
         smallestByteSize = 1;
         smallestType = m_builder->getInt8Ty();
     }
-    else if ((alignment < 4) || ((bytesToHandle & 0x3) != 0))
+    else if (alignment < 4 || (bytesToHandle & 0x3) != 0)
     {
         smallestByteSize = 2;
         smallestType = m_builder->getInt16Ty();
@@ -1549,7 +1549,7 @@ Value* PatchBufferOp::replaceLoadStore(
     while (remainingBytes > 0)
     {
         const unsigned offset = bytesToHandle - remainingBytes;
-        Value* offsetVal = (offset == 0) ?
+        Value* offsetVal = offset == 0 ?
                                baseIndex :
                                m_builder->CreateAdd(baseIndex, m_builder->getInt32(offset));
 
@@ -1751,12 +1751,12 @@ Value* PatchBufferOp::replaceICmp(
     assert(bufferDescTy->getVectorNumElements() == 4);
     assert(bufferDescTy->getVectorElementType()->isIntegerTy(32));
     (void(bufferDescTy)); // unused
-    assert((iCmpInst->getPredicate() == ICmpInst::ICMP_EQ) || (iCmpInst->getPredicate() == ICmpInst::ICMP_NE));
+    assert(iCmpInst->getPredicate() == ICmpInst::ICMP_EQ || iCmpInst->getPredicate() == ICmpInst::ICMP_NE);
 
     Value* bufferDescICmp = m_builder->getFalse();
-    if ((!bufferDescs[0] ) && (!bufferDescs[1] ))
+    if (!bufferDescs[0] && !bufferDescs[1] )
         bufferDescICmp = m_builder->getTrue();
-    else if ((bufferDescs[0] ) && (bufferDescs[1] ))
+    else if (bufferDescs[0] && bufferDescs[1] )
     {
         Value* const bufferDescEqual = m_builder->CreateICmpEQ(bufferDescs[0], bufferDescs[1]);
 

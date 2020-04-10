@@ -179,7 +179,7 @@ Builder* BuilderContext::createBuilder(
     Pipeline*   pipeline,          // [in] Pipeline object for pipeline compile, nullptr for shader compile
     bool        useBuilderRecorder) // true to use BuilderRecorder, false to use BuilderImpl
 {
-    if ((!pipeline ) || useBuilderRecorder)
+    if (!pipeline || useBuilderRecorder)
         return new BuilderRecorder(this, pipeline);
     return new BuilderImpl(this, pipeline);
 }

@@ -227,7 +227,7 @@ Value* BuilderImplDesc::CreateLoadPushConstantsPtr(
     // Remember the size of push constants.
     unsigned pushConstSize = GetInsertPoint()->getModule()->getDataLayout().getTypeStoreSize(pushConstantsTy);
     ResourceUsage* resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
-    assert((resUsage->pushConstSizeInBytes == 0) || (resUsage->pushConstSizeInBytes == pushConstSize));
+    assert(resUsage->pushConstSizeInBytes == 0 || resUsage->pushConstSizeInBytes == pushConstSize);
     resUsage->pushConstSizeInBytes = pushConstSize;
 
     auto pushConstantsPtrTy = PointerType::get(pushConstantsTy, ADDR_SPACE_CONST);
@@ -247,7 +247,7 @@ Value* BuilderImplDesc::scalarizeIfUniform(
     bool    isNonUniform) // Whether value is marked as non-uniform
 {
     assert(value->getType()->isIntegerTy(32));
-    if ((!isNonUniform) && (!isa<Constant>(value)))
+    if (!isNonUniform && !isa<Constant>(value))
     {
         // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
         if (getPipelineState()->getTargetInfo().getGfxIpVersion().major > 6)

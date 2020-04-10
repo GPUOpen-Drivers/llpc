@@ -50,7 +50,7 @@ Function* getEntryPoint(
 
     for (auto func = module->begin(), end = module->end(); func != end; ++func)
     {
-        if ((!func->empty()) && (func->getLinkage() == GlobalValue::ExternalLinkage))
+        if (!func->empty() && func->getLinkage() == GlobalValue::ExternalLinkage)
         {
             entryPoint = &*func;
             break;

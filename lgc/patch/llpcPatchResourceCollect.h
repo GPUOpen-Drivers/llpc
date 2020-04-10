@@ -158,7 +158,7 @@ struct InOutLocation
 {
     uint16_t asIndex() const { return locationInfo.u16All; }
 
-    bool operator<(const InOutLocation& rhs) const { return (this->asIndex() < rhs.asIndex()); }
+    bool operator<(const InOutLocation& rhs) const { return this->asIndex() < rhs.asIndex(); }
 
     InOutLocationInfo locationInfo; // The location info of an input or output
 };
@@ -181,9 +181,9 @@ public:
 
         unsigned asIndex() const { return ((getCompatibilityKey() << 16) | firstLocation.asIndex()); }
 
-        bool operator==(const LocationSpan& rhs) const { return (this->asIndex() == rhs.asIndex()); }
+        bool operator==(const LocationSpan& rhs) const { return this->asIndex() == rhs.asIndex(); }
 
-        bool operator<(const LocationSpan& rhs) const { return (this->asIndex() < rhs.asIndex()); }
+        bool operator<(const LocationSpan& rhs) const { return this->asIndex() < rhs.asIndex(); }
 
         InOutLocation firstLocation;
         InOutCompatibilityInfo compatibilityInfo;

@@ -158,7 +158,7 @@ public:
     BuilderContext* getBuilderContext() const { return m_builderContext; }
 
     // Set the current shader stage, clamp shader stage to the ShaderStageCompute
-    void setShaderStage(ShaderStage stage) { m_shaderStage = (stage > ShaderStageCompute) ? ShaderStageCompute : stage; }
+    void setShaderStage(ShaderStage stage) { m_shaderStage = stage > ShaderStageCompute ? ShaderStageCompute : stage; }
 
     // -----------------------------------------------------------------------------------------------------------------
     // Methods to set shader modes (FP modes, tessellation modes, fragment modes, workgroup size) for the current

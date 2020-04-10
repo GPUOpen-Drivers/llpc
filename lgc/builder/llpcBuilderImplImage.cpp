@@ -958,7 +958,7 @@ Value* BuilderImplImage::CreateImageLoad(
         args.push_back(getInt32(((flags & ImageFlagCoherent) ? 1 : 0) | ((flags & ImageFlagVolatile) ? 2 : 0)));
 
         // Get the intrinsic ID from the load intrinsic ID table and call it.
-        auto table = (mipLevel ) ? &ImageLoadMipIntrinsicTable[0] : &ImageLoadIntrinsicTable[0];
+        auto table = mipLevel ? &ImageLoadMipIntrinsicTable[0] : &ImageLoadIntrinsicTable[0];
         result = CreateIntrinsic(table[dim],
                                   { intrinsicDataTy, coords[0]->getType() },
                                   args,
@@ -1151,7 +1151,7 @@ Value* BuilderImplImage::CreateImageStore(
         args.push_back(getInt32(((flags & ImageFlagCoherent) ? 1 : 0) | ((flags & ImageFlagVolatile) ? 2 : 0)));
 
         // Get the intrinsic ID from the store intrinsic ID table and call it.
-        auto table = (mipLevel ) ? &ImageStoreMipIntrinsicTable[0] : &ImageStoreIntrinsicTable[0];
+        auto table = mipLevel ? &ImageStoreMipIntrinsicTable[0] : &ImageStoreIntrinsicTable[0];
         imageStore = CreateIntrinsic(table[dim],
                                { texelTy, coords[0]->getType() },
                                args,
@@ -1210,8 +1210,8 @@ Value* BuilderImplImage::CreateImageSample(
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
     Value* coord = address[ImageAddressIdxCoordinate];
-    assert((coord->getType()->getScalarType()->isFloatTy()) ||
-                (coord->getType()->getScalarType()->isHalfTy()));
+    assert(coord->getType()->getScalarType()->isFloatTy() ||
+                coord->getType()->getScalarType()->isHalfTy());
 
     // Find the {set,desc} for the sampler and see if it is a YCbCr converting sampler.
     // This is a hack to cope with the design of the Vulkan YCbCr conversion extension, in which
@@ -1303,8 +1303,8 @@ Value* BuilderImplImage::CreateImageGather(
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
     Value* coord = address[ImageAddressIdxCoordinate];
-    assert((coord->getType()->getScalarType()->isFloatTy()) ||
-                (coord->getType()->getScalarType()->isHalfTy()));
+    assert(coord->getType()->getScalarType()->isFloatTy() ||
+                coord->getType()->getScalarType()->isHalfTy());
 
     // Check whether we are being asked for integer texel component type.
     Value* needDescPatch = nullptr;
@@ -1330,14 +1330,14 @@ Value* BuilderImplImage::CreateImageGather(
 
     Value* result = nullptr;
     Value* addrOffset = address[ImageAddressIdxOffset];
-    if ((addrOffset ) && isa<ArrayType>(addrOffset->getType()))
+    if (addrOffset && isa<ArrayType>(addrOffset->getType()))
     {
         // We implement a gather with independent offsets (SPIR-V ConstantOffsets) as four separate gathers.
         Value* residency = nullptr;
         SmallVector<Value*, ImageAddressCount> modifiedAddress;
         modifiedAddress.insert(modifiedAddress.begin(), address.begin(), address.end());
         auto gatherStructTy = dyn_cast<StructType>(gatherTy);
-        result = UndefValue::get((gatherStructTy ) ? gatherStructTy->getElementType(0) : gatherTy);
+        result = UndefValue::get(gatherStructTy ? gatherStructTy->getElementType(0) : gatherTy);
         for (unsigned index = 0; index < 4; ++index)
         {
             modifiedAddress[ImageAddressIdxOffset] = CreateExtractValue(addrOffset, index);
@@ -1441,7 +1441,7 @@ Value* BuilderImplImage::preprocessIntegerImageGather(
     // On to the "else": patch the coordinates: add (-0.5/width, -0.5/height) to the x,y coordinates.
     SetInsertPoint(branch->getSuccessor(1)->getTerminator());
     Value* zero = getInt32(0);
-    dim = (dim == DimCubeArray) ? DimCube : dim;
+    dim = dim == DimCubeArray ? DimCube : dim;
     Value* resInfo = CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim],
                                       { VectorType::get(getFloatTy(), 4), getInt32Ty() },
                                       { getInt32(15), zero, imageDesc, zero, zero });
@@ -1537,7 +1537,7 @@ Value* BuilderImplImage::CreateImageSampleGather(
     unsigned addressMask = 0;
     for (unsigned i = 0; i != ImageAddressCount; ++i)
     {
-        unsigned addressMaskBit = (address[i] ) ? 1 : 0;
+        unsigned addressMaskBit = address[i] ? 1 : 0;
         addressMask |= addressMaskBit << i;
     }
     addressMask &= ~(1U << ImageAddressIdxProjective);
@@ -1655,7 +1655,7 @@ Value* BuilderImplImage::CreateImageSampleGather(
     auto table = isSample ? &ImageSampleIntrinsicTable[0] : &ImageGather4IntrinsicTable[0];
     for (;; ++table)
     {
-        assert((table->matchMask != 0) && "Image sample/gather intrinsic ID not found");
+        assert(table->matchMask != 0 && "Image sample/gather intrinsic ID not found");
         if (table->matchMask == addressMask)
             break;
     }
@@ -1831,7 +1831,7 @@ Value* BuilderImplImage::CreateImageQueryLevels(
     Value*                  imageDesc,         // [in] Image descriptor or texel buffer descriptor
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
-    dim = (dim == DimCubeArray) ? DimCube : dim;
+    dim = dim == DimCubeArray ? DimCube : dim;
     Value* zero = getInt32(0);
     Instruction* resInfo = CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim],
                                             { getFloatTy(), getInt32Ty() },
@@ -1900,7 +1900,7 @@ Value* BuilderImplImage::CreateImageQuerySize(
     }
 
     // Proper image.
-    unsigned modifiedDim = (dim == DimCubeArray) ? DimCube : change1DTo2DIfNeeded(dim);
+    unsigned modifiedDim = dim == DimCubeArray ? DimCube : change1DTo2DIfNeeded(dim);
     Value* zero = getInt32(0);
     Instruction* resInfo = CreateIntrinsic(ImageGetResInfoIntrinsicTable[modifiedDim],
                                             { VectorType::get(getFloatTy(), 4), getInt32Ty() },
@@ -1921,7 +1921,7 @@ Value* BuilderImplImage::CreateImageQuerySize(
         intResInfo = CreateInsertElement(intResInfo, slices, 2);
     }
 
-    if ((dim == Dim1DArray) && (modifiedDim == Dim2DArray))
+    if (dim == Dim1DArray && modifiedDim == Dim2DArray)
     {
         // For a 1D array on gfx9+ that we treated as a 2D array, we want components 0 and 2.
         return CreateShuffleVector(intResInfo, intResInfo, ArrayRef<unsigned>{ 0, 2 }, instName);
@@ -2078,7 +2078,7 @@ unsigned BuilderImplImage::prepareCoordinate(
     if (coordScalarTy->isIntegerTy())
     {
         // Integer components (image load/store/atomic).
-        assert((!derivativeX ) && (!derivativeY ));
+        assert(!derivativeX && !derivativeY );
 
         if (dim == DimCubeArray)
         {
@@ -2091,14 +2091,14 @@ unsigned BuilderImplImage::prepareCoordinate(
 
     // FP coordinates, possibly with explicit derivatives.
     // Round the array slice.
-    if ((dim == Dim1DArray) || (dim == Dim2DArray) || (dim == DimCubeArray))
+    if (dim == Dim1DArray || dim == Dim2DArray || dim == DimCubeArray)
         outCoords.back() = CreateIntrinsic(Intrinsic::rint, coordScalarTy, outCoords.back());
 
     Value* cubeSc = nullptr;
     Value* cubeTc = nullptr;
     Value* cubeMa = nullptr;
     Value* cubeId = nullptr;
-    if ((dim == DimCube) || (dim == DimCubeArray))
+    if (dim == DimCube || dim == DimCubeArray)
     {
         // For a cube or cubearray, transform the coordinates into s,t,faceid.
         cubeSc = CreateIntrinsic(Intrinsic::amdgcn_cubesc, {}, { outCoords[0], outCoords[1], outCoords[2] });
@@ -2167,7 +2167,7 @@ unsigned BuilderImplImage::prepareCoordinate(
             outDerivatives.push_back(Constant::getNullValue(outDerivatives[0]->getType()));
         }
     }
-    if (outDerivatives.empty() || (dim != DimCube))
+    if (outDerivatives.empty() || dim != DimCube)
         return dim;
 
     // When sampling cubemap with explicit gradient value, API supplied gradients are cube vectors,
@@ -2295,26 +2295,26 @@ void BuilderImplImage::combineCubeArrayFaceAndSlice(
         switch (index)
         {
         case 2:
-            face = (!face ) ? insert->getOperand(1) : face;
+            face = !face ? insert->getOperand(1) : face;
             break;
         case 3:
-            slice = (!slice ) ? insert->getOperand(1) : slice;
+            slice = !slice ? insert->getOperand(1) : slice;
             break;
         }
         partialCoord = insert->getOperand(0);
     }
 
     Value* combined = nullptr;
-    if ((face ) && (slice ))
+    if (face && slice )
     {
         if (auto sliceDiv = dyn_cast<BinaryOperator>(slice))
         {
             if (auto faceRem = dyn_cast<BinaryOperator>(face))
             {
-                if ((sliceDiv->getOpcode() == Instruction::UDiv) &&
-                    (faceRem->getOpcode() == Instruction::URem) &&
-                    (sliceDiv->getOperand(1) == multiplier) && (faceRem->getOperand(1) == multiplier) &&
-                    (sliceDiv->getOperand(0) == faceRem->getOperand(0)))
+                if (sliceDiv->getOpcode() == Instruction::UDiv &&
+                    faceRem->getOpcode() == Instruction::URem &&
+                    sliceDiv->getOperand(1) == multiplier && faceRem->getOperand(1) == multiplier &&
+                    sliceDiv->getOperand(0) == faceRem->getOperand(0))
                 {
                     // This is the case that the slice and face were extracted from a combined value using
                     // the same multiplier. That happens with SPIR-V with multiplier 6.
@@ -2342,8 +2342,8 @@ Value* BuilderImplImage::patchCubeDescriptor(
     Value*    desc,  // [in] Descriptor before patching
     unsigned  dim)    // Image dimensions
 {
-    if (((dim != DimCube) && (dim != DimCubeArray)) ||
-        (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9))
+    if ((dim != DimCube && dim != DimCubeArray) ||
+        getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9)
         return desc;
 
     // Extract the depth.

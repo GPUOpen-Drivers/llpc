@@ -162,7 +162,7 @@ void addTypeMangling(
     }
 
     raw_string_ostream nameStream(name);
-    if ((returnTy ) && (!returnTy->isVoidTy()))
+    if (returnTy && !returnTy->isVoidTy())
     {
         nameStream << ".";
         getTypeName(returnTy, nameStream);
@@ -196,8 +196,8 @@ ShaderStage getShaderStageFromCallingConv(
     ShaderStage shaderStage = ShaderStageInvalid;
 
     bool hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry)) != 0;
-    bool hasTs = (((stageMask & shaderStageToMask(ShaderStageTessControl)) != 0) ||
-                  ((stageMask & shaderStageToMask(ShaderStageTessEval)) != 0));
+    bool hasTs = ((stageMask & shaderStageToMask(ShaderStageTessControl)) != 0 ||
+                  (stageMask & shaderStageToMask(ShaderStageTessEval)) != 0);
 
     switch (callConv)
     {
@@ -239,7 +239,7 @@ Value* getFunctionArgument(
     const Twine&  name)     // Name to give the argument if currently empty
 {
     Argument* arg = &func->arg_begin()[idx];
-    if ((!name.isTriviallyEmpty()) && (arg->getName() == ""))
+    if (!name.isTriviallyEmpty() && arg->getName() == "")
         arg->setName(name);
     return arg;
 }
@@ -264,7 +264,7 @@ bool canBitCast(
             const unsigned compCount1 = ty1->isVectorTy() ? ty1->getVectorNumElements() : 1;
             const unsigned compCount2 = ty2->isVectorTy() ? ty2->getVectorNumElements() : 1;
 
-            valid = (compCount1 * compTy1->getScalarSizeInBits() == compCount2 * compTy2->getScalarSizeInBits());
+            valid = compCount1 * compTy1->getScalarSizeInBits() == compCount2 * compTy2->getScalarSizeInBits();
         }
     }
 
@@ -279,7 +279,7 @@ bool isDontCareValue(
     bool isDontCare = false;
 
     if (isa<ConstantInt>(value))
-        isDontCare = (static_cast<unsigned>(cast<ConstantInt>(value)->getZExtValue()) == InvalidValue);
+        isDontCare = static_cast<unsigned>(cast<ConstantInt>(value)->getZExtValue()) == InvalidValue;
 
     return isDontCare;
 }

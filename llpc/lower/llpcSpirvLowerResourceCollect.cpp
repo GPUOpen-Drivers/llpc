@@ -110,7 +110,7 @@ void SpirvLowerResourceCollect::collectResourceNodeData(
 
                 ++pos;
                 Dim dim = static_cast<Dim>(imageTypeName[pos] - '0');
-                nodeType = (dim == DimBuffer) ?
+                nodeType = dim == DimBuffer ?
                            ResourceMappingNodeType::DescriptorTexelBuffer :
                            ResourceMappingNodeType::DescriptorResource;
             }
@@ -142,14 +142,14 @@ void SpirvLowerResourceCollect::collectResourceNodeData(
     // DescriptorCombinedTexture.
     if (!result.second)
     {
-        assert(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
-                     (nodeType == ResourceMappingNodeType::DescriptorResource) ||
-                     (nodeType == ResourceMappingNodeType::DescriptorTexelBuffer) ||
-                     (nodeType == ResourceMappingNodeType::DescriptorSampler)) &&
-                    ((result.first->second == ResourceMappingNodeType::DescriptorCombinedTexture) ||
-                     (result.first->second == ResourceMappingNodeType::DescriptorResource) ||
-                     (result.first->second == ResourceMappingNodeType::DescriptorTexelBuffer) ||
-                     (result.first->second == ResourceMappingNodeType::DescriptorSampler)));
+        assert((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture ||
+                     nodeType == ResourceMappingNodeType::DescriptorResource ||
+                     nodeType == ResourceMappingNodeType::DescriptorTexelBuffer ||
+                     nodeType == ResourceMappingNodeType::DescriptorSampler) &&
+                    (result.first->second == ResourceMappingNodeType::DescriptorCombinedTexture ||
+                     result.first->second == ResourceMappingNodeType::DescriptorResource ||
+                     result.first->second == ResourceMappingNodeType::DescriptorTexelBuffer ||
+                     result.first->second == ResourceMappingNodeType::DescriptorSampler));
         result.first->second = ResourceMappingNodeType::DescriptorCombinedTexture;
     }
 
@@ -173,7 +173,7 @@ bool SpirvLowerResourceCollect::runOnModule(
             if (global->hasInitializer())
                 initializer = global->getInitializer();
 
-            if ((!initializer ) || isa<UndefValue>(initializer))
+            if (!initializer || isa<UndefValue>(initializer))
                 removedGlobals.insert(&*global);
         }
     }
@@ -446,14 +446,14 @@ void SpirvLowerResourceCollect::visitCalls(
                 // DescriptorCombinedTexture.
                 if (!result.second)
                 {
-                    assert(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
-                                 (nodeType == ResourceMappingNodeType::DescriptorResource) ||
-                                 (nodeType == ResourceMappingNodeType::DescriptorTexelBuffer) ||
-                                 (nodeType == ResourceMappingNodeType::DescriptorSampler)) &&
-                                ((result.first->second == ResourceMappingNodeType::DescriptorCombinedTexture) ||
-                                 (result.first->second == ResourceMappingNodeType::DescriptorResource) ||
-                                 (result.first->second == ResourceMappingNodeType::DescriptorTexelBuffer) ||
-                                 (result.first->second == ResourceMappingNodeType::DescriptorSampler)));
+                    assert((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture ||
+                                 nodeType == ResourceMappingNodeType::DescriptorResource ||
+                                 nodeType == ResourceMappingNodeType::DescriptorTexelBuffer ||
+                                 nodeType == ResourceMappingNodeType::DescriptorSampler) &&
+                                (result.first->second == ResourceMappingNodeType::DescriptorCombinedTexture ||
+                                 result.first->second == ResourceMappingNodeType::DescriptorResource ||
+                                 result.first->second == ResourceMappingNodeType::DescriptorTexelBuffer ||
+                                 result.first->second == ResourceMappingNodeType::DescriptorSampler));
                     result.first->second = ResourceMappingNodeType::DescriptorCombinedTexture;
                 }
             }

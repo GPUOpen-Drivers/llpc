@@ -543,7 +543,7 @@ Value* BuilderReplayer::processCall(
             unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
             Value* imageDesc = args[2];
             Value* coord = args[3];
-            Value* mipLevel = (args.size() > 4) ? &*args[4] : nullptr;
+            Value* mipLevel = args.size() > 4 ? &*args[4] : nullptr;
             return m_builder->CreateImageLoad(call->getType(), dim, flags, imageDesc, coord, mipLevel);
         }
 
@@ -571,7 +571,7 @@ Value* BuilderReplayer::processCall(
             unsigned flags = cast<ConstantInt>(args[2])->getZExtValue();
             Value* imageDesc = args[3];
             Value* coord = args[4];
-            Value* mipLevel = (args.size() > 5) ? &*args[5] : nullptr;
+            Value* mipLevel = args.size() > 5 ? &*args[5] : nullptr;
             return m_builder->CreateImageStore(texel, dim, flags, imageDesc, coord, mipLevel);
         }
 

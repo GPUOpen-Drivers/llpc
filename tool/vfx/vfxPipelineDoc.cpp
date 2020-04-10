@@ -199,8 +199,8 @@ bool PipelineDocument::validate()
     for (size_t i = 0; i < m_sectionList.size(); ++i)
     {
         auto sectionType = m_sectionList[i]->getSectionType();
-        if ((sectionType >= SectionTypeVertexShader) &&
-            (sectionType < (SectionTypeVertexShader + ShaderStageCount)))
+        if (sectionType >= SectionTypeVertexShader &&
+            sectionType < (SectionTypeVertexShader + ShaderStageCount))
         {
             auto stage = sectionType - SectionTypeVertexShader;
             stageMask |= (1 << stage);
