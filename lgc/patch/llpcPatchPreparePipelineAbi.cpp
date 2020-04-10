@@ -107,16 +107,20 @@ char PatchPreparePipelineAbi::ID = 0;
 
 // =====================================================================================================================
 // Create pass to prepare the pipeline ABI
+//
+// @param onlySetCallingConvs : Should we only set the calling conventions, or do the full prepare.
 ModulePass* lgc::createPatchPreparePipelineAbi(
-    bool     onlySetCallingConvs) // Should we only set the calling conventions, or do the full prepare.
+    bool     onlySetCallingConvs)
 {
     return new PatchPreparePipelineAbi(onlySetCallingConvs);
 }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool PatchPreparePipelineAbi::runOnModule(
-    Module& module) // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Prepare-Pipeline-Abi\n");
 
@@ -150,8 +154,10 @@ bool PatchPreparePipelineAbi::runOnModule(
 
 // =====================================================================================================================
 // Set calling convention for the entry-point of each shader (pre-GFX9)
+//
+// @param module : LLVM module
 void PatchPreparePipelineAbi::setCallingConvs(
-    Module& module)   // [in] LLVM module
+    Module& module)
 {
     const bool hasTs = (m_hasTcs || m_hasTes);
 
@@ -192,8 +198,10 @@ void PatchPreparePipelineAbi::setCallingConvs(
 
 // =====================================================================================================================
 // Merge shaders and set calling convention for the entry-point of each each shader (GFX9+)
+//
+// @param module : LLVM module
 void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(
-    Module& module)   // [in] LLVM module
+    Module& module)
 {
     assert(m_gfxIp.major >= 9);
 
@@ -325,9 +333,12 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(
 
 // =====================================================================================================================
 // Set calling convention on a particular API shader stage, if that stage has a shader
+//
+// @param shaderStage : Shader stage
+// @param callingConv : Calling convention to set it to
 void PatchPreparePipelineAbi::setCallingConv(
-    ShaderStage     shaderStage,  // Shader stage
-    CallingConv::ID callingConv)  // Calling convention to set it to
+    ShaderStage     shaderStage,
+    CallingConv::ID callingConv)
 {
     auto entryPoint = m_pipelineShaders->getEntryPoint(shaderStage);
     if (entryPoint )
@@ -336,8 +347,10 @@ void PatchPreparePipelineAbi::setCallingConv(
 
 // =====================================================================================================================
 // Set ABI-specified entrypoint name for each shader
+//
+// @param module : LLVM module
 void PatchPreparePipelineAbi::setAbiEntryNames(
-    Module& module)   // [in] LLVM module
+    Module& module)
 {
     for (auto& func : module)
     {
@@ -379,8 +392,10 @@ void PatchPreparePipelineAbi::setAbiEntryNames(
 
 // =====================================================================================================================
 // Add ABI metadata
+//
+// @param module : LLVM module
 void PatchPreparePipelineAbi::addAbiMetadata(
-    Module& module)   // [in] LLVM module
+    Module& module)
 {
     if (m_gfxIp.major <= 8)
     {

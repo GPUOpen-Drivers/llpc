@@ -54,8 +54,10 @@ namespace lgc
 {
 
 // =====================================================================================================================
+//
+// @param pipelineState : Pipeline state
 NggPrimShader::NggPrimShader(
-    PipelineState*  pipelineState) // [in] Pipeline state
+    PipelineState*  pipelineState)
     :
     m_pipelineState(pipelineState),
     m_context(&pipelineState->getContext()),
@@ -83,10 +85,14 @@ NggPrimShader::~NggPrimShader()
 
 // =====================================================================================================================
 // Generates NGG primitive shader entry-point.
+//
+// @param esEntryPoint : Entry-point of hardware export shader (ES) (could be null)
+// @param gsEntryPoint : Entry-point of hardware geometry shader (GS) (could be null)
+// @param copyShaderEntryPoint : Entry-point of hardware vertex shader (VS, copy shader) (could be null)
 Function* NggPrimShader::generate(
-    Function*  esEntryPoint,           // [in] Entry-point of hardware export shader (ES) (could be null)
-    Function*  gsEntryPoint,           // [in] Entry-point of hardware geometry shader (GS) (could be null)
-    Function*  copyShaderEntryPoint)   // [in] Entry-point of hardware vertex shader (VS, copy shader) (could be null)
+    Function*  esEntryPoint,
+    Function*  gsEntryPoint,
+    Function*  copyShaderEntryPoint)
 {
     assert(m_gfxIp.major >= 10);
 
@@ -128,8 +134,10 @@ Function* NggPrimShader::generate(
 
 // =====================================================================================================================
 // Generates the type for the new entry-point of NGG primitive shader.
+//
+// @param [out] inRegMask : "Inreg" bit mask for the arguments
 FunctionType* NggPrimShader::generatePrimShaderEntryPointType(
-    uint64_t* inRegMask // [out] "Inreg" bit mask for the arguments
+    uint64_t* inRegMask
     ) const
 {
     std::vector<Type*> argTys;
@@ -232,8 +240,10 @@ FunctionType* NggPrimShader::generatePrimShaderEntryPointType(
 
 // =====================================================================================================================
 // Generates the new entry-point for NGG primitive shader.
+//
+// @param module : LLVM module
 Function* NggPrimShader::generatePrimShaderEntryPoint(
-    Module* module)  // [in] LLVM module
+    Module* module)
 {
     uint64_t inRegMask = 0;
     auto entryPointTy = generatePrimShaderEntryPointType(&inRegMask);
@@ -331,8 +341,10 @@ Function* NggPrimShader::generatePrimShaderEntryPoint(
 
 // =====================================================================================================================
 // Constructs primitive shader for ES-only merged shader (GS is not present).
+//
+// @param module : LLVM module
 void NggPrimShader::constructPrimShaderWithoutGs(
-    Module* module) // [in] LLVM module
+    Module* module)
 {
     assert(m_hasGs == false);
 
@@ -1835,8 +1847,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(
 
 // =====================================================================================================================
 // Constructs primitive shader for ES-GS merged shader (GS is present).
+//
+// @param module : LLVM module
 void NggPrimShader::constructPrimShaderWithGs(
-    Module* module) // [in] LLVM module
+    Module* module)
 {
     assert(m_hasGs);
 
@@ -2509,9 +2523,12 @@ void NggPrimShader::constructPrimShaderWithGs(
 // Extracts merged group/wave info and initializes part of NGG calculation factors.
 //
 // NOTE: This function must be invoked by the entry block of NGG shader module.
+//
+// @param mergedGroupInfo : Merged group info
+// @param mergedWaveInfo : Merged wave info
 void NggPrimShader::initWaveThreadInfo(
-    Value* mergedGroupInfo,    // [in] Merged group info
-    Value* mergedWaveInfo)     // [in] Merged wave info
+    Value* mergedGroupInfo,
+    Value* mergedWaveInfo)
 {
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
     assert(waveSize == 32 || waveSize == 64);
@@ -2600,8 +2617,10 @@ void NggPrimShader::initWaveThreadInfo(
 
 // =====================================================================================================================
 // Does various culling for NGG primitive shader.
+//
+// @param module : LLVM module
 Value* NggPrimShader::doCulling(
-    Module* module)    // [in] LLVM module
+    Module* module)
 {
     Value* cullFlag = m_builder->getFalse();
 
@@ -2708,8 +2727,10 @@ void NggPrimShader::doParamCacheAllocRequest()
 
 // =====================================================================================================================
 // Does primitive export in NGG primitive shader.
+//
+// @param cullFlag : Cull flag indicating whether this primitive has been culled (could be null)
 void NggPrimShader::doPrimitiveExport(
-    Value* cullFlag)       // [in] Cull flag indicating whether this primitive has been culled (could be null)
+    Value* cullFlag)
 {
     const bool vertexCompact = (m_nggControl->compactMode == NggCompactVertices);
 
@@ -2860,9 +2881,12 @@ void NggPrimShader::doPrimitiveExport(
 // =====================================================================================================================
 // Early exit NGG primitive shader when we detect that the entire sub-group is fully culled, doing dummy
 // primitive/vertex export if necessary.
+//
+// @param fullyCulledThreadCount : Thread count left when the entire sub-group is fully culled
+// @param expPosCount : Position export count
 void NggPrimShader::doEarlyExit(
-    unsigned  fullyCulledThreadCount,   // Thread count left when the entire sub-group is fully culled
-    unsigned  expPosCount)              // Position export count
+    unsigned  fullyCulledThreadCount,
+    unsigned  expPosCount)
 {
     if (fullyCulledThreadCount > 0)
     {
@@ -2940,13 +2964,20 @@ void NggPrimShader::doEarlyExit(
 //
 // NOTE: The ES variant is derived from original ES main function with some additional special handling added to the
 // function body and also mutates its return type.
+//
+// @param module : LLVM module
+// @param entryName : ES entry name
+// @param sysValueStart : Start of system value
+// @param sysValueFromLds : Whether some system values are loaded from LDS (for vertex compaction)
+// @param [out] expDataSet : Set of exported data (could be null)
+// @param insertAtEnd : Where to insert instructions
 void NggPrimShader::runEsOrEsVariant(
-    Module*               module,          // [in] LLVM module
-    StringRef             entryName,        // ES entry name
-    Argument*             sysValueStart,   // Start of system value
-    bool                  sysValueFromLds,  // Whether some system values are loaded from LDS (for vertex compaction)
-    std::vector<ExpData>* expDataSet,      // [out] Set of exported data (could be null)
-    BasicBlock*           insertAtEnd)     // [in] Where to insert instructions
+    Module*               module,
+    StringRef             entryName,
+    Argument*             sysValueStart,
+    bool                  sysValueFromLds,
+    std::vector<ExpData>* expDataSet,
+    BasicBlock*           insertAtEnd)
 {
     const bool hasTs = (m_hasTcs || m_hasTes);
     if (((hasTs && m_hasTes) || (!hasTs && m_hasVs)) == false)
@@ -3193,10 +3224,14 @@ void NggPrimShader::runEsOrEsVariant(
 //   .variant:       [ POS0: <4 x float>, POS1: <4 x float>, ..., PARAM0: <4 x float>, PARAM1: <4 x float>, ... ]
 //   .variant.pos:   [ POS0: <4 x float>, POS1: <4 x float>, ... ]
 //   .variant.param: [ PARAM0: <4 x float>, PARAM1: <4 x float>, ... ]
+//
+// @param module : LLVM module
+// @param entryName : ES entry name
+// @param [out] expDataSet : Set of exported data
 Function* NggPrimShader::mutateEsToVariant(
-    Module*               module,          // [in] LLVM module
-    StringRef             entryName,        // ES entry name
-    std::vector<ExpData>& expDataSet)       // [out] Set of exported data
+    Module*               module,
+    StringRef             entryName,
+    std::vector<ExpData>& expDataSet)
 {
     assert(m_hasGs == false); // GS must not be present
     assert(expDataSet.empty());
@@ -3381,10 +3416,14 @@ Function* NggPrimShader::mutateEsToVariant(
 //
 // NOTE: The GS variant is derived from original GS main function with some additional special handling added to the
 // function body and also mutates its return type.
+//
+// @param module : LLVM module
+// @param sysValueStart : Start of system value
+// @param insertAtEnd : Where to insert instructions
 Value* NggPrimShader::runGsVariant(
-    Module*         module,        // [in] LLVM module
-    Argument*       sysValueStart, // Start of system value
-    BasicBlock*     insertAtEnd)   // [in] Where to insert instructions
+    Module*         module,
+    Argument*       sysValueStart,
+    BasicBlock*     insertAtEnd)
 {
     assert(m_hasGs); // GS must be present
 
@@ -3537,8 +3576,10 @@ Value* NggPrimShader::runGsVariant(
 // handled by shader itself. Also, output primitive/vertex count info is calculated and is returned. The return type
 // is something like this:
 //   { OUT_PRIM_COUNT: i32, OUT_VERT_COUNT: i32, INCLUSIVE_OUT_VERT_COUNT: i32, OUT_VERT_COUNT_IN_WAVE: i32 }
+//
+// @param module : LLVM module
 Function* NggPrimShader::mutateGsToVariant(
-    Module* module)          // [in] LLVM module
+    Module* module)
 {
     assert(m_hasGs); // GS must be present
 
@@ -3774,9 +3815,12 @@ Function* NggPrimShader::mutateGsToVariant(
 
 // =====================================================================================================================
 // Runs copy shader.
+//
+// @param module : LLVM module
+// @param insertAtEnd : Where to insert instructions
 void NggPrimShader::runCopyShader(
-    Module*     module,        // [in] LLVM module
-    BasicBlock* insertAtEnd)   // [in] Where to insert instructions
+    Module*     module,
+    BasicBlock* insertAtEnd)
 {
     assert(m_hasGs); // GS must be present
 
@@ -3858,13 +3902,20 @@ void NggPrimShader::runCopyShader(
 
 // =====================================================================================================================
 // Exports outputs of geometry shader to GS-VS ring.
+//
+// @param output : Output value
+// @param location : Location of the output
+// @param compIdx : Index used for vector element indexing
+// @param streamId : ID of output vertex stream
+// @param threadIdInSubgroup : Thread ID in sub-group
+// @param outVertCounter : GS output vertex counter for this stream
 void NggPrimShader::exportGsOutput(
-    Value*       output,               // [in] Output value
-    unsigned     location,              // Location of the output
-    unsigned     compIdx,               // Index used for vector element indexing
-    unsigned     streamId,              // ID of output vertex stream
-    llvm::Value* threadIdInSubgroup,   // [in] Thread ID in sub-group
-    Value*       outVertCounter)       // [in] GS output vertex counter for this stream
+    Value*       output,
+    unsigned     location,
+    unsigned     compIdx,
+    unsigned     streamId,
+    llvm::Value* threadIdInSubgroup,
+    Value*       outVertCounter)
 {
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
     if (resUsage->inOutUsage.gs.rasterStream != streamId)
@@ -3942,12 +3993,18 @@ void NggPrimShader::exportGsOutput(
 
 // =====================================================================================================================
 // Imports outputs of geometry shader from GS-VS ring.
+//
+// @param outputTy : Type of the output
+// @param location : Location of the output
+// @param compIdx : Index used for vector element indexing
+// @param streamId : ID of output vertex stream
+// @param vertexOffset : Start offset of vertex item in GS-VS ring (in BYTES)
 Value* NggPrimShader::importGsOutput(
-    Type*        outputTy,             // [in] Type of the output
-    unsigned     location,              // Location of the output
-    unsigned     compIdx,               // Index used for vector element indexing
-    unsigned     streamId,              // ID of output vertex stream
-    Value*       vertexOffset)         // [in] Start offset of vertex item in GS-VS ring (in BYTES)
+    Type*        outputTy,
+    unsigned     location,
+    unsigned     compIdx,
+    unsigned     streamId,
+    Value*       vertexOffset)
 {
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
     if (resUsage->inOutUsage.gs.rasterStream != streamId)
@@ -3998,15 +4055,24 @@ Value* NggPrimShader::importGsOutput(
 
 // =====================================================================================================================
 // Processes the message GS_EMIT.
+//
+// @param module : LLVM module
+// @param streamId : ID of output vertex stream
+// @param threadIdInSubgroup : Thread ID in subgroup
+// @param [in,out] emitCounterPtr : Pointer to GS emit counter for this stream
+// @param [in,out] outVertCounterPtr : Pointer to GS output vertex counter for this stream
+// @param [in,out] outPrimCounterPtr : Pointer to GS output primitive counter for this stream
+// @param [in,out] outstandingVertCounterPtr : Pointer to GS outstanding vertex counter for this stream
+// @param [in,out] flipVertOrderPtr : Pointer to flags indicating whether to flip vertex ordering
 void NggPrimShader::processGsEmit(
-    Module*  module,                       // [in] LLVM module
-    unsigned streamId,                      // ID of output vertex stream
-    Value*   threadIdInSubgroup,           // [in] Thread ID in subgroup
-    Value*   emitCounterPtr,               // [in,out] Pointer to GS emit counter for this stream
-    Value*   outVertCounterPtr,            // [in,out] Pointer to GS output vertex counter for this stream
-    Value*   outPrimCounterPtr,            // [in,out] Pointer to GS output primitive counter for this stream
-    Value*   outstandingVertCounterPtr,    // [in,out] Pointer to GS outstanding vertex counter for this stream
-    Value*   flipVertOrderPtr)             // [in,out] Pointer to flags indicating whether to flip vertex ordering
+    Module*  module,
+    unsigned streamId,
+    Value*   threadIdInSubgroup,
+    Value*   emitCounterPtr,
+    Value*   outVertCounterPtr,
+    Value*   outPrimCounterPtr,
+    Value*   outstandingVertCounterPtr,
+    Value*   flipVertOrderPtr)
 {
     auto gsEmitHandler = module->getFunction(lgcName::NggGsEmit);
     if (!gsEmitHandler )
@@ -4025,15 +4091,24 @@ void NggPrimShader::processGsEmit(
 
 // =====================================================================================================================
 // Processes the message GS_CUT.
+//
+// @param module : LLVM module
+// @param streamId : ID of output vertex stream
+// @param threadIdInSubgroup : Thread ID in subgroup
+// @param [in,out] emitCounterPtr : Pointer to GS emit counter for this stream
+// @param [in,out] outVertCounterPtr : Pointer to GS output vertex counter for this stream
+// @param [in,out] outPrimCounterPtr : Pointer to GS output primitive counter for this stream
+// @param [in,out] outstandingVertCounterPtr : Pointer to GS outstanding vertex counter for this stream
+// @param [in,out] flipVertOrderPtr : Pointer to flags indicating whether to flip vertex ordering
 void NggPrimShader::processGsCut(
-    Module*  module,                       // [in] LLVM module
-    unsigned streamId,                      // ID of output vertex stream
-    Value*   threadIdInSubgroup,           // [in] Thread ID in subgroup
-    Value*   emitCounterPtr,               // [in,out] Pointer to GS emit counter for this stream
-    Value*   outVertCounterPtr,            // [in,out] Pointer to GS output vertex counter for this stream
-    Value*   outPrimCounterPtr,            // [in,out] Pointer to GS output primitive counter for this stream
-    Value*   outstandingVertCounterPtr,    // [in,out] Pointer to GS outstanding vertex counter for this stream
-    Value*   flipVertOrderPtr)             // [in,out] Pointer to flags indicating whether to flip vertex ordering
+    Module*  module,
+    unsigned streamId,
+    Value*   threadIdInSubgroup,
+    Value*   emitCounterPtr,
+    Value*   outVertCounterPtr,
+    Value*   outPrimCounterPtr,
+    Value*   outstandingVertCounterPtr,
+    Value*   flipVertOrderPtr)
 {
     auto gsCutHandler = module->getFunction(lgcName::NggGsCut);
     if (!gsCutHandler )
@@ -4052,9 +4127,12 @@ void NggPrimShader::processGsCut(
 
 // =====================================================================================================================
 // Creates the function that processes GS_EMIT.
+//
+// @param module : LLVM module
+// @param streamId : ID of output vertex stream
 Function* NggPrimShader::createGsEmitHandler(
-    Module*     module,    // [in] LLVM module
-    unsigned    streamId)   // ID of output vertex stream
+    Module*     module,
+    unsigned    streamId)
 {
     assert(m_hasGs);
 
@@ -4283,9 +4361,12 @@ Function* NggPrimShader::createGsEmitHandler(
 
 // =====================================================================================================================
 // Creates the function that processes GS_EMIT.
+//
+// @param module : LLVM module
+// @param streamId : ID of output vertex stream
 Function* NggPrimShader::createGsCutHandler(
-    Module*     module,    // [in] LLVM module
-    unsigned    streamId)   // ID of output vertex stream
+    Module*     module,
+    unsigned    streamId)
 {
     assert(m_hasGs);
 
@@ -4461,9 +4542,12 @@ Function* NggPrimShader::createGsCutHandler(
 // vertices emitted by this GS thread. After revising, the index values are "subgroup-view" ones, corresponding to the
 // output vertices emitted by the whole GS sub-group. Thus, number of output vertices prior to this GS thread is
 // counted in.
+//
+// @param outPrimId : GS output primitive ID
+// @param vertexIdAdjust : Adjustment of vertex indices corresponding to the GS output primitive
 void NggPrimShader::reviseOutputPrimitiveData(
-    Value* outPrimId,       // [in] GS output primitive ID
-    Value* vertexIdAdjust)  // [in] Adjustment of vertex indices corresponding to the GS output primitive
+    Value* outPrimId,
+    Value* vertexIdAdjust)
 {
     const auto& geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
     const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
@@ -4563,10 +4647,14 @@ void NggPrimShader::reviseOutputPrimitiveData(
 
 // =====================================================================================================================
 // Reads per-thread data from the specified NGG region in LDS.
+//
+// @param readDataTy : Data written to LDS
+// @param threadId : Thread ID in sub-group to calculate LDS offset
+// @param region : NGG LDS region
 Value* NggPrimShader::readPerThreadDataFromLds(
-    Type*             readDataTy,  // [in] Data written to LDS
-    Value*            threadId,    // [in] Thread ID in sub-group to calculate LDS offset
-    NggLdsRegionType  region)       // NGG LDS region
+    Type*             readDataTy,
+    Value*            threadId,
+    NggLdsRegionType  region)
 {
     auto sizeInBytes = readDataTy->getPrimitiveSizeInBits() / 8;
 
@@ -4584,10 +4672,14 @@ Value* NggPrimShader::readPerThreadDataFromLds(
 
 // =====================================================================================================================
 // Writes the per-thread data to the specified NGG region in LDS.
+//
+// @param writeData : Data written to LDS
+// @param threadId : Thread ID in sub-group to calculate LDS offset
+// @param region : NGG LDS region
 void NggPrimShader::writePerThreadDataToLds(
-    Value*           writeData,        // [in] Data written to LDS
-    Value*           threadId,         // [in] Thread ID in sub-group to calculate LDS offset
-    NggLdsRegionType region)            // NGG LDS region
+    Value*           writeData,
+    Value*           threadId,
+    NggLdsRegionType region)
 {
     auto writeDataTy = writeData->getType();
     auto sizeInBytes = writeDataTy->getPrimitiveSizeInBits() / 8;
@@ -4606,12 +4698,18 @@ void NggPrimShader::writePerThreadDataToLds(
 
 // =====================================================================================================================
 // Backface culler.
+//
+// @param module : LLVM module
+// @param cullFlag : Cull flag before doing this culling
+// @param vertex0 : Position data of vertex0
+// @param vertex1 : Position data of vertex1
+// @param vertex2 : Position data of vertex2
 Value* NggPrimShader::doBackfaceCulling(
-    Module*     module,        // [in] LLVM module
-    Value*      cullFlag,      // [in] Cull flag before doing this culling
-    Value*      vertex0,       // [in] Position data of vertex0
-    Value*      vertex1,       // [in] Position data of vertex1
-    Value*      vertex2)       // [in] Position data of vertex2
+    Module*     module,
+    Value*      cullFlag,
+    Value*      vertex0,
+    Value*      vertex1,
+    Value*      vertex2)
 {
     assert(m_nggControl->enableBackfaceCulling);
 
@@ -4658,12 +4756,18 @@ Value* NggPrimShader::doBackfaceCulling(
 
 // =====================================================================================================================
 // Frustum culler.
+//
+// @param module : LLVM module
+// @param cullFlag : Cull flag before doing this culling
+// @param vertex0 : Position data of vertex0
+// @param vertex1 : Position data of vertex1
+// @param vertex2 : Position data of vertex2
 Value* NggPrimShader::doFrustumCulling(
-    Module*     module,        // [in] LLVM module
-    Value*      cullFlag,      // [in] Cull flag before doing this culling
-    Value*      vertex0,       // [in] Position data of vertex0
-    Value*      vertex1,       // [in] Position data of vertex1
-    Value*      vertex2)       // [in] Position data of vertex2
+    Module*     module,
+    Value*      cullFlag,
+    Value*      vertex0,
+    Value*      vertex1,
+    Value*      vertex2)
 {
     assert(m_nggControl->enableFrustumCulling);
 
@@ -4709,12 +4813,18 @@ Value* NggPrimShader::doFrustumCulling(
 
 // =====================================================================================================================
 // Box filter culler.
+//
+// @param module : LLVM module
+// @param cullFlag : Cull flag before doing this culling
+// @param vertex0 : Position data of vertex0
+// @param vertex1 : Position data of vertex1
+// @param vertex2 : Position data of vertex2
 Value* NggPrimShader::doBoxFilterCulling(
-    Module*     module,        // [in] LLVM module
-    Value*      cullFlag,      // [in] Cull flag before doing this culling
-    Value*      vertex0,       // [in] Position data of vertex0
-    Value*      vertex1,       // [in] Position data of vertex1
-    Value*      vertex2)       // [in] Position data of vertex2
+    Module*     module,
+    Value*      cullFlag,
+    Value*      vertex0,
+    Value*      vertex1,
+    Value*      vertex2)
 {
     assert(m_nggControl->enableBoxFilterCulling);
 
@@ -4764,12 +4874,18 @@ Value* NggPrimShader::doBoxFilterCulling(
 
 // =====================================================================================================================
 // Sphere culler.
+//
+// @param module : LLVM module
+// @param cullFlag : Cull flag before doing this culling
+// @param vertex0 : Position data of vertex0
+// @param vertex1 : Position data of vertex1
+// @param vertex2 : Position data of vertex2
 Value* NggPrimShader::doSphereCulling(
-    Module*     module,        // [in] LLVM module
-    Value*      cullFlag,      // [in] Cull flag before doing this culling
-    Value*      vertex0,       // [in] Position data of vertex0
-    Value*      vertex1,       // [in] Position data of vertex1
-    Value*      vertex2)       // [in] Position data of vertex2
+    Module*     module,
+    Value*      cullFlag,
+    Value*      vertex0,
+    Value*      vertex1,
+    Value*      vertex2)
 {
     assert(m_nggControl->enableSphereCulling);
 
@@ -4819,12 +4935,18 @@ Value* NggPrimShader::doSphereCulling(
 
 // =====================================================================================================================
 // Small primitive filter culler.
+//
+// @param module : LLVM module
+// @param cullFlag : Cull flag before doing this culling
+// @param vertex0 : Position data of vertex0
+// @param vertex1 : Position data of vertex1
+// @param vertex2 : Position data of vertex2
 Value* NggPrimShader::doSmallPrimFilterCulling(
-    Module*     module,        // [in] LLVM module
-    Value*      cullFlag,      // [in] Cull flag before doing this culling
-    Value*      vertex0,       // [in] Position data of vertex0
-    Value*      vertex1,       // [in] Position data of vertex1
-    Value*      vertex2)       // [in] Position data of vertex2
+    Module*     module,
+    Value*      cullFlag,
+    Value*      vertex0,
+    Value*      vertex1,
+    Value*      vertex2)
 {
     assert(m_nggControl->enableSmallPrimFilter);
 
@@ -4862,12 +4984,18 @@ Value* NggPrimShader::doSmallPrimFilterCulling(
 
 // =====================================================================================================================
 // Cull distance culler.
+//
+// @param module : LLVM module
+// @param cullFlag : Cull flag before doing this culling
+// @param signMask0 : Sign mask of cull distance of vertex0
+// @param signMask1 : Sign mask of cull distance of vertex1
+// @param signMask2 : Sign mask of cull distance of vertex2
 Value* NggPrimShader::doCullDistanceCulling(
-    Module*     module,        // [in] LLVM module
-    Value*      cullFlag,      // [in] Cull flag before doing this culling
-    Value*      signMask0,     // [in] Sign mask of cull distance of vertex0
-    Value*      signMask1,     // [in] Sign mask of cull distance of vertex1
-    Value*      signMask2)     // [in] Sign mask of cull distance of vertex2
+    Module*     module,
+    Value*      cullFlag,
+    Value*      signMask0,
+    Value*      signMask1,
+    Value*      signMask2)
 {
     assert(m_nggControl->enableCullDistanceCulling);
 
@@ -4887,9 +5015,12 @@ Value* NggPrimShader::doCullDistanceCulling(
 
 // =====================================================================================================================
 // Fetches culling-control register from primitive shader table.
+//
+// @param module : LLVM module
+// @param regOffset : Register offset in the primitive shader table (in BYTEs)
 Value* NggPrimShader::fetchCullingControlRegister(
-    Module*     module,        // [in] LLVM module
-    unsigned    regOffset)      // Register offset in the primitive shader table (in BYTEs)
+    Module*     module,
+    unsigned    regOffset)
 {
     auto fetchCullingRegister = module->getFunction(lgcName::NggCullingFetchReg);
     if (!fetchCullingRegister )
@@ -4905,8 +5036,10 @@ Value* NggPrimShader::fetchCullingControlRegister(
 
 // =====================================================================================================================
 // Creates the function that does backface culling.
+//
+// @param module : LLVM module
 Function* NggPrimShader::createBackfaceCuller(
-    Module* module) // [in] LLVM module
+    Module* module)
 {
     auto funcTy = FunctionType::get(m_builder->getInt1Ty(),
                                      {
@@ -5176,8 +5309,10 @@ Function* NggPrimShader::createBackfaceCuller(
 
 // =====================================================================================================================
 // Creates the function that does frustum culling.
+//
+// @param module : LLVM module
 Function* NggPrimShader::createFrustumCuller(
-    Module* module)    // [in] LLVM module
+    Module* module)
 {
     auto funcTy = FunctionType::get(m_builder->getInt1Ty(),
                                      {
@@ -5440,8 +5575,10 @@ Function* NggPrimShader::createFrustumCuller(
 
 // =====================================================================================================================
 // Creates the function that does box filter culling.
+//
+// @param module : LLVM module
 Function* NggPrimShader::createBoxFilterCuller(
-    Module* module)    // [in] LLVM module
+    Module* module)
 {
     auto funcTy = FunctionType::get(m_builder->getInt1Ty(),
                                      {
@@ -5687,8 +5824,10 @@ Function* NggPrimShader::createBoxFilterCuller(
 
 // =====================================================================================================================
 // Creates the function that does sphere culling.
+//
+// @param module : LLVM module
 Function* NggPrimShader::createSphereCuller(
-    Module* module)    // [in] LLVM module
+    Module* module)
 {
     auto funcTy = FunctionType::get(m_builder->getInt1Ty(),
                                      {
@@ -6089,8 +6228,10 @@ Function* NggPrimShader::createSphereCuller(
 
 // =====================================================================================================================
 // Creates the function that does small primitive filter culling.
+//
+// @param module : LLVM module
 Function* NggPrimShader::createSmallPrimFilterCuller(
-    Module* module)    // [in] LLVM module
+    Module* module)
 {
     auto funcTy = FunctionType::get(m_builder->getInt1Ty(),
                                      {
@@ -6390,8 +6531,10 @@ Function* NggPrimShader::createSmallPrimFilterCuller(
 
 // =====================================================================================================================
 // Creates the function that does frustum culling.
+//
+// @param module : LLVM module
 Function* NggPrimShader::createCullDistanceCuller(
-    Module* module)    // [in] LLVM module
+    Module* module)
 {
     auto funcTy = FunctionType::get(m_builder->getInt1Ty(),
                                      {
@@ -6471,8 +6614,10 @@ Function* NggPrimShader::createCullDistanceCuller(
 
 // =====================================================================================================================
 // Creates the function that fetches culling control registers.
+//
+// @param module : LLVM module
 Function* NggPrimShader::createFetchCullingRegister(
-    Module* module) // [in] LLVM module
+    Module* module)
 {
     auto funcTy = FunctionType::get(m_builder->getInt32Ty(),
                                      {
@@ -6538,8 +6683,10 @@ Function* NggPrimShader::createFetchCullingRegister(
 
 // =====================================================================================================================
 // Output a subgroup ballot (always return i64 mask)
+//
+// @param value : The value to do the ballot on.
 Value* NggPrimShader::doSubgroupBallot(
-    Value* value) // [in] The value to do the ballot on.
+    Value* value)
 {
     assert(value->getType()->isIntegerTy(1)); // Should be i1
 
@@ -6572,9 +6719,12 @@ Value* NggPrimShader::doSubgroupBallot(
 
 // =====================================================================================================================
 // Output a subgroup inclusive-add (IAdd).
+//
+// @param value : The value to do the inclusive-add on
+// @param [out] ppWwmResult : Result in WWM section (optinal)
 Value* NggPrimShader::doSubgroupInclusiveAdd(
-    Value*   value,        // [in] The value to do the inclusive-add on
-    Value**  ppWwmResult)   // [out] Result in WWM section (optinal)
+    Value*   value,
+    Value**  ppWwmResult)
 {
     assert(value->getType()->isIntegerTy(32)); // Should be i32
 
@@ -6678,13 +6828,20 @@ Value* NggPrimShader::doSubgroupInclusiveAdd(
 
 // =====================================================================================================================
 // Does DPP update with specified parameters.
+//
+// @param oldValue : Old value
+// @param srcValue : Source value to update with
+// @param dppCtrl : DPP controls
+// @param rowMask : Row mask
+// @param bankMask : Bank mask
+// @param boundCtrl : Whether to do bound control
 Value* NggPrimShader::doDppUpdate(
-    Value*      oldValue,  // [in] Old value
-    Value*      srcValue,  // [in] Source value to update with
-    unsigned    dppCtrl,    // DPP controls
-    unsigned    rowMask,    // Row mask
-    unsigned    bankMask,   // Bank mask
-    bool        boundCtrl)  // Whether to do bound control
+    Value*      oldValue,
+    Value*      srcValue,
+    unsigned    dppCtrl,
+    unsigned    rowMask,
+    unsigned    bankMask,
+    bool        boundCtrl)
 {
     return m_builder->CreateIntrinsic(Intrinsic::amdgcn_update_dpp,
                                        m_builder->getInt32Ty(),
@@ -6700,9 +6857,12 @@ Value* NggPrimShader::doDppUpdate(
 
 // =====================================================================================================================
 // Creates a new basic block. Always insert it at the end of the parent function.
+//
+// @param parent : Parent function to which the new block belongs
+// @param blockName : Name of the new block
 BasicBlock* NggPrimShader::createBlock(
-    Function*    parent,   // [in] Parent function to which the new block belongs
-    const Twine& blockName) // [in] Name of the new block
+    Function*    parent,
+    const Twine& blockName)
 {
     return BasicBlock::Create(*m_context, blockName, parent);
 }

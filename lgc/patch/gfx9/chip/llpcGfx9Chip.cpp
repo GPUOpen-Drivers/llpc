@@ -43,8 +43,10 @@ namespace Gfx9
 
 // =====================================================================================================================
 // Initializer
+//
+// @param gfxIp : Graphics IP version info
 VsRegConfig::VsRegConfig(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_VS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_VS);
@@ -72,8 +74,10 @@ VsRegConfig::VsRegConfig(
 
 // =====================================================================================================================
 // Initializer
+//
+// @param gfxIp : Graphics IP version info
 LsHsRegConfig::LsHsRegConfig(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_HS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_HS);
@@ -91,8 +95,10 @@ LsHsRegConfig::LsHsRegConfig(
 
 // =====================================================================================================================
 // Initializer
+//
+// @param gfxIp : Graphics IP version info
 EsGsRegConfig::EsGsRegConfig(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_GS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_GS);
@@ -127,8 +133,10 @@ EsGsRegConfig::EsGsRegConfig(
 
 // =====================================================================================================================
 // Initializer
+//
+// @param gfxIp : Graphics IP version info
 PrimShaderRegConfig::PrimShaderRegConfig(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_GS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_GS);
@@ -174,8 +182,10 @@ PrimShaderRegConfig::PrimShaderRegConfig(
 
 // =====================================================================================================================
 // Initializer
+//
+// @param gfxIp : Graphics IP version info
 PsRegConfig::PsRegConfig(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_PS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_PS);
@@ -205,8 +215,10 @@ PsRegConfig::PsRegConfig(
 
 // =====================================================================================================================
 // Initializer
+//
+// @param gfxIp : Graphics IP version info
 PipelineVsFsRegConfig::PipelineVsFsRegConfig(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
     :
     vsRegs(gfxIp),
     psRegs(gfxIp)
@@ -219,8 +231,10 @@ PipelineVsFsRegConfig::PipelineVsFsRegConfig(
 
 // =====================================================================================================================
 // Initializer
+//
+// @param gfxIp : Graphics IP version info
 PipelineVsTsFsRegConfig::PipelineVsTsFsRegConfig(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
     :
     lsHsRegs(gfxIp),
     vsRegs(gfxIp),
@@ -234,8 +248,10 @@ PipelineVsTsFsRegConfig::PipelineVsTsFsRegConfig(
 
 // =====================================================================================================================
 // Initializer
+//
+// @param gfxIp : Graphics IP version info
 PipelineVsGsFsRegConfig::PipelineVsGsFsRegConfig(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
     :
     esGsRegs(gfxIp),
     vsRegs(gfxIp),
@@ -262,8 +278,10 @@ PipelineVsTsGsFsRegConfig::PipelineVsTsGsFsRegConfig(GfxIpVersion gfxIp)
 
 // =====================================================================================================================
 // Initializer
+//
+// @param gfxIp : Graphics IP version info
 PipelineNggVsFsRegConfig::PipelineNggVsFsRegConfig(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
     :
     primShaderRegs(gfxIp),
     psRegs(gfxIp)
@@ -274,8 +292,10 @@ PipelineNggVsFsRegConfig::PipelineNggVsFsRegConfig(
 
 // =====================================================================================================================
 // Initializer
+//
+// @param gfxIp : Graphics IP version info
 PipelineNggVsTsFsRegConfig::PipelineNggVsTsFsRegConfig(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
     :
     lsHsRegs(gfxIp),
     primShaderRegs(gfxIp),
@@ -287,8 +307,10 @@ PipelineNggVsTsFsRegConfig::PipelineNggVsTsFsRegConfig(
 
 // =====================================================================================================================
 // Initializer
+//
+// @param gfxIp : Graphics IP version info
 PipelineNggVsGsFsRegConfig::PipelineNggVsGsFsRegConfig(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
     :
     primShaderRegs(gfxIp),
     psRegs(gfxIp)
@@ -299,8 +321,10 @@ PipelineNggVsGsFsRegConfig::PipelineNggVsGsFsRegConfig(
 
 // =====================================================================================================================
 // Initializer
+//
+// @param gfxIp : Graphics IP version info
 PipelineNggVsTsGsFsRegConfig::PipelineNggVsTsGsFsRegConfig(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
     :
     lsHsRegs(gfxIp),
     primShaderRegs(gfxIp),
@@ -312,8 +336,10 @@ PipelineNggVsTsGsFsRegConfig::PipelineNggVsTsGsFsRegConfig(
 
 // =====================================================================================================================
 // Initializer
+//
+// @param gfxIp : Graphics IP version info
 CsRegConfig::CsRegConfig(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
 {
     INIT_REG(COMPUTE_PGM_RSRC1);
     INIT_REG(COMPUTE_PGM_RSRC2);
@@ -342,8 +368,10 @@ CsRegConfig::CsRegConfig(
 
 // =====================================================================================================================
 // Adds entries to register name map.
+//
+// @param gfxIp : Graphics IP version info
 void initRegisterNameMap(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
 {
     assert(gfxIp.major == 9 || gfxIp.major == 10);
 

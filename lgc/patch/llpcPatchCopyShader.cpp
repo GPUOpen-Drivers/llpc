@@ -107,8 +107,10 @@ ModulePass* lgc::createPatchCopyShader()
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool PatchCopyShader::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Copy-Shader\n");
 
@@ -285,8 +287,10 @@ bool PatchCopyShader::runOnModule(
 
 // =====================================================================================================================
 // Collects info for GS generic outputs.
+//
+// @param gsEntryPoint : Geometry shader entrypoint
 void PatchCopyShader::collectGsGenericOutputInfo(
-    Function* gsEntryPoint)  // [in] Geometry shader entrypoint
+    Function* gsEntryPoint)
 {
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
@@ -346,9 +350,12 @@ void PatchCopyShader::collectGsGenericOutputInfo(
 
 // =====================================================================================================================
 // Exports outputs of geometry shader, inserting buffer-load/output-export calls.
+//
+// @param streamId : Export output of this stream
+// @param builder : BuilderBase to use for instruction constructing
 void PatchCopyShader::exportOutput(
-    unsigned        streamId,     // Export output of this stream
-    BuilderBase&    builder)      // [in] BuilderBase to use for instruction constructing
+    unsigned        streamId,
+    BuilderBase&    builder)
 {
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
     auto& builtInUsage = resUsage->builtInUsage.gs;
@@ -432,11 +439,16 @@ void PatchCopyShader::exportOutput(
 
 // =====================================================================================================================
 // Calculates GS to VS ring offset from input location
+//
+// @param location : Output location
+// @param compIdx : Output component
+// @param streamId : Output stream ID
+// @param builder : BuilderBase to use for instruction constructing
 Value* PatchCopyShader::calcGsVsRingOffsetForInput(
-    unsigned        location,    // Output location
-    unsigned        compIdx,     // Output component
-    unsigned        streamId,    // Output stream ID
-    BuilderBase&    builder)     // [in] BuilderBase to use for instruction constructing
+    unsigned        location,
+    unsigned        compIdx,
+    unsigned        streamId,
+    BuilderBase&    builder)
 {
     auto entryPoint = builder.GetInsertBlock()->getParent();
     Value* vertexOffset = getFunctionArgument(entryPoint, CopyShaderUserSgprIdxVertexOffset);
@@ -465,11 +477,16 @@ Value* PatchCopyShader::calcGsVsRingOffsetForInput(
 
 // =====================================================================================================================
 // Loads value from GS-VS ring (only accept 32-bit scalar, vector, or arry).
+//
+// @param loadTy : Type of the load value
+// @param location : Output location
+// @param streamId : Output stream ID
+// @param builder : BuilderBase to use for instruction constructing
 Value* PatchCopyShader::loadValueFromGsVsRing(
-    Type*           loadTy,    // [in] Type of the load value
-    unsigned        location,   // Output location
-    unsigned        streamId,   // Output stream ID
-    BuilderBase&    builder)    // [in] BuilderBase to use for instruction constructing
+    Type*           loadTy,
+    unsigned        location,
+    unsigned        streamId,
+    BuilderBase&    builder)
 {
     unsigned elemCount = 1;
     Type* elemTy = loadTy;
@@ -551,8 +568,10 @@ Value* PatchCopyShader::loadValueFromGsVsRing(
 
 // =====================================================================================================================
 // Load GS-VS ring buffer descriptor.
+//
+// @param builder : BuilderBase to use for instruction constructing
 Value* PatchCopyShader::loadGsVsRingBufferDescriptor(
-    BuilderBase& builder)       // [in] BuilderBase to use for instruction constructing
+    BuilderBase& builder)
 {
     Function* entryPoint = builder.GetInsertBlock()->getParent();
     Value* internalTablePtrLow = getFunctionArgument(entryPoint, EntryArgIdxInternalTablePtrLow);
@@ -583,11 +602,16 @@ Value* PatchCopyShader::loadGsVsRingBufferDescriptor(
 
 // =====================================================================================================================
 // Exports generic outputs of geometry shader, inserting output-export calls.
+//
+// @param outputValue : Value exported to output
+// @param location : Location of the output
+// @param streamId : ID of output vertex stream
+// @param builder : BuilderBase to use for instruction constructing
 void PatchCopyShader::exportGenericOutput(
-    Value*       outputValue,  // [in] Value exported to output
-    unsigned     location,      // Location of the output
-    unsigned     streamId,      // ID of output vertex stream
-    BuilderBase& builder)       // [in] BuilderBase to use for instruction constructing
+    Value*       outputValue,
+    unsigned     location,
+    unsigned     streamId,
+    BuilderBase& builder)
 {
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
     if (resUsage->inOutUsage.enableXfb)
@@ -664,11 +688,16 @@ void PatchCopyShader::exportGenericOutput(
 
 // =====================================================================================================================
 // Exports built-in outputs of geometry shader, inserting output-export calls.
+//
+// @param outputValue : Value exported to output
+// @param builtInId : ID of the built-in variable
+// @param streamId : ID of output vertex stream
+// @param builder : BuilderBase to use for instruction constructing
 void PatchCopyShader::exportBuiltInOutput(
-    Value*       outputValue,  // [in] Value exported to output
-    BuiltInKind  builtInId,     // ID of the built-in variable
-    unsigned     streamId,      // ID of output vertex stream
-    BuilderBase& builder)       // [in] BuilderBase to use for instruction constructing
+    Value*       outputValue,
+    BuiltInKind  builtInId,
+    unsigned     streamId,
+    BuilderBase& builder)
 {
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 

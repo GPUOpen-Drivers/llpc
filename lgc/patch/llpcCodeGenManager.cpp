@@ -65,9 +65,12 @@ namespace lgc
 
 // =====================================================================================================================
 // Setup LLVM target features, target features are set per entry point function.
+//
+// @param pipelineState : Pipeline state
+// @param [in, out] module : LLVM module
 void CodeGenManager::setupTargetFeatures(
-    PipelineState*      pipelineState, // [in] Pipeline state
-    Module*             module)        // [in, out] LLVM module
+    PipelineState*      pipelineState,
+    Module*             module)
 {
     std::string globalFeatures = "";
 

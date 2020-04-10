@@ -109,10 +109,14 @@ void BuilderContext::initialize()
 
 // =====================================================================================================================
 // Create the BuilderContext. Returns nullptr on failure to recognize the AMDGPU target whose name is specified
+//
+// @param context : LLVM context to give each Builder
+// @param gpuName : LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
+// @param palAbiVersion : PAL pipeline ABI version to compile for
 BuilderContext* BuilderContext::Create(
-    LLVMContext&  context,              // [in] LLVM context to give each Builder
-    StringRef     gpuName,              // LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
-    unsigned      palAbiVersion)        // PAL pipeline ABI version to compile for
+    LLVMContext&  context,
+    StringRef     gpuName,
+    unsigned      palAbiVersion)
 {
     assert(Initialized && "Must call BuilderContext::Initialize before BuilderContext::Create");
 
@@ -148,9 +152,12 @@ BuilderContext* BuilderContext::Create(
 }
 
 // =====================================================================================================================
+//
+// @param context : LLVM context to give each Builder
+// @param palAbiVersion : PAL pipeline ABI version to compile for
 BuilderContext::BuilderContext(
-    LLVMContext&  context,              // [in] LLVM context to give each Builder
-    unsigned      palAbiVersion)        // PAL pipeline ABI version to compile for
+    LLVMContext&  context,
+    unsigned      palAbiVersion)
     :
     m_context(context)
 {
@@ -175,9 +182,12 @@ Pipeline* BuilderContext::createPipeline()
 // =====================================================================================================================
 // Create a Builder object. For a shader compile (pPipeline is nullptr), useBuilderRecorder is ignored
 // because it always uses BuilderRecorder.
+//
+// @param pipeline : Pipeline object for pipeline compile, nullptr for shader compile
+// @param useBuilderRecorder : true to use BuilderRecorder, false to use BuilderImpl
 Builder* BuilderContext::createBuilder(
-    Pipeline*   pipeline,          // [in] Pipeline object for pipeline compile, nullptr for shader compile
-    bool        useBuilderRecorder) // true to use BuilderRecorder, false to use BuilderImpl
+    Pipeline*   pipeline,
+    bool        useBuilderRecorder)
 {
     if (!pipeline || useBuilderRecorder)
         return new BuilderRecorder(this, pipeline);
@@ -187,8 +197,10 @@ Builder* BuilderContext::createBuilder(
 // =====================================================================================================================
 // Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not think that
 // we have library functions.
+//
+// @param [in/out] passMgr : Pass manager
 void BuilderContext::preparePassManager(
-    legacy::PassManager*  passMgr)   // [in/out] Pass manager
+    legacy::PassManager*  passMgr)
 {
     TargetLibraryInfoImpl targetLibInfo(getTargetMachine()->getTargetTriple());
 
@@ -212,10 +224,14 @@ void BuilderContext::preparePassManager(
 
 // =====================================================================================================================
 // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
+//
+// @param [in/out] passMgr : pass manager to add passes to
+// @param codeGenTimer : Timer to time target passes with, nullptr if not timing
+// @param [out] outStream : Output stream
 void BuilderContext::addTargetPasses(
-    lgc::PassManager&     passMgr,        // [in/out] pass manager to add passes to
-    Timer*                codeGenTimer,  // [in] Timer to time target passes with, nullptr if not timing
-    raw_pwrite_stream&    outStream)      // [out] Output stream
+    lgc::PassManager&     passMgr,
+    Timer*                codeGenTimer,
+    raw_pwrite_stream&    outStream)
 {
     // Start timer for codegen passes.
     if (codeGenTimer )

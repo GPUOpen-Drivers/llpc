@@ -42,14 +42,22 @@ using namespace llvm;
 
 // =====================================================================================================================
 // Create a load of a buffer descriptor.
+//
+// @param descSet : Descriptor set
+// @param binding : Descriptor binding
+// @param descIndex : Descriptor index
+// @param isNonUniform : Whether the descriptor index is non-uniform
+// @param isWritten : Whether the buffer is (or might be) written to
+// @param pointeeTy : Type that the returned pointer should point to.
+// @param instName : Name to give instruction(s)
 Value* BuilderImplDesc::CreateLoadBufferDesc(
-    unsigned      descSet,          // Descriptor set
-    unsigned      binding,          // Descriptor binding
-    Value*        descIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
-    bool          isWritten,        // Whether the buffer is (or might be) written to
-    Type* const   pointeeTy,       // [in] Type that the returned pointer should point to.
-    const Twine&  instName)         // [in] Name to give instruction(s)
+    unsigned      descSet,
+    unsigned      binding,
+    Value*        descIndex,
+    bool          isNonUniform,
+    bool          isWritten,
+    Type* const   pointeeTy,
+    const Twine&  instName)
 {
     assert(pointeeTy );
 
@@ -85,12 +93,16 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
 
 // =====================================================================================================================
 // Add index onto pointer to image/sampler/texelbuffer/F-mask array of descriptors.
+//
+// @param descPtr : Descriptor pointer, as returned by this function or one of the CreateGet*DescPtr methods
+// @param index : Index value
+// @param isNonUniform : Whether the descriptor index is non-uniform
+// @param instName : Name to give instruction(s)
 Value* BuilderImplDesc::CreateIndexDescPtr(
-    Value*        descPtr,           // [in] Descriptor pointer, as returned by this function or one of
-                                      //    the CreateGet*DescPtr methods
-    Value*        index,             // [in] Index value
-    bool          isNonUniform,       // Whether the descriptor index is non-uniform
-    const Twine&  instName)           // [in] Name to give instruction(s)
+    Value*        descPtr,
+    Value*        index,
+    bool          isNonUniform,
+    const Twine&  instName)
 {
     if (index != getInt32(0))
     {
@@ -113,10 +125,12 @@ Value* BuilderImplDesc::CreateIndexDescPtr(
 // =====================================================================================================================
 // Load image/sampler/texelbuffer/F-mask descriptor from pointer.
 // Returns <8 x i32> descriptor for image or F-mask, or <4 x i32> descriptor for sampler or texel buffer.
+//
+// @param descPtr : Descriptor pointer, as returned by CreateIndexDescPtr or one of the CreateGet*DescPtr methods
+// @param instName : Name to give instruction(s)
 Value* BuilderImplDesc::CreateLoadDescFromPtr(
-    Value*        descPtr,           // [in] Descriptor pointer, as returned by CreateIndexDescPtr or one of
-                                      //    the CreateGet*DescPtr methods
-    const Twine&  instName)           // [in] Name to give instruction(s)
+    Value*        descPtr,
+    const Twine&  instName)
 {
     // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
     getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
@@ -134,10 +148,14 @@ Value* BuilderImplDesc::CreateLoadDescFromPtr(
 
 // =====================================================================================================================
 // Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
+//
+// @param descSet : Descriptor set
+// @param binding : Descriptor binding
+// @param instName : Name to give instruction(s)
 Value* BuilderImplDesc::CreateGetSamplerDescPtr(
-    unsigned      descSet,          // Descriptor set
-    unsigned      binding,          // Descriptor binding
-    const Twine&  instName)         // [in] Name to give instruction(s)
+    unsigned      descSet,
+    unsigned      binding,
+    const Twine&  instName)
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
@@ -155,10 +173,14 @@ Value* BuilderImplDesc::CreateGetSamplerDescPtr(
 
 // =====================================================================================================================
 // Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
+//
+// @param descSet : Descriptor set
+// @param binding : Descriptor binding
+// @param instName : Name to give instruction(s)
 Value* BuilderImplDesc::CreateGetImageDescPtr(
-    unsigned      descSet,          // Descriptor set
-    unsigned      binding,          // Descriptor binding
-    const Twine&  instName)         // [in] Name to give instruction(s)
+    unsigned      descSet,
+    unsigned      binding,
+    const Twine&  instName)
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
@@ -176,10 +198,14 @@ Value* BuilderImplDesc::CreateGetImageDescPtr(
 
 // =====================================================================================================================
 // Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
+//
+// @param descSet : Descriptor set
+// @param binding : Descriptor binding
+// @param instName : Name to give instruction(s)
 Value* BuilderImplDesc::CreateGetTexelBufferDescPtr(
-    unsigned      descSet,          // Descriptor set
-    unsigned      binding,          // Descriptor binding
-    const Twine&  instName)         // [in] Name to give instruction(s)
+    unsigned      descSet,
+    unsigned      binding,
+    const Twine&  instName)
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
@@ -197,10 +223,14 @@ Value* BuilderImplDesc::CreateGetTexelBufferDescPtr(
 
 // =====================================================================================================================
 // Create a pointer to F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
+//
+// @param descSet : Descriptor set
+// @param binding : Descriptor binding
+// @param instName : Name to give instruction(s)
 Value* BuilderImplDesc::CreateGetFmaskDescPtr(
-    unsigned      descSet,          // Descriptor set
-    unsigned      binding,          // Descriptor binding
-    const Twine&  instName)         // [in] Name to give instruction(s)
+    unsigned      descSet,
+    unsigned      binding,
+    const Twine&  instName)
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
@@ -220,9 +250,12 @@ Value* BuilderImplDesc::CreateGetFmaskDescPtr(
 // Create a load of the push constants table pointer.
 // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.
 // The type passed must have the correct size for the push constants.
+//
+// @param pushConstantsTy : Type of the push constants table that the returned pointer will point to
+// @param instName : Name to give instruction(s)
 Value* BuilderImplDesc::CreateLoadPushConstantsPtr(
-    Type*         pushConstantsTy, // [in] Type of the push constants table that the returned pointer will point to
-    const Twine&  instName)         // [in] Name to give instruction(s)
+    Type*         pushConstantsTy,
+    const Twine&  instName)
 {
     // Remember the size of push constants.
     unsigned pushConstSize = GetInsertPoint()->getModule()->getDataLayout().getTypeStoreSize(pushConstantsTy);
@@ -242,9 +275,12 @@ Value* BuilderImplDesc::CreateLoadPushConstantsPtr(
 
 // =====================================================================================================================
 // Scalarize a value (pass it through readfirstlane) if uniform
+//
+// @param value : 32-bit integer value to scalarize
+// @param isNonUniform : Whether value is marked as non-uniform
 Value* BuilderImplDesc::scalarizeIfUniform(
-    Value*  value,       // [in] 32-bit integer value to scalarize
-    bool    isNonUniform) // Whether value is marked as non-uniform
+    Value*  value,
+    bool    isNonUniform)
 {
     assert(value->getType()->isIntegerTy(32));
     if (!isNonUniform && !isa<Constant>(value))
@@ -258,9 +294,12 @@ Value* BuilderImplDesc::scalarizeIfUniform(
 
 // =====================================================================================================================
 // Create a buffer length query based on the specified descriptor.
+//
+// @param bufferDesc : The buffer descriptor to query.
+// @param instName : Name to give instruction(s).
 Value* BuilderImplDesc::CreateGetBufferDescLength(
-    Value* const  bufferDesc,      // [in] The buffer descriptor to query.
-    const Twine&  instName)         // [in] Name to give instruction(s).
+    Value* const  bufferDesc,
+    const Twine&  instName)
 {
     // In future this should become a full LLVM intrinsic, but for now we patch in a late intrinsic that is cleaned up
     // in patch buffer op.

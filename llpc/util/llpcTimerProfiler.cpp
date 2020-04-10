@@ -59,10 +59,14 @@ namespace Llpc
 {
 
 // =====================================================================================================================
+//
+// @param hash64 : Hash code
+// @param descriptionPrefix : Profiler description prefix string
+// @param enableMask : Mask of enabled phase timers
 TimerProfiler::TimerProfiler(
-    uint64_t      hash64,              // Hash code
-    const char*   descriptionPrefix,  // [in] Profiler description prefix string
-    unsigned      enableMask)           // Mask of enabled phase timers
+    uint64_t      hash64,
+    const char*   descriptionPrefix,
+    unsigned      enableMask)
     :
     m_total("", "", getDummyTimeRecords()),
     m_phases("", "", getDummyTimeRecords())
@@ -136,10 +140,14 @@ TimerProfiler::~TimerProfiler()
 
 // =====================================================================================================================
 // Adds pass to start or stop timer in PassManager
+//
+// @param passMgr : Pass Manager
+// @param timerKind : Kind of phase timer
+// @param start : Start or  stop timer
 void TimerProfiler::addTimerStartStopPass(
-    lgc::PassManager* passMgr,       // Pass Manager
-    TimerKind         timerKind,      // Kind of phase timer
-    bool              start)          // Start or  stop timer
+    lgc::PassManager* passMgr,
+    TimerKind         timerKind,
+    bool              start)
 {
     if (TimePassesIsEnabled || cl::EnableTimerProfile)
         passMgr->add(lgc::BuilderContext::createStartStopTimer(&m_phaseTimers[timerKind], start));
@@ -147,9 +155,12 @@ void TimerProfiler::addTimerStartStopPass(
 
 // =====================================================================================================================
 // Starts or stop specified timer.
+//
+// @param timerKind : Kind of phase timer
+// @param start : Start or  stop timer
 void TimerProfiler::startStopTimer(
-    TimerKind timerKind,         // Kind of phase timer
-    bool      start)             // Start or  stop timer
+    TimerKind timerKind,
+    bool      start)
 {
     if (TimePassesIsEnabled || cl::EnableTimerProfile)
     {
@@ -162,8 +173,10 @@ void TimerProfiler::startStopTimer(
 
 // =====================================================================================================================
 // Gets a specific timer. Returns nullptr if TimePassesIsEnabled isn't enabled.
+//
+// @param timerKind : Kind of phase timer
 llvm::Timer* TimerProfiler::getTimer(
-    TimerKind    timerKind)           // Kind of phase timer
+    TimerKind    timerKind)
 {
     return TimePassesIsEnabled || cl::EnableTimerProfile ? &m_phaseTimers[timerKind] : nullptr;
 }

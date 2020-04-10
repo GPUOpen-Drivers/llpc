@@ -66,8 +66,10 @@ PatchPushConstOp::PatchPushConstOp()
 
 // =====================================================================================================================
 // Get the analysis usage of this pass.
+//
+// @param [out] analysisUsage : The analysis usage.
 void PatchPushConstOp::getAnalysisUsage(
-    AnalysisUsage& analysisUsage // [out] The analysis usage.
+    AnalysisUsage& analysisUsage
     ) const
 {
     analysisUsage.addRequired<PipelineStateWrapper>();
@@ -78,8 +80,10 @@ void PatchPushConstOp::getAnalysisUsage(
 
 // =====================================================================================================================
 // Executes this SPIR-V patching pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool PatchPushConstOp::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Push-Const-Op\n");
 
@@ -148,8 +152,10 @@ bool PatchPushConstOp::runOnModule(
 
 // =====================================================================================================================
 // Visits "call" instruction.
+//
+// @param callInst : "Call" instruction
 void PatchPushConstOp::visitCallInst(
-    CallInst& callInst) // [in] "Call" instruction
+    CallInst& callInst)
 {
     Function* const callee = callInst.getCalledFunction();
     assert(callee );

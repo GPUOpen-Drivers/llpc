@@ -42,8 +42,10 @@ using namespace llvm;
 
 // =====================================================================================================================
 // Given an opcode, get the call name (without the "llpc.call." prefix)
+//
+// @param opcode : Opcode
 StringRef BuilderRecorder::getCallName(
-    Opcode opcode)    // Opcode
+    Opcode opcode)
 {
     switch (opcode)
     {
@@ -300,16 +302,21 @@ StringRef BuilderRecorder::getCallName(
 
 // =====================================================================================================================
 // BuilderRecordedMetadataKinds constructor : get the metadata kind IDs
+//
+// @param context : LLVM context
 BuilderRecorderMetadataKinds::BuilderRecorderMetadataKinds(
-    llvm::LLVMContext& context)   // [in] LLVM context
+    llvm::LLVMContext& context)
 {
     opcodeMetaKindId = context.getMDKindID(BuilderCallOpcodeMetadataName);
 }
 
 // =====================================================================================================================
+//
+// @param builderContext : Builder context
+// @param pipeline : PipelineState, or nullptr for shader compile
 BuilderRecorder::BuilderRecorder(
-    BuilderContext* builderContext,// [in] Builder context
-    Pipeline*       pipeline)      // [in] PipelineState, or nullptr for shader compile
+    BuilderContext* builderContext,
+    Pipeline*       pipeline)
     : Builder(builderContext),
       BuilderRecorderMetadataKinds(builderContext->getContext()),
       m_pipelineState(reinterpret_cast<PipelineState*>(pipeline))
@@ -320,8 +327,10 @@ BuilderRecorder::BuilderRecorder(
 // =====================================================================================================================
 // Record shader modes into IR metadata if this is a shader compile (no PipelineState).
 // For a pipeline compile with BuilderRecorder, they get recorded by PipelineState.
+//
+// @param [in/out] module : Module to record into
 void BuilderRecorder::recordShaderModes(
-    Module* module)    // [in/out] Module to record into
+    Module* module)
 {
     if (!m_pipelineState && m_shaderModes)
         m_shaderModes->record(module);
@@ -341,10 +350,14 @@ ShaderModes* BuilderRecorder::getShaderModes()
 
 // =====================================================================================================================
 // Create scalar from dot product of vector
+//
+// @param vector1 : The vector 1
+// @param vector2 : The vector 2
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateDotProduct(
-    Value* const vector1,            // [in] The vector 1
-    Value* const vector2,            // [in] The vector 2
-    const Twine& instName)            // [in] Name to give instruction(s)
+    Value* const vector1,
+    Value* const vector2,
+    const Twine& instName)
 {
     Type* const scalarType = vector1->getType()->getVectorElementType();
     return record(Opcode::DotProduct, scalarType, { vector1, vector2 }, instName);
@@ -353,16 +366,20 @@ Value* BuilderRecorder::CreateDotProduct(
 // =====================================================================================================================
 // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
 // the current output primitive in the specified output-primitive stream number.
+//
+// @param streamId : Stream number, 0 if only one stream is present
 Instruction* BuilderRecorder::CreateEmitVertex(
-    unsigned                streamId)           // Stream number, 0 if only one stream is present
+    unsigned                streamId)
 {
     return record(Opcode::EmitVertex, nullptr, getInt32(streamId), "");
 }
 
 // =====================================================================================================================
 // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
+//
+// @param streamId : Stream number, 0 if only one stream is present
 Instruction* BuilderRecorder::CreateEndPrimitive(
-    unsigned                streamId)           // Stream number, 0 if only one stream is present
+    unsigned                streamId)
 {
     return record(Opcode::EndPrimitive, nullptr, getInt32(streamId), "");
 }
@@ -376,37 +393,50 @@ Instruction* BuilderRecorder::CreateBarrier()
 
 // =====================================================================================================================
 // Create a "kill". Only allowed in a fragment shader.
+//
+// @param instName : Name to give final instruction
 Instruction* BuilderRecorder::CreateKill(
-    const Twine& instName)  // [in] Name to give final instruction
+    const Twine& instName)
 {
     return record(Opcode::Kill, nullptr, {}, instName);
 }
 
 // =====================================================================================================================
 // Create a matrix transpose.
+//
+// @param matrix : Matrix to transpose.
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreateTransposeMatrix(
-    Value* const matrix,      // [in] Matrix to transpose.
-    const Twine& instName)     // [in] Name to give final instruction
+    Value* const matrix,
+    const Twine& instName)
 {
     return record(Opcode::TransposeMatrix, getTransposedMatrixTy(matrix->getType()), { matrix }, instName);
 }
 
 // =====================================================================================================================
 // Create matrix from matrix times scalar
+//
+// @param matrix : The matrix
+// @param scalar : The scalar
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateMatrixTimesScalar(
-    Value* const matrix,             // [in] The matrix
-    Value* const scalar,             // [in] The scalar
-    const Twine& instName)            // [in] Name to give instruction(s)
+    Value* const matrix,
+    Value* const scalar,
+    const Twine& instName)
 {
     return record(Opcode::MatrixTimesScalar, matrix->getType(), { matrix, scalar }, instName);
 }
 
 // =====================================================================================================================
 // Create vector from vector times matrix
+//
+// @param vector : The vector
+// @param matrix : The matrix
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateVectorTimesMatrix(
-    Value* const vector,         // [in] The vector
-    Value* const matrix,         // [in] The matrix
-    const Twine& instName)        // [in] Name to give instruction(s)
+    Value* const vector,
+    Value* const matrix,
+    const Twine& instName)
 {
     Type* const matrixType = matrix->getType();
     Type* const compType = matrixType->getArrayElementType()->getVectorElementType();
@@ -417,10 +447,14 @@ Value* BuilderRecorder::CreateVectorTimesMatrix(
 
 // =====================================================================================================================
 // Create vector from matrix times vector
+//
+// @param matrix : The matrix
+// @param vector : The vector
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateMatrixTimesVector(
-    Value* const matrix,             // [in] The matrix
-    Value* const vector,             // [in] The vector
-    const Twine& instName)            // [in] Name to give instruction(s)
+    Value* const matrix,
+    Value* const vector,
+    const Twine& instName)
 {
     Type* const columnType = matrix->getType()->getArrayElementType();
     Type* const compType = columnType->getVectorElementType();
@@ -431,10 +465,14 @@ Value* BuilderRecorder::CreateMatrixTimesVector(
 
 // =====================================================================================================================
 // Create matrix from matrix times matrix
+//
+// @param matrix1 : The matrix 1
+// @param matrix2 : The matrix 2
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateMatrixTimesMatrix(
-    Value* const matrix1,             // [in] The matrix 1
-    Value* const matrix2,             // [in] The matrix 2
-    const Twine& instName)             // [in] Name to give instruction(s)
+    Value* const matrix1,
+    Value* const matrix2,
+    const Twine& instName)
 {
     Type* const mat1ColumnType = matrix1->getType()->getArrayElementType();
     const unsigned mat2ColCount = matrix2->getType()->getArrayNumElements();
@@ -444,10 +482,14 @@ Value* BuilderRecorder::CreateMatrixTimesMatrix(
 
 // =====================================================================================================================
 // Create matrix from outer product of vector
+//
+// @param vector1 : The vector 1
+// @param vector2 : The vector 2
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateOuterProduct(
-    Value* const vector1,            // [in] The vector 1
-    Value* const vector2,            // [in] The vector 2
-    const Twine& instName)            // [in] Name to give instruction(s)
+    Value* const vector1,
+    Value* const vector2,
+    const Twine& instName)
 {
     const unsigned colCount = vector2->getType()->getVectorNumElements();
     Type* const resultTy = ArrayType::get(vector1->getType(), colCount);
@@ -456,9 +498,12 @@ Value* BuilderRecorder::CreateOuterProduct(
 
 // =====================================================================================================================
 // Create calculation of matrix determinant
+//
+// @param matrix : Matrix
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateDeterminant(
-    Value* const matrix,             // [in] Matrix
-    const Twine& instName)            // [in] Name to give instruction(s)
+    Value* const matrix,
+    const Twine& instName)
 {
     return record(Determinant,
                   matrix->getType()->getArrayElementType()->getVectorElementType(),
@@ -468,155 +513,208 @@ Value* BuilderRecorder::CreateDeterminant(
 
 // =====================================================================================================================
 // Create calculation of matrix inverse
+//
+// @param matrix : Matrix
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateMatrixInverse(
-    Value* const matrix,             // [in] Matrix
-    const Twine& instName)            // [in] Name to give instruction(s)
+    Value* const matrix,
+    const Twine& instName)
 {
     return record(MatrixInverse, matrix->getType(), matrix, instName);
 }
 
 // =====================================================================================================================
 // Create a "readclock".
+//
+// @param realtime : Whether to read real-time clock counter
+// @param instName : Name to give final instruction
 Instruction* BuilderRecorder::CreateReadClock(
-    bool         realtime,   // Whether to read real-time clock counter
-    const Twine& instName)   // [in] Name to give final instruction
+    bool         realtime,
+    const Twine& instName)
 {
     return record(Opcode::ReadClock, getInt64Ty(), getInt1(realtime), instName);
 }
 
 // =====================================================================================================================
 // Create tan operation
+//
+// @param x : Input value X
+// @param instName : Name to give final instruction)
 Value* BuilderRecorder::CreateTan(
-        Value*        x,        // [in] Input value X
-        const Twine&  instName)  // [in] Name to give final instruction)
+        Value*        x,
+        const Twine&  instName)
 {
     return record(Tan, x->getType(), x, instName, {});
 }
 
 // =====================================================================================================================
 // Create arc sin operation
+//
+// @param x : Input value X
+// @param instName : Name to give final instruction)
 Value* BuilderRecorder::CreateASin(
-        Value*        x,        // [in] Input value X
-        const Twine&  instName)  // [in] Name to give final instruction)
+        Value*        x,
+        const Twine&  instName)
 {
     return record(ASin, x->getType(), x, instName, {});
 }
 
 // =====================================================================================================================
 // Create arc cos operation
+//
+// @param x : Input value X
+// @param instName : Name to give final instruction)
 Value* BuilderRecorder::CreateACos(
-        Value*        x,        // [in] Input value X
-        const Twine&  instName)  // [in] Name to give final instruction)
+        Value*        x,
+        const Twine&  instName)
 {
     return record(ACos, x->getType(), x, instName, {});
 }
 
 // =====================================================================================================================
 // Create arc tan operation
+//
+// @param yOverX : Input value Y/X
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreateATan(
-        Value*        yOverX,    // [in] Input value Y/X
-        const Twine&  instName)   // [in] Name to give final instruction
+        Value*        yOverX,
+        const Twine&  instName)
 {
     return record(ATan, yOverX->getType(), yOverX, instName, {});
 }
 
 // =====================================================================================================================
 // Create arc tan operation with result in the correct quadrant for the signs of the inputs
+//
+// @param y : Input value Y
+// @param x : Input value X
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreateATan2(
-        Value*        y,         // [in] Input value Y
-        Value*        x,         // [in] Input value X
-        const Twine&  instName)   // [in] Name to give final instruction
+        Value*        y,
+        Value*        x,
+        const Twine&  instName)
 {
     return record(ATan2, y->getType(), { y, x }, instName, {});
 }
 
 // =====================================================================================================================
 // Create hyperbolic sin operation
+//
+// @param x : Input value X
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreateSinh(
-        Value*        x,         // [in] Input value X
-        const Twine&  instName)   // [in] Name to give final instruction
+        Value*        x,
+        const Twine&  instName)
 {
     return record(Sinh, x->getType(), x, instName, {});
 }
 
 // =====================================================================================================================
 // Create hyperbolic cos operation
+//
+// @param x : Input value X
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreateCosh(
-        Value*        x,         // [in] Input value X
-        const Twine&  instName)   // [in] Name to give final instruction
+        Value*        x,
+        const Twine&  instName)
 {
     return record(Cosh, x->getType(), x, instName, {});
 }
 
 // =====================================================================================================================
 // Create hyperbolic tan operation
+//
+// @param x : Input value X
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreateTanh(
-        Value*        x,         // [in] Input value X
-        const Twine&  instName)   // [in] Name to give final instruction
+        Value*        x,
+        const Twine&  instName)
 {
     return record(Tanh, x->getType(), x, instName, {});
 }
 
 // =====================================================================================================================
 // Create hyperbolic arc sin operation
+//
+// @param x : Input value X
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreateASinh(
-        Value*        x,         // [in] Input value X
-        const Twine&  instName)   // [in] Name to give final instruction
+        Value*        x,
+        const Twine&  instName)
 {
     return record(ASinh, x->getType(), x, instName, {});
 }
 
 // =====================================================================================================================
 // Create hyperbolic arc cos operation
+//
+// @param x : Input value X
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreateACosh(
-        Value*        x,         // [in] Input value X
-        const Twine&  instName)   // [in] Name to give final instruction
+        Value*        x,
+        const Twine&  instName)
 {
     return record(ACosh, x->getType(), x, instName, {});
 }
 
 // =====================================================================================================================
 // Create hyperbolic arc tan operation
+//
+// @param x : Input value X
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreateATanh(
-        Value*        x,         // [in] Input value X
-        const Twine&  instName)   // [in] Name to give final instruction
+        Value*        x,
+        const Twine&  instName)
 {
     return record(ATanh, x->getType(), x, instName, {});
 }
 
 // =====================================================================================================================
 // Create power operation
+//
+// @param x : Input value X
+// @param y : Input value Y
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreatePower(
-        Value*        x,         // [in] Input value X
-        Value*        y,         // [in] Input value Y
-        const Twine&  instName)   // [in] Name to give final instruction
+        Value*        x,
+        Value*        y,
+        const Twine&  instName)
 {
     return record(Power, x->getType(), { x, y }, instName, {});
 }
 
 // =====================================================================================================================
 // Create exp operation
+//
+// @param x : Input value X
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreateExp(
-        Value*        x,         // [in] Input value X
-        const Twine&  instName)   // [in] Name to give final instruction
+        Value*        x,
+        const Twine&  instName)
 {
     return record(Exp, x->getType(), x, instName, {});
 }
 
 // =====================================================================================================================
 // Create natural log operation
+//
+// @param x : Input value X
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreateLog(
-        Value*        x,         // [in] Input value X
-        const Twine&  instName)   // [in] Name to give final instruction
+        Value*        x,
+        const Twine&  instName)
 {
     return record(Log, x->getType(), x, instName, {});
 }
 
 // =====================================================================================================================
 // Create inverse square root operation
+//
+// @param x : Input value X
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreateInverseSqrt(
-        Value*        x,         // [in] Input value X
-        const Twine&  instName)   // [in] Name to give final instruction
+        Value*        x,
+        const Twine&  instName)
 {
     return record(InverseSqrt, x->getType(), x, instName, {});
 }
@@ -624,9 +722,12 @@ Value* BuilderRecorder::CreateInverseSqrt(
 // =====================================================================================================================
 // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
 // the given cube map texture coordinates. Returns <2 x float>.
+//
+// @param coord : Input coordinate <3 x float>
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateCubeFaceCoord(
-    Value*        coord,     // [in] Input coordinate <3 x float>
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        coord,
+    const Twine&  instName)
 {
     return record(Opcode::CubeFaceCoord, VectorType::get(coord->getType()->getScalarType(), 2), coord, instName);
 }
@@ -634,18 +735,24 @@ Value* BuilderRecorder::CreateCubeFaceCoord(
 // =====================================================================================================================
 // Create calculation of the index of the cube map face that would be accessed by a texture lookup function for
 // the given cube map texture coordinates.
+//
+// @param coord : Input coordinate <3 x float>
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateCubeFaceIndex(
-    Value*        coord,     // [in] Input coordinate <3 x float>
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        coord,
+    const Twine&  instName)
 {
     return record(Opcode::CubeFaceIndex, coord->getType()->getScalarType(), coord, instName);
 }
 
 // =====================================================================================================================
 // Create "signed integer abs" operation for a scalar or vector integer value.
+//
+// @param x : Input value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSAbs(
-    Value*        x,         // [in] Input value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        x,
+    const Twine&  instName)
 {
     return record(Opcode::SAbs, x->getType(), x, instName);
 }
@@ -653,9 +760,12 @@ Value* BuilderRecorder::CreateSAbs(
 // =====================================================================================================================
 // Create "fsign" operation for a scalar or vector floating-point type, returning -1.0, 0.0 or +1.0 if the input
 // value is negative, zero or positive.
+//
+// @param x : Input value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateFSign(
-    Value*        x,         // [in] Input value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        x,
+    const Twine&  instName)
 {
     return record(Opcode::FSign, x->getType(), x, instName);
 }
@@ -663,18 +773,24 @@ Value* BuilderRecorder::CreateFSign(
 // =====================================================================================================================
 // Create "ssign" operation for a scalar or vector integer type, returning -1, 0 or +1 if the input
 // value is negative, zero or positive.
+//
+// @param x : Input value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSSign(
-    Value*        x,         // [in] Input value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        x,
+    const Twine&  instName)
 {
     return record(Opcode::SSign, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
 // Create "fract" operation for a scalar or vector floating-point type, returning x - floor(x).
+//
+// @param x : Input value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateFract(
-    Value*        x,         // [in] Input value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        x,
+    const Twine&  instName)
 {
     return record(Opcode::Fract, x->getType(), x, instName);
 }
@@ -684,21 +800,30 @@ Value* BuilderRecorder::CreateFract(
 // interpolation between 0 and 1 when edge0 < x < edge1. This is equivalent to:
 // t * t * (3 - 2 * t), where t = clamp ((x - edge0) / (edge1 - edge0), 0, 1)
 // Result is undefined if edge0 >= edge1.
+//
+// @param edge0 : Edge0 value
+// @param edge1 : Edge1 value
+// @param x : X (input) value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSmoothStep(
-    Value*        edge0,     // [in] Edge0 value
-    Value*        edge1,     // [in] Edge1 value
-    Value*        x,         // [in] X (input) value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        edge0,
+    Value*        edge1,
+    Value*        x,
+    const Twine&  instName)
 {
     return record(Opcode::SmoothStep, x->getType(), { edge0, edge1, x }, instName);
 }
 
 // =====================================================================================================================
 // Create "ldexp" operation: given an FP mantissa and int exponent, build an FP value
+//
+// @param x : Mantissa
+// @param exp : Exponent
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateLdexp(
-    Value*        x,         // [in] Mantissa
-    Value*        exp,       // [in] Exponent
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        x,
+    Value*        exp,
+    const Twine&  instName)
 {
     return record(Opcode::Ldexp, x->getType(), { x, exp }, instName);
 }
@@ -707,9 +832,12 @@ Value* BuilderRecorder::CreateLdexp(
 // Create "extract significand" operation: given an FP scalar or vector value, return the significand in the range
 // [0.5,1.0), of the same type as the input. If the input is 0, the result is 0. If the input is infinite or NaN,
 // the result is undefined.
+//
+// @param value : Input value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateExtractSignificand(
-    Value*        value,   // [in] Input value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        value,
+    const Twine&  instName)
 {
     return record(Opcode::ExtractSignificand, value->getType(), value, instName);
 }
@@ -718,9 +846,12 @@ Value* BuilderRecorder::CreateExtractSignificand(
 // Create "extract exponent" operation: given an FP scalar or vector value, return the exponent as a signed integer.
 // If the input is (vector of) half, the result type is (vector of) i16, otherwise it is (vector of) i32.
 // If the input is 0, the result is 0. If the input is infinite or NaN, the result is undefined.
+//
+// @param value : Input value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateExtractExponent(
-    Value*        value,     // [in] Input value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        value,
+    const Twine&  instName)
 {
     Type* resultTy = getInt32Ty();
     if (value->getType()->getScalarType()->isHalfTy())
@@ -731,19 +862,26 @@ Value* BuilderRecorder::CreateExtractExponent(
 
 // =====================================================================================================================
 // Create vector cross product operation. Inputs must be <3 x FP>
+//
+// @param x : Input value X
+// @param y : Input value Y
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateCrossProduct(
-    Value*        x,         // [in] Input value X
-    Value*        y,         // [in] Input value Y
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        x,
+    Value*        y,
+    const Twine&  instName)
 {
     return record(Opcode::CrossProduct, x->getType(), { x, y }, instName);
 }
 
 // =====================================================================================================================
 // Create FP scalar/vector normalize operation: returns a scalar/vector with the same direction and magnitude 1.
+//
+// @param x : Input value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateNormalizeVector(
-    Value*        x,         // [in] Input value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        x,
+    const Twine&  instName)
 {
     return record(Opcode::NormalizeVector, x->getType(), x, instName);
 }
@@ -751,11 +889,16 @@ Value* BuilderRecorder::CreateNormalizeVector(
 // =====================================================================================================================
 // Create "face forward" operation: given three FP scalars/vectors {N, I, Nref}, if the dot product of
 // Nref and I is negative, the result is N, otherwise it is -N
+//
+// @param n : Input value "N"
+// @param i : Input value "I"
+// @param nref : Input value "Nref"
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateFaceForward(
-    Value*        n,         // [in] Input value "N"
-    Value*        i,         // [in] Input value "I"
-    Value*        nref,      // [in] Input value "Nref"
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        n,
+    Value*        i,
+    Value*        nref,
+    const Twine&  instName)
 {
     return record(Opcode::FaceForward, n->getType(), { n, i, nref }, instName);
 }
@@ -764,10 +907,14 @@ Value* BuilderRecorder::CreateFaceForward(
 // Create "reflect" operation. For the incident vector I and normalized surface orientation N, the result is
 // the reflection direction:
 // I - 2 * dot(N, I) * N
+//
+// @param i : Input value "I"
+// @param n : Input value "N"
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateReflect(
-    Value*        i,         // [in] Input value "I"
-    Value*        n,         // [in] Input value "N"
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        i,
+    Value*        n,
+    const Twine&  instName)
 {
     return record(Opcode::Reflect, n->getType(), { i, n }, instName);
 }
@@ -778,11 +925,16 @@ Value* BuilderRecorder::CreateReflect(
 // k = 1.0 - eta * eta * (1.0 - dot(N,I) * dot(N,I))
 // If k < 0.0 the result is 0.0.
 // Otherwise, the result is eta * I - (eta * dot(N,I) + sqrt(k)) * N
+//
+// @param i : Input value "I"
+// @param n : Input value "N"
+// @param eta : Input value "eta"
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateRefract(
-    Value*        i,         // [in] Input value "I"
-    Value*        n,         // [in] Input value "N"
-    Value*        eta,       // [in] Input value "eta"
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        i,
+    Value*        n,
+    Value*        eta,
+    const Twine&  instName)
 {
     return record(Opcode::Refract, n->getType(), { i, n, eta }, instName);
 }
@@ -790,20 +942,28 @@ Value* BuilderRecorder::CreateRefract(
 // =====================================================================================================================
 // Create scalar or vector FP truncate operation with the given rounding mode.
 // Currently only implemented for float/double -> half conversion.
+//
+// @param value : Input value
+// @param destTy : Type to convert to
+// @param roundingMode : Rounding mode
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateFpTruncWithRounding(
-    Value*            value,             // [in] Input value
-    Type*             destTy,            // [in] Type to convert to
-    unsigned          roundingMode,       // Rounding mode
-    const Twine&      instName)           // [in] Name to give instruction(s)
+    Value*            value,
+    Type*             destTy,
+    unsigned          roundingMode,
+    const Twine&      instName)
 {
     return record(Opcode::FpTruncWithRounding, destTy, { value, getInt32(roundingMode) }, instName);
 }
 
 // =====================================================================================================================
 // Create quantize operation.
+//
+// @param value : Input value (float or float vector)
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateQuantizeToFp16(
-    Value*        value,     // [in] Input value (float or float vector)
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        value,
+    const Twine&  instName)
 {
     return record(Opcode::QuantizeToFp16, value->getType(), value, instName);
 }
@@ -811,10 +971,14 @@ Value* BuilderRecorder::CreateQuantizeToFp16(
 // =====================================================================================================================
 // Create signed integer modulo operation, where the sign of the result (if not zero) is the same as the sign
 // of the divisor.
+//
+// @param dividend : Dividend value
+// @param divisor : Divisor value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSMod(
-    Value*        dividend,  // [in] Dividend value
-    Value*        divisor,   // [in] Divisor value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        dividend,
+    Value*        divisor,
+    const Twine&  instName)
 {
     return record(Opcode::SMod, dividend->getType(), { dividend, divisor }, instName);
 }
@@ -822,130 +986,182 @@ Value* BuilderRecorder::CreateSMod(
 // =====================================================================================================================
 // Create FP modulo operation, where the sign of the result (if not zero) is the same as the sign
 // of the divisor.
+//
+// @param dividend : Dividend value
+// @param divisor : Divisor value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateFMod(
-    Value*        dividend,  // [in] Dividend value
-    Value*        divisor,   // [in] Divisor value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        dividend,
+    Value*        divisor,
+    const Twine&  instName)
 {
     return record(Opcode::FMod, dividend->getType(), { dividend, divisor }, instName);
 }
 
 // =====================================================================================================================
 // Create scalar/vector float/half fused multiply-and-add, to compute a * b + c
+//
+// @param a : One value to multiply
+// @param b : The other value to multiply
+// @param c : The value to add to the product of A and B
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateFma(
-    Value*        a,         // [in] One value to multiply
-    Value*        b,         // [in] The other value to multiply
-    Value*        c,         // [in] The value to add to the product of A and B
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        a,
+    Value*        b,
+    Value*        c,
+    const Twine&  instName)
 {
     return record(Opcode::Fma, a->getType(), { a, b, c }, instName);
 }
 
 // =====================================================================================================================
 // Create derivative calculation on float or vector of float or half
+//
+// @param value : Input value
+// @param isDirectionY : False for derivative in X direction, true for Y direction
+// @param isFine : True for "fine" calculation, false for "coarse" calculation.
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateDerivative(
-    Value*        value,       // [in] Input value
-    bool          isDirectionY, // False for derivative in X direction, true for Y direction
-    bool          isFine,       // True for "fine" calculation, false for "coarse" calculation.
-    const Twine&  instName)     // [in] Name to give instruction(s)
+    Value*        value,
+    bool          isDirectionY,
+    bool          isFine,
+    const Twine&  instName)
 {
     return record(Opcode::Derivative, value->getType(), { value, getInt1(isDirectionY), getInt1(isFine) }, instName);
 }
 
 // =====================================================================================================================
 // Create a demote to helper invocation.
+//
+// @param instName : Name to give final instruction
 Instruction* BuilderRecorder::CreateDemoteToHelperInvocation(
-    const Twine& instName)   // [in] Name to give final instruction
+    const Twine& instName)
 {
     return record(Opcode::DemoteToHelperInvocation, nullptr, {}, instName);
 }
 
 // =====================================================================================================================
 // Create a helper invocation query.
+//
+// @param instName : Name to give final instruction
 Value* BuilderRecorder::CreateIsHelperInvocation(
-    const Twine& instName)   // [in] Name to give final instruction
+    const Twine& instName)
 {
     return record(Opcode::IsHelperInvocation, getInt1Ty(), {}, instName);
 }
 
 // =====================================================================================================================
 // Create "fclamp" operation.
+//
+// @param x : Value to clamp
+// @param minVal : Minimum of clamp range
+// @param maxVal : Maximum of clamp range
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateFClamp(
-    Value*        x,         // [in] Value to clamp
-    Value*        minVal,    // [in] Minimum of clamp range
-    Value*        maxVal,    // [in] Maximum of clamp range
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        x,
+    Value*        minVal,
+    Value*        maxVal,
+    const Twine&  instName)
 {
     return record(Opcode::FClamp, x->getType(), { x, minVal, maxVal }, instName);
 }
 
 // =====================================================================================================================
 // Create "fmin" operation, returning the minimum of two scalar or vector FP values.
+//
+// @param value1 : First value
+// @param value2 : Second value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateFMin(
-    Value*        value1,    // [in] First value
-    Value*        value2,    // [in] Second value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        value1,
+    Value*        value2,
+    const Twine&  instName)
 {
     return record(Opcode::FMin, value1->getType(), { value1, value2 }, instName);
 }
 
 // =====================================================================================================================
 // Create "fmax" operation, returning the maximum of three scalar or vector FP values.
+//
+// @param value1 : First value
+// @param value2 : Second value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateFMax(
-    Value*        value1,    // [in] First value
-    Value*        value2,    // [in] Second value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        value1,
+    Value*        value2,
+    const Twine&  instName)
 {
     return record(Opcode::FMax, value1->getType(), { value1, value2 }, instName);
 }
 
 // =====================================================================================================================
 // Create "fmin3" operation, returning the minimum of three scalar or vector float or half values.
+//
+// @param value1 : First value
+// @param value2 : Second value
+// @param value3 : Third value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateFMin3(
-    Value*        value1,    // [in] First value
-    Value*        value2,    // [in] Second value
-    Value*        value3,    // [in] Third value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        value1,
+    Value*        value2,
+    Value*        value3,
+    const Twine&  instName)
 {
     return record(Opcode::FMin3, value1->getType(), { value1, value2, value3 }, instName);
 }
 
 // =====================================================================================================================
 // Create "fmax3" operation, returning the maximum of three scalar or vector float or half values.
+//
+// @param value1 : First value
+// @param value2 : Second value
+// @param value3 : Third value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateFMax3(
-    Value*        value1,    // [in] First value
-    Value*        value2,    // [in] Second value
-    Value*        value3,    // [in] Third value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        value1,
+    Value*        value2,
+    Value*        value3,
+    const Twine&  instName)
 {
     return record(Opcode::FMax3, value1->getType(), { value1, value2, value3 }, instName);
 }
 
 // =====================================================================================================================
 // Create "fmid3" operation, returning the middle one of three float values.
+//
+// @param value1 : First value
+// @param value2 : Second value
+// @param value3 : Third value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateFMid3(
-    Value*        value1,              // [in] First value
-    Value*        value2,              // [in] Second value
-    Value*        value3,              // [in] Third value
-    const Twine&  instName)             // [in] Name to give instruction(s)
+    Value*        value1,
+    Value*        value2,
+    Value*        value3,
+    const Twine&  instName)
 {
     return record(Opcode::FMid3, value1->getType(), { value1, value2, value3 }, instName);
 }
 
 // =====================================================================================================================
 // Create "isInf" operation: return true if the supplied FP (or vector) value is infinity
+//
+// @param x : Input value X
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateIsInf(
-    Value*        x,         // [in] Input value X
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        x,
+    const Twine&  instName)
 {
     return record(Opcode::IsInf, getConditionallyVectorizedTy(getInt1Ty(), x->getType()), x, instName);
 }
 
 // =====================================================================================================================
 // Create "isNaN" operation: return true if the supplied FP (or vector) value is NaN
+//
+// @param x : Input value X
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateIsNaN(
-    Value*        x,         // [in] Input value X
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        x,
+    const Twine&  instName)
 {
     return record(Opcode::IsNaN, getConditionallyVectorizedTy(getInt1Ty(), x->getType()), x, instName);
 }
@@ -957,12 +1173,18 @@ Value* BuilderRecorder::CreateIsNaN(
 // more than the number of bits (per vector element) in "pBase" and "pInsert".
 // If "pBase" and "pInsert" are vectors, "pOffset" and "pCount" can be either scalar or vector of the same
 // width.
+//
+// @param base : Base value
+// @param insert : Value to insert (same type as base)
+// @param offset : Bit number of least-significant end of bitfield
+// @param count : Count of bits in bitfield
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateInsertBitField(
-    Value*        base,                // [in] Base value
-    Value*        insert,              // [in] Value to insert (same type as base)
-    Value*        offset,              // Bit number of least-significant end of bitfield
-    Value*        count,               // Count of bits in bitfield
-    const Twine&  instName)             // [in] Name to give instruction(s)
+    Value*        base,
+    Value*        insert,
+    Value*        offset,
+    Value*        count,
+    const Twine&  instName)
 {
     return record(Opcode::InsertBitField, base->getType(), { base, insert, offset, count }, instName);
 }
@@ -973,35 +1195,52 @@ Value* BuilderRecorder::CreateInsertBitField(
 // "pOffset" in "pBase", and that is zero- or sign-extended (depending on "isSigned") to the rest of the value.
 // If "pBase" and "pInsert" are vectors, "pOffset" and "pCount" can be either scalar or vector of the same
 // width.
+//
+// @param base : Base value
+// @param offset : Bit number of least-significant end of bitfield
+// @param count : Count of bits in bitfield
+// @param isSigned : True for a signed int bitfield extract, false for unsigned
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateExtractBitField(
-    Value*        base,                // [in] Base value
-    Value*        offset,              // Bit number of least-significant end of bitfield
-    Value*        count,               // Count of bits in bitfield
-    bool          isSigned,             // True for a signed int bitfield extract, false for unsigned
-    const Twine&  instName)             // [in] Name to give instruction(s)
+    Value*        base,
+    Value*        offset,
+    Value*        count,
+    bool          isSigned,
+    const Twine&  instName)
 {
     return record(Opcode::ExtractBitField, base->getType(), { base, offset, count, getInt1(isSigned) }, instName);
 }
 
 // =====================================================================================================================
 // Create "find MSB" operation for a (vector of) signed int.
+//
+// @param value : Input value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateFindSMsb(
-    Value*        value,     // [in] Input value
-    const Twine&  instName)   // [in] Name to give instruction(s)
+    Value*        value,
+    const Twine&  instName)
 {
     return record(Opcode::FindSMsb, value->getType(), value, instName);
 }
 
 // =====================================================================================================================
 // Create a load of a buffer descriptor.
+//
+// @param descSet : Descriptor set
+// @param binding : Descriptor binding
+// @param descIndex : Descriptor index
+// @param isNonUniform : Whether the descriptor index is non-uniform
+// @param isWritten : Whether the buffer is written to
+// @param pointeeTy : Type that the returned pointer should point to
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateLoadBufferDesc(
-    unsigned      descSet,          // Descriptor set
-    unsigned      binding,          // Descriptor binding
-    Value*        descIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
-    bool          isWritten,        // Whether the buffer is written to
-    Type*         pointeeTy,       // [in] Type that the returned pointer should point to
-    const Twine&  instName)         // [in] Name to give instruction(s)
+    unsigned      descSet,
+    unsigned      binding,
+    Value*        descIndex,
+    bool          isNonUniform,
+    bool          isWritten,
+    Type*         pointeeTy,
+    const Twine&  instName)
 {
     return record(Opcode::LoadBufferDesc,
                   getBufferDescTy(pointeeTy),
@@ -1017,12 +1256,16 @@ Value* BuilderRecorder::CreateLoadBufferDesc(
 
 // =====================================================================================================================
 // Add index onto pointer to image/sampler/texelbuffer/F-mask array of descriptors.
+//
+// @param descPtr : Descriptor pointer, as returned by this function or one of the CreateGet*DescPtr methods
+// @param index : Index value
+// @param isNonUniform : Whether the descriptor index is non-uniform
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateIndexDescPtr(
-    Value*        descPtr,           // [in] Descriptor pointer, as returned by this function or one of
-                                      //    the CreateGet*DescPtr methods
-    Value*        index,             // [in] Index value
-    bool          isNonUniform,       // Whether the descriptor index is non-uniform
-    const Twine&  instName)           // [in] Name to give instruction(s)
+    Value*        descPtr,
+    Value*        index,
+    bool          isNonUniform,
+    const Twine&  instName)
 {
     assert(descPtr->getType() == getImageDescPtrTy() ||
                 descPtr->getType() == getSamplerDescPtrTy() ||
@@ -1034,10 +1277,12 @@ Value* BuilderRecorder::CreateIndexDescPtr(
 // =====================================================================================================================
 // Load image/sampler/texelbuffer/F-mask descriptor from pointer.
 // Returns <8 x i32> descriptor for image, sampler or F-mask, or <4 x i32> descriptor for texel buffer.
+//
+// @param descPtr : Descriptor pointer, as returned by CreateIndexDescPtr or one of the CreateGet*DescPtr methods
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateLoadDescFromPtr(
-    Value*        descPtr,           // [in] Descriptor pointer, as returned by CreateIndexDescPtr or one of
-                                      //    the CreateGet*DescPtr methods
-    const Twine&  instName)           // [in] Name to give instruction(s)
+    Value*        descPtr,
+    const Twine&  instName)
 {
     assert(descPtr->getType() == getImageDescPtrTy() ||
                 descPtr->getType() == getSamplerDescPtrTy() ||
@@ -1051,30 +1296,42 @@ Value* BuilderRecorder::CreateLoadDescFromPtr(
 
 // =====================================================================================================================
 // Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
+//
+// @param descSet : Descriptor set
+// @param binding : Descriptor binding
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateGetSamplerDescPtr(
-    unsigned      descSet,          // Descriptor set
-    unsigned      binding,          // Descriptor binding
-    const Twine&  instName)         // [in] Name to give instruction(s)
+    unsigned      descSet,
+    unsigned      binding,
+    const Twine&  instName)
 {
     return record(Opcode::GetSamplerDescPtr, getSamplerDescPtrTy(), { getInt32(descSet), getInt32(binding) }, instName);
 }
 
 // =====================================================================================================================
 // Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
+//
+// @param descSet : Descriptor set
+// @param binding : Descriptor binding
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateGetImageDescPtr(
-    unsigned      descSet,          // Descriptor set
-    unsigned      binding,          // Descriptor binding
-    const Twine&  instName)         // [in] Name to give instruction(s)
+    unsigned      descSet,
+    unsigned      binding,
+    const Twine&  instName)
 {
     return record(Opcode::GetImageDescPtr, getImageDescPtrTy(), { getInt32(descSet), getInt32(binding) }, instName);
 }
 
 // =====================================================================================================================
 // Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
+//
+// @param descSet : Descriptor set
+// @param binding : Descriptor binding
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateGetTexelBufferDescPtr(
-    unsigned      descSet,          // Descriptor set
-    unsigned      binding,          // Descriptor binding
-    const Twine&  instName)         // [in] Name to give instruction(s)
+    unsigned      descSet,
+    unsigned      binding,
+    const Twine&  instName)
 {
     return record(Opcode::GetTexelBufferDescPtr,
                   getTexelBufferDescPtrTy(),
@@ -1084,19 +1341,26 @@ Value* BuilderRecorder::CreateGetTexelBufferDescPtr(
 
 // =====================================================================================================================
 // Create a load of a F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
+//
+// @param descSet : Descriptor set
+// @param binding : Descriptor binding
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateGetFmaskDescPtr(
-    unsigned      descSet,          // Descriptor set
-    unsigned      binding,          // Descriptor binding
-    const Twine&  instName)         // [in] Name to give instruction(s)
+    unsigned      descSet,
+    unsigned      binding,
+    const Twine&  instName)
 {
     return record(Opcode::GetFmaskDescPtr, getFmaskDescPtrTy(), { getInt32(descSet), getInt32(binding) }, instName);
 }
 
 // =====================================================================================================================
 // Create a load of the spill table pointer for push constants.
+//
+// @param pushConstantsTy : Type of the push constants table that the returned pointer will point to
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateLoadPushConstantsPtr(
-    Type*         pushConstantsTy, // [in] Type of the push constants table that the returned pointer will point to
-    const Twine&  instName)         // [in] Name to give instruction(s)
+    Type*         pushConstantsTy,
+    const Twine&  instName)
 {
     Type* resultTy = PointerType::get(pushConstantsTy, ADDR_SPACE_CONST);
     return record(Opcode::LoadPushConstantsPtr, resultTy, {}, instName);
@@ -1104,23 +1368,34 @@ Value* BuilderRecorder::CreateLoadPushConstantsPtr(
 
 // =====================================================================================================================
 // Create a buffer length query based on the specified descriptor.
+//
+// @param bufferDesc : The buffer descriptor to query.
+// @param instName : Name to give instruction(s).
 Value* BuilderRecorder::CreateGetBufferDescLength(
-    Value* const  bufferDesc,      // [in] The buffer descriptor to query.
-    const Twine&  instName)         // [in] Name to give instruction(s).
+    Value* const  bufferDesc,
+    const Twine&  instName)
 {
     return record(Opcode::GetBufferDescLength, getInt32Ty(), { bufferDesc }, instName);
 }
 
 // =====================================================================================================================
 // Create an image load.
+//
+// @param resultTy : Result type
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param coord : Coordinates: scalar or vector i32
+// @param mipLevel : Mipmap level if doing load_mip, otherwise nullptr
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateImageLoad(
-    Type*                   resultTy,          // [in] Result type
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    Value*                  imageDesc,         // [in] Image descriptor
-    Value*                  coord,             // [in] Coordinates: scalar or vector i32
-    Value*                  mipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    Type*                   resultTy,
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    Value*                  coord,
+    Value*                  mipLevel,
+    const Twine&            instName)
 {
     SmallVector<Value*, 5> args;
     args.push_back(getInt32(dim));
@@ -1134,16 +1409,24 @@ Value* BuilderRecorder::CreateImageLoad(
 
 // =====================================================================================================================
 // Create an image load with F-mask.
+//
+// @param resultTy : Result type
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param fmaskDesc : Fmask descriptor
+// @param coord : Coordinates: scalar or vector i32, exactly right width for given dimension excluding sample
+// @param sampleNum : Sample number, i32
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateImageLoadWithFmask(
-    Type*                   resultTy,          // [in] Result type
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    Value*                  imageDesc,         // [in] Image descriptor
-    Value*                  fmaskDesc,         // [in] Fmask descriptor
-    Value*                  coord,             // [in] Coordinates: scalar or vector i32, exactly right
-                                                //    width for given dimension excluding sample
-    Value*                  sampleNum,         // [in] Sample number, i32
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    Type*                   resultTy,
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    Value*                  fmaskDesc,
+    Value*                  coord,
+    Value*                  sampleNum,
+    const Twine&            instName)
 {
     return record(Opcode::ImageLoadWithFmask,
                   resultTy,
@@ -1153,14 +1436,22 @@ Value* BuilderRecorder::CreateImageLoadWithFmask(
 
 // =====================================================================================================================
 // Create an image store.
+//
+// @param texel : Texel value to store; v4f16 or v4f32
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param coord : Coordinates: scalar or vector i32
+// @param mipLevel : Mipmap level if doing load_mip, otherwise nullptr
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateImageStore(
-    Value*            texel,             // [in] Texel value to store; v4f16 or v4f32
-    unsigned          dim,                // Image dimension
-    unsigned          flags,              // ImageFlag* flags
-    Value*            imageDesc,         // [in] Image descriptor
-    Value*            coord,             // [in] Coordinates: scalar or vector i32
-    Value*            mipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
-    const Twine&      instName)           // [in] Name to give instruction(s)
+    Value*            texel,
+    unsigned          dim,
+    unsigned          flags,
+    Value*            imageDesc,
+    Value*            coord,
+    Value*            mipLevel,
+    const Twine&      instName)
 {
     SmallVector<Value*, 6> args;
     args.push_back(texel);
@@ -1175,14 +1466,22 @@ Value* BuilderRecorder::CreateImageStore(
 
 // =====================================================================================================================
 // Create an image sample.
+//
+// @param resultTy : Result type
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param samplerDesc : Sampler descriptor
+// @param address : Address and other arguments
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateImageSample(
-    Type*               resultTy,          // [in] Result type
-    unsigned            dim,                // Image dimension
-    unsigned            flags,              // ImageFlag* flags
-    Value*              imageDesc,         // [in] Image descriptor
-    Value*              samplerDesc,       // [in] Sampler descriptor
-    ArrayRef<Value*>    address,            // Address and other arguments
-    const Twine&        instName)           // [in] Name to give instruction(s)
+    Type*               resultTy,
+    unsigned            dim,
+    unsigned            flags,
+    Value*              imageDesc,
+    Value*              samplerDesc,
+    ArrayRef<Value*>    address,
+    const Twine&        instName)
 {
     // Gather a mask of address elements that are not nullptr.
     unsigned addressMask = 0;
@@ -1208,14 +1507,22 @@ Value* BuilderRecorder::CreateImageSample(
 
 // =====================================================================================================================
 // Create an image gather.
+//
+// @param resultTy : Result type
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param samplerDesc : Sampler descriptor
+// @param address : Address and other arguments
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateImageGather(
-    Type*               resultTy,          // [in] Result type
-    unsigned            dim,                // Image dimension
-    unsigned            flags,              // ImageFlag* flags
-    Value*              imageDesc,         // [in] Image descriptor
-    Value*              samplerDesc,       // [in] Sampler descriptor
-    ArrayRef<Value*>    address,            // Address and other arguments
-    const Twine&        instName)           // [in] Name to give instruction(s)
+    Type*               resultTy,
+    unsigned            dim,
+    unsigned            flags,
+    Value*              imageDesc,
+    Value*              samplerDesc,
+    ArrayRef<Value*>    address,
+    const Twine&        instName)
 {
     // Gather a mask of address elements that are not nullptr.
     unsigned addressMask = 0;
@@ -1241,15 +1548,24 @@ Value* BuilderRecorder::CreateImageGather(
 
 // =====================================================================================================================
 // Create an image atomic operation other than compare-and-swap.
+//
+// @param atomicOp : Atomic op to create
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param ordering : Atomic ordering
+// @param imageDesc : Image descriptor
+// @param coord : Coordinates: scalar or vector i32
+// @param inputValue : Input value: i32
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateImageAtomic(
-    unsigned                atomicOp,           // Atomic op to create
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    AtomicOrdering          ordering,           // Atomic ordering
-    Value*                  imageDesc,         // [in] Image descriptor
-    Value*                  coord,             // [in] Coordinates: scalar or vector i32
-    Value*                  inputValue,        // [in] Input value: i32
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    unsigned                atomicOp,
+    unsigned                dim,
+    unsigned                flags,
+    AtomicOrdering          ordering,
+    Value*                  imageDesc,
+    Value*                  coord,
+    Value*                  inputValue,
+    const Twine&            instName)
 {
     return record(Opcode::ImageAtomic,
                   inputValue->getType(),
@@ -1267,15 +1583,24 @@ Value* BuilderRecorder::CreateImageAtomic(
 
 // =====================================================================================================================
 // Create an image atomic compare-and-swap.
+//
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param ordering : Atomic ordering
+// @param imageDesc : Image descriptor
+// @param coord : Coordinates: scalar or vector i32
+// @param inputValue : Input value: i32
+// @param comparatorValue : Value to compare against: i32
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateImageAtomicCompareSwap(
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    AtomicOrdering          ordering,           // Atomic ordering
-    Value*                  imageDesc,         // [in] Image descriptor
-    Value*                  coord,             // [in] Coordinates: scalar or vector i32
-    Value*                  inputValue,        // [in] Input value: i32
-    Value*                  comparatorValue,   // [in] Value to compare against: i32
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    unsigned                dim,
+    unsigned                flags,
+    AtomicOrdering          ordering,
+    Value*                  imageDesc,
+    Value*                  coord,
+    Value*                  inputValue,
+    Value*                  comparatorValue,
+    const Twine&            instName)
 {
     return record(Opcode::ImageAtomicCompareSwap,
                   inputValue->getType(),
@@ -1293,22 +1618,32 @@ Value* BuilderRecorder::CreateImageAtomicCompareSwap(
 
 // =====================================================================================================================
 // Create a query of the number of mipmap levels in an image. Returns an i32 value.
+//
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor or texel buffer descriptor
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateImageQueryLevels(
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    Value*                  imageDesc,         // [in] Image descriptor or texel buffer descriptor
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    const Twine&            instName)
 {
     return record(Opcode::ImageQueryLevels, getInt32Ty(), { getInt32(dim), getInt32(flags), imageDesc }, instName);
 }
 
 // =====================================================================================================================
 // Create a query of the number of samples in an image. Returns an i32 value.
+//
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor or texel buffer descriptor
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateImageQuerySamples(
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    Value*                  imageDesc,         // [in] Image descriptor or texel buffer descriptor
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    const Twine&            instName)
 {
     return record(Opcode::ImageQuerySamples, getInt32Ty(), { getInt32(dim), getInt32(flags), imageDesc }, instName);
 }
@@ -1316,12 +1651,18 @@ Value* BuilderRecorder::CreateImageQuerySamples(
 // =====================================================================================================================
 // Create a query of size of an image.
 // Returns an i32 scalar or vector of the width given by GetImageQuerySizeComponentCount.
+//
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor or texel buffer descriptor
+// @param lod : LOD
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateImageQuerySize(
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    Value*                  imageDesc,         // [in] Image descriptor or texel buffer descriptor
-    Value*                  lod,               // [in] LOD
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    Value*                  lod,
+    const Twine&            instName)
 {
     unsigned compCount = getImageQuerySizeComponentCount(dim);
     Type* resultTy = getInt32Ty();
@@ -1334,13 +1675,20 @@ Value* BuilderRecorder::CreateImageQuerySize(
 // Create a get of the LOD that would be used for an image sample with the given coordinates
 // and implicit LOD. Returns a v2f32 containing the layer number and the implicit level of
 // detail relative to the base level.
+//
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param samplerDesc : Sampler descriptor
+// @param coord : Coordinates
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateImageGetLod(
-    unsigned                dim,                // Image dimension
-    unsigned                flags,              // ImageFlag* flags
-    Value*                  imageDesc,         // [in] Image descriptor
-    Value*                  samplerDesc,       // [in] Sampler descriptor
-    Value*                  coord,             // [in] Coordinates
-    const Twine&            instName)           // [in] Name to give instruction(s)
+    unsigned                dim,
+    unsigned                flags,
+    Value*                  imageDesc,
+    Value*                  samplerDesc,
+    Value*                  coord,
+    const Twine&            instName)
 {
     return record(Opcode::ImageGetLod,
                   VectorType::get(getFloatTy(), 2),
@@ -1350,15 +1698,24 @@ Value* BuilderRecorder::CreateImageGetLod(
 
 // =====================================================================================================================
 // Create a read of (part of) a user input value, passed from the previous shader stage.
+//
+// @param resultTy : Type of value to read
+// @param location : Base location (row) of input
+// @param locationOffset : Variable location offset; must be within locationCount
+// @param elemIdx : Vector index
+// @param locationCount : Count of locations taken by the input
+// @param inputInfo : Extra input info (FS interp info)
+// @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index, else nullptr
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateReadGenericInput(
-    Type*         resultTy,          // [in] Type of value to read
-    unsigned      location,           // Base location (row) of input
-    Value*        locationOffset,    // [in] Variable location offset; must be within locationCount
-    Value*        elemIdx,           // [in] Vector index
-    unsigned      locationCount,      // Count of locations taken by the input
-    InOutInfo     inputInfo,          // Extra input info (FS interp info)
-    Value*        vertexIndex,       // [in] For TCS/TES/GS per-vertex input: vertex index, else nullptr
-    const Twine&  instName)           // [in] Name to give instruction(s)
+    Type*         resultTy,
+    unsigned      location,
+    Value*        locationOffset,
+    Value*        elemIdx,
+    unsigned      locationCount,
+    InOutInfo     inputInfo,
+    Value*        vertexIndex,
+    const Twine&  instName)
 {
     return record(Opcode::ReadGenericInput,
                   resultTy,
@@ -1376,15 +1733,24 @@ Value* BuilderRecorder::CreateReadGenericInput(
 
 // =====================================================================================================================
 // Create a read of (part of) a user output value, the last written value in the same shader stage.
+//
+// @param resultTy : Type of value to read
+// @param location : Base location (row) of input
+// @param locationOffset : Variable location offset; must be within locationCount
+// @param elemIdx : Vector index
+// @param locationCount : Count of locations taken by the input
+// @param outputInfo : Extra output info
+// @param vertexIndex : For TCS per-vertex output: vertex index, else nullptr
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateReadGenericOutput(
-    Type*         resultTy,          // [in] Type of value to read
-    unsigned      location,           // Base location (row) of input
-    Value*        locationOffset,    // [in] Variable location offset; must be within locationCount
-    Value*        elemIdx,           // [in] Vector index
-    unsigned      locationCount,      // Count of locations taken by the input
-    InOutInfo     outputInfo,         // Extra output info
-    Value*        vertexIndex,       // [in] For TCS per-vertex output: vertex index, else nullptr
-    const Twine&  instName)           // [in] Name to give instruction(s)
+    Type*         resultTy,
+    unsigned      location,
+    Value*        locationOffset,
+    Value*        elemIdx,
+    unsigned      locationCount,
+    InOutInfo     outputInfo,
+    Value*        vertexIndex,
+    const Twine&  instName)
 {
     return record(Opcode::ReadGenericOutput,
                   resultTy,
@@ -1406,15 +1772,22 @@ Value* BuilderRecorder::CreateReadGenericOutput(
 // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
 // 64-bit components. Two locations together can contain up to a 4-vector of 64-bit components.
 // A non-constant pLocationOffset is currently only supported for TCS.
+//
+// @param valueToWrite : Value to write
+// @param location : Base location (row) of output
+// @param locationOffset : Location offset; must be within locationCount if variable
+// @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for 64-bit elements.)
+// @param locationCount : Count of locations taken by the output. Ignored if pLocationOffset is const
+// @param outputInfo : Extra output info (GS stream ID, FS integer signedness)
+// @param vertexIndex : For TCS per-vertex output: vertex index; else nullptr
 Instruction* BuilderRecorder::CreateWriteGenericOutput(
-    Value*        valueToWrite,      // [in] Value to write
-    unsigned      location,           // Base location (row) of output
-    Value*        locationOffset,    // [in] Location offset; must be within locationCount if variable
-    Value*        elemIdx,           // [in] Element index in vector. (This is the SPIR-V "component", except
-                                      //      that it is half the component for 64-bit elements.)
-    unsigned      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
-    InOutInfo     outputInfo,         // Extra output info (GS stream ID, FS integer signedness)
-    Value*        vertexIndex)       // [in] For TCS per-vertex output: vertex index; else nullptr
+    Value*        valueToWrite,
+    unsigned      location,
+    Value*        locationOffset,
+    Value*        elemIdx,
+    unsigned      locationCount,
+    InOutInfo     outputInfo,
+    Value*        vertexIndex)
 {
     return record(Opcode::WriteGenericOutput,
                   nullptr,
@@ -1433,14 +1806,22 @@ Instruction* BuilderRecorder::CreateWriteGenericOutput(
 
 // =====================================================================================================================
 // Create a write to an XFB (transform feedback / streamout) buffer.
+//
+// @param valueToWrite : Value to write
+// @param isBuiltIn : True for built-in, false for user output (ignored if not GS)
+// @param location : Location (row) or built-in kind of output (ignored if not GS)
+// @param xfbBuffer : XFB buffer ID
+// @param xfbStride : XFB stride
+// @param xfbOffset : XFB byte offset
+// @param outputInfo : Extra output info (GS stream ID)
 Instruction* BuilderRecorder::CreateWriteXfbOutput(
-    Value*        valueToWrite,      // [in] Value to write
-    bool          isBuiltIn,          // True for built-in, false for user output (ignored if not GS)
-    unsigned      location,           // Location (row) or built-in kind of output (ignored if not GS)
-    unsigned      xfbBuffer,          // XFB buffer ID
-    unsigned      xfbStride,          // XFB stride
-    Value*        xfbOffset,         // [in] XFB byte offset
-    InOutInfo     outputInfo)         // Extra output info (GS stream ID)
+    Value*        valueToWrite,
+    bool          isBuiltIn,
+    unsigned      location,
+    unsigned      xfbBuffer,
+    unsigned      xfbStride,
+    Value*        xfbOffset,
+    InOutInfo     outputInfo)
 {
     return record(Opcode::WriteXfbOutput,
                   nullptr,
@@ -1460,12 +1841,18 @@ Instruction* BuilderRecorder::CreateWriteXfbOutput(
 // Create a read of (part of) a built-in input value.
 // The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
 // or the element type if pIndex is not nullptr.
+//
+// @param builtIn : Built-in kind, one of the BuiltIn* constants
+// @param inputInfo : Extra input info (shader-defined array length)
+// @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index, else nullptr
+// @param index : Array or vector index to access part of an input, else nullptr
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateReadBuiltInInput(
-    BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
-    InOutInfo     inputInfo,          // Extra input info (shader-defined array length)
-    Value*        vertexIndex,       // [in] For TCS/TES/GS per-vertex input: vertex index, else nullptr
-    Value*        index,             // [in] Array or vector index to access part of an input, else nullptr
-    const Twine&  instName)           // [in] Name to give instruction(s)
+    BuiltInKind   builtIn,
+    InOutInfo     inputInfo,
+    Value*        vertexIndex,
+    Value*        index,
+    const Twine&  instName)
 {
     Type* resultTy = getBuiltInTy(builtIn, inputInfo);
     if (index )
@@ -1491,12 +1878,18 @@ Value* BuilderRecorder::CreateReadBuiltInInput(
 // Create a read of (part of) a built-in output value.
 // The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
 // or the element type if pIndex is not nullptr.
+//
+// @param builtIn : Built-in kind, one of the BuiltIn* constants
+// @param outputInfo : Extra output info (shader-defined array length)
+// @param vertexIndex : For TCS per-vertex output: vertex index, else nullptr
+// @param index : Array or vector index to access part of an input, else nullptr
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateReadBuiltInOutput(
-    BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
-    InOutInfo     outputInfo,         // Extra output info (shader-defined array length)
-    Value*        vertexIndex,       // [in] For TCS per-vertex output: vertex index, else nullptr
-    Value*        index,             // [in] Array or vector index to access part of an input, else nullptr
-    const Twine&  instName)           // [in] Name to give instruction(s)
+    BuiltInKind   builtIn,
+    InOutInfo     outputInfo,
+    Value*        vertexIndex,
+    Value*        index,
+    const Twine&  instName)
 {
     Type* resultTy = getBuiltInTy(builtIn, outputInfo);
     if (index )
@@ -1520,12 +1913,18 @@ Value* BuilderRecorder::CreateReadBuiltInOutput(
 
 // =====================================================================================================================
 // Create a write of (part of) a built-in output value.
+//
+// @param valueToWrite : Value to write
+// @param builtIn : Built-in kind, one of the BuiltIn* constants
+// @param outputInfo : Extra output info (shader-defined array length; GS stream id)
+// @param vertexIndex : For TCS per-vertex output: vertex index, else nullptr
+// @param index : Array or vector index to access part of an input, else nullptr
 Instruction* BuilderRecorder::CreateWriteBuiltInOutput(
-    Value*        valueToWrite,      // [in] Value to write
-    BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
-    InOutInfo     outputInfo,         // Extra output info (shader-defined array length; GS stream id)
-    Value*        vertexIndex,       // [in] For TCS per-vertex output: vertex index, else nullptr
-    Value*        index)             // [in] Array or vector index to access part of an input, else nullptr
+    Value*        valueToWrite,
+    BuiltInKind   builtIn,
+    InOutInfo     outputInfo,
+    Value*        vertexIndex,
+    Value*        index)
 {
     return record(Opcode::WriteBuiltInOutput,
                   nullptr,
@@ -1541,199 +1940,273 @@ Instruction* BuilderRecorder::CreateWriteBuiltInOutput(
 
 // =====================================================================================================================
 // Create a get subgroup size query.
+//
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateGetSubgroupSize(
-    const Twine& instName) // [in] Name to give instruction(s)
+    const Twine& instName)
 {
     return record(Opcode::GetSubgroupSize, getInt32Ty(), {}, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup elect.
+//
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupElect(
-    const Twine& instName) // [in] Name to give instruction(s)
+    const Twine& instName)
 {
     return record(Opcode::SubgroupElect, getInt1Ty(), {}, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup all.
+//
+// @param value : The value to compare
+// @param wqm : Executed in WQM (whole quad mode)
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupAll(
-    Value* const value,   // [in] The value to compare
-    bool         wqm,      // Executed in WQM (whole quad mode)
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    bool         wqm,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupAll, getInt1Ty(), { value,  getInt1(wqm) }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup any
+//
+// @param value : The value to compare
+// @param wqm : Executed in WQM (whole quad mode)
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupAny(
-    Value* const value,   // [in] The value to compare
-    bool         wqm,      // Executed in WQM (whole quad mode)
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    bool         wqm,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupAny, getInt1Ty(), { value,  getInt1(wqm) }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup all equal.
+//
+// @param value : The value to compare
+// @param wqm : Executed in WQM (whole quad mode)
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupAllEqual(
-    Value* const value,   // [in] The value to compare
-    bool         wqm,      // Executed in WQM (whole quad mode)
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    bool         wqm,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupAllEqual, getInt1Ty(), { value,  getInt1(wqm) }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup broadcast.
+//
+// @param value : The value to broadcast
+// @param index : The index to broadcast from
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupBroadcast(
-    Value* const value,   // [in] The value to broadcast
-    Value* const index,   // [in] The index to broadcast from
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    Value* const index,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupBroadcast, value->getType(), { value, index }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup broadcast first.
+//
+// @param value : The value to broadcast
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupBroadcastFirst(
-    Value* const value,   // [in] The value to broadcast
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupBroadcastFirst, value->getType(), value, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup ballot.
+//
+// @param value : The value to contribute
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupBallot(
-    Value* const value,   // [in] The value to contribute
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupBallot, VectorType::get(getInt32Ty(), 4), value, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup inverse ballot.
+//
+// @param value : The ballot value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupInverseBallot(
-    Value* const value,   // [in] The ballot value
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupInverseBallot, getInt1Ty(), value, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup ballot bit extract.
+//
+// @param value : The ballot value
+// @param index : The index to extract from the ballot
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupBallotBitExtract(
-    Value* const value,   // [in] The ballot value
-    Value* const index,   // [in] The index to extract from the ballot
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    Value* const index,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupBallotBitExtract, getInt1Ty(), { value, index }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup ballot bit count.
+//
+// @param value : The ballot value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupBallotBitCount(
-    Value* const value,   // [in] The ballot value
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupBallotBitCount, getInt32Ty(), value, instName);
 }
 
 // Create a subgroup ballot inclusive bit count.
+//
+// @param value : The ballot value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupBallotInclusiveBitCount(
-    Value* const value,   // [in] The ballot value
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupBallotInclusiveBitCount, getInt32Ty(), value, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup ballot exclusive bit count.
+//
+// @param value : The ballot value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupBallotExclusiveBitCount(
-    Value* const value,   // [in] The ballot value
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupBallotExclusiveBitCount, getInt32Ty(), value, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup ballot find least significant bit.
+//
+// @param value : The ballot value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupBallotFindLsb(
-    Value* const value,   // [in] The ballot value
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupBallotFindLsb, getInt32Ty(), value, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup ballot find most significant bit.
+//
+// @param value : The ballot value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupBallotFindMsb(
-    Value* const value,   // [in] The ballot value
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupBallotFindMsb, getInt32Ty(), value, instName);
 }
 
 // =====================================================================================================================
 // Create "fmix" operation, returning ( 1 - A ) * X + A * Y. Result would be FP scalar or vector.
+//
+// @param x : left Value
+// @param y : right Value
+// @param a : wight Value
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::createFMix(
-    Value*        x,        // [in] left Value
-    Value*        y,        // [in] right Value
-    Value*        a,        // [in] wight Value
-    const Twine& instName)   // [in] Name to give instruction(s)
+    Value*        x,
+    Value*        y,
+    Value*        a,
+    const Twine& instName)
 {
     return record(Opcode::FMix, x->getType(), { x, y, a }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup shuffle.
+//
+// @param value : The value to shuffle
+// @param index : The index to shuffle from
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupShuffle(
-    Value* const value,   // [in] The value to shuffle
-    Value* const index,   // [in] The index to shuffle from
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    Value* const index,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupShuffle, value->getType(), { value, index }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup shuffle xor.
+//
+// @param value : The value to shuffle
+// @param mask : The mask to shuffle with
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupShuffleXor(
-    Value* const value,   // [in] The value to shuffle
-    Value* const mask,    // [in] The mask to shuffle with
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    Value* const mask,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupShuffleXor, value->getType(), { value, mask }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup shuffle up.
+//
+// @param value : The value to shuffle
+// @param offset : The offset to shuffle up to
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupShuffleUp(
-    Value* const value,   // [in] The value to shuffle
-    Value* const offset,  // [in] The offset to shuffle up to
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    Value* const offset,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupShuffleUp, value->getType(), { value, offset }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup shuffle down.
+//
+// @param value : The value to shuffle
+// @param offset : The offset to shuffle down to
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupShuffleDown(
-    Value* const value,   // [in] The value to shuffle
-    Value* const offset,  // [in] The offset to shuffle down to
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    Value* const offset,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupShuffleDown, value->getType(), { value, offset }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup clustered reduction.
+//
+// @param groupArithOp : The group operation to perform
+// @param value : The value to perform on
+// @param clusterSize : The cluster size
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupClusteredReduction(
-    GroupArithOp groupArithOp, // The group operation to perform
-    Value* const value,       // [in] The value to perform on
-    Value* const clusterSize, // [in] The cluster size
-    const Twine& instName)     // [in] Name to give instruction(s)
+    GroupArithOp groupArithOp,
+    Value* const value,
+    Value* const clusterSize,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupClusteredReduction,
                   value->getType(),
@@ -1747,11 +2220,16 @@ Value* BuilderRecorder::CreateSubgroupClusteredReduction(
 
 // =====================================================================================================================
 // Create a subgroup clustered inclusive scan.
+//
+// @param groupArithOp : The group operation to perform
+// @param value : The value to perform on
+// @param clusterSize : The cluster size
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupClusteredInclusive(
-    GroupArithOp groupArithOp, // The group operation to perform
-    Value* const value,       // [in] The value to perform on
-    Value* const clusterSize, // [in] The cluster size
-    const Twine& instName)     // [in] Name to give instruction(s)
+    GroupArithOp groupArithOp,
+    Value* const value,
+    Value* const clusterSize,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupClusteredInclusive,
                   value->getType(),
@@ -1765,11 +2243,16 @@ Value* BuilderRecorder::CreateSubgroupClusteredInclusive(
 
 // =====================================================================================================================
 // Create a subgroup clustered exclusive scan.
+//
+// @param groupArithOp : The group operation to perform
+// @param value : The value to perform on
+// @param clusterSize : The cluster size
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupClusteredExclusive(
-    GroupArithOp groupArithOp, // The group operation to perform
-    Value* const value,       // [in] The value to perform on
-    Value* const clusterSize, // [in] The cluster size
-    const Twine& instName)     // [in] Name to give instruction(s)
+    GroupArithOp groupArithOp,
+    Value* const value,
+    Value* const clusterSize,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupClusteredExclusive,
                   value->getType(),
@@ -1783,68 +2266,94 @@ Value* BuilderRecorder::CreateSubgroupClusteredExclusive(
 
 // =====================================================================================================================
 // Create a subgroup quad broadcast.
+//
+// @param value : The value to broadcast
+// @param index : The index within the quad to broadcast from
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupQuadBroadcast(
-    Value* const value,   // [in] The value to broadcast
-    Value* const index,   // [in] The index within the quad to broadcast from
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    Value* const index,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupQuadBroadcast, value->getType(), { value, index }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup quad swap horizontal.
+//
+// @param value : The value to swap
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupQuadSwapHorizontal(
-    Value* const value,   // [in] The value to swap
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupQuadSwapHorizontal, value->getType(), value, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup quad swap vertical.
+//
+// @param value : The value to swap
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupQuadSwapVertical(
-    Value* const value,   // [in] The value to swap
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupQuadSwapVertical, value->getType(), value, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup quad swap diagonal.
+//
+// @param value : The value to swap
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupQuadSwapDiagonal(
-    Value* const value,   // [in] The value to swap
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupQuadSwapDiagonal, value->getType(), value, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup swizzle quad.
+//
+// @param value : The value to swizzle.
+// @param offset : The value to specify the swizzle offsets.
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupSwizzleQuad(
-    Value* const value,   // [in] The value to swizzle.
-    Value* const offset,  // [in] The value to specify the swizzle offsets.
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    Value* const offset,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupSwizzleQuad, value->getType(), { value, offset }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup swizzle mask.
+//
+// @param value : The value to swizzle.
+// @param mask : The value to specify the swizzle masks.
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupSwizzleMask(
-    Value* const value,   // [in] The value to swizzle.
-    Value* const mask,    // [in] The value to specify the swizzle masks.
-    const Twine& instName) // [in] Name to give instruction(s)
+    Value* const value,
+    Value* const mask,
+    const Twine& instName)
 {
     return record(Opcode::SubgroupSwizzleMask, value->getType(), { value, mask }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup write invocation.
+//
+// @param inputValue : The value to return for all but one invocations.
+// @param writeValue : The value to return for one invocation.
+// @param index : The index of the invocation that gets the write value.
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupWriteInvocation(
-        Value* const inputValue, // [in] The value to return for all but one invocations.
-        Value* const writeValue, // [in] The value to return for one invocation.
-        Value* const index,      // [in] The index of the invocation that gets the write value.
-        const Twine& instName)    // [in] Name to give instruction(s)
+        Value* const inputValue,
+        Value* const writeValue,
+        Value* const index,
+        const Twine& instName)
 {
     return record(Opcode::SubgroupWriteInvocation,
                   inputValue->getType(),
@@ -1858,21 +2367,30 @@ Value* BuilderRecorder::CreateSubgroupWriteInvocation(
 
 // =====================================================================================================================
 // Create a subgroup mbcnt.
+//
+// @param mask : The mask to mbcnt with.
+// @param instName : Name to give instruction(s)
 Value* BuilderRecorder::CreateSubgroupMbcnt(
-        Value* const mask,    // [in] The mask to mbcnt with.
-        const Twine& instName) // [in] Name to give instruction(s)
+        Value* const mask,
+        const Twine& instName)
 {
     return record(Opcode::SubgroupMbcnt, getInt32Ty(), mask, instName);
 }
 
 // =====================================================================================================================
 // Record one Builder call
+//
+// @param opcode : Opcode of Builder method call being recorded
+// @param resultTy : Return type (can be nullptr for void)
+// @param args : Arguments
+// @param instName : Name to give instruction
+// @param attribs : Attributes to give the function declaration
 Instruction* BuilderRecorder::record(
-    BuilderRecorder::Opcode       opcode,       // Opcode of Builder method call being recorded
-    Type*                         resultTy,    // [in] Return type (can be nullptr for void)
-    ArrayRef<Value*>              args,         // Arguments
-    const Twine&                  instName,     // [in] Name to give instruction
-    ArrayRef<Attribute::AttrKind> attribs)      // Attributes to give the function declaration
+    BuilderRecorder::Opcode       opcode,
+    Type*                         resultTy,
+    ArrayRef<Value*>              args,
+    const Twine&                  instName,
+    ArrayRef<Attribute::AttrKind> attribs)
 {
     // Create mangled name of builder call. This only needs to be mangled on return type.
     std::string mangledName;

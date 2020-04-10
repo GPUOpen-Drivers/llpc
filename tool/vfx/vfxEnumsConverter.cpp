@@ -51,9 +51,12 @@ static std::map<std::string, int>& getEnumMap()
 
 // =====================================================================================================================
 // Gets enum value from enum string
+//
+// @param string : Enum string
+// @param [out] value : Enum value
 bool getEnumValue(
-    const char* string,  // Enum string
-    int&        value)    // [out] Enum value
+    const char* string,
+    int&        value)
 {
     bool ret = false;
     std::map<std::string, int>::iterator it = getEnumMap().find(string);

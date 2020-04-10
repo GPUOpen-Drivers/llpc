@@ -99,8 +99,10 @@ void PatchInOutImportExport::initPerShader()
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool PatchInOutImportExport::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-In-Out-Import-Export\n");
 
@@ -345,8 +347,10 @@ void PatchInOutImportExport::processShader()
 
 // =====================================================================================================================
 // Visits "call" instruction.
+//
+// @param callInst : "Call" instruction
 void PatchInOutImportExport::visitCallInst(
-    CallInst& callInst)   // [in] "Call" instruction
+    CallInst& callInst)
 {
     auto callee = callInst.getCalledFunction();
     if (!callee )
@@ -965,8 +969,10 @@ void PatchInOutImportExport::visitCallInst(
 
 // =====================================================================================================================
 // Visits "ret" instruction.
+//
+// @param retInst : "Ret" instruction
 void PatchInOutImportExport::visitReturnInst(
-    ReturnInst& retInst)  // [in] "Ret" instruction
+    ReturnInst& retInst)
 {
     // We only handle the "ret" of shader entry point
     if (m_shaderStage == ShaderStageInvalid)
@@ -1634,11 +1640,16 @@ void PatchInOutImportExport::visitReturnInst(
 
 // =====================================================================================================================
 // Patches import calls for generic inputs of vertex shader.
+//
+// @param inputTy : Type of input value
+// @param location : Location of the input
+// @param compIdx : Index used for vector element indexing
+// @param insertPos : Where to insert the patch instruction
 Value* PatchInOutImportExport::patchVsGenericInputImport(
-    Type*        inputTy,        // [in] Type of input value
-    unsigned     location,        // Location of the input
-    unsigned     compIdx,         // Index used for vector element indexing
-    Instruction* insertPos)      // [in] Where to insert the patch instruction
+    Type*        inputTy,
+    unsigned     location,
+    unsigned     compIdx,
+    Instruction* insertPos)
 {
     Value* input = UndefValue::get(inputTy);
 
@@ -1661,13 +1672,20 @@ Value* PatchInOutImportExport::patchVsGenericInputImport(
 
 // =====================================================================================================================
 // Patches import calls for generic inputs of tessellation control shader.
+//
+// @param inputTy : Type of input value
+// @param location : Base location of the input
+// @param locOffset : Relative location offset
+// @param compIdx : Index used for vector element indexing
+// @param vertexIdx : Input array outermost index used for vertex indexing
+// @param insertPos : Where to insert the patch instruction
 Value* PatchInOutImportExport::patchTcsGenericInputImport(
-    Type*        inputTy,        // [in] Type of input value
-    unsigned     location,        // Base location of the input
-    Value*       locOffset,      // [in] Relative location offset
-    Value*       compIdx,        // [in] Index used for vector element indexing
-    Value*       vertexIdx,      // [in] Input array outermost index used for vertex indexing
-    Instruction* insertPos)      // [in] Where to insert the patch instruction
+    Type*        inputTy,
+    unsigned     location,
+    Value*       locOffset,
+    Value*       compIdx,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     assert(compIdx && vertexIdx );
 
@@ -1677,13 +1695,20 @@ Value* PatchInOutImportExport::patchTcsGenericInputImport(
 
 // =====================================================================================================================
 // Patches import calls for generic inputs of tessellation evaluation shader.
+//
+// @param inputTy : Type of input value
+// @param location : Base location of the input
+// @param locOffset : Relative location offset
+// @param compIdx : Index used for vector element indexing
+// @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
+// @param insertPos : Where to insert the patch instruction
 Value* PatchInOutImportExport::patchTesGenericInputImport(
-    Type*        inputTy,        // [in] Type of input value
-    unsigned     location,        // Base location of the input
-    Value*       locOffset,      // [in] Relative location offset
-    Value*       compIdx,        // [in] Index used for vector element indexing
-    Value*       vertexIdx,      // [in] Input array outermost index used for vertex indexing (could be null)
-    Instruction* insertPos)      // [in] Where to insert the patch instruction
+    Type*        inputTy,
+    unsigned     location,
+    Value*       locOffset,
+    Value*       compIdx,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     assert(compIdx );
 
@@ -1693,12 +1718,18 @@ Value* PatchInOutImportExport::patchTesGenericInputImport(
 
 // =====================================================================================================================
 // Patches import calls for generic inputs of geometry shader.
+//
+// @param inputTy : Type of input value
+// @param location : Location of the input
+// @param compIdx : Index used for vector element indexing
+// @param vertexIdx : Input array outermost index used for vertex indexing
+// @param insertPos : Where to insert the patch instruction
 Value* PatchInOutImportExport::patchGsGenericInputImport(
-    Type*        inputTy,        // [in] Type of input value
-    unsigned     location,        // Location of the input
-    unsigned     compIdx,         // Index used for vector element indexing
-    Value*       vertexIdx,      // [in] Input array outermost index used for vertex indexing
-    Instruction* insertPos)      // [in] Where to insert the patch instruction
+    Type*        inputTy,
+    unsigned     location,
+    unsigned     compIdx,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     assert(vertexIdx );
 
@@ -1733,17 +1764,24 @@ Value* PatchInOutImportExport::patchGsGenericInputImport(
 
 // =====================================================================================================================
 // Patches import calls for generic inputs of fragment shader.
+//
+// @param inputTy : Type of input value
+// @param location : Base location of the input
+// @param locOffset : Relative location offset
+// @param compIdx : Index used for vector element indexing (could be null)
+// @param auxInterpValue : Auxiliary value of interpolation: for non "custom" interpolation, it is the explicitly calculated I/J; for "custom" interpolation, it is vertex no. (could be null)
+// @param interpMode : Interpolation mode
+// @param interpLoc : Interpolation location
+// @param insertPos : Where to insert the patch instruction
 Value* PatchInOutImportExport::patchFsGenericInputImport(
-    Type*        inputTy,        // [in] Type of input value
-    unsigned     location,        // Base location of the input
-    Value*       locOffset,      // [in] Relative location offset
-    Value*       compIdx,        // [in] Index used for vector element indexing (could be null)
-    Value*       auxInterpValue, // [in] Auxiliary value of interpolation: for non "custom" interpolation, it is the
-                                  // explicitly calculated I/J; for "custom" interpolation, it is vertex no. (could be
-                                  // null)
-    unsigned     interpMode,      // Interpolation mode
-    unsigned     interpLoc,       // Interpolation location
-    Instruction* insertPos)      // [in] Where to insert the patch instruction
+    Type*        inputTy,
+    unsigned     location,
+    Value*       locOffset,
+    Value*       compIdx,
+    Value*       auxInterpValue,
+    unsigned     interpMode,
+    unsigned     interpLoc,
+    Instruction* insertPos)
 {
     Value* input = UndefValue::get(inputTy);
 
@@ -2007,13 +2045,20 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
 
 // =====================================================================================================================
 // Patches import calls for generic outputs of tessellation control shader.
+//
+// @param outputTy : Type of output value
+// @param location : Base location of the output
+// @param locOffset : Relative location offset
+// @param compIdx : Index used for vector element indexing
+// @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
+// @param insertPos : Where to insert the patch instruction
 Value* PatchInOutImportExport::patchTcsGenericOutputImport(
-    Type*        outputTy,       // [in] Type of output value
-    unsigned     location,        // Base location of the output
-    Value*       locOffset,      // [in] Relative location offset
-    Value*       compIdx,        // [in] Index used for vector element indexing
-    Value*       vertexIdx,      // [in] Input array outermost index used for vertex indexing (could be null)
-    Instruction* insertPos)      // [in] Where to insert the patch instruction
+    Type*        outputTy,
+    unsigned     location,
+    Value*       locOffset,
+    Value*       compIdx,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     assert(compIdx );
 
@@ -2023,11 +2068,16 @@ Value* PatchInOutImportExport::patchTcsGenericOutputImport(
 
 // =====================================================================================================================
 // Patches export calls for generic outputs of vertex shader.
+//
+// @param output : Output value
+// @param location : Location of the output
+// @param compIdx : Index used for vector element indexing
+// @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchVsGenericOutputExport(
-    Value*       output,        // [in] Output value
-    unsigned     location,       // Location of the output
-    unsigned     compIdx,        // Index used for vector element indexing
-    Instruction* insertPos)     // [in] Where to insert the patch instruction
+    Value*       output,
+    unsigned     location,
+    unsigned     compIdx,
+    Instruction* insertPos)
 {
     auto outputTy = output->getType();
 
@@ -2067,13 +2117,20 @@ void PatchInOutImportExport::patchVsGenericOutputExport(
 
 // =====================================================================================================================
 // Patches export calls for generic outputs of tessellation control shader.
+//
+// @param output : Output value
+// @param location : Base location of the output
+// @param locOffset : Relative location offset
+// @param compIdx : Index used for vector element indexing
+// @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
+// @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchTcsGenericOutputExport(
-    Value*       output,        // [in] Output value
-    unsigned     location,       // Base location of the output
-    Value*       locOffset,     // [in] Relative location offset
-    Value*       compIdx,       // [in] Index used for vector element indexing
-    Value*       vertexIdx,     // [in] Input array outermost index used for vertex indexing (could be null)
-    Instruction* insertPos)     // [in] Where to insert the patch instruction
+    Value*       output,
+    unsigned     location,
+    Value*       locOffset,
+    Value*       compIdx,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     assert(compIdx );
 
@@ -2084,11 +2141,16 @@ void PatchInOutImportExport::patchTcsGenericOutputExport(
 
 // =====================================================================================================================
 // Patches export calls for generic outputs of tessellation evaluation shader.
+//
+// @param output : Output value
+// @param location : Location of the output
+// @param compIdx : Index used for vector element indexing
+// @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchTesGenericOutputExport(
-    Value*       output,        // [in] Output value
-    unsigned     location,       // Location of the output
-    unsigned     compIdx,        // Index used for vector element indexing
-    Instruction* insertPos)     // [in] Where to insert the patch instruction
+    Value*       output,
+    unsigned     location,
+    unsigned     compIdx,
+    Instruction* insertPos)
 {
     if (m_hasGs)
     {
@@ -2117,12 +2179,18 @@ void PatchInOutImportExport::patchTesGenericOutputExport(
 
 // =====================================================================================================================
 // Patches export calls for generic outputs of geometry shader.
+//
+// @param output : Output value
+// @param location : Location of the output
+// @param compIdx : Index used for vector element indexing
+// @param streamId : ID of output vertex stream
+// @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchGsGenericOutputExport(
-    Value*       output,        // [in] Output value
-    unsigned     location,       // Location of the output
-    unsigned     compIdx,        // Index used for vector element indexing
-    unsigned     streamId,       // ID of output vertex stream
-    Instruction* insertPos)     // [in] Where to insert the patch instruction
+    Value*       output,
+    unsigned     location,
+    unsigned     compIdx,
+    unsigned     streamId,
+    Instruction* insertPos)
 {
     auto outputTy = output->getType();
 
@@ -2164,11 +2232,16 @@ void PatchInOutImportExport::patchGsGenericOutputExport(
 
 // =====================================================================================================================
 // Patches export calls for generic outputs of fragment shader.
+//
+// @param output : Output value
+// @param location : Location of the output
+// @param compIdx : Index used for vector element indexing
+// @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchFsGenericOutputExport(
-    Value*       output,         // [in] Output value
-    unsigned     location,        // Location of the output
-    unsigned     compIdx,         // Index used for vector element indexing
-    Instruction* insertPos)      // [in] Where to insert the patch instruction
+    Value*       output,
+    unsigned     location,
+    unsigned     compIdx,
+    Instruction* insertPos)
 {
     Type* outputTy = output->getType();
 
@@ -2208,10 +2281,14 @@ void PatchInOutImportExport::patchFsGenericOutputExport(
 
 // =====================================================================================================================
 // Patches import calls for built-in inputs of vertex shader.
+//
+// @param inputTy : Type of input value
+// @param builtInId : ID of the built-in variable
+// @param insertPos : Where to insert the patch instruction
 Value* PatchInOutImportExport::patchVsBuiltInInputImport(
-    Type*        inputTy,      // [in] Type of input value
-    unsigned     builtInId,     // ID of the built-in variable
-    Instruction* insertPos)    // [in] Where to insert the patch instruction
+    Type*        inputTy,
+    unsigned     builtInId,
+    Instruction* insertPos)
 {
     auto& entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
 
@@ -2243,12 +2320,18 @@ Value* PatchInOutImportExport::patchVsBuiltInInputImport(
 
 // =====================================================================================================================
 // Patches import calls for built-in inputs of tessellation control shader.
+//
+// @param inputTy : Type of input value
+// @param builtInId : ID of the built-in variable
+// @param elemIdx : Index used for array/vector element indexing (could be null)
+// @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
+// @param insertPos : Where to insert the patch instruction
 Value* PatchInOutImportExport::patchTcsBuiltInInputImport(
-    Type*        inputTy,      // [in] Type of input value
-    unsigned     builtInId,     // ID of the built-in variable
-    Value*       elemIdx,      // [in] Index used for array/vector element indexing (could be null)
-    Value*       vertexIdx,    // [in] Input array outermost index used for vertex indexing (could be null)
-    Instruction* insertPos)    // [in] Where to insert the patch instruction
+    Type*        inputTy,
+    unsigned     builtInId,
+    Value*       elemIdx,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     Value* input = UndefValue::get(inputTy);
 
@@ -2351,12 +2434,18 @@ Value* PatchInOutImportExport::patchTcsBuiltInInputImport(
 
 // =====================================================================================================================
 // Patches import calls for built-in inputs of tessellation evaluation shader.
+//
+// @param inputTy : Type of input value
+// @param builtInId : ID of the built-in variable
+// @param elemIdx : Index used for array/vector element indexing (could be null)
+// @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
+// @param insertPos : Where to insert the patch instruction
 Value* PatchInOutImportExport::patchTesBuiltInInputImport(
-    Type*        inputTy,      // [in] Type of input value
-    unsigned     builtInId,     // ID of the built-in variable
-    Value*       elemIdx,      // [in] Index used for array/vector element indexing (could be null)
-    Value*       vertexIdx,    // [in] Input array outermost index used for vertex indexing (could be null)
-    Instruction* insertPos)    // [in] Where to insert the patch instruction
+    Type*        inputTy,
+    unsigned     builtInId,
+    Value*       elemIdx,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     Value* input = UndefValue::get(inputTy);
 
@@ -2508,11 +2597,16 @@ Value* PatchInOutImportExport::patchTesBuiltInInputImport(
 
 // =====================================================================================================================
 // Patches import calls for built-in inputs of geometry shader.
+//
+// @param inputTy : Type of input value
+// @param builtInId : ID of the built-in variable
+// @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
+// @param insertPos : Where to insert the patch instruction
 Value* PatchInOutImportExport::patchGsBuiltInInputImport(
-    Type*        inputTy,      // [in] Type of input value
-    unsigned     builtInId,     // ID of the built-in variable
-    Value*       vertexIdx,    // [in] Input array outermost index used for vertex indexing (could be null)
-    Instruction* insertPos)    // [in] Where to insert the patch instruction
+    Type*        inputTy,
+    unsigned     builtInId,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     Value* input = nullptr;
 
@@ -2580,11 +2674,16 @@ Value* PatchInOutImportExport::patchGsBuiltInInputImport(
 
 // =====================================================================================================================
 // Patches import calls for built-in inputs of fragment shader.
+//
+// @param inputTy : Type of input value
+// @param builtInId : ID of the built-in variable
+// @param sampleId : Sample ID; only needed for BuiltInSamplePosOffset
+// @param insertPos : Where to insert the patch instruction
 Value* PatchInOutImportExport::patchFsBuiltInInputImport(
-    Type*        inputTy,      // [in] Type of input value
-    unsigned     builtInId,     // ID of the built-in variable
-    Value*       sampleId,     // [in] Sample ID; only needed for BuiltInSamplePosOffset
-    Instruction* insertPos)    // [in] Where to insert the patch instruction
+    Type*        inputTy,
+    unsigned     builtInId,
+    Value*       sampleId,
+    Instruction* insertPos)
 {
     Value* input = UndefValue::get(inputTy);
 
@@ -2946,10 +3045,14 @@ Value* PatchInOutImportExport::patchFsBuiltInInputImport(
 
 // =====================================================================================================================
 // Generate code to read BuiltInSamplePosOffset
+//
+// @param inputTy : Type of BuiltInSamplePosOffset
+// @param sampleId : Sample ID
+// @param insertPos : Insert position
 Value* PatchInOutImportExport::getSamplePosOffset(
-    Type*         inputTy,     // [in] Type of BuiltInSamplePosOffset
-    Value*        sampleId,    // [in] Sample ID
-    Instruction*  insertPos)   // [in] Insert position
+    Type*         inputTy,
+    Value*        sampleId,
+    Instruction*  insertPos)
 {
     // Gets the offset of sample position relative to the pixel center for the specified sample ID
     IRBuilder<> builder(*m_context);
@@ -2983,9 +3086,12 @@ Value* PatchInOutImportExport::getSamplePosOffset(
 
 // =====================================================================================================================
 // Generate code to read BuiltInSamplePosition
+//
+// @param inputTy : Type of BuiltInSamplePosition
+// @param insertPos : Insert position
 Value* PatchInOutImportExport::getSamplePosition(
-    Type*         inputTy,   // [in] Type of BuiltInSamplePosition
-    Instruction*  insertPos) // [in] Insert position
+    Type*         inputTy,
+    Instruction*  insertPos)
 {
     IRBuilder<> builder(*m_context);
     builder.SetInsertPoint(insertPos);
@@ -2996,10 +3102,14 @@ Value* PatchInOutImportExport::getSamplePosition(
 
 // =====================================================================================================================
 // Patches import calls for built-in inputs of compute shader.
+//
+// @param inputTy : Type of input value
+// @param builtInId : ID of the built-in variable
+// @param insertPos : Where to insert the patch instruction
 Value* PatchInOutImportExport::patchCsBuiltInInputImport(
-    Type*        inputTy,      // [in] Type of input value
-    unsigned     builtInId,     // ID of the built-in variable
-    Instruction* insertPos)    // [in] Where to insert the patch instruction
+    Type*        inputTy,
+    unsigned     builtInId,
+    Instruction* insertPos)
 {
     Value* input = nullptr;
 
@@ -3085,9 +3195,12 @@ Value* PatchInOutImportExport::patchCsBuiltInInputImport(
 
 // =====================================================================================================================
 // Get GlobalInvocationId
+//
+// @param inputTy : Type of GlobalInvocationId
+// @param insertPos : Insert position
 Value* PatchInOutImportExport::getGlobalInvocationId(
-    Type*         inputTy,   // [in] Type of GlobalInvocationId
-    Instruction*  insertPos) // [in] Insert position
+    Type*         inputTy,
+    Instruction*  insertPos)
 {
     IRBuilder<> builder(*m_context);
     builder.SetInsertPoint(insertPos);
@@ -3101,9 +3214,12 @@ Value* PatchInOutImportExport::getGlobalInvocationId(
 
 // =====================================================================================================================
 // Get LocalInvocationIndex
+//
+// @param inputTy : Type of LocalInvocationIndex
+// @param insertPos : Insert position
 Value* PatchInOutImportExport::getLocalInvocationIndex(
-    Type*         inputTy,   // [in] Type of LocalInvocationIndex
-    Instruction*  insertPos) // [in] Insert position
+    Type*         inputTy,
+    Instruction*  insertPos)
 {
     IRBuilder<> builder(*m_context);
     builder.SetInsertPoint(insertPos);
@@ -3119,9 +3235,12 @@ Value* PatchInOutImportExport::getLocalInvocationIndex(
 
 // =====================================================================================================================
 // Get SubgroupId
+//
+// @param inputTy : Type of LocalInvocationIndex
+// @param insertPos : Insert position
 Value* PatchInOutImportExport::getSubgroupId(
-    Type*         inputTy,   // [in] Type of LocalInvocationIndex
-    Instruction*  insertPos) // [in] Insert position
+    Type*         inputTy,
+    Instruction*  insertPos)
 {
     // gl_SubgroupID = gl_LocationInvocationIndex / gl_SubgroupSize
     IRBuilder<> builder(*m_context);
@@ -3133,12 +3252,18 @@ Value* PatchInOutImportExport::getSubgroupId(
 
 // =====================================================================================================================
 // Patches import calls for built-in outputs of tessellation control shader.
+//
+// @param outputTy : Type of output value
+// @param builtInId : ID of the built-in variable
+// @param elemIdx : Index used for array/vector element indexing (could be null)
+// @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
+// @param insertPos : Where to insert the patch instruction
 Value* PatchInOutImportExport::patchTcsBuiltInOutputImport(
-    Type*        outputTy,     // [in] Type of output value
-    unsigned     builtInId,     // ID of the built-in variable
-    Value*       elemIdx,      // [in] Index used for array/vector element indexing (could be null)
-    Value*       vertexIdx,    // [in] Input array outermost index used for vertex indexing (could be null)
-    Instruction* insertPos)    // [in] Where to insert the patch instruction
+    Type*        outputTy,
+    unsigned     builtInId,
+    Value*       elemIdx,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     Value* output = UndefValue::get(outputTy);
 
@@ -3271,10 +3396,14 @@ Value* PatchInOutImportExport::patchTcsBuiltInOutputImport(
 
 // =====================================================================================================================
 // Patches export calls for built-in outputs of vertex shader.
+//
+// @param output : Output value
+// @param builtInId : ID of the built-in variable
+// @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchVsBuiltInOutputExport(
-    Value*       output,       // [in] Output value
-    unsigned     builtInId,     // ID of the built-in variable
-    Instruction* insertPos)    // [in] Where to insert the patch instruction
+    Value*       output,
+    unsigned     builtInId,
+    Instruction* insertPos)
 {
     auto outputTy = output->getType();
 
@@ -3492,12 +3621,18 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
 
 // =====================================================================================================================
 // Patches export calls for built-in outputs of tessellation control shader.
+//
+// @param output : Output value
+// @param builtInId : ID of the built-in variable
+// @param elemIdx : Index used for array/vector element indexing (could be null)
+// @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
+// @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchTcsBuiltInOutputExport(
-    Value*       output,       // [in] Output value
-    unsigned     builtInId,     // ID of the built-in variable
-    Value*       elemIdx,      // [in] Index used for array/vector element indexing (could be null)
-    Value*       vertexIdx,    // [in] Input array outermost index used for vertex indexing (could be null)
-    Instruction* insertPos)    // [in] Where to insert the patch instruction
+    Value*       output,
+    unsigned     builtInId,
+    Value*       elemIdx,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     auto outputTy = output->getType();
 
@@ -3719,10 +3854,14 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(
 
 // =====================================================================================================================
 // Patches export calls for built-in outputs of tessellation evaluation shader.
+//
+// @param output : Output value
+// @param builtInId : ID of the built-in variable
+// @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchTesBuiltInOutputExport(
-    Value*       output,       // [in] Output value
-    unsigned     builtInId,     // ID of the built-in variable
-    Instruction* insertPos)    // [in] Where to insert the patch instruction
+    Value*       output,
+    unsigned     builtInId,
+    Instruction* insertPos)
 {
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval);
     auto& builtInUsage = resUsage->builtInUsage.tes;
@@ -3878,11 +4017,16 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(
 
 // =====================================================================================================================
 // Patches export calls for built-in outputs of geometry shader.
+//
+// @param output : Output value
+// @param builtInId : ID of the built-in variable
+// @param streamId : ID of output vertex stream
+// @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchGsBuiltInOutputExport(
-    Value*       output,       // [in] Output value
-    unsigned     builtInId,     // ID of the built-in variable
-    unsigned     streamId,      // ID of output vertex stream
-    Instruction* insertPos)    // [in] Where to insert the patch instruction
+    Value*       output,
+    unsigned     builtInId,
+    unsigned     streamId,
+    Instruction* insertPos)
 {
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
     auto& builtInUsage = resUsage->builtInUsage.gs;
@@ -3925,10 +4069,14 @@ void PatchInOutImportExport::patchGsBuiltInOutputExport(
 
 // =====================================================================================================================
 // Patches export calls for built-in outputs of fragment shader.
+//
+// @param output : Output value
+// @param builtInId : ID of the built-in variable
+// @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchFsBuiltInOutputExport(
-    Value*       output,       // [in] Output value
-    unsigned     builtInId,     // ID of the built-in variable
-    Instruction* insertPos)    // [in] Where to insert the patch instruction
+    Value*       output,
+    unsigned     builtInId,
+    Instruction* insertPos)
 {
     switch (builtInId)
     {
@@ -3961,20 +4109,28 @@ void PatchInOutImportExport::patchFsBuiltInOutputExport(
 
 // =====================================================================================================================
 // Patches export calls for generic outputs of copy shader.
+//
+// @param output : Output value
+// @param location : Location of the output
+// @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchCopyShaderGenericOutputExport(
-    Value*       output,        // [in] Output value
-    unsigned     location,       // Location of the output
-    Instruction* insertPos)     // [in] Where to insert the patch instruction
+    Value*       output,
+    unsigned     location,
+    Instruction* insertPos)
 {
     addExportInstForGenericOutput(output, location, 0, insertPos);
 }
 
 // =====================================================================================================================
 // Patches export calls for built-in outputs of copy shader.
+//
+// @param output : Output value
+// @param builtInId : ID of the built-in variable
+// @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(
-    Value*       output,       // [in] Output value
-    unsigned     builtInId,     // ID of the built-in variable
-    Instruction* insertPos)    // [in] Where to insert the patch instruction
+    Value*       output,
+    unsigned     builtInId,
+    Instruction* insertPos)
 {
     switch (builtInId)
     {
@@ -4038,12 +4194,18 @@ void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(
 
 // =====================================================================================================================
 // Patch export calls for transform feedback outputs of vertex shader and tessellation evaluation shader.
+//
+// @param output : Output value
+// @param xfbBuffer : Transform feedback buffer ID
+// @param xfbOffset : Transform feedback offset
+// @param xfbExtraOffset : Transform feedback extra offset, passed from aggregate type
+// @param insertPos : Where to insert the store instruction
 void PatchInOutImportExport::patchXfbOutputExport(
-    Value*        output,            // [in] Output value
-    unsigned      xfbBuffer,          // Transform feedback buffer ID
-    unsigned      xfbOffset,          // Transform feedback offset
-    unsigned      xfbExtraOffset,     // Transform feedback extra offset, passed from aggregate type
-    Instruction*  insertPos)         // [in] Where to insert the store instruction
+    Value*        output,
+    unsigned      xfbBuffer,
+    unsigned      xfbOffset,
+    unsigned      xfbExtraOffset,
+    Instruction*  insertPos)
 {
     assert(m_shaderStage == ShaderStageVertex ||
                 m_shaderStage == ShaderStageTessEval ||
@@ -4160,10 +4322,14 @@ void PatchInOutImportExport::patchXfbOutputExport(
 
 // =====================================================================================================================
 // Creates the LLPC intrinsic "llpc.streamoutbuffer.store.f32" to store value to to stream-out buffer.
+//
+// @param storeValue : Value to store
+// @param xfbStride : Transform feedback stride
+// @param [out] funcName : Function name to add mangling to
 void PatchInOutImportExport::createStreamOutBufferStoreFunction(
-    Value*         storeValue,   // [in] Value to store
-    unsigned       xfbStride,     // Transform feedback stride
-    std::string&   funcName)      // [out] Function name to add mangling to
+    Value*         storeValue,
+    unsigned       xfbStride,
+    std::string&   funcName)
 {
     addTypeMangling(nullptr, { storeValue }, funcName);
 
@@ -4314,15 +4480,24 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(
 
 // =====================================================================================================================
 // Combines scalar values store to vector store
+//
+// @param storeValues : Values to store
+// @param startIdx : Starting index for load operation in the load value array
+// @param valueOffset : Value offset as a bias of buffer store offset
+// @param bufDesc : Buffer descriptor
+// @param storeOffset : Buffer store offset
+// @param bufBase : Buffer base offset
+// @param coherent : Buffer coherency
+// @param insertPos : Where to insert write instructions
 unsigned PatchInOutImportExport::combineBufferStore(
-    const std::vector<Value*>& storeValues,   // [in] Values to store
-    unsigned                   startIdx,      // Starting index for load operation in the load value array
-    unsigned                   valueOffset,   // Value offset as a bias of buffer store offset
-    Value*                     bufDesc,      // [in] Buffer descriptor
-    Value*                     storeOffset,  // [in] Buffer store offset
-    Value*                     bufBase,      // [in] Buffer base offset
-    CoherentFlag               coherent,      // Buffer coherency
-    Instruction*               insertPos)    // [in] Where to insert write instructions
+    const std::vector<Value*>& storeValues,
+    unsigned                   startIdx,
+    unsigned                   valueOffset,
+    Value*                     bufDesc,
+    Value*                     storeOffset,
+    Value*                     bufBase,
+    CoherentFlag               coherent,
+    Instruction*               insertPos)
 {
 
     std::vector<unsigned> formats;
@@ -4413,14 +4588,22 @@ unsigned PatchInOutImportExport::combineBufferStore(
 
 // =====================================================================================================================
 // Combines scalar values load to vector load
+//
+// @param [in/out] loadValues : Values to load
+// @param startIdx : Starting index for load operation in the load value array
+// @param bufDesc : Buffer descriptor
+// @param loadOffset : Buffer load offset
+// @param bufBase : Buffer base offset
+// @param coherent : Buffer coherency
+// @param insertPos : Where to insert write instructions
 unsigned PatchInOutImportExport::combineBufferLoad(
-    std::vector<Value*>& loadValues,    // [in/out] Values to load
-    unsigned             startIdx,      // Starting index for load operation in the load value array
-    Value *              bufDesc,      // [in] Buffer descriptor
-    Value *              loadOffset,   // [in] Buffer load offset
-    Value *              bufBase,      // [in] Buffer base offset
-    CoherentFlag         coherent,      // Buffer coherency
-    Instruction*         insertPos)    // [in] Where to insert write instructions
+    std::vector<Value*>& loadValues,
+    unsigned             startIdx,
+    Value *              bufDesc,
+    Value *              loadOffset,
+    Value *              bufBase,
+    CoherentFlag         coherent,
+    Instruction*         insertPos)
 {
     std::vector<unsigned> formats;
 
@@ -4508,13 +4691,20 @@ unsigned PatchInOutImportExport::combineBufferLoad(
 
 // =====================================================================================================================
 // Store value to stream-out buffer
+//
+// @param storeValue : Value to store
+// @param xfbBuffer : Transform feedback buffer
+// @param xfbOffset : Offset of the store value within transform feedback buffer
+// @param xfbStride : Transform feedback stride
+// @param streamOutBufDesc : Transform feedback buffer descriptor
+// @param insertPos : Where to insert the store instruction
 void PatchInOutImportExport::storeValueToStreamOutBuffer(
-    Value*        storeValue,        // [in] Value to store
-    unsigned      xfbBuffer,          // Transform feedback buffer
-    unsigned      xfbOffset,          // Offset of the store value within transform feedback buffer
-    unsigned      xfbStride,          // Transform feedback stride
-    Value*        streamOutBufDesc,  // [in] Transform feedback buffer descriptor
-    Instruction * insertPos)         // [in] Where to insert the store instruction
+    Value*        storeValue,
+    unsigned      xfbBuffer,
+    unsigned      xfbOffset,
+    unsigned      xfbStride,
+    Value*        streamOutBufDesc,
+    Instruction * insertPos)
 {
     auto storeTy = storeValue->getType();
 
@@ -4612,11 +4802,16 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(
 
 // =====================================================================================================================
 // Stores value to ES-GS ring (buffer or LDS).
+//
+// @param storeValue : Value to store
+// @param location : Output location
+// @param compIdx : Output component index
+// @param insertPos : Where to insert the store instruction
 void PatchInOutImportExport::storeValueToEsGsRing(
-    Value*       storeValue,   // [in] Value to store
-    unsigned     location,      // Output location
-    unsigned     compIdx,       // Output component index
-    Instruction* insertPos)    // [in] Where to insert the store instruction
+    Value*       storeValue,
+    unsigned     location,
+    unsigned     compIdx,
+    Instruction* insertPos)
 {
     auto storeTy = storeValue->getType();
 
@@ -4721,12 +4916,18 @@ void PatchInOutImportExport::storeValueToEsGsRing(
 
 // =====================================================================================================================
 // Loads value from ES-GS ring (buffer or LDS).
+//
+// @param loadTy : Load value type
+// @param location : Input location
+// @param compIdx : Input component index
+// @param vertexIdx : Vertex index
+// @param insertPos : Where to insert the load instruction
 Value* PatchInOutImportExport::loadValueFromEsGsRing(
-    Type*        loadTy,       // [in] Load value type
-    unsigned     location,      // Input location
-    unsigned     compIdx,       // Input component index
-    Value*       vertexIdx,    // [in] Vertex index
-    Instruction* insertPos)    // [in] Where to insert the load instruction
+    Type*        loadTy,
+    unsigned     location,
+    unsigned     compIdx,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     Type* elemTy = loadTy;
     if (loadTy->isArrayTy())
@@ -4834,12 +5035,18 @@ Value* PatchInOutImportExport::loadValueFromEsGsRing(
 
 // =====================================================================================================================
 // Stores value to GS-VS ring (buffer or LDS).
+//
+// @param storeValue : Value to store
+// @param location : Output location
+// @param compIdx : Output component index
+// @param streamId : Output stream ID
+// @param insertPos : Where to insert the store instruction
 void PatchInOutImportExport::storeValueToGsVsRing(
-    Value*       storeValue,   // [in] Value to store
-    unsigned     location,      // Output location
-    unsigned     compIdx,       // Output component index
-    unsigned     streamId,      // Output stream ID
-    Instruction* insertPos)    // [in] Where to insert the store instruction
+    Value*       storeValue,
+    unsigned     location,
+    unsigned     compIdx,
+    unsigned     streamId,
+    Instruction* insertPos)
 {
     auto storeTy = storeValue->getType();
 
@@ -4978,11 +5185,16 @@ void PatchInOutImportExport::storeValueToGsVsRing(
 
 // =====================================================================================================================
 // Calculates the byte offset to store the output value to ES-GS ring based on the specified output info.
+//
+// @param location : Output location
+// @param compIdx : Output component index
+// @param esGsOffset : ES-GS ring offset in bytes
+// @param insertPos : Where to insert the instruction
 Value* PatchInOutImportExport::calcEsGsRingOffsetForOutput(
-    unsigned        location,    // Output location
-    unsigned        compIdx,     // Output component index
-    Value*          esGsOffset, // [in] ES-GS ring offset in bytes
-    Instruction*    insertPos)  // [in] Where to insert the instruction
+    unsigned        location,
+    unsigned        compIdx,
+    Value*          esGsOffset,
+    Instruction*    insertPos)
 {
     Value* ringOffset = nullptr;
     if (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9)   // ES -> GS ring is always on-chip on GFX9
@@ -5022,11 +5234,16 @@ Value* PatchInOutImportExport::calcEsGsRingOffsetForOutput(
 
 // =====================================================================================================================
 // Calculates the byte offset to load the input value from ES-GS ring based on the specified input info.
+//
+// @param location : Input location
+// @param compIdx : Input Component index
+// @param vertexIdx : Vertex index
+// @param insertPos : Where to insert the instruction
 Value* PatchInOutImportExport::calcEsGsRingOffsetForInput(
-    unsigned        location,    // Input location
-    unsigned        compIdx,     // Input Component index
-    Value*          vertexIdx,  // [in] Vertex index
-    Instruction*    insertPos)  // [in] Where to insert the instruction
+    unsigned        location,
+    unsigned        compIdx,
+    Value*          vertexIdx,
+    Instruction*    insertPos)
 {
     Value* ringOffset = nullptr;
     auto esGsOffsets = m_pipelineSysValues.get(m_entryPoint)->getEsGsOffsets();
@@ -5070,13 +5287,20 @@ Value* PatchInOutImportExport::calcEsGsRingOffsetForInput(
 
 // =====================================================================================================================
 // Calculates the offset to store the output value to GS-VS ring based on the specified output info.
+//
+// @param location : Output location
+// @param compIdx : Output component
+// @param streamId : Output stream ID
+// @param vertexIdx : Vertex index
+// @param gsVsOffset : ES-GS ring offset in bytes
+// @param insertPos : Where to insert the instruction
 Value* PatchInOutImportExport::calcGsVsRingOffsetForOutput(
-    unsigned        location,    // Output location
-    unsigned        compIdx,     // Output component
-    unsigned        streamId,    // Output stream ID
-    Value*          vertexIdx,  // [in] Vertex index
-    Value*          gsVsOffset, // [in] ES-GS ring offset in bytes
-    Instruction*    insertPos)  // [in] Where to insert the instruction
+    unsigned        location,
+    unsigned        compIdx,
+    unsigned        streamId,
+    Value*          vertexIdx,
+    Value*          gsVsOffset,
+    Instruction*    insertPos)
 {
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
 
@@ -5156,11 +5380,16 @@ Value* PatchInOutImportExport::calcGsVsRingOffsetForOutput(
 
 // =====================================================================================================================
 // Reads value from LDS.
+//
+// @param isOutput : is the value from output variable
+// @param readTy : Type of value read from LDS
+// @param ldsOffset : Start offset to do LDS read operations
+// @param insertPos : Where to insert read instructions
 Value* PatchInOutImportExport::readValueFromLds(
-    bool         isOutput,    // is the value from output variable
-    Type*        readTy,     // [in] Type of value read from LDS
-    Value*       ldsOffset,  // [in] Start offset to do LDS read operations
-    Instruction* insertPos)  // [in] Where to insert read instructions
+    bool         isOutput,
+    Type*        readTy,
+    Value*       ldsOffset,
+    Instruction* insertPos)
 {
     assert(m_lds );
     assert(readTy->isSingleValueType());
@@ -5275,10 +5504,14 @@ Value* PatchInOutImportExport::readValueFromLds(
 
 // =====================================================================================================================
 // Writes value to LDS.
+//
+// @param writeValue : Value written to LDS
+// @param ldsOffset : Start offset to do LDS write operations
+// @param insertPos : Where to insert write instructions
 void PatchInOutImportExport::writeValueToLds(
-    Value*        writeValue,   // [in] Value written to LDS
-    Value*        ldsOffset,    // [in] Start offset to do LDS write operations
-    Instruction*  insertPos)    // [in] Where to insert write instructions
+    Value*        writeValue,
+    Value*        ldsOffset,
+    Instruction*  insertPos)
 {
     assert(m_lds );
 
@@ -5370,10 +5603,14 @@ void PatchInOutImportExport::writeValueToLds(
 
 // =====================================================================================================================
 // Calculates start offset of tessellation factors in the TF buffer.
+//
+// @param isOuter : Whether the calculation is for tessellation outer factors
+// @param elemIdxVal : Index used for array element indexing (could be null)
+// @param insertPos : Where to insert store instructions
 Value* PatchInOutImportExport::calcTessFactorOffset(
-    bool         isOuter,     // Whether the calculation is for tessellation outer factors
-    Value*       elemIdxVal, // [in] Index used for array element indexing (could be null)
-    Instruction* insertPos)  // [in] Where to insert store instructions
+    bool         isOuter,
+    Value*       elemIdxVal,
+    Instruction* insertPos)
 {
     assert(m_shaderStage == ShaderStageTessControl);
 
@@ -5490,10 +5727,14 @@ Value* PatchInOutImportExport::calcTessFactorOffset(
 
 // =====================================================================================================================
 // Stores tessellation factors (outer/inner) to corresponding tessellation factor (TF) buffer.
+//
+// @param tessFactors : Tessellation factors to be stored
+// @param tessFactorOffsetVal : Start offset to store the specified tessellation factors
+// @param insertPos : Where to insert store instructions
 void PatchInOutImportExport::storeTessFactorToBuffer(
-    const std::vector<Value*>& tessFactors,           // [in] Tessellation factors to be stored
-    Value*                     tessFactorOffsetVal,  // [in] Start offset to store the specified tessellation factors
-    Instruction*               insertPos)            // [in] Where to insert store instructions
+    const std::vector<Value*>& tessFactors,
+    Value*                     tessFactorOffsetVal,
+    Instruction*               insertPos)
 {
     assert(m_shaderStage == ShaderStageTessControl);
 
@@ -5689,11 +5930,16 @@ void PatchInOutImportExport::createTessBufferStoreFunction()
 
 // =====================================================================================================================
 // Calculates the DWORD offset to write value to LDS based on the specified VS output info.
+//
+// @param outputTy : Type of the output
+// @param location : Base location of the output
+// @param compIdx : Index used for vector element indexing
+// @param insertPos : Where to insert calculation instructions
 Value* PatchInOutImportExport::calcLdsOffsetForVsOutput(
-    Type*        outputTy,     // [in] Type of the output
-    unsigned     location,      // Base location of the output
-    unsigned     compIdx,       // Index used for vector element indexing
-    Instruction* insertPos)    // [in] Where to insert calculation instructions
+    Type*        outputTy,
+    unsigned     location,
+    unsigned     compIdx,
+    Instruction* insertPos)
 {
     assert(m_shaderStage == ShaderStageVertex);
 
@@ -5729,13 +5975,20 @@ Value* PatchInOutImportExport::calcLdsOffsetForVsOutput(
 
 // =====================================================================================================================
 // Calculates the DWORD offset to read value from LDS based on the specified TCS input info.
+//
+// @param inputTy : Type of the input
+// @param location : Base location of the input
+// @param locOffset : Relative location offset
+// @param compIdx : Index used for vector element indexing (could be null)
+// @param vertexIdx : Vertex indexing
+// @param insertPos : Where to insert calculation instructions
 Value* PatchInOutImportExport::calcLdsOffsetForTcsInput(
-    Type*        inputTy,      // [in] Type of the input
-    unsigned     location,      // Base location of the input
-    Value*       locOffset,    // [in] Relative location offset
-    Value*       compIdx,      // [in] Index used for vector element indexing (could be null)
-    Value*       vertexIdx,    // [in] Vertex indexing
-    Instruction* insertPos)    // [in] Where to insert calculation instructions
+    Type*        inputTy,
+    unsigned     location,
+    Value*       locOffset,
+    Value*       compIdx,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     assert(m_shaderStage == ShaderStageTessControl);
 
@@ -5788,13 +6041,20 @@ Value* PatchInOutImportExport::calcLdsOffsetForTcsInput(
 
 // =====================================================================================================================
 // Calculates the DWORD offset to read/write value from/to LDS based on the specified TCS output info.
+//
+// @param outputTy : Type of the output
+// @param location : Base location of the output
+// @param locOffset : Relative location offset (could be null)
+// @param compIdx : Index used for vector element indexing (could be null)
+// @param vertexIdx : Vertex indexing
+// @param insertPos : Where to insert calculation instructions
 Value* PatchInOutImportExport::calcLdsOffsetForTcsOutput(
-    Type*        outputTy,     // [in] Type of the output
-    unsigned     location,      // Base location of the output
-    Value*       locOffset,    // [in] Relative location offset (could be null)
-    Value*       compIdx,      // [in] Index used for vector element indexing (could be null)
-    Value*       vertexIdx,    // [in] Vertex indexing
-    Instruction* insertPos)    // [in] Where to insert calculation instructions
+    Type*        outputTy,
+    unsigned     location,
+    Value*       locOffset,
+    Value*       compIdx,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     assert(m_shaderStage == ShaderStageTessControl);
 
@@ -5874,13 +6134,20 @@ Value* PatchInOutImportExport::calcLdsOffsetForTcsOutput(
 
 // =====================================================================================================================
 // Calculates the DWORD offset to read/write value from/to LDS based on the specified TES input info.
+//
+// @param inputTy : Type of the input
+// @param location : Base location of the input
+// @param locOffset : Relative location offset
+// @param compIdx : Index used for vector element indexing (could be null)
+// @param vertexIdx : Vertex indexing
+// @param insertPos : Where to insert calculation instructions
 Value* PatchInOutImportExport::calcLdsOffsetForTesInput(
-    Type*        inputTy,      // [in] Type of the input
-    unsigned     location,      // Base location of the input
-    Value*       locOffset,    // [in] Relative location offset
-    Value*       compIdx,      // [in] Index used for vector element indexing (could be null)
-    Value*       vertexIdx,    // [in] Vertex indexing
-    Instruction* insertPos)    // [in] Where to insert calculation instructions
+    Type*        inputTy,
+    unsigned     location,
+    Value*       locOffset,
+    Value*       compIdx,
+    Value*       vertexIdx,
+    Instruction* insertPos)
 {
     assert(m_shaderStage == ShaderStageTessEval);
 
@@ -5962,13 +6229,20 @@ Value* PatchInOutImportExport::calcLdsOffsetForTesInput(
 
 // =====================================================================================================================
 // Calculates the patch count for per-thread group.
+//
+// @param inVertexCount : Count of vertices of input patch
+// @param inVertexStride : Vertex stride of input patch in (DWORDs)
+// @param outVertexCount : Count of vertices of output patch
+// @param outVertexStride : Vertex stride of output patch in (DWORDs)
+// @param patchConstCount : Count of output patch constants
+// @param tessFactorStride : Stride of tessellation factors (DWORDs)
 unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(
-    unsigned inVertexCount,     // Count of vertices of input patch
-    unsigned inVertexStride,    // Vertex stride of input patch in (DWORDs)
-    unsigned outVertexCount,    // Count of vertices of output patch
-    unsigned outVertexStride,   // Vertex stride of output patch in (DWORDs)
-    unsigned patchConstCount,   // Count of output patch constants
-    unsigned tessFactorStride   // Stride of tessellation factors (DWORDs)
+    unsigned inVertexCount,
+    unsigned inVertexStride,
+    unsigned outVertexCount,
+    unsigned outVertexStride,
+    unsigned patchConstCount,
+    unsigned tessFactorStride
     ) const
 {
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
@@ -6057,11 +6331,16 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(
 
 // =====================================================================================================================
 // Inserts "exp" instruction to export generic output.
+//
+// @param output : Output value
+// @param location : Location of the output
+// @param compIdx : Index used for vector element indexing
+// @param insertPos : Where to insert the "exp" instruction
 void PatchInOutImportExport::addExportInstForGenericOutput(
-    Value*       output,        // [in] Output value
-    unsigned     location,       // Location of the output
-    unsigned     compIdx,        // Index used for vector element indexing
-    Instruction* insertPos)     // [in] Where to insert the "exp" instruction
+    Value*       output,
+    unsigned     location,
+    unsigned     compIdx,
+    Instruction* insertPos)
 {
     // Check if the shader stage is valid to use "exp" instruction to export output
     const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
@@ -6232,10 +6511,14 @@ void PatchInOutImportExport::addExportInstForGenericOutput(
 
 // =====================================================================================================================
 // Inserts "exp" instruction to export built-in output.
+//
+// @param output : Output value
+// @param builtInId : ID of the built-in variable
+// @param insertPos : Where to insert the "exp" instruction
 void PatchInOutImportExport::addExportInstForBuiltInOutput(
-    Value*       output,       // [in] Output value
-    unsigned     builtInId,     // ID of the built-in variable
-    Instruction* insertPos)    // [in] Where to insert the "exp" instruction
+    Value*       output,
+    unsigned     builtInId,
+    Instruction* insertPos)
 {
     // Check if the shader stage is valid to use "exp" instruction to export output
     const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
@@ -6438,10 +6721,14 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(
 
 // =====================================================================================================================
 // Adjusts I/J calculation for "centroid" interpolation mode by taking "center" mode into account.
+//
+// @param centroidIj : Centroid I/J provided by hardware natively
+// @param centerIj : Center I/J provided by hardware natively
+// @param insertPos : Where to insert this call
 Value* PatchInOutImportExport::adjustCentroidIj(
-    Value*       centroidIj,   // [in] Centroid I/J provided by hardware natively
-    Value*       centerIj,     // [in] Center I/J provided by hardware natively
-    Instruction* insertPos)    // [in] Where to insert this call
+    Value*       centroidIj,
+    Value*       centerIj,
+    Instruction* insertPos)
 {
     auto& entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
     auto primMask = getFunctionArgument(m_entryPoint, entryArgIdxs.primMask);
@@ -6468,8 +6755,10 @@ Value* PatchInOutImportExport::adjustCentroidIj(
 
 // =====================================================================================================================
 // Get Subgroup local invocation Id
+//
+// @param insertPos : Where to insert this call
 Value* PatchInOutImportExport::getSubgroupLocalInvocationId(
-    Instruction* insertPos)  // [in] Where to insert this call
+    Instruction* insertPos)
 {
     Value* args[] = {
         ConstantInt::get(Type::getInt32Ty(*m_context), -1),
@@ -6554,9 +6843,12 @@ WorkgroupLayout PatchInOutImportExport::calculateWorkgroupLayout()
 
 // =====================================================================================================================
 // Reconfigure the workgroup for optimization purposes.
+//
+// @param localInvocationId : The original workgroup ID.
+// @param insertPos : Where to insert instructions.
 Value* PatchInOutImportExport::reconfigWorkgroup(
-    Value*       localInvocationId, // [in] The original workgroup ID.
-    Instruction* insertPos)         // [in] Where to insert instructions.
+    Value*       localInvocationId,
+    Instruction* insertPos)
 {
     auto& builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
     auto workgroupLayout = static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout);
@@ -6875,8 +7167,10 @@ Value* PatchInOutImportExport::getWorkgroupSize()
 
 // =====================================================================================================================
 // Get the value of compute shader built-in LocalInvocationId
+//
+// @param insertPos : Where to insert instructions.
 Value* PatchInOutImportExport::getInLocalInvocationId(
-    Instruction* insertPos) // [in] Where to insert instructions.
+    Instruction* insertPos)
 {
     assert(m_shaderStage == ShaderStageCompute);
 

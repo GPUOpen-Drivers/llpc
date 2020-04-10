@@ -40,9 +40,12 @@ namespace Llpc
 
 // =====================================================================================================================
 // Opens a file stream for read, write or append access.
+//
+// @param filename : Name of file to open
+// @param accessFlags : ORed mask of FileAccessMode values describing how the file will be used
 Result File::open(
-    const char*  filename,     // [in] Name of file to open
-    unsigned     accessFlags)  // ORed mask of FileAccessMode values describing how the file will be used
+    const char*  filename,
+    unsigned     accessFlags)
 {
     Result result = Result::Success;
 
@@ -137,9 +140,12 @@ void File::close()
 
 // =====================================================================================================================
 // Writes a stream of bytes to the file.
+//
+// @param buffer : Buffer to write to the file
+// @param bufferSize : Size of the buffer in bytes
 Result File::write(
-    const void* buffer,     // [in] Buffer to write to the file
-    size_t      bufferSize)  // Size of the buffer in bytes
+    const void* buffer,
+    size_t      bufferSize)
 {
     Result result = Result::Success;
 
@@ -160,10 +166,14 @@ Result File::write(
 
 // =====================================================================================================================
 // Reads a stream of bytes from the file.
+//
+// @param [out] buffer : Buffer to read the file into
+// @param bufferSize : Size of buffer in bytes
+// @param [out] bytesReadOut : Number of bytes actually read (can be nullptr)
 Result File::read(
-    void*   buffer,        // [out] Buffer to read the file into
-    size_t  bufferSize,     // Size of buffer in bytes
-    size_t* bytesReadOut)  // [out] Number of bytes actually read (can be nullptr)
+    void*   buffer,
+    size_t  bufferSize,
+    size_t* bytesReadOut)
 {
     Result result = Result::Success;
 
@@ -189,10 +199,14 @@ Result File::read(
 
 // =====================================================================================================================
 // Reads a single line (until the next newline) of bytes from the file.
+//
+// @param [out] buffer : Buffer to read the file into
+// @param bufferSize : Size of buffer in bytes
+// @param [out] bytesReadOut : Number of bytes actually read (can be nullptr)
 Result File::readLine(
-    void*   buffer,        // [out] Buffer to read the file into
-    size_t  bufferSize,     // Size of buffer in bytes
-    size_t* bytesReadOut)  // [out] Number of bytes actually read (can be nullptr)
+    void*   buffer,
+    size_t  bufferSize,
+    size_t* bytesReadOut)
 {
     Result result = Result::ErrorInvalidValue;
 
@@ -233,8 +247,10 @@ Result File::readLine(
 
 // =====================================================================================================================
 // Prints a formatted string to the file.
+//
+// @param formatStr : Printf-style format string
 Result File::printf(
-    const char* formatStr,   // [in] Printf-style format string
+    const char* formatStr,
     ...                      // Printf-style argument list
     ) const
 {
@@ -259,9 +275,12 @@ Result File::printf(
 
 // =====================================================================================================================
 // Prints a formatted string to the file.
+//
+// @param formatStr : Printf-style format string
+// @param argList : Pre-started variable argument list
 Result File::vPrintf(
-    const char* formatStr,   // [in] Printf-style format string
-    va_list     argList)     // Pre-started variable argument list
+    const char* formatStr,
+    va_list     argList)
 {
     Result result = Result::ErrorUnavailable;
 
@@ -301,10 +320,12 @@ void File::rewind()
 
 // =====================================================================================================================
 // Sets the file position to the beginning of the file.
+//
+// @param offset : Number of bytes to offset
+// @param fromOrigin : If true, the seek will be relative to the file origin; if false, it will be from the current position
 void File::seek(
-    int offset,         // Number of bytes to offset
-    bool   fromOrigin)      // If true, the seek will be relative to the file origin;
-                            // if false, it will be from the current position
+    int offset,
+    bool   fromOrigin)
 {
     if (m_fileHandle )
     {
@@ -317,8 +338,10 @@ void File::seek(
 
 // =====================================================================================================================
 // Returns true if a file with the given name exists.
+//
+// @param filename : Name of the file to check
 size_t File::getFileSize(
-    const char* filename)     // [in] Name of the file to check
+    const char* filename)
 {
     // ...however, on other compilers, they are named 'stat' (no underbar).
     struct stat fileStatus = {};
@@ -330,8 +353,10 @@ size_t File::getFileSize(
 
 // =====================================================================================================================
 // Returns true if a file with the given name exists.
+//
+// @param filename : Name of the file to check
 bool File::exists(
-    const char* filename)      // [in] Name of the file to check
+    const char* filename)
 {
     // ...however, on other compilers, they are named 'stat' (no underbar).
     struct stat fileStatus = {};

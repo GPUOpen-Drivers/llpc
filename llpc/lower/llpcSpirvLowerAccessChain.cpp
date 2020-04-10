@@ -65,8 +65,10 @@ SpirvLowerAccessChain::SpirvLowerAccessChain()
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool SpirvLowerAccessChain::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Access-Chain\n");
 
@@ -80,8 +82,10 @@ bool SpirvLowerAccessChain::runOnModule(
 
 // =====================================================================================================================
 // Visits "getelementptr" instruction.
+//
+// @param getElemPtrInst : "Getelementptr" instruction
 void SpirvLowerAccessChain::visitGetElementPtrInst(
-    GetElementPtrInst& getElemPtrInst) // [in] "Getelementptr" instruction
+    GetElementPtrInst& getElemPtrInst)
 {
     // NOTE: Here, we try to coalesce chained "getelementptr" instructions (created from multi-level access chain).
     // Because the metadata is always decorated on top-level pointer value (actually a global variable).
@@ -103,9 +107,12 @@ void SpirvLowerAccessChain::visitGetElementPtrInst(
 //
 //      %y = getelementptr %blockType, %blockType addrspace(N)* @block, i32 0, i32 L, i32 M, i32 N
 //
+//
+// @param getElemPtr : "getelementptr" instruction in the bottom to do coalescing
+// @param addrSpace : Address space of the pointer value of "getelementptr"
 llvm::GetElementPtrInst* SpirvLowerAccessChain::tryToCoalesceChain(
-    GetElementPtrInst* getElemPtr, // [in] "getelementptr" instruction in the bottom to do coalescing
-    unsigned           addrSpace)   // Address space of the pointer value of "getelementptr"
+    GetElementPtrInst* getElemPtr,
+    unsigned           addrSpace)
 {
     GetElementPtrInst* coalescedGetElemPtr = getElemPtr;
 

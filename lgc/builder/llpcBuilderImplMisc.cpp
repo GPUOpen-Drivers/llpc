@@ -41,8 +41,10 @@ using namespace llvm;
 // =====================================================================================================================
 // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
 // the current output primitive in the specified output-primitive stream number.
+//
+// @param streamId : Stream number, 0 if only one stream is present
 Instruction* BuilderImplMisc::CreateEmitVertex(
-    unsigned                streamId)           // Stream number, 0 if only one stream is present
+    unsigned                streamId)
 {
     assert(m_shaderStage == ShaderStageGeometry);
 
@@ -63,8 +65,10 @@ Instruction* BuilderImplMisc::CreateEmitVertex(
 
 // =====================================================================================================================
 // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
+//
+// @param streamId : Stream number, 0 if only one stream is present
 Instruction* BuilderImplMisc::CreateEndPrimitive(
-    unsigned                streamId)           // Stream number, 0 if only one stream is present
+    unsigned                streamId)
 {
     assert(m_shaderStage == ShaderStageGeometry);
 
@@ -92,8 +96,10 @@ Instruction* BuilderImplMisc::CreateBarrier()
 
 // =====================================================================================================================
 // Create a "kill". Only allowed in a fragment shader.
+//
+// @param instName : Name to give instruction(s)
 Instruction* BuilderImplMisc::CreateKill(
-    const Twine& instName) // [in] Name to give instruction(s)
+    const Twine& instName)
 {
     // This tells the config builder to set KILL_ENABLE in DB_SHADER_CONTROL.
     // Doing it here is suboptimal, as it does not allow for subsequent middle-end optimizations removing the
@@ -106,8 +112,10 @@ Instruction* BuilderImplMisc::CreateKill(
 
 // =====================================================================================================================
 // Create a demote to helper invocation operation. Only allowed in a fragment shader.
+//
+// @param instName : Name to give instruction(s)
 Instruction* BuilderImplMisc::CreateDemoteToHelperInvocation(
-    const Twine& instName) // [in] Name to give instruction(s)
+    const Twine& instName)
 {
     // Treat a demote as a kill for the purposes of disabling middle-end optimizations.
     auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
@@ -118,8 +126,10 @@ Instruction* BuilderImplMisc::CreateDemoteToHelperInvocation(
 
 // =====================================================================================================================
 // Create a helper invocation query. Only allowed in a fragment shader.
+//
+// @param instName : Name to give instruction(s)
 Value* BuilderImplMisc::CreateIsHelperInvocation(
-    const Twine& instName) // [in] Name to give instruction(s)
+    const Twine& instName)
 {
     auto isNotHelper = CreateIntrinsic(Intrinsic::amdgcn_wqm_helper, {}, {}, nullptr, instName);
     return CreateNot(isNotHelper);
@@ -127,9 +137,12 @@ Value* BuilderImplMisc::CreateIsHelperInvocation(
 
 // =====================================================================================================================
 // Create a "readclock".
+//
+// @param realtime : Whether to read real-time clock counter
+// @param instName : Name to give instruction(s)
 Instruction* BuilderImplMisc::CreateReadClock(
-    bool         realtime,  // Whether to read real-time clock counter
-    const Twine& instName)  // [in] Name to give instruction(s)
+    bool         realtime,
+    const Twine& instName)
 {
     CallInst* readClock = nullptr;
     if (realtime)
@@ -149,12 +162,16 @@ Instruction* BuilderImplMisc::CreateReadClock(
 
 // =====================================================================================================================
 // Create derivative calculation on float or vector of float or half
+//
+// @param value : Input value
+// @param isDirectionY : False for derivative in X direction, true for Y direction
+// @param isFine : True for "fine" calculation, where the value in the current fragment is used. False for "coarse" calculation, where it might use fewer locations to calculate.
+// @param instName : Name to give instruction(s)
 Value* BuilderImplMisc::CreateDerivative(
-    Value*        value,       // [in] Input value
-    bool          isDirectionY, // False for derivative in X direction, true for Y direction
-    bool          isFine,       // True for "fine" calculation, where the value in the current fragment is used.
-                                // False for "coarse" calculation, where it might use fewer locations to calculate.
-    const Twine&  instName)     // [in] Name to give instruction(s)
+    Value*        value,
+    bool          isDirectionY,
+    bool          isFine,
+    const Twine&  instName)
 {
     unsigned tableIdx = isDirectionY * 2 + isFine;
     Value* result = nullptr;

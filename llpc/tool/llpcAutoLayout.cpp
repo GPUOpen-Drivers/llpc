@@ -72,8 +72,10 @@ static const unsigned OffsetStrideInDwords = 12;
 // =====================================================================================================================
 // Get the storage size in bytes of a SPIR-V type.
 // This does not need to be completely accurate, as it is only used to fake up a push constant user data node.
+//
+// @param ty : Type to determine the data size of
 static unsigned getTypeDataSize(
-    const SPIRVType*  ty)  // [in] Type to determine the data size of
+    const SPIRVType*  ty)
 {
     switch (ty->getOpCode())
     {
@@ -97,9 +99,12 @@ static unsigned getTypeDataSize(
 
 // =====================================================================================================================
 // Find VaPtr userDataNode with specified set.
+//
+// @param shaderInfo : Shader info, will have user data nodes added to it
+// @param set : Accroding this set to find ResourceMappingNode
 static const ResourceMappingNode* findDescriptorTableVaPtr(
-    PipelineShaderInfo*         shaderInfo,                 // [in] Shader info, will have user data nodes added to it
-    unsigned set)                                            // [in] Accroding this set to find ResourceMappingNode
+    PipelineShaderInfo*         shaderInfo,
+    unsigned set)
 {
     const ResourceMappingNode* descriptorTableVaPtr = nullptr;
 
@@ -122,12 +127,18 @@ static const ResourceMappingNode* findDescriptorTableVaPtr(
 
 // =====================================================================================================================
 // Find userDataNode with specified set and binding. And return Node index.
+//
+// @param userDataNode : ResourceMappingNode pointer
+// @param nodeCount : User data node count
+// @param set : find same set in node array
+// @param binding : find same binding in node array
+// @param [out] index : Return node position in node array
 static const ResourceMappingNode* findResourceNode(
-    const ResourceMappingNode* userDataNode, // [in] ResourceMappingNode pointer
-    unsigned                   nodeCount,     // [in] User data node count
-    unsigned                   set,           // [in] find same set in node array
-    unsigned                   binding,       // [in] find same binding in node array
-    unsigned*                  index)         // [out] Return node position in node array
+    const ResourceMappingNode* userDataNode,
+    unsigned                   nodeCount,
+    unsigned                   set,
+    unsigned                   binding,
+    unsigned*                  index)
 {
     const ResourceMappingNode* resourceNode = nullptr;
 
@@ -148,10 +159,14 @@ static const ResourceMappingNode* findResourceNode(
 
 // =====================================================================================================================
 // Compare if pAutoLayoutUserDataNodes is subset of pUserDataNodes.
+//
+// @param [in/out] shaderInfo : Shader info, will have user data nodes added to it
+// @param autoLayoutUserDataNodeCount : UserData Node count
+// @param autoLayoutUserDataNodes : ResourceMappingNode
 bool checkShaderInfoComptible(
-    PipelineShaderInfo*         shaderInfo,                 // [in/out] Shader info, will have user data nodes added to it
-    unsigned                    autoLayoutUserDataNodeCount, // [in] UserData Node count
-    const ResourceMappingNode*  autoLayoutUserDataNodes)    // [in] ResourceMappingNode
+    PipelineShaderInfo*         shaderInfo,
+    unsigned                    autoLayoutUserDataNodeCount,
+    const ResourceMappingNode*  autoLayoutUserDataNodes)
 {
     bool hit = false;
 
@@ -260,11 +275,16 @@ bool checkShaderInfoComptible(
 
 // =====================================================================================================================
 // Compare if neccessary pipeline state is same.
+//
+// @param compiler : LLPC compiler object
+// @param pipelineInfo : Graphics pipeline info
+// @param autoLayoutPipelineInfo : layout pipeline info
+// @param gfxIp : Graphics IP version
 bool checkPipelineStateCompatible(
-        const ICompiler*                  compiler,                // [in] LLPC compiler object
-        Llpc::GraphicsPipelineBuildInfo*  pipelineInfo,            // [in] Graphics pipeline info
-        Llpc::GraphicsPipelineBuildInfo*  autoLayoutPipelineInfo,  // [in] layout pipeline info
-        Llpc::GfxIpVersion                gfxIp)                    // Graphics IP version
+        const ICompiler*                  compiler,
+        Llpc::GraphicsPipelineBuildInfo*  pipelineInfo,
+        Llpc::GraphicsPipelineBuildInfo*  autoLayoutPipelineInfo,
+        Llpc::GfxIpVersion                gfxIp)
 {
     bool compatible = true;
 
@@ -308,15 +328,20 @@ bool checkPipelineStateCompatible(
 // Lay out dummy descriptors and other information for one shader stage. This is used when running amdllpc on a single
 // SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be leaked, but that does not
 // matter because we are running a short-lived command-line utility.
+//
+// @param shaderStage : Shader stage
+// @param spirvBin : SPIR-V binary
+// @param [in/out] pipelineInfo : Graphics pipeline info, will have dummy information filled in. nullptr if not a graphics pipeline.
+// @param [in/out] shaderInfo : Shader info, will have user data nodes added to it
+// @param [in/out] topLevelOffset : User data offset; ensures that multiple shader stages use disjoint offsets
+// @param checkAutoLayoutCompatible : if check AutoLayout Compatiple
 void doAutoLayoutDesc(
-    ShaderStage                 shaderStage,    // Shader stage
-    BinaryData                  spirvBin,       // SPIR-V binary
-    GraphicsPipelineBuildInfo*  pipelineInfo,  // [in/out] Graphics pipeline info, will have dummy information filled
-                                                //   in. nullptr if not a graphics pipeline.
-    PipelineShaderInfo*         shaderInfo,    // [in/out] Shader info, will have user data nodes added to it
-    unsigned&                   topLevelOffset, // [in/out] User data offset; ensures that multiple shader stages use
-                                                //    disjoint offsets
-    bool                        checkAutoLayoutCompatible) // [in] if check AutoLayout Compatiple
+    ShaderStage                 shaderStage,
+    BinaryData                  spirvBin,
+    GraphicsPipelineBuildInfo*  pipelineInfo,
+    PipelineShaderInfo*         shaderInfo,
+    unsigned&                   topLevelOffset,
+    bool                        checkAutoLayoutCompatible)
 {
     // Read the SPIR-V.
     std::string spirvCode(static_cast<const char*>(spirvBin.pCode), spirvBin.codeSize);

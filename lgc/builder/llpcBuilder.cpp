@@ -45,8 +45,10 @@ using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
+//
+// @param builderContext : Builder context
 Builder::Builder(
-    BuilderContext* builderContext) // [in] Builder context
+    BuilderContext* builderContext)
     :
     BuilderBase(builderContext->getContext()),
     m_builderContext(builderContext)
@@ -55,8 +57,10 @@ Builder::Builder(
 
 // =====================================================================================================================
 // Set the common shader mode for the current shader, containing hardware FP round and denorm modes.
+//
+// @param commonShaderMode : FP round and denorm modes
 void Builder::setCommonShaderMode(
-    const CommonShaderMode& commonShaderMode)   // [in] FP round and denorm modes
+    const CommonShaderMode& commonShaderMode)
 {
     getShaderModes()->setCommonShaderMode(m_shaderStage, commonShaderMode);
 }
@@ -70,32 +74,40 @@ const CommonShaderMode& Builder::getCommonShaderMode()
 
 // =====================================================================================================================
 // Set the tessellation mode
+//
+// @param tessellationMode : Tessellation mode
 void Builder::setTessellationMode(
-    const TessellationMode& tessellationMode)   // [in] Tessellation mode
+    const TessellationMode& tessellationMode)
 {
     getShaderModes()->setTessellationMode(tessellationMode);
 }
 
 // =====================================================================================================================
 // Set the geometry shader mode
+//
+// @param geometryShaderMode : Geometry shader mode
 void Builder::setGeometryShaderMode(
-    const GeometryShaderMode& geometryShaderMode)   // [in] Geometry shader mode
+    const GeometryShaderMode& geometryShaderMode)
 {
     getShaderModes()->setGeometryShaderMode(geometryShaderMode);
 }
 
 // =====================================================================================================================
 // Set the fragment shader mode
+//
+// @param fragmentShaderMode : Fragment shader mode
 void Builder::setFragmentShaderMode(
-    const FragmentShaderMode& fragmentShaderMode)   // [in] Fragment shader mode
+    const FragmentShaderMode& fragmentShaderMode)
 {
     getShaderModes()->setFragmentShaderMode(fragmentShaderMode);
 }
 
 // =====================================================================================================================
 // Set the compute shader mode (workgroup size)
+//
+// @param computeShaderMode : Compute shader mode
 void Builder::setComputeShaderMode(
-    const ComputeShaderMode& computeShaderMode)   // [in] Compute shader mode
+    const ComputeShaderMode& computeShaderMode)
 {
     getShaderModes()->setComputeShaderMode(computeShaderMode);
 }
@@ -103,9 +115,12 @@ void Builder::setComputeShaderMode(
 // =====================================================================================================================
 // Get the type pElementTy, turned into a vector of the same vector width as pMaybeVecTy if the latter
 // is a vector type.
+//
+// @param elementTy : Element type
+// @param maybeVecTy : Possible vector type to get number of elements from
 Type* Builder::getConditionallyVectorizedTy(
-    Type* elementTy,           // [in] Element type
-    Type* maybeVecTy)          // [in] Possible vector type to get number of elements from
+    Type* elementTy,
+    Type* maybeVecTy)
 {
     if (auto vecTy = dyn_cast<VectorType>(maybeVecTy))
         return VectorType::get(elementTy, vecTy->getNumElements());
@@ -117,10 +132,14 @@ Type* Builder::getConditionallyVectorizedTy(
 // to allow us to call these intrinsics. This helper takes a function pointer, massage arguments, and passthrough
 // arguments and massages the mappedArgs into i32's before calling the function pointer. Note that all massage
 // arguments must have the same type.
+//
+// @param mapFunc : The function to call on each provided i32.
+// @param mappedArgs : The arguments to be massaged into i32's and passed to function.
+// @param passthroughArgs : The arguments to be passed through as is (no massaging).
 Value* Builder::CreateMapToInt32(
-    PFN_MapToInt32Func mapFunc,      // [in] The function to call on each provided i32.
-    ArrayRef<Value*>   mappedArgs,      // The arguments to be massaged into i32's and passed to function.
-    ArrayRef<Value*>   passthroughArgs) // The arguments to be passed through as is (no massaging).
+    PFN_MapToInt32Func mapFunc,
+    ArrayRef<Value*>   mappedArgs,
+    ArrayRef<Value*>   passthroughArgs)
 {
     // We must have at least one argument to massage.
     assert(mappedArgs.size() > 0);
@@ -225,8 +244,10 @@ Value* Builder::CreateMapToInt32(
 
 // =====================================================================================================================
 // Gets new matrix type after doing matrix transposing.
+//
+// @param matrixType : The matrix type to get the transposed type from.
 Type* Builder::getTransposedMatrixTy(
-    Type* const matrixType // [in] The matrix type to get the transposed type from.
+    Type* const matrixType
     ) const
 {
     assert(matrixType->isArrayTy());
@@ -242,8 +263,10 @@ Type* Builder::getTransposedMatrixTy(
 
 // =====================================================================================================================
 // Get the type of pointer returned by CreateLoadBufferDesc.
+//
+// @param pointeeTy : Type that the returned pointer should point to.
 PointerType* Builder::getBufferDescTy(
-    Type*         pointeeTy)         // [in] Type that the returned pointer should point to.
+    Type*         pointeeTy)
 {
     return PointerType::get(pointeeTy, ADDR_SPACE_BUFFER_FAT_POINTER);
 }
@@ -311,9 +334,12 @@ Type* Builder::getSamplerDescPtrTy()
 // =====================================================================================================================
 // Get the type of a built-in. Where the built-in has a shader-defined array size (ClipDistance,
 // CullDistance, SampleMask), inOutInfo.GetArraySize() is used as the array size.
+//
+// @param builtIn : Built-in kind
+// @param inOutInfo : Extra input/output info (shader-defined array size)
 Type* Builder::getBuiltInTy(
-    BuiltInKind   builtIn,            // Built-in kind
-    InOutInfo     inOutInfo)          // Extra input/output info (shader-defined array size)
+    BuiltInKind   builtIn,
+    InOutInfo     inOutInfo)
 {
     enum TypeCode: unsigned
     {
@@ -375,9 +401,12 @@ Type* Builder::getBuiltInTy(
 
 // =====================================================================================================================
 // Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
+//
+// @param ty : FP scalar or vector type
+// @param value : APFloat value
 Constant* Builder::getFpConstant(
-    Type*           ty,    // [in] FP scalar or vector type
-    APFloat         value)  // APFloat value
+    Type*           ty,
+    APFloat         value)
 {
     const fltSemantics* semantics = &APFloat::IEEEdouble();
     Type* scalarTy = ty->getScalarType();
@@ -392,8 +421,10 @@ Constant* Builder::getFpConstant(
 
 // =====================================================================================================================
 // Get a constant of FP or vector of FP type for the value PI/180, for converting radians to degrees.
+//
+// @param ty : FP scalar or vector type
 Constant* Builder::getPiOver180(
-    Type* ty)    // [in] FP scalar or vector type
+    Type* ty)
 {
     // PI/180, 0.017453292
     // TODO: Use a value that works for double as well.
@@ -402,8 +433,10 @@ Constant* Builder::getPiOver180(
 
 // =====================================================================================================================
 // Get a constant of FP or vector of FP type for the value 180/PI, for converting degrees to radians.
+//
+// @param ty : FP scalar or vector type
 Constant* Builder::get180OverPi(
-    Type* ty)    // [in] FP scalar or vector type
+    Type* ty)
 {
     // 180/PI, 57.29577951308232
     // TODO: Use a value that works for double as well.
@@ -412,9 +445,12 @@ Constant* Builder::get180OverPi(
 
 // =====================================================================================================================
 // Get a constant of FP or vector of FP type for the value 1/(2^n - 1)
+//
+// @param ty : FP scalar or vector type
+// @param n : Power of two to use
 Constant* Builder::getOneOverPower2MinusOne(
-    Type*     ty,  // [in] FP scalar or vector type
-    unsigned  n)    // Power of two to use
+    Type*     ty,
+    unsigned  n)
 {
     // We could calculate this here, using knowledge that 1(2^n - 1) in binary has a repeating bit pattern
     // of {n-1 zeros, 1 one}. But instead we just special case the values of n that we know are
@@ -443,11 +479,16 @@ Constant* Builder::getOneOverPower2MinusOne(
 // Create a call to the specified intrinsic with one operand, mangled on its type.
 // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
 // flags from the Builder if none are specified by pFmfSource.
+//
+// @param id : Intrinsic ID
+// @param value : Input value
+// @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
+// @param instName : Name to give instruction
 CallInst* Builder::CreateUnaryIntrinsic(
-    Intrinsic::ID id,           // Intrinsic ID
-    Value*        value,       // [in] Input value
-    Instruction*  fmfSource,   // [in] Instruction to copy fast math flags from; nullptr to get from Builder
-    const Twine&  instName)     // [in] Name to give instruction
+    Intrinsic::ID id,
+    Value*        value,
+    Instruction*  fmfSource,
+    const Twine&  instName)
 {
     CallInst* result = IRBuilder<>::CreateUnaryIntrinsic(id, value, fmfSource, instName);
     if (!fmfSource && isa<FPMathOperator>(result))
@@ -470,12 +511,18 @@ CallInst* Builder::CreateUnaryIntrinsic(
 // Create a call to the specified intrinsic with two operands of the same type, mangled on that type.
 // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
 // flags from the Builder if none are specified by pFmfSource.
+//
+// @param id : Intrinsic ID
+// @param value1 : Input value 1
+// @param value2 : Input value 2
+// @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
+// @param name : Name to give instruction
 CallInst* Builder::CreateBinaryIntrinsic(
-    Intrinsic::ID id,           // Intrinsic ID
-    Value*        value1,      // [in] Input value 1
-    Value*        value2,      // [in] Input value 2
-    Instruction*  fmfSource,   // [in] Instruction to copy fast math flags from; nullptr to get from Builder
-    const Twine&  name)         // [in] Name to give instruction
+    Intrinsic::ID id,
+    Value*        value1,
+    Value*        value2,
+    Instruction*  fmfSource,
+    const Twine&  name)
 {
     CallInst* result = IRBuilder<>::CreateBinaryIntrinsic(id, value1, value2, fmfSource, name);
     if (!fmfSource && isa<FPMathOperator>(result))
@@ -487,12 +534,18 @@ CallInst* Builder::CreateBinaryIntrinsic(
 // Create a call to the specified intrinsic with the specified operands, mangled on the specified types.
 // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
 // flags from the Builder if none are specified by pFmfSource.
+//
+// @param id : Intrinsic ID
+// @param types : Types
+// @param args : Input values
+// @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
+// @param name : Name to give instruction
 CallInst* Builder::CreateIntrinsic(
-    Intrinsic::ID    id,         // Intrinsic ID
-    ArrayRef<Type*>  types,      // [in] Types
-    ArrayRef<Value*> args,       // [in] Input values
-    Instruction*     fmfSource, // [in] Instruction to copy fast math flags from; nullptr to get from Builder
-    const Twine&     name)       // [in] Name to give instruction
+    Intrinsic::ID    id,
+    ArrayRef<Type*>  types,
+    ArrayRef<Value*> args,
+    Instruction*     fmfSource,
+    const Twine&     name)
 {
     CallInst* result = IRBuilder<>::CreateIntrinsic(id, types, args, fmfSource, name);
     if (!fmfSource && isa<FPMathOperator>(result))

@@ -345,9 +345,12 @@ struct CompileInfo
 
 // =====================================================================================================================
 // Checks whether the input data is actually a ELF binary
+//
+// @param data : Input data to check
+// @param dataSize : Size of the input data
 static bool isElfBinary(
-    const void* data,    // [in] Input data to check
-    size_t      dataSize) // Size of the input data
+    const void* data,
+    size_t      dataSize)
 {
     bool isElfBin = false;
     if (dataSize >= sizeof(Elf64::FormatHeader))
@@ -360,9 +363,12 @@ static bool isElfBinary(
 
 // =====================================================================================================================
 // Checks whether the input data is actually LLVM bitcode
+//
+// @param data : Input data to check
+// @param dataSize : Size of the input data
 static bool isLlvmBitcode(
-    const void* data,    // [in] Input data to check
-    size_t      dataSize) // Size of the input data
+    const void* data,
+    size_t      dataSize)
 {
     const unsigned char magic[] = { 'B', 'C', 0xC0, 0xDE };
     return dataSize >= sizeof magic && memcmp(data, magic, sizeof magic) == 0;
@@ -370,9 +376,12 @@ static bool isLlvmBitcode(
 
 // =====================================================================================================================
 // Checks whether the output data is actually ISA assembler text
+//
+// @param data : Input data to check
+// @param dataSize : Size of the input data
 static bool isIsaText(
-    const void* data,    // [in] Input data to check
-    size_t      dataSize) // Size of the input data
+    const void* data,
+    size_t      dataSize)
 {
     // This is called by amdllpc to help distinguish between its three output types of ELF binary, LLVM IR assembler
     // and ISA assembler. Here we use the fact that ISA assembler is the only one that starts with a tab character.
@@ -381,8 +390,10 @@ static bool isIsaText(
 
 // =====================================================================================================================
 // Translates GLSL source language to corresponding shader stage.
+//
+// @param sourceLang : GLSL source language
 static ShaderStage sourceLangToShaderStage(
-    SpvGenStage sourceLang) // GLSL source language
+    SpvGenStage sourceLang)
 {
     static_assert(SpvGenStageVertex         == 0, "Unexpected value!");
     static_assert(SpvGenStageTessControl    == 1, "Unexpected value!");
@@ -396,10 +407,14 @@ static ShaderStage sourceLangToShaderStage(
 
 // =====================================================================================================================
 // Performs initialization work for LLPC standalone tool.
+//
+// @param argc : Count of arguments
+// @param argv : List of arguments
+// @param [out] ppCompiler : Created LLPC compiler object
 static Result init(
-    int      argc,          // Count of arguments
-    char*        argv[],        // [in] List of arguments
-    ICompiler**  ppCompiler)    // [out] Created LLPC compiler object
+    int      argc,
+    char*        argv[],
+    ICompiler**  ppCompiler)
 {
     Result result = Result::Success;
 
@@ -563,8 +578,10 @@ static Result init(
 
 // =====================================================================================================================
 // Performs per-pipeline initialization work for LLPC standalone tool.
+//
+// @param [out] compileInfo : Compilation info of LLPC standalone tool
 static Result initCompileInfo(
-    CompileInfo* compileInfo)  // [out] Compilation info of LLPC standalone tool
+    CompileInfo* compileInfo)
 {
     compileInfo->gfxIp = ParsedGfxIp;
 
@@ -598,8 +615,10 @@ static Result initCompileInfo(
 
 // =====================================================================================================================
 // Performs cleanup work for LLPC standalone tool.
+//
+// @param [in,out] compileInfo : Compilation info of LLPC standalone tool
 static void cleanupCompileInfo(
-    CompileInfo* compileInfo)  // [in,out] Compilation info of LLPC standalone tool
+    CompileInfo* compileInfo)
 {
     for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i)
     {
@@ -621,10 +640,14 @@ static void cleanupCompileInfo(
 
 // =====================================================================================================================
 // Callback function to allocate buffer for building shader module and building pipeline.
+//
+// @param instance : Dummy instance object, unused
+// @param userData : User data
+// @param size : Requested allocation size
 void* VKAPI_CALL allocateBuffer(
-    void*  instance,   // [in] Dummy instance object, unused
-    void*  userData,   // [in] User data
-    size_t size)        // Requested allocation size
+    void*  instance,
+    void*  userData,
+    size_t size)
 {
     void* allocBuf = malloc(size);
     memset(allocBuf, 0, size);
@@ -654,8 +677,10 @@ static bool isSpirvTextFile(
 
 // =====================================================================================================================
 // Checks whether the specified file name represents a SPIR-V binary file (.spv).
+//
+// @param fileName : File name to check
 static bool isSpirvBinaryFile(
-    const std::string& fileName) // [in] File name to check
+    const std::string& fileName)
 {
     bool isSpirvBin = false;
 
@@ -672,8 +697,10 @@ static bool isSpirvBinaryFile(
 
 // =====================================================================================================================
 // Checks whether the specified file name represents a LLPC pipeline info file (.pipe).
+//
+// @param fileName : File name to check
 static bool isPipelineInfoFile(
-    const std::string& fileName) // [in] File name to check
+    const std::string& fileName)
 {
     bool isPipelineInfo = false;
 
@@ -690,8 +717,10 @@ static bool isPipelineInfoFile(
 
 // =====================================================================================================================
 // Checks whether the specified file name represents a LLVM IR file (.ll).
+//
+// @param fileName : File name to check
 static bool isLlvmIrFile(
-    const std::string& fileName) // [in] File name to check
+    const std::string& fileName)
 {
     bool isLlvmIr = false;
 
@@ -708,9 +737,12 @@ static bool isLlvmIrFile(
 
 // =====================================================================================================================
 // Gets SPIR-V binary codes from the specified binary file.
+//
+// @param spvBinFile : SPIR-V binary file
+// @param [out] spvBin : SPIR-V binary codes
 static Result getSpirvBinaryFromFile(
-    const std::string& spvBinFile,  // [in] SPIR-V binary file
-    BinaryData*        spvBin)     // [out] SPIR-V binary codes
+    const std::string& spvBinFile,
+    BinaryData*        spvBin)
 {
     Result result = Result::Success;
 
@@ -743,10 +775,14 @@ static Result getSpirvBinaryFromFile(
 
 // =====================================================================================================================
 // GLSL compiler, compiles GLSL source text file (input) to SPIR-V binary file (output).
+//
+// @param inFilename : Input filename, GLSL source text
+// @param [out] stage : Shader stage
+// @param [out] outFilename : Output filename, SPIR-V binary
 static Result compileGlsl(
-    const std::string& inFilename,  // [in] Input filename, GLSL source text
-    ShaderStage*       stage,      // [out] Shader stage
-    std::string&       outFilename) // [out] Output filename, SPIR-V binary
+    const std::string& inFilename,
+    ShaderStage*       stage,
+    std::string&       outFilename)
 {
     if (!InitSpvGen())
     {
@@ -857,9 +893,12 @@ static Result compileGlsl(
 
 // =====================================================================================================================
 // SPIR-V assembler, converts SPIR-V assembly text file (input) to SPIR-V binary file (output).
+//
+// @param inFilename : Input filename, SPIR-V assembly text
+// @param [out] outFilename : Output filename, SPIR-V binary
 static Result assembleSpirv(
-    const std::string& inFilename,  // [in] Input filename, SPIR-V assembly text
-    std::string&       outFilename) // [out] Output filename, SPIR-V binary
+    const std::string& inFilename,
+    std::string&       outFilename)
 {
     if (!InitSpvGen())
     {
@@ -935,10 +974,14 @@ static Result assembleSpirv(
 
 // =====================================================================================================================
 // Decodes the binary after building a pipeline and outputs the decoded info.
+//
+// @param pipelineBin : Pipeline binary
+// @param [in,out] compileInfo : Compilation info of LLPC standalone tool
+// @param isGraphics : Whether it is graphics pipeline
 static Result decodePipelineBinary(
-    const BinaryData* pipelineBin, // [in] Pipeline binary
-    CompileInfo*      compileInfo, // [in,out] Compilation info of LLPC standalone tool
-    bool              isGraphics)   // Whether it is graphics pipeline
+    const BinaryData* pipelineBin,
+    CompileInfo*      compileInfo,
+    bool              isGraphics)
 {
     // Ignore failure from ElfReader. It fails if pPipelineBin is not ELF, as happens with
     // -filetype=asm.
@@ -956,9 +999,12 @@ static Result decodePipelineBinary(
 
 // =====================================================================================================================
 // Builds shader module based on the specified SPIR-V binary.
+//
+// @param compiler : LLPC compiler object
+// @param [in,out] compileInfo : Compilation info of LLPC standalone tool
 static Result buildShaderModules(
-    const ICompiler* compiler,     // [in] LLPC compiler object
-    CompileInfo*     compileInfo)  // [in,out] Compilation info of LLPC standalone tool
+    const ICompiler* compiler,
+    CompileInfo*     compileInfo)
 {
     Result result = Result::Success;
 
@@ -987,9 +1033,12 @@ static Result buildShaderModules(
 
 // =====================================================================================================================
 // Check autolayout compatible.
+//
+// @param compiler : LLPC compiler object
+// @param [in,out] compileInfo : Compilation info of LLPC standalone tool
 static Result checkAutoLayoutCompatibleFunc(
-    const ICompiler*    compiler,          // [in] LLPC compiler object
-    CompileInfo*        compileInfo)       // [in,out] Compilation info of LLPC standalone tool
+    const ICompiler*    compiler,
+    CompileInfo*        compileInfo)
 {
     Result result = Result::Success;
 
@@ -1084,9 +1133,12 @@ static Result checkAutoLayoutCompatibleFunc(
 
 // =====================================================================================================================
 // Builds pipeline and do linking.
+//
+// @param compiler : LLPC compiler object
+// @param [in,out] compileInfo : Compilation info of LLPC standalone tool
 static Result buildPipeline(
-    ICompiler*    compiler,        // [in] LLPC compiler object
-    CompileInfo*  compileInfo)     // [in,out] Compilation info of LLPC standalone tool
+    ICompiler*    compiler,
+    CompileInfo*  compileInfo)
 {
     Result result = Result::Success;
 
@@ -1265,11 +1317,14 @@ static Result buildPipeline(
 
 // =====================================================================================================================
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
+//
+// @param compileInfo : Compilation info of LLPC standalone tool
+// @param suppliedOutFile : Name of the file to output ELF binary (specify "" to use base name of first input file with appropriate extension; specify "-" to use stdout)
+// @param firstInFile : Name of first input file
 static Result outputElf(
-    CompileInfo*       compileInfo,    // [in] Compilation info of LLPC standalone tool
-    const std::string& suppliedOutFile, // [in] Name of the file to output ELF binary (specify "" to use base name of
-                                        //     first input file with appropriate extension; specify "-" to use stdout)
-    StringRef          firstInFile)     // [in] Name of first input file
+    CompileInfo*       compileInfo,
+    const std::string& suppliedOutFile,
+    StringRef          firstInFile)
 {
     Result result = Result::Success;
     const BinaryData* pipelineBin = (compileInfo->stageMask & shaderStageToMask(ShaderStageCompute)) ?
@@ -1353,11 +1408,16 @@ static void EnableMemoryLeakDetection()
 
 // =====================================================================================================================
 // Process one pipeline.
+//
+// @param compiler : LLPC context
+// @param inFiles : Input filename(s)
+// @param startFile : Index of the starting file name being processed in the file name array
+// @param [out] nextFile : Index of next file name being processed in the file name array
 static Result processPipeline(
-    ICompiler*            compiler,   // [in] LLPC context
-    ArrayRef<std::string> inFiles,     // Input filename(s)
-    unsigned              startFile,   // Index of the starting file name being processed in the file name array
-    unsigned*             nextFile)   // [out] Index of next file name being processed in the file name array
+    ICompiler*            compiler,
+    ArrayRef<std::string> inFiles,
+    unsigned              startFile,
+    unsigned*             nextFile)
 {
     Result result = Result::Success;
     CompileInfo compileInfo = {};
@@ -1723,9 +1783,12 @@ void findAllMatchFiles(
 // Main function of LLPC standalone tool, entry-point.
 //
 // Returns 0 if successful. Other numeric values indicate failure.
+//
+// @param argc : Count of arguments
+// @param argv : List of arguments
 int main(
-    int argc,       // Count of arguments
-    char*   argv[])     // [in] List of arguments
+    int argc,
+    char*   argv[])
 {
     Result result = Result::Success;
 

@@ -36,11 +36,16 @@ using namespace llvm;
 // =====================================================================================================================
 // Create an LLVM function call to the named function. The callee is built automically based on return
 // type and its parameters.
+//
+// @param funcName : Name of the callee
+// @param retTy : Return type of the callee
+// @param args : Arguments to pass to the callee
+// @param attribs : Function attributes
 CallInst* BuilderBase::createNamedCall(
-    StringRef                     funcName, // Name of the callee
-    Type*                         retTy,   // [in] Return type of the callee
-    ArrayRef<Value *>             args,     // Arguments to pass to the callee
-    ArrayRef<Attribute::AttrKind> attribs)  // Function attributes
+    StringRef                     funcName,
+    Type*                         retTy,
+    ArrayRef<Value *>             args,
+    ArrayRef<Attribute::AttrKind> attribs)
 {
     Module* module = GetInsertBlock()->getParent()->getParent();
     Function* func = dyn_cast_or_null<Function>(module->getFunction(funcName));

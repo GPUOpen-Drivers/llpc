@@ -72,8 +72,10 @@ namespace Llpc
 {
 
 // Initialize passes for SPIR-V lowering
+//
+// @param passRegistry : Pass registry
 inline static void initializeLowerPasses(
-    llvm::PassRegistry& passRegistry)   // Pass registry
+    llvm::PassRegistry& passRegistry)
 {
     initializeSpirvLowerAccessChainPass(passRegistry);
     initializeSpirvLowerAlgebraTransformPass(passRegistry);

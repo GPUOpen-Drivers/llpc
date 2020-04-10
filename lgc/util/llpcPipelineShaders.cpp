@@ -54,8 +54,10 @@ ModulePass* createPipelineShaders()
 //
 // This populates the shader array. In the pipeline module, a shader entrypoint is a non-internal function definition,
 // and it has metadata giving the SPIR-V execution model.
+//
+// @param [in,out] module : LLVM module to be run on
 bool PipelineShaders::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Pipeline-Shaders\n");
 
@@ -81,8 +83,10 @@ bool PipelineShaders::runOnModule(
 
 // =====================================================================================================================
 // Get the shader for a particular API shader stage, or nullptr if none
+//
+// @param shaderStage : Shader stage
 Function* PipelineShaders::getEntryPoint(
-    ShaderStage shaderStage     // Shader stage
+    ShaderStage shaderStage
     ) const
 {
     assert((unsigned)shaderStage < ShaderStageCountInternal);
@@ -91,8 +95,10 @@ Function* PipelineShaders::getEntryPoint(
 
 // =====================================================================================================================
 // Get the ABI shader stage for a particular function, or ShaderStageInvalid if not a shader entrypoint.
+//
+// @param func : Function to look up
 ShaderStage PipelineShaders::getShaderStage(
-    const Function* func  // [in] Function to look up
+    const Function* func
     ) const
 {
     auto entryMapIt = m_entryPointMap.find(func);

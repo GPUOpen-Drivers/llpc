@@ -423,8 +423,10 @@ const PipelineDumperReg PipelineDumperRegs[] =
 
 // =====================================================================================================================
 // Get name of register, or "" if not known
+//
+// @param regNumber : Register number
 const char* PipelineDumper::getRegisterNameString(
-    unsigned  regNumber)  // Register number
+    unsigned  regNumber)
 {
     for (unsigned idx = 0, end = sizeof(PipelineDumperRegs) / sizeof(PipelineDumperRegs[0]); idx != end; ++idx)
     {

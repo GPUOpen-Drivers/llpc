@@ -50,11 +50,16 @@ public:
 
     // Create an LLVM function call to the named function. The callee is built automically based on return
     // type and its parameters.
+    //
+    // @param funcName : Name of the callee
+    // @param retTy : Return type of the callee
+    // @param args : Arguments to pass to the callee
+    // @param attribs : Function attributes
     llvm::CallInst* createNamedCall(
-        llvm::StringRef                           funcName, // Name of the callee
-        llvm::Type*                               retTy,   // [in] Return type of the callee
-        llvm::ArrayRef<llvm::Value *>             args,     // Arguments to pass to the callee
-        llvm::ArrayRef<llvm::Attribute::AttrKind> attribs); // Function attributes
+        llvm::StringRef                           funcName,
+        llvm::Type*                               retTy,
+        llvm::ArrayRef<llvm::Value *>             args,
+        llvm::ArrayRef<llvm::Attribute::AttrKind> attribs);
 };
 
 } // lgc

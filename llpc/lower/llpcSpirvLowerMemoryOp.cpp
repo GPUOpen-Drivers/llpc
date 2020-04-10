@@ -66,8 +66,10 @@ SpirvLowerMemoryOp::SpirvLowerMemoryOp()
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool SpirvLowerMemoryOp::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Memory-Op\n");
 
@@ -106,8 +108,10 @@ bool SpirvLowerMemoryOp::runOnModule(
 
 // =====================================================================================================================
 // Visits "extractelement" instruction.
+//
+// @param extractElementInst : "ExtractElement" instruction
 void SpirvLowerMemoryOp::visitExtractElementInst(
-    ExtractElementInst& extractElementInst)  // "ExtractElement" instruction
+    ExtractElementInst& extractElementInst)
 {
     auto src = extractElementInst.getOperand(0);
     if (src->getType()->isVectorTy() &&
@@ -150,8 +154,10 @@ void SpirvLowerMemoryOp::visitExtractElementInst(
 
 // =====================================================================================================================
 // Visits "getelementptr" instruction.
+//
+// @param getElemPtrInst : "GetElementPtr" instruction
 void SpirvLowerMemoryOp::visitGetElementPtrInst(
-    GetElementPtrInst& getElemPtrInst) // "GetElementPtr" instruction
+    GetElementPtrInst& getElemPtrInst)
 {
     unsigned operandIndex = InvalidValue;
     unsigned dynIndexBound = 0;
@@ -199,10 +205,14 @@ void SpirvLowerMemoryOp::visitGetElementPtrInst(
 
 // =====================================================================================================================
 // Checks whether the specified "getelementptr" instruction contains dynamic index and is therefore able to be expanded.
+//
+// @param getElemPtr : "GetElementPtr" instruction
+// @param [out] operandIndexOut : Index of the operand that represents a dynamic index
+// @param [out] dynIndexBound : Upper bound of dynamic index
 bool SpirvLowerMemoryOp::needExpandDynamicIndex(
-    GetElementPtrInst* getElemPtr,       // [in] "GetElementPtr" instruction
-    unsigned*          operandIndexOut,  // [out] Index of the operand that represents a dynamic index
-    unsigned*          dynIndexBound     // [out] Upper bound of dynamic index
+    GetElementPtrInst* getElemPtr,
+    unsigned*          operandIndexOut,
+    unsigned*          dynIndexBound
     ) const
 {
     static const unsigned MaxDynIndexBound = 8;
@@ -291,10 +301,14 @@ bool SpirvLowerMemoryOp::needExpandDynamicIndex(
 
 // =====================================================================================================================
 // Expands "load" instruction with constant-index "getelementptr" instructions.
+//
+// @param loadInst : "Load" instruction
+// @param getElemPtrs : A group of "getelementptr" with constant indices
+// @param dynIndex : Dynamic index
 void SpirvLowerMemoryOp::expandLoadInst(
-    LoadInst*                    loadInst,       // [in] "Load" instruction
-    ArrayRef<GetElementPtrInst*> getElemPtrs,     // [in] A group of "getelementptr" with constant indices
-    Value*                       dynIndex)       // [in] Dynamic index
+    LoadInst*                    loadInst,
+    ArrayRef<GetElementPtrInst*> getElemPtrs,
+    Value*                       dynIndex)
 {
     // Expand is something like this:
     //
@@ -332,10 +346,14 @@ void SpirvLowerMemoryOp::expandLoadInst(
 
 // =====================================================================================================================
 // Record store expansion info after visit, because splitBasicBlock will disturb the visit.
+//
+// @param storeInst : "Store" instruction
+// @param getElemPtrs : A group of "getelementptr" with constant indices
+// @param dynIndex : Dynamic index
 void SpirvLowerMemoryOp::recordStoreExpandInfo(
-    StoreInst*                   storeInst,     // [in] "Store" instruction
-    ArrayRef<GetElementPtrInst*> getElemPtrs,    // [in] A group of "getelementptr" with constant indices
-    Value*                       dynIndex)      // [in] Dynamic index
+    StoreInst*                   storeInst,
+    ArrayRef<GetElementPtrInst*> getElemPtrs,
+    Value*                       dynIndex)
 {
     StoreExpandInfo expandInfo = {};
     expandInfo.storeInst = storeInst;
@@ -349,10 +367,14 @@ void SpirvLowerMemoryOp::recordStoreExpandInfo(
 
 // =====================================================================================================================
 // Expands "store" instruction with fixed indexed "getelementptr" instructions.
+//
+// @param storeInst : "Store" instruction
+// @param getElemPtrs : A group of "getelementptr" with constant indices
+// @param dynIndex : Dynamic index
 void SpirvLowerMemoryOp::expandStoreInst(
-    StoreInst*                   storeInst,     // [in] "Store" instruction
-    ArrayRef<GetElementPtrInst*> getElemPtrs,    // [in] A group of "getelementptr" with constant indices
-    Value*                       dynIndex)      // [in] Dynamic index
+    StoreInst*                   storeInst,
+    ArrayRef<GetElementPtrInst*> getElemPtrs,
+    Value*                       dynIndex)
 {
     const bool robustBufferAccess = m_context->getRobustBufferAccess();
     const unsigned getElemPtrCount = getElemPtrs.size();

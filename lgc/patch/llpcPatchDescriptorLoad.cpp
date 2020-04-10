@@ -64,8 +64,10 @@ PatchDescriptorLoad::PatchDescriptorLoad()
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool PatchDescriptorLoad::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+    Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Descriptor-Load\n");
 
@@ -129,9 +131,12 @@ bool PatchDescriptorLoad::runOnModule(
 // =====================================================================================================================
 // Process llpc.descriptor.get.{resource|sampler|fmask}.ptr call.
 // This generates code to build a {ptr,stride} struct.
+//
+// @param descPtrCall : Call to llpc.descriptor.get.*.ptr
+// @param descPtrCallName : Name of that call
 void PatchDescriptorLoad::processDescriptorGetPtr(
-    CallInst* descPtrCall,     // [in] Call to llpc.descriptor.get.*.ptr
-    StringRef descPtrCallName)  // Name of that call
+    CallInst* descPtrCall,
+    StringRef descPtrCallName)
 {
     m_entryPoint = descPtrCall->getFunction();
     IRBuilder<> builder(*m_context);
@@ -182,14 +187,22 @@ void PatchDescriptorLoad::processDescriptorGetPtr(
 
 // =====================================================================================================================
 // Get a struct containing the pointer and byte stride for a descriptor
+//
+// @param resType : Resource type
+// @param descSet : Descriptor set
+// @param binding : Binding
+// @param topNode : Node in top-level descriptor table (TODO: nullptr for shader compilation)
+// @param node : The descriptor node itself (TODO: nullptr for shader compilation)
+// @param shadow : Whether to load from shadow descriptor table
+// @param [in/out] builder : IRBuilder
 Value* PatchDescriptorLoad::getDescPtrAndStride(
-    ResourceNodeType        resType,    // Resource type
-    unsigned                descSet,    // Descriptor set
-    unsigned                binding,    // Binding
-    const ResourceNode*     topNode,   // Node in top-level descriptor table (TODO: nullptr for shader compilation)
-    const ResourceNode*     node,      // The descriptor node itself (TODO: nullptr for shader compilation)
-    bool                    shadow,     // Whether to load from shadow descriptor table
-    IRBuilder<>&            builder)    // [in/out] IRBuilder
+    ResourceNodeType        resType,
+    unsigned                descSet,
+    unsigned                binding,
+    const ResourceNode*     topNode,
+    const ResourceNode*     node,
+    bool                    shadow,
+    IRBuilder<>&            builder)
 {
     // Determine the stride if possible without looking at the resource node.
     unsigned byteSize = 0;
@@ -293,14 +306,22 @@ Value* PatchDescriptorLoad::getDescPtrAndStride(
 
 // =====================================================================================================================
 // Get a pointer to a descriptor, as a pointer to i32
+//
+// @param resType : Resource type
+// @param descSet : Descriptor set
+// @param binding : Binding
+// @param topNode : Node in top-level descriptor table (TODO: nullptr for shader compilation)
+// @param node : The descriptor node itself (TODO: nullptr for shader compilation)
+// @param shadow : Whether to load from shadow descriptor table
+// @param [in/out] builder : IRBuilder
 Value* PatchDescriptorLoad::getDescPtr(
-    ResourceNodeType        resType,    // Resource type
-    unsigned                descSet,    // Descriptor set
-    unsigned                binding,    // Binding
-    const ResourceNode*     topNode,   // Node in top-level descriptor table (TODO: nullptr for shader compilation)
-    const ResourceNode*     node,      // The descriptor node itself (TODO: nullptr for shader compilation)
-    bool                    shadow,     // Whether to load from shadow descriptor table
-    IRBuilder<>&            builder)    // [in/out] IRBuilder
+    ResourceNodeType        resType,
+    unsigned                descSet,
+    unsigned                binding,
+    const ResourceNode*     topNode,
+    const ResourceNode*     node,
+    bool                    shadow,
+    IRBuilder<>&            builder)
 {
     Value* descPtr = nullptr;
     // Get the descriptor table pointer.
@@ -353,8 +374,10 @@ Value* PatchDescriptorLoad::getDescPtr(
 // Process an llvm.descriptor.index : add an array index on to the descriptor pointer.
 // llvm.descriptor.index has two operands: the "descriptor pointer" (actually a struct containing the actual
 // pointer and an int giving the byte stride), and the index to add. It returns the updated "descriptor pointer".
+//
+// @param call : llvm.descriptor.index call
 void PatchDescriptorLoad::processDescriptorIndex(
-    CallInst* call)    // [in] llvm.descriptor.index call
+    CallInst* call)
 {
     IRBuilder<> builder(*m_context);
     builder.SetInsertPoint(call);
@@ -383,8 +406,10 @@ void PatchDescriptorLoad::processDescriptorIndex(
 
 // =====================================================================================================================
 // Process "llpc.descriptor.load.from.ptr" call.
+//
+// @param loadFromPtr : Call to llpc.descriptor.load.from.ptr
 void PatchDescriptorLoad::processLoadDescFromPtr(
-    CallInst* loadFromPtr)   // [in] Call to llpc.descriptor.load.from.ptr
+    CallInst* loadFromPtr)
 {
     IRBuilder<> builder(*m_context);
     builder.SetInsertPoint(loadFromPtr);
@@ -400,8 +425,10 @@ void PatchDescriptorLoad::processLoadDescFromPtr(
 
 // =====================================================================================================================
 // Visits "call" instruction.
+//
+// @param callInst : "Call" instruction
 void PatchDescriptorLoad::visitCallInst(
-    CallInst& callInst)   // [in] "Call" instruction
+    CallInst& callInst)
 {
     auto callee = callInst.getCalledFunction();
     if (!callee )
@@ -469,11 +496,16 @@ void PatchDescriptorLoad::visitCallInst(
 // Generate the code for a buffer descriptor load.
 // This is the handler for llpc.descriptor.load.buffer, which is also used for loading a descriptor
 // from the global table or the per-shader table.
+//
+// @param descSet : Descriptor set
+// @param binding : Binding
+// @param arrayOffset : Index in descriptor array
+// @param insertPoint : Insert point
 Value* PatchDescriptorLoad::loadBufferDescriptor(
-    unsigned      descSet,        // Descriptor set
-    unsigned      binding,        // Binding
-    Value*        arrayOffset,   // [in] Index in descriptor array
-    Instruction*  insertPoint)   // [in] Insert point
+    unsigned      descSet,
+    unsigned      binding,
+    Value*        arrayOffset,
+    Instruction*  insertPoint)
 {
     IRBuilder<> builder(*m_context);
     builder.SetInsertPoint(insertPoint);
@@ -578,9 +610,12 @@ Value* PatchDescriptorLoad::loadBufferDescriptor(
 
 // =====================================================================================================================
 // Calculate a buffer descriptor for an inline buffer
+//
+// @param descPtr : Pointer to inline buffer
+// @param builder : Builder
 Value* PatchDescriptorLoad::buildInlineBufferDesc(
-    Value*        descPtr,   // [in] Pointer to inline buffer
-    IRBuilder<>&  builder)    // [in] Builder
+    Value*        descPtr,
+    IRBuilder<>&  builder)
 {
     // Bitcast the pointer to v2i32
     descPtr = builder.CreatePtrToInt(descPtr, builder.getInt64Ty());
@@ -623,9 +658,12 @@ Value* PatchDescriptorLoad::buildInlineBufferDesc(
 
 // =====================================================================================================================
 // Build buffer compact descriptor
+//
+// @param desc : The buffer descriptor base to build for the buffer compact descriptor
+// @param insertPoint : Insert point
 Value* PatchDescriptorLoad::buildBufferCompactDesc(
-    Value*       desc,          // [in] The buffer descriptor base to build for the buffer compact descriptor
-    Instruction* insertPoint)   // [in] Insert point
+    Value*       desc,
+    Instruction* insertPoint)
 {
     // Extract compact buffer descriptor
     Value* descElem0 = ExtractElementInst::Create(desc,

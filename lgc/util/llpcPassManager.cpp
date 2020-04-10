@@ -92,8 +92,10 @@ private:
 
 // =====================================================================================================================
 // Get the PassInfo for a registered pass given short name
+//
+// @param passName : Short name of pass
 static const PassInfo* getPassInfo(
-    StringRef passName)   // Short name of pass
+    StringRef passName)
 {
     if (passName.empty())
         return nullptr;
@@ -110,8 +112,10 @@ static const PassInfo* getPassInfo(
 
 // =====================================================================================================================
 // Get the ID for a registered pass given short name
+//
+// @param passName : Short name of pass
 static AnalysisID getPassIdFromName(
-    StringRef passName)   // Short name of pass
+    StringRef passName)
 {
   const PassInfo* passInfo = getPassInfo(passName);
   return passInfo ? passInfo->getTypeInfo() : nullptr;
@@ -138,8 +142,10 @@ PassManagerImpl::PassManagerImpl()
 
 // =====================================================================================================================
 // Add a pass to the pass manager.
+//
+// @param pass : Pass to add to the pass manager
 void PassManagerImpl::add(
-    Pass* pass)    // [in] Pass to add to the pass manager
+    Pass* pass)
 {
     // Do not add any passes after calling stop(), except immutable passes.
     if (m_stopped && !pass->getAsImmutablePass() )

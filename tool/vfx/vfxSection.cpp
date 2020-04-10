@@ -125,11 +125,16 @@ static ParserInit Init;
 
 // =====================================================================================================================
 // Constructs an Section object.
+//
+// @param addrTable : Table to map member name to member address
+// @param tableSize : Size of above table
+// @param sectionType : Section type
+// @param sectionName : Name of this section.
 Section::Section(
-    StrToMemberAddr* addrTable,    // [in] Table to map member name to member address
-    unsigned         tableSize,     // Size of above table
-    SectionType      sectionType,   // Section type
-    const char*      sectionName)  // [in] Name of this section.
+    StrToMemberAddr* addrTable,
+    unsigned         tableSize,
+    SectionType      sectionType,
+    const char*      sectionName)
     :
     m_sectionType(sectionType),
     m_sectionName(sectionName),
@@ -234,11 +239,16 @@ void Section::initSectionInfo()
 
 // =====================================================================================================================
 // Gets data type of a member.
+//
+// @param lineNum : Line No.
+// @param memberName : Member string name
+// @param [out] valueType : Member data type.
+// @param [out] errorMsg : Error message
 bool Section::getMemberType(
-    unsigned     lineNum,         // Line No.
-    const char*  memberName,     // [in]  Member string name
-    MemberType*  valueType,      // [out] Member data type.
-    std::string* errorMsg)       // [out] Error message
+    unsigned     lineNum,
+    const char*  memberName,
+    MemberType*  valueType,
+    std::string* errorMsg)
 {
     bool result = false;
     for (unsigned i = 0; i < m_tableSize; ++i)
@@ -264,12 +274,18 @@ bool Section::getMemberType(
 
 // =====================================================================================================================
 // Is this member a section object.
+//
+// @param lineNum : Line number
+// @param memberName : Member name
+// @param [out] output : Is this memeber a section object
+// @param [out] type : Object type
+// @param [out] errorMsg : Error message
 bool Section::isSection(
-    unsigned     lineNum,        // Line number
-    const char*  memberName,    // [in] Member name
-    bool*        output,        // [out] Is this memeber a section object
-    MemberType*  type,          // [out] Object type
-    std::string* errorMsg)      // [out] Error message
+    unsigned     lineNum,
+    const char*  memberName,
+    bool*        output,
+    MemberType*  type,
+    std::string* errorMsg)
 {
     bool result = false;
 
@@ -297,8 +313,10 @@ bool Section::isSection(
 
 // =====================================================================================================================
 // Prints all data in this object, for debug purpose.
+//
+// @param level : Nest level from the base object
 void Section::printSelf(
-    unsigned level)     // Nest level from the base object
+    unsigned level)
 {
     if (m_isActive)
     {
@@ -574,8 +592,10 @@ void Section::printSelf(
 
 // =====================================================================================================================
 // Creates a section object according to section name
+//
+// @param sectionName : Section name
 Section* Section::createSection(
-    const char* sectionName)    // [in] Section name
+    const char* sectionName)
 {
     auto it = m_sectionInfo.find(sectionName);
 
@@ -643,8 +663,10 @@ Section* Section::createSection(
 
 // =====================================================================================================================
 // Gets section type according to section name
+//
+// @param sectionName : Section name
 SectionType Section::getSectionType(
-    const char* sectionName)   // [in] Section name
+    const char* sectionName)
 {
     SectionType type = SectionTypeUnset;
     auto it = m_sectionInfo.find(sectionName);
@@ -655,14 +677,22 @@ SectionType Section::getSectionType(
 
 // =====================================================================================================================
 // Gets the pointer of sub section according to member name
+//
+// @param lineNum : Line No.
+// @param memberName : Member name
+// @param memberType : Member type
+// @param isWriteAccess : Whether the sub section will be written
+// @param arrayIndex : Array index
+// @param [out] ptrOut : Pointer of sub section
+// @param [out] errorMsg : Error message
 bool Section::getPtrOfSubSection(
-    unsigned     lineNum,         // Line No.
-    const char*  memberName,     // [in] Member name
-    MemberType   memberType,      // Member type
-    bool         isWriteAccess,   // Whether the sub section will be written
-    unsigned     arrayIndex,      // Array index
-    Section**    ptrOut,          // [out] Pointer of sub section
-    std::string* errorMsg)       // [out] Error message
+    unsigned     lineNum,
+    const char*  memberName,
+    MemberType   memberType,
+    bool         isWriteAccess,
+    unsigned     arrayIndex,
+    Section**    ptrOut,
+    std::string* errorMsg)
 {
     bool result = false;
 
@@ -698,13 +728,20 @@ bool Section::getPtrOfSubSection(
 // Reads whole file content
 // NOTE: The input file name is  from class member "fileName" and read result is stored in shaderSource or m_spvBin
 // according to file type
+//
+// @param docFilename : File name of parent document
+// @param fileName : File name
+// @param isBinary : Whether file is SPIRV binary file
+// @param [out] binaryData : Binary data
+// @param [out] textData : Text data
+// @param [out] errorMsg : Error message
 bool Section::readFile(
-    const std::string&    docFilename,      // [in] File name of parent document
-    const std::string&    fileName,         // [in] File name
-    bool                  isBinary,         // Whether file is SPIRV binary file
-    std::vector<uint8_t>* binaryData,      // [out] Binary data
-    std::string*          textData,        // [out] Text data
-    std::string*          errorMsg)        // [out] Error message
+    const std::string&    docFilename,
+    const std::string&    fileName,
+    bool                  isBinary,
+    std::vector<uint8_t>* binaryData,
+    std::string*          textData,
+    std::string*          errorMsg)
 {
     bool result = true;
 
@@ -752,9 +789,12 @@ bool Section::readFile(
 
 // =====================================================================================================================
 // Compiles GLSL source text file (input) to SPIR-V binary file (output).
+//
+// @param shaderInfo : Shader info section
+// @param [out] errorMsg : Error message
 bool SectionShader::compileGlsl(
-    const Section* shaderInfo, // [in] Shader info section
-    std::string*   errorMsg)   // [out] Error message
+    const Section* shaderInfo,
+    std::string*   errorMsg)
 {
     int           sourceStringCount = 1;
     const char*const* sourceList[1]     = {};
@@ -812,8 +852,10 @@ bool SectionShader::compileGlsl(
 
 // =====================================================================================================================
 // Assemble Spirv assemble code
+//
+// @param [out] errorMsg : Error message
 bool SectionShader::assembleSpirv(
-    std::string* errorMsg)  // [out] Error message
+    std::string* errorMsg)
 {
     bool result = true;
     const char* text = m_shaderSource.c_str();
@@ -865,10 +907,14 @@ bool SectionShader::isShaderSourceSection()
 
 // =====================================================================================================================
 // Loads external shader code, and translate shader code to SPIRV binary
+//
+// @param docFilename : File name of parent document
+// @param shaderInfo : Shader info sections
+// @param [out] errorMsg : Error message
 bool SectionShader::compileShader(
-    const std::string&  docFilename,      // [in] File name of parent document
-    const Section*      shaderInfo,      // [in] Shader info sections
-    std::string*        errorMsg)        // [out] Error message
+    const std::string&  docFilename,
+    const Section*      shaderInfo,
+    std::string*        errorMsg)
 {
     bool result = false;
     switch (m_shaderType)

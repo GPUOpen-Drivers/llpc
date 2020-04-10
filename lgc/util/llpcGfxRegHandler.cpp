@@ -35,9 +35,12 @@ using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
+//
+// @param builder : The builder handle
+// @param reg : The registered target vec <n x i32>
 GfxRegHandler::GfxRegHandler(
-    Builder* builder,  // [in] The builder handle
-    Value*   reg) // [in] The registered target vec <n x i32>
+    Builder* builder,
+    Value*   reg)
     :
     GfxRegHandlerBase(builder, reg)
 {
@@ -46,8 +49,10 @@ GfxRegHandler::GfxRegHandler(
 
 // =====================================================================================================================
 // Common function for getting the current value for the hardware register
+//
+// @param regId : The register ID, which is the index of BitsInfo and BitsState
 Value* GfxRegHandler::getRegCommon(
-    unsigned regId) // The register ID, which is the index of BitsInfo and BitsState
+    unsigned regId)
 {
     // Under two condition, we need to fetch the range of bits
     //  - The register has not being initialized
@@ -70,9 +75,12 @@ Value* GfxRegHandler::getRegCommon(
 // Get combined data from two seperate DWORDs
 // Note: The return type is one DWORD, it doesn't support two DWORDs for now.
 // TODO: Expand to support 2-DWORDs combination result.
+//
+// @param regIdLo : The ID of low part register
+// @param regIdHi : Reg ID of high part register
 Value* GfxRegHandler::getRegCombine(
-    unsigned regIdLo, // The ID of low part register
-    unsigned regIdHi) // Reg ID of high part register
+    unsigned regIdLo,
+    unsigned regIdHi)
 {
     Value* regValueLo = getRegCommon(regIdLo);
     Value* regValueHi = getRegCommon(regIdHi);
@@ -82,10 +90,14 @@ Value* GfxRegHandler::getRegCombine(
 // =====================================================================================================================
 // Set register value into two seperate DWORDs
 // Note: The input pRegValue only supports one DWORD
+//
+// @param regIdLo : The ID of low part register
+// @param regIdHi : Reg ID of high part register
+// @param regValue : Data used for setting
 void GfxRegHandler::setRegCombine(
-    unsigned regIdLo,   // The ID of low part register
-    unsigned regIdHi,   // Reg ID of high part register
-    Value*   regValue) // [in] Data used for setting
+    unsigned regIdLo,
+    unsigned regIdHi,
+    Value*   regValue)
 {
     Value* regValueLo = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                                      m_builder->getInt32Ty(),
@@ -111,10 +123,14 @@ static constexpr BitsInfo SqImgSampRegBitsGfx9[static_cast<unsigned>(SqSampRegs:
 
 // =====================================================================================================================
 // Helper class for handling Registers defined in SQ_IMG_SAMP_WORD
+//
+// @param builder : Bound builder context
+// @param reg : Bound register vec <n x i32>
+// @param gfxIpVersion : Target GFX IP version
 SqImgSampRegHandler::SqImgSampRegHandler(
-    Builder*      builder,      // [in] Bound builder context
-    Value*        reg,     // [in] Bound register vec <n x i32>
-    GfxIpVersion* gfxIpVersion) // [in] Target GFX IP version
+    Builder*      builder,
+    Value*        reg,
+    GfxIpVersion* gfxIpVersion)
     :
     GfxRegHandler(builder, reg)
 {
@@ -135,8 +151,10 @@ SqImgSampRegHandler::SqImgSampRegHandler(
 
 // =====================================================================================================================
 // Get the current value for the hardware register
+//
+// @param regId : Register ID
 Value* SqImgSampRegHandler::getReg(
-    SqSampRegs regId) // Register ID
+    SqSampRegs regId)
 {
     switch (regId)
     {
@@ -154,9 +172,12 @@ Value* SqImgSampRegHandler::getReg(
 
 // =====================================================================================================================
 // Set the current value for the hardware register
+//
+// @param regId : Register ID
+// @param regValue : Value to set to this register
 void SqImgSampRegHandler::setReg(
-    SqSampRegs regId,      // Register ID
-    Value*     regValue ) // [in] Value to set to this register
+    SqSampRegs regId,
+    Value*     regValue )
 {
     switch (regId)
     {
@@ -211,10 +232,14 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx10[static_cast<unsigned>(SqRsrcRegs
 
 // =====================================================================================================================
 // Helper class for handling Registers defined in SQ_IMG_RSRC_WORD
+//
+// @param builder : Bound builder context
+// @param reg : Bound register vec <n x i32>
+// @param gfxIpVersion : Current GFX IP version
 SqImgRsrcRegHandler::SqImgRsrcRegHandler(
-    Builder*      builder,      // [in] Bound builder context
-    Value*        reg,     // [in] Bound register vec <n x i32>
-    GfxIpVersion* gfxIpVersion) // [in] Current GFX IP version
+    Builder*      builder,
+    Value*        reg,
+    GfxIpVersion* gfxIpVersion)
     :
     GfxRegHandler(builder, reg)
 {
@@ -237,8 +262,10 @@ SqImgRsrcRegHandler::SqImgRsrcRegHandler(
 
 // =====================================================================================================================
 // Get the current value for the hardware register
+//
+// @param regId : Register ID
 Value* SqImgRsrcRegHandler::getReg(
-    SqRsrcRegs regId) // Register ID
+    SqRsrcRegs regId)
 {
     switch (regId)
     {
@@ -275,9 +302,12 @@ Value* SqImgRsrcRegHandler::getReg(
 
 // =====================================================================================================================
 // Set the current value for the hardware register
+//
+// @param regId : Register ID
+// @param regValue : Value to set to this register
 void SqImgRsrcRegHandler::setReg(
-    SqRsrcRegs regId,      // Register ID
-    Value*     regValue)  // [in] Value to set to this register
+    SqRsrcRegs regId,
+    Value*     regValue)
 {
     switch (regId)
     {

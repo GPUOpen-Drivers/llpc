@@ -43,8 +43,10 @@ static cl::opt<int> NativeWaveSize("native-wave-size", cl::desc("Overrides hardw
 // Functions to set up TargetInfo for the various targets
 
 // gfx6+
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx6BaseInfo(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     // Initial settings (could be adjusted later according to graphics IP version info)
     targetInfo->getGpuProperty().waveSize = 64;
@@ -73,8 +75,10 @@ static void setGfx6BaseInfo(
 }
 
 // gfx6
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx6Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx6BaseInfo(targetInfo);
     targetInfo->getGpuProperty().ldsSizePerCu = 32768;
@@ -99,24 +103,30 @@ static void setGfx6Info(
 }
 
 // gfx600
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx600Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx6Info(targetInfo);
     targetInfo->getGpuProperty().numShaderEngines = 2;
 }
 
 // gfx601
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx601Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx6Info(targetInfo);
     targetInfo->getGpuProperty().numShaderEngines = 1;
 }
 
 // gfx7+
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx7BaseInfo(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx6BaseInfo(targetInfo);
     targetInfo->getGpuProperty().ldsSizePerCu = 65536;
@@ -124,8 +134,10 @@ static void setGfx7BaseInfo(
 }
 
 // gfx7
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx7Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx7BaseInfo(targetInfo);
     targetInfo->getGpuProperty().numShaderEngines = 1; // GFX7.0.2+ value
@@ -136,8 +148,10 @@ static void setGfx7Info(
 }
 
 // gfx700
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx700Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx7Info(targetInfo);
     targetInfo->getGpuProperty().numShaderEngines = 2;
@@ -149,16 +163,20 @@ static void setGfx700Info(
 }
 
 // gfx701
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx701Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx7Info(targetInfo);
     targetInfo->getGpuProperty().numShaderEngines = 4;
 }
 
 // gfx703 and gfx704
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx703Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx7Info(targetInfo);
     targetInfo->getGpuProperty().numShaderEngines = 4;
@@ -171,15 +189,19 @@ static void setGfx703Info(
 }
 
 // gfx8+
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx8BaseInfo(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx7BaseInfo(targetInfo);
 }
 
 // gfx8
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx8Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx8BaseInfo(targetInfo);
 
@@ -192,16 +214,20 @@ static void setGfx8Info(
 }
 
 // gfx800/gfx801
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx800Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx8Info(targetInfo);
     targetInfo->getGpuProperty().numShaderEngines = 1;
 }
 
 // gfx802
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx802Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx8Info(targetInfo);
     targetInfo->getGpuProperty().numShaderEngines = 4;
@@ -211,8 +237,10 @@ static void setGfx802Info(
 }
 
 // gfx803+
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx803Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx8Info(targetInfo);
     // TODO: polaris11 and polaris12 is 2, but we can't identify them by GFX IP now.
@@ -220,16 +248,20 @@ static void setGfx803Info(
 }
 
 // gfx81
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx81Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx8Info(targetInfo);
     targetInfo->getGpuProperty().numShaderEngines = 1;
 }
 
 // gfx9+
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx9BaseInfo(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx8BaseInfo(targetInfo);
     targetInfo->getGpuProperty().maxUserDataCount = 32;
@@ -239,8 +271,10 @@ static void setGfx9BaseInfo(
 }
 
 // gfx9
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx9Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx9BaseInfo(targetInfo);
 
@@ -253,16 +287,20 @@ static void setGfx9Info(
 }
 
 // gfx900
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx900Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx9Info(targetInfo);
     targetInfo->getGpuWorkarounds().gfx9.fixLsVgprInput = 1;
 }
 
 // gfx10
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx10Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx9BaseInfo(targetInfo);
 
@@ -285,8 +323,10 @@ static void setGfx10Info(
 }
 
 // gfx1010 (including gfx101E and gfx101F)
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx1010Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx10Info(targetInfo);
 
@@ -300,8 +340,10 @@ static void setGfx1010Info(
 }
 
 // gfx1012
+//
+// @param [in/out] targetInfo : Target info
 static void setGfx1012Info(
-    TargetInfo* targetInfo)    // [in/out] Target info
+    TargetInfo* targetInfo)
 {
     setGfx10Info(targetInfo);
 
@@ -320,8 +362,10 @@ static void setGfx1012Info(
 
 // =====================================================================================================================
 // Set TargetInfo. Returns false if the GPU name is not found or not supported.
+//
+// @param gpuName : LLVM GPU name, e.g. "gfx900"
 bool TargetInfo::setTargetInfo(
-    StringRef     gpuName)      // LLVM GPU name, e.g. "gfx900"
+    StringRef     gpuName)
 {
     struct GpuNameStringMap
     {

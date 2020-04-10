@@ -62,8 +62,10 @@ static const unsigned InvalidValue  = ~0u;
 static const unsigned SizeOfVec4 = sizeof(float) * 4;
 
 // Initialize helper passes
+//
+// @param passRegistry : Pass registry
 inline static void initializeUtilPasses(
-    llvm::PassRegistry& passRegistry)   // Pass registry
+    llvm::PassRegistry& passRegistry)
 {
     initializePipelineShadersPass(passRegistry);
     initializePipelineStateClearerPass(passRegistry);

@@ -40,8 +40,10 @@ using namespace llvm;
 //   - Clear old DWORDs vector
 //   - Fill DWORDs vector with nullptr
 //   - Init dirty mask to all clean
+//
+// @param newRegister : A <n x i32> vector
 void GfxRegHandlerBase::setRegister(
-    Value* newRegister) // [in] A <n x i32> vector
+    Value* newRegister)
 {
     assert(newRegister->getType()->isIntOrIntVectorTy());
 
@@ -95,8 +97,10 @@ Value* GfxRegHandlerBase::getRegister()
 
 // =====================================================================================================================
 // Get data from a range of bits in indexed DWORD according to BitsInfo
+//
+// @param bitsInfo : The BitsInfo of data
 Value* GfxRegHandlerBase::getBits(
-    const BitsInfo& bitsInfo)    // [in] The BitsInfo of data
+    const BitsInfo& bitsInfo)
 {
     if (bitsInfo.count == 32)
         return getDword(bitsInfo.index);
@@ -112,9 +116,12 @@ Value* GfxRegHandlerBase::getBits(
 
 // =====================================================================================================================
 // Set data to a range of bits in indexed DWORD according to BitsInfo
+//
+// @param bitsInfo : The BitsInfo of data's high part
+// @param newBits : The new bits to set
 void GfxRegHandlerBase::setBits(
-    const BitsInfo& bitsInfo,    // [in] The BitsInfo of data's high part
-    Value*          newBits)    // [in] The new bits to set
+    const BitsInfo& bitsInfo,
+    Value*          newBits)
 {
     extractDwordIfNecessary(bitsInfo.index);
 
@@ -132,11 +139,16 @@ void GfxRegHandlerBase::setBits(
 
 // =====================================================================================================================
 // Return new DWORD which is replaced [offset, offset + count) with pNewBits
+//
+// @param dword : Target DWORD
+// @param offset : The first bit to be replaced
+// @param count : The number of bits should be replaced
+// @param newBits : The new bits to replace specified ones
 Value* GfxRegHandlerBase::replaceBits(
-    Value*   dword,   // [in] Target DWORD
-    unsigned offset,   // The first bit to be replaced
-    unsigned count,    // The number of bits should be replaced
-    Value*   newBits) // [in] The new bits to replace specified ones
+    Value*   dword,
+    unsigned offset,
+    unsigned count,
+    Value*   newBits)
 {
     // mask = ((1 << count) - 1) << offset
     // Result = (pDword & ~mask)|((pNewBits << offset) & mask)

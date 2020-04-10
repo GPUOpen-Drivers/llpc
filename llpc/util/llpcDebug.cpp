@@ -105,10 +105,14 @@ bool EnableErrs()
 // With this method, we can redirect logs in all environments, include both standalone compiler and Vulkan ICD. and we
 // can restore the output on all platform, which is very useful when app crashes or hits an assert.
 // CAUTION: The behavior isn't changed if app outputs logs to STDOUT or STDERR directly.
+//
+// @param restoreToDefault : Restore the default behavior of outs() and errs() if it is true
+// @param optionCount : Count of compilation-option strings
+// @param options : An array of compilation-option strings
 void redirectLogOutput(
-    bool              restoreToDefault,   // Restore the default behavior of outs() and errs() if it is true
-    unsigned          optionCount,        // Count of compilation-option strings
-    const char*const* options)            // [in] An array of compilation-option strings
+    bool              restoreToDefault,
+    unsigned          optionCount,
+    const char*const* options)
 {
     static raw_fd_ostream* DbgFile = nullptr;
     static raw_fd_ostream* OutFile = nullptr;
@@ -192,8 +196,10 @@ void redirectLogOutput(
 
 // =====================================================================================================================
 // Enables/disables the output for debugging. TRUE for enable, FALSE for disable.
+//
+// @param restore : Whether to enable debug output
 void enableDebugOutput(
-    bool restore) // Whether to enable debug output
+    bool restore)
 {
     static raw_null_ostream NullStream;
     static uint8_t  DbgStream[sizeof(raw_fd_ostream)] = {};

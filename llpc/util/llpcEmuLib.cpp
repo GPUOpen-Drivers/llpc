@@ -48,8 +48,10 @@ using namespace object;
 
 // =====================================================================================================================
 // Adds an archive to the emulation library.
+//
+// @param buffer : Buffer required to create the archive
 void EmuLib::addArchive(
-    MemoryBufferRef buffer) // Buffer required to create the archive
+    MemoryBufferRef buffer)
 {
     m_archives.emplace_back(cantFail(Archive::create(buffer), "Failed to parse archive"));
 
@@ -64,9 +66,12 @@ void EmuLib::addArchive(
 // Gets a function from the emulation library.
 //
 // Returns nullptr if not found, or if it is not a native function when nativeOnly is true.
+//
+// @param funcName : Function name to find
+// @param nativeOnly : Whether to only find a native function
 Function* EmuLib::getFunction(
-    StringRef funcName, // Function name to find
-    bool nativeOnly)    // Whether to only find a native function
+    StringRef funcName,
+    bool nativeOnly)
 {
     auto symbolIndexIt = m_symbolIndices.find(funcName);
     if (symbolIndexIt != m_symbolIndices.end())

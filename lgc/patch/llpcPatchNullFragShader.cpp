@@ -97,8 +97,10 @@ ModulePass* lgc::createPatchNullFragShader()
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
 bool PatchNullFragShader::runOnModule(
-    llvm::Module& module)  // [in,out] LLVM module to be run on
+    llvm::Module& module)
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Null-Frag-Shader\n");
 

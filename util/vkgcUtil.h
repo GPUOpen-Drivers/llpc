@@ -51,9 +51,12 @@ const char* getResourceMappingNodeTypeName(ResourceMappingNodeType type);
 // Increments a pointer by nBytes by first casting it to a uint8_t*.
 //
 // Returns incremented pointer.
+//
+// @param p : Pointer to be incremented.
+// @param numBytes : Number of bytes to increment the pointer by
 inline void* voidPtrInc(
-    const void* p,         // [in] Pointer to be incremented.
-    size_t      numBytes)  // Number of bytes to increment the pointer by
+    const void* p,
+    size_t      numBytes)
 {
     void* ptr = const_cast<void*>(p);
     return (static_cast<uint8_t*>(ptr) + numBytes);
@@ -62,9 +65,12 @@ inline void* voidPtrInc(
 // ===================================================================================
 // Finds the expected structure in Vulkan structure chain with the specified info.
 template<class T>
+//
+// @param type : Vulkan structure type
+// @param next : Base pointer of Vulkan structure
 inline const T* findVkStructInChain(
-    VkStructureType type,    // Vulkan structure type
-    const void*     next)   // Base pointer of Vulkan structure
+    VkStructureType type,
+    const void*     next)
 {
     struct VkStructHeader
     {

@@ -195,8 +195,10 @@ CsRegConfig::CsRegConfig()
 
 // =====================================================================================================================
 // Adds entries to register name map.
+//
+// @param gfxIp : Graphics IP version info
 void initRegisterNameMap(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp)
 {
     assert(gfxIp.major <= 8);
 

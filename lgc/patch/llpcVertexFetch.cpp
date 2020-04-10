@@ -246,10 +246,14 @@ const BufFormat VertexFetch::MVertexFormatMap[] =
 };
 
 // =====================================================================================================================
+//
+// @param entryPoint : Entry-point of API vertex shader
+// @param shaderSysValues : ShaderSystemValues object for getting vertex buffer pointer from
+// @param pipelineState : Pipeline state
 VertexFetch::VertexFetch(
-    Function*           entryPoint,      // [in] Entry-point of API vertex shader
-    ShaderSystemValues* shaderSysValues, // [in] ShaderSystemValues object for getting vertex buffer pointer from
-    PipelineState*      pipelineState)   // [in] Pipeline state
+    Function*           entryPoint,
+    ShaderSystemValues* shaderSysValues,
+    PipelineState*      pipelineState)
     :
     m_module(entryPoint->getParent()),
     m_context(&m_module->getContext()),
@@ -324,11 +328,16 @@ VertexFetch::VertexFetch(
 
 // =====================================================================================================================
 // Executes vertex fetch operations based on the specified vertex input type and its location.
+//
+// @param inputTy : Type of vertex input
+// @param location : Location of vertex input
+// @param compIdx : Index used for vector element indexing
+// @param insertPos : Where to insert vertex fetch instructions
 Value* VertexFetch::run(
-    Type*        inputTy,      // [in] Type of vertex input
-    unsigned     location,      // Location of vertex input
-    unsigned     compIdx,       // Index used for vector element indexing
-    Instruction* insertPos)    // [in] Where to insert vertex fetch instructions
+    Type*        inputTy,
+    unsigned     location,
+    unsigned     compIdx,
+    Instruction* insertPos)
 {
     Value* vertex = nullptr;
 
@@ -705,8 +714,10 @@ Value* VertexFetch::run(
 
 // =====================================================================================================================
 // Gets info from table according to vertex attribute format.
+//
+// @param inputDesc : Vertex input description
 VertexFormatInfo VertexFetch::getVertexFormatInfo(
-    const VertexInputDescription* inputDesc)    // [in] Vertex input description
+    const VertexInputDescription* inputDesc)
 {
     VertexFormatInfo info = {
                                 static_cast<BufNumFormat>(inputDesc->nfmt),
@@ -758,8 +769,10 @@ VertexFormatInfo VertexFetch::getVertexFormatInfo(
 
 // =====================================================================================================================
 // Gets component info from table according to vertex buffer data format.
+//
+// @param dfmt : Date format of vertex buffer
 const VertexCompFormatInfo* VertexFetch::getVertexComponentFormatInfo(
-    unsigned dfmt) // Date format of vertex buffer
+    unsigned dfmt)
 {
     assert(dfmt < sizeof(MVertexCompFormatInfo) / sizeof(MVertexCompFormatInfo[0]));
     return &MVertexCompFormatInfo[dfmt];
@@ -767,9 +780,12 @@ const VertexCompFormatInfo* VertexFetch::getVertexComponentFormatInfo(
 
 // =====================================================================================================================
 // Maps separate buffer data and numeric formats to the combined buffer format
+//
+// @param dfmt : Data format
+// @param nfmt : Numeric format
 unsigned VertexFetch::mapVertexFormat(
-    unsigned dfmt,  // Data format
-    unsigned nfmt   // Numeric format
+    unsigned dfmt,
+    unsigned nfmt
     ) const
 {
     assert(dfmt < 16);
@@ -795,9 +811,12 @@ unsigned VertexFetch::mapVertexFormat(
 
 // =====================================================================================================================
 // Loads vertex descriptor based on the specified vertex input location.
+//
+// @param binding : ID of vertex buffer binding
+// @param insertPos : Where to insert instructions
 Value* VertexFetch::loadVertexBufferDescriptor(
-    unsigned     binding,       // ID of vertex buffer binding
-    Instruction* insertPos     // [in] Where to insert instructions
+    unsigned     binding,
+    Instruction* insertPos
     ) const
 {
     Value* idxs[] = {
@@ -818,17 +837,28 @@ Value* VertexFetch::loadVertexBufferDescriptor(
 
 // =====================================================================================================================
 // Inserts instructions to do vertex fetch operations.
+//
+// @param vbDesc : Vertex buffer descriptor
+// @param numChannels : Valid number of channels
+// @param is16bitFetch : Whether it is 16-bit vertex fetch
+// @param vbIndex : Index of vertex fetch in buffer
+// @param offset : Vertex attribute offset (in bytes)
+// @param stride : Vertex attribute stride (in bytes)
+// @param dfmt : Date format of vertex buffer
+// @param nfmt : Numeric format of vertex buffer
+// @param insertPos : Where to insert instructions
+// @param [out] ppFetch : Destination of vertex fetch
 void VertexFetch::addVertexFetchInst(
-    Value*       vbDesc,       // [in] Vertex buffer descriptor
-    unsigned     numChannels,   // Valid number of channels
-    bool         is16bitFetch,  // Whether it is 16-bit vertex fetch
-    Value*       vbIndex,      // [in] Index of vertex fetch in buffer
-    unsigned     offset,        // Vertex attribute offset (in bytes)
-    unsigned     stride,        // Vertex attribute stride (in bytes)
-    unsigned     dfmt,          // Date format of vertex buffer
-    unsigned     nfmt,          // Numeric format of vertex buffer
-    Instruction* insertPos,    // [in] Where to insert instructions
-    Value**      ppFetch        // [out] Destination of vertex fetch
+    Value*       vbDesc,
+    unsigned     numChannels,
+    bool         is16bitFetch,
+    Value*       vbIndex,
+    unsigned     offset,
+    unsigned     stride,
+    unsigned     dfmt,
+    unsigned     nfmt,
+    Instruction* insertPos,
+    Value**      ppFetch
     ) const
 {
     const VertexCompFormatInfo* formatInfo = getVertexComponentFormatInfo(dfmt);
@@ -1028,9 +1058,12 @@ void VertexFetch::addVertexFetchInst(
 
 // =====================================================================================================================
 // Checks whether post shuffle is required for vertex fetch oepration.
+//
+// @param inputDesc : Vertex input description
+// @param [out] shuffleMask : Vector shuffle mask
 bool VertexFetch::needPostShuffle(
-    const VertexInputDescription*  inputDesc,   // [in] Vertex input description
-    std::vector<Constant*>&        shuffleMask   // [out] Vector shuffle mask
+    const VertexInputDescription*  inputDesc,
+    std::vector<Constant*>&        shuffleMask
     ) const
 {
     bool needShuffle = false;
@@ -1054,8 +1087,10 @@ bool VertexFetch::needPostShuffle(
 
 // =====================================================================================================================
 // Checks whether patching 2-bit signed alpha channel is required for vertex fetch operation.
+//
+// @param inputDesc : Vertex input description
 bool VertexFetch::needPatchA2S(
-    const VertexInputDescription* inputDesc    // [in] Vertex input description
+    const VertexInputDescription* inputDesc
     ) const
 {
     bool needPatch = false;
@@ -1074,8 +1109,10 @@ bool VertexFetch::needPatchA2S(
 
 // =====================================================================================================================
 // Checks whether the second vertex fetch operation is required (particularly for certain 64-bit typed formats).
+//
+// @param inputDesc : Vertex input description
 bool VertexFetch::needSecondVertexFetch(
-    const VertexInputDescription* inputDesc    // [in] Vertex input description
+    const VertexInputDescription* inputDesc
     ) const
 {
     return inputDesc->dfmt == BufDataFormat64_64_64 ||
