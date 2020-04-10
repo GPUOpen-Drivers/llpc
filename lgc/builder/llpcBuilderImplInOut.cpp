@@ -148,7 +148,7 @@ Value* BuilderImplInOut::readGenericInputOutput(
             args.push_back(getInt32(location));
             args.push_back(locationOffset);
             args.push_back(elemIdx);
-            args.push_back((vertexIndex != nullptr) ? vertexIndex : getInt32(InvalidValue));
+            args.push_back((vertexIndex ) ? vertexIndex : getInt32(InvalidValue));
             if (isOutput)
                 baseCallName = lgcName::OutputImportGeneric;
             break;
@@ -160,7 +160,7 @@ Value* BuilderImplInOut::readGenericInputOutput(
             assert(locationOffset == getInt32(0));
             args.push_back(getInt32(location));
             args.push_back(elemIdx);
-            args.push_back((vertexIndex != nullptr) ? vertexIndex : getInt32(InvalidValue));
+            args.push_back((vertexIndex ) ? vertexIndex : getInt32(InvalidValue));
             break;
         }
 
@@ -260,7 +260,7 @@ Instruction* BuilderImplInOut::CreateWriteGenericOutput(
             args.push_back(getInt32(location));
             args.push_back(locationOffset);
             args.push_back(elemIdx);
-            args.push_back((vertexIndex != nullptr) ? vertexIndex : getInt32(InvalidValue));
+            args.push_back((vertexIndex ) ? vertexIndex : getInt32(InvalidValue));
             break;
         }
 
@@ -318,9 +318,9 @@ void BuilderImplInOut::markGenericInputOutputUsage(
 
     // Mark the input or output locations as in use.
     std::map<unsigned, unsigned>* inOutLocMap = nullptr;
-    if (isOutput == false)
+    if (!isOutput)
     {
-        if ((m_shaderStage != ShaderStageTessEval) || (vertexIndex != nullptr))
+        if ((m_shaderStage != ShaderStageTessEval) || (vertexIndex ))
         {
             // Normal input
             inOutLocMap = &resUsage->inOutUsage.inputLocMap;
@@ -333,7 +333,7 @@ void BuilderImplInOut::markGenericInputOutputUsage(
     }
     else
     {
-        if ((m_shaderStage != ShaderStageTessControl) || (vertexIndex != nullptr))
+        if ((m_shaderStage != ShaderStageTessControl) || (vertexIndex ))
         {
             // Normal output
             inOutLocMap = &resUsage->inOutUsage.outputLocMap;
@@ -345,7 +345,7 @@ void BuilderImplInOut::markGenericInputOutputUsage(
         }
     }
 
-    if ((isOutput == false) || (m_shaderStage != ShaderStageGeometry))
+    if ((!isOutput) || (m_shaderStage != ShaderStageGeometry))
     {
         bool keepAllLocations = false;
         if (getBuilderContext()->buildingRelocatableElf())
@@ -372,7 +372,7 @@ void BuilderImplInOut::markGenericInputOutputUsage(
         }
     }
 
-    if ((isOutput == false) && (m_shaderStage == ShaderStageFragment))
+    if ((!isOutput) && (m_shaderStage == ShaderStageFragment))
     {
         // Mark usage for interpolation info.
         markInterpolationInfo(inOutInfo);
@@ -705,14 +705,14 @@ Value* BuilderImplInOut::readBuiltIn(
     if (auto constIndex = dyn_cast_or_null<ConstantInt>(index))
         arraySize = constIndex->getZExtValue() + 1;
 
-    if (isOutput == false)
+    if (!isOutput)
         markBuiltInInputUsage(builtIn, arraySize);
     else
         markBuiltInOutputUsage(builtIn, arraySize, InvalidValue);
 
     // Get the built-in type.
     Type* resultTy = getBuiltInTy(builtIn, inOutInfo);
-    if (index != nullptr)
+    if (index )
     {
         if (isa<ArrayType>(resultTy))
             resultTy = resultTy->getArrayElementType();
@@ -777,12 +777,12 @@ Value* BuilderImplInOut::readBuiltIn(
     {
     case ShaderStageTessControl:
     case ShaderStageTessEval:
-        args.push_back((index != nullptr) ? index : getInt32(InvalidValue));
-        args.push_back((vertexIndex != nullptr) ? vertexIndex : getInt32(InvalidValue));
+        args.push_back((index ) ? index : getInt32(InvalidValue));
+        args.push_back((vertexIndex ) ? vertexIndex : getInt32(InvalidValue));
         break;
     case ShaderStageGeometry:
-        assert(index == nullptr);
-        args.push_back((vertexIndex != nullptr) ? vertexIndex : getInt32(InvalidValue));
+        assert(!index );
+        args.push_back((vertexIndex ) ? vertexIndex : getInt32(InvalidValue));
         break;
     case ShaderStageFragment:
         if (builtIn == BuiltInSamplePosOffset)
@@ -793,10 +793,10 @@ Value* BuilderImplInOut::readBuiltIn(
             vertexIndex = nullptr;
             args.push_back(sampleNum);
         }
-        assert((index == nullptr) && (vertexIndex == nullptr));
+        assert((!index ) && (!vertexIndex ));
         break;
     default:
-        assert((index == nullptr) && (vertexIndex == nullptr));
+        assert((!index ) && (!vertexIndex ));
         break;
     }
 
@@ -838,7 +838,7 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
 #ifndef NDEBUG
     // Assert we have the right type. Allow for ClipDistance/CullDistance being a different array size.
     Type* expectedTy = getBuiltInTy(builtIn, outputInfo);
-    if (index != nullptr)
+    if (index )
     {
         if (isa<ArrayType>(expectedTy))
             expectedTy = expectedTy->getArrayElementType();
@@ -866,15 +866,15 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
     switch (m_shaderStage)
     {
     case ShaderStageTessControl:
-        args.push_back((index != nullptr) ? index : getInt32(InvalidValue));
-        args.push_back((vertexIndex != nullptr) ? vertexIndex : getInt32(InvalidValue));
+        args.push_back((index ) ? index : getInt32(InvalidValue));
+        args.push_back((vertexIndex ) ? vertexIndex : getInt32(InvalidValue));
         break;
     case ShaderStageGeometry:
-        assert((index == nullptr) && (vertexIndex == nullptr));
+        assert((!index ) && (!vertexIndex ));
         args.push_back(getInt32(streamId));
         break;
     default:
-        assert((index == nullptr) && (vertexIndex == nullptr));
+        assert((!index ) && (!vertexIndex ));
         break;
     }
     args.push_back(valueToWrite);

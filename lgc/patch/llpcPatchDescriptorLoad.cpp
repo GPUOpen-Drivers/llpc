@@ -80,7 +80,7 @@ bool PatchDescriptorLoad::runOnModule(
     for (unsigned shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
     {
         m_entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
-        if (m_entryPoint != nullptr)
+        if (m_entryPoint )
         {
             m_shaderStage = static_cast<ShaderStage>(shaderStage);
             visit(*m_entryPoint);
@@ -117,7 +117,7 @@ bool PatchDescriptorLoad::runOnModule(
     }
     for (Function* func : deadDescFuncs)
     {
-        while (func->use_empty() == false)
+        while (!func->use_empty())
             func->use_begin()->set(UndefValue::get(func->getType()));
         func->eraseFromParent();
     }
@@ -157,7 +157,7 @@ void PatchDescriptorLoad::processDescriptorGetPtr(
     const ResourceNode* topNode = nullptr;
     const ResourceNode* node = nullptr;
     std::tie(topNode, node) = m_pipelineState->findResourceNode(resType, descSet, binding);
-    if ((node == nullptr) && (resType == ResourceNodeType::DescriptorFmask) && shadow)
+    if ((!node ) && (resType == ResourceNodeType::DescriptorFmask) && shadow)
     {
         std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorResource,
                                                                        descSet,
@@ -165,7 +165,7 @@ void PatchDescriptorLoad::processDescriptorGetPtr(
     }
 
     Value* descPtrAndStride = nullptr;
-    if (node == nullptr)
+    if (!node )
     {
         // We did not find the resource node. Use an undef value.
         descPtrAndStride = UndefValue::get(descPtrCall->getType());
@@ -199,7 +199,7 @@ Value* PatchDescriptorLoad::getDescPtrAndStride(
     case ResourceNodeType::DescriptorBuffer:
     case ResourceNodeType::DescriptorTexelBuffer:
         byteSize = DescriptorSizeBuffer;
-        if ((node != nullptr) && (node->type == ResourceNodeType::DescriptorBufferCompact))
+        if ((node ) && (node->type == ResourceNodeType::DescriptorBufferCompact))
             byteSize = DescriptorSizeBufferCompact;
         stride = builder.getInt32(byteSize / 4);
         break;
@@ -215,10 +215,10 @@ Value* PatchDescriptorLoad::getDescPtrAndStride(
         break;
     }
 
-    if (stride == nullptr)
+    if (!stride )
     {
         // Stride is not determinable just from the descriptor type requested by the Builder call.
-        if (node == nullptr)
+        if (!node )
         {
             // TODO: Shader compilation: Get byte stride using a reloc.
             llvm_unreachable("");
@@ -246,7 +246,7 @@ Value* PatchDescriptorLoad::getDescPtrAndStride(
     }
 
     Value* descPtr = nullptr;
-    if ((node != nullptr) && (node->immutableValue != nullptr) && (resType == ResourceNodeType::DescriptorSampler))
+    if ((node ) && (node->immutableValue ) && (resType == ResourceNodeType::DescriptorSampler))
     {
         // This is an immutable sampler. Put the immutable value into a static variable and return a pointer
         // to that. For a simple non-variably-indexed immutable sampler not passed through a function call
@@ -254,7 +254,7 @@ Value* PatchDescriptorLoad::getDescPtrAndStride(
         std::string globalName = (Twine("_immutable_sampler_") + Twine(node->set) +
                                   " " + Twine(node->binding)).str();
         descPtr = m_module->getGlobalVariable(globalName, /*AllowInternal=*/true);
-        if (descPtr == nullptr)
+        if (!descPtr )
         {
             descPtr = new GlobalVariable(*m_module,
                                           node->immutableValue->getType(),
@@ -305,7 +305,7 @@ Value* PatchDescriptorLoad::getDescPtr(
     Value* descPtr = nullptr;
     // Get the descriptor table pointer.
     auto sysValues = m_pipelineSysValues.get(builder.GetInsertPoint()->getFunction());
-    if ((node != nullptr) && (node == topNode))
+    if ((node ) && (node == topNode))
     {
         // The descriptor is in the top-level table. Contrary to what used to happen, we just load from
         // the spill table, so we can get a pointer to the descriptor. It gets returned as a pointer
@@ -326,7 +326,7 @@ Value* PatchDescriptorLoad::getDescPtr(
 
     // Add on the byte offset of the descriptor.
     Value* offset = nullptr;
-    if (node == nullptr)
+    if (!node )
     {
         // TODO: Shader compilation: Get the offset for the descriptor using a reloc. The reloc symbol name
         // needs to contain the descriptor set and binding, and, for image, fmask or sampler, whether it is
@@ -404,7 +404,7 @@ void PatchDescriptorLoad::visitCallInst(
     CallInst& callInst)   // [in] "Call" instruction
 {
     auto callee = callInst.getCalledFunction();
-    if (callee == nullptr)
+    if (!callee )
         return;
 
     StringRef mangledName = callee->getName();
@@ -433,7 +433,7 @@ void PatchDescriptorLoad::visitCallInst(
         assert(callInst.getParent()->getParent() == m_entryPoint);
         m_changed = true;
 
-        if (callInst.use_empty() == false)
+        if (!callInst.use_empty())
         {
             Value* desc = m_pipelineSysValues.get(m_entryPoint)->getSpilledPushConstTablePtr();
             if (desc->getType() != callInst.getType())
@@ -451,7 +451,7 @@ void PatchDescriptorLoad::visitCallInst(
         assert(callInst.getParent()->getParent() == m_entryPoint);
         m_changed = true;
 
-        if (callInst.use_empty() == false)
+        if (!callInst.use_empty())
         {
             unsigned descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
             unsigned binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
@@ -484,7 +484,7 @@ Value* PatchDescriptorLoad::loadBufferDescriptor(
         descPtr = m_pipelineSysValues.get(m_entryPoint)->getInternalGlobalTablePtr();
     else if (descSet == InternalPerShaderTable)
         descPtr = m_pipelineSysValues.get(m_entryPoint)->getInternalPerShaderTablePtr();
-    if (descPtr != nullptr)
+    if (descPtr )
     {
         // "binding" gives the offset, in units of v4i32 descriptors.
         // Add on the offset, giving pointer to i8.
@@ -505,7 +505,7 @@ Value* PatchDescriptorLoad::loadBufferDescriptor(
                                                                    descSet,
                                                                    binding);
 
-    if (node == nullptr)
+    if (!node )
     {
         // We did not find the resource node. Use an undef value.
         return UndefValue::get(VectorType::get(builder.getInt32Ty(), 4));
@@ -546,7 +546,7 @@ Value* PatchDescriptorLoad::loadBufferDescriptor(
                           /*shadow=*/false,
                           builder);
 
-    if ((node != nullptr) && (node->type == ResourceNodeType::PushConst))
+    if ((node ) && (node->type == ResourceNodeType::PushConst))
     {
         // Inline buffer.
         return buildInlineBufferDesc(descPtr, builder);
@@ -554,7 +554,7 @@ Value* PatchDescriptorLoad::loadBufferDescriptor(
 
     // Add on the index.
     unsigned dwordStride = DescriptorSizeBuffer / 4;
-    if ((node != nullptr) && (node->type == ResourceNodeType::DescriptorBufferCompact))
+    if ((node ) && (node->type == ResourceNodeType::DescriptorBufferCompact))
         dwordStride = DescriptorSizeBufferCompact / 4;
     arrayOffset = builder.CreateMul(arrayOffset, builder.getInt32(dwordStride));
     descPtr = builder.CreateGEP(builder.getInt32Ty(), descPtr, arrayOffset);

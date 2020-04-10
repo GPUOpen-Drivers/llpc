@@ -157,7 +157,7 @@ bool checkShaderInfoComptible(
 
     if (autoLayoutUserDataNodeCount == 0)
         hit = true;
-    else if ((shaderInfo->pDescriptorRangeValues != nullptr) || (shaderInfo->pSpecializationInfo->dataSize != 0))
+    else if ((shaderInfo->pDescriptorRangeValues ) || (shaderInfo->pSpecializationInfo->dataSize != 0))
         hit = false;
     else if (shaderInfo->userDataNodeCount >= autoLayoutUserDataNodeCount)
     {
@@ -171,7 +171,7 @@ bool checkShaderInfoComptible(
                 unsigned set = autoLayoutUserDataNode->tablePtr.pNext[0].srdRange.set;
                 const ResourceMappingNode* userDataNode = findDescriptorTableVaPtr(shaderInfo, set);
 
-                if (userDataNode != nullptr)
+                if (userDataNode )
                 {
                     bool hitNode = false;
                     for (unsigned i = 0; i < autoLayoutUserDataNode->tablePtr.nodeCount; ++i)
@@ -186,7 +186,7 @@ bool checkShaderInfoComptible(
                                                             autoLayoutNext->srdRange.binding,
                                                             &index);
 
-                        if (node != nullptr)
+                        if (node )
                         {
                             if ((autoLayoutNext->type == node->type) &&
                                 (autoLayoutNext->sizeInDwords == node->sizeInDwords) &&
@@ -217,7 +217,7 @@ bool checkShaderInfoComptible(
                         else
                             break;
                     }
-                    if (hitNode == false)
+                    if (!hitNode)
                     {
                         hit = false;
                         break;
@@ -241,7 +241,7 @@ bool checkShaderInfoComptible(
                                                             autoLayoutUserDataNode->srdRange.set,
                                                             autoLayoutUserDataNode->srdRange.binding,
                                                             &index);
-                if ((node != nullptr) && (autoLayoutUserDataNode->sizeInDwords == node->sizeInDwords))
+                if ((node ) && (autoLayoutUserDataNode->sizeInDwords == node->sizeInDwords))
                 {
                     hit = true;
                     continue;
@@ -331,13 +331,13 @@ void doAutoLayoutDesc(
     {
         func = module->getFunction(i);
         entryPoint = module->getEntryPoint(func->getId());
-        if ((entryPoint != nullptr) &&
+        if ((entryPoint ) &&
             (entryPoint->getExecModel() == SPIRVExecutionModelKind(shaderStage)) &&
             (entryPoint->getName() == shaderInfo->pEntryTarget))
             break;
         func = nullptr;
     }
-    if (entryPoint == nullptr)
+    if (!entryPoint )
         return;
 
     // Shader stage specific processing
@@ -475,7 +475,7 @@ void doAutoLayoutDesc(
                 continue;
 
             SPIRVWord location = SPIRVID_INVALID;
-            if (var->hasDecorate(DecorationLocation, 0, &location) == false)
+            if (!var->hasDecorate(DecorationLocation, 0, &location))
                 continue;
 
             SPIRVType* varElemTy = var->getType()->getPointerElementType();

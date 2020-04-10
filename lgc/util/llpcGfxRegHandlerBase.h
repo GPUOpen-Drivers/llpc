@@ -101,7 +101,7 @@ private:
     // Load indexed DWORD from <n x i32> vector, if the specific DWORD is nullptr
     inline void extractDwordIfNecessary(unsigned index)
     {
-        if (m_dwords[index] == nullptr)
+        if (!m_dwords[index] )
             m_dwords[index] = m_builder->CreateExtractElement(m_reg, m_builder->getInt64(index));
     }
 

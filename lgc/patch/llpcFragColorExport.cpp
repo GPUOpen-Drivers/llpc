@@ -502,9 +502,9 @@ ExportFormat FragColorExport::computeExportFormat(
     if (target->dfmt == BufDataFormatInvalid)
         expFmt = EXP_FORMAT_ZERO;
     else if ((compSetting == CompSetting::OneCompRed) &&
-             (alphaExport == false)                   &&
-             (isSrgbFormat == false)                        &&
-             ((gfx8RbPlusEnable == false) || (maxCompBitCount == 32)))
+             (!alphaExport)                   &&
+             (!isSrgbFormat)                        &&
+             ((!gfx8RbPlusEnable) || (maxCompBitCount == 32)))
     {
         // NOTE: When Rb+ is enabled, "R8 UNORM" and "R16 UNORM" shouldn't use "EXP_FORMAT_32_R", instead
         // "EXP_FORMAT_FP16_ABGR" and "EXP_FORMAT_UNORM16_ABGR" should be used for 2X exporting performance.
@@ -516,8 +516,8 @@ ExportFormat FragColorExport::computeExportFormat(
         expFmt = EXP_FORMAT_FP16_ABGR;
     else if (isSintFormat &&
              ((maxCompBitCount == 16) ||
-              ((gpuWorkarounds->gfx6.cbNoLt16BitIntClamp == false) && (maxCompBitCount < 16))) &&
-             (enableAlphaToCoverage == false))
+              ((!static_cast<bool>(gpuWorkarounds->gfx6.cbNoLt16BitIntClamp)) && (maxCompBitCount < 16))) &&
+             (!enableAlphaToCoverage))
     {
         // NOTE: On some hardware, the CB will not properly clamp its input if the shader export format is "UINT16"
         // "SINT16" and the CB format is less than 16 bits per channel. On such hardware, the workaround is picking
@@ -525,12 +525,12 @@ ExportFormat FragColorExport::computeExportFormat(
         // performance 16-bit export format in this case.
         expFmt = EXP_FORMAT_SINT16_ABGR;
     }
-    else if (isSnormFormat && (maxCompBitCount == 16) && (blendEnabled == false))
+    else if (isSnormFormat && (maxCompBitCount == 16) && (!blendEnabled))
         expFmt = EXP_FORMAT_SNORM16_ABGR;
     else if (isUintFormat &&
              ((maxCompBitCount == 16) ||
-              ((gpuWorkarounds->gfx6.cbNoLt16BitIntClamp == false) && (maxCompBitCount < 16))) &&
-             (enableAlphaToCoverage == false))
+              ((!static_cast<bool>(gpuWorkarounds->gfx6.cbNoLt16BitIntClamp)) && (maxCompBitCount < 16))) &&
+             (!enableAlphaToCoverage))
     {
         // NOTE: On some hardware, the CB will not properly clamp its input if the shader export format is "UINT16"
         // "SINT16" and the CB format is less than 16 bits per channel. On such hardware, the workaround is picking
@@ -538,7 +538,7 @@ ExportFormat FragColorExport::computeExportFormat(
         // performance 16-bit export format in this case.
         expFmt = EXP_FORMAT_UINT16_ABGR;
     }
-    else if (isUnormFormat && (maxCompBitCount == 16) && (blendEnabled == false))
+    else if (isUnormFormat && (maxCompBitCount == 16) && (!blendEnabled))
         expFmt = EXP_FORMAT_UNORM16_ABGR;
     else if (((isUintFormat || isSintFormat) ||
               (isFloatFormat && (maxCompBitCount > 16)) ||
@@ -550,7 +550,7 @@ ExportFormat FragColorExport::computeExportFormat(
     else if (((isUintFormat || isSintFormat) ||
               (isFloatFormat && (maxCompBitCount > 16)) ||
               ((isUnormFormat || isSnormFormat) && (maxCompBitCount == 16)))  &&
-             (compSetting == CompSetting::TwoCompGreenRed) && (alphaExport == false))
+             (compSetting == CompSetting::TwoCompGreenRed) && (!alphaExport))
         expFmt = EXP_FORMAT_32_GR;
     else if (((isUnormFormat || isSnormFormat) && (maxCompBitCount == 16)) ||
              (isUintFormat || isSintFormat) ||

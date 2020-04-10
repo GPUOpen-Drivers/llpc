@@ -823,7 +823,7 @@ Value* BuilderImplArith::CreateNormalizeVector(
     Value*        x,         // [in] Input value
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
-    if (isa<VectorType>(x->getType()) == false)
+    if (!isa<VectorType>(x->getType()))
     {
         // For a scalar, just return -1.0 or +1.0.
         Value* isPositive = CreateFCmpOGT(x, Constant::getNullValue(x->getType()));
@@ -1114,7 +1114,7 @@ Value* BuilderImplArith::fDivFast(
     Value* numerator,    // [in] Numerator
     Value* denominator)  // [in] Denominator
 {
-    if (numerator->getType()->getScalarType()->isFloatTy() == false)
+    if (!numerator->getType()->getScalarType()->isFloatTy())
         return CreateFMul(numerator, CreateFDiv(ConstantFP::get(denominator->getType(), 1.0), denominator));
 
     // We have to scalarize fdiv.fast ourselves.
@@ -1182,9 +1182,9 @@ Value* BuilderImplArith::CreateInsertBitField(
     // Make pOffset and pCount vectors of the right integer type if necessary.
     if (auto vecTy = dyn_cast<VectorType>(base->getType()))
     {
-        if (isa<VectorType>(offset->getType()) == false)
+        if (!isa<VectorType>(offset->getType()))
             offset = CreateVectorSplat(vecTy->getNumElements(), offset);
-        if (isa<VectorType>(count->getType()) == false)
+        if (!isa<VectorType>(count->getType()))
             count = CreateVectorSplat(vecTy->getNumElements(), count);
     }
     offset = CreateZExtOrTrunc(offset, base->getType());
@@ -1217,9 +1217,9 @@ Value* BuilderImplArith::CreateExtractBitField(
     // Make pOffset and pCount vectors of the right integer type if necessary.
     if (auto vecTy = dyn_cast<VectorType>(base->getType()))
     {
-        if (isa<VectorType>(offset->getType()) == false)
+        if (!isa<VectorType>(offset->getType()))
             offset = CreateVectorSplat(vecTy->getNumElements(), offset);
-        if (isa<VectorType>(count->getType()) == false)
+        if (!isa<VectorType>(count->getType()))
             count = CreateVectorSplat(vecTy->getNumElements(), count);
     }
     offset = CreateZExtOrTrunc(offset, base->getType());
@@ -1300,7 +1300,7 @@ Value* BuilderImplArith::createFMix(
     if (auto vectorResultTy = dyn_cast<VectorType>(ySubX->getType()))
     {
         // pX, pY => vector, but pA => scalar
-        if (isa<VectorType>(a->getType()) == false)
+        if (!isa<VectorType>(a->getType()))
             a = CreateVectorSplat(vectorResultTy->getVectorNumElements(), a);
     }
 

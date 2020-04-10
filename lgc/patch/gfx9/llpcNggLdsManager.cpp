@@ -137,7 +137,7 @@ NggLdsManager::NggLdsManager(
     m_waveCountInSubgroup(Gfx9::NggMaxThreadsPerSubgroup / m_pipelineState->getTargetInfo().getGpuProperty().waveSize),
     m_builder(builder)
 {
-    assert(builder != nullptr);
+    assert(builder );
 
     const auto nggControl = m_pipelineState->getNggControl();
     assert(nggControl->enableNgg);
@@ -223,7 +223,7 @@ NggLdsManager::NggLdsManager(
                          m_ldsRegionStart[LdsRegionDistribPrimId],
                          LdsRegionSizes[LdsRegionDistribPrimId]) << "\n");
 
-        if (nggControl->passthroughMode == false)
+        if (!nggControl->passthroughMode)
         {
             //
             // The LDS layout is something like this:
@@ -249,7 +249,7 @@ NggLdsManager::NggLdsManager(
                     continue;
 
                 // NOTE: If cull distance culling is disabled, skip this region
-                if ((region == LdsRegionCullDistance) && (nggControl->enableCullDistanceCulling == false))
+                if ((region == LdsRegionCullDistance) && (!nggControl->enableCullDistanceCulling))
                     continue;
 
                 // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
@@ -292,7 +292,7 @@ unsigned NggLdsManager::calcEsExtraLdsSize(
     PipelineState* pipelineState)  // [in] Pipeline state
 {
     const auto nggControl = pipelineState->getNggControl();
-    if (nggControl->enableNgg == false)
+    if (!nggControl->enableNgg)
         return 0;
 
     const unsigned stageMask = pipelineState->getShaderStageMask();
@@ -313,7 +313,7 @@ unsigned NggLdsManager::calcEsExtraLdsSize(
     {
         // NOTE: For NGG pass-through mode, only primitive ID region is valid.
         bool distributePrimId = false;
-        if (hasTs == false)
+        if (!hasTs)
         {
             const auto& builtInUsage = pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
             distributePrimId = builtInUsage.primitiveId;
@@ -330,7 +330,7 @@ unsigned NggLdsManager::calcEsExtraLdsSize(
                 continue;
 
             // NOTE: If cull distance culling is disabled, skip this region
-            if ((region == LdsRegionCullDistance) && (nggControl->enableCullDistanceCulling == false))
+            if ((region == LdsRegionCullDistance) && (!nggControl->enableCullDistanceCulling))
                 continue;
 
             // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
@@ -367,12 +367,12 @@ unsigned NggLdsManager::calcGsExtraLdsSize(
     PipelineState* pipelineState)  // [in] Pipeline state
 {
     const auto nggControl = pipelineState->getNggControl();
-    if (nggControl->enableNgg == false)
+    if (!nggControl->enableNgg)
         return 0;
 
     const unsigned stageMask = pipelineState->getShaderStageMask();
     const bool hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
-    if (hasGs == false)
+    if (!hasGs)
     {
         // NOTE: Not need GS extra LDS when GS is not present.
         return 0;
@@ -390,7 +390,7 @@ Value* NggLdsManager::readValueFromLds(
     Value*       ldsOffset,    // [in] Start offset to do LDS read operations
     bool         useDs128)      // Whether to use 128-bit LDS load, 16-byte alignment is guaranteed by caller
 {
-    assert(m_lds != nullptr);
+    assert(m_lds );
     assert(readTy->isIntOrIntVectorTy() || readTy->isFPOrFPVectorTy());
 
     const unsigned readBits = readTy->getPrimitiveSizeInBits();
@@ -466,7 +466,7 @@ void NggLdsManager::writeValueToLds(
     Value*        ldsOffset,       // [in] Start offset to do LDS write operations
     bool          useDs128)         // Whether to use 128-bit LDS store, 16-byte alignment is guaranteed by caller
 {
-    assert(m_lds != nullptr);
+    assert(m_lds );
 
     auto writeTy = writeValue->getType();
     assert(writeTy->isIntOrIntVectorTy() || writeTy->isFPOrFPVectorTy());

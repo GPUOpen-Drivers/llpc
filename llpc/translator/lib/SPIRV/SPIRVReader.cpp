@@ -680,7 +680,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
     unsigned columnCount = spvType->getMatrixColumnCount();
 
     // If the matrix is not explicitly laid out or is column major, just translate the column type.
-    if ((isParentPointer == false) || isColumnMajor)
+    if ((!isParentPointer) || isColumnMajor)
     {
         columnType = transType(spvType->getMatrixColumnType(),
                                 matrixStride,
@@ -702,7 +702,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
         columnType = ArrayType::get(elementType, columnCount);
         columnCount = spvColumnType->getVectorComponentCount();
 
-        if ((isColumnMajor == false) && (matrixStride == 0))
+        if ((!isColumnMajor) && (matrixStride == 0))
         {
             // Targeted for std430 layout
             assert(columnCount == 4);
@@ -733,7 +733,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
 
     Type* const matrixType = ArrayType::get(columnType, columnCount);
     return (isExplicitlyLaidOut && isPaddedMatrix) ?
-           recordTypeWithPad(matrixType, isColumnMajor == false) :
+           recordTypeWithPad(matrixType, !isColumnMajor) :
            matrixType;
 }
 
@@ -972,7 +972,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
         SPIRVWord memberMatrixStride = 0;
         spvStructType->hasMemberDecorate(index, DecorationMatrixStride, 0, &memberMatrixStride);
 
-        const bool memberIsColumnMajor = spvStructType->hasMemberDecorate(index, DecorationRowMajor) == false;
+        const bool memberIsColumnMajor = !spvStructType->hasMemberDecorate(index, DecorationRowMajor);
 
         // If our member is a matrix, check that only one of the specifiers is declared.
         if (isExplicitlyLaidOut && (memberMatrixStride > 0))
@@ -1031,7 +1031,7 @@ Type *SPIRVToLLVM::transType(
   SPIRVType *t, unsigned matrixStride, bool columnMajor,
   bool parentIsPointer, bool explicitlyLaidOut) {
   // If the type is not a sub-part of a pointer or it is a forward pointer, we can look in the map.
-  if ((parentIsPointer == false) || t->isTypeForwardPointer()) {
+  if ((!parentIsPointer) || t->isTypeForwardPointer()) {
     auto loc = m_typeMap.find(t);
     if (loc != m_typeMap.end())
       return loc->second;
@@ -1251,7 +1251,7 @@ Value *SPIRVToLLVM::transValue(SPIRVValue *bv, Function *f, BasicBlock *bb,
 Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f,
                                      BasicBlock *bb) {
   SPIRVUnary *bc = static_cast<SPIRVUnary *>(bv);
-  auto src = transValue(bc->getOperand(0), f, bb, bb ? true : false);
+  auto src = transValue(bc->getOperand(0), f, bb, bb != nullptr);
   auto dst = transType(bc->getType());
   CastInst::CastOps co = Instruction::BitCast;
   bool isExt =
@@ -1379,7 +1379,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
     for (Function& func : m_m->functions())
     {
-        if (func.getName().startswith(SpirvLaunderRowMajor) == false)
+        if (!func.getName().startswith(SpirvLaunderRowMajor))
             continue;
 
         // Remember to remove the function later.
@@ -1389,7 +1389,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
         {
             CallInst* const call = dyn_cast<CallInst>(user);
 
-            assert(call != nullptr);
+            assert(call );
 
             // Remember to remove the call later.
             valuesToRemove.push_back(call);
@@ -1410,12 +1410,12 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
             SmallVector<Value*, 8> workList(call->user_begin(), call->user_end());
 
-            while (workList.empty() == false)
+            while (!workList.empty())
             {
                 Value* const value = workList.pop_back_val();
 
                 Instruction* const inst = dyn_cast<Instruction>(value);
-                assert(inst != nullptr);
+                assert(inst );
 
                 getBuilder()->SetInsertPoint(inst);
 
@@ -1511,7 +1511,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                     Value* const pointer = valueMap[load->getPointerOperand()];
 
                     // If the remapped pointer type isn't a pointer, it's a vector of pointers instead.
-                    if (pointer->getType()->isPointerTy() == false)
+                    if (!pointer->getType()->isPointerTy())
                     {
                         Type* const pointerType = pointer->getType();
                         assert(pointerType->isVectorTy());
@@ -1596,7 +1596,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                     Value* const pointer = valueMap[store->getPointerOperand()];
 
                     // If the remapped pointer type isn't a pointer, it's a vector of pointers instead.
-                    if (pointer->getType()->isPointerTy() == false)
+                    if (!pointer->getType()->isPointerTy())
                     {
                         Type* const pointerType = pointer->getType();
                         assert(pointerType->isVectorTy());
@@ -1708,9 +1708,9 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
         }
     }
 
-    const bool changed = (valuesToRemove.empty() == false);
+    const bool changed = (!valuesToRemove.empty());
 
-    while (valuesToRemove.empty() == false)
+    while (!valuesToRemove.empty())
     {
         Value* const value = valuesToRemove.pop_back_val();
 
@@ -1733,7 +1733,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
 /// Construct a DebugLoc for the given SPIRVInstruction.
 DebugLoc SPIRVToLLVM::getDebugLoc(SPIRVInstruction *bi, Function *f) {
-  if ((f == nullptr) || (!bi->hasLine()))
+  if ((!f ) || (!bi->hasLine()))
     return DebugLoc();
   auto line = bi->getLine();
   return DebugLoc::get(
@@ -1847,7 +1847,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
 
         return load;
     }
-    else if (loadType->isArrayTy() && (spvType->isTypeVector() == false))
+    else if (loadType->isArrayTy() && (!spvType->isTypeVector()))
     {
         // Matrix and arrays both get here. For both we need to turn [<{element-type, pad}>] into [element-type].
         const bool needsPad = isTypeWithPad(loadType);
@@ -1895,7 +1895,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
             const bool scalarBlockLayout = static_cast<Llpc::Context&>(getBuilder()->getContext()).
                                               getScalarBlockLayout();
 
-            if (scalarBlockLayout == false)
+            if (!scalarBlockLayout)
                 alignmentType = vectorType;
         }
 
@@ -1987,7 +1987,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
                                     isNonTemporal);
         }
     }
-    else if (storeType->isArrayTy() && (spvType->isTypeVector() == false))
+    else if (storeType->isArrayTy() && (!spvType->isTypeVector()))
     {
         // Matrix and arrays both get here. For both we need to turn [element-type] into [<{element-type, pad}>].
         const bool needsPad = isTypeWithPad(storeType);
@@ -2040,7 +2040,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
             const bool scalarBlockLayout = static_cast<Llpc::Context&>(getBuilder()->getContext()).
                                               getScalarBlockLayout();
 
-            if (scalarBlockLayout == false)
+            if (!scalarBlockLayout)
                 alignmentType = storeType;
         }
 
@@ -2094,7 +2094,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
 
         return ConstantStruct::get(cast<StructType>(storeType), constMembers);
     }
-    else if (storeType->isArrayTy() && (spvType->isTypeVector() == false))
+    else if (storeType->isArrayTy() && (!spvType->isTypeVector()))
     {
         // Matrix and arrays both get here. For both we need to turn [element-type] into [<{element-type, pad}>].
         const bool needsPad = isTypeWithPad(storeType);
@@ -2136,7 +2136,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
             constStoreValue = ConstantExpr::getZExtOrBitCast(constStoreValue, storeType);
 
         // If the LLVM type is a not a vector, we need to change the constant into an array.
-        if (spvType->isTypeVector() && (storeType->isVectorTy() == false))
+        if (spvType->isTypeVector() && (!storeType->isVectorTy()))
         {
             assert(storeType->isArrayTy());
 
@@ -2742,9 +2742,9 @@ Value* SPIRVToLLVM::transLoadImage(
     }
 
     // Return image or sampler, or join them together in a struct.
-    if (image == nullptr)
+    if (!image )
         return sampler;
-    if (sampler == nullptr)
+    if (!sampler )
         return image;
 
     Value* result = UndefValue::get(StructType::get(*m_context, { image->getType(), sampler->getType() }));
@@ -2962,7 +2962,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
 
     truncConstantIndex(indices, getBuilder()->GetInsertBlock());
 
-    if (spvAccessChain->hasPtrIndex() == false)
+    if (!spvAccessChain->hasPtrIndex())
         indices.insert(indices.begin(), getBuilder()->getInt32(0));
 
     SPIRVType* const spvBaseType = spvAccessChain->getBase()->getType();
@@ -3107,7 +3107,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
                 newBase = getBuilder()->CreateGEP(newBase, frontIndices);
 
             // Matrix splits are identified by having a nullptr as the .second of the pair.
-            if (split.second == nullptr)
+            if (!split.second )
                 newBase = createLaunderRowMajorMatrix(newBase);
             else
             {
@@ -3165,7 +3165,7 @@ Value* SPIRVToLLVM::transOpAccessChainForImage(
         index = getBuilder()->CreateMul(index,
                                        getBuilder()->getInt32(static_cast<SPIRVTypeArray*>(spvElementType)
                                                                 ->getLength()->getZExtIntValue()));
-        if (spvIndices.empty() == false)
+        if (!spvIndices.empty())
         {
             isNonUniform |= spvIndices[0]->hasDecorate(DecorationNonUniformEXT);
             index = getBuilder()->CreateAdd(index,
@@ -3191,7 +3191,7 @@ Value* SPIRVToLLVM::indexDescPtr(
     bool        isNonUniform,       // Whether the index is non-uniform
     SPIRVType*  spvElementType)    // Ultimate non-array element type (nullptr means assume single pointer)
 {
-    if (spvElementType != nullptr)
+    if (spvElementType )
     {
         auto typeOpcode = spvElementType->getOpCode();
         if ((typeOpcode == OpTypeSampledImage) ||
@@ -4234,18 +4234,18 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
     Constant* initializer = nullptr;
 
     // If the type has an initializer, re-create the SPIR-V initializer in LLVM.
-    if (spvInitializer != nullptr)
+    if (spvInitializer )
         initializer = transInitializer(spvInitializer, varType);
     else if (storageClass == SPIRVStorageClassKind::StorageClassWorkgroup)
         initializer = UndefValue::get(varType);
 
     if (storageClass == StorageClassFunction)
     {
-        assert(getBuilder()->GetInsertBlock() != nullptr);
+        assert(getBuilder()->GetInsertBlock() );
 
         Value* const var = getBuilder()->CreateAlloca(varType, nullptr, spvVar->getName());
 
-        if (initializer != nullptr)
+        if (initializer )
             getBuilder()->CreateStore(initializer, var);
 
         return var;
@@ -4291,7 +4291,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
         bool allReadOnly = true;
         for (unsigned i = 0; i < spvVarType->getStructMemberCount(); i++)
         {
-            if (spvVarType->hasMemberDecorate(i, DecorationNonWritable) == false)
+            if (!spvVarType->hasMemberDecorate(i, DecorationNonWritable))
             {
                 allReadOnly = false;
                 break;
@@ -4624,7 +4624,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f,
     auto successor = cast<BasicBlock>(transValue(br->getTargetLabel(), f, bb));
     auto bi = BranchInst::Create(successor, bb);
     auto lm = static_cast<SPIRVLoopMerge *>(br->getPrevious());
-    if (lm != nullptr && lm->getOpCode() == OpLoopMerge)
+    if (lm && lm->getOpCode() == OpLoopMerge)
       setLLVMLoopMetadata(lm, bi);
     else if (br->getBasicBlock()->getLoopMerge())
       setLLVMLoopMetadata(br->getBasicBlock()->getLoopMerge(), bi);
@@ -4654,7 +4654,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f,
       cast<BasicBlock>(transValue(br->getFalseLabel(), f, bb));
     auto bc = BranchInst::Create(trueSuccessor, falseSuccessor, c, bb);
     auto lm = static_cast<SPIRVLoopMerge *>(br->getPrevious());
-    if (lm != nullptr && lm->getOpCode() == OpLoopMerge)
+    if (lm && lm->getOpCode() == OpLoopMerge)
       setLLVMLoopMetadata(lm, bc);
     else if (br->getBasicBlock()->getLoopMerge())
       setLLVMLoopMetadata(br->getBasicBlock()->getLoopMerge(), bc);
@@ -4860,7 +4860,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f,
       auto cv = transValue(ce->getComposite(), f, bb);
       auto indexedTy = ExtractValueInst::getIndexedType(
         cv->getType(), ce->getIndices());
-      if (indexedTy == nullptr) {
+      if (!indexedTy ) {
         // NOTE: "OpCompositeExtract" could extract a scalar component from a
         // vector or a vector in an aggregate. But in LLVM, "extractvalue" is
         // unable to do such thing. We have to replace it with "extractelement"
@@ -4903,7 +4903,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f,
       auto cv = transValue(ci->getComposite(), f, bb);
       auto indexedTy = ExtractValueInst::getIndexedType(
         cv->getType(), ci->getIndices());
-      if (indexedTy == nullptr) {
+      if (!indexedTy ) {
         // NOTE: "OpCompositeInsert" could insert a scalar component to a
         // vector or a vector in an aggregate. But in LLVM, "insertvalue" is
         // unable to do such thing. We have to replace it with "extractvalue" +
@@ -5594,7 +5594,7 @@ void SPIRVToLLVM::truncConstantIndex(std::vector<Value*> &indices, BasicBlock* b
     auto int32Ty = Type::getInt32Ty(*m_context);
     if (isa<ConstantInt>(index)) {
       auto constIndex = cast<ConstantInt>(index);
-      if (constIndex->getType()->isIntegerTy(32) == false) {
+      if (!constIndex->getType()->isIntegerTy(32)) {
         uint64_t constValue = constIndex->getZExtValue();
         if (constValue < UINT32_MAX) {
           auto constIndex32 = ConstantInt::get(int32Ty, constValue);
@@ -5635,7 +5635,7 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
     return loc->second;
 
   auto entryPoint = m_bm->getEntryPoint(bf->getId());
-  bool isEntry = (entryPoint != nullptr);
+  bool isEntry = (entryPoint );
   SPIRVExecutionModelKind execModel =
     isEntry ? entryPoint->getExecModel() : ExecutionModelMax;
   auto linkage = isEntry ? GlobalValue::ExternalLinkage : transLinkageType(bf);
@@ -6778,11 +6778,11 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel,
 
   // Find the targeted entry-point in this translation
   auto entryPoint = m_bm->getEntryPoint(entryExecModel, entryName);
-  if (entryPoint == nullptr)
+  if (!entryPoint )
     return false;
 
   m_entryTarget = m_bm->get<SPIRVFunction>(entryPoint->getTargetId());
-  if (m_entryTarget == nullptr)
+  if (!m_entryTarget )
     return false;
 
   m_fpControlFlags.U32All = 0;
@@ -6902,7 +6902,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel,
     auto bf = m_bm->getFunction(i);
     // Non entry-points and targeted entry-point should be translated.
     // Set DLLExport on targeted entry-point so we can find it later.
-    if (m_bm->getEntryPoint(bf->getId()) == nullptr || bf == m_entryTarget) {
+    if (!m_bm->getEntryPoint(bf->getId()) || bf == m_entryTarget) {
       auto f = transFunction(bf);
       if (bf == m_entryTarget)
         f->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
@@ -6913,7 +6913,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel,
     return false;
 
   postProcessRowMajorMatrix();
-  if (m_moduleUsage->keepUnusedFunctions == false)
+  if (!m_moduleUsage->keepUnusedFunctions)
     eraseUselessFunctions(m_m);
   m_dbgTran.finalize();
   return true;
@@ -6958,10 +6958,10 @@ bool SPIRVToLLVM::transMetadata() {
   for (unsigned i = 0, e = m_bm->getNumFunctions(); i != e; ++i) {
     SPIRVFunction *bf = m_bm->getFunction(i);
     auto entryPoint = m_bm->getEntryPoint(bf->getId());
-    if (entryPoint != nullptr && bf != m_entryTarget)
+    if (entryPoint && bf != m_entryTarget)
       continue; // Ignore those untargeted entry-points
 
-    if (entryPoint == nullptr)
+    if (!entryPoint )
       continue;
     SPIRVExecutionModelKind execModel = entryPoint->getExecModel();
 
@@ -7322,9 +7322,9 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
 
       // TODO: Currently, set default binding and descriptor to 0. Will be
       // changed later.
-      if (hasBinding == false)
+      if (!hasBinding)
         binding = 0;
-      if (hasDescSet == false)
+      if (!hasDescSet)
         descSet = 0;
 
       // Determine block type based on corresponding decorations
@@ -7418,9 +7418,9 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
 
       // TODO: Currently, set default binding and descriptor to 0. Will be
       // changed later.
-      if (hasBinding == false)
+      if (!hasBinding)
           binding = 0;
-      if (hasDescSet == false)
+      if (!hasDescSet)
           descSet = 0;
 
       // Setup resource metadata

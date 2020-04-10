@@ -105,7 +105,7 @@ bool PatchEntryPointMutate::runOnModule(
     for (unsigned shaderStage = ShaderStageVertex; shaderStage < ShaderStageNativeStageCount; ++shaderStage)
     {
         m_entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
-        if (m_entryPoint != nullptr)
+        if (m_entryPoint )
         {
             m_shaderStage = static_cast<ShaderStage>(shaderStage);
             processShader();
@@ -276,7 +276,7 @@ bool PatchEntryPointMutate::isResourceNodeActive(
     if ((node->type == ResourceNodeType::PushConst) && isRootNode)
     {
         active = (resUsage1->pushConstSizeInBytes > 0);
-        if ((active == false) && (resUsage2 != nullptr))
+        if ((!active) && (resUsage2 ))
             active = (resUsage2->pushConstSizeInBytes > 0);
     }
     else if (node->type == ResourceNodeType::DescriptorTableVaPtr)
@@ -308,7 +308,7 @@ bool PatchEntryPointMutate::isResourceNodeActive(
         descPair.binding = node->binding;
 
         active = (resUsage1->descPairs.find(descPair.u64All) != resUsage1->descPairs.end());
-        if ((active == false) && (resUsage2 != nullptr))
+        if ((!active) && (resUsage2 ))
             active = (resUsage2->descPairs.find(descPair.u64All) != resUsage2->descPairs.end());
     }
 
@@ -373,7 +373,7 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
                     // On GFX9+, the shader stage that the vertex shader is merged in to needs a vertex buffer
                     // table, to ensure that the merged shader gets one.
                     if ((m_shaderStage == ShaderStageTessControl) ||
-                        ((m_shaderStage == ShaderStageGeometry) && (m_hasTs == false)))
+                        ((m_shaderStage == ShaderStageGeometry) && (!m_hasTs)))
                         reserveVbTable = true;
                 }
                 continue;
@@ -391,13 +391,13 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
                     // On GFX9+, the shader stage that the last shader is merged in to needs a stream out
                     // table, to ensure that the merged shader gets one.
                     if ((m_shaderStage == ShaderStageTessEval) ||
-                        ((m_shaderStage == ShaderStageVertex) && (m_hasTs == false)))
+                        ((m_shaderStage == ShaderStageVertex) && (!m_hasTs)))
                         reserveStreamOutTable = true;
                 }
                 continue;
             }
 
-            if (isResourceNodeActive(node, true) == false)
+            if (!isResourceNodeActive(node, true))
                 continue;
 
             switch (node->type)
@@ -461,7 +461,7 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
             // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
             const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
             if (((gfxIp.major >= 9) && (m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize)) ||
-                (enableNgg && (m_hasTs == false)))
+                (enableNgg && (!m_hasTs)))
             {
                 availUserDataCount -= 1;
                 reserveEsGsLdsSize = true;
@@ -596,7 +596,7 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
         if (node->type == ResourceNodeType::StreamOutTableVaPtr)
             continue;
 
-        if (isResourceNodeActive(node, true) == false)
+        if (!isResourceNodeActive(node, true))
             continue;
 
         if (useFixedLayout)
@@ -852,7 +852,7 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
         }
     }
 
-    if (needSpill && (useFixedLayout == false))
+    if (needSpill && (!useFixedLayout))
     {
         *inRegMask |= 1ull << argTys.size();
         intfData->entryArgIdxs.spillTable = argTys.size();
@@ -872,13 +872,13 @@ FunctionType* PatchEntryPointMutate::generateEntryPointType(
     {
     case ShaderStageVertex:
         {
-            if (m_hasGs && (m_hasTs == false))   // VS acts as hardware ES
+            if (m_hasGs && (!m_hasTs))   // VS acts as hardware ES
             {
                 *inRegMask |= 1ull << argTys.size();
                 entryArgIdxs.vs.esGsOffset = argTys.size();
                 argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offset
             }
-            else if ((m_hasGs == false) && (m_hasTs == false))  // VS acts as hardware VS
+            else if ((!m_hasGs) && (!m_hasTs))  // VS acts as hardware VS
             {
                 if (enableXfb)  // If output to stream-out buffer
                 {

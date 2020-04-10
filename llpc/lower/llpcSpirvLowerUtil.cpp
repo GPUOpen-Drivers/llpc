@@ -50,14 +50,14 @@ Function* getEntryPoint(
 
     for (auto func = module->begin(), end = module->end(); func != end; ++func)
     {
-        if ((func->empty() == false) && (func->getLinkage() == GlobalValue::ExternalLinkage))
+        if ((!func->empty()) && (func->getLinkage() == GlobalValue::ExternalLinkage))
         {
             entryPoint = &*func;
             break;
         }
     }
 
-    assert(entryPoint != nullptr);
+    assert(entryPoint );
     return entryPoint;
 }
 
@@ -70,7 +70,7 @@ ShaderStage getShaderStageFromModule(
 
     // Check for the execution model metadata that is added by the SPIR-V reader.
     MDNode* execModelNode = func->getMetadata(gSPIRVMD::ExecutionModel);
-    if (execModelNode == nullptr)
+    if (!execModelNode )
         return ShaderStageInvalid;
     auto execModel = mdconst::dyn_extract<ConstantInt>(execModelNode->getOperand(0))->getZExtValue();
     return convertToStageShage(execModel);

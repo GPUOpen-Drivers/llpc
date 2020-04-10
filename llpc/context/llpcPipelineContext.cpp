@@ -169,7 +169,7 @@ ShaderHash PipelineContext::getShaderHashCode(
 ) const
 {
     auto shaderInfo = getPipelineShaderInfo(stage);
-    assert(shaderInfo != nullptr);
+    assert(shaderInfo );
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
     if((shaderInfo->options.clientHash.upper != 0) &&
@@ -180,7 +180,7 @@ ShaderHash PipelineContext::getShaderHashCode(
         ShaderHash hash = {};
         const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo->pModuleData);
 
-        if(moduleData != nullptr)
+        if(moduleData )
         {
             hash.lower = MetroHash::compact64(reinterpret_cast<const MetroHash::Hash*>(&moduleData->hash));
             hash.upper = 0;
@@ -253,7 +253,7 @@ void PipelineContext::setOptionsInPipeline(
         // Only set NGG options for a GFX10+ graphics pipeline.
         auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo());
         const auto& nggState = pipelineInfo->nggState;
-        if (nggState.enableNgg == false)
+        if (!nggState.enableNgg)
             options.nggFlags |= NggFlagDisable;
         else
         {
@@ -335,7 +335,7 @@ void PipelineContext::setOptionsInPipeline(
 
             shaderOptions.waveSize = shaderInfo->options.waveSize;
             shaderOptions.wgpMode = shaderInfo->options.wgpMode;
-            if (shaderInfo->options.allowVaryWaveSize == false)
+            if (!shaderInfo->options.allowVaryWaveSize)
             {
                 // allowVaryWaveSize is disabled, so use -subgroup-size (default 64) to override the wave
                 // size for a shader that uses gl_SubgroupSize.
@@ -582,7 +582,7 @@ void PipelineContext::setVertexInputDescriptions(
 ) const
 {
     auto vertexInput = static_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo())->pVertexInput;
-    if (vertexInput == nullptr)
+    if (!vertexInput )
         return;
 
     // Gather the bindings.
@@ -911,7 +911,7 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(
     {
         assert(format == FormatTable[format].format);
         if ((isColorExport && FormatTable[format].validExportFormat) ||
-            ((isColorExport == false) && FormatTable[format].validVertexFormat))
+            ((!isColorExport) && FormatTable[format].validVertexFormat))
         {
             dfmt = FormatTable[format].dfmt;
             nfmt = FormatTable[format].nfmt;

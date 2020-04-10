@@ -91,7 +91,7 @@ void SpirvLower::replaceConstWithInsts(
     for (Value* const user : users)
     {
         Instruction* const inst = dyn_cast<Instruction>(user);
-        assert(inst != nullptr);
+        assert(inst );
 
         // If the instruction is a phi node, we have to insert the new instructions in the correct predecessor.
         if (PHINode* const phiNode = dyn_cast<PHINode>(inst))
@@ -166,7 +166,7 @@ void SpirvLower::addPasses(
     context->getBuilderContext()->preparePassManager(&passMgr);
 
     // Start timer for lowering passes.
-    if (lowerTimer != nullptr)
+    if (lowerTimer )
         passMgr.add(BuilderContext::createStartStopTimer(lowerTimer, true));
 
     // Lower SPIR-V resource collecting
@@ -216,7 +216,7 @@ void SpirvLower::addPasses(
     passMgr.add(createSpirvLowerInstMetaRemove());
 
     // Stop timer for lowering passes.
-    if (lowerTimer != nullptr)
+    if (lowerTimer )
         passMgr.add(BuilderContext::createStartStopTimer(lowerTimer, false));
 
     // Dump the result

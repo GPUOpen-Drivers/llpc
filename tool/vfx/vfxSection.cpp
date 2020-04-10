@@ -243,18 +243,18 @@ bool Section::getMemberType(
     bool result = false;
     for (unsigned i = 0; i < m_tableSize; ++i)
     {
-        if ((m_memberTable[i].memberName != nullptr) && strcmp(memberName, m_memberTable[i].memberName) == 0)
+        if ((m_memberTable[i].memberName ) && strcmp(memberName, m_memberTable[i].memberName) == 0)
         {
             result = true;
 
-            if (valueType != nullptr)
+            if (valueType )
                 *valueType = m_memberTable[i].memberType;
 
             break;
         }
     }
 
-    if (result == false)
+    if (!result)
     {
         PARSE_WARNING(*errorMsg, lineNum, "Invalid member name: %s", memberName);
     }
@@ -275,19 +275,19 @@ bool Section::isSection(
 
     for (unsigned i = 0; i < m_tableSize; ++i)
     {
-        if ((m_memberTable[i].memberName != nullptr) && strcmp(memberName, m_memberTable[i].memberName) == 0)
+        if ((m_memberTable[i].memberName ) && strcmp(memberName, m_memberTable[i].memberName) == 0)
         {
             result = true;
-            if (output != nullptr)
+            if (output )
                 *output = m_memberTable[i].isSection;
 
-            if (type != nullptr)
+            if (type )
                 *type = m_memberTable[i].memberType;
             break;
         }
     }
 
-    if (result == false)
+    if (!result)
     {
         PARSE_WARNING(*errorMsg, lineNum, "Invalid member name: %s", memberName);
     }
@@ -300,13 +300,13 @@ bool Section::isSection(
 void Section::printSelf(
     unsigned level)     // Nest level from the base object
 {
-    if (m_isActive == true)
+    if (m_isActive)
     {
         for (unsigned l = 0; l < level; ++l) { printf("\t"); }
         printf("[%s]\n", m_sectionName);
         for (unsigned i = 0; i < m_tableSize; ++i)
         {
-            if (m_memberTable[i].memberName != nullptr)
+            if (m_memberTable[i].memberName )
                 continue;
             for (unsigned arrayIndex = 0; arrayIndex < m_memberTable[i].arrayMaxSize; ++arrayIndex)
             {
@@ -322,7 +322,7 @@ void Section::printSelf(
                                            &subObj,
                                            &dummyMsg))
                     {
-                        if (subObj->m_isActive == true)
+                        if (subObj->m_isActive)
                             subObj->printSelf(level + 1);
                     }
                 }
@@ -372,12 +372,12 @@ void Section::printSelf(
                             IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
                             iufValue += arrayIndex;
 
-                            if ((iufValue->props.isDouble == false) && (iufValue->props.isFloat == false))
+                            if ((!iufValue->props.isDouble) && (!iufValue->props.isFloat))
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
                                 {
-                                    if (iufValue->props.isHex == true)
+                                    if (iufValue->props.isHex)
                                         printf(" 0x%x", iufValue->iVec4[j]);
                                     else
                                         printf(" %d", iufValue->iVec4[j]);
@@ -391,12 +391,12 @@ void Section::printSelf(
                             IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
                             iufValue += arrayIndex;
 
-                            if ((iufValue->props.isDouble == false) && (iufValue->props.isFloat == false))
+                            if ((!iufValue->props.isDouble) && (!iufValue->props.isFloat))
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
                                 {
-                                    if (iufValue->props.isHex == true)
+                                    if (iufValue->props.isHex)
                                         printf(" 0x%" PRIx64, iufValue->i64Vec2[j]);
                                     else
                                         printf(" %" PRId64, iufValue->i64Vec2[j]);
@@ -410,7 +410,7 @@ void Section::printSelf(
                             IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
                             iufValue += arrayIndex;
 
-                            if ((iufValue->props.isDouble == false) && (iufValue->props.isFloat == true))
+                            if ((!iufValue->props.isDouble) && (iufValue->props.isFloat))
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
@@ -424,7 +424,7 @@ void Section::printSelf(
                             IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
                             iufValue += arrayIndex;
 
-                            if ((iufValue->props.isDouble == false) && (iufValue->props.isFloat16 == true))
+                            if ((!iufValue->props.isDouble) && (iufValue->props.isFloat16))
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
@@ -438,7 +438,7 @@ void Section::printSelf(
                             IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
                             iufValue += arrayIndex;
 
-                            if ((iufValue->props.isDouble == true) && (iufValue->props.isFloat == false))
+                            if ((iufValue->props.isDouble) && (!iufValue->props.isFloat))
                             {
                                 printf("%s =", m_memberTable[i].memberName);
                                 for (unsigned j = 0; j < iufValue->props.length; ++j)
@@ -717,7 +717,7 @@ bool Section::readFile(
 
     // Open file
     FILE* inFile = fopen(path.c_str(), isBinary ? "rb" : "r");
-    if (inFile == nullptr)
+    if (!inFile )
     {
         PARSE_ERROR(*errorMsg, 0, "Fails to open input file: %s\n", path.c_str());
         return false;
@@ -730,7 +730,7 @@ bool Section::readFile(
 
     // Allocate temp buffer and read file
     char* data = new char[fileSize + 1];
-    VFX_ASSERT(data != nullptr);
+    VFX_ASSERT(data );
     memset(data, 0, fileSize + 1);
     size_t readSize = fread(data, 1, fileSize, inFile);
 
@@ -767,7 +767,7 @@ bool SectionShader::compileGlsl(
     void*       program  = nullptr;
     const char* log      = nullptr;
 
-    if (InitSpvGen() == false)
+    if (!InitSpvGen())
     {
         PARSE_ERROR(*errorMsg, m_lineNum, "Failed to load SPVGEN: cannot compile GLSL\n");
         return false;
@@ -779,7 +779,7 @@ bool SectionShader::compileGlsl(
     if ((m_shaderType == Hlsl) || (m_shaderType == HlslFile))
         compileOption |= SpvGenOptionReadHlsl;
     const char* entryPoint = nullptr;
-    if (shaderInfo != nullptr)
+    if (shaderInfo )
         entryPoint = reinterpret_cast<const SectionShaderInfo*>(shaderInfo)->getEntryPoint();
     bool compileResult = spvCompileAndLinkProgramEx(1,
                                                    &stage,
@@ -818,7 +818,7 @@ bool SectionShader::assembleSpirv(
     bool result = true;
     const char* text = m_shaderSource.c_str();
 
-    if (InitSpvGen() == false)
+    if (!InitSpvGen())
     {
         PARSE_ERROR(*errorMsg, m_lineNum, "Failed to load SPVGEN: cannot assemble SPIR-V assembler source\n");
         return false;

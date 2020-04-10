@@ -79,7 +79,7 @@ void CodeGenManager::setupTargetFeatures(
 
     for (auto func = module->begin(), end = module->end(); func != end; ++func)
     {
-        if ((func->empty() == false) && (func->getLinkage() == GlobalValue::ExternalLinkage))
+        if ((!func->empty()) && (func->getLinkage() == GlobalValue::ExternalLinkage))
         {
              std::string targetFeatures(globalFeatures);
              AttrBuilder builder;
@@ -101,7 +101,7 @@ void CodeGenManager::setupTargetFeatures(
                 // NOTE: For NGG primitive shader, enable 128-bit LDS load/store operations to optimize gvec4 data
                 // read/write. This usage must enable the feature of using CI+ additional instructions.
                 const auto nggControl = pipelineState->getNggControl();
-                if (nggControl->enableNgg && (nggControl->passthroughMode == false))
+                if (nggControl->enableNgg && (!nggControl->passthroughMode))
                     targetFeatures += ",+ci-insts,+enable-ds128";
             }
 

@@ -140,7 +140,7 @@ void SpirvLowerResourceCollect::collectResourceNodeData(
     // Check if the node already had a different pair of node data/type. A DescriptorResource/DescriptorTexelBuffer
     // and a DescriptorSampler can use the same set/binding, in which case it is
     // DescriptorCombinedTexture.
-    if (result.second == false)
+    if (!result.second)
     {
         assert(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
                      (nodeType == ResourceMappingNodeType::DescriptorResource) ||
@@ -173,7 +173,7 @@ bool SpirvLowerResourceCollect::runOnModule(
             if (global->hasInitializer())
                 initializer = global->getInitializer();
 
-            if ((initializer == nullptr) || isa<UndefValue>(initializer))
+            if ((!initializer ) || isa<UndefValue>(initializer))
                 removedGlobals.insert(&*global);
         }
     }
@@ -201,7 +201,7 @@ bool SpirvLowerResourceCollect::runOnModule(
                 else
                 {
                     // Only collect resource node data when requested
-                    if (m_collectDetailUsage == true)
+                    if (m_collectDetailUsage)
                         collectResourceNodeData(&*global);
                 }
                 break;
@@ -217,7 +217,7 @@ bool SpirvLowerResourceCollect::runOnModule(
             {
                 // Only collect FS out info when requested.
                 Type* globalTy = global->getType()->getContainedType(0);
-                if (m_collectDetailUsage == false || globalTy->isSingleValueType() == false)
+                if (!m_collectDetailUsage || !globalTy->isSingleValueType())
                     break;
 
                 FsOutInfo fsOutInfo = {};
@@ -276,7 +276,7 @@ bool SpirvLowerResourceCollect::runOnModule(
         case SPIRAS_Uniform:
             {
                 // Only collect resource node data when requested
-                if (m_collectDetailUsage == true)
+                if (m_collectDetailUsage)
                     collectResourceNodeData(&*global);
                 break;
             }
@@ -305,7 +305,7 @@ unsigned SpirvLowerResourceCollect::getFlattenArrayElementCount(
     unsigned elemCount = 1;
 
     auto arrayTy = dyn_cast<ArrayType>(ty);
-    while (arrayTy != nullptr)
+    while (arrayTy )
     {
         elemCount *= arrayTy->getArrayNumElements();
         arrayTy = dyn_cast<ArrayType>(arrayTy->getArrayElementType());
@@ -322,7 +322,7 @@ const Type* SpirvLowerResourceCollect::getFlattenArrayElementType(
     const Type* elemType = ty;
 
     auto arrayTy = dyn_cast<ArrayType>(ty);
-    while (arrayTy != nullptr)
+    while (arrayTy )
     {
         elemType = arrayTy->getArrayElementType();
         arrayTy = dyn_cast<ArrayType>(elemType);
@@ -339,13 +339,13 @@ Value* SpirvLowerResourceCollect::findCallAndGetIndexValue(
     for (auto& func : module)
     {
         // Skip non-declarations that are definitely not LLPC builder calls.
-        if (func.isDeclaration() == false)
+        if (!func.isDeclaration())
             continue;
 
         const MDNode* const funcMeta = func.getMetadata(module.getMDKindID(BuilderCallOpcodeMetadataName));
 
         // Skip builder calls that do not have the correct metadata to identify the opcode.
-        if (funcMeta == nullptr)
+        if (!funcMeta )
         {
             // If the function had the LLPC builder call prefix, it means the metadata was not encoded correctly.
             assert(func.getName().startswith(BuilderCallPrefix) == false);
@@ -381,13 +381,13 @@ void SpirvLowerResourceCollect::visitCalls(
     for (auto& func : module)
     {
         // Skip non-declarations that are definitely not LLPC builder calls.
-        if (func.isDeclaration() == false)
+        if (!func.isDeclaration())
             continue;
 
         const MDNode* const funcMeta = func.getMetadata(module.getMDKindID(BuilderCallOpcodeMetadataName));
 
         // Skip builder calls that do not have the correct metadata to identify the opcode.
-        if (funcMeta == nullptr)
+        if (!funcMeta )
         {
             // If the function had the llpc builder call prefix, it means the metadata was not encoded correctly.
             assert(func.getName().startswith(BuilderCallPrefix) == false);
@@ -436,7 +436,7 @@ void SpirvLowerResourceCollect::visitCalls(
                 nodeData.value.binding = cast<ConstantInt>(args[1])->getZExtValue();
                 nodeData.value.arraySize = 1;
                 auto index = findCallAndGetIndexValue(module, call);
-                if (index != nullptr)
+                if (index )
                     nodeData.value.arraySize = cast<ConstantInt>(index)->getZExtValue();
 
                 auto result = m_resNodeDatas.insert(std::pair<ResourceNodeDataKey, ResourceMappingNodeType>(nodeData, nodeType));
@@ -444,7 +444,7 @@ void SpirvLowerResourceCollect::visitCalls(
                 // Check if the node already had a different pair of node data/type. A DescriptorResource/DescriptorTexelBuffer
                 // and a DescriptorSampler can use the same set/binding, in which case it is
                 // DescriptorCombinedTexture.
-                if (result.second == false)
+                if (!result.second)
                 {
                     assert(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
                                  (nodeType == ResourceMappingNodeType::DescriptorResource) ||

@@ -65,7 +65,7 @@ bool PipelineShaders::runOnModule(
 
     for (auto& func : module)
     {
-        if ((func.empty() == false) && (func.getLinkage() != GlobalValue::InternalLinkage))
+        if ((!func.empty()) && (func.getLinkage() != GlobalValue::InternalLinkage))
         {
             auto shaderStage = getShaderStageFromFunction(&func);
 

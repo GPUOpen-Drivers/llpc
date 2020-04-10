@@ -64,14 +64,14 @@ namespace Gfx9
 // Builds PAL metadata for pipeline.
 void ConfigBuilder::buildPalMetadata()
 {
-    if (m_pipelineState->isGraphics() == false)
+    if (!m_pipelineState->isGraphics())
         buildPipelineCsRegConfig();
     else
     {
         const bool hasTs = (m_hasTcs || m_hasTes);
         const bool enableNgg = m_pipelineState->getNggControl()->enableNgg;
 
-        if ((hasTs == false) && (m_hasGs == false))
+        if ((!hasTs) && (!m_hasGs))
         {
             // VS-FS pipeline
             if ((m_gfxIp.major >= 10) && enableNgg)
@@ -79,7 +79,7 @@ void ConfigBuilder::buildPalMetadata()
             else
                 buildPipelineVsFsRegConfig();
         }
-        else if (hasTs && (m_hasGs == false))
+        else if (hasTs && (!m_hasGs))
         {
             // VS-TS-FS pipeline
             if ((m_gfxIp.major >= 10) && enableNgg)
@@ -87,7 +87,7 @@ void ConfigBuilder::buildPalMetadata()
             else
                 buildPipelineVsTsFsRegConfig();
         }
-        else if ((hasTs == false) && m_hasGs)
+        else if ((!hasTs) && m_hasGs)
         {
             // VS-GS-FS pipeline
             if ((m_gfxIp.major >= 10) && enableNgg)
@@ -1020,7 +1020,7 @@ void ConfigBuilder::buildVsRegConfig(
     }
 
     uint8_t usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
-    bool depthClipDisable = (m_pipelineState->getViewportState().depthClipEnable == false);
+    bool depthClipDisable = (!static_cast<bool>(m_pipelineState->getViewportState().depthClipEnable));
     bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
     bool disableVertexReuse = m_pipelineState->getInputAssemblyState().disableVertexReuse;
 
@@ -1869,7 +1869,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(
     // Build VS specific configuration
     //
     uint8_t usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
-    bool depthClipDisable = (m_pipelineState->getViewportState().depthClipEnable == false);
+    bool depthClipDisable = (!static_cast<bool>(m_pipelineState->getViewportState().depthClipEnable));
     bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
     bool disableVertexReuse = m_pipelineState->getInputAssemblyState().disableVertexReuse;
 
@@ -1956,7 +1956,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(
 
         // NOTE: If primitive ID is used and there is no GS present, the field NGG_DISABLE_PROVOK_REUSE must be
         // set to ensure provoking vertex reuse is disabled in the GE.
-        if (m_hasGs == false)
+        if (!m_hasGs)
         {
             SET_REG_FIELD(&pConfig->primShaderRegs, VGT_PRIMITIVEID_EN, NGG_DISABLE_PROVOK_REUSE, true);
         }

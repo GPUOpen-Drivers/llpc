@@ -141,13 +141,13 @@ Function* ShaderMerger::generateLsHsEntryPoint(
     Function* lsEntryPoint,  // [in] Entry-point of hardware local shader (LS) (could be null)
     Function* hsEntryPoint)  // [in] Entry-point of hardware hull shader (HS)
 {
-    if (lsEntryPoint != nullptr)
+    if (lsEntryPoint )
     {
         lsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
         lsEntryPoint->addFnAttr(Attribute::AlwaysInline);
     }
 
-    assert(hsEntryPoint != nullptr);
+    assert(hsEntryPoint );
     hsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
     hsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
@@ -604,13 +604,13 @@ Function* ShaderMerger::generateEsGsEntryPoint(
     Function* esEntryPoint,  // [in] Entry-point of hardware export shader (ES) (could be null)
     Function* gsEntryPoint)  // [in] Entry-point of hardware geometry shader (GS)
 {
-    if (esEntryPoint != nullptr)
+    if (esEntryPoint )
     {
         esEntryPoint->setLinkage(GlobalValue::InternalLinkage);
         esEntryPoint->addFnAttr(Attribute::AlwaysInline);
     }
 
-    assert(gsEntryPoint != nullptr);
+    assert(gsEntryPoint );
     gsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
     gsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
@@ -794,7 +794,7 @@ Function* ShaderMerger::generateEsGsEntryPoint(
 
     // Construct ".begines" block
     unsigned spillTableIdx = 0;
-    if ((hasTs && m_hasTes) || ((hasTs == false) && m_hasVs))
+    if ((hasTs && m_hasTes) || ((!hasTs) && m_hasVs))
     {
         // Call ES main function
         args.clear();

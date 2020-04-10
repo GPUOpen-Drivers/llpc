@@ -75,8 +75,8 @@ PatchInOutImportExport::PatchInOutImportExport()
 // =====================================================================================================================
 PatchInOutImportExport::~PatchInOutImportExport()
 {
-    assert(m_fragColorExport == nullptr);
-    assert(m_vertexFetch == nullptr);
+    assert(!m_fragColorExport );
+    assert(!m_vertexFetch );
 }
 
 // =====================================================================================================================
@@ -126,7 +126,7 @@ bool PatchInOutImportExport::runOnModule(
     for (int shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage)
     {
         auto entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
-        if (entryPoint != nullptr)
+        if (entryPoint )
         {
             initPerShader();
             m_entryPoint = entryPoint;
@@ -349,7 +349,7 @@ void PatchInOutImportExport::visitCallInst(
     CallInst& callInst)   // [in] "Call" instruction
 {
     auto callee = callInst.getCalledFunction();
-    if (callee == nullptr)
+    if (!callee )
         return;
 
     auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
@@ -706,14 +706,14 @@ void PatchInOutImportExport::visitCallInst(
             case ShaderStageVertex:
                 {
                     // No TS/GS pipeline, VS is the last stage
-                    if ((m_hasGs == false) && (m_hasTs == false))
+                    if ((!m_hasGs) && (!m_hasTs))
                         patchXfbOutputExport(output, xfbBuffer, xfbOffset, xfbExtraOffset, &callInst);
                     break;
                 }
             case ShaderStageTessEval:
                 {
                     // TS-only pipeline, TES is the last stage
-                    if (m_hasGs == false)
+                    if (!m_hasGs)
                         patchXfbOutputExport(output, xfbBuffer, xfbOffset, xfbExtraOffset, &callInst);
                     break;
                 }
@@ -977,7 +977,7 @@ void PatchInOutImportExport::visitReturnInst(
 
     // Whether this shader stage has to use "exp" instructions to export outputs
     const bool useExpInst = (((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval) ||
-                              ((m_shaderStage == ShaderStageCopyShader) && (enableXfb == false))) &&
+                              ((m_shaderStage == ShaderStageCopyShader) && (!enableXfb))) &&
                              ((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment)));
 
     auto zero  = ConstantFP::get(Type::getFloatTy(*m_context), 0.0);
@@ -1055,7 +1055,7 @@ void PatchInOutImportExport::visitReturnInst(
         useLayer = enableMultiView || useLayer;
 
         // NOTE: If gl_Position is not present in this shader stage, we have to export a dummy one.
-        if (usePosition == false)
+        if (!usePosition)
         {
             Value* args[] = {
                 ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_POS_0),  // tgt
@@ -1076,8 +1076,8 @@ void PatchInOutImportExport::visitReturnInst(
         {
             assert(clipDistanceCount + cullDistanceCount <= MaxClipCullDistanceCount);
 
-            assert((clipDistanceCount == 0) || ((clipDistanceCount > 0) && (m_clipDistance != nullptr)));
-            assert((cullDistanceCount == 0) || ((cullDistanceCount > 0) && (m_cullDistance != nullptr)));
+            assert((clipDistanceCount == 0) || ((clipDistanceCount > 0) && (m_clipDistance )));
+            assert((cullDistanceCount == 0) || ((cullDistanceCount > 0) && (m_cullDistance )));
 
             // Extract elements of gl_ClipDistance[] and gl_CullDistance[]
             std::vector<Value*> clipDistance;
@@ -1279,7 +1279,7 @@ void PatchInOutImportExport::visitReturnInst(
                     loc = inOutUsage.builtInOutputLocMap[BuiltInPrimitiveId];
                 }
 
-                assert(m_primitiveId != nullptr);
+                assert(m_primitiveId );
                 Value* primitiveId = new BitCastInst(m_primitiveId, Type::getFloatTy(*m_context), "", insertPos);
 
                 Value* args[] = {
@@ -1299,7 +1299,7 @@ void PatchInOutImportExport::visitReturnInst(
         // NOTE: If multi-view is enabled, always do exporting for gl_Layer.
         if ((m_gfxIp.major <= 8) && enableMultiView)
         {
-            assert(m_layer != nullptr);
+            assert(m_layer );
             addExportInstForBuiltInOutput(m_layer, BuiltInLayer, insertPos);
         }
 
@@ -1310,7 +1310,7 @@ void PatchInOutImportExport::visitReturnInst(
 
             if (useViewportIndex)
             {
-                assert(m_viewportIndex != nullptr);
+                assert(m_viewportIndex );
                 viewportIndexAndLayer = BinaryOperator::CreateShl(m_viewportIndex,
                                                                    ConstantInt::get(Type::getInt32Ty(*m_context), 16),
                                                                    "",
@@ -1320,7 +1320,7 @@ void PatchInOutImportExport::visitReturnInst(
 
             if (useLayer)
             {
-                assert(m_layer != nullptr);
+                assert(m_layer );
                 viewportIndexAndLayer = BinaryOperator::CreateOr(viewportIndexAndLayer,
                                                                   m_layer,
                                                                   "",
@@ -1487,7 +1487,7 @@ void PatchInOutImportExport::visitReturnInst(
     }
     else if (m_shaderStage == ShaderStageGeometry)
     {
-        if ((m_pipelineState->isGsOnChip() == false) && (m_gfxIp.major >= 10))
+        if ((!m_pipelineState->isGsOnChip()) && (m_gfxIp.major >= 10))
         {
             // NOTE: This is a workaround because backend compiler does not provide s_waitcnt_vscnt intrinsic, so we
             // use fence release to generate s_waitcnt vmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
@@ -1505,7 +1505,7 @@ void PatchInOutImportExport::visitReturnInst(
     }
     else if (m_shaderStage == ShaderStageFragment)
     {
-        if ((m_fragDepth != nullptr) || (m_fragStencilRef != nullptr) || (m_sampleMask != nullptr))
+        if ((m_fragDepth ) || (m_fragStencilRef ) || (m_sampleMask ))
         {
             auto& builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
             Value* fragDepth = undef;
@@ -1513,14 +1513,14 @@ void PatchInOutImportExport::visitReturnInst(
             Value* sampleMask = undef;
 
             unsigned channelMask = 0x1; // Always export gl_FragDepth
-            if (m_fragDepth != nullptr)
+            if (m_fragDepth )
             {
                 assert(builtInUsage.fragDepth);
                 (void(builtInUsage)); // unused
                 fragDepth = m_fragDepth;
             }
 
-            if (m_fragStencilRef != nullptr)
+            if (m_fragStencilRef )
             {
                 assert(builtInUsage.fragStencilRef);
                 (void(builtInUsage)); // unused
@@ -1528,7 +1528,7 @@ void PatchInOutImportExport::visitReturnInst(
                 fragStencilRef = m_fragStencilRef;
             }
 
-            if (m_sampleMask != nullptr)
+            if (m_sampleMask )
             {
                 assert(builtInUsage.sampleMask);
                 (void(builtInUsage)); // unused
@@ -1590,7 +1590,7 @@ void PatchInOutImportExport::visitReturnInst(
 
                 // Do fragment color exporting
                 auto exportInst = m_fragColorExport->run(output, location, insertPos);
-                if (exportInst != nullptr)
+                if (exportInst )
                     m_lastExport = cast<CallInst>(exportInst);
             }
         }
@@ -1601,7 +1601,7 @@ void PatchInOutImportExport::visitReturnInst(
         // NOTE: GFX10 can allow no dummy export when the fragment shader does not have discard operation
         // or ROV (Raster-ordered views)
         resUsage->inOutUsage.fs.dummyExport = ((m_gfxIp.major < 10) || resUsage->builtInUsage.fs.discard);
-        if ((m_lastExport == nullptr) && resUsage->inOutUsage.fs.dummyExport)
+        if ((!m_lastExport ) && resUsage->inOutUsage.fs.dummyExport)
         {
             Value* args[] = {
                 ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_MRT_0),  // tgt
@@ -1618,7 +1618,7 @@ void PatchInOutImportExport::visitReturnInst(
         }
     }
 
-    if (m_lastExport != nullptr)
+    if (m_lastExport )
     {
         // Set "done" flag
         auto exportName = m_lastExport->getCalledFunction()->getName();
@@ -1643,7 +1643,7 @@ Value* PatchInOutImportExport::patchVsGenericInputImport(
     Value* input = UndefValue::get(inputTy);
 
     // Do vertex fetch operations
-    assert(m_vertexFetch != nullptr);
+    assert(m_vertexFetch );
     auto vertex = m_vertexFetch->run(inputTy, location, compIdx, insertPos);
 
     // Cast vertex fetch results if necessary
@@ -1669,7 +1669,7 @@ Value* PatchInOutImportExport::patchTcsGenericInputImport(
     Value*       vertexIdx,      // [in] Input array outermost index used for vertex indexing
     Instruction* insertPos)      // [in] Where to insert the patch instruction
 {
-    assert((compIdx != nullptr) && (vertexIdx != nullptr));
+    assert((compIdx ) && (vertexIdx ));
 
     auto ldsOffset = calcLdsOffsetForTcsInput(inputTy, location, locOffset, compIdx, vertexIdx, insertPos);
     return readValueFromLds(false, inputTy, ldsOffset, insertPos);
@@ -1685,7 +1685,7 @@ Value* PatchInOutImportExport::patchTesGenericInputImport(
     Value*       vertexIdx,      // [in] Input array outermost index used for vertex indexing (could be null)
     Instruction* insertPos)      // [in] Where to insert the patch instruction
 {
-    assert(compIdx != nullptr);
+    assert(compIdx );
 
     auto ldsOffset = calcLdsOffsetForTesInput(inputTy, location, locOffset, compIdx, vertexIdx, insertPos);
     return readValueFromLds(false, inputTy, ldsOffset, insertPos);
@@ -1700,7 +1700,7 @@ Value* PatchInOutImportExport::patchGsGenericInputImport(
     Value*       vertexIdx,      // [in] Input array outermost index used for vertex indexing
     Instruction* insertPos)      // [in] Where to insert the patch instruction
 {
-    assert(vertexIdx != nullptr);
+    assert(vertexIdx );
 
     const unsigned compCount = inputTy->isVectorTy() ? inputTy->getVectorNumElements() : 1;
     const unsigned bitWidth = inputTy->getScalarSizeInBits();
@@ -1783,7 +1783,7 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
     if ((interpMode != InOutInfo::InterpModeFlat) && (interpMode != InOutInfo::InterpModeCustom))
     {
         auto ij = auxInterpValue;
-        if (ij == nullptr)
+        if (!ij )
         {
             if (interpMode == InOutInfo::InterpModeSmooth)
             {
@@ -1850,11 +1850,11 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
     Value* interp = UndefValue::get(interpTy);
 
     unsigned startChannel = 0;
-    if (compIdx != nullptr)
+    if (compIdx )
         startChannel = cast<ConstantInt>(compIdx)->getZExtValue();
 
     Value* loc = ConstantInt::get(Type::getInt32Ty(*m_context), location);
-    if (locOffset != nullptr)
+    if (locOffset )
     {
         loc = BinaryOperator::CreateAdd(loc, locOffset, "", insertPos);
         assert((startChannel + numChannels) <= 4);
@@ -1957,7 +1957,7 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
             Value* args[] = {
                 ConstantInt::get(Type::getInt32Ty(*m_context), interpParam),           // param
                 ConstantInt::get(Type::getInt32Ty(*m_context), i % 4),                 // attr_chan
-                (locOffset != nullptr) ?
+                (locOffset ) ?
                     loc :
                     ConstantInt::get(Type::getInt32Ty(*m_context), location + i / 4),  // attr
                 primMask                                                               // m0
@@ -2015,7 +2015,7 @@ Value* PatchInOutImportExport::patchTcsGenericOutputImport(
     Value*       vertexIdx,      // [in] Input array outermost index used for vertex indexing (could be null)
     Instruction* insertPos)      // [in] Where to insert the patch instruction
 {
-    assert(compIdx != nullptr);
+    assert(compIdx );
 
     auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, location, locOffset, compIdx, vertexIdx, insertPos);
     return readValueFromLds(true, outputTy, ldsOffset, insertPos);
@@ -2075,7 +2075,7 @@ void PatchInOutImportExport::patchTcsGenericOutputExport(
     Value*       vertexIdx,     // [in] Input array outermost index used for vertex indexing (could be null)
     Instruction* insertPos)     // [in] Where to insert the patch instruction
 {
-    assert(compIdx != nullptr);
+    assert(compIdx );
 
     Type* outputTy = output->getType();
     auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, location, locOffset, compIdx, vertexIdx, insertPos);
@@ -2270,7 +2270,7 @@ Value* PatchInOutImportExport::patchTcsBuiltInInputImport(
         }
     case BuiltInPointSize:
         {
-            assert(elemIdx == nullptr);
+            assert(!elemIdx );
             assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
             const unsigned loc = builtInInLocMap[builtInId];
 
@@ -2285,7 +2285,7 @@ Value* PatchInOutImportExport::patchTcsBuiltInInputImport(
             assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
             const unsigned loc = builtInInLocMap[builtInId];
 
-            if (elemIdx == nullptr)
+            if (!elemIdx )
             {
                 // gl_ClipDistanceIn[]/gl_CullDistanceIn[] is treated as 2 x vec4
                 assert(inputTy->isArrayTy());
@@ -2381,7 +2381,7 @@ Value* PatchInOutImportExport::patchTesBuiltInInputImport(
         }
     case BuiltInPointSize:
         {
-            assert(elemIdx == nullptr);
+            assert(!elemIdx );
             assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
             const unsigned loc = builtInInLocMap[builtInId];
 
@@ -2396,7 +2396,7 @@ Value* PatchInOutImportExport::patchTesBuiltInInputImport(
             assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
             const unsigned loc = builtInInLocMap[builtInId];
 
-            if (elemIdx == nullptr)
+            if (!elemIdx )
             {
                 // gl_ClipDistanceIn[]/gl_CullDistanceIn[] is treated as 2 x vec4
                 assert(inputTy->isArrayTy());
@@ -2439,7 +2439,7 @@ Value* PatchInOutImportExport::patchTesBuiltInInputImport(
         {
             auto tessCoord = m_pipelineSysValues.get(m_entryPoint)->getTessCoord();
 
-            if (elemIdx != nullptr)
+            if (elemIdx )
                 input = ExtractElementInst::Create(tessCoord, elemIdx, "", insertPos);
             else
                 input = tessCoord;
@@ -2452,7 +2452,7 @@ Value* PatchInOutImportExport::patchTesBuiltInInputImport(
             assert(perPatchBuiltInInLocMap.find(builtInId) != perPatchBuiltInInLocMap.end());
             unsigned loc = perPatchBuiltInInLocMap[builtInId];
 
-            if (elemIdx == nullptr)
+            if (!elemIdx )
             {
                 // gl_TessLevelOuter[4] is treated as vec4
                 // gl_TessLevelInner[2] is treated as vec2
@@ -3167,7 +3167,7 @@ Value* PatchInOutImportExport::patchTcsBuiltInOutputImport(
             assert(builtInUsage.pointSize);
             (void(builtInUsage)); // unused
 
-            assert(elemIdx == nullptr);
+            assert(!elemIdx );
             assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
             unsigned loc = builtInOutLocMap[builtInId];
 
@@ -3194,7 +3194,7 @@ Value* PatchInOutImportExport::patchTcsBuiltInOutputImport(
             assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
             unsigned loc = builtInOutLocMap[builtInId];
 
-            if (elemIdx == nullptr)
+            if (!elemIdx )
             {
                 // gl_ClipDistance[]/gl_CullDistance[] is treated as 2 x vec4
                 assert(outputTy->isArrayTy());
@@ -3235,7 +3235,7 @@ Value* PatchInOutImportExport::patchTcsBuiltInOutputImport(
             assert(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
             unsigned loc = perPatchBuiltInOutLocMap[builtInId];
 
-            if (elemIdx == nullptr)
+            if (!elemIdx )
             {
                 // gl_TessLevelOuter[4] is treated as vec4
                 // gl_TessLevelInner[2] is treated as vec2
@@ -3286,7 +3286,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
     {
     case BuiltInPosition:
         {
-            if (builtInUsage.position == false)
+            if (!static_cast<bool>(builtInUsage.position))
                 return;
 
             if (m_hasTs)
@@ -3312,7 +3312,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
         }
     case BuiltInPointSize:
         {
-            if (builtInUsage.pointSize == false)
+            if (!static_cast<bool>(builtInUsage.pointSize))
                 return;
 
             if (isa<UndefValue>(output))
@@ -3444,13 +3444,13 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
         }
     case BuiltInLayer:
         {
-            if (builtInUsage.layer == false)
+            if (!static_cast<bool>(builtInUsage.layer))
                 return;
 
             const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
 
             // NOTE: Only last non-fragment shader stage has to export the value of gl_Layer.
-            if ((m_hasTs == false) && (m_hasGs == false) && (enableMultiView == false))
+            if ((!m_hasTs) && (!m_hasGs) && (!static_cast<bool>(enableMultiView)))
             {
                 if (m_gfxIp.major <= 8)
                     addExportInstForBuiltInOutput(output, builtInId, insertPos);
@@ -3465,11 +3465,11 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
         }
     case BuiltInViewportIndex:
         {
-            if (builtInUsage.viewportIndex == false)
+            if (!static_cast<bool>(builtInUsage.viewportIndex))
                 return;
 
             // NOTE: Only last non-fragment shader stage has to export the value of gl_ViewportIndex.
-            if ((m_hasTs == false) && (m_hasGs == false))
+            if ((!m_hasTs) && (!m_hasGs))
             {
                 if (m_gfxIp.major <= 8)
                     addExportInstForBuiltInOutput(output, builtInId, insertPos);
@@ -3510,7 +3510,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(
     {
     case BuiltInPosition:
         {
-            if (builtInUsage.position == false)
+            if (!static_cast<bool>(builtInUsage.position))
                 return;
 
             assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
@@ -3523,10 +3523,10 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(
         }
     case BuiltInPointSize:
         {
-            if (builtInUsage.pointSize == false)
+            if (!static_cast<bool>(builtInUsage.pointSize))
                 return;
 
-            assert(elemIdx == nullptr);
+            assert(!elemIdx );
             assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
             unsigned loc = builtInOutLocMap[builtInId];
 
@@ -3545,7 +3545,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(
             assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
             unsigned loc = builtInOutLocMap[builtInId];
 
-            if (elemIdx == nullptr)
+            if (!elemIdx )
             {
                 // gl_ClipDistance[]/gl_CullDistance[] is treated as 2 x vec4
                 assert(outputTy->isArrayTy());
@@ -3573,7 +3573,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(
             {
                 // Extract tessellation factors
                 std::vector<Value*> tessFactors;
-                if (elemIdx == nullptr)
+                if (!elemIdx )
                 {
                     assert(outputTy->isArrayTy());
 
@@ -3620,7 +3620,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(
                 assert(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
                 unsigned loc = perPatchBuiltInOutLocMap[builtInId];
 
-                if (elemIdx == nullptr)
+                if (!elemIdx )
                 {
                     // gl_TessLevelOuter[4] is treated as vec4
                     assert(outputTy->isArrayTy());
@@ -3648,7 +3648,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(
             {
                 // Extract tessellation factors
                 std::vector<Value*> tessFactors;
-                if (elemIdx == nullptr)
+                if (!elemIdx )
                 {
                     unsigned tessFactorCount = 0;
 
@@ -3686,7 +3686,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(
                 assert(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
                 unsigned loc = perPatchBuiltInOutLocMap[builtInId];
 
-                if (elemIdx == nullptr)
+                if (!elemIdx )
                 {
                     // gl_TessLevelInner[2] is treated as vec2
                     assert(outputTy->isArrayTy());
@@ -3732,7 +3732,7 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(
     {
     case BuiltInPosition:
         {
-            if (builtInUsage.position == false)
+            if (!static_cast<bool>(builtInUsage.position))
                 return;
 
             if (m_hasGs)
@@ -3749,7 +3749,7 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(
         }
     case BuiltInPointSize:
         {
-            if (builtInUsage.pointSize == false)
+            if (!static_cast<bool>(builtInUsage.pointSize))
                 return;
 
             if (isa<UndefValue>(output))
@@ -3830,13 +3830,13 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(
         }
     case BuiltInLayer:
         {
-            if (builtInUsage.layer == false)
+            if (!static_cast<bool>(builtInUsage.layer))
                 return;
 
             const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
 
             // NOTE: Only last non-fragment shader stage has to export the value of gl_Layer.
-            if ((m_hasGs == false) && (enableMultiView == false))
+            if ((!m_hasGs) && (!static_cast<bool>(enableMultiView)))
             {
                 if (m_gfxIp.major <= 8)
                     addExportInstForBuiltInOutput(output, builtInId, insertPos);
@@ -3851,11 +3851,11 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(
         }
     case BuiltInViewportIndex:
         {
-            if (builtInUsage.viewportIndex == false)
+            if (!static_cast<bool>(builtInUsage.viewportIndex))
                 return;
 
             // NOTE: Only last non-fragment shader stage has to export the value of gl_ViewportIndex.
-            if (m_hasGs == false)
+            if (!m_hasGs)
             {
                 if (m_gfxIp.major <= 8)
                     addExportInstForBuiltInOutput(output, builtInId, insertPos);
@@ -4006,7 +4006,7 @@ void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(
         {
             const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
 
-            if ((m_gfxIp.major <= 8) && (enableMultiView == false))
+            if ((m_gfxIp.major <= 8) && (!static_cast<bool>(enableMultiView)))
                 addExportInstForBuiltInOutput(output, builtInId, insertPos);
             else
             {
@@ -4484,7 +4484,7 @@ unsigned PatchInOutImportExport::combineBufferLoad(
                 ConstantInt::get(Type::getInt32Ty(*m_context), coherent.u32All)          // glc
             };
             loadValue = emitCall(funcName, loadTyps[compCount - 1], args, {}, insertPos);
-            assert(loadValue != nullptr);
+            assert(loadValue );
             if (compCount > 1)
             {
                 for (unsigned i = 0; i < compCount; i++)
@@ -5162,7 +5162,7 @@ Value* PatchInOutImportExport::readValueFromLds(
     Value*       ldsOffset,  // [in] Start offset to do LDS read operations
     Instruction* insertPos)  // [in] Where to insert read instructions
 {
-    assert(m_lds != nullptr);
+    assert(m_lds );
     assert(readTy->isSingleValueType());
 
     // Read DWORDs from LDS
@@ -5174,7 +5174,7 @@ Value* PatchInOutImportExport::readValueFromLds(
     std::vector<Value*> loadValues(numChannels);
 
     const bool isTcsOutput = (isOutput && (m_shaderStage == ShaderStageTessControl));
-    const bool isTesInput = ((isOutput == false) && (m_shaderStage == ShaderStageTessEval));
+    const bool isTesInput = ((!isOutput) && (m_shaderStage == ShaderStageTessEval));
 
     if (m_pipelineState->isTessOffChip() && (isTcsOutput || isTesInput)) // Read from off-chip LDS buffer
     {
@@ -5280,7 +5280,7 @@ void PatchInOutImportExport::writeValueToLds(
     Value*        ldsOffset,    // [in] Start offset to do LDS write operations
     Instruction*  insertPos)    // [in] Where to insert write instructions
 {
-    assert(m_lds != nullptr);
+    assert(m_lds );
 
     auto writeTy = writeValue->getType();
     assert(writeTy->isSingleValueType());
@@ -5417,7 +5417,7 @@ Value* PatchInOutImportExport::calcTessFactorOffset(
     }
 
     Value* tessFactorOffset = ConstantInt::get(Type::getInt32Ty(*m_context), tessFactorStart);
-    if (elemIdxVal != nullptr)
+    if (elemIdxVal )
     {
         if (isa<ConstantInt>(elemIdxVal))
         {
@@ -5558,7 +5558,7 @@ void PatchInOutImportExport::storeTessFactorToBuffer(
         // Must be element indexing of tessellation level array
         assert(tessFactors.size() == 1);
 
-        if (m_module->getFunction(lgcName::TfBufferStore) == nullptr)
+        if (!m_module->getFunction(lgcName::TfBufferStore) )
             createTessBufferStoreFunction();
 
         if (m_pipelineState->isTessOffChip())
@@ -5745,7 +5745,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTcsInput(
     // attribOffset = (location + locOffset) * 4 + compIdx
     Value* attribOffset = ConstantInt::get(Type::getInt32Ty(*m_context), location);
 
-    if (locOffset != nullptr)
+    if (locOffset )
         attribOffset = BinaryOperator::CreateAdd(attribOffset, locOffset, "", insertPos);
 
     attribOffset = BinaryOperator::CreateMul(attribOffset,
@@ -5753,7 +5753,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTcsInput(
                                               "",
                                               insertPos);
 
-    if (compIdx != nullptr)
+    if (compIdx )
     {
         const unsigned bitWidth = inputTy->getScalarSizeInBits();
         assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
@@ -5810,7 +5810,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTcsOutput(
     // attribOffset = (location + locOffset) * 4 + compIdx * bitWidth / 32
     Value* attibOffset = ConstantInt::get(Type::getInt32Ty(*m_context), location);
 
-    if (locOffset != nullptr)
+    if (locOffset )
         attibOffset = BinaryOperator::CreateAdd(attibOffset, locOffset, "", insertPos);
 
     attibOffset = BinaryOperator::CreateMul(attibOffset,
@@ -5818,7 +5818,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTcsOutput(
                                              "",
                                              insertPos);
 
-    if (compIdx != nullptr)
+    if (compIdx )
     {
         const unsigned bitWidth = outputTy->getScalarSizeInBits();
         assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
@@ -5837,7 +5837,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTcsOutput(
 
     Value* ldsOffset = nullptr;
 
-    const bool perPatch = (vertexIdx == nullptr); // Vertex indexing is unavailable for per-patch output
+    const bool perPatch = (!vertexIdx ); // Vertex indexing is unavailable for per-patch output
     auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
     if (perPatch)
     {
@@ -5899,7 +5899,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTesInput(
     // attribOffset = (location + locOffset) * 4 + compIdx
     Value* attibOffset = ConstantInt::get(Type::getInt32Ty(*m_context), location);
 
-    if (locOffset != nullptr)
+    if (locOffset )
         attibOffset = BinaryOperator::CreateAdd(attibOffset, locOffset, "", insertPos);
 
     attibOffset = BinaryOperator::CreateMul(attibOffset,
@@ -5907,7 +5907,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTesInput(
                                              "",
                                              insertPos);
 
-    if (compIdx != nullptr)
+    if (compIdx )
     {
         const unsigned bitWidth = inputTy->getScalarSizeInBits();
         assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
@@ -5926,7 +5926,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTesInput(
 
     Value* ldsOffset = nullptr;
 
-    const bool perPatch = (vertexIdx == nullptr); // Vertex indexing is unavailable for per-patch input
+    const bool perPatch = (!vertexIdx ); // Vertex indexing is unavailable for per-patch input
     if (perPatch)
     {
         // dwordOffset = patchConstStart + relPatchId * patchConstSize + attribOffset
@@ -6682,7 +6682,7 @@ Value* PatchInOutImportExport::reconfigWorkgroup(
     Instruction* div = nullptr;
     Instruction* rem = nullptr;
 
-    if (offset != nullptr)
+    if (offset )
     {
         if (((mode.workgroupSizeX % 8) == 0) && ((mode.workgroupSizeY % 8) == 0))
         {
@@ -6826,7 +6826,7 @@ Value* PatchInOutImportExport::reconfigWorkgroup(
     newX = BinaryOperator::CreateAdd(newX, bit0, "", insertPos);
 
     // If we have an offset, we need to incorporate this into X.
-    if (offset != nullptr)
+    if (offset )
     {
         const unsigned workgroupSizeYMin8 = std::min(mode.workgroupSizeY, 8u);
         Instruction* const mul = BinaryOperator::CreateMul(offset,

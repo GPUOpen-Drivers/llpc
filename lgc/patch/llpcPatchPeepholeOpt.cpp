@@ -92,7 +92,7 @@ bool PatchPeepholeOpt::runOnFunction(
 
     visit(function);
 
-    const bool changed = m_instsToErase.empty() == false;
+    const bool changed = !m_instsToErase.empty();
 
     for (Instruction* const inst : m_instsToErase)
     {
@@ -130,7 +130,7 @@ void PatchPeepholeOpt::visitBitCast(
         BitCastInst* const otherBitCast = dyn_cast<BitCastInst>(user);
 
         // If we don't have a bit cast, skip.
-        if (otherBitCast == nullptr)
+        if (!otherBitCast )
             continue;
 
         // If the other bit cast has no users, no point optimizating it.
@@ -165,7 +165,7 @@ void PatchPeepholeOpt::visitBitCast(
                 BitCastInst* const otherBitCast = dyn_cast<BitCastInst>(user);
 
                 // If we don't have a bit cast, skip.
-                if (otherBitCast == nullptr)
+                if (!otherBitCast )
                     continue;
 
                 // If the other bit cast has no users, no point optimizating it.
@@ -282,7 +282,7 @@ void PatchPeepholeOpt::visitBitCast(
         m_instsToErase.push_back(&bitCast);
 
         // If the PHI node that we've just replaced had any other users, make a bit cast for them.
-        if (phiNode->hasOneUse() == false)
+        if (!phiNode->hasOneUse())
         {
             BitCastInst* const newBitCast = new BitCastInst(newPhiNode, phiNode->getType());
 
@@ -317,7 +317,7 @@ void PatchPeepholeOpt::visitICmp(
     ConstantInt* const constantVal = dyn_cast<ConstantInt>(iCmp.getOperand(1));
 
     // If we don't have a constant we are comparing against, or the constant is the maximum representable, bail.
-    if ((constantVal == nullptr) || constantVal->isMaxValue(false))
+    if ((!constantVal ) || constantVal->isMaxValue(false))
         return;
 
     const uint64_t constant = constantVal->getZExtValue();
@@ -380,7 +380,7 @@ void PatchPeepholeOpt::visitExtractElement(
     ConstantInt* const indexVal = dyn_cast<ConstantInt>(extractElement.getIndexOperand());
 
     // We only handle constant indices.
-    if (indexVal == nullptr)
+    if (!indexVal )
         return;
 
     const uint64_t index = indexVal->getZExtValue();
@@ -395,7 +395,7 @@ void PatchPeepholeOpt::visitExtractElement(
         ConstantInt* const nextIndex = dyn_cast<ConstantInt>(nextInsertElement->getOperand(2));
 
         // If the vector was inserting at a non-constant index, bail.
-        if (nextIndex == nullptr)
+        if (!nextIndex )
             break;
 
         // If the index of the insertion matches the index we were extracting, forward the insert!
@@ -420,7 +420,7 @@ void PatchPeepholeOpt::visitExtractElement(
         ExtractElementInst* const otherExtractElement = dyn_cast<ExtractElementInst>(user);
 
         // If we don't have an extract element, skip.
-        if (otherExtractElement == nullptr)
+        if (!otherExtractElement )
             continue;
 
         // If the other extract has no users, no point optimizating it.
@@ -430,11 +430,11 @@ void PatchPeepholeOpt::visitExtractElement(
         ConstantInt* const otherIndex = dyn_cast<ConstantInt>(otherExtractElement->getIndexOperand());
 
         // If the other index is not a constant integer, skip.
-        if (otherIndex == nullptr)
+        if (!otherIndex )
             continue;
 
         // If the indices do not match, skip.
-        if (otherIndex->equalsInt(index) == false)
+        if (!otherIndex->equalsInt(index))
             continue;
 
         numCombinableUsers++;
@@ -460,7 +460,7 @@ void PatchPeepholeOpt::visitExtractElement(
                 ExtractElementInst* const otherExtractElement = dyn_cast<ExtractElementInst>(user);
 
                 // If we don't have an extract element, skip.
-                if (otherExtractElement == nullptr)
+                if (!otherExtractElement )
                     continue;
 
                 // If the other extract has no users, no point optimizating it.
@@ -474,11 +474,11 @@ void PatchPeepholeOpt::visitExtractElement(
                 ConstantInt* const otherIndex = dyn_cast<ConstantInt>(otherExtractElement->getIndexOperand());
 
                 // If the other index is not a constant integer, skip.
-                if (otherIndex == nullptr)
+                if (!otherIndex )
                     continue;
 
                 // If the indices do not match, skip.
-                if (otherIndex->equalsInt(index) == false)
+                if (!otherIndex->equalsInt(index))
                     continue;
 
                 // Replace the other extraction with our new one.
@@ -596,7 +596,7 @@ void PatchPeepholeOpt::visitPHINode(
         Instruction* const incomingInst = dyn_cast<Instruction>(phiNode.getIncomingValue(incomingIndex));
 
         // If we don't have an instruction, bail.
-        if (incomingInst == nullptr)
+        if (!incomingInst )
         {
             prevIncomingInst = nullptr;
             break;
@@ -610,13 +610,13 @@ void PatchPeepholeOpt::visitPHINode(
         }
 
         // If we don't have a previous instruction to compare against, store the current one and continue.
-        if (prevIncomingInst == nullptr)
+        if (!prevIncomingInst )
         {
             prevIncomingInst = incomingInst;
             continue;
         }
 
-        if (incomingInst->isIdenticalTo(prevIncomingInst) == false)
+        if (!incomingInst->isIdenticalTo(prevIncomingInst))
         {
             prevIncomingInst = nullptr;
             break;
@@ -624,7 +624,7 @@ void PatchPeepholeOpt::visitPHINode(
     }
 
     // Do not clone allocas -- we don't want to potentially introduce them in the middle of the function.
-    if ((prevIncomingInst != nullptr) && (isa<AllocaInst>(prevIncomingInst) == false))
+    if ((prevIncomingInst ) && (!isa<AllocaInst>(prevIncomingInst)))
     {
         Instruction* const newInst = prevIncomingInst->clone();
         insertAfter(*newInst, phiNode);
@@ -659,7 +659,7 @@ void PatchPeepholeOpt::visitPHINode(
 
                 // We can attempt to optimize the sub PHI node if an incoming is our parent PHI node, or if the
                 // incoming is a constant.
-                if ((incoming != &phiNode) && (isa<Constant>(incoming) == false))
+                if ((incoming != &phiNode) && (!isa<Constant>(incoming)))
                 {
                     subPhiNodeOptimizable = false;
                     break;
@@ -674,7 +674,7 @@ void PatchPeepholeOpt::visitPHINode(
                     PHINode* const otherPhiNode = dyn_cast<PHINode>(user);
 
                     // If its not a PHI node, skip.
-                    if (otherPhiNode == nullptr)
+                    if (!otherPhiNode )
                         continue;
 
                     // Skip our PHI node in the user list.
@@ -821,7 +821,7 @@ void PatchPeepholeOpt::visitCallInst(
     CallInst& callInst) // [in] "Call" instruction
 {
     auto callee = callInst.getCalledFunction();
-    if (callee == nullptr)
+    if (!callee )
         return;
 
     // Optimization for call @llvm.amdgcn.kill(). Pattern:

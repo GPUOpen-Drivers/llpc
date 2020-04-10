@@ -123,7 +123,7 @@ BuilderContext* BuilderContext::Create(
         gpuName = mcpuName;
 
     builderContext->m_targetInfo = new TargetInfo;
-    if (builderContext->m_targetInfo->setTargetInfo(gpuName) == false)
+    if (!builderContext->m_targetInfo->setTargetInfo(gpuName))
     {
         delete builderContext;
         return nullptr;
@@ -179,7 +179,7 @@ Builder* BuilderContext::createBuilder(
     Pipeline*   pipeline,          // [in] Pipeline object for pipeline compile, nullptr for shader compile
     bool        useBuilderRecorder) // true to use BuilderRecorder, false to use BuilderImpl
 {
-    if ((pipeline == nullptr) || useBuilderRecorder)
+    if ((!pipeline ) || useBuilderRecorder)
         return new BuilderRecorder(this, pipeline);
     return new BuilderImpl(this, pipeline);
 }
@@ -218,7 +218,7 @@ void BuilderContext::addTargetPasses(
     raw_pwrite_stream&    outStream)      // [out] Output stream
 {
     // Start timer for codegen passes.
-    if (codeGenTimer != nullptr)
+    if (codeGenTimer )
         passMgr.add(createStartStopTimer(codeGenTimer, true));
 
     // Dump the module just before codegen.
@@ -259,7 +259,7 @@ void BuilderContext::addTargetPasses(
         report_fatal_error("Target machine cannot emit a file of this type");
 
     // Stop timer for codegen passes.
-    if (codeGenTimer != nullptr)
+    if (codeGenTimer )
         passMgr.add(createStartStopTimer(codeGenTimer, false));
 }
 

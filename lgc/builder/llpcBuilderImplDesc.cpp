@@ -51,7 +51,7 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
     Type* const   pointeeTy,       // [in] Type that the returned pointer should point to.
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    assert(pointeeTy != nullptr);
+    assert(pointeeTy );
 
     Instruction* const insertPos = &*GetInsertPoint();
     descIndex = scalarizeIfUniform(descIndex, isNonUniform);
@@ -247,7 +247,7 @@ Value* BuilderImplDesc::scalarizeIfUniform(
     bool    isNonUniform) // Whether value is marked as non-uniform
 {
     assert(value->getType()->isIntegerTy(32));
-    if ((isNonUniform == false) && (isa<Constant>(value) == false))
+    if ((!isNonUniform) && (!isa<Constant>(value)))
     {
         // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
         if (getPipelineState()->getTargetInfo().getGfxIpVersion().major > 6)

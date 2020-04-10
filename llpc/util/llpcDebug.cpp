@@ -118,14 +118,14 @@ void redirectLogOutput(
     if (restoreToDefault)
     {
         // Restore default raw_fd_ostream objects
-        if (DbgFile != nullptr)
+        if (DbgFile )
         {
             memcpy((void*)&errs(), DbgFileBak, sizeof(raw_fd_ostream));
             DbgFile->close();
             DbgFile = nullptr;
         }
 
-        if (OutFile != nullptr)
+        if (OutFile )
         {
             memcpy((void*)&outs(), OutFileBak, sizeof(raw_fd_ostream));
             OutFile->close();
@@ -135,12 +135,12 @@ void redirectLogOutput(
     else
     {
         // Redirect errs() for dbgs()
-        if (cl::LogFileDbgs.empty() == false)
+        if (!cl::LogFileDbgs.empty())
         {
             // NOTE: Checks whether errs() is needed in compiliation
             // Until now, option -debug, -debug-only and -print-* need use debug output
             bool needDebugOut = ::llvm::DebugFlag;
-            for (unsigned i = 1; (needDebugOut == false) && (i < optionCount); ++i)
+            for (unsigned i = 1; (!needDebugOut) && (i < optionCount); ++i)
             {
                 StringRef option = options[i];
                 if (option.startswith("-debug") || option.startswith("-print"))
@@ -153,7 +153,7 @@ void redirectLogOutput(
 
                 static raw_fd_ostream NewDbgFile(cl::LogFileDbgs.c_str(), errCode, sys::fs::F_Text);
                 assert(!errCode);
-                if (DbgFile == nullptr)
+                if (!DbgFile )
                 {
                     NewDbgFile.SetUnbuffered();
                     memcpy((void*)DbgFileBak, (void*)&errs(), sizeof(raw_fd_ostream));
@@ -164,9 +164,9 @@ void redirectLogOutput(
         }
 
         // Redirect outs() for LLPC_OUTS() and LLPC_ERRS()
-        if ((cl::EnableOuts || cl::EnableErrs) && (cl::LogFileOuts.empty() == false))
+        if ((cl::EnableOuts || cl::EnableErrs) && (!cl::LogFileOuts.empty()))
         {
-            if ((cl::LogFileOuts == cl::LogFileDbgs) && (DbgFile != nullptr))
+            if ((cl::LogFileOuts == cl::LogFileDbgs) && (DbgFile ))
             {
                  memcpy((void*)OutFileBak, (void*)&outs(), sizeof(raw_fd_ostream));
                  memcpy((void*)&outs(), (void*)DbgFile, sizeof(raw_fd_ostream));
@@ -178,7 +178,7 @@ void redirectLogOutput(
 
                 static raw_fd_ostream NewOutFile(cl::LogFileOuts.c_str(), errCode, sys::fs::F_Text);
                 assert(!errCode);
-                if (OutFile == nullptr)
+                if (!OutFile )
                 {
                     NewOutFile.SetUnbuffered();
                     memcpy((void*)OutFileBak, (void*)&outs(), sizeof(raw_fd_ostream));

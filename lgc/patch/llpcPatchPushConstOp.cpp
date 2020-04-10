@@ -103,7 +103,7 @@ bool PatchPushConstOp::runOnModule(
         m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStage>(shaderStage));
 
         // If we don't have an entry point for the shader stage, bail.
-        if (m_entryPoint == nullptr)
+        if (!m_entryPoint )
             continue;
 
         m_shaderStage = static_cast<ShaderStage>(shaderStage);
@@ -115,7 +115,7 @@ bool PatchPushConstOp::runOnModule(
                 CallInst* const call = dyn_cast<CallInst>(user);
 
                 // If the user is not a call, bail.
-                if (call == nullptr)
+                if (!call )
                     continue;
 
                 // If the call is not in the entry point, bail.
@@ -127,10 +127,10 @@ bool PatchPushConstOp::runOnModule(
         }
     }
 
-    const bool changed = (m_instsToRemove.empty() == false);
+    const bool changed = (!m_instsToRemove.empty());
 
     // Remove unnecessary instructions.
-    while (m_instsToRemove.empty() == false)
+    while (!m_instsToRemove.empty())
     {
         Instruction* const inst = m_instsToRemove.pop_back_val();
         inst->dropAllReferences();
@@ -152,7 +152,7 @@ void PatchPushConstOp::visitCallInst(
     CallInst& callInst) // [in] "Call" instruction
 {
     Function* const callee = callInst.getCalledFunction();
-    assert(callee != nullptr);
+    assert(callee );
     assert(callee->getName().startswith(lgcName::DescriptorLoadSpillTable));
     (void(callee)); // unused
 
@@ -186,12 +186,12 @@ void PatchPushConstOp::visitCallInst(
 
         m_instsToRemove.push_back(&callInst);
 
-        while (workList.empty() == false)
+        while (!workList.empty())
         {
             Instruction* const inst = dyn_cast<Instruction>(workList.pop_back_val());
 
             // If the value is not an instruction, bail.
-            if (inst == nullptr)
+            if (!inst )
                 continue;
 
             m_instsToRemove.push_back(inst);

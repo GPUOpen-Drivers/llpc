@@ -77,7 +77,7 @@ Function* EmuLib::getFunction(
         if (funcMapIt != archive.functions.end())
         {
             // Function is already in the function map.
-            if (nativeOnly && (funcMapIt->second.isNative == false))
+            if (nativeOnly && (!funcMapIt->second.isNative))
                 return nullptr;
             return funcMapIt->second.function;
         }
@@ -133,10 +133,10 @@ Function* EmuLib::getFunction(
         Function* requestedFunc = nullptr;
         for (auto& libFunc : *libModule)
         {
-            if (libFunc.empty() == false)
+            if (!libFunc.empty())
             {
                 bool isNative = nonNativeFuncs.find(&libFunc) == nonNativeFuncs.end();
-                if (isNative == false)
+                if (!isNative)
                 {
                     // Non-native if it is in non-native list
                     archive.functions[libFunc.getName()] = EmuLibFunction(&libFunc, false);
@@ -154,7 +154,7 @@ Function* EmuLib::getFunction(
                         // Non-native if any referenced unknown kind function is non-native.
                         for (auto func : funcIt->second)
                         {
-                            if (getFunction(func->getName(), true) == nullptr)
+                            if (!getFunction(func->getName(), true) )
                             {
                                 isNative = false;
                                 break;
@@ -164,7 +164,7 @@ Function* EmuLib::getFunction(
                     }
                 }
 
-                if ((libFunc.getName() == funcName) && ((nativeOnly == false) || isNative))
+                if ((libFunc.getName() == funcName) && ((!nativeOnly) || isNative))
                     requestedFunc = &libFunc;
             }
         }

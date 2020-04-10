@@ -329,7 +329,7 @@ bool Section::getPtrOf(
     MemberType memberType   = MemberTypeInt;
     unsigned   arrayMaxSize = 0;
 
-    if (isWriteAccess == true)
+    if (isWriteAccess)
         setActive(true);
     // Search section member
     for (unsigned i = 0; i < m_tableSize; ++i)
@@ -353,15 +353,15 @@ bool Section::getPtrOf(
         }
     }
 
-    if ((result == true) && (memberAddr == reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue))))
+    if ((result) && (memberAddr == reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue))))
     {
         PARSE_WARNING(*errorMsg, lineNum, "Invalid member name: %s", memberName);
         result = false;
     }
 
-    if (result == true)
+    if (result)
     {
-        VFX_ASSERT(ptrOut != nullptr);
+        VFX_ASSERT(ptrOut );
         if (arrayMaxSize == VfxDynamicArrayId)
         {
             // Member is dynamic array, cast to std::vector
@@ -390,12 +390,12 @@ bool Section::set(
     TValue*     value)            // [in] Value to be set
 {
     bool result = false;
-    VFX_ASSERT(value != nullptr);
+    VFX_ASSERT(value );
     TValue* memberPtr = nullptr;
     std::string dummyMsg;
     result = getPtrOf(lineNum, memberName, true, arrayIndex, &memberPtr, &dummyMsg);
     VFX_ASSERT(result == true);
-    if (result == true)
+    if (result)
         *memberPtr = *value;
 
     return result;

@@ -69,7 +69,7 @@ Value* BuilderImplBase::CreateDotProduct(
     const Twine& instName)            // [in] Name to give instruction(s)
 {
     Value* product = CreateFMul(vector1, vector2);
-    if (isa<VectorType>(product->getType()) == false)
+    if (!isa<VectorType>(product->getType()))
         return product;
 
     const unsigned compCount = product->getType()->getVectorNumElements();
@@ -133,7 +133,7 @@ BranchInst* BuilderImplBase::createIf(
     SmallVector<Use*, 4> nonPhiUses;
     for (auto& use : endIfBlock->uses())
     {
-        if (isa<PHINode>(use.getUser()) == false)
+        if (!isa<PHINode>(use.getUser()))
             nonPhiUses.push_back(&use);
     }
     for (auto use : nonPhiUses)
@@ -155,12 +155,12 @@ BranchInst* BuilderImplBase::createIf(
 
     // Create the branches.
     BranchInst* branch = BranchInst::Create(thenBlock,
-                                             elseBlock != nullptr ? elseBlock : endIfBlock,
+                                             elseBlock ? elseBlock : endIfBlock,
                                              condition,
                                              ifBlock);
     branch->setDebugLoc(getCurrentDebugLocation());
     BranchInst::Create(endIfBlock, thenBlock)->setDebugLoc(getCurrentDebugLocation());
-    if (elseBlock != nullptr)
+    if (elseBlock )
         BranchInst::Create(endIfBlock, elseBlock)->setDebugLoc(getCurrentDebugLocation());
 
     // Set Builder's insert point to the branch at the end of the "then" block.
@@ -191,7 +191,7 @@ Instruction* BuilderImplBase::createWaterfallLoop(
                 if (calledFunc->getName().startswith(lgcName::DescriptorLoadFromPtr))
                 {
                     call = dyn_cast<CallInst>(call->getArgOperand(0)); // The descriptor pointer
-                    if ((call != nullptr) &&
+                    if ((call ) &&
                         call->getCalledFunction()->getName().startswith(lgcName::DescriptorIndex))
                         nonUniformVal = call->getArgOperand(1); // The index operand
                 }
@@ -253,7 +253,7 @@ Instruction* BuilderImplBase::createWaterfallLoop(
     Instruction* resultValue = nonUniformInst;
 
     // End the waterfall loop (as long as pNonUniformInst is not a store with no result).
-    if (nonUniformInst->getType()->isVoidTy() == false)
+    if (!nonUniformInst->getType()->isVoidTy())
     {
         SetInsertPoint(nonUniformInst->getNextNode());
         SetCurrentDebugLocation(nonUniformInst->getDebugLoc());
@@ -278,7 +278,7 @@ Instruction* BuilderImplBase::createWaterfallLoop(
                                   { waterfallBegin, resultValue },
                                   nullptr,
                                   instName);
-        if (useOfNonUniformInst == nullptr)
+        if (!useOfNonUniformInst )
             useOfNonUniformInst = &resultValue->getOperandUse(1);
         if (waterfallEndTy != nonUniformInst->getType())
             resultValue = cast<Instruction>(CreateBitCast(resultValue, nonUniformInst->getType(), instName));

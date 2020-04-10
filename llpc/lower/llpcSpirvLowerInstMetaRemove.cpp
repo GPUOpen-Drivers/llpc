@@ -97,7 +97,7 @@ void SpirvLowerInstMetaRemove::visitCallInst(
     CallInst& callInst) // [in] "Call" instruction
 {
     auto callee = callInst.getCalledFunction();
-    if (callee == nullptr)
+    if (!callee )
         return;
 
     auto mangledName = callee->getName();

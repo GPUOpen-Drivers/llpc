@@ -263,7 +263,7 @@ public:
         llvm::IRBuilder<> builder(context);
         llvm::ArrayRef<unsigned> values(reinterpret_cast<const unsigned*>(&value), sizeof(value) / sizeof(unsigned));
 
-        while ((values.empty() == false) && (values.back() == 0))
+        while ((!values.empty()) && (values.back() == 0))
         {
             if ((values.size() == 1) && atLeastOneValue)
                 break;
@@ -288,7 +288,7 @@ public:
         llvm::StringRef           metaName)   // Name for named metadata node
     {
         llvm::MDNode* arrayMetaNode = getArrayOfInt32MetaNode(module->getContext(), value, false);
-        if (arrayMetaNode == nullptr)
+        if (!arrayMetaNode )
         {
             if (auto namedMetaNode = module->getNamedMetadata(metaName))
                 module->eraseNamedMetadata(namedMetaNode);
@@ -324,7 +324,7 @@ public:
         T&                        value)      // [out] Value to write into (caller must zero initialize)
     {
         auto namedMetaNode = module->getNamedMetadata(metaName);
-        if ((namedMetaNode == nullptr) || (namedMetaNode->getNumOperands() == 0))
+        if ((!namedMetaNode ) || (namedMetaNode->getNumOperands() == 0))
             return 0;
         return readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), value);
     }
