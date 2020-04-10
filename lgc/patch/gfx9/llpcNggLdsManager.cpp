@@ -197,7 +197,7 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
       if (region == LdsRegionEsGsRing)
         ldsRegionSize = esGsRingLdsSize;
 
-      // NOTE: LDS size of ES-GS ring is calculated
+      // NOTE: LDS size of GS-VS ring is calculated
       if (region == LdsRegionGsVsRing)
         ldsRegionSize = gsVsRingLdsSize;
 
@@ -362,7 +362,6 @@ unsigned NggLdsManager::calcGsExtraLdsSize(PipelineState *pipelineState) {
 
   return gsExtraLdsSize;
 }
-
 // =====================================================================================================================
 // Reads value from LDS.
 //
@@ -370,63 +369,23 @@ unsigned NggLdsManager::calcGsExtraLdsSize(PipelineState *pipelineState) {
 // @param ldsOffset : Start offset to do LDS read operations
 // @param useDs128 : Whether to use 128-bit LDS load, 16-byte alignment is guaranteed by caller
 Value *NggLdsManager::readValueFromLds(Type *readTy, Value *ldsOffset, bool useDs128) {
-  assert(m_lds);
   assert(readTy->isIntOrIntVectorTy() || readTy->isFPOrFPVectorTy());
 
-  const unsigned readBits = readTy->getPrimitiveSizeInBits();
-
-  unsigned bitWidth = 0;
-  unsigned compCount = 0;
-  unsigned alignment = 4;
-
-  if (readBits % 128 == 0) {
-    bitWidth = 128;
-    compCount = readBits / 128;
-
-    if (useDs128)
-      alignment = 16; // Set alignment to 16-byte to use 128-bit LDS load
-  } else if (readBits % 64 == 0) {
-    bitWidth = 64;
-    compCount = readBits / 64;
-  } else if (readBits % 32 == 0) {
-    bitWidth = 32;
-    compCount = readBits / 32;
-  } else if (readBits % 16 == 0) {
-    bitWidth = 16;
-    compCount = readBits / 16;
-  } else {
-    assert(readBits % 8 == 0);
-    bitWidth = 8;
-    compCount = readBits / 8;
+  unsigned alignment = readTy->getScalarSizeInBits() / 8;
+  if (useDs128) {
+    assert(readTy->getPrimitiveSizeInBits() == 128);
+    alignment = 16;
   }
-
-  Type *compTy = m_builder->getIntNTy(bitWidth);
-  Value *readValue = UndefValue::get(compCount > 1 ? VectorType::get(compTy, compCount) : compTy);
 
   // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
-  auto lds = ConstantExpr::getBitCast(
-      m_lds, PointerType::get(Type::getInt8Ty(*m_context), m_lds->getType()->getPointerAddressSpace()));
+  assert(m_lds);
+  auto lds = ConstantExpr::getBitCast(m_lds, PointerType::get(Type::getInt8Ty(*m_context),
+                                      m_lds->getType()->getPointerAddressSpace()));
 
-  for (unsigned i = 0; i < compCount; ++i) {
-    Value *loadPtr = m_builder->CreateGEP(lds, ldsOffset);
-    if (bitWidth != 8)
-      loadPtr = m_builder->CreateBitCast(loadPtr, PointerType::get(compTy, ADDR_SPACE_LOCAL));
+  Value *readPtr = m_builder->CreateGEP(lds, ldsOffset);
+  readPtr = m_builder->CreateBitCast(readPtr, PointerType::get(readTy, ADDR_SPACE_LOCAL));
 
-    Value *loadValue = m_builder->CreateAlignedLoad(loadPtr, MaybeAlign(alignment));
-
-    if (compCount > 1)
-      readValue = m_builder->CreateInsertElement(readValue, loadValue, i);
-    else
-      readValue = loadValue;
-
-    if (compCount > 1)
-      ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(bitWidth / 8));
-  }
-
-  if (readValue->getType() != readTy)
-    readValue = m_builder->CreateBitCast(readValue, readTy);
-
-  return readValue;
+  return m_builder->CreateAlignedLoad(readPtr, MaybeAlign(alignment));
 }
 
 // =====================================================================================================================
@@ -436,64 +395,24 @@ Value *NggLdsManager::readValueFromLds(Type *readTy, Value *ldsOffset, bool useD
 // @param ldsOffset : Start offset to do LDS write operations
 // @param useDs128 : Whether to use 128-bit LDS store, 16-byte alignment is guaranteed by caller
 void NggLdsManager::writeValueToLds(Value *writeValue, Value *ldsOffset, bool useDs128) {
-  assert(m_lds);
-
   auto writeTy = writeValue->getType();
   assert(writeTy->isIntOrIntVectorTy() || writeTy->isFPOrFPVectorTy());
 
-  const unsigned writeBits = writeTy->getPrimitiveSizeInBits();
-
-  unsigned bitWidth = 0;
-  unsigned compCount = 0;
-  unsigned alignment = 4;
-
-  if (writeBits % 128 == 0) {
-    bitWidth = 128;
-    compCount = writeBits / 128;
-
-    if (useDs128)
-      alignment = 16; // Set alignment to 16-byte to use 128-bit LDS store
-  } else if (writeBits % 64 == 0) {
-    bitWidth = 64;
-    compCount = writeBits / 64;
-  } else if (writeBits % 32 == 0) {
-    bitWidth = 32;
-    compCount = writeBits / 32;
-  } else if (writeBits % 16 == 0) {
-    bitWidth = 16;
-    compCount = writeBits / 16;
-  } else {
-    assert(writeBits % 8 == 0);
-    bitWidth = 8;
-    compCount = writeBits / 8;
+  unsigned alignment = writeTy->getScalarSizeInBits() / 8;
+  if (useDs128) {
+    assert(writeTy->getPrimitiveSizeInBits() == 128);
+    alignment = 16;
   }
-
-  Type *compTy = m_builder->getIntNTy(bitWidth);
-  writeTy = compCount > 1 ? VectorType::get(compTy, compCount) : compTy;
-
-  if (writeValue->getType() != writeTy)
-    writeValue = m_builder->CreateBitCast(writeValue, writeTy);
 
   // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
-  auto lds = ConstantExpr::getBitCast(
-      m_lds, PointerType::get(Type::getInt8Ty(*m_context), m_lds->getType()->getPointerAddressSpace()));
+  assert(m_lds != nullptr);
+  auto lds = ConstantExpr::getBitCast(m_lds, PointerType::get(Type::getInt8Ty(*m_context),
+                                      m_lds->getType()->getPointerAddressSpace()));
 
-  for (unsigned i = 0; i < compCount; ++i) {
-    Value *storePtr = m_builder->CreateGEP(lds, ldsOffset);
-    if (bitWidth != 8)
-      storePtr = m_builder->CreateBitCast(storePtr, PointerType::get(compTy, ADDR_SPACE_LOCAL));
+  Value* writePtr = m_builder->CreateGEP(lds, ldsOffset);
+  writePtr = m_builder->CreateBitCast(writePtr, PointerType::get(writeTy, ADDR_SPACE_LOCAL));
 
-    Value *storeValue = nullptr;
-    if (compCount > 1)
-      storeValue = m_builder->CreateExtractElement(writeValue, i);
-    else
-      storeValue = writeValue;
-
-    m_builder->CreateAlignedStore(storeValue, storePtr, MaybeAlign(alignment));
-
-    if (compCount > 1)
-      ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(bitWidth / 8));
-  }
+  m_builder->CreateAlignedStore(writeValue, writePtr, MaybeAlign(alignment));
 }
 
 // =====================================================================================================================
