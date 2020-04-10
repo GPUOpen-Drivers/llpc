@@ -31,7 +31,7 @@
 #include "Gfx9ConfigBuilder.h"
 #include "PipelineState.h"
 #include "TargetInfo.h"
-#include "lgc/BuilderBuiltIns.h"
+#include "lgc/BuiltIns.h"
 #include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "llpc-gfx9-config-builder"

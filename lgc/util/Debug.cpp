@@ -24,31 +24,21 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  BuilderCommon.h
- * @brief LLPC header file: contains common interface types in the LGC interface
+ * @file  Debug.cpp
+ * @brief LLPC header file: middle-end debug functions
  ***********************************************************************************************************************
  */
-#pragma once
+#include "Debug.h"
+#include "lgc/LgcContext.h"
 
-#include <stdint.h>
+using namespace llvm;
 
 namespace lgc {
 
-/// Enumerates LGC shader stages.
-enum ShaderStage : unsigned {
-  ShaderStageVertex = 0,                                ///< Vertex shader
-  ShaderStageTessControl,                               ///< Tessellation control shader
-  ShaderStageTessEval,                                  ///< Tessellation evaluation shader
-  ShaderStageGeometry,                                  ///< Geometry shader
-  ShaderStageFragment,                                  ///< Fragment shader
-  ShaderStageCompute,                                   ///< Compute shader
-  ShaderStageCount,                                     ///< Count of shader stages
-  ShaderStageInvalid = ~0u,                             ///< Invalid shader stage
-  ShaderStageNativeStageCount = ShaderStageCompute + 1, ///< Native supported shader stage count
-  ShaderStageGfxCount = ShaderStageFragment + 1,        ///< Count of shader stages for graphics pipeline
-
-  ShaderStageCopyShader = ShaderStageCount, ///< Copy shader (internal-use)
-  ShaderStageCountInternal,                 ///< Count of shader stages (internal-use)
-};
+//======================================================================================================================
+// Get pointer to stream for LLPC_OUTS, or nullptr if disabled.
+raw_ostream *getLgcOuts() {
+  return LgcContext::getLgcOuts();
+}
 
 } // namespace lgc

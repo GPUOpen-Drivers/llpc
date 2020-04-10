@@ -166,6 +166,7 @@ PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/imported/chip/gfx6
     ${CMAKE_CURRENT_SOURCE_DIR}/imported/chip/gfx9
     ${CMAKE_CURRENT_SOURCE_DIR}/patch
+    ${CMAKE_CURRENT_SOURCE_DIR}/state
     ${CMAKE_CURRENT_SOURCE_DIR}/util
 )
 
@@ -173,7 +174,6 @@ PRIVATE
 target_sources(LLVMlgc PRIVATE
     builder/Builder.cpp
     builder/BuilderBase.cpp
-    builder/BuilderContext.cpp
     builder/BuilderImpl.cpp
     builder/BuilderImplArith.cpp
     builder/BuilderImplDesc.cpp
@@ -184,10 +184,7 @@ target_sources(LLVMlgc PRIVATE
     builder/BuilderImplSubgroup.cpp
     builder/BuilderRecorder.cpp
     builder/BuilderReplayer.cpp
-    builder/PipelineState.cpp
-    builder/ShaderModes.cpp
     builder/YCbCrAddressHandler.cpp
-    builder/TargetInfo.cpp
 )
 
 # lgc/patch
@@ -221,9 +218,17 @@ target_sources(LLVMlgc PRIVATE
     patch/VertexFetch.cpp
 )
 
+# lgc/state
+target_sources(LLVMlgc PRIVATE
+    state/LgcContext.cpp
+    state/PipelineState.cpp
+    state/ShaderModes.cpp
+    state/TargetInfo.cpp
+)
+
 # lgc/util
 target_sources(LLVMlgc PRIVATE
-    util/BuilderDebug.cpp
+    util/Debug.cpp
     util/GfxRegHandlerBase.cpp
     util/GfxRegHandler.cpp
     util/Internal.cpp

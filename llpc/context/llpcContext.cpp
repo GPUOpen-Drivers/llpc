@@ -77,13 +77,13 @@ void Context::reset() {
 }
 
 // =====================================================================================================================
-// Get (create if necessary) BuilderContext
-BuilderContext *Context::getBuilderContext() {
+// Get (create if necessary) LgcContext
+LgcContext *Context::getLgcContext() {
   if (!m_builderContext) {
-    // First time: Create the BuilderContext.
+    // First time: Create the LgcContext.
     std::string gpuName;
     PipelineContext::getGpuNameString(m_gfxIp, gpuName);
-    m_builderContext.reset(BuilderContext::Create(*this, gpuName, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
+    m_builderContext.reset(LgcContext::Create(*this, gpuName, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
     if (!m_builderContext)
       report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
   }
@@ -120,7 +120,7 @@ std::unique_ptr<Module> Context::loadLibary(const BinaryData *lib) {
 //
 // @param [in/out] module : Module to modify
 void Context::setModuleTargetMachine(Module *module) {
-  TargetMachine *targetMachine = getBuilderContext()->getTargetMachine();
+  TargetMachine *targetMachine = getLgcContext()->getTargetMachine();
   module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
   module->setDataLayout(targetMachine->createDataLayout());
 }

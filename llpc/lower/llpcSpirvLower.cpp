@@ -33,7 +33,7 @@
 #include "llpcDebug.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
-#include "lgc/BuilderContext.h"
+#include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Analysis/CFGPrinter.h"
@@ -150,11 +150,11 @@ void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
 void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassManager &passMgr, llvm::Timer *lowerTimer,
                            unsigned forceLoopUnrollCount) {
   // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-  context->getBuilderContext()->preparePassManager(&passMgr);
+  context->getLgcContext()->preparePassManager(&passMgr);
 
   // Start timer for lowering passes.
   if (lowerTimer)
-    passMgr.add(BuilderContext::createStartStopTimer(lowerTimer, true));
+    passMgr.add(LgcContext::createStartStopTimer(lowerTimer, true));
 
   // Lower SPIR-V resource collecting
   passMgr.add(createSpirvLowerResourceCollect(false));
@@ -204,7 +204,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassMana
 
   // Stop timer for lowering passes.
   if (lowerTimer)
-    passMgr.add(BuilderContext::createStartStopTimer(lowerTimer, false));
+    passMgr.add(LgcContext::createStartStopTimer(lowerTimer, false));
 
   // Dump the result
   if (EnableOuts()) {

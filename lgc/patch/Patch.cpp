@@ -29,13 +29,13 @@
  ***********************************************************************************************************************
  */
 #include "Patch.h"
-#include "BuilderDebug.h"
+#include "Debug.h"
 #include "Internal.h"
 #include "PatchCheckShaderCache.h"
 #include "PipelineState.h"
 #include "TargetInfo.h"
 #include "lgc/Builder.h"
-#include "lgc/BuilderContext.h"
+#include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -97,7 +97,7 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
 {
   // Start timer for patching passes.
   if (patchTimer)
-    passMgr.add(BuilderContext::createStartStopTimer(patchTimer, true));
+    passMgr.add(LgcContext::createStartStopTimer(patchTimer, true));
 
   // If using BuilderRecorder rather than BuilderImpl, replay the Builder calls now
   if (replayerPass)
@@ -145,8 +145,8 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
 
   // Stop timer for patching passes and start timer for optimization passes.
   if (patchTimer) {
-    passMgr.add(BuilderContext::createStartStopTimer(patchTimer, false));
-    passMgr.add(BuilderContext::createStartStopTimer(optTimer, true));
+    passMgr.add(LgcContext::createStartStopTimer(patchTimer, false));
+    passMgr.add(LgcContext::createStartStopTimer(optTimer, true));
   }
 
   // Prepare pipeline ABI but only set the calling conventions to AMDGPU ones for now.
@@ -162,8 +162,8 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
 
   // Stop timer for optimization passes and restart timer for patching passes.
   if (patchTimer) {
-    passMgr.add(BuilderContext::createStartStopTimer(optTimer, false));
-    passMgr.add(BuilderContext::createStartStopTimer(patchTimer, true));
+    passMgr.add(LgcContext::createStartStopTimer(optTimer, false));
+    passMgr.add(LgcContext::createStartStopTimer(patchTimer, true));
   }
 
   // Patch buffer operations (must be after optimizations)
@@ -177,8 +177,8 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
       (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0) {
     // Stop timer for patching passes and restart timer for optimization passes.
     if (patchTimer) {
-      passMgr.add(BuilderContext::createStartStopTimer(patchTimer, false));
-      passMgr.add(BuilderContext::createStartStopTimer(optTimer, true));
+      passMgr.add(LgcContext::createStartStopTimer(patchTimer, false));
+      passMgr.add(LgcContext::createStartStopTimer(optTimer, true));
     }
 
     // Extra optimizations after NGG primitive shader creation
@@ -191,8 +191,8 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
 
     // Stop timer for optimization passes and restart timer for patching passes.
     if (patchTimer) {
-      passMgr.add(BuilderContext::createStartStopTimer(optTimer, false));
-      passMgr.add(BuilderContext::createStartStopTimer(patchTimer, true));
+      passMgr.add(LgcContext::createStartStopTimer(optTimer, false));
+      passMgr.add(LgcContext::createStartStopTimer(patchTimer, true));
     }
   }
 
@@ -208,7 +208,7 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
 
   // Stop timer for patching passes.
   if (patchTimer)
-    passMgr.add(BuilderContext::createStartStopTimer(patchTimer, false));
+    passMgr.add(LgcContext::createStartStopTimer(patchTimer, false));
 
   // Dump the result
   if (raw_ostream *outs = getLgcOuts()) {

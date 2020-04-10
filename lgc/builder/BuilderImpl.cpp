@@ -38,9 +38,9 @@ using namespace llvm;
 
 // =====================================================================================================================
 //
-// @param builderContext : BuilderContext
+// @param builderContext : LgcContext
 // @param pipeline : PipelineState (as public superclass Pipeline)
-BuilderImpl::BuilderImpl(BuilderContext *builderContext, Pipeline *pipeline)
+BuilderImpl::BuilderImpl(LgcContext *builderContext, Pipeline *pipeline)
     : BuilderImplBase(builderContext), BuilderImplArith(builderContext), BuilderImplDesc(builderContext),
       BuilderImplImage(builderContext), BuilderImplInOut(builderContext), BuilderImplMatrix(builderContext),
       BuilderImplMisc(builderContext), BuilderImplSubgroup(builderContext) {

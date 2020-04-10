@@ -39,7 +39,7 @@ namespace lgc {
 // Builder implementation base class
 class BuilderImplBase : public Builder {
 public:
-  BuilderImplBase(BuilderContext *builderContext) : Builder(builderContext) {}
+  BuilderImplBase(LgcContext *builderContext) : Builder(builderContext) {}
 
   // Create scalar from dot product of vector
   llvm::Value *CreateDotProduct(llvm::Value *const vector1, llvm::Value *const vector2,
@@ -94,7 +94,7 @@ private:
 // Builder implementation subclass for arithmetic operations
 class BuilderImplArith : virtual public BuilderImplBase {
 public:
-  BuilderImplArith(BuilderContext *builderContext) : BuilderImplBase(builderContext) {}
+  BuilderImplArith(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
   // the given cube map texture coordinates.
@@ -253,7 +253,7 @@ private:
 // Builder implementation subclass for descriptors
 class BuilderImplDesc : virtual public BuilderImplBase {
 public:
-  BuilderImplDesc(BuilderContext *builderContext) : BuilderImplBase(builderContext) {}
+  BuilderImplDesc(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // Create a load of a buffer descriptor.
   llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, bool isNonUniform,
@@ -298,7 +298,7 @@ private:
 // Builder implementation subclass for image operations
 class BuilderImplImage : virtual public BuilderImplBase {
 public:
-  BuilderImplImage(BuilderContext *builderContext) : BuilderImplBase(builderContext) {}
+  BuilderImplImage(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // Create an image load.
   llvm::Value *CreateImageLoad(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
@@ -417,7 +417,7 @@ private:
 // Builder implementation subclass for input/output operations
 class BuilderImplInOut : virtual public BuilderImplBase {
 public:
-  BuilderImplInOut(BuilderContext *builderContext) : BuilderImplBase(builderContext) {}
+  BuilderImplInOut(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // Create a read of (part of) a user input value.
   llvm::Value *CreateReadGenericInput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
@@ -509,7 +509,7 @@ private:
 // Builder implementation subclass for matrix operations
 class BuilderImplMatrix : virtual public BuilderImplBase {
 public:
-  BuilderImplMatrix(BuilderContext *builderContext) : BuilderImplBase(builderContext) {}
+  BuilderImplMatrix(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // Create a matrix transpose.
   llvm::Value *CreateTransposeMatrix(llvm::Value *const matrix, const llvm::Twine &instName = "") override final;
@@ -557,7 +557,7 @@ private:
 // Builder implementation subclass for misc. operations
 class BuilderImplMisc : virtual public BuilderImplBase {
 public:
-  BuilderImplMisc(BuilderContext *builderContext) : BuilderImplBase(builderContext) {}
+  BuilderImplMisc(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
   // the current output primitive in the specified output-primitive stream.
@@ -595,7 +595,7 @@ private:
 // Builder implementation subclass for subgroup operations
 class BuilderImplSubgroup : virtual public BuilderImplBase {
 public:
-  BuilderImplSubgroup(BuilderContext *builderContext) : BuilderImplBase(builderContext) {}
+  BuilderImplSubgroup(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // Create a get subgroup size query.
   llvm::Value *CreateGetSubgroupSize(const llvm::Twine &instName) override final;
@@ -765,7 +765,7 @@ class BuilderImpl final : public BuilderImplArith,
                           BuilderImplMatrix,
                           BuilderImplMisc,
                           BuilderImplSubgroup {
-  friend BuilderContext;
+  friend LgcContext;
 
 public:
   ~BuilderImpl() {}
@@ -775,7 +775,7 @@ private:
   BuilderImpl(const BuilderImpl &) = delete;
   BuilderImpl &operator=(const BuilderImpl &) = delete;
 
-  BuilderImpl(BuilderContext *builderContext, Pipeline *pipeline);
+  BuilderImpl(LgcContext *builderContext, Pipeline *pipeline);
 };
 
 // Built-ins for fragment input interpolation (I/J)

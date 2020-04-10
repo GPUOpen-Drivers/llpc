@@ -34,7 +34,7 @@
 #include "Internal.h"
 #include "Patch.h"
 #include "TargetInfo.h"
-#include "lgc/BuilderContext.h"
+#include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/IRBuilder.h"
@@ -68,19 +68,19 @@ static const char ColorExportStateMetadataName[] = "llpc.color.export.state";
 // =====================================================================================================================
 // Get LLVMContext
 LLVMContext &Pipeline::getContext() const {
-  return getBuilderContext()->getContext();
+  return getLgcContext()->getContext();
 }
 
 // =====================================================================================================================
 // Get TargetInfo
 const TargetInfo &PipelineState::getTargetInfo() const {
-  return getBuilderContext()->getTargetInfo();
+  return getLgcContext()->getTargetInfo();
 }
 
 // =====================================================================================================================
 // Get PAL pipeline ABI version
 unsigned PipelineState::getPalAbiVersion() const {
-  return getBuilderContext()->getPalAbiVersion();
+  return getLgcContext()->getPalAbiVersion();
 }
 
 // =====================================================================================================================
@@ -140,7 +140,7 @@ Module *PipelineState::link(ArrayRef<Module *> modules) {
     // disappearing when modules are deleted.
     bool result = true;
     pipelineModule = new Module("llpcPipeline", getContext());
-    TargetMachine *targetMachine = getBuilderContext()->getTargetMachine();
+    TargetMachine *targetMachine = getLgcContext()->getTargetMachine();
     pipelineModule->setTargetTriple(targetMachine->getTargetTriple().getTriple());
     pipelineModule->setDataLayout(targetMachine->createDataLayout());
 
@@ -190,16 +190,16 @@ void PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_
   std::unique_ptr<PassManager> patchPassMgr(PassManager::Create());
   patchPassMgr->setPassIndex(&passIndex);
   patchPassMgr->add(
-      createTargetTransformInfoWrapperPass(getBuilderContext()->getTargetMachine()->getTargetIRAnalysis()));
+      createTargetTransformInfoWrapperPass(getLgcContext()->getTargetMachine()->getTargetIRAnalysis()));
 
   // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-  getBuilderContext()->preparePassManager(&*patchPassMgr);
+  getLgcContext()->preparePassManager(&*patchPassMgr);
 
   // Manually add a PipelineStateWrapper pass.
   // If we were not using BuilderRecorder, give our PipelineState to it. (In the BuilderRecorder case,
   // the first time PipelineStateWrapper is used, it allocates its own PipelineState and populates
   // it by reading IR metadata.)
-  PipelineStateWrapper *pipelineStateWrapper = new PipelineStateWrapper(getBuilderContext());
+  PipelineStateWrapper *pipelineStateWrapper = new PipelineStateWrapper(getLgcContext());
   patchPassMgr->add(pipelineStateWrapper);
   if (m_noReplayer)
     pipelineStateWrapper->setPipelineState(this);
@@ -224,7 +224,7 @@ void PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_
   codeGenPassMgr->setPassIndex(&passIndex);
 
   // Code generation.
-  getBuilderContext()->addTargetPasses(*codeGenPassMgr, codeGenTimer, outStream);
+  getLgcContext()->addTargetPasses(*codeGenPassMgr, codeGenTimer, outStream);
 
   // Run the target backend codegen passes.
   codeGenPassMgr->run(*pipelineModule);
@@ -895,7 +895,7 @@ void PipelineState::readGraphicsState(Module *module) {
 // Determine whether to use off-chip tessellation mode
 bool PipelineState::isTessOffChip() {
   // For GFX9+, always enable tessellation off-chip mode
-  return EnableTessOffChip || getBuilderContext()->getTargetInfo().getGfxIpVersion().major >= 9;
+  return EnableTessOffChip || getLgcContext()->getTargetInfo().getGfxIpVersion().major >= 9;
 }
 
 // =====================================================================================================================
@@ -1187,8 +1187,8 @@ char PipelineStateWrapper::ID = 0;
 
 // =====================================================================================================================
 //
-// @param builderContext : BuilderContext
-PipelineStateWrapper::PipelineStateWrapper(BuilderContext *builderContext)
+// @param builderContext : LgcContext
+PipelineStateWrapper::PipelineStateWrapper(LgcContext *builderContext)
     : ImmutablePass(ID), m_builderContext(builderContext) {
 }
 

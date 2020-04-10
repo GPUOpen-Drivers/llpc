@@ -31,7 +31,7 @@
 
 #include "llpcTimerProfiler.h"
 #include "llpc.h"
-#include "lgc/BuilderContext.h"
+#include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Pass.h"
@@ -121,7 +121,7 @@ TimerProfiler::~TimerProfiler() {
 // @param start : Start or  stop timer
 void TimerProfiler::addTimerStartStopPass(lgc::PassManager *passMgr, TimerKind timerKind, bool start) {
   if (TimePassesIsEnabled || cl::EnableTimerProfile)
-    passMgr->add(lgc::BuilderContext::createStartStopTimer(&m_phaseTimers[timerKind], start));
+    passMgr->add(lgc::LgcContext::createStartStopTimer(&m_phaseTimers[timerKind], start));
 }
 
 // =====================================================================================================================

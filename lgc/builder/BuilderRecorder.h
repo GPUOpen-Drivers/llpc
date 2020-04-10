@@ -69,7 +69,7 @@ public:
 // Each call to a Builder method causes the insertion of a call to llpc.call.*, so the Builder calls can be replayed
 // later on.
 class BuilderRecorder final : public Builder, BuilderRecorderMetadataKinds {
-  friend BuilderContext;
+  friend LgcContext;
 
 public:
   // llpc.call.* opcodes
@@ -541,7 +541,7 @@ private:
   BuilderRecorder(const BuilderRecorder &) = delete;
   BuilderRecorder &operator=(const BuilderRecorder &) = delete;
 
-  BuilderRecorder(BuilderContext *builderContext, Pipeline *pipeline);
+  BuilderRecorder(LgcContext *builderContext, Pipeline *pipeline);
 
   // Record one Builder call
   llvm::Instruction *record(Opcode opcode, llvm::Type *returnTy, llvm::ArrayRef<llvm::Value *> args,

@@ -29,13 +29,13 @@
  ***********************************************************************************************************************
  */
 #include "PatchInOutImportExport.h"
-#include "BuilderDebug.h"
+#include "Debug.h"
 #include "BuilderImpl.h"
 #include "FragColorExport.h"
 #include "PipelineShaders.h"
 #include "VertexFetch.h"
-#include "lgc/BuilderBuiltIns.h"
-#include "lgc/BuilderContext.h"
+#include "lgc/BuiltIns.h"
+#include "lgc/LgcContext.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"
@@ -1253,7 +1253,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       }
     }
 
-    if (m_pipelineState->getBuilderContext()->buildingRelocatableElf()) {
+    if (m_pipelineState->getLgcContext()->buildingRelocatableElf()) {
       // If we are building relocatable shaders, it is possible there are
       // generic outputs that are not written to.  We need to count them in
       // the export count.

@@ -31,7 +31,7 @@
 #include "BuilderRecorder.h"
 #include "Internal.h"
 #include "PipelineState.h"
-#include "lgc/BuilderContext.h"
+#include "lgc/LgcContext.h"
 #include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "llpc-builder-replayer"
@@ -105,7 +105,7 @@ bool BuilderReplayer::runOnModule(Module &module) {
   pipelineState->readState(&module);
 
   // Create the BuilderImpl to replay into, passing it the PipelineState
-  BuilderContext *builderContext = pipelineState->getBuilderContext();
+  LgcContext *builderContext = pipelineState->getLgcContext();
   m_builder.reset(builderContext->createBuilder(pipelineState, /*useBuilderRecorder=*/false));
 
   SmallVector<Function *, 8> funcsToRemove;

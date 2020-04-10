@@ -101,7 +101,7 @@ struct NggControl {
 // The middle-end implementation of PipelineState, a subclass of Pipeline.
 class PipelineState final : public Pipeline {
 public:
-  PipelineState(BuilderContext *builderContext) : Pipeline(builderContext) {}
+  PipelineState(LgcContext *builderContext) : Pipeline(builderContext) {}
 
   ~PipelineState() override final {}
 
@@ -383,7 +383,7 @@ private:
 // Wrapper pass for the pipeline state in the middle-end
 class PipelineStateWrapper : public llvm::ImmutablePass {
 public:
-  PipelineStateWrapper(BuilderContext *builderContext = nullptr);
+  PipelineStateWrapper(LgcContext *builderContext = nullptr);
 
   bool doFinalization(llvm::Module &module) override;
 
@@ -398,7 +398,7 @@ public:
   static char ID; // ID of this pass
 
 private:
-  BuilderContext *m_builderContext = nullptr;              // BuilderContext for allocating PipelineState
+  LgcContext *m_builderContext = nullptr;              // LgcContext for allocating PipelineState
   PipelineState *m_pipelineState = nullptr;                // Cached pipeline state
   std::unique_ptr<PipelineState> m_allocatedPipelineState; // Pipeline state allocated by this pass
 };

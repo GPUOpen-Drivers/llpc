@@ -240,7 +240,7 @@ Result VKAPI_CALL ICompiler::Create(GfxIpVersion gfxIp, unsigned optionCount, co
 
   // Initialize passes so they can be referenced by -print-after etc.
   initializeLowerPasses(*PassRegistry::getPassRegistry());
-  BuilderContext::initialize();
+  LgcContext::initialize();
 
   bool parseCmdOption = true;
   if (Compiler::getInstanceCount() > 0) {
@@ -275,7 +275,7 @@ Result VKAPI_CALL ICompiler::Create(GfxIpVersion gfxIp, unsigned optionCount, co
 
     if (EnableOuts()) {
       // LLPC_OUTS is enabled. Ensure it is enabled in LGC (the middle-end) too.
-      BuilderContext::setLlpcOuts(&outs());
+      LgcContext::setLlpcOuts(&outs());
     }
   } else {
     *ppCompiler = nullptr;
@@ -496,7 +496,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
         Context *context = acquireContext();
 
         context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
-        context->setBuilder(context->getBuilderContext()->createBuilder(nullptr, true));
+        context->setBuilder(context->getLgcContext()->createBuilder(nullptr, true));
 
         for (unsigned i = 0; i < entryNames.size(); ++i) {
           ShaderModuleEntry moduleEntry = {};
@@ -720,7 +720,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   // Merge the user data once for all stages.
   context->getPipelineContext()->doUserDataNodeMerge();
   unsigned originalShaderStageMask = context->getPipelineContext()->getShaderStageMask();
-  context->getBuilderContext()->setBuildRelocatableElf(true);
+  context->getLgcContext()->setBuildRelocatableElf(true);
 
   ElfPackage elf[ShaderStageNativeStageCount];
   for (unsigned stage = 0; stage < shaderInfo.size() && result == Result::Success; ++stage) {
@@ -775,7 +775,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
   }
   context->getPipelineContext()->setShaderStageMask(originalShaderStageMask);
-  context->getBuilderContext()->setBuildRelocatableElf(false);
+  context->getLgcContext()->setBuildRelocatableElf(false);
 
   // Link the relocatable shaders into a single pipeline elf file.
   linkRelocatableShaderElf(elf, pipelineElf, context);
@@ -856,7 +856,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   unsigned passIndex = 0;
   const PipelineShaderInfo *fragmentShaderInfo = nullptr;
   TimerProfiler timerProfiler(context->getPiplineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
-  bool buildingRelocatableElf = context->getBuilderContext()->buildingRelocatableElf();
+  bool buildingRelocatableElf = context->getLgcContext()->buildingRelocatableElf();
 
   context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
 
@@ -871,7 +871,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   }
 
   // Set up middle-end objects.
-  BuilderContext *builderContext = context->getBuilderContext();
+  LgcContext *builderContext = context->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
   context->getPipelineContext()->setPipelineState(&*pipeline);
   context->setBuilder(builderContext->createBuilder(&*pipeline, UseBuilderRecorder));
@@ -1187,7 +1187,7 @@ void GraphicsShaderCacheChecker::updateAndMerge(Result result, ElfPackage *outpu
 unsigned Compiler::ConvertColorBufferFormatToExportFormat(const ColorTarget *target,
                                                           const bool enableAlphaToCoverage) const {
   Context *context = acquireContext();
-  std::unique_ptr<Pipeline> pipeline(context->getBuilderContext()->createPipeline());
+  std::unique_ptr<Pipeline> pipeline(context->getLgcContext()->createPipeline());
   ColorExportFormat format = {};
   ColorExportState state = {};
   std::tie(format.dfmt, format.nfmt) = PipelineContext::mapVkFormat(target->format, true);
