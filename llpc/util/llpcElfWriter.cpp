@@ -54,7 +54,8 @@ static const char *const HwStageNames[] = {".ls", ".hs", ".es", ".gs", ".vs", ".
 template <class Elf>
 ElfWriter<Elf>::ElfWriter(GfxIpVersion gfxIp)
     : m_gfxIp(gfxIp), m_textSecIdx(InvalidValue), m_noteSecIdx(InvalidValue), m_symSecIdx(InvalidValue),
-      m_strtabSecIdx(InvalidValue) {}
+      m_strtabSecIdx(InvalidValue) {
+}
 
 // =====================================================================================================================
 template <class Elf> ElfWriter<Elf>::~ElfWriter() {

@@ -151,7 +151,8 @@ bool Document::compileShader() {
 // =====================================================================================================================
 // Constructs an instance of class VfxParse.
 VfxParser::VfxParser()
-    : m_isValidVfxFile(false), m_currentSection(nullptr), m_currentLineNum(0), m_currentSectionLineNum(0) {}
+    : m_isValidVfxFile(false), m_currentSection(nullptr), m_currentLineNum(0), m_currentSectionLineNum(0) {
+}
 
 // =====================================================================================================================
 // Parses a config file line.
@@ -1310,7 +1311,9 @@ bool VFXAPI vfxParseFile(const char *filename, unsigned int numMacro, const char
 // Closes document handle
 //
 // @param doc : Document handle
-void VFXAPI vfxCloseDoc(void *doc) { delete reinterpret_cast<Document *>(doc); }
+void VFXAPI vfxCloseDoc(void *doc) {
+  delete reinterpret_cast<Document *>(doc);
+}
 
 // =====================================================================================================================
 // Gets render document from document handle
@@ -1338,6 +1341,8 @@ void VFXAPI vfxGetPipelineDoc(void *doc, VfxPipelineStatePtr *pipelineState) {
 // Print Document to STDOUT
 //
 // @param doc : Document handle
-void VFXAPI vfxPrintDoc(void *doc) { reinterpret_cast<Document *>(doc)->printSelf(); }
+void VFXAPI vfxPrintDoc(void *doc) {
+  reinterpret_cast<Document *>(doc)->printSelf();
+}
 
 } // namespace Vfx

@@ -64,12 +64,16 @@ char PatchPeepholeOpt::ID;
 // Pass creator, creates the pass of LLVM patching operations for peephole optimizations.
 //
 // @param enableDiscardOpt : Enable the optimization for "kill" intrinsic
-FunctionPass *createPatchPeepholeOpt(bool enableDiscardOpt) { return new PatchPeepholeOpt(enableDiscardOpt); }
+FunctionPass *createPatchPeepholeOpt(bool enableDiscardOpt) {
+  return new PatchPeepholeOpt(enableDiscardOpt);
+}
 
 // =====================================================================================================================
 //
 // @param enableDiscardOpt : Enable the optimization for "kill" intrinsic
-PatchPeepholeOpt::PatchPeepholeOpt(bool enableDiscardOpt) : FunctionPass(ID) { m_enableDiscardOpt = enableDiscardOpt; }
+PatchPeepholeOpt::PatchPeepholeOpt(bool enableDiscardOpt) : FunctionPass(ID) {
+  m_enableDiscardOpt = enableDiscardOpt;
+}
 
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
@@ -95,7 +99,9 @@ bool PatchPeepholeOpt::runOnFunction(Function &function) {
 // Specify what analysis passes this pass depends on.
 //
 // @param [in,out] analysisUsage : The place to record our analysis pass usage requirements.
-void PatchPeepholeOpt::getAnalysisUsage(AnalysisUsage &analysisUsage) const { analysisUsage.setPreservesCFG(); }
+void PatchPeepholeOpt::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
+  analysisUsage.setPreservesCFG();
+}
 
 // =====================================================================================================================
 // Visit a bit cast instruction.

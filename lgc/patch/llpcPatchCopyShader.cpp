@@ -94,7 +94,9 @@ char PatchCopyShader::ID = 0;
 
 // =====================================================================================================================
 // Create pass to generate copy shader if required.
-ModulePass *lgc::createPatchCopyShader() { return new PatchCopyShader(); }
+ModulePass *lgc::createPatchCopyShader() {
+  return new PatchCopyShader();
+}
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.

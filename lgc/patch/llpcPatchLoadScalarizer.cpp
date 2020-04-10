@@ -49,10 +49,14 @@ char PatchLoadScalarizer::ID;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for load scalarizer optimizations.
-FunctionPass *createPatchLoadScalarizer() { return new PatchLoadScalarizer(); }
+FunctionPass *createPatchLoadScalarizer() {
+  return new PatchLoadScalarizer();
+}
 
 // =====================================================================================================================
-PatchLoadScalarizer::PatchLoadScalarizer() : FunctionPass(ID) { m_scalarThreshold = 0; }
+PatchLoadScalarizer::PatchLoadScalarizer() : FunctionPass(ID) {
+  m_scalarThreshold = 0;
+}
 
 // =====================================================================================================================
 // Get the analysis usage of this pass.

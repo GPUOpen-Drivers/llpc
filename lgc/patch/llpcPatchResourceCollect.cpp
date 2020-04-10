@@ -64,7 +64,9 @@ char PatchResourceCollect::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for resource collecting
-ModulePass *createPatchResourceCollect() { return new PatchResourceCollect(); }
+ModulePass *createPatchResourceCollect() {
+  return new PatchResourceCollect();
+}
 
 // =====================================================================================================================
 PatchResourceCollect::PatchResourceCollect()

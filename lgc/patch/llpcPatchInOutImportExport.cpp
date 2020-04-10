@@ -55,7 +55,9 @@ char PatchInOutImportExport::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for input import and output export
-ModulePass *createPatchInOutImportExport() { return new PatchInOutImportExport(); }
+ModulePass *createPatchInOutImportExport() {
+  return new PatchInOutImportExport();
+}
 
 // =====================================================================================================================
 PatchInOutImportExport::PatchInOutImportExport() : Patch(ID), m_lds(nullptr) {

@@ -142,7 +142,8 @@ BuilderContext *BuilderContext::Create(LLVMContext &context, StringRef gpuName, 
 //
 // @param context : LLVM context to give each Builder
 // @param palAbiVersion : PAL pipeline ABI version to compile for
-BuilderContext::BuilderContext(LLVMContext &context, unsigned palAbiVersion) : m_context(context) {}
+BuilderContext::BuilderContext(LLVMContext &context, unsigned palAbiVersion) : m_context(context) {
+}
 
 // =====================================================================================================================
 BuilderContext::~BuilderContext() {
@@ -154,7 +155,9 @@ BuilderContext::~BuilderContext() {
 // Create a Pipeline object for a pipeline compile.
 // This actually creates a PipelineState, but returns the Pipeline superclass that is visible to
 // the front-end.
-Pipeline *BuilderContext::createPipeline() { return new PipelineState(this); }
+Pipeline *BuilderContext::createPipeline() {
+  return new PipelineState(this);
+}
 
 // =====================================================================================================================
 // Create a Builder object. For a shader compile (pPipeline is nullptr), useBuilderRecorder is ignored

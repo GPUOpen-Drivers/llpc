@@ -68,13 +68,15 @@ ModulePass *createSpirvLowerLoopUnrollControl(unsigned forceLoopUnrollCount) {
 
 // =====================================================================================================================
 SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl()
-    : SpirvLower(ID), m_forceLoopUnrollCount(0), m_disableLicm(false) {}
+    : SpirvLower(ID), m_forceLoopUnrollCount(0), m_disableLicm(false) {
+}
 
 // =====================================================================================================================
 //
 // @param forceLoopUnrollCount : Force loop unroll count
 SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl(unsigned forceLoopUnrollCount)
-    : SpirvLower(ID), m_forceLoopUnrollCount(forceLoopUnrollCount), m_disableLicm(false) {}
+    : SpirvLower(ID), m_forceLoopUnrollCount(forceLoopUnrollCount), m_disableLicm(false) {
+}
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.

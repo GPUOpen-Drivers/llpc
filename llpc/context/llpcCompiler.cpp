@@ -398,7 +398,9 @@ Compiler::~Compiler() {
 
 // =====================================================================================================================
 // Destroys the pipeline compiler.
-void Compiler::Destroy() { delete this; }
+void Compiler::Destroy() {
+  delete this;
+}
 
 // =====================================================================================================================
 // Builds shader module from the specified info.

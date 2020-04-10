@@ -67,7 +67,9 @@ inline unsigned compact32(const Hash *hash) {
 // Takes input parameter hash, which is 64-bit hash to be compacted.
 //
 // Returns 32-bit hash value based on the inputted 64-bit hash.
-inline unsigned compact32(uint64_t hash) { return static_cast<unsigned>(hash) ^ static_cast<unsigned>(hash >> 32); }
+inline unsigned compact32(uint64_t hash) {
+  return static_cast<unsigned>(hash) ^ static_cast<unsigned>(hash >> 32);
+}
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
 // Compacts a 128-bit hash into a 32-bit one by XOR'ing each 32-bit chunk together.

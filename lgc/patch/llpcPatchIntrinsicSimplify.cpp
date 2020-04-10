@@ -55,11 +55,14 @@ char PatchIntrinsicSimplify::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the LLVM pass intrinsic simplifcations.
-FunctionPass *lgc::createPatchIntrinsicSimplify() { return new PatchIntrinsicSimplify(); }
+FunctionPass *lgc::createPatchIntrinsicSimplify() {
+  return new PatchIntrinsicSimplify();
+}
 
 // =====================================================================================================================
 // Constructor.
-PatchIntrinsicSimplify::PatchIntrinsicSimplify() : FunctionPass(ID) {}
+PatchIntrinsicSimplify::PatchIntrinsicSimplify() : FunctionPass(ID) {
+}
 
 // =====================================================================================================================
 // Get the analysis usage.

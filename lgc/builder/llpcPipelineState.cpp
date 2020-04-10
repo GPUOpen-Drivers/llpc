@@ -68,15 +68,21 @@ static const char ColorExportStateMetadataName[] = "llpc.color.export.state";
 
 // =====================================================================================================================
 // Get LLVMContext
-LLVMContext &Pipeline::getContext() const { return getBuilderContext()->getContext(); }
+LLVMContext &Pipeline::getContext() const {
+  return getBuilderContext()->getContext();
+}
 
 // =====================================================================================================================
 // Get TargetInfo
-const TargetInfo &PipelineState::getTargetInfo() const { return getBuilderContext()->getTargetInfo(); }
+const TargetInfo &PipelineState::getTargetInfo() const {
+  return getBuilderContext()->getTargetInfo();
+}
 
 // =====================================================================================================================
 // Get PAL pipeline ABI version
-unsigned PipelineState::getPalAbiVersion() const { return getBuilderContext()->getPalAbiVersion(); }
+unsigned PipelineState::getPalAbiVersion() const {
+  return getBuilderContext()->getPalAbiVersion();
+}
 
 // =====================================================================================================================
 // Link shader modules into a pipeline module.
@@ -1159,7 +1165,9 @@ char PipelineStateClearer::ID = 0;
 
 // =====================================================================================================================
 // Create pipeline state clearer pass
-ModulePass *lgc::createPipelineStateClearer() { return new PipelineStateClearer(); }
+ModulePass *lgc::createPipelineStateClearer() {
+  return new PipelineStateClearer();
+}
 
 // =====================================================================================================================
 // Run PipelineStateClearer pass to clear the pipeline state out of the IR
@@ -1182,13 +1190,16 @@ char PipelineStateWrapper::ID = 0;
 //
 // @param builderContext : BuilderContext
 PipelineStateWrapper::PipelineStateWrapper(BuilderContext *builderContext)
-    : ImmutablePass(ID), m_builderContext(builderContext) {}
+    : ImmutablePass(ID), m_builderContext(builderContext) {
+}
 
 // =====================================================================================================================
 // Clean-up of PipelineStateWrapper at end of pass manager run
 //
 // @param module : Module
-bool PipelineStateWrapper::doFinalization(Module &module) { return false; }
+bool PipelineStateWrapper::doFinalization(Module &module) {
+  return false;
+}
 
 // =====================================================================================================================
 // Initialize the pipeline state wrapper pass

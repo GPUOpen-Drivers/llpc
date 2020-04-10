@@ -46,7 +46,8 @@ using namespace llvm;
 //
 // @param builderContext : Builder context
 Builder::Builder(BuilderContext *builderContext)
-    : BuilderBase(builderContext->getContext()), m_builderContext(builderContext) {}
+    : BuilderBase(builderContext->getContext()), m_builderContext(builderContext) {
+}
 
 // =====================================================================================================================
 // Set the common shader mode for the current shader, containing hardware FP round and denorm modes.
@@ -58,7 +59,9 @@ void Builder::setCommonShaderMode(const CommonShaderMode &commonShaderMode) {
 
 // =====================================================================================================================
 // Get the common shader mode for the current shader.
-const CommonShaderMode &Builder::getCommonShaderMode() { return getShaderModes()->getCommonShaderMode(m_shaderStage); }
+const CommonShaderMode &Builder::getCommonShaderMode() {
+  return getShaderModes()->getCommonShaderMode(m_shaderStage);
+}
 
 // =====================================================================================================================
 // Set the tessellation mode
@@ -228,19 +231,27 @@ PointerType *Builder::getBufferDescTy(Type *pointeeTy) {
 
 // =====================================================================================================================
 // Get the type of an image descriptor
-VectorType *Builder::getImageDescTy() { return VectorType::get(getInt32Ty(), 8); }
+VectorType *Builder::getImageDescTy() {
+  return VectorType::get(getInt32Ty(), 8);
+}
 
 // =====================================================================================================================
 // Get the type of an fmask descriptor
-VectorType *Builder::getFmaskDescTy() { return VectorType::get(getInt32Ty(), 8); }
+VectorType *Builder::getFmaskDescTy() {
+  return VectorType::get(getInt32Ty(), 8);
+}
 
 // =====================================================================================================================
 // Get the type of a texel buffer descriptor
-VectorType *Builder::getTexelBufferDescTy() { return VectorType::get(getInt32Ty(), 4); }
+VectorType *Builder::getTexelBufferDescTy() {
+  return VectorType::get(getInt32Ty(), 4);
+}
 
 // =====================================================================================================================
 // Get the type of a sampler descriptor
-VectorType *Builder::getSamplerDescTy() { return VectorType::get(getInt32Ty(), 4); }
+VectorType *Builder::getSamplerDescTy() {
+  return VectorType::get(getInt32Ty(), 4);
+}
 
 // =====================================================================================================================
 // Get the type of pointer to image descriptor.

@@ -173,7 +173,9 @@ static const unsigned DescRelocMagicMask = 0xFFFFFF00;
 static const unsigned DescSetMask = 0x000000FF;
 
 // Translates shader stage to corresponding stage mask.
-static inline unsigned shaderStageToMask(ShaderStage stage) { return 1U << static_cast<unsigned>(stage); }
+static inline unsigned shaderStageToMask(ShaderStage stage) {
+  return 1U << static_cast<unsigned>(stage);
+}
 
 // Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
 // and its parameters.

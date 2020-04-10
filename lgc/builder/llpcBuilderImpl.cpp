@@ -50,7 +50,9 @@ BuilderImpl::BuilderImpl(BuilderContext *builderContext, Pipeline *pipeline)
 
 // =====================================================================================================================
 // Get the ShaderModes object.
-ShaderModes *BuilderImplBase::getShaderModes() { return m_pipelineState->getShaderModes(); }
+ShaderModes *BuilderImplBase::getShaderModes() {
+  return m_pipelineState->getShaderModes();
+}
 
 // =====================================================================================================================
 // Create scalar from dot product of scalar or vector FP type. (The dot product of two scalars is their product.)
@@ -75,7 +77,9 @@ Value *BuilderImplBase::CreateDotProduct(Value *const vector1, Value *const vect
 
 // =====================================================================================================================
 // Get whether the context we are building in supports DPP operations.
-bool BuilderImplBase::supportDpp() const { return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 8; }
+bool BuilderImplBase::supportDpp() const {
+  return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 8;
+}
 
 // =====================================================================================================================
 // Get whether the context we are building in support the bpermute operation.

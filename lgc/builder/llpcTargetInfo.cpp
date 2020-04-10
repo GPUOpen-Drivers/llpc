@@ -173,7 +173,9 @@ static void setGfx703Info(TargetInfo *targetInfo) {
 // gfx8+
 //
 // @param [in/out] targetInfo : Target info
-static void setGfx8BaseInfo(TargetInfo *targetInfo) { setGfx7BaseInfo(targetInfo); }
+static void setGfx8BaseInfo(TargetInfo *targetInfo) {
+  setGfx7BaseInfo(targetInfo);
+}
 
 // gfx8
 //

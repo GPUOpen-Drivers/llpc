@@ -50,10 +50,13 @@ char SpirvLowerMemoryOp::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering memory operations.
-ModulePass *createSpirvLowerMemoryOp() { return new SpirvLowerMemoryOp(); }
+ModulePass *createSpirvLowerMemoryOp() {
+  return new SpirvLowerMemoryOp();
+}
 
 // =====================================================================================================================
-SpirvLowerMemoryOp::SpirvLowerMemoryOp() : SpirvLower(ID) {}
+SpirvLowerMemoryOp::SpirvLowerMemoryOp() : SpirvLower(ID) {
+}
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.

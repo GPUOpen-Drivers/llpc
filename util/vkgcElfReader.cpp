@@ -44,7 +44,8 @@ namespace Vkgc {
 template <class Elf>
 ElfReader<Elf>::ElfReader(GfxIpVersion gfxIp)
     : m_gfxIp(gfxIp), m_header(), m_symSecIdx(InvalidValue), m_relocSecIdx(InvalidValue), m_strtabSecIdx(InvalidValue),
-      m_textSecIdx(InvalidValue) {}
+      m_textSecIdx(InvalidValue) {
+}
 
 // =====================================================================================================================
 template <class Elf> ElfReader<Elf>::~ElfReader() {
@@ -217,7 +218,9 @@ template <class Elf> void ElfReader<Elf>::getRelocation(unsigned idx, ElfReloc *
 
 // =====================================================================================================================
 // Gets the count of Elf section.
-template <class Elf> unsigned ElfReader<Elf>::getSectionCount() { return static_cast<unsigned>(m_sections.size()); }
+template <class Elf> unsigned ElfReader<Elf>::getSectionCount() {
+  return static_cast<unsigned>(m_sections.size());
+}
 
 // =====================================================================================================================
 // Gets section data by section index.
@@ -466,7 +469,9 @@ template <class Elf> const llvm::msgpack::DocNode *ElfReader<Elf>::getMsgNode() 
 
 // =====================================================================================================================
 // Gets the map level of current message item.
-template <class Elf> unsigned ElfReader<Elf>::getMsgMapLevel() const { return m_msgPackMapLevel; }
+template <class Elf> unsigned ElfReader<Elf>::getMsgMapLevel() const {
+  return m_msgPackMapLevel;
+}
 
 // =====================================================================================================================
 // Gets the status of message packer iterator.

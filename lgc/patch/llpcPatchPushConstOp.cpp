@@ -50,10 +50,13 @@ char PatchPushConstOp::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for push constant operations
-ModulePass *createPatchPushConstOp() { return new PatchPushConstOp(); }
+ModulePass *createPatchPushConstOp() {
+  return new PatchPushConstOp();
+}
 
 // =====================================================================================================================
-PatchPushConstOp::PatchPushConstOp() : Patch(ID) {}
+PatchPushConstOp::PatchPushConstOp() : Patch(ID) {
+}
 
 // =====================================================================================================================
 // Get the analysis usage of this pass.

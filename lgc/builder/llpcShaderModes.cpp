@@ -47,7 +47,9 @@ static const char ComputeShaderModeMetadataName[] = "llpc.compute.mode";
 
 // =====================================================================================================================
 // Clear shader modes
-void ShaderModes::clear() { memset(m_commonShaderModes, 0, sizeof(m_commonShaderModes)); }
+void ShaderModes::clear() {
+  memset(m_commonShaderModes, 0, sizeof(m_commonShaderModes));
+}
 
 // =====================================================================================================================
 // Set the common shader mode (FP modes) for the given shader stage
@@ -114,19 +116,27 @@ const TessellationMode &ShaderModes::getTessellationMode() {
 
 // =====================================================================================================================
 // Set the geometry shader mode
-void ShaderModes::setGeometryShaderMode(const GeometryShaderMode &inMode) { m_geometryShaderMode = inMode; }
+void ShaderModes::setGeometryShaderMode(const GeometryShaderMode &inMode) {
+  m_geometryShaderMode = inMode;
+}
 
 // =====================================================================================================================
 // Get the geometry shader mode
-const GeometryShaderMode &ShaderModes::getGeometryShaderMode() { return m_geometryShaderMode; }
+const GeometryShaderMode &ShaderModes::getGeometryShaderMode() {
+  return m_geometryShaderMode;
+}
 
 // =====================================================================================================================
 // Set the fragment shader mode
-void ShaderModes::setFragmentShaderMode(const FragmentShaderMode &inMode) { m_fragmentShaderMode = inMode; }
+void ShaderModes::setFragmentShaderMode(const FragmentShaderMode &inMode) {
+  m_fragmentShaderMode = inMode;
+}
 
 // =====================================================================================================================
 // Get the fragment shader mode
-const FragmentShaderMode &ShaderModes::getFragmentShaderMode() { return m_fragmentShaderMode; }
+const FragmentShaderMode &ShaderModes::getFragmentShaderMode() {
+  return m_fragmentShaderMode;
+}
 
 // =====================================================================================================================
 // Set the compute shader mode (workgroup size)
@@ -145,7 +155,9 @@ void ShaderModes::setComputeShaderMode(const ComputeShaderMode &inMode) {
 
 // =====================================================================================================================
 // Get the compute shader mode (workgroup size)
-const ComputeShaderMode &ShaderModes::getComputeShaderMode() { return m_computeShaderMode; }
+const ComputeShaderMode &ShaderModes::getComputeShaderMode() {
+  return m_computeShaderMode;
+}
 
 // =====================================================================================================================
 // Record shader modes (common and specific) into IR metadata

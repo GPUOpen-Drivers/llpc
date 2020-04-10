@@ -83,7 +83,9 @@ static const size_t MaxLineBufSize = 65536;              // Buffer size to parse
 #define SIZE_OF_ARRAY(ary) (sizeof(ary) / sizeof(ary[0]))
 
 namespace Math {
-inline unsigned Absu(int number) { return static_cast<unsigned>(abs(number)); }
+inline unsigned Absu(int number) {
+  return static_cast<unsigned>(abs(number));
+}
 } // namespace Math
 
 // =====================================================================================================================
