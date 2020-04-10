@@ -72,7 +72,7 @@ Value *GfxRegHandler::getRegCommon(unsigned regId) {
 Value *GfxRegHandler::getRegCombine(unsigned regIdLo, unsigned regIdHi) {
   Value *regValueLo = getRegCommon(regIdLo);
   Value *regValueHi = getRegCommon(regIdHi);
-  return m_builder->CreateOr(m_builder->CreateShl(regValueHi, m_bitsInfo[regIdLo].offset), regValueLo);
+  return m_builder->CreateOr(m_builder->CreateShl(regValueHi, m_bitsInfo[regIdLo].count), regValueLo);
 }
 
 // =====================================================================================================================
@@ -85,9 +85,9 @@ Value *GfxRegHandler::getRegCombine(unsigned regIdLo, unsigned regIdHi) {
 void GfxRegHandler::setRegCombine(unsigned regIdLo, unsigned regIdHi, Value *regValue) {
   Value *regValueLo =
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                 {regValue, m_builder->getInt32(0), m_builder->getInt32(m_bitsInfo[regIdLo].offset)});
+                                 {regValue, m_builder->getInt32(0), m_builder->getInt32(m_bitsInfo[regIdLo].count)});
 
-  Value *regValueHi = m_builder->CreateLShr(regValue, m_builder->getInt32(m_bitsInfo[regIdLo].offset));
+  Value *regValueHi = m_builder->CreateLShr(regValue, m_builder->getInt32(m_bitsInfo[regIdLo].count));
 
   setRegCommon(regIdLo, regValueLo);
   setRegCommon(regIdHi, regValueHi);
