@@ -206,12 +206,12 @@ private:
     // Checks if NGG culling operations are enabled
     bool enableCulling() const
     {
-        return (m_nggControl->enableBackfaceCulling ||
+        return m_nggControl->enableBackfaceCulling ||
                 m_nggControl->enableFrustumCulling ||
                 m_nggControl->enableBoxFilterCulling ||
                 m_nggControl->enableSphereCulling ||
                 m_nggControl->enableSmallPrimFilter ||
-                m_nggControl->enableCullDistanceCulling);
+                m_nggControl->enableCullDistanceCulling;
     }
 
     llvm::BasicBlock* createBlock(llvm::Function* parent, const llvm::Twine& blockName = "");

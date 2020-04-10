@@ -91,14 +91,14 @@ void ShaderModes::setTessellationMode(
 {
     assert(inMode.outputVertices <= MaxTessPatchVertices);
 
-    m_tessellationMode.vertexSpacing = (inMode.vertexSpacing != static_cast<VertexSpacing>(0)) ?
+    m_tessellationMode.vertexSpacing = inMode.vertexSpacing != static_cast<VertexSpacing>(0) ?
                                         inMode.vertexSpacing : m_tessellationMode.vertexSpacing;
-    m_tessellationMode.vertexOrder = (inMode.vertexOrder != static_cast<VertexOrder>(0)) ?
+    m_tessellationMode.vertexOrder = inMode.vertexOrder != static_cast<VertexOrder>(0) ?
                                       inMode.vertexOrder : m_tessellationMode.vertexOrder;
-    m_tessellationMode.primitiveMode = (inMode.primitiveMode != static_cast<PrimitiveMode>(0)) ?
+    m_tessellationMode.primitiveMode = inMode.primitiveMode != static_cast<PrimitiveMode>(0) ?
                                         inMode.primitiveMode : m_tessellationMode.primitiveMode;
     m_tessellationMode.pointMode |= inMode.pointMode;
-    m_tessellationMode.outputVertices = (inMode.outputVertices != 0) ?
+    m_tessellationMode.outputVertices = inMode.outputVertices != 0 ?
                                             inMode.outputVertices : m_tessellationMode.outputVertices;
 }
 
@@ -156,9 +156,9 @@ void ShaderModes::setComputeShaderMode(
     m_computeShaderMode.workgroupSizeY = std::max(1U, inMode.workgroupSizeY);
     m_computeShaderMode.workgroupSizeZ = std::max(1U, inMode.workgroupSizeZ);
 
-    assert((m_computeShaderMode.workgroupSizeX <= MaxComputeWorkgroupSize) &&
-                (m_computeShaderMode.workgroupSizeY <= MaxComputeWorkgroupSize) &&
-                (m_computeShaderMode.workgroupSizeZ <= MaxComputeWorkgroupSize));
+    assert(m_computeShaderMode.workgroupSizeX <= MaxComputeWorkgroupSize &&
+                m_computeShaderMode.workgroupSizeY <= MaxComputeWorkgroupSize &&
+                m_computeShaderMode.workgroupSizeZ <= MaxComputeWorkgroupSize);
 }
 
 // =====================================================================================================================

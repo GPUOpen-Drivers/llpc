@@ -108,12 +108,12 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
 #endif
     }
 
-    if ((m_forceLoopUnrollCount == 0) && (!m_disableLicm))
+    if (m_forceLoopUnrollCount == 0 && !m_disableLicm)
         return false;
 
-    if ((m_shaderStage == ShaderStageTessControl) ||
-        (m_shaderStage == ShaderStageTessEval) ||
-        (m_shaderStage == ShaderStageGeometry))
+    if (m_shaderStage == ShaderStageTessControl ||
+        m_shaderStage == ShaderStageTessEval ||
+        m_shaderStage == ShaderStageGeometry)
     {
         // Disabled on above shader types.
         return false;
@@ -126,12 +126,12 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
         {
             auto terminator = block.getTerminator();
             MDNode* loopMetaNode = terminator->getMetadata("llvm.loop");
-            if ((!loopMetaNode ) ||
-                (loopMetaNode->getOperand(0) != loopMetaNode) ||
-                ((loopMetaNode->getNumOperands() != 1) && (!m_disableLicm)))
+            if (!loopMetaNode ||
+                loopMetaNode->getOperand(0) != loopMetaNode ||
+                (loopMetaNode->getNumOperands() != 1 && !m_disableLicm))
                 continue;
 
-            if (m_forceLoopUnrollCount && (loopMetaNode->getNumOperands() <= 1))
+            if (m_forceLoopUnrollCount && loopMetaNode->getNumOperands() <= 1)
             {
                 // We have a loop backedge with !llvm.loop metadata containing just
                 // one operand pointing to itself, meaning that the SPIR-V did not

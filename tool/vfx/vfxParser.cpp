@@ -240,7 +240,7 @@ bool VfxParser::endSection()
         // Do nothing
     }
     else if (m_currentSection->isShaderSourceSection() ||
-             (m_currentSection->getSectionType() == SectionTypeCompileLog))
+             m_currentSection->getSectionType() == SectionTypeCompileLog)
     {
         // Process shader source sections.
         parseSectionShaderSource();
@@ -280,7 +280,7 @@ bool VfxParser::parseSectionKeyValues()
         VFX_ASSERT(readCount < MaxLineBufSize);
         if (readCount == 0)
             break;
-        if ((lineBuffer[0] == '\0') || (memcmp(lineBuffer, "\r", 2) == 0))
+        if (lineBuffer[0] == '\0' || memcmp(lineBuffer, "\r", 2) == 0)
         {
             // Skip empty line
             continue;
@@ -957,7 +957,7 @@ bool parseIArray(
         };
         iVal = 0;
 
-        if ((isHex) || (!isSign))
+        if (isHex || !isSign)
             uVal = strtoul(number, nullptr, 0);
         else
             iVal = strtol(number, nullptr, 0);
@@ -999,7 +999,7 @@ bool parseI64Array(
         };
         i64Val = 0;
 
-        if ((isHex) || (!isSign))
+        if (isHex || !isSign)
             u64Val = strtoull(number, nullptr, 0);
         else
             i64Val = strtoll(number, nullptr, 0);
@@ -1274,7 +1274,7 @@ bool parseArrayAccess(
 
     char* lBracket = strchr(str, '[');
     char* rBracket = strchr(str, ']');
-    if ((!lBracket ) || (!rBracket ))
+    if (!lBracket || !rBracket )
     {
         PARSE_ERROR(*errorMsg, lineNum, "Expect [] for array access");
         result = false;
@@ -1305,7 +1305,7 @@ bool isArrayAccess(
 
     const char* lBracket = strchr(str, '[');
     const char* rBracket = strchr(str, ']');
-    if ((!lBracket ) || (!rBracket ))
+    if (!lBracket || !rBracket )
         result = false;
 
     if (result)
@@ -1337,7 +1337,7 @@ char * getWordFromString(
     char *p    = trimStringBeginning(str);
     char *dst = wordBuffer;
 
-    while ((*p != '\0') && (*p != ' ') && (*p != '\t'))
+    while (*p != '\0' && *p != ' ' && *p != '\t')
        *dst++ = *p++;
 
     *dst = '\0';

@@ -345,7 +345,7 @@ CsRegConfig::CsRegConfig(
 void initRegisterNameMap(
     GfxIpVersion gfxIp) // Graphics IP version info
 {
-    assert((gfxIp.major == 9) || (gfxIp.major == 10));
+    assert(gfxIp.major == 9 || gfxIp.major == 10);
 
     ADD_REG_MAP(SPI_SHADER_PGM_RSRC1_VS);
     ADD_REG_MAP(SPI_SHADER_PGM_RSRC2_VS);
@@ -695,7 +695,7 @@ void initRegisterNameMap(
 
         ADD_REG_MAP_GFX10(COMPUTE_PGM_RSRC3);
 
-        if ((gfxIp.major != 10) || (gfxIp.minor != 0))
+        if (gfxIp.major != 10 || gfxIp.minor != 0)
         {
             // For GFX10.1+
             ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_VS_0);

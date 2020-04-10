@@ -104,7 +104,7 @@ void SpirvLowerConstImmediateStore::processAllocaInsts(
             {
                 // Got an "alloca" instruction of aggregate type.
                 auto storeInst = findSingleStore(allocaInst);
-                if ((storeInst ) && isa<Constant>(storeInst->getValueOperand()))
+                if (storeInst && isa<Constant>(storeInst->getValueOperand()))
                 {
                     // Got an aggregate "alloca" with a single store to the whole type.
                     // Do the optimization.
@@ -137,7 +137,7 @@ StoreInst* SpirvLowerConstImmediateStore::findSingleStore(
             auto user = cast<Instruction>(useIt->getUser());
             if (auto storeInst = dyn_cast<StoreInst>(user))
             {
-                if ((pointer == storeInst->getValueOperand()) || (storeInstFound )
+                if (pointer == storeInst->getValueOperand() || storeInstFound
                       || !isOuterPointer)
                 {
                     // Pointer escapes by being stored, or we have already found a "store"

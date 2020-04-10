@@ -331,7 +331,7 @@ void ElfWriter<Elf>::mergeMetaNote(
         mergeMapItem(destRegisters, srcRegisters, regNumber);
 
     const unsigned mmSpiShaderUserDataPs0 = 0x2c0c;
-    unsigned psUserDataCount = (pContext->getGfxIpVersion().major < 9) ? 16 : 32;
+    unsigned psUserDataCount = pContext->getGfxIpVersion().major < 9 ? 16 : 32;
     for (unsigned regNumber = mmSpiShaderUserDataPs0;
          regNumber != mmSpiShaderUserDataPs0 + psUserDataCount; ++regNumber)
         mergeMapItem(destRegisters, srcRegisters, regNumber);
@@ -700,7 +700,7 @@ Result ElfWriter<Elf>::copyFromReader(
     std::sort(m_symbols.begin(), m_symbols.end(),
         [](const ElfSymbol & a, const ElfSymbol & b)
         {
-            return (a.secIdx < b.secIdx) || ((a.secIdx == b.secIdx) && (a.value < b.value));
+            return a.secIdx < b.secIdx || (a.secIdx == b.secIdx && a.value < b.value);
         });
     return result;
 }
@@ -759,7 +759,7 @@ void ElfWriter<Elf>::updateMetaNote(
 
     const unsigned mmSpiShaderUserDataPs0 = 0x2c0c;
     unsigned psUserDataBase = mmSpiShaderUserDataPs0;
-    unsigned psUserDataCount = (pContext->getGfxIpVersion().major < 9) ? 16 : 32;
+    unsigned psUserDataCount = pContext->getGfxIpVersion().major < 9 ? 16 : 32;
     auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->getPipelineBuildInfo());
 
     for (unsigned i = 0; i < psUserDataCount; ++i)
@@ -777,8 +777,8 @@ void ElfWriter<Elf>::updateMetaNote(
                 unsigned set = regValue & DescSetMask;
                 for (unsigned j = 0; j < pipelineInfo->fs.userDataNodeCount; ++j)
                 {
-                    if ((pipelineInfo->fs.pUserDataNodes[j].type == ResourceMappingNodeType::DescriptorTableVaPtr) &&
-                        (set == pipelineInfo->fs.pUserDataNodes[j].tablePtr.pNext[0].srdRange.set))
+                    if (pipelineInfo->fs.pUserDataNodes[j].type == ResourceMappingNodeType::DescriptorTableVaPtr &&
+                        set == pipelineInfo->fs.pUserDataNodes[j].tablePtr.pNext[0].srdRange.set)
                     {
                         // If it's descriptor user data, then update its offset to it.
                         unsigned value = pipelineInfo->fs.pUserDataNodes[j].offsetInDwords;
@@ -901,7 +901,7 @@ void ElfWriter<Elf>::mergeElfBinary(
         symbol->secIdx = InvalidValue;
     }
 
-    size_t isaOffset = (!nonFragmentIsaSymbol ) ?
+    size_t isaOffset = !nonFragmentIsaSymbol ?
                        alignTo(nonFragmentTextSection->secHead.shSize, 0x100) :
                        nonFragmentIsaSymbol->value;
     for (auto& fragmentSymbol : fragmentSymbols)
@@ -934,10 +934,10 @@ void ElfWriter<Elf>::mergeElfBinary(
     }
 
     // LLPC doesn't use per pipeline internal table, and LLVM backend doesn't add symbols for disassembly info.
-    assert((reader.isValidSymbol(fragmentIntrlTblSymbolName) == false) &&
-                (reader.isValidSymbol(fragmentDisassemblySymbolName) == false) &&
-                (reader.isValidSymbol(fragmentIntrlDataSymbolName) == false) &&
-                (reader.isValidSymbol(fragmentAmdIlSymbolName) == false));
+    assert(reader.isValidSymbol(fragmentIntrlTblSymbolName) == false &&
+                reader.isValidSymbol(fragmentDisassemblySymbolName) == false &&
+                reader.isValidSymbol(fragmentIntrlDataSymbolName) == false &&
+                reader.isValidSymbol(fragmentAmdIlSymbolName) == false);
     (void(fragmentIntrlTblSymbolName)); // unused
     (void(fragmentDisassemblySymbolName)); // unused
     (void(fragmentIntrlDataSymbolName)); // unused
@@ -965,13 +965,13 @@ void ElfWriter<Elf>::mergeElfBinary(
         const_cast<uint8_t*>(fragmentDisassemblySectionEnd)[0] = lastChar;
 
         auto fragmentDisassemblyOffset =
-            (!fragmentDisassembly ) ?
+            !fragmentDisassembly ?
             0 :
             (fragmentDisassembly - reinterpret_cast<const char*>(fragmentDisassemblySection->data));
 
         auto disassemblyEnd = strstr(reinterpret_cast<const char*>(nonFragmentDisassemblySection->data),
                                      fragmentIsaSymbolName);
-        auto disassemblySize = (!disassemblyEnd ) ?
+        auto disassemblySize = !disassemblyEnd ?
                               nonFragmentDisassemblySection->secHead.shSize :
                               disassemblyEnd - reinterpret_cast<const char*>(nonFragmentDisassemblySection->data);
 
@@ -1012,13 +1012,13 @@ void ElfWriter<Elf>::mergeElfBinary(
         const_cast<uint8_t*>(fragmentLlvmIrSectionEnd)[0] = lastChar;
 
         auto fragmentLlvmIrOffset =
-            (!fragmentLlvmIrStart ) ?
+            !fragmentLlvmIrStart ?
             0 :
             (fragmentLlvmIrStart - reinterpret_cast<const char*>(fragmentLlvmIrSection->data));
 
         auto llvmIrEnd = strstr(reinterpret_cast<const char*>(nonFragmentLlvmIrSection->data),
                                  fragmentIsaSymbolName);
-        auto llvmIrSize = (!llvmIrEnd ) ?
+        auto llvmIrSize = !llvmIrEnd ?
                           nonFragmentLlvmIrSection->secHead.shSize :
                           llvmIrEnd - reinterpret_cast<const char*>(nonFragmentLlvmIrSection->data);
 

@@ -94,9 +94,9 @@ bool BuilderImplBase::supportDpp() const
 bool BuilderImplBase::supportBPermute() const
 {
     auto gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion().major;
-    auto supportBPermute = (gfxIp == 8) || (gfxIp == 9);
+    auto supportBPermute = gfxIp == 8 || gfxIp == 9;
     auto waveSize = getPipelineState()->getShaderWaveSize(getShaderStageFromFunction(GetInsertBlock()->getParent()));
-    supportBPermute = supportBPermute || ((gfxIp == 10) && (waveSize == 32));
+    supportBPermute = supportBPermute || (gfxIp == 10 && waveSize == 32);
     return supportBPermute;
 }
 
@@ -191,7 +191,7 @@ Instruction* BuilderImplBase::createWaterfallLoop(
                 if (calledFunc->getName().startswith(lgcName::DescriptorLoadFromPtr))
                 {
                     call = dyn_cast<CallInst>(call->getArgOperand(0)); // The descriptor pointer
-                    if ((call ) &&
+                    if (call &&
                         call->getCalledFunction()->getName().startswith(lgcName::DescriptorIndex))
                         nonUniformVal = call->getArgOperand(1); // The index operand
                 }

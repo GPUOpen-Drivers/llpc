@@ -157,15 +157,15 @@ public:
     // Flush denormalized value to zero
     void FlushDenormToZero()
     {
-        if ((m_bits.exp == 0) && (m_bits.mantissa != 0))
+        if (m_bits.exp == 0 && m_bits.mantissa != 0)
             m_bits.mantissa = 0;
     }
 
     // Whether the value is NaN
-    bool IsNaN() const { return ((m_bits.exp == 0xFF) && (m_bits.mantissa != 0)); }
+    bool IsNaN() const { return m_bits.exp == 0xFF && m_bits.mantissa != 0; }
 
     // Whether the value is infinity
-    bool IsInf() const { return ((m_bits.exp == 0xFF) && (m_bits.mantissa == 0)); }
+    bool IsInf() const { return m_bits.exp == 0xFF && m_bits.mantissa == 0; }
 
     // Gets bits
     Float32Bits GetBits() const { return m_bits; }
@@ -236,7 +236,7 @@ public:
     {
         float value = 0.0f;
 
-        if ((m_bits.exp == 0) && (m_bits.mantissa == 0))
+        if (m_bits.exp == 0 && m_bits.mantissa == 0)
         {
             // Zero
             value = 0.0f;
@@ -274,21 +274,21 @@ public:
             }
         }
 
-        return (m_bits.sign) ? -value : value;
+        return m_bits.sign ? -value : value;
     }
 
     // Flush denormalized value to zero
     void FlushDenormToZero()
     {
-        if ((m_bits.exp == 0) && (m_bits.mantissa != 0))
+        if (m_bits.exp == 0 && m_bits.mantissa != 0)
             m_bits.mantissa = 0;
     }
 
     // Whether the value is NaN
-    bool IsNaN() const { return ((m_bits.exp == 0x1F) && (m_bits.mantissa != 0)); }
+    bool IsNaN() const { return m_bits.exp == 0x1F && m_bits.mantissa != 0; }
 
     // Whether the value is infinity
-    bool IsInf() const { return ((m_bits.exp == 0x1F) && (m_bits.mantissa == 0)); }
+    bool IsInf() const { return m_bits.exp == 0x1F && m_bits.mantissa == 0; }
 
     // Gets bits
     Float16Bits GetBits() const { return m_bits; }

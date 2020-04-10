@@ -528,7 +528,7 @@ void PipelineDumper::dumpPipelineShaderInfo(
             {
                 dumpFile << "descriptorRangeValue[" << i << "].uintData = ";
                 const unsigned descriptorSizeInDw =
-                    (descriptorRangeValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler) ? 8 : 4;
+                    descriptorRangeValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler ? 8 : 4;
 
                 for (unsigned k = 0; k < descriptorSizeInDw -1; ++k)
                      dumpFile << descriptorRangeValue->pValue[k] << ", ";
@@ -760,7 +760,7 @@ void PipelineDumper::dumpGraphicsStateInfo(
 
     // Output vertex input state
     if (pipelineInfo->pVertexInput &&
-        (pipelineInfo->pVertexInput->vertexBindingDescriptionCount > 0))
+        pipelineInfo->pVertexInput->vertexBindingDescriptionCount > 0)
     {
         dumpFile << "[VertexInputState]\n";
         for (unsigned i = 0; i < pipelineInfo->pVertexInput->vertexBindingDescriptionCount; ++i)
@@ -913,7 +913,7 @@ void PipelineDumper::updateHashForVertexInputState(
     const VkPipelineVertexInputStateCreateInfo* vertexInput,  // [in] Vertex input state
     MetroHash64*                                hasher)       // [in,out] Haher to generate hash code
 {
-    if ((vertexInput ) && (vertexInput->vertexBindingDescriptionCount > 0))
+    if (vertexInput && vertexInput->vertexBindingDescriptionCount > 0)
     {
         hasher->Update(vertexInput->vertexBindingDescriptionCount);
         hasher->Update(reinterpret_cast<const uint8_t*>(vertexInput->pVertexBindingDescriptions),
@@ -928,7 +928,7 @@ void PipelineDumper::updateHashForVertexInputState(
         auto vertexDivisor = findVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
             VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT,
             vertexInput->pNext);
-        unsigned divisorCount = (vertexDivisor ) ? vertexDivisor->vertexBindingDivisorCount : 0;
+        unsigned divisorCount = vertexDivisor ? vertexDivisor->vertexBindingDivisorCount : 0;
         hasher->Update(divisorCount);
         if (divisorCount > 0)
         {
@@ -961,16 +961,16 @@ void PipelineDumper::updateHashForNonFragmentState(
     auto nggState = &pipeline->nggState;
     bool enableNgg = nggState->enableNgg;
     bool passthroughMode =
-        (!nggState->enableVertexReuse) &&
-        (!nggState->enableBackfaceCulling) &&
-        (!nggState->enableFrustumCulling) &&
-        (!nggState->enableBoxFilterCulling) &&
-        (!nggState->enableSphereCulling) &&
-        (!nggState->enableSmallPrimFilter) &&
-        (!nggState->enableCullDistanceCulling);
+        !nggState->enableVertexReuse &&
+        !nggState->enableBackfaceCulling &&
+        !nggState->enableFrustumCulling &&
+        !nggState->enableBoxFilterCulling &&
+        !nggState->enableSphereCulling &&
+        !nggState->enableSmallPrimFilter &&
+        !nggState->enableCullDistanceCulling;
 
     bool updateHashFromRs = (!isCacheHash);
-    updateHashFromRs |= (enableNgg && (!passthroughMode));
+    updateHashFromRs |= (enableNgg && !passthroughMode);
 
     if (updateHashFromRs)
     {
@@ -1098,7 +1098,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(
                 // The hasher should be updated when the content changes, this is because YCbCrMetaData
                 // is engaged in pipeline compiling.
                 const unsigned descriptorSize =
-                    (descriptorRangeValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler) ? 16 : 32;
+                    descriptorRangeValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 16 : 32;
 
                 hasher->Update(reinterpret_cast<const uint8_t*>(descriptorRangeValue->pValue),
                                 descriptorRangeValue->arraySize * descriptorSize);
@@ -1264,7 +1264,7 @@ void outputBinary(
             out << " ";
     }
 
-    if ((endPos > startPos) && (endPos - startPos) % sizeof(unsigned))
+    if (endPos > startPos && (endPos - startPos) % sizeof(unsigned))
     {
         int padPos = dwordCount * sizeof(unsigned);
         for (int i = padPos; i < endPos; ++i)
@@ -1296,9 +1296,9 @@ OStream& operator<<(
         Result result = reader.getSectionDataBySortingIndex(sortIdx, &secIdx, &section);
         assert(result == Result::Success);
         (void(result)); // unused
-        if ((strcmp(section->name, ShStrTabName) == 0) ||
-            (strcmp(section->name, StrTabName) == 0) ||
-            (strcmp(section->name, SymTabName) == 0))
+        if (strcmp(section->name, ShStrTabName) == 0 ||
+            strcmp(section->name, StrTabName) == 0 ||
+            strcmp(section->name, SymTabName) == 0)
         {
             // Output system section
             out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
@@ -1495,9 +1495,9 @@ OStream& operator<<(
                 out << formatBuf;
             }
         }
-        else if ((strncmp(section->name, AmdGpuDisasmName, sizeof(AmdGpuDisasmName) - 1) == 0) ||
-            (strncmp(section->name, AmdGpuCsdataName, sizeof(AmdGpuCsdataName) - 1) == 0) ||
-            (strncmp(section->name, CommentName, sizeof(CommentName) - 1) == 0))
+        else if (strncmp(section->name, AmdGpuDisasmName, sizeof(AmdGpuDisasmName) - 1) == 0 ||
+            strncmp(section->name, AmdGpuCsdataName, sizeof(AmdGpuCsdataName) - 1) == 0 ||
+            strncmp(section->name, CommentName, sizeof(CommentName) - 1) == 0)
         {
             // Output text based sections
             out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";

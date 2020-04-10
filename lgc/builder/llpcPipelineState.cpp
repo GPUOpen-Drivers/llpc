@@ -193,9 +193,9 @@ void PipelineState::generate(
     ArrayRef<Timer*>                timers)               // Timers for: patch passes, llvm optimizations, codegen
 {
     unsigned passIndex = 1000;
-    Timer* patchTimer = (timers.size() >= 1) ? timers[0] : nullptr;
-    Timer* optTimer = (timers.size() >= 2) ? timers[1] : nullptr;
-    Timer* codeGenTimer = (timers.size() >= 3) ? timers[2] : nullptr;
+    Timer* patchTimer = timers.size() >= 1 ? timers[0] : nullptr;
+    Timer* optTimer = timers.size() >= 2 ? timers[1] : nullptr;
+    Timer* codeGenTimer = timers.size() >= 3 ? timers[2] : nullptr;
 
     // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
     //
@@ -306,7 +306,7 @@ void PipelineState::readShaderStageMask(
     m_stageMask = 0;
     for (auto& func : *module)
     {
-        if ((!func.empty()) && (func.getLinkage() != GlobalValue::InternalLinkage))
+        if (!func.empty() && func.getLinkage() != GlobalValue::InternalLinkage)
         {
             auto shaderStage = getShaderStageFromFunction(&func);
 
@@ -453,7 +453,7 @@ void PipelineState::readOptions(
         std::string metadataName = (Twine(OptionsMetadataName) + "." +
                                     getShaderStageAbbreviation(static_cast<ShaderStage>(stage))).str();
         auto namedMetaNode = module->getNamedMetadata(metadataName);
-        if ((!namedMetaNode ) || (namedMetaNode->getNumOperands() == 0))
+        if (!namedMetaNode || namedMetaNode->getNumOperands() == 0)
             continue;
         m_shaderOptions.resize(stage + 1);
         readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), m_shaderOptions[stage]);
@@ -652,8 +652,8 @@ void PipelineState::readUserDataNodes(
         }
         else
         {
-            if ((nextNode->type == ResourceNodeType::IndirectUserDataVaPtr) ||
-                (nextNode->type == ResourceNodeType::StreamOutTableVaPtr))
+            if (nextNode->type == ResourceNodeType::IndirectUserDataVaPtr ||
+                nextNode->type == ResourceNodeType::StreamOutTableVaPtr)
             {
                 // Operand 3: Size of the indirect data in dwords
                 nextNode->indirectSizeInDwords =
@@ -734,9 +734,9 @@ std::pair<const ResourceNode*, const ResourceNode*> PipelineState::findResourceN
         {
             for (const ResourceNode& innerNode : node.innerTable)
             {
-                if ((innerNode.set == descSet) && (innerNode.binding == binding))
+                if (innerNode.set == descSet && innerNode.binding == binding)
                 {
-                    if ((nodeType == ResourceNodeType::Unknown) || (nodeType == innerNode.type) ||
+                    if (nodeType == ResourceNodeType::Unknown || nodeType == innerNode.type ||
                         (nodeType == ResourceNodeType::DescriptorBuffer &&
                          (innerNode.type == ResourceNodeType::DescriptorBufferCompact ||
                           innerNode.type == ResourceNodeType::PushConst)) ||
@@ -748,9 +748,9 @@ std::pair<const ResourceNode*, const ResourceNode*> PipelineState::findResourceN
                 }
             }
         }
-        else if ((node.set == descSet) && (node.binding == binding))
+        else if (node.set == descSet && node.binding == binding)
         {
-            if ((nodeType == ResourceNodeType::Unknown) || (nodeType == node.type) ||
+            if (nodeType == ResourceNodeType::Unknown || nodeType == node.type ||
                 (nodeType == ResourceNodeType::DescriptorBuffer &&
                  node.type == ResourceNodeType::DescriptorBufferCompact) ||
                 (node.type == ResourceNodeType::DescriptorCombinedTexture &&
@@ -990,7 +990,7 @@ void PipelineState::readGraphicsState(
 bool PipelineState::isTessOffChip()
 {
     // For GFX9+, always enable tessellation off-chip mode
-    return EnableTessOffChip || (getBuilderContext()->getTargetInfo().getGfxIpVersion().major >= 9);
+    return EnableTessOffChip || getBuilderContext()->getTargetInfo().getGfxIpVersion().major >= 9;
 }
 
 // =====================================================================================================================
@@ -1032,7 +1032,7 @@ unsigned PipelineState::getShaderWaveSize(
         if (waveSizeOption != 0)
             waveSize = waveSizeOption;
 
-        if ((stage == ShaderStageGeometry) && (!hasShaderStage(ShaderStageGeometry)))
+        if (stage == ShaderStageGeometry && !hasShaderStage(ShaderStageGeometry))
         {
             // NOTE: For NGG, GS could be absent and VS/TES acts as part of it in the merged shader.
             // In such cases, we check the property of VS or TES.
@@ -1049,7 +1049,7 @@ unsigned PipelineState::getShaderWaveSize(
                 waveSize = subgroupSize;
         }
 
-        assert((waveSize == 32) || (waveSize == 64));
+        assert(waveSize == 32 || waveSize == 64);
     }
 
     return waveSize;

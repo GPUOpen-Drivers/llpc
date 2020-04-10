@@ -172,8 +172,8 @@ ShaderHash PipelineContext::getShaderHashCode(
     assert(shaderInfo );
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
-    if((shaderInfo->options.clientHash.upper != 0) &&
-       (shaderInfo->options.clientHash.lower != 0))
+    if(shaderInfo->options.clientHash.upper != 0 &&
+       shaderInfo->options.clientHash.lower != 0)
         return shaderInfo->options.clientHash;
     else
     {
@@ -248,7 +248,7 @@ void PipelineContext::setOptionsInPipeline(
           static_cast<lgc::ShadowDescriptorTableUsage>(getPipelineOptions()->shadowDescriptorTableUsage);
     options.shadowDescriptorTablePtrHigh = getPipelineOptions()->shadowDescriptorTablePtrHigh;
 
-    if (isGraphics() && (getGfxIpVersion().major >= 10))
+    if (isGraphics() && getGfxIpVersion().major >= 10)
     {
         // Only set NGG options for a GFX10+ graphics pipeline.
         auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo());
@@ -318,12 +318,12 @@ void PipelineContext::setOptionsInPipeline(
             shaderOptions.debugMode = shaderInfo->options.debugMode;
             shaderOptions.allowReZ = shaderInfo->options.allowReZ;
 
-            if ((shaderInfo->options.vgprLimit != 0) && (shaderInfo->options.vgprLimit != UINT_MAX))
+            if (shaderInfo->options.vgprLimit != 0 && shaderInfo->options.vgprLimit != UINT_MAX)
                 shaderOptions.vgprLimit = shaderInfo->options.vgprLimit;
             else
                 shaderOptions.vgprLimit = VgprLimit;
 
-            if ((shaderInfo->options.sgprLimit != 0) && (shaderInfo->options.sgprLimit != UINT_MAX))
+            if (shaderInfo->options.sgprLimit != 0 && shaderInfo->options.sgprLimit != UINT_MAX)
                 shaderOptions.sgprLimit = shaderInfo->options.sgprLimit;
             else
                 shaderOptions.sgprLimit = SgprLimit;
@@ -512,7 +512,7 @@ void PipelineContext::setUserDataNodesTable(
                     if (immutableNode.arraySize != 0)
                     {
                         const unsigned samplerDescriptorSize =
-                            (node.type != ResourceMappingNodeType::DescriptorYCbCrSampler) ? 4 : 8;
+                            node.type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 4 : 8;
 
                         for (unsigned compIdx = 0; compIdx < immutableNode.arraySize; ++compIdx)
                         {
@@ -569,7 +569,7 @@ void PipelineContext::setGraphicsStateInPipeline(
     // PolygonMode and CullModeFlags happen to have the same values as their Vulkan equivalents.
     rasterizerState.polygonMode = static_cast<PolygonMode>(inputRsState.polygonMode);
     rasterizerState.cullMode = static_cast<CullModeFlags>(inputRsState.cullMode);
-    rasterizerState.frontFaceClockwise = (inputRsState.frontFace != VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    rasterizerState.frontFaceClockwise = inputRsState.frontFace != VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizerState.depthBiasEnable = inputRsState.depthBiasEnable;
 
     pipeline->setGraphicsState(inputAssemblyState, viewportState, rasterizerState);
@@ -911,7 +911,7 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(
     {
         assert(format == FormatTable[format].format);
         if ((isColorExport && FormatTable[format].validExportFormat) ||
-            ((!isColorExport) && FormatTable[format].validVertexFormat))
+            (!isColorExport && FormatTable[format].validVertexFormat))
         {
             dfmt = FormatTable[format].dfmt;
             nfmt = FormatTable[format].nfmt;

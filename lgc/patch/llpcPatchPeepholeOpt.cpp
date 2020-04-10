@@ -317,7 +317,7 @@ void PatchPeepholeOpt::visitICmp(
     ConstantInt* const constantVal = dyn_cast<ConstantInt>(iCmp.getOperand(1));
 
     // If we don't have a constant we are comparing against, or the constant is the maximum representable, bail.
-    if ((!constantVal ) || constantVal->isMaxValue(false))
+    if (!constantVal || constantVal->isMaxValue(false))
         return;
 
     const uint64_t constant = constantVal->getZExtValue();
@@ -505,7 +505,7 @@ void PatchPeepholeOpt::visitPHINode(
     const unsigned numIncomings = phiNode.getNumIncomingValues();
 
     // Only care about vector PHI nodes whose element size is at least 32 bits.
-    if (phiNode.getType()->isVectorTy() && (phiNode.getType()->getScalarSizeInBits() >= 32))
+    if (phiNode.getType()->isVectorTy() && phiNode.getType()->getScalarSizeInBits() >= 32)
     {
         // The integer type we'll use for our extract & insert elements.
         IntegerType* const int32Type = IntegerType::get(phiNode.getContext(), 32);
@@ -624,7 +624,7 @@ void PatchPeepholeOpt::visitPHINode(
     }
 
     // Do not clone allocas -- we don't want to potentially introduce them in the middle of the function.
-    if ((prevIncomingInst ) && (!isa<AllocaInst>(prevIncomingInst)))
+    if (prevIncomingInst && !isa<AllocaInst>(prevIncomingInst))
     {
         Instruction* const newInst = prevIncomingInst->clone();
         insertAfter(*newInst, phiNode);
@@ -659,7 +659,7 @@ void PatchPeepholeOpt::visitPHINode(
 
                 // We can attempt to optimize the sub PHI node if an incoming is our parent PHI node, or if the
                 // incoming is a constant.
-                if ((incoming != &phiNode) && (!isa<Constant>(incoming)))
+                if (incoming != &phiNode && !isa<Constant>(incoming))
                 {
                     subPhiNodeOptimizable = false;
                     break;
@@ -715,7 +715,7 @@ void PatchPeepholeOpt::visitPHINode(
                         Value* const incoming = subPhiNode->getIncomingValue(subIncomingIndex);
                         Value* const otherIncoming = otherSubPhiNode->getIncomingValue(subIncomingIndex);
 
-                        if ((otherIncoming != otherPhiNode) && (otherIncoming != incoming))
+                        if (otherIncoming != otherPhiNode && otherIncoming != incoming)
                         {
                             subPhiNodeOptimizable = false;
                             break;
@@ -839,7 +839,7 @@ void PatchPeepholeOpt::visitCallInst(
     // 30:; preds = %.entry
     //   call void @llvm.amdgcn.kill(i1 false)
     //   br label %73
-    if (cl::EnableDiscardOpt && m_enableDiscardOpt && (callee->getIntrinsicID() == Intrinsic::amdgcn_kill))
+    if (cl::EnableDiscardOpt && m_enableDiscardOpt && callee->getIntrinsicID() == Intrinsic::amdgcn_kill)
     {
         auto block = callInst.getParent();
         if (block->size() > 2)

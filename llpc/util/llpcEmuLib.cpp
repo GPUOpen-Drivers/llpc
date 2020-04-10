@@ -77,7 +77,7 @@ Function* EmuLib::getFunction(
         if (funcMapIt != archive.functions.end())
         {
             // Function is already in the function map.
-            if (nativeOnly && (!funcMapIt->second.isNative))
+            if (nativeOnly && !funcMapIt->second.isNative)
                 return nullptr;
             return funcMapIt->second.function;
         }
@@ -164,7 +164,7 @@ Function* EmuLib::getFunction(
                     }
                 }
 
-                if ((libFunc.getName() == funcName) && ((!nativeOnly) || isNative))
+                if (libFunc.getName() == funcName && (!nativeOnly || isNative))
                     requestedFunc = &libFunc;
             }
         }

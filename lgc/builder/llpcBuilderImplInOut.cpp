@@ -112,7 +112,7 @@ Value* BuilderImplInOut::readGenericInputOutput(
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
     assert(resultTy->isAggregateType() == false);
-    assert((isOutput == false) || (m_shaderStage == ShaderStageTessControl));
+    assert(isOutput == false || m_shaderStage == ShaderStageTessControl);
 
     // Fold constant pLocationOffset into location. (Currently a variable pLocationOffset is only supported in
     // TCS, TES, and FS custom interpolation.)
@@ -148,7 +148,7 @@ Value* BuilderImplInOut::readGenericInputOutput(
             args.push_back(getInt32(location));
             args.push_back(locationOffset);
             args.push_back(elemIdx);
-            args.push_back((vertexIndex ) ? vertexIndex : getInt32(InvalidValue));
+            args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
             if (isOutput)
                 baseCallName = lgcName::OutputImportGeneric;
             break;
@@ -160,7 +160,7 @@ Value* BuilderImplInOut::readGenericInputOutput(
             assert(locationOffset == getInt32(0));
             args.push_back(getInt32(location));
             args.push_back(elemIdx);
-            args.push_back((vertexIndex ) ? vertexIndex : getInt32(InvalidValue));
+            args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
             break;
         }
 
@@ -260,7 +260,7 @@ Instruction* BuilderImplInOut::CreateWriteGenericOutput(
             args.push_back(getInt32(location));
             args.push_back(locationOffset);
             args.push_back(elemIdx);
-            args.push_back((vertexIndex ) ? vertexIndex : getInt32(InvalidValue));
+            args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
             break;
         }
 
@@ -320,7 +320,7 @@ void BuilderImplInOut::markGenericInputOutputUsage(
     std::map<unsigned, unsigned>* inOutLocMap = nullptr;
     if (!isOutput)
     {
-        if ((m_shaderStage != ShaderStageTessEval) || (vertexIndex ))
+        if (m_shaderStage != ShaderStageTessEval || vertexIndex )
         {
             // Normal input
             inOutLocMap = &resUsage->inOutUsage.inputLocMap;
@@ -333,7 +333,7 @@ void BuilderImplInOut::markGenericInputOutputUsage(
     }
     else
     {
-        if ((m_shaderStage != ShaderStageTessControl) || (vertexIndex ))
+        if (m_shaderStage != ShaderStageTessControl || vertexIndex )
         {
             // Normal output
             inOutLocMap = &resUsage->inOutUsage.outputLocMap;
@@ -345,7 +345,7 @@ void BuilderImplInOut::markGenericInputOutputUsage(
         }
     }
 
-    if ((!isOutput) || (m_shaderStage != ShaderStageGeometry))
+    if (!isOutput || m_shaderStage != ShaderStageGeometry)
     {
         bool keepAllLocations = false;
         if (getBuilderContext()->buildingRelocatableElf())
@@ -372,7 +372,7 @@ void BuilderImplInOut::markGenericInputOutputUsage(
         }
     }
 
-    if ((!isOutput) && (m_shaderStage == ShaderStageFragment))
+    if (!isOutput && m_shaderStage == ShaderStageFragment)
     {
         // Mark usage for interpolation info.
         markInterpolationInfo(inOutInfo);
@@ -627,7 +627,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
         XfbOutInfo xfbOutInfo = {};
         xfbOutInfo.xfbBuffer = xfbBuffer;
         xfbOutInfo.xfbOffset = cast<ConstantInt>(xfbOffset)->getZExtValue();
-        xfbOutInfo.is16bit = (valueToWrite->getType()->getScalarSizeInBits() == 16);
+        xfbOutInfo.is16bit = valueToWrite->getType()->getScalarSizeInBits() == 16;
         xfbOutInfo.xfbExtraOffset = 0;
 
         auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageGeometry);
@@ -721,11 +721,11 @@ Value* BuilderImplInOut::readBuiltIn(
     }
 
     // Handle the subgroup mask built-ins directly.
-    if ((builtIn == BuiltInSubgroupEqMask)            ||
-        (builtIn == BuiltInSubgroupGeMask)            ||
-        (builtIn == BuiltInSubgroupGtMask)            ||
-        (builtIn == BuiltInSubgroupLeMask)            ||
-        (builtIn == BuiltInSubgroupLtMask))
+    if (builtIn == BuiltInSubgroupEqMask           ||
+        builtIn == BuiltInSubgroupGeMask           ||
+        builtIn == BuiltInSubgroupGtMask           ||
+        builtIn == BuiltInSubgroupLeMask           ||
+        builtIn == BuiltInSubgroupLtMask)
     {
         Value* result = nullptr;
         Value* localInvocationId = readBuiltIn(false, BuiltInSubgroupLocalInvocationId, {}, nullptr, nullptr, "");
@@ -777,12 +777,12 @@ Value* BuilderImplInOut::readBuiltIn(
     {
     case ShaderStageTessControl:
     case ShaderStageTessEval:
-        args.push_back((index ) ? index : getInt32(InvalidValue));
-        args.push_back((vertexIndex ) ? vertexIndex : getInt32(InvalidValue));
+        args.push_back(index ? index : getInt32(InvalidValue));
+        args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
         break;
     case ShaderStageGeometry:
         assert(!index );
-        args.push_back((vertexIndex ) ? vertexIndex : getInt32(InvalidValue));
+        args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
         break;
     case ShaderStageFragment:
         if (builtIn == BuiltInSamplePosOffset)
@@ -793,10 +793,10 @@ Value* BuilderImplInOut::readBuiltIn(
             vertexIndex = nullptr;
             args.push_back(sampleNum);
         }
-        assert((!index ) && (!vertexIndex ));
+        assert(!index && !vertexIndex );
         break;
     default:
-        assert((!index ) && (!vertexIndex ));
+        assert(!index && !vertexIndex );
         break;
     }
 
@@ -845,9 +845,9 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
         else
             expectedTy = expectedTy->getVectorElementType();
     }
-    assert((expectedTy == valueToWrite->getType()) ||
-                (((builtIn == BuiltInClipDistance) || (builtIn == BuiltInCullDistance)) &&
-                 (valueToWrite->getType()->getArrayElementType() == expectedTy->getArrayElementType())));
+    assert(expectedTy == valueToWrite->getType() ||
+                ((builtIn == BuiltInClipDistance || builtIn == BuiltInCullDistance) &&
+                 valueToWrite->getType()->getArrayElementType() == expectedTy->getArrayElementType()));
 #endif // NDEBUG
 
     // For now, this just generates a call to llpc.output.export.builtin. A future commit will
@@ -866,15 +866,15 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
     switch (m_shaderStage)
     {
     case ShaderStageTessControl:
-        args.push_back((index ) ? index : getInt32(InvalidValue));
-        args.push_back((vertexIndex ) ? vertexIndex : getInt32(InvalidValue));
+        args.push_back(index ? index : getInt32(InvalidValue));
+        args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
         break;
     case ShaderStageGeometry:
-        assert((!index ) && (!vertexIndex ));
+        assert(!index && !vertexIndex );
         args.push_back(getInt32(streamId));
         break;
     default:
-        assert((!index ) && (!vertexIndex ));
+        assert(!index && !vertexIndex );
         break;
     }
     args.push_back(valueToWrite);
@@ -941,7 +941,7 @@ void BuilderImplInOut::markBuiltInInputUsage(
                               //    this function for this built-in might have different array sizes; we take the max)
 {
     auto& usage = getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage;
-    assert(((builtIn != BuiltInClipDistance) && (builtIn != BuiltInCullDistance)) || (arraySize != 0));
+    assert((builtIn != BuiltInClipDistance && builtIn != BuiltInCullDistance) || arraySize != 0);
     switch (m_shaderStage)
     {
     case ShaderStageVertex:
@@ -1132,7 +1132,7 @@ void BuilderImplInOut::markBuiltInOutputUsage(
     unsigned    streamId)     // GS stream ID, or InvalidValue if not known
 {
     auto& usage = getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage;
-    assert(((builtIn != BuiltInClipDistance) && (builtIn != BuiltInCullDistance)) || (arraySize != 0));
+    assert((builtIn != BuiltInClipDistance && builtIn != BuiltInCullDistance) || arraySize != 0);
     switch (m_shaderStage)
     {
     case ShaderStageVertex:

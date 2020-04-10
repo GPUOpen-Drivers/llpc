@@ -178,8 +178,8 @@ void Patch::addPasses(
     // Fully prepare the pipeline ABI (must be after optimizations)
     passMgr.add(createPatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
 
-    if (pipelineState->isGraphics() && (pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) &&
-        ((pipelineState->getOptions().nggFlags & NggFlagDisable) == 0))
+    if (pipelineState->isGraphics() && pipelineState->getTargetInfo().getGfxIpVersion().major >= 10 &&
+        (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0)
     {
         // Stop timer for patching passes and restart timer for optimization passes.
         if (patchTimer )

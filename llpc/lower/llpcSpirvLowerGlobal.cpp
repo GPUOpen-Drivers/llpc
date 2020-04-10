@@ -154,7 +154,7 @@ bool SpirvLowerGlobal::runOnModule(
         auto addrSpace = global.getType()->getAddressSpace();
 
         // Remove constant expressions for global variables in these address spaces
-        bool isGlobalVar = (addrSpace == SPIRAS_Private) || (addrSpace == SPIRAS_Input) || (addrSpace == SPIRAS_Output);
+        bool isGlobalVar = addrSpace == SPIRAS_Private || addrSpace == SPIRAS_Input || addrSpace == SPIRAS_Output;
 
         if (!isGlobalVar)
             continue;
@@ -215,7 +215,7 @@ void SpirvLowerGlobal::visitCallInst(
     CallInst& callInst) // [in] "Call" instruction
 {
     // Skip if "emit" and interpolaton calls are not expected to be handled
-    if ((!static_cast<bool>(m_instVisitFlags.checkEmitCall)) && (!static_cast<bool>(m_instVisitFlags.checkInterpCall)))
+    if (!static_cast<bool>(m_instVisitFlags.checkEmitCall) && !static_cast<bool>(m_instVisitFlags.checkInterpCall))
         return;
 
     auto callee = callInst.getCalledFunction();
@@ -306,16 +306,16 @@ void SpirvLowerGlobal::visitLoadInst(
     Value* loadSrc = loadInst.getOperand(0);
     const unsigned addrSpace = loadSrc->getType()->getPointerAddressSpace();
 
-    if ((addrSpace != SPIRAS_Input) && (addrSpace != SPIRAS_Output))
+    if (addrSpace != SPIRAS_Input && addrSpace != SPIRAS_Output)
         return;
 
     // Skip if "load" instructions are not expected to be handled
-    const bool isTcsInput  = ((m_shaderStage == ShaderStageTessControl) && (addrSpace == SPIRAS_Input));
-    const bool isTcsOutput = ((m_shaderStage == ShaderStageTessControl) && (addrSpace == SPIRAS_Output));
-    const bool isTesInput  = ((m_shaderStage == ShaderStageTessEval) && (addrSpace == SPIRAS_Input));
+    const bool isTcsInput  = (m_shaderStage == ShaderStageTessControl && addrSpace == SPIRAS_Input);
+    const bool isTcsOutput = (m_shaderStage == ShaderStageTessControl && addrSpace == SPIRAS_Output);
+    const bool isTesInput  = (m_shaderStage == ShaderStageTessEval && addrSpace == SPIRAS_Input);
 
-    if ((!static_cast<bool>(m_instVisitFlags.checkLoad)) ||
-        ((!isTcsInput) && (!isTcsOutput) && (!isTesInput)))
+    if (!static_cast<bool>(m_instVisitFlags.checkLoad) ||
+        (!isTcsInput && !isTcsOutput && !isTesInput))
         return;
 
     if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(loadSrc))
@@ -373,14 +373,14 @@ void SpirvLowerGlobal::visitLoadInst(
             if (inOutMeta.IsBuiltIn)
             {
                 unsigned builtInId = inOutMeta.Value;
-                isVertexIdx = ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
-                               (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
-                               (builtInId == spv::BuiltInPointSize)    ||
-                               (builtInId == spv::BuiltInClipDistance) ||
-                               (builtInId == spv::BuiltInCullDistance));
+                isVertexIdx = (builtInId == spv::BuiltInPerVertex   || // GLSL style per-vertex data
+                               builtInId == spv::BuiltInPosition    || // HLSL style per-vertex data
+                               builtInId == spv::BuiltInPointSize   ||
+                               builtInId == spv::BuiltInClipDistance ||
+                               builtInId == spv::BuiltInCullDistance);
             }
             else
-                isVertexIdx = (!static_cast<bool>(inOutMeta.PerPatch));
+                isVertexIdx = !static_cast<bool>(inOutMeta.PerPatch);
 
             if (isVertexIdx)
             {
@@ -433,14 +433,14 @@ void SpirvLowerGlobal::visitLoadInst(
             if (inOutMeta.IsBuiltIn)
             {
                 unsigned builtInId = inOutMeta.Value;
-                hasVertexIdx = ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
-                                (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
-                                (builtInId == spv::BuiltInPointSize)    ||
-                                (builtInId == spv::BuiltInClipDistance) ||
-                                (builtInId == spv::BuiltInCullDistance));
+                hasVertexIdx = (builtInId == spv::BuiltInPerVertex   || // GLSL style per-vertex data
+                                builtInId == spv::BuiltInPosition    || // HLSL style per-vertex data
+                                builtInId == spv::BuiltInPointSize   ||
+                                builtInId == spv::BuiltInClipDistance ||
+                                builtInId == spv::BuiltInCullDistance);
             }
             else
-                hasVertexIdx = (!static_cast<bool>(inOutMeta.PerPatch));
+                hasVertexIdx = !static_cast<bool>(inOutMeta.PerPatch);
         }
 
         if (hasVertexIdx)
@@ -496,12 +496,12 @@ void SpirvLowerGlobal::visitStoreInst(
 
     const unsigned addrSpace = storeDest->getType()->getPointerAddressSpace();
 
-    if ((addrSpace != SPIRAS_Input) && (addrSpace != SPIRAS_Output))
+    if (addrSpace != SPIRAS_Input && addrSpace != SPIRAS_Output)
         return;
 
     // Skip if "store" instructions are not expected to be handled
-    const bool isTcsOutput = ((m_shaderStage == ShaderStageTessControl) && (addrSpace == SPIRAS_Output));
-    if ((!static_cast<bool>(m_instVisitFlags.checkStore)) || (!isTcsOutput))
+    const bool isTcsOutput = (m_shaderStage == ShaderStageTessControl && addrSpace == SPIRAS_Output);
+    if (!static_cast<bool>(m_instVisitFlags.checkStore) || !isTcsOutput)
         return;
 
     if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(storeDest))
@@ -555,14 +555,14 @@ void SpirvLowerGlobal::visitStoreInst(
             if (outputMeta.IsBuiltIn)
             {
                 unsigned builtInId = outputMeta.Value;
-                isVertexIdx = ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
-                               (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
-                               (builtInId == spv::BuiltInPointSize)    ||
-                               (builtInId == spv::BuiltInClipDistance) ||
-                               (builtInId == spv::BuiltInCullDistance));
+                isVertexIdx = (builtInId == spv::BuiltInPerVertex   || // GLSL style per-vertex data
+                               builtInId == spv::BuiltInPosition    || // HLSL style per-vertex data
+                               builtInId == spv::BuiltInPointSize   ||
+                               builtInId == spv::BuiltInClipDistance ||
+                               builtInId == spv::BuiltInCullDistance);
             }
             else
-                isVertexIdx = (!static_cast<bool>(outputMeta.PerPatch));
+                isVertexIdx = !static_cast<bool>(outputMeta.PerPatch);
 
             if (isVertexIdx)
             {
@@ -610,14 +610,14 @@ void SpirvLowerGlobal::visitStoreInst(
             if (outputMeta.IsBuiltIn)
             {
                 unsigned builtInId = outputMeta.Value;
-                hasVertexIdx = ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
-                                (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
-                                (builtInId == spv::BuiltInPointSize)    ||
-                                (builtInId == spv::BuiltInClipDistance) ||
-                                (builtInId == spv::BuiltInCullDistance));
+                hasVertexIdx = (builtInId == spv::BuiltInPerVertex   || // GLSL style per-vertex data
+                                builtInId == spv::BuiltInPosition    || // HLSL style per-vertex data
+                                builtInId == spv::BuiltInPointSize   ||
+                                builtInId == spv::BuiltInClipDistance ||
+                                builtInId == spv::BuiltInCullDistance);
             }
             else
-                hasVertexIdx = (!static_cast<bool>(outputMeta.PerPatch));
+                hasVertexIdx = !static_cast<bool>(outputMeta.PerPatch);
         }
 
         if (hasVertexIdx)
@@ -692,7 +692,7 @@ void SpirvLowerGlobal::mapInputToProxy(
 {
     // NOTE: For tessellation shader, we do not map inputs to real proxy variables. Instead, we directly replace
     // "load" instructions with import calls in the lowering operation.
-    if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval))
+    if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval)
     {
         m_inputProxyMap[input] = nullptr;
         m_lowerInputInPlace = true;
@@ -802,7 +802,7 @@ void SpirvLowerGlobal::lowerInput()
 
     // NOTE: For tessellation shader, we invoke handling of "load"/"store" instructions and replace all those
     // instructions with import/export calls in-place.
-    assert((m_shaderStage != ShaderStageTessControl) && (m_shaderStage != ShaderStageTessEval));
+    assert(m_shaderStage != ShaderStageTessControl && m_shaderStage != ShaderStageTessEval);
 
     // NOTE: For fragment shader, we have to handle interpolation functions first since input interpolants must be
     // lowered in-place.
@@ -849,7 +849,7 @@ void SpirvLowerGlobal::lowerInput()
             if (inst )
             {
                 Type* instTy = inst->getType();
-                if (isa<PointerType>(instTy) && (instTy->getPointerAddressSpace() == SPIRAS_Input))
+                if (isa<PointerType>(instTy) && instTy->getPointerAddressSpace() == SPIRAS_Input)
                 {
                     assert(isa<GetElementPtrInst>(inst) || isa<BitCastInst>(inst));
                     Type* newInstTy = PointerType::get(instTy->getContainedType(0), SPIRAS_Private);
@@ -911,8 +911,8 @@ void SpirvLowerGlobal::lowerOutput()
 
         auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
-        if ((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval) ||
-            (m_shaderStage == ShaderStageFragment))
+        if (m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
+            m_shaderStage == ShaderStageFragment)
         {
             Value* outputValue = new LoadInst(proxy, "", retInst);
             addCallInstForOutputExport(outputValue, meta, nullptr, 0, 0, 0, nullptr, nullptr, InvalidValue, retInst);
@@ -947,7 +947,7 @@ void SpirvLowerGlobal::lowerOutput()
     // Replace the Emit(Stream)Vertex calls with builder code.
     for (auto emitCall : m_emitCalls)
     {
-        unsigned emitStreamId = (emitCall->getNumArgOperands() != 0) ?
+        unsigned emitStreamId = emitCall->getNumArgOperands() != 0 ?
                                 cast<ConstantInt>(emitCall->getArgOperand(0))->getZExtValue() : 0;
         m_builder->SetInsertPoint(emitCall);
         m_builder->CreateEmitVertex(emitStreamId);
@@ -967,7 +967,7 @@ void SpirvLowerGlobal::lowerOutput()
             if (inst )
             {
                 Type* instTy = inst->getType();
-                if (isa<PointerType>(instTy) && (instTy->getPointerAddressSpace() == SPIRAS_Output))
+                if (isa<PointerType>(instTy) && instTy->getPointerAddressSpace() == SPIRAS_Output)
                 {
                     assert(isa<GetElementPtrInst>(inst) || isa<BitCastInst>(inst));
                     Type* newInstTy = PointerType::get(instTy->getContainedType(0), SPIRAS_Private);
@@ -988,7 +988,7 @@ void SpirvLowerGlobal::lowerOutput()
 // "store" instructions with export calls.
 void SpirvLowerGlobal::lowerInOutInPlace()
 {
-    assert((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval));
+    assert(m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval);
 
     // Invoke handling of "load" and "store" instruction
     m_instVisitFlags.u32All = 0;
@@ -1090,8 +1090,8 @@ Value* SpirvLowerGlobal::addCallInstForInOutImport(
                                     //   - Value is vertex no. (0 ~ 2) for "InterpLocCustom"
     Instruction* insertPos)        // [in] Where to insert this call
 {
-    assert((addrSpace == SPIRAS_Input) ||
-                ((addrSpace == SPIRAS_Output) && (m_shaderStage == ShaderStageTessControl)));
+    assert(addrSpace == SPIRAS_Input ||
+                (addrSpace == SPIRAS_Output && m_shaderStage == ShaderStageTessControl));
 
     Value* inOutValue = UndefValue::get(inOutTy);
 
@@ -1113,20 +1113,20 @@ Value* SpirvLowerGlobal::addCallInstForInOutImport(
 
             unsigned builtInId = inOutMeta.Value;
 
-            if ((!vertexIdx ) && (m_shaderStage == ShaderStageGeometry) &&
-                ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
-                 (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
-                 (builtInId == spv::BuiltInPointSize)    ||
-                 (builtInId == spv::BuiltInClipDistance) ||
-                 (builtInId == spv::BuiltInCullDistance)))
+            if (!vertexIdx && m_shaderStage == ShaderStageGeometry &&
+                (builtInId == spv::BuiltInPerVertex   || // GLSL style per-vertex data
+                 builtInId == spv::BuiltInPosition    || // HLSL style per-vertex data
+                 builtInId == spv::BuiltInPointSize   ||
+                 builtInId == spv::BuiltInClipDistance ||
+                 builtInId == spv::BuiltInCullDistance))
             {
                 // NOTE: We are handling vertex indexing of built-in inputs of geometry shader. For tessellation
                 // shader, vertex indexing is handled by "load"/"store" instruction lowering.
                 assert(!vertexIdx ); // For per-vertex data, make a serial of per-vertex import calls.
 
-                assert((m_shaderStage == ShaderStageGeometry) ||
-                            (m_shaderStage == ShaderStageTessControl) ||
-                            (m_shaderStage == ShaderStageTessEval));
+                assert(m_shaderStage == ShaderStageGeometry ||
+                            m_shaderStage == ShaderStageTessControl ||
+                            m_shaderStage == ShaderStageTessEval);
 
                 auto elemMeta = cast<Constant>(inOutMetaVal->getOperand(1));
                 auto elemTy   = inOutTy->getArrayElementType();
@@ -1180,7 +1180,7 @@ Value* SpirvLowerGlobal::addCallInstForInOutImport(
 
             const uint64_t elemCount = inOutTy->getArrayNumElements();
 
-            if ((!vertexIdx ) && (m_shaderStage == ShaderStageGeometry))
+            if (!vertexIdx && m_shaderStage == ShaderStageGeometry)
             {
                 // NOTE: We are handling vertex indexing of generic inputs of geometry shader. For tessellation shader,
                 // vertex indexing is handled by "load"/"store" instruction lowering.
@@ -1271,8 +1271,8 @@ Value* SpirvLowerGlobal::addCallInstForInOutImport(
         if (inOutMeta.IsBuiltIn)
         {
             auto builtIn = static_cast<lgc::BuiltInKind>(inOutMeta.Value);
-            elemIdx = (elemIdx == m_builder->getInt32(InvalidValue)) ? nullptr : elemIdx;
-            vertexIdx = (vertexIdx == m_builder->getInt32(InvalidValue)) ? nullptr : vertexIdx;
+            elemIdx = elemIdx == m_builder->getInt32(InvalidValue) ? nullptr : elemIdx;
+            vertexIdx = vertexIdx == m_builder->getInt32(InvalidValue) ? nullptr : vertexIdx;
 
             lgc::InOutInfo inOutInfo;
             inOutInfo.setArraySize(maxLocOffset);
@@ -1281,11 +1281,11 @@ Value* SpirvLowerGlobal::addCallInstForInOutImport(
             else
                 inOutValue = m_builder->CreateReadBuiltInOutput(builtIn, inOutInfo, vertexIdx, elemIdx);
 
-            if (((builtIn == lgc::BuiltInSubgroupEqMask)     ||
-                 (builtIn == lgc::BuiltInSubgroupGeMask)     ||
-                 (builtIn == lgc::BuiltInSubgroupGtMask)     ||
-                 (builtIn == lgc::BuiltInSubgroupLeMask)     ||
-                 (builtIn == lgc::BuiltInSubgroupLtMask)) &&
+            if ((builtIn == lgc::BuiltInSubgroupEqMask    ||
+                 builtIn == lgc::BuiltInSubgroupGeMask    ||
+                 builtIn == lgc::BuiltInSubgroupGtMask    ||
+                 builtIn == lgc::BuiltInSubgroupLeMask    ||
+                 builtIn == lgc::BuiltInSubgroupLtMask) &&
                 inOutTy->isIntegerTy(64))
             {
                 // NOTE: Glslang has a bug. For gl_SubGroupXXXMaskARB, they are implemented as "uint64_t" while
@@ -1309,7 +1309,7 @@ Value* SpirvLowerGlobal::addCallInstForInOutImport(
                 assert(inOutMeta.Component % 2 == 0); // Must be even for 64-bit type
                 idx = inOutMeta.Component / 2;
             }
-            elemIdx = (!elemIdx ) ? m_builder->getInt32(idx) :
+            elemIdx = !elemIdx ? m_builder->getInt32(idx) :
                                                m_builder->CreateAdd(elemIdx, m_builder->getInt32(idx));
 
             lgc::InOutInfo inOutInfo;
@@ -1392,7 +1392,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(
         outputMeta.U64All[0] = cast<ConstantInt>(outputMetaVal->getOperand(2))->getZExtValue();
         outputMeta.U64All[1] = cast<ConstantInt>(outputMetaVal->getOperand(3))->getZExtValue();
 
-        if ((m_shaderStage == ShaderStageGeometry) && (emitStreamId != outputMeta.StreamId))
+        if (m_shaderStage == ShaderStageGeometry && emitStreamId != outputMeta.StreamId)
         {
             // NOTE: For geometry shader, if the output is not bound to this vertex stream, we skip processing.
             return;
@@ -1401,7 +1401,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(
         if (outputMeta.IsBuiltIn)
         {
             // NOTE: For geometry shader, we add stream ID for outputs.
-            assert((m_shaderStage != ShaderStageGeometry) || (emitStreamId == outputMeta.StreamId));
+            assert(m_shaderStage != ShaderStageGeometry || emitStreamId == outputMeta.StreamId);
 
             auto builtInId = static_cast<lgc::BuiltInKind>(outputMeta.Value);
             lgc::InOutInfo outputInfo;
@@ -1414,7 +1414,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(
             if (outputMeta.IsXfb)
             {
                 // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
-                assert((xfbOffsetAdjust == 0) && (xfbBufferAdjust == 0)); // Unused for built-ins
+                assert(xfbOffsetAdjust == 0 && xfbBufferAdjust == 0); // Unused for built-ins
 
                 auto elemTy = outputTy->getArrayElementType();
                 assert(elemTy->isFloatingPointTy() || elemTy->isIntegerTy()); // Must be scalar
@@ -1536,7 +1536,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(
         outputMeta.U64All[0] = cast<ConstantInt>(inOutMetaConst->getOperand(0))->getZExtValue();
         outputMeta.U64All[1] = cast<ConstantInt>(inOutMetaConst->getOperand(1))->getZExtValue();
 
-        if ((m_shaderStage == ShaderStageGeometry) && (emitStreamId != outputMeta.StreamId))
+        if (m_shaderStage == ShaderStageGeometry && emitStreamId != outputMeta.StreamId)
         {
             // NOTE: For geometry shader, if the output is not bound to this vertex stream, we skip processing.
             return;
@@ -1556,7 +1556,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(
             if (outputMeta.IsXfb)
             {
                 // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
-                assert((xfbOffsetAdjust == 0) && (xfbBufferAdjust == 0)); // Unused for built-ins
+                assert(xfbOffsetAdjust == 0 && xfbBufferAdjust == 0); // Unused for built-ins
                 auto xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset);
                 m_builder->CreateWriteXfbOutput(outputValue,
                                                  /*isBuiltIn=*/true,
@@ -1588,7 +1588,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(
         }
 
         unsigned location = outputMeta.Value + outputMeta.Index;
-        assert(((outputMeta.Index == 1) && (outputMeta.Value == 0)) || (outputMeta.Index == 0));
+        assert((outputMeta.Index == 1 && outputMeta.Value == 0) || outputMeta.Index == 0);
         assert(outputTy->isSingleValueType());
 
         unsigned idx = outputMeta.Component;
@@ -1598,9 +1598,9 @@ void SpirvLowerGlobal::addCallInstForOutputExport(
             assert(outputMeta.Component % 2 == 0); // Must be even for 64-bit type
             idx = outputMeta.Component / 2;
         }
-        elemIdx = (!elemIdx ) ? m_builder->getInt32(idx) :
+        elemIdx = !elemIdx ? m_builder->getInt32(idx) :
                                            m_builder->CreateAdd(elemIdx, m_builder->getInt32(idx));
-        locOffset = (!locOffset ) ? m_builder->getInt32(0) : locOffset;
+        locOffset = !locOffset ? m_builder->getInt32(0) : locOffset;
 
         if (outputMeta.IsXfb)
         {
@@ -1661,9 +1661,9 @@ Value* SpirvLowerGlobal::loadInOutMember(
                                                 //   - Vertex no. (0 ~ 2) for "InterpLocCustom"
     Instruction*               insertPos)      // [in] Where to insert calculation instructions
 {
-    assert((m_shaderStage == ShaderStageTessControl) ||
-                (m_shaderStage == ShaderStageTessEval) ||
-                (m_shaderStage == ShaderStageFragment));
+    assert(m_shaderStage == ShaderStageTessControl ||
+                m_shaderStage == ShaderStageTessEval ||
+                m_shaderStage == ShaderStageFragment);
 
     if (operandIdx < indexOperands.size() - 1)
     {
@@ -1712,7 +1712,7 @@ Value* SpirvLowerGlobal::loadInOutMember(
 
                 // Mark the end+1 possible location offset if the index is variable. The Builder call needs it
                 // so it knows how many locations to mark as used by this access.
-                if ((maxLocOffset == 0) && (!isa<ConstantInt>(elemIdx)))
+                if (maxLocOffset == 0 && !isa<ConstantInt>(elemIdx))
                 {
                     maxLocOffset = cast<ConstantInt>(locOffset)->getZExtValue() +
                                    stride * inOutTy->getArrayNumElements();
@@ -1854,7 +1854,7 @@ void SpirvLowerGlobal::storeOutputMember(
 
                 // Mark the end+1 possible location offset if the index is variable. The Builder call needs it
                 // so it knows how many locations to mark as used by this access.
-                if ((maxLocOffset == 0) && (!isa<ConstantInt>(elemIdx)))
+                if (maxLocOffset == 0 && !isa<ConstantInt>(elemIdx))
                 {
                     maxLocOffset = cast<ConstantInt>(locOffset)->getZExtValue() +
                                    stride * outputTy->getArrayNumElements();
@@ -2046,7 +2046,7 @@ void SpirvLowerGlobal::lowerBufferBlock()
                         indices.push_back(index);
 
                     // The first index should always be zero.
-                    assert(isa<ConstantInt>(indices[0]) && (cast<ConstantInt>(indices[0])->getZExtValue() == 0));
+                    assert(isa<ConstantInt>(indices[0]) && cast<ConstantInt>(indices[0])->getZExtValue() == 0);
 
                     // The second index is the block index.
                     Value* const blockIndex = indices[1];
@@ -2158,7 +2158,7 @@ void SpirvLowerGlobal::lowerPushConsts()
     for (GlobalVariable& global : m_module->globals())
     {
         // Skip anything that is not a push constant.
-        if ((global.getAddressSpace() != SPIRAS_Constant) || (!global.hasMetadata(gSPIRVMD::PushConst)))
+        if (global.getAddressSpace() != SPIRAS_Constant || !global.hasMetadata(gSPIRVMD::PushConst))
             continue;
 
         // There should only be a single push constant variable!

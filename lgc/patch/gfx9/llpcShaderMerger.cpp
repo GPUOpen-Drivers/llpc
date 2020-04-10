@@ -111,8 +111,8 @@ FunctionType* ShaderMerger::generateLsHsEntryPointType(
         auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
         auto tcsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl);
 
-        if ((vsIntfData->spillTable.sizeInDwords == 0) &&
-            (tcsIntfData->spillTable.sizeInDwords > 0))
+        if (vsIntfData->spillTable.sizeInDwords == 0 &&
+            tcsIntfData->spillTable.sizeInDwords > 0)
         {
             vsIntfData->userDataUsage.spillTable = userDataCount;
             ++userDataCount;
@@ -544,8 +544,8 @@ FunctionType* ShaderMerger::generateEsGsEntryPointType(
         {
             const auto tesIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval);
             assert(tesIntfData->userDataUsage.tes.viewIndex == intfData->userDataUsage.gs.viewIndex);
-            if ((intfData->spillTable.sizeInDwords > 0) &&
-                (tesIntfData->spillTable.sizeInDwords == 0))
+            if (intfData->spillTable.sizeInDwords > 0 &&
+                tesIntfData->spillTable.sizeInDwords == 0)
             {
                 tesIntfData->userDataUsage.spillTable = userDataCount;
                 ++userDataCount;
@@ -559,8 +559,8 @@ FunctionType* ShaderMerger::generateEsGsEntryPointType(
         {
             const auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
             assert(vsIntfData->userDataUsage.vs.viewIndex == intfData->userDataUsage.gs.viewIndex);
-            if ((intfData->spillTable.sizeInDwords > 0) &&
-                (vsIntfData->spillTable.sizeInDwords == 0))
+            if (intfData->spillTable.sizeInDwords > 0 &&
+                vsIntfData->spillTable.sizeInDwords == 0)
             {
                 vsIntfData->userDataUsage.spillTable = userDataCount;
                 ++userDataCount;
@@ -794,7 +794,7 @@ Function* ShaderMerger::generateEsGsEntryPoint(
 
     // Construct ".begines" block
     unsigned spillTableIdx = 0;
-    if ((hasTs && m_hasTes) || ((!hasTs) && m_hasVs))
+    if ((hasTs && m_hasTes) || (!hasTs && m_hasVs))
     {
         // Call ES main function
         args.clear();

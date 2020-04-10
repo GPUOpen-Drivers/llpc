@@ -71,26 +71,26 @@ void ConfigBuilder::buildPalMetadata()
         const bool hasTs = (m_hasTcs || m_hasTes);
         const bool enableNgg = m_pipelineState->getNggControl()->enableNgg;
 
-        if ((!hasTs) && (!m_hasGs))
+        if (!hasTs && !m_hasGs)
         {
             // VS-FS pipeline
-            if ((m_gfxIp.major >= 10) && enableNgg)
+            if (m_gfxIp.major >= 10 && enableNgg)
                 buildPipelineNggVsFsRegConfig();
             else
                 buildPipelineVsFsRegConfig();
         }
-        else if (hasTs && (!m_hasGs))
+        else if (hasTs && !m_hasGs)
         {
             // VS-TS-FS pipeline
-            if ((m_gfxIp.major >= 10) && enableNgg)
+            if (m_gfxIp.major >= 10 && enableNgg)
                 buildPipelineNggVsTsFsRegConfig();
             else
                 buildPipelineVsTsFsRegConfig();
         }
-        else if ((!hasTs) && m_hasGs)
+        else if (!hasTs && m_hasGs)
         {
             // VS-GS-FS pipeline
-            if ((m_gfxIp.major >= 10) && enableNgg)
+            if (m_gfxIp.major >= 10 && enableNgg)
                 buildPipelineNggVsGsFsRegConfig();
             else
                 buildPipelineVsGsFsRegConfig();
@@ -98,7 +98,7 @@ void ConfigBuilder::buildPalMetadata()
         else
         {
             // VS-TS-GS-FS pipeline
-            if ((m_gfxIp.major >= 10) && enableNgg)
+            if (m_gfxIp.major >= 10 && enableNgg)
                 buildPipelineNggVsTsGsFsRegConfig();
             else
                 buildPipelineVsTsGsFsRegConfig();
@@ -936,9 +936,9 @@ void ConfigBuilder::buildVsRegConfig(
     ShaderStage         shaderStage,    // Current shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for vertex-shader-specific pipeline
 {
-    assert((shaderStage == ShaderStageVertex)   ||
-                (shaderStage == ShaderStageTessEval) ||
-                (shaderStage == ShaderStageCopyShader));
+    assert(shaderStage == ShaderStageVertex  ||
+                shaderStage == ShaderStageTessEval ||
+                shaderStage == ShaderStageCopyShader);
 
     GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
@@ -961,7 +961,7 @@ void ConfigBuilder::buildVsRegConfig(
         setNumAvailVgprs(Util::Abi::HardwareStage::Vs, m_pipelineState->getTargetInfo().getGpuProperty().maxVgprsAvailable);
 
         SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN,
-            (resUsage->inOutUsage.gs.outLocCount[0] > 0) && enableXfb);
+            resUsage->inOutUsage.gs.outLocCount[0] > 0 && enableXfb);
         SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN,
             resUsage->inOutUsage.gs.outLocCount[1] > 0);
         SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_2_EN,
@@ -1142,7 +1142,7 @@ void ConfigBuilder::buildVsRegConfig(
 
     SET_REG_FIELD(&pConfig->vsRegs, VGT_PRIMITIVEID_EN, PRIMITIVEID_EN, usePrimitiveId);
 
-    if ((gfxIp.major >= 10) && (resUsage->inOutUsage.expCount == 0))
+    if (gfxIp.major >= 10 && resUsage->inOutUsage.expCount == 0)
     {
         SET_REG_GFX10_FIELD(&pConfig->vsRegs, SPI_VS_OUT_CONFIG, NO_PC_EXPORT, true);
     }
@@ -1193,7 +1193,7 @@ void ConfigBuilder::buildVsRegConfig(
             llvm_unreachable("Not implemented!");
     }
 
-    if ((clipDistanceCount > 0) || (cullDistanceCount > 0))
+    if (clipDistanceCount > 0 || cullDistanceCount > 0)
     {
         SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST0_VEC_ENA, true);
         if (clipDistanceCount + cullDistanceCount > 4)
@@ -1256,8 +1256,8 @@ void ConfigBuilder::buildLsHsRegConfig(
     ShaderStage         shaderStage2,   // Current second shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for local-hull-shader-specific pipeline
 {
-    assert((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageInvalid));
-    assert((shaderStage2 == ShaderStageTessControl) || (shaderStage2 == ShaderStageInvalid));
+    assert(shaderStage1 == ShaderStageVertex || shaderStage1 == ShaderStageInvalid);
+    assert(shaderStage2 == ShaderStageTessControl || shaderStage2 == ShaderStageInvalid);
 
     GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
@@ -1265,7 +1265,7 @@ void ConfigBuilder::buildLsHsRegConfig(
     const auto& vsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
 
     unsigned floatMode =
-        setupFloatingPointMode((shaderStage2 != ShaderStageInvalid) ? shaderStage2 : shaderStage1);
+        setupFloatingPointMode(shaderStage2 != ShaderStageInvalid ? shaderStage2 : shaderStage1);
     SET_REG_FIELD(&pConfig->lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, DX10_CLAMP, true); // Follow PAL setting
 
@@ -1356,15 +1356,15 @@ void ConfigBuilder::buildLsHsRegConfig(
     if (gfxIp.major == 9)
     {
         buildUserDataConfig(
-                     (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
-                     (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
+                     shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
+                     shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
                      Gfx09::mmSPI_SHADER_USER_DATA_LS_0);
     }
     else if (gfxIp.major == 10)
     {
         buildUserDataConfig(
-                     (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
-                     (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
+                     shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
+                     shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
                      Gfx10::mmSPI_SHADER_USER_DATA_HS_0);
     }
     else
@@ -1379,9 +1379,9 @@ void ConfigBuilder::buildEsGsRegConfig(
     ShaderStage         shaderStage2,   // Current second shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for export-geometry-shader-specific pipeline
 {
-    assert((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageTessEval) ||
-                (shaderStage1 == ShaderStageInvalid));
-    assert((shaderStage2 == ShaderStageGeometry) || (shaderStage2 == ShaderStageInvalid));
+    assert(shaderStage1 == ShaderStageVertex || shaderStage1 == ShaderStageTessEval ||
+                shaderStage1 == ShaderStageInvalid);
+    assert(shaderStage2 == ShaderStageGeometry || shaderStage2 == ShaderStageInvalid);
 
     GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
@@ -1402,7 +1402,7 @@ void ConfigBuilder::buildEsGsRegConfig(
     const auto& calcFactor     = gsInOutUsage.gs.calcFactor;
 
     unsigned gsVgprCompCnt = 0;
-    if ((calcFactor.inputVertices > 4) || gsBuiltInUsage.invocationId)
+    if (calcFactor.inputVertices > 4 || gsBuiltInUsage.invocationId)
         gsVgprCompCnt = 3;
     else if (gsBuiltInUsage.primitiveIdIn)
         gsVgprCompCnt = 2;
@@ -1412,7 +1412,7 @@ void ConfigBuilder::buildEsGsRegConfig(
     SET_REG_FIELD(&pConfig->esGsRegs, SPI_SHADER_PGM_RSRC1_GS, GS_VGPR_COMP_CNT, gsVgprCompCnt);
 
     unsigned floatMode =
-        setupFloatingPointMode((shaderStage2 != ShaderStageInvalid) ? shaderStage2 : shaderStage1);
+        setupFloatingPointMode(shaderStage2 != ShaderStageInvalid ? shaderStage2 : shaderStage1);
     SET_REG_FIELD(&pConfig->esGsRegs, SPI_SHADER_PGM_RSRC1_GS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->esGsRegs, SPI_SHADER_PGM_RSRC1_GS, DX10_CLAMP, true); // Follow PAL setting
 
@@ -1518,7 +1518,7 @@ void ConfigBuilder::buildEsGsRegConfig(
     // NOTE: The value of field "GS_INST_PRIMS_IN_SUBGRP" should be strictly equal to the product of
     // VGT_GS_ONCHIP_CNTL.GS_PRIMS_PER_SUBGRP * VGT_GS_INSTANCE_CNT.CNT.
     const unsigned gsInstPrimsInSubgrp =
-        (geometryMode.invocations > 1) ? (calcFactor.gsPrimsPerSubgroup * geometryMode.invocations) : 0;
+        geometryMode.invocations > 1 ? (calcFactor.gsPrimsPerSubgroup * geometryMode.invocations) : 0;
     SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, gsInstPrimsInSubgrp);
 
     unsigned gsVertItemSize0 = sizeof(unsigned) * gsInOutUsage.gs.outLocCount[0];
@@ -1542,7 +1542,7 @@ void ConfigBuilder::buildEsGsRegConfig(
     gsVsRingOffset += gsVertItemSize2 * maxVertOut;
     SET_REG_FIELD(&pConfig->esGsRegs, VGT_GSVS_RING_OFFSET_3, OFFSET, gsVsRingOffset);
 
-    if ((geometryMode.invocations > 1) || gsBuiltInUsage.invocationId)
+    if (geometryMode.invocations > 1 || gsBuiltInUsage.invocationId)
     {
         SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_INSTANCE_CNT, ENABLE, true);
         SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_INSTANCE_CNT, CNT, geometryMode.invocations);
@@ -1560,17 +1560,17 @@ void ConfigBuilder::buildEsGsRegConfig(
     SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
 
     // Set multi-stream output primitive type
-    if ((gsVertItemSize1 > 0) || (gsVertItemSize2 > 0) || (gsVertItemSize3 > 0))
+    if (gsVertItemSize1 > 0 || gsVertItemSize2 > 0 || gsVertItemSize3 > 0)
     {
         const static auto GsOutPrimInvalid = 3u;
         SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_1,
-            (gsVertItemSize1 > 0)? gsOutputPrimitiveType: GsOutPrimInvalid);
+            gsVertItemSize1 > 0? gsOutputPrimitiveType: GsOutPrimInvalid);
 
         SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_2,
-            (gsVertItemSize2 > 0) ? gsOutputPrimitiveType : GsOutPrimInvalid);
+            gsVertItemSize2 > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid);
 
         SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_3,
-            (gsVertItemSize3 > 0) ? gsOutputPrimitiveType : GsOutPrimInvalid);
+            gsVertItemSize3 > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid);
     }
 
     SET_REG_FIELD(&pConfig->esGsRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, calcFactor.gsVsRingItemSize);
@@ -1609,15 +1609,15 @@ void ConfigBuilder::buildEsGsRegConfig(
     if (gfxIp.major == 9)
     {
         buildUserDataConfig(
-                     (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
-                     (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
+                     shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
+                     shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
                      Gfx09::mmSPI_SHADER_USER_DATA_ES_0);
     }
     else if (gfxIp.major == 10)
     {
         buildUserDataConfig(
-                     (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
-                     (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
+                     shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
+                     shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
                      Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
     }
     else
@@ -1632,9 +1632,9 @@ void ConfigBuilder::buildPrimShaderRegConfig(
     ShaderStage         shaderStage2,   // Current second shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for primitive-shader-specific pipeline
 {
-    assert((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageTessEval) ||
-                (shaderStage1 == ShaderStageInvalid));
-    assert((shaderStage2 == ShaderStageGeometry) || (shaderStage2 == ShaderStageInvalid));
+    assert(shaderStage1 == ShaderStageVertex || shaderStage1 == ShaderStageTessEval ||
+                shaderStage1 == ShaderStageInvalid);
+    assert(shaderStage2 == ShaderStageGeometry || shaderStage2 == ShaderStageInvalid);
 
     const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
     assert(gfxIp.major >= 10);
@@ -1665,7 +1665,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(
     unsigned gsVgprCompCnt = 0;
     if (hasGs)
     {
-        if ((calcFactor.inputVertices > 4) || gsBuiltInUsage.invocationId)
+        if (calcFactor.inputVertices > 4 || gsBuiltInUsage.invocationId)
             gsVgprCompCnt = 3;
         else if (gsBuiltInUsage.primitiveIdIn)
             gsVgprCompCnt = 2;
@@ -1682,7 +1682,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(
     SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_PGM_RSRC1_GS, GS_VGPR_COMP_CNT, gsVgprCompCnt);
 
     unsigned floatMode =
-        setupFloatingPointMode((shaderStage2 != ShaderStageInvalid) ? shaderStage2 : shaderStage1);
+        setupFloatingPointMode(shaderStage2 != ShaderStageInvalid ? shaderStage2 : shaderStage1);
     SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_PGM_RSRC1_GS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_PGM_RSRC1_GS, DX10_CLAMP, true); // Follow PAL setting
 
@@ -1759,18 +1759,18 @@ void ConfigBuilder::buildPrimShaderRegConfig(
     SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, calcFactor.gsPrimsPerSubgroup);
 
     const unsigned gsInstPrimsInSubgrp =
-        (geometryMode.invocations > 1) ?
+        geometryMode.invocations > 1 ?
             (calcFactor.gsPrimsPerSubgroup * geometryMode.invocations) : calcFactor.gsPrimsPerSubgroup;
     SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, gsInstPrimsInSubgrp);
 
     unsigned gsVertItemSize = 4 * gsInOutUsage.outputMapLocCount;
     SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_VERT_ITEMSIZE, ITEMSIZE, gsVertItemSize);
 
-    if ((geometryMode.invocations > 1) || gsBuiltInUsage.invocationId)
+    if (geometryMode.invocations > 1 || gsBuiltInUsage.invocationId)
     {
         SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_INSTANCE_CNT, ENABLE, true);
         SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_INSTANCE_CNT, CNT, geometryMode.invocations);
-        if ((gfxIp.major > 10) || ((gfxIp.major == 10) && (gfxIp.minor >= 1)))
+        if (gfxIp.major > 10 || (gfxIp.major == 10 && gfxIp.minor >= 1))
         {
             SET_REG_GFX10_1_PLUS_FIELD(&pConfig->primShaderRegs,
                                        VGT_GS_INSTANCE_CNT,
@@ -1803,8 +1803,8 @@ void ConfigBuilder::buildPrimShaderRegConfig(
             gsOutputPrimitiveType = POINTLIST;
         else if (tessMode.primitiveMode == PrimitiveMode::Isolines)
             gsOutputPrimitiveType = LINESTRIP;
-        else if ((tessMode.primitiveMode == PrimitiveMode::Triangles) ||
-                 (tessMode.primitiveMode == PrimitiveMode::Quads))
+        else if (tessMode.primitiveMode == PrimitiveMode::Triangles ||
+                 tessMode.primitiveMode == PrimitiveMode::Quads)
             gsOutputPrimitiveType = TRISTRIP;
         else
             llvm_unreachable("Should never be called!");
@@ -1815,16 +1815,16 @@ void ConfigBuilder::buildPrimShaderRegConfig(
         const auto topology = m_pipelineState->getInputAssemblyState().topology;
         if (topology == PrimitiveTopology::PointList)
             gsOutputPrimitiveType = POINTLIST;
-        else if ((topology == PrimitiveTopology::LineList) ||
-                 (topology == PrimitiveTopology::LineStrip) ||
-                 (topology == PrimitiveTopology::LineListWithAdjacency) ||
-                 (topology == PrimitiveTopology::LineStripWithAdjacency))
+        else if (topology == PrimitiveTopology::LineList ||
+                 topology == PrimitiveTopology::LineStrip ||
+                 topology == PrimitiveTopology::LineListWithAdjacency ||
+                 topology == PrimitiveTopology::LineStripWithAdjacency)
             gsOutputPrimitiveType = LINESTRIP;
-        else if ((topology == PrimitiveTopology::TriangleList) ||
-                 (topology == PrimitiveTopology::TriangleStrip) ||
-                 (topology == PrimitiveTopology::TriangleFan) ||
-                 (topology == PrimitiveTopology::TriangleListWithAdjacency) ||
-                 (topology == PrimitiveTopology::TriangleStripWithAdjacency))
+        else if (topology == PrimitiveTopology::TriangleList ||
+                 topology == PrimitiveTopology::TriangleStrip ||
+                 topology == PrimitiveTopology::TriangleFan ||
+                 topology == PrimitiveTopology::TriangleListWithAdjacency ||
+                 topology == PrimitiveTopology::TriangleStripWithAdjacency)
             gsOutputPrimitiveType = TRISTRIP;
         else
             llvm_unreachable("Should never be called!");
@@ -2002,7 +2002,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(
         SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
     }
 
-    if ((clipDistanceCount > 0) || (cullDistanceCount > 0))
+    if (clipDistanceCount > 0 || cullDistanceCount > 0)
     {
         SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST0_VEC_ENA, true);
         if (clipDistanceCount + cullDistanceCount > 4)
@@ -2075,8 +2075,8 @@ void ConfigBuilder::buildPrimShaderRegConfig(
     // Build use data configuration
     //
     buildUserDataConfig(
-                 (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
-                 (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
+                 shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
+                 shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
                  Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
 }
 
@@ -2174,7 +2174,7 @@ void ConfigBuilder::buildPsRegConfig(
     SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, MASK_EXPORT_ENABLE, builtInUsage.sampleMask);
     SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, ALPHA_TO_MASK_DISABLE,
                   (builtInUsage.sampleMask ||
-                   (m_pipelineState->getColorExportState().alphaToCoverageEnable == false)));
+                   m_pipelineState->getColorExportState().alphaToCoverageEnable == false));
     SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, DEPTH_BEFORE_SHADER, fragmentMode.earlyFragmentTests);
     SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, EXEC_ON_NOOP,
                   (fragmentMode.earlyFragmentTests && resUsage->resourceWrite));
@@ -2205,7 +2205,7 @@ void ConfigBuilder::buildPsRegConfig(
         spiShaderColFormat |= (expFmts[i] << (4 * i));
     }
 
-    if ((spiShaderColFormat == 0) && (depthExpFmt == EXP_FORMAT_ZERO) && resUsage->inOutUsage.fs.dummyExport)
+    if (spiShaderColFormat == 0 && depthExpFmt == EXP_FORMAT_ZERO && resUsage->inOutUsage.fs.dummyExport)
     {
         // NOTE: Hardware requires that fragment shader always exports "something" (color or depth) to the SX.
         // If both SPI_SHADER_Z_FORMAT and SPI_SHADER_COL_FORMAT are zero, we need to override
@@ -2240,15 +2240,15 @@ void ConfigBuilder::buildPsRegConfig(
     // were identified in the shader.
     const std::vector<FsInterpInfo> dummyInterpInfo {{ 0, false, false, false }};
     const auto& fsInterpInfo = resUsage->inOutUsage.fs.interpInfo;
-    const auto* interpInfo = (fsInterpInfo.size() == 0) ? &dummyInterpInfo : &fsInterpInfo;
+    const auto* interpInfo = fsInterpInfo.size() == 0 ? &dummyInterpInfo : &fsInterpInfo;
 
     for (unsigned i = 0; i < interpInfo->size(); ++i)
     {
         auto interpInfoElem = (*interpInfo)[i];
-        if (((interpInfoElem.loc     == InvalidFsInterpInfo.loc) &&
-             (interpInfoElem.flat    == InvalidFsInterpInfo.flat) &&
-             (interpInfoElem.custom  == InvalidFsInterpInfo.custom) &&
-             (interpInfoElem.is16bit == InvalidFsInterpInfo.is16bit)))
+        if ((interpInfoElem.loc     == InvalidFsInterpInfo.loc &&
+             interpInfoElem.flat    == InvalidFsInterpInfo.flat &&
+             interpInfoElem.custom  == InvalidFsInterpInfo.custom &&
+             interpInfoElem.is16bit == InvalidFsInterpInfo.is16bit))
           interpInfoElem.loc = i;
 
         regSPI_PS_INPUT_CNTL_0 spiPsInputCntl = {};
@@ -2378,7 +2378,7 @@ void ConfigBuilder::buildCsRegConfig(
         SET_REG_GFX10_FIELD(config, COMPUTE_PGM_RSRC1, MEM_ORDERED, true);
         SET_REG_GFX10_FIELD(config, COMPUTE_PGM_RSRC1, WGP_MODE, wgpMode);
         unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageCompute);
-        assert((waveSize == 32) || (waveSize == 64));
+        assert(waveSize == 32 || waveSize == 64);
         if (m_pipelineState->getPalAbiVersion() < 495)
         {
             if (waveSize == 32)
@@ -2439,16 +2439,16 @@ void ConfigBuilder::buildUserDataConfig(
 
     // NOTE: For merged shader, the second shader stage should be tessellation control shader (LS-HS) or geometry
     // shader (ES-GS).
-    assert((shaderStage2 == ShaderStageTessControl) || (shaderStage2 == ShaderStageGeometry) ||
-                (shaderStage2 == ShaderStageInvalid));
+    assert(shaderStage2 == ShaderStageTessControl || shaderStage2 == ShaderStageGeometry ||
+                shaderStage2 == ShaderStageInvalid);
 
     bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
 
     bool enableXfb = false;
     if (m_pipelineState->isGraphics())
     {
-        if (((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageTessEval)) &&
-            (shaderStage2 == ShaderStageInvalid))
+        if ((shaderStage1 == ShaderStageVertex || shaderStage1 == ShaderStageTessEval) &&
+            shaderStage2 == ShaderStageInvalid)
             enableXfb = m_pipelineState->getShaderResourceUsage(shaderStage1)->inOutUsage.enableXfb;
     }
 
@@ -2462,7 +2462,7 @@ void ConfigBuilder::buildUserDataConfig(
     const auto resUsage1 = m_pipelineState->getShaderResourceUsage(shaderStage1);
     const auto& builtInUsage1 = resUsage1->builtInUsage;
 
-    const auto intfData2 = (shaderStage2 != ShaderStageInvalid) ?
+    const auto intfData2 = shaderStage2 != ShaderStageInvalid ?
                                 m_pipelineState->getShaderInterfaceData(shaderStage2) : nullptr;
 
     // Stage-specific processing
@@ -2496,7 +2496,7 @@ void ConfigBuilder::buildUserDataConfig(
                          static_cast<unsigned>(Util::Abi::UserDataMapping::VertexBufferTable));
         }
 
-        if (enableXfb && (intfData1->userDataUsage.vs.streamOutTablePtr > 0) && (shaderStage2 == ShaderStageInvalid))
+        if (enableXfb && intfData1->userDataUsage.vs.streamOutTablePtr > 0 && shaderStage2 == ShaderStageInvalid)
         {
             assert(intfData1->userDataMap[intfData1->userDataUsage.vs.streamOutTablePtr] ==
                 InterfaceData::UserDataUnmapped);
@@ -2507,7 +2507,7 @@ void ConfigBuilder::buildUserDataConfig(
 
         if (enableMultiView)
         {
-            if ((shaderStage2 == ShaderStageInvalid) || (shaderStage2 == ShaderStageTessControl))
+            if (shaderStage2 == ShaderStageInvalid || shaderStage2 == ShaderStageTessControl)
             {
                 // Act as hardware VS or LS-HS merged shader
                 assert(entryArgIdxs1.vs.viewIndex > 0);
@@ -2519,7 +2519,7 @@ void ConfigBuilder::buildUserDataConfig(
                 // Act as hardware ES-GS merged shader
                 const auto& entryArgIdxs2 = intfData2->entryArgIdxs;
 
-                assert((entryArgIdxs1.vs.viewIndex > 0) && (entryArgIdxs2.gs.viewIndex > 0));
+                assert(entryArgIdxs1.vs.viewIndex > 0 && entryArgIdxs2.gs.viewIndex > 0);
                 (void(entryArgIdxs2)); // unused
                 assert(intfData1->userDataUsage.vs.viewIndex == intfData2->userDataUsage.gs.viewIndex);
                 appendConfig(startUserData + intfData1->userDataUsage.vs.viewIndex,
@@ -2549,7 +2549,7 @@ void ConfigBuilder::buildUserDataConfig(
     }
     else if (shaderStage1 == ShaderStageTessEval)
     {
-        if (enableXfb && (intfData1->userDataUsage.tes.streamOutTablePtr > 0) && (shaderStage2 == ShaderStageInvalid))
+        if (enableXfb && intfData1->userDataUsage.tes.streamOutTablePtr > 0 && shaderStage2 == ShaderStageInvalid)
         {
             assert(intfData1->userDataMap[intfData1->userDataUsage.tes.streamOutTablePtr] ==
                 InterfaceData::UserDataUnmapped);
@@ -2572,7 +2572,7 @@ void ConfigBuilder::buildUserDataConfig(
                 // Act as hardware ES-GS merged shader
                 const auto& entryArgIdxs2 = intfData2->entryArgIdxs;
 
-                assert((entryArgIdxs1.tes.viewIndex > 0) && (entryArgIdxs2.gs.viewIndex > 0));
+                assert(entryArgIdxs1.tes.viewIndex > 0 && entryArgIdxs2.gs.viewIndex > 0);
                 (void(entryArgIdxs2)); // unused
                 assert(intfData1->userDataUsage.tes.viewIndex == intfData2->userDataUsage.gs.viewIndex);
                 appendConfig(startUserData + intfData1->userDataUsage.tes.viewIndex,
@@ -2652,12 +2652,12 @@ void ConfigBuilder::buildUserDataConfig(
         // table is in use except the vertex buffer table and streamout table.
         // Also do this if no user data nodes are used; PAL does not like userDataLimit being 0
         // if there are any user data nodes.
-        if ((intfData1->userDataUsage.spillTable > 0) || (userDataLimit == 0))
+        if (intfData1->userDataUsage.spillTable > 0 || userDataLimit == 0)
         {
             for (auto& node : m_pipelineState->getUserDataNodes())
             {
-                if ((node.type != ResourceNodeType::IndirectUserDataVaPtr) &&
-                    (node.type != ResourceNodeType::StreamOutTableVaPtr))
+                if (node.type != ResourceNodeType::IndirectUserDataVaPtr &&
+                    node.type != ResourceNodeType::StreamOutTableVaPtr)
                     userDataLimit = std::max(userDataLimit, node.offsetInDwords + node.sizeInDwords);
             }
         }

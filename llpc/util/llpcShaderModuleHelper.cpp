@@ -66,7 +66,7 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(
         unsigned opCode = (codePos[0] & OpCodeMask);
         unsigned wordCount = (codePos[0] >> WordCountShift);
 
-        if ((wordCount == 0) || (codePos + wordCount > end))
+        if (wordCount == 0 || codePos + wordCount > end)
         {
             LLPC_ERRS("Invalid SPIR-V binary\n");
             result = Result::ErrorInvalidShader;
@@ -287,7 +287,7 @@ unsigned ShaderModuleHelper::getStageMaskFromSpirvBinary(
             unsigned opCode = (codePos[0] & OpCodeMask);
             unsigned wordCount = (codePos[0] >> WordCountShift);
 
-            if ((wordCount == 0) || (codePos + wordCount > end))
+            if (wordCount == 0 || codePos + wordCount > end)
             {
                 LLPC_ERRS("Invalid SPIR-V binary\n");
                 stageMask = 0;
@@ -345,7 +345,7 @@ const char* ShaderModuleHelper::getEntryPointNameFromSpirvBinary(
             unsigned opCode = (codePos[0] & OpCodeMask);
             unsigned wordCount = (codePos[0] >> WordCountShift);
 
-            if ((wordCount == 0) || (codePos + wordCount > end))
+            if (wordCount == 0 || codePos + wordCount > end)
             {
                 LLPC_ERRS("Invalid SPIR-V binary\n");
                 break;
@@ -408,7 +408,7 @@ Result ShaderModuleHelper::verifySpirvBinary(
         Op opCode = static_cast<Op>(codePos[0] & OpCodeMask);
         unsigned wordCount = (codePos[0] >> WordCountShift);
 
-        if ((wordCount == 0) || (codePos + wordCount > end))
+        if (wordCount == 0 || codePos + wordCount > end)
         {
             result = Result::ErrorInvalidShader;
             break;
@@ -435,7 +435,7 @@ bool ShaderModuleHelper::isSpirvBinary(
     if (shaderBin->codeSize > sizeof(SpirvHeader))
     {
         const SpirvHeader* header = reinterpret_cast<const SpirvHeader*>(shaderBin->pCode);
-        if ((header->magicNumber == MagicNumber) && (header->spvVersion <= spv::Version) && (header->reserved == 0))
+        if (header->magicNumber == MagicNumber && header->spvVersion <= spv::Version && header->reserved == 0)
             isSpvBinary = true;
     }
 
@@ -449,8 +449,8 @@ bool ShaderModuleHelper::isLlvmBitcode(
 {
     static unsigned BitcodeMagicNumber = 0xDEC04342; // 0x42, 0x43, 0xC0, 0xDE
     bool isLlvmBitcode = false;
-    if ((shaderBin->codeSize > 4) &&
-        (*reinterpret_cast<const unsigned*>(shaderBin->pCode) == BitcodeMagicNumber))
+    if (shaderBin->codeSize > 4 &&
+        *reinterpret_cast<const unsigned*>(shaderBin->pCode) == BitcodeMagicNumber)
         isLlvmBitcode = true;
 
     return isLlvmBitcode;

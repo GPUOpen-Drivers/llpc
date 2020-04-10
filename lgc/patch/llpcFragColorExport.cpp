@@ -84,9 +84,9 @@ Value* FragColorExport::run(
 
     const unsigned bitWidth = outputTy->getScalarSizeInBits();
     BasicType outputType = resUsage->inOutUsage.fs.outputTypes[origLoc];
-    const bool signedness = ((outputType == BasicType::Int8) ||
-                             (outputType == BasicType::Int16) ||
-                             (outputType == BasicType::Int));
+    const bool signedness = (outputType == BasicType::Int8 ||
+                             outputType == BasicType::Int16 ||
+                             outputType == BasicType::Int);
 
     auto compTy = outputTy->isVectorTy() ? outputTy->getVectorElementType() : outputTy;
     unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() : 1;
@@ -283,8 +283,8 @@ Value* FragColorExport::run(
                 compCount++;
             }
 
-            StringRef funcName = (expFmt == EXP_FORMAT_SNORM16_ABGR) ?
-                ("llvm.amdgcn.cvt.pknorm.i16") : ("llvm.amdgcn.cvt.pknorm.u16");
+            StringRef funcName = expFmt == EXP_FORMAT_SNORM16_ABGR ?
+                "llvm.amdgcn.cvt.pknorm.i16" : "llvm.amdgcn.cvt.pknorm.u16";
 
             for (unsigned i = 0; i < compCount; i += 2)
             {
@@ -336,8 +336,8 @@ Value* FragColorExport::run(
                 compCount++;
             }
 
-            StringRef funcName = (expFmt == EXP_FORMAT_SINT16_ABGR) ?
-                ("llvm.amdgcn.cvt.pk.i16") : ("llvm.amdgcn.cvt.pk.u16");
+            StringRef funcName = expFmt == EXP_FORMAT_SINT16_ABGR ?
+                "llvm.amdgcn.cvt.pk.i16" : "llvm.amdgcn.cvt.pk.u16";
 
             for (unsigned i = 0; i < compCount; i += 2)
             {
@@ -424,7 +424,7 @@ Value* FragColorExport::run(
 
         Value* args[] = {
             ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_MRT_0 + location), // tgt
-            ConstantInt::get(Type::getInt32Ty(*m_context), (compCount > 2) ? 0xF : 0x3), // en
+            ConstantInt::get(Type::getInt32Ty(*m_context), compCount > 2 ? 0xF : 0x3), // en
             comps[0],                                                                     // src0
             comps[1],                                                                     // src1
             ConstantInt::get(Type::getInt1Ty(*m_context), false),                        // done
@@ -467,7 +467,7 @@ ExportFormat FragColorExport::computeExportFormat(
     const auto cbState = &m_pipelineState->getColorExportState();
     const auto target = &m_pipelineState->getColorExportFormat(location);
     // NOTE: Alpha-to-coverage only takes effect for outputs from color target 0.
-    const bool enableAlphaToCoverage = (cbState->alphaToCoverageEnable && (location == 0));
+    const bool enableAlphaToCoverage = (cbState->alphaToCoverageEnable && location == 0);
 
     const bool blendEnabled = target->blendEnable;
 
@@ -478,7 +478,7 @@ ExportFormat FragColorExport::computeExportFormat(
     const bool isSintFormat = (target->nfmt == BufNumFormatSint);
     const bool isSrgbFormat = (target->nfmt == BufNumFormatSrgb);
 
-    if ((target->dfmt == BufDataFormat8_8_8) || (target->dfmt == BufDataFormat8_8_8_Bgr))
+    if (target->dfmt == BufDataFormat8_8_8 || target->dfmt == BufDataFormat8_8_8_Bgr)
     {
         // These three-byte formats are handled by pretending they are float.
         isFloatFormat = true;
@@ -487,7 +487,7 @@ ExportFormat FragColorExport::computeExportFormat(
     const unsigned maxCompBitCount = getMaxComponentBitCount(target->dfmt);
 
     const bool formatHasAlpha = hasAlpha(target->dfmt);
-    const bool alphaExport = ((outputMask == 0xF) &&
+    const bool alphaExport = (outputMask == 0xF &&
                               (formatHasAlpha || target->blendSrcAlphaToColor || enableAlphaToCoverage));
 
     const CompSetting compSetting = computeCompSetting(target->dfmt);
@@ -496,28 +496,28 @@ ExportFormat FragColorExport::computeExportFormat(
     ExportFormat expFmt = EXP_FORMAT_ZERO;
 
     bool gfx8RbPlusEnable = false;
-    if ((gfxIp.major == 8) && (gfxIp.minor == 1))
+    if (gfxIp.major == 8 && gfxIp.minor == 1)
         gfx8RbPlusEnable = true;
 
     if (target->dfmt == BufDataFormatInvalid)
         expFmt = EXP_FORMAT_ZERO;
-    else if ((compSetting == CompSetting::OneCompRed) &&
-             (!alphaExport)                   &&
-             (!isSrgbFormat)                        &&
-             ((!gfx8RbPlusEnable) || (maxCompBitCount == 32)))
+    else if (compSetting == CompSetting::OneCompRed &&
+             !alphaExport                  &&
+             !isSrgbFormat                       &&
+             (!gfx8RbPlusEnable || maxCompBitCount == 32))
     {
         // NOTE: When Rb+ is enabled, "R8 UNORM" and "R16 UNORM" shouldn't use "EXP_FORMAT_32_R", instead
         // "EXP_FORMAT_FP16_ABGR" and "EXP_FORMAT_UNORM16_ABGR" should be used for 2X exporting performance.
         expFmt = EXP_FORMAT_32_R;
     }
-    else if (((isUnormFormat || isSnormFormat) && (maxCompBitCount <= 10)) ||
-             (isFloatFormat && (maxCompBitCount <= 16)) ||
-             (isSrgbFormat && (maxCompBitCount == 8)))
+    else if (((isUnormFormat || isSnormFormat) && maxCompBitCount <= 10) ||
+             (isFloatFormat && maxCompBitCount <= 16) ||
+             (isSrgbFormat && maxCompBitCount == 8))
         expFmt = EXP_FORMAT_FP16_ABGR;
     else if (isSintFormat &&
-             ((maxCompBitCount == 16) ||
-              ((!static_cast<bool>(gpuWorkarounds->gfx6.cbNoLt16BitIntClamp)) && (maxCompBitCount < 16))) &&
-             (!enableAlphaToCoverage))
+             (maxCompBitCount == 16 ||
+              (!static_cast<bool>(gpuWorkarounds->gfx6.cbNoLt16BitIntClamp) && maxCompBitCount < 16)) &&
+             !enableAlphaToCoverage)
     {
         // NOTE: On some hardware, the CB will not properly clamp its input if the shader export format is "UINT16"
         // "SINT16" and the CB format is less than 16 bits per channel. On such hardware, the workaround is picking
@@ -525,12 +525,12 @@ ExportFormat FragColorExport::computeExportFormat(
         // performance 16-bit export format in this case.
         expFmt = EXP_FORMAT_SINT16_ABGR;
     }
-    else if (isSnormFormat && (maxCompBitCount == 16) && (!blendEnabled))
+    else if (isSnormFormat && maxCompBitCount == 16 && !blendEnabled)
         expFmt = EXP_FORMAT_SNORM16_ABGR;
     else if (isUintFormat &&
-             ((maxCompBitCount == 16) ||
-              ((!static_cast<bool>(gpuWorkarounds->gfx6.cbNoLt16BitIntClamp)) && (maxCompBitCount < 16))) &&
-             (!enableAlphaToCoverage))
+             (maxCompBitCount == 16 ||
+              (!static_cast<bool>(gpuWorkarounds->gfx6.cbNoLt16BitIntClamp) && maxCompBitCount < 16)) &&
+             !enableAlphaToCoverage)
     {
         // NOTE: On some hardware, the CB will not properly clamp its input if the shader export format is "UINT16"
         // "SINT16" and the CB format is less than 16 bits per channel. On such hardware, the workaround is picking
@@ -538,23 +538,23 @@ ExportFormat FragColorExport::computeExportFormat(
         // performance 16-bit export format in this case.
         expFmt = EXP_FORMAT_UINT16_ABGR;
     }
-    else if (isUnormFormat && (maxCompBitCount == 16) && (!blendEnabled))
+    else if (isUnormFormat && maxCompBitCount == 16 && !blendEnabled)
         expFmt = EXP_FORMAT_UNORM16_ABGR;
     else if (((isUintFormat || isSintFormat) ||
-              (isFloatFormat && (maxCompBitCount > 16)) ||
-              ((isUnormFormat || isSnormFormat) && (maxCompBitCount == 16)))  &&
-             ((compSetting == CompSetting::OneCompRed) ||
-              (compSetting == CompSetting::OneCompAlpha) ||
-              (compSetting == CompSetting::TwoCompAlphaRed)))
+              (isFloatFormat && maxCompBitCount > 16) ||
+              ((isUnormFormat || isSnormFormat) && maxCompBitCount == 16))  &&
+             (compSetting == CompSetting::OneCompRed ||
+              compSetting == CompSetting::OneCompAlpha ||
+              compSetting == CompSetting::TwoCompAlphaRed))
         expFmt = EXP_FORMAT_32_AR;
     else if (((isUintFormat || isSintFormat) ||
-              (isFloatFormat && (maxCompBitCount > 16)) ||
-              ((isUnormFormat || isSnormFormat) && (maxCompBitCount == 16)))  &&
-             (compSetting == CompSetting::TwoCompGreenRed) && (!alphaExport))
+              (isFloatFormat && maxCompBitCount > 16) ||
+              ((isUnormFormat || isSnormFormat) && maxCompBitCount == 16))  &&
+             compSetting == CompSetting::TwoCompGreenRed && !alphaExport)
         expFmt = EXP_FORMAT_32_GR;
-    else if (((isUnormFormat || isSnormFormat) && (maxCompBitCount == 16)) ||
+    else if (((isUnormFormat || isSnormFormat) && maxCompBitCount == 16) ||
              (isUintFormat || isSintFormat) ||
-             (isFloatFormat && (maxCompBitCount >  16)))
+             (isFloatFormat && maxCompBitCount >  16))
         expFmt = EXP_FORMAT_32_ABGR;
 
     return expFmt;

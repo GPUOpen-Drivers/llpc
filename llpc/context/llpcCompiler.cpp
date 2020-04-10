@@ -214,7 +214,7 @@ class LlpcDiagnosticHandler : public llvm::DiagnosticHandler
     {
         if (EnableOuts() || EnableErrs())
         {
-            if ((diagInfo.getSeverity() == DS_Error) || (diagInfo.getSeverity() == DS_Warning))
+            if (diagInfo.getSeverity() == DS_Error || diagInfo.getSeverity() == DS_Warning)
             {
                 DiagnosticPrinterRawOStream printStream(outs());
                 printStream << "ERROR: LLVM DIAGNOSIS INFO: ";
@@ -319,7 +319,7 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
     VkFormat format)   // Vertex attribute format
 {
     BufDataFormat dfmt = PipelineContext::mapVkFormat(format, false).first;
-    return (dfmt != BufDataFormatInvalid);
+    return dfmt != BufDataFormatInvalid;
 }
 
 // =====================================================================================================================
@@ -397,7 +397,7 @@ Compiler::~Compiler()
             if (maxResidentContextsEnv )
                 maxResidentContexts = strtoul(maxResidentContextsEnv, nullptr, 0);
 
-            if ((!context->isInUse()) && (m_contextPool->size() > maxResidentContexts))
+            if (!context->isInUse() && m_contextPool->size() > maxResidentContexts)
             {
                 it = m_contextPool->erase(it);
                 delete context;
@@ -595,8 +595,8 @@ Result Compiler::BuildShaderModule(
                     shaderInfo.pEntryTarget = entryNames[i].name;
                     lowerPassMgr->add(createSpirvLowerTranslator(static_cast<ShaderStage>(entryNames[i].stage),
                                                                 &shaderInfo));
-                    bool collectDetailUsage = (entryNames[i].stage == ShaderStageFragment) ||
-                                               (entryNames[i].stage == ShaderStageCompute);
+                    bool collectDetailUsage = entryNames[i].stage == ShaderStageFragment ||
+                                               entryNames[i].stage == ShaderStageCompute;
                     auto resCollectPass = static_cast<SpirvLowerResourceCollect*>(
                                            createSpirvLowerResourceCollect(collectDetailUsage));
                     lowerPassMgr->add(resCollectPass);
@@ -691,7 +691,7 @@ Result Compiler::BuildShaderModule(
                 shaderInfo->pUserData,
                 allocSize);
 
-            result = (allocBuf ) ? Result::Success : Result::ErrorOutOfMemory;
+            result = allocBuf ? Result::Success : Result::ErrorOutOfMemory;
         }
         else
         {
@@ -814,7 +814,7 @@ Result Compiler::buildPipelineWithRelocatableElf(
     context->getBuilderContext()->setBuildRelocatableElf(true);
 
     ElfPackage elf[ShaderStageNativeStageCount];
-    for (unsigned stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
+    for (unsigned stage = 0; stage < shaderInfo.size() && result == Result::Success; ++stage)
     {
         if (!shaderInfo[stage] || !shaderInfo[stage]->pModuleData )
             continue;
@@ -900,7 +900,7 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(
     {
         if (stage != ShaderStageVertex && stage != ShaderStageFragment)
         {
-            if ((shaderInfo[stage] ) && (shaderInfo[stage]->pModuleData ))
+            if (shaderInfo[stage] && shaderInfo[stage]->pModuleData )
                 useRelocatableShaderElf = false;
         }
         else if (!shaderInfo[stage] || !shaderInfo[stage]->pModuleData )
@@ -913,7 +913,7 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(
     if (useRelocatableShaderElf && shaderInfo[0] )
     {
         const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo[0]->pModuleData);
-        if ((moduleData ) && (moduleData->binType != BinaryType::Spirv))
+        if (moduleData && moduleData->binType != BinaryType::Spirv)
             useRelocatableShaderElf = false;
     }
 
@@ -941,7 +941,7 @@ bool Compiler::canUseRelocatableComputeShaderElf(
     if (useRelocatableShaderElf && shaderInfo )
     {
         const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo->pModuleData);
-        if ((moduleData ) && (moduleData->binType != BinaryType::Spirv))
+        if (moduleData && moduleData->binType != BinaryType::Spirv)
             useRelocatableShaderElf = false;
     }
 
@@ -994,11 +994,11 @@ Result Compiler::buildPipelineInternal(
     // NOTE: If input is LLVM IR, read it now. There is now only ever one IR module representing the
     // whole pipeline.
     bool isLlvmBc = false;
-    const PipelineShaderInfo* shaderInfoEntry = (shaderInfo[0] ) ? shaderInfo[0] : shaderInfo.back();
+    const PipelineShaderInfo* shaderInfoEntry = shaderInfo[0] ? shaderInfo[0] : shaderInfo.back();
     if (shaderInfoEntry )
     {
         const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfoEntry->pModuleData);
-        if ((moduleData ) && (moduleData->binType == BinaryType::LlvmBc))
+        if (moduleData && moduleData->binType == BinaryType::LlvmBc)
         {
             isLlvmBc = true;
             pipelineModule.reset(context->loadLibary(&moduleData->binCode).release());
@@ -1012,10 +1012,10 @@ Result Compiler::buildPipelineInternal(
         // Create empty modules and set target machine in each.
         std::vector<Module*> modules(shaderInfo.size());
         unsigned stageSkipMask = 0;
-        for (unsigned shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
+        for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex)
         {
             const PipelineShaderInfo* shaderInfoEntry = shaderInfo[shaderIndex];
-            if ((!shaderInfoEntry ) || (!shaderInfoEntry->pModuleData ))
+            if (!shaderInfoEntry || !shaderInfoEntry->pModuleData )
                 continue;
 
             const ShaderModuleDataEx* moduleDataEx =
@@ -1038,8 +1038,8 @@ Result Compiler::buildPipelineInternal(
                 {
                     auto entryData = &moduleDataEx->extra.entryDatas[i];
                     auto shaderEntry = reinterpret_cast<ShaderModuleEntry*>(entryData->pShaderEntry);
-                    if ((entryData->stage == shaderInfoEntry->entryStage) &&
-                        (memcmp(shaderEntry->entryNameHash, &entryNameHash, sizeof(MetroHash::Hash)) == 0))
+                    if (entryData->stage == shaderInfoEntry->entryStage &&
+                        memcmp(shaderEntry->entryNameHash, &entryNameHash, sizeof(MetroHash::Hash)) == 0)
                     {
                         // LLVM bitcode
                         binCode.codeSize = shaderEntry->entrySize;
@@ -1069,15 +1069,15 @@ Result Compiler::buildPipelineInternal(
             context->setModuleTargetMachine(module);
         }
 
-        for (unsigned shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
+        for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex)
         {
             const PipelineShaderInfo* shaderInfoEntry = shaderInfo[shaderIndex];
-            ShaderStage entryStage = (shaderInfoEntry ) ? shaderInfoEntry->entryStage : ShaderStageInvalid;
+            ShaderStage entryStage = shaderInfoEntry ? shaderInfoEntry->entryStage : ShaderStageInvalid;
 
             if (entryStage == ShaderStageFragment)
                 fragmentShaderInfo = shaderInfoEntry;
-            if ((!shaderInfoEntry ) ||
-                (!shaderInfoEntry->pModuleData ) ||
+            if (!shaderInfoEntry ||
+                !shaderInfoEntry->pModuleData ||
                 (stageSkipMask & shaderStageToMask(entryStage)))
                 continue;
 
@@ -1109,13 +1109,13 @@ Result Compiler::buildPipelineInternal(
                 result = Result::ErrorInvalidShader;
             }
         }
-        for (unsigned shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
+        for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex)
         {
             // Per-shader SPIR-V lowering passes.
             const PipelineShaderInfo* shaderInfoEntry = shaderInfo[shaderIndex];
-            ShaderStage entryStage = (shaderInfoEntry ) ? shaderInfoEntry->entryStage : ShaderStageInvalid;
-            if ((!shaderInfoEntry ) ||
-                (!shaderInfoEntry->pModuleData ) ||
+            ShaderStage entryStage = shaderInfoEntry ? shaderInfoEntry->entryStage : ShaderStageInvalid;
+            if (!shaderInfoEntry ||
+                !shaderInfoEntry->pModuleData ||
                 (stageSkipMask & shaderStageToMask(entryStage)))
                 continue;
 
@@ -1198,7 +1198,7 @@ Result Compiler::buildPipelineInternal(
         graphicsShaderCacheChecker.updateAndMerge(result, pipelineElf);
     }
 
-    if ((result == Result::Success) &&
+    if (result == Result::Success &&
         fragmentShaderInfo &&
         fragmentShaderInfo->options.updateDescInElf &&
         (context->getShaderStageMask() & shaderStageToMask(ShaderStageFragment)))
@@ -1405,7 +1405,7 @@ Result Compiler::BuildGraphicsPipeline(
         &pipelineInfo->fs,
     };
 
-    for (unsigned i = 0; (i < ShaderStageGfxCount) && (result == Result::Success); ++i)
+    for (unsigned i = 0; i < ShaderStageGfxCount && result == Result::Success; ++i)
         result = validatePipelineShaderInfo(shaderInfo[i]);
 
     MetroHash::Hash cacheHash = {};
@@ -1413,7 +1413,7 @@ Result Compiler::BuildGraphicsPipeline(
     cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true);
     pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false);
 
-    if ((result == Result::Success) && EnableOuts())
+    if (result == Result::Success && EnableOuts())
     {
         LLPC_OUTS("===============================================================================\n");
         LLPC_OUTS("// LLPC calculated hash results (graphics pipline)\n\n");
@@ -1432,7 +1432,7 @@ Result Compiler::BuildGraphicsPipeline(
         LLPC_OUTS("\n");
     }
 
-    if ((result == Result::Success) && (pipelineDumpFile ))
+    if (result == Result::Success && pipelineDumpFile )
     {
         std::stringstream strStream;
         strStream << ";Compiler Options: ";
@@ -1552,7 +1552,7 @@ Result Compiler::BuildComputePipeline(
     cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true);
     pipelineHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false);
 
-    if ((result == Result::Success) && EnableOuts())
+    if (result == Result::Success && EnableOuts())
     {
         const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(pipelineInfo->cs.pModuleData);
         auto moduleHash = reinterpret_cast<const MetroHash::Hash*>(&moduleData->hash[0]);
@@ -1564,7 +1564,7 @@ Result Compiler::BuildComputePipeline(
         LLPC_OUTS("\n");
     }
 
-    if ((result == Result::Success) && (pipelineDumpFile ))
+    if (result == Result::Success && pipelineDumpFile )
     {
         std::stringstream strStream;
         strStream << ";Compiler Options: ";
@@ -1699,7 +1699,7 @@ Result Compiler::validatePipelineShaderInfo(
     ) const
 {
     Result result = Result::Success;
-    ShaderStage shaderStage = (shaderInfo ) ? shaderInfo->entryStage : ShaderStageInvalid;
+    ShaderStage shaderStage = shaderInfo ? shaderInfo->entryStage : ShaderStageInvalid;
 
     const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo->pModuleData);
     if (moduleData )
@@ -1725,7 +1725,7 @@ Result Compiler::validatePipelineShaderInfo(
                 result = Result::ErrorInvalidShader;
             }
         }
-        else if ((moduleData->binType == BinaryType::LlvmBc) || (moduleData->binType == BinaryType::MultiLlvmBc))
+        else if (moduleData->binType == BinaryType::LlvmBc || moduleData->binType == BinaryType::MultiLlvmBc)
         {
             // Do nothing if input is LLVM IR
         }
@@ -1796,10 +1796,10 @@ Context* Compiler::acquireContext() const
     {
         GfxIpVersion gfxIpVersion = context->getGfxIpVersion();
 
-        if ((!context->isInUse()) &&
-            (gfxIpVersion.major    == m_gfxIp.major) &&
-            (gfxIpVersion.minor    == m_gfxIp.minor) &&
-            (gfxIpVersion.stepping == m_gfxIp.stepping))
+        if (!context->isInUse() &&
+            gfxIpVersion.major    == m_gfxIp.major &&
+            gfxIpVersion.minor    == m_gfxIp.minor &&
+            gfxIpVersion.stepping == m_gfxIp.stepping)
         {
             freeContext = context;
             freeContext->setInUse(true);

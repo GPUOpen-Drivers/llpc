@@ -249,27 +249,27 @@ NggLdsManager::NggLdsManager(
                     continue;
 
                 // NOTE: If cull distance culling is disabled, skip this region
-                if ((region == LdsRegionCullDistance) && (!nggControl->enableCullDistanceCulling))
+                if (region == LdsRegionCullDistance && !nggControl->enableCullDistanceCulling)
                     continue;
 
                 // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
                 // skipped.
-                if ((nggControl->compactMode == NggCompactSubgroup) &&
-                    ((region >= LdsRegionCompactBeginRange) && (region <= LdsRegionCompactEndRange)))
+                if (nggControl->compactMode == NggCompactSubgroup &&
+                    (region >= LdsRegionCompactBeginRange && region <= LdsRegionCompactEndRange))
                     continue;
 
                 if (hasTs)
                 {
                     // Skip those regions that are for VS only
-                    if ((region == LdsRegionCompactVertexId) || (region == LdsRegionCompactInstanceId) ||
-                        (region == LdsRegionCompactPrimId))
+                    if (region == LdsRegionCompactVertexId || region == LdsRegionCompactInstanceId ||
+                        region == LdsRegionCompactPrimId)
                         continue;
                 }
                 else
                 {
                     // Skip those regions that are for TES only
-                    if ((region == LdsRegionCompactTessCoordX) || (region == LdsRegionCompactTessCoordY) ||
-                        (region == LdsRegionCompactRelPatchId) || (region == LdsRegionCompactPatchId))
+                    if (region == LdsRegionCompactTessCoordX || region == LdsRegionCompactTessCoordY ||
+                        region == LdsRegionCompactRelPatchId || region == LdsRegionCompactPatchId)
                         continue;
                 }
 
@@ -330,27 +330,27 @@ unsigned NggLdsManager::calcEsExtraLdsSize(
                 continue;
 
             // NOTE: If cull distance culling is disabled, skip this region
-            if ((region == LdsRegionCullDistance) && (!nggControl->enableCullDistanceCulling))
+            if (region == LdsRegionCullDistance && !nggControl->enableCullDistanceCulling)
                 continue;
 
             // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
             // skipped.
-            if ((nggControl->compactMode == NggCompactSubgroup) &&
-                ((region >= LdsRegionCompactBeginRange) && (region <= LdsRegionCompactEndRange)))
+            if (nggControl->compactMode == NggCompactSubgroup &&
+                (region >= LdsRegionCompactBeginRange && region <= LdsRegionCompactEndRange))
                 continue;
 
             if (hasTs)
             {
                 // Skip those regions that are for VS only
-                if ((region == LdsRegionCompactVertexId) || (region == LdsRegionCompactInstanceId) ||
-                    (region == LdsRegionCompactPrimId))
+                if (region == LdsRegionCompactVertexId || region == LdsRegionCompactInstanceId ||
+                    region == LdsRegionCompactPrimId)
                     continue;
             }
             else
             {
                 // Skip those regions that are for TES only
-                if ((region == LdsRegionCompactTessCoordX) || (region == LdsRegionCompactTessCoordY) ||
-                    (region == LdsRegionCompactRelPatchId) || (region == LdsRegionCompactPatchId))
+                if (region == LdsRegionCompactTessCoordX || region == LdsRegionCompactTessCoordY ||
+                    region == LdsRegionCompactRelPatchId || region == LdsRegionCompactPatchId)
                     continue;
             }
 
@@ -430,7 +430,7 @@ Value* NggLdsManager::readValueFromLds(
     }
 
     Type* compTy = m_builder->getIntNTy(bitWidth);
-    Value* readValue =  UndefValue::get((compCount > 1) ? VectorType::get(compTy, compCount) : compTy);
+    Value* readValue =  UndefValue::get(compCount > 1 ? VectorType::get(compTy, compCount) : compTy);
 
     // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
     auto lds = ConstantExpr::getBitCast(m_lds,
@@ -508,7 +508,7 @@ void NggLdsManager::writeValueToLds(
     }
 
     Type* compTy = m_builder->getIntNTy(bitWidth);
-    writeTy = (compCount > 1) ? VectorType::get(compTy, compCount) : compTy;
+    writeTy = compCount > 1 ? VectorType::get(compTy, compCount) : compTy;
 
     if (writeValue->getType() != writeTy)
         writeValue = m_builder->CreateBitCast(writeValue, writeTy);

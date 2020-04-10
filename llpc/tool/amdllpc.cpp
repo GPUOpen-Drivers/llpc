@@ -365,7 +365,7 @@ static bool isLlvmBitcode(
     size_t      dataSize) // Size of the input data
 {
     const unsigned char magic[] = { 'B', 'C', 0xC0, 0xDE };
-    return (dataSize >= sizeof magic) && (memcmp(data, magic, sizeof magic) == 0);
+    return dataSize >= sizeof magic && memcmp(data, magic, sizeof magic) == 0;
 }
 
 // =====================================================================================================================
@@ -376,7 +376,7 @@ static bool isIsaText(
 {
     // This is called by amdllpc to help distinguish between its three output types of ELF binary, LLVM IR assembler
     // and ISA assembler. Here we use the fact that ISA assembler is the only one that starts with a tab character.
-    return (dataSize != 0) && ((reinterpret_cast<const char*>(data))[0] == '\t');
+    return dataSize != 0 && (reinterpret_cast<const char*>(data))[0] == '\t';
 }
 
 // =====================================================================================================================
@@ -440,8 +440,8 @@ static Result init(
             for (int i = 1; i < argc; ++i)
             {
                 arg = argv[i];
-                if ((strncmp(arg, name, nameLen) == 0) &&
-                    ((arg[nameLen] == '\0') || (arg[nameLen] == '=') || (isdigit((int)arg[nameLen]))))
+                if (strncmp(arg, name, nameLen) == 0 &&
+                    (arg[nameLen] == '\0' || arg[nameLen] == '=' || isdigit((int)arg[nameLen])))
                 {
                     found = true;
                     break;
@@ -453,7 +453,7 @@ static Result init(
             else if (optionIdx == 0) // Find option -gfxip
             {
                 size_t argLen = strlen(arg);
-                if ((argLen > nameLen) && arg[nameLen] == '=')
+                if (argLen > nameLen && arg[nameLen] == '=')
                 {
                     // Extract tokens of graphics IP version info (delimiter is ".")
                     const unsigned len = argLen - nameLen - 1;
@@ -463,15 +463,15 @@ static Result init(
 
                     char* tokens[3] = {}; // Format: major.minor.step
                     char* token = std::strtok(gfxIp, ".");
-                    for (unsigned i = 0; (i < 3) && (token ); ++i)
+                    for (unsigned i = 0; i < 3 && token ; ++i)
                     {
                         tokens[i] = token;
                         token = std::strtok(nullptr, ".");
                     }
 
-                    ParsedGfxIp.major    = (tokens[0] ) ? std::strtoul(tokens[0], nullptr, 10) : 0;
-                    ParsedGfxIp.minor    = (tokens[1] ) ? std::strtoul(tokens[1], nullptr, 10) : 0;
-                    ParsedGfxIp.stepping = (tokens[2] ) ? std::strtoul(tokens[2], nullptr, 10) : 0;
+                    ParsedGfxIp.major    = tokens[0] ? std::strtoul(tokens[0], nullptr, 10) : 0;
+                    ParsedGfxIp.minor    = tokens[1] ? std::strtoul(tokens[1], nullptr, 10) : 0;
+                    ParsedGfxIp.stepping = tokens[2] ? std::strtoul(tokens[2], nullptr, 10) : 0;
 
                     delete[] gfxIp;
                 }
@@ -485,8 +485,8 @@ static Result init(
         for (int i = 1; i < argc; ++i)
         {
             arg = argv[i];
-            if ((strncmp(arg, name, nameLen) == 0) &&
-                ((arg[nameLen] == '\0') || (arg[nameLen] == '=')))
+            if (strncmp(arg, name, nameLen) == 0 &&
+                (arg[nameLen] == '\0' || arg[nameLen] == '='))
             {
                 found = true;
                 break;
@@ -548,7 +548,7 @@ static Result init(
         result = ICompiler::Create(ParsedGfxIp, newArgs.size(), &newArgs[0], ppCompiler);
     }
 
-    if ((result == Result::Success) && (SpvGenDir != ""))
+    if (result == Result::Success && SpvGenDir != "")
     {
         // -spvgen-dir option: preload spvgen from the given directory
         if (!InitSpvGen(SpvGenDir.c_str()))
@@ -646,7 +646,7 @@ static bool isSpirvTextFile(
     if (extPos != std::string::npos)
         extName = fileName.substr(extPos, fileName.size() - extPos);
 
-    if ((!extName.empty()) && (extName == LlpcExt::SpirvText))
+    if (!extName.empty() && extName == LlpcExt::SpirvText)
         isSpirvText = true;
 
     return isSpirvText;
@@ -664,7 +664,7 @@ static bool isSpirvBinaryFile(
     if (extPos != std::string::npos)
         extName = fileName.substr(extPos, fileName.size() - extPos);
 
-    if ((!extName.empty()) && (extName == LlpcExt::SpirvBin))
+    if (!extName.empty() && extName == LlpcExt::SpirvBin)
         isSpirvBin = true;
 
     return isSpirvBin;
@@ -682,7 +682,7 @@ static bool isPipelineInfoFile(
     if (extPos != std::string::npos)
         extName = fileName.substr(extPos, fileName.size() - extPos);
 
-    if ((!extName.empty()) && (extName == LlpcExt::PipelineInfo))
+    if (!extName.empty() && extName == LlpcExt::PipelineInfo)
         isPipelineInfo = true;
 
     return isPipelineInfo;
@@ -700,7 +700,7 @@ static bool isLlvmIrFile(
     if (extPos != std::string::npos)
         extName = fileName.substr(extPos, fileName.size() - extPos);
 
-    if ((!extName.empty()) && (extName == LlpcExt::LlvmIr))
+    if (!extName.empty() && extName == LlpcExt::LlvmIr)
         isLlvmIr = true;
 
     return isLlvmIr;
@@ -973,7 +973,7 @@ static Result buildShaderModules(
         shaderInfo->shaderBin = compileInfo->shaderModuleDatas[i].spirvBin;
 
         result = compiler->BuildShaderModule(shaderInfo, shaderOut);
-        if ((result != Result::Success) && (result != Result::Delayed))
+        if (result != Result::Success && result != Result::Delayed)
         {
             LLPC_ERRS("Fails to build "
                 << getShaderStageName(compileInfo->shaderModuleDatas[i].shaderStage)
@@ -1309,7 +1309,7 @@ static Result outputElf(
         if (fwrite(pipelineBin->pCode, 1, pipelineBin->codeSize, outFile) != pipelineBin->codeSize)
             result = Result::ErrorUnavailable;
 
-        if ((outFile != stdout) && (fclose(outFile) != 0))
+        if (outFile != stdout && fclose(outFile) != 0)
             result = Result::ErrorUnavailable;
 
         if (result != Result::Success)
@@ -1370,7 +1370,7 @@ static Result processPipeline(
     //
     // Translate sources to SPIR-V binary
     //
-    for (unsigned i = startFile; (i < inFiles.size()) && (result == Result::Success); ++i)
+    for (unsigned i = startFile; i < inFiles.size() && result == Result::Success; ++i)
     {
         const std::string& inFile = inFiles[i];
         std::string spvBinFile;
@@ -1412,7 +1412,7 @@ static Result processPipeline(
                 }
             }
 
-            if ((result == Result::Success) && Validate)
+            if (result == Result::Success && Validate)
             {
                 char log[1024] = {};
                 if (!InitSpvGen())
@@ -1489,7 +1489,7 @@ static Result processPipeline(
                     LLPC_OUTS("===============================================================================\n");
                     LLPC_OUTS("// Pipeline file info for " << inFile << " \n\n");
 
-                    if ((log ) && (strlen(log) > 0))
+                    if (log && strlen(log) > 0)
                     {
                         LLPC_OUTS("Pipeline file parse warning:\n" << log << "\n");
                     }
@@ -1503,13 +1503,13 @@ static Result processPipeline(
                         // formats are not UNDEFINED, we set them to R8G8B8A8_SRGB as well.
                         for (unsigned target = 0; target < MaxColorTargets; ++target)
                         {
-                            if ((target == 0) ||
-                                (compileInfo.gfxPipelineInfo.cbState.target[target].format != VK_FORMAT_UNDEFINED))
+                            if (target == 0 ||
+                                compileInfo.gfxPipelineInfo.cbState.target[target].format != VK_FORMAT_UNDEFINED)
                                 compileInfo.gfxPipelineInfo.cbState.target[target].format = VK_FORMAT_R8G8B8A8_SRGB;
                         }
                     }
 
-                    if (EnableOuts() && (!InitSpvGen()))
+                    if (EnableOuts() && !InitSpvGen())
                     {
                         LLPC_OUTS("Failed to load SPVGEN -- cannot disassemble and validate SPIR-V\n");
                     }
@@ -1583,7 +1583,7 @@ static Result processPipeline(
             // Verify LLVM module
             std::string errMsg;
             raw_string_ostream errStream(errMsg);
-            if ((result == Result::Success) && verifyModule(*module.get(), &errStream))
+            if (result == Result::Success && verifyModule(*module.get(), &errStream))
             {
                 LLPC_ERRS("File " << inFile << " parsed, but fail to verify the module: " << errMsg << "\n");
                 result = Result::ErrorInvalidShader;
@@ -1650,7 +1650,7 @@ static Result processPipeline(
         *nextFile = i + 1;
     }
 
-    if ((result == Result::Success) && (compileInfo.checkAutoLayoutCompatible))
+    if (result == Result::Success && compileInfo.checkAutoLayoutCompatible)
     {
         compileInfo.fileNames = fileNames.c_str();
         result = checkAutoLayoutCompatibleFunc(compiler, &compileInfo);
@@ -1660,13 +1660,13 @@ static Result processPipeline(
         //
         // Build shader modules
         //
-        if ((result == Result::Success) && (compileInfo.stageMask != 0))
+        if (result == Result::Success && compileInfo.stageMask != 0)
             result = buildShaderModules(compiler, &compileInfo);
 
         //
         // Build pipeline
         //
-        if ((result == Result::Success) && ToLink)
+        if (result == Result::Success && ToLink)
         {
             compileInfo.fileNames = fileNames.c_str();
             result = buildPipeline(compiler, &compileInfo);
@@ -1763,7 +1763,7 @@ int main(
 
         // The first input file is a pipeline file or LLVM IR file. Assume they all are, and compile each one
         // separately but in the same context.
-        for (unsigned i = 0; (i < InFiles.size()) && (result == Result::Success); ++i)
+        for (unsigned i = 0; i < InFiles.size() && result == Result::Success; ++i)
         {
 #ifdef WIN_OS
             if (InFiles[i].find_last_of("*?") != std::string::npos)
@@ -1850,6 +1850,6 @@ int main(
         LLPC_ERRS("\n=====  AMDLLPC FAILED  =====\n");
     }
 
-    return (result == Result::Success) ? 0 : 1;
+    return result == Result::Success ? 0 : 1;
 }
 

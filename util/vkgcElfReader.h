@@ -481,7 +481,7 @@ public:
     int32_t GetSectionIndex(const char* name) const
     {
         auto entry = m_map.find(name);
-        return (entry != m_map.end()) ? entry->second : InvalidValue;
+        return entry != m_map.end() ? entry->second : InvalidValue;
     }
 
     void initMsgPackDocument(const void* buffer, uint32_t sizeInBytes);

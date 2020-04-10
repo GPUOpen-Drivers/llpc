@@ -269,7 +269,7 @@ static void setGfx10Info(
     // Compiler is free to choose wave mode if forced wave size is not specified.
     if (NativeWaveSize != 0)
     {
-        assert((NativeWaveSize == 32) || (NativeWaveSize == 64));
+        assert(NativeWaveSize == 32 || NativeWaveSize == 64);
         targetInfo->getGpuProperty().waveSize = NativeWaveSize;
     }
     else

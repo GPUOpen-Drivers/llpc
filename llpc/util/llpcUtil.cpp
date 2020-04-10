@@ -131,7 +131,7 @@ spv::ExecutionModel convertToExecModel(
 unsigned shaderStageToMask(
     ShaderStage stage)  // Shader stage
 {
-    assert((stage < ShaderStageCount) || (stage == ShaderStageCopyShader));
+    assert(stage < ShaderStageCount || stage == ShaderStageCopyShader);
     return (1 << stage);
 }
 

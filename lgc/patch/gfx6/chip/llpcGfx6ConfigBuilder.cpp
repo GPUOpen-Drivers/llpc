@@ -70,17 +70,17 @@ void ConfigBuilder::buildPalMetadata()
     {
         const bool hasTs = (m_hasTcs || m_hasTes);
 
-        if ((!hasTs) && (!m_hasGs))
+        if (!hasTs && !m_hasGs)
         {
             // VS-FS pipeline
             buildPipelineVsFsRegConfig();
         }
-        else if (hasTs && (!m_hasGs))
+        else if (hasTs && !m_hasGs)
         {
             // VS-TS-FS pipeline
             buildPipelineVsTsFsRegConfig();
         }
-        else if ((!hasTs) && m_hasGs)
+        else if (!hasTs && m_hasGs)
         {
             // VS-GS-FS pipeline
             buildPipelineVsGsFsRegConfig();
@@ -385,9 +385,9 @@ void ConfigBuilder::buildVsRegConfig(
     ShaderStage         shaderStage,    // Current shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for vertex-shader-specific pipeline
 {
-    assert((shaderStage == ShaderStageVertex)   ||
-                (shaderStage == ShaderStageTessEval) ||
-                (shaderStage == ShaderStageCopyShader));
+    assert(shaderStage == ShaderStageVertex  ||
+                shaderStage == ShaderStageTessEval ||
+                shaderStage == ShaderStageCopyShader);
 
     const auto intfData = m_pipelineState->getShaderInterfaceData(shaderStage);
 
@@ -408,7 +408,7 @@ void ConfigBuilder::buildVsRegConfig(
         setNumAvailVgprs(Util::Abi::HardwareStage::Vs, m_pipelineState->getTargetInfo().getGpuProperty().maxVgprsAvailable);
 
         SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN,
-            (resUsage->inOutUsage.gs.outLocCount[0] > 0) && enableXfb);
+            resUsage->inOutUsage.gs.outLocCount[0] > 0 && enableXfb);
         SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN,
             resUsage->inOutUsage.gs.outLocCount[1] > 0);
         SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG,
@@ -589,7 +589,7 @@ void ConfigBuilder::buildVsRegConfig(
         SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
     }
 
-    if ((clipDistanceCount > 0) || (cullDistanceCount > 0))
+    if (clipDistanceCount > 0 || cullDistanceCount > 0)
     {
         SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST0_VEC_ENA, true);
         if (clipDistanceCount + cullDistanceCount > 4)
@@ -692,7 +692,7 @@ void ConfigBuilder::buildEsRegConfig(
     ShaderStage         shaderStage,    // Current shader stage (from API side)
     T*                  pConfig)        // [out] Register configuration for export-shader-specific pipeline
 {
-    assert((shaderStage == ShaderStageVertex) || (shaderStage == ShaderStageTessEval));
+    assert(shaderStage == ShaderStageVertex || shaderStage == ShaderStageTessEval);
 
     const auto intfData = m_pipelineState->getShaderInterfaceData(shaderStage);
 
@@ -863,8 +863,8 @@ void ConfigBuilder::buildGsRegConfig(
     SET_REG_FIELD(&pConfig->gsRegs, SPI_SHADER_PGM_RSRC2_GS, TRAP_PRESENT, shaderOptions.trapPresent);
     SET_REG_FIELD(&pConfig->gsRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR, intfData->userDataCount);
 
-    const bool primAdjacency = (geometryMode.inputPrimitive == InputPrimitives::LinesAdjacency) ||
-                               (geometryMode.inputPrimitive == InputPrimitives::TrianglesAdjacency);
+    const bool primAdjacency = geometryMode.inputPrimitive == InputPrimitives::LinesAdjacency ||
+                               geometryMode.inputPrimitive == InputPrimitives::TrianglesAdjacency;
 
     // Maximum number of GS primitives per ES thread is capped by the hardware's GS-prim FIFO.
     auto gpuProp = &m_pipelineState->getTargetInfo().getGpuProperty();
@@ -951,7 +951,7 @@ void ConfigBuilder::buildGsRegConfig(
     gsVsRingOffset += gsVertItemSize2 * maxVertOut;
     SET_REG_FIELD(&pConfig->gsRegs, VGT_GSVS_RING_OFFSET_3, OFFSET, gsVsRingOffset);
 
-    if ((geometryMode.invocations > 1) || builtInUsage.invocationId)
+    if (geometryMode.invocations > 1 || builtInUsage.invocationId)
     {
         SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_INSTANCE_CNT, ENABLE, true);
         SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_INSTANCE_CNT, CNT, geometryMode.invocations);
@@ -969,17 +969,17 @@ void ConfigBuilder::buildGsRegConfig(
     SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
 
     // Set multi-stream output primitive type
-    if ((gsVertItemSize1 > 0) || (gsVertItemSize2 > 0) || (gsVertItemSize3 > 0))
+    if (gsVertItemSize1 > 0 || gsVertItemSize2 > 0 || gsVertItemSize3 > 0)
     {
         const static auto GsOutPrimInvalid = 3u;
         SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_1,
-            (gsVertItemSize1 > 0) ? gsOutputPrimitiveType : GsOutPrimInvalid);
+            gsVertItemSize1 > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid);
 
         SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_2,
-            (gsVertItemSize2 > 0) ? gsOutputPrimitiveType : GsOutPrimInvalid);
+            gsVertItemSize2 > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid);
 
         SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_3,
-            (gsVertItemSize3 > 0) ? gsOutputPrimitiveType : GsOutPrimInvalid);
+            gsVertItemSize3 > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid);
     }
 
     SET_REG_FIELD(&pConfig->gsRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, inOutUsage.gs.calcFactor.gsVsRingItemSize);
@@ -1084,7 +1084,7 @@ void ConfigBuilder::buildPsRegConfig(
         spiShaderColFormat |= (expFmts[i] << (4 * i));
     }
 
-    if ((spiShaderColFormat == 0) && (depthExpFmt == EXP_FORMAT_ZERO))
+    if (spiShaderColFormat == 0 && depthExpFmt == EXP_FORMAT_ZERO)
     {
         // NOTE: Hardware requires that fragment shader always exports "something" (color or depth) to the SX.
         // If both SPI_SHADER_Z_FORMAT and SPI_SHADER_COL_FORMAT are zero, we need to override
@@ -1110,15 +1110,15 @@ void ConfigBuilder::buildPsRegConfig(
     // were identified in the shader.
     const std::vector<FsInterpInfo> dummyInterpInfo {{ 0, false, false, false }};
     const auto& fsInterpInfo = resUsage->inOutUsage.fs.interpInfo;
-    const auto* interpInfo = (fsInterpInfo.size() == 0) ? &dummyInterpInfo : &fsInterpInfo;
+    const auto* interpInfo = fsInterpInfo.size() == 0 ? &dummyInterpInfo : &fsInterpInfo;
 
     for (unsigned i = 0; i < interpInfo->size(); ++i)
     {
         const auto& interpInfoElem = (*interpInfo)[i];
-        assert(((interpInfoElem.loc     == InvalidFsInterpInfo.loc) &&
-                     (interpInfoElem.flat    == InvalidFsInterpInfo.flat) &&
-                     (interpInfoElem.custom  == InvalidFsInterpInfo.custom) &&
-                     (interpInfoElem.is16bit == InvalidFsInterpInfo.is16bit)) == false);
+        assert((interpInfoElem.loc     == InvalidFsInterpInfo.loc &&
+                     interpInfoElem.flat    == InvalidFsInterpInfo.flat &&
+                     interpInfoElem.custom  == InvalidFsInterpInfo.custom &&
+                     interpInfoElem.is16bit == InvalidFsInterpInfo.is16bit) == false);
 
         regSPI_PS_INPUT_CNTL_0 spiPsInputCntl = {};
         spiPsInputCntl.bits.FLAT_SHADE = interpInfoElem.flat;
@@ -1361,12 +1361,12 @@ void ConfigBuilder::buildUserDataConfig(
         // table is in use except the vertex buffer table and streamout table.
         // Also do this if no user data nodes are used; PAL does not like userDataLimit being 0
         // if there are any user data nodes.
-        if ((intfData->userDataUsage.spillTable > 0) || (userDataLimit == 0))
+        if (intfData->userDataUsage.spillTable > 0 || userDataLimit == 0)
         {
             for (auto& node : m_pipelineState->getUserDataNodes())
             {
-                if ((node.type != ResourceNodeType::IndirectUserDataVaPtr) &&
-                    (node.type != ResourceNodeType::StreamOutTableVaPtr))
+                if (node.type != ResourceNodeType::IndirectUserDataVaPtr &&
+                    node.type != ResourceNodeType::StreamOutTableVaPtr)
                     userDataLimit = std::max(userDataLimit, node.offsetInDwords + node.sizeInDwords);
             }
         }

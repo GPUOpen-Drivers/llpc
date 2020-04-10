@@ -169,7 +169,7 @@ Value* Builder::CreateMapToInt32(
     {
         SmallVector<Value*, 4> newMappedArgs;
 
-        Type* const vectorType = VectorType::get(type, (type->getPrimitiveSizeInBits() == 16) ? 2 : 4);
+        Type* const vectorType = VectorType::get(type, type->getPrimitiveSizeInBits() == 16 ? 2 : 4);
         Value* const undef = UndefValue::get(vectorType);
 
         for (Value* const mappedArg : mappedArgs)
@@ -450,7 +450,7 @@ CallInst* Builder::CreateUnaryIntrinsic(
     const Twine&  instName)     // [in] Name to give instruction
 {
     CallInst* result = IRBuilder<>::CreateUnaryIntrinsic(id, value, fmfSource, instName);
-    if ((!fmfSource ) && isa<FPMathOperator>(result))
+    if (!fmfSource && isa<FPMathOperator>(result))
     {
         // There are certain intrinsics with an FP result that we do not want FMF on.
         switch (id)
@@ -478,7 +478,7 @@ CallInst* Builder::CreateBinaryIntrinsic(
     const Twine&  name)         // [in] Name to give instruction
 {
     CallInst* result = IRBuilder<>::CreateBinaryIntrinsic(id, value1, value2, fmfSource, name);
-    if ((!fmfSource ) && isa<FPMathOperator>(result))
+    if (!fmfSource && isa<FPMathOperator>(result))
         result->setFastMathFlags(getFastMathFlags());
     return result;
 }
@@ -495,7 +495,7 @@ CallInst* Builder::CreateIntrinsic(
     const Twine&     name)       // [in] Name to give instruction
 {
     CallInst* result = IRBuilder<>::CreateIntrinsic(id, types, args, fmfSource, name);
-    if ((!fmfSource ) && isa<FPMathOperator>(result))
+    if (!fmfSource && isa<FPMathOperator>(result))
         result->setFastMathFlags(getFastMathFlags());
     return result;
 }

@@ -353,7 +353,7 @@ bool Section::getPtrOf(
         }
     }
 
-    if ((result) && (memberAddr == reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue))))
+    if (result && memberAddr == reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue)))
     {
         PARSE_WARNING(*errorMsg, lineNum, "Invalid member name: %s", memberName);
         result = false;
