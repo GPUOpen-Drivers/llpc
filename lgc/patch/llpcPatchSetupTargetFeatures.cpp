@@ -71,7 +71,7 @@ char PatchSetupTargetFeatures::ID = 0;
 
 // =====================================================================================================================
 // Create pass to set up target features
-ModulePass* lgc::CreatePatchSetupTargetFeatures()
+ModulePass* lgc::createPatchSetupTargetFeatures()
 {
     return new PatchSetupTargetFeatures();
 }
@@ -83,10 +83,10 @@ bool PatchSetupTargetFeatures::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Setup-Target-Features\n");
 
-    Patch::Init(&module);
+    Patch::init(&module);
 
-    auto pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
-    CodeGenManager::SetupTargetFeatures(pPipelineState, &module);
+    auto pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+    CodeGenManager::setupTargetFeatures(pipelineState, &module);
 
     return true; // Modified the module.
 }

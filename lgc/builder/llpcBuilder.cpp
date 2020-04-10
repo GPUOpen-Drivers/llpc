@@ -46,72 +46,72 @@ using namespace llvm;
 
 // =====================================================================================================================
 Builder::Builder(
-    BuilderContext* pBuilderContext) // [in] Builder context
+    BuilderContext* builderContext) // [in] Builder context
     :
-    BuilderBase(pBuilderContext->GetContext()),
-    m_pBuilderContext(pBuilderContext)
+    BuilderBase(builderContext->getContext()),
+    m_builderContext(builderContext)
 {
 }
 
 // =====================================================================================================================
 // Set the common shader mode for the current shader, containing hardware FP round and denorm modes.
-void Builder::SetCommonShaderMode(
+void Builder::setCommonShaderMode(
     const CommonShaderMode& commonShaderMode)   // [in] FP round and denorm modes
 {
-    GetShaderModes()->SetCommonShaderMode(m_shaderStage, commonShaderMode);
+    getShaderModes()->setCommonShaderMode(m_shaderStage, commonShaderMode);
 }
 
 // =====================================================================================================================
 // Get the common shader mode for the current shader.
-const CommonShaderMode& Builder::GetCommonShaderMode()
+const CommonShaderMode& Builder::getCommonShaderMode()
 {
-    return GetShaderModes()->GetCommonShaderMode(m_shaderStage);
+    return getShaderModes()->getCommonShaderMode(m_shaderStage);
 }
 
 // =====================================================================================================================
 // Set the tessellation mode
-void Builder::SetTessellationMode(
+void Builder::setTessellationMode(
     const TessellationMode& tessellationMode)   // [in] Tessellation mode
 {
-    GetShaderModes()->SetTessellationMode(tessellationMode);
+    getShaderModes()->setTessellationMode(tessellationMode);
 }
 
 // =====================================================================================================================
 // Set the geometry shader mode
-void Builder::SetGeometryShaderMode(
+void Builder::setGeometryShaderMode(
     const GeometryShaderMode& geometryShaderMode)   // [in] Geometry shader mode
 {
-    GetShaderModes()->SetGeometryShaderMode(geometryShaderMode);
+    getShaderModes()->setGeometryShaderMode(geometryShaderMode);
 }
 
 // =====================================================================================================================
 // Set the fragment shader mode
-void Builder::SetFragmentShaderMode(
+void Builder::setFragmentShaderMode(
     const FragmentShaderMode& fragmentShaderMode)   // [in] Fragment shader mode
 {
-    GetShaderModes()->SetFragmentShaderMode(fragmentShaderMode);
+    getShaderModes()->setFragmentShaderMode(fragmentShaderMode);
 }
 
 // =====================================================================================================================
 // Set the compute shader mode (workgroup size)
-void Builder::SetComputeShaderMode(
+void Builder::setComputeShaderMode(
     const ComputeShaderMode& computeShaderMode)   // [in] Compute shader mode
 {
-    GetShaderModes()->SetComputeShaderMode(computeShaderMode);
+    getShaderModes()->setComputeShaderMode(computeShaderMode);
 }
 
 // =====================================================================================================================
 // Get the type pElementTy, turned into a vector of the same vector width as pMaybeVecTy if the latter
 // is a vector type.
-Type* Builder::GetConditionallyVectorizedTy(
-    Type* pElementTy,           // [in] Element type
-    Type* pMaybeVecTy)          // [in] Possible vector type to get number of elements from
+Type* Builder::getConditionallyVectorizedTy(
+    Type* elementTy,           // [in] Element type
+    Type* maybeVecTy)          // [in] Possible vector type to get number of elements from
 {
-    if (auto pVecTy = dyn_cast<VectorType>(pMaybeVecTy))
+    if (auto vecTy = dyn_cast<VectorType>(maybeVecTy))
     {
-        return VectorType::get(pElementTy, pVecTy->getNumElements());
+        return VectorType::get(elementTy, vecTy->getNumElements());
     }
-    return pElementTy;
+    return elementTy;
 }
 
 // =====================================================================================================================
@@ -120,25 +120,25 @@ Type* Builder::GetConditionallyVectorizedTy(
 // arguments and massages the mappedArgs into i32's before calling the function pointer. Note that all massage
 // arguments must have the same type.
 Value* Builder::CreateMapToInt32(
-    PFN_MapToInt32Func pfnMapFunc,      // [in] The function to call on each provided i32.
+    PFN_MapToInt32Func mapFunc,      // [in] The function to call on each provided i32.
     ArrayRef<Value*>   mappedArgs,      // The arguments to be massaged into i32's and passed to function.
     ArrayRef<Value*>   passthroughArgs) // The arguments to be passed through as is (no massaging).
 {
     // We must have at least one argument to massage.
     assert(mappedArgs.size() > 0);
 
-    Type* const pType = mappedArgs[0]->getType();
+    Type* const type = mappedArgs[0]->getType();
 
     // Check the massage types all match.
     for (unsigned i = 1; i < mappedArgs.size(); i++)
     {
-        assert(mappedArgs[i]->getType() == pType);
+        assert(mappedArgs[i]->getType() == type);
     }
 
     if (mappedArgs[0]->getType()->isVectorTy())
     {
         // For vectors we extract each vector component and map them individually.
-        const unsigned compCount = pType->getVectorNumElements();
+        const unsigned compCount = type->getVectorNumElements();
 
         SmallVector<Value*, 4> results;
 
@@ -146,93 +146,93 @@ Value* Builder::CreateMapToInt32(
         {
             SmallVector<Value*, 4> newMappedArgs;
 
-            for (Value* const pMappedArg : mappedArgs)
+            for (Value* const mappedArg : mappedArgs)
             {
-                newMappedArgs.push_back(CreateExtractElement(pMappedArg, i));
+                newMappedArgs.push_back(CreateExtractElement(mappedArg, i));
             }
 
-            results.push_back(CreateMapToInt32(pfnMapFunc, newMappedArgs, passthroughArgs));
+            results.push_back(CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs));
         }
 
-        Value* pResult = UndefValue::get(VectorType::get(results[0]->getType(), compCount));
+        Value* result = UndefValue::get(VectorType::get(results[0]->getType(), compCount));
 
         for (unsigned i = 0; i < compCount; i++)
         {
-            pResult = CreateInsertElement(pResult, results[i], i);
+            result = CreateInsertElement(result, results[i], i);
         }
 
-        return pResult;
+        return result;
     }
-    else if (pType->isIntegerTy() && pType->getIntegerBitWidth() == 1)
+    else if (type->isIntegerTy() && type->getIntegerBitWidth() == 1)
     {
         SmallVector<Value*, 4> newMappedArgs;
 
-        for (Value* const pMappedArg : mappedArgs)
+        for (Value* const mappedArg : mappedArgs)
         {
-            newMappedArgs.push_back(CreateZExt(pMappedArg, getInt32Ty()));
+            newMappedArgs.push_back(CreateZExt(mappedArg, getInt32Ty()));
         }
 
-        Value* const pResult = CreateMapToInt32(pfnMapFunc, newMappedArgs, passthroughArgs);
-        return CreateTrunc(pResult, getInt1Ty());
+        Value* const result = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
+        return CreateTrunc(result, getInt1Ty());
     }
-    else if (pType->isIntegerTy() && pType->getIntegerBitWidth() < 32)
+    else if (type->isIntegerTy() && type->getIntegerBitWidth() < 32)
     {
         SmallVector<Value*, 4> newMappedArgs;
 
-        Type* const pVectorType = VectorType::get(pType, (pType->getPrimitiveSizeInBits() == 16) ? 2 : 4);
-        Value* const pUndef = UndefValue::get(pVectorType);
+        Type* const vectorType = VectorType::get(type, (type->getPrimitiveSizeInBits() == 16) ? 2 : 4);
+        Value* const undef = UndefValue::get(vectorType);
 
-        for (Value* const pMappedArg : mappedArgs)
+        for (Value* const mappedArg : mappedArgs)
         {
-            Value* const pNewMappedArg = CreateInsertElement(pUndef, pMappedArg, static_cast<uint64_t>(0));
-            newMappedArgs.push_back(CreateBitCast(pNewMappedArg, getInt32Ty()));
+            Value* const newMappedArg = CreateInsertElement(undef, mappedArg, static_cast<uint64_t>(0));
+            newMappedArgs.push_back(CreateBitCast(newMappedArg, getInt32Ty()));
         }
 
-        Value* const pResult = CreateMapToInt32(pfnMapFunc, newMappedArgs, passthroughArgs);
-        return CreateExtractElement(CreateBitCast(pResult, pVectorType), static_cast<uint64_t>(0));
+        Value* const result = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
+        return CreateExtractElement(CreateBitCast(result, vectorType), static_cast<uint64_t>(0));
     }
-    else if (pType->getPrimitiveSizeInBits() == 64)
+    else if (type->getPrimitiveSizeInBits() == 64)
     {
         SmallVector<Value*, 4> castMappedArgs;
 
-        for (Value* const pMappedArg : mappedArgs)
+        for (Value* const mappedArg : mappedArgs)
         {
-            castMappedArgs.push_back(CreateBitCast(pMappedArg, VectorType::get(getInt32Ty(), 2)));
+            castMappedArgs.push_back(CreateBitCast(mappedArg, VectorType::get(getInt32Ty(), 2)));
         }
 
-        Value* pResult = UndefValue::get(castMappedArgs[0]->getType());
+        Value* result = UndefValue::get(castMappedArgs[0]->getType());
 
         for (unsigned i = 0; i < 2; i++)
         {
             SmallVector<Value*, 4> newMappedArgs;
 
-            for (Value* const pCastMappedArg : castMappedArgs)
+            for (Value* const castMappedArg : castMappedArgs)
             {
-                newMappedArgs.push_back(CreateExtractElement(pCastMappedArg, i));
+                newMappedArgs.push_back(CreateExtractElement(castMappedArg, i));
             }
 
-            Value* const pResultComp = CreateMapToInt32(pfnMapFunc, newMappedArgs, passthroughArgs);
+            Value* const resultComp = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
 
-            pResult = CreateInsertElement(pResult, pResultComp, i);
+            result = CreateInsertElement(result, resultComp, i);
         }
 
-        return CreateBitCast(pResult, pType);
+        return CreateBitCast(result, type);
     }
-    else if (pType->isFloatingPointTy())
+    else if (type->isFloatingPointTy())
     {
         SmallVector<Value*, 4> newMappedArgs;
 
-        for (Value* const pMappedArg : mappedArgs)
+        for (Value* const mappedArg : mappedArgs)
         {
-            newMappedArgs.push_back(CreateBitCast(pMappedArg, getIntNTy(pMappedArg->getType()->getPrimitiveSizeInBits())));
+            newMappedArgs.push_back(CreateBitCast(mappedArg, getIntNTy(mappedArg->getType()->getPrimitiveSizeInBits())));
         }
 
-        Value* const pResult = CreateMapToInt32(pfnMapFunc, newMappedArgs, passthroughArgs);
-        return CreateBitCast(pResult, pType);
+        Value* const result = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
+        return CreateBitCast(result, type);
     }
-    else if (pType->isIntegerTy(32))
+    else if (type->isIntegerTy(32))
     {
-        return pfnMapFunc(*this, mappedArgs, passthroughArgs);
+        return mapFunc(*this, mappedArgs, passthroughArgs);
     }
     else
     {
@@ -243,53 +243,53 @@ Value* Builder::CreateMapToInt32(
 
 // =====================================================================================================================
 // Gets new matrix type after doing matrix transposing.
-Type* Builder::GetTransposedMatrixTy(
-    Type* const pMatrixType // [in] The matrix type to get the transposed type from.
+Type* Builder::getTransposedMatrixTy(
+    Type* const matrixType // [in] The matrix type to get the transposed type from.
     ) const
 {
-    assert(pMatrixType->isArrayTy());
+    assert(matrixType->isArrayTy());
 
-    Type* const pColumnVectorType = pMatrixType->getArrayElementType();
-    assert(pColumnVectorType->isVectorTy());
+    Type* const columnVectorType = matrixType->getArrayElementType();
+    assert(columnVectorType->isVectorTy());
 
-    const unsigned columnCount = pMatrixType->getArrayNumElements();
-    const unsigned rowCount = pColumnVectorType->getVectorNumElements();
+    const unsigned columnCount = matrixType->getArrayNumElements();
+    const unsigned rowCount = columnVectorType->getVectorNumElements();
 
-    return ArrayType::get(VectorType::get(pColumnVectorType->getVectorElementType(), columnCount), rowCount);
+    return ArrayType::get(VectorType::get(columnVectorType->getVectorElementType(), columnCount), rowCount);
 }
 
 // =====================================================================================================================
 // Get the type of pointer returned by CreateLoadBufferDesc.
-PointerType* Builder::GetBufferDescTy(
-    Type*         pPointeeTy)         // [in] Type that the returned pointer should point to.
+PointerType* Builder::getBufferDescTy(
+    Type*         pointeeTy)         // [in] Type that the returned pointer should point to.
 {
-    return PointerType::get(pPointeeTy, ADDR_SPACE_BUFFER_FAT_POINTER);
+    return PointerType::get(pointeeTy, ADDR_SPACE_BUFFER_FAT_POINTER);
 }
 
 // =====================================================================================================================
 // Get the type of an image descriptor
-VectorType* Builder::GetImageDescTy()
+VectorType* Builder::getImageDescTy()
 {
     return VectorType::get(getInt32Ty(), 8);
 }
 
 // =====================================================================================================================
 // Get the type of an fmask descriptor
-VectorType* Builder::GetFmaskDescTy()
+VectorType* Builder::getFmaskDescTy()
 {
     return VectorType::get(getInt32Ty(), 8);
 }
 
 // =====================================================================================================================
 // Get the type of a texel buffer descriptor
-VectorType* Builder::GetTexelBufferDescTy()
+VectorType* Builder::getTexelBufferDescTy()
 {
     return VectorType::get(getInt32Ty(), 4);
 }
 
 // =====================================================================================================================
 // Get the type of a sampler descriptor
-VectorType* Builder::GetSamplerDescTy()
+VectorType* Builder::getSamplerDescTy()
 {
     return VectorType::get(getInt32Ty(), 4);
 }
@@ -297,39 +297,39 @@ VectorType* Builder::GetSamplerDescTy()
 // =====================================================================================================================
 // Get the type of pointer to image descriptor.
 // This is in fact a struct containing the pointer itself plus the stride in dwords.
-Type* Builder::GetImageDescPtrTy()
+Type* Builder::getImageDescPtrTy()
 {
-    return StructType::get(getContext(), { PointerType::get(GetImageDescTy(), ADDR_SPACE_CONST), getInt32Ty() });
+    return StructType::get(getContext(), { PointerType::get(getImageDescTy(), ADDR_SPACE_CONST), getInt32Ty() });
 }
 
 // =====================================================================================================================
 // Get the type of pointer to fmask descriptor.
 // This is in fact a struct containing the pointer itself plus the stride in dwords.
-Type* Builder::GetFmaskDescPtrTy()
+Type* Builder::getFmaskDescPtrTy()
 {
-    return StructType::get(getContext(), { PointerType::get(GetFmaskDescTy(), ADDR_SPACE_CONST), getInt32Ty() });
+    return StructType::get(getContext(), { PointerType::get(getFmaskDescTy(), ADDR_SPACE_CONST), getInt32Ty() });
 }
 
 // =====================================================================================================================
 // Get the type of pointer to texel buffer descriptor.
 // This is in fact a struct containing the pointer itself plus the stride in dwords.
-Type* Builder::GetTexelBufferDescPtrTy()
+Type* Builder::getTexelBufferDescPtrTy()
 {
-    return StructType::get(getContext(), { PointerType::get(GetTexelBufferDescTy(), ADDR_SPACE_CONST), getInt32Ty() });
+    return StructType::get(getContext(), { PointerType::get(getTexelBufferDescTy(), ADDR_SPACE_CONST), getInt32Ty() });
 }
 
 // =====================================================================================================================
 // Get the type of pointer to sampler descriptor.
 // This is in fact a struct containing the pointer itself plus the stride in dwords.
-Type* Builder::GetSamplerDescPtrTy()
+Type* Builder::getSamplerDescPtrTy()
 {
-    return StructType::get(getContext(), { PointerType::get(GetSamplerDescTy(), ADDR_SPACE_CONST), getInt32Ty() });
+    return StructType::get(getContext(), { PointerType::get(getSamplerDescTy(), ADDR_SPACE_CONST), getInt32Ty() });
 }
 
 // =====================================================================================================================
 // Get the type of a built-in. Where the built-in has a shader-defined array size (ClipDistance,
 // CullDistance, SampleMask), inOutInfo.GetArraySize() is used as the array size.
-Type* Builder::GetBuiltInTy(
+Type* Builder::getBuiltInTy(
     BuiltInKind   builtIn,            // Built-in kind
     InOutInfo     inOutInfo)          // Extra input/output info (shader-defined array size)
 {
@@ -352,7 +352,7 @@ Type* Builder::GetBuiltInTy(
         a4v3f32
     };
 
-    unsigned arraySize = inOutInfo.GetArraySize();
+    unsigned arraySize = inOutInfo.getArraySize();
     TypeCode typeCode = TypeCode::i32;
     switch (builtIn)
     {
@@ -393,49 +393,49 @@ Type* Builder::GetBuiltInTy(
 
 // =====================================================================================================================
 // Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
-Constant* Builder::GetFpConstant(
-    Type*           pTy,    // [in] FP scalar or vector type
+Constant* Builder::getFpConstant(
+    Type*           ty,    // [in] FP scalar or vector type
     APFloat         value)  // APFloat value
 {
-    const fltSemantics* pSemantics = &APFloat::IEEEdouble();
-    Type* pScalarTy = pTy->getScalarType();
-    if (pScalarTy->isHalfTy())
+    const fltSemantics* semantics = &APFloat::IEEEdouble();
+    Type* scalarTy = ty->getScalarType();
+    if (scalarTy->isHalfTy())
     {
-        pSemantics = &APFloat::IEEEhalf();
+        semantics = &APFloat::IEEEhalf();
     }
-    else if (pScalarTy->isFloatTy())
+    else if (scalarTy->isFloatTy())
     {
-        pSemantics = &APFloat::IEEEsingle();
+        semantics = &APFloat::IEEEsingle();
     }
     bool ignored = true;
-    value.convert(*pSemantics, APFloat::rmNearestTiesToEven, &ignored);
-    return ConstantFP::get(pTy, value);
+    value.convert(*semantics, APFloat::rmNearestTiesToEven, &ignored);
+    return ConstantFP::get(ty, value);
 }
 
 // =====================================================================================================================
 // Get a constant of FP or vector of FP type for the value PI/180, for converting radians to degrees.
-Constant* Builder::GetPiOver180(
-    Type* pTy)    // [in] FP scalar or vector type
+Constant* Builder::getPiOver180(
+    Type* ty)    // [in] FP scalar or vector type
 {
     // PI/180, 0.017453292
     // TODO: Use a value that works for double as well.
-    return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, 0x3F91DF46A0000000)));
+    return getFpConstant(ty, APFloat(APFloat::IEEEdouble(), APInt(64, 0x3F91DF46A0000000)));
 }
 
 // =====================================================================================================================
 // Get a constant of FP or vector of FP type for the value 180/PI, for converting degrees to radians.
-Constant* Builder::Get180OverPi(
-    Type* pTy)    // [in] FP scalar or vector type
+Constant* Builder::get180OverPi(
+    Type* ty)    // [in] FP scalar or vector type
 {
     // 180/PI, 57.29577951308232
     // TODO: Use a value that works for double as well.
-    return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, 0x404CA5DC20000000)));
+    return getFpConstant(ty, APFloat(APFloat::IEEEdouble(), APInt(64, 0x404CA5DC20000000)));
 }
 
 // =====================================================================================================================
 // Get a constant of FP or vector of FP type for the value 1/(2^n - 1)
-Constant* Builder::GetOneOverPower2MinusOne(
-    Type*     pTy,  // [in] FP scalar or vector type
+Constant* Builder::getOneOverPower2MinusOne(
+    Type*     ty,  // [in] FP scalar or vector type
     unsigned  n)    // Power of two to use
 {
     // We could calculate this here, using knowledge that 1(2^n - 1) in binary has a repeating bit pattern
@@ -458,7 +458,7 @@ Constant* Builder::GetOneOverPower2MinusOne(
     default:
         llvm_unreachable("Should never be called!");
     }
-    return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, bits)));
+    return getFpConstant(ty, APFloat(APFloat::IEEEdouble(), APInt(64, bits)));
 }
 
 // =====================================================================================================================
@@ -467,12 +467,12 @@ Constant* Builder::GetOneOverPower2MinusOne(
 // flags from the Builder if none are specified by pFmfSource.
 CallInst* Builder::CreateUnaryIntrinsic(
     Intrinsic::ID id,           // Intrinsic ID
-    Value*        pValue,       // [in] Input value
-    Instruction*  pFmfSource,   // [in] Instruction to copy fast math flags from; nullptr to get from Builder
+    Value*        value,       // [in] Input value
+    Instruction*  fmfSource,   // [in] Instruction to copy fast math flags from; nullptr to get from Builder
     const Twine&  instName)     // [in] Name to give instruction
 {
-    CallInst* pResult = IRBuilder<>::CreateUnaryIntrinsic(id, pValue, pFmfSource, instName);
-    if ((pFmfSource == nullptr) && isa<FPMathOperator>(pResult))
+    CallInst* result = IRBuilder<>::CreateUnaryIntrinsic(id, value, fmfSource, instName);
+    if ((fmfSource == nullptr) && isa<FPMathOperator>(result))
     {
         // There are certain intrinsics with an FP result that we do not want FMF on.
         switch (id)
@@ -481,11 +481,11 @@ CallInst* Builder::CreateUnaryIntrinsic(
         case Intrinsic::amdgcn_wwm:
             break;
         default:
-            pResult->setFastMathFlags(getFastMathFlags());
+            result->setFastMathFlags(getFastMathFlags());
             break;
         }
     }
-    return pResult;
+    return result;
 }
 
 // =====================================================================================================================
@@ -494,17 +494,17 @@ CallInst* Builder::CreateUnaryIntrinsic(
 // flags from the Builder if none are specified by pFmfSource.
 CallInst* Builder::CreateBinaryIntrinsic(
     Intrinsic::ID id,           // Intrinsic ID
-    Value*        pValue1,      // [in] Input value 1
-    Value*        pValue2,      // [in] Input value 2
-    Instruction*  pFmfSource,   // [in] Instruction to copy fast math flags from; nullptr to get from Builder
+    Value*        value1,      // [in] Input value 1
+    Value*        value2,      // [in] Input value 2
+    Instruction*  fmfSource,   // [in] Instruction to copy fast math flags from; nullptr to get from Builder
     const Twine&  name)         // [in] Name to give instruction
 {
-    CallInst* pResult = IRBuilder<>::CreateBinaryIntrinsic(id, pValue1, pValue2, pFmfSource, name);
-    if ((pFmfSource == nullptr) && isa<FPMathOperator>(pResult))
+    CallInst* result = IRBuilder<>::CreateBinaryIntrinsic(id, value1, value2, fmfSource, name);
+    if ((fmfSource == nullptr) && isa<FPMathOperator>(result))
     {
-        pResult->setFastMathFlags(getFastMathFlags());
+        result->setFastMathFlags(getFastMathFlags());
     }
-    return pResult;
+    return result;
 }
 
 // =====================================================================================================================
@@ -515,14 +515,14 @@ CallInst* Builder::CreateIntrinsic(
     Intrinsic::ID    id,         // Intrinsic ID
     ArrayRef<Type*>  types,      // [in] Types
     ArrayRef<Value*> args,       // [in] Input values
-    Instruction*     pFmfSource, // [in] Instruction to copy fast math flags from; nullptr to get from Builder
+    Instruction*     fmfSource, // [in] Instruction to copy fast math flags from; nullptr to get from Builder
     const Twine&     name)       // [in] Name to give instruction
 {
-    CallInst* pResult = IRBuilder<>::CreateIntrinsic(id, types, args, pFmfSource, name);
-    if ((pFmfSource == nullptr) && isa<FPMathOperator>(pResult))
+    CallInst* result = IRBuilder<>::CreateIntrinsic(id, types, args, fmfSource, name);
+    if ((fmfSource == nullptr) && isa<FPMathOperator>(result))
     {
-        pResult->setFastMathFlags(getFastMathFlags());
+        result->setFastMathFlags(getFastMathFlags());
     }
-    return pResult;
+    return result;
 }
 

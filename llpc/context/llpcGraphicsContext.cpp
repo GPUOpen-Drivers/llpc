@@ -46,35 +46,35 @@ namespace Llpc
 // =====================================================================================================================
 GraphicsContext::GraphicsContext(
     GfxIpVersion                     gfxIp,            // Graphics Ip version info
-    const GraphicsPipelineBuildInfo* pPipelineInfo,    // [in] Graphics pipeline build info
-    MetroHash::Hash*                 pPipelineHash,    // [in] Pipeline hash code
-    MetroHash::Hash*                 pCacheHash)       // [in] Cache hash code
+    const GraphicsPipelineBuildInfo* pipelineInfo,    // [in] Graphics pipeline build info
+    MetroHash::Hash*                 pipelineHash,    // [in] Pipeline hash code
+    MetroHash::Hash*                 cacheHash)       // [in] Cache hash code
     :
-    PipelineContext(gfxIp, pPipelineHash, pCacheHash),
-    m_pPipelineInfo(pPipelineInfo),
+    PipelineContext(gfxIp, pipelineHash, cacheHash),
+    m_pipelineInfo(pipelineInfo),
     m_stageMask(0),
     m_activeStageCount(0),
     m_gsOnChip(false)
 {
     const PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
     {
-        &pPipelineInfo->vs,
-        &pPipelineInfo->tcs,
-        &pPipelineInfo->tes,
-        &pPipelineInfo->gs,
-        &pPipelineInfo->fs,
+        &pipelineInfo->vs,
+        &pipelineInfo->tcs,
+        &pipelineInfo->tes,
+        &pipelineInfo->gs,
+        &pipelineInfo->fs,
     };
 
     for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage)
     {
         if (shaderInfo[stage]->pModuleData != nullptr)
         {
-            m_stageMask |= ShaderStageToMask(static_cast<ShaderStage>(stage));
+            m_stageMask |= shaderStageToMask(static_cast<ShaderStage>(stage));
             ++m_activeStageCount;
 
             if (stage == ShaderStageGeometry)
             {
-                m_stageMask |= ShaderStageToMask(ShaderStageCopyShader);
+                m_stageMask |= shaderStageToMask(ShaderStageCopyShader);
                 ++m_activeStageCount;
             }
         }
@@ -88,7 +88,7 @@ GraphicsContext::~GraphicsContext()
 
 // =====================================================================================================================
 // Gets pipeline shader info of the specified shader stage
-const PipelineShaderInfo* GraphicsContext::GetPipelineShaderInfo(
+const PipelineShaderInfo* GraphicsContext::getPipelineShaderInfo(
     ShaderStage shaderStage // Shader stage
     ) const
 {
@@ -100,37 +100,37 @@ const PipelineShaderInfo* GraphicsContext::GetPipelineShaderInfo(
 
     assert(shaderStage < ShaderStageGfxCount);
 
-    const PipelineShaderInfo* pShaderInfo = nullptr;
+    const PipelineShaderInfo* shaderInfo = nullptr;
     switch (shaderStage)
     {
     case Llpc::ShaderStageVertex:
-        pShaderInfo = &m_pPipelineInfo->vs;
+        shaderInfo = &m_pipelineInfo->vs;
         break;
     case Llpc::ShaderStageTessControl:
-        pShaderInfo = &m_pPipelineInfo->tcs;
+        shaderInfo = &m_pipelineInfo->tcs;
         break;
     case Llpc::ShaderStageTessEval:
-        pShaderInfo = &m_pPipelineInfo->tes;
+        shaderInfo = &m_pipelineInfo->tes;
         break;
     case Llpc::ShaderStageGeometry:
-        pShaderInfo = &m_pPipelineInfo->gs;
+        shaderInfo = &m_pipelineInfo->gs;
         break;
     case Llpc::ShaderStageFragment:
-        pShaderInfo = &m_pPipelineInfo->fs;
+        shaderInfo = &m_pipelineInfo->fs;
         break;
     default:
         llvm_unreachable("Should never be called!");
         break;
     }
 
-    return pShaderInfo;
+    return shaderInfo;
 }
 
 // =====================================================================================================================
 // Does user data node merging for all shader stages
-void GraphicsContext::DoUserDataNodeMerge()
+void GraphicsContext::doUserDataNodeMerge()
 {
-    unsigned stageMask = GetShaderStageMask();
+    unsigned stageMask = getShaderStageMask();
     SmallVector<ResourceMappingNode, 8> allNodes;
 
     // No need to merge if there is only one shader stage.
@@ -144,9 +144,9 @@ void GraphicsContext::DoUserDataNodeMerge()
     {
         if ((stageMask >> stage) & 1)
         {
-            auto pShaderInfo = GetPipelineShaderInfo(ShaderStage(stage));
-            for (const ResourceMappingNode& node : ArrayRef<ResourceMappingNode>(pShaderInfo->pUserDataNodes,
-                                                                                 pShaderInfo->userDataNodeCount))
+            auto shaderInfo = getPipelineShaderInfo(ShaderStage(stage));
+            for (const ResourceMappingNode& node : ArrayRef<ResourceMappingNode>(shaderInfo->pUserDataNodes,
+                                                                                 shaderInfo->userDataNodeCount))
             {
                 allNodes.push_back(node);
             }
@@ -154,7 +154,7 @@ void GraphicsContext::DoUserDataNodeMerge()
     }
 
     // Sort and merge.
-    ArrayRef<ResourceMappingNode> mergedNodes = MergeUserDataNodeTable(allNodes);
+    ArrayRef<ResourceMappingNode> mergedNodes = mergeUserDataNodeTable(allNodes);
 
     // Collect descriptor range values (immutable descriptors) from all shader stages into one big table.
     SmallVector<DescriptorRangeValue, 8> allRangeValues;
@@ -162,10 +162,10 @@ void GraphicsContext::DoUserDataNodeMerge()
     {
         if ((stageMask >> stage) & 1)
         {
-            auto pShaderInfo = GetPipelineShaderInfo(ShaderStage(stage));
+            auto shaderInfo = getPipelineShaderInfo(ShaderStage(stage));
             for (const DescriptorRangeValue& rangeValue :
-                        ArrayRef<DescriptorRangeValue>(pShaderInfo->pDescriptorRangeValues,
-                                                       pShaderInfo->descriptorRangeValueCount))
+                        ArrayRef<DescriptorRangeValue>(shaderInfo->pDescriptorRangeValues,
+                                                       shaderInfo->descriptorRangeValueCount))
             {
                 allRangeValues.push_back(rangeValue);
             }
@@ -222,13 +222,13 @@ void GraphicsContext::DoUserDataNodeMerge()
     {
         if ((stageMask >> stage) & 1)
         {
-            auto pShaderInfo = const_cast<PipelineShaderInfo*>(GetPipelineShaderInfo(ShaderStage(stage)));
-            pShaderInfo->pUserDataNodes = mergedNodes.data();
-            pShaderInfo->userDataNodeCount = mergedNodes.size();
+            auto shaderInfo = const_cast<PipelineShaderInfo*>(getPipelineShaderInfo(ShaderStage(stage)));
+            shaderInfo->pUserDataNodes = mergedNodes.data();
+            shaderInfo->userDataNodeCount = mergedNodes.size();
             if (m_allocDescriptorRangeValues)
             {
-                pShaderInfo->pDescriptorRangeValues = m_allocDescriptorRangeValues->data();
-                pShaderInfo->descriptorRangeValueCount = m_allocDescriptorRangeValues->size();
+                shaderInfo->pDescriptorRangeValues = m_allocDescriptorRangeValues->data();
+                shaderInfo->descriptorRangeValueCount = m_allocDescriptorRangeValues->size();
             }
         }
     }
@@ -236,7 +236,7 @@ void GraphicsContext::DoUserDataNodeMerge()
 
 // =====================================================================================================================
 // Merge user data nodes that have been collected into one big table
-ArrayRef<ResourceMappingNode> GraphicsContext::MergeUserDataNodeTable(
+ArrayRef<ResourceMappingNode> GraphicsContext::mergeUserDataNodeTable(
     SmallVectorImpl<ResourceMappingNode>& allNodes)   // Table of nodes
 {
     // Sort the nodes by offset, so we can spot duplicates.
@@ -295,7 +295,7 @@ ArrayRef<ResourceMappingNode> GraphicsContext::MergeUserDataNodeTable(
             }
 
             // Call recursively to sort and merge.
-            auto mergedInnerNodes = MergeUserDataNodeTable(allInnerNodes);
+            auto mergedInnerNodes = mergeUserDataNodeTable(allInnerNodes);
 
             // Finished merging the inner tables. Keep the merged DescriptorTableVaPtr node.
             ResourceMappingNode modifiedNode = nodes[0];

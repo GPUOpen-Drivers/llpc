@@ -47,7 +47,7 @@ char PatchLlvmIrInclusion::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations of including LLVM IR as a separate section in the ELF.
-ModulePass* CreatePatchLlvmIrInclusion()
+ModulePass* createPatchLlvmIrInclusion()
 {
     return new PatchLlvmIrInclusion();
 }
@@ -67,28 +67,28 @@ PatchLlvmIrInclusion::PatchLlvmIrInclusion()
 bool PatchLlvmIrInclusion::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    Patch::Init(&module);
+    Patch::init(&module);
 
     std::string moduleStr;
     raw_string_ostream llvmIr(moduleStr);
-    llvmIr << *m_pModule;
+    llvmIr << *m_module;
     llvmIr.flush();
 
-    auto pGlobalTy = ArrayType::get(Type::getInt8Ty(*m_pContext), moduleStr.size());
-    auto pInitializer = ConstantDataArray::getString(m_pModule->getContext(), moduleStr, false);
-    auto pGlobal = new GlobalVariable(*m_pModule,
-                                      pGlobalTy,
+    auto globalTy = ArrayType::get(Type::getInt8Ty(*m_context), moduleStr.size());
+    auto initializer = ConstantDataArray::getString(m_module->getContext(), moduleStr, false);
+    auto global = new GlobalVariable(*m_module,
+                                      globalTy,
                                       true,
                                       GlobalValue::ExternalLinkage,
-                                      pInitializer,
+                                      initializer,
                                       "llvmir",
                                       nullptr,
                                       GlobalValue::NotThreadLocal,
                                       false);
-    assert(pGlobal != nullptr);
+    assert(global != nullptr);
 
     std::string namePrefix = Util::Abi::AmdGpuCommentName;
-    pGlobal->setSection(namePrefix + "llvmir");
+    global->setSection(namePrefix + "llvmir");
 
     return true;
 }

@@ -76,8 +76,8 @@ public:
     PassManagerImpl();
     ~PassManagerImpl() override {}
 
-    void SetPassIndex(unsigned* pPassIndex) override { m_pPassIndex = pPassIndex; }
-    void add(llvm::Pass* pPass) override;
+    void setPassIndex(unsigned* passIndex) override { m_passIndex = passIndex; }
+    void add(llvm::Pass* pass) override;
     void stop() override;
 
 private:
@@ -85,14 +85,14 @@ private:
     llvm::AnalysisID  m_dumpCfgAfter = nullptr;  // -dump-cfg-after pass id
     llvm::AnalysisID  m_printModule = nullptr;   // Pass id of dump pass "Print Module IR"
     llvm::AnalysisID  m_jumpThreading = nullptr; // Pass id of opt pass "Jump Threading"
-    unsigned*         m_pPassIndex = nullptr;    // Pass Index
+    unsigned*         m_passIndex = nullptr;    // Pass Index
 };
 
 } // anonymous
 
 // =====================================================================================================================
 // Get the PassInfo for a registered pass given short name
-static const PassInfo* GetPassInfo(
+static const PassInfo* getPassInfo(
     StringRef passName)   // Short name of pass
 {
     if (passName.empty())
@@ -101,22 +101,22 @@ static const PassInfo* GetPassInfo(
     }
 
     const PassRegistry& passRegistry = *PassRegistry::getPassRegistry();
-    const PassInfo* pPassInfo = passRegistry.getPassInfo(passName);
-    if (pPassInfo == nullptr)
+    const PassInfo* passInfo = passRegistry.getPassInfo(passName);
+    if (passInfo == nullptr)
     {
         report_fatal_error(Twine('\"') + Twine(passName) +
                            Twine("\" pass is not registered."));
     }
-    return pPassInfo;
+    return passInfo;
 }
 
 // =====================================================================================================================
 // Get the ID for a registered pass given short name
-static AnalysisID GetPassIdFromName(
+static AnalysisID getPassIdFromName(
     StringRef passName)   // Short name of pass
 {
-  const PassInfo* pPassInfo = GetPassInfo(passName);
-  return pPassInfo ? pPassInfo->getTypeInfo() : nullptr;
+  const PassInfo* passInfo = getPassInfo(passName);
+  return passInfo ? passInfo->getTypeInfo() : nullptr;
 }
 
 // =====================================================================================================================
@@ -133,25 +133,25 @@ PassManagerImpl::PassManagerImpl()
 {
     if (cl::DumpCfgAfter.empty() == false)
     {
-        m_dumpCfgAfter = GetPassIdFromName(cl::DumpCfgAfter);
+        m_dumpCfgAfter = getPassIdFromName(cl::DumpCfgAfter);
     }
 
-    m_jumpThreading = GetPassIdFromName("jump-threading");
-    m_printModule = GetPassIdFromName("print-module");
+    m_jumpThreading = getPassIdFromName("jump-threading");
+    m_printModule = getPassIdFromName("print-module");
 }
 
 // =====================================================================================================================
 // Add a pass to the pass manager.
 void PassManagerImpl::add(
-    Pass* pPass)    // [in] Pass to add to the pass manager
+    Pass* pass)    // [in] Pass to add to the pass manager
 {
     // Do not add any passes after calling stop(), except immutable passes.
-    if (m_stopped && (pPass->getAsImmutablePass() == nullptr))
+    if (m_stopped && (pass->getAsImmutablePass() == nullptr))
     {
         return;
     }
 
-    AnalysisID passId = pPass->getPassID();
+    AnalysisID passId = pass->getPassID();
 
     // Skip the jump threading pass as it interacts really badly with the structurizer.
     if (passId == m_jumpThreading)
@@ -159,27 +159,27 @@ void PassManagerImpl::add(
         return;
     }
 
-    if ((passId != m_printModule) && (m_pPassIndex != nullptr))
+    if ((passId != m_printModule) && (m_passIndex != nullptr))
     {
-        unsigned passIndex = (*m_pPassIndex)++;
+        unsigned passIndex = (*m_passIndex)++;
 
         for (auto disableIndex : cl::DisablePassIndices)
         {
             if (disableIndex == passIndex)
             {
-                LLPC_OUTS("Pass[" << passIndex << "] = " << pPass->getPassName() << " (disabled)\n");
+                LLPC_OUTS("Pass[" << passIndex << "] = " << pass->getPassName() << " (disabled)\n");
                 return;
             }
         }
 
         if (cl::DumpPassName)
         {
-            LLPC_OUTS("Pass[" << passIndex << "] = " << pPass->getPassName() << "\n");
+            LLPC_OUTS("Pass[" << passIndex << "] = " << pass->getPassName() << "\n");
         }
     }
 
     // Add the pass to the superclass pass manager.
-    legacy::PassManager::add(pPass);
+    legacy::PassManager::add(pass);
 
     if (cl::VerifyIr)
     {

@@ -190,8 +190,8 @@ struct PsRegConfig
     DEF_REG(DB_SHADER_CONTROL);
     DEF_REG(CB_SHADER_MASK);
 
-    static unsigned GetPsInputCntlStart();
-    static unsigned GetPsUserDataStart();
+    static unsigned getPsInputCntlStart();
+    static unsigned getPsUserDataStart();
 
     PsRegConfig();
 };
@@ -284,7 +284,7 @@ struct CsRegConfig
 static std::unordered_map<unsigned, const char*>    RegNameMap;
 
 // Adds entries to register name map.
-void InitRegisterNameMap(GfxIpVersion gfxIp);
+void initRegisterNameMap(GfxIpVersion gfxIp);
 
 } // Gfx6
 

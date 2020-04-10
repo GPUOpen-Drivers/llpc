@@ -47,14 +47,14 @@ static const char ComputeShaderModeMetadataName[] = "llpc.compute.mode";
 
 // =====================================================================================================================
 // Clear shader modes
-void ShaderModes::Clear()
+void ShaderModes::clear()
 {
     memset(m_commonShaderModes, 0, sizeof(m_commonShaderModes));
 }
 
 // =====================================================================================================================
 // Set the common shader mode (FP modes) for the given shader stage
-void ShaderModes::SetCommonShaderMode(
+void ShaderModes::setCommonShaderMode(
     ShaderStage             stage,             // Shader stage
     const CommonShaderMode& commonShaderMode)  // [in] Common shader mode
 {
@@ -65,7 +65,7 @@ void ShaderModes::SetCommonShaderMode(
 
 // =====================================================================================================================
 // Get the common shader mode (FP mode) for the given shader stage
-const CommonShaderMode& ShaderModes::GetCommonShaderMode(
+const CommonShaderMode& ShaderModes::getCommonShaderMode(
     ShaderStage                       stage)              // Shader stage
 {
     return ArrayRef<CommonShaderMode>(m_commonShaderModes)[stage];
@@ -73,7 +73,7 @@ const CommonShaderMode& ShaderModes::GetCommonShaderMode(
 
 // =====================================================================================================================
 // Check if any shader stage has useSubgroupSize set
-bool ShaderModes::GetAnyUseSubgroupSize()
+bool ShaderModes::getAnyUseSubgroupSize()
 {
     for (const auto& commonShaderMode : m_commonShaderModes)
     {
@@ -88,7 +88,7 @@ bool ShaderModes::GetAnyUseSubgroupSize()
 // =====================================================================================================================
 // Set the tessellation mode. This in fact merges the supplied values with any previously supplied values,
 // to allow the client to call this twice, once for TCS and once for TES.
-void ShaderModes::SetTessellationMode(
+void ShaderModes::setTessellationMode(
     const TessellationMode& inMode)   // [in] Tessellation mode
 {
     assert(inMode.outputVertices <= MaxTessPatchVertices);
@@ -106,7 +106,7 @@ void ShaderModes::SetTessellationMode(
 
 // =====================================================================================================================
 // Get the tessellation state.
-const TessellationMode& ShaderModes::GetTessellationMode()
+const TessellationMode& ShaderModes::getTessellationMode()
 {
     // Ensure defaults are correctly set the first time the middle-end uses TessellationMode.
     if (m_tessellationMode.outputVertices == 0)
@@ -130,35 +130,35 @@ const TessellationMode& ShaderModes::GetTessellationMode()
 
 // =====================================================================================================================
 // Set the geometry shader mode
-void ShaderModes::SetGeometryShaderMode(const GeometryShaderMode& inMode)
+void ShaderModes::setGeometryShaderMode(const GeometryShaderMode& inMode)
 {
     m_geometryShaderMode = inMode;
 }
 
 // =====================================================================================================================
 // Get the geometry shader mode
-const GeometryShaderMode& ShaderModes::GetGeometryShaderMode()
+const GeometryShaderMode& ShaderModes::getGeometryShaderMode()
 {
     return m_geometryShaderMode;
 }
 
 // =====================================================================================================================
 // Set the fragment shader mode
-void ShaderModes::SetFragmentShaderMode(const FragmentShaderMode& inMode)
+void ShaderModes::setFragmentShaderMode(const FragmentShaderMode& inMode)
 {
     m_fragmentShaderMode = inMode;
 }
 
 // =====================================================================================================================
 // Get the fragment shader mode
-const FragmentShaderMode& ShaderModes::GetFragmentShaderMode()
+const FragmentShaderMode& ShaderModes::getFragmentShaderMode()
 {
     return m_fragmentShaderMode;
 }
 
 // =====================================================================================================================
 // Set the compute shader mode (workgroup size)
-void ShaderModes::SetComputeShaderMode(
+void ShaderModes::setComputeShaderMode(
     const ComputeShaderMode& inMode)   // [in] Compute shader state
 {
     // 0 is taken to be 1 in workgroup size.
@@ -173,37 +173,37 @@ void ShaderModes::SetComputeShaderMode(
 
 // =====================================================================================================================
 // Get the compute shader mode (workgroup size)
-const ComputeShaderMode& ShaderModes::GetComputeShaderMode()
+const ComputeShaderMode& ShaderModes::getComputeShaderMode()
 {
     return m_computeShaderMode;
 }
 
 // =====================================================================================================================
 // Record shader modes (common and specific) into IR metadata
-void ShaderModes::Record(
-    Module* pModule)    // [in/out] Module to record the IR metadata in
+void ShaderModes::record(
+    Module* module)    // [in/out] Module to record the IR metadata in
 {
     // First the common state.
     for (unsigned stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage)
     {
         std::string metadataName = std::string(CommonShaderModeMetadataPrefix) +
-                                   PipelineState::GetShaderStageAbbreviation(static_cast<ShaderStage>(stage));
-        PipelineState::SetNamedMetadataToArrayOfInt32(pModule, m_commonShaderModes[stage], metadataName);
+                                   PipelineState::getShaderStageAbbreviation(static_cast<ShaderStage>(stage));
+        PipelineState::setNamedMetadataToArrayOfInt32(module, m_commonShaderModes[stage], metadataName);
     }
 
     // Then the specific shader modes.
-    PipelineState::SetNamedMetadataToArrayOfInt32(pModule, m_tessellationMode, TessellationModeMetadataName);
-    PipelineState::SetNamedMetadataToArrayOfInt32(pModule, m_geometryShaderMode, GeometryShaderModeMetadataName);
-    PipelineState::SetNamedMetadataToArrayOfInt32(pModule, m_fragmentShaderMode, FragmentShaderModeMetadataName);
-    PipelineState::SetNamedMetadataToArrayOfInt32(pModule, m_computeShaderMode, ComputeShaderModeMetadataName);
+    PipelineState::setNamedMetadataToArrayOfInt32(module, m_tessellationMode, TessellationModeMetadataName);
+    PipelineState::setNamedMetadataToArrayOfInt32(module, m_geometryShaderMode, GeometryShaderModeMetadataName);
+    PipelineState::setNamedMetadataToArrayOfInt32(module, m_fragmentShaderMode, FragmentShaderModeMetadataName);
+    PipelineState::setNamedMetadataToArrayOfInt32(module, m_computeShaderMode, ComputeShaderModeMetadataName);
 }
 
 // =====================================================================================================================
 // Read shader modes (common and specific) from a shader IR module, but only if no modes have been set
 // in this ShaderModes. This is used to handle the case that the shader module comes from an earlier
 // shader compile, and it had its ShaderModes recorded into IR then.
-void ShaderModes::ReadModesFromShader(
-    Module*     pModule,    // [in] LLVM module
+void ShaderModes::readModesFromShader(
+    Module*     module,    // [in] LLVM module
     ShaderStage stage)      // Shader stage
 {
     // Bail if any modes have been set, which would mean that this is a full pipeline compile.
@@ -214,24 +214,24 @@ void ShaderModes::ReadModesFromShader(
 
     // First the common state.
     std::string metadataName = std::string(CommonShaderModeMetadataPrefix) +
-                               PipelineState::GetShaderStageAbbreviation(static_cast<ShaderStage>(stage));
-    PipelineState::ReadNamedMetadataArrayOfInt32(pModule, metadataName, m_commonShaderModes[stage]);
+                               PipelineState::getShaderStageAbbreviation(static_cast<ShaderStage>(stage));
+    PipelineState::readNamedMetadataArrayOfInt32(module, metadataName, m_commonShaderModes[stage]);
 
     // Then the specific shader modes.
     switch (stage)
     {
     case ShaderStageTessControl:
     case ShaderStageTessEval:
-        PipelineState::ReadNamedMetadataArrayOfInt32(pModule, TessellationModeMetadataName, m_tessellationMode);
+        PipelineState::readNamedMetadataArrayOfInt32(module, TessellationModeMetadataName, m_tessellationMode);
         break;
     case ShaderStageGeometry:
-        PipelineState::ReadNamedMetadataArrayOfInt32(pModule, GeometryShaderModeMetadataName, m_geometryShaderMode);
+        PipelineState::readNamedMetadataArrayOfInt32(module, GeometryShaderModeMetadataName, m_geometryShaderMode);
         break;
     case ShaderStageFragment:
-        PipelineState::ReadNamedMetadataArrayOfInt32(pModule, FragmentShaderModeMetadataName, m_fragmentShaderMode);
+        PipelineState::readNamedMetadataArrayOfInt32(module, FragmentShaderModeMetadataName, m_fragmentShaderMode);
         break;
     case ShaderStageCompute:
-        PipelineState::ReadNamedMetadataArrayOfInt32(pModule,
+        PipelineState::readNamedMetadataArrayOfInt32(module,
                                                      ComputeShaderModeMetadataName,
                                                      m_computeShaderMode);
         break;
@@ -242,21 +242,21 @@ void ShaderModes::ReadModesFromShader(
 
 // =====================================================================================================================
 // Read shader modes (common and specific) from the pipeline IR module.
-void ShaderModes::ReadModesFromPipeline(
-    Module* pModule)    // [in] LLVM module
+void ShaderModes::readModesFromPipeline(
+    Module* module)    // [in] LLVM module
 {
     // First the common state.
     for (unsigned stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage)
     {
         std::string metadataName = std::string(CommonShaderModeMetadataPrefix) +
-                                   PipelineState::GetShaderStageAbbreviation(static_cast<ShaderStage>(stage));
-        PipelineState::ReadNamedMetadataArrayOfInt32(pModule, metadataName, m_commonShaderModes[stage]);
+                                   PipelineState::getShaderStageAbbreviation(static_cast<ShaderStage>(stage));
+        PipelineState::readNamedMetadataArrayOfInt32(module, metadataName, m_commonShaderModes[stage]);
     }
 
     // Then the specific shader modes.
-    PipelineState::ReadNamedMetadataArrayOfInt32(pModule, TessellationModeMetadataName, m_tessellationMode);
-    PipelineState::ReadNamedMetadataArrayOfInt32(pModule, GeometryShaderModeMetadataName, m_geometryShaderMode);
-    PipelineState::ReadNamedMetadataArrayOfInt32(pModule, FragmentShaderModeMetadataName, m_fragmentShaderMode);
-    PipelineState::ReadNamedMetadataArrayOfInt32(pModule, ComputeShaderModeMetadataName, m_computeShaderMode);
+    PipelineState::readNamedMetadataArrayOfInt32(module, TessellationModeMetadataName, m_tessellationMode);
+    PipelineState::readNamedMetadataArrayOfInt32(module, GeometryShaderModeMetadataName, m_geometryShaderMode);
+    PipelineState::readNamedMetadataArrayOfInt32(module, FragmentShaderModeMetadataName, m_fragmentShaderMode);
+    PipelineState::readNamedMetadataArrayOfInt32(module, ComputeShaderModeMetadataName, m_computeShaderMode);
 }
 

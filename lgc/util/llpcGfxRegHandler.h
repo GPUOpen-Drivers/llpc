@@ -56,7 +56,7 @@ namespace lgc
 // Note: the value mentioned above are all in symbolic state and the load/reload are symbolic expressions.
 struct BitsState
 {
-    llvm::Value* pValue     = nullptr;
+    llvm::Value* value     = nullptr;
     bool         isModified = false;
 };
 
@@ -75,38 +75,38 @@ struct BitsState
 class GfxRegHandler : public GfxRegHandlerBase
 {
 protected:
-    GfxRegHandler(Builder* pBuilder, llvm::Value* pReg);
+    GfxRegHandler(Builder* builder, llvm::Value* reg);
 
     // Common function for getting the current value for the hardware register
-    llvm::Value* GetRegCommon(unsigned regId);
+    llvm::Value* getRegCommon(unsigned regId);
 
     // Common function for setting the current value for the hardware register
-    void SetRegCommon(unsigned regId, llvm::Value* pVal)
+    void setRegCommon(unsigned regId, llvm::Value* val)
     {
-        SetBits(m_pBitsInfo[regId], pVal);
+        setBits(m_bitsInfo[regId], val);
         // It is assumed the register is being modified
-        m_pBitsState[regId].isModified = 1;
+        m_bitsState[regId].isModified = 1;
     }
 
     // Get combined data from two seperate DWORDs
-    llvm::Value* GetRegCombine(unsigned regIdLo, unsigned regIdHi);
+    llvm::Value* getRegCombine(unsigned regIdLo, unsigned regIdHi);
 
     // Set data into two seperate DWORDs
-    void SetRegCombine(unsigned regIdLo, unsigned regIdHi, llvm::Value* pReg);
+    void setRegCombine(unsigned regIdLo, unsigned regIdHi, llvm::Value* reg);
 
     // Get current value state for the hardware register
-    const BitsState* GetBitsState() { return m_pBitsState; }
+    const BitsState* getBitsState() { return m_bitsState; }
 
     // Set current value state for the hardware register
-    void SetBitsState(BitsState* bitsState) { m_pBitsState = bitsState; }
+    void setBitsState(BitsState* bitsState) { m_bitsState = bitsState; }
 
 protected:
-    llvm::Value*    m_pOne          = nullptr; // Int32 constant one
-    GfxIpVersion*   m_pGfxIpVersion = nullptr;
-    const BitsInfo* m_pBitsInfo     = nullptr;
+    llvm::Value*    m_one          = nullptr; // Int32 constant one
+    GfxIpVersion*   m_gfxIpVersion = nullptr;
+    const BitsInfo* m_bitsInfo     = nullptr;
 
 private:
-    BitsState*      m_pBitsState    = nullptr;
+    BitsState*      m_bitsState    = nullptr;
 };
 
 // SqImgSampRegs ID
@@ -125,16 +125,16 @@ enum class SqSampRegs
 class SqImgSampRegHandler: public GfxRegHandler
 {
 public:
-    SqImgSampRegHandler(Builder* pBuilder, llvm::Value* pReg, GfxIpVersion* pGfxIpVersion);
+    SqImgSampRegHandler(Builder* builder, llvm::Value* reg, GfxIpVersion* gfxIpVersion);
 
     // Get the current value for the hardware register
-    llvm::Value* GetReg(SqSampRegs regId);
+    llvm::Value* getReg(SqSampRegs regId);
 
     // Set the current value for the hardware register
-    void SetReg(SqSampRegs regId, llvm::Value* pRegValue);
+    void setReg(SqSampRegs regId, llvm::Value* regValue);
 
 private:
-    BitsState m_pBitsState[static_cast<unsigned>(SqSampRegs::Count)];
+    BitsState m_bitsState[static_cast<unsigned>(SqSampRegs::Count)];
 };
 
 // SqImgRsrcRegisters ID
@@ -164,16 +164,16 @@ enum class SqRsrcRegs
 class SqImgRsrcRegHandler : public GfxRegHandler
 {
 public:
-    SqImgRsrcRegHandler(Builder* pBuilder, llvm::Value* pReg, GfxIpVersion* pGfxIpVersion);
+    SqImgRsrcRegHandler(Builder* builder, llvm::Value* reg, GfxIpVersion* gfxIpVersion);
 
     // Get the current value for the hardware register
-    llvm::Value* GetReg(SqRsrcRegs regId);
+    llvm::Value* getReg(SqRsrcRegs regId);
 
     // Set the current value for the hardware register
-    void SetReg(SqRsrcRegs regId, llvm::Value* pRegValue);
+    void setReg(SqRsrcRegs regId, llvm::Value* regValue);
 
 private:
-    BitsState m_pBitsState[static_cast<unsigned>(SqRsrcRegs::Count)];
+    BitsState m_bitsState[static_cast<unsigned>(SqRsrcRegs::Count)];
 };
 
 } // lgc

@@ -36,15 +36,15 @@ using namespace llvm;
 // =====================================================================================================================
 // Create an LLVM function call to the named function. The callee is built automically based on return
 // type and its parameters.
-CallInst* BuilderBase::CreateNamedCall(
+CallInst* BuilderBase::createNamedCall(
     StringRef                     funcName, // Name of the callee
-    Type*                         pRetTy,   // [in] Return type of the callee
+    Type*                         retTy,   // [in] Return type of the callee
     ArrayRef<Value *>             args,     // Arguments to pass to the callee
     ArrayRef<Attribute::AttrKind> attribs)  // Function attributes
 {
-    Module* pModule = GetInsertBlock()->getParent()->getParent();
-    Function* pFunc = dyn_cast_or_null<Function>(pModule->getFunction(funcName));
-    if (!pFunc)
+    Module* module = GetInsertBlock()->getParent()->getParent();
+    Function* func = dyn_cast_or_null<Function>(module->getFunction(funcName));
+    if (!func)
     {
         SmallVector<Type*, 8> argTys;
         argTys.reserve(args.size());
@@ -53,22 +53,22 @@ CallInst* BuilderBase::CreateNamedCall(
             argTys.push_back(arg->getType());
         }
 
-        auto pFuncTy = FunctionType::get(pRetTy, argTys, false);
-        pFunc = Function::Create(pFuncTy, GlobalValue::ExternalLinkage, funcName, pModule);
+        auto funcTy = FunctionType::get(retTy, argTys, false);
+        func = Function::Create(funcTy, GlobalValue::ExternalLinkage, funcName, module);
 
-        pFunc->setCallingConv(CallingConv::C);
-        pFunc->addFnAttr(Attribute::NoUnwind);
+        func->setCallingConv(CallingConv::C);
+        func->addFnAttr(Attribute::NoUnwind);
 
         for (auto attrib : attribs)
         {
-            pFunc->addFnAttr(attrib);
+            func->addFnAttr(attrib);
         }
     }
 
-    auto pCall = CreateCall(pFunc, args);
-    pCall->setCallingConv(CallingConv::C);
-    pCall->setAttributes(pFunc->getAttributes());
+    auto call = CreateCall(func, args);
+    call->setCallingConv(CallingConv::C);
+    call->setAttributes(func->getAttributes());
 
-    return pCall;
+    return call;
 }
 

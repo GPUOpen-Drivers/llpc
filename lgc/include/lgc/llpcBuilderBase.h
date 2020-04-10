@@ -45,14 +45,14 @@ class BuilderBase : public llvm::IRBuilder<>
 public:
     // Constructors
     BuilderBase(llvm::LLVMContext& context) : IRBuilder(context) {}
-    BuilderBase(llvm::BasicBlock* pBlock) : IRBuilder(pBlock) {}
-    BuilderBase(llvm::Instruction* pInst) : IRBuilder(pInst) {}
+    BuilderBase(llvm::BasicBlock* block) : IRBuilder(block) {}
+    BuilderBase(llvm::Instruction* inst) : IRBuilder(inst) {}
 
     // Create an LLVM function call to the named function. The callee is built automically based on return
     // type and its parameters.
-    llvm::CallInst* CreateNamedCall(
+    llvm::CallInst* createNamedCall(
         llvm::StringRef                           funcName, // Name of the callee
-        llvm::Type*                               pRetTy,   // [in] Return type of the callee
+        llvm::Type*                               retTy,   // [in] Return type of the callee
         llvm::ArrayRef<llvm::Value *>             args,     // Arguments to pass to the callee
         llvm::ArrayRef<llvm::Attribute::AttrKind> attribs); // Function attributes
 };

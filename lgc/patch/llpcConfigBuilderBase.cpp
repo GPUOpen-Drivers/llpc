@@ -44,27 +44,27 @@ using namespace llvm;
 
 // =====================================================================================================================
 ConfigBuilderBase::ConfigBuilderBase(
-    llvm::Module*   pModule,        // [in/out] LLVM module
-    PipelineState*  pPipelineState) // [in] Pipeline state
+    llvm::Module*   module,        // [in/out] LLVM module
+    PipelineState*  pipelineState) // [in] Pipeline state
     :
-    m_pModule(pModule),
-    m_pPipelineState(pPipelineState),
+    m_module(module),
+    m_pipelineState(pipelineState),
     m_userDataLimit(0),
     m_spillThreshold(UINT32_MAX)
 {
-    m_pContext = &pModule->getContext();
+    m_context = &module->getContext();
 
-    m_hasVs = m_pPipelineState->HasShaderStage(ShaderStageVertex);
-    m_hasTcs = m_pPipelineState->HasShaderStage(ShaderStageTessControl);
-    m_hasTes = m_pPipelineState->HasShaderStage(ShaderStageTessEval);
-    m_hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
+    m_hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
+    m_hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);
+    m_hasTes = m_pipelineState->hasShaderStage(ShaderStageTessEval);
+    m_hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
 
-    m_gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
+    m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
     // Only generate MsgPack PAL metadata for PAL client 477 onwards. PAL changed the .note record type
     // from 13 to 32 at that point, and not using MsgPack metadata before that avoids some compatibility
     // problems.
-    if (m_pPipelineState->GetPalAbiVersion() < 477)
+    if (m_pipelineState->getPalAbiVersion() < 477)
     {
         report_fatal_error("PAL ABI version less than 477 not supported");
     }
@@ -73,7 +73,7 @@ ConfigBuilderBase::ConfigBuilderBase(
     m_pipelineNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines]
                                               .getArray(true)[0].getMap(true);
 
-    SetApiName("Vulkan"); // TODO: Client API name should be from ICD.
+    setApiName("Vulkan"); // TODO: Client API name should be from ICD.
 }
 
 // =====================================================================================================================
@@ -87,11 +87,11 @@ ConfigBuilderBase::~ConfigBuilderBase()
 /// @param [in] apiStage The API shader stage
 /// @param [in] hwStages The HW stage(s) that the API shader is mapped to, as a combination of
 ///                      @ref Util::Abi::HardwareStageFlagBits.
-void ConfigBuilderBase::AddApiHwShaderMapping(
+void ConfigBuilderBase::addApiHwShaderMapping(
     ShaderStage apiStage,
     unsigned hwStages)
 {
-    auto hwMappingNode = GetApiShaderNode(apiStage)[Util::Abi::ShaderMetadataKey::HardwareMapping]
+    auto hwMappingNode = getApiShaderNode(apiStage)[Util::Abi::ShaderMetadataKey::HardwareMapping]
                             .getArray(true);
     for (unsigned hwStage = 0; hwStage < unsigned(Util::Abi::HardwareStage::Count); ++hwStage)
     {
@@ -104,7 +104,7 @@ void ConfigBuilderBase::AddApiHwShaderMapping(
 
 // =====================================================================================================================
 // Get the MsgPack map node for the specified API shader in the ".shaders" map
-msgpack::MapDocNode ConfigBuilderBase::GetApiShaderNode(
+msgpack::MapDocNode ConfigBuilderBase::getApiShaderNode(
     unsigned apiStage)  // API shader stage
 {
     if (m_apiShaderNodes[apiStage].isEmpty())
@@ -117,7 +117,7 @@ msgpack::MapDocNode ConfigBuilderBase::GetApiShaderNode(
 
 // =====================================================================================================================
 // Get the MsgPack map node for the specified hardware shader in the ".hardware_stages" map
-msgpack::MapDocNode ConfigBuilderBase::GetHwShaderNode(
+msgpack::MapDocNode ConfigBuilderBase::getHwShaderNode(
     Util::Abi::HardwareStage hwStage)   // Hardware shader stage
 {
     if (m_hwShaderNodes[unsigned(hwStage)].isEmpty())
@@ -131,11 +131,11 @@ msgpack::MapDocNode ConfigBuilderBase::GetHwShaderNode(
 // =====================================================================================================================
 // Set an API shader's hash in metadata. Returns a 32-bit value derived from the hash that is used as
 // a shader checksum for performance profiling where applicable.
-unsigned ConfigBuilderBase::SetShaderHash(
+unsigned ConfigBuilderBase::setShaderHash(
     ShaderStage   apiStage) // API shader stage
 {
-    const ShaderOptions& shaderOptions = m_pPipelineState->GetShaderOptions(apiStage);
-    auto hashNode = GetApiShaderNode(unsigned(apiStage))[Util::Abi::ShaderMetadataKey::ApiShaderHash].getArray(true);
+    const ShaderOptions& shaderOptions = m_pipelineState->getShaderOptions(apiStage);
+    auto hashNode = getApiShaderNode(unsigned(apiStage))[Util::Abi::ShaderMetadataKey::ApiShaderHash].getArray(true);
     hashNode[0] = hashNode.getDocument()->getNode(shaderOptions.hash[0]);
     hashNode[1] = hashNode.getDocument()->getNode(shaderOptions.hash[1]);
     return shaderOptions.hash[0] >> 32 ^ shaderOptions.hash[0] ^ shaderOptions.hash[1] >> 32 ^ shaderOptions.hash[1];
@@ -143,27 +143,27 @@ unsigned ConfigBuilderBase::SetShaderHash(
 
 // =====================================================================================================================
 // Set *S_NUM_AVAIL_SGPRS for given hardware shader stage
-void ConfigBuilderBase::SetNumAvailSgprs(
+void ConfigBuilderBase::setNumAvailSgprs(
     Util::Abi::HardwareStage hwStage, // Hardware shader stage
     unsigned value)                   // Number of available SGPRs
 {
-    auto hwShaderNode = GetHwShaderNode(hwStage);
+    auto hwShaderNode = getHwShaderNode(hwStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::SgprLimit] = hwShaderNode.getDocument()->getNode(value);
 }
 
 // =====================================================================================================================
 // Set *S_NUM_AVAIL_VGPRS for given hardware shader stage
-void ConfigBuilderBase::SetNumAvailVgprs(
+void ConfigBuilderBase::setNumAvailVgprs(
     Util::Abi::HardwareStage hwStage, // Hardware shader stage
     unsigned value)                   // Number of available VGPRs
 {
-    auto hwShaderNode = GetHwShaderNode(hwStage);
+    auto hwShaderNode = getHwShaderNode(hwStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::VgprLimit] = hwShaderNode.getDocument()->getNode(value);
 }
 
 // =====================================================================================================================
 // Set USES_VIEWPORT_ARRAY_INDEX
-void ConfigBuilderBase::SetUsesViewportArrayIndex(
+void ConfigBuilderBase::setUsesViewportArrayIndex(
     bool value)   // Value to set
 {
     if (value == false)
@@ -176,7 +176,7 @@ void ConfigBuilderBase::SetUsesViewportArrayIndex(
 
 // =====================================================================================================================
 // Set PS_USES_UAVS
-void ConfigBuilderBase::SetPsUsesUavs(
+void ConfigBuilderBase::setPsUsesUavs(
     bool value)   // Value to set
 {
     if (value == false)
@@ -184,13 +184,13 @@ void ConfigBuilderBase::SetPsUsesUavs(
         return; // Optional
     }
 
-    GetHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::UsesUavs] =
+    getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::UsesUavs] =
         m_document->getNode(value);
 }
 
 // =====================================================================================================================
 // Set PS_WRITES_UAVS
-void ConfigBuilderBase::SetPsWritesUavs(
+void ConfigBuilderBase::setPsWritesUavs(
     bool value)   // Value to set
 {
     if (value == false)
@@ -198,14 +198,14 @@ void ConfigBuilderBase::SetPsWritesUavs(
         return; // Optional
     }
 
-    GetHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesUavs] =
+    getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesUavs] =
         m_document->getNode(value);
 
 }
 
 // =====================================================================================================================
 // Set PS_WRITES_DEPTH
-void ConfigBuilderBase::SetPsWritesDepth(
+void ConfigBuilderBase::setPsWritesDepth(
     bool value)   // Value to set
 {
     if (value == false)
@@ -213,13 +213,13 @@ void ConfigBuilderBase::SetPsWritesDepth(
         return; // Optional
     }
 
-    GetHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesDepth] =
+    getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesDepth] =
         m_document->getNode(value);
 }
 
 // =====================================================================================================================
 // Set ES_GS_LDS_BYTE_SIZE
-void ConfigBuilderBase::SetEsGsLdsByteSize(
+void ConfigBuilderBase::setEsGsLdsByteSize(
     unsigned value)   // Value to set
 {
     m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = m_document->getNode(value);
@@ -227,7 +227,7 @@ void ConfigBuilderBase::SetEsGsLdsByteSize(
 
 // =====================================================================================================================
 // Set CALC_WAVE_BREAK_SIZE_AT_DRAW_TIME
-void ConfigBuilderBase::SetCalcWaveBreakSizeAtDrawTime(
+void ConfigBuilderBase::setCalcWaveBreakSizeAtDrawTime(
     bool value)   // Value to set
 {
     m_pipelineNode[Util::Abi::PipelineMetadataKey::CalcWaveBreakSizeAtDrawTime] = m_document->getNode(value);
@@ -235,63 +235,63 @@ void ConfigBuilderBase::SetCalcWaveBreakSizeAtDrawTime(
 
 // =====================================================================================================================
 // Set hardware stage wavefront
-void ConfigBuilderBase::SetWaveFrontSize(
+void ConfigBuilderBase::setWaveFrontSize(
     Util::Abi::HardwareStage hwStage,   // Hardware shader stage
     unsigned                 value)     // Value to set
 {
-    if (m_pPipelineState->GetPalAbiVersion() >= 495)
+    if (m_pipelineState->getPalAbiVersion() >= 495)
     {
-        auto hwShaderNode = GetHwShaderNode(hwStage);
+        auto hwShaderNode = getHwShaderNode(hwStage);
         hwShaderNode[Util::Abi::HardwareStageMetadataKey::WavefrontSize] = m_document->getNode(value);
     }
 }
 
 // =====================================================================================================================
 // Set API name
-void ConfigBuilderBase::SetApiName(
-    const char* pValue) // [in] Value to set
+void ConfigBuilderBase::setApiName(
+    const char* value) // [in] Value to set
 {
-    m_pipelineNode[Util::Abi::PipelineMetadataKey::Api] = m_document->getNode(pValue);
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::Api] = m_document->getNode(value);
 }
 
 // =====================================================================================================================
 // Set pipeline type
-void ConfigBuilderBase::SetPipelineType(
+void ConfigBuilderBase::setPipelineType(
     Util::Abi::PipelineType value) // Value to set
 {
-    const char* pTypeStr = "";
+    const char* typeStr = "";
     switch (value)
     {
     case Util::Abi::VsPs:
-        pTypeStr = "VsPs";
+        typeStr = "VsPs";
         break;
     case Util::Abi::Gs:
-        pTypeStr = "Gs";
+        typeStr = "Gs";
         break;
     case Util::Abi::Cs:
-        pTypeStr = "Cs";
+        typeStr = "Cs";
         break;
     case Util::Abi::Ngg:
-        pTypeStr = "Ngg";
+        typeStr = "Ngg";
         break;
     case Util::Abi::Tess:
-        pTypeStr = "Tess";
+        typeStr = "Tess";
         break;
     case Util::Abi::GsTess:
-        pTypeStr = "GsTess";
+        typeStr = "GsTess";
         break;
     case Util::Abi::NggTess:
-        pTypeStr = "NggTess";
+        typeStr = "NggTess";
         break;
     default:
         break;
     }
-    m_pipelineNode[Util::Abi::PipelineMetadataKey::Type] = m_document->getNode(pTypeStr);
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::Type] = m_document->getNode(typeStr);
 }
 
 // =====================================================================================================================
 // Set LDS byte size for given hardware shader stage
-void ConfigBuilderBase::SetLdsSizeByteSize(
+void ConfigBuilderBase::setLdsSizeByteSize(
     Util::Abi::HardwareStage hwStage, // Hardware shader stage
     unsigned                 value)   // Value to set
 {
@@ -300,13 +300,13 @@ void ConfigBuilderBase::SetLdsSizeByteSize(
         return; // Optional
     }
 
-    auto hwShaderNode = GetHwShaderNode(hwStage);
+    auto hwShaderNode = getHwShaderNode(hwStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = hwShaderNode.getDocument()->getNode(value);
 }
 
 // =====================================================================================================================
 // Set ES-GS LDS byte size
-void ConfigBuilderBase::SetEsGsLdsSize(
+void ConfigBuilderBase::setEsGsLdsSize(
     unsigned value) // Value to set
 {
     if (value == 0)
@@ -319,23 +319,23 @@ void ConfigBuilderBase::SetEsGsLdsSize(
 
 // =====================================================================================================================
 // Set USER_DATA_LIMIT (called once for the whole pipeline)
-void ConfigBuilderBase::SetUserDataLimit()
+void ConfigBuilderBase::setUserDataLimit()
 {
     m_pipelineNode[Util::Abi::PipelineMetadataKey::UserDataLimit] = m_document->getNode(m_userDataLimit);
 }
 
 // =====================================================================================================================
 // Set SPILL_THRESHOLD (called once for the whole pipeline)
-void ConfigBuilderBase::SetSpillThreshold()
+void ConfigBuilderBase::setSpillThreshold()
 {
     m_pipelineNode[Util::Abi::PipelineMetadataKey::SpillThreshold] = m_document->getNode(m_spillThreshold);
 }
 
 // =====================================================================================================================
 // Set PIPELINE_HASH (called once for the whole pipeline)
-void ConfigBuilderBase::SetPipelineHash()
+void ConfigBuilderBase::setPipelineHash()
 {
-    const auto& options = m_pPipelineState->GetOptions();
+    const auto& options = m_pipelineState->getOptions();
 
     auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
     pipelineHashNode[0] = m_document->getNode(options.hash[0]);
@@ -347,7 +347,7 @@ void ConfigBuilderBase::SetPipelineHash()
 ///
 /// @param [in] key The metadata key (usually a register address).
 /// @param [in] value The metadata value.
-void ConfigBuilderBase::AppendConfig(unsigned key, unsigned value)
+void ConfigBuilderBase::appendConfig(unsigned key, unsigned value)
 {
     assert(key != InvalidMetadataKey);
 
@@ -361,7 +361,7 @@ void ConfigBuilderBase::AppendConfig(unsigned key, unsigned value)
 /// Append an array of entries to the PAL register metadata. Invalid keys are filtered out.
 ///
 /// @param [in] config The array of register metadata entries.
-void ConfigBuilderBase::AppendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config)
+void ConfigBuilderBase::appendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config)
 {
     unsigned count = 0;
 
@@ -385,12 +385,12 @@ void ConfigBuilderBase::AppendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config
 
 // =====================================================================================================================
 // Write the config into PAL metadata in the LLVM IR module
-void ConfigBuilderBase::WritePalMetadata()
+void ConfigBuilderBase::writePalMetadata()
 {
     // Set whole-pipeline values.
-    SetUserDataLimit();
-    SetSpillThreshold();
-    SetPipelineHash();
+    setUserDataLimit();
+    setSpillThreshold();
+    setPipelineHash();
 
     // Generating MsgPack metadata.
     // Add the register values to the MsgPack document.
@@ -413,22 +413,22 @@ void ConfigBuilderBase::WritePalMetadata()
     // Write the MsgPack document into an IR metadata node.
     std::string blob;
     m_document->writeToBlob(blob);
-    auto pAbiMetaString = MDString::get(m_pModule->getContext(), blob);
-    auto pAbiMetaNode = MDNode::get(m_pModule->getContext(), pAbiMetaString);
-    auto pNamedMeta = m_pModule->getOrInsertNamedMetadata("amdgpu.pal.metadata.msgpack");
-    pNamedMeta->addOperand(pAbiMetaNode);
+    auto abiMetaString = MDString::get(m_module->getContext(), blob);
+    auto abiMetaNode = MDNode::get(m_module->getContext(), abiMetaString);
+    auto namedMeta = m_module->getOrInsertNamedMetadata("amdgpu.pal.metadata.msgpack");
+    namedMeta->addOperand(abiMetaNode);
 }
 
 // =====================================================================================================================
 // Sets up floating point mode from the specified floating point control flags.
-unsigned ConfigBuilderBase::SetupFloatingPointMode(
+unsigned ConfigBuilderBase::setupFloatingPointMode(
     ShaderStage shaderStage)    // Shader stage
 {
     FloatMode floatMode = {};
     floatMode.bits.fp16fp64DenormMode = FP_DENORM_FLUSH_NONE;
     if (shaderStage != ShaderStageCopyShader)
     {
-        const auto& shaderMode = m_pPipelineState->GetShaderModes()->GetCommonShaderMode(shaderStage);
+        const auto& shaderMode = m_pipelineState->getShaderModes()->getCommonShaderMode(shaderStage);
 
         // The HW rounding mode values happen to be one less than the FpRoundMode value, other than
         // FpRoundMode::DontCare, which we map to a default value.

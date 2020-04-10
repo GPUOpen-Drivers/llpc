@@ -54,12 +54,12 @@ const static char OutputProxyPrefix[]             = "__llpc_output_proxy_";
 } // LlpcName
 
 // Gets the shader stage from the specified LLVM module.
-ShaderStage GetShaderStageFromModule(llvm::Module* pModule);
+ShaderStage getShaderStageFromModule(llvm::Module* module);
 
 // Set the shader stage to the specified LLVM module.
-void SetShaderStageToModule(llvm::Module* pModule, ShaderStage shaderStage);
+void setShaderStageToModule(llvm::Module* module, ShaderStage shaderStage);
 
 // Gets the entry point (valid for AMD GPU) of a LLVM module.
-llvm::Function* GetEntryPoint(llvm::Module* pModule);
+llvm::Function* getEntryPoint(llvm::Module* module);
 
 } // Llpc

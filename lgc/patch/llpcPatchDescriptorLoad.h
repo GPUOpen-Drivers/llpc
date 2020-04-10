@@ -68,31 +68,31 @@ private:
     PatchDescriptorLoad(const PatchDescriptorLoad&) = delete;
     PatchDescriptorLoad& operator=(const PatchDescriptorLoad&) = delete;
 
-    void ProcessDescriptorGetPtr(llvm::CallInst* pDescPtrCall, llvm::StringRef descPtrCallName);
-    llvm::Value* GetDescPtrAndStride(ResourceNodeType        resType,
+    void processDescriptorGetPtr(llvm::CallInst* descPtrCall, llvm::StringRef descPtrCallName);
+    llvm::Value* getDescPtrAndStride(ResourceNodeType        resType,
                                      unsigned                descSet,
                                      unsigned                binding,
-                                     const ResourceNode*     pTopNode,
-                                     const ResourceNode*     pNode,
+                                     const ResourceNode*     topNode,
+                                     const ResourceNode*     node,
                                      bool                    shadow,
                                      llvm::IRBuilder<>&      builder);
-    llvm::Value* GetDescPtr(ResourceNodeType resType,
+    llvm::Value* getDescPtr(ResourceNodeType resType,
                             unsigned                descSet,
                             unsigned                binding,
-                            const ResourceNode*     pTopNode,
-                            const ResourceNode*     pNode,
+                            const ResourceNode*     topNode,
+                            const ResourceNode*     node,
                             bool                    shadow,
                             llvm::IRBuilder<>&      builder);
 
-    void ProcessDescriptorIndex(llvm::CallInst* pCall);
-    void ProcessLoadDescFromPtr(llvm::CallInst* pLoadFromPtr);
-    llvm::Value* LoadBufferDescriptor(unsigned            descSet,
+    void processDescriptorIndex(llvm::CallInst* call);
+    void processLoadDescFromPtr(llvm::CallInst* loadFromPtr);
+    llvm::Value* loadBufferDescriptor(unsigned            descSet,
                                       unsigned            binding,
-                                      llvm::Value*        pArrayOffset,
-                                      llvm::Instruction*  pInsertPoint);
+                                      llvm::Value*        arrayOffset,
+                                      llvm::Instruction*  insertPoint);
 
-    llvm::Value* BuildInlineBufferDesc(llvm::Value* pDescPtr, llvm::IRBuilder<>& builder);
-    llvm::Value* BuildBufferCompactDesc(llvm::Value* pDesc, llvm::Instruction* pInsertPoint);
+    llvm::Value* buildInlineBufferDesc(llvm::Value* descPtr, llvm::IRBuilder<>& builder);
+    llvm::Value* buildBufferCompactDesc(llvm::Value* desc, llvm::Instruction* insertPoint);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -107,7 +107,7 @@ private:
     std::vector<llvm::CallInst*>        m_descLoadCalls;      // List of instructions to load descriptors
     std::unordered_set<llvm::Function*> m_descLoadFuncs;      // Set of descriptor load functions
 
-    PipelineState*                  m_pPipelineState = nullptr;
+    PipelineState*                  m_pipelineState = nullptr;
                                                               // Pipeline state from PipelineStateWrapper pass
 };
 

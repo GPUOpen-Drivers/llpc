@@ -66,11 +66,11 @@ private:
     PatchEntryPointMutate(const PatchEntryPointMutate&) = delete;
     PatchEntryPointMutate& operator=(const PatchEntryPointMutate&) = delete;
 
-    void ProcessShader();
+    void processShader();
 
-    llvm::FunctionType* GenerateEntryPointType(uint64_t* pInRegMask) const;
+    llvm::FunctionType* generateEntryPointType(uint64_t* inRegMask) const;
 
-    bool IsResourceNodeActive(const ResourceNode* pNode, bool isRootNode) const;
+    bool isResourceNodeActive(const ResourceNode* node, bool isRootNode) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -79,7 +79,7 @@ private:
 
     bool    m_hasTs;    // Whether the pipeline has tessllation shader
     bool    m_hasGs;    // Whether the pipeline has geometry shader
-    PipelineState*  m_pPipelineState = nullptr;
+    PipelineState*  m_pipelineState = nullptr;
                         // Pipeline state from PipelineStateWrapper pass
 };
 

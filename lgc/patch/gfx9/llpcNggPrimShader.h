@@ -50,7 +50,7 @@ struct ExpData
     uint8_t         target;         // Export target
     uint8_t         channelMask;    // Channel mask of export value
     bool            doneFlag;       // "Done" flag
-    llvm::Value*    pExpValue;      // Export value
+    llvm::Value*    expValue;      // Export value
 };
 
 // =====================================================================================================================
@@ -58,200 +58,200 @@ struct ExpData
 class NggPrimShader
 {
 public:
-    NggPrimShader(PipelineState* pPipelineState);
+    NggPrimShader(PipelineState* pipelineState);
     ~NggPrimShader();
 
-    llvm::Function* Generate(llvm::Function* pEsEntryPoint,
-                             llvm::Function* pGsEntryPoint,
-                             llvm::Function* pCopyShaderEntryPoint);
+    llvm::Function* generate(llvm::Function* esEntryPoint,
+                             llvm::Function* gsEntryPoint,
+                             llvm::Function* copyShaderEntryPoint);
 
 private:
     NggPrimShader() = delete;
     NggPrimShader(const NggPrimShader&) = delete;
     NggPrimShader& operator=(const NggPrimShader&) = delete;
 
-    llvm::FunctionType* GeneratePrimShaderEntryPointType(uint64_t* pInRegMask) const;
-    llvm::Function* GeneratePrimShaderEntryPoint(llvm::Module* pModule);
+    llvm::FunctionType* generatePrimShaderEntryPointType(uint64_t* inRegMask) const;
+    llvm::Function* generatePrimShaderEntryPoint(llvm::Module* module);
 
-    void ConstructPrimShaderWithoutGs(llvm::Module* pModule);
-    void ConstructPrimShaderWithGs(llvm::Module* pModule);
+    void constructPrimShaderWithoutGs(llvm::Module* module);
+    void constructPrimShaderWithGs(llvm::Module* module);
 
-    void InitWaveThreadInfo(llvm::Value* pMergedGroupInfo, llvm::Value* pMergedWaveInfo);
+    void initWaveThreadInfo(llvm::Value* mergedGroupInfo, llvm::Value* mergedWaveInfo);
 
-    llvm::Value* DoCulling(llvm::Module* pModule);
-    void DoParamCacheAllocRequest();
-    void DoPrimitiveExport(llvm::Value* pCullFlag = nullptr);
+    llvm::Value* doCulling(llvm::Module* module);
+    void doParamCacheAllocRequest();
+    void doPrimitiveExport(llvm::Value* cullFlag = nullptr);
 
-    void DoEarlyExit(unsigned fullyCullThreadCount, unsigned expPosCount);
+    void doEarlyExit(unsigned fullyCullThreadCount, unsigned expPosCount);
 
-    void RunEsOrEsVariant(llvm::Module*         pModule,
+    void runEsOrEsVariant(llvm::Module*         module,
                           llvm::StringRef       entryName,
-                          llvm::Argument*       pSysValueStart,
+                          llvm::Argument*       sysValueStart,
                           bool                  sysValueFromLds,
-                          std::vector<ExpData>* pExpDataSet,
-                          llvm::BasicBlock*     pInsertAtEnd);
+                          std::vector<ExpData>* expDataSet,
+                          llvm::BasicBlock*     insertAtEnd);
 
-    llvm::Function* MutateEsToVariant(llvm::Module*         pModule,
+    llvm::Function* mutateEsToVariant(llvm::Module*         module,
                                       llvm::StringRef       entryName,
                                       std::vector<ExpData>& expDataSet);
 
-    llvm::Value* RunGsVariant(llvm::Module*     pModule,
-                              llvm::Argument*   pSysValueStart,
-                              llvm::BasicBlock* pInsertAtEnd);
+    llvm::Value* runGsVariant(llvm::Module*     module,
+                              llvm::Argument*   sysValueStart,
+                              llvm::BasicBlock* insertAtEnd);
 
-    llvm::Function* MutateGsToVariant(llvm::Module* pModule);
+    llvm::Function* mutateGsToVariant(llvm::Module* module);
 
-    void RunCopyShader(llvm::Module* pModule, llvm::BasicBlock* pInsertAtEnd);
+    void runCopyShader(llvm::Module* module, llvm::BasicBlock* insertAtEnd);
 
-    void ExportGsOutput(llvm::Value* pOutput,
+    void exportGsOutput(llvm::Value* output,
                         unsigned     location,
                         unsigned     compIdx,
                         unsigned     streamId,
-                        llvm::Value* pThreadIdInSubgroup,
-                        llvm::Value* pOutVertCounter);
+                        llvm::Value* threadIdInSubgroup,
+                        llvm::Value* outVertCounter);
 
-    llvm::Value* ImportGsOutput(llvm::Type*  pOutputTy,
+    llvm::Value* importGsOutput(llvm::Type*  outputTy,
                                 unsigned     location,
                                 unsigned     compIdx,
                                 unsigned     streamId,
-                                llvm::Value* pThreadIdInSubgroup);
+                                llvm::Value* threadIdInSubgroup);
 
-    void ProcessGsEmit(llvm::Module* pModule,
+    void processGsEmit(llvm::Module* module,
                         unsigned     streamId,
-                        llvm::Value* pThreadIdInSubgroup,
-                        llvm::Value* pEmitCounterPtr,
-                        llvm::Value* pOutVertCounterPtr,
-                        llvm::Value* pOutPrimCounterPtr,
-                        llvm::Value* pOutstandingVertCounterPtr,
-                        llvm::Value* pFlipVertOrderPtr);
+                        llvm::Value* threadIdInSubgroup,
+                        llvm::Value* emitCounterPtr,
+                        llvm::Value* outVertCounterPtr,
+                        llvm::Value* outPrimCounterPtr,
+                        llvm::Value* outstandingVertCounterPtr,
+                        llvm::Value* flipVertOrderPtr);
 
-    void ProcessGsCut(llvm::Module*  pModule,
+    void processGsCut(llvm::Module*  module,
                       unsigned       streamId,
-                      llvm::Value*   pThreadIdInSubgroup,
-                      llvm::Value*   pEmitCounterPtr,
-                      llvm::Value*   pOutVertCounterPtr,
-                      llvm::Value*   pOutPrimCounterPtr,
-                      llvm::Value*   pOutstandingVertCounterPtr,
-                      llvm::Value*   pFlipVertOrderPtr);
+                      llvm::Value*   threadIdInSubgroup,
+                      llvm::Value*   emitCounterPtr,
+                      llvm::Value*   outVertCounterPtr,
+                      llvm::Value*   outPrimCounterPtr,
+                      llvm::Value*   outstandingVertCounterPtr,
+                      llvm::Value*   flipVertOrderPtr);
 
-    llvm::Function* CreateGsEmitHandler(llvm::Module* pModule, unsigned streamId);
-    llvm::Function* CreateGsCutHandler(llvm::Module* pModule, unsigned streamId);
+    llvm::Function* createGsEmitHandler(llvm::Module* module, unsigned streamId);
+    llvm::Function* createGsCutHandler(llvm::Module* module, unsigned streamId);
 
-    void ReviseOutputPrimitiveData(llvm::Value* pOutPrimId, llvm::Value* pVertexIdAdjust);
+    void reviseOutputPrimitiveData(llvm::Value* outPrimId, llvm::Value* vertexIdAdjust);
 
-    llvm::Value* ReadPerThreadDataFromLds(llvm::Type*       pReadDataTy,
-                                          llvm::Value*      pThreadId,
+    llvm::Value* readPerThreadDataFromLds(llvm::Type*       readDataTy,
+                                          llvm::Value*      threadId,
                                           NggLdsRegionType  region);
 
-    void WritePerThreadDataToLds(llvm::Value*      pWriteData,
-                                 llvm::Value*      pThreadId,
+    void writePerThreadDataToLds(llvm::Value*      writeData,
+                                 llvm::Value*      threadId,
                                  NggLdsRegionType  region);
 
-    llvm::Value* DoBackfaceCulling(llvm::Module*     pModule,
-                                   llvm::Value*      pCullFlag,
-                                   llvm::Value*      pVertex0,
-                                   llvm::Value*      pVertex1,
-                                   llvm::Value*      pVertex2);
+    llvm::Value* doBackfaceCulling(llvm::Module*     module,
+                                   llvm::Value*      cullFlag,
+                                   llvm::Value*      vertex0,
+                                   llvm::Value*      vertex1,
+                                   llvm::Value*      vertex2);
 
-    llvm::Value* DoFrustumCulling(llvm::Module*     pModule,
-                                  llvm::Value*      pCullFlag,
-                                  llvm::Value*      pVertex0,
-                                  llvm::Value*      pVertex1,
-                                  llvm::Value*      pVertex2);
+    llvm::Value* doFrustumCulling(llvm::Module*     module,
+                                  llvm::Value*      cullFlag,
+                                  llvm::Value*      vertex0,
+                                  llvm::Value*      vertex1,
+                                  llvm::Value*      vertex2);
 
-    llvm::Value* DoBoxFilterCulling(llvm::Module*     pModule,
-                                    llvm::Value*      pCullFlag,
-                                    llvm::Value*      pVertex0,
-                                    llvm::Value*      pVertex1,
-                                    llvm::Value*      pVertex2);
+    llvm::Value* doBoxFilterCulling(llvm::Module*     module,
+                                    llvm::Value*      cullFlag,
+                                    llvm::Value*      vertex0,
+                                    llvm::Value*      vertex1,
+                                    llvm::Value*      vertex2);
 
-    llvm::Value* DoSphereCulling(llvm::Module*     pModule,
-                                 llvm::Value*      pCullFlag,
-                                 llvm::Value*      pVertex0,
-                                 llvm::Value*      pVertex1,
-                                 llvm::Value*      pVertex2);
+    llvm::Value* doSphereCulling(llvm::Module*     module,
+                                 llvm::Value*      cullFlag,
+                                 llvm::Value*      vertex0,
+                                 llvm::Value*      vertex1,
+                                 llvm::Value*      vertex2);
 
-    llvm::Value* DoSmallPrimFilterCulling(llvm::Module*     pModule,
-                                          llvm::Value*      pCullFlag,
-                                          llvm::Value*      pVertex0,
-                                          llvm::Value*      pVertex1,
-                                          llvm::Value*      pVertex2);
+    llvm::Value* doSmallPrimFilterCulling(llvm::Module*     module,
+                                          llvm::Value*      cullFlag,
+                                          llvm::Value*      vertex0,
+                                          llvm::Value*      vertex1,
+                                          llvm::Value*      vertex2);
 
-    llvm::Value* DoCullDistanceCulling(llvm::Module*     pModule,
-                                       llvm::Value*      pCullFlag,
-                                       llvm::Value*      pSignMask0,
-                                       llvm::Value*      pSignMask1,
-                                       llvm::Value*      pSignMask2);
+    llvm::Value* doCullDistanceCulling(llvm::Module*     module,
+                                       llvm::Value*      cullFlag,
+                                       llvm::Value*      signMask0,
+                                       llvm::Value*      signMask1,
+                                       llvm::Value*      signMask2);
 
-    llvm::Value* FetchCullingControlRegister(llvm::Module* pModule, unsigned regOffset);
+    llvm::Value* fetchCullingControlRegister(llvm::Module* module, unsigned regOffset);
 
-    llvm::Function* CreateBackfaceCuller(llvm::Module* pModule);
-    llvm::Function* CreateFrustumCuller(llvm::Module* pModule);
-    llvm::Function* CreateBoxFilterCuller(llvm::Module* pModule);
-    llvm::Function* CreateSphereCuller(llvm::Module* pModule);
-    llvm::Function* CreateSmallPrimFilterCuller(llvm::Module* pModule);
-    llvm::Function* CreateCullDistanceCuller(llvm::Module* pModule);
+    llvm::Function* createBackfaceCuller(llvm::Module* module);
+    llvm::Function* createFrustumCuller(llvm::Module* module);
+    llvm::Function* createBoxFilterCuller(llvm::Module* module);
+    llvm::Function* createSphereCuller(llvm::Module* module);
+    llvm::Function* createSmallPrimFilterCuller(llvm::Module* module);
+    llvm::Function* createCullDistanceCuller(llvm::Module* module);
 
-    llvm::Function* CreateFetchCullingRegister(llvm::Module* pModule);
+    llvm::Function* createFetchCullingRegister(llvm::Module* module);
 
-    llvm::Value* DoSubgroupBallot(llvm::Value* pValue);
-    llvm::Value* DoSubgroupInclusiveAdd(llvm::Value* pValue, llvm::Value** ppWwmResult = nullptr);
-    llvm::Value* DoDppUpdate(llvm::Value* pOldValue,
-                             llvm::Value* pSrcValue,
+    llvm::Value* doSubgroupBallot(llvm::Value* value);
+    llvm::Value* doSubgroupInclusiveAdd(llvm::Value* value, llvm::Value** ppWwmResult = nullptr);
+    llvm::Value* doDppUpdate(llvm::Value* oldValue,
+                             llvm::Value* srcValue,
                              unsigned     dppCtrl,
                              unsigned     rowMask,
                              unsigned     bankMask,
                              bool         boundCtrl = false);
 
     // Checks if NGG culling operations are enabled
-    bool EnableCulling() const
+    bool enableCulling() const
     {
-        return (m_pNggControl->enableBackfaceCulling ||
-                m_pNggControl->enableFrustumCulling ||
-                m_pNggControl->enableBoxFilterCulling ||
-                m_pNggControl->enableSphereCulling ||
-                m_pNggControl->enableSmallPrimFilter ||
-                m_pNggControl->enableCullDistanceCulling);
+        return (m_nggControl->enableBackfaceCulling ||
+                m_nggControl->enableFrustumCulling ||
+                m_nggControl->enableBoxFilterCulling ||
+                m_nggControl->enableSphereCulling ||
+                m_nggControl->enableSmallPrimFilter ||
+                m_nggControl->enableCullDistanceCulling);
     }
 
-    llvm::BasicBlock* CreateBlock(llvm::Function* pParent, const llvm::Twine& blockName = "");
+    llvm::BasicBlock* createBlock(llvm::Function* parent, const llvm::Twine& blockName = "");
 
     // -----------------------------------------------------------------------------------------------------------------
 
     static const unsigned NullPrim = (1u << 31); // Null primitive data (invalid)
 
-    PipelineState*  m_pPipelineState; // Pipeline state
-    llvm::LLVMContext*        m_pContext;       // LLVM context
+    PipelineState*  m_pipelineState; // Pipeline state
+    llvm::LLVMContext*        m_context;       // LLVM context
     GfxIpVersion    m_gfxIp;          // Graphics IP version info
 
-    const NggControl* m_pNggControl;  // NGG control settings
+    const NggControl* m_nggControl;  // NGG control settings
 
-    NggLdsManager*    m_pLdsManager;  // NGG LDS manager
+    NggLdsManager*    m_ldsManager;  // NGG LDS manager
 
     // NGG factors used for calculation (different modes use different factors)
     struct
     {
-        llvm::Value*    pVertCountInSubgroup;       // Number of vertices in sub-group
-        llvm::Value*    pPrimCountInSubgroup;       // Number of primitives in sub-group
-        llvm::Value*    pVertCountInWave;           // Number of vertices in wave
-        llvm::Value*    pPrimCountInWave;           // Number of primitives in wave
+        llvm::Value*    vertCountInSubgroup;       // Number of vertices in sub-group
+        llvm::Value*    primCountInSubgroup;       // Number of primitives in sub-group
+        llvm::Value*    vertCountInWave;           // Number of vertices in wave
+        llvm::Value*    primCountInWave;           // Number of primitives in wave
 
-        llvm::Value*    pThreadIdInWave;            // Thread ID in wave
-        llvm::Value*    pThreadIdInSubgroup;        // Thread ID in sub-group
+        llvm::Value*    threadIdInWave;            // Thread ID in wave
+        llvm::Value*    threadIdInSubgroup;        // Thread ID in sub-group
 
-        llvm::Value*    pWaveIdInSubgroup;          // Wave ID in sub-group
+        llvm::Value*    waveIdInSubgroup;          // Wave ID in sub-group
 
-        llvm::Value*    pPrimitiveId;               // Primitive ID (for VS)
+        llvm::Value*    primitiveId;               // Primitive ID (for VS)
 
         // System values, not used in pass-through mode (SGPRs)
-        llvm::Value*    pMergedGroupInfo;           // Merged group info
-        llvm::Value*    pPrimShaderTableAddrLow;    // Primitive shader table address low
-        llvm::Value*    pPrimShaderTableAddrHigh;   // Primitive shader table address high
+        llvm::Value*    mergedGroupInfo;           // Merged group info
+        llvm::Value*    primShaderTableAddrLow;    // Primitive shader table address low
+        llvm::Value*    primShaderTableAddrHigh;   // Primitive shader table address high
 
         // System values (VGPRs)
-        llvm::Value*    pEsGsOffsets01;             // ES-GS offset 0 and 1
-        llvm::Value*    pEsGsOffsets23;             // ES-GS offset 2 and 3
-        llvm::Value*    pEsGsOffsets45;             // ES-GS offset 4 and 5
+        llvm::Value*    esGsOffsets01;             // ES-GS offset 0 and 1
+        llvm::Value*    esGsOffsets23;             // ES-GS offset 2 and 3
+        llvm::Value*    esGsOffsets45;             // ES-GS offset 4 and 5
 
     } m_nggFactor;
 
@@ -260,7 +260,7 @@ private:
     bool        m_hasTes;       // Whether the pipeline has tessellation evaluation shader
     bool        m_hasGs;        // Whether the pipeline has geometry shader
 
-    std::unique_ptr<llvm::IRBuilder<>>  m_pBuilder; // LLVM IR builder
+    std::unique_ptr<llvm::IRBuilder<>>  m_builder; // LLVM IR builder
 };
 
 } // lgc

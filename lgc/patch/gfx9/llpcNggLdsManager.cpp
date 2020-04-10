@@ -100,7 +100,7 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] =
 
 // =====================================================================================================================
 // Initialize static members
-const char* NggLdsManager::LdsRegionNames[LdsRegionCount] =
+const char* NggLdsManager::m_ldsRegionNames[LdsRegionCount] =
 {
     // LDS region name for ES-only
     "Distributed primitive ID",             // LdsRegionDistribPrimId
@@ -128,29 +128,29 @@ const char* NggLdsManager::LdsRegionNames[LdsRegionCount] =
 
 // =====================================================================================================================
 NggLdsManager::NggLdsManager(
-    Module*             pModule,        // [in] LLVM module
-    PipelineState*      pPipelineState, // [in] Pipeline state
-    IRBuilder<>*        pBuilder)       // [in] LLVM IR builder
+    Module*             module,        // [in] LLVM module
+    PipelineState*      pipelineState, // [in] Pipeline state
+    IRBuilder<>*        builder)       // [in] LLVM IR builder
     :
-    m_pPipelineState(pPipelineState),
-    m_pContext(&pPipelineState->GetContext()),
-    m_waveCountInSubgroup(Gfx9::NggMaxThreadsPerSubgroup / m_pPipelineState->GetTargetInfo().GetGpuProperty().waveSize),
-    m_pBuilder(pBuilder)
+    m_pipelineState(pipelineState),
+    m_context(&pipelineState->getContext()),
+    m_waveCountInSubgroup(Gfx9::NggMaxThreadsPerSubgroup / m_pipelineState->getTargetInfo().getGpuProperty().waveSize),
+    m_builder(builder)
 {
-    assert(pBuilder != nullptr);
+    assert(builder != nullptr);
 
-    const auto pNggControl = m_pPipelineState->GetNggControl();
-    assert(pNggControl->enableNgg);
+    const auto nggControl = m_pipelineState->getNggControl();
+    assert(nggControl->enableNgg);
 
-    const unsigned stageMask = m_pPipelineState->GetShaderStageMask();
-    const bool hasGs = (stageMask & ShaderStageToMask(ShaderStageGeometry));
-    const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
-                                      ShaderStageToMask(ShaderStageTessEval))) != 0);
+    const unsigned stageMask = m_pipelineState->getShaderStageMask();
+    const bool hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry));
+    const bool hasTs = ((stageMask & (shaderStageToMask(ShaderStageTessControl) |
+                                      shaderStageToMask(ShaderStageTessEval))) != 0);
 
     //
     // Create global variable modeling LDS
     //
-    m_pLds = Patch::GetLdsVariable(m_pPipelineState, pModule);
+    m_lds = Patch::getLdsVariable(m_pipelineState, module);
 
     memset(&m_ldsRegionStart, InvalidValue, sizeof(m_ldsRegionStart)); // Initialized to invalid value (0xFFFFFFFF)
 
@@ -161,7 +161,7 @@ NggLdsManager::NggLdsManager(
     LLPC_OUTS("===============================================================================\n");
     LLPC_OUTS("// LLPC NGG LDS region info (in bytes)\n\n");
 
-    const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+    const auto& calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
     if (hasGs)
     {
@@ -179,7 +179,7 @@ NggLdsManager::NggLdsManager(
         // DWORDs (such as DS128).
         const unsigned esGsRingLdsSize = alignTo(calcFactor.esGsLdsSize, 4u) * SizeOfDword;
         const unsigned gsVsRingLdsSize = calcFactor.gsOnChipLdsSize * SizeOfDword - esGsRingLdsSize -
-                                         CalcGsExtraLdsSize(m_pPipelineState);
+                                         calcGsExtraLdsSize(m_pipelineState);
 
         unsigned ldsRegionStart = 0;
 
@@ -193,7 +193,7 @@ NggLdsManager::NggLdsManager(
                 m_ldsRegionStart[LdsRegionOutVertOffset] = m_ldsRegionStart[LdsRegionOutPrimData];
 
                 LLPC_OUTS(format("%-40s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32,
-                    LdsRegionNames[region], m_ldsRegionStart[region], ldsRegionSize) << "\n");
+                    m_ldsRegionNames[region], m_ldsRegionStart[region], ldsRegionSize) << "\n");
 
                 continue;
             }
@@ -215,7 +215,7 @@ NggLdsManager::NggLdsManager(
             ldsRegionStart += ldsRegionSize;
 
             LLPC_OUTS(format("%-40s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32,
-                LdsRegionNames[region], m_ldsRegionStart[region], ldsRegionSize) << "\n");
+                m_ldsRegionNames[region], m_ldsRegionStart[region], ldsRegionSize) << "\n");
         }
     }
     else
@@ -223,11 +223,11 @@ NggLdsManager::NggLdsManager(
         m_ldsRegionStart[LdsRegionDistribPrimId] = 0;
 
         LLPC_OUTS(format("%-40s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32,
-                         LdsRegionNames[LdsRegionDistribPrimId],
+                         m_ldsRegionNames[LdsRegionDistribPrimId],
                          m_ldsRegionStart[LdsRegionDistribPrimId],
                          LdsRegionSizes[LdsRegionDistribPrimId]) << "\n");
 
-        if (pNggControl->passthroughMode == false)
+        if (nggControl->passthroughMode == false)
         {
             //
             // The LDS layout is something like this:
@@ -255,14 +255,14 @@ NggLdsManager::NggLdsManager(
                 }
 
                 // NOTE: If cull distance culling is disabled, skip this region
-                if ((region == LdsRegionCullDistance) && (pNggControl->enableCullDistanceCulling == false))
+                if ((region == LdsRegionCullDistance) && (nggControl->enableCullDistanceCulling == false))
                 {
                     continue;
                 }
 
                 // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
                 // skipped.
-                if ((pNggControl->compactMode == NggCompactSubgroup) &&
+                if ((nggControl->compactMode == NggCompactSubgroup) &&
                     ((region >= LdsRegionCompactBeginRange) && (region <= LdsRegionCompactEndRange)))
                 {
                     continue;
@@ -291,7 +291,7 @@ NggLdsManager::NggLdsManager(
                 ldsRegionStart += LdsRegionSizes[region];
 
                 LLPC_OUTS(format("%-40s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32,
-                    LdsRegionNames[region], m_ldsRegionStart[region], LdsRegionSizes[region]) << "\n");
+                    m_ldsRegionNames[region], m_ldsRegionStart[region], LdsRegionSizes[region]) << "\n");
             }
         }
     }
@@ -302,17 +302,17 @@ NggLdsManager::NggLdsManager(
 
 // =====================================================================================================================
 // Calculates ES extra LDS size.
-unsigned NggLdsManager::CalcEsExtraLdsSize(
-    PipelineState* pPipelineState)  // [in] Pipeline state
+unsigned NggLdsManager::calcEsExtraLdsSize(
+    PipelineState* pipelineState)  // [in] Pipeline state
 {
-    const auto pNggControl = pPipelineState->GetNggControl();
-    if (pNggControl->enableNgg == false)
+    const auto nggControl = pipelineState->getNggControl();
+    if (nggControl->enableNgg == false)
     {
         return 0;
     }
 
-    const unsigned stageMask = pPipelineState->GetShaderStageMask();
-    const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+    const unsigned stageMask = pipelineState->getShaderStageMask();
+    const bool hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
 
     if (hasGs)
     {
@@ -320,18 +320,18 @@ unsigned NggLdsManager::CalcEsExtraLdsSize(
         return 0;
     }
 
-    const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
-                                      ShaderStageToMask(ShaderStageTessEval))) != 0);
+    const bool hasTs = ((stageMask & (shaderStageToMask(ShaderStageTessControl) |
+                                      shaderStageToMask(ShaderStageTessEval))) != 0);
 
     unsigned esExtraLdsSize = 0;
 
-    if (pNggControl->passthroughMode)
+    if (nggControl->passthroughMode)
     {
         // NOTE: For NGG pass-through mode, only primitive ID region is valid.
         bool distributePrimId = false;
         if (hasTs == false)
         {
-            const auto& builtInUsage = pPipelineState->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
+            const auto& builtInUsage = pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
             distributePrimId = builtInUsage.primitiveId;
         }
 
@@ -348,14 +348,14 @@ unsigned NggLdsManager::CalcEsExtraLdsSize(
             }
 
             // NOTE: If cull distance culling is disabled, skip this region
-            if ((region == LdsRegionCullDistance) && (pNggControl->enableCullDistanceCulling == false))
+            if ((region == LdsRegionCullDistance) && (nggControl->enableCullDistanceCulling == false))
             {
                 continue;
             }
 
             // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
             // skipped.
-            if ((pNggControl->compactMode == NggCompactSubgroup) &&
+            if ((nggControl->compactMode == NggCompactSubgroup) &&
                 ((region >= LdsRegionCompactBeginRange) && (region <= LdsRegionCompactEndRange)))
             {
                 continue;
@@ -389,17 +389,17 @@ unsigned NggLdsManager::CalcEsExtraLdsSize(
 
 // =====================================================================================================================
 // Calculates GS extra LDS size (used for operations other than ES-GS ring and GS-VS ring read/write).
-unsigned NggLdsManager::CalcGsExtraLdsSize(
-    PipelineState* pPipelineState)  // [in] Pipeline state
+unsigned NggLdsManager::calcGsExtraLdsSize(
+    PipelineState* pipelineState)  // [in] Pipeline state
 {
-    const auto pNggControl = pPipelineState->GetNggControl();
-    if (pNggControl->enableNgg == false)
+    const auto nggControl = pipelineState->getNggControl();
+    if (nggControl->enableNgg == false)
     {
         return 0;
     }
 
-    const unsigned stageMask = pPipelineState->GetShaderStageMask();
-    const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+    const unsigned stageMask = pipelineState->getShaderStageMask();
+    const bool hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
     if (hasGs == false)
     {
         // NOTE: Not need GS extra LDS when GS is not present.
@@ -413,15 +413,15 @@ unsigned NggLdsManager::CalcGsExtraLdsSize(
 
 // =====================================================================================================================
 // Reads value from LDS.
-Value* NggLdsManager::ReadValueFromLds(
-    Type*        pReadTy,       // [in] Type of value read from LDS
-    Value*       pLdsOffset,    // [in] Start offset to do LDS read operations
+Value* NggLdsManager::readValueFromLds(
+    Type*        readTy,       // [in] Type of value read from LDS
+    Value*       ldsOffset,    // [in] Start offset to do LDS read operations
     bool         useDs128)      // Whether to use 128-bit LDS load, 16-byte alignment is guaranteed by caller
 {
-    assert(m_pLds != nullptr);
-    assert(pReadTy->isIntOrIntVectorTy() || pReadTy->isFPOrFPVectorTy());
+    assert(m_lds != nullptr);
+    assert(readTy->isIntOrIntVectorTy() || readTy->isFPOrFPVectorTy());
 
-    const unsigned readBits = pReadTy->getPrimitiveSizeInBits();
+    const unsigned readBits = readTy->getPrimitiveSizeInBits();
 
     unsigned bitWidth = 0;
     unsigned compCount = 0;
@@ -459,59 +459,59 @@ Value* NggLdsManager::ReadValueFromLds(
         compCount = readBits / 8;
     }
 
-    Type* pCompTy = m_pBuilder->getIntNTy(bitWidth);
-    Value* pReadValue =  UndefValue::get((compCount > 1) ? VectorType::get(pCompTy, compCount) : pCompTy);
+    Type* compTy = m_builder->getIntNTy(bitWidth);
+    Value* readValue =  UndefValue::get((compCount > 1) ? VectorType::get(compTy, compCount) : compTy);
 
     // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
-    auto pLds = ConstantExpr::getBitCast(m_pLds,
-                    PointerType::get(Type::getInt8Ty(*m_pContext), m_pLds->getType()->getPointerAddressSpace()));
+    auto lds = ConstantExpr::getBitCast(m_lds,
+                    PointerType::get(Type::getInt8Ty(*m_context), m_lds->getType()->getPointerAddressSpace()));
 
     for (unsigned i = 0; i < compCount; ++i)
     {
-        Value* pLoadPtr = m_pBuilder->CreateGEP(pLds, pLdsOffset);
+        Value* loadPtr = m_builder->CreateGEP(lds, ldsOffset);
         if (bitWidth != 8)
         {
-            pLoadPtr = m_pBuilder->CreateBitCast(pLoadPtr, PointerType::get(pCompTy, ADDR_SPACE_LOCAL));
+            loadPtr = m_builder->CreateBitCast(loadPtr, PointerType::get(compTy, ADDR_SPACE_LOCAL));
         }
 
-        Value* pLoadValue = m_pBuilder->CreateAlignedLoad(pLoadPtr, MaybeAlign(alignment));
+        Value* loadValue = m_builder->CreateAlignedLoad(loadPtr, MaybeAlign(alignment));
 
         if (compCount > 1)
         {
-            pReadValue = m_pBuilder->CreateInsertElement(pReadValue, pLoadValue, i);
+            readValue = m_builder->CreateInsertElement(readValue, loadValue, i);
         }
         else
         {
-            pReadValue = pLoadValue;
+            readValue = loadValue;
         }
 
         if (compCount > 1)
         {
-            pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(bitWidth / 8));
+            ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(bitWidth / 8));
         }
     }
 
-    if (pReadValue->getType() != pReadTy)
+    if (readValue->getType() != readTy)
     {
-        pReadValue = m_pBuilder->CreateBitCast(pReadValue, pReadTy);
+        readValue = m_builder->CreateBitCast(readValue, readTy);
     }
 
-    return pReadValue;
+    return readValue;
 }
 
 // =====================================================================================================================
 // Writes value to LDS.
-void NggLdsManager::WriteValueToLds(
-    Value*        pWriteValue,      // [in] Value written to LDS
-    Value*        pLdsOffset,       // [in] Start offset to do LDS write operations
+void NggLdsManager::writeValueToLds(
+    Value*        writeValue,      // [in] Value written to LDS
+    Value*        ldsOffset,       // [in] Start offset to do LDS write operations
     bool          useDs128)         // Whether to use 128-bit LDS store, 16-byte alignment is guaranteed by caller
 {
-    assert(m_pLds != nullptr);
+    assert(m_lds != nullptr);
 
-    auto pWriteTy = pWriteValue->getType();
-    assert(pWriteTy->isIntOrIntVectorTy() || pWriteTy->isFPOrFPVectorTy());
+    auto writeTy = writeValue->getType();
+    assert(writeTy->isIntOrIntVectorTy() || writeTy->isFPOrFPVectorTy());
 
-    const unsigned writeBits = pWriteTy->getPrimitiveSizeInBits();
+    const unsigned writeBits = writeTy->getPrimitiveSizeInBits();
 
     unsigned bitWidth = 0;
     unsigned compCount = 0;
@@ -549,66 +549,66 @@ void NggLdsManager::WriteValueToLds(
         compCount = writeBits / 8;
     }
 
-    Type* pCompTy = m_pBuilder->getIntNTy(bitWidth);
-    pWriteTy = (compCount > 1) ? VectorType::get(pCompTy, compCount) : pCompTy;
+    Type* compTy = m_builder->getIntNTy(bitWidth);
+    writeTy = (compCount > 1) ? VectorType::get(compTy, compCount) : compTy;
 
-    if (pWriteValue->getType() != pWriteTy)
+    if (writeValue->getType() != writeTy)
     {
-        pWriteValue = m_pBuilder->CreateBitCast(pWriteValue, pWriteTy);
+        writeValue = m_builder->CreateBitCast(writeValue, writeTy);
     }
 
     // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
-    auto pLds = ConstantExpr::getBitCast(m_pLds,
-                  PointerType::get(Type::getInt8Ty(*m_pContext), m_pLds->getType()->getPointerAddressSpace()));
+    auto lds = ConstantExpr::getBitCast(m_lds,
+                  PointerType::get(Type::getInt8Ty(*m_context), m_lds->getType()->getPointerAddressSpace()));
 
     for (unsigned i = 0; i < compCount; ++i)
     {
-        Value* pStorePtr = m_pBuilder->CreateGEP(pLds, pLdsOffset);
+        Value* storePtr = m_builder->CreateGEP(lds, ldsOffset);
         if (bitWidth != 8)
         {
-            pStorePtr = m_pBuilder->CreateBitCast(pStorePtr, PointerType::get(pCompTy, ADDR_SPACE_LOCAL));
+            storePtr = m_builder->CreateBitCast(storePtr, PointerType::get(compTy, ADDR_SPACE_LOCAL));
         }
 
-        Value* pStoreValue = nullptr;
+        Value* storeValue = nullptr;
         if (compCount > 1)
         {
-            pStoreValue = m_pBuilder->CreateExtractElement(pWriteValue, i);
+            storeValue = m_builder->CreateExtractElement(writeValue, i);
         }
         else
         {
-            pStoreValue = pWriteValue;
+            storeValue = writeValue;
         }
 
-        m_pBuilder->CreateAlignedStore(pStoreValue, pStorePtr, MaybeAlign(alignment));
+        m_builder->CreateAlignedStore(storeValue, storePtr, MaybeAlign(alignment));
 
         if (compCount > 1)
         {
-            pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(bitWidth / 8));
+            ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(bitWidth / 8));
         }
     }
 }
 
 // =====================================================================================================================
 // Does atomic binary operation with the value stored in LDS.
-void NggLdsManager::AtomicOpWithLds(
+void NggLdsManager::atomicOpWithLds(
     AtomicRMWInst::BinOp atomicOp,      // Atomic binary operation
-    Value*               pAtomicValue,  // [in] Value to do atomic operation
-    Value*               pLdsOffset)    // [in] Start offset to do LDS atomic operations
+    Value*               atomicValue,  // [in] Value to do atomic operation
+    Value*               ldsOffset)    // [in] Start offset to do LDS atomic operations
 {
-    assert(pAtomicValue->getType()->isIntegerTy(32));
+    assert(atomicValue->getType()->isIntegerTy(32));
 
     // NOTE: LDS variable is defined as a pointer to i32 array. The LDS offset here has to be casted to DWORD offset
     // from BYTE offset.
-    pLdsOffset = m_pBuilder->CreateLShr(pLdsOffset, 2);
+    ldsOffset = m_builder->CreateLShr(ldsOffset, 2);
 
-    Value* pAtomicPtr = m_pBuilder->CreateGEP(m_pLds, { m_pBuilder->getInt32(0), pLdsOffset });
+    Value* atomicPtr = m_builder->CreateGEP(m_lds, { m_builder->getInt32(0), ldsOffset });
 
-    auto pAtomicInst = m_pBuilder->CreateAtomicRMW(atomicOp,
-                                                   pAtomicPtr,
-                                                   pAtomicValue,
+    auto atomicInst = m_builder->CreateAtomicRMW(atomicOp,
+                                                   atomicPtr,
+                                                   atomicValue,
                                                    AtomicOrdering::SequentiallyConsistent,
                                                    SyncScope::System);
-    pAtomicInst->setVolatile(true);
+    atomicInst->setVolatile(true);
 }
 
 } // lgc

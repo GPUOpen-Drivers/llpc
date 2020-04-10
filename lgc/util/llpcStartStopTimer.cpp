@@ -49,7 +49,7 @@ class StartStopTimer : public ModulePass
 public:
     static char ID;
     StartStopTimer() : ModulePass(ID) {}
-    StartStopTimer(Timer* pTimer, bool starting) : ModulePass(ID), m_pTimer(pTimer), m_starting(starting)
+    StartStopTimer(Timer* timer, bool starting) : ModulePass(ID), m_timer(timer), m_starting(starting)
     {
     }
 
@@ -61,7 +61,7 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    Timer*  m_pTimer;   // The timer to start or stop when the pass is run
+    Timer*  m_timer;   // The timer to start or stop when the pass is run
     bool    m_starting; // True to start the timer, false to stop it
 };
 
@@ -72,11 +72,11 @@ char StartStopTimer::ID = 0;
 // =====================================================================================================================
 // Create a start/stop timer pass. This is a static method in BuilderContext, so it can be accessed by
 // the front-end to add to its pass manager.
-ModulePass* BuilderContext::CreateStartStopTimer(
-    Timer*  pTimer,   // The timer to start or stop when the pass is run
+ModulePass* BuilderContext::createStartStopTimer(
+    Timer*  timer,   // The timer to start or stop when the pass is run
     bool    starting) // True to start the timer, false to stop it
 {
-    return new StartStopTimer(pTimer, starting);
+    return new StartStopTimer(timer, starting);
 }
 
 // =====================================================================================================================
@@ -86,11 +86,11 @@ bool StartStopTimer::runOnModule(
 {
     if (m_starting)
     {
-        m_pTimer->startTimer();
+        m_timer->startTimer();
     }
     else
     {
-        m_pTimer->stopTimer();
+        m_timer->stopTimer();
     }
     return false;
 }

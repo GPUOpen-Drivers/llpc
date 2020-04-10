@@ -47,7 +47,7 @@ namespace lgc
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for checking shader cache
-PatchCheckShaderCache* CreatePatchCheckShaderCache()
+PatchCheckShaderCache* createPatchCheckShaderCache()
 {
     return new PatchCheckShaderCache();
 }
@@ -60,7 +60,7 @@ namespace
 // =====================================================================================================================
 // Stream each map key and value for later inclusion in a hash
 template <class MapType>
-static void StreamMapEntries(MapType&     map,    // [in] Map to stream
+static void streamMapEntries(MapType&     map,    // [in] Map to stream
                              raw_ostream& stream) // [in/out] Stream to output map entries to
 {
     size_t mapCount = map.size();
@@ -94,28 +94,28 @@ bool PatchCheckShaderCache::runOnModule(
         return false;
     }
 
-    Patch::Init(&module);
+    Patch::init(&module);
 
     // NOTE: Global constant are added to the end of pipeline binary. we can't merge ELF binaries if global constant
     // is used in non-fragment shader stages.
     for (auto& global : module.globals())
     {
-        if (auto pGlobalVar = dyn_cast<GlobalVariable>(&global))
+        if (auto globalVar = dyn_cast<GlobalVariable>(&global))
         {
-            if (pGlobalVar->isConstant())
+            if (globalVar->isConstant())
             {
                 SmallVector<const Value*, 4> vals;
-                vals.push_back(pGlobalVar);
+                vals.push_back(globalVar);
                 for (unsigned i = 0; i != vals.size(); ++i)
                 {
-                    for (auto pUser : vals[i]->users())
+                    for (auto user : vals[i]->users())
                     {
-                        if (isa<Constant>(pUser))
+                        if (isa<Constant>(user))
                         {
-                            vals.push_back(pUser);
+                            vals.push_back(user);
                             continue;
                         }
-                        if (GetShaderStageFromFunction(cast<Instruction>(pUser)->getFunction()) != ShaderStageFragment)
+                        if (getShaderStageFromFunction(cast<Instruction>(user)->getFunction()) != ShaderStageFragment)
                         {
                             return false;
                         }
@@ -127,36 +127,36 @@ bool PatchCheckShaderCache::runOnModule(
 
     std::string inOutUsageStreams[ShaderStageGfxCount];
     ArrayRef<uint8_t> inOutUsageValues[ShaderStageGfxCount];
-    PipelineState* pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
-    auto stageMask = pPipelineState->GetShaderStageMask();
+    PipelineState* pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+    auto stageMask = pipelineState->getShaderStageMask();
 
     // Build input/output layout hash per shader stage
     for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1))
     {
-        if ((stageMask & ShaderStageToMask(stage)) == 0)
+        if ((stageMask & shaderStageToMask(stage)) == 0)
         {
             continue;
         }
 
-        auto pResUsage = pPipelineState->GetShaderResourceUsage(stage);
+        auto resUsage = pipelineState->getShaderResourceUsage(stage);
         raw_string_ostream stream(inOutUsageStreams[stage]);
 
         // Update input/output usage
-        StreamMapEntries(pResUsage->inOutUsage.inputLocMap, stream);
-        StreamMapEntries(pResUsage->inOutUsage.outputLocMap, stream);
-        StreamMapEntries(pResUsage->inOutUsage.inOutLocMap, stream);
-        StreamMapEntries(pResUsage->inOutUsage.perPatchInputLocMap, stream);
-        StreamMapEntries(pResUsage->inOutUsage.perPatchOutputLocMap, stream);
-        StreamMapEntries(pResUsage->inOutUsage.builtInInputLocMap, stream);
-        StreamMapEntries(pResUsage->inOutUsage.builtInOutputLocMap, stream);
-        StreamMapEntries(pResUsage->inOutUsage.perPatchBuiltInInputLocMap, stream);
-        StreamMapEntries(pResUsage->inOutUsage.perPatchBuiltInOutputLocMap, stream);
+        streamMapEntries(resUsage->inOutUsage.inputLocMap, stream);
+        streamMapEntries(resUsage->inOutUsage.outputLocMap, stream);
+        streamMapEntries(resUsage->inOutUsage.inOutLocMap, stream);
+        streamMapEntries(resUsage->inOutUsage.perPatchInputLocMap, stream);
+        streamMapEntries(resUsage->inOutUsage.perPatchOutputLocMap, stream);
+        streamMapEntries(resUsage->inOutUsage.builtInInputLocMap, stream);
+        streamMapEntries(resUsage->inOutUsage.builtInOutputLocMap, stream);
+        streamMapEntries(resUsage->inOutUsage.perPatchBuiltInInputLocMap, stream);
+        streamMapEntries(resUsage->inOutUsage.perPatchBuiltInOutputLocMap, stream);
 
         if (stage == ShaderStageGeometry)
         {
             // NOTE: For geometry shader, copy shader will use this special map info (from built-in outputs to
             // locations of generic outputs). We have to add it to shader hash calculation.
-            StreamMapEntries(pResUsage->inOutUsage.gs.builtInOutLocs, stream);
+            streamMapEntries(resUsage->inOutUsage.gs.builtInOutLocs, stream);
         }
 
         // Store the result of the hash for this shader stage.
@@ -177,8 +177,8 @@ bool PatchCheckShaderCache::runOnModule(
     {
         if ((func.empty() == false) && (func.getLinkage() != GlobalValue::InternalLinkage))
         {
-            auto stage = GetShaderStageFromFunction(&func);
-            if ((stage != ShaderStageInvalid) && ((ShaderStageToMask(stage) & ~modifiedStageMask) != 0))
+            auto stage = getShaderStageFromFunction(&func);
+            if ((stage != ShaderStageInvalid) && ((shaderStageToMask(stage) & ~modifiedStageMask) != 0))
             {
                 func.setLinkage(GlobalValue::InternalLinkage);
             }

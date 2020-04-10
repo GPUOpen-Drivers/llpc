@@ -67,7 +67,7 @@ char PatchPeepholeOpt::ID;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for peephole optimizations.
-FunctionPass* CreatePatchPeepholeOpt(
+FunctionPass* createPatchPeepholeOpt(
     bool enableDiscardOpt) // Enable the optimization for "kill" intrinsic
 {
     return new PatchPeepholeOpt(enableDiscardOpt);
@@ -94,10 +94,10 @@ bool PatchPeepholeOpt::runOnFunction(
 
     const bool changed = m_instsToErase.empty() == false;
 
-    for (Instruction* const pInst : m_instsToErase)
+    for (Instruction* const inst : m_instsToErase)
     {
         // Lastly delete any instructions we replaced.
-        pInst->eraseFromParent();
+        inst->eraseFromParent();
     }
     m_instsToErase.clear();
 
@@ -127,24 +127,24 @@ void PatchPeepholeOpt::visitBitCast(
     // First run through the thing we are bit casting and see if there are multiple bit casts we can combine.
     unsigned numCombinableUsers = 0;
 
-    for (User* const pUser : bitCast.getOperand(0)->users())
+    for (User* const user : bitCast.getOperand(0)->users())
     {
-        BitCastInst* const pOtherBitCast = dyn_cast<BitCastInst>(pUser);
+        BitCastInst* const otherBitCast = dyn_cast<BitCastInst>(user);
 
         // If we don't have a bit cast, skip.
-        if (pOtherBitCast == nullptr)
+        if (otherBitCast == nullptr)
         {
             continue;
         }
 
         // If the other bit cast has no users, no point optimizating it.
-        if (pOtherBitCast->user_empty())
+        if (otherBitCast->user_empty())
         {
             continue;
         }
 
         // If the other bit cast doesn't match our type, skip.
-        if (pOtherBitCast->getDestTy() != bitCast.getDestTy())
+        if (otherBitCast->getDestTy() != bitCast.getDestTy())
         {
             continue;
         }
@@ -161,50 +161,50 @@ void PatchPeepholeOpt::visitBitCast(
     // If we have at least 2 users, optimize!
     if (numCombinableUsers > 1)
     {
-        if (Instruction* const pInst = dyn_cast<Instruction>(bitCast.getOperand(0)))
+        if (Instruction* const inst = dyn_cast<Instruction>(bitCast.getOperand(0)))
         {
-            moveAfter(bitCast, *pInst);
+            moveAfter(bitCast, *inst);
 
             // Replace all extract element instructions that extract with the same value and index.
-            for (User* const pUser : bitCast.getOperand(0)->users())
+            for (User* const user : bitCast.getOperand(0)->users())
             {
                 // Skip ourselves.
-                if (pUser == &bitCast)
+                if (user == &bitCast)
                 {
                     continue;
                 }
 
-                BitCastInst* const pOtherBitCast = dyn_cast<BitCastInst>(pUser);
+                BitCastInst* const otherBitCast = dyn_cast<BitCastInst>(user);
 
                 // If we don't have a bit cast, skip.
-                if (pOtherBitCast == nullptr)
+                if (otherBitCast == nullptr)
                 {
                     continue;
                 }
 
                 // If the other bit cast has no users, no point optimizating it.
-                if (pOtherBitCast->user_empty())
+                if (otherBitCast->user_empty())
                 {
                     continue;
                 }
 
                 // If the other bit cast doesn't match our type, skip.
-                if (pOtherBitCast->getDestTy() != bitCast.getDestTy())
+                if (otherBitCast->getDestTy() != bitCast.getDestTy())
                 {
                     continue;
                 }
 
                 // Replace the other bit cast with our one.
-                pOtherBitCast->replaceAllUsesWith(&bitCast);
+                otherBitCast->replaceAllUsesWith(&bitCast);
 
                 // Lastly remember to delete the bit cast we just replaced.
-                m_instsToErase.push_back(pOtherBitCast);
+                m_instsToErase.push_back(otherBitCast);
             }
         }
     }
 
     // Check if we are bitcasting a shuffle instruction.
-    if (ShuffleVectorInst* const pShuffleVector = dyn_cast<ShuffleVectorInst>(bitCast.getOperand(0)))
+    if (ShuffleVectorInst* const shuffleVector = dyn_cast<ShuffleVectorInst>(bitCast.getOperand(0)))
     {
         // Only check bit casts where the element types match to make porting the shuffle vector more trivial.
         if (bitCast.getSrcTy()->getScalarSizeInBits() != bitCast.getDestTy()->getScalarSizeInBits())
@@ -213,89 +213,89 @@ void PatchPeepholeOpt::visitBitCast(
         }
 
         // Bit cast the LHS of the original shuffle.
-        Value* const pShuffleVectorLhs = pShuffleVector->getOperand(0);
-        Type* const pBitCastLhsType = VectorType::get(bitCast.getDestTy()->getVectorElementType(),
-            pShuffleVectorLhs->getType()->getVectorNumElements());
-        BitCastInst* const pBitCastLhs = new BitCastInst(pShuffleVectorLhs, pBitCastLhsType,
-                                                         pShuffleVectorLhs->getName() + ".bitcast");
-        insertAfter(*pBitCastLhs, *pShuffleVector);
+        Value* const shuffleVectorLhs = shuffleVector->getOperand(0);
+        Type* const bitCastLhsType = VectorType::get(bitCast.getDestTy()->getVectorElementType(),
+            shuffleVectorLhs->getType()->getVectorNumElements());
+        BitCastInst* const bitCastLhs = new BitCastInst(shuffleVectorLhs, bitCastLhsType,
+                                                         shuffleVectorLhs->getName() + ".bitcast");
+        insertAfter(*bitCastLhs, *shuffleVector);
 
         // Bit cast the RHS of the original shuffle.
-        Value* const pShuffleVectorRhs = pShuffleVector->getOperand(1);
-        Type* const pBitCastRhsType = VectorType::get(bitCast.getDestTy()->getVectorElementType(),
-            pShuffleVectorRhs->getType()->getVectorNumElements());
-        BitCastInst* const pBitCastRhs = new BitCastInst(pShuffleVectorRhs, pBitCastRhsType,
-                                                         pShuffleVectorRhs->getName() + ".bitcast");
-        insertAfter(*pBitCastRhs, *pBitCastLhs);
+        Value* const shuffleVectorRhs = shuffleVector->getOperand(1);
+        Type* const bitCastRhsType = VectorType::get(bitCast.getDestTy()->getVectorElementType(),
+            shuffleVectorRhs->getType()->getVectorNumElements());
+        BitCastInst* const bitCastRhs = new BitCastInst(shuffleVectorRhs, bitCastRhsType,
+                                                         shuffleVectorRhs->getName() + ".bitcast");
+        insertAfter(*bitCastRhs, *bitCastLhs);
 
         // Create our new shuffle instruction.
 
         // TODO: Simplify by using pShuffleVector->getShuffleMask() (no arguments) when it becomes available.
         SmallVector<int, 8> maskVals;
-        pShuffleVector->getShuffleMask(maskVals);
+        shuffleVector->getShuffleMask(maskVals);
 
-        auto pInt32Type = Type::getInt32Ty(pShuffleVector->getContext());
+        auto int32Type = Type::getInt32Ty(shuffleVector->getContext());
         SmallVector<Constant*, 8> masks;
         for (unsigned i = 0; i < maskVals.size(); ++i) {
             if (maskVals[i] == -1)
             {
-                masks.push_back(UndefValue::get(pInt32Type));
+                masks.push_back(UndefValue::get(int32Type));
             }
             else
             {
-                masks.push_back(ConstantInt::get(pInt32Type, maskVals[i]));
+                masks.push_back(ConstantInt::get(int32Type, maskVals[i]));
             }
         }
-        ShuffleVectorInst* const pNewShuffleVector = new ShuffleVectorInst(
-            pBitCastLhs, pBitCastRhs, ConstantVector::get(masks), pShuffleVector->getName());
-        pNewShuffleVector->insertAfter(&bitCast);
+        ShuffleVectorInst* const newShuffleVector = new ShuffleVectorInst(
+            bitCastLhs, bitCastRhs, ConstantVector::get(masks), shuffleVector->getName());
+        newShuffleVector->insertAfter(&bitCast);
 
         // Replace the bit cast with the new shuffle vector.
-        bitCast.replaceAllUsesWith(pNewShuffleVector);
+        bitCast.replaceAllUsesWith(newShuffleVector);
 
         // Lastly remember to delete the bit cast we just replaced.
         m_instsToErase.push_back(&bitCast);
 
         // Visit the bit cast instructions we just inserted in case there are optimization opportunities.
-        visitBitCast(*pBitCastLhs);
-        visitBitCast(*pBitCastRhs);
+        visitBitCast(*bitCastLhs);
+        visitBitCast(*bitCastRhs);
 
         return;
     }
 
-    if (PHINode* const pPhiNode = dyn_cast<PHINode>(bitCast.getOperand(0)))
+    if (PHINode* const phiNode = dyn_cast<PHINode>(bitCast.getOperand(0)))
     {
         // We only want to push bitcasts where the PHI node is an i8, as it'll save us PHI nodes later.
-        if (pPhiNode->getType()->getScalarSizeInBits() != 8)
+        if (phiNode->getType()->getScalarSizeInBits() != 8)
         {
             return;
         }
 
         // Push the bit cast to each of the PHI's incoming values instead.
-        const unsigned numIncomings = pPhiNode->getNumIncomingValues();
+        const unsigned numIncomings = phiNode->getNumIncomingValues();
 
-        PHINode* const pNewPhiNode = PHINode::Create(bitCast.getDestTy(), numIncomings, pPhiNode->getName(), pPhiNode);
+        PHINode* const newPhiNode = PHINode::Create(bitCast.getDestTy(), numIncomings, phiNode->getName(), phiNode);
 
         // Loop through each incoming edge to the PHI node.
         for (unsigned incomingIndex = 0; incomingIndex < numIncomings; incomingIndex++)
         {
-            Value* const pIncoming = pPhiNode->getIncomingValue(incomingIndex);
+            Value* const incoming = phiNode->getIncomingValue(incomingIndex);
 
-            BasicBlock* const pBasicBlock = pPhiNode->getIncomingBlock(incomingIndex);
+            BasicBlock* const basicBlock = phiNode->getIncomingBlock(incomingIndex);
 
-            if (Instruction* const pInst = dyn_cast<Instruction>(pIncoming))
+            if (Instruction* const inst = dyn_cast<Instruction>(incoming))
             {
-                BitCastInst* const pNewBitCast = new BitCastInst(pInst, bitCast.getDestTy());
+                BitCastInst* const newBitCast = new BitCastInst(inst, bitCast.getDestTy());
 
-                insertAfter(*pNewBitCast, *pInst);
+                insertAfter(*newBitCast, *inst);
 
-                pNewPhiNode->addIncoming(pNewBitCast, pBasicBlock);
+                newPhiNode->addIncoming(newBitCast, basicBlock);
             }
-            else if (Constant* const pConstant = dyn_cast<Constant>(pIncoming))
+            else if (Constant* const constant = dyn_cast<Constant>(incoming))
             {
-                Constant* const pNewBitCast = ConstantExpr::getBitCast(pConstant, bitCast.getDestTy());
+                Constant* const newBitCast = ConstantExpr::getBitCast(constant, bitCast.getDestTy());
 
-                pNewPhiNode->addIncoming(pNewBitCast, pBasicBlock);
+                newPhiNode->addIncoming(newBitCast, basicBlock);
             }
             else
             {
@@ -304,26 +304,26 @@ void PatchPeepholeOpt::visitBitCast(
         }
 
         // Replace the bit cast with the new PHI node.
-        bitCast.replaceAllUsesWith(pNewPhiNode);
+        bitCast.replaceAllUsesWith(newPhiNode);
 
         // Lastly remember to delete the bit cast we just replaced.
         m_instsToErase.push_back(&bitCast);
 
         // If the PHI node that we've just replaced had any other users, make a bit cast for them.
-        if (pPhiNode->hasOneUse() == false)
+        if (phiNode->hasOneUse() == false)
         {
-            BitCastInst* const pNewBitCast = new BitCastInst(pNewPhiNode, pPhiNode->getType());
+            BitCastInst* const newBitCast = new BitCastInst(newPhiNode, phiNode->getType());
 
-            insertAfter(*pNewBitCast, *pNewPhiNode);
+            insertAfter(*newBitCast, *newPhiNode);
 
-            pPhiNode->replaceAllUsesWith(pNewBitCast);
+            phiNode->replaceAllUsesWith(newBitCast);
 
             // Visit the bit cast instructions we just inserted in case there are optimization opportunities.
-            visitBitCast(*pNewBitCast);
+            visitBitCast(*newBitCast);
         }
 
         // Lastly remember to delete the PHI node we just replaced.
-        m_instsToErase.push_back(pPhiNode);
+        m_instsToErase.push_back(phiNode);
 
         return;
     }
@@ -342,40 +342,40 @@ void PatchPeepholeOpt::visitICmp(
         return;
     }
 
-    ConstantInt* const pConstantVal = dyn_cast<ConstantInt>(iCmp.getOperand(1));
+    ConstantInt* const constantVal = dyn_cast<ConstantInt>(iCmp.getOperand(1));
 
     // If we don't have a constant we are comparing against, or the constant is the maximum representable, bail.
-    if ((pConstantVal == nullptr) || pConstantVal->isMaxValue(false))
+    if ((constantVal == nullptr) || constantVal->isMaxValue(false))
     {
         return;
     }
 
-    const uint64_t constant = pConstantVal->getZExtValue();
+    const uint64_t constant = constantVal->getZExtValue();
 
-    ConstantInt* const pNewConstant = ConstantInt::get(pConstantVal->getType(), constant + 1, false);
+    ConstantInt* const newConstant = ConstantInt::get(constantVal->getType(), constant + 1, false);
 
     // Swap the predicate to less than. This helps the loop analysis passes detect more loops that can be trivially
     // unrolled.
     iCmp.setPredicate(CmpInst::ICMP_ULT);
 
     // Set our new constant to the second operand.
-    iCmp.setOperand(1, pNewConstant);
+    iCmp.setOperand(1, newConstant);
 
     // Run through the users of the icmp and if they are branches, switch the branch conditions, otherwise make a not
     // of the icmp and replace the use with the not.
 
     SmallVector<Instruction*, 4> instsWithOpsToReplace;
 
-    for (User* const pUser : iCmp.users())
+    for (User* const user : iCmp.users())
     {
-        if (BranchInst* const pBranch = dyn_cast<BranchInst>(pUser))
+        if (BranchInst* const branch = dyn_cast<BranchInst>(user))
         {
             // Only conditional branches could use an integer comparison instruction, so we just swap the operands.
-            pBranch->swapSuccessors();
+            branch->swapSuccessors();
         }
-        else if (Instruction* const pInst = dyn_cast<Instruction>(pUser))
+        else if (Instruction* const inst = dyn_cast<Instruction>(user))
         {
-            instsWithOpsToReplace.push_back(pInst);
+            instsWithOpsToReplace.push_back(inst);
         }
     }
 
@@ -385,18 +385,18 @@ void PatchPeepholeOpt::visitICmp(
         return;
     }
 
-    Instruction* const pICmpNot = BinaryOperator::CreateNot(&iCmp);
-    insertAfter(*pICmpNot, iCmp);
+    Instruction* const iCmpNot = BinaryOperator::CreateNot(&iCmp);
+    insertAfter(*iCmpNot, iCmp);
 
-    for (Instruction* const pInst : instsWithOpsToReplace)
+    for (Instruction* const inst : instsWithOpsToReplace)
     {
-        const unsigned numOperands = pInst->getNumOperands();
+        const unsigned numOperands = inst->getNumOperands();
 
         for (unsigned operandIndex = 0; operandIndex < numOperands; operandIndex++)
         {
-            if (&iCmp == pInst->getOperand(operandIndex))
+            if (&iCmp == inst->getOperand(operandIndex))
             {
-                pInst->setOperand(operandIndex, pICmpNot);
+                inst->setOperand(operandIndex, iCmpNot);
             }
         }
     }
@@ -413,37 +413,37 @@ void PatchPeepholeOpt::visitExtractElement(
         return;
     }
 
-    Value* const pVector = extractElement.getVectorOperand();
+    Value* const vector = extractElement.getVectorOperand();
 
-    ConstantInt* const pIndexVal = dyn_cast<ConstantInt>(extractElement.getIndexOperand());
+    ConstantInt* const indexVal = dyn_cast<ConstantInt>(extractElement.getIndexOperand());
 
     // We only handle constant indices.
-    if (pIndexVal == nullptr)
+    if (indexVal == nullptr)
     {
         return;
     }
 
-    const uint64_t index = pIndexVal->getZExtValue();
+    const uint64_t index = indexVal->getZExtValue();
 
     // Check if the extract is coming from an insert element, and try and track the extract back to see if there is an
     // insert we can forward onto the result of the extract.
 
-    Value* pNextVector = pVector;
+    Value* nextVector = vector;
 
-    while (InsertElementInst* const pNextInsertElement = dyn_cast<InsertElementInst>(pNextVector))
+    while (InsertElementInst* const nextInsertElement = dyn_cast<InsertElementInst>(nextVector))
     {
-        ConstantInt* const pNextIndex = dyn_cast<ConstantInt>(pNextInsertElement->getOperand(2));
+        ConstantInt* const nextIndex = dyn_cast<ConstantInt>(nextInsertElement->getOperand(2));
 
         // If the vector was inserting at a non-constant index, bail.
-        if (pNextIndex == nullptr)
+        if (nextIndex == nullptr)
         {
             break;
         }
 
         // If the index of the insertion matches the index we were extracting, forward the insert!
-        if (pNextIndex->equalsInt(index))
+        if (nextIndex->equalsInt(index))
         {
-            extractElement.replaceAllUsesWith(pNextInsertElement->getOperand(1));
+            extractElement.replaceAllUsesWith(nextInsertElement->getOperand(1));
 
             // Lastly remember to delete the extract we just replaced.
             m_instsToErase.push_back(&extractElement);
@@ -452,37 +452,37 @@ void PatchPeepholeOpt::visitExtractElement(
         }
 
         // Otherwise do another loop iteration and check the vector the insert element was inserting into.
-        pNextVector = pNextInsertElement->getOperand(0);
+        nextVector = nextInsertElement->getOperand(0);
     }
 
     unsigned numCombinableUsers = 0;
 
-    for (User* const pUser : pVector->users())
+    for (User* const user : vector->users())
     {
-        ExtractElementInst* const pOtherExtractElement = dyn_cast<ExtractElementInst>(pUser);
+        ExtractElementInst* const otherExtractElement = dyn_cast<ExtractElementInst>(user);
 
         // If we don't have an extract element, skip.
-        if (pOtherExtractElement == nullptr)
+        if (otherExtractElement == nullptr)
         {
             continue;
         }
 
         // If the other extract has no users, no point optimizating it.
-        if (pOtherExtractElement->user_empty())
+        if (otherExtractElement->user_empty())
         {
             continue;
         }
 
-        ConstantInt* const pOtherIndex = dyn_cast<ConstantInt>(pOtherExtractElement->getIndexOperand());
+        ConstantInt* const otherIndex = dyn_cast<ConstantInt>(otherExtractElement->getIndexOperand());
 
         // If the other index is not a constant integer, skip.
-        if (pOtherIndex == nullptr)
+        if (otherIndex == nullptr)
         {
             continue;
         }
 
         // If the indices do not match, skip.
-        if (pOtherIndex->equalsInt(index) == false)
+        if (otherIndex->equalsInt(index) == false)
         {
             continue;
         }
@@ -499,55 +499,55 @@ void PatchPeepholeOpt::visitExtractElement(
     // If we have at least 2 users, optimize!
     if (numCombinableUsers > 1)
     {
-        if (Instruction* const pInst = dyn_cast<Instruction>(pVector))
+        if (Instruction* const inst = dyn_cast<Instruction>(vector))
         {
-            ExtractElementInst* const pNewExtractElement =
-                ExtractElementInst::Create(pVector, pIndexVal, extractElement.getName());
+            ExtractElementInst* const newExtractElement =
+                ExtractElementInst::Create(vector, indexVal, extractElement.getName());
 
-            insertAfter(*pNewExtractElement, *pInst);
+            insertAfter(*newExtractElement, *inst);
 
             // Replace all extract element instructions that extract with the same value and index.
-            for (User* const pUser : pVector->users())
+            for (User* const user : vector->users())
             {
-                ExtractElementInst* const pOtherExtractElement = dyn_cast<ExtractElementInst>(pUser);
+                ExtractElementInst* const otherExtractElement = dyn_cast<ExtractElementInst>(user);
 
                 // If we don't have an extract element, skip.
-                if (pOtherExtractElement == nullptr)
+                if (otherExtractElement == nullptr)
                 {
                     continue;
                 }
 
                 // If the other extract has no users, no point optimizating it.
-                if (pOtherExtractElement->user_empty())
+                if (otherExtractElement->user_empty())
                 {
                     continue;
                 }
 
                 // If the extract element is the new one we just inserted, skip.
-                if (pNewExtractElement == pOtherExtractElement)
+                if (newExtractElement == otherExtractElement)
                 {
                     continue;
                 }
 
-                ConstantInt* const pOtherIndex = dyn_cast<ConstantInt>(pOtherExtractElement->getIndexOperand());
+                ConstantInt* const otherIndex = dyn_cast<ConstantInt>(otherExtractElement->getIndexOperand());
 
                 // If the other index is not a constant integer, skip.
-                if (pOtherIndex == nullptr)
+                if (otherIndex == nullptr)
                 {
                     continue;
                 }
 
                 // If the indices do not match, skip.
-                if (pOtherIndex->equalsInt(index) == false)
+                if (otherIndex->equalsInt(index) == false)
                 {
                     continue;
                 }
 
                 // Replace the other extraction with our new one.
-                pOtherExtractElement->replaceAllUsesWith(pNewExtractElement);
+                otherExtractElement->replaceAllUsesWith(newExtractElement);
 
                 // Lastly remember to delete the extract we just replaced.
-                m_instsToErase.push_back(pOtherExtractElement);
+                m_instsToErase.push_back(otherExtractElement);
             }
 
             return;
@@ -572,34 +572,34 @@ void PatchPeepholeOpt::visitPHINode(
     if (phiNode.getType()->isVectorTy() && (phiNode.getType()->getScalarSizeInBits() >= 32))
     {
         // The integer type we'll use for our extract & insert elements.
-        IntegerType* const pInt32Type = IntegerType::get(phiNode.getContext(), 32);
+        IntegerType* const int32Type = IntegerType::get(phiNode.getContext(), 32);
 
         // Where we will insert our vector create that will replace the uses of the PHI node.
-        Instruction* const pInsertPos = phiNode.getParent()->getFirstNonPHI();
+        Instruction* const insertPos = phiNode.getParent()->getFirstNonPHI();
 
         // The type of the vector.
-        Type* const pType = phiNode.getType();
+        Type* const type = phiNode.getType();
 
         // The number of elements in the vector type (which will result in N new scalar PHI nodes).
-        const unsigned numElements = pType->getVectorNumElements();
+        const unsigned numElements = type->getVectorNumElements();
 
         // The element type of the vector.
-        Type* const pElementType = pType->getVectorElementType();
+        Type* const elementType = type->getVectorElementType();
 
-        Value* pResult = UndefValue::get(pType);
+        Value* result = UndefValue::get(type);
 
         // Loop through each element of the vector.
         for (unsigned elementIndex = 0; elementIndex < numElements; elementIndex++)
         {
             // We create a new name that is "old name".N, where N is the index of element into the original vector.
-            ConstantInt* const pElementIndexVal = ConstantInt::get(pInt32Type, elementIndex, false);
+            ConstantInt* const elementIndexVal = ConstantInt::get(int32Type, elementIndex, false);
 
-            PHINode* const pNewPhiNode = PHINode::Create(pElementType, numIncomings,
+            PHINode* const newPhiNode = PHINode::Create(elementType, numIncomings,
                                                          phiNode.getName() + "." +
                                                          Twine(elementIndex));
-            insertAfter(*pNewPhiNode, phiNode);
+            insertAfter(*newPhiNode, phiNode);
 
-            pResult = InsertElementInst::Create(pResult, pNewPhiNode, pElementIndexVal, "", pInsertPos);
+            result = InsertElementInst::Create(result, newPhiNode, elementIndexVal, "", insertPos);
 
             // Make sure the same incoming blocks have identical incoming values.
             // If we have already inserted an incoming arc for a basic block,
@@ -610,35 +610,35 @@ void PatchPeepholeOpt::visitPHINode(
             // Loop through each incoming edge to the PHI node.
             for (unsigned incomingIndex = 0; incomingIndex < numIncomings; incomingIndex++)
             {
-                Value* const pIncoming = phiNode.getIncomingValue(incomingIndex);
+                Value* const incoming = phiNode.getIncomingValue(incomingIndex);
 
-                BasicBlock* const pBasicBlock = phiNode.getIncomingBlock(incomingIndex);
+                BasicBlock* const basicBlock = phiNode.getIncomingBlock(incomingIndex);
 
-                if (Instruction* const pInst = dyn_cast<Instruction>(pIncoming))
+                if (Instruction* const inst = dyn_cast<Instruction>(incoming))
                 {
-                    Value* pNewIncomingValue = nullptr;
-                    auto it = incomingPairMap.find(pBasicBlock);
+                    Value* newIncomingValue = nullptr;
+                    auto it = incomingPairMap.find(basicBlock);
                     if (it != incomingPairMap.end())
                     {
-                        pNewIncomingValue = it->second;
+                        newIncomingValue = it->second;
                     }
                     else
                     {
-                        ExtractElementInst* const pExtractElement =
-                            ExtractElementInst::Create(pIncoming, pElementIndexVal);
+                        ExtractElementInst* const extractElement =
+                            ExtractElementInst::Create(incoming, elementIndexVal);
 
-                        insertAfter(*pExtractElement, *pInst);
-                        pNewIncomingValue = pExtractElement;
-                        incomingPairMap.insert({pBasicBlock, pNewIncomingValue});
+                        insertAfter(*extractElement, *inst);
+                        newIncomingValue = extractElement;
+                        incomingPairMap.insert({basicBlock, newIncomingValue});
                     }
 
-                    pNewPhiNode->addIncoming(pNewIncomingValue, pBasicBlock);
+                    newPhiNode->addIncoming(newIncomingValue, basicBlock);
                 }
-                else if (Constant* const pConstant = dyn_cast<Constant>(pIncoming))
+                else if (Constant* const constant = dyn_cast<Constant>(incoming))
                 {
-                    Constant* const pExtractElement = ConstantExpr::getExtractElement(pConstant, pElementIndexVal);
-                    incomingPairMap.insert({pBasicBlock, pExtractElement});
-                    pNewPhiNode->addIncoming(pExtractElement, pBasicBlock);
+                    Constant* const extractElement = ConstantExpr::getExtractElement(constant, elementIndexVal);
+                    incomingPairMap.insert({basicBlock, extractElement});
+                    newPhiNode->addIncoming(extractElement, basicBlock);
                 }
                 else
                 {
@@ -648,7 +648,7 @@ void PatchPeepholeOpt::visitPHINode(
         }
 
         // Replace all the users of the original PHI node with the new nodes combined using insertions.
-        phiNode.replaceAllUsesWith(pResult);
+        phiNode.replaceAllUsesWith(result);
 
         // Lastly remember the phi so we can delete it later when it is safe to do so.
         m_instsToErase.push_back(&phiNode);
@@ -657,48 +657,48 @@ void PatchPeepholeOpt::visitPHINode(
     }
 
     // Optimize PHI nodes that have incoming values that are identical in their parent blocks.
-    Instruction* pPrevIncomingInst = nullptr;
+    Instruction* prevIncomingInst = nullptr;
 
     for (unsigned incomingIndex = 0; incomingIndex < numIncomings; incomingIndex++)
     {
-        Instruction* const pIncomingInst = dyn_cast<Instruction>(phiNode.getIncomingValue(incomingIndex));
+        Instruction* const incomingInst = dyn_cast<Instruction>(phiNode.getIncomingValue(incomingIndex));
 
         // If we don't have an instruction, bail.
-        if (pIncomingInst == nullptr)
+        if (incomingInst == nullptr)
         {
-            pPrevIncomingInst = nullptr;
+            prevIncomingInst = nullptr;
             break;
         }
 
         // If our incoming instruction is a PHI node, we can't move it so bail.
-        if (isa<PHINode>(pIncomingInst))
+        if (isa<PHINode>(incomingInst))
         {
-            pPrevIncomingInst = nullptr;
+            prevIncomingInst = nullptr;
             break;
         }
 
         // If we don't have a previous instruction to compare against, store the current one and continue.
-        if (pPrevIncomingInst == nullptr)
+        if (prevIncomingInst == nullptr)
         {
-            pPrevIncomingInst = pIncomingInst;
+            prevIncomingInst = incomingInst;
             continue;
         }
 
-        if (pIncomingInst->isIdenticalTo(pPrevIncomingInst) == false)
+        if (incomingInst->isIdenticalTo(prevIncomingInst) == false)
         {
-            pPrevIncomingInst = nullptr;
+            prevIncomingInst = nullptr;
             break;
         }
     }
 
     // Do not clone allocas -- we don't want to potentially introduce them in the middle of the function.
-    if ((pPrevIncomingInst != nullptr) && (isa<AllocaInst>(pPrevIncomingInst) == false))
+    if ((prevIncomingInst != nullptr) && (isa<AllocaInst>(prevIncomingInst) == false))
     {
-        Instruction* const pNewInst = pPrevIncomingInst->clone();
-        insertAfter(*pNewInst, phiNode);
+        Instruction* const newInst = prevIncomingInst->clone();
+        insertAfter(*newInst, phiNode);
 
         // Replace all the users of the original PHI node with the incoming value that each incoming references.
-        phiNode.replaceAllUsesWith(pNewInst);
+        phiNode.replaceAllUsesWith(newInst);
 
         // Lastly remember the phi so we can delete it later when it is safe to do so.
         m_instsToErase.push_back(&phiNode);
@@ -713,21 +713,21 @@ void PatchPeepholeOpt::visitPHINode(
         //   %b = phi [%c, %har], [%p, %fiz]
         // Where we have multiple PHI nodes similar to %p, that take an %a, but are actually passing the same value
         // back and forth (and thus can be collapsed into a single PHI node).
-        PHINode* const pSubPhiNode = dyn_cast<PHINode>(phiNode.getIncomingValue(1));
+        PHINode* const subPhiNode = dyn_cast<PHINode>(phiNode.getIncomingValue(1));
 
-        if (pSubPhiNode == phiNode.getIncomingValue(2))
+        if (subPhiNode == phiNode.getIncomingValue(2))
         {
             bool subPhiNodeOptimizable = true;
 
-            const unsigned numSubIncomings = pSubPhiNode->getNumIncomingValues();
+            const unsigned numSubIncomings = subPhiNode->getNumIncomingValues();
 
             for (unsigned subIncomingIndex = 0; subIncomingIndex < numSubIncomings; subIncomingIndex++)
             {
-                Value* const pIncoming = pSubPhiNode->getIncomingValue(subIncomingIndex);
+                Value* const incoming = subPhiNode->getIncomingValue(subIncomingIndex);
 
                 // We can attempt to optimize the sub PHI node if an incoming is our parent PHI node, or if the
                 // incoming is a constant.
-                if ((pIncoming != &phiNode) && (isa<Constant>(pIncoming) == false))
+                if ((incoming != &phiNode) && (isa<Constant>(incoming) == false))
                 {
                     subPhiNodeOptimizable = false;
                     break;
@@ -737,67 +737,67 @@ void PatchPeepholeOpt::visitPHINode(
             // If the sub PHI node was optimizable, lets try and optimize!
             if (subPhiNodeOptimizable)
             {
-                for (User* const pUser : phiNode.getIncomingValue(0)->users())
+                for (User* const user : phiNode.getIncomingValue(0)->users())
                 {
-                    PHINode* const pOtherPhiNode = dyn_cast<PHINode>(pUser);
+                    PHINode* const otherPhiNode = dyn_cast<PHINode>(user);
 
                     // If its not a PHI node, skip.
-                    if (pOtherPhiNode == nullptr)
+                    if (otherPhiNode == nullptr)
                     {
                         continue;
                     }
 
                     // Skip our PHI node in the user list.
-                    if (pOtherPhiNode == &phiNode)
+                    if (otherPhiNode == &phiNode)
                     {
                         continue;
                     }
 
                     // If both PHI nodes are not in the same parent block, skip.
-                    if (pOtherPhiNode->getParent() != phiNode.getParent())
+                    if (otherPhiNode->getParent() != phiNode.getParent())
                     {
                         continue;
                     }
 
                     // If the PHI does not match the number of incomings as us, skip.
-                    if (pOtherPhiNode->getNumIncomingValues() != numIncomings)
+                    if (otherPhiNode->getNumIncomingValues() != numIncomings)
                     {
                         continue;
                     }
 
-                    PHINode* const pOtherSubPhiNode = dyn_cast<PHINode>(pOtherPhiNode->getIncomingValue(1));
+                    PHINode* const otherSubPhiNode = dyn_cast<PHINode>(otherPhiNode->getIncomingValue(1));
 
                     // If the other incomings don't match, its not like our PHI node, skip.
-                    if (pOtherSubPhiNode != pOtherPhiNode->getIncomingValue(2))
+                    if (otherSubPhiNode != otherPhiNode->getIncomingValue(2))
                     {
                         continue;
                     }
 
                     // If both sub PHI nodes are not in the same parent block, skip.
-                    if (pOtherSubPhiNode->getParent() != pSubPhiNode->getParent())
+                    if (otherSubPhiNode->getParent() != subPhiNode->getParent())
                     {
                         continue;
                     }
 
                     // If the sub PHI nodes don't have the same incomings, we can't fold them so we skip.
-                    if (pOtherSubPhiNode->getNumIncomingValues() != numSubIncomings)
+                    if (otherSubPhiNode->getNumIncomingValues() != numSubIncomings)
                     {
                         continue;
                     }
 
                     for (unsigned subIncomingIndex = 0; subIncomingIndex < numSubIncomings; subIncomingIndex++)
                     {
-                        if (pSubPhiNode->getIncomingBlock(subIncomingIndex) !=
-                            pOtherSubPhiNode->getIncomingBlock(subIncomingIndex))
+                        if (subPhiNode->getIncomingBlock(subIncomingIndex) !=
+                            otherSubPhiNode->getIncomingBlock(subIncomingIndex))
                         {
                             subPhiNodeOptimizable = false;
                             break;
                         }
 
-                        Value* const pIncoming = pSubPhiNode->getIncomingValue(subIncomingIndex);
-                        Value* const pOtherIncoming = pOtherSubPhiNode->getIncomingValue(subIncomingIndex);
+                        Value* const incoming = subPhiNode->getIncomingValue(subIncomingIndex);
+                        Value* const otherIncoming = otherSubPhiNode->getIncomingValue(subIncomingIndex);
 
-                        if ((pOtherIncoming != pOtherPhiNode) && (pOtherIncoming != pIncoming))
+                        if ((otherIncoming != otherPhiNode) && (otherIncoming != incoming))
                         {
                             subPhiNodeOptimizable = false;
                             break;
@@ -807,12 +807,12 @@ void PatchPeepholeOpt::visitPHINode(
                     if (subPhiNodeOptimizable)
                     {
                         // Both our PHI's are actually identical! Optimize away.
-                        pOtherPhiNode->replaceAllUsesWith(&phiNode);
-                        pOtherSubPhiNode->replaceAllUsesWith(pSubPhiNode);
+                        otherPhiNode->replaceAllUsesWith(&phiNode);
+                        otherSubPhiNode->replaceAllUsesWith(subPhiNode);
 
                         // Lastly remember the phis so we can delete them later when it is safe to do so.
-                        m_instsToErase.push_back(pOtherPhiNode);
-                        m_instsToErase.push_back(pOtherSubPhiNode);
+                        m_instsToErase.push_back(otherPhiNode);
+                        m_instsToErase.push_back(otherSubPhiNode);
                     }
                 }
             }
@@ -832,26 +832,26 @@ void PatchPeepholeOpt::visitPHINode(
         {
             const unsigned otherIncomingIndex = (incomingIndex + 1) % 2;
 
-            Value* const pIncoming = phiNode.getIncomingValue(incomingIndex);
-            Value* const pOtherIncoming = phiNode.getIncomingValue(otherIncomingIndex);
+            Value* const incoming = phiNode.getIncomingValue(incomingIndex);
+            Value* const otherIncoming = phiNode.getIncomingValue(otherIncomingIndex);
 
-            if (BinaryOperator* const pBinaryOp = dyn_cast<BinaryOperator>(pIncoming))
+            if (BinaryOperator* const binaryOp = dyn_cast<BinaryOperator>(incoming))
             {
-                Value* const pOperands[2] =
+                Value* const operands[2] =
                 {
-                    pBinaryOp->getOperand(0),
-                    pBinaryOp->getOperand(1)
+                    binaryOp->getOperand(0),
+                    binaryOp->getOperand(1)
                 };
 
                 Value* sinkableValue = nullptr;
 
-                if (pOtherIncoming == pOperands[0])
+                if (otherIncoming == operands[0])
                 {
-                    sinkableValue = pOperands[1];
+                    sinkableValue = operands[1];
                 }
-                else if (pOtherIncoming == pOperands[1])
+                else if (otherIncoming == operands[1])
                 {
-                    sinkableValue = pOperands[0];
+                    sinkableValue = operands[0];
                 }
                 else
                 {
@@ -859,42 +859,42 @@ void PatchPeepholeOpt::visitPHINode(
                 }
 
                 // Create a constant for the other incoming that won't affect the result when the operator is applied.
-                Constant* pNoEffectConstant = nullptr;
+                Constant* noEffectConstant = nullptr;
 
-                const Instruction::BinaryOps opCode = pBinaryOp->getOpcode();
+                const Instruction::BinaryOps opCode = binaryOp->getOpcode();
 
                 switch (opCode)
                 {
                 case BinaryOperator::Add:
-                    pNoEffectConstant = ConstantInt::get(sinkableValue->getType(), 0);
+                    noEffectConstant = ConstantInt::get(sinkableValue->getType(), 0);
                     break;
                 case BinaryOperator::Mul:
-                    pNoEffectConstant = ConstantInt::get(sinkableValue->getType(), 1);
+                    noEffectConstant = ConstantInt::get(sinkableValue->getType(), 1);
                     break;
                 case BinaryOperator::FAdd:
-                    pNoEffectConstant = ConstantFP::get(sinkableValue->getType(), 0.0);
+                    noEffectConstant = ConstantFP::get(sinkableValue->getType(), 0.0);
                     break;
                 case BinaryOperator::FMul:
-                    pNoEffectConstant = ConstantFP::get(sinkableValue->getType(), 1.0);
+                    noEffectConstant = ConstantFP::get(sinkableValue->getType(), 1.0);
                     break;
                 default:
                     continue;
                 }
 
                 phiNode.setIncomingValue(incomingIndex, sinkableValue);
-                phiNode.setIncomingValue(otherIncomingIndex, pNoEffectConstant);
+                phiNode.setIncomingValue(otherIncomingIndex, noEffectConstant);
 
-                BinaryOperator* const pNewBinaryOp = BinaryOperator::Create(opCode, &phiNode, pOtherIncoming);
-                if (isa<FPMathOperator>(pNewBinaryOp))
-                    pNewBinaryOp->copyFastMathFlags(pBinaryOp);
+                BinaryOperator* const newBinaryOp = BinaryOperator::Create(opCode, &phiNode, otherIncoming);
+                if (isa<FPMathOperator>(newBinaryOp))
+                    newBinaryOp->copyFastMathFlags(binaryOp);
 
-                insertAfter(*pNewBinaryOp, phiNode);
+                insertAfter(*newBinaryOp, phiNode);
 
                 // Replace all the users of the original PHI node with the binary operator.
-                phiNode.replaceAllUsesWith(pNewBinaryOp);
+                phiNode.replaceAllUsesWith(newBinaryOp);
 
                 // We just replaced our binary operators use of the phi, so we need to reset the use.
-                pNewBinaryOp->setOperand(0, &phiNode);
+                newBinaryOp->setOperand(0, &phiNode);
 
                 // We've optimized the PHI, so we're done!
                 return;
@@ -908,8 +908,8 @@ void PatchPeepholeOpt::visitPHINode(
 void PatchPeepholeOpt::visitCallInst(
     CallInst& callInst) // [in] "Call" instruction
 {
-    auto pCallee = callInst.getCalledFunction();
-    if (pCallee == nullptr)
+    auto callee = callInst.getCalledFunction();
+    if (callee == nullptr)
     {
         return;
     }
@@ -929,42 +929,42 @@ void PatchPeepholeOpt::visitCallInst(
     // 30:; preds = %.entry
     //   call void @llvm.amdgcn.kill(i1 false)
     //   br label %73
-    if (cl::EnableDiscardOpt && m_enableDiscardOpt && (pCallee->getIntrinsicID() == Intrinsic::amdgcn_kill))
+    if (cl::EnableDiscardOpt && m_enableDiscardOpt && (callee->getIntrinsicID() == Intrinsic::amdgcn_kill))
     {
-        auto pBlock = callInst.getParent();
-        if (pBlock->size() > 2)
+        auto block = callInst.getParent();
+        if (block->size() > 2)
         {
             // Apply the optimization to blocks that contains single kill call instruction.
             return;
         }
 
-        for (BasicBlock *pPredBlock : predecessors(pBlock))
+        for (BasicBlock *predBlock : predecessors(block))
         {
-            auto pTerminator = pPredBlock->getTerminator();
-            BranchInst* pBranch = dyn_cast<BranchInst>(pTerminator);
-            if (pBranch && pBranch->isConditional())
+            auto terminator = predBlock->getTerminator();
+            BranchInst* branch = dyn_cast<BranchInst>(terminator);
+            if (branch && branch->isConditional())
             {
-                auto pCond = pBranch->getCondition();
-                auto pTrueBlock = dyn_cast<BasicBlock>(pBranch->getSuccessor(0));
-                auto pNewKill = dyn_cast<CallInst>(callInst.clone());
-                llvm::LLVMContext* pContext = &callInst.getContext();
+                auto cond = branch->getCondition();
+                auto trueBlock = dyn_cast<BasicBlock>(branch->getSuccessor(0));
+                auto newKill = dyn_cast<CallInst>(callInst.clone());
+                llvm::LLVMContext* context = &callInst.getContext();
 
-                if (pTrueBlock == pBlock)
+                if (trueBlock == block)
                 {
                     // the kill block is the true condition block
                     // insert a bitwise not instruction.
-                    auto pNotCond = BinaryOperator::CreateNot(pCond, "", pTerminator);
-                    pNewKill->setArgOperand(0, pNotCond);
+                    auto notCond = BinaryOperator::CreateNot(cond, "", terminator);
+                    newKill->setArgOperand(0, notCond);
                     // Make the kill block unreachable
-                    pBranch->setCondition(ConstantInt::get(Type::getInt1Ty(*pContext), false));
+                    branch->setCondition(ConstantInt::get(Type::getInt1Ty(*context), false));
                 }
                 else
                 {
-                    pNewKill->setArgOperand(0, pCond);
+                    newKill->setArgOperand(0, cond);
                     // make the kill block unreachable
-                    pBranch->setCondition(ConstantInt::get(Type::getInt1Ty(*pContext), true));
+                    branch->setCondition(ConstantInt::get(Type::getInt1Ty(*context), true));
                 }
-                pNewKill->insertBefore(pTerminator);
+                newKill->insertBefore(terminator);
             }
         }
     }

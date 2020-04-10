@@ -55,133 +55,133 @@ class ShaderSystemValues
 {
 public:
     // Initialize this ShaderSystemValues if it was previously uninitialized.
-    void Initialize(PipelineState* pPipelineState, llvm::Function* pEntryPoint);
+    void initialize(PipelineState* pipelineState, llvm::Function* entryPoint);
 
     // Get ES-GS ring buffer descriptor (for VS/TES output or GS input)
-    llvm::Value* GetEsGsRingBufDesc();
+    llvm::Value* getEsGsRingBufDesc();
 
     // Get the descriptor for tessellation factor (TF) buffer (TCS output)
-    llvm::Value* GetTessFactorBufDesc();
+    llvm::Value* getTessFactorBufDesc();
 
     // Extract value of primitive ID (TCS)
-    llvm::Value* GetPrimitiveId();
+    llvm::Value* getPrimitiveId();
 
     // Get invocation ID (TCS)
-    llvm::Value* GetInvocationId();
+    llvm::Value* getInvocationId();
 
     // Get relative patchId (TCS)
-    llvm::Value* GetRelativeId();
+    llvm::Value* getRelativeId();
 
     // Get offchip LDS descriptor (TCS and TES)
-    llvm::Value* GetOffChipLdsDesc();
+    llvm::Value* getOffChipLdsDesc();
 
     // Get tessellated coordinate (TES)
-    llvm::Value* GetTessCoord();
+    llvm::Value* getTessCoord();
 
     // Get ES -> GS offsets (GS in)
-    llvm::Value* GetEsGsOffsets();
+    llvm::Value* getEsGsOffsets();
 
     // Get GS -> VS ring buffer descriptor (GS out and copy shader in)
-    llvm::Value* GetGsVsRingBufDesc(unsigned streamId);
+    llvm::Value* getGsVsRingBufDesc(unsigned streamId);
 
     // Get pointers to emit counters (GS)
-    llvm::ArrayRef<llvm::Value*> GetEmitCounterPtr();
+    llvm::ArrayRef<llvm::Value*> getEmitCounterPtr();
 
     // Get descriptor table pointer
-    llvm::Value* GetDescTablePtr(unsigned descSet);
+    llvm::Value* getDescTablePtr(unsigned descSet);
 
     // Get shadow descriptor table pointer
-    llvm::Value* GetShadowDescTablePtr(unsigned descSet);
+    llvm::Value* getShadowDescTablePtr(unsigned descSet);
 
     // Get global internal table pointer as pointer to i8.
-    llvm::Value* GetInternalGlobalTablePtr();
+    llvm::Value* getInternalGlobalTablePtr();
 
     // Get internal per shader table pointer as pointer to i8.
-    llvm::Value* GetInternalPerShaderTablePtr();
+    llvm::Value* getInternalPerShaderTablePtr();
 
     // Get number of workgroups value
-    llvm::Value* GetNumWorkgroups();
+    llvm::Value* getNumWorkgroups();
 
     // Get spilled push constant pointer
-    llvm::Value* GetSpilledPushConstTablePtr();
+    llvm::Value* getSpilledPushConstTablePtr();
 
     // Get vertex buffer table pointer
-    llvm::Value* GetVertexBufTablePtr();
+    llvm::Value* getVertexBufTablePtr();
 
     // Get stream-out buffer descriptor
-    llvm::Value* GetStreamOutBufDesc(unsigned xfbBuffer);
+    llvm::Value* getStreamOutBufDesc(unsigned xfbBuffer);
 
     // Get spill table pointer
-    llvm::Instruction* GetSpillTablePtr();
+    llvm::Instruction* getSpillTablePtr();
 
     // Test if shadow descriptor table is enabled
-    bool IsShadowDescTableEnabled() const;
+    bool isShadowDescTableEnabled() const;
 
 private:
     // Get stream-out buffer table pointer
-    llvm::Instruction* GetStreamOutTablePtr();
+    llvm::Instruction* getStreamOutTablePtr();
 
     // Make 64-bit pointer of specified type from 32-bit int, extending with the specified value, or PC if InvalidValue
-    llvm::Instruction* MakePointer(llvm::Value* pLowValue, llvm::Type* pPtrTy, unsigned highValue);
+    llvm::Instruction* makePointer(llvm::Value* lowValue, llvm::Type* ptrTy, unsigned highValue);
 
     // Get 64-bit extended resource node value
-    llvm::Value* GetExtendedResourceNodeValue(unsigned resNodeIdx, llvm::Type* pResNodeTy, unsigned highValue);
+    llvm::Value* getExtendedResourceNodeValue(unsigned resNodeIdx, llvm::Type* resNodeTy, unsigned highValue);
 
     // Get 32 bit resource node value
-    llvm::Value* GetResourceNodeValue(unsigned resNodeIdx);
+    llvm::Value* getResourceNodeValue(unsigned resNodeIdx);
 
     // Load descriptor from driver table
-    llvm::Instruction* LoadDescFromDriverTable(unsigned tableOffset, BuilderBase& builder);
+    llvm::Instruction* loadDescFromDriverTable(unsigned tableOffset, BuilderBase& builder);
 
     // Explicitly set the DATA_FORMAT of ring buffer descriptor.
-    llvm::Value* SetRingBufferDataFormat(llvm::Value*       pBufDesc,
+    llvm::Value* setRingBufferDataFormat(llvm::Value*       bufDesc,
                                          unsigned           dataFormat,
                                          BuilderBase&       builder) const;
 
     // Find resource node by type
-    const ResourceNode* FindResourceNodeByType(ResourceNodeType type);
+    const ResourceNode* findResourceNodeByType(ResourceNodeType type);
 
     // Find resource node by descriptor set ID
-    unsigned FindResourceNodeByDescSet(unsigned descSet);
+    unsigned findResourceNodeByDescSet(unsigned descSet);
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::Function*     m_pEntryPoint = nullptr;        // Shader entrypoint
-    llvm::LLVMContext*  m_pContext;                     // LLVM context
-    PipelineState*      m_pPipelineState;               // Pipeline state
+    llvm::Function*     m_entryPoint = nullptr;        // Shader entrypoint
+    llvm::LLVMContext*  m_context;                     // LLVM context
+    PipelineState*      m_pipelineState;               // Pipeline state
     ShaderStage         m_shaderStage;                  // Shader stage
 
-    llvm::Value*        m_pEsGsRingBufDesc = nullptr;   // ES -> GS ring buffer descriptor (VS, TES, and GS)
-    llvm::Value*        m_pTfBufDesc = nullptr;         // Descriptor for tessellation factor (TF) buffer (TCS)
-    llvm::Value*        m_pOffChipLdsDesc = nullptr;    // Descriptor for off-chip LDS buffer (TCS and TES)
+    llvm::Value*        m_esGsRingBufDesc = nullptr;   // ES -> GS ring buffer descriptor (VS, TES, and GS)
+    llvm::Value*        m_tfBufDesc = nullptr;         // Descriptor for tessellation factor (TF) buffer (TCS)
+    llvm::Value*        m_offChipLdsDesc = nullptr;    // Descriptor for off-chip LDS buffer (TCS and TES)
     llvm::SmallVector<llvm::Value*, MaxGsStreams>
                         m_gsVsRingBufDescs;             // GS -> VS ring buffer descriptor (GS out and copy shader in)
     llvm::SmallVector<llvm::Value*, MaxTransformFeedbackBuffers>
                         m_streamOutBufDescs;            // Stream-out buffer descriptors
 
-    llvm::Value*        m_pPrimitiveId = nullptr;       // PrimitiveId (TCS)
-    llvm::Value*        m_pInvocationId = nullptr;      // InvocationId (TCS)
-    llvm::Value*        m_pRelativeId = nullptr;        // Relative PatchId (TCS)
-    llvm::Value*        m_pTessCoord = nullptr;         // Tessellated coordinate (TES)
-    llvm::Value*        m_pEsGsOffsets = nullptr;       // ES -> GS offsets (GS in)
+    llvm::Value*        m_primitiveId = nullptr;       // PrimitiveId (TCS)
+    llvm::Value*        m_invocationId = nullptr;      // InvocationId (TCS)
+    llvm::Value*        m_relativeId = nullptr;        // Relative PatchId (TCS)
+    llvm::Value*        m_tessCoord = nullptr;         // Tessellated coordinate (TES)
+    llvm::Value*        m_esGsOffsets = nullptr;       // ES -> GS offsets (GS in)
     llvm::SmallVector<llvm::Value*, MaxGsStreams>
                         m_emitCounterPtrs;              // Pointers to emit counters (GS)
-    llvm::Value*        m_pNumWorkgroups = nullptr;     // NumWorkgroups
+    llvm::Value*        m_numWorkgroups = nullptr;     // NumWorkgroups
 
     llvm::SmallVector<llvm::Value *, 8>
                         m_descTablePtrs;                // Descriptor table pointers
     llvm::SmallVector<llvm::Value *, 8>
                         m_shadowDescTablePtrs;          // Shadow descriptor table pointers
-    llvm::Value*        m_pInternalGlobalTablePtr = nullptr;
+    llvm::Value*        m_internalGlobalTablePtr = nullptr;
                                                         // Internal global table pointer
-    llvm::Value*        m_pInternalPerShaderTablePtr = nullptr;
+    llvm::Value*        m_internalPerShaderTablePtr = nullptr;
                                                         // Internal per shader table pointer
-    llvm::Value*        m_pSpilledPushConstTablePtr = nullptr;
+    llvm::Value*        m_spilledPushConstTablePtr = nullptr;
                                                         // Spilled push constant pointer
-    llvm::Value*        m_pVbTablePtr = nullptr;        // Vertex buffer table pointer
-    llvm::Instruction*  m_pStreamOutTablePtr;           // Stream-out buffer table pointer
-    llvm::Instruction*  m_pSpillTablePtr = nullptr;     // Spill table pointer
-    llvm::Instruction*  m_pPc = nullptr;                // Program counter as <2 x i32>
+    llvm::Value*        m_vbTablePtr = nullptr;        // Vertex buffer table pointer
+    llvm::Instruction*  m_streamOutTablePtr;           // Stream-out buffer table pointer
+    llvm::Instruction*  m_spillTablePtr = nullptr;     // Spill table pointer
+    llvm::Instruction*  m_pc = nullptr;                // Program counter as <2 x i32>
 
     bool                m_enableShadowDescTable = true; // Enable shadow descriptor table
     unsigned            m_shadowDescTablePtrHigh = 2;   // High part of VA for shadow table pointer
@@ -194,24 +194,24 @@ class PipelineSystemValues
 {
 public:
     // Initialize this PipelineSystemValues.
-    void Initialize(PipelineState* pPipelineState) { m_pPipelineState = pPipelineState; }
+    void initialize(PipelineState* pipelineState) { m_pipelineState = pipelineState; }
 
     // Get the ShaderSystemValues object for the given shader entrypoint.
-    ShaderSystemValues* Get(llvm::Function* pEntryPoint)
+    ShaderSystemValues* get(llvm::Function* entryPoint)
     {
-        auto pShaderSysValues = &m_shaderSysValuesMap[pEntryPoint];
-        pShaderSysValues->Initialize(m_pPipelineState, pEntryPoint);
-        return pShaderSysValues;
+        auto shaderSysValues = &m_shaderSysValuesMap[entryPoint];
+        shaderSysValues->initialize(m_pipelineState, entryPoint);
+        return shaderSysValues;
     }
 
     // Clear at the end of a pass run.
-    void Clear()
+    void clear()
     {
         m_shaderSysValuesMap.clear();
     }
 
 private:
-    PipelineState*                                m_pPipelineState;
+    PipelineState*                                m_pipelineState;
     std::map<llvm::Function*, ShaderSystemValues> m_shaderSysValuesMap;
 };
 

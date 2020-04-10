@@ -44,47 +44,47 @@
 namespace Vfx
 {
 // Parser functions to parse a value by it's type
-bool ParseInt(char* pStr, unsigned lineNum, IUFValue* pOutput);
-bool ParseFloat(char* pStr, unsigned lineNum, IUFValue* pOutput);
-bool ParseFloat16(char* pStr, unsigned lineNum, IUFValue* pOutput);
-bool ParseDouble(char* pStr, unsigned lineNum, IUFValue* pOutput);
+bool parseInt(char* str, unsigned lineNum, IUFValue* output);
+bool parseFloat(char* str, unsigned lineNum, IUFValue* output);
+bool parseFloat16(char* str, unsigned lineNum, IUFValue* output);
+bool parseDouble(char* str, unsigned lineNum, IUFValue* output);
 
-bool ParseBool(char* pStr, unsigned lineNum, IUFValue* pOutput, std::string* pErrorMsg);
+bool parseBool(char* str, unsigned lineNum, IUFValue* output, std::string* errorMsg);
 
-bool ParseIVec4(char* pStr, unsigned lineNum, IUFValue* pOutput);
-bool ParseI64Vec2(char* pStr, unsigned lineNum, IUFValue* pOutput);
-bool ParseFVec4(char* pStr, unsigned lineNum, IUFValue* pOutput);
-bool ParseF16Vec4(char* pStr, unsigned lineNum, IUFValue* pOutput);
-bool ParseDVec2(char* pStr, unsigned lineNum, IUFValue* pOutput);
+bool parseIVec4(char* str, unsigned lineNum, IUFValue* output);
+bool parseI64Vec2(char* str, unsigned lineNum, IUFValue* output);
+bool parseFVec4(char* str, unsigned lineNum, IUFValue* output);
+bool parseF16Vec4(char* str, unsigned lineNum, IUFValue* output);
+bool parseDVec2(char* str, unsigned lineNum, IUFValue* output);
 
-bool ParseIArray(char* pStr, unsigned lineNum, bool isSign, std::vector<uint8_t>& bufMem);
-bool ParseI64Array(char* pStr, unsigned lineNum, bool isSign, std::vector<uint8_t>& bufMem);
-bool ParseFArray(char* pStr, unsigned lineNum, std::vector<uint8_t>& bufMem);
-bool ParseF16Array(char* pStr, unsigned lineNum, std::vector<uint8_t>& bufMem);
-bool ParseDArray(char* pStr, unsigned lineNum, std::vector<uint8_t>& bufMem);
+bool parseIArray(char* str, unsigned lineNum, bool isSign, std::vector<uint8_t>& bufMem);
+bool parseI64Array(char* str, unsigned lineNum, bool isSign, std::vector<uint8_t>& bufMem);
+bool parseFArray(char* str, unsigned lineNum, std::vector<uint8_t>& bufMem);
+bool parseF16Array(char* str, unsigned lineNum, std::vector<uint8_t>& bufMem);
+bool parseDArray(char* str, unsigned lineNum, std::vector<uint8_t>& bufMem);
 
-bool ParseBinding(char* pStr, unsigned lineNum, IUFValue* pOutput);
+bool parseBinding(char* str, unsigned lineNum, IUFValue* output);
 
-bool ParseEnumName(char* pEnumName, unsigned lineNum, IUFValue* pOutput, std::string* pErrorMsg);
+bool parseEnumName(char* enumName, unsigned lineNum, IUFValue* output, std::string* errorMsg);
 
 // Trims space at the beginning of a string.
-char* TrimStringBeginning(char * pStr);
+char* trimStringBeginning(char * str);
 
 // Trims space at the end of a string.
-char* TrimStringEnd(char* pStr);
+char* trimStringEnd(char* str);
 
 // Parses a key-value pair.
-bool ExtractKeyAndValue(char* pLine, unsigned lineNum, const char delimiter, char** ppKey, char** ppValue, std::string* pErrorMsg);
+bool extractKeyAndValue(char* line, unsigned lineNum, const char delimiter, char** ppKey, char** ppValue, std::string* errorMsg);
 
 // Parses an array index access in a pair of brackets.
-bool ParseArrayAccess(char* pStr, unsigned lineNum, unsigned* pArrayIndex, char** ppLBracket, char** ppRBracket, std::string* pErrorMsg);
+bool parseArrayAccess(char* str, unsigned lineNum, unsigned* arrayIndex, char** ppLBracket, char** ppRBracket, std::string* errorMsg);
 
 // Checks if a string contains array index access, which is a digits string inside a pair of brackets.
-bool IsArrayAccess(const char* pStr);
+bool isArrayAccess(const char* str);
 
 // Gets one word for a string and return the start position of next word, nullptr is returned if word isn't found
 // in the string
-char* GetWordFromString(char* pStr, char* pWordBuffer);
+char* getWordFromString(char* str, char* wordBuffer);
 
 // =====================================================================================================================
 Document::~Document()
@@ -101,7 +101,7 @@ Document::~Document()
 
 // =====================================================================================================================
 // Creates Vfx document object with specified document type
-Document* Document::CreateDocument(
+Document* Document::createDocument(
     VfxDocType type)          // Document type
 {
     if (type == VfxDocTypeRender)
@@ -116,47 +116,47 @@ Document* Document::CreateDocument(
 
 // =====================================================================================================================
 // Gets a free section for specified section type
-Section* Document::GetFreeSection(
-    const char* pSectionName)      // [in] Section name
+Section* Document::getFreeSection(
+    const char* sectionName)      // [in] Section name
 {
-    Section*    pSection        = nullptr;
-    SectionType type            = Section::GetSectionType(pSectionName);
-    const unsigned maxSectionCount = GetMaxSectionCount(type);
+    Section*    section        = nullptr;
+    SectionType type            = Section::getSectionType(sectionName);
+    const unsigned maxSectionCount = getMaxSectionCount(type);
     if (m_sections[type].size() < maxSectionCount)
     {
-        pSection = Section::CreateSection(pSectionName);
-        m_sections[type].push_back(pSection);
-        m_sectionList.push_back(pSection);
+        section = Section::createSection(sectionName);
+        m_sections[type].push_back(section);
+        m_sectionList.push_back(section);
     }
-    return pSection;
+    return section;
 }
 
 // =====================================================================================================================
 // Prints all parsed rule based key-values, for debug purpose.
-void Document::PrintSelf()
+void Document::printSelf()
 {
     for (unsigned i = 0; i < SectionTypeNameNum; ++i)
     {
         for (unsigned j = 0; j < m_sections[i].size(); ++j)
         {
-            m_sections[i][j]->PrintSelf(0);
+            m_sections[i][j]->printSelf(0);
         }
     }
 }
 
 // =====================================================================================================================
 // Compiles input shader source to SPIRV binary
-bool Document::CompileShader()
+bool Document::compileShader()
 {
     bool ret = true;
     for (unsigned stage = 0; stage < ShaderStageCount; ++stage)
     {
         for (size_t i = 0; i < m_sections[SectionTypeVertexShader + stage].size(); ++i)
         {
-            auto pShaderSection = m_sections[SectionTypeVertexShader + stage][i];
+            auto shaderSection = m_sections[SectionTypeVertexShader + stage][i];
             VFX_ASSERT(m_sections[SectionTypeVertexShaderInfo + stage].size() > i);
-            auto pShaderInfoSection = m_sections[SectionTypeVertexShaderInfo + stage][i];
-            bool stageRet = reinterpret_cast<SectionShader*>(pShaderSection)->CompileShader(m_fileName, pShaderInfoSection, &m_errorMsg);
+            auto shaderInfoSection = m_sections[SectionTypeVertexShaderInfo + stage][i];
+            bool stageRet = reinterpret_cast<SectionShader*>(shaderSection)->compileShader(m_fileName, shaderInfoSection, &m_errorMsg);
             ret = ret && stageRet;
         }
     }
@@ -168,7 +168,7 @@ bool Document::CompileShader()
 VfxParser::VfxParser()
     :
     m_isValidVfxFile(false),
-    m_pCurrentSection(nullptr),
+    m_currentSection(nullptr),
     m_currentLineNum(0),
     m_currentSectionLineNum(0)
 {
@@ -177,33 +177,33 @@ VfxParser::VfxParser()
 
 // =====================================================================================================================
 // Parses a config file line.
-bool VfxParser::ParseLine(
-    char* pLine)    // [in] Input test config line.
+bool VfxParser::parseLine(
+    char* line)    // [in] Input test config line.
 {
     bool result = true;
     ++m_currentLineNum;
 
     // Trim comments for blocks other than shader source blocks, shader source strings are passed to compiler as-is.
-    if (m_pCurrentSection == nullptr || m_pCurrentSection->IsShaderSourceSection() == false)
+    if (m_currentSection == nullptr || m_currentSection->isShaderSourceSection() == false)
     {
-        char* pComments = strchr(pLine, ';');
-        if (pComments != nullptr)
+        char* comments = strchr(line, ';');
+        if (comments != nullptr)
         {
-            *pComments = '\0';
+            *comments = '\0';
         }
     }
 
-    if (*pLine == '[')
+    if (*line == '[')
     {
-        result = EndSection();
+        result = endSection();
         if (result == true)
         {
-            result = BeginSection(pLine);
+            result = beginSection(line);
         }
     }
     else
     {
-        m_currentSectionStringBuffer << pLine;
+        m_currentSectionStringBuffer << line;
     }
 
     return result;
@@ -211,34 +211,34 @@ bool VfxParser::ParseLine(
 
 // =====================================================================================================================
 // Begins a section.
-bool VfxParser::BeginSection(
-    char* pLine)    // [in] Input test config line.
+bool VfxParser::beginSection(
+    char* line)    // [in] Input test config line.
 {
     bool result = true;
-    VFX_ASSERT(*pLine == '[');
-    char* pBracketBack = strchr(pLine, ']');
-    if (pBracketBack != nullptr)
+    VFX_ASSERT(*line == '[');
+    char* bracketBack = strchr(line, ']');
+    if (bracketBack != nullptr)
     {
-        *pBracketBack = '\0';
+        *bracketBack = '\0';
     }
     else
     {
-        PARSE_ERROR(*m_pErrorMsg, m_currentLineNum, "expect ]");
+        PARSE_ERROR(*m_errorMsg, m_currentLineNum, "expect ]");
         result = false;
     }
 
     if (result)
     {
-        pLine = pLine + 1;
-        char* pSectionName = strtok(pLine, ",");
-        m_pCurrentSection = m_pVfxDoc->GetFreeSection(pSectionName);
-        if (m_pCurrentSection != nullptr)
+        line = line + 1;
+        char* sectionName = strtok(line, ",");
+        m_currentSection = m_vfxDoc->getFreeSection(sectionName);
+        if (m_currentSection != nullptr)
         {
             // Next line is the first line of section content.
             m_currentSectionLineNum       = m_currentLineNum + 1;
             m_currentSectionStringBuffer.str("");
             m_currentSectionStringBuffer.clear();
-            m_pCurrentSection->SetLineNum(m_currentLineNum);
+            m_currentSection->setLineNum(m_currentLineNum);
         }
     }
 
@@ -247,31 +247,31 @@ bool VfxParser::BeginSection(
 
 // =====================================================================================================================
 // Ends a section.
-bool VfxParser::EndSection()
+bool VfxParser::endSection()
 {
     bool result = true;
 
-    if (m_pCurrentSection == nullptr)
+    if (m_currentSection == nullptr)
     {
         // Do nothing
     }
-    else if (m_pCurrentSection->IsShaderSourceSection() ||
-             (m_pCurrentSection->GetSectionType() == SectionTypeCompileLog))
+    else if (m_currentSection->isShaderSourceSection() ||
+             (m_currentSection->getSectionType() == SectionTypeCompileLog))
     {
         // Process shader source sections.
-        ParseSectionShaderSource();
+        parseSectionShaderSource();
     }
     else
     {
         // Process key-value based sections.
-        result = ParseSectionKeyValues();
+        result = parseSectionKeyValues();
         if (result)
         {
-            if (m_pCurrentSection->GetSectionType() == SectionTypeVersion)
+            if (m_currentSection->getSectionType() == SectionTypeVersion)
             {
                 unsigned version;
-                reinterpret_cast<SectionVersion*>(m_pCurrentSection)->GetSubState(version);
-                result = m_pVfxDoc->CheckVersion(version);
+                reinterpret_cast<SectionVersion*>(m_currentSection)->getSubState(version);
+                result = m_vfxDoc->checkVersion(version);
             }
         }
     }
@@ -281,16 +281,16 @@ bool VfxParser::EndSection()
 
 // =====================================================================================================================
 // Parses a line of a pre-defined key-value section.
-bool VfxParser::ParseSectionKeyValues()
+bool VfxParser::parseSectionKeyValues()
 {
     bool result = true;
 
     // Set line number variable which is used in error report.
     unsigned lineNum = m_currentSectionLineNum;
-    char pLineBuffer[MaxLineBufSize];
+    char lineBuffer[MaxLineBufSize];
     while (true)
     {
-        m_currentSectionStringBuffer.getline(pLineBuffer, MaxLineBufSize);
+        m_currentSectionStringBuffer.getline(lineBuffer, MaxLineBufSize);
 
         size_t readCount = static_cast<size_t>(m_currentSectionStringBuffer.gcount());
         VFX_ASSERT(readCount < MaxLineBufSize);
@@ -298,26 +298,26 @@ bool VfxParser::ParseSectionKeyValues()
         {
             break;
         }
-        if ((pLineBuffer[0] == '\0') || (memcmp(pLineBuffer, "\r", 2) == 0))
+        if ((lineBuffer[0] == '\0') || (memcmp(lineBuffer, "\r", 2) == 0))
         {
             // Skip empty line
             continue;
         }
 
-        char* pKey   = nullptr;
-        char* pValue = nullptr;
+        char* key   = nullptr;
+        char* value = nullptr;
 
-        result = ExtractKeyAndValue(pLineBuffer, lineNum, '=', &pKey, &pValue, m_pErrorMsg);
+        result = extractKeyAndValue(lineBuffer, lineNum, '=', &key, &value, m_errorMsg);
 
         if (result == false)
         {
             break;
         }
 
-        ParseKeyValue(pKey,
-                      pValue,
+        parseKeyValue(key,
+                      value,
                       lineNum,
-                      m_pCurrentSection);
+                      m_currentSection);
 
         ++lineNum;
     }
@@ -327,51 +327,51 @@ bool VfxParser::ParseSectionKeyValues()
 
 // =====================================================================================================================
 // Parses a key string to process array access("[]") and member access(".").
-bool VfxParser::ParseKey(
-    const char*           pKey,                 // [in]  Input key string
+bool VfxParser::parseKey(
+    const char*           key,                 // [in]  Input key string
     unsigned              lineNum,              // Line number
-    Section*              pSectionObjectIn,     // [in]  Base section object
+    Section*              sectionObjectIn,     // [in]  Base section object
     Section**             ppSectionObjectOut,   // [out] Target section object after apply array access and member
                                                 //       access in key string.
-    char*                 pMemberNameBuffer,    // [out] Name of the member to be accessed in target section object.
+    char*                 memberNameBuffer,    // [out] Name of the member to be accessed in target section object.
     unsigned              memberNameBufferSize, // Size of member name buffer.
-    unsigned*             pArrayIndex)          // [out] Array index applied this member (0 for non array)
+    unsigned*             arrayIndex)          // [out] Array index applied this member (0 for non array)
 
 {
     bool result = true;
     // Get a copy of key string.
     char keyBuffer[MaxKeyBufSize];
-    VFX_ASSERT(strlen(pKey) < MaxKeyBufSize);
-    strcpy(keyBuffer, pKey);
+    VFX_ASSERT(strlen(key) < MaxKeyBufSize);
+    strcpy(keyBuffer, key);
 
-    VFX_ASSERT(pSectionObjectIn != nullptr);
-    Section* pTempSectionObj = pSectionObjectIn;
+    VFX_ASSERT(sectionObjectIn != nullptr);
+    Section* tempSectionObj = sectionObjectIn;
 
     // Process member access
-    char* pKeyTok = strtok(keyBuffer, ".");
-    pKeyTok = TrimStringBeginning(pKeyTok);
-    pKeyTok = TrimStringEnd(pKeyTok);
+    char* keyTok = strtok(keyBuffer, ".");
+    keyTok = trimStringBeginning(keyTok);
+    keyTok = trimStringEnd(keyTok);
 
     bool isSection = false;          // Is this member an Section object
     unsigned parsedArrayIndex = 0;        // Array access index
     MemberType memberType;
 
-    while (pKeyTok != nullptr)
+    while (keyTok != nullptr)
     {
-        if (IsArrayAccess(pKeyTok))
+        if (isArrayAccess(keyTok))
         {
-            char* pLBracket = nullptr;
-            result = ParseArrayAccess(pKeyTok, lineNum, &parsedArrayIndex, &pLBracket, nullptr, m_pErrorMsg);
+            char* lBracket = nullptr;
+            result = parseArrayAccess(keyTok, lineNum, &parsedArrayIndex, &lBracket, nullptr, m_errorMsg);
             // Remove bracket from string token
-            *pLBracket = '\0';
-            pKeyTok = TrimStringEnd(pKeyTok);
+            *lBracket = '\0';
+            keyTok = trimStringEnd(keyTok);
         }
         else
         {
             parsedArrayIndex = 0;
         }
 
-        result = pTempSectionObj->IsSection(lineNum, pKeyTok, &isSection, &memberType, m_pErrorMsg);
+        result = tempSectionObj->isSection(lineNum, keyTok, &isSection, &memberType, m_errorMsg);
         if (result == false)
         {
             break;
@@ -379,35 +379,35 @@ bool VfxParser::ParseKey(
 
         if (isSection == false)
         {
-            VFX_ASSERT(strlen(pKeyTok) < memberNameBufferSize);
-            strncpy(pMemberNameBuffer, pKeyTok, memberNameBufferSize);
+            VFX_ASSERT(strlen(keyTok) < memberNameBufferSize);
+            strncpy(memberNameBuffer, keyTok, memberNameBufferSize);
         }
         else
         {
-            result = pTempSectionObj->GetPtrOfSubSection(lineNum,
-                                                         pKeyTok,
+            result = tempSectionObj->getPtrOfSubSection(lineNum,
+                                                         keyTok,
                                                          memberType,
                                                          true,
                                                          parsedArrayIndex,
-                                                         &pTempSectionObj,
-                                                         m_pErrorMsg);
+                                                         &tempSectionObj,
+                                                         m_errorMsg);
             if (result == false)
             {
                 break;
             }
         }
 
-        pKeyTok = strtok(nullptr, ".");
+        keyTok = strtok(nullptr, ".");
     }
 
-    if (pArrayIndex != nullptr)
+    if (arrayIndex != nullptr)
     {
-        *pArrayIndex = parsedArrayIndex;
+        *arrayIndex = parsedArrayIndex;
     }
 
     if (ppSectionObjectOut != nullptr)
     {
-        *ppSectionObjectOut = pTempSectionObj;
+        *ppSectionObjectOut = tempSectionObj;
     }
 
     return result;
@@ -415,21 +415,21 @@ bool VfxParser::ParseKey(
 
 // =====================================================================================================================
 // Parses a key-value pair according to predefined rule.
-bool VfxParser::ParseKeyValue(
-    char*                         pKey,           // [in] Input key string
-    char*                         pValueStr,         // [in] Input value string
+bool VfxParser::parseKeyValue(
+    char*                         key,           // [in] Input key string
+    char*                         valueStr,         // [in] Input value string
     unsigned                      lineNum,        // Line number
-    Section*                      pSectionObject) // [out] Key-value map to hold the parse results.
+    Section*                      sectionObject) // [out] Key-value map to hold the parse results.
 {
     bool result = false;
 
-    Section* pAccessedSectionObject = nullptr;
+    Section* accessedSectionObject = nullptr;
     unsigned arrayIndex = 0;
     char memberName[MaxKeyBufSize];
-    result = ParseKey(pKey,
+    result = parseKey(key,
                       lineNum,
-                      pSectionObject,
-                      &pAccessedSectionObject,
+                      sectionObject,
+                      &accessedSectionObject,
                       memberName,
                       MaxKeyBufSize,
                       &arrayIndex);
@@ -437,7 +437,7 @@ bool VfxParser::ParseKeyValue(
     if (result == true)
     {
         MemberType valueType;
-        result = pAccessedSectionObject->GetMemberType(lineNum, memberName, &valueType, m_pErrorMsg);
+        result = accessedSectionObject->getMemberType(lineNum, memberName, &valueType, m_errorMsg);
 
         if (result == true)
         {
@@ -448,152 +448,152 @@ bool VfxParser::ParseKeyValue(
             {
             case MemberTypeEnum:
                 {
-                    result = ParseEnumName(pValueStr, lineNum, &value, m_pErrorMsg);
+                    result = parseEnumName(valueStr, lineNum, &value, m_errorMsg);
                     if (result == true)
                     {
-                        result = pAccessedSectionObject->Set(lineNum, memberName, &(value.iVec4[0]));
+                        result = accessedSectionObject->set(lineNum, memberName, &(value.iVec4[0]));
                     }
                     break;
                 }
             case MemberTypeInt:
                 {
-                    result = ParseInt(pValueStr, lineNum, &value);
+                    result = parseInt(valueStr, lineNum, &value);
                     if (result == true)
                     {
-                        result = pAccessedSectionObject->Set(lineNum, memberName, &(value.iVec4[0]));
+                        result = accessedSectionObject->set(lineNum, memberName, &(value.iVec4[0]));
                     }
                     break;
                 }
             case MemberTypeFloat:
                 {
-                    result = ParseFloat16(pValueStr, lineNum, &value);
+                    result = parseFloat16(valueStr, lineNum, &value);
                     if (result == true)
                     {
-                        result = pAccessedSectionObject->Set(lineNum, memberName, &(value.f16Vec4[0]));
+                        result = accessedSectionObject->set(lineNum, memberName, &(value.f16Vec4[0]));
                     }
                     break;
                 }
             case MemberTypeDouble:
                 {
-                    result = ParseDouble(pValueStr, lineNum, &value);
+                    result = parseDouble(valueStr, lineNum, &value);
                     if (result == true)
                     {
-                        result = pAccessedSectionObject->Set(lineNum, memberName, &(value.dVec2[0]));
+                        result = accessedSectionObject->set(lineNum, memberName, &(value.dVec2[0]));
                     }
                     break;
                 }
             case MemberTypeBool:
                 {
-                    result = ParseBool(pValueStr, lineNum, &value, m_pErrorMsg);
+                    result = parseBool(valueStr, lineNum, &value, m_errorMsg);
                     if (result == true)
                     {
                         static_assert(sizeof(uint8_t) == sizeof(bool), "");
                         uint8_t boolValue = value.iVec4[0] ? 1 : 0;
-                        result = pAccessedSectionObject->Set(lineNum, memberName, &boolValue);
+                        result = accessedSectionObject->set(lineNum, memberName, &boolValue);
                     }
                     break;
                 }
             case MemberTypeIVec4:
                 {
-                    result = ParseIVec4(pValueStr, lineNum, &value);
+                    result = parseIVec4(valueStr, lineNum, &value);
                     if (result == false)
                     {
                         break;
                     }
-                    result = pAccessedSectionObject->Set(lineNum, memberName, &value);
+                    result = accessedSectionObject->set(lineNum, memberName, &value);
                     break;
                 }
             case MemberTypeI64Vec2:
                 {
-                    result = ParseI64Vec2(pValueStr, lineNum, &value);
+                    result = parseI64Vec2(valueStr, lineNum, &value);
                     if (result == false)
                     {
                         break;
                     }
-                    result = pAccessedSectionObject->Set(lineNum, memberName, &value);
+                    result = accessedSectionObject->set(lineNum, memberName, &value);
                     break;
                 }
             case MemberTypeBinding:
                 {
-                    result = ParseBinding(pValueStr, lineNum, &value);
+                    result = parseBinding(valueStr, lineNum, &value);
                     if (result == false)
                     {
                         break;
                     }
-                    result = pAccessedSectionObject->Set(lineNum, memberName, &value);
+                    result = accessedSectionObject->set(lineNum, memberName, &value);
                     break;
                 }
             case MemberTypeFVec4:
                 {
-                    result = ParseFVec4(pValueStr, lineNum, &value);
+                    result = parseFVec4(valueStr, lineNum, &value);
                     if (result == false)
                     {
                         break;
                     }
-                    result = pAccessedSectionObject->Set(lineNum, memberName, &value);
+                    result = accessedSectionObject->set(lineNum, memberName, &value);
                     break;
                 }
             case MemberTypeF16Vec4:
                 {
-                    result = ParseF16Vec4(pValueStr, lineNum, &value);
+                    result = parseF16Vec4(valueStr, lineNum, &value);
                     if (result == false)
                     {
                         break;
                     }
-                    result = pAccessedSectionObject->Set(lineNum, memberName, &value);
+                    result = accessedSectionObject->set(lineNum, memberName, &value);
                     break;
                 }
             case MemberTypeDVec2:
                 {
-                    result = ParseDVec2(pValueStr, lineNum, &value);
+                    result = parseDVec2(valueStr, lineNum, &value);
                     if (result == false)
                     {
                         break;
                     }
-                    result = pAccessedSectionObject->Set(lineNum, memberName, &value);
+                    result = accessedSectionObject->set(lineNum, memberName, &value);
                     break;
                 }
             case MemberTypeIArray:
             case MemberTypeUArray:
                 {
                     std::vector<uint8_t>** ppIntData = nullptr;
-                    pAccessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppIntData, m_pErrorMsg);
-                    result = ParseIArray(pValueStr, lineNum, valueType == MemberTypeIArray, **ppIntData);
+                    accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppIntData, m_errorMsg);
+                    result = parseIArray(valueStr, lineNum, valueType == MemberTypeIArray, **ppIntData);
                     break;
                 }
             case MemberTypeI64Array:
             case MemberTypeU64Array:
                 {
                     std::vector<uint8_t>** ppIntData = nullptr;
-                    pAccessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppIntData, m_pErrorMsg);
-                    result = ParseI64Array(pValueStr, lineNum, valueType == MemberTypeI64Array, **ppIntData);
+                    accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppIntData, m_errorMsg);
+                    result = parseI64Array(valueStr, lineNum, valueType == MemberTypeI64Array, **ppIntData);
                     break;
                 }
             case MemberTypeFArray:
                 {
                     std::vector<uint8_t>** ppFloatData = nullptr;
-                    pAccessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppFloatData, m_pErrorMsg);
-                    result = ParseFArray(pValueStr, lineNum, **ppFloatData);
+                    accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppFloatData, m_errorMsg);
+                    result = parseFArray(valueStr, lineNum, **ppFloatData);
                     break;
                 }
             case MemberTypeF16Array:
                 {
                     std::vector<uint8_t>** ppFloatData = nullptr;
-                    pAccessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppFloatData, m_pErrorMsg);
-                    result = ParseF16Array(pValueStr, lineNum, **ppFloatData);
+                    accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppFloatData, m_errorMsg);
+                    result = parseF16Array(valueStr, lineNum, **ppFloatData);
                     break;
                 }
             case MemberTypeDArray:
                 {
                     std::vector<uint8_t>** ppDoubleData;
-                    pAccessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppDoubleData, m_pErrorMsg);
-                    result = ParseDArray(pValueStr, lineNum, **ppDoubleData);
+                    accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppDoubleData, m_errorMsg);
+                    result = parseDArray(valueStr, lineNum, **ppDoubleData);
                     break;
                 }
             case MemberTypeString:
                 {
-                    std::string str = pValueStr;
-                    result = pAccessedSectionObject->Set(lineNum, memberName, &str);
+                    std::string str = valueStr;
+                    result = accessedSectionObject->set(lineNum, memberName, &str);
                     break;
                 }
             default:
@@ -609,13 +609,13 @@ bool VfxParser::ParseKeyValue(
 
 // =====================================================================================================================
 // Parses shader source section.
-void VfxParser::ParseSectionShaderSource()
+void VfxParser::parseSectionShaderSource()
 {
-    char pLineBuffer[MaxLineBufSize];
+    char lineBuffer[MaxLineBufSize];
 
     while (true)
     {
-        m_currentSectionStringBuffer.getline(pLineBuffer, MaxLineBufSize);
+        m_currentSectionStringBuffer.getline(lineBuffer, MaxLineBufSize);
 
         size_t readCount = static_cast<size_t>(m_currentSectionStringBuffer.gcount());
         VFX_ASSERT(readCount < MaxLineBufSize);
@@ -625,47 +625,47 @@ void VfxParser::ParseSectionShaderSource()
         }
 
         // Line ending is not returned by getline(), so append them manually.
-        pLineBuffer[readCount- 1] = '\n';
-        pLineBuffer[readCount]    = '\0';
-        m_pCurrentSection->AddLine(pLineBuffer);
+        lineBuffer[readCount- 1] = '\n';
+        lineBuffer[readCount]    = '\0';
+        m_currentSection->addLine(lineBuffer);
     }
 }
 
 // =====================================================================================================================
 // Parses a VFX config file.
-bool VfxParser::Parse(
+bool VfxParser::parse(
     const TestCaseInfo& info,  // [in] Name of VFX file to parse.
-    Document*           pDoc)  // [out] Parse result
+    Document*           doc)  // [out] Parse result
 {
     bool result = true;
-    m_pVfxDoc   = pDoc;
-    m_pErrorMsg = pDoc->GetErrorMsg();
+    m_vfxDoc   = doc;
+    m_errorMsg = doc->getErrorMsg();
 
-    FILE* pConfigFile = fopen(info.vfxFile.c_str(), "r");
-    if (pConfigFile != nullptr)
+    FILE* configFile = fopen(info.vfxFile.c_str(), "r");
+    if (configFile != nullptr)
     {
-        pDoc->SetFileName(info.vfxFile);
+        doc->setFileName(info.vfxFile);
         char lineBuf[MaxLineBufSize];
-        char* pLinePtr = nullptr;
+        char* linePtr = nullptr;
 
         while (true)
         {
-            pLinePtr = fgets(lineBuf, MaxLineBufSize, pConfigFile);
+            linePtr = fgets(lineBuf, MaxLineBufSize, configFile);
 
-            if (pLinePtr == nullptr)
+            if (linePtr == nullptr)
             {
-                result = EndSection();
+                result = endSection();
                 break;
             }
             else
             {
-                result = MacroSubstituteLine(pLinePtr, m_currentLineNum+1, &info.macros, MaxLineBufSize);
+                result = macroSubstituteLine(linePtr, m_currentLineNum+1, &info.macros, MaxLineBufSize);
                 if (result == false)
                 {
                     break;
                 }
 
-                result = ParseLine(pLinePtr);
+                result = parseLine(linePtr);
                 if (result == false)
                 {
                     break;
@@ -673,16 +673,16 @@ bool VfxParser::Parse(
             }
         }
 
-        fclose(pConfigFile);
+        fclose(configFile);
 
         if (result)
         {
-            result = m_pVfxDoc->Validate();
+            result = m_vfxDoc->validate();
         }
 
         if (result)
         {
-            result = m_pVfxDoc->CompileShader();
+            result = m_vfxDoc->compileShader();
         }
     }
     else
@@ -697,16 +697,16 @@ bool VfxParser::Parse(
 
 // =====================================================================================================================
 // Parses an int number from a string.
-bool ParseInt(
-    char*       pStr,       // [in]  Input string
+bool parseInt(
+    char*       str,       // [in]  Input string
     unsigned    lineNum,    // Current line number
-    IUFValue*   pOutput)    // [out] Stores parsed value
+    IUFValue*   output)    // [out] Stores parsed value
 {
-    VFX_ASSERT(pOutput != nullptr);
+    VFX_ASSERT(output != nullptr);
     bool result = true;
 
     bool isHex = false;
-    char* p0x = strstr(pStr, "0x");
+    char* p0x = strstr(str, "0x");
     if (p0x != nullptr)
     {
         isHex = true;
@@ -714,114 +714,114 @@ bool ParseInt(
 
     if (isHex)
     {
-        pOutput->uVec4[0] = strtoul(pStr, nullptr, 0);
+        output->uVec4[0] = strtoul(str, nullptr, 0);
     }
     else
     {
-        pOutput->iVec4[0] = strtol(pStr, nullptr, 0);
+        output->iVec4[0] = strtol(str, nullptr, 0);
     }
 
-    pOutput->props.isInt64 = false;
-    pOutput->props.isFloat = false;
-    pOutput->props.isDouble = false;
-    pOutput->props.isHex = isHex;
-    pOutput->props.length = 1;
+    output->props.isInt64 = false;
+    output->props.isFloat = false;
+    output->props.isDouble = false;
+    output->props.isHex = isHex;
+    output->props.length = 1;
 
     return result;
 }
 
 // =====================================================================================================================
 // Parses a float number from a string.
-bool ParseFloat(
-    char*       pStr,       // [in]  Input string
+bool parseFloat(
+    char*       str,       // [in]  Input string
     unsigned    lineNum,    // Current line number
-    IUFValue*   pOutput)    // [out] Stores parsed value
+    IUFValue*   output)    // [out] Stores parsed value
 {
-    VFX_ASSERT(pOutput != nullptr);
+    VFX_ASSERT(output != nullptr);
     bool result = true;
 
-    pOutput->fVec4[0] = static_cast<float>(strtod(pStr, nullptr));
+    output->fVec4[0] = static_cast<float>(strtod(str, nullptr));
 
-    pOutput->props.isInt64 = false;
-    pOutput->props.isFloat = true;
-    pOutput->props.isDouble = false;
-    pOutput->props.length = 1;
+    output->props.isInt64 = false;
+    output->props.isFloat = true;
+    output->props.isDouble = false;
+    output->props.length = 1;
 
     return result;
 }
 
 // =====================================================================================================================
 // Parses a float16 number from a string.
-bool ParseFloat16(
-    char*       pStr,       // [in]  Input string
+bool parseFloat16(
+    char*       str,       // [in]  Input string
     unsigned    lineNum,    // Current line number
-    IUFValue*   pOutput)    // [out] Stores parsed value
+    IUFValue*   output)    // [out] Stores parsed value
 {
-    VFX_ASSERT(pOutput != nullptr);
+    VFX_ASSERT(output != nullptr);
     bool result = true;
 
-    float v = static_cast<float>(strtod(pStr, nullptr));
+    float v = static_cast<float>(strtod(str, nullptr));
     Float16 v16;
     v16.FromFloat32(v);
-    pOutput->f16Vec4[0] = v16;
+    output->f16Vec4[0] = v16;
 
-    pOutput->props.isInt64      = false;
-    pOutput->props.isFloat      = false;
-    pOutput->props.isFloat16    = true;
-    pOutput->props.isDouble     = false;
-    pOutput->props.length       = 1;
+    output->props.isInt64      = false;
+    output->props.isFloat      = false;
+    output->props.isFloat16    = true;
+    output->props.isDouble     = false;
+    output->props.length       = 1;
 
     return result;
 }
 
 // =====================================================================================================================
 // Parses a double number from a string.
-bool ParseDouble(
-    char*       pStr,       // [in]  Input string
+bool parseDouble(
+    char*       str,       // [in]  Input string
     unsigned    lineNum,    // Current line number
-    IUFValue*   pOutput)    // [out] Stores parsed value
+    IUFValue*   output)    // [out] Stores parsed value
 {
-    VFX_ASSERT(pOutput != nullptr);
+    VFX_ASSERT(output != nullptr);
     bool result = true;
 
-    pOutput->dVec2[0] = strtod(pStr, nullptr);
+    output->dVec2[0] = strtod(str, nullptr);
 
-    pOutput->props.isInt64 = false;
-    pOutput->props.isFloat = false;
-    pOutput->props.isDouble = true;
-    pOutput->props.length = 1;
+    output->props.isInt64 = false;
+    output->props.isFloat = false;
+    output->props.isDouble = true;
+    output->props.length = 1;
 
     return result;
 }
 
 // =====================================================================================================================
 // Parse a boolean value from a string.
-bool ParseBool(
-    char*       pStr,       // [in]  Input string
+bool parseBool(
+    char*       str,       // [in]  Input string
     unsigned    lineNum,    // Current line number
-    IUFValue*   pOutput,    // [out] Stores parsed value
-    std::string* pErrorMsg)
+    IUFValue*   output,    // [out] Stores parsed value
+    std::string* errorMsg)
 {
-    VFX_ASSERT(pOutput != nullptr);
+    VFX_ASSERT(output != nullptr);
     bool result = true;
 
-    if (strcmp(pStr, "true") == 0)
+    if (strcmp(str, "true") == 0)
     {
-        pOutput->iVec4[0] = 1;
+        output->iVec4[0] = 1;
     }
-    else if (strcmp(pStr, "false") == 0)
+    else if (strcmp(str, "false") == 0)
     {
-        pOutput->iVec4[0] = 0;
+        output->iVec4[0] = 0;
     }
     else
     {
-        pOutput->iVec4[0] = strtol(pStr, nullptr, 0);
+        output->iVec4[0] = strtol(str, nullptr, 0);
     }
 
-    pOutput->props.isInt64 = false;
-    pOutput->props.isFloat = false;
-    pOutput->props.isDouble = false;
-    pOutput->props.length = 1;
+    output->props.isInt64 = false;
+    output->props.isFloat = false;
+    output->props.isDouble = false;
+    output->props.length = 1;
 
     return result;
 }
@@ -829,44 +829,44 @@ bool ParseBool(
 // =====================================================================================================================
 // Parses a integer vec4 from a string.
 // NOTE: content of pStr will be changed.
-bool ParseIVec4(
-    char*       pStr,       // [in]  Input string
+bool parseIVec4(
+    char*       str,       // [in]  Input string
     unsigned    lineNum,    // Current line number
-    IUFValue*   pOutput)    // [out] Stores parsed value
+    IUFValue*   output)    // [out] Stores parsed value
 {
-    VFX_ASSERT(pOutput != nullptr);
+    VFX_ASSERT(output != nullptr);
     bool result = false;
 
     bool isHex = false;
-    char* p0x = strstr(pStr, "0x");
+    char* p0x = strstr(str, "0x");
     if (p0x != nullptr)
     {
         isHex = true;
     }
 
-    char* pNumber = strtok(pStr, ", ");
+    char* number = strtok(str, ", ");
     unsigned numberId = 0;
-    while (pNumber != nullptr)
+    while (number != nullptr)
     {
         result = true;
         VFX_ASSERT(numberId < 4);
         if (isHex == true)
         {
-            pOutput->uVec4[numberId] = strtoul(pNumber, nullptr, 0);
+            output->uVec4[numberId] = strtoul(number, nullptr, 0);
         }
         else
         {
-            pOutput->iVec4[numberId] = strtol(pNumber, nullptr, 0);
+            output->iVec4[numberId] = strtol(number, nullptr, 0);
         }
-        pNumber = strtok(nullptr, ", ");
+        number = strtok(nullptr, ", ");
         ++numberId;
     }
 
-    pOutput->props.isInt64 = false;
-    pOutput->props.isFloat = false;
-    pOutput->props.isDouble = false;
-    pOutput->props.isHex = isHex;
-    pOutput->props.length = numberId;
+    output->props.isInt64 = false;
+    output->props.isFloat = false;
+    output->props.isDouble = false;
+    output->props.isHex = isHex;
+    output->props.length = numberId;
 
     return result;
 }
@@ -874,44 +874,44 @@ bool ParseIVec4(
 // =====================================================================================================================
 // Parses a int64 vec2 from a string.
 // NOTE: content of pStr will be changed.
-bool ParseI64Vec2(
-    char*       pStr,       // [in]  Input string
+bool parseI64Vec2(
+    char*       str,       // [in]  Input string
     unsigned    lineNum,    // Current line number
-    IUFValue*   pOutput)    // [out] Stores parsed value
+    IUFValue*   output)    // [out] Stores parsed value
 {
-    VFX_ASSERT(pOutput != nullptr);
+    VFX_ASSERT(output != nullptr);
     bool result = false;
 
     bool isHex = false;
-    char* p0x = strstr(pStr, "0x");
+    char* p0x = strstr(str, "0x");
     if (p0x != nullptr)
     {
         isHex = true;
     }
 
-    char* pNumber = strtok(pStr, ", ");
+    char* number = strtok(str, ", ");
     unsigned numberId = 0;
-    while (pNumber != nullptr)
+    while (number != nullptr)
     {
         result = true;
         VFX_ASSERT(numberId < 2);
         if (isHex == true)
         {
-            pOutput->i64Vec2[numberId] = strtoull(pNumber, nullptr, 0);
+            output->i64Vec2[numberId] = strtoull(number, nullptr, 0);
         }
         else
         {
-            pOutput->i64Vec2[numberId] = strtoll(pNumber, nullptr, 0);
+            output->i64Vec2[numberId] = strtoll(number, nullptr, 0);
         }
-        pNumber = strtok(nullptr, ", ");
+        number = strtok(nullptr, ", ");
         ++numberId;
     }
 
-    pOutput->props.isInt64 = true;
-    pOutput->props.isFloat = false;
-    pOutput->props.isDouble = false;
-    pOutput->props.isHex = isHex;
-    pOutput->props.length = numberId;
+    output->props.isInt64 = true;
+    output->props.isFloat = false;
+    output->props.isDouble = false;
+    output->props.isHex = isHex;
+    output->props.length = numberId;
 
     return result;
 }
@@ -919,31 +919,31 @@ bool ParseI64Vec2(
 // =====================================================================================================================
 // Parses a float vec4 from a string.
 // NOTE: content of pStr will be changed.
-bool ParseFVec4(
-    char*       pStr,       // [in]  Input string
+bool parseFVec4(
+    char*       str,       // [in]  Input string
     unsigned    lineNum,    // Current line number
-    IUFValue*   pOutput)    // [out] Stores parsed value
+    IUFValue*   output)    // [out] Stores parsed value
 {
-    VFX_ASSERT(pOutput != nullptr);
+    VFX_ASSERT(output != nullptr);
     bool result = false;
 
-    char* pNumber = strtok(pStr, ", ");
+    char* number = strtok(str, ", ");
     unsigned numberId = 0;
-    while (pNumber != nullptr)
+    while (number != nullptr)
     {
         result = true;
         VFX_ASSERT(numberId < 4);
 
-        pOutput->fVec4[numberId] = static_cast<float>(strtod(pNumber, nullptr));
+        output->fVec4[numberId] = static_cast<float>(strtod(number, nullptr));
 
-        pNumber = strtok(nullptr, ", ");
+        number = strtok(nullptr, ", ");
         ++numberId;
     }
 
-    pOutput->props.isInt64 = false;
-    pOutput->props.isFloat = true;
-    pOutput->props.isDouble = false;
-    pOutput->props.length = numberId;
+    output->props.isInt64 = false;
+    output->props.isFloat = true;
+    output->props.isDouble = false;
+    output->props.length = numberId;
 
     return result;
 }
@@ -951,35 +951,35 @@ bool ParseFVec4(
 // =====================================================================================================================
 // Parses a float16 vec4 from a string.
 // NOTE: content of pStr will be changed.
-bool ParseF16Vec4(
-    char*       pStr,       // [in]  Input string
+bool parseF16Vec4(
+    char*       str,       // [in]  Input string
     unsigned    lineNum,    // Current line number
-    IUFValue*   pOutput)    // [out] Stores parsed value
+    IUFValue*   output)    // [out] Stores parsed value
 {
-    VFX_ASSERT(pOutput != nullptr);
+    VFX_ASSERT(output != nullptr);
     bool result = false;
 
-    char* pNumber = strtok(pStr, ", ");
+    char* number = strtok(str, ", ");
     unsigned numberId = 0;
-    while (pNumber != nullptr)
+    while (number != nullptr)
     {
         result = true;
         VFX_ASSERT(numberId < 4);
 
-        float v = static_cast<float>(strtod(pNumber, nullptr));
+        float v = static_cast<float>(strtod(number, nullptr));
         Float16 v16;
         v16.FromFloat32(v);
-        pOutput->f16Vec4[numberId] = v16;
+        output->f16Vec4[numberId] = v16;
 
-        pNumber = strtok(nullptr, ", ");
+        number = strtok(nullptr, ", ");
         ++numberId;
     }
 
-    pOutput->props.isInt64      = false;
-    pOutput->props.isFloat      = false;
-    pOutput->props.isFloat16    = true;
-    pOutput->props.isDouble     = false;
-    pOutput->props.length       = numberId;
+    output->props.isInt64      = false;
+    output->props.isFloat      = false;
+    output->props.isFloat16    = true;
+    output->props.isDouble     = false;
+    output->props.length       = numberId;
 
     return result;
 }
@@ -987,31 +987,31 @@ bool ParseF16Vec4(
 // =====================================================================================================================
 // Parses a double vec2 from a string.
 // NOTE: content of pStr will be changed.
-bool ParseDVec2(
-    char*       pStr,       // [in]  Input string
+bool parseDVec2(
+    char*       str,       // [in]  Input string
     unsigned    lineNum,    // Current line number
-    IUFValue*   pOutput)    // [out] Stores parsed value
+    IUFValue*   output)    // [out] Stores parsed value
 {
-    VFX_ASSERT(pOutput != nullptr);
+    VFX_ASSERT(output != nullptr);
     bool result = false;
 
-    char* pNumber = strtok(pStr, ", ");
+    char* number = strtok(str, ", ");
     unsigned numberId = 0;
-    while (pNumber != nullptr)
+    while (number != nullptr)
     {
         result = true;
         VFX_ASSERT(numberId < 2);
 
-        pOutput->dVec2[numberId] = strtod(pNumber, nullptr);
+        output->dVec2[numberId] = strtod(number, nullptr);
 
-        pNumber = strtok(nullptr, ", ");
+        number = strtok(nullptr, ", ");
         ++numberId;
     }
 
-    pOutput->props.isInt64 = false;
-    pOutput->props.isFloat = false;
-    pOutput->props.isDouble = true;
-    pOutput->props.length = numberId;
+    output->props.isInt64 = false;
+    output->props.isFloat = false;
+    output->props.isDouble = true;
+    output->props.length = numberId;
 
     return result;
 }
@@ -1019,19 +1019,19 @@ bool ParseDVec2(
 // =====================================================================================================================
 // Parses an array of comma separated integer values
 // NOTE: content of pStr will be changed.
-bool ParseIArray(
-    char*                  pStr,       // [in]  Input string
+bool parseIArray(
+    char*                  str,       // [in]  Input string
     unsigned               lineNum,    // Current line number
     bool                   isSign,     // True if it is signed integer
     std::vector<uint8_t>&  bufMem)     // [in,out] Buffer data
 {
     bool result = true;
 
-    char* pNumber = strtok(pStr, ", ");
-    while (pNumber != nullptr)
+    char* number = strtok(str, ", ");
+    while (number != nullptr)
     {
         bool isHex = false;
-        char* p0x = strstr(pNumber, "0x");
+        char* p0x = strstr(number, "0x");
         if (p0x != nullptr)
         {
             isHex = true;
@@ -1041,25 +1041,25 @@ bool ParseIArray(
         {
             int  iVal;
             unsigned uVal;
-            uint8_t  bVal[4];
+            uint8_t  val[4];
         };
         iVal = 0;
 
         if ((isHex == true) || (isSign == false))
         {
-            uVal = strtoul(pNumber, nullptr, 0);
+            uVal = strtoul(number, nullptr, 0);
         }
         else
         {
-            iVal = strtol(pNumber, nullptr, 0);
+            iVal = strtol(number, nullptr, 0);
         }
 
-        for (unsigned i = 0; i < sizeof(bVal); ++i)
+        for (unsigned i = 0; i < sizeof(val); ++i)
         {
-            bufMem.push_back(bVal[i]);
+            bufMem.push_back(val[i]);
         }
 
-        pNumber = strtok(nullptr, ", ");
+        number = strtok(nullptr, ", ");
     }
 
     return result;
@@ -1068,19 +1068,19 @@ bool ParseIArray(
 // =====================================================================================================================
 // Parses an array of comma separated int64 values
 // NOTE: content of pStr will be changed.
-bool ParseI64Array(
-    char*                  pStr,       // [in]  Input string
+bool parseI64Array(
+    char*                  str,       // [in]  Input string
     unsigned               lineNum,    // Current line number
     bool                   isSign,     // True if it is signed integer
     std::vector<uint8_t>&  bufMem)     // [in,out] Buffer data
 {
     bool result = true;
 
-    char* pNumber = strtok(pStr, ", ");
-    while (pNumber != nullptr)
+    char* number = strtok(str, ", ");
+    while (number != nullptr)
     {
         bool isHex = false;
-        char* p0x = strstr(pNumber, "0x");
+        char* p0x = strstr(number, "0x");
         if (p0x != nullptr)
         {
             isHex = true;
@@ -1091,25 +1091,25 @@ bool ParseI64Array(
             int64_t  i64Val;
             uint64_t u64Val;
             unsigned uVal[2];
-            uint8_t  bVal[8];
+            uint8_t  val[8];
         };
         i64Val = 0;
 
         if ((isHex == true) || (isSign == false))
         {
-            u64Val = strtoull(pNumber, nullptr, 0);
+            u64Val = strtoull(number, nullptr, 0);
         }
         else
         {
-            i64Val = strtoll(pNumber, nullptr, 0);
+            i64Val = strtoll(number, nullptr, 0);
         }
 
-        for (unsigned i = 0; i < sizeof(bVal); ++i)
+        for (unsigned i = 0; i < sizeof(val); ++i)
         {
-            bufMem.push_back(bVal[i]);
+            bufMem.push_back(val[i]);
         }
 
-        pNumber = strtok(nullptr, ", ");
+        number = strtok(nullptr, ", ");
     }
 
     return result;
@@ -1118,31 +1118,31 @@ bool ParseI64Array(
 // =====================================================================================================================
 // Parses an array of comma separated float values
 // NOTE: content of pStr will be changed.
-bool ParseFArray(
-    char*                  pStr,       // [in]  Input string
+bool parseFArray(
+    char*                  str,       // [in]  Input string
     unsigned               lineNum,    // Current line number
     std::vector<uint8_t>&  bufMem)     // [in,out] Buffer data
 {
     bool result = true;
 
-    char* pNumber = strtok(pStr, ", ");
-    while (pNumber != nullptr)
+    char* number = strtok(str, ", ");
+    while (number != nullptr)
     {
         union
         {
            float    fVal;
            unsigned uVal;
-           uint8_t  bVal[4];
+           uint8_t  val[4];
         };
 
-        fVal = static_cast<float>(strtod(pNumber, nullptr));
+        fVal = static_cast<float>(strtod(number, nullptr));
 
-        for (unsigned i = 0; i < sizeof(bVal); ++i)
+        for (unsigned i = 0; i < sizeof(val); ++i)
         {
-            bufMem.push_back(bVal[i]);
+            bufMem.push_back(val[i]);
         }
 
-        pNumber = strtok(nullptr, ", ");
+        number = strtok(nullptr, ", ");
     }
 
     return result;
@@ -1151,34 +1151,34 @@ bool ParseFArray(
 // =====================================================================================================================
 // Parses an array of comma separated float16 values
 // NOTE: content of pStr will be changed.
-bool ParseF16Array(
-    char*                  pStr,       // [in]  Input string
+bool parseF16Array(
+    char*                  str,       // [in]  Input string
     unsigned               lineNum,    // Current line number
     std::vector<uint8_t>&  bufMem)     // [in,out] Buffer data
 {
     bool result = true;
 
-    char* pNumber = strtok(pStr, ", ");
-    while (pNumber != nullptr)
+    char* number = strtok(str, ", ");
+    while (number != nullptr)
     {
         union
         {
            Float16Bits fVal;
            uint16_t    uVal;
-           uint8_t     bVal[2];
+           uint8_t     val[2];
         };
 
-        float v = static_cast<float>(strtod(pNumber, nullptr));
+        float v = static_cast<float>(strtod(number, nullptr));
         Float16 v16;
         v16.FromFloat32(v);
         fVal = v16.GetBits();
 
-        for (unsigned i = 0; i < sizeof(bVal); ++i)
+        for (unsigned i = 0; i < sizeof(val); ++i)
         {
-            bufMem.push_back(bVal[i]);
+            bufMem.push_back(val[i]);
         }
 
-        pNumber = strtok(nullptr, ", ");
+        number = strtok(nullptr, ", ");
     }
 
     return result;
@@ -1187,31 +1187,31 @@ bool ParseF16Array(
 // =====================================================================================================================
 // Parses an array of comma separated double values
 // NOTE: content of pStr will be changed.
-bool ParseDArray(
-    char*               pStr,          // [in]  Input string
+bool parseDArray(
+    char*               str,          // [in]  Input string
     unsigned            lineNum,       // Current line number
     std::vector<uint8_t>& bufMem)      // [in,out] Buffer data
 {
     bool result = true;
 
-    char* pNumber = strtok(pStr, ", ");
-    while (pNumber != nullptr)
+    char* number = strtok(str, ", ");
+    while (number != nullptr)
     {
         union
         {
            double   dVal;
            unsigned uVal[2];
-           uint8_t  bVal[8];
+           uint8_t  val[8];
         };
 
-        dVal = strtod(pNumber, nullptr);
+        dVal = strtod(number, nullptr);
 
-        for (unsigned i = 0; i < sizeof(bVal); ++i)
+        for (unsigned i = 0; i < sizeof(val); ++i)
         {
-            bufMem.push_back(bVal[i]);
+            bufMem.push_back(val[i]);
         }
 
-        pNumber = strtok(nullptr, ", ");
+        number = strtok(nullptr, ", ");
     }
 
     return result;
@@ -1220,78 +1220,78 @@ bool ParseDArray(
 // =====================================================================================================================
 // Parses binding, it's a integer vec3 from a string.
 // NOTE: content of pStr will be changed.
-bool ParseBinding(
-    char*       pStr,       // [in]  Input string
+bool parseBinding(
+    char*       str,       // [in]  Input string
     unsigned    lineNum,    // Current line number
-    IUFValue*   pOutput)    // [out] Stores parsed value
+    IUFValue*   output)    // [out] Stores parsed value
 {
-    VFX_ASSERT(pOutput != nullptr);
+    VFX_ASSERT(output != nullptr);
     bool result = false;
 
     bool isHex = false;
-    char* p0x = strstr(pStr, "0x");
+    char* p0x = strstr(str, "0x");
     if (p0x != nullptr)
     {
         isHex = true;
     }
 
-    char* pNumber = strtok(pStr, ", ");
+    char* number = strtok(str, ", ");
     unsigned numberId = 0;
-    while (pNumber != nullptr)
+    while (number != nullptr)
     {
         result = true;
         VFX_ASSERT(numberId < 3);
-        if (strcmp(pNumber, "vb") == 0)
+        if (strcmp(number, "vb") == 0)
         {
-            pOutput->uVec4[numberId] = VfxVertexBufferSetId;
+            output->uVec4[numberId] = VfxVertexBufferSetId;
         }
-        else if (strcmp(pNumber, "ib") == 0)
+        else if (strcmp(number, "ib") == 0)
         {
-            pOutput->uVec4[numberId] = VfxIndexBufferSetId;
+            output->uVec4[numberId] = VfxIndexBufferSetId;
         }
         else
         {
             if (isHex == true)
             {
-                pOutput->uVec4[numberId] = strtoul(pNumber, nullptr, 0);
+                output->uVec4[numberId] = strtoul(number, nullptr, 0);
             }
             else
             {
-                pOutput->iVec4[numberId] = strtol(pNumber, nullptr, 0);
+                output->iVec4[numberId] = strtol(number, nullptr, 0);
             }
         }
-        pNumber = strtok(nullptr, ", ");
+        number = strtok(nullptr, ", ");
         ++numberId;
     }
 
-    pOutput->props.isInt64 = false;
-    pOutput->props.isFloat = false;
-    pOutput->props.isDouble = false;
-    pOutput->props.isHex = isHex;
-    pOutput->props.length = numberId;
+    output->props.isInt64 = false;
+    output->props.isFloat = false;
+    output->props.isDouble = false;
+    output->props.isHex = isHex;
+    output->props.length = numberId;
 
     return result;
 }
 
 // =====================================================================================================================
 // Parses a enum string
-bool ParseEnumName(
-    char*        pEnumName,  // Enum name
+bool parseEnumName(
+    char*        enumName,  // Enum name
     unsigned     lineNum,    // Line No.
-    IUFValue*    pOutput,    // [Out] Enum value
-    std::string* pErrorMsg)  // [Out] Error message
+    IUFValue*    output,    // [Out] Enum value
+    std::string* errorMsg)  // [Out] Error message
 {
     bool result = false;
     int value = VfxInvalidValue;
-    result = GetEnumValue(pEnumName, value);
+    result = getEnumValue(enumName, value);
 
     if (result == false)
     {
-        PARSE_ERROR(*pErrorMsg, lineNum, "unknow enum");
+        PARSE_ERROR(*errorMsg, lineNum, "unknow enum");
     }
     else
     {
-        pOutput->iVec4[0] = value;
+        output->iVec4[0] = value;
     }
 
     return result;
@@ -1299,33 +1299,33 @@ bool ParseEnumName(
 
 // =====================================================================================================================
 // Trims space at the beginning of a string.
-char * TrimStringBeginning(
-    char * pStr)    // [in] Input string pointer.
+char * trimStringBeginning(
+    char * str)    // [in] Input string pointer.
 {
-    while (*pStr)
+    while (*str)
     {
-        if (*pStr == ' ' || *pStr == '\t' || *pStr == '\n' || *pStr == '\r')
+        if (*str == ' ' || *str == '\t' || *str == '\n' || *str == '\r')
         {
-            ++pStr;
+            ++str;
         }
         else
         {
             break;
         }
     }
-    return pStr;
+    return str;
 }
 
 // =====================================================================================================================
 // Trims space at the end of a string.
 // NOTE: The function will change the contents of an input string
-char * TrimStringEnd(
-    char * pStr)    // [in] Input string pointer.
+char * trimStringEnd(
+    char * str)    // [in] Input string pointer.
 {
-    size_t len = strlen(pStr);
-    char *sRev = pStr + len - 1;
+    size_t len = strlen(str);
+    char *sRev = str + len - 1;
 
-    while (sRev >= pStr)
+    while (sRev >= str)
     {
         if (*sRev == ' ' || *sRev == '\t' || *sRev == '\n' || *sRev == '\r')
         {
@@ -1337,56 +1337,56 @@ char * TrimStringEnd(
         }
     }
 
-    if (sRev != pStr + len - 1)
+    if (sRev != str + len - 1)
     {
         *(sRev + 1) = '\0';
     }
 
-    return pStr;
+    return str;
 }
 
 // =====================================================================================================================
 // Parses a key-value pair.
 // NOTE: The function will change the contents of an input string
-bool ExtractKeyAndValue(
-    char*      pLine,        // [in]  Input key-value pair.
+bool extractKeyAndValue(
+    char*      line,        // [in]  Input key-value pair.
     unsigned   lineNum,      // Current line number.
     const char delimiter,    // Key-value splitter.
     char**     ppKey,        // [out] Key string, a substring of the input.
     char**     ppValue,      // [out] Value string, a substring of the input.
-    std::string* pErrorMsg)  // [out] Error message
+    std::string* errorMsg)  // [out] Error message
 {
     bool result = true;
 
-    char* pEqual = strchr(pLine, delimiter);
-    if (pEqual != nullptr)
+    char* equal = strchr(line, delimiter);
+    if (equal != nullptr)
     {
-        *ppKey = TrimStringBeginning(pLine);
+        *ppKey = trimStringBeginning(line);
 
         // Terminates key string.
-        *pEqual = '\0';
+        *equal = '\0';
 
-        *ppValue = pEqual + 1;
+        *ppValue = equal + 1;
         if (**ppValue != '\0')
         {
-            *ppValue = TrimStringBeginning(*ppValue);
+            *ppValue = trimStringBeginning(*ppValue);
         }
         else
         {
-            PARSE_ERROR(*pErrorMsg, lineNum, "Expect value after %c", delimiter);
+            PARSE_ERROR(*errorMsg, lineNum, "Expect value after %c", delimiter);
             result = false;
         }
     }
     else
     {
-        PARSE_ERROR(*pErrorMsg, lineNum, "Expect %c", delimiter);
+        PARSE_ERROR(*errorMsg, lineNum, "Expect %c", delimiter);
         result = false;
     }
 
     if (result != false)
     {
-        TrimStringEnd(*ppKey);
-        TrimStringEnd(*ppValue);
+        trimStringEnd(*ppKey);
+        trimStringEnd(*ppValue);
     }
 
     return result;
@@ -1394,21 +1394,21 @@ bool ExtractKeyAndValue(
 
 // =====================================================================================================================
 // Parses an array index access in a pair of brackets.
-bool ParseArrayAccess(
-    char*        pStr,            // [in]  Input string pointer
+bool parseArrayAccess(
+    char*        str,            // [in]  Input string pointer
     unsigned     lineNum,         // Line number used to report error
-    unsigned*    pArrayIndex,     // [out] Parsed array index result
+    unsigned*    arrayIndex,     // [out] Parsed array index result
     char**       ppLBracket,      // [out] Position of '['
     char**       ppRBracket,      // [out] Position of ']'
-    std::string* pErrorMsg)       // [out] Error message
+    std::string* errorMsg)       // [out] Error message
 {
     bool result = true;
 
-    char* pLBracket = strchr(pStr, '[');
-    char* pRBracket = strchr(pStr, ']');
-    if ((pLBracket == nullptr) || (pRBracket == nullptr))
+    char* lBracket = strchr(str, '[');
+    char* rBracket = strchr(str, ']');
+    if ((lBracket == nullptr) || (rBracket == nullptr))
     {
-        PARSE_ERROR(*pErrorMsg, lineNum, "Expect [] for array access");
+        PARSE_ERROR(*errorMsg, lineNum, "Expect [] for array access");
         result = false;
     }
 
@@ -1416,16 +1416,16 @@ bool ParseArrayAccess(
     {
         if (ppLBracket != nullptr)
         {
-            *ppLBracket = pLBracket;
+            *ppLBracket = lBracket;
         }
         if (ppRBracket != nullptr)
         {
-            *ppRBracket = pRBracket;
+            *ppRBracket = rBracket;
         }
-        if (pArrayIndex != nullptr)
+        if (arrayIndex != nullptr)
         {
-            unsigned parsedArrayIndex = strtol(pLBracket + 1, nullptr, 10);
-            *pArrayIndex = parsedArrayIndex;
+            unsigned parsedArrayIndex = strtol(lBracket + 1, nullptr, 10);
+            *arrayIndex = parsedArrayIndex;
         }
     }
 
@@ -1434,21 +1434,21 @@ bool ParseArrayAccess(
 
 // =====================================================================================================================
 // Checks if a string contains array index access, which is a digits string inside a pair of brackets.
-bool IsArrayAccess(
-    const char* pStr)   // [in] Input string pointer
+bool isArrayAccess(
+    const char* str)   // [in] Input string pointer
 {
     bool result = true;
 
-    const char* pLBracket = strchr(pStr, '[');
-    const char* pRBracket = strchr(pStr, ']');
-    if ((pLBracket == nullptr) || (pRBracket == nullptr))
+    const char* lBracket = strchr(str, '[');
+    const char* rBracket = strchr(str, ']');
+    if ((lBracket == nullptr) || (rBracket == nullptr))
     {
         result = false;
     }
 
     if (result == true)
     {
-        for (const char* p = pLBracket + 1; p != pRBracket; ++p)
+        for (const char* p = lBracket + 1; p != rBracket; ++p)
         {
             if ((*p >= '0' && *p <= '9') ||
                 *p == ' ' ||
@@ -1470,63 +1470,63 @@ bool IsArrayAccess(
 // =====================================================================================================================
 // Gets one word for a string and return the start position of next word, nullptr is returned if word isn't found
 // in the string
-char * GetWordFromString(
-    char* pStr,           // [in] Input string
-    char* pWordBuffer)    // [out] A word from input string
+char * getWordFromString(
+    char* str,           // [in] Input string
+    char* wordBuffer)    // [out] A word from input string
 {
-    char *p    = TrimStringBeginning(pStr);
-    char *pDst = pWordBuffer;
+    char *p    = trimStringBeginning(str);
+    char *dst = wordBuffer;
 
     while ((*p != '\0') && (*p != ' ') && (*p != '\t'))
     {
-       *pDst++ = *p++;
+       *dst++ = *p++;
     }
 
-    *pDst = '\0';
-    return strlen(pWordBuffer)==0 ? nullptr : p;
+    *dst = '\0';
+    return strlen(wordBuffer)==0 ? nullptr : p;
 }
 
 // =====================================================================================================================
 // Substitutes marcros for 1 line.
 // Returns false if line length after substitution exceeds MaxLineBufSize
-bool VfxParser::MacroSubstituteLine(
-    char*                  pLine,                 // [in] Line string
+bool VfxParser::macroSubstituteLine(
+    char*                  line,                 // [in] Line string
     unsigned               lineNum,               // Line number
-    const MacroDefinition* pMacroDefinition,      // [in] Map of macro definitions
+    const MacroDefinition* macroDefinition,      // [in] Map of macro definitions
     unsigned               maxLineLength)         // Max line length allowed for the substituted string.
 {
     bool result = true;
-    VFX_ASSERT(pMacroDefinition != nullptr);
+    VFX_ASSERT(macroDefinition != nullptr);
 
-    for (MacroDefinition::const_iterator iter = pMacroDefinition->begin();
-         iter != pMacroDefinition->end();
+    for (MacroDefinition::const_iterator iter = macroDefinition->begin();
+         iter != macroDefinition->end();
          ++iter)
     {
-        const char* pName  = iter->first.c_str();
-        const char* pValue = iter->second.c_str();
+        const char* name  = iter->first.c_str();
+        const char* value = iter->second.c_str();
 
-        char* pNamePos = strstr(pLine, pName);
-        if (pNamePos != nullptr)
+        char* namePos = strstr(line, name);
+        if (namePos != nullptr)
         {
-            size_t nameLen   = strlen(pName);
-            size_t valueLen  = strlen(pValue);
+            size_t nameLen   = strlen(name);
+            size_t valueLen  = strlen(value);
 
-            char*  pLineRest = pNamePos + nameLen;
-            size_t restLen   = strlen(pLineRest);
-            size_t beforeLen = pNamePos - pLine;
+            char*  lineRest = namePos + nameLen;
+            size_t restLen   = strlen(lineRest);
+            size_t beforeLen = namePos - line;
 
             if (beforeLen + valueLen + restLen >= maxLineLength)
             {
-                PARSE_ERROR(*m_pErrorMsg, lineNum, "Line length after macro substitution exceeds MaxLineBufSize.");
+                PARSE_ERROR(*m_errorMsg, lineNum, "Line length after macro substitution exceeds MaxLineBufSize.");
                 result = false;
                 break;
             }
 
-            sprintf(pNamePos, "%s%s", pValue, pLineRest);
-            pLineRest = pNamePos + nameLen + valueLen;
+            sprintf(namePos, "%s%s", value, lineRest);
+            lineRest = namePos + nameLen + valueLen;
             MacroDefinition macros2;
             macros2[iter->first] = iter->second;
-            result = MacroSubstituteLine(pLineRest, lineNum, &macros2, static_cast<unsigned>(maxLineLength - beforeLen - valueLen));
+            result = macroSubstituteLine(lineRest, lineNum, &macros2, static_cast<unsigned>(maxLineLength - beforeLen - valueLen));
             if (result == false)
             {
                 break;
@@ -1544,9 +1544,9 @@ namespace Vfx
 // =====================================================================================================================
 // Parses input file
 bool VFXAPI vfxParseFile(
-    const char*     pFilename,      // [in] Input file name
+    const char*     filename,      // [in] Input file name
     unsigned int    numMacro,       // Number of marcos
-    const char*     pMacros[],      // [in] Marco list, Two strings are a macro, and macro will be extract before parse
+    const char*     macros[],      // [in] Marco list, Two strings are a macro, and macro will be extract before parse
     VfxDocType      type,           // Document type
     void**          ppDoc,          // [out] Document handle
     const char**    ppErrorMsg)     // [out] Error message
@@ -1554,17 +1554,17 @@ bool VFXAPI vfxParseFile(
     VfxParser    parser;
     TestCaseInfo testCase;
 
-    testCase.vfxFile = pFilename;
+    testCase.vfxFile = filename;
     for (unsigned i = 0; i < numMacro / 2; ++i)
     {
-        testCase.macros[pMacros[2 * i]] = pMacros[2 * i + 1];
+        testCase.macros[macros[2 * i]] = macros[2 * i + 1];
     }
 
-    Document* pDoc = Document::CreateDocument(type);
-    bool ret  = parser.Parse(testCase, pDoc);
+    Document* doc = Document::createDocument(type);
+    bool ret  = parser.parse(testCase, doc);
 
-    *ppDoc  = pDoc;
-    *ppErrorMsg = pDoc->GetErrorMsg()->c_str();
+    *ppDoc  = doc;
+    *ppErrorMsg = doc->getErrorMsg()->c_str();
 
     return ret;
 }
@@ -1572,9 +1572,9 @@ bool VFXAPI vfxParseFile(
 // =====================================================================================================================
 // Closes document handle
 void VFXAPI vfxCloseDoc(
-    void* pDoc)    // [in] Document handle
+    void* doc)    // [in] Document handle
 {
-    delete reinterpret_cast<Document*>(pDoc);
+    delete reinterpret_cast<Document*>(doc);
 }
 
 // =====================================================================================================================
@@ -1582,10 +1582,10 @@ void VFXAPI vfxCloseDoc(
 //
 // NOTE: The document contents are not accessable after call vfxCloseDoc
 void VFXAPI vfxGetRenderDoc(
-    void*              pDoc,         // [in] Document handle
-    VfxRenderStatePtr* pRenderState) // [out] Pointer of struct VfxRenderState
+    void*              doc,         // [in] Document handle
+    VfxRenderStatePtr* renderState) // [out] Pointer of struct VfxRenderState
 {
-   *pRenderState = reinterpret_cast<RenderDocument*>(pDoc)->GetDocument();
+   *renderState = reinterpret_cast<RenderDocument*>(doc)->getDocument();
 }
 
 // =====================================================================================================================
@@ -1593,18 +1593,18 @@ void VFXAPI vfxGetRenderDoc(
 //
 // NOTE: The document contents are not accessable after call vfxCloseDoc
 void VFXAPI vfxGetPipelineDoc(
-    void*                pDoc,            // [in] Document handle
-    VfxPipelineStatePtr* pPipelineState)  // [out] Pointer of struct VfxPipelineState
+    void*                doc,            // [in] Document handle
+    VfxPipelineStatePtr* pipelineState)  // [out] Pointer of struct VfxPipelineState
 {
-   *pPipelineState = reinterpret_cast<PipelineDocument*>(pDoc)->GetDocument();
+   *pipelineState = reinterpret_cast<PipelineDocument*>(doc)->getDocument();
 }
 
 // =====================================================================================================================
 // Print Document to STDOUT
 void VFXAPI vfxPrintDoc(
-    void*                pDoc)            // [in] Document handle
+    void*                doc)            // [in] Document handle
 {
-   reinterpret_cast<Document*>(pDoc)->PrintSelf();
+   reinterpret_cast<Document*>(doc)->printSelf();
 }
 
 } // Vfx

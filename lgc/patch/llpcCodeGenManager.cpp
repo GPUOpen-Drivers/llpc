@@ -65,13 +65,13 @@ namespace lgc
 
 // =====================================================================================================================
 // Setup LLVM target features, target features are set per entry point function.
-void CodeGenManager::SetupTargetFeatures(
-    PipelineState*      pPipelineState, // [in] Pipeline state
-    Module*             pModule)        // [in, out] LLVM module
+void CodeGenManager::setupTargetFeatures(
+    PipelineState*      pipelineState, // [in] Pipeline state
+    Module*             module)        // [in, out] LLVM module
 {
     std::string globalFeatures = "";
 
-    if (pPipelineState->GetOptions().includeDisassembly)
+    if (pipelineState->getOptions().includeDisassembly)
     {
         globalFeatures += ",+DumpCode";
     }
@@ -81,17 +81,17 @@ void CodeGenManager::SetupTargetFeatures(
         globalFeatures += ",-fp32-denormals";
     }
 
-    for (auto pFunc = pModule->begin(), pEnd = pModule->end(); pFunc != pEnd; ++pFunc)
+    for (auto func = module->begin(), end = module->end(); func != end; ++func)
     {
-        if ((pFunc->empty() == false) && (pFunc->getLinkage() == GlobalValue::ExternalLinkage))
+        if ((func->empty() == false) && (func->getLinkage() == GlobalValue::ExternalLinkage))
         {
              std::string targetFeatures(globalFeatures);
              AttrBuilder builder;
 
-             ShaderStage shaderStage = GetShaderStageFromCallingConv(pPipelineState->GetShaderStageMask(),
-                                                                     pFunc->getCallingConv());
+             ShaderStage shaderStage = getShaderStageFromCallingConv(pipelineState->getShaderStageMask(),
+                                                                     func->getCallingConv());
 
-            bool useSiScheduler = pPipelineState->GetShaderOptions(shaderStage).useSiScheduler;
+            bool useSiScheduler = pipelineState->getShaderOptions(shaderStage).useSiScheduler;
             if (useSiScheduler)
             {
                 // It was found that enabling both SIScheduler and SIFormClauses was bad on one particular
@@ -100,26 +100,26 @@ void CodeGenManager::SetupTargetFeatures(
                 builder.addAttribute("amdgpu-max-memory-clause", "1");
             }
 
-            if (pFunc->getCallingConv() == CallingConv::AMDGPU_GS)
+            if (func->getCallingConv() == CallingConv::AMDGPU_GS)
             {
                 // NOTE: For NGG primitive shader, enable 128-bit LDS load/store operations to optimize gvec4 data
                 // read/write. This usage must enable the feature of using CI+ additional instructions.
-                const auto pNggControl = pPipelineState->GetNggControl();
-                if (pNggControl->enableNgg && (pNggControl->passthroughMode == false))
+                const auto nggControl = pipelineState->getNggControl();
+                if (nggControl->enableNgg && (nggControl->passthroughMode == false))
                 {
                     targetFeatures += ",+ci-insts,+enable-ds128";
                 }
             }
 
-            if (pFunc->getCallingConv() == CallingConv::AMDGPU_HS)
+            if (func->getCallingConv() == CallingConv::AMDGPU_HS)
             {
                 // Force s_barrier to be present (ignore optimization)
                 builder.addAttribute("amdgpu-flat-work-group-size", "128,128");
             }
-            if (pFunc->getCallingConv() == CallingConv::AMDGPU_CS)
+            if (func->getCallingConv() == CallingConv::AMDGPU_CS)
             {
                 // Set the work group size
-                const auto& csBuiltInUsage = pPipelineState->GetShaderModes()->GetComputeShaderMode();
+                const auto& csBuiltInUsage = pipelineState->getShaderModes()->getComputeShaderMode();
                 unsigned flatWorkGroupSize =
                     csBuiltInUsage.workgroupSizeX * csBuiltInUsage.workgroupSizeY * csBuiltInUsage.workgroupSizeZ;
                 auto flatWorkGroupSizeString = std::to_string(flatWorkGroupSize);
@@ -127,7 +127,7 @@ void CodeGenManager::SetupTargetFeatures(
                                      flatWorkGroupSizeString + "," + flatWorkGroupSizeString);
             }
 
-            auto gfxIp = pPipelineState->GetTargetInfo().GetGfxIpVersion();
+            auto gfxIp = pipelineState->getTargetInfo().getGfxIpVersion();
             if (gfxIp.major >= 9)
             {
                 targetFeatures += ",+enable-scratch-bounds-checks";
@@ -136,7 +136,7 @@ void CodeGenManager::SetupTargetFeatures(
             if (gfxIp.major >= 10)
             {
                 // Setup wavefront size per shader stage
-                unsigned waveSize = pPipelineState->GetShaderWaveSize(shaderStage);
+                unsigned waveSize = pipelineState->getShaderWaveSize(shaderStage);
 
                 targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
 
@@ -147,7 +147,7 @@ void CodeGenManager::SetupTargetFeatures(
 
             if (shaderStage != ShaderStageCopyShader)
             {
-                const auto& shaderMode = pPipelineState->GetShaderModes()->GetCommonShaderMode(shaderStage);
+                const auto& shaderMode = pipelineState->getShaderModes()->getCommonShaderMode(shaderStage);
                 if ((shaderMode.fp16DenormMode == FpDenormMode::FlushNone) ||
                     (shaderMode.fp16DenormMode == FpDenormMode::FlushIn) ||
                     (shaderMode.fp64DenormMode == FpDenormMode::FlushNone) ||
@@ -176,7 +176,7 @@ void CodeGenManager::SetupTargetFeatures(
 
             builder.addAttribute("target-features", targetFeatures);
             AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
-            pFunc->addAttributes(attribIdx, builder);
+            func->addAttributes(attribIdx, builder);
         }
     }
 }

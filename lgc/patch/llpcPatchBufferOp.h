@@ -84,19 +84,19 @@ private:
     PatchBufferOp(const PatchBufferOp&) = delete;
     PatchBufferOp& operator=(const PatchBufferOp&) = delete;
 
-    llvm::Value* GetPointerOperandAsInst(llvm::Value* const pValue);
-    llvm::Value* GetBaseAddressFromBufferDesc(llvm::Value* const pBufferDesc) const;
-    void CopyMetadata(llvm::Value* const pDest, const llvm::Value* const pSrc) const;
-    llvm::PointerType* GetRemappedType(llvm::Type* const pType) const;
-    bool RemoveUsersForInvariantStarts(llvm::Value* const pValue);
-    llvm::Value* ReplaceLoadStore(llvm::Instruction& pLoadInst);
-    llvm::Value* ReplaceICmp(llvm::ICmpInst* const pICmpInst);
-    llvm::Instruction* MakeLoop(llvm::Value* const       pLoopStart,
-                                llvm::Value* const       pLoopEnd,
-                                llvm::Value* const       pLoopStride,
-                                llvm::Instruction* const pInsertPos);
-    void PostVisitMemCpyInst(llvm::MemCpyInst& memCpyInst);
-    void PostVisitMemSetInst(llvm::MemSetInst& memSetInst);
+    llvm::Value* getPointerOperandAsInst(llvm::Value* const value);
+    llvm::Value* getBaseAddressFromBufferDesc(llvm::Value* const bufferDesc) const;
+    void copyMetadata(llvm::Value* const dest, const llvm::Value* const src) const;
+    llvm::PointerType* getRemappedType(llvm::Type* const type) const;
+    bool removeUsersForInvariantStarts(llvm::Value* const value);
+    llvm::Value* replaceLoadStore(llvm::Instruction& loadInst);
+    llvm::Value* replaceICmp(llvm::ICmpInst* const iCmpInst);
+    llvm::Instruction* makeLoop(llvm::Value* const       loopStart,
+                                llvm::Value* const       loopEnd,
+                                llvm::Value* const       loopStride,
+                                llvm::Instruction* const insertPos);
+    void postVisitMemCpyInst(llvm::MemCpyInst& memCpyInst);
+    void postVisitMemSetInst(llvm::MemSetInst& memSetInst);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -104,11 +104,11 @@ private:
     llvm::DenseMap<llvm::Value*, Replacement>       m_replacementMap;      // The replacement map.
     llvm::DenseSet<llvm::Value*>                    m_invariantSet;        // The invariant set.
     llvm::DenseSet<llvm::Value*>                    m_divergenceSet;       // The divergence set.
-    llvm::LegacyDivergenceAnalysis*                 m_pDivergenceAnalysis; // The divergence analysis.
+    llvm::LegacyDivergenceAnalysis*                 m_divergenceAnalysis; // The divergence analysis.
     llvm::SmallVector<llvm::Instruction*, 16>       m_postVisitInsts;      // The post process instruction set.
-    std::unique_ptr<llvm::IRBuilder<>>              m_pBuilder;            // The IRBuilder.
-    llvm::LLVMContext*                              m_pContext;            // The LLVM context.
-    PipelineState*                                  m_pPipelineState;      // The pipeline state
+    std::unique_ptr<llvm::IRBuilder<>>              m_builder;            // The IRBuilder.
+    llvm::LLVMContext*                              m_context;            // The LLVM context.
+    PipelineState*                                  m_pipelineState;      // The pipeline state
 
     static constexpr unsigned MinMemOpLoopBytes = 256;
 };

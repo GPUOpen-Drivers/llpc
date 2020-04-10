@@ -43,43 +43,43 @@ class GraphicsContext: public PipelineContext
 {
 public:
     GraphicsContext(GfxIpVersion                     gfxIp,
-                    const GraphicsPipelineBuildInfo* pPipelineInfo,
-                    MetroHash::Hash*                 pPipelineHash,
-                    MetroHash::Hash*                 pCacheHash);
+                    const GraphicsPipelineBuildInfo* pipelineInfo,
+                    MetroHash::Hash*                 pipelineHash,
+                    MetroHash::Hash*                 cacheHash);
     virtual ~GraphicsContext();
 
-    virtual const PipelineShaderInfo* GetPipelineShaderInfo(ShaderStage shaderStage) const;
+    virtual const PipelineShaderInfo* getPipelineShaderInfo(ShaderStage shaderStage) const;
 
     // Checks whether the pipeline is graphics or compute
-    virtual bool IsGraphics() const { return true; }
+    virtual bool isGraphics() const { return true; }
 
     // Gets pipeline build info
-    virtual const void* GetPipelineBuildInfo() const { return m_pPipelineInfo; }
+    virtual const void* getPipelineBuildInfo() const { return m_pipelineInfo; }
 
     // Gets the mask of active shader stages bound to this pipeline
-    virtual unsigned GetShaderStageMask() const { return m_stageMask; }
+    virtual unsigned getShaderStageMask() const { return m_stageMask; }
 
     // Gets the mask of active shader stages bound to this pipeline
-    void SetShaderStageMask(unsigned mask) { m_stageMask = mask; }
+    void setShaderStageMask(unsigned mask) { m_stageMask = mask; }
 
     // Gets the count of active shader stages
-    virtual unsigned GetActiveShaderStageCount() const { return m_activeStageCount; }
+    virtual unsigned getActiveShaderStageCount() const { return m_activeStageCount; }
 
-    virtual void DoUserDataNodeMerge();
+    virtual void doUserDataNodeMerge();
 
     // Gets per pipeline options
-    virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
+    virtual const PipelineOptions* getPipelineOptions() const { return &m_pipelineInfo->options; }
 
 private:
     GraphicsContext() = delete;
     GraphicsContext(const GraphicsContext&) = delete;
     GraphicsContext& operator=(const GraphicsContext&) = delete;
 
-    llvm::ArrayRef<ResourceMappingNode> MergeUserDataNodeTable(llvm::SmallVectorImpl<ResourceMappingNode>& allNodes);
+    llvm::ArrayRef<ResourceMappingNode> mergeUserDataNodeTable(llvm::SmallVectorImpl<ResourceMappingNode>& allNodes);
 
-    void BuildNggCullingControlRegister();
+    void buildNggCullingControlRegister();
 
-    const GraphicsPipelineBuildInfo*    m_pPipelineInfo; // Info to build a graphics pipeline
+    const GraphicsPipelineBuildInfo*    m_pipelineInfo; // Info to build a graphics pipeline
 
     unsigned m_stageMask; // Mask of active shader stages bound to this graphics pipeline
     unsigned m_activeStageCount;    // Count of active shader stages

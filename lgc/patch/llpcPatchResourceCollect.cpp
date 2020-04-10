@@ -68,7 +68,7 @@ char PatchResourceCollect::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for resource collecting
-ModulePass* CreatePatchResourceCollect()
+ModulePass* createPatchResourceCollect()
 {
     return new PatchResourceCollect();
 }
@@ -80,9 +80,9 @@ PatchResourceCollect::PatchResourceCollect()
     m_hasPushConstOp(false),
     m_hasDynIndexedInput(false),
     m_hasDynIndexedOutput(false),
-    m_pResUsage(nullptr)
+    m_resUsage(nullptr)
 {
-    m_pLocationMapManager.reset(new InOutLocationMapManager);
+    m_locationMapManager.reset(new InOutLocationMapManager);
 }
 
 // =====================================================================================================================
@@ -92,40 +92,40 @@ bool PatchResourceCollect::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Resource-Collect\n");
 
-    Patch::Init(&module);
-    m_pPipelineShaders = &getAnalysis<PipelineShaders>();
-    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    Patch::init(&module);
+    m_pipelineShaders = &getAnalysis<PipelineShaders>();
+    m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
     // If packing final vertex stage outputs and FS inputs, scalarize those outputs and inputs now.
-    if (CanPackInOut())
+    if (canPackInOut())
     {
-        ScalarizeForInOutPacking(&module);
+        scalarizeForInOutPacking(&module);
     }
 
     // Process each shader stage, in reverse order.
     for (int shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage)
     {
-        m_pEntryPoint = m_pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
-        if (m_pEntryPoint != nullptr)
+        m_entryPoint = m_pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
+        if (m_entryPoint != nullptr)
         {
             m_shaderStage = static_cast<ShaderStage>(shaderStage);
-            ProcessShader();
+            processShader();
         }
     }
 
-    if (m_pPipelineState->IsGraphics())
+    if (m_pipelineState->isGraphics())
     {
         // Set NGG control settings
-        SetNggControl();
+        setNggControl();
 
         // Determine whether or not GS on-chip mode is valid for this pipeline
-        bool hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
-        bool checkGsOnChip = hasGs || m_pPipelineState->GetNggControl()->enableNgg;
+        bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
+        bool checkGsOnChip = hasGs || m_pipelineState->getNggControl()->enableNgg;
 
         if (checkGsOnChip)
         {
-            bool gsOnChip = CheckGsOnChipValidity();
-            m_pPipelineState->SetGsOnChip(gsOnChip);
+            bool gsOnChip = checkGsOnChipValidity();
+            m_pipelineState->setGsOnChip(gsOnChip);
         }
     }
 
@@ -134,47 +134,47 @@ bool PatchResourceCollect::runOnModule(
 
 // =====================================================================================================================
 // Sets NGG control settings
-void PatchResourceCollect::SetNggControl()
+void PatchResourceCollect::setNggControl()
 {
     // For GFX10+, initialize NGG control settings
-    if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major < 10)
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10)
     {
         return;
     }
 
-    unsigned stageMask = m_pPipelineState->GetShaderStageMask();
-    const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
-                                        ShaderStageToMask(ShaderStageTessEval))) != 0);
-    const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+    unsigned stageMask = m_pipelineState->getShaderStageMask();
+    const bool hasTs = ((stageMask & (shaderStageToMask(ShaderStageTessControl) |
+                                        shaderStageToMask(ShaderStageTessEval))) != 0);
+    const bool hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
 
     // Check the use of cull distance for NGG primitive shader
     bool useCullDistance = false;
     bool enableXfb = false;
     if (hasGs)
     {
-        const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
-        enableXfb = pResUsage->inOutUsage.enableXfb;
+        const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+        enableXfb = resUsage->inOutUsage.enableXfb;
     }
     else
     {
         if (hasTs)
         {
-            const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessEval);
-            const auto& builtInUsage = pResUsage->builtInUsage.tes;
+            const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval);
+            const auto& builtInUsage = resUsage->builtInUsage.tes;
             useCullDistance = (builtInUsage.cullDistance > 0);
-            enableXfb = pResUsage->inOutUsage.enableXfb;
+            enableXfb = resUsage->inOutUsage.enableXfb;
         }
         else
         {
-            const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageVertex);
-            const auto& builtInUsage = pResUsage->builtInUsage.vs;
+            const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
+            const auto& builtInUsage = resUsage->builtInUsage.vs;
             useCullDistance = (builtInUsage.cullDistance > 0);
-            enableXfb = pResUsage->inOutUsage.enableXfb;
+            enableXfb = resUsage->inOutUsage.enableXfb;
         }
     }
 
-    const auto& options = m_pPipelineState->GetOptions();
-    NggControl& nggControl = *m_pPipelineState->GetNggControl();
+    const auto& options = m_pipelineState->getOptions();
+    NggControl& nggControl = *m_pipelineState->getNggControl();
 
     bool enableNgg = (options.nggFlags & NggFlagDisable) == 0;
     if (enableXfb)
@@ -189,7 +189,7 @@ void PatchResourceCollect::SetNggControl()
         enableNgg = false;
     }
 
-    if (m_pPipelineState->GetTargetInfo().GetGpuWorkarounds().gfx10.waNggDisabled)
+    if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waNggDisabled)
     {
         enableNgg = false;
     }
@@ -236,7 +236,7 @@ void PatchResourceCollect::SetNggControl()
         if (nggControl.passthroughMode == false)
         {
             // NOTE: Further check if pass-through mode should be enabled
-            const auto topology = m_pPipelineState->GetInputAssemblyState().topology;
+            const auto topology = m_pipelineState->getInputAssemblyState().topology;
             if ((topology == PrimitiveTopology::PointList) ||
                 (topology == PrimitiveTopology::LineList)  ||
                 (topology == PrimitiveTopology::LineStrip) ||
@@ -251,14 +251,14 @@ void PatchResourceCollect::SetNggControl()
                 // NGG runs in pass-through mode for non-triangle tessellation output
                 assert(hasTs);
 
-                const auto& tessMode = m_pPipelineState->GetShaderModes()->GetTessellationMode();
+                const auto& tessMode = m_pipelineState->getShaderModes()->getTessellationMode();
                 if (tessMode.pointMode || (tessMode.primitiveMode == PrimitiveMode::Isolines))
                 {
                     nggControl.passthroughMode = true;
                 }
             }
 
-            const auto polygonMode = m_pPipelineState->GetRasterizerState().polygonMode;
+            const auto polygonMode = m_pipelineState->getRasterizerState().polygonMode;
             if ((polygonMode == PolygonModeLine) || (polygonMode == PolygonModePoint))
             {
                 // NGG runs in pass-through mode for non-fill polygon mode
@@ -267,7 +267,7 @@ void PatchResourceCollect::SetNggControl()
 
             if (hasGs)
             {
-                const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
+                const auto& geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
                 if (geometryMode.outputPrimitive != OutputPrimitives::TriangleStrip)
                 {
                     // If GS output primitive type is not triangle strip, NGG runs in "pass-through"
@@ -278,7 +278,7 @@ void PatchResourceCollect::SetNggControl()
         }
 
         // Build NGG culling-control registers
-        BuildNggCullingControlRegister(nggControl);
+        buildNggCullingControlRegister(nggControl);
 
         LLPC_OUTS("===============================================================================\n");
         LLPC_OUTS("// LLPC NGG control settings results\n\n");
@@ -342,11 +342,11 @@ void PatchResourceCollect::SetNggControl()
 
 // =====================================================================================================================
 // Builds NGG culling-control registers (fill part of compile-time primitive shader table).
-void PatchResourceCollect::BuildNggCullingControlRegister(
+void PatchResourceCollect::buildNggCullingControlRegister(
     NggControl& nggControl)   // [in/out] NggControl struct
 {
-    const auto& vpState = m_pPipelineState->GetViewportState();
-    const auto& rsState = m_pPipelineState->GetRasterizerState();
+    const auto& vpState = m_pipelineState->getViewportState();
+    const auto& rsState = m_pipelineState->getRasterizerState();
 
     auto& pipelineState = nggControl.primShaderTable.pipelineStateCb;
 
@@ -356,36 +356,36 @@ void PatchResourceCollect::BuildNggCullingControlRegister(
     PaSuScModeCntl paSuScModeCntl;
     paSuScModeCntl.u32All = 0;
 
-    paSuScModeCntl.bits.POLY_OFFSET_FRONT_ENABLE = rsState.depthBiasEnable;
-    paSuScModeCntl.bits.POLY_OFFSET_BACK_ENABLE  = rsState.depthBiasEnable;
-    paSuScModeCntl.bits.MULTI_PRIM_IB_ENA        = true;
+    paSuScModeCntl.bits.polyOffsetFrontEnable = rsState.depthBiasEnable;
+    paSuScModeCntl.bits.polyOffsetBackEnable  = rsState.depthBiasEnable;
+    paSuScModeCntl.bits.multiPrimIbEna        = true;
 
-    paSuScModeCntl.bits.POLY_MODE            = (rsState.polygonMode != PolygonModeFill);
+    paSuScModeCntl.bits.polyMode            = (rsState.polygonMode != PolygonModeFill);
 
     if (rsState.polygonMode == PolygonModeFill)
     {
-        paSuScModeCntl.bits.POLYMODE_BACK_PTYPE  = POLY_MODE_TRIANGLES;
-        paSuScModeCntl.bits.POLYMODE_FRONT_PTYPE = POLY_MODE_TRIANGLES;
+        paSuScModeCntl.bits.polymodeBackPtype  = POLY_MODE_TRIANGLES;
+        paSuScModeCntl.bits.polymodeFrontPtype = POLY_MODE_TRIANGLES;
     }
     else if (rsState.polygonMode == PolygonModeLine)
     {
-        paSuScModeCntl.bits.POLYMODE_BACK_PTYPE  = POLY_MODE_LINES;
-        paSuScModeCntl.bits.POLYMODE_FRONT_PTYPE = POLY_MODE_LINES;
+        paSuScModeCntl.bits.polymodeBackPtype  = POLY_MODE_LINES;
+        paSuScModeCntl.bits.polymodeFrontPtype = POLY_MODE_LINES;
     }
     else if (rsState.polygonMode == PolygonModePoint)
     {
-        paSuScModeCntl.bits.POLYMODE_BACK_PTYPE  = POLY_MODE_POINTS;
-        paSuScModeCntl.bits.POLYMODE_FRONT_PTYPE = POLY_MODE_POINTS;
+        paSuScModeCntl.bits.polymodeBackPtype  = POLY_MODE_POINTS;
+        paSuScModeCntl.bits.polymodeFrontPtype = POLY_MODE_POINTS;
     }
     else
     {
         llvm_unreachable("Should never be called!");
     }
 
-    paSuScModeCntl.bits.CULL_FRONT = ((rsState.cullMode & CullModeFront) != 0);
-    paSuScModeCntl.bits.CULL_BACK  = ((rsState.cullMode & CullModeBack) != 0);
+    paSuScModeCntl.bits.cullFront = ((rsState.cullMode & CullModeFront) != 0);
+    paSuScModeCntl.bits.cullBack  = ((rsState.cullMode & CullModeBack) != 0);
 
-    paSuScModeCntl.bits.FACE = rsState.frontFaceClockwise;
+    paSuScModeCntl.bits.face = rsState.frontFaceClockwise;
 
     pipelineState.paSuScModeCntl = paSuScModeCntl.u32All;
 
@@ -396,18 +396,18 @@ void PatchResourceCollect::BuildNggCullingControlRegister(
     assert((rsState.usrClipPlaneMask & ~0x3F) == 0);
     paClClipCntl.u32All = rsState.usrClipPlaneMask;
 
-    paClClipCntl.bits.DX_CLIP_SPACE_DEF = true;
-    paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
+    paClClipCntl.bits.dxClipSpaceDef = true;
+    paClClipCntl.bits.dxLinearAttrClipEna = true;
 
     if (vpState.depthClipEnable == false)
     {
-        paClClipCntl.bits.ZCLIP_NEAR_DISABLE = true;
-        paClClipCntl.bits.ZCLIP_FAR_DISABLE  = true;
+        paClClipCntl.bits.zclipNearDisable = true;
+        paClClipCntl.bits.zclipFarDisable  = true;
     }
 
     if (rsState.rasterizerDiscardEnable)
     {
-        paClClipCntl.bits.DX_RASTERIZATION_KILL = true;
+        paClClipCntl.bits.dxRasterizationKill = true;
     }
 
     pipelineState.paClClipCntl = paClClipCntl.u32All;
@@ -418,30 +418,30 @@ void PatchResourceCollect::BuildNggCullingControlRegister(
     PaClVteCntl paClVteCntl;
     paClVteCntl.u32All = 0;
 
-    paClVteCntl.bits.VPORT_X_SCALE_ENA  = true;
-    paClVteCntl.bits.VPORT_X_OFFSET_ENA = true;
-    paClVteCntl.bits.VPORT_Y_SCALE_ENA  = true;
-    paClVteCntl.bits.VPORT_Y_OFFSET_ENA = true;
-    paClVteCntl.bits.VPORT_Z_SCALE_ENA  = true;
-    paClVteCntl.bits.VPORT_Z_OFFSET_ENA = true;
-    paClVteCntl.bits.VTX_W0_FMT         = true;
+    paClVteCntl.bits.vportXScaleEna  = true;
+    paClVteCntl.bits.vportXOffsetEna = true;
+    paClVteCntl.bits.vportYScaleEna  = true;
+    paClVteCntl.bits.vportYOffsetEna = true;
+    paClVteCntl.bits.vportZScaleEna  = true;
+    paClVteCntl.bits.vportZOffsetEna = true;
+    paClVteCntl.bits.vtxW0Fmt         = true;
 
     pipelineState.paClVteCntl = paClVteCntl.u32All;
 }
 
 // =====================================================================================================================
 // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
-bool PatchResourceCollect::CheckGsOnChipValidity()
+bool PatchResourceCollect::checkGsOnChipValidity()
 {
     bool gsOnChip = true;
 
-    unsigned stageMask = m_pPipelineState->GetShaderStageMask();
-    const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
-                                      ShaderStageToMask(ShaderStageTessEval))) != 0);
-    const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+    unsigned stageMask = m_pipelineState->getShaderStageMask();
+    const bool hasTs = ((stageMask & (shaderStageToMask(ShaderStageTessControl) |
+                                      shaderStageToMask(ShaderStageTessEval))) != 0);
+    const bool hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
 
-    const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
-    auto pGsResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
+    const auto& geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
+    auto gsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
 
     unsigned inVertsPerPrim = 0;
     bool useAdjacency = false;
@@ -469,7 +469,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         break;
     }
 
-    pGsResUsage->inOutUsage.gs.calcFactor.inputVertices = inVertsPerPrim;
+    gsResUsage->inOutUsage.gs.calcFactor.inputVertices = inVertsPerPrim;
 
     unsigned outVertsPerPrim = 0;
     switch (geometryMode.outputPrimitive)
@@ -488,14 +488,14 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         break;
     }
 
-    if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major <= 8)
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 8)
     {
-        unsigned gsPrimsPerSubgroup = m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipDefaultPrimsPerSubgroup;
+        unsigned gsPrimsPerSubgroup = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipDefaultPrimsPerSubgroup;
 
-        const unsigned esGsRingItemSize = 4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount);
+        const unsigned esGsRingItemSize = 4 * std::max(1u, gsResUsage->inOutUsage.inputMapLocCount);
         const unsigned gsInstanceCount  = geometryMode.invocations;
         const unsigned gsVsRingItemSize = 4 * std::max(1u,
-                                                       (pGsResUsage->inOutUsage.outputMapLocCount *
+                                                       (gsResUsage->inOutUsage.outputMapLocCount *
                                                         geometryMode.outputVertices));
 
         unsigned esGsRingItemSizeOnChip = esGsRingItemSize;
@@ -527,20 +527,20 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
         // Compute ES-GS LDS size based on the worst case number of ES vertices needed to create the target number of
         // GS primitives per subgroup.
-        const unsigned reuseOffMultiplier = IsVertexReuseDisabled() ? gsInstanceCount : 1;
+        const unsigned reuseOffMultiplier = isVertexReuseDisabled() ? gsInstanceCount : 1;
         unsigned worstCaseEsVertsPerSubgroup = esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier;
         unsigned esGsLdsSize = esGsRingItemSizeOnChip * worstCaseEsVertsPerSubgroup;
 
         // Total LDS use per subgroup aligned to the register granularity
         unsigned gsOnChipLdsSize =
             alignTo((esGsLdsSize + gsVsLdsSize),
-                      static_cast<unsigned>((1 << m_pPipelineState->GetTargetInfo().GetGpuProperty()
+                      static_cast<unsigned>((1 << m_pipelineState->getTargetInfo().getGpuProperty()
                                             .ldsSizeDwordGranularityShift)));
 
         // Use the client-specified amount of LDS space per subgroup. If they specified zero, they want us to choose a
         // reasonable default. The final amount must be 128-DWORD aligned.
 
-        unsigned maxLdsSize = m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipDefaultLdsSizePerSubgroup;
+        unsigned maxLdsSize = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup;
 
         // TODO: For BONAIRE A0, GODAVARI and KALINDI, set maxLdsSize to 1024 due to SPI barrier management bug
 
@@ -582,56 +582,56 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         // determining onchip/offchip mode, unused builtin output like PointSize and Clip/CullDistance is factored in
         // LDS usage and deactivates onchip GS when GsOffChipDefaultThreshold  is 64. To fix this we will probably
         // need to clear unused builtin ouput before determining onchip/offchip GS mode.
-        constexpr unsigned GsOffChipDefaultThreshold = 32;
+        constexpr unsigned gsOffChipDefaultThreshold = 32;
 
         bool disableGsOnChip = DisableGsOnChip;
-        if (hasTs || (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major == 6))
+        if (hasTs || (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 6))
         {
             // GS on-chip is not supportd with tessellation, and is not supportd on GFX6
             disableGsOnChip = true;
         }
 
         if (disableGsOnChip ||
-            ((gsPrimsPerSubgroup * gsInstanceCount) < GsOffChipDefaultThreshold) ||
+            ((gsPrimsPerSubgroup * gsInstanceCount) < gsOffChipDefaultThreshold) ||
             (esVertsPerSubgroup == 0))
         {
             gsOnChip = false;
-            pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = 0;
-            pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = 0;
-            pGsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize          = 0;
-            pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = 0;
+            gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = 0;
+            gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = 0;
+            gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize          = 0;
+            gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = 0;
 
-            pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSize;
-            pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsVsRingItemSize;
+            gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSize;
+            gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsVsRingItemSize;
         }
         else
         {
-            pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = esVertsPerSubgroup;
-            pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = gsPrimsPerSubgroup;
-            pGsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize          = esGsLdsSize;
-            pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = gsOnChipLdsSize;
+            gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = esVertsPerSubgroup;
+            gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = gsPrimsPerSubgroup;
+            gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize          = esGsLdsSize;
+            gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = gsOnChipLdsSize;
 
-            pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSizeOnChip;
-            pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsVsRingItemSizeOnChip;
+            gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSizeOnChip;
+            gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsVsRingItemSizeOnChip;
         }
     }
     else
     {
-        const auto pNggControl = m_pPipelineState->GetNggControl();
+        const auto nggControl = m_pipelineState->getNggControl();
 
-        if (pNggControl->enableNgg)
+        if (nggControl->enableNgg)
         {
             // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
             const unsigned esGsRingItemSize = hasGs ? ((4 * std::max(1u,
-                                                                     pGsResUsage->inOutUsage.inputMapLocCount)) | 1) :
+                                                                     gsResUsage->inOutUsage.inputMapLocCount)) | 1) :
                                                       4; // Always 4 components for NGG when GS is not present
 
             const unsigned gsVsRingItemSize = hasGs ? std::max(1u,
-                                                               4 * pGsResUsage->inOutUsage.outputMapLocCount
+                                                               4 * gsResUsage->inOutUsage.outputMapLocCount
                                                                  * geometryMode.outputVertices) : 0;
 
-            const unsigned esExtraLdsSize = NggLdsManager::CalcEsExtraLdsSize(m_pPipelineState) / 4; // In DWORDs
-            const unsigned gsExtraLdsSize = NggLdsManager::CalcGsExtraLdsSize(m_pPipelineState) / 4; // In DWORDs
+            const unsigned esExtraLdsSize = NggLdsManager::calcEsExtraLdsSize(m_pipelineState) / 4; // In DWORDs
+            const unsigned gsExtraLdsSize = NggLdsManager::calcGsExtraLdsSize(m_pipelineState) / 4; // In DWORDs
 
             // NOTE: Primitive amplification factor must be at least 1. If the maximum number of GS output vertices
             // is too small to form a complete primitive, set the factor to 1.
@@ -642,20 +642,20 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 primAmpFactor = geometryMode.outputVertices - (outVertsPerPrim - 1);
             }
 
-            const unsigned vertsPerPrimitive = GetVerticesPerPrimitive();
+            const unsigned vertsPerPrimitive = getVerticesPerPrimitive();
 
             const bool needsLds = (hasGs ||
-                                   (pNggControl->passthroughMode == false) ||
+                                   (nggControl->passthroughMode == false) ||
                                    (esExtraLdsSize > 0) || (gsExtraLdsSize > 0));
 
             unsigned esVertsPerSubgroup = 0;
             unsigned gsPrimsPerSubgroup = 0;
 
             // It is expected that regular launch NGG will be the most prevalent, so handle its logic first.
-            if (pNggControl->enableFastLaunch == false)
+            if (nggControl->enableFastLaunch == false)
             {
                 // The numbers below come from hardware guidance and most likely require further tuning.
-                switch (pNggControl->subgroupSizing)
+                switch (nggControl->subgroupSizing)
                 {
                 case NggSubgroupSizing::HalfSize:
                     esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
@@ -670,8 +670,8 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                     gsPrimsPerSubgroup = 128;
                     break;
                 case NggSubgroupSizing::Explicit:
-                    esVertsPerSubgroup = pNggControl->vertsPerSubgroup;
-                    gsPrimsPerSubgroup = pNggControl->primsPerSubgroup;
+                    esVertsPerSubgroup = nggControl->vertsPerSubgroup;
+                    gsPrimsPerSubgroup = nggControl->primsPerSubgroup;
                     break;
                 default:
                 case NggSubgroupSizing::Auto:
@@ -689,7 +689,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 // Fast launch NGG launches like a compute shader and bypasses most of the fixed function hardware.
                 // As such, the values of esVerts and gsPrims have to be accurate for the primitive type
                 // (and vertsPerPrimitive) to avoid hanging.
-                switch (pNggControl->subgroupSizing)
+                switch (nggControl->subgroupSizing)
                 {
                 case NggSubgroupSizing::HalfSize:
                     esVertsPerSubgroup = alignDown((Gfx9::NggMaxThreadsPerSubgroup / 2u), vertsPerPrimitive);
@@ -703,8 +703,8 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                     esVertsPerSubgroup = gsPrimsPerSubgroup / vertsPerPrimitive;
                     break;
                 case NggSubgroupSizing::Explicit:
-                    esVertsPerSubgroup = pNggControl->vertsPerSubgroup;
-                    gsPrimsPerSubgroup = pNggControl->primsPerSubgroup;
+                    esVertsPerSubgroup = nggControl->vertsPerSubgroup;
+                    gsPrimsPerSubgroup = nggControl->primsPerSubgroup;
                     break;
                 case NggSubgroupSizing::OptimizeForPrims:
                     // Currently the programming of OptimizeForPrims is the same as MaximumSize, it is possible that
@@ -778,43 +778,43 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
             const unsigned ldsSizeDwords =
                 alignTo(expectedEsLdsSize + expectedGsLdsSize,
-                          static_cast<unsigned>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty()
+                          static_cast<unsigned>(1 << m_pipelineState->getTargetInfo().getGpuProperty()
                                                 .ldsSizeDwordGranularityShift));
 
             // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
             assert(ldsSizeDwords <= 16384);
 
-            pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = esVertsPerSubgroup;
-            pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = gsPrimsPerSubgroup;
+            gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = esVertsPerSubgroup;
+            gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = gsPrimsPerSubgroup;
 
             // EsGsLdsSize is passed in a user data SGPR to the merged shader so that the API GS knows where to start
             // reading out of LDS. EsGsLdsSize is unnecessary when there is no API GS.
-            pGsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize          = hasGs ? expectedEsLdsSize : 0;
-            pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = needsLds ? ldsSizeDwords : 0;
+            gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize          = hasGs ? expectedEsLdsSize : 0;
+            gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = needsLds ? ldsSizeDwords : 0;
 
-            pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSize;
-            pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsVsRingItemSize;
+            gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSize;
+            gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsVsRingItemSize;
 
-            pGsResUsage->inOutUsage.gs.calcFactor.primAmpFactor        = primAmpFactor;
-            pGsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut     = enableMaxVertOut;
+            gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor        = primAmpFactor;
+            gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut     = enableMaxVertOut;
 
             gsOnChip = true; // In NGG mode, GS is always on-chip since copy shader is not present.
         }
         else
         {
             unsigned ldsSizeDwordGranularity =
-                static_cast<unsigned>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift);
+                static_cast<unsigned>(1 << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift);
 
             // gsPrimsPerSubgroup shouldn't be bigger than wave size.
             unsigned gsPrimsPerSubgroup =
-                std::min(m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipDefaultPrimsPerSubgroup,
-                         m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry));
+                std::min(m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipDefaultPrimsPerSubgroup,
+                         m_pipelineState->getShaderWaveSize(ShaderStageGeometry));
 
             // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
-            const unsigned esGsRingItemSize = (4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount)) | 1;
+            const unsigned esGsRingItemSize = (4 * std::max(1u, gsResUsage->inOutUsage.inputMapLocCount)) | 1;
 
             const unsigned gsVsRingItemSize = 4 * std::max(1u,
-                                                           (pGsResUsage->inOutUsage.outputMapLocCount *
+                                                           (gsResUsage->inOutUsage.outputMapLocCount *
                                                             geometryMode.outputVertices));
 
             // NOTE: Make gsVsRingItemSize odd by "| 1", to optimize GS -> VS ring layout for LDS bank conflicts.
@@ -845,7 +845,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
             gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, maxGsPrimsPerSubgroup);
 
-            const unsigned reuseOffMultiplier = IsVertexReuseDisabled() ? gsInstanceCount : 1;
+            const unsigned reuseOffMultiplier = isVertexReuseDisabled() ? gsInstanceCount : 1;
             unsigned worstCaseEsVertsPerSubgroup =
                 std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier, maxEsVertsPerSubgroup);
 
@@ -961,21 +961,21 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
             // beyond ES_VERTS_PER_SUBGRP.
             esVertsPerSubgroup -= (esMinVertsPerSubgroup - 1);
 
-            pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = esVertsPerSubgroup;
-            pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = gsPrimsPerSubgroup;
-            pGsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize          = esGsLdsSize;
-            pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = gsOnChipLdsSize;
+            gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = esVertsPerSubgroup;
+            gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = gsPrimsPerSubgroup;
+            gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize          = esGsLdsSize;
+            gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = gsOnChipLdsSize;
 
-            pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSize;
-            pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsOnChip ?
+            gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSize;
+            gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsOnChip ?
                                                                          gsVsRingItemSizeOnChip :
                                                                          gsVsRingItemSize;
 
-            if ((m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major == 10) && hasTs && (gsOnChip == false))
+            if ((m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) && hasTs && (gsOnChip == false))
             {
                 unsigned esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
                 unsigned onChipGsLdsMagicSize = alignTo((esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
-                            static_cast<unsigned>((1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift)));
+                            static_cast<unsigned>((1 << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift)));
 
                 // If the new size is greater than the size we previously set
                 // then we need to either increase the size or decrease the verts
@@ -985,48 +985,48 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                     {
                         // Decrease the verts
                         esVertsNum = (maxLdsSize - esGsExtraLdsDwords) / esGsRingItemSize;
-                        pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = maxLdsSize;
+                        gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = maxLdsSize;
                     }
                     else
                     {
                         // Increase the size
-                        pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = onChipGsLdsMagicSize;
+                        gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = onChipGsLdsMagicSize;
                     }
                 }
                 // Support multiple GS instances
                 unsigned gsPrimsNum = Gfx9::GsPrimsOffchipGsOrTess / gsInstanceCount;
 
-                pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsNum;
-                pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsNum;
+                gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsNum;
+                gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsNum;
             }
         }
     }
 
     LLPC_OUTS("===============================================================================\n");
     LLPC_OUTS("// LLPC geometry calculation factor results\n\n");
-    LLPC_OUTS("ES vertices per sub-group: " << pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup << "\n");
-    LLPC_OUTS("GS primitives per sub-group: " << pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup << "\n");
+    LLPC_OUTS("ES vertices per sub-group: " << gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup << "\n");
+    LLPC_OUTS("GS primitives per sub-group: " << gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup << "\n");
     LLPC_OUTS("\n");
-    LLPC_OUTS("ES-GS LDS size: " << pGsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize << "\n");
-    LLPC_OUTS("On-chip GS LDS size: " << pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << "\n");
+    LLPC_OUTS("ES-GS LDS size: " << gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize << "\n");
+    LLPC_OUTS("On-chip GS LDS size: " << gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << "\n");
     LLPC_OUTS("\n");
-    LLPC_OUTS("ES-GS ring item size: " << pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize << "\n");
-    LLPC_OUTS("GS-VS ring item size: " << pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize << "\n");
+    LLPC_OUTS("ES-GS ring item size: " << gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize << "\n");
+    LLPC_OUTS("GS-VS ring item size: " << gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize << "\n");
     LLPC_OUTS("\n");
 
     LLPC_OUTS("GS stream item size:\n");
     for (unsigned i = 0; i < MaxGsStreams; ++i)
     {
-        unsigned streamItemSize = pGsResUsage->inOutUsage.gs.outLocCount[i] *
+        unsigned streamItemSize = gsResUsage->inOutUsage.gs.outLocCount[i] *
                                     geometryMode.outputVertices * 4;
         LLPC_OUTS("    stream " << i << " = " << streamItemSize);
 
-        if (pGsResUsage->inOutUsage.enableXfb)
+        if (gsResUsage->inOutUsage.enableXfb)
         {
             LLPC_OUTS(", XFB buffer = ");
             for (unsigned j = 0; j < MaxTransformFeedbackBuffers; ++j)
             {
-                if ((pGsResUsage->inOutUsage.streamXfbBuffers[i] & (1 << j)) != 0)
+                if ((gsResUsage->inOutUsage.streamXfbBuffers[i] & (1 << j)) != 0)
                 {
                     LLPC_OUTS(j);
                     if (j != MaxTransformFeedbackBuffers - 1)
@@ -1041,15 +1041,15 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
     }
     LLPC_OUTS("\n");
 
-    if (gsOnChip || (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 9))
+    if (gsOnChip || (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9))
     {
-        if (m_pPipelineState->GetNggControl()->enableNgg)
+        if (m_pipelineState->getNggControl()->enableNgg)
         {
             LLPC_OUTS("GS primitive amplification factor: "
-                      << pGsResUsage->inOutUsage.gs.calcFactor.primAmpFactor
+                      << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor
                       << "\n");
             LLPC_OUTS("GS enable max output vertices per instance: "
-                      << (pGsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut ? "true" : "false")
+                      << (gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut ? "true" : "false")
                       << "\n");
             LLPC_OUTS("\n");
 
@@ -1071,11 +1071,11 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
 // =====================================================================================================================
 // Gets the count of vertices per primitive
-unsigned PatchResourceCollect::GetVerticesPerPrimitive() const
+unsigned PatchResourceCollect::getVerticesPerPrimitive() const
 {
     unsigned vertsPerPrim = 1;
 
-    switch (m_pPipelineState->GetInputAssemblyState().topology)
+    switch (m_pipelineState->getInputAssemblyState().topology)
     {
     case PrimitiveTopology::PointList:
         vertsPerPrim = 1;
@@ -1108,7 +1108,7 @@ unsigned PatchResourceCollect::GetVerticesPerPrimitive() const
         vertsPerPrim = 6;
         break;
     case PrimitiveTopology::PatchList:
-        vertsPerPrim = m_pPipelineState->GetInputAssemblyState().patchControlPoints;
+        vertsPerPrim = m_pipelineState->getInputAssemblyState().patchControlPoints;
         break;
     default:
         llvm_unreachable("Should never be called!");
@@ -1120,40 +1120,40 @@ unsigned PatchResourceCollect::GetVerticesPerPrimitive() const
 
 // =====================================================================================================================
 // Process a single shader
-void PatchResourceCollect::ProcessShader()
+void PatchResourceCollect::processShader()
 {
     m_hasPushConstOp = false;
     m_hasDynIndexedInput = false;
     m_hasDynIndexedOutput = false;
-    m_pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
+    m_resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
     // Invoke handling of "call" instruction
-    visit(m_pEntryPoint);
+    visit(m_entryPoint);
 
     // Disable push constant if not used
     if (m_hasPushConstOp == false)
     {
-        m_pResUsage->pushConstSizeInBytes = 0;
+        m_resUsage->pushConstSizeInBytes = 0;
     }
 
-    ClearInactiveInput();
-    ClearInactiveOutput();
+    clearInactiveInput();
+    clearInactiveOutput();
 
-    if (m_pPipelineState->IsGraphics())
+    if (m_pipelineState->isGraphics())
     {
-        MatchGenericInOut();
-        MapBuiltInToGenericInOut();
+        matchGenericInOut();
+        mapBuiltInToGenericInOut();
     }
 
     if (m_shaderStage == ShaderStageFragment)
     {
-        if (m_pResUsage->builtInUsage.fs.fragCoord ||
-            m_pResUsage->builtInUsage.fs.pointCoord ||
-            m_pResUsage->builtInUsage.fs.sampleMaskIn)
+        if (m_resUsage->builtInUsage.fs.fragCoord ||
+            m_resUsage->builtInUsage.fs.pointCoord ||
+            m_resUsage->builtInUsage.fs.sampleMaskIn)
         {
-            if (m_pPipelineState->GetRasterizerState().perSampleShading)
+            if (m_pipelineState->getRasterizerState().perSampleShading)
             {
-                m_pResUsage->builtInUsage.fs.runAtSampleRate = true;
+                m_resUsage->builtInUsage.fs.runAtSampleRate = true;
             }
         }
     }
@@ -1162,56 +1162,56 @@ void PatchResourceCollect::ProcessShader()
         // Collect resource usages from vertex input create info
         // TODO: In the future, we might check if the corresponding vertex attribute is active in vertex shader
         // and set the usage based on this info.
-        for (const auto& vertexInput : m_pPipelineState->GetVertexInputDescriptions())
+        for (const auto& vertexInput : m_pipelineState->getVertexInputDescriptions())
         {
             if (vertexInput.inputRate == VertexInputRateVertex)
             {
-                m_pResUsage->builtInUsage.vs.vertexIndex = true;
-                m_pResUsage->builtInUsage.vs.baseVertex = true;
+                m_resUsage->builtInUsage.vs.vertexIndex = true;
+                m_resUsage->builtInUsage.vs.baseVertex = true;
             }
             else
             {
                 // TODO: We probably don't need instanceIndex for VertexInputRateNone.
-                m_pResUsage->builtInUsage.vs.instanceIndex = true;
-                m_pResUsage->builtInUsage.vs.baseInstance = true;
+                m_resUsage->builtInUsage.vs.instanceIndex = true;
+                m_resUsage->builtInUsage.vs.baseInstance = true;
             }
         }
     }
 
     // Remove dead calls
-    for (auto pCall : m_deadCalls)
+    for (auto call : m_deadCalls)
     {
-        assert(pCall->user_empty());
-        pCall->dropAllReferences();
-        pCall->eraseFromParent();
+        assert(call->user_empty());
+        call->dropAllReferences();
+        call->eraseFromParent();
     }
     m_deadCalls.clear();
 }
 
 // =====================================================================================================================
 // Check whether vertex reuse should be disabled.
-bool PatchResourceCollect::IsVertexReuseDisabled()
+bool PatchResourceCollect::isVertexReuseDisabled()
 {
-    const bool hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
-    const bool hasTs = (m_pPipelineState->HasShaderStage(ShaderStageTessControl) ||
-                        m_pPipelineState->HasShaderStage(ShaderStageTessEval));
-    const bool hasVs = m_pPipelineState->HasShaderStage(ShaderStageVertex);
+    const bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
+    const bool hasTs = (m_pipelineState->hasShaderStage(ShaderStageTessControl) ||
+                        m_pipelineState->hasShaderStage(ShaderStageTessEval));
+    const bool hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
 
-    bool disableVertexReuse = m_pPipelineState->GetInputAssemblyState().disableVertexReuse;
+    bool disableVertexReuse = m_pipelineState->getInputAssemblyState().disableVertexReuse;
 
     bool useViewportIndex = false;
     if (hasGs)
     {
-        useViewportIndex = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs.viewportIndex;
+        useViewportIndex = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs.viewportIndex;
     }
     else if (hasTs)
     {
-        useViewportIndex = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessEval)->
+        useViewportIndex = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval)->
                               builtInUsage.tes.viewportIndex;
     }
     else if (hasVs)
     {
-        useViewportIndex = m_pPipelineState->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.viewportIndex;
+        useViewportIndex = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.viewportIndex;
     }
 
     disableVertexReuse |= useViewportIndex;
@@ -1224,15 +1224,15 @@ bool PatchResourceCollect::IsVertexReuseDisabled()
 void PatchResourceCollect::visitCallInst(
     CallInst& callInst) // [in] "Call" instruction
 {
-    auto pCallee = callInst.getCalledFunction();
-    if (pCallee == nullptr)
+    auto callee = callInst.getCalledFunction();
+    if (callee == nullptr)
     {
         return;
     }
 
     bool isDeadCall = callInst.user_empty();
 
-    auto mangledName = pCallee->getName();
+    auto mangledName = callee->getName();
 
     if (mangledName.startswith(lgcName::PushConstLoad) ||
         mangledName.startswith(lgcName::DescriptorLoadSpillTable))
@@ -1256,7 +1256,7 @@ void PatchResourceCollect::visitCallInst(
         unsigned descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         unsigned binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
         DescriptorPair descPair = { descSet, binding };
-        m_pResUsage->descPairs.insert(descPair.u64All);
+        m_resUsage->descPairs.insert(descPair.u64All);
     }
     else if (mangledName.startswith(lgcName::BufferLoad))
     {
@@ -1274,29 +1274,29 @@ void PatchResourceCollect::visitCallInst(
         }
         else
         {
-            auto pInputTy = callInst.getType();
-            assert(pInputTy->isSingleValueType());
+            auto inputTy = callInst.getType();
+            assert(inputTy->isSingleValueType());
 
             auto loc = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
 
             if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval))
             {
-                auto pLocOffset = callInst.getOperand(1);
-                auto pCompIdx = callInst.getOperand(2);
+                auto locOffset = callInst.getOperand(1);
+                auto compIdx = callInst.getOperand(2);
 
-                if (isa<ConstantInt>(pLocOffset))
+                if (isa<ConstantInt>(locOffset))
                 {
                     // Location offset is constant
-                    loc +=  cast<ConstantInt>(pLocOffset)->getZExtValue();
+                    loc +=  cast<ConstantInt>(locOffset)->getZExtValue();
 
-                    auto bitWidth = pInputTy->getScalarSizeInBits();
+                    auto bitWidth = inputTy->getScalarSizeInBits();
                     if (bitWidth == 64)
                     {
-                        if (isa<ConstantInt>(pCompIdx))
+                        if (isa<ConstantInt>(compIdx))
                         {
 
                             m_activeInputLocs.insert(loc);
-                            if (cast<ConstantInt>(pCompIdx)->getZExtValue() >= 2)
+                            if (cast<ConstantInt>(compIdx)->getZExtValue() >= 2)
                             {
                                 // NOTE: For the addressing of .z/.w component of 64-bit vector/scalar, the count of
                                 // occupied locations are two.
@@ -1326,9 +1326,9 @@ void PatchResourceCollect::visitCallInst(
             else
             {
                 m_activeInputLocs.insert(loc);
-                if (pInputTy->getPrimitiveSizeInBits() > (8 * SizeOfVec4))
+                if (inputTy->getPrimitiveSizeInBits() > (8 * SizeOfVec4))
                 {
-                    assert(pInputTy->getPrimitiveSizeInBits() <= (8 * 2 * SizeOfVec4));
+                    assert(inputTy->getPrimitiveSizeInBits() <= (8 * 2 * SizeOfVec4));
                     m_activeInputLocs.insert(loc + 1);
                 }
             }
@@ -1347,12 +1347,12 @@ void PatchResourceCollect::visitCallInst(
         {
             assert(callInst.getType()->isSingleValueType());
 
-            auto pLocOffset = callInst.getOperand(1);
-            if (isa<ConstantInt>(pLocOffset))
+            auto locOffset = callInst.getOperand(1);
+            if (isa<ConstantInt>(locOffset))
             {
                 // Location offset is constant
                 auto loc = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-                loc += cast<ConstantInt>(pLocOffset)->getZExtValue();
+                loc += cast<ConstantInt>(locOffset)->getZExtValue();
 
                 assert(callInst.getType()->getPrimitiveSizeInBits() <= (8 * SizeOfVec4));
                 m_activeInputLocs.insert(loc);
@@ -1382,25 +1382,25 @@ void PatchResourceCollect::visitCallInst(
         // Generic output import
         assert(m_shaderStage == ShaderStageTessControl);
 
-        auto pOutputTy = callInst.getType();
-        assert(pOutputTy->isSingleValueType());
+        auto outputTy = callInst.getType();
+        assert(outputTy->isSingleValueType());
 
         auto loc = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-        auto pLocOffset = callInst.getOperand(1);
-        auto pCompIdx = callInst.getOperand(2);
+        auto locOffset = callInst.getOperand(1);
+        auto compIdx = callInst.getOperand(2);
 
-        if (isa<ConstantInt>(pLocOffset))
+        if (isa<ConstantInt>(locOffset))
         {
             // Location offset is constant
-            loc += cast<ConstantInt>(pLocOffset)->getZExtValue();
+            loc += cast<ConstantInt>(locOffset)->getZExtValue();
 
-            auto bitWidth = pOutputTy->getScalarSizeInBits();
+            auto bitWidth = outputTy->getScalarSizeInBits();
             if (bitWidth == 64)
             {
-                if (isa<ConstantInt>(pCompIdx))
+                if (isa<ConstantInt>(compIdx))
                 {
                     m_importedOutputLocs.insert(loc);
-                    if (cast<ConstantInt>(pCompIdx)->getZExtValue() >= 2)
+                    if (cast<ConstantInt>(compIdx)->getZExtValue() >= 2)
                     {
                         // NOTE: For the addressing of .z/.w component of 64-bit vector/scalar, the count of
                         // occupied locations are two.
@@ -1440,18 +1440,18 @@ void PatchResourceCollect::visitCallInst(
         // Generic output export
         if (m_shaderStage == ShaderStageTessControl)
         {
-            auto pOutput = callInst.getOperand(callInst.getNumArgOperands() - 1);
-            auto pOutputTy = pOutput->getType();
-            assert(pOutputTy->isSingleValueType());
+            auto output = callInst.getOperand(callInst.getNumArgOperands() - 1);
+            auto outputTy = output->getType();
+            assert(outputTy->isSingleValueType());
 
-            auto pLocOffset = callInst.getOperand(1);
-            auto pCompIdx = callInst.getOperand(2);
+            auto locOffset = callInst.getOperand(1);
+            auto compIdx = callInst.getOperand(2);
 
-            if (isa<ConstantInt>(pLocOffset))
+            if (isa<ConstantInt>(locOffset))
             {
                 // Location offset is constant
-                auto bitWidth = pOutputTy->getScalarSizeInBits();
-                if ((bitWidth == 64) && (isa<ConstantInt>(pCompIdx) == false))
+                auto bitWidth = outputTy->getScalarSizeInBits();
+                if ((bitWidth == 64) && (isa<ConstantInt>(compIdx) == false))
                 {
                     // NOTE: If vector component index is not constant and it is vector component addressing for
                     // 64-bit vector, we treat this as dynamic indexing.
@@ -1471,8 +1471,8 @@ void PatchResourceCollect::visitCallInst(
         // Currently, do this for geometry shader.
         if (m_shaderStage == ShaderStageGeometry)
         {
-            auto* pOutputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
-            if (isa<UndefValue>(pOutputValue))
+            auto* outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
+            if (isa<UndefValue>(outputValue))
             {
                 m_deadCalls.insert(&callInst);
             }
@@ -1484,12 +1484,12 @@ void PatchResourceCollect::visitCallInst(
         }
     }
 
-    if (CanPackInOut())
+    if (canPackInOut())
     {
         if ((m_shaderStage == ShaderStageFragment) && (isDeadCall == false))
         {
             // Collect LocationSpans according to each FS' input call
-            bool isInput = m_pLocationMapManager->AddSpan(&callInst);
+            bool isInput = m_locationMapManager->addSpan(&callInst);
             if (isInput)
             {
                 m_inOutCalls.push_back(&callInst);
@@ -1506,11 +1506,11 @@ void PatchResourceCollect::visitCallInst(
 
 // =====================================================================================================================
 // Clears inactive (those actually unused) inputs.
-void PatchResourceCollect::ClearInactiveInput()
+void PatchResourceCollect::clearInactiveInput()
 {
-    bool buildingRelocatableElf = m_pPipelineState->GetBuilderContext()->BuildingRelocatableElf();
+    bool buildingRelocatableElf = m_pipelineState->getBuilderContext()->buildingRelocatableElf();
     // Clear those inactive generic inputs, remove them from location mappings
-    if (m_pPipelineState->IsGraphics() && (m_hasDynIndexedInput == false) && (m_shaderStage != ShaderStageTessEval)
+    if (m_pipelineState->isGraphics() && (m_hasDynIndexedInput == false) && (m_shaderStage != ShaderStageTessEval)
         && !buildingRelocatableElf)
     {
         // TODO: Here, we keep all generic inputs of tessellation evaluation shader. This is because corresponding
@@ -1519,7 +1519,7 @@ void PatchResourceCollect::ClearInactiveInput()
 
         // Clear normal inputs
         std::unordered_set<unsigned> unusedLocs;
-        for (auto locMap : m_pResUsage->inOutUsage.inputLocMap)
+        for (auto locMap : m_resUsage->inOutUsage.inputLocMap)
         {
             unsigned loc = locMap.first;
             if (m_activeInputLocs.find(loc) == m_activeInputLocs.end())
@@ -1530,14 +1530,14 @@ void PatchResourceCollect::ClearInactiveInput()
 
         for (auto loc : unusedLocs)
         {
-            m_pResUsage->inOutUsage.inputLocMap.erase(loc);
+            m_resUsage->inOutUsage.inputLocMap.erase(loc);
         }
 
         // Clear per-patch inputs
         if (m_shaderStage == ShaderStageTessEval)
         {
             unusedLocs.clear();
-            for (auto locMap : m_pResUsage->inOutUsage.perPatchInputLocMap)
+            for (auto locMap : m_resUsage->inOutUsage.perPatchInputLocMap)
             {
                 unsigned loc = locMap.first;
                 if (m_activeInputLocs.find(loc) == m_activeInputLocs.end())
@@ -1548,19 +1548,19 @@ void PatchResourceCollect::ClearInactiveInput()
 
             for (auto loc : unusedLocs)
             {
-                m_pResUsage->inOutUsage.perPatchInputLocMap.erase(loc);
+                m_resUsage->inOutUsage.perPatchInputLocMap.erase(loc);
             }
         }
         else
         {
             // For other stages, must be empty
-            assert(m_pResUsage->inOutUsage.perPatchInputLocMap.empty());
+            assert(m_resUsage->inOutUsage.perPatchInputLocMap.empty());
         }
     }
 
     // Clear those inactive built-in inputs (some are not checked, whose usage flags do not rely on their
     // actual uses)
-    auto& builtInUsage = m_pResUsage->builtInUsage;
+    auto& builtInUsage = m_resUsage->builtInUsage;
 
     // Check per-stage built-in usage
     if (m_shaderStage == ShaderStageVertex)
@@ -1930,12 +1930,12 @@ void PatchResourceCollect::ClearInactiveInput()
 
 // =====================================================================================================================
 // Clears inactive (those actually unused) outputs.
-void PatchResourceCollect::ClearInactiveOutput()
+void PatchResourceCollect::clearInactiveOutput()
 {
     // Clear inactive output builtins
     if (m_shaderStage == ShaderStageGeometry)
     {
-        auto& builtInUsage = m_pResUsage->builtInUsage.gs;
+        auto& builtInUsage = m_resUsage->builtInUsage.gs;
 
         if (builtInUsage.position &&
             (m_activeOutputBuiltIns.find(BuiltInPosition) == m_activeOutputBuiltIns.end()))
@@ -1985,10 +1985,10 @@ void PatchResourceCollect::ClearInactiveOutput()
 // Does generic input/output matching and does location mapping afterwards.
 //
 // NOTE: This function should be called after the cleanup work of inactive inputs is done.
-void PatchResourceCollect::MatchGenericInOut()
+void PatchResourceCollect::matchGenericInOut()
 {
-    assert(m_pPipelineState->IsGraphics());
-    auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
+    assert(m_pipelineState->isGraphics());
+    auto& inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
 
     auto& inLocMap  = inOutUsage.inputLocMap;
     auto& outLocMap = inOutUsage.outputLocMap;
@@ -1997,17 +1997,17 @@ void PatchResourceCollect::MatchGenericInOut()
     auto& perPatchOutLocMap = inOutUsage.perPatchOutputLocMap;
 
     // Do input/output matching
-    if (!m_pPipelineState->GetBuilderContext()->BuildingRelocatableElf() && m_shaderStage != ShaderStageFragment)
+    if (!m_pipelineState->getBuilderContext()->buildingRelocatableElf() && m_shaderStage != ShaderStageFragment)
     {
-        const auto nextStage = m_pPipelineState->GetNextShaderStage(m_shaderStage);
+        const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
 
         // Do normal input/output matching
         if (nextStage != ShaderStageInvalid)
         {
-            const auto pNextResUsage = m_pPipelineState->GetShaderResourceUsage(nextStage);
-            const auto& nextInLocMap = pNextResUsage->inOutUsage.inputLocMap;
+            const auto nextResUsage = m_pipelineState->getShaderResourceUsage(nextStage);
+            const auto& nextInLocMap = nextResUsage->inOutUsage.inputLocMap;
 
-            unsigned availInMapLoc = pNextResUsage->inOutUsage.inputMapLocCount;
+            unsigned availInMapLoc = nextResUsage->inOutUsage.inputMapLocCount;
 
             // Collect locations of those outputs that are not used by next shader stage
             std::vector<unsigned> unusedLocs;
@@ -2051,10 +2051,10 @@ void PatchResourceCollect::MatchGenericInOut()
         {
             if (nextStage != ShaderStageInvalid)
             {
-                const auto pNextResUsage = m_pPipelineState->GetShaderResourceUsage(nextStage);
-                const auto& nextPerPatchInLocMap = pNextResUsage->inOutUsage.perPatchInputLocMap;
+                const auto nextResUsage = m_pipelineState->getShaderResourceUsage(nextStage);
+                const auto& nextPerPatchInLocMap = nextResUsage->inOutUsage.perPatchInputLocMap;
 
-                unsigned availPerPatchInMapLoc = pNextResUsage->inOutUsage.perPatchInputMapLocCount;
+                unsigned availPerPatchInMapLoc = nextResUsage->inOutUsage.perPatchInputMapLocCount;
 
                 // Collect locations of those outputs that are not used by next shader stage
                 std::vector<unsigned> unusedLocs;
@@ -2092,15 +2092,15 @@ void PatchResourceCollect::MatchGenericInOut()
         }
     }
 
-    if (CanPackInOut())
+    if (canPackInOut())
     {
         // Do packing input/output
-        PackInOutLocation();
+        packInOutLocation();
     }
 
     // Do location mapping
     LLPC_OUTS("===============================================================================\n");
-    LLPC_OUTS("// LLPC location input/output mapping results (" << PipelineState::GetShaderStageAbbreviation(m_shaderStage)
+    LLPC_OUTS("// LLPC location input/output mapping results (" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
               << " shader)\n\n");
     unsigned nextMapLoc = 0;
     if (inLocMap.empty() == false)
@@ -2109,11 +2109,11 @@ void PatchResourceCollect::MatchGenericInOut()
         for (auto& locMap : inLocMap)
         {
             assert(locMap.second == InvalidValue ||
-                        m_pPipelineState->GetBuilderContext()->BuildingRelocatableElf());
+                        m_pipelineState->getBuilderContext()->buildingRelocatableElf());
             // NOTE: For vertex shader, the input location mapping is actually trivial.
             locMap.second = (m_shaderStage == ShaderStageVertex) ? locMap.first : nextMapLoc++;
             inOutUsage.inputMapLocCount = std::max(inOutUsage.inputMapLocCount, locMap.second + 1);
-            LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Input:  loc = "
+            LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input:  loc = "
                           << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
         }
         LLPC_OUTS("\n");
@@ -2135,11 +2135,11 @@ void PatchResourceCollect::MatchGenericInOut()
             if (m_shaderStage == ShaderStageFragment)
             {
                 unsigned location = locMap.first;
-                if (m_pPipelineState->GetColorExportState().dualSourceBlendEnable && (location == 1))
+                if (m_pipelineState->getColorExportState().dualSourceBlendEnable && (location == 1))
                 {
                     location = 0;
                 }
-                if (m_pPipelineState->GetColorExportFormat(location).dfmt == BufDataFormatInvalid)
+                if (m_pipelineState->getColorExportFormat(location).dfmt == BufDataFormatInvalid)
                 {
                     locMapIt = outLocMap.erase(locMapIt);
                     continue;
@@ -2151,7 +2151,7 @@ void PatchResourceCollect::MatchGenericInOut()
                 if (locMap.second == InvalidValue)
                 {
                     unsigned outLocInfo = locMap.first;
-                    MapGsGenericOutput(*(reinterpret_cast<GsOutLocInfo*>(&outLocInfo)));
+                    mapGsGenericOutput(*(reinterpret_cast<GsOutLocInfo*>(&outLocInfo)));
                 }
             }
             else
@@ -2166,7 +2166,7 @@ void PatchResourceCollect::MatchGenericInOut()
                     assert(m_shaderStage == ShaderStageTessControl);
                 }
                 inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, locMap.second + 1);
-                LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Output: loc = "
+                LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Output: loc = "
                     << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
 
                 if (m_shaderStage == ShaderStageFragment)
@@ -2189,7 +2189,7 @@ void PatchResourceCollect::MatchGenericInOut()
             assert(locMap.second == InvalidValue);
             locMap.second = nextMapLoc++;
             inOutUsage.perPatchInputMapLocCount = std::max(inOutUsage.perPatchInputMapLocCount, locMap.second + 1);
-            LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  loc = "
+            LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  loc = "
                           << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
         }
         LLPC_OUTS("\n");
@@ -2211,20 +2211,20 @@ void PatchResourceCollect::MatchGenericInOut()
                 assert(m_shaderStage == ShaderStageTessControl);
             }
             inOutUsage.perPatchOutputMapLocCount = std::max(inOutUsage.perPatchOutputMapLocCount, locMap.second + 1);
-            LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): loc = "
+            LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): loc = "
                           << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
         }
         LLPC_OUTS("\n");
     }
 
     LLPC_OUTS("// LLPC location count results (after input/output matching) \n\n");
-    LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Input:  loc count = "
+    LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input:  loc count = "
                   << inOutUsage.inputMapLocCount << "\n");
-    LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Output: loc count = "
+    LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Output: loc count = "
                   << inOutUsage.outputMapLocCount << "\n");
-    LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  loc count = "
+    LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  loc count = "
                   << inOutUsage.perPatchInputMapLocCount << "\n");
-    LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): loc count = "
+    LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): loc count = "
                   << inOutUsage.perPatchOutputMapLocCount << "\n");
     LLPC_OUTS("\n");
 }
@@ -2233,18 +2233,18 @@ void PatchResourceCollect::MatchGenericInOut()
 // Maps special built-in input/output to generic ones.
 //
 // NOTE: This function should be called after generic input/output matching is done.
-void PatchResourceCollect::MapBuiltInToGenericInOut()
+void PatchResourceCollect::mapBuiltInToGenericInOut()
 {
-    assert(m_pPipelineState->IsGraphics());
+    assert(m_pipelineState->isGraphics());
 
-    const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
+    const auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
-    auto& builtInUsage = pResUsage->builtInUsage;
-    auto& inOutUsage = pResUsage->inOutUsage;
+    auto& builtInUsage = resUsage->builtInUsage;
+    auto& inOutUsage = resUsage->inOutUsage;
 
-    const auto nextStage = m_pPipelineState->GetNextShaderStage(m_shaderStage);
-    auto pNextResUsage =
-        (nextStage != ShaderStageInvalid) ? m_pPipelineState->GetShaderResourceUsage(nextStage) : nullptr;
+    const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+    auto nextResUsage =
+        (nextStage != ShaderStageInvalid) ? m_pipelineState->getShaderResourceUsage(nextStage) : nullptr;
 
     assert(inOutUsage.builtInInputLocMap.empty()); // Should be empty
     assert(inOutUsage.builtInOutputLocMap.empty());
@@ -2263,8 +2263,8 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         if (nextStage == ShaderStageFragment)
         {
             // VS  ==>  FS
-            const auto& nextBuiltInUsage = pNextResUsage->builtInUsage.fs;
-            auto& nextInOutUsage = pNextResUsage->inOutUsage;
+            const auto& nextBuiltInUsage = nextResUsage->builtInUsage.fs;
+            auto& nextInOutUsage = nextResUsage->inOutUsage;
 
             if (nextBuiltInUsage.clipDistance > 0)
             {
@@ -2320,8 +2320,8 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         else if (nextStage == ShaderStageTessControl)
         {
             // VS  ==>  TCS
-            const auto& nextBuiltInUsage = pNextResUsage->builtInUsage.tcs;
-            auto& nextInOutUsage = pNextResUsage->inOutUsage;
+            const auto& nextBuiltInUsage = nextResUsage->builtInUsage.tcs;
+            auto& nextInOutUsage = nextResUsage->inOutUsage;
 
             if (nextBuiltInUsage.positionIn)
             {
@@ -2381,8 +2381,8 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         else if (nextStage == ShaderStageGeometry)
         {
             // VS  ==>  GS
-            const auto& nextBuiltInUsage = pNextResUsage->builtInUsage.gs;
-            auto& nextInOutUsage = pNextResUsage->inOutUsage;
+            const auto& nextBuiltInUsage = nextResUsage->builtInUsage.gs;
+            auto& nextInOutUsage = nextResUsage->inOutUsage;
 
             if (nextBuiltInUsage.positionIn)
             {
@@ -2525,8 +2525,8 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         // Map built-in outputs to generic ones
         if (nextStage == ShaderStageTessEval)
         {
-            const auto& nextBuiltInUsage = pNextResUsage->builtInUsage.tes;
-            auto& nextInOutUsage = pNextResUsage->inOutUsage;
+            const auto& nextBuiltInUsage = nextResUsage->builtInUsage.tes;
+            auto& nextInOutUsage = nextResUsage->inOutUsage;
 
             // NOTE: For tessellation control shadder, those built-in outputs that involve in output import have to
             // be mapped to generic ones even if they do not have corresponding built-in inputs used in next shader
@@ -2756,10 +2756,10 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             // NOTE: If gl_in[].gl_ClipDistance is used, we have to check the usage of gl_out[].gl_ClipDistance in
             // tessellation control shader. The clip distance is the maximum of the two. We do this to avoid
             // incorrectness of location assignment during builtin-to-generic mapping.
-            const auto prevStage = m_pPipelineState->GetPrevShaderStage(m_shaderStage);
+            const auto prevStage = m_pipelineState->getPrevShaderStage(m_shaderStage);
             if (prevStage == ShaderStageTessControl)
             {
-                const auto& prevBuiltInUsage = m_pPipelineState->GetShaderResourceUsage(prevStage)->builtInUsage.tcs;
+                const auto& prevBuiltInUsage = m_pipelineState->getShaderResourceUsage(prevStage)->builtInUsage.tcs;
                 clipDistanceCount = std::max(clipDistanceCount, prevBuiltInUsage.clipDistance);
             }
 
@@ -2774,10 +2774,10 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         {
             unsigned cullDistanceCount = builtInUsage.tes.cullDistanceIn;
 
-            const auto prevStage = m_pPipelineState->GetPrevShaderStage(m_shaderStage);
+            const auto prevStage = m_pipelineState->getPrevShaderStage(m_shaderStage);
             if (prevStage == ShaderStageTessControl)
             {
-                const auto& prevBuiltInUsage = m_pPipelineState->GetShaderResourceUsage(prevStage)->builtInUsage.tcs;
+                const auto& prevBuiltInUsage = m_pipelineState->getShaderResourceUsage(prevStage)->builtInUsage.tcs;
                 cullDistanceCount = std::max(cullDistanceCount, prevBuiltInUsage.clipDistance);
             }
 
@@ -2802,8 +2802,8 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         if (nextStage == ShaderStageFragment)
         {
             // TES  ==>  FS
-            const auto& nextBuiltInUsage = pNextResUsage->builtInUsage.fs;
-            auto& nextInOutUsage = pNextResUsage->inOutUsage;
+            const auto& nextBuiltInUsage = nextResUsage->builtInUsage.fs;
+            auto& nextInOutUsage = nextResUsage->inOutUsage;
 
             if (nextBuiltInUsage.clipDistance > 0)
             {
@@ -2859,8 +2859,8 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         else if (nextStage == ShaderStageGeometry)
         {
             // TES  ==>  GS
-            const auto& nextBuiltInUsage = pNextResUsage->builtInUsage.gs;
-            auto& nextInOutUsage = pNextResUsage->inOutUsage;
+            const auto& nextBuiltInUsage = nextResUsage->builtInUsage.gs;
+            auto& nextInOutUsage = nextResUsage->inOutUsage;
 
             if (nextBuiltInUsage.positionIn)
             {
@@ -3003,42 +3003,42 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         // Map built-in outputs to generic ones (for GS)
         if (builtInUsage.gs.position)
         {
-            MapGsBuiltInOutput(BuiltInPosition, 1);
+            mapGsBuiltInOutput(BuiltInPosition, 1);
         }
 
         if (builtInUsage.gs.pointSize)
         {
-            MapGsBuiltInOutput(BuiltInPointSize, 1);
+            mapGsBuiltInOutput(BuiltInPointSize, 1);
         }
 
         if (builtInUsage.gs.clipDistance > 0)
         {
-            MapGsBuiltInOutput(BuiltInClipDistance, builtInUsage.gs.clipDistance);
+            mapGsBuiltInOutput(BuiltInClipDistance, builtInUsage.gs.clipDistance);
         }
 
         if (builtInUsage.gs.cullDistance > 0)
         {
-            MapGsBuiltInOutput(BuiltInCullDistance, builtInUsage.gs.cullDistance);
+            mapGsBuiltInOutput(BuiltInCullDistance, builtInUsage.gs.cullDistance);
         }
 
         if (builtInUsage.gs.primitiveId)
         {
-            MapGsBuiltInOutput(BuiltInPrimitiveId, 1);
+            mapGsBuiltInOutput(BuiltInPrimitiveId, 1);
         }
 
         if (builtInUsage.gs.layer)
         {
-            MapGsBuiltInOutput(BuiltInLayer, 1);
+            mapGsBuiltInOutput(BuiltInLayer, 1);
         }
 
         if (builtInUsage.gs.viewIndex)
         {
-            MapGsBuiltInOutput(BuiltInViewIndex, 1);
+            mapGsBuiltInOutput(BuiltInViewIndex, 1);
         }
 
         if (builtInUsage.gs.viewportIndex)
         {
-            MapGsBuiltInOutput(BuiltInViewportIndex, 1);
+            mapGsBuiltInOutput(BuiltInViewportIndex, 1);
         }
 
         // Map built-in outputs to generic ones (for copy shader)
@@ -3047,8 +3047,8 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         if (nextStage == ShaderStageFragment)
         {
             // GS  ==>  FS
-            const auto& nextBuiltInUsage = pNextResUsage->builtInUsage.fs;
-            auto& nextInOutUsage = pNextResUsage->inOutUsage;
+            const auto& nextBuiltInUsage = nextResUsage->builtInUsage.fs;
+            auto& nextInOutUsage = nextResUsage->inOutUsage;
 
             if (nextBuiltInUsage.clipDistance > 0)
             {
@@ -3211,7 +3211,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
     // Do builtin-to-generic mapping
     LLPC_OUTS("===============================================================================\n");
-    LLPC_OUTS("// LLPC builtin-to-generic mapping results (" << PipelineState::GetShaderStageAbbreviation(m_shaderStage)
+    LLPC_OUTS("// LLPC builtin-to-generic mapping results (" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
               << " shader)\n\n");
     if (inOutUsage.builtInInputLocMap.empty() == false)
     {
@@ -3219,8 +3219,8 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         {
             const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
             const unsigned loc = builtInMap.second;
-            LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Input:  builtin = "
-                          << BuilderImplInOut::GetBuiltInName(builtInId)
+            LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input:  builtin = "
+                          << BuilderImplInOut::getBuiltInName(builtInId)
                           << "  =>  Mapped = " << loc << "\n");
         }
         LLPC_OUTS("\n");
@@ -3235,16 +3235,16 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 
             if (m_shaderStage == ShaderStageGeometry)
             {
-                LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage)
+                LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
                     << ") Output: stream = " << inOutUsage.gs.rasterStream << " , "
-                    << "builtin = " << BuilderImplInOut::GetBuiltInName(builtInId)
+                    << "builtin = " << BuilderImplInOut::getBuiltInName(builtInId)
                     << "  =>  Mapped = " << loc << "\n");
             }
             else
             {
-                LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage)
+                LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
                     << ") Output: builtin = "
-                    << BuilderImplInOut::GetBuiltInName(builtInId)
+                    << BuilderImplInOut::getBuiltInName(builtInId)
                     << "  =>  Mapped = " << loc << "\n");
             }
         }
@@ -3257,8 +3257,8 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         {
             const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
             const unsigned loc = builtInMap.second;
-            LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  builtin = "
-                          << BuilderImplInOut::GetBuiltInName(builtInId)
+            LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  builtin = "
+                          << BuilderImplInOut::getBuiltInName(builtInId)
                           << "  =>  Mapped = " << loc << "\n");
         }
         LLPC_OUTS("\n");
@@ -3270,63 +3270,63 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         {
             const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
             const unsigned loc = builtInMap.second;
-            LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): builtin = "
-                          << BuilderImplInOut::GetBuiltInName(builtInId)
+            LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): builtin = "
+                          << BuilderImplInOut::getBuiltInName(builtInId)
                           << "  =>  Mapped = " << loc << "\n");
         }
         LLPC_OUTS("\n");
     }
 
     LLPC_OUTS("// LLPC location count results (after builtin-to-generic mapping)\n\n");
-    LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Input:  loc count = "
+    LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input:  loc count = "
                   << inOutUsage.inputMapLocCount << "\n");
-    LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Output: loc count = "
+    LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Output: loc count = "
                   << inOutUsage.outputMapLocCount << "\n");
-    LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  loc count = "
+    LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  loc count = "
                   << inOutUsage.perPatchInputMapLocCount << "\n");
-    LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): loc count = "
+    LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): loc count = "
                   << inOutUsage.perPatchOutputMapLocCount << "\n");
     LLPC_OUTS("\n");
 }
 
 // =====================================================================================================================
 // Map locations of generic outputs of geometry shader to tightly packed ones.
-void PatchResourceCollect::MapGsGenericOutput(
+void PatchResourceCollect::mapGsGenericOutput(
     GsOutLocInfo outLocInfo)             // GS output location info
 {
     assert(m_shaderStage == ShaderStageGeometry);
     unsigned streamId = outLocInfo.streamId;
-    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
-    auto& inOutUsage = pResUsage->inOutUsage.gs;
+    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+    auto& inOutUsage = resUsage->inOutUsage.gs;
 
-    pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All] = inOutUsage.outLocCount[streamId]++;
+    resUsage->inOutUsage.outputLocMap[outLocInfo.u32All] = inOutUsage.outLocCount[streamId]++;
 
     unsigned assignedLocCount = inOutUsage.outLocCount[0] +
                             inOutUsage.outLocCount[1] +
                             inOutUsage.outLocCount[2] +
                             inOutUsage.outLocCount[3];
 
-    pResUsage->inOutUsage.outputMapLocCount = std::max(pResUsage->inOutUsage.outputMapLocCount, assignedLocCount);
+    resUsage->inOutUsage.outputMapLocCount = std::max(resUsage->inOutUsage.outputMapLocCount, assignedLocCount);
 
-    LLPC_OUTS("(" << PipelineState::GetShaderStageAbbreviation(m_shaderStage)
+    LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
                 << ") Output: stream = " << outLocInfo.streamId << ", "
                 << " loc = " << outLocInfo.location
                 << "  =>  Mapped = "
-                << pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All] << "\n");
+                << resUsage->inOutUsage.outputLocMap[outLocInfo.u32All] << "\n");
 }
 
 // =====================================================================================================================
 // Map built-in outputs of geometry shader to tightly packed locations.
-void PatchResourceCollect::MapGsBuiltInOutput(
+void PatchResourceCollect::mapGsBuiltInOutput(
     unsigned builtInId,         // Built-in ID
     unsigned elemCount)         // Element count of this built-in
 {
     assert(m_shaderStage == ShaderStageGeometry);
-    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
-    auto& inOutUsage = pResUsage->inOutUsage.gs;
+    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+    auto& inOutUsage = resUsage->inOutUsage.gs;
     unsigned streamId = inOutUsage.rasterStream;
 
-    pResUsage->inOutUsage.builtInOutputLocMap[builtInId] = inOutUsage.outLocCount[streamId]++;
+    resUsage->inOutUsage.builtInOutputLocMap[builtInId] = inOutUsage.outLocCount[streamId]++;
 
     if (elemCount > 4)
     {
@@ -3338,40 +3338,40 @@ void PatchResourceCollect::MapGsBuiltInOutput(
                             inOutUsage.outLocCount[2] +
                             inOutUsage.outLocCount[3];
 
-    pResUsage->inOutUsage.outputMapLocCount = std::max(pResUsage->inOutUsage.outputMapLocCount, assignedLocCount);
+    resUsage->inOutUsage.outputMapLocCount = std::max(resUsage->inOutUsage.outputMapLocCount, assignedLocCount);
 }
 
 // =====================================================================================================================
 // Determine whether the requirements of packing input/output is satisfied in patch phase
-bool PatchResourceCollect::CanPackInOut() const
+bool PatchResourceCollect::canPackInOut() const
 {
     // Pack input/output requirements:
     // 1) -pack-in-out option is on
     // 2) It is a VS-FS pipeline
     return PackInOut &&
-           (m_pPipelineState->GetShaderStageMask() ==
-            (ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageFragment)));
+           (m_pipelineState->getShaderStageMask() ==
+            (shaderStageToMask(ShaderStageVertex) | shaderStageToMask(ShaderStageFragment)));
 }
 
 // =====================================================================================================================
 // The process of packing input/output
-void PatchResourceCollect::PackInOutLocation()
+void PatchResourceCollect::packInOutLocation()
 {
     if (m_shaderStage == ShaderStageFragment)
     {
-        m_pLocationMapManager->BuildLocationMap();
+        m_locationMapManager->buildLocationMap();
 
-        ReviseInputImportCalls();
+        reviseInputImportCalls();
 
         m_inOutCalls.clear(); // It will hold XX' output calls
     }
     else if (m_shaderStage == ShaderStageVertex)
     {
-        ReassembleOutputExportCalls();
+        reassembleOutputExportCalls();
 
         // For computing the shader hash
-        m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage.inOutLocMap =
-            m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->inOutUsage.inOutLocMap;
+        m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.inOutLocMap =
+            m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->inOutUsage.inOutLocMap;
     }
     else
     {
@@ -3382,7 +3382,7 @@ void PatchResourceCollect::PackInOutLocation()
 
 // =====================================================================================================================
 // Revise the location and element index fields of the fragment shaders input import functions
-void PatchResourceCollect::ReviseInputImportCalls()
+void PatchResourceCollect::reviseInputImportCalls()
 {
     if (m_inOutCalls.empty())
     {
@@ -3391,130 +3391,130 @@ void PatchResourceCollect::ReviseInputImportCalls()
 
     assert(m_shaderStage == ShaderStageFragment);
 
-    auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
+    auto& inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
     auto& inputLocMap = inOutUsage.inputLocMap;
     inputLocMap.clear();
 
-    BuilderBase builder(*m_pContext);
+    BuilderBase builder(*m_context);
 
-    for (auto pCall : m_inOutCalls)
+    for (auto call : m_inOutCalls)
     {
-        auto argCount = pCall->arg_size();
+        auto argCount = call->arg_size();
         const bool isInterpolant = (argCount == 5);
         unsigned compIdx = 1;
         unsigned locOffset = 0;
         if (isInterpolant)
         {
             compIdx = 2;
-            locOffset = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+            locOffset = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
         }
 
         // Construct original InOutLocation from the location and elemIdx operands of the FS' input import call
         InOutLocation origInLoc = {};
-        origInLoc.locationInfo.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue() + locOffset;
-        origInLoc.locationInfo.component = cast<ConstantInt>(pCall->getOperand(compIdx))->getZExtValue();
+        origInLoc.locationInfo.location = cast<ConstantInt>(call->getOperand(0))->getZExtValue() + locOffset;
+        origInLoc.locationInfo.component = cast<ConstantInt>(call->getOperand(compIdx))->getZExtValue();
         origInLoc.locationInfo.half = false;
 
         // Get the packed InOutLocation from locationMap
-        const InOutLocation* pNewInLoc = nullptr;
-        m_pLocationMapManager->FindMap(origInLoc, pNewInLoc);
-        assert(m_pLocationMapManager->FindMap(origInLoc, pNewInLoc));
+        const InOutLocation* newInLoc = nullptr;
+        m_locationMapManager->findMap(origInLoc, newInLoc);
+        assert(m_locationMapManager->findMap(origInLoc, newInLoc));
 
         // TODO: inputLocMap can be removed
-        inputLocMap[pNewInLoc->locationInfo.location] = InvalidValue;
-        inOutUsage.inOutLocMap[origInLoc.AsIndex()] = pNewInLoc->AsIndex();
+        inputLocMap[newInLoc->locationInfo.location] = InvalidValue;
+        inOutUsage.inOutLocMap[origInLoc.asIndex()] = newInLoc->asIndex();
 
         // Re-write the input import call by using the new InOutLocation
         SmallVector<Value*, 5> args;
         std::string callName;
         if (isInterpolant == false)
         {
-            args.push_back(builder.getInt32(pNewInLoc->locationInfo.location));
-            args.push_back(builder.getInt32(pNewInLoc->locationInfo.component));
-            args.push_back(pCall->getOperand(2));
-            args.push_back(pCall->getOperand(3));
+            args.push_back(builder.getInt32(newInLoc->locationInfo.location));
+            args.push_back(builder.getInt32(newInLoc->locationInfo.component));
+            args.push_back(call->getOperand(2));
+            args.push_back(call->getOperand(3));
 
             callName = lgcName::InputImportGeneric;
         }
         else
         {
-            args.push_back(builder.getInt32(pNewInLoc->locationInfo.location));
+            args.push_back(builder.getInt32(newInLoc->locationInfo.location));
             args.push_back(builder.getInt32(0));
-            args.push_back(builder.getInt32(pNewInLoc->locationInfo.component));
-            args.push_back(pCall->getOperand(3));
-            args.push_back(pCall->getOperand(4));
+            args.push_back(builder.getInt32(newInLoc->locationInfo.component));
+            args.push_back(call->getOperand(3));
+            args.push_back(call->getOperand(4));
 
             callName = lgcName::InputImportInterpolant;
         }
 
         // Previous stage converts non-float type to float type when outputs
-        Type* pReturnTy = builder.getFloatTy();
-        AddTypeMangling(pReturnTy, args, callName);
-        Value* pOutValue = EmitCall(callName,
-                                    pReturnTy,
+        Type* returnTy = builder.getFloatTy();
+        addTypeMangling(returnTy, args, callName);
+        Value* outValue = emitCall(callName,
+                                    returnTy,
                                     args,
                                     {},
-                                    pCall);
+                                    call);
 
         // Restore float type to original type
-        builder.SetInsertPoint(pCall);
+        builder.SetInsertPoint(call);
 
-        auto pCallee = pCall->getCalledFunction();
-        Type* pOrigReturnTy = pCallee->getReturnType();
-        if (pOrigReturnTy->isIntegerTy())
+        auto callee = call->getCalledFunction();
+        Type* origReturnTy = callee->getReturnType();
+        if (origReturnTy->isIntegerTy())
         {
             // float -> i32
-            pOutValue = builder.CreateBitCast(pOutValue, builder.getInt32Ty());
-            if (pOrigReturnTy->getScalarSizeInBits() < 32)
+            outValue = builder.CreateBitCast(outValue, builder.getInt32Ty());
+            if (origReturnTy->getScalarSizeInBits() < 32)
             {
                 // i32 -> i16 or i8
-                pOutValue = builder.CreateTrunc(pOutValue, pOrigReturnTy);
+                outValue = builder.CreateTrunc(outValue, origReturnTy);
             }
         }
-        else if (pOrigReturnTy->isHalfTy())
+        else if (origReturnTy->isHalfTy())
         {
             // float -> f16
-            pOutValue = builder.CreateFPTrunc(pOutValue, pOrigReturnTy);
+            outValue = builder.CreateFPTrunc(outValue, origReturnTy);
         }
 
-        pCall->replaceAllUsesWith(pOutValue);
+        call->replaceAllUsesWith(outValue);
     }
 }
 
 // =====================================================================================================================
 // Re-assemble output export functions based on the locationMap
-void PatchResourceCollect::ReassembleOutputExportCalls()
+void PatchResourceCollect::reassembleOutputExportCalls()
 {
     if (m_inOutCalls.empty())
     {
         return;
     }
 
-    auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
+    auto& inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
 
     // Collect the components of a vector exported from each packed location
     // Assume each location exports a vector with four components
     std::vector<std::array<Value*, 4>> packedComponents(m_inOutCalls.size());
-    for (auto pCall : m_inOutCalls)
+    for (auto call : m_inOutCalls)
     {
         InOutLocation origOutLoc = {};
-        origOutLoc.locationInfo.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
-        origOutLoc.locationInfo.component = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+        origOutLoc.locationInfo.location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
+        origOutLoc.locationInfo.component = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
         origOutLoc.locationInfo.half = false;
 
-        const InOutLocation* pNewInLoc = nullptr;
-        const bool isFound = m_pLocationMapManager->FindMap(origOutLoc, pNewInLoc);
+        const InOutLocation* newInLoc = nullptr;
+        const bool isFound = m_locationMapManager->findMap(origOutLoc, newInLoc);
         if (isFound == false)
         {
             continue;
         }
 
-        auto& components = packedComponents[pNewInLoc->locationInfo.location];
-        components[pNewInLoc->locationInfo.component] = pCall->getOperand(2);
+        auto& components = packedComponents[newInLoc->locationInfo.location];
+        components[newInLoc->locationInfo.component] = call->getOperand(2);
     }
 
     // Re-assamble XX' output export calls for each packed location
-    BuilderBase builder(*m_pContext);
+    BuilderBase builder(*m_context);
     builder.SetInsertPoint(m_inOutCalls.back());
 
     auto& outputLocMap = inOutUsage.outputLocMap;
@@ -3525,9 +3525,9 @@ void PatchResourceCollect::ReassembleOutputExportCalls()
     for (auto components : packedComponents)
     {
         unsigned compCount = 0;
-        for (auto pComp : components)
+        for (auto comp : components)
         {
-            if (pComp != nullptr)
+            if (comp != nullptr)
             {
                 ++compCount;
             }
@@ -3539,47 +3539,47 @@ void PatchResourceCollect::ReassembleOutputExportCalls()
         }
 
         // Construct the output vector
-        Value* pOutValue = (compCount == 1) ? components[0] :
+        Value* outValue = (compCount == 1) ? components[0] :
                            UndefValue::get(VectorType::get(builder.getFloatTy(), compCount));
         for (auto compIdx = 0; compIdx < compCount; ++compIdx)
         {
             // Type conversion from non-float to float
-            Value* pComp = components[compIdx];
-            Type* pCompTy = pComp->getType();
-            if (pCompTy->isIntegerTy())
+            Value* comp = components[compIdx];
+            Type* compTy = comp->getType();
+            if (compTy->isIntegerTy())
             {
                 // i8/i16 -> i32
-                if (pCompTy->getScalarSizeInBits() < 32)
+                if (compTy->getScalarSizeInBits() < 32)
                 {
-                    pComp = builder.CreateZExt(pComp, builder.getInt32Ty());
+                    comp = builder.CreateZExt(comp, builder.getInt32Ty());
                 }
                 // i32 -> float
-                pComp = builder.CreateBitCast(pComp, builder.getFloatTy());
+                comp = builder.CreateBitCast(comp, builder.getFloatTy());
             }
-            else if (pCompTy->isHalfTy())
+            else if (compTy->isHalfTy())
             {
                 // f16 -> float
-                pComp = builder.CreateFPExt(pComp, builder.getFloatTy());
+                comp = builder.CreateFPExt(comp, builder.getFloatTy());
             }
 
             if (compCount > 1)
             {
-                pOutValue = builder.CreateInsertElement(pOutValue, pComp, compIdx);
+                outValue = builder.CreateInsertElement(outValue, comp, compIdx);
             }
             else
             {
-                pOutValue = pComp;
+                outValue = comp;
             }
         }
 
         args[0] = builder.getInt32(consectiveLocation);
         args[1] = builder.getInt32(0);
-        args[2] = pOutValue;
+        args[2] = outValue;
 
         std::string callName(lgcName::OutputExportGeneric);
-        AddTypeMangling(builder.getVoidTy(), args, callName);
+        addTypeMangling(builder.getVoidTy(), args, callName);
 
-        builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
+        builder.createNamedCall(callName, builder.getVoidTy(), args, {});
 
         outputLocMap[consectiveLocation] = InvalidValue;
         ++consectiveLocation;
@@ -3588,114 +3588,114 @@ void PatchResourceCollect::ReassembleOutputExportCalls()
 
 // =====================================================================================================================
 // Scalarize last vertex processing stage outputs and FS inputs ready for packing.
-void PatchResourceCollect::ScalarizeForInOutPacking(
-    Module* pModule)    // [in/out] Module
+void PatchResourceCollect::scalarizeForInOutPacking(
+    Module* module)    // [in/out] Module
 {
     // First gather the input/output calls that need scalarizing.
     SmallVector<CallInst*, 4> vsOutputCalls;
     SmallVector<CallInst*, 4> fsInputCalls;
-    for (Function& func : *pModule)
+    for (Function& func : *module)
     {
         if (func.getName().startswith(lgcName::InputImportGeneric) ||
             func.getName().startswith(lgcName::InputImportInterpolant))
         {
             // This is a generic (possibly interpolated) input. Find its uses in FS.
-            for (User* pUser : func.users())
+            for (User* user : func.users())
             {
-                auto pCall = cast<CallInst>(pUser);
-                if (m_pPipelineShaders->GetShaderStage(pCall->getFunction()) != ShaderStageFragment)
+                auto call = cast<CallInst>(user);
+                if (m_pipelineShaders->getShaderStage(call->getFunction()) != ShaderStageFragment)
                 {
                     continue;
                 }
                 // We have a use in FS. See if it needs scalarizing.
-                if (isa<VectorType>(pCall->getType()) || (pCall->getType()->getPrimitiveSizeInBits() == 64))
+                if (isa<VectorType>(call->getType()) || (call->getType()->getPrimitiveSizeInBits() == 64))
                 {
-                    fsInputCalls.push_back(pCall);
+                    fsInputCalls.push_back(call);
                 }
             }
         }
         else if (func.getName().startswith(lgcName::OutputExportGeneric))
         {
             // This is a generic output. Find its uses in the last vertex processing stage.
-            for (User* pUser : func.users())
+            for (User* user : func.users())
             {
-                auto pCall = cast<CallInst>(pUser);
-                if (m_pPipelineShaders->GetShaderStage(pCall->getFunction()) !=
-                      m_pPipelineState->GetLastVertexProcessingStage())
+                auto call = cast<CallInst>(user);
+                if (m_pipelineShaders->getShaderStage(call->getFunction()) !=
+                      m_pipelineState->getLastVertexProcessingStage())
                 {
                     continue;
                 }
                 // We have a use the last vertex processing stage. See if it needs scalarizing. The output value is
                 // always the final argument.
-                Type* pValueTy = pCall->getArgOperand(pCall->getNumArgOperands() - 1)->getType();
-                if (isa<VectorType>(pValueTy) || (pValueTy->getPrimitiveSizeInBits() == 64))
+                Type* valueTy = call->getArgOperand(call->getNumArgOperands() - 1)->getType();
+                if (isa<VectorType>(valueTy) || (valueTy->getPrimitiveSizeInBits() == 64))
                 {
-                    vsOutputCalls.push_back(pCall);
+                    vsOutputCalls.push_back(call);
                 }
             }
         }
     }
 
     // Scalarize the gathered inputs and outputs.
-    for (CallInst* pCall : fsInputCalls)
+    for (CallInst* call : fsInputCalls)
     {
-        ScalarizeGenericInput(pCall);
+        scalarizeGenericInput(call);
     }
-    for (CallInst* pCall : vsOutputCalls)
+    for (CallInst* call : vsOutputCalls)
     {
-        ScalarizeGenericOutput(pCall);
+        scalarizeGenericOutput(call);
     }
 }
 
 // =====================================================================================================================
 // Scalarize a generic input.
 // This is known to be an FS generic or interpolant input that is either a vector or 64 bit.
-void PatchResourceCollect::ScalarizeGenericInput(
-    CallInst* pCall)  // [in] Call that represents importing the generic or interpolant input
+void PatchResourceCollect::scalarizeGenericInput(
+    CallInst* call)  // [in] Call that represents importing the generic or interpolant input
 {
-    BuilderBase builder(pCall->getContext());
-    builder.SetInsertPoint(pCall);
+    BuilderBase builder(call->getContext());
+    builder.SetInsertPoint(call);
 
     // FS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
     //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
     //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
     SmallVector<Value*, 5> args;
-    for (unsigned i = 0, end = pCall->getNumArgOperands(); i != end; ++i)
+    for (unsigned i = 0, end = call->getNumArgOperands(); i != end; ++i)
     {
-        args.push_back(pCall->getArgOperand(i));
+        args.push_back(call->getArgOperand(i));
     }
 
     bool isInterpolant = args.size() != 4;
     unsigned elemIdxArgIdx = isInterpolant ? 2 : 1;
     unsigned elemIdx = cast<ConstantInt>(args[elemIdxArgIdx])->getZExtValue();
-    Type* pResultTy = pCall->getType();
+    Type* resultTy = call->getType();
 
-    if (!isa<VectorType>(pResultTy))
+    if (!isa<VectorType>(resultTy))
     {
         // Handle the case of splitting a 64 bit scalar in two.
-        assert(pResultTy->getPrimitiveSizeInBits() == 64);
+        assert(resultTy->getPrimitiveSizeInBits() == 64);
         std::string callName = isInterpolant ? lgcName::InputImportInterpolant : lgcName::InputImportGeneric;
-        AddTypeMangling(builder.getInt32Ty(), args, callName);
-        Value* pResult = UndefValue::get(VectorType::get(builder.getInt32Ty(), 2));
+        addTypeMangling(builder.getInt32Ty(), args, callName);
+        Value* result = UndefValue::get(VectorType::get(builder.getInt32Ty(), 2));
         for (unsigned i = 0; i != 2; ++i)
         {
             args[elemIdxArgIdx] = builder.getInt32(elemIdx * 2 + i);
-            pResult = builder.CreateInsertElement(pResult,
-                                                  builder.CreateNamedCall(callName,
+            result = builder.CreateInsertElement(result,
+                                                  builder.createNamedCall(callName,
                                                                           builder.getInt32Ty(),
                                                                           args,
                                                                           Attribute::ReadOnly),
                                                   i);
         }
-        pResult = builder.CreateBitCast(pResult, pCall->getType());
-        pCall->replaceAllUsesWith(pResult);
-        pCall->eraseFromParent();
+        result = builder.CreateBitCast(result, call->getType());
+        call->replaceAllUsesWith(result);
+        call->eraseFromParent();
         return;
     }
 
     // Now we know we're reading a vector.
-    Type* pElementTy = pResultTy->getVectorElementType();
-    unsigned scalarizeBy = pResultTy->getVectorNumElements();
+    Type* elementTy = resultTy->getVectorElementType();
+    unsigned scalarizeBy = resultTy->getVectorNumElements();
 
     // Find trivially unused elements.
     // This is not quite as good as the previous version of this code that scalarized in the
@@ -3706,26 +3706,26 @@ void PatchResourceCollect::ScalarizeGenericInput(
     assert(scalarizeBy <= MaxScalarizeBy);
     bool elementUsed[MaxScalarizeBy] = {};
     bool unknownElementsUsed = false;
-    for (User* pUser : pCall->users())
+    for (User* user : call->users())
     {
-        if (auto pExtract = dyn_cast<ExtractElementInst>(pUser))
+        if (auto extract = dyn_cast<ExtractElementInst>(user))
         {
-            unsigned idx = cast<ConstantInt>(pExtract->getIndexOperand())->getZExtValue();
+            unsigned idx = cast<ConstantInt>(extract->getIndexOperand())->getZExtValue();
             assert(idx < scalarizeBy);
             elementUsed[idx] = true;
             continue;
         }
-        if (auto pShuffle = dyn_cast<ShuffleVectorInst>(pUser))
+        if (auto shuffle = dyn_cast<ShuffleVectorInst>(user))
         {
             SmallVector<int, 4> mask;
-            pShuffle->getShuffleMask(mask);
+            shuffle->getShuffleMask(mask);
             for (int maskElement : mask)
             {
                 if (maskElement >= 0)
                 {
                     if (maskElement < scalarizeBy)
                     {
-                        if (pShuffle->getOperand(0) == pCall)
+                        if (shuffle->getOperand(0) == call)
                         {
                             elementUsed[maskElement] = true;
                         }
@@ -3733,7 +3733,7 @@ void PatchResourceCollect::ScalarizeGenericInput(
                     else
                     {
                         assert(maskElement < 2 * scalarizeBy);
-                        if (pShuffle->getOperand(1) == pCall)
+                        if (shuffle->getOperand(1) == call)
                         {
                             elementUsed[maskElement - scalarizeBy] = true;
                         }
@@ -3747,9 +3747,9 @@ void PatchResourceCollect::ScalarizeGenericInput(
     }
 
     // Load the individual elements and insert into a vector.
-    Value* pResult = UndefValue::get(pResultTy);
+    Value* result = UndefValue::get(resultTy);
     std::string callName = isInterpolant ? lgcName::InputImportInterpolant : lgcName::InputImportGeneric;
-    AddTypeMangling(pElementTy, args, callName);
+    addTypeMangling(elementTy, args, callName);
     for (unsigned i = 0; i != scalarizeBy; ++i)
     {
         if (!unknownElementsUsed && !elementUsed[i])
@@ -3758,101 +3758,101 @@ void PatchResourceCollect::ScalarizeGenericInput(
         }
         args[elemIdxArgIdx] = builder.getInt32(elemIdx + i);
 
-        CallInst* pElement = builder.CreateNamedCall(callName, pElementTy, args, Attribute::ReadOnly);
-        pResult = builder.CreateInsertElement(pResult, pElement, i);
-        if (pElementTy->getPrimitiveSizeInBits() == 64)
+        CallInst* element = builder.createNamedCall(callName, elementTy, args, Attribute::ReadOnly);
+        result = builder.CreateInsertElement(result, element, i);
+        if (elementTy->getPrimitiveSizeInBits() == 64)
         {
             // If scalarizing with 64 bit elements, further split each element.
-            ScalarizeGenericInput(pElement);
+            scalarizeGenericInput(element);
         }
     }
 
-    pCall->replaceAllUsesWith(pResult);
-    pCall->eraseFromParent();
+    call->replaceAllUsesWith(result);
+    call->eraseFromParent();
 }
 
 // =====================================================================================================================
 // Scalarize a generic output.
 // This is known to be a last vertex processing stage (VS/TES/GS) generic output that is either a vector or 64 bit.
-void PatchResourceCollect::ScalarizeGenericOutput(
-    CallInst* pCall)  // [in] Call that represents exporting the generic output
+void PatchResourceCollect::scalarizeGenericOutput(
+    CallInst* call)  // [in] Call that represents exporting the generic output
 {
-    BuilderBase builder(pCall->getContext());
-    builder.SetInsertPoint(pCall);
+    BuilderBase builder(call->getContext());
+    builder.SetInsertPoint(call);
 
     // VS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
     // TES: @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
     // GS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
     SmallVector<Value*, 5> args;
-    for (unsigned i = 0, end = pCall->getNumArgOperands(); i != end; ++i)
+    for (unsigned i = 0, end = call->getNumArgOperands(); i != end; ++i)
     {
-        args.push_back(pCall->getArgOperand(i));
+        args.push_back(call->getArgOperand(i));
     }
 
     static const unsigned ElemIdxArgIdx = 1;
-    unsigned valArgIdx = pCall->getNumArgOperands() - 1;
+    unsigned valArgIdx = call->getNumArgOperands() - 1;
     unsigned elemIdx = cast<ConstantInt>(args[ElemIdxArgIdx])->getZExtValue();
-    Value* pOutputVal = pCall->getArgOperand(valArgIdx);
-    Type* pElementTy = pOutputVal->getType();
+    Value* outputVal = call->getArgOperand(valArgIdx);
+    Type* elementTy = outputVal->getType();
     unsigned scalarizeBy = 1;
-    if (auto pVectorTy = dyn_cast<VectorType>(pElementTy))
+    if (auto vectorTy = dyn_cast<VectorType>(elementTy))
     {
-        scalarizeBy = pVectorTy->getNumElements();
-        pElementTy = pVectorTy->getElementType();
+        scalarizeBy = vectorTy->getNumElements();
+        elementTy = vectorTy->getElementType();
     }
 
     // For a 64-bit element type, split each element in two. (We're assuming no interpolation for 64 bit.)
-    if (pElementTy->getPrimitiveSizeInBits() == 64)
+    if (elementTy->getPrimitiveSizeInBits() == 64)
     {
         scalarizeBy *= 2;
         elemIdx *= 2;
-        pElementTy = builder.getInt32Ty();
+        elementTy = builder.getInt32Ty();
     }
 
     // Bitcast the original value to the vector type if necessary.
-    pOutputVal = builder.CreateBitCast(pOutputVal, VectorType::get(pElementTy, scalarizeBy));
+    outputVal = builder.CreateBitCast(outputVal, VectorType::get(elementTy, scalarizeBy));
 
     // Extract and store the individual elements.
     std::string callName;
     for (unsigned i = 0; i != scalarizeBy; ++i)
     {
         args[ElemIdxArgIdx] = builder.getInt32(elemIdx + i);
-        args[valArgIdx] = builder.CreateExtractElement(pOutputVal, i);
+        args[valArgIdx] = builder.CreateExtractElement(outputVal, i);
         if (i == 0)
         {
             callName = lgcName::OutputExportGeneric;
-            AddTypeMangling(nullptr, args, callName);
+            addTypeMangling(nullptr, args, callName);
         }
-        builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
+        builder.createNamedCall(callName, builder.getVoidTy(), args, {});
     }
 
-    pCall->eraseFromParent();
+    call->eraseFromParent();
 }
 
 // =====================================================================================================================
 // Fill the locationSpan container by constructing a LocationSpan from each input import call
-bool InOutLocationMapManager::AddSpan(
-    CallInst*   pCall)  // [in] Call to process
+bool InOutLocationMapManager::addSpan(
+    CallInst*   call)  // [in] Call to process
 {
-    auto pCallee = pCall->getCalledFunction();
-    auto mangledName = pCallee->getName();
+    auto callee = call->getCalledFunction();
+    auto mangledName = callee->getName();
     bool isInput = false;
     if (mangledName.startswith(lgcName::InputImportGeneric))
     {
         LocationSpan span = {};
 
-        span.firstLocation.locationInfo.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
-        span.firstLocation.locationInfo.component = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+        span.firstLocation.locationInfo.location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
+        span.firstLocation.locationInfo.component = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
         span.firstLocation.locationInfo.half = false;
 
-        const unsigned bitWidth = pCallee->getReturnType()->getScalarSizeInBits();
+        const unsigned bitWidth = callee->getReturnType()->getScalarSizeInBits();
         span.compatibilityInfo.halfComponentCount = bitWidth < 64 ? 2 : 4;
 
         span.compatibilityInfo.isFlat =
-            (cast<ConstantInt>(pCall->getOperand(2))->getZExtValue() == InOutInfo::InterpModeFlat);
+            (cast<ConstantInt>(call->getOperand(2))->getZExtValue() == InOutInfo::InterpModeFlat);
         span.compatibilityInfo.is16Bit = false;
         span.compatibilityInfo.isCustom =
-            (cast<ConstantInt>(pCall->getOperand(2))->getZExtValue() == InOutInfo::InterpModeCustom);
+            (cast<ConstantInt>(call->getOperand(2))->getZExtValue() == InOutInfo::InterpModeCustom);
 
         assert(std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end());
         m_locationSpans.push_back(span);
@@ -3861,24 +3861,24 @@ bool InOutLocationMapManager::AddSpan(
     }
     if (mangledName.startswith(lgcName::InputImportInterpolant))
     {
-        auto pLocOffset = pCall->getOperand(1);
-        assert(isa<ConstantInt>(pLocOffset));
+        auto locOffset = call->getOperand(1);
+        assert(isa<ConstantInt>(locOffset));
 
         LocationSpan span = {};
 
-        span.firstLocation.locationInfo.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue() +
-                                        cast<ConstantInt>(pLocOffset)->getZExtValue();
-        span.firstLocation.locationInfo.component = cast<ConstantInt>(pCall->getOperand(2))->getZExtValue();
+        span.firstLocation.locationInfo.location = cast<ConstantInt>(call->getOperand(0))->getZExtValue() +
+                                        cast<ConstantInt>(locOffset)->getZExtValue();
+        span.firstLocation.locationInfo.component = cast<ConstantInt>(call->getOperand(2))->getZExtValue();
         span.firstLocation.locationInfo.half = false;
 
-        const unsigned bitWidth = pCallee->getReturnType()->getScalarSizeInBits();
+        const unsigned bitWidth = callee->getReturnType()->getScalarSizeInBits();
         span.compatibilityInfo.halfComponentCount = bitWidth < 64 ? 2 : 4;
 
         span.compatibilityInfo.isFlat =
-            (cast<ConstantInt>(pCall->getOperand(3))->getZExtValue() == InOutInfo::InterpModeFlat);
+            (cast<ConstantInt>(call->getOperand(3))->getZExtValue() == InOutInfo::InterpModeFlat);
         span.compatibilityInfo.is16Bit = false;
         span.compatibilityInfo.isCustom =
-            (cast<ConstantInt>(pCall->getOperand(3))->getZExtValue() == InOutInfo::InterpModeCustom);
+            (cast<ConstantInt>(call->getOperand(3))->getZExtValue() == InOutInfo::InterpModeCustom);
 
         if (std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end())
         {
@@ -3893,7 +3893,7 @@ bool InOutLocationMapManager::AddSpan(
 
 // =====================================================================================================================
 // Build the map between orignal InOutLocation and packed InOutLocation based on sorted locaiton spans
-void InOutLocationMapManager::BuildLocationMap()
+void InOutLocationMapManager::buildLocationMap()
 {
     // Sort m_locationSpans based on LocationSpan::GetCompatibilityKey() and InOutLocation::AsIndex()
     std::sort(m_locationSpans.begin(), m_locationSpans.end());
@@ -3940,9 +3940,9 @@ void InOutLocationMapManager::BuildLocationMap()
 
 // =====================================================================================================================
 // Output a mapped InOutLocation from a given InOutLocation if the mapping exists
-bool InOutLocationMapManager::FindMap(
+bool InOutLocationMapManager::findMap(
     const InOutLocation& originalLocation,  // [in] The original InOutLocation
-    const InOutLocation*& pNewLocation)     // [out] The new InOutLocation
+    const InOutLocation*& newLocation)     // [out] The new InOutLocation
 {
     auto it = m_locationMap.find(originalLocation);
     if (it == m_locationMap.end())
@@ -3950,7 +3950,7 @@ bool InOutLocationMapManager::FindMap(
         return false;
     }
 
-    pNewLocation = &(it->second);
+    newLocation = &(it->second);
     return true;
 }
 

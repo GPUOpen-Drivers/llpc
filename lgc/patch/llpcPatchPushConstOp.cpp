@@ -52,7 +52,7 @@ char PatchPushConstOp::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for push constant operations
-ModulePass* CreatePatchPushConstOp()
+ModulePass* createPatchPushConstOp()
 {
     return new PatchPushConstOp();
 }
@@ -83,7 +83,7 @@ bool PatchPushConstOp::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Push-Const-Op\n");
 
-    Patch::Init(&module);
+    Patch::init(&module);
 
     SmallVector<Function*, 4> spillTableFuncs;
     for (auto& func : module)
@@ -100,39 +100,39 @@ bool PatchPushConstOp::runOnModule(
         return false;
     }
 
-    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
     const PipelineShaders& pipelineShaders = getAnalysis<PipelineShaders>();
     for (unsigned shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
     {
-        m_pEntryPoint = pipelineShaders.GetEntryPoint(static_cast<ShaderStage>(shaderStage));
+        m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStage>(shaderStage));
 
         // If we don't have an entry point for the shader stage, bail.
-        if (m_pEntryPoint == nullptr)
+        if (m_entryPoint == nullptr)
         {
             continue;
         }
 
         m_shaderStage = static_cast<ShaderStage>(shaderStage);
 
-        for (Function* pFunc : spillTableFuncs)
+        for (Function* func : spillTableFuncs)
         {
-            for (User* const pUser : pFunc->users())
+            for (User* const user : func->users())
             {
-                CallInst* const pCall = dyn_cast<CallInst>(pUser);
+                CallInst* const call = dyn_cast<CallInst>(user);
 
                 // If the user is not a call, bail.
-                if (pCall == nullptr)
+                if (call == nullptr)
                 {
                     continue;
                 }
 
                 // If the call is not in the entry point, bail.
-                if (pCall->getFunction() != m_pEntryPoint)
+                if (call->getFunction() != m_entryPoint)
                 {
                     continue;
                 }
 
-                visitCallInst(*pCall);
+                visitCallInst(*call);
             }
         }
     }
@@ -142,16 +142,16 @@ bool PatchPushConstOp::runOnModule(
     // Remove unnecessary instructions.
     while (m_instsToRemove.empty() == false)
     {
-        Instruction* const pInst = m_instsToRemove.pop_back_val();
-        pInst->dropAllReferences();
-        pInst->eraseFromParent();
+        Instruction* const inst = m_instsToRemove.pop_back_val();
+        inst->dropAllReferences();
+        inst->eraseFromParent();
     }
 
-    for (Function* pFunc : spillTableFuncs)
+    for (Function* func : spillTableFuncs)
     {
-        if (pFunc->user_empty())
+        if (func->user_empty())
         {
-            pFunc->eraseFromParent();
+            func->eraseFromParent();
         }
     }
 
@@ -163,104 +163,104 @@ bool PatchPushConstOp::runOnModule(
 void PatchPushConstOp::visitCallInst(
     CallInst& callInst) // [in] "Call" instruction
 {
-    Function* const pCallee = callInst.getCalledFunction();
-    assert(pCallee != nullptr);
-    assert(pCallee->getName().startswith(lgcName::DescriptorLoadSpillTable));
-    (void(pCallee)); // unused
+    Function* const callee = callInst.getCalledFunction();
+    assert(callee != nullptr);
+    assert(callee->getName().startswith(lgcName::DescriptorLoadSpillTable));
+    (void(callee)); // unused
 
-    auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
-    unsigned pushConstNodeIdx = pIntfData->pushConst.resNodeIdx;
+    auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+    unsigned pushConstNodeIdx = intfData->pushConst.resNodeIdx;
     assert(pushConstNodeIdx != InvalidValue);
-    auto pPushConstNode = &m_pPipelineState->GetUserDataNodes()[pushConstNodeIdx];
+    auto pushConstNode = &m_pipelineState->getUserDataNodes()[pushConstNodeIdx];
 
-    if (pPushConstNode->offsetInDwords < pIntfData->spillTable.offsetInDwords)
+    if (pushConstNode->offsetInDwords < intfData->spillTable.offsetInDwords)
     {
-        auto pPushConst = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.resNodeValues[pushConstNodeIdx]);
+        auto pushConst = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.resNodeValues[pushConstNodeIdx]);
 
-        IRBuilder<> builder(*m_pContext);
+        IRBuilder<> builder(*m_context);
         builder.SetInsertPoint(callInst.getFunction()->getEntryBlock().getFirstNonPHI());
 
-        Value* pPushConstPointer = builder.CreateAlloca(pPushConst->getType());
-        builder.CreateStore(pPushConst, pPushConstPointer);
+        Value* pushConstPointer = builder.CreateAlloca(pushConst->getType());
+        builder.CreateStore(pushConst, pushConstPointer);
 
-        Type* const pCastType = callInst.getType()->getPointerElementType()->getPointerTo(ADDR_SPACE_PRIVATE);
+        Type* const castType = callInst.getType()->getPointerElementType()->getPointerTo(ADDR_SPACE_PRIVATE);
 
-        pPushConstPointer = builder.CreateBitCast(pPushConstPointer, pCastType);
+        pushConstPointer = builder.CreateBitCast(pushConstPointer, castType);
 
         ValueMap<Value*, Value*> valueMap;
 
-        valueMap[&callInst] = pPushConstPointer;
+        valueMap[&callInst] = pushConstPointer;
 
         SmallVector<Value*, 8> workList;
 
-        for (User* const pUser : callInst.users())
+        for (User* const user : callInst.users())
         {
-            workList.push_back(pUser);
+            workList.push_back(user);
         }
 
         m_instsToRemove.push_back(&callInst);
 
         while (workList.empty() == false)
         {
-            Instruction* const pInst = dyn_cast<Instruction>(workList.pop_back_val());
+            Instruction* const inst = dyn_cast<Instruction>(workList.pop_back_val());
 
             // If the value is not an instruction, bail.
-            if (pInst == nullptr)
+            if (inst == nullptr)
             {
                 continue;
             }
 
-            m_instsToRemove.push_back(pInst);
+            m_instsToRemove.push_back(inst);
 
-            if (BitCastInst* const pBitCast = dyn_cast<BitCastInst>(pInst))
+            if (BitCastInst* const bitCast = dyn_cast<BitCastInst>(inst))
             {
-                assert(valueMap.count(pBitCast->getOperand(0)) > 0);
+                assert(valueMap.count(bitCast->getOperand(0)) > 0);
 
-                Type* const pCastType = pBitCast->getType();
-                assert(pCastType->isPointerTy());
-                assert(pCastType->getPointerAddressSpace() == ADDR_SPACE_CONST);
+                Type* const castType = bitCast->getType();
+                assert(castType->isPointerTy());
+                assert(castType->getPointerAddressSpace() == ADDR_SPACE_CONST);
 
-                Type* const pNewType = pCastType->getPointerElementType()->getPointerTo(ADDR_SPACE_PRIVATE);
+                Type* const newType = castType->getPointerElementType()->getPointerTo(ADDR_SPACE_PRIVATE);
 
-                builder.SetInsertPoint(pBitCast);
-                valueMap[pBitCast] = builder.CreateBitCast(valueMap[pBitCast->getOperand(0)], pNewType);
+                builder.SetInsertPoint(bitCast);
+                valueMap[bitCast] = builder.CreateBitCast(valueMap[bitCast->getOperand(0)], newType);
 
-                for (User* const pUser : pBitCast->users())
+                for (User* const user : bitCast->users())
                 {
-                    workList.push_back(pUser);
+                    workList.push_back(user);
                 }
             }
-            else if (GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pInst))
+            else if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(inst))
             {
-                assert(valueMap.count(pGetElemPtr->getPointerOperand()) > 0);
+                assert(valueMap.count(getElemPtr->getPointerOperand()) > 0);
 
                 SmallVector<Value*, 8> indices;
 
-                for (Value* const pIndex : pGetElemPtr->indices())
+                for (Value* const index : getElemPtr->indices())
                 {
-                    indices.push_back(pIndex);
+                    indices.push_back(index);
                 }
 
-                builder.SetInsertPoint(pGetElemPtr);
-                valueMap[pGetElemPtr] = builder.CreateInBoundsGEP(valueMap[pGetElemPtr->getPointerOperand()],
+                builder.SetInsertPoint(getElemPtr);
+                valueMap[getElemPtr] = builder.CreateInBoundsGEP(valueMap[getElemPtr->getPointerOperand()],
                                                                     indices);
 
-                for (User* const pUser : pGetElemPtr->users())
+                for (User* const user : getElemPtr->users())
                 {
-                    workList.push_back(pUser);
+                    workList.push_back(user);
                 }
             }
-            else if (LoadInst* const pLoad = dyn_cast<LoadInst>(pInst))
+            else if (LoadInst* const load = dyn_cast<LoadInst>(inst))
             {
-                assert(valueMap.count(pLoad->getPointerOperand()) > 0);
+                assert(valueMap.count(load->getPointerOperand()) > 0);
 
-                builder.SetInsertPoint(pLoad);
+                builder.SetInsertPoint(load);
 
-                LoadInst* const pNewLoad = builder.CreateLoad(valueMap[pLoad->getPointerOperand()]);
+                LoadInst* const newLoad = builder.CreateLoad(valueMap[load->getPointerOperand()]);
 
-                valueMap[pLoad] = pNewLoad;
+                valueMap[load] = newLoad;
 
-                pLoad->replaceAllUsesWith(pNewLoad);
+                load->replaceAllUsesWith(newLoad);
             }
             else
             {

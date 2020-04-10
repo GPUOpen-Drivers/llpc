@@ -43,330 +43,330 @@ static cl::opt<int> NativeWaveSize("native-wave-size", cl::desc("Overrides hardw
 // Functions to set up TargetInfo for the various targets
 
 // gfx6+
-static void SetGfx6BaseInfo(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx6BaseInfo(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
     // Initial settings (could be adjusted later according to graphics IP version info)
-    pTargetInfo->GetGpuProperty().waveSize = 64;
+    targetInfo->getGpuProperty().waveSize = 64;
 
-    pTargetInfo->GetGpuProperty().ldsSizePerThreadGroup = 32 * 1024;
-    pTargetInfo->GetGpuProperty().numShaderEngines = 4;
-    pTargetInfo->GetGpuProperty().maxSgprsAvailable = 104;
-    pTargetInfo->GetGpuProperty().maxVgprsAvailable = 256;
+    targetInfo->getGpuProperty().ldsSizePerThreadGroup = 32 * 1024;
+    targetInfo->getGpuProperty().numShaderEngines = 4;
+    targetInfo->getGpuProperty().maxSgprsAvailable = 104;
+    targetInfo->getGpuProperty().maxVgprsAvailable = 256;
 
     //TODO: Setup gsPrimBufferDepth from hardware config option, will be done in another change.
-    pTargetInfo->GetGpuProperty().gsPrimBufferDepth = 0x100;
+    targetInfo->getGpuProperty().gsPrimBufferDepth = 0x100;
 
-    pTargetInfo->GetGpuProperty().maxUserDataCount = 16; // GFX6-8 value
+    targetInfo->getGpuProperty().maxUserDataCount = 16; // GFX6-8 value
 
-    pTargetInfo->GetGpuProperty().gsOnChipMaxLdsSize = 16384;
+    targetInfo->getGpuProperty().gsOnChipMaxLdsSize = 16384;
 
-    pTargetInfo->GetGpuProperty().tessOffChipLdsBufferSize = 32768;
+    targetInfo->getGpuProperty().tessOffChipLdsBufferSize = 32768;
 
     // TODO: Accept gsOnChipDefaultPrimsPerSubgroup from panel option
-    pTargetInfo->GetGpuProperty().gsOnChipDefaultPrimsPerSubgroup   = 64;
+    targetInfo->getGpuProperty().gsOnChipDefaultPrimsPerSubgroup   = 64;
 
-    pTargetInfo->GetGpuProperty().tessFactorBufferSizePerSe = 4096;
+    targetInfo->getGpuProperty().tessFactorBufferSizePerSe = 4096;
 
     // TODO: Accept gsOnChipDefaultLdsSizePerSubgroup from panel option
-    pTargetInfo->GetGpuProperty().gsOnChipDefaultLdsSizePerSubgroup = 8192; // GFX6-8 value
+    targetInfo->getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup = 8192; // GFX6-8 value
 }
 
 // gfx6
-static void SetGfx6Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx6Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx6BaseInfo(pTargetInfo);
-    pTargetInfo->GetGpuProperty().ldsSizePerCu = 32768;
-    pTargetInfo->GetGpuProperty().ldsSizeDwordGranularityShift = 6;
+    setGfx6BaseInfo(targetInfo);
+    targetInfo->getGpuProperty().ldsSizePerCu = 32768;
+    targetInfo->getGpuProperty().ldsSizeDwordGranularityShift = 6;
 
     // Hardware workarounds for GFX6 based GPU's:
-    pTargetInfo->GetGpuWorkarounds().gfx6.cbNoLt16BitIntClamp = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx6.miscLoadBalancePerWatt = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx6.shader8b16bLocalWriteCorruption = 1;
+    targetInfo->getGpuWorkarounds().gfx6.cbNoLt16BitIntClamp = 1;
+    targetInfo->getGpuWorkarounds().gfx6.miscLoadBalancePerWatt = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shader8b16bLocalWriteCorruption = 1;
 
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderReadlaneSmrd = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderReadlaneSmrd = 1;
 
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderSpiCsRegAllocFragmentation = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderSpiCsRegAllocFragmentation = 1;
 
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderVcczScalarReadBranchFailure = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderVcczScalarReadBranchFailure = 1;
 
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderMinMaxFlushDenorm = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderMinMaxFlushDenorm = 1;
 
     // NOTE: We only need workaround it in Tahiti, Pitcairn, Capeverde, to simplify the design, we set this
     // flag for all gfxIp.major == 6
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderZExport = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderZExport = 1;
 }
 
 // gfx600
-static void SetGfx600Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx600Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx6Info(pTargetInfo);
-    pTargetInfo->GetGpuProperty().numShaderEngines = 2;
+    setGfx6Info(targetInfo);
+    targetInfo->getGpuProperty().numShaderEngines = 2;
 }
 
 // gfx601
-static void SetGfx601Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx601Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx6Info(pTargetInfo);
-    pTargetInfo->GetGpuProperty().numShaderEngines = 1;
+    setGfx6Info(targetInfo);
+    targetInfo->getGpuProperty().numShaderEngines = 1;
 }
 
 // gfx7+
-static void SetGfx7BaseInfo(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx7BaseInfo(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx6BaseInfo(pTargetInfo);
-    pTargetInfo->GetGpuProperty().ldsSizePerCu = 65536;
-    pTargetInfo->GetGpuProperty().ldsSizeDwordGranularityShift = 7;
+    setGfx6BaseInfo(targetInfo);
+    targetInfo->getGpuProperty().ldsSizePerCu = 65536;
+    targetInfo->getGpuProperty().ldsSizeDwordGranularityShift = 7;
 }
 
 // gfx7
-static void SetGfx7Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx7Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx7BaseInfo(pTargetInfo);
-    pTargetInfo->GetGpuProperty().numShaderEngines = 1; // GFX7.0.2+ value
+    setGfx7BaseInfo(targetInfo);
+    targetInfo->getGpuProperty().numShaderEngines = 1; // GFX7.0.2+ value
 
     // Hardware workarounds for GFX7 based GPU's:
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderVcczScalarReadBranchFailure = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderMinMaxFlushDenorm = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderVcczScalarReadBranchFailure = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderMinMaxFlushDenorm = 1;
 }
 
 // gfx700
-static void SetGfx700Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx700Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx7Info(pTargetInfo);
-    pTargetInfo->GetGpuProperty().numShaderEngines = 2;
+    setGfx7Info(targetInfo);
+    targetInfo->getGpuProperty().numShaderEngines = 2;
 
     // Hardware workarounds for GFX7.0.0
-    pTargetInfo->GetGpuWorkarounds().gfx6.cbNoLt16BitIntClamp = 1;
+    targetInfo->getGpuWorkarounds().gfx6.cbNoLt16BitIntClamp = 1;
     // NOTE: Buffer store + index mode are not used in vulkan, so we can skip this workaround in safe.
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderCoalesceStore = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderCoalesceStore = 1;
 }
 
 // gfx701
-static void SetGfx701Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx701Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx7Info(pTargetInfo);
-    pTargetInfo->GetGpuProperty().numShaderEngines = 4;
+    setGfx7Info(targetInfo);
+    targetInfo->getGpuProperty().numShaderEngines = 4;
 }
 
 // gfx703 and gfx704
-static void SetGfx703Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx703Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx7Info(pTargetInfo);
-    pTargetInfo->GetGpuProperty().numShaderEngines = 4;
+    setGfx7Info(targetInfo);
+    targetInfo->getGpuProperty().numShaderEngines = 4;
 
     // Hardware workarounds for GFX7.0.3 / GFX7.0.4
-    pTargetInfo->GetGpuWorkarounds().gfx6.cbNoLt16BitIntClamp = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderCoalesceStore = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderSpiBarrierMgmt = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderSpiCsRegAllocFragmentation = 1;
+    targetInfo->getGpuWorkarounds().gfx6.cbNoLt16BitIntClamp = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderCoalesceStore = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderSpiBarrierMgmt = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderSpiCsRegAllocFragmentation = 1;
 }
 
 // gfx8+
-static void SetGfx8BaseInfo(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx8BaseInfo(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx7BaseInfo(pTargetInfo);
+    setGfx7BaseInfo(targetInfo);
 }
 
 // gfx8
-static void SetGfx8Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx8Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx8BaseInfo(pTargetInfo);
+    setGfx8BaseInfo(targetInfo);
 
     // Hardware workarounds for GFX8.x based GPU's:
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderMinMaxFlushDenorm = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderMinMaxFlushDenorm = 1;
 
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderSmemBufferAddrClamp = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderSmemBufferAddrClamp = 1;
 
-    pTargetInfo->GetGpuWorkarounds().gfx6.shaderEstimateRegisterUsage = 1;
+    targetInfo->getGpuWorkarounds().gfx6.shaderEstimateRegisterUsage = 1;
 }
 
 // gfx800/gfx801
-static void SetGfx800Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx800Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx8Info(pTargetInfo);
-    pTargetInfo->GetGpuProperty().numShaderEngines = 1;
+    setGfx8Info(targetInfo);
+    targetInfo->getGpuProperty().numShaderEngines = 1;
 }
 
 // gfx802
-static void SetGfx802Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx802Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx8Info(pTargetInfo);
-    pTargetInfo->GetGpuProperty().numShaderEngines = 4;
+    setGfx8Info(targetInfo);
+    targetInfo->getGpuProperty().numShaderEngines = 4;
 
     // Hardware workarounds
-    pTargetInfo->GetGpuWorkarounds().gfx6.miscSpiSgprsNum = 1;
+    targetInfo->getGpuWorkarounds().gfx6.miscSpiSgprsNum = 1;
 }
 
 // gfx803+
-static void SetGfx803Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx803Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx8Info(pTargetInfo);
+    setGfx8Info(targetInfo);
     // TODO: polaris11 and polaris12 is 2, but we can't identify them by GFX IP now.
-    pTargetInfo->GetGpuProperty().numShaderEngines = 4;
+    targetInfo->getGpuProperty().numShaderEngines = 4;
 }
 
 // gfx81
-static void SetGfx81Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx81Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx8Info(pTargetInfo);
-    pTargetInfo->GetGpuProperty().numShaderEngines = 1;
+    setGfx8Info(targetInfo);
+    targetInfo->getGpuProperty().numShaderEngines = 1;
 }
 
 // gfx9+
-static void SetGfx9BaseInfo(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx9BaseInfo(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx8BaseInfo(pTargetInfo);
-    pTargetInfo->GetGpuProperty().maxUserDataCount = 32;
-    pTargetInfo->GetGpuProperty().gsOnChipDefaultLdsSizePerSubgroup = 0; // GFX9+ does not use this
-    pTargetInfo->GetGpuProperty().tessFactorBufferSizePerSe = 8192;
-    pTargetInfo->GetGpuProperty().numShaderEngines = 4;
+    setGfx8BaseInfo(targetInfo);
+    targetInfo->getGpuProperty().maxUserDataCount = 32;
+    targetInfo->getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup = 0; // GFX9+ does not use this
+    targetInfo->getGpuProperty().tessFactorBufferSizePerSe = 8192;
+    targetInfo->getGpuProperty().numShaderEngines = 4;
 }
 
 // gfx9
-static void SetGfx9Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx9Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx9BaseInfo(pTargetInfo);
+    setGfx9BaseInfo(targetInfo);
 
     // TODO: Clean up code for all 1d texture patch
-    pTargetInfo->GetGpuWorkarounds().gfx9.treat1dImagesAs2d = 1;
+    targetInfo->getGpuWorkarounds().gfx9.treat1dImagesAs2d = 1;
 
-    pTargetInfo->GetGpuWorkarounds().gfx9.shaderImageGatherInstFix = 1;
+    targetInfo->getGpuWorkarounds().gfx9.shaderImageGatherInstFix = 1;
 
-    pTargetInfo->GetGpuWorkarounds().gfx9.fixCacheLineStraddling = 1;
+    targetInfo->getGpuWorkarounds().gfx9.fixCacheLineStraddling = 1;
 }
 
 // gfx900
-static void SetGfx900Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx900Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx9Info(pTargetInfo);
-    pTargetInfo->GetGpuWorkarounds().gfx9.fixLsVgprInput = 1;
+    setGfx9Info(targetInfo);
+    targetInfo->getGpuWorkarounds().gfx9.fixLsVgprInput = 1;
 }
 
 // gfx10
-static void SetGfx10Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx10Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx9BaseInfo(pTargetInfo);
+    setGfx9BaseInfo(targetInfo);
 
     // Compiler is free to choose wave mode if forced wave size is not specified.
     if (NativeWaveSize != 0)
     {
         assert((NativeWaveSize == 32) || (NativeWaveSize == 64));
-        pTargetInfo->GetGpuProperty().waveSize = NativeWaveSize;
+        targetInfo->getGpuProperty().waveSize = NativeWaveSize;
     }
     else
     {
-        pTargetInfo->GetGpuProperty().waveSize = 32;
+        targetInfo->getGpuProperty().waveSize = 32;
     }
 
-    pTargetInfo->GetGpuProperty().numShaderEngines = 2;
-    pTargetInfo->GetGpuProperty().supportShaderPowerProfiling = true;
-    pTargetInfo->GetGpuProperty().tessFactorBufferSizePerSe = 8192;
-    pTargetInfo->GetGpuProperty().supportSpiPrefPriority = true;
+    targetInfo->getGpuProperty().numShaderEngines = 2;
+    targetInfo->getGpuProperty().supportShaderPowerProfiling = true;
+    targetInfo->getGpuProperty().tessFactorBufferSizePerSe = 8192;
+    targetInfo->getGpuProperty().supportSpiPrefPriority = true;
 
     // Hardware workarounds for GFX10 based GPU's:
-    pTargetInfo->GetGpuWorkarounds().gfx10.disableI32ModToI16Mod = 1;
+    targetInfo->getGpuWorkarounds().gfx10.disableI32ModToI16Mod = 1;
 }
 
 // gfx1010 (including gfx101E and gfx101F)
-static void SetGfx1010Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx1010Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx10Info(pTargetInfo);
+    setGfx10Info(targetInfo);
 
-    pTargetInfo->GetGpuWorkarounds().gfx10.waShaderInstPrefetch0 = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waDidtThrottleVmem = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waLdsVmemNotWaitingVmVsrc = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waNsaAndClauseCanHang = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waNsaCannotFollowWritelane = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waTessIncorrectRelativeIndex = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waSmemFollowedByVopc = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waShaderInstPrefetch0 = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waDidtThrottleVmem = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waLdsVmemNotWaitingVmVsrc = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waNsaAndClauseCanHang = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waNsaCannotFollowWritelane = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waTessIncorrectRelativeIndex = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waSmemFollowedByVopc = 1;
 }
 
 // gfx1012
-static void SetGfx1012Info(
-    TargetInfo* pTargetInfo)    // [in/out] Target info
+static void setGfx1012Info(
+    TargetInfo* targetInfo)    // [in/out] Target info
 {
-    SetGfx10Info(pTargetInfo);
+    setGfx10Info(targetInfo);
 
-    pTargetInfo->GetGpuWorkarounds().gfx10.waShaderInstPrefetch0      = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waDidtThrottleVmem         = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waLdsVmemNotWaitingVmVsrc  = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waNsaCannotFollowWritelane = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waNsaAndClauseCanHang      = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waThrottleInMultiDwordNsa  = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waSmemFollowedByVopc       = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waShaderInstPrefetchFwd64  = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waWarFpAtomicDenormHazard  = 1;
-    pTargetInfo->GetGpuWorkarounds().gfx10.waNggDisabled              = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waShaderInstPrefetch0      = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waDidtThrottleVmem         = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waLdsVmemNotWaitingVmVsrc  = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waNsaCannotFollowWritelane = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waNsaAndClauseCanHang      = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waThrottleInMultiDwordNsa  = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waSmemFollowedByVopc       = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waShaderInstPrefetchFwd64  = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waWarFpAtomicDenormHazard  = 1;
+    targetInfo->getGpuWorkarounds().gfx10.waNggDisabled              = 1;
 }
 
 // =====================================================================================================================
 // Set TargetInfo. Returns false if the GPU name is not found or not supported.
-bool TargetInfo::SetTargetInfo(
+bool TargetInfo::setTargetInfo(
     StringRef     gpuName)      // LLVM GPU name, e.g. "gfx900"
 {
     struct GpuNameStringMap
     {
-        const char* pGpuName;
-        void(*      pSetTargetInfoFunc)(TargetInfo* pTargetInfo);
+        const char* gpuName;
+        void(*      setTargetInfoFunc)(TargetInfo* targetInfo);
     };
 
     static const GpuNameStringMap GpuNameMap[] =
     {
-        { "gfx600",   &SetGfx600Info },   // gfx600, tahiti
-        { "gfx601",   &SetGfx601Info },   // gfx601, pitcairn, verde, oland, hainan
-        { "gfx700",   &SetGfx700Info },   // gfx700, kaveri
-        { "gfx701",   &SetGfx701Info },   // gfx701, hawaii
-        { "gfx702",   &SetGfx7Info },     // gfx702
-        { "gfx703",   &SetGfx703Info },   // gfx703, kabini, mullins
-        { "gfx704",   &SetGfx703Info },   // gfx704, bonaire
-        { "gfx800",   &SetGfx800Info },   // gfx800, iceland
-        { "gfx801",   &SetGfx800Info },   // gfx801, carrizo
-        { "gfx802",   &SetGfx802Info },   // gfx802, tonga
-        { "gfx803",   &SetGfx803Info },   // gfx803, fiji, polaris10, polaris11
-        { "gfx804",   &SetGfx803Info },   // gfx804
-        { "gfx810",   &SetGfx81Info },    // gfx810, stoney
-        { "gfx900",   &SetGfx900Info },   // gfx900
-        { "gfx901",   &SetGfx9Info },     // gfx901
-        { "gfx902",   &SetGfx900Info },   // gfx902
-        { "gfx903",   &SetGfx9Info },     // gfx903
-        { "gfx904",   &SetGfx9Info },     // gfx904, vega12
-        { "gfx906",   &SetGfx9Info },     // gfx906, vega20
-        { "gfx909",   &SetGfx9Info },     // gfx909, raven2
-        { "gfx1010",  &SetGfx1010Info },  // gfx1010
-        { "gfx1012",  &SetGfx1012Info },  // gfx1012, navi14
+        { "gfx600",   &setGfx600Info },   // gfx600, tahiti
+        { "gfx601",   &setGfx601Info },   // gfx601, pitcairn, verde, oland, hainan
+        { "gfx700",   &setGfx700Info },   // gfx700, kaveri
+        { "gfx701",   &setGfx701Info },   // gfx701, hawaii
+        { "gfx702",   &setGfx7Info },     // gfx702
+        { "gfx703",   &setGfx703Info },   // gfx703, kabini, mullins
+        { "gfx704",   &setGfx703Info },   // gfx704, bonaire
+        { "gfx800",   &setGfx800Info },   // gfx800, iceland
+        { "gfx801",   &setGfx800Info },   // gfx801, carrizo
+        { "gfx802",   &setGfx802Info },   // gfx802, tonga
+        { "gfx803",   &setGfx803Info },   // gfx803, fiji, polaris10, polaris11
+        { "gfx804",   &setGfx803Info },   // gfx804
+        { "gfx810",   &setGfx81Info },    // gfx810, stoney
+        { "gfx900",   &setGfx900Info },   // gfx900
+        { "gfx901",   &setGfx9Info },     // gfx901
+        { "gfx902",   &setGfx900Info },   // gfx902
+        { "gfx903",   &setGfx9Info },     // gfx903
+        { "gfx904",   &setGfx9Info },     // gfx904, vega12
+        { "gfx906",   &setGfx9Info },     // gfx906, vega20
+        { "gfx909",   &setGfx9Info },     // gfx909, raven2
+        { "gfx1010",  &setGfx1010Info },  // gfx1010
+        { "gfx1012",  &setGfx1012Info },  // gfx1012, navi14
     };
 
-    void(* pSetTargetInfoFunc)(TargetInfo* pTargetInfo) = nullptr;
+    void(* setTargetInfoFunc)(TargetInfo* targetInfo) = nullptr;
     for (const GpuNameStringMap& mapEntry : ArrayRef<GpuNameStringMap>(GpuNameMap))
     {
-        if (gpuName == mapEntry.pGpuName)
+        if (gpuName == mapEntry.gpuName)
         {
-            pSetTargetInfoFunc = mapEntry.pSetTargetInfoFunc;
+            setTargetInfoFunc = mapEntry.setTargetInfoFunc;
             break;
         }
     }
-    if (pSetTargetInfoFunc == nullptr)
+    if (setTargetInfoFunc == nullptr)
     {
         return false;   // Target not supported
     }
@@ -383,7 +383,7 @@ bool TargetInfo::SetTargetInfo(
     }
 
     // Set up the rest of TargetInfo.
-    (*pSetTargetInfoFunc)(this);
+    (*setTargetInfoFunc)(this);
 
     return true;
 }

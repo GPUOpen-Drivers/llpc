@@ -142,14 +142,14 @@ class TargetInfo
 {
 public:
     // Set TargetInfo. Returns false if the GPU name is not found or not supported.
-    bool SetTargetInfo(llvm::StringRef gpuName);
+    bool setTargetInfo(llvm::StringRef gpuName);
 
     // Accessors.
-    GfxIpVersion GetGfxIpVersion() const { return m_gfxIp; }
-    GpuProperty& GetGpuProperty() { return m_gpuProperty; }
-    const GpuProperty& GetGpuProperty() const { return m_gpuProperty; }
-    WorkaroundFlags& GetGpuWorkarounds() { return m_gpuWorkarounds; }
-    const WorkaroundFlags& GetGpuWorkarounds() const { return m_gpuWorkarounds; }
+    GfxIpVersion getGfxIpVersion() const { return m_gfxIp; }
+    GpuProperty& getGpuProperty() { return m_gpuProperty; }
+    const GpuProperty& getGpuProperty() const { return m_gpuProperty; }
+    WorkaroundFlags& getGpuWorkarounds() { return m_gpuWorkarounds; }
+    const WorkaroundFlags& getGpuWorkarounds() const { return m_gpuWorkarounds; }
 
 private:
     GfxIpVersion    m_gfxIp = {};          // major.minor.stepping

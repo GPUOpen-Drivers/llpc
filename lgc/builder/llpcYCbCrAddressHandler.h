@@ -42,48 +42,48 @@ namespace lgc
 class YCbCrAddressHandler
 {
 public:
-    YCbCrAddressHandler(Builder* pBuilder, SqImgRsrcRegHandler* pSqImgRsrcRegHelper, GfxIpVersion* pGfxIp)
+    YCbCrAddressHandler(Builder* builder, SqImgRsrcRegHandler* sqImgRsrcRegHelper, GfxIpVersion* gfxIp)
     {
-        m_pBuilder = pBuilder;
-        m_pRegHelper = pSqImgRsrcRegHelper;
-        m_pGfxIp = pGfxIp;
-        m_PlaneBaseAddresses.clear();
-        m_pOne = pBuilder->getInt32(1);
+        pBuilder = builder;
+        pRegHelper = sqImgRsrcRegHelper;
+        pGfxIp = gfxIp;
+        planeBaseAddresses.clear();
+        pOne = builder->getInt32(1);
     }
 
     // Generate base address for image planes
-    void GenBaseAddress(unsigned planeCount);
+    void genBaseAddress(unsigned planeCount);
 
     // Generate height and pitch
-    void GenHeightAndPitch(unsigned bits, unsigned bpp, unsigned xBitCount, bool isTileOptimal, unsigned planeNum);
+    void genHeightAndPitch(unsigned bits, unsigned bpp, unsigned xBitCount, bool isTileOptimal, unsigned planeNum);
 
     // Power2Align operation
-    llvm::Value* Power2Align(llvm::Value* pX, unsigned align);
+    llvm::Value* power2Align(llvm::Value* x, unsigned align);
 
     // Get specific plane
-    llvm::Value* GetPlane(unsigned idx) { assert(idx < 3); return m_PlaneBaseAddresses[idx]; }
+    llvm::Value* getPlane(unsigned idx) { assert(idx < 3); return planeBaseAddresses[idx]; }
 
     // Get pitch for Y plane
-    llvm::Value* GetPitchY() { return m_pPitchY; }
+    llvm::Value* getPitchY() { return pPitchY; }
 
     // Get pitch for Cb plane
-    llvm::Value* GetPitchCb() { return m_pPitchCb; }
+    llvm::Value* getPitchCb() { return pPitchCb; }
 
     // Get height for Y plane
-    llvm::Value* GetHeightY() { return m_pHeightY; }
+    llvm::Value* getHeightY() { return pHeightY; }
 
     // Get Height for Cb plane
-    llvm::Value* GetHeightCb() { return m_pHeightCb; }
+    llvm::Value* getHeightCb() { return pHeightCb; }
 
-    SqImgRsrcRegHandler*               m_pRegHelper;
-    Builder*                           m_pBuilder;
-    llvm::SmallVector<llvm::Value*, 3> m_PlaneBaseAddresses;
-    llvm::Value*                       m_pPitchY;
-    llvm::Value*                       m_pHeightY;
-    llvm::Value*                       m_pPitchCb;
-    llvm::Value*                       m_pHeightCb;
-    llvm::Value*                       m_pOne;
-    GfxIpVersion*                      m_pGfxIp;
+    SqImgRsrcRegHandler*               pRegHelper;
+    Builder*                           pBuilder;
+    llvm::SmallVector<llvm::Value*, 3> planeBaseAddresses;
+    llvm::Value*                       pPitchY;
+    llvm::Value*                       pHeightY;
+    llvm::Value*                       pPitchCb;
+    llvm::Value*                       pHeightCb;
+    llvm::Value*                       pOne;
+    GfxIpVersion*                      pGfxIp;
 };
 
 } // lgc

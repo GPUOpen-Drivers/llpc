@@ -83,58 +83,58 @@ class ParserInit
 public:
     ParserInit()
     {
-        InitEnumMap();
+        initEnumMap();
 
-        Section::InitSectionInfo();
+        Section::initSectionInfo();
 
-        SectionResultItem::InitialAddrTable();
-        SectionResult::InitialAddrTable();
-        SectionSpecConstItem::InitialAddrTable();
-        SectionSpecConst::InitialAddrTable();
-        SectionVertexBufferBinding::InitialAddrTable();
-        SectionVertexAttribute::InitialAddrTable();
-        SectionVertexState::InitialAddrTable();
-        SectionBufferView::InitialAddrTable();
-        SectionDrawState::InitialAddrTable();
-        SectionPushConstRange::InitialAddrTable();
-        SectionImageView::InitialAddrTable();
-        SectionSampler::InitialAddrTable();
-        SectionVersion::InitialAddrTable();
-        SectionCompileLog::InitialAddrTable();
-        SectionShader::InitialAddrTable();
-        SectionColorBuffer::InitialAddrTable();
-        SectionGraphicsState::InitialAddrTable();
-        SectionComputeState::InitialAddrTable();
-        SectionVertexInputBinding::InitialAddrTable();
-        SectionVertexInputAttribute::InitialAddrTable();
-        SectionVertexInputDivisor::InitialAddrTable();
-        SectionVertexInput::InitialAddrTable();
-        SectionSpecEntryItem::InitialAddrTable();
-        SectionSpecInfo::InitialAddrTable();
-        SectionDescriptorRangeValueItem::InitialAddrTable();
-        SectionResourceMappingNode::InitialAddrTable();
-        SectionShaderInfo::InitialAddrTable();
-        SectionPipelineOption::InitialAddrTable();
-        SectionShaderOption::InitialAddrTable();
-        SectionNggState::InitialAddrTable();
+        SectionResultItem::initialAddrTable();
+        SectionResult::initialAddrTable();
+        SectionSpecConstItem::initialAddrTable();
+        SectionSpecConst::initialAddrTable();
+        SectionVertexBufferBinding::initialAddrTable();
+        SectionVertexAttribute::initialAddrTable();
+        SectionVertexState::initialAddrTable();
+        SectionBufferView::initialAddrTable();
+        SectionDrawState::initialAddrTable();
+        SectionPushConstRange::initialAddrTable();
+        SectionImageView::initialAddrTable();
+        SectionSampler::initialAddrTable();
+        SectionVersion::initialAddrTable();
+        SectionCompileLog::initialAddrTable();
+        SectionShader::initialAddrTable();
+        SectionColorBuffer::initialAddrTable();
+        SectionGraphicsState::initialAddrTable();
+        SectionComputeState::initialAddrTable();
+        SectionVertexInputBinding::initialAddrTable();
+        SectionVertexInputAttribute::initialAddrTable();
+        SectionVertexInputDivisor::initialAddrTable();
+        SectionVertexInput::initialAddrTable();
+        SectionSpecEntryItem::initialAddrTable();
+        SectionSpecInfo::initialAddrTable();
+        SectionDescriptorRangeValueItem::initialAddrTable();
+        SectionResourceMappingNode::initialAddrTable();
+        SectionShaderInfo::initialAddrTable();
+        SectionPipelineOption::initialAddrTable();
+        SectionShaderOption::initialAddrTable();
+        SectionNggState::initialAddrTable();
 
     };
 };
 
-static ParserInit g_init;
+static ParserInit Init;
 
 // =====================================================================================================================
 // Constructs an Section object.
 Section::Section(
-    StrToMemberAddr* pAddrTable,    // [in] Table to map member name to member address
+    StrToMemberAddr* addrTable,    // [in] Table to map member name to member address
     unsigned         tableSize,     // Size of above table
     SectionType      sectionType,   // Section type
-    const char*      pSectionName)  // [in] Name of this section.
+    const char*      sectionName)  // [in] Name of this section.
     :
     m_sectionType(sectionType),
-    m_pSectionName(pSectionName),
+    m_sectionName(sectionName),
     m_lineNum(0),
-    m_pMemberTable(pAddrTable),
+    m_memberTable(addrTable),
     m_tableSize(tableSize),
     m_isActive(false)
 {
@@ -143,7 +143,7 @@ Section::Section(
 
 // =====================================================================================================================
 // Initializes static variable m_sectionInfo
-void Section::InitSectionInfo()
+void Section::initSectionInfo()
 {
     // Shader sections
     INIT_SECTION_INFO("VertexShaderGlsl", SectionTypeVertexShader, Glsl)
@@ -234,22 +234,22 @@ void Section::InitSectionInfo()
 
 // =====================================================================================================================
 // Gets data type of a member.
-bool Section::GetMemberType(
+bool Section::getMemberType(
     unsigned     lineNum,         // Line No.
     const char*  memberName,     // [in]  Member string name
-    MemberType*  pValueType,      // [out] Member data type.
+    MemberType*  valueType,      // [out] Member data type.
     std::string* errorMsg)       // [out] Error message
 {
     bool result = false;
     for (unsigned i = 0; i < m_tableSize; ++i)
     {
-        if ((m_pMemberTable[i].memberName != nullptr) && strcmp(memberName, m_pMemberTable[i].memberName) == 0)
+        if ((m_memberTable[i].memberName != nullptr) && strcmp(memberName, m_memberTable[i].memberName) == 0)
         {
             result = true;
 
-            if (pValueType != nullptr)
+            if (valueType != nullptr)
             {
-                *pValueType = m_pMemberTable[i].memberType;
+                *valueType = m_memberTable[i].memberType;
             }
 
             break;
@@ -266,28 +266,28 @@ bool Section::GetMemberType(
 
 // =====================================================================================================================
 // Is this member a section object.
-bool Section::IsSection(
+bool Section::isSection(
     unsigned     lineNum,        // Line number
     const char*  memberName,    // [in] Member name
-    bool*        pOutput,        // [out] Is this memeber a section object
-    MemberType*  pType,          // [out] Object type
+    bool*        output,        // [out] Is this memeber a section object
+    MemberType*  type,          // [out] Object type
     std::string* errorMsg)      // [out] Error message
 {
     bool result = false;
 
     for (unsigned i = 0; i < m_tableSize; ++i)
     {
-        if ((m_pMemberTable[i].memberName != nullptr) && strcmp(memberName, m_pMemberTable[i].memberName) == 0)
+        if ((m_memberTable[i].memberName != nullptr) && strcmp(memberName, m_memberTable[i].memberName) == 0)
         {
             result = true;
-            if (pOutput != nullptr)
+            if (output != nullptr)
             {
-                *pOutput = m_pMemberTable[i].isSection;
+                *output = m_memberTable[i].isSection;
             }
 
-            if (pType != nullptr)
+            if (type != nullptr)
             {
-                *pType = m_pMemberTable[i].memberType;
+                *type = m_memberTable[i].memberType;
             }
             break;
         }
@@ -303,97 +303,97 @@ bool Section::IsSection(
 
 // =====================================================================================================================
 // Prints all data in this object, for debug purpose.
-void Section::PrintSelf(
+void Section::printSelf(
     unsigned level)     // Nest level from the base object
 {
     if (m_isActive == true)
     {
         for (unsigned l = 0; l < level; ++l) { printf("\t"); }
-        printf("[%s]\n", m_pSectionName);
+        printf("[%s]\n", m_sectionName);
         for (unsigned i = 0; i < m_tableSize; ++i)
         {
-            if (m_pMemberTable[i].memberName != nullptr)
+            if (m_memberTable[i].memberName != nullptr)
             {
                 continue;
             }
-            for (unsigned arrayIndex = 0; arrayIndex < m_pMemberTable[i].arrayMaxSize; ++arrayIndex)
+            for (unsigned arrayIndex = 0; arrayIndex < m_memberTable[i].arrayMaxSize; ++arrayIndex)
             {
-                if (m_pMemberTable[i].isSection)
+                if (m_memberTable[i].isSection)
                 {
-                    Section* pSubObj;
+                    Section* subObj;
                     std::string dummyMsg;
-                    if (GetPtrOfSubSection(0,
-                                           m_pMemberTable[i].memberName,
-                                           m_pMemberTable[i].memberType,
+                    if (getPtrOfSubSection(0,
+                                           m_memberTable[i].memberName,
+                                           m_memberTable[i].memberType,
                                            false,
                                            arrayIndex,
-                                           &pSubObj,
+                                           &subObj,
                                            &dummyMsg))
                     {
-                        if (pSubObj->m_isActive == true)
+                        if (subObj->m_isActive == true)
                         {
-                            pSubObj->PrintSelf(level + 1);
+                            subObj->printSelf(level + 1);
                         }
                     }
                 }
                 else
                 {
                     for (unsigned l = 0; l < level; ++l) { printf("\t"); }
-                    int tempValue = *(((int*)(GetMemberAddr(i))) + arrayIndex);
+                    int tempValue = *(((int*)(getMemberAddr(i))) + arrayIndex);
                     if (static_cast<unsigned>(tempValue) != VfxInvalidValue)
                     {
-                        switch (m_pMemberTable[i].memberType)
+                        switch (m_memberTable[i].memberType)
                         {
                         case MemberTypeEnum:
                         case MemberTypeInt:
                         {
                             printf("%s = %d\n",
-                                m_pMemberTable[i].memberName,
-                                *(((int*)(GetMemberAddr(i))) + arrayIndex));
+                                m_memberTable[i].memberName,
+                                *(((int*)(getMemberAddr(i))) + arrayIndex));
                             break;
                         }
                         case MemberTypeBool:
                         {
                             printf("%s = %d\n",
-                                   m_pMemberTable[i].memberName,
-                                   *(((bool*)(GetMemberAddr(i))) + arrayIndex));
+                                   m_memberTable[i].memberName,
+                                   *(((bool*)(getMemberAddr(i))) + arrayIndex));
                             break;
                         }
                         case MemberTypeFloat:
                         {
                             printf("%s = %.3f\n",
-                                   m_pMemberTable[i].memberName,
-                                   *(((float*)(GetMemberAddr(i))) + arrayIndex));
+                                   m_memberTable[i].memberName,
+                                   *(((float*)(getMemberAddr(i))) + arrayIndex));
                             break;
                         }
                         case MemberTypeFloat16:
                         {
-                            float v = (((Float16*)(GetMemberAddr(i))) + arrayIndex)->GetValue();
-                            printf("%s = %.3fhf\n", m_pMemberTable[i].memberName, v);
+                            float v = (((Float16*)(getMemberAddr(i))) + arrayIndex)->GetValue();
+                            printf("%s = %.3fhf\n", m_memberTable[i].memberName, v);
                             break;
                         }
                         case MemberTypeDouble:
                         {
-                            printf("%s = %.3f\n", m_pMemberTable[i].memberName, *(((double*)(GetMemberAddr(i))) + arrayIndex));
+                            printf("%s = %.3f\n", m_memberTable[i].memberName, *(((double*)(getMemberAddr(i))) + arrayIndex));
                             break;
                         }
                         case MemberTypeIVec4:
                         {
-                            IUFValue* pIUFValue = static_cast<IUFValue*>(GetMemberAddr(i));
-                            pIUFValue += arrayIndex;
+                            IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
+                            iufValue += arrayIndex;
 
-                            if ((pIUFValue->props.isDouble == false) && (pIUFValue->props.isFloat == false))
+                            if ((iufValue->props.isDouble == false) && (iufValue->props.isFloat == false))
                             {
-                                printf("%s =", m_pMemberTable[i].memberName);
-                                for (unsigned j = 0; j < pIUFValue->props.length; ++j)
+                                printf("%s =", m_memberTable[i].memberName);
+                                for (unsigned j = 0; j < iufValue->props.length; ++j)
                                 {
-                                    if (pIUFValue->props.isHex == true)
+                                    if (iufValue->props.isHex == true)
                                     {
-                                        printf(" 0x%x", pIUFValue->iVec4[j]);
+                                        printf(" 0x%x", iufValue->iVec4[j]);
                                     }
                                     else
                                     {
-                                        printf(" %d", pIUFValue->iVec4[j]);
+                                        printf(" %d", iufValue->iVec4[j]);
                                     }
                                 }
                                 printf("\n");
@@ -402,21 +402,21 @@ void Section::PrintSelf(
                         }
                         case MemberTypeI64Vec2:
                         {
-                            IUFValue* pIUFValue = static_cast<IUFValue*>(GetMemberAddr(i));
-                            pIUFValue += arrayIndex;
+                            IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
+                            iufValue += arrayIndex;
 
-                            if ((pIUFValue->props.isDouble == false) && (pIUFValue->props.isFloat == false))
+                            if ((iufValue->props.isDouble == false) && (iufValue->props.isFloat == false))
                             {
-                                printf("%s =", m_pMemberTable[i].memberName);
-                                for (unsigned j = 0; j < pIUFValue->props.length; ++j)
+                                printf("%s =", m_memberTable[i].memberName);
+                                for (unsigned j = 0; j < iufValue->props.length; ++j)
                                 {
-                                    if (pIUFValue->props.isHex == true)
+                                    if (iufValue->props.isHex == true)
                                     {
-                                        printf(" 0x%" PRIx64, pIUFValue->i64Vec2[j]);
+                                        printf(" 0x%" PRIx64, iufValue->i64Vec2[j]);
                                     }
                                     else
                                     {
-                                        printf(" %" PRId64, pIUFValue->i64Vec2[j]);
+                                        printf(" %" PRId64, iufValue->i64Vec2[j]);
                                     }
                                 }
                                 printf("\n");
@@ -425,15 +425,15 @@ void Section::PrintSelf(
                         }
                         case MemberTypeFVec4:
                         {
-                            IUFValue* pIUFValue = static_cast<IUFValue*>(GetMemberAddr(i));
-                            pIUFValue += arrayIndex;
+                            IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
+                            iufValue += arrayIndex;
 
-                            if ((pIUFValue->props.isDouble == false) && (pIUFValue->props.isFloat == true))
+                            if ((iufValue->props.isDouble == false) && (iufValue->props.isFloat == true))
                             {
-                                printf("%s =", m_pMemberTable[i].memberName);
-                                for (unsigned j = 0; j < pIUFValue->props.length; ++j)
+                                printf("%s =", m_memberTable[i].memberName);
+                                for (unsigned j = 0; j < iufValue->props.length; ++j)
                                 {
-                                    printf(" %.3f", pIUFValue->fVec4[j]);
+                                    printf(" %.3f", iufValue->fVec4[j]);
                                 }
                                 printf("\n");
                             }
@@ -441,15 +441,15 @@ void Section::PrintSelf(
                         }
                         case MemberTypeF16Vec4:
                         {
-                            IUFValue* pIUFValue = static_cast<IUFValue*>(GetMemberAddr(i));
-                            pIUFValue += arrayIndex;
+                            IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
+                            iufValue += arrayIndex;
 
-                            if ((pIUFValue->props.isDouble == false) && (pIUFValue->props.isFloat16 == true))
+                            if ((iufValue->props.isDouble == false) && (iufValue->props.isFloat16 == true))
                             {
-                                printf("%s =", m_pMemberTable[i].memberName);
-                                for (unsigned j = 0; j < pIUFValue->props.length; ++j)
+                                printf("%s =", m_memberTable[i].memberName);
+                                for (unsigned j = 0; j < iufValue->props.length; ++j)
                                 {
-                                    printf(" %.3fhf", pIUFValue->f16Vec4[j].GetValue());
+                                    printf(" %.3fhf", iufValue->f16Vec4[j].GetValue());
                                 }
                                 printf("\n");
                             }
@@ -457,15 +457,15 @@ void Section::PrintSelf(
                         }
                         case MemberTypeDVec2:
                         {
-                            IUFValue* pIUFValue = static_cast<IUFValue*>(GetMemberAddr(i));
-                            pIUFValue += arrayIndex;
+                            IUFValue* iufValue = static_cast<IUFValue*>(getMemberAddr(i));
+                            iufValue += arrayIndex;
 
-                            if ((pIUFValue->props.isDouble == true) && (pIUFValue->props.isFloat == false))
+                            if ((iufValue->props.isDouble == true) && (iufValue->props.isFloat == false))
                             {
-                                printf("%s =", m_pMemberTable[i].memberName);
-                                for (unsigned j = 0; j < pIUFValue->props.length; ++j)
+                                printf("%s =", m_memberTable[i].memberName);
+                                for (unsigned j = 0; j < iufValue->props.length; ++j)
                                 {
-                                    printf(" %.3f", pIUFValue->dVec2[j]);
+                                    printf(" %.3f", iufValue->dVec2[j]);
                                 }
                                 printf("\n");
                             }
@@ -474,15 +474,15 @@ void Section::PrintSelf(
                         case MemberTypeIArray:
                         case MemberTypeUArray:
                         {
-                            std::vector<unsigned>* pIntBufData =
-                                *static_cast<std::vector<unsigned>**>(GetMemberAddr(i));
+                            std::vector<unsigned>* intBufData =
+                                *static_cast<std::vector<unsigned>**>(getMemberAddr(i));
 
-                            if (pIntBufData->size() > 0)
+                            if (intBufData->size() > 0)
                             {
-                                printf("%s =", m_pMemberTable[i].memberName);
-                                for (unsigned i = 0; i < pIntBufData->size(); ++i)
+                                printf("%s =", m_memberTable[i].memberName);
+                                for (unsigned i = 0; i < intBufData->size(); ++i)
                                 {
-                                    printf(" 0x%x", (*pIntBufData)[i]);
+                                    printf(" 0x%x", (*intBufData)[i]);
                                 }
                                 printf("\n");
                             }
@@ -492,21 +492,21 @@ void Section::PrintSelf(
                         case MemberTypeI64Array:
                         case MemberTypeU64Array:
                         {
-                            std::vector<unsigned>* pInt64BufData =
-                                *static_cast<std::vector<unsigned>**>(GetMemberAddr(i));
+                            std::vector<unsigned>* int64BufData =
+                                *static_cast<std::vector<unsigned>**>(getMemberAddr(i));
                             union
                             {
                                 uint64_t u64Val;
                                 unsigned uVal[2];
                             };
 
-                            if (pInt64BufData->size() > 0)
+                            if (int64BufData->size() > 0)
                             {
-                                printf("%s =", m_pMemberTable[i].memberName);
-                                for (unsigned i = 0; i < pInt64BufData->size(); i += 2)
+                                printf("%s =", m_memberTable[i].memberName);
+                                for (unsigned i = 0; i < int64BufData->size(); i += 2)
                                 {
-                                    uVal[0] = (*pInt64BufData)[i];
-                                    uVal[1] = (*pInt64BufData)[i + 1];
+                                    uVal[0] = (*int64BufData)[i];
+                                    uVal[1] = (*int64BufData)[i + 1];
                                     printf(" 0x%" PRIx64, u64Val);
                                 }
                                 printf("\n");
@@ -516,20 +516,20 @@ void Section::PrintSelf(
                         }
                         case MemberTypeFArray:
                         {
-                            std::vector<unsigned>* pFloatBufData =
-                                *static_cast<std::vector<unsigned>**>(GetMemberAddr(i));
+                            std::vector<unsigned>* floatBufData =
+                                *static_cast<std::vector<unsigned>**>(getMemberAddr(i));
                             union
                             {
                                 float    fVal;
                                 unsigned uVal;
                             };
-                            if (pFloatBufData->size() > 0)
+                            if (floatBufData->size() > 0)
                             {
-                                printf("%s =", m_pMemberTable[i].memberName);
+                                printf("%s =", m_memberTable[i].memberName);
 
-                                for (unsigned i = 0; i < pFloatBufData->size(); ++i)
+                                for (unsigned i = 0; i < floatBufData->size(); ++i)
                                 {
-                                    uVal = (*pFloatBufData)[i];
+                                    uVal = (*floatBufData)[i];
                                     printf(" %.3f", fVal);
                                 }
                                 printf("\n");
@@ -538,20 +538,20 @@ void Section::PrintSelf(
                         }
                         case MemberTypeF16Array:
                         {
-                            std::vector<uint16_t>* pFloat16BufData =
-                                *static_cast<std::vector<uint16_t>**>(GetMemberAddr(i));
+                            std::vector<uint16_t>* float16BufData =
+                                *static_cast<std::vector<uint16_t>**>(getMemberAddr(i));
                             union
                             {
                                 Float16  f16Val;
                                 uint16_t uVal;
                             };
-                            if (pFloat16BufData->size() > 0)
+                            if (float16BufData->size() > 0)
                             {
-                                printf("%s =", m_pMemberTable[i].memberName);
+                                printf("%s =", m_memberTable[i].memberName);
 
-                                for (unsigned i = 0; i < pFloat16BufData->size(); ++i)
+                                for (unsigned i = 0; i < float16BufData->size(); ++i)
                                 {
-                                    uVal = (*pFloat16BufData)[i];
+                                    uVal = (*float16BufData)[i];
                                     printf(" %.3f", f16Val.GetValue());
                                 }
                                 printf("\n");
@@ -560,21 +560,21 @@ void Section::PrintSelf(
                         }
                         case MemberTypeDArray:
                         {
-                            std::vector<unsigned>* pDoubleBufData =
-                                *static_cast<std::vector<unsigned>**>(GetMemberAddr(i));
+                            std::vector<unsigned>* doubleBufData =
+                                *static_cast<std::vector<unsigned>**>(getMemberAddr(i));
                             union
                             {
                                 double   dVal;
                                 unsigned uVal[2];
                             };
 
-                            if (pDoubleBufData->size() > 1)
+                            if (doubleBufData->size() > 1)
                             {
-                                printf("%s =", m_pMemberTable[i].memberName);
-                                for (unsigned i = 0; i < pDoubleBufData->size() - 1; i+=2)
+                                printf("%s =", m_memberTable[i].memberName);
+                                for (unsigned i = 0; i < doubleBufData->size() - 1; i+=2)
                                 {
-                                    uVal[0] = (*pDoubleBufData)[i];
-                                    uVal[1] = (*pDoubleBufData)[i + 1];
+                                    uVal[0] = (*doubleBufData)[i];
+                                    uVal[1] = (*doubleBufData)[i + 1];
                                     printf(" %.3f", dVal);
                                 }
                                 printf("\n");
@@ -583,8 +583,8 @@ void Section::PrintSelf(
                         }
                         case MemberTypeString:
                         {
-                            std::string* pStr = static_cast<std::string*>(GetMemberAddr(i));
-                            printf("%s = %s\n", m_pMemberTable[i].memberName, pStr->c_str());
+                            std::string* str = static_cast<std::string*>(getMemberAddr(i));
+                            printf("%s = %s\n", m_memberTable[i].memberName, str->c_str());
                             break;
                         }
                         default:
@@ -600,48 +600,48 @@ void Section::PrintSelf(
 
 // =====================================================================================================================
 // Creates a section object according to section name
-Section* Section::CreateSection(
-    const char* pSectionName)    // [in] Section name
+Section* Section::createSection(
+    const char* sectionName)    // [in] Section name
 {
-    auto it = m_sectionInfo.find(pSectionName);
+    auto it = m_sectionInfo.find(sectionName);
 
     VFX_ASSERT(it->second.type != SectionTypeUnset);
 
-    Section* pSection = nullptr;
+    Section* section = nullptr;
     switch (it->second.type)
     {
     case SectionTypeResult:
-        pSection = new SectionResult();
+        section = new SectionResult();
         break;
     case SectionTypeBufferView:
-        pSection = new SectionBufferView();
+        section = new SectionBufferView();
         break;
     case SectionTypeVertexState:
-        pSection = new SectionVertexState();
+        section = new SectionVertexState();
         break;
     case SectionTypeDrawState:
-        pSection = new SectionDrawState();
+        section = new SectionDrawState();
         break;
     case SectionTypeImageView:
-        pSection = new SectionImageView();
+        section = new SectionImageView();
         break;
     case SectionTypeSampler:
-        pSection = new SectionSampler();
+        section = new SectionSampler();
         break;
     case SectionTypeVersion:
-        pSection = new SectionVersion();
+        section = new SectionVersion();
         break;
     case SectionTypeCompileLog:
-        pSection = new SectionCompileLog();
+        section = new SectionCompileLog();
         break;
     case SectionTypeGraphicsState:
-        pSection = new SectionGraphicsState();
+        section = new SectionGraphicsState();
         break;
     case SectionTypeComputeState:
-        pSection = new SectionComputeState();
+        section = new SectionComputeState();
         break;
     case SectionTypeVertexInputState:
-        pSection = new SectionVertexInput();
+        section = new SectionVertexInput();
         break;
     case SectionTypeVertexShaderInfo:
     case SectionTypeTessControlShaderInfo:
@@ -649,7 +649,7 @@ Section* Section::CreateSection(
     case SectionTypeGeometryShaderInfo:
     case SectionTypeFragmentShaderInfo:
     case SectionTypeComputeShaderInfo:
-        pSection = new SectionShaderInfo(it->second.type);
+        section = new SectionShaderInfo(it->second.type);
         break;
     case SectionTypeVertexShader:
     case SectionTypeTessControlShader:
@@ -657,23 +657,23 @@ Section* Section::CreateSection(
     case SectionTypeGeometryShader:
     case SectionTypeFragmentShader:
     case SectionTypeComputeShader:
-        pSection = new SectionShader(it->second);
+        section = new SectionShader(it->second);
         break;
     default:
         VFX_NEVER_CALLED();
         break;
     }
 
-    return pSection;
+    return section;
 }
 
 // =====================================================================================================================
 // Gets section type according to section name
-SectionType Section::GetSectionType(
-    const char* pSectionName)   // [in] Section name
+SectionType Section::getSectionType(
+    const char* sectionName)   // [in] Section name
 {
     SectionType type = SectionTypeUnset;
-    auto it = m_sectionInfo.find(pSectionName);
+    auto it = m_sectionInfo.find(sectionName);
     if (it != m_sectionInfo.end())
     {
         type = it->second.type;
@@ -683,7 +683,7 @@ SectionType Section::GetSectionType(
 
 // =====================================================================================================================
 // Gets the pointer of sub section according to member name
-bool Section::GetPtrOfSubSection(
+bool Section::getPtrOfSubSection(
     unsigned     lineNum,         // Line No.
     const char*  memberName,     // [in] Member name
     MemberType   memberType,      // Member type
@@ -726,12 +726,12 @@ bool Section::GetPtrOfSubSection(
 // Reads whole file content
 // NOTE: The input file name is  from class member "fileName" and read result is stored in shaderSource or m_spvBin
 // according to file type
-bool Section::ReadFile(
+bool Section::readFile(
     const std::string&    docFilename,      // [in] File name of parent document
     const std::string&    fileName,         // [in] File name
     bool                  isBinary,         // Whether file is SPIRV binary file
-    std::vector<uint8_t>* pBinaryData,      // [out] Binary data
-    std::string*          pTextData,        // [out] Text data
+    std::vector<uint8_t>* binaryData,      // [out] Binary data
+    std::string*          textData,        // [out] Text data
     std::string*          errorMsg)        // [out] Error message
 {
     bool result = true;
@@ -746,46 +746,46 @@ bool Section::ReadFile(
     path += fileName;
 
     // Open file
-    FILE* pInFile = fopen(path.c_str(), isBinary ? "rb" : "r");
-    if (pInFile == nullptr)
+    FILE* inFile = fopen(path.c_str(), isBinary ? "rb" : "r");
+    if (inFile == nullptr)
     {
         PARSE_ERROR(*errorMsg, 0, "Fails to open input file: %s\n", path.c_str());
         return false;
     }
 
     // Get file size
-    fseek(pInFile, 0, SEEK_END);
-    size_t fileSize = ftell(pInFile);
-    fseek(pInFile, 0, SEEK_SET);
+    fseek(inFile, 0, SEEK_END);
+    size_t fileSize = ftell(inFile);
+    fseek(inFile, 0, SEEK_SET);
 
     // Allocate temp buffer and read file
-    char* pData = new char[fileSize + 1];
-    VFX_ASSERT(pData != nullptr);
-    memset(pData, 0, fileSize + 1);
-    size_t readSize = fread(pData, 1, fileSize, pInFile);
+    char* data = new char[fileSize + 1];
+    VFX_ASSERT(data != nullptr);
+    memset(data, 0, fileSize + 1);
+    size_t readSize = fread(data, 1, fileSize, inFile);
 
     // Copy to destination
     if (isBinary)
     {
-        (*pBinaryData).resize(readSize);
-        memcpy(&(*pBinaryData)[0], pData, readSize);
+        (*binaryData).resize(readSize);
+        memcpy(&(*binaryData)[0], data, readSize);
     }
     else
     {
-        *pTextData = pData;
+        *textData = data;
     }
 
     // Clean up
-    delete[] pData;
-    fclose(pInFile);
+    delete[] data;
+    fclose(inFile);
 
     return result;
 }
 
 // =====================================================================================================================
 // Compiles GLSL source text file (input) to SPIR-V binary file (output).
-bool SectionShader::CompileGlsl(
-    const Section* pShaderInfo, // [in] Shader info section
+bool SectionShader::compileGlsl(
+    const Section* shaderInfo, // [in] Shader info section
     std::string*   errorMsg)   // [out] Error message
 {
     int           sourceStringCount = 1;
@@ -793,11 +793,11 @@ bool SectionShader::CompileGlsl(
     const char*const* fileList[1]       = {};
 
     bool        result    = true;
-    const char* pGlslText = shaderSource.c_str();
-    const char* pFileName = fileName.c_str();
+    const char* glslText = m_shaderSource.c_str();
+    const char* fileName = m_fileName.c_str();
     SpvGenStage stage     = static_cast<SpvGenStage>(m_sectionType - SectionTypeVertexShader);
-    void*       pProgram  = nullptr;
-    const char* pLog      = nullptr;
+    void*       program  = nullptr;
+    const char* log      = nullptr;
 
     if (InitSpvGen() == false)
     {
@@ -805,44 +805,44 @@ bool SectionShader::CompileGlsl(
         return false;
     }
 
-    sourceList[0] = &pGlslText;
-    fileList[0] = &pFileName;
+    sourceList[0] = &glslText;
+    fileList[0] = &fileName;
     int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
     if ((m_shaderType == Hlsl) || (m_shaderType == HlslFile))
     {
         compileOption |= SpvGenOptionReadHlsl;
     }
-    const char* pEntryPoint = nullptr;
-    if (pShaderInfo != nullptr)
+    const char* entryPoint = nullptr;
+    if (shaderInfo != nullptr)
     {
-        pEntryPoint = reinterpret_cast<const SectionShaderInfo*>(pShaderInfo)->GetEntryPoint();
+        entryPoint = reinterpret_cast<const SectionShaderInfo*>(shaderInfo)->getEntryPoint();
     }
     bool compileResult = spvCompileAndLinkProgramEx(1,
                                                    &stage,
                                                    &sourceStringCount,
                                                    sourceList,
                                                    fileList,
-                                                   &pEntryPoint,
-                                                   &pProgram,
-                                                   &pLog,
+                                                   &entryPoint,
+                                                   &program,
+                                                   &log,
                                                    compileOption);
 
     if (compileResult)
     {
-        const unsigned* pSpvBin = nullptr;
-        unsigned binSize = spvGetSpirvBinaryFromProgram(pProgram, 0, &pSpvBin);
+        const unsigned* spvBin = nullptr;
+        unsigned binSize = spvGetSpirvBinaryFromProgram(program, 0, &spvBin);
         m_spvBin.resize(binSize);
-        memcpy(&m_spvBin[0], pSpvBin, binSize);
+        memcpy(&m_spvBin[0], spvBin, binSize);
     }
     else
     {
-        PARSE_ERROR(*errorMsg, m_lineNum, "Fail to compile GLSL\n%s\n", pLog);
+        PARSE_ERROR(*errorMsg, m_lineNum, "Fail to compile GLSL\n%s\n", log);
         result = false;
     }
 
-    if (pProgram)
+    if (program)
     {
-        spvDestroyProgram(pProgram);
+        spvDestroyProgram(program);
     }
 
     return result;
@@ -850,11 +850,11 @@ bool SectionShader::CompileGlsl(
 
 // =====================================================================================================================
 // Assemble Spirv assemble code
-bool SectionShader::AssembleSpirv(
+bool SectionShader::assembleSpirv(
     std::string* errorMsg)  // [out] Error message
 {
     bool result = true;
-    const char* pText = shaderSource.c_str();
+    const char* text = m_shaderSource.c_str();
 
     if (InitSpvGen() == false)
     {
@@ -862,30 +862,30 @@ bool SectionShader::AssembleSpirv(
         return false;
     }
 
-    const char* pLog = nullptr;
-    unsigned bufSize = static_cast<unsigned>(shaderSource.size()) * 4 + 1024;
-    unsigned* pBuffer = new unsigned[bufSize / 4];
+    const char* log = nullptr;
+    unsigned bufSize = static_cast<unsigned>(m_shaderSource.size()) * 4 + 1024;
+    unsigned* buffer = new unsigned[bufSize / 4];
 
-    int binSize = spvAssembleSpirv(pText, bufSize, pBuffer, &pLog);
+    int binSize = spvAssembleSpirv(text, bufSize, buffer, &log);
 
     if (binSize > 0)
     {
         m_spvBin.resize(binSize);
-        memcpy(&m_spvBin[0], pBuffer, binSize);
+        memcpy(&m_spvBin[0], buffer, binSize);
     }
     else
     {
-        PARSE_ERROR(*errorMsg, m_lineNum, "Fail to Assemble SPIRV\n%s\n", pLog);
+        PARSE_ERROR(*errorMsg, m_lineNum, "Fail to Assemble SPIRV\n%s\n", log);
         result = false;
     }
 
-    delete[] pBuffer;
+    delete[] buffer;
     return result;
 }
 
 // =====================================================================================================================
 // Returns true if this section contains shader source
-bool SectionShader::IsShaderSourceSection()
+bool SectionShader::isShaderSourceSection()
 {
     bool ret = false;
     switch (m_shaderType)
@@ -903,9 +903,9 @@ bool SectionShader::IsShaderSourceSection()
 
 // =====================================================================================================================
 // Loads external shader code, and translate shader code to SPIRV binary
-bool SectionShader::CompileShader(
+bool SectionShader::compileShader(
     const std::string&  docFilename,      // [in] File name of parent document
-    const Section*      pShaderInfo,      // [in] Shader info sections
+    const Section*      shaderInfo,      // [in] Shader info sections
     std::string*        errorMsg)        // [out] Error message
 {
     bool result = false;
@@ -914,36 +914,36 @@ bool SectionShader::CompileShader(
     case Glsl:
     case Hlsl:
         {
-            result = CompileGlsl(pShaderInfo, errorMsg);
+            result = compileGlsl(shaderInfo, errorMsg);
             break;
         }
     case GlslFile:
     case HlslFile:
         {
-            result = ReadFile(docFilename, fileName, false, &m_spvBin, &shaderSource, errorMsg);
+            result = readFile(docFilename, m_fileName, false, &m_spvBin, &m_shaderSource, errorMsg);
             if (result)
             {
-                CompileGlsl(pShaderInfo, errorMsg);
+                compileGlsl(shaderInfo, errorMsg);
             }
             break;
         }
     case SpirvAsm:
         {
-            result = AssembleSpirv(errorMsg);
+            result = assembleSpirv(errorMsg);
             break;
         }
     case SpirvAsmFile:
         {
-            result = ReadFile(docFilename, fileName, false, &m_spvBin, &shaderSource, errorMsg);
+            result = readFile(docFilename, m_fileName, false, &m_spvBin, &m_shaderSource, errorMsg);
             if (result)
             {
-                AssembleSpirv(errorMsg);
+                assembleSpirv(errorMsg);
             }
             break;
         }
     case SpirvFile:
         {
-            result = ReadFile(docFilename, fileName, true, &m_spvBin, &shaderSource, errorMsg);
+            result = readFile(docFilename, m_fileName, true, &m_spvBin, &m_shaderSource, errorMsg);
             break;
         }
     default:
@@ -955,7 +955,7 @@ bool SectionShader::CompileShader(
     return result;
 }
 
-void SectionShader::GetSubState(SectionShader::SubState& state)
+void SectionShader::getSubState(SectionShader::SubState& state)
 {
     state.dataSize = static_cast<unsigned>(m_spvBin.size());
     state.pData = state.dataSize > 0 ? &m_spvBin[0] : nullptr;

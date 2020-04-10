@@ -136,14 +136,14 @@ PsRegConfig::PsRegConfig()
 
 // =====================================================================================================================
 // Gets the starting register ID of SPI_PS_INPUT_CNTL.
-unsigned PsRegConfig::GetPsInputCntlStart()
+unsigned PsRegConfig::getPsInputCntlStart()
 {
     return mmSPI_PS_INPUT_CNTL_0;
 }
 
 // =====================================================================================================================
 // Gets the starting register ID of SPI_SHADER_USER_DATA_PS.
-unsigned PsRegConfig::GetPsUserDataStart()
+unsigned PsRegConfig::getPsUserDataStart()
 {
     return mmSPI_SHADER_USER_DATA_PS_0;
 }
@@ -195,7 +195,7 @@ CsRegConfig::CsRegConfig()
 
 // =====================================================================================================================
 // Adds entries to register name map.
-void InitRegisterNameMap(
+void initRegisterNameMap(
     GfxIpVersion gfxIp) // Graphics IP version info
 {
     assert(gfxIp.major <= 8);

@@ -59,7 +59,7 @@ public:
         bool    onlySetCallingConvs = false)
         :
         Patch(ID),
-        m_onlySetCallingConvs(onlySetCallingConvs)
+        MOnlySetCallingConvs(onlySetCallingConvs)
     {
     }
 
@@ -75,21 +75,21 @@ private:
     PatchPreparePipelineAbi(const PatchPreparePipelineAbi&) = delete;
     PatchPreparePipelineAbi& operator=(const PatchPreparePipelineAbi&) = delete;
 
-    void SetCallingConvs(Module& module);
+    void setCallingConvs(Module& module);
 
-    void MergeShaderAndSetCallingConvs(Module& module);
+    void mergeShaderAndSetCallingConvs(Module& module);
 
-    void SetCallingConv(ShaderStage     stage,
+    void setCallingConv(ShaderStage     stage,
                         CallingConv::ID callingConv);
 
-    void SetAbiEntryNames(Module& module);
+    void setAbiEntryNames(Module& module);
 
-    void AddAbiMetadata(Module& module);
+    void addAbiMetadata(Module& module);
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    PipelineState*    m_pPipelineState;      // Pipeline state
-    PipelineShaders*  m_pPipelineShaders;    // API shaders in the pipeline
+    PipelineState*    m_pipelineState;      // Pipeline state
+    PipelineShaders*  m_pipelineShaders;    // API shaders in the pipeline
 
     bool              m_hasVs;               // Whether the pipeline has vertex shader
     bool              m_hasTcs;              // Whether the pipeline has tessellation control shader
@@ -98,7 +98,7 @@ private:
 
     GfxIpVersion      m_gfxIp;               // Graphics IP version info
 
-    const bool        m_onlySetCallingConvs; // Whether to only set the calling conventions
+    const bool        MOnlySetCallingConvs; // Whether to only set the calling conventions
 };
 
 char PatchPreparePipelineAbi::ID = 0;
@@ -107,7 +107,7 @@ char PatchPreparePipelineAbi::ID = 0;
 
 // =====================================================================================================================
 // Create pass to prepare the pipeline ABI
-ModulePass* lgc::CreatePatchPreparePipelineAbi(
+ModulePass* lgc::createPatchPreparePipelineAbi(
     bool     onlySetCallingConvs) // Should we only set the calling conventions, or do the full prepare.
 {
     return new PatchPreparePipelineAbi(onlySetCallingConvs);
@@ -120,33 +120,33 @@ bool PatchPreparePipelineAbi::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Prepare-Pipeline-Abi\n");
 
-    Patch::Init(&module);
+    Patch::init(&module);
 
-    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
-    m_pPipelineShaders = &getAnalysis<PipelineShaders>();
+    m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+    m_pipelineShaders = &getAnalysis<PipelineShaders>();
 
-    m_hasVs = m_pPipelineState->HasShaderStage(ShaderStageVertex);
-    m_hasTcs = m_pPipelineState->HasShaderStage(ShaderStageTessControl);
-    m_hasTes = m_pPipelineState->HasShaderStage(ShaderStageTessEval);
-    m_hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
+    m_hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
+    m_hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);
+    m_hasTes = m_pipelineState->hasShaderStage(ShaderStageTessEval);
+    m_hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
 
-    m_gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
+    m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
     // If we've only to set the calling conventions, do that now.
-    if (m_onlySetCallingConvs)
+    if (MOnlySetCallingConvs)
     {
-        SetCallingConvs(module);
+        setCallingConvs(module);
     }
     else
     {
         if (m_gfxIp.major >= 9)
         {
-            MergeShaderAndSetCallingConvs(module);
+            mergeShaderAndSetCallingConvs(module);
         }
 
-        SetAbiEntryNames(module);
+        setAbiEntryNames(module);
 
-        AddAbiMetadata(module);
+        addAbiMetadata(module);
     }
 
     return true; // Modified the module.
@@ -154,49 +154,49 @@ bool PatchPreparePipelineAbi::runOnModule(
 
 // =====================================================================================================================
 // Set calling convention for the entry-point of each shader (pre-GFX9)
-void PatchPreparePipelineAbi::SetCallingConvs(
+void PatchPreparePipelineAbi::setCallingConvs(
     Module& module)   // [in] LLVM module
 {
     const bool hasTs = (m_hasTcs || m_hasTes);
 
     // NOTE: For each entry-point, set the calling convention appropriate to the hardware shader stage. The action here
     // depends on the pipeline type.
-    SetCallingConv(ShaderStageCompute, CallingConv::AMDGPU_CS);
-    SetCallingConv(ShaderStageFragment, CallingConv::AMDGPU_PS);
+    setCallingConv(ShaderStageCompute, CallingConv::AMDGPU_CS);
+    setCallingConv(ShaderStageFragment, CallingConv::AMDGPU_PS);
 
     if (hasTs && m_hasGs)
     {
         // TS-GS pipeline
-        SetCallingConv(ShaderStageVertex, CallingConv::AMDGPU_LS);
-        SetCallingConv(ShaderStageTessControl, CallingConv::AMDGPU_HS);
-        SetCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_ES);
-        SetCallingConv(ShaderStageGeometry, CallingConv::AMDGPU_GS);
-        SetCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
+        setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_LS);
+        setCallingConv(ShaderStageTessControl, CallingConv::AMDGPU_HS);
+        setCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_ES);
+        setCallingConv(ShaderStageGeometry, CallingConv::AMDGPU_GS);
+        setCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
     }
     else if (hasTs)
     {
         // TS-only pipeline
-        SetCallingConv(ShaderStageVertex, CallingConv::AMDGPU_LS);
-        SetCallingConv(ShaderStageTessControl, CallingConv::AMDGPU_HS);
-        SetCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_VS);
+        setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_LS);
+        setCallingConv(ShaderStageTessControl, CallingConv::AMDGPU_HS);
+        setCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_VS);
     }
     else if (m_hasGs)
     {
         // GS-only pipeline
-        SetCallingConv(ShaderStageVertex, CallingConv::AMDGPU_ES);
-        SetCallingConv(ShaderStageGeometry, CallingConv::AMDGPU_GS);
-        SetCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
+        setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_ES);
+        setCallingConv(ShaderStageGeometry, CallingConv::AMDGPU_GS);
+        setCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
     }
     else if (m_hasVs)
     {
         // VS-FS pipeine
-        SetCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
+        setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
     }
 }
 
 // =====================================================================================================================
 // Merge shaders and set calling convention for the entry-point of each each shader (GFX9+)
-void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
+void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(
     Module& module)   // [in] LLVM module
 {
     assert(m_gfxIp.major >= 9);
@@ -205,51 +205,51 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
 
     // NOTE: For each entry-point, set the calling convention appropriate to the hardware shader stage. The action here
     // depends on the pipeline type, and, for GFX9+, may involve merging shaders.
-    SetCallingConv(ShaderStageCompute, CallingConv::AMDGPU_CS);
-    SetCallingConv(ShaderStageFragment, CallingConv::AMDGPU_PS);
+    setCallingConv(ShaderStageCompute, CallingConv::AMDGPU_CS);
+    setCallingConv(ShaderStageFragment, CallingConv::AMDGPU_PS);
 
-    if (m_pPipelineState->IsGraphics())
+    if (m_pipelineState->isGraphics())
     {
-        ShaderMerger shaderMerger(m_pPipelineState, m_pPipelineShaders);
-        const bool enableNgg = m_pPipelineState->GetNggControl()->enableNgg;
+        ShaderMerger shaderMerger(m_pipelineState, m_pipelineShaders);
+        const bool enableNgg = m_pipelineState->getNggControl()->enableNgg;
 
         if (hasTs && m_hasGs)
         {
             // TS-GS pipeline
             if (m_hasTcs)
             {
-                auto pLsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageVertex);
-                auto pHsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageTessControl);
+                auto lsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
+                auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessControl);
 
-                if (pHsEntryPoint != nullptr)
+                if (hsEntryPoint != nullptr)
                 {
-                    auto pLsHsEntryPoint = shaderMerger.GenerateLsHsEntryPoint(pLsEntryPoint, pHsEntryPoint);
-                    pLsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
+                    auto lsHsEntryPoint = shaderMerger.generateLsHsEntryPoint(lsEntryPoint, hsEntryPoint);
+                    lsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
                 }
             }
 
-            auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageTessEval);
-            auto pGsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
+            auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessEval);
+            auto gsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageGeometry);
 
             if (enableNgg)
             {
-                if (pGsEntryPoint != nullptr)
+                if (gsEntryPoint != nullptr)
                 {
-                    auto pCopyShaderEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageCopyShader);
-                    auto pPrimShaderEntryPoint =
-                        shaderMerger.BuildPrimShader(pEsEntryPoint, pGsEntryPoint, pCopyShaderEntryPoint);
-                    pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                    auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageCopyShader);
+                    auto primShaderEntryPoint =
+                        shaderMerger.buildPrimShader(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
+                    primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
                 }
             }
             else
             {
-                if (pGsEntryPoint != nullptr)
+                if (gsEntryPoint != nullptr)
                 {
-                    auto pEsGsEntryPoint = shaderMerger.GenerateEsGsEntryPoint(pEsEntryPoint, pGsEntryPoint);
-                    pEsGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                    auto esGsEntryPoint = shaderMerger.generateEsGsEntryPoint(esEntryPoint, gsEntryPoint);
+                    esGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
                 }
 
-                SetCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
+                setCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
             }
         }
         else if (hasTs)
@@ -257,57 +257,57 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
             // TS-only pipeline
             if (m_hasTcs)
             {
-                auto pLsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageVertex);
-                auto pHsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageTessControl);
+                auto lsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
+                auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessControl);
 
-                if (pHsEntryPoint != nullptr)
+                if (hsEntryPoint != nullptr)
                 {
-                    auto pLsHsEntryPoint = shaderMerger.GenerateLsHsEntryPoint(pLsEntryPoint, pHsEntryPoint);
-                    pLsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
+                    auto lsHsEntryPoint = shaderMerger.generateLsHsEntryPoint(lsEntryPoint, hsEntryPoint);
+                    lsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
                 }
             }
 
             if (enableNgg)
             {
                 // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
-                auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageTessEval);
+                auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessEval);
 
-                if (pEsEntryPoint != nullptr)
+                if (esEntryPoint != nullptr)
                 {
-                    auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, nullptr, nullptr);
-                    pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                    auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, nullptr, nullptr);
+                    primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
                 }
             }
             else
             {
-                SetCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_VS);
+                setCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_VS);
             }
         }
         else if (m_hasGs)
         {
             // GS-only pipeline
-            auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageVertex);
-            auto pGsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
+            auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
+            auto gsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageGeometry);
 
             if (enableNgg)
             {
-                if (pGsEntryPoint != nullptr)
+                if (gsEntryPoint != nullptr)
                 {
-                    auto pCopyShaderEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageCopyShader);
-                    auto pPrimShaderEntryPoint =
-                        shaderMerger.BuildPrimShader(pEsEntryPoint, pGsEntryPoint, pCopyShaderEntryPoint);
-                    pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                    auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageCopyShader);
+                    auto primShaderEntryPoint =
+                        shaderMerger.buildPrimShader(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
+                    primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
                 }
             }
             else
             {
-                if (pGsEntryPoint != nullptr)
+                if (gsEntryPoint != nullptr)
                 {
-                    auto pEsGsEntryPoint = shaderMerger.GenerateEsGsEntryPoint(pEsEntryPoint, pGsEntryPoint);
-                    pEsGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                    auto esGsEntryPoint = shaderMerger.generateEsGsEntryPoint(esEntryPoint, gsEntryPoint);
+                    esGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
                 }
 
-                SetCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
+                setCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
             }
         }
         else if (m_hasVs)
@@ -316,16 +316,16 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
             if (enableNgg)
             {
                 // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
-                auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageVertex);
-                if (pEsEntryPoint != nullptr)
+                auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
+                if (esEntryPoint != nullptr)
                 {
-                    auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, nullptr, nullptr);
-                    pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                    auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, nullptr, nullptr);
+                    primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
                 }
             }
             else
             {
-                SetCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
+                setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
             }
         }
     }
@@ -333,20 +333,20 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
 
 // =====================================================================================================================
 // Set calling convention on a particular API shader stage, if that stage has a shader
-void PatchPreparePipelineAbi::SetCallingConv(
+void PatchPreparePipelineAbi::setCallingConv(
     ShaderStage     shaderStage,  // Shader stage
     CallingConv::ID callingConv)  // Calling convention to set it to
 {
-    auto pEntryPoint = m_pPipelineShaders->GetEntryPoint(shaderStage);
-    if (pEntryPoint != nullptr)
+    auto entryPoint = m_pipelineShaders->getEntryPoint(shaderStage);
+    if (entryPoint != nullptr)
     {
-        pEntryPoint->setCallingConv(callingConv);
+        entryPoint->setCallingConv(callingConv);
     }
 }
 
 // =====================================================================================================================
 // Set ABI-specified entrypoint name for each shader
-void PatchPreparePipelineAbi::SetAbiEntryNames(
+void PatchPreparePipelineAbi::setAbiEntryNames(
     Module& module)   // [in] LLVM module
 {
     for (auto& func : module)
@@ -354,53 +354,53 @@ void PatchPreparePipelineAbi::SetAbiEntryNames(
         if (func.empty() == false)
         {
             auto callingConv = func.getCallingConv();
-            const char* pEntryName = nullptr;
+            const char* entryName = nullptr;
 
             switch (callingConv)
             {
             case CallingConv::AMDGPU_CS:
-                pEntryName = Util::Abi::AmdGpuCsEntryName;
+                entryName = Util::Abi::AmdGpuCsEntryName;
                 break;
             case CallingConv::AMDGPU_PS:
-                pEntryName = Util::Abi::AmdGpuPsEntryName;
+                entryName = Util::Abi::AmdGpuPsEntryName;
                 break;
             case CallingConv::AMDGPU_VS:
-                pEntryName = Util::Abi::AmdGpuVsEntryName;
+                entryName = Util::Abi::AmdGpuVsEntryName;
                 break;
             case CallingConv::AMDGPU_GS:
-                pEntryName = Util::Abi::AmdGpuGsEntryName;
+                entryName = Util::Abi::AmdGpuGsEntryName;
                 break;
             case CallingConv::AMDGPU_ES:
-                pEntryName = Util::Abi::AmdGpuEsEntryName;
+                entryName = Util::Abi::AmdGpuEsEntryName;
                 break;
             case CallingConv::AMDGPU_HS:
-                pEntryName = Util::Abi::AmdGpuHsEntryName;
+                entryName = Util::Abi::AmdGpuHsEntryName;
                 break;
             case CallingConv::AMDGPU_LS:
-                pEntryName = Util::Abi::AmdGpuLsEntryName;
+                entryName = Util::Abi::AmdGpuLsEntryName;
                 break;
             default:
                 continue;
             }
-            func.setName(pEntryName);
+            func.setName(entryName);
         }
     }
 }
 
 // =====================================================================================================================
 // Add ABI metadata
-void PatchPreparePipelineAbi::AddAbiMetadata(
+void PatchPreparePipelineAbi::addAbiMetadata(
     Module& module)   // [in] LLVM module
 {
     if (m_gfxIp.major <= 8)
     {
-        Gfx6::ConfigBuilder configBuilder(&module, m_pPipelineState);
-        configBuilder.BuildPalMetadata();
+        Gfx6::ConfigBuilder configBuilder(&module, m_pipelineState);
+        configBuilder.buildPalMetadata();
     }
     else
     {
-        Gfx9::ConfigBuilder configBuilder(&module, m_pPipelineState);
-        configBuilder.BuildPalMetadata();
+        Gfx9::ConfigBuilder configBuilder(&module, m_pipelineState);
+        configBuilder.buildPalMetadata();
     }
 }
 

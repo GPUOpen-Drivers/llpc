@@ -33,6 +33,6 @@
 
 namespace Vfx
 {
-bool GetEnumValue(const char* pString, int& value);
-void InitEnumMap();
+bool getEnumValue(const char* string, int& value);
+void initEnumMap();
 }

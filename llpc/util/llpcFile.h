@@ -55,26 +55,26 @@ public:
     File() : m_fileHandle(nullptr) { }
 
     // Closes the file if it is still open.
-    ~File() { Close(); }
+    ~File() { close(); }
 
-    static size_t GetFileSize(const char* pFilename);
-    static bool Exists(const char* pFilename);
+    static size_t getFileSize(const char* filename);
+    static bool exists(const char* filename);
 
-    Result Open(const char* pFilename, unsigned accessFlags);
-    void Close();
-    Result Write(const void* pBuffer, size_t bufferSize);
-    Result Read(void* pBuffer, size_t bufferSize, size_t* pBytesRead);
-    Result ReadLine(void* pBuffer, size_t bufferSize, size_t* pBytesRead);
-    Result Printf(const char* pFormatStr, ...) const;
-    Result VPrintf(const char* pFormatStr, va_list argList);
-    Result Flush() const;
-    void Rewind();
-    void Seek(int offset, bool fromOrigin);
+    Result open(const char* filename, unsigned accessFlags);
+    void close();
+    Result write(const void* buffer, size_t bufferSize);
+    Result read(void* buffer, size_t bufferSize, size_t* bytesRead);
+    Result readLine(void* buffer, size_t bufferSize, size_t* bytesRead);
+    Result printf(const char* formatStr, ...) const;
+    Result vPrintf(const char* formatStr, va_list argList);
+    Result flush() const;
+    void rewind();
+    void seek(int offset, bool fromOrigin);
 
     // Returns true if the file is presently open.
-    bool IsOpen() const { return (m_fileHandle != nullptr); }
+    bool isOpen() const { return (m_fileHandle != nullptr); }
     // Gets handle of the file
-    const std::FILE* GetHandle() const { return m_fileHandle; }
+    const std::FILE* getHandle() const { return m_fileHandle; }
 
 private:
     std::FILE* m_fileHandle;      // File handle

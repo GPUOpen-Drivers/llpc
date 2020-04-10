@@ -51,7 +51,7 @@ char PatchLoadScalarizer::ID;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for load scalarizer optimizations.
-FunctionPass* CreatePatchLoadScalarizer()
+FunctionPass* createPatchLoadScalarizer()
 {
     return new PatchLoadScalarizer();
 }
@@ -82,31 +82,31 @@ bool PatchLoadScalarizer::runOnFunction(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Load-Scalarizer-Opt\n");
 
-    auto pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(function.getParent());
-    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
-    auto shaderStage = pPipelineShaders->GetShaderStage(&function);
+    auto pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(function.getParent());
+    auto pipelineShaders = &getAnalysis<PipelineShaders>();
+    auto shaderStage = pipelineShaders->getShaderStage(&function);
 
     // If the function is not a valid shader stage, or the optimization is disabled, bail.
     m_scalarThreshold = 0;
     if (shaderStage != ShaderStageInvalid)
     {
-        m_scalarThreshold = pPipelineState->GetShaderOptions(shaderStage).loadScalarizerThreshold;
+        m_scalarThreshold = pipelineState->getShaderOptions(shaderStage).loadScalarizerThreshold;
     }
     if (m_scalarThreshold == 0)
     {
         return false;
     }
 
-    m_pBuilder.reset(new IRBuilder<>(function.getContext()));
+    m_builder.reset(new IRBuilder<>(function.getContext()));
 
     visit(function);
 
     const bool changed = (m_instsToErase.empty() == false);
 
-    for (Instruction* const pInst : m_instsToErase)
+    for (Instruction* const inst : m_instsToErase)
     {
         // Lastly delete any instructions we replaced.
-        pInst->eraseFromParent();
+        inst->eraseFromParent();
     }
     m_instsToErase.clear();
 
@@ -119,9 +119,9 @@ void PatchLoadScalarizer::visitLoadInst(
     LoadInst& loadInst) // [in] The instruction
 {
     const unsigned addrSpace = loadInst.getPointerAddressSpace();
-    auto pLoadTy = dyn_cast<VectorType>(loadInst.getType());
+    auto loadTy = dyn_cast<VectorType>(loadInst.getType());
 
-    if (pLoadTy != nullptr)
+    if (loadTy != nullptr)
     {
         // This optimization will try to scalarize the load inst. The pattern is like:
         //    %loadValue = load <4 x float>, <4 x float> addrspace(7)* %loadPtr, align 16
@@ -140,18 +140,18 @@ void PatchLoadScalarizer::visitLoadInst(
         //    %loadValue.i012 = insertelement <4 x float> %loadValue.i01, float %loadComp.i2, i32 2
         //    %loadValue = insertelement <4 x float> %loadValue.i012, float %loadComp.i3, i32 3
 
-        unsigned compCount = pLoadTy->getNumElements();
+        unsigned compCount = loadTy->getNumElements();
 
         if (compCount > m_scalarThreshold)
         {
             return;
         }
 
-        Type* pCompTy = pLoadTy->getVectorElementType();
-        uint64_t compSize = loadInst.getModule()->getDataLayout().getTypeStoreSize(pCompTy);
+        Type* compTy = loadTy->getVectorElementType();
+        uint64_t compSize = loadInst.getModule()->getDataLayout().getTypeStoreSize(compTy);
 
-        Value* pLoadValue = UndefValue::get(pLoadTy);
-        Type*  pNewLoadPtrTy = PointerType::get(pCompTy, addrSpace);
+        Value* loadValue = UndefValue::get(loadTy);
+        Type*  newLoadPtrTy = PointerType::get(compTy, addrSpace);
         llvm::SmallVector<llvm::Value*, 4> loadComps;
 
         loadComps.resize(compCount);
@@ -160,22 +160,22 @@ void PatchLoadScalarizer::visitLoadInst(
         SmallVector<std::pair<unsigned, MDNode*>, 8> allMetaNodes;
         loadInst.getAllMetadata(allMetaNodes);
 
-        m_pBuilder->SetInsertPoint(&loadInst);
-        Value* pNewLoadPtr = m_pBuilder->CreateBitCast(loadInst.getPointerOperand(),
-                                                       pNewLoadPtrTy,
+        m_builder->SetInsertPoint(&loadInst);
+        Value* newLoadPtr = m_builder->CreateBitCast(loadInst.getPointerOperand(),
+                                                       newLoadPtrTy,
                                                        loadInst.getPointerOperand()->getName() + ".i0");
 
         for (unsigned i = 0; i < compCount; i++)
         {
-            Value* pLoadCompPtr = m_pBuilder->CreateConstGEP1_32(pCompTy,
-                                                                 pNewLoadPtr,
+            Value* loadCompPtr = m_builder->CreateConstGEP1_32(compTy,
+                                                                 newLoadPtr,
                                                                  i,
                                                                  loadInst.getPointerOperand()->getName() + ".i" + Twine(i));
             // Calculate the alignment of component i
             uint64_t compAlignment = MinAlign(loadInst.getAlignment(), i * compSize);
 
-            loadComps[i] = m_pBuilder->CreateAlignedLoad(pCompTy,
-                                                         pLoadCompPtr,
+            loadComps[i] = m_builder->CreateAlignedLoad(compTy,
+                                                         loadCompPtr,
                                                          MaybeAlign(compAlignment),
                                                          loadInst.getName() + ".ii" + Twine(i));
 
@@ -187,12 +187,12 @@ void PatchLoadScalarizer::visitLoadInst(
 
         for (unsigned i = 0; i < compCount; i++)
         {
-            pLoadValue = m_pBuilder->CreateInsertElement(pLoadValue, loadComps[i], m_pBuilder->getInt32(i),
+            loadValue = m_builder->CreateInsertElement(loadValue, loadComps[i], m_builder->getInt32(i),
                 loadInst.getName() + ".u" + Twine(i));
         }
 
-        pLoadValue->takeName(&loadInst);
-        loadInst.replaceAllUsesWith(pLoadValue);
+        loadValue->takeName(&loadInst);
+        loadInst.replaceAllUsesWith(loadValue);
         m_instsToErase.push_back(&loadInst);
     }
 }

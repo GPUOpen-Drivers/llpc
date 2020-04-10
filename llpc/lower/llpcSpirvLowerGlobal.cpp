@@ -111,7 +111,7 @@ char SpirvLowerGlobal::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for globals
-ModulePass* CreateSpirvLowerGlobal()
+ModulePass* createSpirvLowerGlobal()
 {
     return new SpirvLowerGlobal();
 }
@@ -120,7 +120,7 @@ ModulePass* CreateSpirvLowerGlobal()
 SpirvLowerGlobal::SpirvLowerGlobal()
     :
     SpirvLower(ID),
-    m_pRetBlock(nullptr),
+    m_retBlock(nullptr),
     m_lowerInputInPlace(false),
     m_lowerOutputInPlace(false)
 {
@@ -133,29 +133,29 @@ bool SpirvLowerGlobal::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Global\n");
 
-    SpirvLower::Init(&module);
+    SpirvLower::init(&module);
 
     // Map globals to proxy variables
-    for (auto pGlobal = m_pModule->global_begin(), pEnd = m_pModule->global_end(); pGlobal != pEnd; ++pGlobal)
+    for (auto global = m_module->global_begin(), end = m_module->global_end(); global != end; ++global)
     {
-        if (pGlobal->getType()->getAddressSpace() == SPIRAS_Private)
+        if (global->getType()->getAddressSpace() == SPIRAS_Private)
         {
-            MapGlobalVariableToProxy(&*pGlobal);
+            mapGlobalVariableToProxy(&*global);
         }
-        else if (pGlobal->getType()->getAddressSpace() == SPIRAS_Input)
+        else if (global->getType()->getAddressSpace() == SPIRAS_Input)
         {
-            MapInputToProxy(&*pGlobal);
+            mapInputToProxy(&*global);
         }
-        else if (pGlobal->getType()->getAddressSpace() == SPIRAS_Output)
+        else if (global->getType()->getAddressSpace() == SPIRAS_Output)
         {
-            MapOutputToProxy(&*pGlobal);
+            mapOutputToProxy(&*global);
         }
     }
 
     // NOTE: Global variable, inlcude general global variable, input and output is a special constant variable, so if
     // it is referenced by constant expression, we need translate constant expression to normal instruction first,
     // Otherwise, we will hit assert in replaceAllUsesWith() when we replace global variable with proxy variable.
-    for (GlobalVariable& global : m_pModule->globals())
+    for (GlobalVariable& global : m_module->globals())
     {
         auto addrSpace = global.getType()->getAddressSpace();
 
@@ -166,43 +166,43 @@ bool SpirvLowerGlobal::runOnModule(
         {
             continue;
         }
-        RemoveConstantExpr(m_pContext, &global);
+        removeConstantExpr(m_context, &global);
     }
 
     // Do lowering operations
-    LowerGlobalVar();
+    lowerGlobalVar();
 
     if (m_lowerInputInPlace && m_lowerOutputInPlace)
     {
         // Both input and output have to be lowered in-place (without proxy variables)
-        LowerInOutInPlace(); // Just one lowering operation is sufficient
+        lowerInOutInPlace(); // Just one lowering operation is sufficient
     }
     else
     {
         // Either input or output has to be lowered in-place, not both
         if (m_lowerInputInPlace)
         {
-            LowerInOutInPlace();
+            lowerInOutInPlace();
         }
         else
         {
-            LowerInput();
+            lowerInput();
         }
 
         if (m_lowerOutputInPlace)
         {
-            LowerInOutInPlace();
+            lowerInOutInPlace();
         }
         else
         {
-            LowerOutput();
+            lowerOutput();
         }
     }
 
-    LowerBufferBlock();
-    LowerPushConsts();
+    lowerBufferBlock();
+    lowerPushConsts();
 
-    CleanupReturnBlock();
+    cleanupReturnBlock();
 
     return true;
 }
@@ -224,8 +224,8 @@ void SpirvLowerGlobal::visitReturnInst(
         return;
     }
 
-    assert(m_pRetBlock != nullptr); // Must have been created
-    BranchInst::Create(m_pRetBlock, retInst.getParent());
+    assert(m_retBlock != nullptr); // Must have been created
+    BranchInst::Create(m_retBlock, retInst.getParent());
     m_retInsts.insert(&retInst);
 }
 
@@ -240,13 +240,13 @@ void SpirvLowerGlobal::visitCallInst(
         return;
     }
 
-    auto pCallee = callInst.getCalledFunction();
-    if (pCallee == nullptr)
+    auto callee = callInst.getCalledFunction();
+    if (callee == nullptr)
     {
         return;
     }
 
-    auto mangledName = pCallee->getName();
+    auto mangledName = callee->getName();
 
     if (m_instVisitFlags.checkEmitCall)
     {
@@ -266,9 +266,9 @@ void SpirvLowerGlobal::visitCallInst(
             mangledName.startswith(gSPIRVName::InterpolateAtVertexAMD))
         {
             // Translate interpolation functions to LLPC intrinsic calls
-            auto pLoadSrc = callInst.getArgOperand(0);
+            auto loadSrc = callInst.getArgOperand(0);
             unsigned interpLoc = InterpLocUnknown;
-            Value* pAuxInterpValue = nullptr;
+            Value* auxInterpValue = nullptr;
 
             if (mangledName.startswith(gSPIRVName::InterpolateAtCentroid))
             {
@@ -277,50 +277,50 @@ void SpirvLowerGlobal::visitCallInst(
             else if (mangledName.startswith(gSPIRVName::InterpolateAtSample))
             {
                 interpLoc = InterpLocSample;
-                pAuxInterpValue = callInst.getArgOperand(1); // Sample ID
+                auxInterpValue = callInst.getArgOperand(1); // Sample ID
             }
             else if (mangledName.startswith(gSPIRVName::InterpolateAtOffset))
             {
                 interpLoc = InterpLocCenter;
-                pAuxInterpValue = callInst.getArgOperand(1); // Offset from pixel center
+                auxInterpValue = callInst.getArgOperand(1); // Offset from pixel center
             }
             else
             {
                 assert(mangledName.startswith(gSPIRVName::InterpolateAtVertexAMD));
                 interpLoc = InterpLocCustom;
-                pAuxInterpValue = callInst.getArgOperand(1); // Vertex no.
+                auxInterpValue = callInst.getArgOperand(1); // Vertex no.
             }
 
-            if (isa<GetElementPtrInst>(pLoadSrc))
+            if (isa<GetElementPtrInst>(loadSrc))
             {
                 // The interpolant is an element of the input
-                InterpolateInputElement(interpLoc, pAuxInterpValue, callInst);
+                interpolateInputElement(interpLoc, auxInterpValue, callInst);
             }
             else
             {
                 // The interpolant is an input
-                assert(isa<GlobalVariable>(pLoadSrc));
+                assert(isa<GlobalVariable>(loadSrc));
 
-                auto pInput = cast<GlobalVariable>(pLoadSrc);
-                auto pInputTy = pInput->getType()->getContainedType(0);
+                auto input = cast<GlobalVariable>(loadSrc);
+                auto inputTy = input->getType()->getContainedType(0);
 
-                MDNode* pMetaNode = pInput->getMetadata(gSPIRVMD::InOut);
-                assert(pMetaNode != nullptr);
-                auto pInputMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+                MDNode* metaNode = input->getMetadata(gSPIRVMD::InOut);
+                assert(metaNode != nullptr);
+                auto inputMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
-                auto pLoadValue = AddCallInstForInOutImport(pInputTy,
+                auto loadValue = addCallInstForInOutImport(inputTy,
                                                             SPIRAS_Input,
-                                                            pInputMeta,
+                                                            inputMeta,
                                                             nullptr,
                                                             0,
                                                             nullptr,
                                                             nullptr,
                                                             interpLoc,
-                                                            pAuxInterpValue,
+                                                            auxInterpValue,
                                                             &callInst);
 
                 m_interpCalls.insert(&callInst);
-                callInst.replaceAllUsesWith(pLoadValue);
+                callInst.replaceAllUsesWith(loadValue);
             }
         }
     }
@@ -331,8 +331,8 @@ void SpirvLowerGlobal::visitCallInst(
 void SpirvLowerGlobal::visitLoadInst(
     LoadInst& loadInst) // [in] "Load" instruction
 {
-    Value* pLoadSrc = loadInst.getOperand(0);
-    const unsigned addrSpace = pLoadSrc->getType()->getPointerAddressSpace();
+    Value* loadSrc = loadInst.getOperand(0);
+    const unsigned addrSpace = loadSrc->getType()->getPointerAddressSpace();
 
     if ((addrSpace != SPIRAS_Input) && (addrSpace != SPIRAS_Output))
     {
@@ -350,18 +350,18 @@ void SpirvLowerGlobal::visitLoadInst(
         return;
     }
 
-    if (GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pLoadSrc))
+    if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(loadSrc))
     {
         std::vector<Value*> indexOperands;
 
-        GlobalVariable* pInOut = nullptr;
+        GlobalVariable* inOut = nullptr;
 
         // Loop back through the get element pointer to find the global variable.
-        for (GetElementPtrInst* pCurrGetElemPtr = pGetElemPtr;
-             pCurrGetElemPtr != nullptr;
-             pCurrGetElemPtr = dyn_cast<GetElementPtrInst>(pCurrGetElemPtr->getPointerOperand()))
+        for (GetElementPtrInst* currGetElemPtr = getElemPtr;
+             currGetElemPtr != nullptr;
+             currGetElemPtr = dyn_cast<GetElementPtrInst>(currGetElemPtr->getPointerOperand()))
         {
-            assert(pCurrGetElemPtr != nullptr);
+            assert(currGetElemPtr != nullptr);
 
             // If we have previous index operands, we need to remove the first operand (a zero index into the pointer)
             // when concatenating two GEP indices together.
@@ -372,39 +372,39 @@ void SpirvLowerGlobal::visitLoadInst(
 
             SmallVector<Value*, 8> indices;
 
-            for (Value* const pIndex : pCurrGetElemPtr->indices())
+            for (Value* const index : currGetElemPtr->indices())
             {
-                indices.push_back(ToInt32Value(pIndex, &loadInst));
+                indices.push_back(toInt32Value(index, &loadInst));
             }
 
             indexOperands.insert(indexOperands.begin(), indices.begin(), indices.end());
 
-            pInOut = dyn_cast<GlobalVariable>(pCurrGetElemPtr->getPointerOperand());
+            inOut = dyn_cast<GlobalVariable>(currGetElemPtr->getPointerOperand());
         }
 
         // The root of the GEP should always be the global variable.
-        assert(pInOut != nullptr);
+        assert(inOut != nullptr);
 
         unsigned operandIdx = 0;
 
-        auto pInOutTy = pInOut->getType()->getContainedType(0);
+        auto inOutTy = inOut->getType()->getContainedType(0);
 
-        MDNode* pMetaNode = pInOut->getMetadata(gSPIRVMD::InOut);
-        assert(pMetaNode != nullptr);
-        auto pInOutMetaVal = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+        MDNode* metaNode = inOut->getMetadata(gSPIRVMD::InOut);
+        assert(metaNode != nullptr);
+        auto inOutMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
-        Value* pVertexIdx = nullptr;
+        Value* vertexIdx = nullptr;
 
         // If the input/output is arrayed, the outermost index might be used for vertex indexing
-        if (pInOutTy->isArrayTy())
+        if (inOutTy->isArrayTy())
         {
             bool isVertexIdx = false;
 
-            assert(pInOutMetaVal->getNumOperands() == 4);
+            assert(inOutMetaVal->getNumOperands() == 4);
             ShaderInOutMetadata inOutMeta = {};
 
-            inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaVal->getOperand(2))->getZExtValue();
-            inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaVal->getOperand(3))->getZExtValue();
+            inOutMeta.U64All[0] = cast<ConstantInt>(inOutMetaVal->getOperand(2))->getZExtValue();
+            inOutMeta.U64All[1] = cast<ConstantInt>(inOutMetaVal->getOperand(3))->getZExtValue();
 
             if (inOutMeta.IsBuiltIn)
             {
@@ -422,50 +422,50 @@ void SpirvLowerGlobal::visitLoadInst(
 
             if (isVertexIdx)
             {
-                pInOutTy = pInOutTy->getArrayElementType();
-                pVertexIdx = indexOperands[1];
+                inOutTy = inOutTy->getArrayElementType();
+                vertexIdx = indexOperands[1];
                 ++operandIdx;
 
-                pInOutMetaVal = cast<Constant>(pInOutMetaVal->getOperand(1));
+                inOutMetaVal = cast<Constant>(inOutMetaVal->getOperand(1));
             }
         }
 
-        auto pLoadValue = LoadInOutMember(pInOutTy,
+        auto loadValue = loadInOutMember(inOutTy,
                                           addrSpace,
                                           indexOperands,
                                           operandIdx,
                                           0,
-                                          pInOutMetaVal,
+                                          inOutMetaVal,
                                           nullptr,
-                                          pVertexIdx,
+                                          vertexIdx,
                                           InterpLocUnknown,
                                           nullptr,
                                           &loadInst);
 
         m_loadInsts.insert(&loadInst);
-        loadInst.replaceAllUsesWith(pLoadValue);
+        loadInst.replaceAllUsesWith(loadValue);
     }
     else
     {
-        assert(isa<GlobalVariable>(pLoadSrc));
+        assert(isa<GlobalVariable>(loadSrc));
 
-        auto pInOut = cast<GlobalVariable>(pLoadSrc);
-        auto pInOutTy = pInOut->getType()->getContainedType(0);
+        auto inOut = cast<GlobalVariable>(loadSrc);
+        auto inOutTy = inOut->getType()->getContainedType(0);
 
-        MDNode* pMetaNode = pInOut->getMetadata(gSPIRVMD::InOut);
-        assert(pMetaNode != nullptr);
-        auto pInOutMetaVal = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+        MDNode* metaNode = inOut->getMetadata(gSPIRVMD::InOut);
+        assert(metaNode != nullptr);
+        auto inOutMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
-        Value* pLoadValue = UndefValue::get(pInOutTy);
+        Value* loadValue = UndefValue::get(inOutTy);
         bool hasVertexIdx = false;
 
-        if (pInOutTy->isArrayTy())
+        if (inOutTy->isArrayTy())
         {
             // Arrayed input/output
-            assert(pInOutMetaVal->getNumOperands() == 4);
+            assert(inOutMetaVal->getNumOperands() == 4);
             ShaderInOutMetadata inOutMeta = {};
-            inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaVal->getOperand(2))->getZExtValue();
-            inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaVal->getOperand(3))->getZExtValue();
+            inOutMeta.U64All[0] = cast<ConstantInt>(inOutMetaVal->getOperand(2))->getZExtValue();
+            inOutMeta.U64All[1] = cast<ConstantInt>(inOutMetaVal->getOperand(3))->getZExtValue();
 
             // If the input/output is arrayed, the outermost dimension might for vertex indexing
             if (inOutMeta.IsBuiltIn)
@@ -485,33 +485,33 @@ void SpirvLowerGlobal::visitLoadInst(
 
         if (hasVertexIdx)
         {
-            assert(pInOutTy->isArrayTy());
+            assert(inOutTy->isArrayTy());
 
-            auto pElemTy = pInOutTy->getArrayElementType();
-            auto pElemMeta = cast<Constant>(pInOutMetaVal->getOperand(1));
+            auto elemTy = inOutTy->getArrayElementType();
+            auto elemMeta = cast<Constant>(inOutMetaVal->getOperand(1));
 
-            const unsigned elemCount = pInOutTy->getArrayNumElements();
+            const unsigned elemCount = inOutTy->getArrayNumElements();
             for (unsigned i = 0; i < elemCount; ++i)
             {
-                Value* pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
-                auto pElemValue = AddCallInstForInOutImport(pElemTy,
+                Value* vertexIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
+                auto elemValue = addCallInstForInOutImport(elemTy,
                                                             addrSpace,
-                                                            pElemMeta,
+                                                            elemMeta,
                                                             nullptr,
                                                             0,
                                                             nullptr,
-                                                            pVertexIdx,
+                                                            vertexIdx,
                                                             InterpLocUnknown,
                                                             nullptr,
                                                             &loadInst);
-                pLoadValue = InsertValueInst::Create(pLoadValue, pElemValue, { i }, "", &loadInst);
+                loadValue = InsertValueInst::Create(loadValue, elemValue, { i }, "", &loadInst);
             }
         }
         else
         {
-            pLoadValue = AddCallInstForInOutImport(pInOutTy,
+            loadValue = addCallInstForInOutImport(inOutTy,
                                                    addrSpace,
-                                                   pInOutMetaVal,
+                                                   inOutMetaVal,
                                                    nullptr,
                                                    0,
                                                    nullptr,
@@ -522,7 +522,7 @@ void SpirvLowerGlobal::visitLoadInst(
         }
 
         m_loadInsts.insert(&loadInst);
-        loadInst.replaceAllUsesWith(pLoadValue);
+        loadInst.replaceAllUsesWith(loadValue);
     }
 }
 
@@ -531,10 +531,10 @@ void SpirvLowerGlobal::visitLoadInst(
 void SpirvLowerGlobal::visitStoreInst(
     StoreInst& storeInst) // [in] "Store" instruction
 {
-    Value* pStoreValue = storeInst.getOperand(0);
-    Value* pStoreDest  = storeInst.getOperand(1);
+    Value* storeValue = storeInst.getOperand(0);
+    Value* storeDest  = storeInst.getOperand(1);
 
-    const unsigned addrSpace = pStoreDest->getType()->getPointerAddressSpace();
+    const unsigned addrSpace = storeDest->getType()->getPointerAddressSpace();
 
     if ((addrSpace != SPIRAS_Input) && (addrSpace != SPIRAS_Output))
     {
@@ -548,18 +548,18 @@ void SpirvLowerGlobal::visitStoreInst(
         return;
     }
 
-    if (GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pStoreDest))
+    if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(storeDest))
     {
         std::vector<Value*> indexOperands;
 
-        GlobalVariable* pOutput = nullptr;
+        GlobalVariable* output = nullptr;
 
         // Loop back through the get element pointer to find the global variable.
-        for (GetElementPtrInst* pCurrGetElemPtr = pGetElemPtr;
-             pCurrGetElemPtr != nullptr;
-             pCurrGetElemPtr = dyn_cast<GetElementPtrInst>(pCurrGetElemPtr->getPointerOperand()))
+        for (GetElementPtrInst* currGetElemPtr = getElemPtr;
+             currGetElemPtr != nullptr;
+             currGetElemPtr = dyn_cast<GetElementPtrInst>(currGetElemPtr->getPointerOperand()))
         {
-            assert(pCurrGetElemPtr != nullptr);
+            assert(currGetElemPtr != nullptr);
 
             // If we have previous index operands, we need to remove the first operand (a zero index into the pointer)
             // when concatenating two GEP indices together.
@@ -570,35 +570,35 @@ void SpirvLowerGlobal::visitStoreInst(
 
             SmallVector<Value*, 8> indices;
 
-            for (Value* const pIndex : pCurrGetElemPtr->indices())
+            for (Value* const index : currGetElemPtr->indices())
             {
-                indices.push_back(ToInt32Value(pIndex, &storeInst));
+                indices.push_back(toInt32Value(index, &storeInst));
             }
 
             indexOperands.insert(indexOperands.begin(), indices.begin(), indices.end());
 
-            pOutput = dyn_cast<GlobalVariable>(pCurrGetElemPtr->getPointerOperand());
+            output = dyn_cast<GlobalVariable>(currGetElemPtr->getPointerOperand());
         }
 
         unsigned operandIdx = 0;
 
-        auto pOutputTy = pOutput->getType()->getContainedType(0);
+        auto outputTy = output->getType()->getContainedType(0);
 
-        MDNode* pMetaNode = pOutput->getMetadata(gSPIRVMD::InOut);
-        assert(pMetaNode != nullptr);
-        auto pOutputMetaVal = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+        MDNode* metaNode = output->getMetadata(gSPIRVMD::InOut);
+        assert(metaNode != nullptr);
+        auto outputMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
-        Value* pVertexIdx = nullptr;
+        Value* vertexIdx = nullptr;
 
         // If the output is arrayed, the outermost index might be used for vertex indexing
-        if (pOutputTy->isArrayTy())
+        if (outputTy->isArrayTy())
         {
             bool isVertexIdx = false;
 
-            assert(pOutputMetaVal->getNumOperands() == 4);
+            assert(outputMetaVal->getNumOperands() == 4);
             ShaderInOutMetadata outputMeta = {};
-            outputMeta.U64All[0] = cast<ConstantInt>(pOutputMetaVal->getOperand(2))->getZExtValue();
-            outputMeta.U64All[1] = cast<ConstantInt>(pOutputMetaVal->getOperand(3))->getZExtValue();
+            outputMeta.U64All[0] = cast<ConstantInt>(outputMetaVal->getOperand(2))->getZExtValue();
+            outputMeta.U64All[1] = cast<ConstantInt>(outputMetaVal->getOperand(3))->getZExtValue();
 
             if (outputMeta.IsBuiltIn)
             {
@@ -616,46 +616,46 @@ void SpirvLowerGlobal::visitStoreInst(
 
             if (isVertexIdx)
             {
-                pOutputTy = pOutputTy->getArrayElementType();
-                pVertexIdx = indexOperands[1];
+                outputTy = outputTy->getArrayElementType();
+                vertexIdx = indexOperands[1];
                 ++operandIdx;
 
-                pOutputMetaVal = cast<Constant>(pOutputMetaVal->getOperand(1));
+                outputMetaVal = cast<Constant>(outputMetaVal->getOperand(1));
             }
         }
 
-        StoreOutputMember(pOutputTy,
-                          pStoreValue,
+        storeOutputMember(outputTy,
+                          storeValue,
                           indexOperands,
                           operandIdx,
                           0,
-                          pOutputMetaVal,
+                          outputMetaVal,
                           nullptr,
-                          pVertexIdx,
+                          vertexIdx,
                           &storeInst);
 
         m_storeInsts.insert(&storeInst);
     }
     else
     {
-        assert(isa<GlobalVariable>(pStoreDest));
+        assert(isa<GlobalVariable>(storeDest));
 
-        auto pOutput = cast<GlobalVariable>(pStoreDest);
-        auto pOutputy = pOutput->getType()->getContainedType(0);
+        auto output = cast<GlobalVariable>(storeDest);
+        auto outputy = output->getType()->getContainedType(0);
 
-        MDNode* pMetaNode = pOutput->getMetadata(gSPIRVMD::InOut);
-        assert(pMetaNode != nullptr);
-        auto pOutputMetaVal = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+        MDNode* metaNode = output->getMetadata(gSPIRVMD::InOut);
+        assert(metaNode != nullptr);
+        auto outputMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
         bool hasVertexIdx = false;
 
         // If the input/output is arrayed, the outermost dimension might for vertex indexing
-        if (pOutputy->isArrayTy())
+        if (outputy->isArrayTy())
         {
-            assert(pOutputMetaVal->getNumOperands() == 4);
+            assert(outputMetaVal->getNumOperands() == 4);
             ShaderInOutMetadata outputMeta = {};
-            outputMeta.U64All[0] = cast<ConstantInt>(pOutputMetaVal->getOperand(2))->getZExtValue();
-            outputMeta.U64All[1] = cast<ConstantInt>(pOutputMetaVal->getOperand(3))->getZExtValue();
+            outputMeta.U64All[0] = cast<ConstantInt>(outputMetaVal->getOperand(2))->getZExtValue();
+            outputMeta.U64All[1] = cast<ConstantInt>(outputMetaVal->getOperand(3))->getZExtValue();
 
             if (outputMeta.IsBuiltIn)
             {
@@ -674,30 +674,30 @@ void SpirvLowerGlobal::visitStoreInst(
 
         if (hasVertexIdx)
         {
-            assert(pOutputy->isArrayTy());
-            auto pElemMeta = cast<Constant>(pOutputMetaVal->getOperand(1));
+            assert(outputy->isArrayTy());
+            auto elemMeta = cast<Constant>(outputMetaVal->getOperand(1));
 
-            const unsigned elemCount = pOutputy->getArrayNumElements();
+            const unsigned elemCount = outputy->getArrayNumElements();
             for (unsigned i = 0; i < elemCount; ++i)
             {
-                auto pElemValue = ExtractValueInst::Create(pStoreValue, { i }, "", &storeInst);
-                Value* pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
-                AddCallInstForOutputExport(pElemValue,
-                                           pElemMeta,
+                auto elemValue = ExtractValueInst::Create(storeValue, { i }, "", &storeInst);
+                Value* vertexIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
+                addCallInstForOutputExport(elemValue,
+                                           elemMeta,
                                            nullptr,
                                            0,
                                            InvalidValue,
                                            0,
                                            nullptr,
-                                           pVertexIdx,
+                                           vertexIdx,
                                            InvalidValue,
                                            &storeInst);
             }
         }
         else
         {
-            AddCallInstForOutputExport(pStoreValue,
-                                       pOutputMetaVal,
+            addCallInstForOutputExport(storeValue,
+                                       outputMetaVal,
                                        nullptr,
                                        0,
                                        InvalidValue,
@@ -715,114 +715,114 @@ void SpirvLowerGlobal::visitStoreInst(
 
 // =====================================================================================================================
 // Maps the specified global variable to proxy variable.
-void SpirvLowerGlobal::MapGlobalVariableToProxy(
-    GlobalVariable* pGlobalVar) // [in] Global variable to be mapped
+void SpirvLowerGlobal::mapGlobalVariableToProxy(
+    GlobalVariable* globalVar) // [in] Global variable to be mapped
 {
-    const auto& dataLayout = m_pModule->getDataLayout();
-    Type* pGlobalVarTy = pGlobalVar->getType()->getContainedType(0);
+    const auto& dataLayout = m_module->getDataLayout();
+    Type* globalVarTy = globalVar->getType()->getContainedType(0);
     Twine prefix = LlpcName::GlobalProxyPrefix;
-    auto pInsertPos = m_pEntryPoint->begin()->getFirstInsertionPt();
+    auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
 
-    auto pProxy = new AllocaInst(pGlobalVarTy,
+    auto proxy = new AllocaInst(globalVarTy,
                                  dataLayout.getAllocaAddrSpace(),
-                                 prefix + pGlobalVar->getName(),
-                                 &*pInsertPos);
+                                 prefix + globalVar->getName(),
+                                 &*insertPos);
 
-    if (pGlobalVar->hasInitializer())
+    if (globalVar->hasInitializer())
     {
-        auto pInitializer = pGlobalVar->getInitializer();
-        new StoreInst(pInitializer, pProxy, &*pInsertPos);
+        auto initializer = globalVar->getInitializer();
+        new StoreInst(initializer, proxy, &*insertPos);
     }
 
-    m_globalVarProxyMap[pGlobalVar] = pProxy;
+    m_globalVarProxyMap[globalVar] = proxy;
 }
 
 // =====================================================================================================================
 // Maps the specified input to proxy variable.
-void SpirvLowerGlobal::MapInputToProxy(
-    GlobalVariable* pInput) // [in] Input to be mapped
+void SpirvLowerGlobal::mapInputToProxy(
+    GlobalVariable* input) // [in] Input to be mapped
 {
     // NOTE: For tessellation shader, we do not map inputs to real proxy variables. Instead, we directly replace
     // "load" instructions with import calls in the lowering operation.
     if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval))
     {
-        m_inputProxyMap[pInput] = nullptr;
+        m_inputProxyMap[input] = nullptr;
         m_lowerInputInPlace = true;
         return;
     }
 
-    const auto& dataLayout = m_pModule->getDataLayout();
-    Type* pInputTy = pInput->getType()->getContainedType(0);
+    const auto& dataLayout = m_module->getDataLayout();
+    Type* inputTy = input->getType()->getContainedType(0);
     Twine prefix = LlpcName::InputProxyPrefix;
-    auto pInsertPos = m_pEntryPoint->begin()->getFirstInsertionPt();
+    auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
 
-    MDNode* pMetaNode  = pInput->getMetadata(gSPIRVMD::InOut);
-    assert(pMetaNode != nullptr);
+    MDNode* metaNode  = input->getMetadata(gSPIRVMD::InOut);
+    assert(metaNode != nullptr);
 
-    auto pMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
-    auto pProxy = new AllocaInst(pInputTy,
+    auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+    auto proxy = new AllocaInst(inputTy,
                                  dataLayout.getAllocaAddrSpace(),
-                                 prefix + pInput->getName(),
-                                 &*pInsertPos);
+                                 prefix + input->getName(),
+                                 &*insertPos);
 
     // Import input to proxy variable
-    auto pInputValue = AddCallInstForInOutImport(pInputTy,
+    auto inputValue = addCallInstForInOutImport(inputTy,
                                                  SPIRAS_Input,
-                                                 pMeta,
+                                                 meta,
                                                  nullptr,
                                                  0,
                                                  nullptr,
                                                  nullptr,
                                                  InterpLocUnknown,
                                                  nullptr,
-                                                 &*pInsertPos);
-    new StoreInst(pInputValue, pProxy, &*pInsertPos);
+                                                 &*insertPos);
+    new StoreInst(inputValue, proxy, &*insertPos);
 
-    m_inputProxyMap[pInput] = pProxy;
+    m_inputProxyMap[input] = proxy;
 }
 
 // =====================================================================================================================
 // Maps the specified output to proxy variable.
-void SpirvLowerGlobal::MapOutputToProxy(
-    GlobalVariable* pOutput) // [in] Output to be mapped
+void SpirvLowerGlobal::mapOutputToProxy(
+    GlobalVariable* output) // [in] Output to be mapped
 {
-    auto pInsertPos = m_pEntryPoint->begin()->getFirstInsertionPt();
+    auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
 
     // NOTE: For tessellation control shader, we do not map outputs to real proxy variables. Instead, we directly
     // replace "store" instructions with export calls in the lowering operation.
     if (m_shaderStage == ShaderStageTessControl)
     {
-        if (pOutput->hasInitializer())
+        if (output->hasInitializer())
         {
-            auto pInitializer = pOutput->getInitializer();
-            new StoreInst(pInitializer, pOutput, &*pInsertPos);
+            auto initializer = output->getInitializer();
+            new StoreInst(initializer, output, &*insertPos);
         }
-        m_outputProxyMap.push_back(std::pair<Value*, Value*>(pOutput, nullptr));
+        m_outputProxyMap.push_back(std::pair<Value*, Value*>(output, nullptr));
         m_lowerOutputInPlace = true;
         return;
     }
 
-    const auto& dataLayout = m_pModule->getDataLayout();
-    Type* pOutputTy = pOutput->getType()->getContainedType(0);
+    const auto& dataLayout = m_module->getDataLayout();
+    Type* outputTy = output->getType()->getContainedType(0);
     Twine prefix = LlpcName::OutputProxyPrefix;
 
-    auto pProxy = new AllocaInst(pOutputTy,
+    auto proxy = new AllocaInst(outputTy,
                                  dataLayout.getAllocaAddrSpace(),
-                                 prefix + pOutput->getName(),
-                                 &*pInsertPos);
+                                 prefix + output->getName(),
+                                 &*insertPos);
 
-    if (pOutput->hasInitializer())
+    if (output->hasInitializer())
     {
-        auto pInitializer = pOutput->getInitializer();
-        new StoreInst(pInitializer, pProxy, &*pInsertPos);
+        auto initializer = output->getInitializer();
+        new StoreInst(initializer, proxy, &*insertPos);
     }
 
-    m_outputProxyMap.push_back(std::pair<Value*, Value*>(pOutput, pProxy));
+    m_outputProxyMap.push_back(std::pair<Value*, Value*>(output, proxy));
 }
 
 // =====================================================================================================================
 // Does lowering opertions for SPIR-V global variables, replaces global variables with proxy variables.
-void SpirvLowerGlobal::LowerGlobalVar()
+void SpirvLowerGlobal::lowerGlobalVar()
 {
     if (m_globalVarProxyMap.empty())
     {
@@ -833,18 +833,18 @@ void SpirvLowerGlobal::LowerGlobalVar()
     // Replace global variable with proxy variable
     for (auto globalVarMap : m_globalVarProxyMap)
     {
-        auto pGlobalVar = cast<GlobalVariable>(globalVarMap.first);
-        auto pProxy = globalVarMap.second;
-        pGlobalVar->mutateType(pProxy->getType()); // To clear address space for pointer to make replacement valid
-        pGlobalVar->replaceAllUsesWith(pProxy);
-        pGlobalVar->dropAllReferences();
-        pGlobalVar->eraseFromParent();
+        auto globalVar = cast<GlobalVariable>(globalVarMap.first);
+        auto proxy = globalVarMap.second;
+        globalVar->mutateType(proxy->getType()); // To clear address space for pointer to make replacement valid
+        globalVar->replaceAllUsesWith(proxy);
+        globalVar->dropAllReferences();
+        globalVar->eraseFromParent();
     }
 }
 
 // =====================================================================================================================
 // Does lowering opertions for SPIR-V inputs, replaces inputs with proxy variables.
-void SpirvLowerGlobal::LowerInput()
+void SpirvLowerGlobal::lowerInput()
 {
     if (m_inputProxyMap.empty())
     {
@@ -863,67 +863,67 @@ void SpirvLowerGlobal::LowerInput()
         // Invoke handling of interpolation calls
         m_instVisitFlags.u32All = 0;
         m_instVisitFlags.checkInterpCall = true;
-        visit(m_pModule);
+        visit(m_module);
 
         // Remove interpolation calls, they must have been replaced with LLPC intrinsics
         std::unordered_set<GetElementPtrInst*> getElemInsts;
-        for (auto pInterpCall : m_interpCalls)
+        for (auto interpCall : m_interpCalls)
         {
-            GetElementPtrInst* pGetElemPtr = dyn_cast<GetElementPtrInst>(pInterpCall->getArgOperand(0));
-            if (pGetElemPtr != nullptr)
+            GetElementPtrInst* getElemPtr = dyn_cast<GetElementPtrInst>(interpCall->getArgOperand(0));
+            if (getElemPtr != nullptr)
             {
-                getElemInsts.insert(pGetElemPtr);
+                getElemInsts.insert(getElemPtr);
             }
 
-            assert(pInterpCall->use_empty());
-            pInterpCall->dropAllReferences();
-            pInterpCall->eraseFromParent();
+            assert(interpCall->use_empty());
+            interpCall->dropAllReferences();
+            interpCall->eraseFromParent();
         }
 
-        for (auto pGetElemPtr : getElemInsts)
+        for (auto getElemPtr : getElemInsts)
         {
-            if (pGetElemPtr->use_empty())
+            if (getElemPtr->use_empty())
             {
-                pGetElemPtr->dropAllReferences();
-                pGetElemPtr->eraseFromParent();
+                getElemPtr->dropAllReferences();
+                getElemPtr->eraseFromParent();
             }
         }
     }
 
     for (auto inputMap : m_inputProxyMap)
     {
-        auto pInput = cast<GlobalVariable>(inputMap.first);
+        auto input = cast<GlobalVariable>(inputMap.first);
 
-        for (auto pUser = pInput->user_begin(), pEnd = pInput->user_end(); pUser != pEnd; ++pUser)
+        for (auto user = input->user_begin(), end = input->user_end(); user != end; ++user)
         {
             // NOTE: "Getelementptr" and "bitcast" will propogate the address space of pointer value (input variable)
             // to the element pointer value (destination). We have to clear the address space of this element pointer
             // value. The original pointer value has been lowered and therefore the address space is invalid now.
-            Instruction* pInst = dyn_cast<Instruction>(*pUser);
-            if (pInst != nullptr)
+            Instruction* inst = dyn_cast<Instruction>(*user);
+            if (inst != nullptr)
             {
-                Type* pInstTy = pInst->getType();
-                if (isa<PointerType>(pInstTy) && (pInstTy->getPointerAddressSpace() == SPIRAS_Input))
+                Type* instTy = inst->getType();
+                if (isa<PointerType>(instTy) && (instTy->getPointerAddressSpace() == SPIRAS_Input))
                 {
-                    assert(isa<GetElementPtrInst>(pInst) || isa<BitCastInst>(pInst));
-                    Type* pNewInstTy = PointerType::get(pInstTy->getContainedType(0), SPIRAS_Private);
-                    pInst->mutateType(pNewInstTy);
+                    assert(isa<GetElementPtrInst>(inst) || isa<BitCastInst>(inst));
+                    Type* newInstTy = PointerType::get(instTy->getContainedType(0), SPIRAS_Private);
+                    inst->mutateType(newInstTy);
                 }
             }
         }
 
-        auto pProxy = inputMap.second;
-        pInput->mutateType(pProxy->getType()); // To clear address space for pointer to make replacement valid
-        pInput->replaceAllUsesWith(pProxy);
-        pInput->eraseFromParent();
+        auto proxy = inputMap.second;
+        input->mutateType(proxy->getType()); // To clear address space for pointer to make replacement valid
+        input->replaceAllUsesWith(proxy);
+        input->eraseFromParent();
     }
 }
 
 // =====================================================================================================================
 // Does lowering opertions for SPIR-V outputs, replaces outputs with proxy variables.
-void SpirvLowerGlobal::LowerOutput()
+void SpirvLowerGlobal::lowerOutput()
 {
-    m_pRetBlock = BasicBlock::Create(*m_pContext, "", m_pEntryPoint);
+    m_retBlock = BasicBlock::Create(*m_context, "", m_entryPoint);
 
     // Invoke handling of "return" instructions or "emit" calls
     m_instVisitFlags.u32All = 0;
@@ -936,9 +936,9 @@ void SpirvLowerGlobal::LowerOutput()
     {
         m_instVisitFlags.checkReturn = true;
     }
-    visit(m_pModule);
+    visit(m_module);
 
-    auto pRetInst = ReturnInst::Create(*m_pContext, m_pRetBlock);
+    auto retInst = ReturnInst::Create(*m_context, m_retBlock);
 
     for (auto retInst : m_retInsts)
     {
@@ -959,39 +959,39 @@ void SpirvLowerGlobal::LowerOutput()
     // Export output from the proxy variable prior to "return" instruction or "emit" calls
     for (auto outputMap : m_outputProxyMap)
     {
-        auto pOutput = cast<GlobalVariable>(outputMap.first);
-        auto pProxy  = outputMap.second;
+        auto output = cast<GlobalVariable>(outputMap.first);
+        auto proxy  = outputMap.second;
 
-        MDNode* pMetaNode = pOutput->getMetadata(gSPIRVMD::InOut);
-        assert(pMetaNode != nullptr);
+        MDNode* metaNode = output->getMetadata(gSPIRVMD::InOut);
+        assert(metaNode != nullptr);
 
-        auto pMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+        auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
         if ((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval) ||
             (m_shaderStage == ShaderStageFragment))
         {
-            Value* pOutputValue = new LoadInst(pProxy, "", pRetInst);
-            AddCallInstForOutputExport(pOutputValue, pMeta, nullptr, 0, 0, 0, nullptr, nullptr, InvalidValue, pRetInst);
+            Value* outputValue = new LoadInst(proxy, "", retInst);
+            addCallInstForOutputExport(outputValue, meta, nullptr, 0, 0, 0, nullptr, nullptr, InvalidValue, retInst);
         }
         else if (m_shaderStage == ShaderStageGeometry)
         {
-            for (auto pEmitCall : m_emitCalls)
+            for (auto emitCall : m_emitCalls)
             {
                 unsigned emitStreamId = 0;
 
-                auto mangledName = pEmitCall->getCalledFunction()->getName();
+                auto mangledName = emitCall->getCalledFunction()->getName();
                 if (mangledName.startswith(gSPIRVName::EmitStreamVertex))
                 {
-                    emitStreamId = cast<ConstantInt>(pEmitCall->getOperand(0))->getZExtValue();
+                    emitStreamId = cast<ConstantInt>(emitCall->getOperand(0))->getZExtValue();
                 }
                 else
                 {
                     assert(mangledName.startswith(gSPIRVName::EmitVertex));
                 }
 
-                Value* pOutputValue = new LoadInst(pProxy, "", pEmitCall);
-                AddCallInstForOutputExport(pOutputValue,
-                                           pMeta,
+                Value* outputValue = new LoadInst(proxy, "", emitCall);
+                addCallInstForOutputExport(outputValue,
+                                           meta,
                                            nullptr,
                                            0,
                                            0,
@@ -999,54 +999,54 @@ void SpirvLowerGlobal::LowerOutput()
                                            nullptr,
                                            nullptr,
                                            emitStreamId,
-                                           pEmitCall);
+                                           emitCall);
             }
         }
     }
 
     // Replace the Emit(Stream)Vertex calls with builder code.
-    for (auto pEmitCall : m_emitCalls)
+    for (auto emitCall : m_emitCalls)
     {
-        unsigned emitStreamId = (pEmitCall->getNumArgOperands() != 0) ?
-                                cast<ConstantInt>(pEmitCall->getArgOperand(0))->getZExtValue() : 0;
-        m_pBuilder->SetInsertPoint(pEmitCall);
-        m_pBuilder->CreateEmitVertex(emitStreamId);
-        pEmitCall->eraseFromParent();
+        unsigned emitStreamId = (emitCall->getNumArgOperands() != 0) ?
+                                cast<ConstantInt>(emitCall->getArgOperand(0))->getZExtValue() : 0;
+        m_builder->SetInsertPoint(emitCall);
+        m_builder->CreateEmitVertex(emitStreamId);
+        emitCall->eraseFromParent();
     }
 
     for (auto outputMap : m_outputProxyMap)
     {
-        auto pOutput = cast<GlobalVariable>(outputMap.first);
+        auto output = cast<GlobalVariable>(outputMap.first);
 
-        for (auto pUser = pOutput->user_begin(), pEnd = pOutput->user_end(); pUser != pEnd; ++pUser)
+        for (auto user = output->user_begin(), end = output->user_end(); user != end; ++user)
         {
             // NOTE: "Getelementptr" and "bitCast" will propogate the address space of pointer value (output variable)
             // to the element pointer value (destination). We have to clear the address space of this element pointer
             // value. The original pointer value has been lowered and therefore the address space is invalid now.
-            Instruction* pInst = dyn_cast<Instruction>(*pUser);
-            if (pInst != nullptr)
+            Instruction* inst = dyn_cast<Instruction>(*user);
+            if (inst != nullptr)
             {
-                Type* pInstTy = pInst->getType();
-                if (isa<PointerType>(pInstTy) && (pInstTy->getPointerAddressSpace() == SPIRAS_Output))
+                Type* instTy = inst->getType();
+                if (isa<PointerType>(instTy) && (instTy->getPointerAddressSpace() == SPIRAS_Output))
                 {
-                    assert(isa<GetElementPtrInst>(pInst) || isa<BitCastInst>(pInst));
-                    Type* pNewInstTy = PointerType::get(pInstTy->getContainedType(0), SPIRAS_Private);
-                    pInst->mutateType(pNewInstTy);
+                    assert(isa<GetElementPtrInst>(inst) || isa<BitCastInst>(inst));
+                    Type* newInstTy = PointerType::get(instTy->getContainedType(0), SPIRAS_Private);
+                    inst->mutateType(newInstTy);
                 }
             }
         }
 
-        auto pProxy = outputMap.second;
-        pOutput->mutateType(pProxy->getType()); // To clear address space for pointer to make replacement valid
-        pOutput->replaceAllUsesWith(pProxy);
-        pOutput->eraseFromParent();
+        auto proxy = outputMap.second;
+        output->mutateType(proxy->getType()); // To clear address space for pointer to make replacement valid
+        output->replaceAllUsesWith(proxy);
+        output->eraseFromParent();
     }
 }
 
 // =====================================================================================================================
 // Does inplace lowering opertions for SPIR-V inputs/outputs, replaces "load" instructions with import calls and
 // "store" instructions with export calls.
-void SpirvLowerGlobal::LowerInOutInPlace()
+void SpirvLowerGlobal::lowerInOutInPlace()
 {
     assert((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval));
 
@@ -1057,38 +1057,38 @@ void SpirvLowerGlobal::LowerInOutInPlace()
     {
         m_instVisitFlags.checkStore = true;
     }
-    visit(m_pModule);
+    visit(m_module);
 
     llvm::DenseSet<GetElementPtrInst*> getElemInsts;
 
     // Remove unnecessary "load" instructions
-    for (auto pLoadInst : m_loadInsts)
+    for (auto loadInst : m_loadInsts)
     {
-        GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pLoadInst->getPointerOperand());
-        if (pGetElemPtr != nullptr)
+        GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(loadInst->getPointerOperand());
+        if (getElemPtr != nullptr)
         {
-            getElemInsts.insert(pGetElemPtr);
+            getElemInsts.insert(getElemPtr);
         }
 
-        assert(pLoadInst->use_empty());
-        pLoadInst->dropAllReferences();
-        pLoadInst->eraseFromParent();
+        assert(loadInst->use_empty());
+        loadInst->dropAllReferences();
+        loadInst->eraseFromParent();
     }
 
     m_loadInsts.clear();
 
     // Remove unnecessary "store" instructions
-    for (auto pStoreInst : m_storeInsts)
+    for (auto storeInst : m_storeInsts)
     {
-        GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pStoreInst->getPointerOperand());
-        if (pGetElemPtr != nullptr)
+        GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(storeInst->getPointerOperand());
+        if (getElemPtr != nullptr)
         {
-            getElemInsts.insert(pGetElemPtr);
+            getElemInsts.insert(getElemPtr);
         }
 
-        assert(pStoreInst->use_empty());
-        pStoreInst->dropAllReferences();
-        pStoreInst->eraseFromParent();
+        assert(storeInst->use_empty());
+        storeInst->dropAllReferences();
+        storeInst->eraseFromParent();
     }
 
     m_storeInsts.clear();
@@ -1096,23 +1096,23 @@ void SpirvLowerGlobal::LowerInOutInPlace()
     // Remove unnecessary "getelementptr" instructions
     while (getElemInsts.empty() == false)
     {
-        GetElementPtrInst* const pGetElemPtr = *getElemInsts.begin();
-        getElemInsts.erase(pGetElemPtr);
+        GetElementPtrInst* const getElemPtr = *getElemInsts.begin();
+        getElemInsts.erase(getElemPtr);
 
         // If the GEP still has any uses, skip processing it.
-        if (pGetElemPtr->use_empty() == false)
+        if (getElemPtr->use_empty() == false)
         {
             continue;
         }
 
         // If the GEP is GEPing into another GEP, record that GEP as something we need to visit too.
-        if (GetElementPtrInst* const pOtherGetElemInst = dyn_cast<GetElementPtrInst>(pGetElemPtr->getPointerOperand()))
+        if (GetElementPtrInst* const otherGetElemInst = dyn_cast<GetElementPtrInst>(getElemPtr->getPointerOperand()))
         {
-            getElemInsts.insert(pOtherGetElemInst);
+            getElemInsts.insert(otherGetElemInst);
         }
 
-        pGetElemPtr->dropAllReferences();
-        pGetElemPtr->eraseFromParent();
+        getElemPtr->dropAllReferences();
+        getElemPtr->eraseFromParent();
     }
 
     // Remove inputs if they are lowered in-place
@@ -1120,9 +1120,9 @@ void SpirvLowerGlobal::LowerInOutInPlace()
     {
         for (auto inputMap : m_inputProxyMap)
         {
-            auto pInput = cast<GlobalVariable>(inputMap.first);
-            assert(pInput->use_empty());
-            pInput->eraseFromParent();
+            auto input = cast<GlobalVariable>(inputMap.first);
+            assert(input->use_empty());
+            input->eraseFromParent();
         }
     }
 
@@ -1131,59 +1131,59 @@ void SpirvLowerGlobal::LowerInOutInPlace()
     {
         for (auto outputMap : m_outputProxyMap)
         {
-            auto pOutput = cast<GlobalVariable>(outputMap.first);
-            assert(pOutput->use_empty());
-            pOutput->eraseFromParent();
+            auto output = cast<GlobalVariable>(outputMap.first);
+            assert(output->use_empty());
+            output->eraseFromParent();
         }
     }
 }
 
 // =====================================================================================================================
 // Inserts LLVM call instruction to import input/output.
-Value* SpirvLowerGlobal::AddCallInstForInOutImport(
-    Type*        pInOutTy,          // [in] Type of value imported from input/output
+Value* SpirvLowerGlobal::addCallInstForInOutImport(
+    Type*        inOutTy,          // [in] Type of value imported from input/output
     unsigned     addrSpace,         // Address space
-    Constant*    pInOutMetaVal,        // [in] Metadata of this input/output
-    Value*       pLocOffset,        // [in] Relative location offset, passed from aggregate type
+    Constant*    inOutMetaVal,        // [in] Metadata of this input/output
+    Value*       locOffset,        // [in] Relative location offset, passed from aggregate type
     unsigned     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
                                     //   For an array built-in with a variable index, this is the array size.
-    Value*       pElemIdx,          // [in] Element index used for element indexing, valid for tessellation shader
+    Value*       elemIdx,          // [in] Element index used for element indexing, valid for tessellation shader
                                     // (usually, it is vector component index, for built-in input/output, it could be
                                     // element index of scalar array)
-    Value*       pVertexIdx,        // [in] Input array outermost index used for vertex indexing, valid for
+    Value*       vertexIdx,        // [in] Input array outermost index used for vertex indexing, valid for
                                     // tessellation shader and geometry shader
     unsigned     interpLoc,         // Interpolation location, valid for fragment shader (use "InterpLocUnknown" as
                                     // don't-care value)
-    Value*       pAuxInterpValue,   // [in] Auxiliary value of interpolation (valid for fragment shader)
+    Value*       auxInterpValue,   // [in] Auxiliary value of interpolation (valid for fragment shader)
                                     //   - Value is sample ID for "InterpLocSample"
                                     //   - Value is offset from the center of the pixel for "InterpLocCenter"
                                     //   - Value is vertex no. (0 ~ 2) for "InterpLocCustom"
-    Instruction* pInsertPos)        // [in] Where to insert this call
+    Instruction* insertPos)        // [in] Where to insert this call
 {
     assert((addrSpace == SPIRAS_Input) ||
                 ((addrSpace == SPIRAS_Output) && (m_shaderStage == ShaderStageTessControl)));
 
-    Value* pInOutValue = UndefValue::get(pInOutTy);
+    Value* inOutValue = UndefValue::get(inOutTy);
 
     ShaderInOutMetadata inOutMeta = {};
 
-    if (pInOutTy->isArrayTy())
+    if (inOutTy->isArrayTy())
     {
         // Array type
-        assert(pElemIdx == nullptr);
+        assert(elemIdx == nullptr);
 
-        assert(pInOutMetaVal->getNumOperands() == 4);
-        unsigned stride = cast<ConstantInt>(pInOutMetaVal->getOperand(0))->getZExtValue();
-        inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaVal->getOperand(2))->getZExtValue();
-        inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaVal->getOperand(3))->getZExtValue();
+        assert(inOutMetaVal->getNumOperands() == 4);
+        unsigned stride = cast<ConstantInt>(inOutMetaVal->getOperand(0))->getZExtValue();
+        inOutMeta.U64All[0] = cast<ConstantInt>(inOutMetaVal->getOperand(2))->getZExtValue();
+        inOutMeta.U64All[1] = cast<ConstantInt>(inOutMetaVal->getOperand(3))->getZExtValue();
 
         if (inOutMeta.IsBuiltIn)
         {
-            assert(pLocOffset == nullptr);
+            assert(locOffset == nullptr);
 
             unsigned builtInId = inOutMeta.Value;
 
-            if ((pVertexIdx == nullptr) && (m_shaderStage == ShaderStageGeometry) &&
+            if ((vertexIdx == nullptr) && (m_shaderStage == ShaderStageGeometry) &&
                 ((builtInId == spv::BuiltInPerVertex)    || // GLSL style per-vertex data
                  (builtInId == spv::BuiltInPosition)     || // HLSL style per-vertex data
                  (builtInId == spv::BuiltInPointSize)    ||
@@ -1192,90 +1192,90 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
             {
                 // NOTE: We are handling vertex indexing of built-in inputs of geometry shader. For tessellation
                 // shader, vertex indexing is handled by "load"/"store" instruction lowering.
-                assert(pVertexIdx == nullptr); // For per-vertex data, make a serial of per-vertex import calls.
+                assert(vertexIdx == nullptr); // For per-vertex data, make a serial of per-vertex import calls.
 
                 assert((m_shaderStage == ShaderStageGeometry) ||
                             (m_shaderStage == ShaderStageTessControl) ||
                             (m_shaderStage == ShaderStageTessEval));
 
-                auto pElemMeta = cast<Constant>(pInOutMetaVal->getOperand(1));
-                auto pElemTy   = pInOutTy->getArrayElementType();
+                auto elemMeta = cast<Constant>(inOutMetaVal->getOperand(1));
+                auto elemTy   = inOutTy->getArrayElementType();
 
-                const uint64_t elemCount = pInOutTy->getArrayNumElements();
+                const uint64_t elemCount = inOutTy->getArrayNumElements();
                 for (unsigned idx = 0; idx < elemCount; ++idx)
                 {
                     // Handle array elements recursively
-                    pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), idx);
-                    auto pElem = AddCallInstForInOutImport(pElemTy,
+                    vertexIdx = ConstantInt::get(Type::getInt32Ty(*m_context), idx);
+                    auto elem = addCallInstForInOutImport(elemTy,
                                                            addrSpace,
-                                                           pElemMeta,
+                                                           elemMeta,
                                                            nullptr,
                                                            maxLocOffset,
                                                            nullptr,
-                                                           pVertexIdx,
+                                                           vertexIdx,
                                                            interpLoc,
-                                                           pAuxInterpValue,
-                                                           pInsertPos);
-                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, { idx }, "", pInsertPos);
+                                                           auxInterpValue,
+                                                           insertPos);
+                    inOutValue = InsertValueInst::Create(inOutValue, elem, { idx }, "", insertPos);
                 }
             }
             else
             {
                 // Array built-in without vertex indexing (ClipDistance/CullDistance).
                 lgc::InOutInfo inOutInfo;
-                inOutInfo.SetArraySize(pInOutTy->getArrayNumElements());
-                m_pBuilder->SetInsertPoint(pInsertPos);
+                inOutInfo.setArraySize(inOutTy->getArrayNumElements());
+                m_builder->SetInsertPoint(insertPos);
                 if (addrSpace == SPIRAS_Input)
                 {
-                    pInOutValue =  m_pBuilder->CreateReadBuiltInInput(
+                    inOutValue =  m_builder->CreateReadBuiltInInput(
                                       static_cast<lgc::BuiltInKind>(inOutMeta.Value),
                                       inOutInfo,
-                                      pVertexIdx,
+                                      vertexIdx,
                                       nullptr);
                 }
                 else
                 {
-                    pInOutValue =  m_pBuilder->CreateReadBuiltInOutput(
+                    inOutValue =  m_builder->CreateReadBuiltInOutput(
                                       static_cast<lgc::BuiltInKind>(inOutMeta.Value),
                                       inOutInfo,
-                                      pVertexIdx,
+                                      vertexIdx,
                                       nullptr);
                 }
             }
         }
         else
         {
-            auto pElemMeta = cast<Constant>(pInOutMetaVal->getOperand(1));
-            auto pElemTy   = pInOutTy->getArrayElementType();
+            auto elemMeta = cast<Constant>(inOutMetaVal->getOperand(1));
+            auto elemTy   = inOutTy->getArrayElementType();
 
-            const uint64_t elemCount = pInOutTy->getArrayNumElements();
+            const uint64_t elemCount = inOutTy->getArrayNumElements();
 
-            if ((pVertexIdx == nullptr) && (m_shaderStage == ShaderStageGeometry))
+            if ((vertexIdx == nullptr) && (m_shaderStage == ShaderStageGeometry))
             {
                 // NOTE: We are handling vertex indexing of generic inputs of geometry shader. For tessellation shader,
                 // vertex indexing is handled by "load"/"store" instruction lowering.
                 for (unsigned idx = 0; idx < elemCount; ++idx)
                 {
-                    pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), idx);
-                    auto pElem = AddCallInstForInOutImport(pElemTy,
+                    vertexIdx = ConstantInt::get(Type::getInt32Ty(*m_context), idx);
+                    auto elem = addCallInstForInOutImport(elemTy,
                                                            addrSpace,
-                                                           pElemMeta,
-                                                           pLocOffset,
+                                                           elemMeta,
+                                                           locOffset,
                                                            maxLocOffset,
                                                            nullptr,
-                                                           pVertexIdx,
+                                                           vertexIdx,
                                                            InterpLocUnknown,
                                                            nullptr,
-                                                           pInsertPos);
-                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, { idx }, "", pInsertPos);
+                                                           insertPos);
+                    inOutValue = InsertValueInst::Create(inOutValue, elem, { idx }, "", insertPos);
                 }
             }
             else
             {
                 // NOTE: If the relative location offset is not specified, initialize it to 0.
-                if (pLocOffset == nullptr)
+                if (locOffset == nullptr)
                 {
-                    pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
+                    locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
                 }
 
                 for (unsigned idx = 0; idx < elemCount; ++idx)
@@ -1283,78 +1283,78 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                     // Handle array elements recursively
 
                     // elemLocOffset = locOffset + stride * idx
-                    Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                    Value* elemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_context),
                                                                                        stride),
-                                                                      ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                      ConstantInt::get(Type::getInt32Ty(*m_context),
                                                                                        idx),
                                                                       "",
-                                                                      pInsertPos);
-                    pElemLocOffset = BinaryOperator::CreateAdd(pLocOffset, pElemLocOffset, "", pInsertPos);
+                                                                      insertPos);
+                    elemLocOffset = BinaryOperator::CreateAdd(locOffset, elemLocOffset, "", insertPos);
 
-                    auto pElem = AddCallInstForInOutImport(pElemTy,
+                    auto elem = addCallInstForInOutImport(elemTy,
                                                            addrSpace,
-                                                           pElemMeta,
-                                                           pElemLocOffset,
+                                                           elemMeta,
+                                                           elemLocOffset,
                                                            maxLocOffset,
-                                                           pElemIdx,
-                                                           pVertexIdx,
+                                                           elemIdx,
+                                                           vertexIdx,
                                                            InterpLocUnknown,
                                                            nullptr,
-                                                           pInsertPos);
-                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, { idx }, "", pInsertPos);
+                                                           insertPos);
+                    inOutValue = InsertValueInst::Create(inOutValue, elem, { idx }, "", insertPos);
                 }
             }
         }
     }
-    else if (pInOutTy->isStructTy())
+    else if (inOutTy->isStructTy())
     {
         // Structure type
-        assert(pElemIdx == nullptr);
+        assert(elemIdx == nullptr);
 
-        const uint64_t memberCount = pInOutTy->getStructNumElements();
+        const uint64_t memberCount = inOutTy->getStructNumElements();
         for (unsigned memberIdx = 0; memberIdx < memberCount; ++memberIdx)
         {
             // Handle structure member recursively
-            auto pMemberTy = pInOutTy->getStructElementType(memberIdx);
-            auto pMemberMeta = cast<Constant>(pInOutMetaVal->getOperand(memberIdx));
+            auto memberTy = inOutTy->getStructElementType(memberIdx);
+            auto memberMeta = cast<Constant>(inOutMetaVal->getOperand(memberIdx));
 
-            auto pMember = AddCallInstForInOutImport(pMemberTy,
+            auto member = addCallInstForInOutImport(memberTy,
                                                      addrSpace,
-                                                     pMemberMeta,
-                                                     pLocOffset,
+                                                     memberMeta,
+                                                     locOffset,
                                                      maxLocOffset,
                                                      nullptr,
-                                                     pVertexIdx,
+                                                     vertexIdx,
                                                      InterpLocUnknown,
                                                      nullptr,
-                                                     pInsertPos);
-            pInOutValue = InsertValueInst::Create(pInOutValue, pMember, { memberIdx }, "", pInsertPos);
+                                                     insertPos);
+            inOutValue = InsertValueInst::Create(inOutValue, member, { memberIdx }, "", insertPos);
         }
     }
     else
     {
-        Constant* pInOutMetaValConst = cast<Constant>(pInOutMetaVal);
-        inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaValConst->getOperand(0))->getZExtValue();
-        inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaValConst->getOperand(1))->getZExtValue();
+        Constant* inOutMetaValConst = cast<Constant>(inOutMetaVal);
+        inOutMeta.U64All[0] = cast<ConstantInt>(inOutMetaValConst->getOperand(0))->getZExtValue();
+        inOutMeta.U64All[1] = cast<ConstantInt>(inOutMetaValConst->getOperand(1))->getZExtValue();
 
         assert(inOutMeta.IsLoc || inOutMeta.IsBuiltIn);
 
-        m_pBuilder->SetInsertPoint(pInsertPos);
+        m_builder->SetInsertPoint(insertPos);
         if (inOutMeta.IsBuiltIn)
         {
             auto builtIn = static_cast<lgc::BuiltInKind>(inOutMeta.Value);
-            pElemIdx = (pElemIdx == m_pBuilder->getInt32(InvalidValue)) ? nullptr : pElemIdx;
-            pVertexIdx = (pVertexIdx == m_pBuilder->getInt32(InvalidValue)) ? nullptr : pVertexIdx;
+            elemIdx = (elemIdx == m_builder->getInt32(InvalidValue)) ? nullptr : elemIdx;
+            vertexIdx = (vertexIdx == m_builder->getInt32(InvalidValue)) ? nullptr : vertexIdx;
 
             lgc::InOutInfo inOutInfo;
-            inOutInfo.SetArraySize(maxLocOffset);
+            inOutInfo.setArraySize(maxLocOffset);
             if (addrSpace == SPIRAS_Input)
             {
-                pInOutValue = m_pBuilder->CreateReadBuiltInInput(builtIn, inOutInfo, pVertexIdx, pElemIdx);
+                inOutValue = m_builder->CreateReadBuiltInInput(builtIn, inOutInfo, vertexIdx, elemIdx);
             }
             else
             {
-                pInOutValue = m_pBuilder->CreateReadBuiltInOutput(builtIn, inOutInfo, pVertexIdx, pElemIdx);
+                inOutValue = m_builder->CreateReadBuiltInOutput(builtIn, inOutInfo, vertexIdx, elemIdx);
             }
 
             if (((builtIn == lgc::BuiltInSubgroupEqMask)     ||
@@ -1362,36 +1362,36 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                  (builtIn == lgc::BuiltInSubgroupGtMask)     ||
                  (builtIn == lgc::BuiltInSubgroupLeMask)     ||
                  (builtIn == lgc::BuiltInSubgroupLtMask)) &&
-                pInOutTy->isIntegerTy(64))
+                inOutTy->isIntegerTy(64))
             {
                 // NOTE: Glslang has a bug. For gl_SubGroupXXXMaskARB, they are implemented as "uint64_t" while
                 // for gl_subgroupXXXMask they are "uvec4". And the SPIR-V enumerants "BuiltInSubgroupXXXMaskKHR"
                 // and "BuiltInSubgroupXXXMask" share the same numeric values.
-                pInOutValue = m_pBuilder->CreateBitCast(pInOutValue, VectorType::get(pInOutTy, 2));
-                pInOutValue = m_pBuilder->CreateExtractElement(pInOutValue, uint64_t(0));
+                inOutValue = m_builder->CreateBitCast(inOutValue, VectorType::get(inOutTy, 2));
+                inOutValue = m_builder->CreateExtractElement(inOutValue, uint64_t(0));
             }
-            if (pInOutValue->getType()->isIntegerTy(1))
+            if (inOutValue->getType()->isIntegerTy(1))
             {
                 // Convert i1 to i32.
-                pInOutValue = m_pBuilder->CreateZExt(pInOutValue, m_pBuilder->getInt32Ty());
+                inOutValue = m_builder->CreateZExt(inOutValue, m_builder->getInt32Ty());
             }
         }
         else
         {
             unsigned idx = inOutMeta.Component;
             assert(inOutMeta.Component <= 3);
-            if (pInOutTy->getScalarSizeInBits() == 64)
+            if (inOutTy->getScalarSizeInBits() == 64)
             {
                 assert(inOutMeta.Component % 2 == 0); // Must be even for 64-bit type
                 idx = inOutMeta.Component / 2;
             }
-            pElemIdx = (pElemIdx == nullptr) ? m_pBuilder->getInt32(idx) :
-                                               m_pBuilder->CreateAdd(pElemIdx, m_pBuilder->getInt32(idx));
+            elemIdx = (elemIdx == nullptr) ? m_builder->getInt32(idx) :
+                                               m_builder->CreateAdd(elemIdx, m_builder->getInt32(idx));
 
             lgc::InOutInfo inOutInfo;
-            if (pLocOffset == nullptr)
+            if (locOffset == nullptr)
             {
-                pLocOffset = m_pBuilder->getInt32(0);
+                locOffset = m_builder->getInt32(0);
             }
 
             if (addrSpace == SPIRAS_Input)
@@ -1402,75 +1402,75 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                     {
                         // Use auxiliary value of interpolation (calcuated I/J or vertex no.) for
                         // interpolant inputs of fragment shader.
-                        pVertexIdx = pAuxInterpValue;
-                        inOutInfo.SetHasInterpAux();
+                        vertexIdx = auxInterpValue;
+                        inOutInfo.setHasInterpAux();
                     }
                     else
                     {
                         interpLoc = inOutMeta.InterpLoc;
                     }
-                    inOutInfo.SetInterpLoc(interpLoc);
-                    inOutInfo.SetInterpMode(inOutMeta.InterpMode);
+                    inOutInfo.setInterpLoc(interpLoc);
+                    inOutInfo.setInterpMode(inOutMeta.InterpMode);
                 }
-                pInOutValue = m_pBuilder->CreateReadGenericInput(pInOutTy,
+                inOutValue = m_builder->CreateReadGenericInput(inOutTy,
                                                                  inOutMeta.Value,
-                                                                 pLocOffset,
-                                                                 pElemIdx,
+                                                                 locOffset,
+                                                                 elemIdx,
                                                                  maxLocOffset,
                                                                  inOutInfo,
-                                                                 pVertexIdx);
+                                                                 vertexIdx);
             }
             else
             {
-                pInOutValue = m_pBuilder->CreateReadGenericOutput(pInOutTy,
+                inOutValue = m_builder->CreateReadGenericOutput(inOutTy,
                                                                   inOutMeta.Value,
-                                                                  pLocOffset,
-                                                                  pElemIdx,
+                                                                  locOffset,
+                                                                  elemIdx,
                                                                   maxLocOffset,
                                                                   inOutInfo,
-                                                                  pVertexIdx);
+                                                                  vertexIdx);
             }
         }
     }
 
-    return pInOutValue;
+    return inOutValue;
 }
 
 // =====================================================================================================================
 // Inserts LLVM call instruction to export output.
-void SpirvLowerGlobal::AddCallInstForOutputExport(
-    Value*       pOutputValue,      // [in] Value exported to output
-    Constant*    pOutputMetaVal,       // [in] Metadata of this output
-    Value*       pLocOffset,        // [in] Relative location offset, passed from aggregate type
+void SpirvLowerGlobal::addCallInstForOutputExport(
+    Value*       outputValue,      // [in] Value exported to output
+    Constant*    outputMetaVal,       // [in] Metadata of this output
+    Value*       locOffset,        // [in] Relative location offset, passed from aggregate type
     unsigned     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
                                     //   For an array built-in with a variable index, this is the array size.
     unsigned     xfbOffsetAdjust,   // Adjustment of transform feedback offset (for array type)
     unsigned     xfbBufferAdjust,   // Adjustment of transform feedback buffer ID (for array type, default is 0)
-    Value*       pElemIdx,          // [in] Element index used for element indexing, valid for tessellation control
+    Value*       elemIdx,          // [in] Element index used for element indexing, valid for tessellation control
                                     //   shader (usually, it is vector component index, for built-in input/output, it
                                     //   could be element index of scalar array)
-    Value*       pVertexIdx,        // [in] Output array outermost index used for vertex indexing, valid for
+    Value*       vertexIdx,        // [in] Output array outermost index used for vertex indexing, valid for
                                     //   tessellation control shader
     unsigned     emitStreamId,      // ID of emitted vertex stream, valid for geometry shader (0xFFFFFFFF for others)
-    Instruction* pInsertPos)        // [in] Where to insert this call
+    Instruction* insertPos)        // [in] Where to insert this call
 {
-    Type* pOutputTy = pOutputValue->getType();
+    Type* outputTy = outputValue->getType();
 
     ShaderInOutMetadata outputMeta = {};
 
     // NOTE: This special flag is just to check if we need output header of transform feedback info.
-    static unsigned enableXfb = false;
+    static unsigned EnableXfb = false;
 
-    if (pOutputTy->isArrayTy())
+    if (outputTy->isArrayTy())
     {
         // Array type
-        assert(pElemIdx == nullptr);
+        assert(elemIdx == nullptr);
 
-        assert(pOutputMetaVal->getNumOperands() == 4);
-        unsigned stride = cast<ConstantInt>(pOutputMetaVal->getOperand(0))->getZExtValue();
+        assert(outputMetaVal->getNumOperands() == 4);
+        unsigned stride = cast<ConstantInt>(outputMetaVal->getOperand(0))->getZExtValue();
 
-        outputMeta.U64All[0] = cast<ConstantInt>(pOutputMetaVal->getOperand(2))->getZExtValue();
-        outputMeta.U64All[1] = cast<ConstantInt>(pOutputMetaVal->getOperand(3))->getZExtValue();
+        outputMeta.U64All[0] = cast<ConstantInt>(outputMetaVal->getOperand(2))->getZExtValue();
+        outputMeta.U64All[1] = cast<ConstantInt>(outputMetaVal->getOperand(3))->getZExtValue();
 
         if ((m_shaderStage == ShaderStageGeometry) && (emitStreamId != outputMeta.StreamId))
         {
@@ -1487,138 +1487,138 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             lgc::InOutInfo outputInfo;
             if (emitStreamId != InvalidValue)
             {
-                outputInfo.SetStreamId(emitStreamId);
+                outputInfo.setStreamId(emitStreamId);
             }
-            outputInfo.SetArraySize(pOutputTy->getArrayNumElements());
-            m_pBuilder->SetInsertPoint(pInsertPos);
-            m_pBuilder->CreateWriteBuiltInOutput(pOutputValue, builtInId, outputInfo, pVertexIdx, nullptr);
+            outputInfo.setArraySize(outputTy->getArrayNumElements());
+            m_builder->SetInsertPoint(insertPos);
+            m_builder->CreateWriteBuiltInOutput(outputValue, builtInId, outputInfo, vertexIdx, nullptr);
 
             if (outputMeta.IsXfb)
             {
                 // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
                 assert((xfbOffsetAdjust == 0) && (xfbBufferAdjust == 0)); // Unused for built-ins
 
-                auto pElemTy = pOutputTy->getArrayElementType();
-                assert(pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()); // Must be scalar
+                auto elemTy = outputTy->getArrayElementType();
+                assert(elemTy->isFloatingPointTy() || elemTy->isIntegerTy()); // Must be scalar
 
-                const uint64_t elemCount = pOutputTy->getArrayNumElements();
-                const uint64_t byteSize = pElemTy->getScalarSizeInBits() / 8;
+                const uint64_t elemCount = outputTy->getArrayNumElements();
+                const uint64_t byteSize = elemTy->getScalarSizeInBits() / 8;
 
                 for (unsigned idx = 0; idx < elemCount; ++idx)
                 {
                     // Handle array elements recursively
-		  auto pElem = ExtractValueInst::Create(pOutputValue, { idx }, "", pInsertPos);
+		  auto elem = ExtractValueInst::Create(outputValue, { idx }, "", insertPos);
 
-                    auto pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset +
+                    auto xfbOffset = m_builder->getInt32(outputMeta.XfbOffset +
                                                            outputMeta.XfbExtraOffset +
                                                            byteSize * idx);
-                    m_pBuilder->CreateWriteXfbOutput(pElem,
+                    m_builder->CreateWriteXfbOutput(elem,
                                                      /*isBuiltIn=*/true,
                                                      builtInId,
                                                      outputMeta.XfbBuffer,
                                                      outputMeta.XfbStride,
-                                                     pXfbOffset,
+                                                     xfbOffset,
                                                      outputInfo);
 
-                    if (enableXfb == false)
+                    if (EnableXfb == false)
                     {
                         LLPC_OUTS("\n===============================================================================\n");
                         LLPC_OUTS("// LLPC transform feedback export info (" <<
-                                  GetShaderStageName(m_shaderStage) << " shader)\n\n");
+                                  getShaderStageName(m_shaderStage) << " shader)\n\n");
 
-                        enableXfb = true;
+                        EnableXfb = true;
                     }
 
                     auto builtInName = getNameMap(static_cast<BuiltIn>(builtInId)).map(static_cast<BuiltIn>(builtInId));
-                    LLPC_OUTS(*pOutputValue->getType() <<
+                    LLPC_OUTS(*outputValue->getType() <<
                               " (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), " <<
                               "xfbBuffer = " << outputMeta.XfbBuffer << ", " <<
                               "xfbStride = " << outputMeta.XfbStride << ", " <<
-                              "xfbOffset = " << cast<ConstantInt>(pXfbOffset)->getZExtValue() << "\n");
+                              "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << "\n");
                 }
             }
         }
         else
         {
             // NOTE: If the relative location offset is not specified, initialize it to 0.
-            if (pLocOffset == nullptr)
+            if (locOffset == nullptr)
             {
-                pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
+                locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
             }
 
-            auto pElemMeta = cast<Constant>(pOutputMetaVal->getOperand(1));
+            auto elemMeta = cast<Constant>(outputMetaVal->getOperand(1));
 
-            const uint64_t elemCount = pOutputTy->getArrayNumElements();
+            const uint64_t elemCount = outputTy->getArrayNumElements();
             for (unsigned idx = 0; idx < elemCount; ++idx)
             {
                 // Handle array elements recursively
-	      Value* pElem = ExtractValueInst::Create(pOutputValue, { idx }, "", pInsertPos);
+	      Value* elem = ExtractValueInst::Create(outputValue, { idx }, "", insertPos);
 
-                Value* pElemLocOffset = nullptr;
-                ConstantInt* pLocOffsetConst = dyn_cast<ConstantInt>(pLocOffset);
+                Value* elemLocOffset = nullptr;
+                ConstantInt* locOffsetConst = dyn_cast<ConstantInt>(locOffset);
 
-                if (pLocOffsetConst != nullptr)
+                if (locOffsetConst != nullptr)
                 {
-                    unsigned locOffset = pLocOffsetConst->getZExtValue();
-                    pElemLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), locOffset + stride * idx);
+                    unsigned locOffset = locOffsetConst->getZExtValue();
+                    elemLocOffset = ConstantInt::get(Type::getInt32Ty(*m_context), locOffset + stride * idx);
                 }
                 else
                 {
                     // elemLocOffset = locOffset + stride * idx
-                    pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext), stride),
-                                                               ConstantInt::get(Type::getInt32Ty(*m_pContext), idx),
+                    elemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_context), stride),
+                                                               ConstantInt::get(Type::getInt32Ty(*m_context), idx),
                                                                "",
-                                                               pInsertPos);
-                    pElemLocOffset = BinaryOperator::CreateAdd(pLocOffset, pElemLocOffset, "", pInsertPos);
+                                                               insertPos);
+                    elemLocOffset = BinaryOperator::CreateAdd(locOffset, elemLocOffset, "", insertPos);
                 }
 
                 // NOTE: GLSL spec says: an array of size N of blocks is captured by N consecutive buffers,
                 // with all members of block array-element E captured by buffer B, where B equals the declared or
                 // inherited xfb_buffer plus E.
                 bool blockArray = outputMeta.IsBlockArray;
-                AddCallInstForOutputExport(pElem,
-                                           pElemMeta,
-                                           pElemLocOffset,
+                addCallInstForOutputExport(elem,
+                                           elemMeta,
+                                           elemLocOffset,
                                            maxLocOffset,
                                            xfbOffsetAdjust + (blockArray ? 0 : outputMeta.XfbArrayStride * idx),
                                            xfbBufferAdjust + (blockArray ? outputMeta.XfbArrayStride * idx : 0),
                                            nullptr,
-                                           pVertexIdx,
+                                           vertexIdx,
                                            emitStreamId,
-                                           pInsertPos);
+                                           insertPos);
             }
         }
     }
-    else if (pOutputTy->isStructTy())
+    else if (outputTy->isStructTy())
     {
         // Structure type
-        assert(pElemIdx == nullptr);
+        assert(elemIdx == nullptr);
 
-        const uint64_t memberCount = pOutputTy->getStructNumElements();
+        const uint64_t memberCount = outputTy->getStructNumElements();
         for (unsigned memberIdx = 0; memberIdx < memberCount; ++memberIdx)
         {
             // Handle structure member recursively
-            auto pMemberMeta = cast<Constant>(pOutputMetaVal->getOperand(memberIdx));
-            Value* pMember = ExtractValueInst::Create(pOutputValue, { memberIdx }, "", pInsertPos);
-            AddCallInstForOutputExport(pMember,
-                                       pMemberMeta,
-                                       pLocOffset,
+            auto memberMeta = cast<Constant>(outputMetaVal->getOperand(memberIdx));
+            Value* member = ExtractValueInst::Create(outputValue, { memberIdx }, "", insertPos);
+            addCallInstForOutputExport(member,
+                                       memberMeta,
+                                       locOffset,
                                        maxLocOffset,
                                        xfbOffsetAdjust,
                                        xfbBufferAdjust,
                                        nullptr,
-                                       pVertexIdx,
+                                       vertexIdx,
                                        emitStreamId,
-                                       pInsertPos);
+                                       insertPos);
         }
     }
     else
     {
         // Normal scalar or vector type
-        m_pBuilder->SetInsertPoint(pInsertPos);
-        Constant* pInOutMetaConst = cast<Constant>(pOutputMetaVal);
-        outputMeta.U64All[0] = cast<ConstantInt>(pInOutMetaConst->getOperand(0))->getZExtValue();
-        outputMeta.U64All[1] = cast<ConstantInt>(pInOutMetaConst->getOperand(1))->getZExtValue();
+        m_builder->SetInsertPoint(insertPos);
+        Constant* inOutMetaConst = cast<Constant>(outputMetaVal);
+        outputMeta.U64All[0] = cast<ConstantInt>(inOutMetaConst->getOperand(0))->getZExtValue();
+        outputMeta.U64All[1] = cast<ConstantInt>(inOutMetaConst->getOperand(1))->getZExtValue();
 
         if ((m_shaderStage == ShaderStageGeometry) && (emitStreamId != outputMeta.StreamId))
         {
@@ -1631,121 +1631,121 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         lgc::InOutInfo outputInfo;
         if (emitStreamId != InvalidValue)
         {
-            outputInfo.SetStreamId(emitStreamId);
+            outputInfo.setStreamId(emitStreamId);
         }
-        outputInfo.SetIsSigned(outputMeta.Signedness);
+        outputInfo.setIsSigned(outputMeta.Signedness);
 
         if (outputMeta.IsBuiltIn)
         {
             auto builtInId = static_cast<lgc::BuiltInKind>(outputMeta.Value);
-            outputInfo.SetArraySize(maxLocOffset);
+            outputInfo.setArraySize(maxLocOffset);
             if (outputMeta.IsXfb)
             {
                 // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
                 assert((xfbOffsetAdjust == 0) && (xfbBufferAdjust == 0)); // Unused for built-ins
-                auto pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset);
-                m_pBuilder->CreateWriteXfbOutput(pOutputValue,
+                auto xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset);
+                m_builder->CreateWriteXfbOutput(outputValue,
                                                  /*isBuiltIn=*/true,
                                                  builtInId,
                                                  outputMeta.XfbBuffer,
                                                  outputMeta.XfbStride,
-                                                 pXfbOffset,
+                                                 xfbOffset,
                                                  outputInfo);
 
-                if (enableXfb == false)
+                if (EnableXfb == false)
                 {
                     LLPC_OUTS("\n===============================================================================\n");
                     LLPC_OUTS("// LLPC transform feedback export info (" <<
-                              GetShaderStageName(m_shaderStage) << " shader)\n\n");
+                              getShaderStageName(m_shaderStage) << " shader)\n\n");
 
-                    enableXfb = true;
+                    EnableXfb = true;
                 }
 
                 auto builtInName = getNameMap(static_cast<BuiltIn>(builtInId)).map(static_cast<BuiltIn>(builtInId));
-                LLPC_OUTS(*pOutputValue->getType() <<
+                LLPC_OUTS(*outputValue->getType() <<
                           " (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), " <<
                           "xfbBuffer = " << outputMeta.XfbBuffer << ", " <<
                           "xfbStride = " << outputMeta.XfbStride << ", " <<
-                          "xfbOffset = " << cast<ConstantInt>(pXfbOffset)->getZExtValue() << "\n");
+                          "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << "\n");
             }
 
-            m_pBuilder->CreateWriteBuiltInOutput(pOutputValue, builtInId, outputInfo, pVertexIdx, pElemIdx);
+            m_builder->CreateWriteBuiltInOutput(outputValue, builtInId, outputInfo, vertexIdx, elemIdx);
             return;
         }
 
         unsigned location = outputMeta.Value + outputMeta.Index;
         assert(((outputMeta.Index == 1) && (outputMeta.Value == 0)) || (outputMeta.Index == 0));
-        assert(pOutputTy->isSingleValueType());
+        assert(outputTy->isSingleValueType());
 
         unsigned idx = outputMeta.Component;
         assert(outputMeta.Component <= 3);
-        if (pOutputTy->getScalarSizeInBits() == 64)
+        if (outputTy->getScalarSizeInBits() == 64)
         {
             assert(outputMeta.Component % 2 == 0); // Must be even for 64-bit type
             idx = outputMeta.Component / 2;
         }
-        pElemIdx = (pElemIdx == nullptr) ? m_pBuilder->getInt32(idx) :
-                                           m_pBuilder->CreateAdd(pElemIdx, m_pBuilder->getInt32(idx));
-        pLocOffset = (pLocOffset == nullptr) ? m_pBuilder->getInt32(0) : pLocOffset;
+        elemIdx = (elemIdx == nullptr) ? m_builder->getInt32(idx) :
+                                           m_builder->CreateAdd(elemIdx, m_builder->getInt32(idx));
+        locOffset = (locOffset == nullptr) ? m_builder->getInt32(0) : locOffset;
 
         if (outputMeta.IsXfb)
         {
             // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
             assert(xfbOffsetAdjust != InvalidValue);
-            Value* pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset +
+            Value* xfbOffset = m_builder->getInt32(outputMeta.XfbOffset +
                                                      outputMeta.XfbExtraOffset +
                                                      xfbOffsetAdjust);
-            m_pBuilder->CreateWriteXfbOutput(pOutputValue,
+            m_builder->CreateWriteXfbOutput(outputValue,
                                              /*isBuiltIn=*/false,
-                                             location + cast<ConstantInt>(pLocOffset)->getZExtValue(),
+                                             location + cast<ConstantInt>(locOffset)->getZExtValue(),
                                              outputMeta.XfbBuffer + xfbBufferAdjust,
                                              outputMeta.XfbStride,
-                                             pXfbOffset, outputInfo);
+                                             xfbOffset, outputInfo);
 
-            if (enableXfb == false)
+            if (EnableXfb == false)
             {
                 LLPC_OUTS("\n===============================================================================\n");
                 LLPC_OUTS("// LLPC transform feedback export info ("
-                          << GetShaderStageName(m_shaderStage) << " shader)\n\n");
+                          << getShaderStageName(m_shaderStage) << " shader)\n\n");
 
-                enableXfb = true;
+                EnableXfb = true;
             }
 
-            LLPC_OUTS(*pOutputValue->getType() <<
-                      " (loc = " << location + cast<ConstantInt>(pLocOffset)->getZExtValue() << "), " <<
+            LLPC_OUTS(*outputValue->getType() <<
+                      " (loc = " << location + cast<ConstantInt>(locOffset)->getZExtValue() << "), " <<
                       "xfbBuffer = " << outputMeta.XfbBuffer + xfbBufferAdjust << ", " <<
                       "xfbStride = " << outputMeta.XfbStride << ", " <<
-                      "xfbOffset = " << cast<ConstantInt>(pXfbOffset)->getZExtValue() << "\n");
+                      "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << "\n");
         }
 
-        m_pBuilder->CreateWriteGenericOutput(pOutputValue,
+        m_builder->CreateWriteGenericOutput(outputValue,
                                              location,
-                                             pLocOffset,
-                                             pElemIdx,
+                                             locOffset,
+                                             elemIdx,
                                              maxLocOffset,
                                              outputInfo,
-                                             pVertexIdx);
+                                             vertexIdx);
     }
 }
 
 // =====================================================================================================================
 // Inserts instructions to load value from input/ouput member.
-Value* SpirvLowerGlobal::LoadInOutMember(
-    Type*                      pInOutTy,        // [in] Type of this input/output member
+Value* SpirvLowerGlobal::loadInOutMember(
+    Type*                      inOutTy,        // [in] Type of this input/output member
     unsigned                   addrSpace,       // Address space
     const std::vector<Value*>& indexOperands,   // [in] Index operands
     unsigned                   operandIdx,      // Index of the index operand in processing
     unsigned                   maxLocOffset,    // Max+1 location offset if variable index has been encountered
-    Constant*                  pInOutMetaVal,      // [in] Metadata of this input/output member
-    Value*                     pLocOffset,      // [in] Relative location offset of this input/output member
-    Value*                     pVertexIdx,      // [in] Input array outermost index used for vertex indexing
+    Constant*                  inOutMetaVal,      // [in] Metadata of this input/output member
+    Value*                     locOffset,      // [in] Relative location offset of this input/output member
+    Value*                     vertexIdx,      // [in] Input array outermost index used for vertex indexing
     unsigned                   interpLoc,       // Interpolation location, valid for fragment shader
                                                 // (use "InterpLocUnknown" as don't-care value)
-    Value*                     pAuxInterpValue, // [in] Auxiliary value of interpolation (valid for fragment shader):
+    Value*                     auxInterpValue, // [in] Auxiliary value of interpolation (valid for fragment shader):
                                                 //   - Sample ID for "InterpLocSample"
                                                 //   - Offset from the center of the pixel for "InterpLocCenter"
                                                 //   - Vertex no. (0 ~ 2) for "InterpLocCustom"
-    Instruction*               pInsertPos)      // [in] Where to insert calculation instructions
+    Instruction*               insertPos)      // [in] Where to insert calculation instructions
 {
     assert((m_shaderStage == ShaderStageTessControl) ||
                 (m_shaderStage == ShaderStageTessEval) ||
@@ -1753,126 +1753,126 @@ Value* SpirvLowerGlobal::LoadInOutMember(
 
     if (operandIdx < indexOperands.size() - 1)
     {
-        if (pInOutTy->isArrayTy())
+        if (inOutTy->isArrayTy())
         {
             // Array type
-            assert(pInOutMetaVal->getNumOperands() == 4);
+            assert(inOutMetaVal->getNumOperands() == 4);
             ShaderInOutMetadata inOutMeta = {};
 
-            inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaVal->getOperand(2))->getZExtValue();
-            inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaVal->getOperand(3))->getZExtValue();
+            inOutMeta.U64All[0] = cast<ConstantInt>(inOutMetaVal->getOperand(2))->getZExtValue();
+            inOutMeta.U64All[1] = cast<ConstantInt>(inOutMetaVal->getOperand(3))->getZExtValue();
 
-            auto pElemMeta = cast<Constant>(pInOutMetaVal->getOperand(1));
-            auto pElemTy   = pInOutTy->getArrayElementType();
+            auto elemMeta = cast<Constant>(inOutMetaVal->getOperand(1));
+            auto elemTy   = inOutTy->getArrayElementType();
 
             if (inOutMeta.IsBuiltIn)
             {
                 assert(operandIdx + 1 == indexOperands.size() - 1);
-                auto pElemIdx = indexOperands[operandIdx + 1];
-                return AddCallInstForInOutImport(pElemTy,
+                auto elemIdx = indexOperands[operandIdx + 1];
+                return addCallInstForInOutImport(elemTy,
                                                  addrSpace,
-                                                 pElemMeta,
-                                                 pLocOffset,
-                                                 pInOutTy->getArrayNumElements(),
-                                                 pElemIdx,
-                                                 pVertexIdx,
+                                                 elemMeta,
+                                                 locOffset,
+                                                 inOutTy->getArrayNumElements(),
+                                                 elemIdx,
+                                                 vertexIdx,
                                                  interpLoc,
-                                                 pAuxInterpValue,
-                                                 pInsertPos);
+                                                 auxInterpValue,
+                                                 insertPos);
             }
             else
             {
                 // NOTE: If the relative location offset is not specified, initialize it to 0.
-                if (pLocOffset == nullptr)
+                if (locOffset == nullptr)
                 {
-                    pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
+                    locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
                 }
 
                 // elemLocOffset = locOffset + stride * elemIdx
-                unsigned stride = cast<ConstantInt>(pInOutMetaVal->getOperand(0))->getZExtValue();
-                auto pElemIdx = indexOperands[operandIdx + 1];
-                Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                unsigned stride = cast<ConstantInt>(inOutMetaVal->getOperand(0))->getZExtValue();
+                auto elemIdx = indexOperands[operandIdx + 1];
+                Value* elemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_context),
                                                                                    stride),
-                                                                  pElemIdx,
+                                                                  elemIdx,
                                                                   "",
-                                                                  pInsertPos);
-                pElemLocOffset = BinaryOperator::CreateAdd(pLocOffset, pElemLocOffset, "", pInsertPos);
+                                                                  insertPos);
+                elemLocOffset = BinaryOperator::CreateAdd(locOffset, elemLocOffset, "", insertPos);
 
                 // Mark the end+1 possible location offset if the index is variable. The Builder call needs it
                 // so it knows how many locations to mark as used by this access.
-                if ((maxLocOffset == 0) && (isa<ConstantInt>(pElemIdx) == false))
+                if ((maxLocOffset == 0) && (isa<ConstantInt>(elemIdx) == false))
                 {
-                    maxLocOffset = cast<ConstantInt>(pLocOffset)->getZExtValue() +
-                                   stride * pInOutTy->getArrayNumElements();
+                    maxLocOffset = cast<ConstantInt>(locOffset)->getZExtValue() +
+                                   stride * inOutTy->getArrayNumElements();
                 }
 
-                return LoadInOutMember(pElemTy,
+                return loadInOutMember(elemTy,
                                        addrSpace,
                                        indexOperands,
                                        operandIdx + 1,
                                        maxLocOffset,
-                                       pElemMeta,
-                                       pElemLocOffset,
-                                       pVertexIdx,
+                                       elemMeta,
+                                       elemLocOffset,
+                                       vertexIdx,
                                        interpLoc,
-                                       pAuxInterpValue,
-                                       pInsertPos);
+                                       auxInterpValue,
+                                       insertPos);
             }
         }
-        else if (pInOutTy->isStructTy())
+        else if (inOutTy->isStructTy())
         {
             // Structure type
             unsigned memberIdx = cast<ConstantInt>(indexOperands[operandIdx + 1])->getZExtValue();
 
-            auto pMemberTy = pInOutTy->getStructElementType(memberIdx);
-            auto pMemberMeta = cast<Constant>(pInOutMetaVal->getOperand(memberIdx));
+            auto memberTy = inOutTy->getStructElementType(memberIdx);
+            auto memberMeta = cast<Constant>(inOutMetaVal->getOperand(memberIdx));
 
-            return LoadInOutMember(pMemberTy,
+            return loadInOutMember(memberTy,
                                    addrSpace,
                                    indexOperands,
                                    operandIdx + 1,
                                    maxLocOffset,
-                                   pMemberMeta,
-                                   pLocOffset,
-                                   pVertexIdx,
+                                   memberMeta,
+                                   locOffset,
+                                   vertexIdx,
                                    interpLoc,
-                                   pAuxInterpValue,
-                                   pInsertPos);
+                                   auxInterpValue,
+                                   insertPos);
         }
-        else if (pInOutTy->isVectorTy())
+        else if (inOutTy->isVectorTy())
         {
             // Vector type
-            auto pCompTy = pInOutTy->getVectorElementType();
+            auto compTy = inOutTy->getVectorElementType();
 
             assert(operandIdx + 1 == indexOperands.size() - 1);
-            auto pCompIdx = indexOperands[operandIdx + 1];
+            auto compIdx = indexOperands[operandIdx + 1];
 
-            return AddCallInstForInOutImport(pCompTy,
+            return addCallInstForInOutImport(compTy,
                                              addrSpace,
-                                             pInOutMetaVal,
-                                             pLocOffset,
+                                             inOutMetaVal,
+                                             locOffset,
                                              maxLocOffset,
-                                             pCompIdx,
-                                             pVertexIdx,
+                                             compIdx,
+                                             vertexIdx,
                                              interpLoc,
-                                             pAuxInterpValue,
-                                             pInsertPos);
+                                             auxInterpValue,
+                                             insertPos);
         }
     }
     else
     {
         // Last index operand
         assert(operandIdx == indexOperands.size() - 1);
-        return AddCallInstForInOutImport(pInOutTy,
+        return addCallInstForInOutImport(inOutTy,
                                          addrSpace,
-                                         pInOutMetaVal,
-                                         pLocOffset,
+                                         inOutMetaVal,
+                                         locOffset,
                                          maxLocOffset,
                                          nullptr,
-                                         pVertexIdx,
+                                         vertexIdx,
                                          interpLoc,
-                                         pAuxInterpValue,
-                                         pInsertPos);
+                                         auxInterpValue,
+                                         insertPos);
     }
 
     llvm_unreachable("Should never be called!");
@@ -1881,120 +1881,120 @@ Value* SpirvLowerGlobal::LoadInOutMember(
 
 // =====================================================================================================================
 // Inserts instructions to store value to ouput member.
-void SpirvLowerGlobal::StoreOutputMember(
-    Type*                      pOutputTy,       // [in] Type of this output member
-    Value*                     pStoreValue,     // [in] Value stored to output member
+void SpirvLowerGlobal::storeOutputMember(
+    Type*                      outputTy,       // [in] Type of this output member
+    Value*                     storeValue,     // [in] Value stored to output member
     const std::vector<Value*>& indexOperands,   // [in] Index operands
     unsigned                   operandIdx,      // Index of the index operand in processing
     unsigned                   maxLocOffset,    // Max+1 location offset if variable index has been encountered
-    Constant*                  pOutputMetaVal,     // [in] Metadata of this output member
-    Value*                     pLocOffset,      // [in] Relative location offset of this output member
-    Value*                     pVertexIdx,      // [in] Input array outermost index used for vertex indexing
-    Instruction*               pInsertPos)      // [in] Where to insert store instructions
+    Constant*                  outputMetaVal,     // [in] Metadata of this output member
+    Value*                     locOffset,      // [in] Relative location offset of this output member
+    Value*                     vertexIdx,      // [in] Input array outermost index used for vertex indexing
+    Instruction*               insertPos)      // [in] Where to insert store instructions
 {
     assert(m_shaderStage == ShaderStageTessControl);
 
     if (operandIdx < indexOperands.size() - 1)
     {
-        if (pOutputTy->isArrayTy())
+        if (outputTy->isArrayTy())
         {
-            assert(pOutputMetaVal->getNumOperands() == 4);
+            assert(outputMetaVal->getNumOperands() == 4);
             ShaderInOutMetadata outputMeta = {};
 
-            outputMeta.U64All[0] = cast<ConstantInt>(pOutputMetaVal->getOperand(2))->getZExtValue();
-            outputMeta.U64All[1] = cast<ConstantInt>(pOutputMetaVal->getOperand(3))->getZExtValue();
+            outputMeta.U64All[0] = cast<ConstantInt>(outputMetaVal->getOperand(2))->getZExtValue();
+            outputMeta.U64All[1] = cast<ConstantInt>(outputMetaVal->getOperand(3))->getZExtValue();
 
-            auto pElemMeta = cast<Constant>(pOutputMetaVal->getOperand(1));
-            auto pElemTy   = pOutputTy->getArrayElementType();
+            auto elemMeta = cast<Constant>(outputMetaVal->getOperand(1));
+            auto elemTy   = outputTy->getArrayElementType();
 
             if (outputMeta.IsBuiltIn)
             {
-                assert(pLocOffset == nullptr);
+                assert(locOffset == nullptr);
                 assert(operandIdx + 1 == indexOperands.size() - 1);
 
-                auto pElemIdx = indexOperands[operandIdx + 1];
-                return AddCallInstForOutputExport(pStoreValue,
-                                                  pElemMeta,
+                auto elemIdx = indexOperands[operandIdx + 1];
+                return addCallInstForOutputExport(storeValue,
+                                                  elemMeta,
                                                   nullptr,
-                                                  pOutputTy->getArrayNumElements(),
+                                                  outputTy->getArrayNumElements(),
                                                   InvalidValue,
                                                   0,
-                                                  pElemIdx,
-                                                  pVertexIdx,
+                                                  elemIdx,
+                                                  vertexIdx,
                                                   InvalidValue,
-                                                  pInsertPos);
+                                                  insertPos);
             }
             else
             {
                 // NOTE: If the relative location offset is not specified, initialize it.
-                if (pLocOffset == nullptr)
+                if (locOffset == nullptr)
                 {
-                    pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
+                    locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
                 }
 
                 // elemLocOffset = locOffset + stride * elemIdx
-                unsigned stride = cast<ConstantInt>(pOutputMetaVal->getOperand(0))->getZExtValue();
-                auto pElemIdx = indexOperands[operandIdx + 1];
-                Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                unsigned stride = cast<ConstantInt>(outputMetaVal->getOperand(0))->getZExtValue();
+                auto elemIdx = indexOperands[operandIdx + 1];
+                Value* elemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_context),
                                                                                    stride),
-                                                                  pElemIdx,
+                                                                  elemIdx,
                                                                   "",
-                                                                  pInsertPos);
-                pElemLocOffset = BinaryOperator::CreateAdd(pLocOffset, pElemLocOffset, "", pInsertPos);
+                                                                  insertPos);
+                elemLocOffset = BinaryOperator::CreateAdd(locOffset, elemLocOffset, "", insertPos);
 
                 // Mark the end+1 possible location offset if the index is variable. The Builder call needs it
                 // so it knows how many locations to mark as used by this access.
-                if ((maxLocOffset == 0) && (isa<ConstantInt>(pElemIdx) == false))
+                if ((maxLocOffset == 0) && (isa<ConstantInt>(elemIdx) == false))
                 {
-                    maxLocOffset = cast<ConstantInt>(pLocOffset)->getZExtValue() +
-                                   stride * pOutputTy->getArrayNumElements();
+                    maxLocOffset = cast<ConstantInt>(locOffset)->getZExtValue() +
+                                   stride * outputTy->getArrayNumElements();
                 }
 
-                return StoreOutputMember(pElemTy,
-                                         pStoreValue,
+                return storeOutputMember(elemTy,
+                                         storeValue,
                                          indexOperands,
                                          operandIdx + 1,
                                          maxLocOffset,
-                                         pElemMeta,
-                                         pElemLocOffset,
-                                         pVertexIdx,
-                                         pInsertPos);
+                                         elemMeta,
+                                         elemLocOffset,
+                                         vertexIdx,
+                                         insertPos);
             }
         }
-        else if (pOutputTy->isStructTy())
+        else if (outputTy->isStructTy())
         {
             // Structure type
             unsigned memberIdx = cast<ConstantInt>(indexOperands[operandIdx + 1])->getZExtValue();
 
-            auto pMemberTy = pOutputTy->getStructElementType(memberIdx);
-            auto pMemberMeta = cast<Constant>(pOutputMetaVal->getOperand(memberIdx));
+            auto memberTy = outputTy->getStructElementType(memberIdx);
+            auto memberMeta = cast<Constant>(outputMetaVal->getOperand(memberIdx));
 
-            return StoreOutputMember(pMemberTy,
-                                     pStoreValue,
+            return storeOutputMember(memberTy,
+                                     storeValue,
                                      indexOperands,
                                      operandIdx + 1,
                                      maxLocOffset,
-                                     pMemberMeta,
-                                     pLocOffset,
-                                     pVertexIdx,
-                                     pInsertPos);
+                                     memberMeta,
+                                     locOffset,
+                                     vertexIdx,
+                                     insertPos);
         }
-        else if (pOutputTy->isVectorTy())
+        else if (outputTy->isVectorTy())
         {
             // Vector type
             assert(operandIdx + 1 == indexOperands.size() - 1);
-            auto pCompIdx = indexOperands[operandIdx + 1];
+            auto compIdx = indexOperands[operandIdx + 1];
 
-            return AddCallInstForOutputExport(pStoreValue,
-                                              pOutputMetaVal,
-                                              pLocOffset,
+            return addCallInstForOutputExport(storeValue,
+                                              outputMetaVal,
+                                              locOffset,
                                               maxLocOffset,
                                               InvalidValue,
                                               0,
-                                              pCompIdx,
-                                              pVertexIdx,
+                                              compIdx,
+                                              vertexIdx,
                                               InvalidValue,
-                                              pInsertPos);
+                                              insertPos);
         }
     }
     else
@@ -2002,16 +2002,16 @@ void SpirvLowerGlobal::StoreOutputMember(
         // Last index operand
         assert(operandIdx == indexOperands.size() - 1);
 
-        return AddCallInstForOutputExport(pStoreValue,
-                                          pOutputMetaVal,
-                                          pLocOffset,
+        return addCallInstForOutputExport(storeValue,
+                                          outputMetaVal,
+                                          locOffset,
                                           maxLocOffset,
                                           InvalidValue,
                                           0,
                                           nullptr,
-                                          pVertexIdx,
+                                          vertexIdx,
                                           InvalidValue,
-                                          pInsertPos);
+                                          insertPos);
     }
 
     llvm_unreachable("Should never be called!");
@@ -2019,11 +2019,11 @@ void SpirvLowerGlobal::StoreOutputMember(
 
 // =====================================================================================================================
 // Lowers buffer blocks.
-void SpirvLowerGlobal::LowerBufferBlock()
+void SpirvLowerGlobal::lowerBufferBlock()
 {
     SmallVector<GlobalVariable*, 8> globalsToRemove;
 
-    for (GlobalVariable& global : m_pModule->globals())
+    for (GlobalVariable& global : m_module->globals())
     {
         // Skip anything that is not a block.
         if (global.getAddressSpace() != SPIRAS_Uniform)
@@ -2031,169 +2031,169 @@ void SpirvLowerGlobal::LowerBufferBlock()
             continue;
         }
 
-        MDNode* const pResMetaNode = global.getMetadata(gSPIRVMD::Resource);
-        assert(pResMetaNode != nullptr);
+        MDNode* const resMetaNode = global.getMetadata(gSPIRVMD::Resource);
+        assert(resMetaNode != nullptr);
 
-        const unsigned descSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0))->getZExtValue();
-        const unsigned binding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1))->getZExtValue();
+        const unsigned descSet = mdconst::dyn_extract<ConstantInt>(resMetaNode->getOperand(0))->getZExtValue();
+        const unsigned binding = mdconst::dyn_extract<ConstantInt>(resMetaNode->getOperand(1))->getZExtValue();
 
         SmallVector<Constant*, 8> constantUsers;
 
-        for (User* const pUser : global.users())
+        for (User* const user : global.users())
         {
-            if (Constant* const pConstVal = dyn_cast<Constant>(pUser))
+            if (Constant* const constVal = dyn_cast<Constant>(user))
             {
-                constantUsers.push_back(pConstVal);
+                constantUsers.push_back(constVal);
             }
         }
 
-        for (Constant* const pConstVal : constantUsers)
+        for (Constant* const constVal : constantUsers)
         {
-            ReplaceConstWithInsts(m_pContext, pConstVal);
+            replaceConstWithInsts(m_context, constVal);
         }
 
         // Record of all the functions that our global is used within.
         SmallSet<Function*, 4> funcsUsedIn;
 
-        for (User* const pUser : global.users())
+        for (User* const user : global.users())
         {
-            if (Instruction* const pInst = dyn_cast<Instruction>(pUser))
+            if (Instruction* const inst = dyn_cast<Instruction>(user))
             {
-                funcsUsedIn.insert(pInst->getFunction());
+                funcsUsedIn.insert(inst->getFunction());
             }
         }
 
-        for (Function* const pFunc : funcsUsedIn)
+        for (Function* const func : funcsUsedIn)
         {
             // Check if our block is an array of blocks.
             if (global.getType()->getPointerElementType()->isArrayTy())
             {
-                Type* const pElementType = global.getType()->getPointerElementType()->getArrayElementType();
-                Type* const pBlockType = pElementType->getPointerTo(global.getAddressSpace());
+                Type* const elementType = global.getType()->getPointerElementType()->getArrayElementType();
+                Type* const blockType = elementType->getPointerTo(global.getAddressSpace());
 
                 SmallVector<BitCastInst*, 8> bitCastsToModify;
                 SmallVector<GetElementPtrInst*, 8> getElemPtrsToReplace;
 
                 // We need to run over the users of the global, find the GEPs, and add a load for each.
-                for (User* const pUser : global.users())
+                for (User* const user : global.users())
                 {
                     // Skip over non-instructions.
-                    if (isa<Instruction>(pUser) == false)
+                    if (isa<Instruction>(user) == false)
                     {
                         continue;
                     }
 
-                    GetElementPtrInst* pGetElemPtr = dyn_cast<GetElementPtrInst>(pUser);
+                    GetElementPtrInst* getElemPtr = dyn_cast<GetElementPtrInst>(user);
 
-                    if (pGetElemPtr == nullptr)
+                    if (getElemPtr == nullptr)
                     {
                         // Skip all bitcasts, looking for a GEP.
-                        for (BitCastInst* pBitCast = dyn_cast<BitCastInst>(pUser);
-                             pBitCast != nullptr;
-                             pBitCast = dyn_cast<BitCastInst>(pBitCast->getOperand(0)))
+                        for (BitCastInst* bitCast = dyn_cast<BitCastInst>(user);
+                             bitCast != nullptr;
+                             bitCast = dyn_cast<BitCastInst>(bitCast->getOperand(0)))
                         {
-                            pGetElemPtr = dyn_cast<GetElementPtrInst>(pBitCast);
+                            getElemPtr = dyn_cast<GetElementPtrInst>(bitCast);
                         }
 
                         // If even after we've stripped away all the bitcasts we did not find a GEP, we need to modify
                         // the bitcast instead.
-                        if (pGetElemPtr == nullptr)
+                        if (getElemPtr == nullptr)
                         {
-                            BitCastInst* const pBitCast = dyn_cast<BitCastInst>(pUser);
-                            assert(pBitCast != nullptr);
+                            BitCastInst* const bitCast = dyn_cast<BitCastInst>(user);
+                            assert(bitCast != nullptr);
 
-                            bitCastsToModify.push_back(pBitCast);
+                            bitCastsToModify.push_back(bitCast);
                             continue;
                         }
                     }
 
                     // Skip instructions in other functions.
-                    if (pGetElemPtr->getFunction() != pFunc)
+                    if (getElemPtr->getFunction() != func)
                     {
                         continue;
                     }
 
-                    getElemPtrsToReplace.push_back(pGetElemPtr);
+                    getElemPtrsToReplace.push_back(getElemPtr);
                 }
 
                 // All bitcasts recorded here are for GEPs that indexed by 0, 0 into the arrayed resource, and LLVM
                 // has been clever enough to realise that doing a GEP of 0, 0 is actually a no-op (because the pointer
                 // does not change!), and has removed it.
-                for (BitCastInst* const pBitCast : bitCastsToModify)
+                for (BitCastInst* const bitCast : bitCastsToModify)
                 {
-                    m_pBuilder->SetInsertPoint(pBitCast);
+                    m_builder->SetInsertPoint(bitCast);
 
-                    Value* const pBufferDesc = m_pBuilder->CreateLoadBufferDesc(descSet,
+                    Value* const bufferDesc = m_builder->CreateLoadBufferDesc(descSet,
                                                                                 binding,
-                                                                                m_pBuilder->getInt32(0),
+                                                                                m_builder->getInt32(0),
                                                                                 /*isNonUniform=*/false,
                                                                                 global.isConstant() == false,
-                                                                                m_pBuilder->getInt8Ty());
+                                                                                m_builder->getInt8Ty());
 
                     // If the global variable is a constant, the data it points to is invariant.
                     if (global.isConstant())
                     {
-                        m_pBuilder->CreateInvariantStart(pBufferDesc);
+                        m_builder->CreateInvariantStart(bufferDesc);
                     }
 
-                    pBitCast->replaceUsesOfWith(&global, m_pBuilder->CreateBitCast(pBufferDesc, pBlockType));
+                    bitCast->replaceUsesOfWith(&global, m_builder->CreateBitCast(bufferDesc, blockType));
                 }
 
-                for (GetElementPtrInst* const pGetElemPtr : getElemPtrsToReplace)
+                for (GetElementPtrInst* const getElemPtr : getElemPtrsToReplace)
                 {
                     // The second index is the block offset, so we need at least two indices!
-                    assert(pGetElemPtr->getNumIndices() >= 2);
+                    assert(getElemPtr->getNumIndices() >= 2);
 
-                    m_pBuilder->SetInsertPoint(pGetElemPtr);
+                    m_builder->SetInsertPoint(getElemPtr);
 
                     SmallVector<Value*, 8> indices;
 
-                    for (Value* const pIndex : pGetElemPtr->indices())
+                    for (Value* const index : getElemPtr->indices())
                     {
-                        indices.push_back(pIndex);
+                        indices.push_back(index);
                     }
 
                     // The first index should always be zero.
                     assert(isa<ConstantInt>(indices[0]) && (cast<ConstantInt>(indices[0])->getZExtValue() == 0));
 
                     // The second index is the block index.
-                    Value* const pBlockIndex = indices[1];
+                    Value* const blockIndex = indices[1];
 
                     bool isNonUniform = false;
 
                     // Run the users of the block index to check for any nonuniform calls.
-                    for (User* const pUser : pBlockIndex->users())
+                    for (User* const user : blockIndex->users())
                     {
-                        CallInst* const pCall = dyn_cast<CallInst>(pUser);
+                        CallInst* const call = dyn_cast<CallInst>(user);
 
                         // If the user is not a call, bail.
-                        if (pCall == nullptr)
+                        if (call == nullptr)
                         {
                             continue;
                         }
 
                         // If the call is our non uniform decoration, record we are non uniform.
-                        if (pCall->getCalledFunction()->getName().startswith(gSPIRVName::NonUniform))
+                        if (call->getCalledFunction()->getName().startswith(gSPIRVName::NonUniform))
                         {
                             isNonUniform = true;
                             break;
                         }
                     }
 
-                    Value* const pBufferDesc = m_pBuilder->CreateLoadBufferDesc(descSet,
+                    Value* const bufferDesc = m_builder->CreateLoadBufferDesc(descSet,
                                                                                 binding,
-                                                                                pBlockIndex,
+                                                                                blockIndex,
                                                                                 isNonUniform,
                                                                                 global.isConstant() == false,
-                                                                                m_pBuilder->getInt8Ty());
+                                                                                m_builder->getInt8Ty());
 
                     // If the global variable is a constant, the data it points to is invariant.
                     if (global.isConstant())
                     {
-                        m_pBuilder->CreateInvariantStart(pBufferDesc);
+                        m_builder->CreateInvariantStart(bufferDesc);
                     }
 
-                    Value* const pBitCast = m_pBuilder->CreateBitCast(pBufferDesc, pBlockType);
+                    Value* const bitCast = m_builder->CreateBitCast(bufferDesc, blockType);
 
                     // We need to remove the block index from the original GEP indices so that we can use them.
                     indices[1] = indices[0];
@@ -2201,64 +2201,64 @@ void SpirvLowerGlobal::LowerBufferBlock()
                     ArrayRef<Value*> newIndices(indices);
                     newIndices = newIndices.drop_front(1);
 
-                    Value* pNewGetElemPtr = nullptr;
+                    Value* newGetElemPtr = nullptr;
 
-                    if (pGetElemPtr->isInBounds())
+                    if (getElemPtr->isInBounds())
                     {
-                        pNewGetElemPtr = m_pBuilder->CreateInBoundsGEP(pBitCast, newIndices);
+                        newGetElemPtr = m_builder->CreateInBoundsGEP(bitCast, newIndices);
                     }
                     else
                     {
-                        pNewGetElemPtr = m_pBuilder->CreateGEP(pBitCast, newIndices);
+                        newGetElemPtr = m_builder->CreateGEP(bitCast, newIndices);
                     }
 
-                    pGetElemPtr->replaceAllUsesWith(pNewGetElemPtr);
-                    pGetElemPtr->eraseFromParent();
+                    getElemPtr->replaceAllUsesWith(newGetElemPtr);
+                    getElemPtr->eraseFromParent();
                 }
             }
             else
             {
-                m_pBuilder->SetInsertPoint(&pFunc->getEntryBlock(), pFunc->getEntryBlock().getFirstInsertionPt());
+                m_builder->SetInsertPoint(&func->getEntryBlock(), func->getEntryBlock().getFirstInsertionPt());
 
-                Value* const pBufferDesc = m_pBuilder->CreateLoadBufferDesc(descSet,
+                Value* const bufferDesc = m_builder->CreateLoadBufferDesc(descSet,
                                                                             binding,
-                                                                            m_pBuilder->getInt32(0),
+                                                                            m_builder->getInt32(0),
                                                                             /*isNonUniform=*/false,
                                                                             global.isConstant() == false,
-                                                                            m_pBuilder->getInt8Ty());
+                                                                            m_builder->getInt8Ty());
 
                 // If the global variable is a constant, the data it points to is invariant.
                 if (global.isConstant())
                 {
-                    m_pBuilder->CreateInvariantStart(pBufferDesc);
+                    m_builder->CreateInvariantStart(bufferDesc);
                 }
 
-                Value* const pBitCast = m_pBuilder->CreateBitCast(pBufferDesc, global.getType());
+                Value* const bitCast = m_builder->CreateBitCast(bufferDesc, global.getType());
 
                 SmallVector<Instruction*, 8> usesToReplace;
 
-                for (User* const pUser : global.users())
+                for (User* const user : global.users())
                 {
                     // Skip over non-instructions that we've already made useless.
-                    if (isa<Instruction>(pUser) == false)
+                    if (isa<Instruction>(user) == false)
                     {
                         continue;
                     }
 
-                    Instruction* const pInst = cast<Instruction>(pUser);
+                    Instruction* const inst = cast<Instruction>(user);
 
                     // Skip instructions in other functions.
-                    if (pInst->getFunction() != pFunc)
+                    if (inst->getFunction() != func)
                     {
                         continue;
                     }
 
-                    usesToReplace.push_back(pInst);
+                    usesToReplace.push_back(inst);
                 }
 
-                for (Instruction* const pUse : usesToReplace)
+                for (Instruction* const use : usesToReplace)
                 {
-                    pUse->replaceUsesOfWith(&global, pBitCast);
+                    use->replaceUsesOfWith(&global, bitCast);
                 }
             }
         }
@@ -2266,20 +2266,20 @@ void SpirvLowerGlobal::LowerBufferBlock()
         globalsToRemove.push_back(&global);
     }
 
-    for (GlobalVariable* const pGlobal : globalsToRemove)
+    for (GlobalVariable* const global : globalsToRemove)
     {
-        pGlobal->dropAllReferences();
-        pGlobal->eraseFromParent();
+        global->dropAllReferences();
+        global->eraseFromParent();
     }
 }
 
 // =====================================================================================================================
 // Lowers push constants.
-void SpirvLowerGlobal::LowerPushConsts()
+void SpirvLowerGlobal::lowerPushConsts()
 {
     SmallVector<GlobalVariable*, 1> globalsToRemove;
 
-    for (GlobalVariable& global : m_pModule->globals())
+    for (GlobalVariable& global : m_module->globals())
     {
         // Skip anything that is not a push constant.
         if ((global.getAddressSpace() != SPIRAS_Constant) || (global.hasMetadata(gSPIRVMD::PushConst) == false))
@@ -2292,163 +2292,163 @@ void SpirvLowerGlobal::LowerPushConsts()
 
         SmallVector<Constant*, 8> constantUsers;
 
-        for (User* const pUser : global.users())
+        for (User* const user : global.users())
         {
-            if (Constant* const pConstVal = dyn_cast<Constant>(pUser))
+            if (Constant* const constVal = dyn_cast<Constant>(user))
             {
-                constantUsers.push_back(pConstVal);
+                constantUsers.push_back(constVal);
             }
         }
 
-        for (Constant* const pConstVal : constantUsers)
+        for (Constant* const constVal : constantUsers)
         {
-            ReplaceConstWithInsts(m_pContext, pConstVal);
+            replaceConstWithInsts(m_context, constVal);
         }
 
         // Record of all the functions that our global is used within.
         SmallSet<Function*, 4> funcsUsedIn;
 
-        for (User* const pUser : global.users())
+        for (User* const user : global.users())
         {
-            if (Instruction* const pInst = dyn_cast<Instruction>(pUser))
+            if (Instruction* const inst = dyn_cast<Instruction>(user))
             {
-                funcsUsedIn.insert(pInst->getFunction());
+                funcsUsedIn.insert(inst->getFunction());
             }
         }
 
-        for (Function* const pFunc : funcsUsedIn)
+        for (Function* const func : funcsUsedIn)
         {
-            m_pBuilder->SetInsertPoint(&pFunc->getEntryBlock(), pFunc->getEntryBlock().getFirstInsertionPt());
+            m_builder->SetInsertPoint(&func->getEntryBlock(), func->getEntryBlock().getFirstInsertionPt());
 
-            MDNode* pMetaNode = global.getMetadata(gSPIRVMD::PushConst);
-            auto pushConstSize = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
-            Type* const pPushConstantsType = ArrayType::get(m_pBuilder->getInt8Ty(), pushConstSize);
-            Value* pPushConstants = m_pBuilder->CreateLoadPushConstantsPtr(pPushConstantsType);
+            MDNode* metaNode = global.getMetadata(gSPIRVMD::PushConst);
+            auto pushConstSize = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
+            Type* const pushConstantsType = ArrayType::get(m_builder->getInt8Ty(), pushConstSize);
+            Value* pushConstants = m_builder->CreateLoadPushConstantsPtr(pushConstantsType);
 
-            auto addrSpace = pPushConstants->getType()->getPointerAddressSpace();
-            Type* const pCastType = global.getType()->getPointerElementType()->getPointerTo(addrSpace);
-            pPushConstants = m_pBuilder->CreateBitCast(pPushConstants, pCastType);
+            auto addrSpace = pushConstants->getType()->getPointerAddressSpace();
+            Type* const castType = global.getType()->getPointerElementType()->getPointerTo(addrSpace);
+            pushConstants = m_builder->CreateBitCast(pushConstants, castType);
 
             SmallVector<Instruction*, 8> usesToReplace;
 
-            for (User* const pUser : global.users())
+            for (User* const user : global.users())
             {
                 // Skip over non-instructions that we've already made useless.
-                if (isa<Instruction>(pUser) == false)
+                if (isa<Instruction>(user) == false)
                 {
                     continue;
                 }
 
-                Instruction* const pInst = cast<Instruction>(pUser);
+                Instruction* const inst = cast<Instruction>(user);
 
                 // Skip instructions in other functions.
-                if (pInst->getFunction() != pFunc)
+                if (inst->getFunction() != func)
                 {
                     continue;
                 }
 
-                usesToReplace.push_back(pInst);
+                usesToReplace.push_back(inst);
             }
 
-            for (Instruction* const pInst : usesToReplace)
+            for (Instruction* const inst : usesToReplace)
             {
-                pInst->replaceUsesOfWith(&global, pPushConstants);
+                inst->replaceUsesOfWith(&global, pushConstants);
             }
         }
 
         globalsToRemove.push_back(&global);
     }
 
-    for (GlobalVariable* const pGlobal : globalsToRemove)
+    for (GlobalVariable* const global : globalsToRemove)
     {
-        pGlobal->dropAllReferences();
-        pGlobal->eraseFromParent();
+        global->dropAllReferences();
+        global->eraseFromParent();
     }
 }
 
 // =====================================================================================================================
 // Removes the created return block if it has a single predecessor. This is to avoid
 // scheduling future heavy-weight cleanup passes if we can trivially simplify the CFG here.
-void SpirvLowerGlobal::CleanupReturnBlock()
+void SpirvLowerGlobal::cleanupReturnBlock()
 {
-    if (m_pRetBlock == nullptr)
+    if (m_retBlock == nullptr)
     {
         return;
     }
 
-    if (MergeBlockIntoPredecessor(m_pRetBlock))
+    if (MergeBlockIntoPredecessor(m_retBlock))
     {
-        m_pRetBlock = nullptr;
+        m_retBlock = nullptr;
     }
 }
 
 // =====================================================================================================================
 // Interpolates an element of the input.
-void SpirvLowerGlobal::InterpolateInputElement(
+void SpirvLowerGlobal::interpolateInputElement(
     unsigned        interpLoc,          // [in] Interpolation location, valid for fragment shader
                                         // (use "InterpLocUnknown" as don't-care value)
-    Value*          pAuxInterpValue,    // [in] Auxiliary value of interpolation (valid for fragment shader):
+    Value*          auxInterpValue,    // [in] Auxiliary value of interpolation (valid for fragment shader):
                                         //   - Sample ID for "InterpLocSample"
                                         //   - Offset from the center of the pixel for "InterpLocCenter"
                                         //   - Vertex no. (0 ~ 2) for "InterpLocCustom"
     CallInst&       callInst)           // [in] "Call" instruction
 {
-    GetElementPtrInst* pGetElemPtr = cast<GetElementPtrInst>(callInst.getArgOperand(0));
+    GetElementPtrInst* getElemPtr = cast<GetElementPtrInst>(callInst.getArgOperand(0));
 
     std::vector<Value*> indexOperands;
-    for (unsigned i = 0, indexOperandCount = pGetElemPtr->getNumIndices(); i < indexOperandCount; ++i)
+    for (unsigned i = 0, indexOperandCount = getElemPtr->getNumIndices(); i < indexOperandCount; ++i)
     {
-        indexOperands.push_back(ToInt32Value(pGetElemPtr->getOperand(1 + i), &callInst));
+        indexOperands.push_back(toInt32Value(getElemPtr->getOperand(1 + i), &callInst));
     }
     unsigned operandIdx = 0;
 
-    auto pInput = cast<GlobalVariable>(pGetElemPtr->getPointerOperand());
-    auto pInputTy = pInput->getType()->getContainedType(0);
+    auto input = cast<GlobalVariable>(getElemPtr->getPointerOperand());
+    auto inputTy = input->getType()->getContainedType(0);
 
-    MDNode* pMetaNode = pInput->getMetadata(gSPIRVMD::InOut);
-    assert(pMetaNode != nullptr);
-    auto pInputMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+    MDNode* metaNode = input->getMetadata(gSPIRVMD::InOut);
+    assert(metaNode != nullptr);
+    auto inputMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
-    if (pGetElemPtr->hasAllConstantIndices())
+    if (getElemPtr->hasAllConstantIndices())
     {
-        auto pLoadValue = LoadInOutMember(pInputTy,
+        auto loadValue = loadInOutMember(inputTy,
                                           SPIRAS_Input,
                                           indexOperands,
                                           operandIdx,
                                           0,
-                                          pInputMeta,
+                                          inputMeta,
                                           nullptr,
                                           nullptr,
                                           interpLoc,
-                                          pAuxInterpValue,
+                                          auxInterpValue,
                                           &callInst);
 
         m_interpCalls.insert(&callInst);
-        callInst.replaceAllUsesWith(pLoadValue);
+        callInst.replaceAllUsesWith(loadValue);
     }
     else  // Interpolant an element via dynamic index by extending interpolant to each element
     {
-        auto pInterpValueTy = pInputTy;
-        auto pInterpPtr = new AllocaInst(pInterpValueTy,
-                                         m_pModule->getDataLayout().getAllocaAddrSpace(),
+        auto interpValueTy = inputTy;
+        auto interpPtr = new AllocaInst(interpValueTy,
+                                         m_module->getDataLayout().getAllocaAddrSpace(),
                                          "",
-                                         &*(m_pEntryPoint->begin()->getFirstInsertionPt()));
+                                         &*(m_entryPoint->begin()->getFirstInsertionPt()));
 
         std::vector<unsigned> arraySizes;
         std::vector<unsigned> indexOperandIdxs;
         unsigned flattenElemCount = 1;
-        auto pElemTy = pInputTy;
+        auto elemTy = inputTy;
         for (unsigned i = 1, indexOperandCount = indexOperands.size(); i < indexOperandCount; ++i)
         {
             if (isa<ConstantInt>(indexOperands[i]))
             {
                 unsigned index = (cast<ConstantInt>(indexOperands[i]))->getZExtValue();
-                pElemTy = pElemTy->getContainedType(index);
+                elemTy = elemTy->getContainedType(index);
             }
             else
             {
-                arraySizes.push_back(cast<ArrayType>(pElemTy)->getNumElements());
-                pElemTy = pElemTy->getArrayElementType();
+                arraySizes.push_back(cast<ArrayType>(elemTy)->getNumElements());
+                elemTy = elemTy->getArrayElementType();
                 flattenElemCount *= arraySizes.back();
                 indexOperandIdxs.push_back(i);
             }
@@ -2463,7 +2463,7 @@ void SpirvLowerGlobal::InterpolateInputElement(
         }
 
         std::vector<Value*> newIndexOperands = indexOperands;
-        Value* pInterpValue = UndefValue::get(pInterpValueTy);
+        Value* interpValue = UndefValue::get(interpValueTy);
 
         for (unsigned elemIdx = 0; elemIdx < flattenElemCount; ++elemIdx)
         {
@@ -2472,21 +2472,21 @@ void SpirvLowerGlobal::InterpolateInputElement(
             {
                 unsigned index = flattenElemIdx / elemStrides[arraySizeIdx];
                 flattenElemIdx = flattenElemIdx - index * elemStrides[arraySizeIdx];
-                newIndexOperands[indexOperandIdxs[arraySizeIdx]] = ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                newIndexOperands[indexOperandIdxs[arraySizeIdx]] = ConstantInt::get(Type::getInt32Ty(*m_context),
                                                                                     index,
                                                                                     true);
             }
 
-            auto pLoadValue = LoadInOutMember(pInputTy,
+            auto loadValue = loadInOutMember(inputTy,
                                               SPIRAS_Input,
                                               newIndexOperands,
                                               operandIdx,
                                               0,
-                                              pInputMeta,
+                                              inputMeta,
                                               nullptr,
                                               nullptr,
                                               interpLoc,
-                                              pAuxInterpValue,
+                                              auxInterpValue,
                                               &callInst);
 
             std::vector<unsigned> idxs;
@@ -2494,14 +2494,14 @@ void SpirvLowerGlobal::InterpolateInputElement(
             {
                 idxs.push_back((cast<ConstantInt>(*indexIt))->getZExtValue());
             }
-            pInterpValue = InsertValueInst::Create(pInterpValue, pLoadValue, idxs, "", &callInst);
+            interpValue = InsertValueInst::Create(interpValue, loadValue, idxs, "", &callInst);
         }
-        new StoreInst(pInterpValue, pInterpPtr, &callInst);
+        new StoreInst(interpValue, interpPtr, &callInst);
 
-        auto pInterpElemPtr = GetElementPtrInst::Create(nullptr, pInterpPtr, indexOperands, "", &callInst);
+        auto interpElemPtr = GetElementPtrInst::Create(nullptr, interpPtr, indexOperands, "", &callInst);
 
-        auto pInterpElemValue = new LoadInst(pInterpElemPtr, "", &callInst);
-        callInst.replaceAllUsesWith(pInterpElemValue);
+        auto interpElemValue = new LoadInst(interpElemPtr, "", &callInst);
+        callInst.replaceAllUsesWith(interpElemValue);
 
         if (callInst.user_empty())
         {
@@ -2513,26 +2513,26 @@ void SpirvLowerGlobal::InterpolateInputElement(
 
 // =====================================================================================================================
 // Translates an integer to 32-bit integer regardless of its initial bit width.
-Value* SpirvLowerGlobal::ToInt32Value(
-    Value*       pValue,     // [in] Value to be translated
-    Instruction* pInsertPos) // [in] Where to insert the translation instructions
+Value* SpirvLowerGlobal::toInt32Value(
+    Value*       value,     // [in] Value to be translated
+    Instruction* insertPos) // [in] Where to insert the translation instructions
 {
-    assert(isa<IntegerType>(pValue->getType()));
-    auto pValueTy = cast<IntegerType>(pValue->getType());
+    assert(isa<IntegerType>(value->getType()));
+    auto valueTy = cast<IntegerType>(value->getType());
 
-    const unsigned bitWidth = pValueTy->getBitWidth();
+    const unsigned bitWidth = valueTy->getBitWidth();
     if (bitWidth > 32)
     {
         // Truncated to i32 type
-        pValue = CastInst::CreateTruncOrBitCast(pValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+        value = CastInst::CreateTruncOrBitCast(value, Type::getInt32Ty(*m_context), "", insertPos);
     }
     else if (bitWidth < 32)
     {
         // Extended to i32 type
-        pValue = CastInst::CreateZExtOrBitCast(pValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+        value = CastInst::CreateZExtOrBitCast(value, Type::getInt32Ty(*m_context), "", insertPos);
     }
 
-    return pValue;
+    return value;
 }
 
 } // Llpc

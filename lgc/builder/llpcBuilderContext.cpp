@@ -55,7 +55,7 @@ static codegen::RegisterCodeGenFlags CGF;
 static bool Initialized;
 #endif
 
-raw_ostream* BuilderContext::m_pLlpcOuts;
+raw_ostream* BuilderContext::m_llpcOuts;
 
 // -emit-llvm: emit LLVM assembly instead of ISA
 static cl::opt<bool> EmitLlvm("emit-llvm",
@@ -72,7 +72,7 @@ static cl::opt<bool> EmitLlvmBc("emit-llvm-bc",
 // allowed to call it again after that. It must also be called before LLVM command-line processing, so
 // that you can use a pass name in an option such as -print-after. If multiple concurrent compiles are
 // possible, this should be called in a thread-safe way.
-void BuilderContext::Initialize()
+void BuilderContext::initialize()
 {
 #ifndef NDEBUG
     Initialized = true;
@@ -102,9 +102,9 @@ void BuilderContext::Initialize()
     initializeRewriteSymbolsLegacyPassPass(passRegistry);
 
     // Initialize LGC passes so they can be referenced by -stop-before etc.
-    InitializeUtilPasses(passRegistry);
+    initializeUtilPasses(passRegistry);
     initializeBuilderReplayerPass(passRegistry);
-    InitializePatchPasses(passRegistry);
+    initializePatchPasses(passRegistry);
 }
 
 // =====================================================================================================================
@@ -116,7 +116,7 @@ BuilderContext* BuilderContext::Create(
 {
     assert(Initialized && "Must call BuilderContext::Initialize before BuilderContext::Create");
 
-    BuilderContext* pBuilderContext = new BuilderContext(context, palAbiVersion);
+    BuilderContext* builderContext = new BuilderContext(context, palAbiVersion);
 
     std::string mcpuName = codegen::getMCPU(); // -mcpu setting from llvm/CodeGen/CommandFlags.h
     if (gpuName == "")
@@ -124,10 +124,10 @@ BuilderContext* BuilderContext::Create(
         gpuName = mcpuName;
     }
 
-    pBuilderContext->m_pTargetInfo = new TargetInfo;
-    if (pBuilderContext->m_pTargetInfo->SetTargetInfo(gpuName) == false)
+    builderContext->m_targetInfo = new TargetInfo;
+    if (builderContext->m_targetInfo->setTargetInfo(gpuName) == false)
     {
-        delete pBuilderContext;
+        delete builderContext;
         return nullptr;
     }
 
@@ -135,18 +135,18 @@ BuilderContext* BuilderContext::Create(
     // that we support the requested target.
     const std::string triple = "amdgcn--amdpal";
     std::string errMsg;
-    const Target* pTarget = TargetRegistry::lookupTarget(triple, errMsg);
+    const Target* target = TargetRegistry::lookupTarget(triple, errMsg);
     // Allow no signed zeros - this enables omod modifiers (div:2, mul:2)
     TargetOptions targetOpts;
     targetOpts.NoSignedZerosFPMath = true;
 
-    pBuilderContext->m_pTargetMachine = pTarget->createTargetMachine(triple,
+    builderContext->m_targetMachine = target->createTargetMachine(triple,
                                                                      gpuName,
                                                                      "",
                                                                      targetOpts,
                                                                      Optional<Reloc::Model>());
-    assert(pBuilderContext->m_pTargetMachine);
-    return pBuilderContext;
+    assert(builderContext->m_targetMachine);
+    return builderContext;
 }
 
 // =====================================================================================================================
@@ -161,15 +161,15 @@ BuilderContext::BuilderContext(
 // =====================================================================================================================
 BuilderContext::~BuilderContext()
 {
-    delete m_pTargetMachine;
-    delete m_pTargetInfo;
+    delete m_targetMachine;
+    delete m_targetInfo;
 }
 
 // =====================================================================================================================
 // Create a Pipeline object for a pipeline compile.
 // This actually creates a PipelineState, but returns the Pipeline superclass that is visible to
 // the front-end.
-Pipeline* BuilderContext::CreatePipeline()
+Pipeline* BuilderContext::createPipeline()
 {
     return new PipelineState(this);
 }
@@ -177,24 +177,24 @@ Pipeline* BuilderContext::CreatePipeline()
 // =====================================================================================================================
 // Create a Builder object. For a shader compile (pPipeline is nullptr), useBuilderRecorder is ignored
 // because it always uses BuilderRecorder.
-Builder* BuilderContext::CreateBuilder(
-    Pipeline*   pPipeline,          // [in] Pipeline object for pipeline compile, nullptr for shader compile
+Builder* BuilderContext::createBuilder(
+    Pipeline*   pipeline,          // [in] Pipeline object for pipeline compile, nullptr for shader compile
     bool        useBuilderRecorder) // true to use BuilderRecorder, false to use BuilderImpl
 {
-    if ((pPipeline == nullptr) || useBuilderRecorder)
+    if ((pipeline == nullptr) || useBuilderRecorder)
     {
-        return new BuilderRecorder(this, pPipeline);
+        return new BuilderRecorder(this, pipeline);
     }
-    return new BuilderImpl(this, pPipeline);
+    return new BuilderImpl(this, pipeline);
 }
 
 // =====================================================================================================================
 // Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not think that
 // we have library functions.
-void BuilderContext::PreparePassManager(
-    legacy::PassManager*  pPassMgr)   // [in/out] Pass manager
+void BuilderContext::preparePassManager(
+    legacy::PassManager*  passMgr)   // [in/out] Pass manager
 {
-    TargetLibraryInfoImpl targetLibInfo(GetTargetMachine()->getTargetTriple());
+    TargetLibraryInfoImpl targetLibInfo(getTargetMachine()->getTargetTriple());
 
     // Adjust it to allow memcpy and memset.
     // TODO: Investigate why the latter is necessary. I found that
@@ -210,27 +210,27 @@ void BuilderContext::PreparePassManager(
     targetLibInfo.setUnavailable(LibFunc_tanf);
     targetLibInfo.setUnavailable(LibFunc_tanl);
 
-    auto pTargetLibInfoPass = new TargetLibraryInfoWrapperPass(targetLibInfo);
-    pPassMgr->add(pTargetLibInfoPass);
+    auto targetLibInfoPass = new TargetLibraryInfoWrapperPass(targetLibInfo);
+    passMgr->add(targetLibInfoPass);
 }
 
 // =====================================================================================================================
 // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
-void BuilderContext::AddTargetPasses(
+void BuilderContext::addTargetPasses(
     lgc::PassManager&     passMgr,        // [in/out] pass manager to add passes to
-    Timer*                pCodeGenTimer,  // [in] Timer to time target passes with, nullptr if not timing
+    Timer*                codeGenTimer,  // [in] Timer to time target passes with, nullptr if not timing
     raw_pwrite_stream&    outStream)      // [out] Output stream
 {
     // Start timer for codegen passes.
-    if (pCodeGenTimer != nullptr)
+    if (codeGenTimer != nullptr)
     {
-        passMgr.add(CreateStartStopTimer(pCodeGenTimer, true));
+        passMgr.add(createStartStopTimer(codeGenTimer, true));
     }
 
     // Dump the module just before codegen.
-    if (raw_ostream* pOuts = GetLgcOuts())
+    if (raw_ostream* outs = getLgcOuts())
     {
-        passMgr.add(createPrintModulePass(*pOuts,
+        passMgr.add(createPrintModulePass(*outs,
                     "===============================================================================\n"
                     "// LLPC final pipeline module info\n"));
     }
@@ -263,15 +263,15 @@ void BuilderContext::AddTargetPasses(
     // CLANG. So we avoid the warning by referencing it here.
     (void(&codegen::InitTargetOptionsFromCodeGenFlags)); // unused
 
-    if (GetTargetMachine()->addPassesToEmitFile(passMgr, outStream, nullptr, codegen::getFileType()))
+    if (getTargetMachine()->addPassesToEmitFile(passMgr, outStream, nullptr, codegen::getFileType()))
     {
         report_fatal_error("Target machine cannot emit a file of this type");
     }
 
     // Stop timer for codegen passes.
-    if (pCodeGenTimer != nullptr)
+    if (codeGenTimer != nullptr)
     {
-        passMgr.add(CreateStartStopTimer(pCodeGenTimer, false));
+        passMgr.add(createStartStopTimer(codeGenTimer, false));
     }
 }
 

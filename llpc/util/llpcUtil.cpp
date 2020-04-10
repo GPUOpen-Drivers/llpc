@@ -45,14 +45,14 @@ namespace Llpc
 
 // =====================================================================================================================
 // Gets the name string of shader stage.
-const char* GetShaderStageName(
+const char* getShaderStageName(
     ShaderStage shaderStage)  // Shader stage
 {
-    const char* pName = nullptr;
+    const char* name = nullptr;
 
     if (shaderStage == ShaderStageCopyShader)
     {
-        pName = "copy";
+        name = "copy";
     }
     else if (shaderStage < ShaderStageCount)
     {
@@ -66,19 +66,19 @@ const char* GetShaderStageName(
             "compute",
         };
 
-        pName = ShaderStageNames[static_cast<unsigned>(shaderStage)];
+        name = ShaderStageNames[static_cast<unsigned>(shaderStage)];
     }
     else
     {
-        pName = "bad";
+        name = "bad";
     }
 
-    return pName;
+    return name;
 }
 
 // =====================================================================================================================
 // Converts the SPIR-V execution model to the shader stage
-ShaderStage ConvertToStageShage(
+ShaderStage convertToStageShage(
     unsigned execModel)  // SPIR-V execution model
 {
     switch (execModel)
@@ -104,7 +104,7 @@ ShaderStage ConvertToStageShage(
 
 // =====================================================================================================================
 // Converts the shader stage to the SPIR-V execution model
-spv::ExecutionModel ConvertToExecModel(
+spv::ExecutionModel convertToExecModel(
     ShaderStage shaderStage)  // Shader stage
 {
     switch (shaderStage)
@@ -132,7 +132,7 @@ spv::ExecutionModel ConvertToExecModel(
 
 // =====================================================================================================================
 // Translates shader stage to corresponding stage mask.
-unsigned ShaderStageToMask(
+unsigned shaderStageToMask(
     ShaderStage stage)  // Shader stage
 {
     assert((stage < ShaderStageCount) || (stage == ShaderStageCopyShader));

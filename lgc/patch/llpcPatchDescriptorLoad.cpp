@@ -50,7 +50,7 @@ char PatchDescriptorLoad::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for descriptor load
-ModulePass* CreatePatchDescriptorLoad()
+ModulePass* createPatchDescriptorLoad()
 {
     return new PatchDescriptorLoad();
 }
@@ -69,39 +69,39 @@ bool PatchDescriptorLoad::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Descriptor-Load\n");
 
-    Patch::Init(&module);
+    Patch::init(&module);
     m_changed = false;
 
-    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
-    m_pipelineSysValues.Initialize(m_pPipelineState);
+    m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+    m_pipelineSysValues.initialize(m_pipelineState);
 
     // Invoke handling of "call" instruction
-    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    auto pipelineShaders = &getAnalysis<PipelineShaders>();
     for (unsigned shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
     {
-        m_pEntryPoint = pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
-        if (m_pEntryPoint != nullptr)
+        m_entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
+        if (m_entryPoint != nullptr)
         {
             m_shaderStage = static_cast<ShaderStage>(shaderStage);
-            visit(*m_pEntryPoint);
+            visit(*m_entryPoint);
         }
     }
 
     // Remove unnecessary descriptor load calls
-    for (auto pCallInst : m_descLoadCalls)
+    for (auto callInst : m_descLoadCalls)
     {
-        pCallInst->dropAllReferences();
-        pCallInst->eraseFromParent();
+        callInst->dropAllReferences();
+        callInst->eraseFromParent();
     }
     m_descLoadCalls.clear();
 
     // Remove unnecessary descriptor load functions
-    for (auto pFunc : m_descLoadFuncs)
+    for (auto func : m_descLoadFuncs)
     {
-        if (pFunc->user_empty())
+        if (func->user_empty())
         {
-            pFunc->dropAllReferences();
-            pFunc->eraseFromParent();
+            func->dropAllReferences();
+            func->eraseFromParent();
         }
     }
     m_descLoadFuncs.clear();
@@ -109,7 +109,7 @@ bool PatchDescriptorLoad::runOnModule(
     // Remove dead llpc.descriptor.point* and llpc.descriptor.index calls that were not
     // processed by the code above. That happens if they were never used in llpc.descriptor.load.from.ptr.
     SmallVector<Function*, 4> deadDescFuncs;
-    for (Function& func : *m_pModule)
+    for (Function& func : *m_module)
     {
         if (func.isDeclaration() && (func.getName().startswith(lgcName::DescriptorGetPtrPrefix) ||
                                      func.getName().startswith(lgcName::DescriptorIndex)))
@@ -117,33 +117,33 @@ bool PatchDescriptorLoad::runOnModule(
             deadDescFuncs.push_back(&func);
         }
     }
-    for (Function* pFunc : deadDescFuncs)
+    for (Function* func : deadDescFuncs)
     {
-        while (pFunc->use_empty() == false)
+        while (func->use_empty() == false)
         {
-            pFunc->use_begin()->set(UndefValue::get(pFunc->getType()));
+            func->use_begin()->set(UndefValue::get(func->getType()));
         }
-        pFunc->eraseFromParent();
+        func->eraseFromParent();
     }
 
-    m_pipelineSysValues.Clear();
+    m_pipelineSysValues.clear();
     return m_changed;
 }
 
 // =====================================================================================================================
 // Process llpc.descriptor.get.{resource|sampler|fmask}.ptr call.
 // This generates code to build a {ptr,stride} struct.
-void PatchDescriptorLoad::ProcessDescriptorGetPtr(
-    CallInst* pDescPtrCall,     // [in] Call to llpc.descriptor.get.*.ptr
+void PatchDescriptorLoad::processDescriptorGetPtr(
+    CallInst* descPtrCall,     // [in] Call to llpc.descriptor.get.*.ptr
     StringRef descPtrCallName)  // Name of that call
 {
-    m_pEntryPoint = pDescPtrCall->getFunction();
-    IRBuilder<> builder(*m_pContext);
-    builder.SetInsertPoint(pDescPtrCall);
+    m_entryPoint = descPtrCall->getFunction();
+    IRBuilder<> builder(*m_context);
+    builder.SetInsertPoint(descPtrCall);
 
     // Find the resource node for the descriptor set and binding.
-    unsigned descSet = cast<ConstantInt>(pDescPtrCall->getArgOperand(0))->getZExtValue();
-    unsigned binding = cast<ConstantInt>(pDescPtrCall->getArgOperand(1))->getZExtValue();
+    unsigned descSet = cast<ConstantInt>(descPtrCall->getArgOperand(0))->getZExtValue();
+    unsigned binding = cast<ConstantInt>(descPtrCall->getArgOperand(1))->getZExtValue();
     auto resType = ResourceNodeType::DescriptorResource;
     bool shadow = false;
     if (descPtrCallName.startswith(lgcName::DescriptorGetTexelBufferPtr))
@@ -156,62 +156,62 @@ void PatchDescriptorLoad::ProcessDescriptorGetPtr(
     }
     else if (descPtrCallName.startswith(lgcName::DescriptorGetFmaskPtr))
     {
-        shadow = m_pipelineSysValues.Get(m_pEntryPoint)->IsShadowDescTableEnabled();
+        shadow = m_pipelineSysValues.get(m_entryPoint)->isShadowDescTableEnabled();
         resType = ResourceNodeType::DescriptorFmask;
     }
 
     // Find the descriptor node. For fmask with -enable-shadow-descriptor-table, if no fmask descriptor
     // is found, look for a resource (image) one instead.
-    const ResourceNode* pTopNode = nullptr;
-    const ResourceNode* pNode = nullptr;
-    std::tie(pTopNode, pNode) = m_pPipelineState->FindResourceNode(resType, descSet, binding);
-    if ((pNode == nullptr) && (resType == ResourceNodeType::DescriptorFmask) && shadow)
+    const ResourceNode* topNode = nullptr;
+    const ResourceNode* node = nullptr;
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(resType, descSet, binding);
+    if ((node == nullptr) && (resType == ResourceNodeType::DescriptorFmask) && shadow)
     {
-        std::tie(pTopNode, pNode) = m_pPipelineState->FindResourceNode(ResourceNodeType::DescriptorResource,
+        std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorResource,
                                                                        descSet,
                                                                        binding);
     }
 
-    Value* pDescPtrAndStride = nullptr;
-    if (pNode == nullptr)
+    Value* descPtrAndStride = nullptr;
+    if (node == nullptr)
     {
         // We did not find the resource node. Use an undef value.
-        pDescPtrAndStride = UndefValue::get(pDescPtrCall->getType());
+        descPtrAndStride = UndefValue::get(descPtrCall->getType());
     }
     else
     {
         // Get the descriptor pointer and stride as a struct.
-        pDescPtrAndStride = GetDescPtrAndStride(resType, descSet, binding, pTopNode, pNode, shadow, builder);
+        descPtrAndStride = getDescPtrAndStride(resType, descSet, binding, topNode, node, shadow, builder);
     }
-    pDescPtrCall->replaceAllUsesWith(pDescPtrAndStride);
-    m_descLoadCalls.push_back(pDescPtrCall);
+    descPtrCall->replaceAllUsesWith(descPtrAndStride);
+    m_descLoadCalls.push_back(descPtrCall);
     m_changed = true;
 }
 
 // =====================================================================================================================
 // Get a struct containing the pointer and byte stride for a descriptor
-Value* PatchDescriptorLoad::GetDescPtrAndStride(
+Value* PatchDescriptorLoad::getDescPtrAndStride(
     ResourceNodeType        resType,    // Resource type
     unsigned                descSet,    // Descriptor set
     unsigned                binding,    // Binding
-    const ResourceNode*     pTopNode,   // Node in top-level descriptor table (TODO: nullptr for shader compilation)
-    const ResourceNode*     pNode,      // The descriptor node itself (TODO: nullptr for shader compilation)
+    const ResourceNode*     topNode,   // Node in top-level descriptor table (TODO: nullptr for shader compilation)
+    const ResourceNode*     node,      // The descriptor node itself (TODO: nullptr for shader compilation)
     bool                    shadow,     // Whether to load from shadow descriptor table
     IRBuilder<>&            builder)    // [in/out] IRBuilder
 {
     // Determine the stride if possible without looking at the resource node.
     unsigned byteSize = 0;
-    Value* pStride = nullptr;
+    Value* stride = nullptr;
     switch (resType)
     {
     case ResourceNodeType::DescriptorBuffer:
     case ResourceNodeType::DescriptorTexelBuffer:
         byteSize = DescriptorSizeBuffer;
-        if ((pNode != nullptr) && (pNode->type == ResourceNodeType::DescriptorBufferCompact))
+        if ((node != nullptr) && (node->type == ResourceNodeType::DescriptorBufferCompact))
         {
             byteSize = DescriptorSizeBufferCompact;
         }
-        pStride = builder.getInt32(byteSize / 4);
+        stride = builder.getInt32(byteSize / 4);
         break;
     case ResourceNodeType::DescriptorSampler:
         byteSize = DescriptorSizeSampler;
@@ -225,10 +225,10 @@ Value* PatchDescriptorLoad::GetDescPtrAndStride(
         break;
     }
 
-    if (pStride == nullptr)
+    if (stride == nullptr)
     {
         // Stride is not determinable just from the descriptor type requested by the Builder call.
-        if (pNode == nullptr)
+        if (node == nullptr)
         {
             // TODO: Shader compilation: Get byte stride using a reloc.
             llvm_unreachable("");
@@ -236,17 +236,17 @@ Value* PatchDescriptorLoad::GetDescPtrAndStride(
         else
         {
             // Pipeline compilation: Get the stride from the resource type in the node.
-            switch (pNode->type)
+            switch (node->type)
             {
             case ResourceNodeType::DescriptorSampler:
-                pStride = builder.getInt32(DescriptorSizeSampler / 4);
+                stride = builder.getInt32(DescriptorSizeSampler / 4);
                 break;
             case ResourceNodeType::DescriptorResource:
             case ResourceNodeType::DescriptorFmask:
-                pStride = builder.getInt32(DescriptorSizeResource / 4);
+                stride = builder.getInt32(DescriptorSizeResource / 4);
                 break;
             case ResourceNodeType::DescriptorCombinedTexture:
-                pStride = builder.getInt32((DescriptorSizeResource + DescriptorSizeSampler) / 4);
+                stride = builder.getInt32((DescriptorSizeResource + DescriptorSizeSampler) / 4);
                 break;
             default:
                 llvm_unreachable("Unexpected resource node type");
@@ -255,88 +255,88 @@ Value* PatchDescriptorLoad::GetDescPtrAndStride(
         }
     }
 
-    Value* pDescPtr = nullptr;
-    if ((pNode != nullptr) && (pNode->pImmutableValue != nullptr) && (resType == ResourceNodeType::DescriptorSampler))
+    Value* descPtr = nullptr;
+    if ((node != nullptr) && (node->immutableValue != nullptr) && (resType == ResourceNodeType::DescriptorSampler))
     {
         // This is an immutable sampler. Put the immutable value into a static variable and return a pointer
         // to that. For a simple non-variably-indexed immutable sampler not passed through a function call
         // or phi node, we rely on subsequent LLVM optimizations promoting the value back to a constant.
-        std::string globalName = (Twine("_immutable_sampler_") + Twine(pNode->set) +
-                                  " " + Twine(pNode->binding)).str();
-        pDescPtr = m_pModule->getGlobalVariable(globalName, /*AllowInternal=*/true);
-        if (pDescPtr == nullptr)
+        std::string globalName = (Twine("_immutable_sampler_") + Twine(node->set) +
+                                  " " + Twine(node->binding)).str();
+        descPtr = m_module->getGlobalVariable(globalName, /*AllowInternal=*/true);
+        if (descPtr == nullptr)
         {
-            pDescPtr = new GlobalVariable(*m_pModule,
-                                          pNode->pImmutableValue->getType(),
+            descPtr = new GlobalVariable(*m_module,
+                                          node->immutableValue->getType(),
                                           /*isConstant=*/true,
                                           GlobalValue::InternalLinkage,
-                                          pNode->pImmutableValue,
+                                          node->immutableValue,
                                           globalName,
                                           nullptr,
                                           GlobalValue::NotThreadLocal,
                                           ADDR_SPACE_CONST);
         }
-        pDescPtr = builder.CreateBitCast(pDescPtr, builder.getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
+        descPtr = builder.CreateBitCast(descPtr, builder.getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
 
         // We need to change the stride to 4 dwords. It would otherwise be incorrectly set to 12 dwords
         // for a sampler in a combined texture.
-        pStride = builder.getInt32(DescriptorSizeSampler / 4);
+        stride = builder.getInt32(DescriptorSizeSampler / 4);
     }
     else
     {
         // Get a pointer to the descriptor.
-        pDescPtr = GetDescPtr(resType, descSet, binding, pTopNode, pNode, shadow, builder);
+        descPtr = getDescPtr(resType, descSet, binding, topNode, node, shadow, builder);
     }
 
     // Cast the pointer to the right type and create and return the struct.
-    pDescPtr = builder.CreateBitCast(
-                            pDescPtr,
+    descPtr = builder.CreateBitCast(
+                            descPtr,
                             VectorType::get(builder.getInt32Ty(), byteSize / 4)->getPointerTo(ADDR_SPACE_CONST));
-    Value* pDescPtrStruct = builder.CreateInsertValue(UndefValue::get(StructType::get(*m_pContext,
-                                                                                      { pDescPtr->getType(),
+    Value* descPtrStruct = builder.CreateInsertValue(UndefValue::get(StructType::get(*m_context,
+                                                                                      { descPtr->getType(),
                                                                                         builder.getInt32Ty() })),
-                                                      pDescPtr,
+                                                      descPtr,
                                                       0);
-    pDescPtrStruct = builder.CreateInsertValue(pDescPtrStruct, pStride, 1);
-    return pDescPtrStruct;
+    descPtrStruct = builder.CreateInsertValue(descPtrStruct, stride, 1);
+    return descPtrStruct;
 }
 
 // =====================================================================================================================
 // Get a pointer to a descriptor, as a pointer to i32
-Value* PatchDescriptorLoad::GetDescPtr(
+Value* PatchDescriptorLoad::getDescPtr(
     ResourceNodeType        resType,    // Resource type
     unsigned                descSet,    // Descriptor set
     unsigned                binding,    // Binding
-    const ResourceNode*     pTopNode,   // Node in top-level descriptor table (TODO: nullptr for shader compilation)
-    const ResourceNode*     pNode,      // The descriptor node itself (TODO: nullptr for shader compilation)
+    const ResourceNode*     topNode,   // Node in top-level descriptor table (TODO: nullptr for shader compilation)
+    const ResourceNode*     node,      // The descriptor node itself (TODO: nullptr for shader compilation)
     bool                    shadow,     // Whether to load from shadow descriptor table
     IRBuilder<>&            builder)    // [in/out] IRBuilder
 {
-    Value* pDescPtr = nullptr;
+    Value* descPtr = nullptr;
     // Get the descriptor table pointer.
-    auto pSysValues = m_pipelineSysValues.Get(builder.GetInsertPoint()->getFunction());
-    if ((pNode != nullptr) && (pNode == pTopNode))
+    auto sysValues = m_pipelineSysValues.get(builder.GetInsertPoint()->getFunction());
+    if ((node != nullptr) && (node == topNode))
     {
         // The descriptor is in the top-level table. Contrary to what used to happen, we just load from
         // the spill table, so we can get a pointer to the descriptor. It gets returned as a pointer
         // to array of i8.
-        pDescPtr = pSysValues->GetSpillTablePtr();
+        descPtr = sysValues->getSpillTablePtr();
     }
     else if (shadow)
     {
         // Get pointer to descriptor set's descriptor table as pointer to i8.
-        pDescPtr = pSysValues->GetShadowDescTablePtr(descSet);
+        descPtr = sysValues->getShadowDescTablePtr(descSet);
     }
     else
     {
         // Get pointer to descriptor set's descriptor table. This also gets returned as a pointer to
         // array of i8.
-        pDescPtr = pSysValues->GetDescTablePtr(descSet);
+        descPtr = sysValues->getDescTablePtr(descSet);
     }
 
     // Add on the byte offset of the descriptor.
-    Value* pOffset = nullptr;
-    if (pNode == nullptr)
+    Value* offset = nullptr;
+    if (node == nullptr)
     {
         // TODO: Shader compilation: Get the offset for the descriptor using a reloc. The reloc symbol name
         // needs to contain the descriptor set and binding, and, for image, fmask or sampler, whether it is
@@ -347,66 +347,66 @@ Value* PatchDescriptorLoad::GetDescPtr(
     {
         // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
         // add on the size of the first part.
-        unsigned offsetInDwords = pNode->offsetInDwords;
+        unsigned offsetInDwords = node->offsetInDwords;
         if ((resType == ResourceNodeType::DescriptorSampler) &&
-            (pNode->type == ResourceNodeType::DescriptorCombinedTexture))
+            (node->type == ResourceNodeType::DescriptorCombinedTexture))
         {
             offsetInDwords += DescriptorSizeResource / 4;
         }
-        pOffset = builder.getInt32(offsetInDwords);
+        offset = builder.getInt32(offsetInDwords);
     }
-    pDescPtr = builder.CreateBitCast(pDescPtr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
-    pDescPtr = builder.CreateGEP(builder.getInt32Ty(), pDescPtr, pOffset);
+    descPtr = builder.CreateBitCast(descPtr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
+    descPtr = builder.CreateGEP(builder.getInt32Ty(), descPtr, offset);
 
-    return pDescPtr;
+    return descPtr;
 }
 
 // =====================================================================================================================
 // Process an llvm.descriptor.index : add an array index on to the descriptor pointer.
 // llvm.descriptor.index has two operands: the "descriptor pointer" (actually a struct containing the actual
 // pointer and an int giving the byte stride), and the index to add. It returns the updated "descriptor pointer".
-void PatchDescriptorLoad::ProcessDescriptorIndex(
-    CallInst* pCall)    // [in] llvm.descriptor.index call
+void PatchDescriptorLoad::processDescriptorIndex(
+    CallInst* call)    // [in] llvm.descriptor.index call
 {
-    IRBuilder<> builder(*m_pContext);
-    builder.SetInsertPoint(pCall);
+    IRBuilder<> builder(*m_context);
+    builder.SetInsertPoint(call);
 
-    Value* pDescPtrStruct = pCall->getArgOperand(0);
-    Value* pIndex = pCall->getArgOperand(1);
-    Value* pStride = builder.CreateExtractValue(pDescPtrStruct, 1);
-    Value* pDescPtr = builder.CreateExtractValue(pDescPtrStruct, 0);
+    Value* descPtrStruct = call->getArgOperand(0);
+    Value* index = call->getArgOperand(1);
+    Value* stride = builder.CreateExtractValue(descPtrStruct, 1);
+    Value* descPtr = builder.CreateExtractValue(descPtrStruct, 0);
 
-    Value* pBytePtr = builder.CreateBitCast(pDescPtr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
-    pIndex = builder.CreateMul(pIndex, pStride);
-    pBytePtr = builder.CreateGEP(builder.getInt32Ty(), pBytePtr, pIndex);
-    pDescPtr = builder.CreateBitCast(pBytePtr, pDescPtr->getType());
+    Value* bytePtr = builder.CreateBitCast(descPtr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
+    index = builder.CreateMul(index, stride);
+    bytePtr = builder.CreateGEP(builder.getInt32Ty(), bytePtr, index);
+    descPtr = builder.CreateBitCast(bytePtr, descPtr->getType());
 
-    pDescPtrStruct = builder.CreateInsertValue(UndefValue::get(StructType::get(*m_pContext,
-                                                                               { pDescPtr->getType(),
+    descPtrStruct = builder.CreateInsertValue(UndefValue::get(StructType::get(*m_context,
+                                                                               { descPtr->getType(),
                                                                                  builder.getInt32Ty() })),
-                                                      pDescPtr,
+                                                      descPtr,
                                                       0);
-    pDescPtrStruct = builder.CreateInsertValue(pDescPtrStruct, pStride, 1);
+    descPtrStruct = builder.CreateInsertValue(descPtrStruct, stride, 1);
 
-    pCall->replaceAllUsesWith(pDescPtrStruct);
-    m_descLoadCalls.push_back(pCall);
+    call->replaceAllUsesWith(descPtrStruct);
+    m_descLoadCalls.push_back(call);
     m_changed = true;
 }
 
 // =====================================================================================================================
 // Process "llpc.descriptor.load.from.ptr" call.
-void PatchDescriptorLoad::ProcessLoadDescFromPtr(
-    CallInst* pLoadFromPtr)   // [in] Call to llpc.descriptor.load.from.ptr
+void PatchDescriptorLoad::processLoadDescFromPtr(
+    CallInst* loadFromPtr)   // [in] Call to llpc.descriptor.load.from.ptr
 {
-    IRBuilder<> builder(*m_pContext);
-    builder.SetInsertPoint(pLoadFromPtr);
+    IRBuilder<> builder(*m_context);
+    builder.SetInsertPoint(loadFromPtr);
 
-    Value* pDescPtrStruct = pLoadFromPtr->getArgOperand(0);
-    Value* pDescPtr = builder.CreateExtractValue(pDescPtrStruct, 0);
-    Value* pDesc = builder.CreateLoad(pLoadFromPtr->getType(), pDescPtr);
+    Value* descPtrStruct = loadFromPtr->getArgOperand(0);
+    Value* descPtr = builder.CreateExtractValue(descPtrStruct, 0);
+    Value* desc = builder.CreateLoad(loadFromPtr->getType(), descPtr);
 
-    pLoadFromPtr->replaceAllUsesWith(pDesc);
-    m_descLoadCalls.push_back(pLoadFromPtr);
+    loadFromPtr->replaceAllUsesWith(desc);
+    m_descLoadCalls.push_back(loadFromPtr);
     m_changed = true;
 }
 
@@ -415,68 +415,68 @@ void PatchDescriptorLoad::ProcessLoadDescFromPtr(
 void PatchDescriptorLoad::visitCallInst(
     CallInst& callInst)   // [in] "Call" instruction
 {
-    auto pCallee = callInst.getCalledFunction();
-    if (pCallee == nullptr)
+    auto callee = callInst.getCalledFunction();
+    if (callee == nullptr)
     {
         return;
     }
 
-    StringRef mangledName = pCallee->getName();
+    StringRef mangledName = callee->getName();
 
     if (mangledName.startswith(lgcName::DescriptorGetPtrPrefix))
     {
-        ProcessDescriptorGetPtr(&callInst, mangledName);
+        processDescriptorGetPtr(&callInst, mangledName);
         return;
     }
 
     if (mangledName.startswith(lgcName::DescriptorIndex))
     {
-        ProcessDescriptorIndex(&callInst);
+        processDescriptorIndex(&callInst);
         return;
     }
 
     if (mangledName.startswith(lgcName::DescriptorLoadFromPtr))
     {
-        ProcessLoadDescFromPtr(&callInst);
+        processLoadDescFromPtr(&callInst);
         return;
     }
 
     if (mangledName.startswith(lgcName::DescriptorLoadSpillTable))
     {
         // Descriptor loading should be inlined and stay in shader entry-point
-        assert(callInst.getParent()->getParent() == m_pEntryPoint);
+        assert(callInst.getParent()->getParent() == m_entryPoint);
         m_changed = true;
 
         if (callInst.use_empty() == false)
         {
-            Value* pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetSpilledPushConstTablePtr();
-            if (pDesc->getType() != callInst.getType())
+            Value* desc = m_pipelineSysValues.get(m_entryPoint)->getSpilledPushConstTablePtr();
+            if (desc->getType() != callInst.getType())
             {
-                pDesc = new BitCastInst(pDesc, callInst.getType(), "", &callInst);
+                desc = new BitCastInst(desc, callInst.getType(), "", &callInst);
             }
-            callInst.replaceAllUsesWith(pDesc);
+            callInst.replaceAllUsesWith(desc);
         }
         m_descLoadCalls.push_back(&callInst);
-        m_descLoadFuncs.insert(pCallee);
+        m_descLoadFuncs.insert(callee);
         return;
     }
 
     if (mangledName.startswith(lgcName::DescriptorLoadBuffer))
     {
         // Descriptor loading should be inlined and stay in shader entry-point
-        assert(callInst.getParent()->getParent() == m_pEntryPoint);
+        assert(callInst.getParent()->getParent() == m_entryPoint);
         m_changed = true;
 
         if (callInst.use_empty() == false)
         {
             unsigned descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
             unsigned binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-            Value* pArrayOffset = callInst.getOperand(2); // Offset for arrayed resource (index)
-            Value* pDesc = LoadBufferDescriptor(descSet, binding, pArrayOffset, &callInst);
-            callInst.replaceAllUsesWith(pDesc);
+            Value* arrayOffset = callInst.getOperand(2); // Offset for arrayed resource (index)
+            Value* desc = loadBufferDescriptor(descSet, binding, arrayOffset, &callInst);
+            callInst.replaceAllUsesWith(desc);
         }
         m_descLoadCalls.push_back(&callInst);
-        m_descLoadFuncs.insert(pCallee);
+        m_descLoadFuncs.insert(callee);
         return;
     }
 }
@@ -485,260 +485,260 @@ void PatchDescriptorLoad::visitCallInst(
 // Generate the code for a buffer descriptor load.
 // This is the handler for llpc.descriptor.load.buffer, which is also used for loading a descriptor
 // from the global table or the per-shader table.
-Value* PatchDescriptorLoad::LoadBufferDescriptor(
+Value* PatchDescriptorLoad::loadBufferDescriptor(
     unsigned      descSet,        // Descriptor set
     unsigned      binding,        // Binding
-    Value*        pArrayOffset,   // [in] Index in descriptor array
-    Instruction*  pInsertPoint)   // [in] Insert point
+    Value*        arrayOffset,   // [in] Index in descriptor array
+    Instruction*  insertPoint)   // [in] Insert point
 {
-    IRBuilder<> builder(*m_pContext);
-    builder.SetInsertPoint(pInsertPoint);
+    IRBuilder<> builder(*m_context);
+    builder.SetInsertPoint(insertPoint);
 
     // Handle the special cases. First get a pointer to the global/per-shader table as pointer to i8.
-    Value* pDescPtr = nullptr;
+    Value* descPtr = nullptr;
     if (descSet == InternalResourceTable)
     {
-        pDescPtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetInternalGlobalTablePtr();
+        descPtr = m_pipelineSysValues.get(m_entryPoint)->getInternalGlobalTablePtr();
     }
     else if (descSet == InternalPerShaderTable)
     {
-        pDescPtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetInternalPerShaderTablePtr();
+        descPtr = m_pipelineSysValues.get(m_entryPoint)->getInternalPerShaderTablePtr();
     }
-    if (pDescPtr != nullptr)
+    if (descPtr != nullptr)
     {
         // "binding" gives the offset, in units of v4i32 descriptors.
         // Add on the offset, giving pointer to i8.
-        pDescPtr = builder.CreateGEP(builder.getInt8Ty(), pDescPtr, builder.getInt32(binding * DescriptorSizeBuffer));
+        descPtr = builder.CreateGEP(builder.getInt8Ty(), descPtr, builder.getInt32(binding * DescriptorSizeBuffer));
         // Load the descriptor.
-        Type* pDescTy = VectorType::get(builder.getInt32Ty(), DescriptorSizeBuffer / 4);
-        pDescPtr = builder.CreateBitCast(pDescPtr, pDescTy->getPointerTo(ADDR_SPACE_CONST));
-        Instruction* pLoad = builder.CreateLoad(pDescTy, pDescPtr);
-        pLoad->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(pLoad->getContext(), {}));
-        return pLoad;
+        Type* descTy = VectorType::get(builder.getInt32Ty(), DescriptorSizeBuffer / 4);
+        descPtr = builder.CreateBitCast(descPtr, descTy->getPointerTo(ADDR_SPACE_CONST));
+        Instruction* load = builder.CreateLoad(descTy, descPtr);
+        load->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(load->getContext(), {}));
+        return load;
     }
 
     // Normal buffer descriptor load.
     // Find the descriptor node, either a DescriptorBuffer or PushConst (inline buffer).
-    const ResourceNode* pTopNode = nullptr;
-    const ResourceNode* pNode = nullptr;
-    std::tie(pTopNode, pNode) = m_pPipelineState->FindResourceNode(ResourceNodeType::DescriptorBuffer,
+    const ResourceNode* topNode = nullptr;
+    const ResourceNode* node = nullptr;
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorBuffer,
                                                                    descSet,
                                                                    binding);
 
-    if (pNode == nullptr)
+    if (node == nullptr)
     {
         // We did not find the resource node. Use an undef value.
         return UndefValue::get(VectorType::get(builder.getInt32Ty(), 4));
     }
 
-    if ((pNode == pTopNode) && (pNode->type == ResourceNodeType::DescriptorBufferCompact))
+    if ((node == topNode) && (node->type == ResourceNodeType::DescriptorBufferCompact))
     {
         // This is a compact buffer descriptor (only two dwords) in the top-level table. We special-case
         // that to use user data SGPRs directly, if PatchEntryPointMutate managed to fit the value into
         // user data SGPRs.
-        unsigned resNodeIdx = pTopNode - m_pPipelineState->GetUserDataNodes().data();
-        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
-        unsigned argIdx = pIntfData->entryArgIdxs.resNodeValues[resNodeIdx];
+        unsigned resNodeIdx = topNode - m_pipelineState->getUserDataNodes().data();
+        auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+        unsigned argIdx = intfData->entryArgIdxs.resNodeValues[resNodeIdx];
         if (argIdx > 0)
         {
             // Resource node isn't spilled. Load its value from function argument.
-            Argument* pDescArg = m_pEntryPoint->getArg(argIdx);
-            pDescArg->setName(Twine("resNode") + Twine(resNodeIdx));
+            Argument* descArg = m_entryPoint->getArg(argIdx);
+            descArg->setName(Twine("resNode") + Twine(resNodeIdx));
             // The function argument is a vector of i32. Treat it as an array of <2 x i32> and
             // extract the required array element.
-            pArrayOffset = builder.CreateMul(pArrayOffset, builder.getInt32(2));
-            Value* pDescDword0 = builder.CreateExtractElement(pDescArg, pArrayOffset);
-            pArrayOffset = builder.CreateAdd(pArrayOffset, builder.getInt32(1));
-            Value* pDescDword1 = builder.CreateExtractElement(pDescArg, pArrayOffset);
-            Value* pDesc = UndefValue::get(VectorType::get(builder.getInt32Ty(), 2));
-            pDesc = builder.CreateInsertElement(pDesc, pDescDword0, uint64_t(0));
-            pDesc = builder.CreateInsertElement(pDesc, pDescDword1, 1);
-            return BuildBufferCompactDesc(pDesc, &*builder.GetInsertPoint());
+            arrayOffset = builder.CreateMul(arrayOffset, builder.getInt32(2));
+            Value* descDword0 = builder.CreateExtractElement(descArg, arrayOffset);
+            arrayOffset = builder.CreateAdd(arrayOffset, builder.getInt32(1));
+            Value* descDword1 = builder.CreateExtractElement(descArg, arrayOffset);
+            Value* desc = UndefValue::get(VectorType::get(builder.getInt32Ty(), 2));
+            desc = builder.CreateInsertElement(desc, descDword0, uint64_t(0));
+            desc = builder.CreateInsertElement(desc, descDword1, 1);
+            return buildBufferCompactDesc(desc, &*builder.GetInsertPoint());
         }
     }
 
     // Get a pointer to the descriptor, as a pointer to i32.
-    pDescPtr = GetDescPtr(ResourceNodeType::DescriptorBuffer,
+    descPtr = getDescPtr(ResourceNodeType::DescriptorBuffer,
                           descSet,
                           binding,
-                          pTopNode,
-                          pNode,
+                          topNode,
+                          node,
                           /*shadow=*/false,
                           builder);
 
-    if ((pNode != nullptr) && (pNode->type == ResourceNodeType::PushConst))
+    if ((node != nullptr) && (node->type == ResourceNodeType::PushConst))
     {
         // Inline buffer.
-        return BuildInlineBufferDesc(pDescPtr, builder);
+        return buildInlineBufferDesc(descPtr, builder);
     }
 
     // Add on the index.
     unsigned dwordStride = DescriptorSizeBuffer / 4;
-    if ((pNode != nullptr) && (pNode->type == ResourceNodeType::DescriptorBufferCompact))
+    if ((node != nullptr) && (node->type == ResourceNodeType::DescriptorBufferCompact))
     {
         dwordStride = DescriptorSizeBufferCompact / 4;
     }
-    pArrayOffset = builder.CreateMul(pArrayOffset, builder.getInt32(dwordStride));
-    pDescPtr = builder.CreateGEP(builder.getInt32Ty(), pDescPtr, pArrayOffset);
+    arrayOffset = builder.CreateMul(arrayOffset, builder.getInt32(dwordStride));
+    descPtr = builder.CreateGEP(builder.getInt32Ty(), descPtr, arrayOffset);
 
     if (dwordStride == DescriptorSizeBufferCompact / 4)
     {
         // Load compact buffer descriptor and convert it into a normal buffer descriptor.
-        Type* pDescTy = VectorType::get(builder.getInt32Ty(), DescriptorSizeBufferCompact / 4);
-        pDescPtr = builder.CreateBitCast(pDescPtr, pDescTy->getPointerTo(ADDR_SPACE_CONST));
-        Value* pDesc = builder.CreateLoad(pDescTy, pDescPtr);
-        return BuildBufferCompactDesc(pDesc, &*builder.GetInsertPoint());
+        Type* descTy = VectorType::get(builder.getInt32Ty(), DescriptorSizeBufferCompact / 4);
+        descPtr = builder.CreateBitCast(descPtr, descTy->getPointerTo(ADDR_SPACE_CONST));
+        Value* desc = builder.CreateLoad(descTy, descPtr);
+        return buildBufferCompactDesc(desc, &*builder.GetInsertPoint());
     }
 
     // Load normal buffer descriptor.
-    Type* pDescTy = VectorType::get(builder.getInt32Ty(), DescriptorSizeBuffer / 4);
-    pDescPtr = builder.CreateBitCast(pDescPtr, pDescTy->getPointerTo(ADDR_SPACE_CONST));
-    Instruction* pLoad = builder.CreateLoad(pDescTy, pDescPtr);
-    pLoad->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(pLoad->getContext(), {}));
-    return pLoad;
+    Type* descTy = VectorType::get(builder.getInt32Ty(), DescriptorSizeBuffer / 4);
+    descPtr = builder.CreateBitCast(descPtr, descTy->getPointerTo(ADDR_SPACE_CONST));
+    Instruction* load = builder.CreateLoad(descTy, descPtr);
+    load->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(load->getContext(), {}));
+    return load;
 }
 
 // =====================================================================================================================
 // Calculate a buffer descriptor for an inline buffer
-Value* PatchDescriptorLoad::BuildInlineBufferDesc(
-    Value*        pDescPtr,   // [in] Pointer to inline buffer
+Value* PatchDescriptorLoad::buildInlineBufferDesc(
+    Value*        descPtr,   // [in] Pointer to inline buffer
     IRBuilder<>&  builder)    // [in] Builder
 {
     // Bitcast the pointer to v2i32
-    pDescPtr = builder.CreatePtrToInt(pDescPtr, builder.getInt64Ty());
-    pDescPtr = builder.CreateBitCast(pDescPtr, VectorType::get(builder.getInt32Ty(), 2));
+    descPtr = builder.CreatePtrToInt(descPtr, builder.getInt64Ty());
+    descPtr = builder.CreateBitCast(descPtr, VectorType::get(builder.getInt32Ty(), 2));
 
     // Build descriptor words.
     SqBufRsrcWord1 sqBufRsrcWord1 = {};
     SqBufRsrcWord2 sqBufRsrcWord2 = {};
     SqBufRsrcWord3 sqBufRsrcWord3 = {};
 
-    sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
-    sqBufRsrcWord2.bits.NUM_RECORDS = UINT32_MAX;
+    sqBufRsrcWord1.bits.baseAddressHi = UINT16_MAX;
+    sqBufRsrcWord2.bits.numRecords = UINT32_MAX;
 
-    sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
-    sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
-    sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
-    sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
-    sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
-    sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
+    sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
+    sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
+    sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
+    sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
+    sqBufRsrcWord3.gfx6.numFormat = BUF_NUM_FORMAT_UINT;
+    sqBufRsrcWord3.gfx6.dataFormat = BUF_DATA_FORMAT_32;
     assert(sqBufRsrcWord3.u32All == 0x24FAC);
 
     // DWORD0
-    Value* pDesc = UndefValue::get(VectorType::get(builder.getInt32Ty(), 4));
-    Value* pDescElem0 = builder.CreateExtractElement(pDescPtr, uint64_t(0));
-    pDesc = builder.CreateInsertElement(pDesc, pDescElem0, uint64_t(0));
+    Value* desc = UndefValue::get(VectorType::get(builder.getInt32Ty(), 4));
+    Value* descElem0 = builder.CreateExtractElement(descPtr, uint64_t(0));
+    desc = builder.CreateInsertElement(desc, descElem0, uint64_t(0));
 
     // DWORD1
-    Value* pDescElem1 = builder.CreateExtractElement(pDescPtr, 1);
-    pDescElem1 = builder.CreateAnd(pDescElem1, builder.getInt32(sqBufRsrcWord1.u32All));
-    pDesc = builder.CreateInsertElement(pDesc, pDescElem1, 1);
+    Value* descElem1 = builder.CreateExtractElement(descPtr, 1);
+    descElem1 = builder.CreateAnd(descElem1, builder.getInt32(sqBufRsrcWord1.u32All));
+    desc = builder.CreateInsertElement(desc, descElem1, 1);
 
     // DWORD2
-    pDesc = builder.CreateInsertElement(pDesc, builder.getInt32(sqBufRsrcWord2.u32All), 2);
+    desc = builder.CreateInsertElement(desc, builder.getInt32(sqBufRsrcWord2.u32All), 2);
 
     // DWORD3
-    pDesc = builder.CreateInsertElement(pDesc, builder.getInt32(sqBufRsrcWord3.u32All), 3);
+    desc = builder.CreateInsertElement(desc, builder.getInt32(sqBufRsrcWord3.u32All), 3);
 
-    return pDesc;
+    return desc;
 }
 
 // =====================================================================================================================
 // Build buffer compact descriptor
-Value* PatchDescriptorLoad::BuildBufferCompactDesc(
-    Value*       pDesc,          // [in] The buffer descriptor base to build for the buffer compact descriptor
-    Instruction* pInsertPoint)   // [in] Insert point
+Value* PatchDescriptorLoad::buildBufferCompactDesc(
+    Value*       desc,          // [in] The buffer descriptor base to build for the buffer compact descriptor
+    Instruction* insertPoint)   // [in] Insert point
 {
     // Extract compact buffer descriptor
-    Value* pDescElem0 = ExtractElementInst::Create(pDesc,
-                                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+    Value* descElem0 = ExtractElementInst::Create(desc,
+                                                    ConstantInt::get(Type::getInt32Ty(*m_context), 0),
                                                     "",
-                                                    pInsertPoint);
+                                                    insertPoint);
 
-    Value* pDescElem1 = ExtractElementInst::Create(pDesc,
-                                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
+    Value* descElem1 = ExtractElementInst::Create(desc,
+                                                    ConstantInt::get(Type::getInt32Ty(*m_context), 1),
                                                     "",
-                                                    pInsertPoint);
+                                                    insertPoint);
 
     // Build normal buffer descriptor
-    auto pBufDescTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4);
-    Value* pBufDesc = UndefValue::get(pBufDescTy);
+    auto bufDescTy = VectorType::get(Type::getInt32Ty(*m_context), 4);
+    Value* bufDesc = UndefValue::get(bufDescTy);
 
     // DWORD0
-    pBufDesc = InsertElementInst::Create(pBufDesc,
-                                        pDescElem0,
-                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+    bufDesc = InsertElementInst::Create(bufDesc,
+                                        descElem0,
+                                        ConstantInt::get(Type::getInt32Ty(*m_context), 0),
                                         "",
-                                        pInsertPoint);
+                                        insertPoint);
 
     // DWORD1
     SqBufRsrcWord1 sqBufRsrcWord1 = {};
-    sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
+    sqBufRsrcWord1.bits.baseAddressHi = UINT16_MAX;
 
-    pDescElem1 = BinaryOperator::CreateAnd(pDescElem1,
-                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), sqBufRsrcWord1.u32All),
+    descElem1 = BinaryOperator::CreateAnd(descElem1,
+                                            ConstantInt::get(Type::getInt32Ty(*m_context), sqBufRsrcWord1.u32All),
                                             "",
-                                            pInsertPoint);
+                                            insertPoint);
 
-    pBufDesc = InsertElementInst::Create(pBufDesc,
-                                        pDescElem1,
-                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
+    bufDesc = InsertElementInst::Create(bufDesc,
+                                        descElem1,
+                                        ConstantInt::get(Type::getInt32Ty(*m_context), 1),
                                         "",
-                                        pInsertPoint);
+                                        insertPoint);
 
     // DWORD2
     SqBufRsrcWord2 sqBufRsrcWord2 = {};
-    sqBufRsrcWord2.bits.NUM_RECORDS = UINT32_MAX;
+    sqBufRsrcWord2.bits.numRecords = UINT32_MAX;
 
-    pBufDesc = InsertElementInst::Create(pBufDesc,
-                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), sqBufRsrcWord2.u32All),
-                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
+    bufDesc = InsertElementInst::Create(bufDesc,
+                                        ConstantInt::get(Type::getInt32Ty(*m_context), sqBufRsrcWord2.u32All),
+                                        ConstantInt::get(Type::getInt32Ty(*m_context), 2),
                                         "",
-                                        pInsertPoint);
+                                        insertPoint);
 
     // DWORD3
-    const GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
+    const GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
     if (gfxIp.major < 10)
     {
         SqBufRsrcWord3 sqBufRsrcWord3 = {};
-        sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
-        sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
-        sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
-        sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
-        sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
-        sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
+        sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
+        sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
+        sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
+        sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
+        sqBufRsrcWord3.gfx6.numFormat = BUF_NUM_FORMAT_UINT;
+        sqBufRsrcWord3.gfx6.dataFormat = BUF_DATA_FORMAT_32;
         assert(sqBufRsrcWord3.u32All == 0x24FAC);
 
-        pBufDesc = InsertElementInst::Create(pBufDesc,
-                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), sqBufRsrcWord3.u32All),
-                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), 3),
+        bufDesc = InsertElementInst::Create(bufDesc,
+                                            ConstantInt::get(Type::getInt32Ty(*m_context), sqBufRsrcWord3.u32All),
+                                            ConstantInt::get(Type::getInt32Ty(*m_context), 3),
                                             "",
-                                            pInsertPoint);
+                                            insertPoint);
     }
     else if (gfxIp.major == 10)
     {
         SqBufRsrcWord3 sqBufRsrcWord3 = {};
-        sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
-        sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
-        sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
-        sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
-        sqBufRsrcWord3.gfx10.FORMAT = BUF_FORMAT_32_UINT;
-        sqBufRsrcWord3.gfx10.RESOURCE_LEVEL = 1;
-        sqBufRsrcWord3.gfx10.OOB_SELECT = 2;
+        sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
+        sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
+        sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
+        sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
+        sqBufRsrcWord3.gfx10.format = BUF_FORMAT_32_UINT;
+        sqBufRsrcWord3.gfx10.resourceLevel = 1;
+        sqBufRsrcWord3.gfx10.oobSelect = 2;
         assert(sqBufRsrcWord3.u32All == 0x21014FAC);
 
-        pBufDesc = InsertElementInst::Create(pBufDesc,
-                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), sqBufRsrcWord3.u32All),
-                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), 3),
+        bufDesc = InsertElementInst::Create(bufDesc,
+                                            ConstantInt::get(Type::getInt32Ty(*m_context), sqBufRsrcWord3.u32All),
+                                            ConstantInt::get(Type::getInt32Ty(*m_context), 3),
                                             "",
-                                            pInsertPoint);
+                                            insertPoint);
     }
     else
     {
         llvm_unreachable("Not implemented!");
     }
 
-    return pBufDesc;
+    return bufDesc;
 }
 
 } // lgc

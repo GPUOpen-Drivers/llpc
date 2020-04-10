@@ -108,28 +108,28 @@ bool EnableErrs()
 void redirectLogOutput(
     bool              restoreToDefault,   // Restore the default behavior of outs() and errs() if it is true
     unsigned          optionCount,        // Count of compilation-option strings
-    const char*const* pOptions)            // [in] An array of compilation-option strings
+    const char*const* options)            // [in] An array of compilation-option strings
 {
-    static raw_fd_ostream* pDbgFile = nullptr;
-    static raw_fd_ostream* pOutFile = nullptr;
-    static uint8_t  dbgFileBak[sizeof(raw_fd_ostream)] = {};
-    static uint8_t  outFileBak[sizeof(raw_fd_ostream)] = {};
+    static raw_fd_ostream* DbgFile = nullptr;
+    static raw_fd_ostream* OutFile = nullptr;
+    static uint8_t  DbgFileBak[sizeof(raw_fd_ostream)] = {};
+    static uint8_t  OutFileBak[sizeof(raw_fd_ostream)] = {};
 
     if (restoreToDefault)
     {
         // Restore default raw_fd_ostream objects
-        if (pDbgFile != nullptr)
+        if (DbgFile != nullptr)
         {
-            memcpy((void*)&errs(), dbgFileBak, sizeof(raw_fd_ostream));
-            pDbgFile->close();
-            pDbgFile = nullptr;
+            memcpy((void*)&errs(), DbgFileBak, sizeof(raw_fd_ostream));
+            DbgFile->close();
+            DbgFile = nullptr;
         }
 
-        if (pOutFile != nullptr)
+        if (OutFile != nullptr)
         {
-            memcpy((void*)&outs(), outFileBak, sizeof(raw_fd_ostream));
-            pOutFile->close();
-            pOutFile = nullptr;
+            memcpy((void*)&outs(), OutFileBak, sizeof(raw_fd_ostream));
+            OutFile->close();
+            OutFile = nullptr;
         }
     }
     else
@@ -142,7 +142,7 @@ void redirectLogOutput(
             bool needDebugOut = ::llvm::DebugFlag;
             for (unsigned i = 1; (needDebugOut == false) && (i < optionCount); ++i)
             {
-                StringRef option = pOptions[i];
+                StringRef option = options[i];
                 if (option.startswith("-debug") || option.startswith("-print"))
                 {
                     needDebugOut = true;
@@ -153,14 +153,14 @@ void redirectLogOutput(
             {
                 std::error_code errCode;
 
-                static raw_fd_ostream newDbgFile(cl::LogFileDbgs.c_str(), errCode, sys::fs::F_Text);
+                static raw_fd_ostream NewDbgFile(cl::LogFileDbgs.c_str(), errCode, sys::fs::F_Text);
                 assert(!errCode);
-                if (pDbgFile == nullptr)
+                if (DbgFile == nullptr)
                 {
-                    newDbgFile.SetUnbuffered();
-                    memcpy((void*)dbgFileBak, (void*)&errs(), sizeof(raw_fd_ostream));
-                    memcpy((void*)&errs(), (void*)&newDbgFile, sizeof(raw_fd_ostream));
-                    pDbgFile = &newDbgFile;
+                    NewDbgFile.SetUnbuffered();
+                    memcpy((void*)DbgFileBak, (void*)&errs(), sizeof(raw_fd_ostream));
+                    memcpy((void*)&errs(), (void*)&NewDbgFile, sizeof(raw_fd_ostream));
+                    DbgFile = &NewDbgFile;
                 }
             }
         }
@@ -168,24 +168,24 @@ void redirectLogOutput(
         // Redirect outs() for LLPC_OUTS() and LLPC_ERRS()
         if ((cl::EnableOuts || cl::EnableErrs) && (cl::LogFileOuts.empty() == false))
         {
-            if ((cl::LogFileOuts == cl::LogFileDbgs) && (pDbgFile != nullptr))
+            if ((cl::LogFileOuts == cl::LogFileDbgs) && (DbgFile != nullptr))
             {
-                 memcpy((void*)outFileBak, (void*)&outs(), sizeof(raw_fd_ostream));
-                 memcpy((void*)&outs(), (void*)pDbgFile, sizeof(raw_fd_ostream));
-                 pOutFile = pDbgFile;
+                 memcpy((void*)OutFileBak, (void*)&outs(), sizeof(raw_fd_ostream));
+                 memcpy((void*)&outs(), (void*)DbgFile, sizeof(raw_fd_ostream));
+                 OutFile = DbgFile;
             }
             else
             {
                 std::error_code errCode;
 
-                static raw_fd_ostream newOutFile(cl::LogFileOuts.c_str(), errCode, sys::fs::F_Text);
+                static raw_fd_ostream NewOutFile(cl::LogFileOuts.c_str(), errCode, sys::fs::F_Text);
                 assert(!errCode);
-                if (pOutFile == nullptr)
+                if (OutFile == nullptr)
                 {
-                    newOutFile.SetUnbuffered();
-                    memcpy((void*)outFileBak, (void*)&outs(), sizeof(raw_fd_ostream));
-                    memcpy((void*)&outs(), (void*)&newOutFile, sizeof(raw_fd_ostream));
-                    pOutFile = &newOutFile;
+                    NewOutFile.SetUnbuffered();
+                    memcpy((void*)OutFileBak, (void*)&outs(), sizeof(raw_fd_ostream));
+                    memcpy((void*)&outs(), (void*)&NewOutFile, sizeof(raw_fd_ostream));
+                    OutFile = &NewOutFile;
                 }
             }
         }
@@ -194,22 +194,22 @@ void redirectLogOutput(
 
 // =====================================================================================================================
 // Enables/disables the output for debugging. TRUE for enable, FALSE for disable.
-void EnableDebugOutput(
+void enableDebugOutput(
     bool restore) // Whether to enable debug output
 {
-    static raw_null_ostream nullStream;
-    static uint8_t  dbgStream[sizeof(raw_fd_ostream)] = {};
+    static raw_null_ostream NullStream;
+    static uint8_t  DbgStream[sizeof(raw_fd_ostream)] = {};
 
     if (restore)
     {
         // Restore default raw_fd_ostream objects
-        memcpy((void*)&errs(), dbgStream, sizeof(raw_fd_ostream));
+        memcpy((void*)&errs(), DbgStream, sizeof(raw_fd_ostream));
     }
     else
     {
         // Redirect errs() for dbgs()
-         memcpy((void*)dbgStream, (void*)&errs(), sizeof(raw_fd_ostream));
-         memcpy((void*)&errs(), (void*)&nullStream, sizeof(nullStream));
+         memcpy((void*)DbgStream, (void*)&errs(), sizeof(raw_fd_ostream));
+         memcpy((void*)&errs(), (void*)&NullStream, sizeof(NullStream));
     }
 }
 

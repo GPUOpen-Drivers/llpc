@@ -65,17 +65,17 @@ enum TimerKind : unsigned
 class TimerProfiler
 {
 public:
-    TimerProfiler(uint64_t hash64, const char* pDescriptionPrefix, unsigned enableMask);
+    TimerProfiler(uint64_t hash64, const char* descriptionPrefix, unsigned enableMask);
 
     ~TimerProfiler();
 
-    void AddTimerStartStopPass(lgc::PassManager* pPassMgr, TimerKind timerKind, bool start);
+    void addTimerStartStopPass(lgc::PassManager* passMgr, TimerKind timerKind, bool start);
 
-    void StartStopTimer(TimerKind name, bool start);
+    void startStopTimer(TimerKind name, bool start);
 
-    llvm::Timer* GetTimer(TimerKind timerKind);
+    llvm::Timer* getTimer(TimerKind timerKind);
 
-    static const llvm::StringMap<llvm::TimeRecord>& GetDummyTimeRecords();
+    static const llvm::StringMap<llvm::TimeRecord>& getDummyTimeRecords();
 
     // -----------------------------------------------------------------------------------------------------------------
 

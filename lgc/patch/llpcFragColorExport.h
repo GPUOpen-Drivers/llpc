@@ -56,31 +56,31 @@ enum class CompSetting : unsigned
 class FragColorExport
 {
 public:
-    FragColorExport(PipelineState* pPipelineState, llvm::Module* pModule);
+    FragColorExport(PipelineState* pipelineState, llvm::Module* module);
 
-    llvm::Value* Run(llvm::Value* pOutput, unsigned location, llvm::Instruction* pInsertPos);
+    llvm::Value* run(llvm::Value* output, unsigned location, llvm::Instruction* insertPos);
 
-    ExportFormat ComputeExportFormat(llvm::Type* pOutputTy, unsigned location) const;
+    ExportFormat computeExportFormat(llvm::Type* outputTy, unsigned location) const;
 
 private:
     FragColorExport() = delete;
     FragColorExport(const FragColorExport&) = delete;
     FragColorExport& operator =(const FragColorExport&) = delete;
 
-    static CompSetting ComputeCompSetting(BufDataFormat dfmt);
-    static unsigned GetNumChannels(BufDataFormat dfmt);
+    static CompSetting computeCompSetting(BufDataFormat dfmt);
+    static unsigned getNumChannels(BufDataFormat dfmt);
 
-    static bool HasAlpha(BufDataFormat dfmt);
+    static bool hasAlpha(BufDataFormat dfmt);
 
-    static unsigned GetMaxComponentBitCount(BufDataFormat dfmt);
+    static unsigned getMaxComponentBitCount(BufDataFormat dfmt);
 
-    llvm::Value* ConvertToFloat(llvm::Value* pValue, bool signedness, llvm::Instruction* pInsertPos) const;
-    llvm::Value* ConvertToInt(llvm::Value* pValue, bool signedness, llvm::Instruction* pInsertPos) const;
+    llvm::Value* convertToFloat(llvm::Value* value, bool signedness, llvm::Instruction* insertPos) const;
+    llvm::Value* convertToInt(llvm::Value* value, bool signedness, llvm::Instruction* insertPos) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    PipelineState*  m_pPipelineState;   // Pipeline state
-    llvm::LLVMContext*        m_pContext;         // LLVM context
+    PipelineState*  m_pipelineState;   // Pipeline state
+    llvm::LLVMContext*        m_context;         // LLVM context
 };
 
 } // lgc

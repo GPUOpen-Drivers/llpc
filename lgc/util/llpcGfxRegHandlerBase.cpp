@@ -40,14 +40,14 @@ using namespace llvm;
 //   - Clear old DWORDs vector
 //   - Fill DWORDs vector with nullptr
 //   - Init dirty mask to all clean
-void GfxRegHandlerBase::SetRegister(
-    Value* pNewRegister) // [in] A <n x i32> vector
+void GfxRegHandlerBase::setRegister(
+    Value* newRegister) // [in] A <n x i32> vector
 {
-    assert(pNewRegister->getType()->isIntOrIntVectorTy());
+    assert(newRegister->getType()->isIntOrIntVectorTy());
 
-    if (auto pVectorTy = dyn_cast<VectorType>(pNewRegister->getType()))
+    if (auto vectorTy = dyn_cast<VectorType>(newRegister->getType()))
     {
-        unsigned count = pVectorTy->getNumElements();
+        unsigned count = vectorTy->getNumElements();
 
         // Clear previously stored DWORDs
         m_dwords.clear();
@@ -60,18 +60,18 @@ void GfxRegHandlerBase::SetRegister(
     }
     else
     {
-        assert(pNewRegister->getType() == m_pBuilder->getInt32Ty());
+        assert(newRegister->getType() == m_builder->getInt32Ty());
         m_dwords.push_back(nullptr);
     }
 
-    m_pReg = pNewRegister;
+    m_reg = newRegister;
     m_dirtyDwords = 0u;
 }
 
 // =====================================================================================================================
 // Get register
 //   - Overwrite DWORDs in <n x i32> register if marked as dirty
-Value* GfxRegHandlerBase::GetRegister()
+Value* GfxRegHandlerBase::getRegister()
 {
     unsigned dirtyMask = m_dirtyDwords;
 
@@ -80,9 +80,9 @@ Value* GfxRegHandlerBase::GetRegister()
     {
         if (dirtyMask & 1)
         {
-            m_pReg = m_pBuilder->CreateInsertElement(m_pReg,
+            m_reg = m_builder->CreateInsertElement(m_reg,
                                                           m_dwords[i],
-                                                          m_pBuilder->getInt64(i));
+                                                          m_builder->getInt64(i));
         }
 
         i++;
@@ -92,64 +92,64 @@ Value* GfxRegHandlerBase::GetRegister()
     m_dirtyDwords = 0u;
 
     // Just return updated m_pReg
-    return m_pReg;
+    return m_reg;
 }
 
 // =====================================================================================================================
 // Get data from a range of bits in indexed DWORD according to BitsInfo
-Value* GfxRegHandlerBase::GetBits(
+Value* GfxRegHandlerBase::getBits(
     const BitsInfo& bitsInfo)    // [in] The BitsInfo of data
 {
     if (bitsInfo.count == 32)
     {
-        return GetDword(bitsInfo.index);
+        return getDword(bitsInfo.index);
     }
 
-    ExtractDwordIfNecessary(bitsInfo.index);
+    extractDwordIfNecessary(bitsInfo.index);
 
-    return m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
-                                       m_pBuilder->getInt32Ty(),
+    return m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                       m_builder->getInt32Ty(),
                                        { m_dwords[bitsInfo.index],
-                                         m_pBuilder->getInt32(bitsInfo.offset),
-                                         m_pBuilder->getInt32(bitsInfo.count) });
+                                         m_builder->getInt32(bitsInfo.offset),
+                                         m_builder->getInt32(bitsInfo.count) });
 }
 
 // =====================================================================================================================
 // Set data to a range of bits in indexed DWORD according to BitsInfo
-void GfxRegHandlerBase::SetBits(
+void GfxRegHandlerBase::setBits(
     const BitsInfo& bitsInfo,    // [in] The BitsInfo of data's high part
-    Value*          pNewBits)    // [in] The new bits to set
+    Value*          newBits)    // [in] The new bits to set
 {
-    ExtractDwordIfNecessary(bitsInfo.index);
+    extractDwordIfNecessary(bitsInfo.index);
 
     if (bitsInfo.count != 32)
     {
-        Value* pDwordsNew = ReplaceBits(m_dwords[bitsInfo.index],
+        Value* dwordsNew = replaceBits(m_dwords[bitsInfo.index],
                                         bitsInfo.offset,
                                         bitsInfo.count,
-                                        pNewBits);
-        SetDword(bitsInfo.index, pDwordsNew);
+                                        newBits);
+        setDword(bitsInfo.index, dwordsNew);
     }
     else
     {
-        SetDword(bitsInfo.index, pNewBits);
+        setDword(bitsInfo.index, newBits);
     }
 }
 
 // =====================================================================================================================
 // Return new DWORD which is replaced [offset, offset + count) with pNewBits
-Value* GfxRegHandlerBase::ReplaceBits(
-    Value*   pDword,   // [in] Target DWORD
+Value* GfxRegHandlerBase::replaceBits(
+    Value*   dword,   // [in] Target DWORD
     unsigned offset,   // The first bit to be replaced
     unsigned count,    // The number of bits should be replaced
-    Value*   pNewBits) // [in] The new bits to replace specified ones
+    Value*   newBits) // [in] The new bits to replace specified ones
 {
     // mask = ((1 << count) - 1) << offset
     // Result = (pDword & ~mask)|((pNewBits << offset) & mask)
     unsigned maskBits = ((1 << count) - 1) << offset;
-    Value* pMask = m_pBuilder->getInt32(maskBits);
-    Value* pNotMask = m_pBuilder->getInt32(~maskBits);
-    Value* pBeginBit = m_pBuilder->getInt32(offset);
-    pNewBits = m_pBuilder->CreateAnd(m_pBuilder->CreateShl(pNewBits, pBeginBit), pMask);
-    return m_pBuilder->CreateOr(m_pBuilder->CreateAnd(pDword, pNotMask), pNewBits);
+    Value* mask = m_builder->getInt32(maskBits);
+    Value* notMask = m_builder->getInt32(~maskBits);
+    Value* beginBit = m_builder->getInt32(offset);
+    newBits = m_builder->CreateAnd(m_builder->CreateShl(newBits, beginBit), mask);
+    return m_builder->CreateOr(m_builder->CreateAnd(dword, notMask), newBits);
 }

@@ -88,77 +88,77 @@ namespace lgc
 
 // =====================================================================================================================
 // Add whole-pipeline patch passes to pass manager
-void Patch::AddPasses(
-    PipelineState*        pPipelineState, // [in] Pipeline state
+void Patch::addPasses(
+    PipelineState*        pipelineState, // [in] Pipeline state
     legacy::PassManager&  passMgr,       // [in/out] Pass manager to add passes to
-    ModulePass*           pReplayerPass, // [in] BuilderReplayer pass, or nullptr if not needed
-    llvm::Timer*          pPatchTimer,   // [in] Timer to time patch passes with, nullptr if not timing
-    llvm::Timer*          pOptTimer,     // [in] Timer to time LLVM optimization passes with, nullptr if not timing
+    ModulePass*           replayerPass, // [in] BuilderReplayer pass, or nullptr if not needed
+    llvm::Timer*          patchTimer,   // [in] Timer to time patch passes with, nullptr if not timing
+    llvm::Timer*          optTimer,     // [in] Timer to time LLVM optimization passes with, nullptr if not timing
     Pipeline::CheckShaderCacheFunc  checkShaderCacheFunc)
                                          // Callback function to check shader cache
 {
     // Start timer for patching passes.
-    if (pPatchTimer != nullptr)
+    if (patchTimer != nullptr)
     {
-        passMgr.add(BuilderContext::CreateStartStopTimer(pPatchTimer, true));
+        passMgr.add(BuilderContext::createStartStopTimer(patchTimer, true));
     }
 
     // If using BuilderRecorder rather than BuilderImpl, replay the Builder calls now
-    if (pReplayerPass != nullptr)
+    if (replayerPass != nullptr)
     {
-        passMgr.add(pReplayerPass);
+        passMgr.add(replayerPass);
     }
 
-    if (raw_ostream* pOuts = getLgcOuts())
+    if (raw_ostream* outs = getLgcOuts())
     {
-        passMgr.add(createPrintModulePass(*pOuts,
+        passMgr.add(createPrintModulePass(*outs,
                     "===============================================================================\n"
                     "// LLPC pipeline before-patching results\n"));
     }
 
     // Build null fragment shader if necessary
-    passMgr.add(CreatePatchNullFragShader());
+    passMgr.add(createPatchNullFragShader());
 
     // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
-    passMgr.add(CreatePatchResourceCollect());
+    passMgr.add(createPatchResourceCollect());
 
     // Generate copy shader if necessary.
-    passMgr.add(CreatePatchCopyShader());
+    passMgr.add(createPatchCopyShader());
 
     // Patch entry-point mutation (should be done before external library link)
-    passMgr.add(CreatePatchEntryPointMutate());
+    passMgr.add(createPatchEntryPointMutate());
 
     // Patch push constant loading (should be done before external library link)
-    passMgr.add(CreatePatchPushConstOp());
+    passMgr.add(createPatchPushConstOp());
 
     // Function inlining and remove dead functions after it
     passMgr.add(createAlwaysInlinerLegacyPass());
     passMgr.add(createGlobalDCEPass());
 
     // Patch input import and output export operations
-    passMgr.add(CreatePatchInOutImportExport());
+    passMgr.add(createPatchInOutImportExport());
 
     // Patch descriptor load operations
-    passMgr.add(CreatePatchDescriptorLoad());
+    passMgr.add(createPatchDescriptorLoad());
 
     // Prior to general optimization, do function inlining and dead function removal once again
     passMgr.add(createAlwaysInlinerLegacyPass());
     passMgr.add(createGlobalDCEPass());
 
     // Check shader cache
-    auto pCheckShaderCachePass = CreatePatchCheckShaderCache();
-    passMgr.add(pCheckShaderCachePass);
-    pCheckShaderCachePass->SetCallbackFunction(checkShaderCacheFunc);
+    auto checkShaderCachePass = createPatchCheckShaderCache();
+    passMgr.add(checkShaderCachePass);
+    checkShaderCachePass->setCallbackFunction(checkShaderCacheFunc);
 
     // Stop timer for patching passes and start timer for optimization passes.
-    if (pPatchTimer != nullptr)
+    if (patchTimer != nullptr)
     {
-        passMgr.add(BuilderContext::CreateStartStopTimer(pPatchTimer, false));
-        passMgr.add(BuilderContext::CreateStartStopTimer(pOptTimer, true));
+        passMgr.add(BuilderContext::createStartStopTimer(patchTimer, false));
+        passMgr.add(BuilderContext::createStartStopTimer(optTimer, true));
     }
 
     // Prepare pipeline ABI but only set the calling conventions to AMDGPU ones for now.
-    passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */true));
+    passMgr.add(createPatchPreparePipelineAbi(/* onlySetCallingConvs = */true));
 
     // Add some optimization passes
 
@@ -167,31 +167,31 @@ void Patch::AddPasses(
 
     if (cl::DisablePatchOpt == false)
     {
-        AddOptimizationPasses(passMgr);
+        addOptimizationPasses(passMgr);
     }
 
     // Stop timer for optimization passes and restart timer for patching passes.
-    if (pPatchTimer != nullptr)
+    if (patchTimer != nullptr)
     {
-        passMgr.add(BuilderContext::CreateStartStopTimer(pOptTimer, false));
-        passMgr.add(BuilderContext::CreateStartStopTimer(pPatchTimer, true));
+        passMgr.add(BuilderContext::createStartStopTimer(optTimer, false));
+        passMgr.add(BuilderContext::createStartStopTimer(patchTimer, true));
     }
 
     // Patch buffer operations (must be after optimizations)
-    passMgr.add(CreatePatchBufferOp());
+    passMgr.add(createPatchBufferOp());
     passMgr.add(createInstructionCombiningPass(false, 2));
 
     // Fully prepare the pipeline ABI (must be after optimizations)
-    passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
+    passMgr.add(createPatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
 
-    if (pPipelineState->IsGraphics() && (pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 10) &&
-        ((pPipelineState->GetOptions().nggFlags & NggFlagDisable) == 0))
+    if (pipelineState->isGraphics() && (pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) &&
+        ((pipelineState->getOptions().nggFlags & NggFlagDisable) == 0))
     {
         // Stop timer for patching passes and restart timer for optimization passes.
-        if (pPatchTimer != nullptr)
+        if (patchTimer != nullptr)
         {
-            passMgr.add(BuilderContext::CreateStartStopTimer(pPatchTimer, false));
-            passMgr.add(BuilderContext::CreateStartStopTimer(pOptTimer, true));
+            passMgr.add(BuilderContext::createStartStopTimer(patchTimer, false));
+            passMgr.add(BuilderContext::createStartStopTimer(optTimer, true));
         }
 
         // Extra optimizations after NGG primitive shader creation
@@ -203,10 +203,10 @@ void Patch::AddPasses(
         passMgr.add(createCFGSimplificationPass());
 
         // Stop timer for optimization passes and restart timer for patching passes.
-        if (pPatchTimer != nullptr)
+        if (patchTimer != nullptr)
         {
-            passMgr.add(BuilderContext::CreateStartStopTimer(pOptTimer, false));
-            passMgr.add(BuilderContext::CreateStartStopTimer(pPatchTimer, true));
+            passMgr.add(BuilderContext::createStartStopTimer(optTimer, false));
+            passMgr.add(BuilderContext::createStartStopTimer(patchTimer, true));
         }
     }
 
@@ -214,24 +214,24 @@ void Patch::AddPasses(
     // NOTE: Needs to be done after post-NGG function inlining, because LLVM refuses to inline something
     // with conflicting attributes. Attributes could conflict on GFX10 because PatchSetupTargetFeatures
     // adds a target feature to determine wave32 or wave64.
-    passMgr.add(CreatePatchSetupTargetFeatures());
+    passMgr.add(createPatchSetupTargetFeatures());
 
     // Include LLVM IR as a separate section in the ELF binary
-    if (pPipelineState->GetOptions().includeIr)
+    if (pipelineState->getOptions().includeIr)
     {
-        passMgr.add(CreatePatchLlvmIrInclusion());
+        passMgr.add(createPatchLlvmIrInclusion());
     }
 
     // Stop timer for patching passes.
-    if (pPatchTimer != nullptr)
+    if (patchTimer != nullptr)
     {
-        passMgr.add(BuilderContext::CreateStartStopTimer(pPatchTimer, false));
+        passMgr.add(BuilderContext::createStartStopTimer(patchTimer, false));
     }
 
     // Dump the result
-    if (raw_ostream* pOuts = getLgcOuts())
+    if (raw_ostream* outs = getLgcOuts())
     {
-        passMgr.add(createPrintModulePass(*pOuts,
+        passMgr.add(createPrintModulePass(*outs,
                     "===============================================================================\n"
                     "// LLPC pipeline patching results\n"));
     }
@@ -239,7 +239,7 @@ void Patch::AddPasses(
 
 // =====================================================================================================================
 // Add optimization passes to pass manager
-void Patch::AddOptimizationPasses(
+void Patch::addOptimizationPasses(
     legacy::PassManager&  passMgr)  // [in/out] Pass manager to add passes to
 {
     // Set up standard optimization passes.
@@ -255,7 +255,7 @@ void Patch::AddOptimizationPasses(
         passMgr.add(createGlobalOptimizerPass());
         passMgr.add(createPromoteMemoryToRegisterPass());
         passMgr.add(createInstructionCombiningPass(expensiveCombines, 5));
-        passMgr.add(CreatePatchPeepholeOpt());
+        passMgr.add(createPatchPeepholeOpt());
         passMgr.add(createInstSimplifyLegacyPass());
         passMgr.add(createCFGSimplificationPass());
         passMgr.add(createSROAPass());
@@ -265,7 +265,7 @@ void Patch::AddOptimizationPasses(
         passMgr.add(createCFGSimplificationPass());
         passMgr.add(createAggressiveInstCombinerPass());
         passMgr.add(createInstructionCombiningPass(expensiveCombines, 3));
-        passMgr.add(CreatePatchPeepholeOpt());
+        passMgr.add(createPatchPeepholeOpt());
         passMgr.add(createInstSimplifyLegacyPass());
         passMgr.add(createCFGSimplificationPass());
         passMgr.add(createReassociatePass());
@@ -277,17 +277,17 @@ void Patch::AddOptimizationPasses(
         passMgr.add(createLoopIdiomPass());
         passMgr.add(createLoopDeletionPass());
         passMgr.add(createSimpleLoopUnrollPass(optLevel));
-        passMgr.add(CreatePatchPeepholeOpt());
+        passMgr.add(createPatchPeepholeOpt());
         passMgr.add(createScalarizerPass());
-        passMgr.add(CreatePatchLoadScalarizer());
+        passMgr.add(createPatchLoadScalarizer());
         passMgr.add(createInstSimplifyLegacyPass());
-        passMgr.add(CreatePatchIntrinsicSimplify());
+        passMgr.add(createPatchIntrinsicSimplify());
         passMgr.add(createMergedLoadStoreMotionPass());
         passMgr.add(createGVNPass(disableGvnLoadPre));
         passMgr.add(createSCCPPass());
         passMgr.add(createBitTrackingDCEPass());
         passMgr.add(createInstructionCombiningPass(expensiveCombines, 2));
-        passMgr.add(CreatePatchPeepholeOpt());
+        passMgr.add(createPatchPeepholeOpt());
         passMgr.add(createCorrelatedValuePropagationPass());
         passMgr.add(createAggressiveDCEPass());
         passMgr.add(createCFGSimplificationPass());
@@ -295,7 +295,7 @@ void Patch::AddOptimizationPasses(
         passMgr.add(createFloat2IntPass());
         passMgr.add(createLoopRotatePass());
         passMgr.add(createCFGSimplificationPass(1, true, true, true, true));
-        passMgr.add(CreatePatchPeepholeOpt(true));
+        passMgr.add(createPatchPeepholeOpt(true));
         passMgr.add(createInstSimplifyLegacyPass());
         passMgr.add(createLoopUnrollPass(optLevel));
         passMgr.add(createInstructionCombiningPass(expensiveCombines, 2));
@@ -318,7 +318,7 @@ void Patch::AddOptimizationPasses(
         passBuilder.addExtension(PassManagerBuilder::EP_Peephole,
                                  [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
                                  {
-                                     passMgr.add(CreatePatchPeepholeOpt());
+                                     passMgr.add(createPatchPeepholeOpt());
                                      passMgr.add(createInstSimplifyLegacyPass());
                                  });
         passBuilder.addExtension(PassManagerBuilder::EP_LoopOptimizerEnd,
@@ -328,7 +328,7 @@ void Patch::AddOptimizationPasses(
                 // are performed before the scalarizer. One important case this helps with is when you have bit casts
                 // whose source is a PHI - we want to make sure that the PHI does not have an i8 type before the
                 // scalarizer is called, otherwise a different kind of PHI mess is generated.
-                passMgr.add(CreatePatchPeepholeOpt(true));
+                passMgr.add(createPatchPeepholeOpt(true));
 
                 // Run the scalarizer as it helps our register pressure in the backend significantly. The scalarizer
                 // allows us to much more easily identify dead parts of vectors that we do not need to do any
@@ -340,7 +340,7 @@ void Patch::AddOptimizationPasses(
                 passMgr.add(createInstSimplifyLegacyPass());
 
                 // After we've finished loop optimizations, we run a pass to optimize our intrinsics.
-                passMgr.add(CreatePatchIntrinsicSimplify());
+                passMgr.add(createPatchIntrinsicSimplify());
             });
 
         passBuilder.populateModulePassManager(passMgr);
@@ -351,37 +351,37 @@ void Patch::AddOptimizationPasses(
 // Initializes the pass according to the specified module.
 //
 // NOTE: This function should be called at the beginning of "runOnModule()".
-void Patch::Init(
-    Module* pModule) // [in] LLVM module
+void Patch::init(
+    Module* module) // [in] LLVM module
 {
-    m_pModule  = pModule;
-    m_pContext = &m_pModule->getContext();
+    m_module  = module;
+    m_context = &m_module->getContext();
     m_shaderStage = ShaderStageInvalid;
-    m_pEntryPoint = nullptr;
+    m_entryPoint = nullptr;
 }
 
 // =====================================================================================================================
 // Get or create global variable for LDS.
-GlobalVariable* Patch::GetLdsVariable(
-    PipelineState*  pPipelineState, // [in] Pipeline state
-    Module*         pModule)        // [in/out] Module to get or create LDS in
+GlobalVariable* Patch::getLdsVariable(
+    PipelineState*  pipelineState, // [in] Pipeline state
+    Module*         module)        // [in/out] Module to get or create LDS in
 {
-    auto pContext = &pModule->getContext();
+    auto context = &module->getContext();
 
     // See if this module already has LDS.
-    auto pOldLds = pModule->getNamedValue("lds");
-    if (pOldLds != nullptr)
+    auto oldLds = module->getNamedValue("lds");
+    if (oldLds != nullptr)
     {
         // We already have LDS.
-        return cast<GlobalVariable>(pOldLds);
+        return cast<GlobalVariable>(oldLds);
     }
     // Now we can create LDS.
     // Construct LDS type: [ldsSize * i32], address space 3
-    auto ldsSize = pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizePerCu;
-    auto pLdsTy = ArrayType::get(Type::getInt32Ty(*pContext), ldsSize / sizeof(unsigned));
+    auto ldsSize = pipelineState->getTargetInfo().getGpuProperty().ldsSizePerCu;
+    auto ldsTy = ArrayType::get(Type::getInt32Ty(*context), ldsSize / sizeof(unsigned));
 
-    auto pLds = new GlobalVariable(*pModule,
-                                   pLdsTy,
+    auto lds = new GlobalVariable(*module,
+                                   ldsTy,
                                    false,
                                    GlobalValue::ExternalLinkage,
                                    nullptr,
@@ -389,8 +389,8 @@ GlobalVariable* Patch::GetLdsVariable(
                                    nullptr,
                                    GlobalValue::NotThreadLocal,
                                    ADDR_SPACE_LOCAL);
-    pLds->setAlignment(MaybeAlign(sizeof(unsigned)));
-    return pLds;
+    lds->setAlignment(MaybeAlign(sizeof(unsigned)));
+    return lds;
 }
 
 } // lgc

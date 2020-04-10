@@ -69,7 +69,7 @@ Context::Context(
     m_gfxIp(gfxIp),
     m_glslEmuLib(this)
 {
-    Reset();
+    reset();
 }
 
 // =====================================================================================================================
@@ -78,22 +78,22 @@ Context::~Context()
 }
 
 // =====================================================================================================================
-void Context::Reset()
+void Context::reset()
 {
-    m_pPipelineContext = nullptr;
-    delete m_pBuilder;
-    m_pBuilder = nullptr;
+    m_pipelineContext = nullptr;
+    delete m_builder;
+    m_builder = nullptr;
 }
 
 // =====================================================================================================================
 // Get (create if necessary) BuilderContext
-BuilderContext* Context::GetBuilderContext()
+BuilderContext* Context::getBuilderContext()
 {
     if (!m_builderContext)
     {
         // First time: Create the BuilderContext.
         std::string gpuName;
-        PipelineContext::GetGpuNameString(m_gfxIp, gpuName);
+        PipelineContext::getGpuNameString(m_gfxIp, gpuName);
         m_builderContext.reset(BuilderContext::Create(*this, gpuName, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
         if (!m_builderContext)
         {
@@ -105,16 +105,16 @@ BuilderContext* Context::GetBuilderContext()
 
 // =====================================================================================================================
 // Loads library from external LLVM library.
-std::unique_ptr<Module> Context::LoadLibary(
-    const BinaryData* pLib)     // [in] Bitcodes of external LLVM library
+std::unique_ptr<Module> Context::loadLibary(
+    const BinaryData* lib)     // [in] Bitcodes of external LLVM library
 {
-    auto pMemBuffer = MemoryBuffer::getMemBuffer(
-        StringRef(static_cast<const char*>(pLib->pCode), pLib->codeSize), "", false);
+    auto memBuffer = MemoryBuffer::getMemBuffer(
+        StringRef(static_cast<const char*>(lib->pCode), lib->codeSize), "", false);
 
     Expected<std::unique_ptr<Module>> moduleOrErr =
-        getLazyBitcodeModule(pMemBuffer->getMemBufferRef(), *this);
+        getLazyBitcodeModule(memBuffer->getMemBufferRef(), *this);
 
-    std::unique_ptr<Module> pLibModule = nullptr;
+    std::unique_ptr<Module> libModule = nullptr;
     if (!moduleOrErr)
     {
         Error error = moduleOrErr.takeError();
@@ -122,25 +122,25 @@ std::unique_ptr<Module> Context::LoadLibary(
     }
     else
     {
-        pLibModule = std::move(*moduleOrErr);
-        if (llvm::Error errCode = pLibModule->materializeAll())
+        libModule = std::move(*moduleOrErr);
+        if (llvm::Error errCode = libModule->materializeAll())
         {
             LLPC_ERRS("Fails to materialize \n");
-            pLibModule = nullptr;
+            libModule = nullptr;
         }
     }
 
-    return pLibModule;
+    return libModule;
 }
 
 // =====================================================================================================================
 // Sets triple and data layout in specified module from the context's target machine.
-void Context::SetModuleTargetMachine(
-    Module* pModule)  // [in/out] Module to modify
+void Context::setModuleTargetMachine(
+    Module* module)  // [in/out] Module to modify
 {
-    TargetMachine* pTargetMachine = GetBuilderContext()->GetTargetMachine();
-    pModule->setTargetTriple(pTargetMachine->getTargetTriple().getTriple());
-    pModule->setDataLayout(pTargetMachine->createDataLayout());
+    TargetMachine* targetMachine = getBuilderContext()->getTargetMachine();
+    module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
+    module->setDataLayout(targetMachine->createDataLayout());
 }
 
 } // Llpc

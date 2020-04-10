@@ -48,9 +48,9 @@ namespace Llpc
 // The structure for store instruction which needs to be expanded.
 struct StoreExpandInfo
 {
-    llvm::StoreInst *pStoreInst;                                  ///< "Store" instruction
+    llvm::StoreInst *storeInst;                                  ///< "Store" instruction
     llvm::SmallVector<llvm::GetElementPtrInst *, 1> getElemPtrs;  ///< A group of "getelementptr" with constant indices
-    llvm::Value *pDynIndex;                                       ///< Dynamic index of destination.
+    llvm::Value *dynIndex;                                       ///< Dynamic index of destination.
 };
 
 // =====================================================================================================================
@@ -73,18 +73,18 @@ private:
     SpirvLowerMemoryOp(const SpirvLowerMemoryOp&) = delete;
     SpirvLowerMemoryOp& operator=(const SpirvLowerMemoryOp&) = delete;
 
-    bool NeedExpandDynamicIndex(llvm::GetElementPtrInst* pGetElemPtr,
-                                unsigned*                pOperandIndex,
-                                unsigned*                pDynIndexBound) const;
-    void ExpandLoadInst(llvm::LoadInst*                          pLoadInst,
+    bool needExpandDynamicIndex(llvm::GetElementPtrInst* getElemPtr,
+                                unsigned*                operandIndex,
+                                unsigned*                dynIndexBound) const;
+    void expandLoadInst(llvm::LoadInst*                          loadInst,
                         llvm::ArrayRef<llvm::GetElementPtrInst*> getElemPtrs,
-                        llvm::Value*                             pDynIndex);
-    void RecordStoreExpandInfo(llvm::StoreInst*                         pStoreInst,
+                        llvm::Value*                             dynIndex);
+    void recordStoreExpandInfo(llvm::StoreInst*                         storeInst,
                                llvm::ArrayRef<llvm::GetElementPtrInst*> getElemPtrs,
-                               llvm::Value*                             pDynIndex);
-    void ExpandStoreInst(llvm::StoreInst*                         pStoreInst,
+                               llvm::Value*                             dynIndex);
+    void expandStoreInst(llvm::StoreInst*                         storeInst,
                          llvm::ArrayRef<llvm::GetElementPtrInst*> getElemPtrs,
-                         llvm::Value*                             pDynIndex);
+                         llvm::Value*                             dynIndex);
 
     std::unordered_set<llvm::Instruction*> m_removeInsts;
     std::unordered_set<llvm::Instruction*> m_preRemoveInsts;

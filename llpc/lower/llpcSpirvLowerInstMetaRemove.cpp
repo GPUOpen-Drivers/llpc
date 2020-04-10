@@ -50,7 +50,7 @@ char SpirvLowerInstMetaRemove::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering opertions for removing the instruction metadata
-ModulePass* CreateSpirvLowerInstMetaRemove()
+ModulePass* createSpirvLowerInstMetaRemove()
 {
     return new SpirvLowerInstMetaRemove();
 }
@@ -70,23 +70,23 @@ bool SpirvLowerInstMetaRemove::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Inst-Meta-Remove\n");
 
-    SpirvLower::Init(&module);
+    SpirvLower::init(&module);
     m_changed = false;
 
-    visit(m_pModule);
+    visit(m_module);
 
     // Remove any named metadata in the module that starts "spirv.".
     SmallVector<NamedMDNode*, 8> nodesToRemove;
-    for (auto& namedMdNode : m_pModule->getNamedMDList())
+    for (auto& namedMdNode : m_module->getNamedMDList())
     {
         if (namedMdNode.getName().startswith(gSPIRVMD::Prefix))
         {
             nodesToRemove.push_back(&namedMdNode);
         }
     }
-    for (NamedMDNode* pNamedMdNode : nodesToRemove)
+    for (NamedMDNode* namedMdNode : nodesToRemove)
     {
-        pNamedMdNode->eraseFromParent();
+        namedMdNode->eraseFromParent();
         m_changed = true;
     }
 
@@ -98,13 +98,13 @@ bool SpirvLowerInstMetaRemove::runOnModule(
 void SpirvLowerInstMetaRemove::visitCallInst(
     CallInst& callInst) // [in] "Call" instruction
 {
-    auto pCallee = callInst.getCalledFunction();
-    if (pCallee == nullptr)
+    auto callee = callInst.getCalledFunction();
+    if (callee == nullptr)
     {
         return;
     }
 
-    auto mangledName = pCallee->getName();
+    auto mangledName = callee->getName();
     if (mangledName.startswith(gSPIRVName::NonUniform))
     {
         callInst.dropAllReferences();

@@ -71,17 +71,17 @@ class SpirvLowerResourceCollect:
 {
 public:
     SpirvLowerResourceCollect(bool collectDetailUsage = false);
-    auto& GetResourceNodeDatas()
+    auto& getResourceNodeDatas()
     {
         return m_resNodeDatas;
     }
-    auto GetPushConstSize() {return m_pushConstSize; }
-    auto& GetFsOutInfos() { return m_fsOutInfos; }
-    bool DetailUsageValid() { return m_detailUsageValid; }
+    auto getPushConstSize() {return m_pushConstSize; }
+    auto& getFsOutInfos() { return m_fsOutInfos; }
+    bool detailUsageValid() { return m_detailUsageValid; }
 
     virtual bool runOnModule(llvm::Module& module);
-    void VisitCalls(llvm::Module& module);
-    llvm::Value* FindCallAndGetIndexValue(llvm::Module& module, llvm::CallInst* const pTargetCall);
+    void visitCalls(llvm::Module& module);
+    llvm::Value* findCallAndGetIndexValue(llvm::Module& module, llvm::CallInst* const targetCall);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -91,10 +91,10 @@ private:
     SpirvLowerResourceCollect(const SpirvLowerResourceCollect&) = delete;
     SpirvLowerResourceCollect& operator=(const SpirvLowerResourceCollect&) = delete;
 
-    unsigned GetFlattenArrayElementCount(const llvm::Type* pTy) const;
-    const llvm::Type* GetFlattenArrayElementType(const llvm::Type* pTy) const;
+    unsigned getFlattenArrayElementCount(const llvm::Type* ty) const;
+    const llvm::Type* getFlattenArrayElementType(const llvm::Type* ty) const;
 
-    void CollectResourceNodeData(const GlobalVariable* pGlobal);
+    void collectResourceNodeData(const GlobalVariable* global);
 
     // -----------------------------------------------------------------------------------------------------------------
 

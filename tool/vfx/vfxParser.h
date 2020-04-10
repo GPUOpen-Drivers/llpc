@@ -60,18 +60,18 @@ public:
     Document() {}
     virtual ~Document();
 
-    virtual unsigned GetMaxSectionCount(SectionType type) = 0;
-    virtual bool CheckVersion(unsigned ver) { return true; }
-    virtual bool Validate() { return true; }
+    virtual unsigned getMaxSectionCount(SectionType type) = 0;
+    virtual bool checkVersion(unsigned ver) { return true; }
+    virtual bool validate() { return true; }
 
-    static Document* CreateDocument(VfxDocType type);
+    static Document* createDocument(VfxDocType type);
 
-    Section* GetFreeSection(const char* pSectionName);
-    void PrintSelf();
-    bool CompileShader();
-    void SetFileName(const std::string& fileName) { m_fileName = fileName; }
+    Section* getFreeSection(const char* sectionName);
+    void printSelf();
+    bool compileShader();
+    void setFileName(const std::string& fileName) { m_fileName = fileName; }
 
-    std::string* GetErrorMsg()  { return &m_errorMsg; }
+    std::string* getErrorMsg()  { return &m_errorMsg; }
 
 protected:
     std::vector<Section*>  m_sections[SectionTypeNameNum]; // Contains sections
@@ -86,46 +86,46 @@ class VfxParser
 {
 public:
     VfxParser();
-    bool IsValidVfxFile() { return m_isValidVfxFile; }
+    bool isValidVfxFile() { return m_isValidVfxFile; }
 
-    bool Parse(const TestCaseInfo& info, Document* pDoc);
+    bool parse(const TestCaseInfo& info, Document* doc);
 
 private:
-    bool MacroSubstituteLine(char* pLine,
+    bool macroSubstituteLine(char* line,
                              unsigned lineNum,
-                             const MacroDefinition* pMacroDefinition,
+                             const MacroDefinition* macroDefinition,
                              unsigned maxLineLength);
 
-    bool ParseLine(char* pLine);
+    bool parseLine(char* line);
 
-    bool BeginSection(char* pLine);
+    bool beginSection(char* line);
 
-    bool EndSection();
+    bool endSection();
 
-    void ParseSectionShaderSource();
+    void parseSectionShaderSource();
 
-    bool ParseSectionKeyValues();
+    bool parseSectionKeyValues();
 
-    bool ParseKey(const char* pKey,
+    bool parseKey(const char* key,
                   unsigned    lineNum,
-                  Section*    pSectionObjectIn,
+                  Section*    sectionObjectIn,
                   Section**   ppSectionObjectOut,
-                  char*       pSectionMemberName,
+                  char*       sectionMemberName,
                   unsigned    memberNameBufferSize,
-                  unsigned*   pArrayIndex);
+                  unsigned*   arrayIndex);
 
-    bool ParseKeyValue(char*      pKey,
-                       char*      pValue,
+    bool parseKeyValue(char*      key,
+                       char*      value,
                        unsigned   lineNum,
-                       Section*   pSectionObject);
+                       Section*   sectionObject);
 
-    Document*           m_pVfxDoc;                       // Parse result
+    Document*           m_vfxDoc;                       // Parse result
     bool                m_isValidVfxFile;                // If vfx file is valid
-    Section*            m_pCurrentSection;               // Current section
+    Section*            m_currentSection;               // Current section
     unsigned            m_currentLineNum;                // Current line number
     std::stringstream   m_currentSectionStringBuffer;    // Current section string buffer
     unsigned            m_currentSectionLineNum;         // Current section line number
-    std::string*        m_pErrorMsg;                     // Error message
+    std::string*        m_errorMsg;                     // Error message
 };
 
 }

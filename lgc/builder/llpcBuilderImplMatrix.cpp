@@ -38,211 +38,211 @@ using namespace llvm;
 // =====================================================================================================================
 // Create a matrix transpose.
 Value* BuilderImplMatrix::CreateTransposeMatrix(
-    Value* const pMatrix,  // [in] Matrix to transpose.
+    Value* const matrix,  // [in] Matrix to transpose.
     const Twine& instName) // [in] Name to give final instruction
 {
-    assert(pMatrix != nullptr);
+    assert(matrix != nullptr);
 
-    Type* const pMatrixType = pMatrix->getType();
-    assert(pMatrixType->isArrayTy());
+    Type* const matrixType = matrix->getType();
+    assert(matrixType->isArrayTy());
 
-    Type* const pColumnVectorType = pMatrixType->getArrayElementType();
-    assert(pColumnVectorType->isVectorTy());
+    Type* const columnVectorType = matrixType->getArrayElementType();
+    assert(columnVectorType->isVectorTy());
 
-    const unsigned columnCount = pMatrixType->getArrayNumElements();
-    const unsigned rowCount = pColumnVectorType->getVectorNumElements();
+    const unsigned columnCount = matrixType->getArrayNumElements();
+    const unsigned rowCount = columnVectorType->getVectorNumElements();
 
-    Type* const pElementType = pColumnVectorType->getVectorElementType();
+    Type* const elementType = columnVectorType->getVectorElementType();
 
-    Type* const pNewColumnVectorType = VectorType::get(pElementType, columnCount);
-    Type* const pNewMatrixType = ArrayType::get(pNewColumnVectorType, rowCount);
+    Type* const newColumnVectorType = VectorType::get(elementType, columnCount);
+    Type* const newMatrixType = ArrayType::get(newColumnVectorType, rowCount);
 
     SmallVector<Value*, 4> columns;
 
     for (unsigned column = 0; column < columnCount; column++)
     {
-        columns.push_back(CreateExtractValue(pMatrix, column));
+        columns.push_back(CreateExtractValue(matrix, column));
     }
 
     SmallVector<Value*, 4> newColumns;
 
     for (unsigned row = 0; row < rowCount; row++)
     {
-        newColumns.push_back(UndefValue::get(pNewColumnVectorType));
+        newColumns.push_back(UndefValue::get(newColumnVectorType));
     }
 
     for (unsigned column = 0; column < columnCount; column++)
     {
         for (unsigned row = 0; row < rowCount; row++)
         {
-            Value* const pElement = CreateExtractElement(columns[column], row);
-            newColumns[row] = CreateInsertElement(newColumns[row], pElement, column);
+            Value* const element = CreateExtractElement(columns[column], row);
+            newColumns[row] = CreateInsertElement(newColumns[row], element, column);
         }
     }
 
-    Value* pNewMatrix = UndefValue::get(pNewMatrixType);
+    Value* newMatrix = UndefValue::get(newMatrixType);
 
     for (unsigned row = 0; row < rowCount; row++)
     {
-        pNewMatrix = CreateInsertValue(pNewMatrix, newColumns[row], row);
+        newMatrix = CreateInsertValue(newMatrix, newColumns[row], row);
     }
 
-    pNewMatrix->setName(instName);
-    return pNewMatrix;
+    newMatrix->setName(instName);
+    return newMatrix;
 }
 
 // =====================================================================================================================
 // Create matrix from matrix Times scalar
 Value* BuilderImplMatrix::CreateMatrixTimesScalar(
-    Value* const pMatrix,             // [in] The column major matrix, n x <n x float>
-    Value* const pScalar,             // [in] The float scalar
+    Value* const matrix,             // [in] The column major matrix, n x <n x float>
+    Value* const scalar,             // [in] The float scalar
     const Twine& instName)            // [in] Name to give instruction(s)
 {
-    Type* const pMatrixTy = pMatrix->getType();
-    Type* const pColumnTy = pMatrixTy->getArrayElementType();
-    const unsigned rowCount = pColumnTy->getVectorNumElements();
-    unsigned columnCount = pMatrixTy->getArrayNumElements();
-    auto pSmearScalar = CreateVectorSplat(rowCount, pScalar);
+    Type* const matrixTy = matrix->getType();
+    Type* const columnTy = matrixTy->getArrayElementType();
+    const unsigned rowCount = columnTy->getVectorNumElements();
+    unsigned columnCount = matrixTy->getArrayNumElements();
+    auto smearScalar = CreateVectorSplat(rowCount, scalar);
 
-    Value* pResult = UndefValue::get(pMatrixTy);
+    Value* result = UndefValue::get(matrixTy);
     for (unsigned column = 0; column < columnCount; column++)
     {
-        auto pColumnVector = CreateExtractValue(pMatrix, column);
-        pColumnVector = CreateFMul(pColumnVector, pSmearScalar);
-        pResult = CreateInsertValue(pResult, pColumnVector, column);
+        auto columnVector = CreateExtractValue(matrix, column);
+        columnVector = CreateFMul(columnVector, smearScalar);
+        result = CreateInsertValue(result, columnVector, column);
     }
 
-    pResult->setName(instName);
-    return pResult;
+    result->setName(instName);
+    return result;
 }
 
 // =====================================================================================================================
 // Create vector from vector Times matrix
 Value* BuilderImplMatrix::CreateVectorTimesMatrix(
-    Value* const pVector,         // [in] The float vector
-    Value* const pMatrix,         // [in] The column major matrix, n x <n x float>
+    Value* const vector,         // [in] The float vector
+    Value* const matrix,         // [in] The column major matrix, n x <n x float>
     const Twine& instName)        // [in] Name to give instruction(s)
 {
-    Type* const pMatrixTy = pMatrix->getType();
-    Type* const pCompTy = pMatrixTy->getArrayElementType()->getVectorElementType();
-    const unsigned columnCount = pMatrixTy->getArrayNumElements();
-    Type* const pResultTy = VectorType::get(pCompTy, columnCount);
-    Value* pResult = UndefValue::get(pResultTy);
+    Type* const matrixTy = matrix->getType();
+    Type* const compTy = matrixTy->getArrayElementType()->getVectorElementType();
+    const unsigned columnCount = matrixTy->getArrayNumElements();
+    Type* const resultTy = VectorType::get(compTy, columnCount);
+    Value* result = UndefValue::get(resultTy);
 
     for (unsigned column = 0; column < columnCount; column++)
     {
-        auto pColumnVector = CreateExtractValue(pMatrix, column);
-        pResult = CreateInsertElement(pResult, CreateDotProduct(pColumnVector, pVector), column);
+        auto columnVector = CreateExtractValue(matrix, column);
+        result = CreateInsertElement(result, CreateDotProduct(columnVector, vector), column);
     }
 
-    pResult->setName(instName);
-    return pResult;
+    result->setName(instName);
+    return result;
 }
 
 // =====================================================================================================================
 // Create vector from matrix times vector
 Value* BuilderImplMatrix::CreateMatrixTimesVector(
-    Value* const pMatrix,             // [in] The column major matrix, n x <n x float>
-    Value* const pVector,             // [in] The vector
+    Value* const matrix,             // [in] The column major matrix, n x <n x float>
+    Value* const vector,             // [in] The vector
     const Twine& instName)            // [in] Name to give instruction(s)
 {
-    Type* const pColumnTy = pMatrix->getType()->getArrayElementType();
-    const unsigned rowCount = pColumnTy->getVectorNumElements();
-    Value* pResult = nullptr;
+    Type* const columnTy = matrix->getType()->getArrayElementType();
+    const unsigned rowCount = columnTy->getVectorNumElements();
+    Value* result = nullptr;
 
-    for (unsigned i = 0; i < pMatrix->getType()->getArrayNumElements(); ++i)
+    for (unsigned i = 0; i < matrix->getType()->getArrayNumElements(); ++i)
     {
         SmallVector<unsigned, 4> shuffleMask(rowCount, i);
-        auto pPartialResult = CreateShuffleVector(pVector, pVector, shuffleMask);
-        pPartialResult = CreateFMul(CreateExtractValue(pMatrix, i), pPartialResult);
-        if (pResult != nullptr)
+        auto partialResult = CreateShuffleVector(vector, vector, shuffleMask);
+        partialResult = CreateFMul(CreateExtractValue(matrix, i), partialResult);
+        if (result != nullptr)
         {
-            pResult = CreateFAdd(pResult, pPartialResult);
+            result = CreateFAdd(result, partialResult);
         }
         else
         {
-            pResult = pPartialResult;
+            result = partialResult;
         }
     }
 
-    pResult->setName(instName);
-    return pResult;
+    result->setName(instName);
+    return result;
 }
 
 // =====================================================================================================================
 // Create matrix from matrix times matrix
 Value* BuilderImplMatrix::CreateMatrixTimesMatrix(
-    Value* const pMatrix1,             // [in] The float matrix 1
-    Value* const pMatrix2,             // [in] The float matrix 2
+    Value* const matrix1,             // [in] The float matrix 1
+    Value* const matrix2,             // [in] The float matrix 2
     const Twine& instName)             // [in] Name to give instruction(s)
 {
-    Type* const pMat1ColumnType = pMatrix1->getType()->getArrayElementType();
-    const unsigned mat2ColCount = pMatrix2->getType()->getArrayNumElements();
-    Type* const pResultTy = ArrayType::get(pMat1ColumnType, mat2ColCount);
-    Value* pResult = UndefValue::get(pResultTy);
+    Type* const mat1ColumnType = matrix1->getType()->getArrayElementType();
+    const unsigned mat2ColCount = matrix2->getType()->getArrayNumElements();
+    Type* const resultTy = ArrayType::get(mat1ColumnType, mat2ColCount);
+    Value* result = UndefValue::get(resultTy);
 
     for (unsigned i = 0; i < mat2ColCount; ++i)
     {
-        Value* pNewColumnVector = CreateMatrixTimesVector(pMatrix1, CreateExtractValue(pMatrix2, i));
-        pResult = CreateInsertValue(pResult, pNewColumnVector, i);
+        Value* newColumnVector = CreateMatrixTimesVector(matrix1, CreateExtractValue(matrix2, i));
+        result = CreateInsertValue(result, newColumnVector, i);
     }
 
-    pResult->setName(instName);
-    return pResult;
+    result->setName(instName);
+    return result;
 }
 
 // =====================================================================================================================
 // Create matrix from outer product of vector
 Value* BuilderImplMatrix::CreateOuterProduct(
-    Value* const pVector1,            // [in] The float vector 1
-    Value* const pVector2,            // [in] The float vector 2
+    Value* const vector1,            // [in] The float vector 1
+    Value* const vector2,            // [in] The float vector 2
     const Twine& instName)            // [in] Name to give instruction(s)
 {
-    const unsigned rowCount = pVector1->getType()->getVectorNumElements();
-    const unsigned colCount = pVector2->getType()->getVectorNumElements();
-    Type* const pResultTy = ArrayType::get(pVector1->getType(), colCount);
-    Value* pResult = UndefValue::get(pResultTy);
+    const unsigned rowCount = vector1->getType()->getVectorNumElements();
+    const unsigned colCount = vector2->getType()->getVectorNumElements();
+    Type* const resultTy = ArrayType::get(vector1->getType(), colCount);
+    Value* result = UndefValue::get(resultTy);
 
     for (unsigned i = 0; i < colCount; ++i)
     {
         SmallVector<unsigned, 4> shuffleIdx(rowCount, i);
-        Value* pColumnVector = CreateFMul(pVector1, CreateShuffleVector(pVector2, pVector2, shuffleIdx));
-        pResult = CreateInsertValue(pResult, pColumnVector, i);
+        Value* columnVector = CreateFMul(vector1, CreateShuffleVector(vector2, vector2, shuffleIdx));
+        result = CreateInsertValue(result, columnVector, i);
     }
 
-    pResult->setName(instName);
-    return pResult;
+    result->setName(instName);
+    return result;
 }
 
 // =====================================================================================================================
 // Create matrix determinant operation. Matrix must be square
 Value* BuilderImplMatrix::CreateDeterminant(
-    Value* const pMatrix,     // [in] Matrix
+    Value* const matrix,     // [in] Matrix
     const Twine& instName)    // [in] Name to give instruction(s)
 {
-    unsigned order = pMatrix->getType()->getArrayNumElements();
-    assert(pMatrix->getType()->getArrayElementType()->getVectorNumElements() == order);
+    unsigned order = matrix->getType()->getArrayNumElements();
+    assert(matrix->getType()->getArrayElementType()->getVectorNumElements() == order);
     assert(order >= 2);
 
     // Extract matrix elements.
     SmallVector<Value*, 16> elements;
     for (unsigned columnIdx = 0; columnIdx != order; ++columnIdx)
     {
-        Value* pColumn = CreateExtractValue(pMatrix, columnIdx);
+        Value* column = CreateExtractValue(matrix, columnIdx);
         for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
         {
-            elements.push_back(CreateExtractElement(pColumn, rowIdx));
+            elements.push_back(CreateExtractElement(column, rowIdx));
         }
     }
 
-    Value* pResult = Determinant(elements, order);
-    pResult->setName(instName);
-    return pResult;
+    Value* result = determinant(elements, order);
+    result->setName(instName);
+    return result;
 }
 
 // =====================================================================================================================
 // Helper function for determinant calculation
-Value* BuilderImplMatrix::Determinant(
+Value* BuilderImplMatrix::determinant(
     ArrayRef<Value*>    elements,     // Elements of matrix (order*order of them)
     unsigned            order)        // Order of matrix
 {
@@ -266,33 +266,33 @@ Value* BuilderImplMatrix::Determinant(
     // | z0   z1   z2 |
     SmallVector<Value*, 9> submatrix;
     submatrix.resize((order - 1) * (order - 1));
-    Value* pResult = nullptr;
+    Value* result = nullptr;
     for (unsigned leadRowIdx = 0; leadRowIdx != order; ++leadRowIdx)
     {
-        GetSubmatrix(elements, submatrix, order, leadRowIdx, 0);
-        Value* pSubdeterminant = CreateFMul(elements[leadRowIdx], Determinant(submatrix, order - 1));
+        getSubmatrix(elements, submatrix, order, leadRowIdx, 0);
+        Value* subdeterminant = CreateFMul(elements[leadRowIdx], determinant(submatrix, order - 1));
         if ((leadRowIdx & 1) != 0)
         {
-            pResult = CreateFSub(pResult, pSubdeterminant);
+            result = CreateFSub(result, subdeterminant);
         }
         else
         {
-            if (pResult == nullptr)
+            if (result == nullptr)
             {
-                pResult = pSubdeterminant;
+                result = subdeterminant;
             }
             else
             {
-                pResult = CreateFAdd(pResult, pSubdeterminant);
+                result = CreateFAdd(result, subdeterminant);
             }
         }
     }
-    return pResult;
+    return result;
 }
 
 // =====================================================================================================================
 // Get submatrix by deleting specified row and column
-void BuilderImplMatrix::GetSubmatrix(
+void BuilderImplMatrix::getSubmatrix(
     ArrayRef<Value*>        matrix,         // Input matrix (as linearized array of values, order*order of them)
     MutableArrayRef<Value*> submatrix,      // Output matrix (ditto, (order-1)*(order-1) of them)
     unsigned                order,          // Order of input matrix
@@ -317,21 +317,21 @@ void BuilderImplMatrix::GetSubmatrix(
 // Create matrix inverse operation. Matrix must be square. Result is undefined if the matrix
 // is singular or poorly conditioned (nearly singular).
 Value* BuilderImplMatrix::CreateMatrixInverse(
-    Value* const pMatrix,     // [in] Matrix
+    Value* const matrix,     // [in] Matrix
     const Twine& instName)    // [in] Name to give instruction(s)
 {
-    unsigned order = pMatrix->getType()->getArrayNumElements();
-    assert(pMatrix->getType()->getArrayElementType()->getVectorNumElements() == order);
+    unsigned order = matrix->getType()->getArrayNumElements();
+    assert(matrix->getType()->getArrayElementType()->getVectorNumElements() == order);
     assert(order >= 2);
 
     // Extract matrix elements.
     SmallVector<Value*, 16> elements;
     for (unsigned columnIdx = 0; columnIdx != order; ++columnIdx)
     {
-        Value* pColumn = CreateExtractValue(pMatrix, columnIdx);
+        Value* column = CreateExtractValue(matrix, columnIdx);
         for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
         {
-            elements.push_back(CreateExtractElement(pColumn, rowIdx));
+            elements.push_back(CreateExtractElement(column, rowIdx));
         }
     }
 
@@ -350,8 +350,8 @@ Value* BuilderImplMatrix::CreateMatrixInverse(
     submatrix.resize((order - 1) * (order - 1));
 
     // Calculate reciprocal of determinant, and negated reciprocal of determinant.
-    Value* pRcpDet = CreateFDiv(ConstantFP::get(elements[0]->getType(), 1.0), Determinant(elements, order));
-    Value* pNegRcpDet = CreateFSub(Constant::getNullValue(elements[0]->getType()), pRcpDet);
+    Value* rcpDet = CreateFDiv(ConstantFP::get(elements[0]->getType(), 1.0), determinant(elements, order));
+    Value* negRcpDet = CreateFSub(Constant::getNullValue(elements[0]->getType()), rcpDet);
 
     // For each element:
     for (unsigned columnIdx = 0; columnIdx != order; ++columnIdx)
@@ -359,30 +359,30 @@ Value* BuilderImplMatrix::CreateMatrixInverse(
         for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
         {
             // Calculate cofactor for this element.
-            GetSubmatrix(elements, submatrix, order, rowIdx, columnIdx);
+            getSubmatrix(elements, submatrix, order, rowIdx, columnIdx);
             // Calculate its determinant.
-            Value* pCofactor = Determinant(submatrix, order - 1);
+            Value* cofactor = determinant(submatrix, order - 1);
             // Divide by whole matrix determinant, and negate if row+col is odd.
-            pCofactor = CreateFMul(pCofactor,
-                                   (((rowIdx + columnIdx) & 1) != 0) ? pNegRcpDet : pRcpDet);
+            cofactor = CreateFMul(cofactor,
+                                   (((rowIdx + columnIdx) & 1) != 0) ? negRcpDet : rcpDet);
             // Transpose by placing the cofactor in the transpose position.
-            resultElements[rowIdx * order + columnIdx] = pCofactor;
+            resultElements[rowIdx * order + columnIdx] = cofactor;
         }
     }
 
     // Create the result matrix.
-    Value* pResult = UndefValue::get(pMatrix->getType());
+    Value* result = UndefValue::get(matrix->getType());
     for (unsigned columnIdx = 0; columnIdx != order; ++columnIdx)
     {
-        Value* pColumn = UndefValue::get(pMatrix->getType()->getArrayElementType());
+        Value* column = UndefValue::get(matrix->getType()->getArrayElementType());
         for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
         {
-            pColumn = CreateInsertElement(pColumn, resultElements[rowIdx + columnIdx * order], rowIdx);
+            column = CreateInsertElement(column, resultElements[rowIdx + columnIdx * order], rowIdx);
         }
-        pResult = CreateInsertValue(pResult, pColumn, columnIdx);
+        result = CreateInsertValue(result, column, columnIdx);
     }
 
-    pResult->setName(instName);
-    return pResult;
+    result->setName(instName);
+    return result;
 }
 

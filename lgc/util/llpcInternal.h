@@ -62,7 +62,7 @@ static const unsigned InvalidValue  = ~0u;
 static const unsigned SizeOfVec4 = sizeof(float) * 4;
 
 // Initialize helper passes
-inline static void InitializeUtilPasses(
+inline static void initializeUtilPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
 {
     initializePipelineShadersPass(passRegistry);
@@ -172,44 +172,44 @@ static const unsigned DescRelocMagicMask    = 0xFFFFFF00;
 static const unsigned DescSetMask           = 0x000000FF;
 
 // Translates shader stage to corresponding stage mask.
-static inline unsigned ShaderStageToMask(ShaderStage stage) { return 1U << static_cast<unsigned>(stage); }
+static inline unsigned shaderStageToMask(ShaderStage stage) { return 1U << static_cast<unsigned>(stage); }
 
 // Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
 // and its parameters.
-llvm::CallInst* EmitCall(llvm::StringRef                           funcName,
-                         llvm::Type*                               pRetTy,
+llvm::CallInst* emitCall(llvm::StringRef                           funcName,
+                         llvm::Type*                               retTy,
                          llvm::ArrayRef<llvm::Value *>             args,
                          llvm::ArrayRef<llvm::Attribute::AttrKind> attribs,
-                         llvm::Instruction*                        pInsertPos);
+                         llvm::Instruction*                        insertPos);
 
 // Emits a LLVM function call (inserted at the end of the specified basic block), builds it automically based on return
 // type and its parameters.
-llvm::CallInst* EmitCall(llvm::StringRef                           funcName,
-                         llvm::Type*                               pRetTy,
+llvm::CallInst* emitCall(llvm::StringRef                           funcName,
+                         llvm::Type*                               retTy,
                          llvm::ArrayRef<llvm::Value *>             args,
                          llvm::ArrayRef<llvm::Attribute::AttrKind> attribs,
-                         llvm::BasicBlock*                         pInsertAtEnd);
+                         llvm::BasicBlock*                         insertAtEnd);
 
 // Adds LLVM-style type mangling suffix for the specified return type and args to the name.
-void AddTypeMangling(llvm::Type* pReturnTy, llvm::ArrayRef<llvm::Value*> args, std::string& name);
+void addTypeMangling(llvm::Type* returnTy, llvm::ArrayRef<llvm::Value*> args, std::string& name);
 
 // Gets LLVM-style name for type.
-void GetTypeName(llvm::Type* pTy, llvm::raw_ostream& nameStream);
-std::string GetTypeName(llvm::Type* pTy);
+void getTypeName(llvm::Type* ty, llvm::raw_ostream& nameStream);
+std::string getTypeName(llvm::Type* ty);
 
 // Gets the shader stage from the specified LLVM function.
-ShaderStage GetShaderStageFromFunction(const llvm::Function* pFunc);
+ShaderStage getShaderStageFromFunction(const llvm::Function* func);
 
 // Gets the shader stage from the specified calling convention.
-ShaderStage GetShaderStageFromCallingConv(unsigned stageMask, llvm::CallingConv::ID callConv);
+ShaderStage getShaderStageFromCallingConv(unsigned stageMask, llvm::CallingConv::ID callConv);
 
 // Gets the argument from the specified function according to the argument index.
-llvm::Value* GetFunctionArgument(llvm::Function* pFunc, unsigned idx, const llvm::Twine& name = "");
+llvm::Value* getFunctionArgument(llvm::Function* func, unsigned idx, const llvm::Twine& name = "");
 
 // Checks if one type can be bitcasted to the other (type1 -> type2).
-bool CanBitCast(const llvm::Type* pTy1, const llvm::Type* pTy2);
+bool canBitCast(const llvm::Type* ty1, const llvm::Type* ty2);
 
 // Checks if the specified value actually represents a don't-care value (0xFFFFFFFF).
-bool IsDontCareValue(llvm::Value* pValue);
+bool isDontCareValue(llvm::Value* value);
 
 } // lgc

@@ -74,19 +74,19 @@ public:
     PatchIntrinsicSimplify& operator=(const PatchIntrinsicSimplify&) = delete;
 
 private:
-    bool CanSafelyConvertTo16Bit(llvm::Value& value) const;
-    llvm::Value* ConvertTo16Bit(llvm::Value& value, llvm::IRBuilder<>& builder) const;
-    llvm::Value* SimplifyImage(llvm::IntrinsicInst& intrinsicCall,
+    bool canSafelyConvertTo16Bit(llvm::Value& value) const;
+    llvm::Value* convertTo16Bit(llvm::Value& value, llvm::IRBuilder<>& builder) const;
+    llvm::Value* simplifyImage(llvm::IntrinsicInst& intrinsicCall,
                                llvm::ArrayRef<unsigned> coordOperandIndices) const;
-    llvm::Value* SimplifyTrigonometric(llvm::IntrinsicInst& intrinsicCall) const;
-    bool CanSimplify(llvm::IntrinsicInst& intrinsicCall) const;
-    llvm::Value* Simplify(llvm::IntrinsicInst& intrinsicCall) const;
+    llvm::Value* simplifyTrigonometric(llvm::IntrinsicInst& intrinsicCall) const;
+    bool canSimplify(llvm::IntrinsicInst& intrinsicCall) const;
+    llvm::Value* simplify(llvm::IntrinsicInst& intrinsicCall) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::ScalarEvolution* m_pScalarEvolution = nullptr;
-    llvm::LLVMContext*     m_pContext         = nullptr;
-    llvm::Module*          m_pModule          = nullptr;
+    llvm::ScalarEvolution* m_scalarEvolution = nullptr;
+    llvm::LLVMContext*     m_context         = nullptr;
+    llvm::Module*          m_module          = nullptr;
     GfxIpVersion m_gfxIp;
 };
 

@@ -46,11 +46,11 @@ char SpirvLowerTranslator::ID = 0;
 
 // =====================================================================================================================
 // Creates the pass of translating SPIR-V to LLVM IR.
-ModulePass* Llpc::CreateSpirvLowerTranslator(
+ModulePass* Llpc::createSpirvLowerTranslator(
     ShaderStage                 stage,        // Shader stage
-    const PipelineShaderInfo*   pShaderInfo)  // [in] Shader info for this shader
+    const PipelineShaderInfo*   shaderInfo)  // [in] Shader info for this shader
 {
-    return new SpirvLowerTranslator(stage, pShaderInfo);
+    return new SpirvLowerTranslator(stage, shaderInfo);
 }
 
 // =====================================================================================================================
@@ -60,74 +60,74 @@ bool SpirvLowerTranslator::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Translator\n");
 
-    SpirvLower::Init(&module);
+    SpirvLower::init(&module);
 
 #ifdef LLPC_ENABLE_SPIRV_OPT
     InitSpvGen();
 #endif
 
-    m_pContext = static_cast<Context*>(&module.getContext());
+    m_context = static_cast<Context*>(&module.getContext());
 
     // Translate SPIR-V binary to machine-independent LLVM module
-    TranslateSpirvToLlvm(m_pShaderInfo, &module);
+    translateSpirvToLlvm(m_shaderInfo, &module);
     return true;
 }
 
 // =====================================================================================================================
 // Translates SPIR-V binary to machine-independent LLVM module.
-void SpirvLowerTranslator::TranslateSpirvToLlvm(
-    const PipelineShaderInfo*   pShaderInfo,         // [in] Specialization info
-    Module*                     pModule)             // [in/out] Module to translate into, initially empty
+void SpirvLowerTranslator::translateSpirvToLlvm(
+    const PipelineShaderInfo*   shaderInfo,         // [in] Specialization info
+    Module*                     module)             // [in/out] Module to translate into, initially empty
 {
     BinaryData  optimizedSpirvBin = {};
-    const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
-    assert(pModuleData->binType == BinaryType::Spirv);
-    const BinaryData* pSpirvBin = &pModuleData->binCode;
-    if (ShaderModuleHelper::OptimizeSpirv(pSpirvBin, &optimizedSpirvBin) == Result::Success)
+    const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo->pModuleData);
+    assert(moduleData->binType == BinaryType::Spirv);
+    const BinaryData* spirvBin = &moduleData->binCode;
+    if (ShaderModuleHelper::optimizeSpirv(spirvBin, &optimizedSpirvBin) == Result::Success)
     {
-        pSpirvBin = &optimizedSpirvBin;
+        spirvBin = &optimizedSpirvBin;
     }
 
-    std::string spirvCode(static_cast<const char*>(pSpirvBin->pCode), pSpirvBin->codeSize);
+    std::string spirvCode(static_cast<const char*>(spirvBin->pCode), spirvBin->codeSize);
     std::istringstream spirvStream(spirvCode);
     std::string errMsg;
     SPIRV::SPIRVSpecConstMap specConstMap;
-    ShaderStage entryStage = pShaderInfo->entryStage;
+    ShaderStage entryStage = shaderInfo->entryStage;
     // Build specialization constant map
-    if (pShaderInfo->pSpecializationInfo != nullptr)
+    if (shaderInfo->pSpecializationInfo != nullptr)
     {
-        for (unsigned i = 0; i < pShaderInfo->pSpecializationInfo->mapEntryCount; ++i)
+        for (unsigned i = 0; i < shaderInfo->pSpecializationInfo->mapEntryCount; ++i)
         {
             SPIRV::SPIRVSpecConstEntry specConstEntry  = {};
-            auto pMapEntry = &pShaderInfo->pSpecializationInfo->pMapEntries[i];
-            specConstEntry.DataSize= pMapEntry->size;
-            specConstEntry.Data = VoidPtrInc(pShaderInfo->pSpecializationInfo->pData, pMapEntry->offset);
-            specConstMap[pMapEntry->constantID] = specConstEntry;
+            auto mapEntry = &shaderInfo->pSpecializationInfo->pMapEntries[i];
+            specConstEntry.DataSize= mapEntry->size;
+            specConstEntry.Data = voidPtrInc(shaderInfo->pSpecializationInfo->pData, mapEntry->offset);
+            specConstMap[mapEntry->constantID] = specConstEntry;
         }
     }
 
-    Context* pContext = static_cast<Context*>(&pModule->getContext());
+    Context* context = static_cast<Context*>(&module->getContext());
 
-    if (readSpirv(pContext->GetBuilder(),
-                  &(pModuleData->usage),
+    if (readSpirv(context->getBuilder(),
+                  &(moduleData->usage),
                   spirvStream,
-                  ConvertToExecModel(entryStage),
-                  pShaderInfo->pEntryTarget,
+                  convertToExecModel(entryStage),
+                  shaderInfo->pEntryTarget,
                   specConstMap,
-                  pModule,
+                  module,
                   errMsg) == false)
     {
         report_fatal_error(Twine("Failed to translate SPIR-V to LLVM (") +
-                           GetShaderStageName(static_cast<ShaderStage>(entryStage)) + " shader): " +
+                           getShaderStageName(static_cast<ShaderStage>(entryStage)) + " shader): " +
                            errMsg,
                            false);
     }
 
     // Ensure the shader modes are recorded in IR metadata in the case that this is a shader compile
     // rather than a pipeline compile.
-    m_pContext->GetBuilder()->RecordShaderModes(pModule);
+    m_context->getBuilder()->recordShaderModes(module);
 
-    ShaderModuleHelper::CleanOptimizedSpirv(&optimizedSpirvBin);
+    ShaderModuleHelper::cleanOptimizedSpirv(&optimizedSpirvBin);
 
     // NOTE: Our shader entrypoint is marked in the SPIR-V reader as dllexport. Here we mark it as follows:
     //   * remove the dllexport;
@@ -140,7 +140,7 @@ void SpirvLowerTranslator::TranslateSpirvToLlvm(
     //   3. remove the code we added to the spir-v reader to detect the required entrypoint and mark it as DLLExport;
     //   4. remove the required entrypoint name and execution model args that we added to the spir-v reader API, to
     //      make it closer to the upstream Khronos copy of that code.
-    for (auto& func : *pModule)
+    for (auto& func : *module)
     {
         if (func.empty())
         {

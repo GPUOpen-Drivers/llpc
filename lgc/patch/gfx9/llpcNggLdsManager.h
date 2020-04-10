@@ -92,23 +92,23 @@ static const unsigned SizeOfDword = sizeof(unsigned);
 class NggLdsManager
 {
 public:
-    NggLdsManager(llvm::Module* pModule, PipelineState* pPipelineState, llvm::IRBuilder<>* pBuilder);
+    NggLdsManager(llvm::Module* module, PipelineState* pipelineState, llvm::IRBuilder<>* builder);
 
-    static unsigned CalcEsExtraLdsSize(PipelineState* pPipelineState);
-    static unsigned CalcGsExtraLdsSize(PipelineState* pPipelineState);
+    static unsigned calcEsExtraLdsSize(PipelineState* pipelineState);
+    static unsigned calcGsExtraLdsSize(PipelineState* pipelineState);
 
     // Gets the LDS starting offset for the specified region
-    unsigned GetLdsRegionStart(NggLdsRegionType region) const
+    unsigned getLdsRegionStart(NggLdsRegionType region) const
     {
         unsigned regionStart = m_ldsRegionStart[region];
         assert(regionStart != InvalidValue);
         return regionStart;
     }
 
-    llvm::Value* ReadValueFromLds(llvm::Type* pReadTy, llvm::Value* pLdsOffset, bool useDs128 = false);
-    void WriteValueToLds(llvm::Value* pWriteValue, llvm::Value* pLdsOffset, bool useDs128 = false);
+    llvm::Value* readValueFromLds(llvm::Type* readTy, llvm::Value* ldsOffset, bool useDs128 = false);
+    void writeValueToLds(llvm::Value* writeValue, llvm::Value* ldsOffset, bool useDs128 = false);
 
-    void AtomicOpWithLds(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value* pAtomicValue, llvm::Value* pLdsOffset);
+    void atomicOpWithLds(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value* atomicValue, llvm::Value* ldsOffset);
 
 private:
     NggLdsManager() = delete;
@@ -118,18 +118,18 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
 
     static const unsigned LdsRegionSizes[LdsRegionCount];  // LDS sizes for all LDS region types (in BYTEs)
-    static const char*    LdsRegionNames[LdsRegionCount];  // Name strings for all LDS region types
+    static const char*    m_ldsRegionNames[LdsRegionCount];  // Name strings for all LDS region types
 
-    PipelineState*  m_pPipelineState; // Pipeline state
-    llvm::LLVMContext*        m_pContext;     // LLVM context
+    PipelineState*  m_pipelineState; // Pipeline state
+    llvm::LLVMContext*        m_context;     // LLVM context
 
-    llvm::GlobalValue*  m_pLds;     // Global variable to model NGG LDS
+    llvm::GlobalValue*  m_lds;     // Global variable to model NGG LDS
 
     unsigned        m_ldsRegionStart[LdsRegionCount]; // Start LDS offsets for all available LDS region types (in BYTEs)
 
     unsigned        m_waveCountInSubgroup; // Wave count in sub-group
 
-    llvm::IRBuilder<>*  m_pBuilder; // LLVM IR builder
+    llvm::IRBuilder<>*  m_builder; // LLVM IR builder
 };
 
 } // lgc

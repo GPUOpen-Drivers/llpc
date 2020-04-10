@@ -61,11 +61,11 @@ namespace Llpc
 // =====================================================================================================================
 TimerProfiler::TimerProfiler(
     uint64_t      hash64,              // Hash code
-    const char*   pDescriptionPrefix,  // [in] Profiler description prefix string
+    const char*   descriptionPrefix,  // [in] Profiler description prefix string
     unsigned      enableMask)           // Mask of enabled phase timers
     :
-    m_total("", "", GetDummyTimeRecords()),
-    m_phases("", "", GetDummyTimeRecords())
+    m_total("", "", getDummyTimeRecords()),
+    m_phases("", "", getDummyTimeRecords())
 {
     if (TimePassesIsEnabled || cl::EnableTimerProfile)
     {
@@ -75,47 +75,47 @@ TimerProfiler::TimerProfiler(
         ostream.flush();
 
         // Init whole timer
-        m_total.setName("llpc", (Twine(pDescriptionPrefix) + Twine(" ") + hashString).str());
-        m_wholeTimer.init("llpc-total", (Twine(pDescriptionPrefix) + Twine(" Total ") + hashString).str(), m_total);
+        m_total.setName("llpc", (Twine(descriptionPrefix) + Twine(" ") + hashString).str());
+        m_wholeTimer.init("llpc-total", (Twine(descriptionPrefix) + Twine(" Total ") + hashString).str(), m_total);
 
         // Init phase timers
-        m_phases.setName("llpc", (Twine(pDescriptionPrefix) + Twine(" Phases ") + hashString).str());
+        m_phases.setName("llpc", (Twine(descriptionPrefix) + Twine(" Phases ") + hashString).str());
         if (enableMask & (1 << TimerTranslate))
         {
             m_phaseTimers[TimerTranslate].init("llpc-translate",
-                                               (Twine(pDescriptionPrefix) +Twine(" Translate ") + hashString).str(),
+                                               (Twine(descriptionPrefix) +Twine(" Translate ") + hashString).str(),
                                                m_phases);
         }
 
         if (enableMask & (1 << TimerLower))
         {
             m_phaseTimers[TimerLower].init("llpc-lower",
-                                           (Twine(pDescriptionPrefix) + Twine(" Lower ") + hashString).str(),
+                                           (Twine(descriptionPrefix) + Twine(" Lower ") + hashString).str(),
                                            m_phases);
         }
         if (enableMask & (1 << TimerLoadBc))
         {
             m_phaseTimers[TimerLoadBc].init("llpc-load",
-                                            (Twine(pDescriptionPrefix) + Twine(" Load ") + hashString).str(),
+                                            (Twine(descriptionPrefix) + Twine(" Load ") + hashString).str(),
                                             m_phases);
         }
         if (enableMask & (1 << TimerPatch))
         {
             m_phaseTimers[TimerPatch].init("llpc-patch",
-                                           (Twine(pDescriptionPrefix) + Twine(" Patch ") + hashString).str(),
+                                           (Twine(descriptionPrefix) + Twine(" Patch ") + hashString).str(),
                                            m_phases);
         }
         if (enableMask & (1 << TimerOpt))
         {
             m_phaseTimers[TimerOpt].init("llpc-opt",
-                                         (Twine(pDescriptionPrefix) + Twine(" Optimization ") + hashString).str(),
+                                         (Twine(descriptionPrefix) + Twine(" Optimization ") + hashString).str(),
                                          m_phases);
         }
 
         if (enableMask & (1 << TimerCodeGen))
         {
             m_phaseTimers[TimerCodeGen].init("llpc-codegen",
-                                             (Twine(pDescriptionPrefix) + Twine(" CodeGen ") + hashString).str(),
+                                             (Twine(descriptionPrefix) + Twine(" CodeGen ") + hashString).str(),
                                              m_phases);
         }
 
@@ -136,20 +136,20 @@ TimerProfiler::~TimerProfiler()
 
 // =====================================================================================================================
 // Adds pass to start or stop timer in PassManager
-void TimerProfiler::AddTimerStartStopPass(
-    lgc::PassManager* pPassMgr,       // Pass Manager
+void TimerProfiler::addTimerStartStopPass(
+    lgc::PassManager* passMgr,       // Pass Manager
     TimerKind         timerKind,      // Kind of phase timer
     bool              start)          // Start or  stop timer
 {
     if (TimePassesIsEnabled || cl::EnableTimerProfile)
     {
-        pPassMgr->add(lgc::BuilderContext::CreateStartStopTimer(&m_phaseTimers[timerKind], start));
+        passMgr->add(lgc::BuilderContext::createStartStopTimer(&m_phaseTimers[timerKind], start));
     }
 }
 
 // =====================================================================================================================
 // Starts or stop specified timer.
-void TimerProfiler::StartStopTimer(
+void TimerProfiler::startStopTimer(
     TimerKind timerKind,         // Kind of phase timer
     bool      start)             // Start or  stop timer
 {
@@ -168,7 +168,7 @@ void TimerProfiler::StartStopTimer(
 
 // =====================================================================================================================
 // Gets a specific timer. Returns nullptr if TimePassesIsEnabled isn't enabled.
-llvm::Timer* TimerProfiler::GetTimer(
+llvm::Timer* TimerProfiler::getTimer(
     TimerKind    timerKind)           // Kind of phase timer
 {
     return (TimePassesIsEnabled || cl::EnableTimerProfile) ? &m_phaseTimers[timerKind] : nullptr;
@@ -176,10 +176,10 @@ llvm::Timer* TimerProfiler::GetTimer(
 
 // =====================================================================================================================
 // Gets dummy TimeRecords.
-const StringMap<TimeRecord>& TimerProfiler::GetDummyTimeRecords()
+const StringMap<TimeRecord>& TimerProfiler::getDummyTimeRecords()
 {
-    static StringMap<TimeRecord> dummyTimeRecords;
-    if ((TimePassesIsEnabled || cl::EnableTimerProfile) && dummyTimeRecords.empty())
+    static StringMap<TimeRecord> DummyTimeRecords;
+    if ((TimePassesIsEnabled || cl::EnableTimerProfile) && DummyTimeRecords.empty())
     {
         // NOTE: It is a workaround to get fixed layout in timer reports. Please remove it if we find a better solution.
         // LLVM timer skips the field if it is zero in all timers, it causes the layout of the report isn't stable when
@@ -196,10 +196,10 @@ const StringMap<TimeRecord>& TimerProfiler::GetDummyTimeRecords()
         } hackedTimeRecord = { 1e-100, 1e-100, 1e-100, 0 };
         static_assert(sizeof(timeRecord) == sizeof(hackedTimeRecord), "Unexpected Size!");
         memcpy(&timeRecord, &hackedTimeRecord, sizeof(TimeRecord));
-        dummyTimeRecords["DUMMY"] = timeRecord;
+        DummyTimeRecords["DUMMY"] = timeRecord;
     }
 
-    return dummyTimeRecords;
+    return DummyTimeRecords;
 }
 
 } // Llpc

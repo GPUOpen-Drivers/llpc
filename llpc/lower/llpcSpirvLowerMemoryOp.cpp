@@ -52,7 +52,7 @@ char SpirvLowerMemoryOp::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering memory operations.
-ModulePass* CreateSpirvLowerMemoryOp()
+ModulePass* createSpirvLowerMemoryOp()
 {
     return new SpirvLowerMemoryOp();
 }
@@ -71,31 +71,31 @@ bool SpirvLowerMemoryOp::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Memory-Op\n");
 
-    SpirvLower::Init(&module);
+    SpirvLower::init(&module);
 
-    visit(m_pModule);
+    visit(m_module);
 
     // Remove those instructions that are replaced by this lower pass
-    for (auto pInst : m_preRemoveInsts)
+    for (auto inst : m_preRemoveInsts)
     {
-        assert(pInst->user_empty());
-        pInst->dropAllReferences();
-        pInst->eraseFromParent();
+        assert(inst->user_empty());
+        inst->dropAllReferences();
+        inst->eraseFromParent();
     }
     m_preRemoveInsts.clear();
 
     for (unsigned i = 0; i < m_storeExpandInfo.size(); i++)
     {
-        StoreExpandInfo* pExpandInfo = &m_storeExpandInfo[i];
-        ExpandStoreInst(pExpandInfo->pStoreInst, pExpandInfo->getElemPtrs, pExpandInfo->pDynIndex);
+        StoreExpandInfo* expandInfo = &m_storeExpandInfo[i];
+        expandStoreInst(expandInfo->storeInst, expandInfo->getElemPtrs, expandInfo->dynIndex);
     }
     m_storeExpandInfo.clear();
 
-    for (auto pInst : m_removeInsts)
+    for (auto inst : m_removeInsts)
     {
-        assert(pInst->user_empty());
-        pInst->dropAllReferences();
-        pInst->eraseFromParent();
+        assert(inst->user_empty());
+        inst->dropAllReferences();
+        inst->eraseFromParent();
     }
     m_removeInsts.clear();
 
@@ -109,10 +109,10 @@ bool SpirvLowerMemoryOp::runOnModule(
 void SpirvLowerMemoryOp::visitExtractElementInst(
     ExtractElementInst& extractElementInst)  // "ExtractElement" instruction
 {
-    auto pSrc = extractElementInst.getOperand(0);
-    if (pSrc->getType()->isVectorTy() &&
-        isa<LoadInst>(pSrc) &&
-        pSrc->hasOneUse())
+    auto src = extractElementInst.getOperand(0);
+    if (src->getType()->isVectorTy() &&
+        isa<LoadInst>(src) &&
+        src->hasOneUse())
     {
         // NOTE: Optimize loading vector component for local variable and memory block
         // Original pattern:
@@ -123,27 +123,27 @@ void SpirvLowerMemoryOp::visitExtractElementInst(
         // %3 = getelementptr[4 x float] addrspace(7)* %2, i32 0, i32 0
         // %4 = load float addrspace(7)* %3
 
-        auto pLoadInst = cast<LoadInst>(pSrc);
-        auto pLoadPtr = pLoadInst->getOperand(0);
-        auto addrSpace = pLoadPtr->getType()->getPointerAddressSpace();
+        auto loadInst = cast<LoadInst>(src);
+        auto loadPtr = loadInst->getOperand(0);
+        auto addrSpace = loadPtr->getType()->getPointerAddressSpace();
 
         if ((addrSpace == SPIRAS_Local) || (addrSpace == SPIRAS_Uniform))
         {
-            auto pSrcTy = pSrc->getType();
-            auto pCastTy = ArrayType::get(pSrcTy->getVectorElementType(), pSrcTy->getVectorNumElements());
-            auto pCastPtrTy = pCastTy->getPointerTo(addrSpace);
-            auto pCastPtr = new BitCastInst(pLoadPtr, pCastPtrTy, "", &extractElementInst);
+            auto srcTy = src->getType();
+            auto castTy = ArrayType::get(srcTy->getVectorElementType(), srcTy->getVectorNumElements());
+            auto castPtrTy = castTy->getPointerTo(addrSpace);
+            auto castPtr = new BitCastInst(loadPtr, castPtrTy, "", &extractElementInst);
             Value* idxs[] =
             {
-                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+                ConstantInt::get(Type::getInt32Ty(*m_context), 0),
                 extractElementInst.getOperand(1)
             };
-            auto pElementPtr = GetElementPtrInst::Create(nullptr, pCastPtr, idxs, "", &extractElementInst);
-            auto pNewLoad = new LoadInst(pElementPtr, "", &extractElementInst);
-            extractElementInst.replaceAllUsesWith(pNewLoad);
+            auto elementPtr = GetElementPtrInst::Create(nullptr, castPtr, idxs, "", &extractElementInst);
+            auto newLoad = new LoadInst(elementPtr, "", &extractElementInst);
+            extractElementInst.replaceAllUsesWith(newLoad);
 
             m_preRemoveInsts.insert(&extractElementInst);
-            m_removeInsts.insert(pLoadInst);
+            m_removeInsts.insert(loadInst);
         }
     }
 }
@@ -156,43 +156,43 @@ void SpirvLowerMemoryOp::visitGetElementPtrInst(
     unsigned operandIndex = InvalidValue;
     unsigned dynIndexBound = 0;
 
-    if (NeedExpandDynamicIndex(&getElemPtrInst, &operandIndex, &dynIndexBound))
+    if (needExpandDynamicIndex(&getElemPtrInst, &operandIndex, &dynIndexBound))
     {
         SmallVector<GetElementPtrInst*, 1> getElemPtrs;
-        auto pDynIndex = getElemPtrInst.getOperand(operandIndex);
-        bool isType64 = (pDynIndex->getType()->getPrimitiveSizeInBits() == 64);
+        auto dynIndex = getElemPtrInst.getOperand(operandIndex);
+        bool isType64 = (dynIndex->getType()->getPrimitiveSizeInBits() == 64);
 
         // Create "getelementptr" instructions with constant indices
         for (unsigned i = 0; i < dynIndexBound; ++i)
         {
-            auto pGetElemPtr = cast<GetElementPtrInst>(getElemPtrInst.clone());
-            auto pConstIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_pContext), i) :
-                                          ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
-            pGetElemPtr->setOperand(operandIndex, pConstIndex);
-            getElemPtrs.push_back(pGetElemPtr);
-            pGetElemPtr->insertBefore(&getElemPtrInst);
+            auto getElemPtr = cast<GetElementPtrInst>(getElemPtrInst.clone());
+            auto constIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_context), i) :
+                                          ConstantInt::get(Type::getInt32Ty(*m_context), i);
+            getElemPtr->setOperand(operandIndex, constIndex);
+            getElemPtrs.push_back(getElemPtr);
+            getElemPtr->insertBefore(&getElemPtrInst);
         }
 
         // Copy users, ExpandStoreInst/ExpandLoadInst change getElemPtrInst's user
         std::vector<User*> users;
-        for (auto pUser : getElemPtrInst.users())
+        for (auto user : getElemPtrInst.users())
         {
-            users.push_back(pUser);
+            users.push_back(user);
         }
 
         // Replace the original "getelementptr" instructions with a group of newly-created "getelementptr" instructions
-        for (auto pUser : users)
+        for (auto user : users)
         {
-            auto pLoadInst = dyn_cast<LoadInst>(pUser);
-            auto pStoreInst = dyn_cast<StoreInst>(pUser);
+            auto loadInst = dyn_cast<LoadInst>(user);
+            auto storeInst = dyn_cast<StoreInst>(user);
 
-            if (pLoadInst != nullptr)
+            if (loadInst != nullptr)
             {
-                ExpandLoadInst(pLoadInst, getElemPtrs, pDynIndex);
+                expandLoadInst(loadInst, getElemPtrs, dynIndex);
             }
-            else if (pStoreInst != nullptr)
+            else if (storeInst != nullptr)
             {
-                RecordStoreExpandInfo(pStoreInst, getElemPtrs, pDynIndex);
+                recordStoreExpandInfo(storeInst, getElemPtrs, dynIndex);
             }
             else
             {
@@ -207,10 +207,10 @@ void SpirvLowerMemoryOp::visitGetElementPtrInst(
 
 // =====================================================================================================================
 // Checks whether the specified "getelementptr" instruction contains dynamic index and is therefore able to be expanded.
-bool SpirvLowerMemoryOp::NeedExpandDynamicIndex(
-    GetElementPtrInst* pGetElemPtr,       // [in] "GetElementPtr" instruction
-    unsigned*          pOperandIndexOut,  // [out] Index of the operand that represents a dynamic index
-    unsigned*          pDynIndexBound     // [out] Upper bound of dynamic index
+bool SpirvLowerMemoryOp::needExpandDynamicIndex(
+    GetElementPtrInst* getElemPtr,       // [in] "GetElementPtr" instruction
+    unsigned*          operandIndexOut,  // [out] Index of the operand that represents a dynamic index
+    unsigned*          dynIndexBound     // [out] Upper bound of dynamic index
     ) const
 {
     static const unsigned MaxDynIndexBound = 8;
@@ -219,18 +219,18 @@ bool SpirvLowerMemoryOp::NeedExpandDynamicIndex(
     unsigned operandIndex = InvalidValue;
     bool     needExpand   = false;
     bool     allowExpand  = true;
-    auto     pPtrVal      = pGetElemPtr->getPointerOperand();
+    auto     ptrVal      = getElemPtr->getPointerOperand();
 
     // NOTE: We only handle local variables.
-    if (pPtrVal->getType()->getPointerAddressSpace() != SPIRAS_Private)
+    if (ptrVal->getType()->getPointerAddressSpace() != SPIRAS_Private)
     {
         allowExpand = false;
     }
 
-    for (unsigned i = 1, operandCount = pGetElemPtr->getNumOperands(); allowExpand && (i < operandCount); ++i)
+    for (unsigned i = 1, operandCount = getElemPtr->getNumOperands(); allowExpand && (i < operandCount); ++i)
     {
-        auto pIndex = pGetElemPtr->getOperand(i);
-        if (isa<Constant>(pIndex) == false)
+        auto index = getElemPtr->getOperand(i);
+        if (isa<Constant>(index) == false)
         {
             // Find the operand that represents a dynamic index
             if (operandIndex == InvalidValue)
@@ -239,28 +239,28 @@ bool SpirvLowerMemoryOp::NeedExpandDynamicIndex(
                 operandIndex = i;
                 needExpand = true;
 
-                auto pIndexedTy = pGetElemPtr->getIndexedType(pPtrVal->getType()->getPointerElementType(), idxs);
-                if (pIndexedTy != nullptr)
+                auto indexedTy = getElemPtr->getIndexedType(ptrVal->getType()->getPointerElementType(), idxs);
+                if (indexedTy != nullptr)
                 {
                     // Check the upper bound of dynamic index
-                    if (isa<ArrayType>(pIndexedTy))
+                    if (isa<ArrayType>(indexedTy))
                     {
-                        auto pArrayTy = dyn_cast<ArrayType>(pIndexedTy);
-                        if (pArrayTy->getArrayNumElements() > MaxDynIndexBound)
+                        auto arrayTy = dyn_cast<ArrayType>(indexedTy);
+                        if (arrayTy->getArrayNumElements() > MaxDynIndexBound)
                         {
                             // Skip expand if array size greater than threshold
                             allowExpand = false;
                         }
                         else
                         {
-                            *pDynIndexBound = pArrayTy->getArrayNumElements();
+                            *dynIndexBound = arrayTy->getArrayNumElements();
                         }
                     }
-                    else if (isa<VectorType>(pIndexedTy))
+                    else if (isa<VectorType>(indexedTy))
                     {
                         // Always expand for vector
-                        auto pVectorTy = dyn_cast<VectorType>(pIndexedTy);
-                        *pDynIndexBound = pVectorTy->getVectorNumElements();
+                        auto vectorTy = dyn_cast<VectorType>(indexedTy);
+                        *dynIndexBound = vectorTy->getVectorNumElements();
                     }
                     else
                     {
@@ -282,16 +282,16 @@ bool SpirvLowerMemoryOp::NeedExpandDynamicIndex(
         }
         else
         {
-            idxs.push_back(pIndex);
+            idxs.push_back(index);
         }
     }
 
     if (needExpand && allowExpand)
     {
         // Skip expand if the user of "getelementptr" is neither "load" nor "store"
-        for (auto pUser : pGetElemPtr->users())
+        for (auto user : getElemPtr->users())
         {
-            if ((isa<LoadInst>(pUser) == false) && (isa<StoreInst>(pUser) == false))
+            if ((isa<LoadInst>(user) == false) && (isa<StoreInst>(user) == false))
             {
                 allowExpand = false;
                 break;
@@ -299,16 +299,16 @@ bool SpirvLowerMemoryOp::NeedExpandDynamicIndex(
         }
     }
 
-    *pOperandIndexOut = operandIndex;
+    *operandIndexOut = operandIndex;
     return needExpand && allowExpand;
 }
 
 // =====================================================================================================================
 // Expands "load" instruction with constant-index "getelementptr" instructions.
-void SpirvLowerMemoryOp::ExpandLoadInst(
-    LoadInst*                    pLoadInst,       // [in] "Load" instruction
+void SpirvLowerMemoryOp::expandLoadInst(
+    LoadInst*                    loadInst,       // [in] "Load" instruction
     ArrayRef<GetElementPtrInst*> getElemPtrs,     // [in] A group of "getelementptr" with constant indices
-    Value*                       pDynIndex)       // [in] Dynamic index
+    Value*                       dynIndex)       // [in] Dynamic index
 {
     // Expand is something like this:
     //
@@ -327,33 +327,33 @@ void SpirvLowerMemoryOp::ExpandLoadInst(
     //
     //   loadValue   = firstValue
 
-    bool isType64 = (pDynIndex->getType()->getPrimitiveSizeInBits() == 64);
-    Instruction* pFirstLoadValue = new LoadInst(getElemPtrs[0], "", false, pLoadInst);
+    bool isType64 = (dynIndex->getType()->getPrimitiveSizeInBits() == 64);
+    Instruction* firstLoadValue = new LoadInst(getElemPtrs[0], "", false, loadInst);
 
     for (unsigned i = 1, getElemPtrCount = getElemPtrs.size(); i < getElemPtrCount; ++i)
     {
-        auto pConstIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_pContext), i) :
-                                      ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
+        auto constIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_context), i) :
+                                      ConstantInt::get(Type::getInt32Ty(*m_context), i);
 
-        auto pSecondLoadValue = new LoadInst(getElemPtrs[i], "", false, pLoadInst);
-        auto pCond = new ICmpInst(pLoadInst, ICmpInst::ICMP_EQ, pDynIndex, pConstIndex);
-        pFirstLoadValue = SelectInst::Create(pCond, pSecondLoadValue, pFirstLoadValue, "", pLoadInst);
+        auto secondLoadValue = new LoadInst(getElemPtrs[i], "", false, loadInst);
+        auto cond = new ICmpInst(loadInst, ICmpInst::ICMP_EQ, dynIndex, constIndex);
+        firstLoadValue = SelectInst::Create(cond, secondLoadValue, firstLoadValue, "", loadInst);
     }
 
-    pLoadInst->replaceAllUsesWith(pFirstLoadValue);
-    m_preRemoveInsts.insert(pLoadInst);
+    loadInst->replaceAllUsesWith(firstLoadValue);
+    m_preRemoveInsts.insert(loadInst);
 }
 
 // =====================================================================================================================
 // Record store expansion info after visit, because splitBasicBlock will disturb the visit.
-void SpirvLowerMemoryOp::RecordStoreExpandInfo(
-    StoreInst*                   pStoreInst,     // [in] "Store" instruction
+void SpirvLowerMemoryOp::recordStoreExpandInfo(
+    StoreInst*                   storeInst,     // [in] "Store" instruction
     ArrayRef<GetElementPtrInst*> getElemPtrs,    // [in] A group of "getelementptr" with constant indices
-    Value*                       pDynIndex)      // [in] Dynamic index
+    Value*                       dynIndex)      // [in] Dynamic index
 {
     StoreExpandInfo expandInfo = {};
-    expandInfo.pStoreInst = pStoreInst;
-    expandInfo.pDynIndex  = pDynIndex;
+    expandInfo.storeInst = storeInst;
+    expandInfo.dynIndex  = dynIndex;
 
     for (unsigned i = 0; i < getElemPtrs.size(); ++i)
     {
@@ -365,15 +365,15 @@ void SpirvLowerMemoryOp::RecordStoreExpandInfo(
 
 // =====================================================================================================================
 // Expands "store" instruction with fixed indexed "getelementptr" instructions.
-void SpirvLowerMemoryOp::ExpandStoreInst(
-    StoreInst*                   pStoreInst,     // [in] "Store" instruction
+void SpirvLowerMemoryOp::expandStoreInst(
+    StoreInst*                   storeInst,     // [in] "Store" instruction
     ArrayRef<GetElementPtrInst*> getElemPtrs,    // [in] A group of "getelementptr" with constant indices
-    Value*                       pDynIndex)      // [in] Dynamic index
+    Value*                       dynIndex)      // [in] Dynamic index
 {
-    const bool robustBufferAccess = m_pContext->GetRobustBufferAccess();
+    const bool robustBufferAccess = m_context->getRobustBufferAccess();
     const unsigned getElemPtrCount = getElemPtrs.size();
-    bool isType64 = (pDynIndex->getType()->getPrimitiveSizeInBits() == 64);
-    Value* pFirstStoreDest = getElemPtrs[0];
+    bool isType64 = (dynIndex->getType()->getPrimitiveSizeInBits() == 64);
+    Value* firstStoreDest = getElemPtrs[0];
 
     if (robustBufferAccess)
     {
@@ -408,36 +408,36 @@ void SpirvLowerMemoryOp::ExpandStoreInst(
         //   ...
         //   ret
 
-        auto pCheckStoreBlock = pStoreInst->getParent();
-        auto pStoreBlock      = pCheckStoreBlock->splitBasicBlock(pStoreInst);
-        auto pEndStoreBlock   = pStoreBlock->splitBasicBlock(pStoreInst);
+        auto checkStoreBlock = storeInst->getParent();
+        auto storeBlock      = checkStoreBlock->splitBasicBlock(storeInst);
+        auto endStoreBlock   = storeBlock->splitBasicBlock(storeInst);
 
-        Instruction* pCheckStoreInsertPos = &pCheckStoreBlock->getInstList().back();
-        Instruction* pStoreInsertPos      = &pStoreBlock->getInstList().front();
+        Instruction* checkStoreInsertPos = &checkStoreBlock->getInstList().back();
+        Instruction* storeInsertPos      = &storeBlock->getInstList().front();
 
-        auto pGetElemPtrCountVal = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_pContext), getElemPtrCount) :
-                                              ConstantInt::get(Type::getInt32Ty(*m_pContext), getElemPtrCount);
+        auto getElemPtrCountVal = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_context), getElemPtrCount) :
+                                              ConstantInt::get(Type::getInt32Ty(*m_context), getElemPtrCount);
 
-        auto pDoStore = new ICmpInst(pCheckStoreInsertPos, ICmpInst::ICMP_ULT, pDynIndex, pGetElemPtrCountVal);
-        BranchInst::Create(pStoreBlock, pEndStoreBlock, pDoStore, pCheckStoreInsertPos);
+        auto doStore = new ICmpInst(checkStoreInsertPos, ICmpInst::ICMP_ULT, dynIndex, getElemPtrCountVal);
+        BranchInst::Create(storeBlock, endStoreBlock, doStore, checkStoreInsertPos);
 
         for (unsigned i = 1; i < getElemPtrCount; ++i)
         {
-            auto pSecondStoreDest = getElemPtrs[i];
-            auto pConstIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_pContext), i) :
-                                          ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
-            auto pCond = new ICmpInst(pStoreInsertPos, ICmpInst::ICMP_EQ, pDynIndex, pConstIndex);
-            pFirstStoreDest = SelectInst::Create(pCond, pSecondStoreDest, pFirstStoreDest, "", pStoreInsertPos);
+            auto secondStoreDest = getElemPtrs[i];
+            auto constIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_context), i) :
+                                          ConstantInt::get(Type::getInt32Ty(*m_context), i);
+            auto cond = new ICmpInst(storeInsertPos, ICmpInst::ICMP_EQ, dynIndex, constIndex);
+            firstStoreDest = SelectInst::Create(cond, secondStoreDest, firstStoreDest, "", storeInsertPos);
         }
 
-        Value* pStoreValue = pStoreInst->getOperand(0);
-        new StoreInst(pStoreValue, pFirstStoreDest, pStoreInsertPos);
+        Value* storeValue = storeInst->getOperand(0);
+        new StoreInst(storeValue, firstStoreDest, storeInsertPos);
 
-        pCheckStoreInsertPos->eraseFromParent();
+        checkStoreInsertPos->eraseFromParent();
 
-        assert(pStoreInst->user_empty());
-        pStoreInst->dropAllReferences();
-        pStoreInst->eraseFromParent();
+        assert(storeInst->user_empty());
+        storeInst->dropAllReferences();
+        storeInst->eraseFromParent();
     }
     else
     {
@@ -463,14 +463,14 @@ void SpirvLowerMemoryOp::ExpandStoreInst(
 
         for (unsigned i = 1; i < getElemPtrCount; ++i)
         {
-            auto pSecondStoreDest = getElemPtrs[i];
-            auto pConstIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_pContext), i) :
-                                          ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
-            auto pCond = new ICmpInst(pStoreInst, ICmpInst::ICMP_EQ, pDynIndex, pConstIndex);
-            pFirstStoreDest = SelectInst::Create(pCond, pSecondStoreDest, pFirstStoreDest, "", pStoreInst);
+            auto secondStoreDest = getElemPtrs[i];
+            auto constIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_context), i) :
+                                          ConstantInt::get(Type::getInt32Ty(*m_context), i);
+            auto cond = new ICmpInst(storeInst, ICmpInst::ICMP_EQ, dynIndex, constIndex);
+            firstStoreDest = SelectInst::Create(cond, secondStoreDest, firstStoreDest, "", storeInst);
         }
 
-        pStoreInst->setOperand(1, pFirstStoreDest);
+        storeInst->setOperand(1, firstStoreDest);
     }
 }
 

@@ -342,7 +342,7 @@ CsRegConfig::CsRegConfig(
 
 // =====================================================================================================================
 // Adds entries to register name map.
-void InitRegisterNameMap(
+void initRegisterNameMap(
     GfxIpVersion gfxIp) // Graphics IP version info
 {
     assert((gfxIp.major == 9) || (gfxIp.major == 10));

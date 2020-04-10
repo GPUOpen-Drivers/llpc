@@ -54,115 +54,115 @@ public:
     Context(GfxIpVersion gfxIp);
     ~Context();
 
-    void Reset();
+    void reset();
 
     // Checks whether this context is in use.
-    bool IsInUse() const { return m_isInUse; }
+    bool isInUse() const { return m_isInUse; }
 
     // Set context in-use flag.
-    void SetInUse(bool inUse) { m_isInUse = inUse; }
+    void setInUse(bool inUse) { m_isInUse = inUse; }
 
     // Attaches pipeline context to LLPC context.
-    void AttachPipelineContext(PipelineContext* pPipelineContext)
+    void attachPipelineContext(PipelineContext* pipelineContext)
     {
-        m_pPipelineContext = pPipelineContext;
+        m_pipelineContext = pipelineContext;
     }
 
     // Gets pipeline context.
-    PipelineContext* GetPipelineContext() const
+    PipelineContext* getPipelineContext() const
     {
-        return m_pPipelineContext;
+        return m_pipelineContext;
     }
 
     // Set LLPC builder
-    void SetBuilder(lgc::Builder* pBuilder) { m_pBuilder = pBuilder; }
+    void setBuilder(lgc::Builder* builder) { m_builder = builder; }
 
     // Get LLPC builder
-    lgc::Builder* GetBuilder() const { return m_pBuilder; }
+    lgc::Builder* getBuilder() const { return m_builder; }
 
     // Get (create if necessary) BuilderContext
-    lgc::BuilderContext* GetBuilderContext();
+    lgc::BuilderContext* getBuilderContext();
 
     // Set value of scalarBlockLayout option. This gets called with the value from PipelineOptions when
     // starting a pipeline compile.
-    void SetScalarBlockLayout(bool scalarBlockLayout) { m_scalarBlockLayout = scalarBlockLayout; }
+    void setScalarBlockLayout(bool scalarBlockLayout) { m_scalarBlockLayout = scalarBlockLayout; }
 
     // Get value of scalarBlockLayout for front-end use. If there have been any pipeline compiles in this context,
     // then it returns the value from the most recent one. If there have not been any pipeline compiles in this
     // context yet, then it returns false.
     // TODO: This is not correct behavior. The front-end should not be using pipeline options. Possibly
     // scalarBlockLayout is a whole-device option that should be passed into LLPC in a different way.
-    bool GetScalarBlockLayout() const { return m_scalarBlockLayout; }
+    bool getScalarBlockLayout() const { return m_scalarBlockLayout; }
 
     // Set value of robustBufferAccess option. This gets called with the value from PipelineOptions when
     // starting a pipeline compile.
-    void SetRobustBufferAccess(bool robustBufferAccess) { m_robustBufferAccess = robustBufferAccess; }
+    void setRobustBufferAccess(bool robustBufferAccess) { m_robustBufferAccess = robustBufferAccess; }
 
     // Get value of robustBufferAccess for front-end use. If there have been any pipeline compiles in this context,
     // then it returns the value from the most recent one. If there have not been any pipeline compiles in this
     // context yet, then it returns false.
     // TODO: This is not correct behavior. The front-end should not be using pipeline options.
-    bool GetRobustBufferAccess() const { return m_robustBufferAccess; }
+    bool getRobustBufferAccess() const { return m_robustBufferAccess; }
 
-    std::unique_ptr<llvm::Module> LoadLibary(const BinaryData* pLib);
+    std::unique_ptr<llvm::Module> loadLibary(const BinaryData* lib);
 
     // Wrappers of interfaces of pipeline context
-    bool IsGraphics() const
+    bool isGraphics() const
     {
-        return m_pPipelineContext->IsGraphics();
+        return m_pipelineContext->isGraphics();
     }
-    const PipelineShaderInfo* GetPipelineShaderInfo(ShaderStage shaderStage) const
+    const PipelineShaderInfo* getPipelineShaderInfo(ShaderStage shaderStage) const
     {
-        return m_pPipelineContext->GetPipelineShaderInfo(shaderStage);
-    }
-
-    const void* GetPipelineBuildInfo() const
-    {
-        return m_pPipelineContext->GetPipelineBuildInfo();
+        return m_pipelineContext->getPipelineShaderInfo(shaderStage);
     }
 
-    unsigned GetShaderStageMask() const
+    const void* getPipelineBuildInfo() const
     {
-        return m_pPipelineContext->GetShaderStageMask();
+        return m_pipelineContext->getPipelineBuildInfo();
     }
 
-    unsigned GetActiveShaderStageCount() const
+    unsigned getShaderStageMask() const
     {
-        return m_pPipelineContext->GetActiveShaderStageCount();
+        return m_pipelineContext->getShaderStageMask();
     }
 
-    const char* GetGpuNameAbbreviation() const
+    unsigned getActiveShaderStageCount() const
     {
-        return PipelineContext::GetGpuNameAbbreviation(m_gfxIp);
+        return m_pipelineContext->getActiveShaderStageCount();
     }
 
-    GfxIpVersion GetGfxIpVersion() const
+    const char* getGpuNameAbbreviation() const
+    {
+        return PipelineContext::getGpuNameAbbreviation(m_gfxIp);
+    }
+
+    GfxIpVersion getGfxIpVersion() const
     {
         return m_gfxIp;
     }
 
-    void DoUserDataNodeMerge()
+    void doUserDataNodeMerge()
     {
-        m_pPipelineContext->DoUserDataNodeMerge();
+        m_pipelineContext->doUserDataNodeMerge();
     }
 
-    uint64_t GetPiplineHashCode() const
+    uint64_t getPiplineHashCode() const
     {
-        return m_pPipelineContext->GetPiplineHashCode();
+        return m_pipelineContext->getPiplineHashCode();
     }
 
-    uint64_t GetCacheHashCode() const
+    uint64_t getCacheHashCode() const
     {
-        return m_pPipelineContext->GetCacheHashCode();
+        return m_pipelineContext->getCacheHashCode();
     }
 
-    ShaderHash GetShaderHashCode(ShaderStage shaderStage) const
+    ShaderHash getShaderHashCode(ShaderStage shaderStage) const
     {
-        return m_pPipelineContext->GetShaderHashCode(shaderStage);
+        return m_pipelineContext->getShaderHashCode(shaderStage);
     }
 
     // Sets triple and data layout in specified module from the context's target machine.
-    void SetModuleTargetMachine(llvm::Module* pModule);
+    void setModuleTargetMachine(llvm::Module* module);
 
 private:
     Context() = delete;
@@ -172,13 +172,13 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
 
     GfxIpVersion                  m_gfxIp;             // Graphics IP version info
-    PipelineContext*              m_pPipelineContext;  // Pipeline-specific context
+    PipelineContext*              m_pipelineContext;  // Pipeline-specific context
     EmuLib                        m_glslEmuLib;        // LLVM library for GLSL emulation
     volatile  bool                m_isInUse;           // Whether this context is in use
-    lgc::Builder*                 m_pBuilder = nullptr; // LLPC builder object
+    lgc::Builder*                 m_builder = nullptr; // LLPC builder object
     std::unique_ptr<lgc::BuilderContext> m_builderContext;  // Builder context
 
-    std::unique_ptr<llvm::TargetMachine> m_pTargetMachine; // Target machine
+    std::unique_ptr<llvm::TargetMachine> m_targetMachine; // Target machine
     bool                          m_scalarBlockLayout = false;  // scalarBlockLayout option from last pipeline compile
     bool                          m_robustBufferAccess = false; // robustBufferAccess option from last pipeline compile
 };

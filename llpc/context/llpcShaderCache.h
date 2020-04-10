@@ -77,7 +77,7 @@ struct ShaderIndex
 {
     ShaderHeader                header;      // Shader header data (key, crc, size)
     volatile ShaderEntryState   state;       // Shader entry state
-    void*                       pDataBlob;   // Serialized data blob representing a cached RelocatableShader object.
+    void*                       dataBlob;   // Serialized data blob representing a cached RelocatableShader object.
 };
 
 // The key in hash map is a 64-bit compacted Shader Hash
@@ -90,7 +90,7 @@ struct ShaderCacheAuxCreateInfo
     GfxIpVersion           gfxIp;              // Graphics IP version info
     MetroHash::Hash        hash;               // Hash code of compilation options
     const char*            cacheFilePath;      // root directory of cache file
-    const char*            pExecutableName;    // Name of executable file
+    const char*            executableName;    // Name of executable file
 };
 
 // Length of date field used in BuildUniqueId
@@ -134,59 +134,59 @@ public:
     ShaderCache();
     virtual ~ShaderCache();
 
-    Result Init(const ShaderCacheCreateInfo* pCreateInfo, const ShaderCacheAuxCreateInfo* pAuxCreateInfo);
+    Result init(const ShaderCacheCreateInfo* createInfo, const ShaderCacheAuxCreateInfo* auxCreateInfo);
     virtual void Destroy();
 
-    virtual Result Serialize(void* pBlob, size_t* pSize);
+    virtual Result Serialize(void* blob, size_t* size);
 
     virtual Result Merge(unsigned srcCacheCount, const IShaderCache** ppSrcCaches);
 
-    ShaderEntryState FindShader(MetroHash::Hash   hash,
+    ShaderEntryState findShader(MetroHash::Hash   hash,
                                 bool              allocateOnMiss,
                                 CacheEntryHandle* phEntry);
 
-    void InsertShader(CacheEntryHandle         hEntry,
-                      const void*              pBlob,
+    void insertShader(CacheEntryHandle         hEntry,
+                      const void*              blob,
                       size_t                   size);
 
-    void ResetShader(CacheEntryHandle         hEntry);
+    void resetShader(CacheEntryHandle         hEntry);
 
-    Result RetrieveShader(CacheEntryHandle   hEntry,
+    Result retrieveShader(CacheEntryHandle   hEntry,
                           const void**       ppBlob,
-                          size_t*            pSize);
+                          size_t*            size);
 
-    bool IsCompatible(const ShaderCacheCreateInfo* pCreateInfo, const ShaderCacheAuxCreateInfo* pAuxCreateInfo);
+    bool isCompatible(const ShaderCacheCreateInfo* createInfo, const ShaderCacheAuxCreateInfo* auxCreateInfo);
 
 private:
     ShaderCache(const ShaderCache&) = delete;
     ShaderCache& operator=(const ShaderCache&) = delete;
 
-    Result BuildFileName(const char*  pExecutableName,
-                         const char*  pCacheFilePath,
+    Result buildFileName(const char*  executableName,
+                         const char*  cacheFilePath,
                          GfxIpVersion gfxIp,
-                         bool*        pCacheFileExists);
-    Result ValidateAndLoadHeader(const ShaderCacheSerializedHeader* pHeader, size_t dataSourceSize);
-    Result LoadCacheFromBlob(const void* pInitialData, size_t initialDataSize);
-    Result PopulateIndexMap(void* pDataStart, size_t dataSize);
-    uint64_t CalculateCrc(const uint8_t* pData, size_t numBytes);
+                         bool*        cacheFileExists);
+    Result validateAndLoadHeader(const ShaderCacheSerializedHeader* header, size_t dataSourceSize);
+    Result loadCacheFromBlob(const void* initialData, size_t initialDataSize);
+    Result populateIndexMap(void* dataStart, size_t dataSize);
+    uint64_t calculateCrc(const uint8_t* data, size_t numBytes);
 
-    Result LoadCacheFromFile();
-    void ResetCacheFile();
-    void AddShaderToFile(const ShaderIndex* pIndex);
+    Result loadCacheFromFile();
+    void resetCacheFile();
+    void addShaderToFile(const ShaderIndex* index);
 
-    void* GetCacheSpace(size_t numBytes);
+    void* getCacheSpace(size_t numBytes);
 
     // Lock cache map
-    void LockCacheMap(bool readOnly) { m_lock.lock(); }
+    void lockCacheMap(bool readOnly) { m_lock.lock(); }
 
     // Unlock cache map
-    void UnlockCacheMap(bool readOnly) { m_lock.unlock(); }
+    void unlockCacheMap(bool readOnly) { m_lock.unlock(); }
 
-    bool UseExternalCache()
-        { return ((m_pfnGetValueFunc != nullptr) && (m_pfnStoreValueFunc != nullptr)); }
+    bool useExternalCache()
+        { return ((m_getValueFunc != nullptr) && (m_storeValueFunc != nullptr)); }
 
-    void ResetRuntimeCache();
-    void GetBuildTime(BuildUniqueId *pBuildId);
+    void resetRuntimeCache();
+    void getBuildTime(BuildUniqueId *buildId);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -209,9 +209,9 @@ private:
     unsigned                 m_serializedSize;      // Serialized byte size of whole shader cache
     std::mutex               m_conditionMutex;      // Mutex that will be used with the condition variable
     std::condition_variable  m_conditionVariable;   // Condition variable that will be used to wait compile finish
-    const void*              m_pClientData;         // Client data that will be used by function GetValue and StoreValue
-    ShaderCacheGetValue      m_pfnGetValueFunc;     // GetValue function used to query an external cache for shader data
-    ShaderCacheStoreValue    m_pfnStoreValueFunc;   // StoreValue function used to store shader data in an external cache
+    const void*              m_clientData;         // Client data that will be used by function GetValue and StoreValue
+    ShaderCacheGetValue      m_getValueFunc;     // GetValue function used to query an external cache for shader data
+    ShaderCacheStoreValue    m_storeValueFunc;   // StoreValue function used to store shader data in an external cache
     GfxIpVersion             m_gfxIp;               // Graphics IP version info
     MetroHash::Hash          m_hash;                // Hash code of compilation options
 };

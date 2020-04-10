@@ -47,38 +47,38 @@ using namespace lgc;
 
 // =====================================================================================================================
 ShaderMerger::ShaderMerger(
-    PipelineState*    pPipelineState,   // [in] Pipeline state
-    PipelineShaders*  pPipelineShaders) // [in] API shaders in the pipeline
+    PipelineState*    pipelineState,   // [in] Pipeline state
+    PipelineShaders*  pipelineShaders) // [in] API shaders in the pipeline
     :
-    m_pPipelineState(pPipelineState),
-    m_pContext(&pPipelineState->GetContext()),
-    m_gfxIp(pPipelineState->GetTargetInfo().GetGfxIpVersion()),
-    m_primShader(pPipelineState)
+    m_pipelineState(pipelineState),
+    m_context(&pipelineState->getContext()),
+    m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()),
+    m_primShader(pipelineState)
 {
     assert(m_gfxIp.major >= 9);
-    assert(m_pPipelineState->IsGraphics());
+    assert(m_pipelineState->isGraphics());
 
-    m_hasVs = m_pPipelineState->HasShaderStage(ShaderStageVertex);
-    m_hasTcs = m_pPipelineState->HasShaderStage(ShaderStageTessControl);
-    m_hasTes = m_pPipelineState->HasShaderStage(ShaderStageTessEval);
-    m_hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
+    m_hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
+    m_hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);
+    m_hasTes = m_pipelineState->hasShaderStage(ShaderStageTessEval);
+    m_hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
 }
 
 // =====================================================================================================================
 // Builds LLVM function for hardware primitive shader (NGG).
-Function* ShaderMerger::BuildPrimShader(
-    Function*  pEsEntryPoint,           // [in] Entry-point of hardware export shader (ES) (could be null)
-    Function*  pGsEntryPoint,           // [in] Entry-point of hardware geometry shader (GS) (could be null)
-    Function*  pCopyShaderEntryPoint)   // [in] Entry-point of hardware vertex shader (VS, copy shader) (could be null)
+Function* ShaderMerger::buildPrimShader(
+    Function*  esEntryPoint,           // [in] Entry-point of hardware export shader (ES) (could be null)
+    Function*  gsEntryPoint,           // [in] Entry-point of hardware geometry shader (GS) (could be null)
+    Function*  copyShaderEntryPoint)   // [in] Entry-point of hardware vertex shader (VS, copy shader) (could be null)
 {
-    NggPrimShader primShader(m_pPipelineState);
-    return primShader.Generate(pEsEntryPoint, pGsEntryPoint, pCopyShaderEntryPoint);
+    NggPrimShader primShader(m_pipelineState);
+    return primShader.generate(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
 }
 
 // =====================================================================================================================
 // Generates the type for the new entry-point of LS-HS merged shader.
-FunctionType* ShaderMerger::GenerateLsHsEntryPointType(
-    uint64_t* pInRegMask // [out] "Inreg" bit mask for the arguments
+FunctionType* ShaderMerger::generateLsHsEntryPointType(
+    uint64_t* inRegMask // [out] "Inreg" bit mask for the arguments
     ) const
 {
     assert(m_hasVs || m_hasTcs);
@@ -88,82 +88,82 @@ FunctionType* ShaderMerger::GenerateLsHsEntryPointType(
     // First 8 system values (SGPRs)
     for (unsigned i = 0; i < LsHsSpecialSysValueCount; ++i)
     {
-        argTys.push_back(Type::getInt32Ty(*m_pContext));
-        *pInRegMask |= (1ull << i);
+        argTys.push_back(Type::getInt32Ty(*m_context));
+        *inRegMask |= (1ull << i);
     }
 
     // User data (SGPRs)
     unsigned userDataCount = 0;
     if (m_hasVs)
     {
-        const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
-        userDataCount = std::max(pIntfData->userDataCount, userDataCount);
+        const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+        userDataCount = std::max(intfData->userDataCount, userDataCount);
     }
 
     if (m_hasTcs)
     {
-        const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessControl);
-        userDataCount = std::max(pIntfData->userDataCount, userDataCount);
+        const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl);
+        userDataCount = std::max(intfData->userDataCount, userDataCount);
     }
 
     if (m_hasTcs && m_hasVs)
     {
-        auto pVsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
-        auto pTcsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessControl);
+        auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+        auto tcsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl);
 
-        if ((pVsIntfData->spillTable.sizeInDwords == 0) &&
-            (pTcsIntfData->spillTable.sizeInDwords > 0))
+        if ((vsIntfData->spillTable.sizeInDwords == 0) &&
+            (tcsIntfData->spillTable.sizeInDwords > 0))
         {
-            pVsIntfData->userDataUsage.spillTable = userDataCount;
+            vsIntfData->userDataUsage.spillTable = userDataCount;
             ++userDataCount;
-            assert(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
+            assert(userDataCount <= m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount);
         }
     }
 
     assert(userDataCount > 0);
-    argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), userDataCount));
-    *pInRegMask |= (1ull << LsHsSpecialSysValueCount);
+    argTys.push_back(VectorType::get(Type::getInt32Ty(*m_context), userDataCount));
+    *inRegMask |= (1ull << LsHsSpecialSysValueCount);
 
     // Other system values (VGPRs)
-    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Patch ID
-    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Relative patch ID (control point ID included)
-    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Vertex ID
-    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Relative vertex ID (auto index)
-    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Step rate
-    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Instance ID
+    argTys.push_back(Type::getInt32Ty(*m_context)); // Patch ID
+    argTys.push_back(Type::getInt32Ty(*m_context)); // Relative patch ID (control point ID included)
+    argTys.push_back(Type::getInt32Ty(*m_context)); // Vertex ID
+    argTys.push_back(Type::getInt32Ty(*m_context)); // Relative vertex ID (auto index)
+    argTys.push_back(Type::getInt32Ty(*m_context)); // Step rate
+    argTys.push_back(Type::getInt32Ty(*m_context)); // Instance ID
 
-    return FunctionType::get(Type::getVoidTy(*m_pContext), argTys, false);
+    return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
 }
 
 // =====================================================================================================================
 // Generates the new entry-point for LS-HS merged shader.
-Function* ShaderMerger::GenerateLsHsEntryPoint(
-    Function* pLsEntryPoint,  // [in] Entry-point of hardware local shader (LS) (could be null)
-    Function* pHsEntryPoint)  // [in] Entry-point of hardware hull shader (HS)
+Function* ShaderMerger::generateLsHsEntryPoint(
+    Function* lsEntryPoint,  // [in] Entry-point of hardware local shader (LS) (could be null)
+    Function* hsEntryPoint)  // [in] Entry-point of hardware hull shader (HS)
 {
-    if (pLsEntryPoint != nullptr)
+    if (lsEntryPoint != nullptr)
     {
-        pLsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
-        pLsEntryPoint->addFnAttr(Attribute::AlwaysInline);
+        lsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+        lsEntryPoint->addFnAttr(Attribute::AlwaysInline);
     }
 
-    assert(pHsEntryPoint != nullptr);
-    pHsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
-    pHsEntryPoint->addFnAttr(Attribute::AlwaysInline);
+    assert(hsEntryPoint != nullptr);
+    hsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+    hsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
     uint64_t inRegMask = 0;
-    auto pEntryPointTy = GenerateLsHsEntryPointType(&inRegMask);
+    auto entryPointTy = generateLsHsEntryPointType(&inRegMask);
 
     // Create the entrypoint for the merged shader, and insert it just before the old HS.
-    Function* pEntryPoint = Function::Create(pEntryPointTy,
+    Function* entryPoint = Function::Create(entryPointTy,
                                              GlobalValue::ExternalLinkage,
                                              lgcName::LsHsEntryPoint);
-    auto pModule = pHsEntryPoint->getParent();
-    pModule->getFunctionList().insert(pHsEntryPoint->getIterator(), pEntryPoint);
+    auto module = hsEntryPoint->getParent();
+    module->getFunctionList().insert(hsEntryPoint->getIterator(), entryPoint);
 
-    pEntryPoint->addFnAttr("amdgpu-flat-work-group-size", "128,128"); // Force s_barrier to be present (ignore optimization)
+    entryPoint->addFnAttr("amdgpu-flat-work-group-size", "128,128"); // Force s_barrier to be present (ignore optimization)
 
-    for (auto& arg : pEntryPoint->args())
+    for (auto& arg : entryPoint->args())
     {
         auto argIdx = arg.getArgNo();
         if (inRegMask & (1ull << argIdx))
@@ -218,93 +218,93 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
     std::vector<Value*> args;
     std::vector<Attribute::AttrKind> attribs;
 
-    auto pArg = pEntryPoint->arg_begin();
+    auto arg = entryPoint->arg_begin();
 
-    Value* pOffChipLdsBase  = (pArg + LsHsSysValueOffChipLdsBase);
-    Value* pMergeWaveInfo   = (pArg + LsHsSysValueMergedWaveInfo);
-    Value* pTfBufferBase    = (pArg + LsHsSysValueTfBufferBase);
+    Value* offChipLdsBase  = (arg + LsHsSysValueOffChipLdsBase);
+    Value* mergeWaveInfo   = (arg + LsHsSysValueMergedWaveInfo);
+    Value* tfBufferBase    = (arg + LsHsSysValueTfBufferBase);
 
-    pArg += LsHsSpecialSysValueCount;
+    arg += LsHsSpecialSysValueCount;
 
-    Value* pUserData = pArg++;
+    Value* userData = arg++;
 
     // Define basic blocks
-    auto pEndHsBlock    = BasicBlock::Create(*m_pContext, ".endhs", pEntryPoint);
-    auto pBeginHsBlock  = BasicBlock::Create(*m_pContext, ".beginhs", pEntryPoint, pEndHsBlock);
-    auto pEndLsBlock    = BasicBlock::Create(*m_pContext, ".endls", pEntryPoint, pBeginHsBlock);
-    auto pBeginLsBlock  = BasicBlock::Create(*m_pContext, ".beginls", pEntryPoint, pEndLsBlock);
-    auto pEntryBlock    = BasicBlock::Create(*m_pContext, ".entry", pEntryPoint, pBeginLsBlock);
+    auto endHsBlock    = BasicBlock::Create(*m_context, ".endhs", entryPoint);
+    auto beginHsBlock  = BasicBlock::Create(*m_context, ".beginhs", entryPoint, endHsBlock);
+    auto endLsBlock    = BasicBlock::Create(*m_context, ".endls", entryPoint, beginHsBlock);
+    auto beginLsBlock  = BasicBlock::Create(*m_context, ".beginls", entryPoint, endLsBlock);
+    auto entryBlock    = BasicBlock::Create(*m_context, ".entry", entryPoint, beginLsBlock);
 
     // Construct ".entry" block
     args.clear();
-    args.push_back(ConstantInt::get(Type::getInt64Ty(*m_pContext), -1));
+    args.push_back(ConstantInt::get(Type::getInt64Ty(*m_context), -1));
 
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
 
-    EmitCall("llvm.amdgcn.init.exec", Type::getVoidTy(*m_pContext), args, attribs, pEntryBlock);
+    emitCall("llvm.amdgcn.init.exec", Type::getVoidTy(*m_context), args, attribs, entryBlock);
 
     args.clear();
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), -1));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), -1));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
 
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
 
-    auto pThreadId = EmitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
+    auto threadId = emitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
 
-    unsigned waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageTessControl);
+    unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
     if (waveSize == 64)
     {
         args.clear();
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), -1));
-        args.push_back(pThreadId);
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), -1));
+        args.push_back(threadId);
 
-        pThreadId = EmitCall("llvm.amdgcn.mbcnt.hi", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
+        threadId = emitCall("llvm.amdgcn.mbcnt.hi", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
     }
 
     args.clear();
-    args.push_back(pMergeWaveInfo);
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
+    args.push_back(mergeWaveInfo);
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
 
     attribs.clear();
     attribs.push_back(Attribute::ReadNone);
 
-    auto pLsVertCount = EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
+    auto lsVertCount = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
 
-    Value* pPatchId     = pArg;
-    Value* pRelPatchId  = (pArg + 1);
-    Value* pVertexId    = (pArg + 2);
-    Value* pRelVertexId = (pArg + 3);
-    Value* pStepRate    = (pArg + 4);
-    Value* pInstanceId  = (pArg + 5);
+    Value* patchId     = arg;
+    Value* relPatchId  = (arg + 1);
+    Value* vertexId    = (arg + 2);
+    Value* relVertexId = (arg + 3);
+    Value* stepRate    = (arg + 4);
+    Value* instanceId  = (arg + 5);
 
     args.clear();
-    args.push_back(pMergeWaveInfo);
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
+    args.push_back(mergeWaveInfo);
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
 
-    auto pHsVertCount = EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
+    auto hsVertCount = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
     // NOTE: For GFX9, hardware has an issue of initializing LS VGPRs. When HS is null, v0~v3 are initialized as LS
     // VGPRs rather than expected v2~v4.
-    auto pGpuWorkarounds = &m_pPipelineState->GetTargetInfo().GetGpuWorkarounds();
-    if (pGpuWorkarounds->gfx9.fixLsVgprInput)
+    auto gpuWorkarounds = &m_pipelineState->getTargetInfo().getGpuWorkarounds();
+    if (gpuWorkarounds->gfx9.fixLsVgprInput)
     {
-        auto pNullHs = new ICmpInst(*pEntryBlock,
+        auto nullHs = new ICmpInst(*entryBlock,
                                     ICmpInst::ICMP_EQ,
-                                    pHsVertCount,
-                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+                                    hsVertCount,
+                                    ConstantInt::get(Type::getInt32Ty(*m_context), 0),
                                     "");
 
-        pVertexId    = SelectInst::Create(pNullHs, pArg,       (pArg + 2), "", pEntryBlock);
-        pRelVertexId = SelectInst::Create(pNullHs, (pArg + 1), (pArg + 3), "", pEntryBlock);
-        pStepRate    = SelectInst::Create(pNullHs, (pArg + 2), (pArg + 4), "", pEntryBlock);
-        pInstanceId  = SelectInst::Create(pNullHs, (pArg + 3), (pArg + 5), "", pEntryBlock);
+        vertexId    = SelectInst::Create(nullHs, arg,       (arg + 2), "", entryBlock);
+        relVertexId = SelectInst::Create(nullHs, (arg + 1), (arg + 3), "", entryBlock);
+        stepRate    = SelectInst::Create(nullHs, (arg + 2), (arg + 4), "", entryBlock);
+        instanceId  = SelectInst::Create(nullHs, (arg + 3), (arg + 5), "", entryBlock);
     }
 
-    auto pLsEnable = new ICmpInst(*pEntryBlock, ICmpInst::ICMP_ULT, pThreadId, pLsVertCount, "");
-    BranchInst::Create(pBeginLsBlock, pEndLsBlock, pLsEnable, pEntryBlock);
+    auto lsEnable = new ICmpInst(*entryBlock, ICmpInst::ICMP_ULT, threadId, lsVertCount, "");
+    BranchInst::Create(beginLsBlock, endLsBlock, lsEnable, entryBlock);
 
     // Construct ".beginls" block
     if (m_hasVs)
@@ -312,13 +312,13 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         // Call LS main function
         args.clear();
 
-        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
-        const unsigned userDataCount = pIntfData->userDataCount;
+        auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+        const unsigned userDataCount = intfData->userDataCount;
 
         unsigned userDataIdx = 0;
 
-        auto pLsArgBegin = pLsEntryPoint->arg_begin();
-        const unsigned lsArgCount = pLsEntryPoint->arg_size();
+        auto lsArgBegin = lsEntryPoint->arg_begin();
+        const unsigned lsArgCount = lsEntryPoint->arg_size();
 
         unsigned lsArgIdx = 0;
 
@@ -327,38 +327,38 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         {
             assert(lsArgIdx < lsArgCount);
 
-            auto pLsArg = (pLsArgBegin + lsArgIdx);
-            assert(pLsArg->hasAttribute(Attribute::InReg));
+            auto lsArg = (lsArgBegin + lsArgIdx);
+            assert(lsArg->hasAttribute(Attribute::InReg));
 
-            auto pLsArgTy = pLsArg->getType();
-            if (pLsArgTy->isVectorTy())
+            auto lsArgTy = lsArg->getType();
+            if (lsArgTy->isVectorTy())
             {
-                assert(pLsArgTy->getVectorElementType()->isIntegerTy());
+                assert(lsArgTy->getVectorElementType()->isIntegerTy());
 
-                const unsigned userDataSize = pLsArgTy->getVectorNumElements();
+                const unsigned userDataSize = lsArgTy->getVectorNumElements();
 
                 std::vector<Constant*> shuffleMask;
                 for (unsigned i = 0; i < userDataSize; ++i)
                 {
-                    shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), userDataIdx + i));
+                    shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx + i));
                 }
 
                 userDataIdx += userDataSize;
 
-                auto pLsUserData =
-                    new ShuffleVectorInst(pUserData, pUserData, ConstantVector::get(shuffleMask), "", pBeginLsBlock);
-                args.push_back(pLsUserData);
+                auto lsUserData =
+                    new ShuffleVectorInst(userData, userData, ConstantVector::get(shuffleMask), "", beginLsBlock);
+                args.push_back(lsUserData);
             }
             else
             {
-                assert(pLsArgTy->isIntegerTy());
+                assert(lsArgTy->isIntegerTy());
 
-                auto pLsUserData = ExtractElementInst::Create(pUserData,
-                                                              ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                auto lsUserData = ExtractElementInst::Create(userData,
+                                                              ConstantInt::get(Type::getInt32Ty(*m_context),
                                                                                userDataIdx),
                                                               "",
-                                                              pBeginLsBlock);
-                args.push_back(pLsUserData);
+                                                              beginLsBlock);
+                args.push_back(lsUserData);
                 ++userDataIdx;
             }
 
@@ -368,42 +368,42 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         // Set up system value VGPRs (LS does not have system value SGPRs)
         if (lsArgIdx < lsArgCount)
         {
-            args.push_back(pVertexId);
+            args.push_back(vertexId);
             ++lsArgIdx;
         }
 
         if (lsArgIdx < lsArgCount)
         {
-            args.push_back(pRelVertexId);
+            args.push_back(relVertexId);
             ++lsArgIdx;
         }
 
         if (lsArgIdx < lsArgCount)
         {
-            args.push_back(pStepRate);
+            args.push_back(stepRate);
             ++lsArgIdx;
         }
 
         if (lsArgIdx < lsArgCount)
         {
-            args.push_back(pInstanceId);
+            args.push_back(instanceId);
             ++lsArgIdx;
         }
 
         assert(lsArgIdx == lsArgCount); // Must have visit all arguments of LS entry point
 
-        CallInst::Create(pLsEntryPoint, args, "", pBeginLsBlock);
+        CallInst::Create(lsEntryPoint, args, "", beginLsBlock);
     }
-    BranchInst::Create(pEndLsBlock, pBeginLsBlock);
+    BranchInst::Create(endLsBlock, beginLsBlock);
 
     // Construct ".endls" block
     args.clear();
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
-    EmitCall("llvm.amdgcn.s.barrier", Type::getVoidTy(*m_pContext), args, attribs, pEndLsBlock);
+    emitCall("llvm.amdgcn.s.barrier", Type::getVoidTy(*m_context), args, attribs, endLsBlock);
 
-    auto pHsEnable = new ICmpInst(*pEndLsBlock, ICmpInst::ICMP_ULT, pThreadId, pHsVertCount, "");
-    BranchInst::Create(pBeginHsBlock, pEndHsBlock, pHsEnable, pEndLsBlock);
+    auto hsEnable = new ICmpInst(*endLsBlock, ICmpInst::ICMP_ULT, threadId, hsVertCount, "");
+    BranchInst::Create(beginHsBlock, endHsBlock, hsEnable, endLsBlock);
 
     // Construct ".beginhs" block
     if (m_hasTcs)
@@ -411,64 +411,64 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         // Call HS main function
         args.clear();
 
-        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessControl);
-        const unsigned userDataCount = pIntfData->userDataCount;
+        auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl);
+        const unsigned userDataCount = intfData->userDataCount;
 
         unsigned userDataIdx = 0;
 
-        auto pHsArgBegin = pHsEntryPoint->arg_begin();
+        auto hsArgBegin = hsEntryPoint->arg_begin();
 
         unsigned hsArgIdx = 0;
 
         // Set up user data SGPRs
         while (userDataIdx < userDataCount)
         {
-            assert(hsArgIdx < pHsEntryPoint->arg_size());
+            assert(hsArgIdx < hsEntryPoint->arg_size());
 
-            auto pHsArg = (pHsArgBegin + hsArgIdx);
-            assert(pHsArg->hasAttribute(Attribute::InReg));
+            auto hsArg = (hsArgBegin + hsArgIdx);
+            assert(hsArg->hasAttribute(Attribute::InReg));
 
-            auto pHsArgTy = pHsArg->getType();
-            if (pHsArgTy->isVectorTy())
+            auto hsArgTy = hsArg->getType();
+            if (hsArgTy->isVectorTy())
             {
-                assert(pHsArgTy->getVectorElementType()->isIntegerTy());
+                assert(hsArgTy->getVectorElementType()->isIntegerTy());
 
-                const unsigned userDataSize = pHsArgTy->getVectorNumElements();
+                const unsigned userDataSize = hsArgTy->getVectorNumElements();
 
                 std::vector<Constant*> shuffleMask;
                 for (unsigned i = 0; i < userDataSize; ++i)
                 {
-                    shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), userDataIdx + i));
+                    shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx + i));
                 }
 
                 userDataIdx += userDataSize;
 
-                auto pHsUserData =
-                    new ShuffleVectorInst(pUserData, pUserData, ConstantVector::get(shuffleMask), "", pBeginHsBlock);
-                args.push_back(pHsUserData);
+                auto hsUserData =
+                    new ShuffleVectorInst(userData, userData, ConstantVector::get(shuffleMask), "", beginHsBlock);
+                args.push_back(hsUserData);
             }
             else
             {
-                assert(pHsArgTy->isIntegerTy());
+                assert(hsArgTy->isIntegerTy());
                 unsigned actualUserDataIdx = userDataIdx;
-                if (pIntfData->spillTable.sizeInDwords > 0)
+                if (intfData->spillTable.sizeInDwords > 0)
                 {
-                    if (pIntfData->userDataUsage.spillTable == userDataIdx)
+                    if (intfData->userDataUsage.spillTable == userDataIdx)
                     {
                         if (m_hasVs)
                         {
-                            auto pVsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
-                            assert(pVsIntfData->userDataUsage.spillTable > 0);
-                            actualUserDataIdx = pVsIntfData->userDataUsage.spillTable;
+                            auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+                            assert(vsIntfData->userDataUsage.spillTable > 0);
+                            actualUserDataIdx = vsIntfData->userDataUsage.spillTable;
                         }
                     }
                 }
-                auto pHsUserData = ExtractElementInst::Create(pUserData,
-                                                              ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                auto hsUserData = ExtractElementInst::Create(userData,
+                                                              ConstantInt::get(Type::getInt32Ty(*m_context),
                                                                                actualUserDataIdx),
                                                               "",
-                                                              pBeginHsBlock);
-                args.push_back(pHsUserData);
+                                                              beginHsBlock);
+                args.push_back(hsUserData);
                 ++userDataIdx;
             }
 
@@ -476,38 +476,38 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         }
 
         // Set up system value SGPRs
-        if (m_pPipelineState->IsTessOffChip())
+        if (m_pipelineState->isTessOffChip())
         {
-            args.push_back(pOffChipLdsBase);
+            args.push_back(offChipLdsBase);
             ++hsArgIdx;
         }
 
-        args.push_back(pTfBufferBase);
+        args.push_back(tfBufferBase);
         ++hsArgIdx;
 
         // Set up system value VGPRs
-        args.push_back(pPatchId);
+        args.push_back(patchId);
         ++hsArgIdx;
 
-        args.push_back(pRelPatchId);
+        args.push_back(relPatchId);
         ++hsArgIdx;
 
-        assert(hsArgIdx == pHsEntryPoint->arg_size()); // Must have visit all arguments of HS entry point
+        assert(hsArgIdx == hsEntryPoint->arg_size()); // Must have visit all arguments of HS entry point
 
-        CallInst::Create(pHsEntryPoint, args, "", pBeginHsBlock);
+        CallInst::Create(hsEntryPoint, args, "", beginHsBlock);
     }
-    BranchInst::Create(pEndHsBlock, pBeginHsBlock);
+    BranchInst::Create(endHsBlock, beginHsBlock);
 
     // Construct ".endhs" block
-    ReturnInst::Create(*m_pContext, pEndHsBlock);
+    ReturnInst::Create(*m_context, endHsBlock);
 
-    return pEntryPoint;
+    return entryPoint;
 }
 
 // =====================================================================================================================
 // Generates the type for the new entry-point of ES-GS merged shader.
-FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
-    uint64_t* pInRegMask // [out] "Inreg" bit mask for the arguments
+FunctionType* ShaderMerger::generateEsGsEntryPointType(
+    uint64_t* inRegMask // [out] "Inreg" bit mask for the arguments
     ) const
 {
     assert(m_hasGs);
@@ -517,8 +517,8 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
     // First 8 system values (SGPRs)
     for (unsigned i = 0; i < EsGsSpecialSysValueCount; ++i)
     {
-        argTys.push_back(Type::getInt32Ty(*m_pContext));
-        *pInRegMask |= (1ull << i);
+        argTys.push_back(Type::getInt32Ty(*m_context));
+        *inRegMask |= (1ull << i);
     }
 
     // User data (SGPRs)
@@ -528,34 +528,34 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
     {
         if (m_hasTes)
         {
-            const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessEval);
-            userDataCount = std::max(pIntfData->userDataCount, userDataCount);
+            const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval);
+            userDataCount = std::max(intfData->userDataCount, userDataCount);
         }
     }
     else
     {
         if (m_hasVs)
         {
-            const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
-            userDataCount = std::max(pIntfData->userDataCount, userDataCount);
+            const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+            userDataCount = std::max(intfData->userDataCount, userDataCount);
         }
     }
 
-    const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry);
-    userDataCount = std::max(pIntfData->userDataCount, userDataCount);
+    const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
+    userDataCount = std::max(intfData->userDataCount, userDataCount);
 
     if (hasTs)
     {
         if (m_hasTes)
         {
-            const auto pTesIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessEval);
-            assert(pTesIntfData->userDataUsage.tes.viewIndex == pIntfData->userDataUsage.gs.viewIndex);
-            if ((pIntfData->spillTable.sizeInDwords > 0) &&
-                (pTesIntfData->spillTable.sizeInDwords == 0))
+            const auto tesIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval);
+            assert(tesIntfData->userDataUsage.tes.viewIndex == intfData->userDataUsage.gs.viewIndex);
+            if ((intfData->spillTable.sizeInDwords > 0) &&
+                (tesIntfData->spillTable.sizeInDwords == 0))
             {
-                pTesIntfData->userDataUsage.spillTable = userDataCount;
+                tesIntfData->userDataUsage.spillTable = userDataCount;
                 ++userDataCount;
-                assert(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
+                assert(userDataCount <= m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount);
             }
         }
     }
@@ -563,78 +563,78 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
     {
         if (m_hasVs)
         {
-            const auto pVsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
-            assert(pVsIntfData->userDataUsage.vs.viewIndex == pIntfData->userDataUsage.gs.viewIndex);
-            if ((pIntfData->spillTable.sizeInDwords > 0) &&
-                (pVsIntfData->spillTable.sizeInDwords == 0))
+            const auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+            assert(vsIntfData->userDataUsage.vs.viewIndex == intfData->userDataUsage.gs.viewIndex);
+            if ((intfData->spillTable.sizeInDwords > 0) &&
+                (vsIntfData->spillTable.sizeInDwords == 0))
             {
-                pVsIntfData->userDataUsage.spillTable = userDataCount;
+                vsIntfData->userDataUsage.spillTable = userDataCount;
                 ++userDataCount;
-                assert(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
+                assert(userDataCount <= m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount);
             }
         }
     }
 
     assert(userDataCount > 0);
-    argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), userDataCount));
-    *pInRegMask |= (1ull << EsGsSpecialSysValueCount);
+    argTys.push_back(VectorType::get(Type::getInt32Ty(*m_context), userDataCount));
+    *inRegMask |= (1ull << EsGsSpecialSysValueCount);
 
     // Other system values (VGPRs)
-    argTys.push_back(Type::getInt32Ty(*m_pContext));        // ES to GS offsets (vertex 0 and 1)
-    argTys.push_back(Type::getInt32Ty(*m_pContext));        // ES to GS offsets (vertex 2 and 3)
-    argTys.push_back(Type::getInt32Ty(*m_pContext));        // Primitive ID (GS)
-    argTys.push_back(Type::getInt32Ty(*m_pContext));        // Invocation ID
-    argTys.push_back(Type::getInt32Ty(*m_pContext));        // ES to GS offsets (vertex 4 and 5)
+    argTys.push_back(Type::getInt32Ty(*m_context));        // ES to GS offsets (vertex 0 and 1)
+    argTys.push_back(Type::getInt32Ty(*m_context));        // ES to GS offsets (vertex 2 and 3)
+    argTys.push_back(Type::getInt32Ty(*m_context));        // Primitive ID (GS)
+    argTys.push_back(Type::getInt32Ty(*m_context));        // Invocation ID
+    argTys.push_back(Type::getInt32Ty(*m_context));        // ES to GS offsets (vertex 4 and 5)
 
     if (hasTs)
     {
-        argTys.push_back(Type::getFloatTy(*m_pContext));    // X of TessCoord (U)
-        argTys.push_back(Type::getFloatTy(*m_pContext));    // Y of TessCoord (V)
-        argTys.push_back(Type::getInt32Ty(*m_pContext));    // Relative patch ID
-        argTys.push_back(Type::getInt32Ty(*m_pContext));    // Patch ID
+        argTys.push_back(Type::getFloatTy(*m_context));    // X of TessCoord (U)
+        argTys.push_back(Type::getFloatTy(*m_context));    // Y of TessCoord (V)
+        argTys.push_back(Type::getInt32Ty(*m_context));    // Relative patch ID
+        argTys.push_back(Type::getInt32Ty(*m_context));    // Patch ID
     }
     else
     {
-        argTys.push_back(Type::getInt32Ty(*m_pContext));    // Vertex ID
-        argTys.push_back(Type::getInt32Ty(*m_pContext));    // Relative vertex ID (auto index)
-        argTys.push_back(Type::getInt32Ty(*m_pContext));    // Primitive ID (VS)
-        argTys.push_back(Type::getInt32Ty(*m_pContext));    // Instance ID
+        argTys.push_back(Type::getInt32Ty(*m_context));    // Vertex ID
+        argTys.push_back(Type::getInt32Ty(*m_context));    // Relative vertex ID (auto index)
+        argTys.push_back(Type::getInt32Ty(*m_context));    // Primitive ID (VS)
+        argTys.push_back(Type::getInt32Ty(*m_context));    // Instance ID
     }
 
-    return FunctionType::get(Type::getVoidTy(*m_pContext), argTys, false);
+    return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
 }
 
 // =====================================================================================================================
 // Generates the new entry-point for ES-GS merged shader.
-Function* ShaderMerger::GenerateEsGsEntryPoint(
-    Function* pEsEntryPoint,  // [in] Entry-point of hardware export shader (ES) (could be null)
-    Function* pGsEntryPoint)  // [in] Entry-point of hardware geometry shader (GS)
+Function* ShaderMerger::generateEsGsEntryPoint(
+    Function* esEntryPoint,  // [in] Entry-point of hardware export shader (ES) (could be null)
+    Function* gsEntryPoint)  // [in] Entry-point of hardware geometry shader (GS)
 {
-    if (pEsEntryPoint != nullptr)
+    if (esEntryPoint != nullptr)
     {
-        pEsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
-        pEsEntryPoint->addFnAttr(Attribute::AlwaysInline);
+        esEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+        esEntryPoint->addFnAttr(Attribute::AlwaysInline);
     }
 
-    assert(pGsEntryPoint != nullptr);
-    pGsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
-    pGsEntryPoint->addFnAttr(Attribute::AlwaysInline);
+    assert(gsEntryPoint != nullptr);
+    gsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+    gsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
-    auto pModule = pGsEntryPoint->getParent();
+    auto module = gsEntryPoint->getParent();
     const bool hasTs = (m_hasTcs || m_hasTes);
 
     uint64_t inRegMask = 0;
-    auto pEntryPointTy = GenerateEsGsEntryPointType(&inRegMask);
+    auto entryPointTy = generateEsGsEntryPointType(&inRegMask);
 
     // Create the entrypoint for the merged shader, and insert it just before the old GS.
-    Function* pEntryPoint = Function::Create(pEntryPointTy,
+    Function* entryPoint = Function::Create(entryPointTy,
                                              GlobalValue::ExternalLinkage,
                                              lgcName::EsGsEntryPoint);
-    pModule->getFunctionList().insert(pGsEntryPoint->getIterator(), pEntryPoint);
+    module->getFunctionList().insert(gsEntryPoint->getIterator(), entryPoint);
 
-    pEntryPoint->addFnAttr("amdgpu-flat-work-group-size", "128,128"); // Force s_barrier to be present (ignore optimization)
+    entryPoint->addFnAttr("amdgpu-flat-work-group-size", "128,128"); // Force s_barrier to be present (ignore optimization)
 
-    for (auto& arg : pEntryPoint->args())
+    for (auto& arg : entryPoint->args())
     {
         auto argIdx = arg.getArgNo();
         if (inRegMask & (1ull << argIdx))
@@ -683,122 +683,122 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
     std::vector<Value*> args;
     std::vector<Attribute::AttrKind> attribs;
 
-    const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+    const auto& calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
-    auto pArg = pEntryPoint->arg_begin();
+    auto arg = entryPoint->arg_begin();
 
-    Value* pGsVsOffset      = (pArg + EsGsSysValueGsVsOffset);
-    Value* pMergedWaveInfo  = (pArg + EsGsSysValueMergedWaveInfo);
-    Value* pOffChipLdsBase  = (pArg + EsGsSysValueOffChipLdsBase);
+    Value* gsVsOffset      = (arg + EsGsSysValueGsVsOffset);
+    Value* mergedWaveInfo  = (arg + EsGsSysValueMergedWaveInfo);
+    Value* offChipLdsBase  = (arg + EsGsSysValueOffChipLdsBase);
 
-    pArg += EsGsSpecialSysValueCount;
+    arg += EsGsSpecialSysValueCount;
 
-    Value* pUserData = pArg++;
+    Value* userData = arg++;
 
     // Define basic blocks
-    auto pEndGsBlock    = BasicBlock::Create(*m_pContext, ".endgs", pEntryPoint);
-    auto pBeginGsBlock  = BasicBlock::Create(*m_pContext, ".begings", pEntryPoint, pEndGsBlock);
-    auto pEndEsBlock    = BasicBlock::Create(*m_pContext, ".endes", pEntryPoint, pBeginGsBlock);
-    auto pBeginEsBlock  = BasicBlock::Create(*m_pContext, ".begines", pEntryPoint, pEndEsBlock);
-    auto pEntryBlock    = BasicBlock::Create(*m_pContext, ".entry", pEntryPoint, pBeginEsBlock);
+    auto endGsBlock    = BasicBlock::Create(*m_context, ".endgs", entryPoint);
+    auto beginGsBlock  = BasicBlock::Create(*m_context, ".begings", entryPoint, endGsBlock);
+    auto endEsBlock    = BasicBlock::Create(*m_context, ".endes", entryPoint, beginGsBlock);
+    auto beginEsBlock  = BasicBlock::Create(*m_context, ".begines", entryPoint, endEsBlock);
+    auto entryBlock    = BasicBlock::Create(*m_context, ".entry", entryPoint, beginEsBlock);
 
     // Construct ".entry" block
     args.clear();
-    args.push_back(ConstantInt::get(Type::getInt64Ty(*m_pContext), -1));
+    args.push_back(ConstantInt::get(Type::getInt64Ty(*m_context), -1));
 
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
 
-    EmitCall("llvm.amdgcn.init.exec", Type::getVoidTy(*m_pContext), args, attribs, pEntryBlock);
+    emitCall("llvm.amdgcn.init.exec", Type::getVoidTy(*m_context), args, attribs, entryBlock);
 
     args.clear();
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), -1));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), -1));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
 
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
 
-    auto pThreadId = EmitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
+    auto threadId = emitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
 
-    unsigned waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
+    unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
     if (waveSize == 64)
     {
         args.clear();
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), -1));
-        args.push_back(pThreadId);
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), -1));
+        args.push_back(threadId);
 
-        pThreadId = EmitCall("llvm.amdgcn.mbcnt.hi", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
+        threadId = emitCall("llvm.amdgcn.mbcnt.hi", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
     }
 
     args.clear();
-    args.push_back(pMergedWaveInfo);
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
+    args.push_back(mergedWaveInfo);
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
 
     attribs.clear();
     attribs.push_back(Attribute::ReadNone);
 
-    auto pEsVertCount = EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
+    auto esVertCount = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
 
     args.clear();
-    args.push_back(pMergedWaveInfo);
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
+    args.push_back(mergedWaveInfo);
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
 
-    auto pGsPrimCount = EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
-
-    args.clear();
-    args.push_back(pMergedWaveInfo);
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
-
-    auto pGsWaveId = EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
+    auto gsPrimCount = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
 
     args.clear();
-    args.push_back(pMergedWaveInfo);
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 24));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 4));
+    args.push_back(mergedWaveInfo);
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
 
-    auto pWaveInSubgroup =
-        EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
+    auto gsWaveId = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
 
-    auto pEsGsOffset =
-        BinaryOperator::CreateMul(pWaveInSubgroup,
-                                  ConstantInt::get(Type::getInt32Ty(*m_pContext), 64 * 4 * calcFactor.esGsRingItemSize),
+    args.clear();
+    args.push_back(mergedWaveInfo);
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 24));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 4));
+
+    auto waveInSubgroup =
+        emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
+
+    auto esGsOffset =
+        BinaryOperator::CreateMul(waveInSubgroup,
+                                  ConstantInt::get(Type::getInt32Ty(*m_context), 64 * 4 * calcFactor.esGsRingItemSize),
                                   "",
-                                  pEntryBlock);
+                                  entryBlock);
 
-    auto pEsEnable = new ICmpInst(*pEntryBlock, ICmpInst::ICMP_ULT, pThreadId, pEsVertCount, "");
-    BranchInst::Create(pBeginEsBlock, pEndEsBlock, pEsEnable, pEntryBlock);
+    auto esEnable = new ICmpInst(*entryBlock, ICmpInst::ICMP_ULT, threadId, esVertCount, "");
+    BranchInst::Create(beginEsBlock, endEsBlock, esEnable, entryBlock);
 
-    Value* pEsGsOffsets01 = pArg;
+    Value* esGsOffsets01 = arg;
 
-    Value* pEsGsOffsets23 = UndefValue::get(Type::getInt32Ty(*m_pContext));
+    Value* esGsOffsets23 = UndefValue::get(Type::getInt32Ty(*m_context));
     if (calcFactor.inputVertices > 2)
     {
         // NOTE: ES to GS offset (vertex 2 and 3) is valid once the primitive type has more than 2 vertices.
-        pEsGsOffsets23 = (pArg + 1);
+        esGsOffsets23 = (arg + 1);
     }
 
-    Value* pGsPrimitiveId = (pArg + 2);
-    Value* pInvocationId  = (pArg + 3);
+    Value* gsPrimitiveId = (arg + 2);
+    Value* invocationId  = (arg + 3);
 
-    Value* pEsGsOffsets45 = UndefValue::get(Type::getInt32Ty(*m_pContext));
+    Value* esGsOffsets45 = UndefValue::get(Type::getInt32Ty(*m_context));
     if (calcFactor.inputVertices > 4)
     {
         // NOTE: ES to GS offset (vertex 4 and 5) is valid once the primitive type has more than 4 vertices.
-        pEsGsOffsets45 = (pArg + 4);
+        esGsOffsets45 = (arg + 4);
     }
 
-    Value* pTessCoordX    = (pArg + 5);
-    Value* pTessCoordY    = (pArg + 6);
-    Value* pRelPatchId    = (pArg + 7);
-    Value* pPatchId       = (pArg + 8);
+    Value* tessCoordX    = (arg + 5);
+    Value* tessCoordY    = (arg + 6);
+    Value* relPatchId    = (arg + 7);
+    Value* patchId       = (arg + 8);
 
-    Value* pVertexId      = (pArg + 5);
-    Value* pRelVertexId   = (pArg + 6);
-    Value* pVsPrimitiveId = (pArg + 7);
-    Value* pInstanceId    = (pArg + 8);
+    Value* vertexId      = (arg + 5);
+    Value* relVertexId   = (arg + 6);
+    Value* vsPrimitiveId = (arg + 7);
+    Value* instanceId    = (arg + 8);
 
     // Construct ".begines" block
     unsigned spillTableIdx = 0;
@@ -807,14 +807,14 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
         // Call ES main function
         args.clear();
 
-        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
-        const unsigned userDataCount = pIntfData->userDataCount;
-        spillTableIdx = pIntfData->userDataUsage.spillTable;
+        auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+        const unsigned userDataCount = intfData->userDataCount;
+        spillTableIdx = intfData->userDataUsage.spillTable;
 
         unsigned userDataIdx = 0;
 
-        auto pEsArgBegin = pEsEntryPoint->arg_begin();
-        const unsigned esArgCount = pEsEntryPoint->arg_size();
+        auto esArgBegin = esEntryPoint->arg_begin();
+        const unsigned esArgCount = esEntryPoint->arg_size();
 
         unsigned esArgIdx = 0;
 
@@ -823,38 +823,38 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
         {
             assert(esArgIdx < esArgCount);
 
-            auto pEsArg = (pEsArgBegin + esArgIdx);
-            assert(pEsArg->hasAttribute(Attribute::InReg));
+            auto esArg = (esArgBegin + esArgIdx);
+            assert(esArg->hasAttribute(Attribute::InReg));
 
-            auto pEsArgTy = pEsArg->getType();
-            if (pEsArgTy->isVectorTy())
+            auto esArgTy = esArg->getType();
+            if (esArgTy->isVectorTy())
             {
-                assert(pEsArgTy->getVectorElementType()->isIntegerTy());
+                assert(esArgTy->getVectorElementType()->isIntegerTy());
 
-                const unsigned userDataSize = pEsArgTy->getVectorNumElements();
+                const unsigned userDataSize = esArgTy->getVectorNumElements();
 
                 std::vector<Constant*> shuffleMask;
                 for (unsigned i = 0; i < userDataSize; ++i)
                 {
-                    shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), userDataIdx + i));
+                    shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx + i));
                 }
 
                 userDataIdx += userDataSize;
 
-                auto pEsUserData =
-                    new ShuffleVectorInst(pUserData, pUserData, ConstantVector::get(shuffleMask), "", pBeginEsBlock);
-                args.push_back(pEsUserData);
+                auto esUserData =
+                    new ShuffleVectorInst(userData, userData, ConstantVector::get(shuffleMask), "", beginEsBlock);
+                args.push_back(esUserData);
             }
             else
             {
-                assert(pEsArgTy->isIntegerTy());
+                assert(esArgTy->isIntegerTy());
 
-                auto pEsUserData = ExtractElementInst::Create(pUserData,
-                                                              ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                auto esUserData = ExtractElementInst::Create(userData,
+                                                              ConstantInt::get(Type::getInt32Ty(*m_context),
                                                                                userDataIdx),
                                                               "",
-                                                              pBeginEsBlock);
-                args.push_back(pEsUserData);
+                                                              beginEsBlock);
+                args.push_back(esUserData);
                 ++userDataIdx;
             }
 
@@ -864,77 +864,77 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
         if (hasTs)
         {
             // Set up system value SGPRs
-            if (m_pPipelineState->IsTessOffChip())
+            if (m_pipelineState->isTessOffChip())
             {
-                args.push_back(pOffChipLdsBase);
+                args.push_back(offChipLdsBase);
                 ++esArgIdx;
 
-                args.push_back(pOffChipLdsBase);
+                args.push_back(offChipLdsBase);
                 ++esArgIdx;
             }
 
-            args.push_back(pEsGsOffset);
+            args.push_back(esGsOffset);
             ++esArgIdx;
 
             // Set up system value VGPRs
-            args.push_back(pTessCoordX);
+            args.push_back(tessCoordX);
             ++esArgIdx;
 
-            args.push_back(pTessCoordY);
+            args.push_back(tessCoordY);
             ++esArgIdx;
 
-            args.push_back(pRelPatchId);
+            args.push_back(relPatchId);
             ++esArgIdx;
 
-            args.push_back(pPatchId);
+            args.push_back(patchId);
             ++esArgIdx;
         }
         else
         {
             // Set up system value SGPRs
-            args.push_back(pEsGsOffset);
+            args.push_back(esGsOffset);
             ++esArgIdx;
 
             // Set up system value VGPRs
             if (esArgIdx < esArgCount)
             {
-                args.push_back(pVertexId);
+                args.push_back(vertexId);
                 ++esArgIdx;
             }
 
             if (esArgIdx < esArgCount)
             {
-                args.push_back(pRelVertexId);
+                args.push_back(relVertexId);
                 ++esArgIdx;
             }
 
             if (esArgIdx < esArgCount)
             {
-                args.push_back(pVsPrimitiveId);
+                args.push_back(vsPrimitiveId);
                 ++esArgIdx;
             }
 
             if (esArgIdx < esArgCount)
             {
-                args.push_back(pInstanceId);
+                args.push_back(instanceId);
                 ++esArgIdx;
             }
         }
 
         assert(esArgIdx == esArgCount); // Must have visit all arguments of ES entry point
 
-        CallInst::Create(pEsEntryPoint, args, "", pBeginEsBlock);
+        CallInst::Create(esEntryPoint, args, "", beginEsBlock);
     }
-    BranchInst::Create(pEndEsBlock, pBeginEsBlock);
+    BranchInst::Create(endEsBlock, beginEsBlock);
 
     // Construct ".endes" block
     args.clear();
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
-    EmitCall("llvm.amdgcn.s.barrier", Type::getVoidTy(*m_pContext), args, attribs, pEndEsBlock);
+    emitCall("llvm.amdgcn.s.barrier", Type::getVoidTy(*m_context), args, attribs, endEsBlock);
 
-    auto pGsEnable = new ICmpInst(*pEndEsBlock, ICmpInst::ICMP_ULT, pThreadId, pGsPrimCount, "");
-    BranchInst::Create(pBeginGsBlock, pEndGsBlock, pGsEnable, pEndEsBlock);
+    auto gsEnable = new ICmpInst(*endEsBlock, ICmpInst::ICMP_ULT, threadId, gsPrimCount, "");
+    BranchInst::Create(beginGsBlock, endGsBlock, gsEnable, endEsBlock);
 
     // Construct ".begings" block
     {
@@ -942,99 +942,99 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
         attribs.push_back(Attribute::ReadNone);
 
         args.clear();
-        args.push_back(pEsGsOffsets01);
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
+        args.push_back(esGsOffsets01);
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
 
-        auto pEsGsOffset0 =
-            EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pBeginGsBlock);
-
-        args.clear();
-        args.push_back(pEsGsOffsets01);
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
-
-        auto pEsGsOffset1 =
-            EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pBeginGsBlock);
+        auto esGsOffset0 =
+            emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, beginGsBlock);
 
         args.clear();
-        args.push_back(pEsGsOffsets23);
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
+        args.push_back(esGsOffsets01);
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
 
-        auto pEsGsOffset2 =
-            EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pBeginGsBlock);
-
-        args.clear();
-        args.push_back(pEsGsOffsets23);
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
-
-        auto pEsGsOffset3 =
-            EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pBeginGsBlock);
+        auto esGsOffset1 =
+            emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, beginGsBlock);
 
         args.clear();
-        args.push_back(pEsGsOffsets45);
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
+        args.push_back(esGsOffsets23);
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
 
-        auto pEsGsOffset4 =
-            EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pBeginGsBlock);
+        auto esGsOffset2 =
+            emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, beginGsBlock);
 
         args.clear();
-        args.push_back(pEsGsOffsets45);
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
-        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
+        args.push_back(esGsOffsets23);
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
 
-        auto pEsGsOffset5 =
-            EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pBeginGsBlock);
+        auto esGsOffset3 =
+            emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, beginGsBlock);
+
+        args.clear();
+        args.push_back(esGsOffsets45);
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
+
+        auto esGsOffset4 =
+            emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, beginGsBlock);
+
+        args.clear();
+        args.push_back(esGsOffsets45);
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
+
+        auto esGsOffset5 =
+            emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, beginGsBlock);
 
         // Call GS main function
         args.clear();
 
-        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry);
-        const unsigned userDataCount = pIntfData->userDataCount;
+        auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
+        const unsigned userDataCount = intfData->userDataCount;
 
         unsigned userDataIdx = 0;
 
-        auto pGsArgBegin = pGsEntryPoint->arg_begin();
+        auto gsArgBegin = gsEntryPoint->arg_begin();
 
         unsigned gsArgIdx = 0;
 
         // Set up user data SGPRs
         while (userDataIdx < userDataCount)
         {
-            assert(gsArgIdx < pGsEntryPoint->arg_size());
+            assert(gsArgIdx < gsEntryPoint->arg_size());
 
-            auto pGsArg = (pGsArgBegin + gsArgIdx);
-            assert(pGsArg->hasAttribute(Attribute::InReg));
+            auto gsArg = (gsArgBegin + gsArgIdx);
+            assert(gsArg->hasAttribute(Attribute::InReg));
 
-            auto pGsArgTy = pGsArg->getType();
-            if (pGsArgTy->isVectorTy())
+            auto gsArgTy = gsArg->getType();
+            if (gsArgTy->isVectorTy())
             {
-                assert(pGsArgTy->getVectorElementType()->isIntegerTy());
+                assert(gsArgTy->getVectorElementType()->isIntegerTy());
 
-                const unsigned userDataSize = pGsArgTy->getVectorNumElements();
+                const unsigned userDataSize = gsArgTy->getVectorNumElements();
 
                 std::vector<Constant*> shuffleMask;
                 for (unsigned i = 0; i < userDataSize; ++i)
                 {
-                    shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), userDataIdx + i));
+                    shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx + i));
                 }
 
                 userDataIdx += userDataSize;
 
-                auto pGsUserData =
-                    new ShuffleVectorInst(pUserData, pUserData, ConstantVector::get(shuffleMask), "", pBeginGsBlock);
-                args.push_back(pGsUserData);
+                auto gsUserData =
+                    new ShuffleVectorInst(userData, userData, ConstantVector::get(shuffleMask), "", beginGsBlock);
+                args.push_back(gsUserData);
             }
             else
             {
-                assert(pGsArgTy->isIntegerTy());
+                assert(gsArgTy->isIntegerTy());
                 unsigned actualUserDataIdx = userDataIdx;
-                if (pIntfData->spillTable.sizeInDwords > 0)
+                if (intfData->spillTable.sizeInDwords > 0)
                 {
-                    if (pIntfData->userDataUsage.spillTable == userDataIdx)
+                    if (intfData->userDataUsage.spillTable == userDataIdx)
                     {
                         if (spillTableIdx > 0)
                         {
@@ -1042,12 +1042,12 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
                         }
                     }
                 }
-                auto pGsUserData = ExtractElementInst::Create(pUserData,
-                                                              ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                auto gsUserData = ExtractElementInst::Create(userData,
+                                                              ConstantInt::get(Type::getInt32Ty(*m_context),
                                                                                actualUserDataIdx),
                                                               "",
-                                                              pBeginGsBlock);
-                args.push_back(pGsUserData);
+                                                              beginGsBlock);
+                args.push_back(gsUserData);
                 ++userDataIdx;
             }
 
@@ -1055,45 +1055,45 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
         }
 
         // Set up system value SGPRs
-        args.push_back(pGsVsOffset);
+        args.push_back(gsVsOffset);
         ++gsArgIdx;
 
-        args.push_back(pGsWaveId);
+        args.push_back(gsWaveId);
         ++gsArgIdx;
 
         // Set up system value VGPRs
-        args.push_back(pEsGsOffset0);
+        args.push_back(esGsOffset0);
         ++gsArgIdx;
 
-        args.push_back(pEsGsOffset1);
+        args.push_back(esGsOffset1);
         ++gsArgIdx;
 
-        args.push_back(pGsPrimitiveId);
+        args.push_back(gsPrimitiveId);
         ++gsArgIdx;
 
-        args.push_back(pEsGsOffset2);
+        args.push_back(esGsOffset2);
         ++gsArgIdx;
 
-        args.push_back(pEsGsOffset3);
+        args.push_back(esGsOffset3);
         ++gsArgIdx;
 
-        args.push_back(pEsGsOffset4);
+        args.push_back(esGsOffset4);
         ++gsArgIdx;
 
-        args.push_back(pEsGsOffset5);
+        args.push_back(esGsOffset5);
         ++gsArgIdx;
 
-        args.push_back(pInvocationId);
+        args.push_back(invocationId);
         ++gsArgIdx;
 
-        assert(gsArgIdx == pGsEntryPoint->arg_size()); // Must have visit all arguments of GS entry point
+        assert(gsArgIdx == gsEntryPoint->arg_size()); // Must have visit all arguments of GS entry point
 
-        CallInst::Create(pGsEntryPoint, args, "", pBeginGsBlock);
+        CallInst::Create(gsEntryPoint, args, "", beginGsBlock);
     }
-    BranchInst::Create(pEndGsBlock, pBeginGsBlock);
+    BranchInst::Create(endGsBlock, beginGsBlock);
 
     // Construct ".endgs" block
-    ReturnInst::Create(*m_pContext, pEndGsBlock);
+    ReturnInst::Create(*m_context, endGsBlock);
 
-    return pEntryPoint;
+    return entryPoint;
 }

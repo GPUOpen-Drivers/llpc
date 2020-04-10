@@ -35,18 +35,18 @@
 // Lay out dummy descriptors and other information for one shader stage. This is used when running amdllpc on a single
 // SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be leaked, but that does not
 // matter because we are running a short-lived command-line utility.
-void DoAutoLayoutDesc(Llpc::ShaderStage                 shaderStage,
+void doAutoLayoutDesc(Llpc::ShaderStage                 shaderStage,
                       Llpc::BinaryData                  spirvBin,
-                      Llpc::GraphicsPipelineBuildInfo*  pPipelineInfo,
-                      Llpc::PipelineShaderInfo*         pShaderInfo,
+                      Llpc::GraphicsPipelineBuildInfo*  pipelineInfo,
+                      Llpc::PipelineShaderInfo*         shaderInfo,
                       unsigned&                         topLevelOffset,
                       bool                              checkAutoLayoutCompatible);
 
-bool CheckShaderInfoComptible(Llpc::PipelineShaderInfo*        pShaderInfo,
+bool checkShaderInfoComptible(Llpc::PipelineShaderInfo*        shaderInfo,
                               unsigned                         autoLayoutUserDataNodeCount,
-                              const Llpc::ResourceMappingNode* pAutoLayoutUserDataNodes);
+                              const Llpc::ResourceMappingNode* autoLayoutUserDataNodes);
 
-bool CheckPipelineStateCompatible(const Llpc::ICompiler*            pCompiler,
-                                  Llpc::GraphicsPipelineBuildInfo*  pPipelineInfo,
-                                  Llpc::GraphicsPipelineBuildInfo*  pAutoLayoutPipelineInfo,
+bool checkPipelineStateCompatible(const Llpc::ICompiler*            compiler,
+                                  Llpc::GraphicsPipelineBuildInfo*  pipelineInfo,
+                                  Llpc::GraphicsPipelineBuildInfo*  autoLayoutPipelineInfo,
                                   Llpc::GfxIpVersion                gfxIp);

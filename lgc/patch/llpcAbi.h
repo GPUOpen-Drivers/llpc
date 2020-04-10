@@ -36,21 +36,21 @@ namespace lgc
 {
 
 // Internal resource table's virtual bindings
-static const unsigned SI_DRV_TABLE_SCRATCH_GFX_SRD_OFFS = 0;
-static const unsigned SI_DRV_TABLE_SCRATCH_CS_SRD_OFFS  = 1;
-static const unsigned SI_DRV_TABLE_ES_RING_OUT_OFFS     = 2;
-static const unsigned SI_DRV_TABLE_GS_RING_IN_OFFS      = 3;
-static const unsigned SI_DRV_TABLE_GS_RING_OUT0_OFFS    = 4;
-static const unsigned SI_DRV_TABLE_GS_RING_OUT1_OFFS    = 5;
-static const unsigned SI_DRV_TABLE_GS_RING_OUT2_OFFS    = 6;
-static const unsigned SI_DRV_TABLE_GS_RING_OUT3_OFFS    = 7;
-static const unsigned SI_DRV_TABLE_VS_RING_IN_OFFS      = 8;
-static const unsigned SI_DRV_TABLE_TF_BUFFER_OFFS       = 9;
-static const unsigned SI_DRV_TABLE_HS_BUFFER0_OFFS      = 10;
-static const unsigned SI_DRV_TABLE_OFF_CHIP_PARAM_CACHE = 11;
-static const unsigned SI_DRV_TABLE_SAMPLEPOS            = 12;
+static const unsigned SiDrvTableScratchGfxSrdOffs = 0;
+static const unsigned SiDrvTableScratchCsSrdOffs  = 1;
+static const unsigned SiDrvTableEsRingOutOffs     = 2;
+static const unsigned SiDrvTableGsRingInOffs      = 3;
+static const unsigned SiDrvTableGsRingOuT0Offs    = 4;
+static const unsigned SiDrvTableGsRingOuT1Offs    = 5;
+static const unsigned SiDrvTableGsRingOuT2Offs    = 6;
+static const unsigned SiDrvTableGsRingOuT3Offs    = 7;
+static const unsigned SiDrvTableVsRingInOffs      = 8;
+static const unsigned SiDrvTableTfBufferOffs       = 9;
+static const unsigned SiDrvTableHsBuffeR0Offs      = 10;
+static const unsigned SiDrvTableOffChipParamCache = 11;
+static const unsigned SiDrvTableSamplepos            = 12;
 
-static const unsigned SI_STREAMOUT_TABLE_OFFS           = 0;
+static const unsigned SiStreamoutTableOffs           = 0;
 
 namespace Util
 {

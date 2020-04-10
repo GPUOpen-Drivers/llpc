@@ -867,110 +867,110 @@ static const Intrinsic::ID ImageAtomicIntrinsicTable[][8] =
 
 // =====================================================================================================================
 // Convert an integer or vector of integer type to the equivalent (vector of) half/float/double
-static Type* ConvertToFloatingPointType(
-    Type* pOrigTy)    // Original type
+static Type* convertToFloatingPointType(
+    Type* origTy)    // Original type
 {
-    assert(pOrigTy->isIntOrIntVectorTy());
-    Type* pNewTy = pOrigTy;
-    switch (pNewTy->getScalarType()->getIntegerBitWidth())
+    assert(origTy->isIntOrIntVectorTy());
+    Type* newTy = origTy;
+    switch (newTy->getScalarType()->getIntegerBitWidth())
     {
     case 16:
-        pNewTy = Type::getHalfTy(pNewTy->getContext());
+        newTy = Type::getHalfTy(newTy->getContext());
         break;
     case 32:
-        pNewTy = Type::getFloatTy(pNewTy->getContext());
+        newTy = Type::getFloatTy(newTy->getContext());
         break;
     default:
         llvm_unreachable("Should never be called!");
     }
-    if (isa<VectorType>(pOrigTy))
+    if (isa<VectorType>(origTy))
     {
-        pNewTy = VectorType::get(pNewTy, pOrigTy->getVectorNumElements());
+        newTy = VectorType::get(newTy, origTy->getVectorNumElements());
     }
-    return pNewTy;
+    return newTy;
 }
 
 // =====================================================================================================================
 // Create an image load.
 Value* BuilderImplImage::CreateImageLoad(
-    Type*             pResultTy,          // [in] Result type
+    Type*             resultTy,          // [in] Result type
     unsigned          dim,                // Image dimension
     unsigned          flags,              // ImageFlag* flags
-    Value*            pImageDesc,         // [in] Image descriptor
-    Value*            pCoord,             // [in] Coordinates: scalar or vector i32
-    Value*            pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
+    Value*            imageDesc,         // [in] Image descriptor
+    Value*            coord,             // [in] Coordinates: scalar or vector i32
+    Value*            mipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
     const Twine&      instName)           // [in] Name to give instruction(s)
 {
-    GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->resourceRead = true;
-    assert(pCoord->getType()->getScalarType()->isIntegerTy(32));
-    pImageDesc = PatchCubeDescriptor(pImageDesc, dim);
-    pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
+    getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceRead = true;
+    assert(coord->getType()->getScalarType()->isIntegerTy(32));
+    imageDesc = patchCubeDescriptor(imageDesc, dim);
+    coord = handleFragCoordViewIndex(coord, flags, dim);
 
     unsigned dmask = 1;
-    Type* pOrigTexelTy = pResultTy;
-    if (auto pStructResultTy = dyn_cast<StructType>(pResultTy))
+    Type* origTexelTy = resultTy;
+    if (auto structResultTy = dyn_cast<StructType>(resultTy))
     {
-        pOrigTexelTy = pStructResultTy->getElementType(0);
+        origTexelTy = structResultTy->getElementType(0);
     }
 
-    Type* pTexelTy = pOrigTexelTy;
-    if (pOrigTexelTy->isIntOrIntVectorTy(64))
+    Type* texelTy = origTexelTy;
+    if (origTexelTy->isIntOrIntVectorTy(64))
     {
         // Only load the first component for 64-bit texel, casted to <2 x i32>
-        pTexelTy = VectorType::get(getInt32Ty(), 2);
+        texelTy = VectorType::get(getInt32Ty(), 2);
     }
 
-    if (auto pVectorResultTy = dyn_cast<VectorType>(pTexelTy))
+    if (auto vectorResultTy = dyn_cast<VectorType>(texelTy))
     {
-        dmask = (1U << pVectorResultTy->getNumElements()) - 1;
+        dmask = (1U << vectorResultTy->getNumElements()) - 1;
     }
 
     // Prepare the coordinate, which might also change the dimension.
     SmallVector<Value*, 4> coords;
     SmallVector<Value*, 6> derivatives;
-    dim = PrepareCoordinate(dim,
-                            pCoord,
+    dim = prepareCoordinate(dim,
+                            coord,
                             nullptr,
                             nullptr,
                             nullptr,
                             coords,
                             derivatives);
 
-    Type* pIntrinsicDataTy = nullptr;
-    if (isa<StructType>(pResultTy))
+    Type* intrinsicDataTy = nullptr;
+    if (isa<StructType>(resultTy))
     {
         // TFE
-        pIntrinsicDataTy = StructType::get(pTexelTy->getContext(), { pTexelTy, getInt32Ty() });
+        intrinsicDataTy = StructType::get(texelTy->getContext(), { texelTy, getInt32Ty() });
     }
     else
     {
-        pIntrinsicDataTy = pTexelTy;
+        intrinsicDataTy = texelTy;
     }
 
     SmallVector<Value*, 16> args;
-    Value* pResult = nullptr;
+    Value* result = nullptr;
     unsigned imageDescArgIndex = 0;
-    if (pImageDesc->getType() == GetImageDescTy())
+    if (imageDesc->getType() == getImageDescTy())
     {
         // Not texel buffer; use image load instruction.
         // Build the intrinsic arguments.
-        bool tfe = isa<StructType>(pIntrinsicDataTy);
+        bool tfe = isa<StructType>(intrinsicDataTy);
         args.push_back(getInt32(dmask));
         args.insert(args.end(), coords.begin(), coords.end());
 
-        if (pMipLevel != nullptr)
+        if (mipLevel != nullptr)
         {
-            args.push_back(pMipLevel);
+            args.push_back(mipLevel);
         }
         imageDescArgIndex = args.size();
-        args.push_back(pImageDesc);
+        args.push_back(imageDesc);
         args.push_back(getInt32(tfe));
         args.push_back(getInt32(((flags & ImageFlagCoherent) ? 1 : 0) | ((flags & ImageFlagVolatile) ? 2 : 0)));
 
         // Get the intrinsic ID from the load intrinsic ID table and call it.
-        auto pTable = (pMipLevel != nullptr) ? &ImageLoadMipIntrinsicTable[0] : &ImageLoadIntrinsicTable[0];
-        pResult = CreateIntrinsic(pTable[dim],
-                                  { pIntrinsicDataTy, coords[0]->getType() },
+        auto table = (mipLevel != nullptr) ? &ImageLoadMipIntrinsicTable[0] : &ImageLoadIntrinsicTable[0];
+        result = CreateIntrinsic(table[dim],
+                                  { intrinsicDataTy, coords[0]->getType() },
                                   args,
                                   nullptr,
                                   instName);
@@ -979,13 +979,13 @@ Value* BuilderImplImage::CreateImageLoad(
     {
         // Texel buffer descriptor. Use the buffer instruction.
         imageDescArgIndex = args.size();
-        args.push_back(pImageDesc);
+        args.push_back(imageDesc);
         args.push_back(coords[0]);
         args.push_back(getInt32(0));
         args.push_back(getInt32(0));
         args.push_back(getInt32(0));
-        pResult = CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format,
-                                  pIntrinsicDataTy,
+        result = CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format,
+                                  intrinsicDataTy,
                                   args,
                                   nullptr,
                                   instName);
@@ -993,48 +993,48 @@ Value* BuilderImplImage::CreateImageLoad(
 
     // For 64-bit texel, only the first component is loaded, other components are filled in with (0, 0, 1). This
     // operation could be viewed as supplement of the intrinsic call.
-    if (pOrigTexelTy->isIntOrIntVectorTy(64))
+    if (origTexelTy->isIntOrIntVectorTy(64))
     {
-        Value* pTexel = pResult;
-        if (isa<StructType>(pResultTy))
+        Value* texel = result;
+        if (isa<StructType>(resultTy))
         {
-            pTexel = CreateExtractValue(pResult, uint64_t(0));
+            texel = CreateExtractValue(result, uint64_t(0));
         }
-        pTexel = CreateBitCast(pTexel, getInt64Ty()); // Casted to i64
+        texel = CreateBitCast(texel, getInt64Ty()); // Casted to i64
 
-        if (pOrigTexelTy->isVectorTy())
+        if (origTexelTy->isVectorTy())
         {
-            pTexel = CreateInsertElement(UndefValue::get(pOrigTexelTy), pTexel, uint64_t(0));
+            texel = CreateInsertElement(UndefValue::get(origTexelTy), texel, uint64_t(0));
 
             SmallVector<Value*, 3> defaults = { getInt64(0), getInt64(0), getInt64(1) };
-            for (unsigned i = 1; i < pOrigTexelTy->getVectorNumElements(); ++i)
+            for (unsigned i = 1; i < origTexelTy->getVectorNumElements(); ++i)
             {
-                pTexel = CreateInsertElement(pTexel, defaults[i - 1], i);
+                texel = CreateInsertElement(texel, defaults[i - 1], i);
             }
         }
 
-        if (isa<StructType>(pResultTy))
+        if (isa<StructType>(resultTy))
         {
             // TFE
-            pIntrinsicDataTy = StructType::get(pOrigTexelTy->getContext(), { pOrigTexelTy, getInt32Ty() });
-            pResult = CreateInsertValue(CreateInsertValue(UndefValue::get(pIntrinsicDataTy), pTexel, uint64_t(0)),
-                                        CreateExtractValue(pResult, 1),
+            intrinsicDataTy = StructType::get(origTexelTy->getContext(), { origTexelTy, getInt32Ty() });
+            result = CreateInsertValue(CreateInsertValue(UndefValue::get(intrinsicDataTy), texel, uint64_t(0)),
+                                        CreateExtractValue(result, 1),
                                         1);
         }
         else
         {
-            pIntrinsicDataTy = pOrigTexelTy;
-            pResult = pTexel;
+            intrinsicDataTy = origTexelTy;
+            result = texel;
         }
     }
 
     // Add a waterfall loop if needed.
     if (flags & ImageFlagNonUniformImage)
     {
-        pResult = CreateWaterfallLoop(cast<Instruction>(pResult), imageDescArgIndex);
+        result = createWaterfallLoop(cast<Instruction>(result), imageDescArgIndex);
     }
 
-    return pResult;
+    return result;
 }
 
 // =====================================================================================================================
@@ -1045,14 +1045,14 @@ Value* BuilderImplImage::CreateImageLoad(
 // just uses the supplied sample number. The calculated sample is then appended to the supplied coordinates
 // for a normal image load.
 Value* BuilderImplImage::CreateImageLoadWithFmask(
-    Type*                   pResultTy,          // [in] Result type
+    Type*                   resultTy,          // [in] Result type
     unsigned                dim,                // Image dimension
     unsigned                flags,              // ImageFlag* flags
-    Value*                  pImageDesc,         // [in] Image descriptor
-    Value*                  pFmaskDesc,         // [in] Fmask descriptor
-    Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right
+    Value*                  imageDesc,         // [in] Image descriptor
+    Value*                  fmaskDesc,         // [in] Fmask descriptor
+    Value*                  coord,             // [in] Coordinates: scalar or vector i32, exactly right
                                                 //    width for given dimension excluding sample
-    Value*                  pSampleNum,         // [in] Sample number, i32
+    Value*                  sampleNum,         // [in] Sample number, i32
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
     // Load texel from F-mask image.
@@ -1069,113 +1069,113 @@ Value* BuilderImplImage::CreateImageLoadWithFmask(
         llvm_unreachable("Should never be called!");
         break;
     }
-    Value* pFmaskTexel = CreateImageLoad(VectorType::get(getInt32Ty(), 4),
+    Value* fmaskTexel = CreateImageLoad(VectorType::get(getInt32Ty(), 4),
                                          fmaskDim,
                                          flags,
-                                         pFmaskDesc,
-                                         pCoord,
+                                         fmaskDesc,
+                                         coord,
                                          nullptr,
                                          instName + ".fmaskload");
 
     // Calculate the sample number we would use if the F-mask descriptor format is valid.
-    Value* pCalcSampleNum = CreateExtractElement(pFmaskTexel, uint64_t(0));
-    Value* pShiftSampleNum = CreateShl(pSampleNum, getInt32(2));
-    pCalcSampleNum = CreateLShr(pCalcSampleNum, pShiftSampleNum);
-    pCalcSampleNum = CreateAnd(pCalcSampleNum, getInt32(15));
+    Value* calcSampleNum = CreateExtractElement(fmaskTexel, uint64_t(0));
+    Value* shiftSampleNum = CreateShl(sampleNum, getInt32(2));
+    calcSampleNum = CreateLShr(calcSampleNum, shiftSampleNum);
+    calcSampleNum = CreateAnd(calcSampleNum, getInt32(15));
 
     // Check whether the F-mask descriptor has a BUF_DATA_FORMAT_INVALID (0) format (dword[1].bit[20-25]).
-    Value* pFmaskFormat = CreateExtractElement(pFmaskDesc, 1);
-    pFmaskFormat = CreateAnd(pFmaskFormat, getInt32(63 << 20));
-    Value* pFmaskValidFormat = CreateICmpNE(pFmaskFormat, getInt32(0));
+    Value* fmaskFormat = CreateExtractElement(fmaskDesc, 1);
+    fmaskFormat = CreateAnd(fmaskFormat, getInt32(63 << 20));
+    Value* fmaskValidFormat = CreateICmpNE(fmaskFormat, getInt32(0));
 
     // Use that to select the calculated sample number or the provided one, then append that to the coordinates.
-    pSampleNum = CreateSelect(pFmaskValidFormat, pCalcSampleNum, pSampleNum);
-    pSampleNum = CreateInsertElement(UndefValue::get(pCoord->getType()), pSampleNum, uint64_t(0));
+    sampleNum = CreateSelect(fmaskValidFormat, calcSampleNum, sampleNum);
+    sampleNum = CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
     static const unsigned Idxs[] = { 0, 1, 2, 3 };
-    pCoord = CreateShuffleVector(pCoord,
-                                 pSampleNum,
+    coord = CreateShuffleVector(coord,
+                                 sampleNum,
                                  ArrayRef<unsigned>(Idxs).slice(0, dim == Dim2DArrayMsaa ? 4 : 3));
 
     // Now do the normal load.
-    return dyn_cast<Instruction>(CreateImageLoad(pResultTy, dim, flags, pImageDesc, pCoord, nullptr, instName));
+    return dyn_cast<Instruction>(CreateImageLoad(resultTy, dim, flags, imageDesc, coord, nullptr, instName));
 }
 
 // =====================================================================================================================
 // Create an image store.
 Value* BuilderImplImage::CreateImageStore(
-    Value*            pTexel,             // [in] Texel value to store; v4i16, v4i32, v4i64, v4f16 or v4f32
+    Value*            texel,             // [in] Texel value to store; v4i16, v4i32, v4i64, v4f16 or v4f32
     unsigned          dim,                // Image dimension
     unsigned          flags,              // ImageFlag* flags
-    Value*            pImageDesc,         // [in] Image descriptor
-    Value*            pCoord,             // [in] Coordinates: scalar or vector i32
-    Value*            pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
+    Value*            imageDesc,         // [in] Image descriptor
+    Value*            coord,             // [in] Coordinates: scalar or vector i32
+    Value*            mipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
     const Twine&      instName)           // [in] Name to give instruction(s)
 {
-    GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
-    assert(pCoord->getType()->getScalarType()->isIntegerTy(32));
-    pImageDesc = PatchCubeDescriptor(pImageDesc, dim);
-    pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
+    getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceWrite = true;
+    assert(coord->getType()->getScalarType()->isIntegerTy(32));
+    imageDesc = patchCubeDescriptor(imageDesc, dim);
+    coord = handleFragCoordViewIndex(coord, flags, dim);
 
     // For 64-bit texel, only the first component is stored
-    if (pTexel->getType()->isIntOrIntVectorTy(64))
+    if (texel->getType()->isIntOrIntVectorTy(64))
     {
-        if (pTexel->getType()->isVectorTy())
+        if (texel->getType()->isVectorTy())
         {
-            pTexel = CreateExtractElement(pTexel, uint64_t(0));
+            texel = CreateExtractElement(texel, uint64_t(0));
         }
-        pTexel = CreateBitCast(pTexel, VectorType::get(getFloatTy(), 2)); // Casted to <2 x float>
+        texel = CreateBitCast(texel, VectorType::get(getFloatTy(), 2)); // Casted to <2 x float>
     }
 
     // The intrinsics insist on an FP data type, so we need to bitcast from an integer data type.
-    Type* pIntrinsicDataTy = pTexel->getType();
-    if (pIntrinsicDataTy->isIntOrIntVectorTy())
+    Type* intrinsicDataTy = texel->getType();
+    if (intrinsicDataTy->isIntOrIntVectorTy())
     {
-        pIntrinsicDataTy = ConvertToFloatingPointType(pIntrinsicDataTy);
-        pTexel = CreateBitCast(pTexel, pIntrinsicDataTy);
+        intrinsicDataTy = convertToFloatingPointType(intrinsicDataTy);
+        texel = CreateBitCast(texel, intrinsicDataTy);
     }
 
     // Prepare the coordinate, which might also change the dimension.
     SmallVector<Value*, 4> coords;
     SmallVector<Value*, 6> derivatives;
-    dim = PrepareCoordinate(dim,
-                            pCoord,
+    dim = prepareCoordinate(dim,
+                            coord,
                             nullptr,
                             nullptr,
                             nullptr,
                             coords,
                             derivatives);
 
-    Type* pTexelTy = pTexel->getType();
+    Type* texelTy = texel->getType();
     SmallVector<Value*, 16> args;
-    Instruction* pImageStore = nullptr;
+    Instruction* imageStore = nullptr;
     unsigned imageDescArgIndex = 0;
-    if (pImageDesc->getType() == GetImageDescTy())
+    if (imageDesc->getType() == getImageDescTy())
     {
         // Not texel buffer; use image store instruction.
         // Build the intrinsic arguments.
         unsigned dmask = 1;
-        if (auto pVectorTexelTy = dyn_cast<VectorType>(pTexelTy))
+        if (auto vectorTexelTy = dyn_cast<VectorType>(texelTy))
         {
-            dmask = (1U << pVectorTexelTy->getNumElements()) - 1;
+            dmask = (1U << vectorTexelTy->getNumElements()) - 1;
         }
 
         // Build the intrinsic arguments.
-        args.push_back(pTexel);
+        args.push_back(texel);
         args.push_back(getInt32(dmask));
         args.insert(args.end(), coords.begin(), coords.end());
-        if (pMipLevel != nullptr)
+        if (mipLevel != nullptr)
         {
-            args.push_back(pMipLevel);
+            args.push_back(mipLevel);
         }
         imageDescArgIndex = args.size();
-        args.push_back(pImageDesc);
+        args.push_back(imageDesc);
         args.push_back(getInt32(0));    // tfe/lwe
         args.push_back(getInt32(((flags & ImageFlagCoherent) ? 1 : 0) | ((flags & ImageFlagVolatile) ? 2 : 0)));
 
         // Get the intrinsic ID from the store intrinsic ID table and call it.
-        auto pTable = (pMipLevel != nullptr) ? &ImageStoreMipIntrinsicTable[0] : &ImageStoreIntrinsicTable[0];
-        pImageStore = CreateIntrinsic(pTable[dim],
-                               { pTexelTy, coords[0]->getType() },
+        auto table = (mipLevel != nullptr) ? &ImageStoreMipIntrinsicTable[0] : &ImageStoreIntrinsicTable[0];
+        imageStore = CreateIntrinsic(table[dim],
+                               { texelTy, coords[0]->getType() },
                                args,
                                nullptr,
                                instName);
@@ -1184,30 +1184,30 @@ Value* BuilderImplImage::CreateImageStore(
     {
         // Texel buffer descriptor. Use the buffer instruction.
         // First widen texel to vec4 if necessary.
-        if (auto pVectorTexelTy = dyn_cast<VectorType>(pTexelTy))
+        if (auto vectorTexelTy = dyn_cast<VectorType>(texelTy))
         {
-            if (pVectorTexelTy->getNumElements() != 4)
+            if (vectorTexelTy->getNumElements() != 4)
             {
-                pTexel = CreateShuffleVector(pTexel,
-                                             Constant::getNullValue(pTexelTy),
+                texel = CreateShuffleVector(texel,
+                                             Constant::getNullValue(texelTy),
                                              ArrayRef<unsigned>{ 0, 1, 2, 3 });
             }
         }
         else
         {
-            pTexel = CreateInsertElement(Constant::getNullValue(VectorType::get(pTexelTy, 4)), pTexel, uint64_t(0));
+            texel = CreateInsertElement(Constant::getNullValue(VectorType::get(texelTy, 4)), texel, uint64_t(0));
         }
 
         // Do the buffer store.
-        args.push_back(pTexel);
+        args.push_back(texel);
         imageDescArgIndex = args.size();
-        args.push_back(pImageDesc);
+        args.push_back(imageDesc);
         args.push_back(coords[0]);
         args.push_back(getInt32(0));
         args.push_back(getInt32(0));
         args.push_back(getInt32(0));
-        pImageStore = CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store_format,
-                                 pTexel->getType(),
+        imageStore = CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store_format,
+                                 texel->getType(),
                                  args,
                                  nullptr,
                                  instName);
@@ -1216,10 +1216,10 @@ Value* BuilderImplImage::CreateImageStore(
     // Add a waterfall loop if needed.
     if (flags & ImageFlagNonUniformImage)
     {
-        CreateWaterfallLoop(pImageStore, imageDescArgIndex);
+        createWaterfallLoop(imageStore, imageDescArgIndex);
     }
 
-    return pImageStore;
+    return imageStore;
 }
 
 // =====================================================================================================================
@@ -1227,17 +1227,17 @@ Value* BuilderImplImage::CreateImageStore(
 // The caller supplies all arguments to the image sample op in "address", in the order specified
 // by the indices defined as ImageIndex* below.
 Value* BuilderImplImage::CreateImageSample(
-    Type*                   pResultTy,          // [in] Result type
+    Type*                   resultTy,          // [in] Result type
     unsigned                dim,                // Image dimension
     unsigned                flags,              // ImageFlag* flags
-    Value*                  pImageDesc,         // [in] Image descriptor
-    Value*                  pSamplerDesc,       // [in] Sampler descriptor
+    Value*                  imageDesc,         // [in] Image descriptor
+    Value*                  samplerDesc,       // [in] Sampler descriptor
     ArrayRef<Value*>        address,            // Address and other arguments
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
-    Value* pCoord = address[ImageAddressIdxCoordinate];
-    assert((pCoord->getType()->getScalarType()->isFloatTy()) ||
-                (pCoord->getType()->getScalarType()->isHalfTy()));
+    Value* coord = address[ImageAddressIdxCoordinate];
+    assert((coord->getType()->getScalarType()->isFloatTy()) ||
+                (coord->getType()->getScalarType()->isHalfTy()));
 
     // Find the {set,desc} for the sampler and see if it is a YCbCr converting sampler.
     // This is a hack to cope with the design of the Vulkan YCbCr conversion extension, in which
@@ -1245,37 +1245,37 @@ Value* BuilderImplImage::CreateImageSample(
     // if the sampler pointer is passed through a non-inlined function arg or a phi node.
     // If using BuilderRecorder, it relies on the order in which recorded builder calls are
     // processed in BuilderReplayer.
-    if (m_pPipelineState->HaveConvertingSampler())
+    if (m_pipelineState->haveConvertingSampler())
     {
-        if (auto pLoadFromPtr = dyn_cast<CallInst>(pSamplerDesc))
+        if (auto loadFromPtr = dyn_cast<CallInst>(samplerDesc))
         {
-            if (Function* pLoadFromPtrFunc = pLoadFromPtr->getCalledFunction())
+            if (Function* loadFromPtrFunc = loadFromPtr->getCalledFunction())
             {
-                if (pLoadFromPtrFunc->getName().startswith(lgcName::DescriptorLoadFromPtr))
+                if (loadFromPtrFunc->getName().startswith(lgcName::DescriptorLoadFromPtr))
                 {
-                    Value* pDescPtr = pLoadFromPtr->getOperand(0);
-                    if (auto pDescPtrCall = dyn_cast<CallInst>(pDescPtr))
+                    Value* descPtr = loadFromPtr->getOperand(0);
+                    if (auto descPtrCall = dyn_cast<CallInst>(descPtr))
                     {
-                        if (Function* pDescPtrCallFunc = pDescPtrCall->getCalledFunction())
+                        if (Function* descPtrCallFunc = descPtrCall->getCalledFunction())
                         {
-                            if (pDescPtrCallFunc->getName().startswith(lgcName::DescriptorGetSamplerPtr))
+                            if (descPtrCallFunc->getName().startswith(lgcName::DescriptorGetSamplerPtr))
                             {
                                 // We have found the call that tells us the descriptor set and binding.
-                                unsigned descSet = cast<ConstantInt>(pDescPtrCall->getArgOperand(0))->getZExtValue();
-                                unsigned binding = cast<ConstantInt>(pDescPtrCall->getArgOperand(1))->getZExtValue();
-                                const ResourceNode* pNode = m_pPipelineState->FindResourceNode(
+                                unsigned descSet = cast<ConstantInt>(descPtrCall->getArgOperand(0))->getZExtValue();
+                                unsigned binding = cast<ConstantInt>(descPtrCall->getArgOperand(1))->getZExtValue();
+                                const ResourceNode* node = m_pipelineState->findResourceNode(
                                                                       ResourceNodeType::DescriptorYCbCrSampler,
                                                                       descSet,
                                                                       binding).second;
-                                if (pNode)
+                                if (node)
                                 {
                                     // It is a YCbCr converting sampler. Get the immutable converter and call the
                                     // appropriate function for a converting image sample.
-                                    return CreateImageSampleConvert(pResultTy,
+                                    return CreateImageSampleConvert(resultTy,
                                                                     dim,
                                                                     flags,
-                                                                    pImageDesc,
-                                                                    pNode->pImmutableValue,
+                                                                    imageDesc,
+                                                                    node->immutableValue,
                                                                     address,
                                                                     instName);
                                 }
@@ -1288,12 +1288,12 @@ Value* BuilderImplImage::CreateImageSample(
     }
 
     // Normal image sample.
-    return CreateImageSampleGather(pResultTy,
+    return CreateImageSampleGather(resultTy,
                                    dim,
                                    flags,
-                                   pCoord,
-                                   pImageDesc,
-                                   pSamplerDesc,
+                                   coord,
+                                   imageDesc,
+                                   samplerDesc,
                                    address,
                                    instName,
                                    true);
@@ -1304,11 +1304,11 @@ Value* BuilderImplImage::CreateImageSample(
 // The caller supplies all arguments to the image sample op in "address", in the order specified
 // by the indices defined as ImageIndex* below.
 Value* BuilderImplImage::CreateImageSampleConvert(
-    Type*                   pResultTy,              // [in] Result type
+    Type*                   resultTy,              // [in] Result type
     unsigned                dim,                    // Image dimension
     unsigned                flags,                  // ImageFlag* flags
-    Value*                  pImageDesc,             // [in] Image descriptor
-    Value*                  pConvertingSamplerDesc, // [in] Converting sampler descriptor (v8i32)
+    Value*                  imageDesc,             // [in] Image descriptor
+    Value*                  convertingSamplerDesc, // [in] Converting sampler descriptor (v8i32)
     ArrayRef<Value*>        address,                // Address and other arguments
     const Twine&            instName)               // [in] Name to give instruction(s)
 {
@@ -1320,240 +1320,240 @@ Value* BuilderImplImage::CreateImageSampleConvert(
 // The caller supplies all arguments to the image sample op in "address", in the order specified
 // by the indices defined as ImageIndex* below.
 Value* BuilderImplImage::CreateImageGather(
-    Type*                   pResultTy,          // [in] Result type
+    Type*                   resultTy,          // [in] Result type
     unsigned                dim,                // Image dimension
     unsigned                flags,              // ImageFlag* flags
-    Value*                  pImageDesc,         // [in] Image descriptor
-    Value*                  pSamplerDesc,       // [in] Sampler descriptor
+    Value*                  imageDesc,         // [in] Image descriptor
+    Value*                  samplerDesc,       // [in] Sampler descriptor
     ArrayRef<Value*>        address,            // Address and other arguments
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
-    Value* pCoord = address[ImageAddressIdxCoordinate];
-    assert((pCoord->getType()->getScalarType()->isFloatTy()) ||
-                (pCoord->getType()->getScalarType()->isHalfTy()));
+    Value* coord = address[ImageAddressIdxCoordinate];
+    assert((coord->getType()->getScalarType()->isFloatTy()) ||
+                (coord->getType()->getScalarType()->isHalfTy()));
 
     // Check whether we are being asked for integer texel component type.
-    Value* pNeedDescPatch = nullptr;
-    Type* pTexelTy = pResultTy;
-    if (auto pStructResultTy = dyn_cast<StructType>(pResultTy))
+    Value* needDescPatch = nullptr;
+    Type* texelTy = resultTy;
+    if (auto structResultTy = dyn_cast<StructType>(resultTy))
     {
-        pTexelTy = pStructResultTy->getElementType(0);
+        texelTy = structResultTy->getElementType(0);
     }
-    Type* pTexelComponentTy = pTexelTy->getScalarType();
-    Type* pGatherTy = pResultTy;
+    Type* texelComponentTy = texelTy->getScalarType();
+    Type* gatherTy = resultTy;
 
-    if (pTexelComponentTy->isIntegerTy())
+    if (texelComponentTy->isIntegerTy())
     {
         // Handle integer texel component type.
-        pGatherTy = VectorType::get(getFloatTy(), 4);
-        if (pResultTy != pTexelTy)
+        gatherTy = VectorType::get(getFloatTy(), 4);
+        if (resultTy != texelTy)
         {
-            pGatherTy = StructType::get(getContext(), { pGatherTy, getInt32Ty() });
+            gatherTy = StructType::get(getContext(), { gatherTy, getInt32Ty() });
         }
 
         // For integer gather on pre-GFX9, patch descriptor or coordinate.
-        pNeedDescPatch = PreprocessIntegerImageGather(dim, pImageDesc, pCoord);
+        needDescPatch = preprocessIntegerImageGather(dim, imageDesc, coord);
     }
 
     // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
-    pSamplerDesc = CreateShuffleVector(pSamplerDesc, pSamplerDesc, ArrayRef<unsigned>{ 0, 1, 2, 3 });
+    samplerDesc = CreateShuffleVector(samplerDesc, samplerDesc, ArrayRef<unsigned>{ 0, 1, 2, 3 });
 
-    Value* pResult = nullptr;
-    Value* pAddrOffset = address[ImageAddressIdxOffset];
-    if ((pAddrOffset != nullptr) && isa<ArrayType>(pAddrOffset->getType()))
+    Value* result = nullptr;
+    Value* addrOffset = address[ImageAddressIdxOffset];
+    if ((addrOffset != nullptr) && isa<ArrayType>(addrOffset->getType()))
     {
         // We implement a gather with independent offsets (SPIR-V ConstantOffsets) as four separate gathers.
-        Value* pResidency = nullptr;
+        Value* residency = nullptr;
         SmallVector<Value*, ImageAddressCount> modifiedAddress;
         modifiedAddress.insert(modifiedAddress.begin(), address.begin(), address.end());
-        auto pGatherStructTy = dyn_cast<StructType>(pGatherTy);
-        pResult = UndefValue::get((pGatherStructTy != nullptr) ? pGatherStructTy->getElementType(0) : pGatherTy);
+        auto gatherStructTy = dyn_cast<StructType>(gatherTy);
+        result = UndefValue::get((gatherStructTy != nullptr) ? gatherStructTy->getElementType(0) : gatherTy);
         for (unsigned index = 0; index < 4; ++index)
         {
-            modifiedAddress[ImageAddressIdxOffset] = CreateExtractValue(pAddrOffset, index);
-            Value* pSingleResult = CreateImageSampleGather(pGatherTy,
+            modifiedAddress[ImageAddressIdxOffset] = CreateExtractValue(addrOffset, index);
+            Value* singleResult = CreateImageSampleGather(gatherTy,
                                                            dim,
                                                            flags,
-                                                           pCoord,
-                                                           pImageDesc,
-                                                           pSamplerDesc,
+                                                           coord,
+                                                           imageDesc,
+                                                           samplerDesc,
                                                            modifiedAddress,
                                                            instName,
                                                            false);
-            if (pGatherStructTy != nullptr)
+            if (gatherStructTy != nullptr)
             {
-                pResidency = CreateExtractValue(pSingleResult, 1);
-                pSingleResult = CreateExtractValue(pSingleResult, 0);
+                residency = CreateExtractValue(singleResult, 1);
+                singleResult = CreateExtractValue(singleResult, 0);
             }
-            pResult = CreateInsertElement(pResult, CreateExtractElement(pSingleResult, 3), index);
+            result = CreateInsertElement(result, CreateExtractElement(singleResult, 3), index);
         }
-        if (pResidency != nullptr)
+        if (residency != nullptr)
         {
-            pResult = CreateInsertValue(UndefValue::get(pGatherTy), pResult, 0);
-            pResult = CreateInsertValue(pResult, pResidency, 1);
+            result = CreateInsertValue(UndefValue::get(gatherTy), result, 0);
+            result = CreateInsertValue(result, residency, 1);
         }
     }
     else
     {
         // No independent offsets. Do the single image gather.
-        pResult = CreateImageSampleGather(pGatherTy,
+        result = CreateImageSampleGather(gatherTy,
                                           dim,
                                           flags,
-                                          pCoord,
-                                          pImageDesc,
-                                          pSamplerDesc,
+                                          coord,
+                                          imageDesc,
+                                          samplerDesc,
                                           address,
                                           instName,
                                           false);
     }
 
-    if (pNeedDescPatch != nullptr)
+    if (needDescPatch != nullptr)
     {
         // For integer gather on pre-GFX9, post-process the result.
-        pResult = PostprocessIntegerImageGather(pNeedDescPatch, flags, pImageDesc, pTexelTy, pResult);
+        result = postprocessIntegerImageGather(needDescPatch, flags, imageDesc, texelTy, result);
     }
 
     // Bitcast returned texel from v4f32 to v4i32. (It would be easier to call the gather
     // intrinsic with the right return type, but we do it this way to match the code generated
     // before the image rework.)
-    if (isa<StructType>(pResult->getType()))
+    if (isa<StructType>(result->getType()))
     {
         // TFE: Need to extract texel from the struct, convert it, and re-insert it.
-        Value* pTexel = CreateExtractValue(pResult, 0);
-        Value* pTfe = CreateExtractValue(pResult, 1);
-        pTexel = cast<Instruction>(CreateBitCast(pTexel, pTexelTy));
-        pResult = UndefValue::get(StructType::get(getContext(), { pTexel->getType(), pTfe->getType() }));
-        pResult = CreateInsertValue(pResult, pTexel, 0);
-        pResult = CreateInsertValue(pResult, pTfe, 1);
+        Value* texel = CreateExtractValue(result, 0);
+        Value* tfe = CreateExtractValue(result, 1);
+        texel = cast<Instruction>(CreateBitCast(texel, texelTy));
+        result = UndefValue::get(StructType::get(getContext(), { texel->getType(), tfe->getType() }));
+        result = CreateInsertValue(result, texel, 0);
+        result = CreateInsertValue(result, tfe, 1);
     }
     else
     {
-        pResult = cast<Instruction>(CreateBitCast(pResult, pTexelTy));
+        result = cast<Instruction>(CreateBitCast(result, texelTy));
     }
 
-    return pResult;
+    return result;
 }
 
 // =====================================================================================================================
 // Implement pre-GFX9 integer gather workaround to patch descriptor or coordinate, depending on format in descriptor
 // Returns nullptr for GFX9+, or a bool value that is true if the descriptor was patched or false if the
 // coordinate was modified.
-Value* BuilderImplImage::PreprocessIntegerImageGather(
+Value* BuilderImplImage::preprocessIntegerImageGather(
     unsigned  dim,        // Image dimension
-    Value*&   pImageDesc, // [in/out] Image descriptor
-    Value*&   pCoord)     // [in/out] Coordinate
+    Value*&   imageDesc, // [in/out] Image descriptor
+    Value*&   coord)     // [in/out] Coordinate
 {
-    if (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major >= 9)
+    if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9)
     {
         // GFX9+: Workaround not needed.
         return nullptr;
     }
 
     // Check whether the descriptor needs patching. It does if it does not have format 32, 32_32 or 32_32_32_32.
-    Value* pDescDword1 = CreateExtractElement(pImageDesc, 1);
-    Value* pDataFormat = CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+    Value* descDword1 = CreateExtractElement(imageDesc, 1);
+    Value* dataFormat = CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                          getInt32Ty(),
-                                         { pDescDword1, getInt32(20), getInt32(6) });
-    Value* pIsDataFormat32 = CreateICmpEQ(pDataFormat, getInt32(IMG_DATA_FORMAT_32));
-    Value* pIsDataFormat3232 = CreateICmpEQ(pDataFormat, getInt32(IMG_DATA_FORMAT_32_32));
-    Value* pIsDataFormat32323232 = CreateICmpEQ(pDataFormat, getInt32(IMG_DATA_FORMAT_32_32_32_32));
-    Value* pCond = CreateOr(pIsDataFormat3232, pIsDataFormat32);
-    pCond = CreateOr(pIsDataFormat32323232, pCond);
-    Value* pNeedDescPatch = CreateXor(pCond, getInt1(true));
+                                         { descDword1, getInt32(20), getInt32(6) });
+    Value* isDataFormat32 = CreateICmpEQ(dataFormat, getInt32(IMG_DATA_FORMAT_32));
+    Value* isDataFormat3232 = CreateICmpEQ(dataFormat, getInt32(IMG_DATA_FORMAT_32_32));
+    Value* isDataFormat32323232 = CreateICmpEQ(dataFormat, getInt32(IMG_DATA_FORMAT_32_32_32_32));
+    Value* cond = CreateOr(isDataFormat3232, isDataFormat32);
+    cond = CreateOr(isDataFormat32323232, cond);
+    Value* needDescPatch = CreateXor(cond, getInt1(true));
 
     // Create the if..else..endif, where the condition is whether the descriptor needs patching.
     InsertPoint savedInsertPoint = saveIP();
-    BranchInst* pBranch = CreateIf(pNeedDescPatch, true, "before.int.gather");
+    BranchInst* branch = createIf(needDescPatch, true, "before.int.gather");
 
     // Inside the "then": patch the descriptor: change NUM_FORMAT from SINT to SSCALE.
-    Value* pDescDword1A = CreateExtractElement(pImageDesc, 1);
-    pDescDword1A = CreateSub(pDescDword1A, getInt32(0x08000000));
-    Value* pPatchedImageDesc = CreateInsertElement(pImageDesc, pDescDword1A, 1);
+    Value* descDword1A = CreateExtractElement(imageDesc, 1);
+    descDword1A = CreateSub(descDword1A, getInt32(0x08000000));
+    Value* patchedImageDesc = CreateInsertElement(imageDesc, descDword1A, 1);
 
     // On to the "else": patch the coordinates: add (-0.5/width, -0.5/height) to the x,y coordinates.
-    SetInsertPoint(pBranch->getSuccessor(1)->getTerminator());
-    Value* pZero = getInt32(0);
+    SetInsertPoint(branch->getSuccessor(1)->getTerminator());
+    Value* zero = getInt32(0);
     dim = (dim == DimCubeArray) ? DimCube : dim;
-    Value* pResInfo = CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim],
+    Value* resInfo = CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim],
                                       { VectorType::get(getFloatTy(), 4), getInt32Ty() },
-                                      { getInt32(15), pZero, pImageDesc, pZero, pZero });
-    pResInfo = CreateBitCast(pResInfo, VectorType::get(getInt32Ty(), 4));
+                                      { getInt32(15), zero, imageDesc, zero, zero });
+    resInfo = CreateBitCast(resInfo, VectorType::get(getInt32Ty(), 4));
 
-    Value* pWidthHeight = CreateShuffleVector(pResInfo, pResInfo, ArrayRef<unsigned>{ 0, 1 });
-    pWidthHeight = CreateSIToFP(pWidthHeight, VectorType::get(getFloatTy(), 2));
-    Value* pValueToAdd = CreateFDiv(ConstantFP::get(pWidthHeight->getType(), -0.5), pWidthHeight);
-    unsigned coordCount = pCoord->getType()->getVectorNumElements();
+    Value* widthHeight = CreateShuffleVector(resInfo, resInfo, ArrayRef<unsigned>{ 0, 1 });
+    widthHeight = CreateSIToFP(widthHeight, VectorType::get(getFloatTy(), 2));
+    Value* valueToAdd = CreateFDiv(ConstantFP::get(widthHeight->getType(), -0.5), widthHeight);
+    unsigned coordCount = coord->getType()->getVectorNumElements();
     if (coordCount > 2)
     {
-        pValueToAdd = CreateShuffleVector(pValueToAdd,
-                                          Constant::getNullValue(pValueToAdd->getType()),
+        valueToAdd = CreateShuffleVector(valueToAdd,
+                                          Constant::getNullValue(valueToAdd->getType()),
                                           ArrayRef<unsigned>({ 0, 1, 2, 3 }).slice(0, coordCount));
     }
-    Value* pPatchedCoord = CreateFAdd(pCoord, pValueToAdd);
+    Value* patchedCoord = CreateFAdd(coord, valueToAdd);
 
     // Restore insert point to after the if..else..endif, and add the phi nodes.
     restoreIP(savedInsertPoint);
-    PHINode* pImageDescPhi = CreatePHI(pImageDesc->getType(), 2);
-    pImageDescPhi->addIncoming(pPatchedImageDesc, pBranch->getSuccessor(0));
-    pImageDescPhi->addIncoming(pImageDesc, pBranch->getSuccessor(1));
-    pImageDesc = pImageDescPhi;
+    PHINode* imageDescPhi = CreatePHI(imageDesc->getType(), 2);
+    imageDescPhi->addIncoming(patchedImageDesc, branch->getSuccessor(0));
+    imageDescPhi->addIncoming(imageDesc, branch->getSuccessor(1));
+    imageDesc = imageDescPhi;
 
-    PHINode* pCoordPhi = CreatePHI(pCoord->getType(), 2);
-    pCoordPhi->addIncoming(pCoord, pBranch->getSuccessor(0));
-    pCoordPhi->addIncoming(pPatchedCoord, pBranch->getSuccessor(1));
-    pCoord = pCoordPhi;
+    PHINode* coordPhi = CreatePHI(coord->getType(), 2);
+    coordPhi->addIncoming(coord, branch->getSuccessor(0));
+    coordPhi->addIncoming(patchedCoord, branch->getSuccessor(1));
+    coord = coordPhi;
 
-    return pNeedDescPatch;
+    return needDescPatch;
 }
 
 // =====================================================================================================================
 // Implement pre-GFX9 integer gather workaround to modify result.
 // Returns possibly modified result.
-Value* BuilderImplImage::PostprocessIntegerImageGather(
-    Value*    pNeedDescPatch,   // [in] Bool value that is true if descriptor was patched
+Value* BuilderImplImage::postprocessIntegerImageGather(
+    Value*    needDescPatch,   // [in] Bool value that is true if descriptor was patched
     unsigned  flags,            // Flags passed to CreateImageGather
-    Value*    pImageDesc,       // [in] Image descriptor
-    Type*     pTexelTy,         // [in] Type of returned texel
-    Value*    pResult)          // [in] Returned texel value, or struct containing texel and TFE
+    Value*    imageDesc,       // [in] Image descriptor
+    Type*     texelTy,         // [in] Type of returned texel
+    Value*    result)          // [in] Returned texel value, or struct containing texel and TFE
 {
     // Post-processing of result for integer return type.
     // Create the if..endif, where the condition is whether the descriptor was patched. If it was,
     // then we need to convert the texel from float to i32.
     InsertPoint savedInsertPoint = saveIP();
-    BranchInst* pBranch = CreateIf(pNeedDescPatch, false, "after.int.gather");
+    BranchInst* branch = createIf(needDescPatch, false, "after.int.gather");
 
     // Process the returned texel.
-    Value* pTexel = pResult;
-    bool tfe = isa<StructType>(pResult->getType());
+    Value* texel = result;
+    bool tfe = isa<StructType>(result->getType());
     if (tfe)
     {
         // TFE: Need to extract texel from the struct, convert it, and re-insert it.
-        pTexel = CreateExtractValue(pResult, 0);
+        texel = CreateExtractValue(result, 0);
     }
     if (flags & ImageFlagSignedResult)
     {
-        pTexel = CreateFPToSI(pTexel, pTexelTy);
+        texel = CreateFPToSI(texel, texelTy);
     }
     else
     {
-        pTexel = CreateFPToUI(pTexel, pTexelTy);
+        texel = CreateFPToUI(texel, texelTy);
     }
-    Value* pPatchedResult = CreateBitCast(pTexel, VectorType::get(getFloatTy(), 4));
+    Value* patchedResult = CreateBitCast(texel, VectorType::get(getFloatTy(), 4));
     if (tfe)
     {
-        pPatchedResult = CreateInsertValue(pResult, pPatchedResult, 0);
+        patchedResult = CreateInsertValue(result, patchedResult, 0);
     }
 
-    pPatchedResult = CreateSelect(pNeedDescPatch, pPatchedResult, pResult);
+    patchedResult = CreateSelect(needDescPatch, patchedResult, result);
 
     // Restore insert point to after the if..endif, and add the phi node.
-    BasicBlock* pThenBlock = GetInsertBlock();
+    BasicBlock* thenBlock = GetInsertBlock();
     restoreIP(savedInsertPoint);
-    PHINode* pResultPhi = CreatePHI(pResult->getType(), 2);
-    pResultPhi->addIncoming(pPatchedResult, pThenBlock);
-    pResultPhi->addIncoming(pResult, pBranch->getParent());
+    PHINode* resultPhi = CreatePHI(result->getType(), 2);
+    resultPhi->addIncoming(patchedResult, thenBlock);
+    resultPhi->addIncoming(result, branch->getParent());
 
-    return pResultPhi;
+    return resultPhi;
 }
 
 // =====================================================================================================================
@@ -1561,12 +1561,12 @@ Value* BuilderImplImage::PostprocessIntegerImageGather(
 // The caller supplies all arguments to the image sample op in "address", in the order specified
 // by the indices defined as ImageIndex* below.
 Value* BuilderImplImage::CreateImageSampleGather(
-    Type*                       pResultTy,      // [in] Result type
+    Type*                       resultTy,      // [in] Result type
     unsigned                    dim,            // Image dimension
     unsigned                    flags,          // ImageFlag* flags
-    Value*                      pCoord,         // [in] Coordinates (the one in address is ignored in favor of this one)
-    Value*                      pImageDesc,     // [in] Image descriptor
-    Value*                      pSamplerDesc,   // [in] Sampler descriptor
+    Value*                      coord,         // [in] Coordinates (the one in address is ignored in favor of this one)
+    Value*                      imageDesc,     // [in] Image descriptor
+    Value*                      samplerDesc,   // [in] Sampler descriptor
     ArrayRef<Value*>            address,        // Address and other arguments
     const Twine&                instName,       // [in] Name to give instruction(s)
     bool                        isSample)       // Is sample rather than gather
@@ -1584,15 +1584,15 @@ Value* BuilderImplImage::CreateImageSampleGather(
     // Prepare the coordinate and derivatives, which might also change the dimension.
     SmallVector<Value*, 4> coords;
     SmallVector<Value*, 6> derivatives;
-    Value* pProjective = address[ImageAddressIdxProjective];
-    if (pProjective != nullptr)
+    Value* projective = address[ImageAddressIdxProjective];
+    if (projective != nullptr)
     {
-        pProjective = CreateFDiv(ConstantFP::get(pProjective->getType(), 1.0), pProjective);
+        projective = CreateFDiv(ConstantFP::get(projective->getType(), 1.0), projective);
     }
 
-    dim = PrepareCoordinate(dim,
-                            pCoord,
-                            pProjective,
+    dim = prepareCoordinate(dim,
+                            coord,
+                            projective,
                             address[ImageAddressIdxDerivativeX],
                             address[ImageAddressIdxDerivativeY],
                             coords,
@@ -1601,7 +1601,7 @@ Value* BuilderImplImage::CreateImageSampleGather(
     // Build the intrinsic arguments and overloaded types.
     SmallVector<Value*, 16> args;
     SmallVector<Type*, 4> overloadTys;
-    overloadTys.push_back(pResultTy);
+    overloadTys.push_back(resultTy);
 
     // Dmask.
     unsigned dmask = 15;
@@ -1621,21 +1621,21 @@ Value* BuilderImplImage::CreateImageSampleGather(
 
     // Offset: Supplied to us as a scalar or vector of i32, but need to be three 6-bit fields
     // X=[5:0] Y=[13:8] Z=[21:16] in a single i32.
-    if (Value* pOffsetVal = address[ImageAddressIdxOffset])
+    if (Value* offsetVal = address[ImageAddressIdxOffset])
     {
-        Value* pSingleOffsetVal = nullptr;
-        if (isa<VectorType>((pOffsetVal)->getType()))
+        Value* singleOffsetVal = nullptr;
+        if (isa<VectorType>((offsetVal)->getType()))
         {
-            pSingleOffsetVal = CreateAnd(CreateExtractElement(pOffsetVal, uint64_t(0)), getInt32(0x3F));
-            if (pOffsetVal->getType()->getVectorNumElements() >= 2)
+            singleOffsetVal = CreateAnd(CreateExtractElement(offsetVal, uint64_t(0)), getInt32(0x3F));
+            if (offsetVal->getType()->getVectorNumElements() >= 2)
             {
-                pSingleOffsetVal = CreateOr(pSingleOffsetVal,
-                                            CreateShl(CreateAnd(CreateExtractElement(pOffsetVal, 1), getInt32(0x3F)),
+                singleOffsetVal = CreateOr(singleOffsetVal,
+                                            CreateShl(CreateAnd(CreateExtractElement(offsetVal, 1), getInt32(0x3F)),
                                                       getInt32(8)));
-                if (pOffsetVal->getType()->getVectorNumElements() >= 3)
+                if (offsetVal->getType()->getVectorNumElements() >= 3)
                 {
-                    pSingleOffsetVal = CreateOr(pSingleOffsetVal,
-                                                CreateShl(CreateAnd(CreateExtractElement(pOffsetVal, 2),
+                    singleOffsetVal = CreateOr(singleOffsetVal,
+                                                CreateShl(CreateAnd(CreateExtractElement(offsetVal, 2),
                                                                     getInt32(0x3F)),
                                                           getInt32(16)));
                 }
@@ -1643,26 +1643,26 @@ Value* BuilderImplImage::CreateImageSampleGather(
         }
         else
         {
-            pSingleOffsetVal = CreateAnd(pOffsetVal, getInt32(0x3F));
+            singleOffsetVal = CreateAnd(offsetVal, getInt32(0x3F));
         }
-        args.push_back(pSingleOffsetVal);
+        args.push_back(singleOffsetVal);
     }
 
     // Bias: float
-    if (Value* pBiasVal = address[ImageAddressIdxLodBias])
+    if (Value* biasVal = address[ImageAddressIdxLodBias])
     {
-        args.push_back(pBiasVal);
-        overloadTys.push_back(pBiasVal->getType());
+        args.push_back(biasVal);
+        overloadTys.push_back(biasVal->getType());
     }
 
     // ZCompare (dref)
-    if (Value* pZCompareVal = address[ImageAddressIdxZCompare])
+    if (Value* zCompareVal = address[ImageAddressIdxZCompare])
     {
-        if (pProjective != nullptr)
+        if (projective != nullptr)
         {
-            pZCompareVal = CreateFMul(pZCompareVal, pProjective);
+            zCompareVal = CreateFMul(zCompareVal, projective);
         }
-        args.push_back(pZCompareVal);
+        args.push_back(zCompareVal);
     }
 
     // Grad (explicit derivatives)
@@ -1677,46 +1677,46 @@ Value* BuilderImplImage::CreateImageSampleGather(
     overloadTys.push_back(coords[0]->getType());
 
     // LodClamp
-    if (Value* pLodClampVal = address[ImageAddressIdxLodClamp])
+    if (Value* lodClampVal = address[ImageAddressIdxLodClamp])
     {
-        args.push_back(pLodClampVal);
+        args.push_back(lodClampVal);
     }
 
     // Lod
-    if (Value* pLodVal = address[ImageAddressIdxLod])
+    if (Value* lodVal = address[ImageAddressIdxLod])
     {
-        args.push_back(pLodVal);
+        args.push_back(lodVal);
     }
 
     // Image and sampler
     unsigned imageDescArgIndex = args.size();
-    args.push_back(pImageDesc);
-    args.push_back(pSamplerDesc);
+    args.push_back(imageDesc);
+    args.push_back(samplerDesc);
 
     // i32 Unorm
     args.push_back(getInt1(false));
 
     // i32 tfe/lwe bits
-    bool tfe = isa<StructType>(pResultTy);
+    bool tfe = isa<StructType>(resultTy);
     args.push_back(getInt32(tfe));
 
     // glc/slc bits
     args.push_back(getInt32(((flags & ImageFlagCoherent) ? 1 : 0) | ((flags & ImageFlagVolatile) ? 2 : 0)));
 
     // Search the intrinsic ID table.
-    auto pTable = isSample ? &ImageSampleIntrinsicTable[0] : &ImageGather4IntrinsicTable[0];
-    for (;; ++pTable)
+    auto table = isSample ? &ImageSampleIntrinsicTable[0] : &ImageGather4IntrinsicTable[0];
+    for (;; ++table)
     {
-        assert((pTable->matchMask != 0) && "Image sample/gather intrinsic ID not found");
-        if (pTable->matchMask == addressMask)
+        assert((table->matchMask != 0) && "Image sample/gather intrinsic ID not found");
+        if (table->matchMask == addressMask)
         {
             break;
         }
     }
-    Intrinsic::ID intrinsicId = pTable->ids[dim];
+    Intrinsic::ID intrinsicId = table->ids[dim];
 
     // Create the intrinsic.
-    Instruction* pImageOp = CreateIntrinsic(intrinsicId,
+    Instruction* imageOp = CreateIntrinsic(intrinsicId,
                                             overloadTys,
                                             args,
                                             nullptr,
@@ -1734,9 +1734,9 @@ Value* BuilderImplImage::CreateImageSampleGather(
     }
     if (nonUniformArgIndexes.empty() == false)
     {
-        pImageOp = CreateWaterfallLoop(pImageOp, nonUniformArgIndexes);
+        imageOp = createWaterfallLoop(imageOp, nonUniformArgIndexes);
     }
-    return pImageOp;
+    return imageOp;
 }
 
 // =====================================================================================================================
@@ -1746,18 +1746,18 @@ Value* BuilderImplImage::CreateImageAtomic(
     unsigned                dim,                // Image dimension
     unsigned                flags,              // ImageFlag* flags
     AtomicOrdering          ordering,           // Atomic ordering
-    Value*                  pImageDesc,         // [in] Image descriptor
-    Value*                  pCoord,             // [in] Coordinates: scalar or vector i32
-    Value*                  pInputValue,        // [in] Input value: i32
+    Value*                  imageDesc,         // [in] Image descriptor
+    Value*                  coord,             // [in] Coordinates: scalar or vector i32
+    Value*                  inputValue,        // [in] Input value: i32
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
     return CreateImageAtomicCommon(atomicOp,
                                    dim,
                                    flags,
                                    ordering,
-                                   pImageDesc,
-                                   pCoord,
-                                   pInputValue,
+                                   imageDesc,
+                                   coord,
+                                   inputValue,
                                    nullptr,
                                    instName);
 }
@@ -1768,20 +1768,20 @@ Value* BuilderImplImage::CreateImageAtomicCompareSwap(
     unsigned                dim,                // Image dimension
     unsigned                flags,              // ImageFlag* flags
     AtomicOrdering          ordering,           // Atomic ordering
-    Value*                  pImageDesc,         // [in] Image descriptor
-    Value*                  pCoord,             // [in] Coordinates: scalar or vector i32
-    Value*                  pInputValue,        // [in] Input value: i32
-    Value*                  pComparatorValue,   // [in] Value to compare against: i32
+    Value*                  imageDesc,         // [in] Image descriptor
+    Value*                  coord,             // [in] Coordinates: scalar or vector i32
+    Value*                  inputValue,        // [in] Input value: i32
+    Value*                  comparatorValue,   // [in] Value to compare against: i32
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
     return CreateImageAtomicCommon(AtomicOpCompareSwap,
                                    dim,
                                    flags,
                                    ordering,
-                                   pImageDesc,
-                                   pCoord,
-                                   pInputValue,
-                                   pComparatorValue,
+                                   imageDesc,
+                                   coord,
+                                   inputValue,
+                                   comparatorValue,
                                    instName);
 }
 
@@ -1792,15 +1792,15 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
     unsigned                dim,                // Image dimension
     unsigned                flags,              // ImageFlag* flags
     AtomicOrdering          ordering,           // Atomic ordering
-    Value*                  pImageDesc,         // [in] Image descriptor
-    Value*                  pCoord,             // [in] Coordinates: scalar or vector i32
-    Value*                  pInputValue,        // [in] Input value: i32
-    Value*                  pComparatorValue,   // [in] Value to compare against: i32; ignored if not compare-swap
+    Value*                  imageDesc,         // [in] Image descriptor
+    Value*                  coord,             // [in] Coordinates: scalar or vector i32
+    Value*                  inputValue,        // [in] Input value: i32
+    Value*                  comparatorValue,   // [in] Value to compare against: i32; ignored if not compare-swap
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
-    GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
-    assert(pCoord->getType()->getScalarType()->isIntegerTy(32));
-    pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
+    getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceWrite = true;
+    assert(coord->getType()->getScalarType()->isIntegerTy(32));
+    coord = handleFragCoordViewIndex(coord, flags, dim);
 
     switch (ordering)
     {
@@ -1816,8 +1816,8 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
     // Prepare the coordinate, which might also change the dimension.
     SmallVector<Value*, 4> coords;
     SmallVector<Value*, 6> derivatives;
-    dim = PrepareCoordinate(dim,
-                            pCoord,
+    dim = prepareCoordinate(dim,
+                            coord,
                             nullptr,
                             nullptr,
                             nullptr,
@@ -1825,27 +1825,27 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
                             derivatives);
 
     SmallVector<Value*, 8> args;
-    Instruction* pAtomicInst = nullptr;
+    Instruction* atomicInst = nullptr;
     unsigned imageDescArgIndex = 0;
-    if (pImageDesc->getType() == GetImageDescTy())
+    if (imageDesc->getType() == getImageDescTy())
     {
         // Resource descriptor. Use the image atomic instruction.
-        pImageDesc = PatchCubeDescriptor(pImageDesc, dim);
-        args.push_back(pInputValue);
+        imageDesc = patchCubeDescriptor(imageDesc, dim);
+        args.push_back(inputValue);
         if (atomicOp == AtomicOpCompareSwap)
         {
-            args.push_back(pComparatorValue);
+            args.push_back(comparatorValue);
         }
         args.insert(args.end(), coords.begin(), coords.end());
         imageDescArgIndex = args.size();
-        args.push_back(pImageDesc);
+        args.push_back(imageDesc);
         args.push_back(getInt32(0));
         args.push_back(getInt32(0));
 
         // Get the intrinsic ID from the load intrinsic ID table, and create the intrinsic.
         Intrinsic::ID intrinsicId = ImageAtomicIntrinsicTable[atomicOp][dim];
-        pAtomicInst = CreateIntrinsic(intrinsicId,
-                                      { pInputValue->getType(), pCoord->getType()->getScalarType() },
+        atomicInst = CreateIntrinsic(intrinsicId,
+                                      { inputValue->getType(), coord->getType()->getScalarType() },
                                       args,
                                       nullptr,
                                       instName);
@@ -1853,26 +1853,26 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
     else
     {
         // Texel buffer descriptor. Use the buffer atomic instruction.
-        args.push_back(pInputValue);
+        args.push_back(inputValue);
         if (atomicOp == AtomicOpCompareSwap)
         {
-            args.push_back(pComparatorValue);
+            args.push_back(comparatorValue);
         }
         imageDescArgIndex = args.size();
-        args.push_back(pImageDesc);
+        args.push_back(imageDesc);
         args.push_back(coords[0]);
         args.push_back(getInt32(0));
         args.push_back(getInt32(0));
         args.push_back(getInt32(0));
-        pAtomicInst = CreateIntrinsic(StructBufferAtomicIntrinsicTable[atomicOp],
-                                      pInputValue->getType(),
+        atomicInst = CreateIntrinsic(StructBufferAtomicIntrinsicTable[atomicOp],
+                                      inputValue->getType(),
                                       args,
                                       nullptr,
                                       instName);
     }
     if (flags & ImageFlagNonUniformImage)
     {
-        pAtomicInst = CreateWaterfallLoop(pAtomicInst, imageDescArgIndex);
+        atomicInst = createWaterfallLoop(atomicInst, imageDescArgIndex);
     }
 
     switch (ordering)
@@ -1886,7 +1886,7 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
         break;
     }
 
-    return pAtomicInst;
+    return atomicInst;
 }
 
 // =====================================================================================================================
@@ -1894,19 +1894,19 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
 Value* BuilderImplImage::CreateImageQueryLevels(
     unsigned                dim,                // Image dimension
     unsigned                flags,              // ImageFlag* flags
-    Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+    Value*                  imageDesc,         // [in] Image descriptor or texel buffer descriptor
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
     dim = (dim == DimCubeArray) ? DimCube : dim;
-    Value* pZero = getInt32(0);
-    Instruction* pResInfo = CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim],
+    Value* zero = getInt32(0);
+    Instruction* resInfo = CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim],
                                             { getFloatTy(), getInt32Ty() },
-                                            { getInt32(8), UndefValue::get(getInt32Ty()), pImageDesc, pZero, pZero });
+                                            { getInt32(8), UndefValue::get(getInt32Ty()), imageDesc, zero, zero });
     if (flags & ImageFlagNonUniformImage)
     {
-        pResInfo = CreateWaterfallLoop(pResInfo, 2);
+        resInfo = createWaterfallLoop(resInfo, 2);
     }
-    return CreateBitCast(pResInfo, getInt32Ty(), instName);
+    return CreateBitCast(resInfo, getInt32Ty(), instName);
 }
 
 // =====================================================================================================================
@@ -1914,28 +1914,28 @@ Value* BuilderImplImage::CreateImageQueryLevels(
 Value* BuilderImplImage::CreateImageQuerySamples(
     unsigned                dim,                // Image dimension
     unsigned                flags,              // ImageFlag* flags
-    Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+    Value*                  imageDesc,         // [in] Image descriptor or texel buffer descriptor
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
     // Extract LAST_LEVEL (SQ_IMG_RSRC_WORD3, [19:16])
-    Value* pDescWord3 = CreateExtractElement(pImageDesc, 3);
-    Value* pLastLevel = CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+    Value* descWord3 = CreateExtractElement(imageDesc, 3);
+    Value* lastLevel = CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                         getInt32Ty(),
-                                        { pDescWord3, getInt32(16), getInt32(4) });
+                                        { descWord3, getInt32(16), getInt32(4) });
     // Sample number = 1 << LAST_LEVEL
-    Value* pSampleNumber = CreateShl(getInt32(1), pLastLevel);
+    Value* sampleNumber = CreateShl(getInt32(1), lastLevel);
 
     // Extract TYPE(SQ_IMG_RSRC_WORD3, [31:28])
-    Value* pImageType = CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+    Value* imageType = CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                         getInt32Ty(),
-                                        { pDescWord3, getInt32(28), getInt32(4) });
+                                        { descWord3, getInt32(28), getInt32(4) });
 
     // Check if resource type is 2D MSAA or 2D MSAA array, 14 = SQ_RSRC_IMG_2D_MSAA, 15 = SQ_RSRC_IMG_2D_MSAA_ARRAY
-    Value* pIsMsaa = CreateOr(CreateICmpEQ(pImageType, getInt32(14)),
-                              CreateICmpEQ(pImageType, getInt32(15)));
+    Value* isMsaa = CreateOr(CreateICmpEQ(imageType, getInt32(14)),
+                              CreateICmpEQ(imageType, getInt32(15)));
 
     // Return sample number if resource type is 2D MSAA or 2D MSAA array. Otherwise, return 1.
-    return CreateSelect(pIsMsaa, pSampleNumber, getInt32(1), instName);
+    return CreateSelect(isMsaa, sampleNumber, getInt32(1), instName);
 }
 
 // =====================================================================================================================
@@ -1944,64 +1944,64 @@ Value* BuilderImplImage::CreateImageQuerySamples(
 Value* BuilderImplImage::CreateImageQuerySize(
     unsigned                dim,                // Image dimension
     unsigned                flags,              // ImageFlag* flags
-    Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
-    Value*                  pLod,               // [in] LOD
+    Value*                  imageDesc,         // [in] Image descriptor or texel buffer descriptor
+    Value*                  lod,               // [in] LOD
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
-    if (pImageDesc->getType() == GetTexelBufferDescTy())
+    if (imageDesc->getType() == getTexelBufferDescTy())
     {
         // Texel buffer.
         // Extract NUM_RECORDS (SQ_BUF_RSRC_WORD2)
-        Value* pNumRecords = CreateExtractElement(pImageDesc, 2);
+        Value* numRecords = CreateExtractElement(imageDesc, 2);
 
-        if (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major == 8)
+        if (getPipelineState()->getTargetInfo().getGfxIpVersion().major == 8)
         {
             // GFX8 only: extract STRIDE (SQ_BUF_RSRC_WORD1 [29:16]) and divide into NUM_RECORDS.
-            Value* pStride = CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+            Value* stride = CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                              getInt32Ty(),
-                                             { CreateExtractElement(pImageDesc, 1), getInt32(16), getInt32(14) });
-            pNumRecords = CreateUDiv(pNumRecords, pStride);
+                                             { CreateExtractElement(imageDesc, 1), getInt32(16), getInt32(14) });
+            numRecords = CreateUDiv(numRecords, stride);
         }
         if (instName.isTriviallyEmpty() == false)
         {
-            pNumRecords->setName(instName);
+            numRecords->setName(instName);
         }
-        return pNumRecords;
+        return numRecords;
     }
 
     // Proper image.
-    unsigned modifiedDim = (dim == DimCubeArray) ? DimCube : Change1DTo2DIfNeeded(dim);
-    Value* pZero = getInt32(0);
-    Instruction* pResInfo = CreateIntrinsic(ImageGetResInfoIntrinsicTable[modifiedDim],
+    unsigned modifiedDim = (dim == DimCubeArray) ? DimCube : change1DTo2DIfNeeded(dim);
+    Value* zero = getInt32(0);
+    Instruction* resInfo = CreateIntrinsic(ImageGetResInfoIntrinsicTable[modifiedDim],
                                             { VectorType::get(getFloatTy(), 4), getInt32Ty() },
-                                            { getInt32(15), pLod, pImageDesc, pZero, pZero });
+                                            { getInt32(15), lod, imageDesc, zero, zero });
     if (flags & ImageFlagNonUniformImage)
     {
-        pResInfo = CreateWaterfallLoop(pResInfo, 2);
+        resInfo = createWaterfallLoop(resInfo, 2);
     }
-    Value* pIntResInfo = CreateBitCast(pResInfo, VectorType::get(getInt32Ty(), 4));
+    Value* intResInfo = CreateBitCast(resInfo, VectorType::get(getInt32Ty(), 4));
 
-    unsigned sizeComponentCount = GetImageQuerySizeComponentCount(dim);
+    unsigned sizeComponentCount = getImageQuerySizeComponentCount(dim);
 
     if (sizeComponentCount == 1)
     {
-        return CreateExtractElement(pIntResInfo, uint64_t(0), instName);
+        return CreateExtractElement(intResInfo, uint64_t(0), instName);
     }
 
     if (dim == DimCubeArray)
     {
-        Value* pSlices = CreateExtractElement(pIntResInfo, 2);
-        pSlices = CreateSDiv(pSlices, getInt32(6));
-        pIntResInfo = CreateInsertElement(pIntResInfo, pSlices, 2);
+        Value* slices = CreateExtractElement(intResInfo, 2);
+        slices = CreateSDiv(slices, getInt32(6));
+        intResInfo = CreateInsertElement(intResInfo, slices, 2);
     }
 
     if ((dim == Dim1DArray) && (modifiedDim == Dim2DArray))
     {
         // For a 1D array on gfx9+ that we treated as a 2D array, we want components 0 and 2.
-        return CreateShuffleVector(pIntResInfo, pIntResInfo, ArrayRef<unsigned>{ 0, 2 }, instName);
+        return CreateShuffleVector(intResInfo, intResInfo, ArrayRef<unsigned>{ 0, 2 }, instName);
     }
-    return CreateShuffleVector(pIntResInfo,
-                               pIntResInfo,
+    return CreateShuffleVector(intResInfo,
+                               intResInfo,
                                ArrayRef<unsigned>({ 0, 1, 2 }).slice(0, sizeComponentCount),
                                instName);
 }
@@ -2013,9 +2013,9 @@ Value* BuilderImplImage::CreateImageQuerySize(
 Value* BuilderImplImage::CreateImageGetLod(
     unsigned                dim,                // Image dimension
     unsigned                flags,              // ImageFlag* flags
-    Value*                  pImageDesc,         // [in] Image descriptor
-    Value*                  pSamplerDesc,       // [in] Sampler descriptor
-    Value*                  pCoord,             // [in] Coordinates: scalar or vector f32, exactly right
+    Value*                  imageDesc,         // [in] Image descriptor
+    Value*                  samplerDesc,       // [in] Sampler descriptor
+    Value*                  coord,             // [in] Coordinates: scalar or vector f32, exactly right
                                                 //    width without array layer
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
@@ -2033,8 +2033,8 @@ Value* BuilderImplImage::CreateImageGetLod(
     // Prepare the coordinate, which might also change the dimension.
     SmallVector<Value*, 4> coords;
     SmallVector<Value*, 6> derivatives;
-    dim = PrepareCoordinate(dim,
-                            pCoord,
+    dim = prepareCoordinate(dim,
+                            coord,
                             nullptr,
                             nullptr,
                             nullptr,
@@ -2042,19 +2042,19 @@ Value* BuilderImplImage::CreateImageGetLod(
                             derivatives);
 
     // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
-    pSamplerDesc = CreateShuffleVector(pSamplerDesc, pSamplerDesc, ArrayRef<unsigned>{ 0, 1, 2, 3 });
+    samplerDesc = CreateShuffleVector(samplerDesc, samplerDesc, ArrayRef<unsigned>{ 0, 1, 2, 3 });
 
     SmallVector<Value*, 9> args;
     args.push_back(getInt32(3));                    // dmask
     args.insert(args.end(), coords.begin(), coords.end());
     unsigned imageDescArgIndex = args.size();
-    args.push_back(pImageDesc);                     // image desc
-    args.push_back(pSamplerDesc);                   // sampler desc
+    args.push_back(imageDesc);                     // image desc
+    args.push_back(samplerDesc);                   // sampler desc
     args.push_back(getInt1(false));                 // unorm
     args.push_back(getInt32(0));                    // tfe/lwe
     args.push_back(getInt32(0));                    // glc/slc
 
-    Instruction* pResult = CreateIntrinsic(ImageGetLodIntrinsicTable[dim],
+    Instruction* result = CreateIntrinsic(ImageGetLodIntrinsicTable[dim],
                                            { VectorType::get(getFloatTy(), 2), getFloatTy() },
                                            args,
                                            nullptr,
@@ -2072,17 +2072,17 @@ Value* BuilderImplImage::CreateImageGetLod(
 
     if (nonUniformArgIndexes.empty() == false)
     {
-        pResult = CreateWaterfallLoop(pResult, nonUniformArgIndexes);
+        result = createWaterfallLoop(result, nonUniformArgIndexes);
     }
-    return pResult;
+    return result;
 }
 
 // =====================================================================================================================
 // Change 1D or 1DArray dimension to 2D or 2DArray if needed as a workaround on GFX9+
-unsigned BuilderImplImage::Change1DTo2DIfNeeded(
+unsigned BuilderImplImage::change1DTo2DIfNeeded(
     unsigned                  dim)            // Image dimension
 {
-    if (GetPipelineState()->GetTargetInfo().GetGpuWorkarounds().gfx9.treat1dImagesAs2d)
+    if (getPipelineState()->getTargetInfo().getGpuWorkarounds().gfx9.treat1dImagesAs2d)
     {
         switch (dim)
         {
@@ -2098,43 +2098,43 @@ unsigned BuilderImplImage::Change1DTo2DIfNeeded(
 // Prepare coordinate and explicit derivatives, pushing the separate components into the supplied vectors, and
 // modifying if necessary.
 // Returns possibly modified image dimension.
-unsigned BuilderImplImage::PrepareCoordinate(
+unsigned BuilderImplImage::prepareCoordinate(
     unsigned                  dim,            // Image dimension
-    Value*                    pCoord,         // [in] Scalar or vector coordinate value
-    Value*                    pProjective,    // [in] Value to multiply into each coordinate component; nullptr if none
-    Value*                    pDerivativeX,   // [in] Scalar or vector X derivative value, nullptr if none
-    Value*                    pDerivativeY,   // [in] Scalar or vector Y derivative value, nullptr if none
+    Value*                    coord,         // [in] Scalar or vector coordinate value
+    Value*                    projective,    // [in] Value to multiply into each coordinate component; nullptr if none
+    Value*                    derivativeX,   // [in] Scalar or vector X derivative value, nullptr if none
+    Value*                    derivativeY,   // [in] Scalar or vector Y derivative value, nullptr if none
     SmallVectorImpl<Value*>&  outCoords,      // [out] Vector to push coordinate components into
     SmallVectorImpl<Value*>&  outDerivatives) // [out] Vector to push derivative components into
 {
     // Push the coordinate components.
-    Type* pCoordTy = pCoord->getType();
-    Type* pCoordScalarTy = pCoordTy->getScalarType();
+    Type* coordTy = coord->getType();
+    Type* coordScalarTy = coordTy->getScalarType();
 
-    if (pCoordTy == pCoordScalarTy)
+    if (coordTy == coordScalarTy)
     {
         // Push the single component.
-        assert(GetImageNumCoords(dim) == 1);
-        outCoords.push_back(pCoord);
+        assert(getImageNumCoords(dim) == 1);
+        outCoords.push_back(coord);
     }
     else
     {
-        assert(GetImageNumCoords(dim) == pCoordTy->getVectorNumElements());
+        assert(getImageNumCoords(dim) == coordTy->getVectorNumElements());
 
         // Push the components.
-        for (unsigned i = 0; i != GetImageNumCoords(dim); ++i)
+        for (unsigned i = 0; i != getImageNumCoords(dim); ++i)
         {
-            outCoords.push_back(CreateExtractElement(pCoord, i));
+            outCoords.push_back(CreateExtractElement(coord, i));
         }
     }
 
     // Divide the projective value into each component.
     // (We need to do this before we add an extra component for GFX9+.)
-    if (pProjective != nullptr)
+    if (projective != nullptr)
     {
         for (unsigned i = 0; i != outCoords.size(); ++i)
         {
-            outCoords[i] = CreateFMul(outCoords[i], pProjective);
+            outCoords[i] = CreateFMul(outCoords[i], projective);
         }
     }
 
@@ -2142,36 +2142,36 @@ unsigned BuilderImplImage::PrepareCoordinate(
     // extra component is 0 for int or 0.5 for FP.
     unsigned origDim = dim;
     bool needExtraDerivativeDim = false;
-    dim = Change1DTo2DIfNeeded(dim);
+    dim = change1DTo2DIfNeeded(dim);
     if (dim != origDim)
     {
-        Value* pExtraComponent = getInt32(0);
+        Value* extraComponent = getInt32(0);
         needExtraDerivativeDim = true;
-        if (pCoordScalarTy->isIntegerTy() == false)
+        if (coordScalarTy->isIntegerTy() == false)
         {
-            pExtraComponent = ConstantFP::get(pCoordScalarTy, 0.5);
+            extraComponent = ConstantFP::get(coordScalarTy, 0.5);
         }
 
         if (dim == Dim2D)
         {
-            outCoords.push_back(pExtraComponent);
+            outCoords.push_back(extraComponent);
         }
         else
         {
             outCoords.push_back(outCoords.back());
-            outCoords[1] = pExtraComponent;
+            outCoords[1] = extraComponent;
         }
     }
 
-    if (pCoordScalarTy->isIntegerTy())
+    if (coordScalarTy->isIntegerTy())
     {
         // Integer components (image load/store/atomic).
-        assert((pDerivativeX == nullptr) && (pDerivativeY == nullptr));
+        assert((derivativeX == nullptr) && (derivativeY == nullptr));
 
         if (dim == DimCubeArray)
         {
             // For a cubearray, combine the face and slice into a single component.
-            CombineCubeArrayFaceAndSlice(pCoord, outCoords);
+            combineCubeArrayFaceAndSlice(coord, outCoords);
             dim = DimCube;
         }
         return dim;
@@ -2181,41 +2181,41 @@ unsigned BuilderImplImage::PrepareCoordinate(
     // Round the array slice.
     if ((dim == Dim1DArray) || (dim == Dim2DArray) || (dim == DimCubeArray))
     {
-        outCoords.back() = CreateIntrinsic(Intrinsic::rint, pCoordScalarTy, outCoords.back());
+        outCoords.back() = CreateIntrinsic(Intrinsic::rint, coordScalarTy, outCoords.back());
     }
 
-    Value* pCubeSc = nullptr;
-    Value* pCubeTc = nullptr;
-    Value* pCubeMa = nullptr;
-    Value* pCubeId = nullptr;
+    Value* cubeSc = nullptr;
+    Value* cubeTc = nullptr;
+    Value* cubeMa = nullptr;
+    Value* cubeId = nullptr;
     if ((dim == DimCube) || (dim == DimCubeArray))
     {
         // For a cube or cubearray, transform the coordinates into s,t,faceid.
-        pCubeSc = CreateIntrinsic(Intrinsic::amdgcn_cubesc, {}, { outCoords[0], outCoords[1], outCoords[2] });
-        pCubeTc = CreateIntrinsic(Intrinsic::amdgcn_cubetc, {}, { outCoords[0], outCoords[1], outCoords[2] });
-        pCubeMa = CreateIntrinsic(Intrinsic::amdgcn_cubema, {}, { outCoords[0], outCoords[1], outCoords[2] });
-        pCubeId = CreateIntrinsic(Intrinsic::amdgcn_cubeid, {}, { outCoords[0], outCoords[1], outCoords[2] });
+        cubeSc = CreateIntrinsic(Intrinsic::amdgcn_cubesc, {}, { outCoords[0], outCoords[1], outCoords[2] });
+        cubeTc = CreateIntrinsic(Intrinsic::amdgcn_cubetc, {}, { outCoords[0], outCoords[1], outCoords[2] });
+        cubeMa = CreateIntrinsic(Intrinsic::amdgcn_cubema, {}, { outCoords[0], outCoords[1], outCoords[2] });
+        cubeId = CreateIntrinsic(Intrinsic::amdgcn_cubeid, {}, { outCoords[0], outCoords[1], outCoords[2] });
 
-        Value* pAbsMa = CreateIntrinsic(Intrinsic::fabs, getFloatTy(), pCubeMa);
-        Value* pRecipAbsMa = CreateFDiv(ConstantFP::get(getFloatTy(), 1.0), pAbsMa);
-        Value* pSc = CreateFMul(pCubeSc, pRecipAbsMa);
-        pSc = CreateFAdd(pSc, ConstantFP::get(getFloatTy(), 1.5));
-        Value* pTc = CreateFMul(pCubeTc, pRecipAbsMa);
-        pTc = CreateFAdd(pTc, ConstantFP::get(getFloatTy(), 1.5));
+        Value* absMa = CreateIntrinsic(Intrinsic::fabs, getFloatTy(), cubeMa);
+        Value* recipAbsMa = CreateFDiv(ConstantFP::get(getFloatTy(), 1.0), absMa);
+        Value* sc = CreateFMul(cubeSc, recipAbsMa);
+        sc = CreateFAdd(sc, ConstantFP::get(getFloatTy(), 1.5));
+        Value* tc = CreateFMul(cubeTc, recipAbsMa);
+        tc = CreateFAdd(tc, ConstantFP::get(getFloatTy(), 1.5));
 
-        outCoords[0] = pSc;
-        outCoords[1] = pTc;
-        outCoords[2] = pCubeId;
+        outCoords[0] = sc;
+        outCoords[1] = tc;
+        outCoords[2] = cubeId;
 
         // For a cubearray, combine the face and slice into a single component.
         if (dim == DimCubeArray)
         {
-            Value* pFace = outCoords[2];
-            Value* pSlice = outCoords[3];
-            Constant* pMultiplier = ConstantFP::get(pFace->getType(), 8.0);
-            Value* pCombined = CreateFMul(pSlice, pMultiplier);
-            pCombined = CreateFAdd(pCombined, pFace);
-            outCoords[2] = pCombined;
+            Value* face = outCoords[2];
+            Value* slice = outCoords[3];
+            Constant* multiplier = ConstantFP::get(face->getType(), 8.0);
+            Value* combined = CreateFMul(slice, multiplier);
+            combined = CreateFAdd(combined, face);
+            outCoords[2] = combined;
             outCoords.pop_back();
             dim = DimCube;
         }
@@ -2225,19 +2225,19 @@ unsigned BuilderImplImage::PrepareCoordinate(
     }
 
     // Push the derivative components.
-    if (pDerivativeX != nullptr)
+    if (derivativeX != nullptr)
     {
         // Derivatives by X
-        if (auto pVectorDerivativeXTy = dyn_cast<VectorType>(pDerivativeX->getType()))
+        if (auto vectorDerivativeXTy = dyn_cast<VectorType>(derivativeX->getType()))
         {
-            for (unsigned i = 0; i != pVectorDerivativeXTy->getNumElements(); ++i)
+            for (unsigned i = 0; i != vectorDerivativeXTy->getNumElements(); ++i)
             {
-                outDerivatives.push_back(CreateExtractElement(pDerivativeX, i));
+                outDerivatives.push_back(CreateExtractElement(derivativeX, i));
             }
         }
         else
         {
-            outDerivatives.push_back(pDerivativeX);
+            outDerivatives.push_back(derivativeX);
         }
 
         if (needExtraDerivativeDim)
@@ -2247,16 +2247,16 @@ unsigned BuilderImplImage::PrepareCoordinate(
         }
 
         // Derivatives by Y
-        if (auto pVectorDerivativeYTy = dyn_cast<VectorType>(pDerivativeY->getType()))
+        if (auto vectorDerivativeYTy = dyn_cast<VectorType>(derivativeY->getType()))
         {
-            for (unsigned i = 0; i != pVectorDerivativeYTy->getNumElements(); ++i)
+            for (unsigned i = 0; i != vectorDerivativeYTy->getNumElements(); ++i)
             {
-                outDerivatives.push_back(CreateExtractElement(pDerivativeY, i));
+                outDerivatives.push_back(CreateExtractElement(derivativeY, i));
             }
         }
         else
         {
-            outDerivatives.push_back(pDerivativeY);
+            outDerivatives.push_back(derivativeY);
         }
 
         if (needExtraDerivativeDim)
@@ -2292,85 +2292,85 @@ unsigned BuilderImplImage::PrepareCoordinate(
     //   4.0     | 2.0          | false     | false | true
     //   5.0     | 2.0          | true      | true  | true
 
-    Value* pFaceCoordX = pCubeSc;
-    Value* pFaceCoordY = pCubeTc;
-    Value* pFaceId = pCubeId;
+    Value* faceCoordX = cubeSc;
+    Value* faceCoordY = cubeTc;
+    Value* faceId = cubeId;
 
-    Value* pGradXx = outDerivatives[0];
-    Value* pGradXy = outDerivatives[1];
-    Value* pGradXz = outDerivatives[2];
-    Value* pGradYx = outDerivatives[3];
-    Value* pGradYy = outDerivatives[4];
-    Value* pGradYz = outDerivatives[5];
+    Value* gradXx = outDerivatives[0];
+    Value* gradXy = outDerivatives[1];
+    Value* gradXz = outDerivatives[2];
+    Value* gradYx = outDerivatives[3];
+    Value* gradYy = outDerivatives[4];
+    Value* gradYz = outDerivatives[5];
 
     outDerivatives.resize(4);
 
-    Constant* pNegOne = ConstantFP::get(pFaceId->getType(), -1.0);
-    Constant* pZero = Constant::getNullValue(pFaceId->getType());
-    Constant* pHalf = ConstantFP::get(pFaceId->getType(), 0.5);
-    Constant* pOne = ConstantFP::get(pFaceId->getType(), 1.0);
-    Constant* pTwo = ConstantFP::get(pFaceId->getType(), 2.0);
-    Constant* pFive = ConstantFP::get(pFaceId->getType(), 5.0);
+    Constant* negOne = ConstantFP::get(faceId->getType(), -1.0);
+    Constant* zero = Constant::getNullValue(faceId->getType());
+    Constant* half = ConstantFP::get(faceId->getType(), 0.5);
+    Constant* one = ConstantFP::get(faceId->getType(), 1.0);
+    Constant* two = ConstantFP::get(faceId->getType(), 2.0);
+    Constant* five = ConstantFP::get(faceId->getType(), 5.0);
 
     // faceIdHalf = faceId * 0.5
-    Value* pFaceIdHalf = CreateFMul(pFaceId, pHalf);
+    Value* faceIdHalf = CreateFMul(faceId, half);
     // faceIdPos = round_zero(faceIdHalf)
     //   faceIdPos is: 0.0 (X axis) when face ID is 0.0 or 1.0;
     //                 1.0 (Y axis) when face ID is 2.0 or 3.0;
     //                 2.0 (Z axis) when face ID is 4.0 or 5.0;
-    Value* pFaceIdPos = CreateIntrinsic(Intrinsic::trunc, pFaceIdHalf->getType(), pFaceIdHalf);
+    Value* faceIdPos = CreateIntrinsic(Intrinsic::trunc, faceIdHalf->getType(), faceIdHalf);
     // faceNeg = (faceIdPos != faceIdHalf)
     //   faceNeg is true when major axis is negative, this corresponds to             face ID being 1.0, 3.0, or 5.0
-    Value* pFaceNeg = CreateFCmpONE(pFaceIdPos, pFaceIdHalf);
+    Value* faceNeg = CreateFCmpONE(faceIdPos, faceIdHalf);
     // faceIsY = (faceIdPos == 1.0);
-    Value* pFaceIsY = CreateFCmpOEQ(pFaceIdPos, pOne);
+    Value* faceIsY = CreateFCmpOEQ(faceIdPos, one);
     // flipU is true when U-axis is negative, this corresponds to face ID being 0.0 or 5.0.
-    Value* pFlipU = CreateOr(CreateFCmpOEQ(pFaceId, pFive), CreateFCmpOEQ(pFaceId, pZero));
+    Value* flipU = CreateOr(CreateFCmpOEQ(faceId, five), CreateFCmpOEQ(faceId, zero));
     // flipV is true when V-axis is negative, this corresponds to face ID being             anything other than 2.0.
     // flipV = (faceId != 2.0);
-    Value* pFlipV = CreateFCmpONE(pFaceId, pTwo);
+    Value* flipV = CreateFCmpONE(faceId, two);
     // major2.x = 1/major.x * 1/major.x * 0.5;
     //          = 1/(2*major.x) * 1/(2*major.x) * 2
-    Value* pRecipMa = CreateFDiv(pOne, pCubeMa);
-    Value* pMajor2X = CreateFMul(CreateFMul(pRecipMa, pRecipMa), pTwo);
+    Value* recipMa = CreateFDiv(one, cubeMa);
+    Value* major2X = CreateFMul(CreateFMul(recipMa, recipMa), two);
 
-    Value* pGradx = pGradXx;
-    Value* pGrady = pGradXy;
-    Value* pGradz = pGradXz;
+    Value* gradx = gradXx;
+    Value* grady = gradXy;
+    Value* gradz = gradXz;
     for (unsigned i = 0; i < 2; ++i)
     {
         // majorDeriv.x = (faceIdPos == 0.0) ? grad.x : grad.z;
-        Value* pMajorDerivX = CreateSelect(CreateFCmpOEQ(pFaceIdPos, pZero), pGradx, pGradz);
+        Value* majorDerivX = CreateSelect(CreateFCmpOEQ(faceIdPos, zero), gradx, gradz);
         // majorDeriv.x = (faceIsY == 0) ? majorDeriv.x : grad.y;
-        pMajorDerivX = CreateSelect(pFaceIsY, pGrady, pMajorDerivX);
+        majorDerivX = CreateSelect(faceIsY, grady, majorDerivX);
         // majorDeriv.x = (faceNeg == 0.0) ? majorDeriv.x : (-majorDeriv.x);
-        pMajorDerivX = CreateSelect(pFaceNeg, CreateFMul(pMajorDerivX, pNegOne), pMajorDerivX);
+        majorDerivX = CreateSelect(faceNeg, CreateFMul(majorDerivX, negOne), majorDerivX);
         // faceDeriv.x = (faceIdPos == 0.0) ? grad.z : grad.x;
-        Value* pFaceDerivX = CreateSelect(CreateFCmpOEQ(pFaceIdPos, pZero), pGradz, pGradx);
+        Value* faceDerivX = CreateSelect(CreateFCmpOEQ(faceIdPos, zero), gradz, gradx);
         // faceDeriv.x = (flipU == 0) ? faceDeriv.x : (-faceDeriv.x);
-        pFaceDerivX = CreateSelect(pFlipU, CreateFMul(pFaceDerivX, pNegOne), pFaceDerivX);
+        faceDerivX = CreateSelect(flipU, CreateFMul(faceDerivX, negOne), faceDerivX);
         // faceDeriv.y = (faceIsY == 0) ? grad.y : grad.z;
-        Value* pFaceDerivY = CreateSelect(pFaceIsY, pGradz, pGrady);
+        Value* faceDerivY = CreateSelect(faceIsY, gradz, grady);
         // faceDeriv.y = (flipV == 0) ? faceDeriv.y : (-faceDeriv.y);
-        pFaceDerivY = CreateSelect(pFlipV, CreateFMul(pFaceDerivY, pNegOne), pFaceDerivY);
+        faceDerivY = CreateSelect(flipV, CreateFMul(faceDerivY, negOne), faceDerivY);
         // faceDeriv.xy = major.xx * faceDeriv.xy;
-        Value* pHalfMa = CreateFMul(pCubeMa, pHalf);
-        pFaceDerivX = CreateFMul(pFaceDerivX, pHalfMa);
-        pFaceDerivY = CreateFMul(pFaceDerivY, pHalfMa);
+        Value* halfMa = CreateFMul(cubeMa, half);
+        faceDerivX = CreateFMul(faceDerivX, halfMa);
+        faceDerivY = CreateFMul(faceDerivY, halfMa);
         // faceDeriv.xy = (-faceCrd.xy) * majorDeriv.xx + faceDeriv.xy;
-        Value* pNegFaceCoordX = CreateFMul(pFaceCoordX, pNegOne);
-        Value* pNegFaceCoordY = CreateFMul(pFaceCoordY, pNegOne);
-        Value* pFaceDerivIncX = CreateFMul(pNegFaceCoordX, pMajorDerivX);
-        Value* pFaceDerivIncY = CreateFMul(pNegFaceCoordY, pMajorDerivX);
-        pFaceDerivX = CreateFAdd(pFaceDerivIncX, pFaceDerivX);
-        pFaceDerivY = CreateFAdd(pFaceDerivIncY, pFaceDerivY);
+        Value* negFaceCoordX = CreateFMul(faceCoordX, negOne);
+        Value* negFaceCoordY = CreateFMul(faceCoordY, negOne);
+        Value* faceDerivIncX = CreateFMul(negFaceCoordX, majorDerivX);
+        Value* faceDerivIncY = CreateFMul(negFaceCoordY, majorDerivX);
+        faceDerivX = CreateFAdd(faceDerivIncX, faceDerivX);
+        faceDerivY = CreateFAdd(faceDerivIncY, faceDerivY);
         // grad.xy = faceDeriv.xy * major2.xx;
-        outDerivatives[i * 2] = CreateFMul(pFaceDerivX, pMajor2X);
-        outDerivatives[i * 2 + 1] = CreateFMul(pFaceDerivY, pMajor2X);
+        outDerivatives[i * 2] = CreateFMul(faceDerivX, major2X);
+        outDerivatives[i * 2 + 1] = CreateFMul(faceDerivY, major2X);
 
-        pGradx = pGradYx;
-        pGrady = pGradYy;
-        pGradz = pGradYz;
+        gradx = gradYx;
+        grady = gradYy;
+        gradz = gradYz;
     }
 
     return dim;
@@ -2380,114 +2380,114 @@ unsigned BuilderImplImage::PrepareCoordinate(
 // For a cubearray with integer coordinates, combine the face and slice into a single component.
 // In this case, the frontend may have generated code to separate the
 // face and slice out of a single component, so we look for that code first.
-void BuilderImplImage::CombineCubeArrayFaceAndSlice(
-    Value*                    pCoord,   // [in] Coordinate as vector value
+void BuilderImplImage::combineCubeArrayFaceAndSlice(
+    Value*                    coord,   // [in] Coordinate as vector value
     SmallVectorImpl<Value*>&  coords)   // [in/out] Coordinate components
 {
     // See if we can find the face and slice components in a chain of insertelements.
-    Constant* pMultiplier = getInt32(6);
-    Value* pFace = nullptr;
-    Value* pSlice = nullptr;
-    Value* pPartialCoord = pCoord;
-    while (auto pInsert = dyn_cast<InsertElementInst>(pPartialCoord))
+    Constant* multiplier = getInt32(6);
+    Value* face = nullptr;
+    Value* slice = nullptr;
+    Value* partialCoord = coord;
+    while (auto insert = dyn_cast<InsertElementInst>(partialCoord))
     {
-        unsigned index = cast<ConstantInt>(pInsert->getOperand(2))->getZExtValue();
+        unsigned index = cast<ConstantInt>(insert->getOperand(2))->getZExtValue();
         switch (index)
         {
         case 2:
-            pFace = (pFace == nullptr) ? pInsert->getOperand(1) : pFace;
+            face = (face == nullptr) ? insert->getOperand(1) : face;
             break;
         case 3:
-            pSlice = (pSlice == nullptr) ? pInsert->getOperand(1) : pSlice;
+            slice = (slice == nullptr) ? insert->getOperand(1) : slice;
             break;
         }
-        pPartialCoord = pInsert->getOperand(0);
+        partialCoord = insert->getOperand(0);
     }
 
-    Value* pCombined = nullptr;
-    if ((pFace != nullptr) && (pSlice != nullptr))
+    Value* combined = nullptr;
+    if ((face != nullptr) && (slice != nullptr))
     {
-        if (auto pSliceDiv = dyn_cast<BinaryOperator>(pSlice))
+        if (auto sliceDiv = dyn_cast<BinaryOperator>(slice))
         {
-            if (auto pFaceRem = dyn_cast<BinaryOperator>(pFace))
+            if (auto faceRem = dyn_cast<BinaryOperator>(face))
             {
-                if ((pSliceDiv->getOpcode() == Instruction::UDiv) &&
-                    (pFaceRem->getOpcode() == Instruction::URem) &&
-                    (pSliceDiv->getOperand(1) == pMultiplier) && (pFaceRem->getOperand(1) == pMultiplier) &&
-                    (pSliceDiv->getOperand(0) == pFaceRem->getOperand(0)))
+                if ((sliceDiv->getOpcode() == Instruction::UDiv) &&
+                    (faceRem->getOpcode() == Instruction::URem) &&
+                    (sliceDiv->getOperand(1) == multiplier) && (faceRem->getOperand(1) == multiplier) &&
+                    (sliceDiv->getOperand(0) == faceRem->getOperand(0)))
                 {
                     // This is the case that the slice and face were extracted from a combined value using
                     // the same multiplier. That happens with SPIR-V with multiplier 6.
-                    pCombined = pSliceDiv->getOperand(0);
+                    combined = sliceDiv->getOperand(0);
                 }
             }
         }
     }
 
-    if (pCombined == nullptr)
+    if (combined == nullptr)
     {
         // We did not find the div and rem generated by the frontend to separate the face and slice.
-        pFace = coords[2];
-        pSlice = coords[3];
-        pCombined = CreateMul(pSlice, pMultiplier);
-        pCombined = CreateAdd(pCombined, pFace);
+        face = coords[2];
+        slice = coords[3];
+        combined = CreateMul(slice, multiplier);
+        combined = CreateAdd(combined, face);
     }
-    coords[2] = pCombined;
+    coords[2] = combined;
     coords.pop_back();
 }
 
 // =====================================================================================================================
 // Patch descriptor with cube dimension for image load/store/atomic for GFX8 and earlier
-Value* BuilderImplImage::PatchCubeDescriptor(
-    Value*    pDesc,  // [in] Descriptor before patching
+Value* BuilderImplImage::patchCubeDescriptor(
+    Value*    desc,  // [in] Descriptor before patching
     unsigned  dim)    // Image dimensions
 {
     if (((dim != DimCube) && (dim != DimCubeArray)) ||
-        (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major >= 9))
+        (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9))
     {
-        return pDesc;
+        return desc;
     }
 
     // Extract the depth.
-    Value* pElem4 = CreateExtractElement(pDesc, 4);
-    Value* pDepth = CreateAnd(pElem4, getInt32(0x1FFF));
+    Value* elem4 = CreateExtractElement(desc, 4);
+    Value* depth = CreateAnd(elem4, getInt32(0x1FFF));
 
     // Change to depth * 6 + 5
-    pDepth = CreateMul(pDepth, getInt32(6));
-    pDepth = CreateAdd(pDepth, getInt32(5));
-    pElem4 = CreateAnd(pElem4, getInt32(0xFFFFE000));
-    pElem4 = CreateOr(pElem4, pDepth);
+    depth = CreateMul(depth, getInt32(6));
+    depth = CreateAdd(depth, getInt32(5));
+    elem4 = CreateAnd(elem4, getInt32(0xFFFFE000));
+    elem4 = CreateOr(elem4, depth);
 
     // Change resource type to 2D array (0xD)
-    Value* pElem3 = CreateExtractElement(pDesc, 3);
-    pElem3 = CreateAnd(pElem3, getInt32(0x0FFFFFFF));
-    pElem3 = CreateOr(pElem3, getInt32(0xD0000000));
+    Value* elem3 = CreateExtractElement(desc, 3);
+    elem3 = CreateAnd(elem3, getInt32(0x0FFFFFFF));
+    elem3 = CreateOr(elem3, getInt32(0xD0000000));
 
     // Reassemble descriptor.
-    pDesc = CreateInsertElement(pDesc, pElem4, 4);
-    pDesc = CreateInsertElement(pDesc, pElem3, 3);
-    return pDesc;
+    desc = CreateInsertElement(desc, elem4, 4);
+    desc = CreateInsertElement(desc, elem3, 3);
+    return desc;
 }
 
 // =====================================================================================================================
 // Handle cases where we need to add the FragCoord x,y to the coordinate, and use ViewIndex as the z coordinate.
-Value* BuilderImplImage::HandleFragCoordViewIndex(
-    Value*    pCoord,   // [in] Coordinate, scalar or vector i32
+Value* BuilderImplImage::handleFragCoordViewIndex(
+    Value*    coord,   // [in] Coordinate, scalar or vector i32
     unsigned  flags,    // Image flags
     unsigned& dim)      // [in,out] Image dimension
 {
     bool useViewIndex = false;
     if (flags & ImageFlagCheckMultiView)
     {
-        if (GetPipelineState()->GetInputAssemblyState().enableMultiView)
+        if (getPipelineState()->getInputAssemblyState().enableMultiView)
         {
             useViewIndex = true;
             dim = Dim2DArray;
-            unsigned coordCount = pCoord->getType()->getVectorNumElements();
+            unsigned coordCount = coord->getType()->getVectorNumElements();
             if (coordCount < 3)
             {
                 const static unsigned Indexes[] = { 0, 1, 1 };
-                pCoord = CreateShuffleVector(pCoord, Constant::getNullValue(pCoord->getType()), Indexes);
+                coord = CreateShuffleVector(coord, Constant::getNullValue(coord->getType()), Indexes);
             }
         }
     }
@@ -2497,29 +2497,29 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
         // Get FragCoord, convert to signed i32, and add its x,y to the coordinate.
         // For now, this just generates a call to llpc.input.import.builtin. A future commit will
         // change it to use a Builder call to read the built-in.
-        GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->builtInUsage.fs.fragCoord = true;
+        getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage.fs.fragCoord = true;
 
         const static unsigned BuiltInFragCoord = 15;
         std::string callName = lgcName::InputImportBuiltIn;
-        Type* pBuiltInTy = VectorType::get(getFloatTy(), 4);
-        AddTypeMangling(pBuiltInTy, {}, callName);
-        Value *pFragCoord = EmitCall(callName,
-                                     pBuiltInTy,
+        Type* builtInTy = VectorType::get(getFloatTy(), 4);
+        addTypeMangling(builtInTy, {}, callName);
+        Value *fragCoord = emitCall(callName,
+                                     builtInTy,
                                      getInt32(BuiltInFragCoord),
                                      {},
                                      &*GetInsertPoint());
-        pFragCoord->setName("FragCoord");
-        pFragCoord = CreateShuffleVector(pFragCoord, pFragCoord, ArrayRef<unsigned>{ 0, 1 });
-        pFragCoord = CreateFPToSI(pFragCoord, VectorType::get(getInt32Ty(), 2));
-        unsigned coordCount = pCoord->getType()->getVectorNumElements();
+        fragCoord->setName("FragCoord");
+        fragCoord = CreateShuffleVector(fragCoord, fragCoord, ArrayRef<unsigned>{ 0, 1 });
+        fragCoord = CreateFPToSI(fragCoord, VectorType::get(getInt32Ty(), 2));
+        unsigned coordCount = coord->getType()->getVectorNumElements();
         if (coordCount > 2)
         {
             const static unsigned Indexes[] = { 0, 1, 2, 3 };
-            pFragCoord = CreateShuffleVector(pFragCoord,
-                                             Constant::getNullValue(pFragCoord->getType()),
+            fragCoord = CreateShuffleVector(fragCoord,
+                                             Constant::getNullValue(fragCoord->getType()),
                                              ArrayRef<unsigned>(Indexes).slice(0, coordCount));
         }
-        pCoord = CreateAdd(pCoord, pFragCoord);
+        coord = CreateAdd(coord, fragCoord);
     }
 
     if (useViewIndex)
@@ -2527,7 +2527,7 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
         // Get ViewIndex and use it as the z coordinate.
         // For now, this just generates a call to llpc.input.import.builtin. A future commit will
         // change it to use a Builder call to read the built-in.
-        auto& builtInUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->builtInUsage;
+        auto& builtInUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage;
         switch (m_shaderStage)
         {
         case ShaderStageVertex:
@@ -2549,17 +2549,17 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
 
         const static unsigned BuiltInViewIndex = 4440;
         std::string callName = lgcName::InputImportBuiltIn;
-        Type* pBuiltInTy = getInt32Ty();
-        AddTypeMangling(pBuiltInTy, {}, callName);
-        Value *pViewIndex = EmitCall(callName,
-                                     pBuiltInTy,
+        Type* builtInTy = getInt32Ty();
+        addTypeMangling(builtInTy, {}, callName);
+        Value *viewIndex = emitCall(callName,
+                                     builtInTy,
                                      getInt32(BuiltInViewIndex),
                                      {},
                                      &*GetInsertPoint());
-        pViewIndex->setName("ViewIndex");
-        pCoord = CreateInsertElement(pCoord, pViewIndex, 2);
+        viewIndex->setName("ViewIndex");
+        coord = CreateInsertElement(coord, viewIndex, 2);
     }
 
-    return pCoord;
+    return coord;
 }
 

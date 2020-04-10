@@ -47,8 +47,8 @@ public:
 
     SpirvLowerTranslator(
         ShaderStage                 stage,        // Shader stage
-        const PipelineShaderInfo*   pShaderInfo)  // [in] Shader info for this shader
-        : SpirvLower(ID), m_pShaderInfo(pShaderInfo)
+        const PipelineShaderInfo*   shaderInfo)  // [in] Shader info for this shader
+        : SpirvLower(ID), m_shaderInfo(shaderInfo)
     {
     }
 
@@ -58,12 +58,12 @@ private:
     SpirvLowerTranslator(const SpirvLowerTranslator&) = delete;
     SpirvLowerTranslator& operator=(const SpirvLowerTranslator&) = delete;
 
-    void TranslateSpirvToLlvm(const PipelineShaderInfo* pShaderInfo,
-                              llvm::Module*             pModule);
+    void translateSpirvToLlvm(const PipelineShaderInfo* shaderInfo,
+                              llvm::Module*             module);
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    const PipelineShaderInfo* m_pShaderInfo;    // Input shader info
+    const PipelineShaderInfo* m_shaderInfo;    // Input shader info
 };
 
 } // Llpc

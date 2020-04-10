@@ -65,75 +65,75 @@ namespace Llpc
 {
 // =====================================================================================================================
 // Replace a constant with instructions using a builder.
-void SpirvLower::ReplaceConstWithInsts(
-    Context*        pContext,      // [in] The context
-    Constant* const pConstVal)     // [in/out] The constant to replace with instructions.
+void SpirvLower::replaceConstWithInsts(
+    Context*        context,      // [in] The context
+    Constant* const constVal)     // [in/out] The constant to replace with instructions.
 
 {
     SmallSet<Constant*, 8> otherConsts;
-    Builder* pBuilder = pContext->GetBuilder();
-    for (User* const pUser : pConstVal->users())
+    Builder* builder = context->getBuilder();
+    for (User* const user : constVal->users())
     {
-        if (Constant* const pOtherConst = dyn_cast<Constant>(pUser))
+        if (Constant* const otherConst = dyn_cast<Constant>(user))
         {
-            otherConsts.insert(pOtherConst);
+            otherConsts.insert(otherConst);
         }
     }
 
-    for (Constant* const pOtherConst : otherConsts)
+    for (Constant* const otherConst : otherConsts)
     {
-        ReplaceConstWithInsts(pContext, pOtherConst);
+        replaceConstWithInsts(context, otherConst);
     }
 
     otherConsts.clear();
 
     SmallVector<Value*, 8> users;
 
-    for (User* const pUser : pConstVal->users())
+    for (User* const user : constVal->users())
     {
-        users.push_back(pUser);
+        users.push_back(user);
     }
 
-    for (Value* const pUser : users)
+    for (Value* const user : users)
     {
-        Instruction* const pInst = dyn_cast<Instruction>(pUser);
-        assert(pInst != nullptr);
+        Instruction* const inst = dyn_cast<Instruction>(user);
+        assert(inst != nullptr);
 
         // If the instruction is a phi node, we have to insert the new instructions in the correct predecessor.
-        if (PHINode* const pPhiNode = dyn_cast<PHINode>(pInst))
+        if (PHINode* const phiNode = dyn_cast<PHINode>(inst))
         {
-            const unsigned incomingValueCount = pPhiNode->getNumIncomingValues();
+            const unsigned incomingValueCount = phiNode->getNumIncomingValues();
             for (unsigned i = 0; i < incomingValueCount; i++)
             {
-                if (pPhiNode->getIncomingValue(i) == pConstVal)
+                if (phiNode->getIncomingValue(i) == constVal)
                 {
-                    pBuilder->SetInsertPoint(pPhiNode->getIncomingBlock(i)->getTerminator());
+                    builder->SetInsertPoint(phiNode->getIncomingBlock(i)->getTerminator());
                     break;
                 }
             }
         }
         else
         {
-            pBuilder->SetInsertPoint(pInst);
+            builder->SetInsertPoint(inst);
         }
 
-        if (ConstantExpr* const pConstExpr = dyn_cast<ConstantExpr>(pConstVal))
+        if (ConstantExpr* const constExpr = dyn_cast<ConstantExpr>(constVal))
         {
-            Instruction* const pInsertPos = pBuilder->Insert(pConstExpr->getAsInstruction());
-            pInst->replaceUsesOfWith(pConstExpr, pInsertPos);
+            Instruction* const insertPos = builder->Insert(constExpr->getAsInstruction());
+            inst->replaceUsesOfWith(constExpr, insertPos);
         }
-        else if (ConstantVector* const pConstVector = dyn_cast<ConstantVector>(pConstVal))
+        else if (ConstantVector* const constVector = dyn_cast<ConstantVector>(constVal))
         {
-            Value* pResultValue = UndefValue::get(pConstVector->getType());
-            for (unsigned i = 0; i < pConstVector->getNumOperands(); i++)
+            Value* resultValue = UndefValue::get(constVector->getType());
+            for (unsigned i = 0; i < constVector->getNumOperands(); i++)
             {
                 // Have to not use the builder here because it will constant fold and we are trying to undo that now!
-                Instruction* const pInsertPos = InsertElementInst::Create(pResultValue,
-                    pConstVector->getOperand(i),
-                    pBuilder->getInt32(i));
-                pResultValue = pBuilder->Insert(pInsertPos);
+                Instruction* const insertPos = InsertElementInst::Create(resultValue,
+                    constVector->getOperand(i),
+                    builder->getInt32(i));
+                resultValue = builder->Insert(insertPos);
             }
-            pInst->replaceUsesOfWith(pConstVector, pResultValue);
+            inst->replaceUsesOfWith(constVector, resultValue);
         }
         else
         {
@@ -141,52 +141,52 @@ void SpirvLower::ReplaceConstWithInsts(
         }
     }
 
-    pConstVal->removeDeadConstantUsers();
-    pConstVal->destroyConstant();
+    constVal->removeDeadConstantUsers();
+    constVal->destroyConstant();
 }
 
 // =====================================================================================================================
 // Removes those constant expressions that reference global variables.
-void SpirvLower::RemoveConstantExpr(
-    Context*        pContext,   // [in] The context
-    GlobalVariable* pGlobal)    // [in] The global variable
+void SpirvLower::removeConstantExpr(
+    Context*        context,   // [in] The context
+    GlobalVariable* global)    // [in] The global variable
 {
     SmallVector<Constant*, 8> constantUsers;
 
-    for (User* const pUser : pGlobal->users())
+    for (User* const user : global->users())
     {
-        if (Constant* const pConst = dyn_cast<Constant>(pUser))
+        if (Constant* const pConst = dyn_cast<Constant>(user))
         {
             constantUsers.push_back(pConst);
         }
     }
 
-    for (Constant* const pConstVal : constantUsers)
+    for (Constant* const constVal : constantUsers)
     {
-        ReplaceConstWithInsts(pContext, pConstVal);
+        replaceConstWithInsts(context, constVal);
     }
 }
 
 // =====================================================================================================================
 // Add per-shader lowering passes to pass manager
-void SpirvLower::AddPasses(
-    Context*              pContext,               // [in] LLPC context
+void SpirvLower::addPasses(
+    Context*              context,               // [in] LLPC context
     ShaderStage           stage,                  // Shader stage
     legacy::PassManager&  passMgr,                // [in/out] Pass manager to add passes to
-    llvm::Timer*          pLowerTimer,            // [in] Timer to time lower passes with, nullptr if not timing
+    llvm::Timer*          lowerTimer,            // [in] Timer to time lower passes with, nullptr if not timing
     unsigned              forceLoopUnrollCount)   // 0 or force loop unroll count
 {
     // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-    pContext->GetBuilderContext()->PreparePassManager(&passMgr);
+    context->getBuilderContext()->preparePassManager(&passMgr);
 
     // Start timer for lowering passes.
-    if (pLowerTimer != nullptr)
+    if (lowerTimer != nullptr)
     {
-        passMgr.add(BuilderContext::CreateStartStopTimer(pLowerTimer, true));
+        passMgr.add(BuilderContext::createStartStopTimer(lowerTimer, true));
     }
 
     // Lower SPIR-V resource collecting
-    passMgr.add(CreateSpirvLowerResourceCollect(false));
+    passMgr.add(createSpirvLowerResourceCollect(false));
 
     // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
     // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.
@@ -194,22 +194,22 @@ void SpirvLower::AddPasses(
     passMgr.add(createGlobalDCEPass());
 
     // Control loop unrolling
-    passMgr.add(CreateSpirvLowerLoopUnrollControl(forceLoopUnrollCount));
+    passMgr.add(createSpirvLowerLoopUnrollControl(forceLoopUnrollCount));
 
     // Lower SPIR-V access chain
-    passMgr.add(CreateSpirvLowerAccessChain());
+    passMgr.add(createSpirvLowerAccessChain());
 
     // Lower SPIR-V global variables, inputs, and outputs
-    passMgr.add(CreateSpirvLowerGlobal());
+    passMgr.add(createSpirvLowerGlobal());
 
     // Lower SPIR-V constant immediate store.
-    passMgr.add(CreateSpirvLowerConstImmediateStore());
+    passMgr.add(createSpirvLowerConstImmediateStore());
 
     // Lower SPIR-V algebraic transforms, constant folding must be done before instruction combining pass.
-    passMgr.add(CreateSpirvLowerAlgebraTransform(true, false));
+    passMgr.add(createSpirvLowerAlgebraTransform(true, false));
 
     // Lower SPIR-V memory operations
-    passMgr.add(CreateSpirvLowerMemoryOp());
+    passMgr.add(createSpirvLowerMemoryOp());
 
     // Remove reduant load/store operations and do minimal optimization
     // It is required by SpirvLowerImageOp.
@@ -226,15 +226,15 @@ void SpirvLower::AddPasses(
     passMgr.add(createIPConstantPropagationPass());
 
     // Lower SPIR-V algebraic transforms
-    passMgr.add(CreateSpirvLowerAlgebraTransform(false, true));
+    passMgr.add(createSpirvLowerAlgebraTransform(false, true));
 
     // Lower SPIR-V instruction metadata remove
-    passMgr.add(CreateSpirvLowerInstMetaRemove());
+    passMgr.add(createSpirvLowerInstMetaRemove());
 
     // Stop timer for lowering passes.
-    if (pLowerTimer != nullptr)
+    if (lowerTimer != nullptr)
     {
-        passMgr.add(BuilderContext::CreateStartStopTimer(pLowerTimer, false));
+        passMgr.add(BuilderContext::createStartStopTimer(lowerTimer, false));
     }
 
     // Dump the result
@@ -250,22 +250,22 @@ void SpirvLower::AddPasses(
 // Initializes the pass according to the specified module.
 //
 // NOTE: This function should be called at the beginning of "runOnModule()".
-void SpirvLower::Init(
-    Module* pModule) // [in] LLVM module
+void SpirvLower::init(
+    Module* module) // [in] LLVM module
 {
-    m_pModule  = pModule;
-    m_pContext = static_cast<Context*>(&m_pModule->getContext());
-    if (m_pModule->empty())
+    m_module  = module;
+    m_context = static_cast<Context*>(&m_module->getContext());
+    if (m_module->empty())
     {
         m_shaderStage = ShaderStageInvalid;
-        m_pEntryPoint = nullptr;
+        m_entryPoint = nullptr;
     }
     else
     {
-        m_shaderStage = GetShaderStageFromModule(m_pModule);
-        m_pEntryPoint = GetEntryPoint(m_pModule);
+        m_shaderStage = getShaderStageFromModule(m_module);
+        m_entryPoint = getEntryPoint(m_module);
     }
-    m_pBuilder = m_pContext->GetBuilder();
+    m_builder = m_context->getBuilder();
 }
 
 } // Llpc

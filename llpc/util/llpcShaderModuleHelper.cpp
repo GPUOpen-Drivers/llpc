@@ -45,28 +45,28 @@ namespace Llpc
 {
 // =====================================================================================================================
 // Collect information from SPIR-V binary
-Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
-    const BinaryData*                pSpvBinCode,           // [in] SPIR-V binary data
-    ShaderModuleUsage*               pShaderModuleUsage,    // [out] Shader module usage info
+Result ShaderModuleHelper::collectInfoFromSpirvBinary(
+    const BinaryData*                spvBinCode,           // [in] SPIR-V binary data
+    ShaderModuleUsage*               shaderModuleUsage,    // [out] Shader module usage info
     std::vector<ShaderEntryName>&    shaderEntryNames,      // [out] Entry names for this shader module
-    unsigned*                        pDebugInfoSize)        // Debug info size
+    unsigned*                        debugInfoSize)        // Debug info size
 {
     Result result = Result::Success;
 
-    const unsigned* pCode = reinterpret_cast<const unsigned*>(pSpvBinCode->pCode);
-    const unsigned* pEnd = pCode + pSpvBinCode->codeSize / sizeof(unsigned);
+    const unsigned* code = reinterpret_cast<const unsigned*>(spvBinCode->pCode);
+    const unsigned* end = code + spvBinCode->codeSize / sizeof(unsigned);
 
-    const unsigned* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(unsigned);
+    const unsigned* codePos = code + sizeof(SpirvHeader) / sizeof(unsigned);
 
     // Parse SPIR-V instructions
     std::unordered_set<unsigned> capabilities;
 
-    while (pCodePos < pEnd)
+    while (codePos < end)
     {
-        unsigned opCode = (pCodePos[0] & OpCodeMask);
-        unsigned wordCount = (pCodePos[0] >> WordCountShift);
+        unsigned opCode = (codePos[0] & OpCodeMask);
+        unsigned wordCount = (codePos[0] >> WordCountShift);
 
-        if ((wordCount == 0) || (pCodePos + wordCount > pEnd))
+        if ((wordCount == 0) || (codePos + wordCount > end))
         {
             LLPC_ERRS("Invalid SPIR-V binary\n");
             result = Result::ErrorInvalidShader;
@@ -79,7 +79,7 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
         case OpCapability:
             {
                 assert(wordCount == 2);
-                auto capability = static_cast<Capability>(pCodePos[1]);
+                auto capability = static_cast<Capability>(codePos[1]);
                 capabilities.insert(capability);
                 break;
             }
@@ -97,7 +97,7 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
         case OpImageSparseSampleProjDrefImplicitLod:
         case OpImageSparseSampleProjImplicitLod:
             {
-                pShaderModuleUsage->useHelpInvocation = true;
+                shaderModuleUsage->useHelpInvocation = true;
                 break;
             }
         case OpString:
@@ -111,7 +111,7 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
         case OpNoLine:
         case OpModuleProcessed:
             {
-                *pDebugInfoSize += wordCount * sizeof(unsigned);
+                *debugInfoSize += wordCount * sizeof(unsigned);
                 break;
             }
         case OpSpecConstantTrue:
@@ -120,15 +120,15 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
         case OpSpecConstantComposite:
         case OpSpecConstantOp:
             {
-                pShaderModuleUsage->useSpecConstant = true;
+                shaderModuleUsage->useSpecConstant = true;
                 break;
             }
         case OpEntryPoint:
             {
                 ShaderEntryName entry = {};
                 // The fourth word is start of the name string of the entry-point
-                entry.pName = reinterpret_cast<const char*>(&pCodePos[3]);
-                entry.stage = ConvertToStageShage(pCodePos[1]);
+                entry.name = reinterpret_cast<const char*>(&codePos[3]);
+                entry.stage = convertToStageShage(codePos[1]);
                 shaderEntryNames.push_back(entry);
                 break;
             }
@@ -137,17 +137,17 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
                 break;
             }
         }
-        pCodePos += wordCount;
+        codePos += wordCount;
     }
 
     if (capabilities.find(CapabilityVariablePointersStorageBuffer) != capabilities.end())
     {
-        pShaderModuleUsage->enableVarPtrStorageBuf = true;
+        shaderModuleUsage->enableVarPtrStorageBuf = true;
     }
 
     if (capabilities.find(CapabilityVariablePointers) != capabilities.end())
     {
-        pShaderModuleUsage->enableVarPtr = true;
+        shaderModuleUsage->enableVarPtr = true;
     }
 
     return result;
@@ -155,29 +155,29 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
 
 // =====================================================================================================================
 // Removes all debug instructions for SPIR-V binary.
-void ShaderModuleHelper::TrimSpirvDebugInfo(
-    const BinaryData* pSpvBin,       // [in] SPIR-V binay code
+void ShaderModuleHelper::trimSpirvDebugInfo(
+    const BinaryData* spvBin,       // [in] SPIR-V binay code
     unsigned          bufferSize,    // Output buffer size in bytes
-    void*             pTrimSpvBin)   // [out] Trimmed SPIR-V binary code
+    void*             trimSpvBin)   // [out] Trimmed SPIR-V binary code
 {
     assert(bufferSize > sizeof(SpirvHeader));
 
-    const unsigned* pCode = reinterpret_cast<const unsigned*>(pSpvBin->pCode);
-    const unsigned* pEnd = pCode + pSpvBin->codeSize / sizeof(unsigned);
-    const unsigned* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(unsigned);
+    const unsigned* code = reinterpret_cast<const unsigned*>(spvBin->pCode);
+    const unsigned* end = code + spvBin->codeSize / sizeof(unsigned);
+    const unsigned* codePos = code + sizeof(SpirvHeader) / sizeof(unsigned);
 
-    unsigned* pTrimEnd = reinterpret_cast<unsigned*>(VoidPtrInc(pTrimSpvBin, bufferSize));
-    (void(pTrimEnd)); // unused
-    unsigned* pTrimCodePos = reinterpret_cast<unsigned*>(VoidPtrInc(pTrimSpvBin, sizeof(SpirvHeader)));
+    unsigned* trimEnd = reinterpret_cast<unsigned*>(voidPtrInc(trimSpvBin, bufferSize));
+    (void(trimEnd)); // unused
+    unsigned* trimCodePos = reinterpret_cast<unsigned*>(voidPtrInc(trimSpvBin, sizeof(SpirvHeader)));
 
     // Copy SPIR-V header
-    memcpy(pTrimSpvBin, pCode, sizeof(SpirvHeader));
+    memcpy(trimSpvBin, code, sizeof(SpirvHeader));
 
     // Copy SPIR-V instructions
-    while (pCodePos < pEnd)
+    while (codePos < end)
     {
-        unsigned opCode = (pCodePos[0] & OpCodeMask);
-        unsigned wordCount = (pCodePos[0] >> WordCountShift);
+        unsigned opCode = (codePos[0] & OpCodeMask);
+        unsigned wordCount = (codePos[0] >> WordCountShift);
         switch (opCode)
         {
         case OpString:
@@ -197,29 +197,29 @@ void ShaderModuleHelper::TrimSpirvDebugInfo(
         default:
             {
                 // Copy other instructions
-                assert(pCodePos + wordCount <= pEnd);
-                assert(pTrimCodePos + wordCount <= pTrimEnd);
-                memcpy(pTrimCodePos, pCodePos, wordCount * sizeof(unsigned));
-                pTrimCodePos += wordCount;
+                assert(codePos + wordCount <= end);
+                assert(trimCodePos + wordCount <= trimEnd);
+                memcpy(trimCodePos, codePos, wordCount * sizeof(unsigned));
+                trimCodePos += wordCount;
                 break;
             }
         }
 
-        pCodePos += wordCount;
+        codePos += wordCount;
     }
 
-    assert(pTrimCodePos == pTrimEnd);
+    assert(trimCodePos == trimEnd);
 }
 
 // =====================================================================================================================
 // Optimizes SPIR-V binary
-Result ShaderModuleHelper::OptimizeSpirv(
-    const BinaryData* pSpirvBinIn,     // [in] Input SPIR-V binary
-    BinaryData*       pSpirvBinOut)    // [out] Optimized SPIR-V binary
+Result ShaderModuleHelper::optimizeSpirv(
+    const BinaryData* spirvBinIn,     // [in] Input SPIR-V binary
+    BinaryData*       spirvBinOut)    // [out] Optimized SPIR-V binary
 {
     bool success = false;
     unsigned optBinSize = 0;
-    void* pOptBin = nullptr;
+    void* optBin = nullptr;
 
 #ifdef LLPC_ENABLE_SPIRV_OPT
     if (cl::EnableSpirvOpt)
@@ -243,13 +243,13 @@ Result ShaderModuleHelper::OptimizeSpirv(
 
     if (success)
     {
-        pSpirvBinOut->codeSize = optBinSize;
-        pSpirvBinOut->pCode = pOptBin;
+        spirvBinOut->codeSize = optBinSize;
+        spirvBinOut->pCode = optBin;
     }
     else
     {
-        pSpirvBinOut->codeSize = 0;
-        pSpirvBinOut->pCode = nullptr;
+        spirvBinOut->codeSize = 0;
+        spirvBinOut->pCode = nullptr;
     }
 
     return success ? Result::Success : Result::ErrorInvalidShader;
@@ -257,8 +257,8 @@ Result ShaderModuleHelper::OptimizeSpirv(
 
 // =====================================================================================================================
 // Cleanup work for SPIR-V binary, freeing the allocated buffer by OptimizeSpirv()
-void ShaderModuleHelper::CleanOptimizedSpirv(
-    BinaryData* pSpirvBin)  // [in] Optimized SPIR-V binary
+void ShaderModuleHelper::cleanOptimizedSpirv(
+    BinaryData* spirvBin)  // [in] Optimized SPIR-V binary
 {
 #ifdef LLPC_ENABLE_SPIRV_OPT
     if (pSpirvBin->pCode)
@@ -272,26 +272,26 @@ void ShaderModuleHelper::CleanOptimizedSpirv(
 // Gets the shader stage mask from the SPIR-V binary according to the specified entry-point.
 //
 // Returns 0 on error, or the stage mask of the specified entry-point on success.
-unsigned ShaderModuleHelper::GetStageMaskFromSpirvBinary(
-    const BinaryData* pSpvBin,      // [in] SPIR-V binary
-    const char*       pEntryName)   // [in] Name of entry-point
+unsigned ShaderModuleHelper::getStageMaskFromSpirvBinary(
+    const BinaryData* spvBin,      // [in] SPIR-V binary
+    const char*       entryName)   // [in] Name of entry-point
 {
     unsigned stageMask = 0;
 
-    const unsigned* pCode = reinterpret_cast<const unsigned*>(pSpvBin->pCode);
-    const unsigned* pEnd = pCode + pSpvBin->codeSize / sizeof(unsigned);
+    const unsigned* code = reinterpret_cast<const unsigned*>(spvBin->pCode);
+    const unsigned* end = code + spvBin->codeSize / sizeof(unsigned);
 
-    if (IsSpirvBinary(pSpvBin))
+    if (isSpirvBinary(spvBin))
     {
         // Skip SPIR-V header
-        const unsigned* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(unsigned);
+        const unsigned* codePos = code + sizeof(SpirvHeader) / sizeof(unsigned);
 
-        while (pCodePos < pEnd)
+        while (codePos < end)
         {
-            unsigned opCode = (pCodePos[0] & OpCodeMask);
-            unsigned wordCount = (pCodePos[0] >> WordCountShift);
+            unsigned opCode = (codePos[0] & OpCodeMask);
+            unsigned wordCount = (codePos[0] >> WordCountShift);
 
-            if ((wordCount == 0) || (pCodePos + wordCount > pEnd))
+            if ((wordCount == 0) || (codePos + wordCount > end))
             {
                 LLPC_ERRS("Invalid SPIR-V binary\n");
                 stageMask = 0;
@@ -303,11 +303,11 @@ unsigned ShaderModuleHelper::GetStageMaskFromSpirvBinary(
                 assert(wordCount >= 4);
 
                 // The fourth word is start of the name string of the entry-point
-                const char* pName = reinterpret_cast<const char*>(&pCodePos[3]);
-                if (strcmp(pEntryName, pName) == 0)
+                const char* name = reinterpret_cast<const char*>(&codePos[3]);
+                if (strcmp(entryName, name) == 0)
                 {
                     // An matching entry-point is found
-                    stageMask |= ShaderStageToMask(ConvertToStageShage(pCodePos[1]));
+                    stageMask |= shaderStageToMask(convertToStageShage(codePos[1]));
                 }
             }
 
@@ -317,7 +317,7 @@ unsigned ShaderModuleHelper::GetStageMaskFromSpirvBinary(
                 break;
             }
 
-            pCodePos += wordCount;
+            codePos += wordCount;
         }
     }
     else
@@ -333,25 +333,25 @@ unsigned ShaderModuleHelper::GetStageMaskFromSpirvBinary(
 //
 // NOTE: This function is for single entry-point. If the SPIR-V binary contains multiple entry-points, we get the name
 // of the first entry-point and ignore others.
-const char* ShaderModuleHelper::GetEntryPointNameFromSpirvBinary(
-    const BinaryData* pSpvBin) // [in] SPIR-V binary
+const char* ShaderModuleHelper::getEntryPointNameFromSpirvBinary(
+    const BinaryData* spvBin) // [in] SPIR-V binary
 {
-    const char* pEntryName = nullptr;
+    const char* entryName = nullptr;
 
-    const unsigned* pCode = reinterpret_cast<const unsigned*>(pSpvBin->pCode);
-    const unsigned* pEnd = pCode + pSpvBin->codeSize / sizeof(unsigned);
+    const unsigned* code = reinterpret_cast<const unsigned*>(spvBin->pCode);
+    const unsigned* end = code + spvBin->codeSize / sizeof(unsigned);
 
-    if (IsSpirvBinary(pSpvBin))
+    if (isSpirvBinary(spvBin))
     {
         // Skip SPIR-V header
-        const unsigned* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(unsigned);
+        const unsigned* codePos = code + sizeof(SpirvHeader) / sizeof(unsigned);
 
-        while (pCodePos < pEnd)
+        while (codePos < end)
         {
-            unsigned opCode = (pCodePos[0] & OpCodeMask);
-            unsigned wordCount = (pCodePos[0] >> WordCountShift);
+            unsigned opCode = (codePos[0] & OpCodeMask);
+            unsigned wordCount = (codePos[0] >> WordCountShift);
 
-            if ((wordCount == 0) || (pCodePos + wordCount > pEnd))
+            if ((wordCount == 0) || (codePos + wordCount > end))
             {
                 LLPC_ERRS("Invalid SPIR-V binary\n");
                 break;
@@ -362,7 +362,7 @@ const char* ShaderModuleHelper::GetEntryPointNameFromSpirvBinary(
                 assert(wordCount >= 4);
 
                 // The fourth word is start of the name string of the entry-point
-                pEntryName = reinterpret_cast<const char*>(&pCodePos[3]);
+                entryName = reinterpret_cast<const char*>(&codePos[3]);
                 break;
             }
 
@@ -372,28 +372,28 @@ const char* ShaderModuleHelper::GetEntryPointNameFromSpirvBinary(
                 break;
             }
 
-            pCodePos += wordCount;
+            codePos += wordCount;
         }
 
-        if (pEntryName == nullptr)
+        if (entryName == nullptr)
         {
             LLPC_ERRS("Entry-point not found\n");
-            pEntryName = "";
+            entryName = "";
         }
     }
     else
     {
         LLPC_ERRS("Invalid SPIR-V binary\n");
-        pEntryName = "";
+        entryName = "";
     }
 
-    return pEntryName;
+    return entryName;
 }
 
 // =====================================================================================================================
 // Verifies if the SPIR-V binary is valid and is supported
-Result ShaderModuleHelper::VerifySpirvBinary(
-    const BinaryData* pSpvBin)  // [in] SPIR-V binary
+Result ShaderModuleHelper::verifySpirvBinary(
+    const BinaryData* spvBin)  // [in] SPIR-V binary
 {
     Result result = Result::Success;
 
@@ -405,18 +405,18 @@ Result ShaderModuleHelper::VerifySpirvBinary(
     };
 #undef _SPIRV_OP
 
-    const unsigned* pCode = reinterpret_cast<const unsigned*>(pSpvBin->pCode);
-    const unsigned* pEnd = pCode + pSpvBin->codeSize / sizeof(unsigned);
+    const unsigned* code = reinterpret_cast<const unsigned*>(spvBin->pCode);
+    const unsigned* end = code + spvBin->codeSize / sizeof(unsigned);
 
     // Skip SPIR-V header
-    const unsigned* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(unsigned);
+    const unsigned* codePos = code + sizeof(SpirvHeader) / sizeof(unsigned);
 
-    while (pCodePos < pEnd)
+    while (codePos < end)
     {
-        Op opCode = static_cast<Op>(pCodePos[0] & OpCodeMask);
-        unsigned wordCount = (pCodePos[0] >> WordCountShift);
+        Op opCode = static_cast<Op>(codePos[0] & OpCodeMask);
+        unsigned wordCount = (codePos[0] >> WordCountShift);
 
-        if ((wordCount == 0) || (pCodePos + wordCount > pEnd))
+        if ((wordCount == 0) || (codePos + wordCount > end))
         {
             result = Result::ErrorInvalidShader;
             break;
@@ -428,7 +428,7 @@ Result ShaderModuleHelper::VerifySpirvBinary(
             break;
         }
 
-        pCodePos += wordCount;
+        codePos += wordCount;
     }
 
     return result;
@@ -436,14 +436,14 @@ Result ShaderModuleHelper::VerifySpirvBinary(
 
 // =====================================================================================================================
 // Checks whether input binary data is SPIR-V binary
-bool ShaderModuleHelper::IsSpirvBinary(
-    const BinaryData* pShaderBin)  // [in] Shader binary codes
+bool ShaderModuleHelper::isSpirvBinary(
+    const BinaryData* shaderBin)  // [in] Shader binary codes
 {
     bool isSpvBinary = false;
-    if (pShaderBin->codeSize > sizeof(SpirvHeader))
+    if (shaderBin->codeSize > sizeof(SpirvHeader))
     {
-        const SpirvHeader* pHeader = reinterpret_cast<const SpirvHeader*>(pShaderBin->pCode);
-        if ((pHeader->magicNumber == MagicNumber) && (pHeader->spvVersion <= spv::Version) && (pHeader->reserved == 0))
+        const SpirvHeader* header = reinterpret_cast<const SpirvHeader*>(shaderBin->pCode);
+        if ((header->magicNumber == MagicNumber) && (header->spvVersion <= spv::Version) && (header->reserved == 0))
         {
             isSpvBinary = true;
         }
@@ -454,13 +454,13 @@ bool ShaderModuleHelper::IsSpirvBinary(
 
 // =====================================================================================================================
 // Checks whether input binary data is LLVM bitcode.
-bool ShaderModuleHelper::IsLlvmBitcode(
-    const BinaryData* pShaderBin)  // [in] Shader binary codes
+bool ShaderModuleHelper::isLlvmBitcode(
+    const BinaryData* shaderBin)  // [in] Shader binary codes
 {
     static unsigned BitcodeMagicNumber = 0xDEC04342; // 0x42, 0x43, 0xC0, 0xDE
     bool isLlvmBitcode = false;
-    if ((pShaderBin->codeSize > 4) &&
-        (*reinterpret_cast<const unsigned*>(pShaderBin->pCode) == BitcodeMagicNumber))
+    if ((shaderBin->codeSize > 4) &&
+        (*reinterpret_cast<const unsigned*>(shaderBin->pCode) == BitcodeMagicNumber))
     {
         isLlvmBitcode = true;
     }

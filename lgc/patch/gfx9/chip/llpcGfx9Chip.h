@@ -550,7 +550,7 @@ static std::unordered_map<unsigned, const char*>    RegNameMapGfx9;  // GFX9 spe
 static std::unordered_map<unsigned, const char*>    RegNameMapGfx10; // GFX10 specific
 
 // Adds entries to register name map.
-void InitRegisterNameMap(GfxIpVersion gfxIp);
+void initRegisterNameMap(GfxIpVersion gfxIp);
 
 } // Gfx9
 

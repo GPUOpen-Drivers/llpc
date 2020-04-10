@@ -57,9 +57,9 @@ ElfReader<Elf>::ElfReader(
 template<class Elf>
 ElfReader<Elf>::~ElfReader()
 {
-    for (auto pSection : m_sections)
+    for (auto section : m_sections)
     {
-        delete pSection;
+        delete section;
     }
     m_sections.clear();
 }
@@ -88,60 +88,60 @@ Result ElfReader<Elf>::ReadFromBuffer(
 
     Result result = Result::Success;
 
-    const uint8_t* pData = static_cast<const uint8_t*>(pBuffer);
+    const uint8_t* data = static_cast<const uint8_t*>(pBuffer);
 
     // ELF header is always located at the beginning of the file
-    auto pHeader = static_cast<const typename Elf::FormatHeader*>(pBuffer);
+    auto header = static_cast<const typename Elf::FormatHeader*>(pBuffer);
 
     // If the identification info isn't the magic number, this isn't a valid file.
-    result = (pHeader->e_ident32[EI_MAG0] == ElfMagic) ?  Result::Success : Result::ErrorInvalidValue;
+    result = (header->eIdent32[EI_MAG0] == ElfMagic) ?  Result::Success : Result::ErrorInvalidValue;
 
     if (result == Result::Success)
     {
-        result = (pHeader->e_machine == EM_AMDGPU) ? Result::Success : Result::ErrorInvalidValue;
+        result = (header->eMachine == EM_AMDGPU) ? Result::Success : Result::ErrorInvalidValue;
     }
 
     if (result == Result::Success)
     {
-        m_header = *pHeader;
+        m_header = *header;
         size_t readSize = sizeof(typename Elf::FormatHeader);
 
         // Section header location information.
-        const unsigned sectionHeaderOffset = static_cast<unsigned>(pHeader->e_shoff);
-        const unsigned sectionHeaderNum    = pHeader->e_shnum;
-        const unsigned sectionHeaderSize   = pHeader->e_shentsize;
+        const unsigned sectionHeaderOffset = static_cast<unsigned>(header->eShoff);
+        const unsigned sectionHeaderNum    = header->eShnum;
+        const unsigned sectionHeaderSize   = header->eShentsize;
 
-        const unsigned sectionStrTableHeaderOffset = sectionHeaderOffset + (pHeader->e_shstrndx * sectionHeaderSize);
-        auto pSectionStrTableHeader = reinterpret_cast<const typename Elf::SectionHeader*>(pData + sectionStrTableHeaderOffset);
-        const unsigned sectionStrTableOffset = static_cast<unsigned>(pSectionStrTableHeader->sh_offset);
+        const unsigned sectionStrTableHeaderOffset = sectionHeaderOffset + (header->eShstrndx * sectionHeaderSize);
+        auto sectionStrTableHeader = reinterpret_cast<const typename Elf::SectionHeader*>(data + sectionStrTableHeaderOffset);
+        const unsigned sectionStrTableOffset = static_cast<unsigned>(sectionStrTableHeader->shOffset);
 
         for (unsigned section = 0; section < sectionHeaderNum; section++)
         {
             // Where the header is located for this section
             const unsigned sectionOffset = sectionHeaderOffset + (section * sectionHeaderSize);
-            auto pSectionHeader = reinterpret_cast<const typename Elf::SectionHeader*>(pData + sectionOffset);
+            auto sectionHeader = reinterpret_cast<const typename Elf::SectionHeader*>(data + sectionOffset);
             readSize += sizeof(typename Elf::SectionHeader);
 
             // Where the name is located for this section
-            const unsigned sectionNameOffset = sectionStrTableOffset + pSectionHeader->sh_name;
-            const char* pSectionName = reinterpret_cast<const char*>(pData + sectionNameOffset);
+            const unsigned sectionNameOffset = sectionStrTableOffset + sectionHeader->shName;
+            const char* sectionName = reinterpret_cast<const char*>(data + sectionNameOffset);
 
             // Where the data is located for this section
-            const unsigned sectionDataOffset = static_cast<unsigned>(pSectionHeader->sh_offset);
-            auto pBuf = new SectionBuffer;
+            const unsigned sectionDataOffset = static_cast<unsigned>(sectionHeader->shOffset);
+            auto buf = new SectionBuffer;
 
-            result = (pBuf != nullptr) ? Result::Success : Result::ErrorOutOfMemory;
+            result = (buf != nullptr) ? Result::Success : Result::ErrorOutOfMemory;
 
             if (result == Result::Success)
             {
-                pBuf->secHead = *pSectionHeader;
-                pBuf->pName   = pSectionName;
-                pBuf->pData   = (pData + sectionDataOffset);
+                buf->secHead = *sectionHeader;
+                buf->name   = sectionName;
+                buf->data   = (data + sectionDataOffset);
 
-                readSize += static_cast<size_t>(pSectionHeader->sh_size);
+                readSize += static_cast<size_t>(sectionHeader->shSize);
 
-                m_sections.push_back(pBuf);
-                m_map[pSectionName] = section;
+                m_sections.push_back(buf);
+                m_map[sectionName] = section;
             }
         }
 
@@ -162,18 +162,18 @@ Result ElfReader<Elf>::ReadFromBuffer(
 template<class Elf>
 Result ElfReader<Elf>::GetSectionData(
     const char*  pName,       // [in] Name of the section to look for
-    const void** pSectData,   // [out] Pointer to section data
+    const void** sectData,   // [out] Pointer to section data
     size_t*      pDataLength  // [out] Size of the section data
     ) const
 {
     Result result = Result::ErrorInvalidValue;
 
-    auto pEntry = m_map.find(pName);
+    auto entry = m_map.find(pName);
 
-    if (pEntry != m_map.end())
+    if (entry != m_map.end())
     {
-        *pSectData = m_sections[pEntry->second]->pData;
-        *pDataLength = static_cast<size_t>(m_sections[pEntry->second]->secHead.sh_size);
+        *sectData = m_sections[entry->second]->data;
+        *pDataLength = static_cast<size_t>(m_sections[entry->second]->secHead.shSize);
         result = Result::Success;
     }
 
@@ -188,8 +188,8 @@ unsigned ElfReader<Elf>::getSymbolCount() const
     unsigned symCount = 0;
     if (m_symSecIdx >= 0)
     {
-        auto& pSection = m_sections[m_symSecIdx];
-        symCount = static_cast<unsigned>(pSection->secHead.sh_size / pSection->secHead.sh_entsize);
+        auto& section = m_sections[m_symSecIdx];
+        symCount = static_cast<unsigned>(section->secHead.shSize / section->secHead.shEntsize);
     }
     return symCount;
 }
@@ -201,16 +201,16 @@ void ElfReader<Elf>::getSymbol(
     unsigned   idx,       // Symbol index
     ElfSymbol* pSymbol)   // [out] Info of the symbol
 {
-    auto& pSection = m_sections[m_symSecIdx];
-    const char* pStrTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx]->pData);
+    auto& section = m_sections[m_symSecIdx];
+    const char* strTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx]->data);
 
-    auto symbols = reinterpret_cast<const typename Elf::Symbol*>(pSection->pData);
-    pSymbol->secIdx   = symbols[idx].st_shndx;
-    pSymbol->pSecName = m_sections[pSymbol->secIdx]->pName;
-    pSymbol->pSymName = pStrTab + symbols[idx].st_name;
-    pSymbol->size     = symbols[idx].st_size;
-    pSymbol->value    = symbols[idx].st_value;
-    pSymbol->info.all = symbols[idx].st_info.all;
+    auto symbols = reinterpret_cast<const typename Elf::Symbol*>(section->data);
+    pSymbol->secIdx   = symbols[idx].stShndx;
+    pSymbol->secName = m_sections[pSymbol->secIdx]->name;
+    pSymbol->pSymName = strTab + symbols[idx].stName;
+    pSymbol->size     = symbols[idx].stSize;
+    pSymbol->value    = symbols[idx].stValue;
+    pSymbol->info.all = symbols[idx].stInfo.all;
 }
 
 // =====================================================================================================================
@@ -221,8 +221,8 @@ unsigned ElfReader<Elf>::getRelocationCount()
     unsigned relocCount = 0;
     if (m_relocSecIdx >= 0)
     {
-        auto& pSection = m_sections[m_relocSecIdx];
-        relocCount = static_cast<unsigned>(pSection->secHead.sh_size / pSection->secHead.sh_entsize);
+        auto& section = m_sections[m_relocSecIdx];
+        relocCount = static_cast<unsigned>(section->secHead.shSize / section->secHead.shEntsize);
     }
     return relocCount;
 }
@@ -234,11 +234,11 @@ void ElfReader<Elf>::getRelocation(
     unsigned  idx,      // Relocation index
     ElfReloc* pReloc)   // [out] Info of the relocation
 {
-    auto& pSection = m_sections[m_relocSecIdx];
+    auto& section = m_sections[m_relocSecIdx];
 
-    auto relocs = reinterpret_cast<const typename Elf::Reloc*>(pSection->pData);
-    pReloc->offset = relocs[idx].r_offset;
-    pReloc->symIdx = relocs[idx].r_symbol;
+    auto relocs = reinterpret_cast<const typename Elf::Reloc*>(section->data);
+    pReloc->offset = relocs[idx].rOffset;
+    pReloc->symIdx = relocs[idx].rSymbol;
 }
 
 // =====================================================================================================================
@@ -300,23 +300,23 @@ void ElfReader<Elf>::GetSymbolsBySectionIndex(
 {
     if ((secIdx < m_sections.size()) && (m_symSecIdx >= 0))
     {
-        auto& pSection = m_sections[m_symSecIdx];
-        const char* pStrTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx]->pData);
+        auto& section = m_sections[m_symSecIdx];
+        const char* strTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx]->data);
 
-        auto symbols = reinterpret_cast<const typename Elf::Symbol*>(pSection->pData);
+        auto symbols = reinterpret_cast<const typename Elf::Symbol*>(section->data);
         unsigned symCount = getSymbolCount();
         ElfSymbol symbol = {};
 
         for (unsigned idx = 0; idx < symCount; ++idx)
         {
-            if (symbols[idx].st_shndx == secIdx)
+            if (symbols[idx].stShndx == secIdx)
             {
-                symbol.secIdx   = symbols[idx].st_shndx;
-                symbol.pSecName = m_sections[symbol.secIdx]->pName;
-                symbol.pSymName = pStrTab + symbols[idx].st_name;
-                symbol.size     = symbols[idx].st_size;
-                symbol.value    = symbols[idx].st_value;
-                symbol.info.all = symbols[idx].st_info.all;
+                symbol.secIdx   = symbols[idx].stShndx;
+                symbol.secName = m_sections[symbol.secIdx]->name;
+                symbol.pSymName = strTab + symbols[idx].stName;
+                symbol.size     = symbols[idx].stSize;
+                symbol.value    = symbols[idx].stValue;
+                symbol.info.all = symbols[idx].stInfo.all;
 
                 secSymbols.push_back(symbol);
             }
@@ -336,16 +336,16 @@ template<class Elf>
 bool ElfReader<Elf>::isValidSymbol(
     const char* pSymbolName)  // [in] Symbol name
 {
-    auto& pSection = m_sections[m_symSecIdx];
-    const char* pStrTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx]->pData);
+    auto& section = m_sections[m_symSecIdx];
+    const char* strTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx]->data);
 
-    auto symbols = reinterpret_cast<const typename Elf::Symbol*>(pSection->pData);
+    auto symbols = reinterpret_cast<const typename Elf::Symbol*>(section->data);
     unsigned symCount = getSymbolCount();
     bool findSymbol = false;
     for (unsigned idx = 0; idx < symCount; ++idx)
     {
-        auto pName = pStrTab + symbols[idx].st_name;
-        if (strcmp(pName, pSymbolName) == 0)
+        auto name = strTab + symbols[idx].stName;
+        if (strcmp(name, pSymbolName) == 0)
         {
             findSymbol = true;
             break;
@@ -364,22 +364,22 @@ ElfNote ElfReader<Elf>::getNote(
     unsigned noteSecIdx = m_map.at(NoteName);
     assert(noteSecIdx > 0);
 
-    auto pNoteSection = m_sections[noteSecIdx];
+    auto noteSection = m_sections[noteSecIdx];
     ElfNote noteNode = {};
     const unsigned noteHeaderSize = sizeof(NoteHeader) - 8;
 
     size_t offset = 0;
-    while (offset < pNoteSection->secHead.sh_size)
+    while (offset < noteSection->secHead.shSize)
     {
-        const NoteHeader* pNote = reinterpret_cast<const NoteHeader*>(pNoteSection->pData + offset);
-        const unsigned noteNameSize = alignTo(pNote->nameSize, 4);
-        if (pNote->type == noteType)
+        const NoteHeader* note = reinterpret_cast<const NoteHeader*>(noteSection->data + offset);
+        const unsigned noteNameSize = alignTo(note->nameSize, 4);
+        if (note->type == noteType)
         {
-            memcpy(&noteNode.hdr, pNote, sizeof(NoteHeader));
-            noteNode.pData = pNoteSection->pData + offset + noteHeaderSize + noteNameSize;
+            memcpy(&noteNode.hdr, note, sizeof(NoteHeader));
+            noteNode.data = noteSection->data + offset + noteHeaderSize + noteNameSize;
             break;
         }
-        offset += noteHeaderSize + noteNameSize + alignTo(pNote->descSize, 4);
+        offset += noteHeaderSize + noteNameSize + alignTo(note->descSize, 4);
     }
 
     return noteNode;
@@ -394,12 +394,12 @@ void ElfReader<Elf>::initMsgPackDocument(
 {
     m_document.readFromBlob(StringRef(reinterpret_cast<const char*>(pBuffer), sizeInBytes), false);
 
-    auto pRoot = &m_document.getRoot();
-    assert(pRoot->isMap());
+    auto root = &m_document.getRoot();
+    assert(root->isMap());
 
     m_iteratorStack.clear();
     MsgPackIterator iter = { };
-    iter.pNode = &(pRoot->getMap(true));
+    iter.node = &(root->getMap(true));
     iter.status = MsgPackIteratorMapBegin;
     m_iteratorStack.push_back(iter);
 
@@ -420,9 +420,9 @@ bool ElfReader<Elf>::getNextMsgNode()
     bool skipPostCheck = false;
     if (curIter.status == MsgPackIteratorMapBegin)
     {
-        auto pMap = &(curIter.pNode->getMap(true));
-        curIter.mapIt = pMap->begin();
-        curIter.mapEnd = pMap->end();
+        auto map = &(curIter.node->getMap(true));
+        curIter.mapIt = map->begin();
+        curIter.mapEnd = map->end();
         m_msgPackMapLevel++;
         curIter.status = MsgPackIteratorMapPair;
         m_iteratorStack.push_back(curIter);
@@ -439,15 +439,15 @@ bool ElfReader<Elf>::getNextMsgNode()
         if (curIter.mapIt->second.isMap())
         {
             curIter.status = MsgPackIteratorMapBegin;
-            curIter.pNode = &(curIter.mapIt->second.getMap(true));
+            curIter.node = &(curIter.mapIt->second.getMap(true));
         }
         else if (curIter.mapIt->second.isArray())
         {
             curIter.status = MsgPackIteratorArray;
-            auto pArray = &(curIter.mapIt->second.getArray(true));
-            curIter.arrayIt = pArray->begin();
-            curIter.arrayEnd = pArray->end();
-            curIter.pNode = pArray;
+            auto array = &(curIter.mapIt->second.getArray(true));
+            curIter.arrayIt = array->begin();
+            curIter.arrayEnd = array->end();
+            curIter.node = array;
         }
         else
         {
@@ -458,20 +458,20 @@ bool ElfReader<Elf>::getNextMsgNode()
     }
     else if (curIter.status == MsgPackIteratorArray)
     {
-        curIter.arrayIt = curIter.pNode->getArray(true).begin();
-        curIter.arrayEnd = curIter.pNode->getArray(true).end();
+        curIter.arrayIt = curIter.node->getArray(true).begin();
+        curIter.arrayEnd = curIter.node->getArray(true).end();
         if (curIter.arrayIt->isMap())
         {
             curIter.status = MsgPackIteratorMapBegin;
-            curIter.pNode = &(curIter.arrayIt->getMap(true));
+            curIter.node = &(curIter.arrayIt->getMap(true));
         }
         else if (curIter.arrayIt->isArray())
         {
             curIter.status = MsgPackIteratorArray;
-            auto pArray = &(curIter.arrayIt->getArray(true));
-            curIter.arrayIt = pArray->begin();
-            curIter.arrayEnd = pArray->end();
-            curIter.pNode = pArray;
+            auto array = &(curIter.arrayIt->getArray(true));
+            curIter.arrayIt = array->begin();
+            curIter.arrayEnd = array->end();
+            curIter.node = array;
         }
         else
         {
@@ -503,19 +503,19 @@ bool ElfReader<Elf>::getNextMsgNode()
     // Post check for end visit map or array element
     if ((m_iteratorStack.size() > 0) && (skipPostCheck == false))
     {
-        auto pNextIter = &m_iteratorStack.back();
-        if (pNextIter->status == MsgPackIteratorMapPair)
+        auto nextIter = &m_iteratorStack.back();
+        if (nextIter->status == MsgPackIteratorMapPair)
         {
-            pNextIter->mapIt++;
-            if (pNextIter->mapIt == pNextIter->mapEnd)
+            nextIter->mapIt++;
+            if (nextIter->mapIt == nextIter->mapEnd)
             {
-                pNextIter->status = MsgPackIteratorMapEnd;
+                nextIter->status = MsgPackIteratorMapEnd;
             }
         }
-        else if (pNextIter->status == MsgPackIteratorArray)
+        else if (nextIter->status == MsgPackIteratorArray)
         {
-            pNextIter->arrayIt++;
-            curIter = *pNextIter;
+            nextIter->arrayIt++;
+            curIter = *nextIter;
             if (curIter.arrayIt == curIter.arrayEnd)
             {
                 curIter.status = MsgPackIteratorArrayEnd;
@@ -523,15 +523,15 @@ bool ElfReader<Elf>::getNextMsgNode()
             else if (curIter.arrayIt->isMap())
             {
                 curIter.status = MsgPackIteratorMapBegin;
-                curIter.pNode = &(curIter.arrayIt->getMap(true));
+                curIter.node = &(curIter.arrayIt->getMap(true));
             }
             else if (curIter.arrayIt->isArray())
             {
                 curIter.status = MsgPackIteratorArray;
-                auto pArray = &(curIter.arrayIt->getArray(true));
-                curIter.arrayIt = pArray->begin();
-                curIter.arrayEnd = pArray->end();
-                curIter.pNode = pArray;
+                auto array = &(curIter.arrayIt->getArray(true));
+                curIter.arrayIt = array->begin();
+                curIter.arrayEnd = array->end();
+                curIter.node = array;
             }
             else
             {
@@ -550,22 +550,22 @@ template<class Elf>
 const llvm::msgpack::DocNode* ElfReader<Elf>::getMsgNode() const
 {
     assert(m_iteratorStack.size() > 0);
-    auto pCurIter = &(m_iteratorStack.back());
-    if (pCurIter->status == MsgPackIteratorArrayValue)
+    auto curIter = &(m_iteratorStack.back());
+    if (curIter->status == MsgPackIteratorArrayValue)
     {
-        return &(*pCurIter->arrayIt);
+        return &(*curIter->arrayIt);
     }
-    else if (pCurIter->status == MsgPackIteratorMapValue)
+    else if (curIter->status == MsgPackIteratorMapValue)
     {
-        return &(pCurIter->mapIt->second);
+        return &(curIter->mapIt->second);
     }
-    else if (pCurIter->status == MsgPackIteratorMapKey)
+    else if (curIter->status == MsgPackIteratorMapKey)
     {
-        return &(pCurIter->mapIt->first);
+        return &(curIter->mapIt->first);
     }
     else
     {
-        return pCurIter->pNode;
+        return curIter->node;
     }
 }
 

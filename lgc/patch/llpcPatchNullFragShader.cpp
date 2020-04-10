@@ -90,7 +90,7 @@ char PatchNullFragShader::ID = 0;
 
 // =====================================================================================================================
 // Create the pass that generates a null fragment shader if required.
-ModulePass* lgc::CreatePatchNullFragShader()
+ModulePass* lgc::createPatchNullFragShader()
 {
     return new PatchNullFragShader();
 }
@@ -102,22 +102,22 @@ bool PatchNullFragShader::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Null-Frag-Shader\n");
 
-    Patch::Init(&module);
+    Patch::init(&module);
 
-    PipelineState* pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    PipelineState* pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
-    if (cl::DisableNullFragShader || pPipelineState->GetBuilderContext()->BuildingRelocatableElf())
+    if (cl::DisableNullFragShader || pipelineState->getBuilderContext()->buildingRelocatableElf())
     {
         // NOTE: If the option -disable-null-frag-shader is set to TRUE, we skip this pass. This is done by
         // standalone compiler.
         return false;
     }
 
-    const bool hasCs = pPipelineState->HasShaderStage(ShaderStageCompute);
-    const bool hasVs = pPipelineState->HasShaderStage(ShaderStageVertex);
-    const bool hasTes = pPipelineState->HasShaderStage(ShaderStageTessEval);
-    const bool hasGs = pPipelineState->HasShaderStage(ShaderStageGeometry);
-    const bool hasFs = pPipelineState->HasShaderStage(ShaderStageFragment);
+    const bool hasCs = pipelineState->hasShaderStage(ShaderStageCompute);
+    const bool hasVs = pipelineState->hasShaderStage(ShaderStageVertex);
+    const bool hasTes = pipelineState->hasShaderStage(ShaderStageTessEval);
+    const bool hasGs = pipelineState->hasShaderStage(ShaderStageGeometry);
+    const bool hasFs = pipelineState->hasShaderStage(ShaderStageFragment);
     if (hasCs || hasFs || ((hasVs == false) && (hasTes == false) && (hasGs == false)))
     {
         // This is an incomplete graphics pipeline from the amdllpc command-line tool, or a compute pipeline, or a
@@ -135,53 +135,53 @@ bool PatchNullFragShader::runOnModule(
     // }
 
     // Create type of new function: void()
-    auto pEntryPointTy = FunctionType::get(Type::getVoidTy(*m_pContext), ArrayRef<Type*>(), false);
+    auto entryPointTy = FunctionType::get(Type::getVoidTy(*m_context), ArrayRef<Type*>(), false);
 
     // Create function for the null fragment shader entrypoint.
-    auto pEntryPoint = Function::Create(pEntryPointTy,
+    auto entryPoint = Function::Create(entryPointTy,
                                         GlobalValue::ExternalLinkage,
                                         lgcName::NullFsEntryPoint,
                                         &module);
 
     // Create its basic block, and terminate it with return.
-    auto pBlock = BasicBlock::Create(*m_pContext, "", pEntryPoint, nullptr);
-    auto pInsertPos = ReturnInst::Create(*m_pContext, pBlock);
+    auto block = BasicBlock::Create(*m_context, "", entryPoint, nullptr);
+    auto insertPos = ReturnInst::Create(*m_context, block);
 
     // Add its code. First the import.
-    auto pZero = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
-    auto pOne = ConstantInt::get(Type::getInt32Ty(*m_pContext), 1);
-    Value* importArgs[] = { pZero, pZero, pZero, pOne };
-    auto pInputTy = Type::getFloatTy(*m_pContext);
+    auto zero = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
+    auto one = ConstantInt::get(Type::getInt32Ty(*m_context), 1);
+    Value* importArgs[] = { zero, zero, zero, one };
+    auto inputTy = Type::getFloatTy(*m_context);
     std::string importName = lgcName::InputImportGeneric;
-    AddTypeMangling(pInputTy, importArgs, importName);
-    auto pInput = EmitCall(importName, pInputTy, importArgs, {}, pInsertPos);
+    addTypeMangling(inputTy, importArgs, importName);
+    auto input = emitCall(importName, inputTy, importArgs, {}, insertPos);
 
     // Then the export.
-    Value* exportArgs[] = { pZero, pZero, pInput };
+    Value* exportArgs[] = { zero, zero, input };
     std::string exportName = lgcName::OutputExportGeneric;
-    AddTypeMangling(Type::getVoidTy(*m_pContext), exportArgs, exportName);
-    EmitCall(exportName, Type::getVoidTy(*m_pContext), exportArgs, {}, pInsertPos);
+    addTypeMangling(Type::getVoidTy(*m_context), exportArgs, exportName);
+    emitCall(exportName, Type::getVoidTy(*m_context), exportArgs, {}, insertPos);
 
     // Add execution model metadata to the function.
-    auto pExecModelMeta = ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_pContext), ShaderStageFragment));
-    auto pExecModelMetaNode = MDNode::get(*m_pContext, pExecModelMeta);
-    pEntryPoint->addMetadata(lgcName::ShaderStageMetadata, *pExecModelMetaNode);
+    auto execModelMeta = ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_context), ShaderStageFragment));
+    auto execModelMetaNode = MDNode::get(*m_context, execModelMeta);
+    entryPoint->addMetadata(lgcName::ShaderStageMetadata, *execModelMetaNode);
 
     // Initialize shader info.
-    auto pResUsage = pPipelineState->GetShaderResourceUsage(ShaderStageFragment);
-    pPipelineState->SetShaderStageMask(pPipelineState->GetShaderStageMask() | ShaderStageToMask(ShaderStageFragment));
+    auto resUsage = pipelineState->getShaderResourceUsage(ShaderStageFragment);
+    pipelineState->setShaderStageMask(pipelineState->getShaderStageMask() | shaderStageToMask(ShaderStageFragment));
 
     // Add usage info for dummy input
     FsInterpInfo interpInfo = { 0, false, false, false };
-    pResUsage->builtInUsage.fs.smooth = true;
-    pResUsage->inOutUsage.inputLocMap[0] = InvalidValue;
-    pResUsage->inOutUsage.fs.interpInfo.push_back(interpInfo);
+    resUsage->builtInUsage.fs.smooth = true;
+    resUsage->inOutUsage.inputLocMap[0] = InvalidValue;
+    resUsage->inOutUsage.fs.interpInfo.push_back(interpInfo);
 
     // Add usage info for dummy output
-    pResUsage->inOutUsage.fs.cbShaderMask = 0;
-    pResUsage->inOutUsage.fs.dummyExport = true;
-    pResUsage->inOutUsage.fs.isNullFs = true;
-    pResUsage->inOutUsage.outputLocMap[0] = InvalidValue;
+    resUsage->inOutUsage.fs.cbShaderMask = 0;
+    resUsage->inOutUsage.fs.dummyExport = true;
+    resUsage->inOutUsage.fs.isNullFs = true;
+    resUsage->inOutUsage.outputLocMap[0] = InvalidValue;
 
     return true;
 }
