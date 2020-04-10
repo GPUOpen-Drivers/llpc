@@ -663,7 +663,8 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
               (nodeType == ResourceNodeType::DescriptorBuffer &&
                (innerNode.type == ResourceNodeType::DescriptorBufferCompact ||
                 innerNode.type == ResourceNodeType::PushConst)) ||
-              (innerNode.type == ResourceNodeType::DescriptorCombinedTexture &&
+              ((innerNode.type == ResourceNodeType::DescriptorCombinedTexture ||
+                innerNode.type == ResourceNodeType::DescriptorYCbCrSampler) &&
                (nodeType == ResourceNodeType::DescriptorResource ||
                 nodeType == ResourceNodeType::DescriptorTexelBuffer ||
                 nodeType == ResourceNodeType::DescriptorSampler)))
@@ -673,7 +674,8 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
     } else if (node.set == descSet && node.binding == binding) {
       if (nodeType == ResourceNodeType::Unknown || nodeType == node.type ||
           (nodeType == ResourceNodeType::DescriptorBuffer && node.type == ResourceNodeType::DescriptorBufferCompact) ||
-          (node.type == ResourceNodeType::DescriptorCombinedTexture &&
+          ((node.type == ResourceNodeType::DescriptorCombinedTexture ||
+            node.type == ResourceNodeType::DescriptorYCbCrSampler) &&
            (nodeType == ResourceNodeType::DescriptorResource || nodeType == ResourceNodeType::DescriptorTexelBuffer ||
             nodeType == ResourceNodeType::DescriptorSampler)))
         return {&node, &node};
