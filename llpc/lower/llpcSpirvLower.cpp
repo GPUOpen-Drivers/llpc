@@ -189,7 +189,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassMana
   passMgr.add(createGlobalDCEPass());
   passMgr.add(createPromoteMemoryToRegisterPass());
   passMgr.add(createAggressiveDCEPass());
-  passMgr.add(createInstructionCombiningPass(false, 3));
+  passMgr.add(createInstructionCombiningPass(3));
   passMgr.add(createCFGSimplificationPass());
   passMgr.add(createSROAPass());
   passMgr.add(createEarlyCSEPass());
