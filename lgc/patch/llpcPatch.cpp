@@ -99,15 +99,11 @@ void Patch::addPasses(
 {
     // Start timer for patching passes.
     if (patchTimer != nullptr)
-    {
         passMgr.add(BuilderContext::createStartStopTimer(patchTimer, true));
-    }
 
     // If using BuilderRecorder rather than BuilderImpl, replay the Builder calls now
     if (replayerPass != nullptr)
-    {
         passMgr.add(replayerPass);
-    }
 
     if (raw_ostream* outs = getLgcOuts())
     {
@@ -166,9 +162,7 @@ void Patch::addPasses(
     passMgr.add(createPromoteMemoryToRegisterPass());
 
     if (cl::DisablePatchOpt == false)
-    {
         addOptimizationPasses(passMgr);
-    }
 
     // Stop timer for optimization passes and restart timer for patching passes.
     if (patchTimer != nullptr)
@@ -218,15 +212,11 @@ void Patch::addPasses(
 
     // Include LLVM IR as a separate section in the ELF binary
     if (pipelineState->getOptions().includeIr)
-    {
         passMgr.add(createPatchLlvmIrInclusion());
-    }
 
     // Stop timer for patching passes.
     if (patchTimer != nullptr)
-    {
         passMgr.add(BuilderContext::createStartStopTimer(patchTimer, false));
-    }
 
     // Dump the result
     if (raw_ostream* outs = getLgcOuts())

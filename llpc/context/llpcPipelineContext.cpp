@@ -129,13 +129,9 @@ void PipelineContext::getGpuNameString(
     raw_string_ostream gpuNameStream(gpuName);
     gpuNameStream << "gfx" << gfxIp.major << gfxIp.minor;
     if (gfxIp.stepping >= 0xFFFA)
-    {
         gpuNameStream << char(gfxIp.stepping - 0xFFFA + 'A');
-    }
     else
-    {
         gpuNameStream << gfxIp.stepping;
-    }
 }
 
 // =====================================================================================================================
@@ -178,9 +174,7 @@ ShaderHash PipelineContext::getShaderHashCode(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
     if((shaderInfo->options.clientHash.upper != 0) &&
        (shaderInfo->options.clientHash.lower != 0))
-    {
         return shaderInfo->options.clientHash;
-    }
     else
     {
         ShaderHash hash = {};
@@ -228,9 +222,7 @@ void PipelineContext::setPipelineState(
         setGraphicsStateInPipeline(pipeline);
     }
     else
-    {
         pipeline->setDeviceIndex(static_cast<const ComputePipelineBuildInfo*>(getPipelineBuildInfo())->deviceIndex);
-    }
 }
 
 // =====================================================================================================================
@@ -262,9 +254,7 @@ void PipelineContext::setOptionsInPipeline(
         auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo());
         const auto& nggState = pipelineInfo->nggState;
         if (nggState.enableNgg == false)
-        {
             options.nggFlags |= NggFlagDisable;
-        }
         else
         {
             options.nggFlags =
@@ -329,31 +319,19 @@ void PipelineContext::setOptionsInPipeline(
             shaderOptions.allowReZ = shaderInfo->options.allowReZ;
 
             if ((shaderInfo->options.vgprLimit != 0) && (shaderInfo->options.vgprLimit != UINT_MAX))
-            {
                 shaderOptions.vgprLimit = shaderInfo->options.vgprLimit;
-            }
             else
-            {
                 shaderOptions.vgprLimit = VgprLimit;
-            }
 
             if ((shaderInfo->options.sgprLimit != 0) && (shaderInfo->options.sgprLimit != UINT_MAX))
-            {
                 shaderOptions.sgprLimit = shaderInfo->options.sgprLimit;
-            }
             else
-            {
                 shaderOptions.sgprLimit = SgprLimit;
-            }
 
             if (shaderInfo->options.maxThreadGroupsPerComputeUnit != 0)
-            {
                 shaderOptions.maxThreadGroupsPerComputeUnit = shaderInfo->options.maxThreadGroupsPerComputeUnit;
-            }
             else
-            {
                 shaderOptions.maxThreadGroupsPerComputeUnit = WavesPerEu;
-            }
 
             shaderOptions.waveSize = shaderInfo->options.waveSize;
             shaderOptions.wgpMode = shaderInfo->options.wgpMode;
@@ -375,20 +353,14 @@ void PipelineContext::setOptionsInPipeline(
 
             shaderOptions.loadScalarizerThreshold = 0;
             if (EnableScalarLoad)
-            {
                 shaderOptions.loadScalarizerThreshold = ScalarThreshold;
-            }
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
             if (shaderInfo->options.enableLoadScalarizer)
             {
                 if (shaderInfo->options.scalarThreshold != 0)
-                {
                     shaderOptions.loadScalarizerThreshold = shaderInfo->options.scalarThreshold;
-                }
                 else
-                {
                     shaderOptions.loadScalarizerThreshold = MaxScalarThreshold;
-                }
             }
 #endif
 
@@ -410,9 +382,7 @@ void PipelineContext::setUserDataInPipeline(
 {
     const PipelineShaderInfo* shaderInfo = nullptr;
     unsigned stageMask = getShaderStageMask();
-    {
         shaderInfo = getPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
-    }
 
     // Translate the resource nodes into the LGC format expected by Pipeline::SetUserDataNodes.
     ArrayRef<ResourceMappingNode> nodes(shaderInfo->pUserDataNodes, shaderInfo->userDataNodeCount);
@@ -422,18 +392,14 @@ void PipelineContext::setUserDataInPipeline(
     // First, create a map of immutable nodes.
     ImmutableNodesMap immutableNodesMap;
     for (auto& rangeValue : descriptorRangeValues)
-    {
         immutableNodesMap[{ rangeValue.set, rangeValue.binding }] = &rangeValue;
-    }
 
     // Count how many user data nodes we have, and allocate the buffer.
     unsigned nodeCount = nodes.size();
     for (auto& node : nodes)
     {
         if (node.type == ResourceMappingNodeType::DescriptorTableVaPtr)
-        {
             nodeCount += node.tablePtr.nodeCount;
-        }
     }
     auto allocUserDataNodes = std::make_unique<ResourceNode[]>(nodeCount);
 
@@ -525,13 +491,9 @@ void PipelineContext::setUserDataNodesTable(
                               static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorBufferCompact),
                               "mismatch");
                 if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
-                {
                     destNode.type = ResourceNodeType::DescriptorYCbCrSampler;
-                }
                 else
-                {
                     destNode.type = static_cast<ResourceNodeType>(node.type);
-                }
 
                 destNode.set = node.srdRange.set;
                 destNode.binding = node.srdRange.binding;
@@ -561,9 +523,7 @@ void PipelineContext::setUserDataNodesTable(
                                     builder.getInt32(immutableNode.pValue[compIdx * samplerDescriptorSize + i]);
                             }
                             for (unsigned i = samplerDescriptorSize; i < 8; ++i)
-                            {
                                 compValues[i] = builder.getInt32(0);
-                            }
                             values.push_back(ConstantVector::get(compValues));
                         }
                         destNode.immutableValue = ConstantArray::get(ArrayType::get(values[0]->getType(),
@@ -623,9 +583,7 @@ void PipelineContext::setVertexInputDescriptions(
 {
     auto vertexInput = static_cast<const GraphicsPipelineBuildInfo*>(getPipelineBuildInfo())->pVertexInput;
     if (vertexInput == nullptr)
-    {
         return;
-    }
 
     // Gather the bindings.
     SmallVector<VertexInputDescription, 8> bindings;
@@ -634,9 +592,7 @@ void PipelineContext::setVertexInputDescriptions(
         auto binding = &vertexInput->pVertexBindingDescriptions[i];
         unsigned idx = binding->binding;
         if (idx >= bindings.size())
-        {
             bindings.resize(idx + 1);
-        }
         bindings[idx].binding = binding->binding;
         bindings[idx].stride = binding->stride;
         switch (binding->inputRate)
@@ -662,9 +618,7 @@ void PipelineContext::setVertexInputDescriptions(
         {
             auto divisor = &vertexDivisor->pVertexBindingDivisors[i];
             if (divisor->binding <= bindings.size())
-            {
                 bindings[divisor->binding].inputRate = divisor->divisor;
-            }
         }
     }
 
@@ -674,14 +628,10 @@ void PipelineContext::setVertexInputDescriptions(
     {
         auto attrib = &vertexInput->pVertexAttributeDescriptions[i];
         if (attrib->binding >= bindings.size())
-        {
             continue;
-        }
         auto binding = &bindings[attrib->binding];
         if (binding->binding != attrib->binding)
-        {
             continue;
-        }
 
         auto dfmt = BufDataFormatInvalid;
         auto nfmt = BufNumFormatUnorm;

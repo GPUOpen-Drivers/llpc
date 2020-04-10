@@ -96,9 +96,7 @@ BuilderContext* Context::getBuilderContext()
         PipelineContext::getGpuNameString(m_gfxIp, gpuName);
         m_builderContext.reset(BuilderContext::Create(*this, gpuName, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
         if (!m_builderContext)
-        {
             report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
-        }
     }
     return &*m_builderContext;
 }

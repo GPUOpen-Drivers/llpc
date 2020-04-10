@@ -116,9 +116,7 @@ bool PatchCheckShaderCache::runOnModule(
                             continue;
                         }
                         if (getShaderStageFromFunction(cast<Instruction>(user)->getFunction()) != ShaderStageFragment)
-                        {
                             return false;
-                        }
                     }
                 }
             }
@@ -134,9 +132,7 @@ bool PatchCheckShaderCache::runOnModule(
     for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1))
     {
         if ((stageMask & shaderStageToMask(stage)) == 0)
-        {
             continue;
-        }
 
         auto resUsage = pipelineState->getShaderResourceUsage(stage);
         raw_string_ostream stream(inOutUsageStreams[stage]);
@@ -168,9 +164,7 @@ bool PatchCheckShaderCache::runOnModule(
     // Ask callback function if it wants to remove any shader stages.
     unsigned modifiedStageMask = m_callbackFunc(&module, stageMask, inOutUsageValues);
     if (modifiedStageMask == stageMask)
-    {
         return false;
-    }
 
     // "Remove" a shader stage by making its entry-point function internal, so it gets removed later.
     for (auto& func : module)
@@ -179,9 +173,7 @@ bool PatchCheckShaderCache::runOnModule(
         {
             auto stage = getShaderStageFromFunction(&func);
             if ((stage != ShaderStageInvalid) && ((shaderStageToMask(stage) & ~modifiedStageMask) != 0))
-            {
                 func.setLinkage(GlobalValue::InternalLinkage);
-            }
         }
     }
     return true;

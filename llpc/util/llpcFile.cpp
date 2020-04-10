@@ -47,13 +47,9 @@ Result File::open(
     Result result = Result::Success;
 
     if (m_fileHandle != nullptr)
-    {
         result = Result::ErrorUnavailable;
-    }
     else if (filename == nullptr)
-    {
         result = Result::ErrorInvalidPointer;
-    }
     else
     {
         char fileMode[5] = { };
@@ -121,9 +117,7 @@ Result File::open(
             // Just use the traditional fopen.
             m_fileHandle = fopen(filename, &fileMode[0]);
             if (m_fileHandle == nullptr)
-            {
                 result = Result::ErrorUnknown;
-            }
         }
     }
 
@@ -150,23 +144,15 @@ Result File::write(
     Result result = Result::Success;
 
     if (m_fileHandle == nullptr)
-    {
         result = Result::ErrorUnavailable;
-    }
     else if (buffer == nullptr)
-    {
         result = Result::ErrorInvalidPointer;
-    }
     else if (bufferSize == 0)
-    {
         result = Result::ErrorInvalidValue;
-    }
     else
     {
         if (fwrite(buffer, 1, bufferSize, m_fileHandle) != bufferSize)
-        {
             result = Result::ErrorUnknown;
-        }
     }
 
     return result;
@@ -182,30 +168,20 @@ Result File::read(
     Result result = Result::Success;
 
     if (m_fileHandle == nullptr)
-    {
         result = Result::ErrorUnavailable;
-    }
     else if (buffer == nullptr)
-    {
         result = Result::ErrorInvalidPointer;
-    }
     else if (bufferSize == 0)
-    {
         result = Result::ErrorInvalidValue;
-    }
     else
     {
         const size_t bytesRead = fread(buffer, 1, bufferSize, m_fileHandle);
 
         if (bytesRead != bufferSize)
-        {
             result = Result::ErrorUnknown;
-        }
 
         if (bytesReadOut != nullptr)
-        {
             *bytesReadOut = bytesRead;
-        }
     }
 
     return result;
@@ -221,17 +197,11 @@ Result File::readLine(
     Result result = Result::ErrorInvalidValue;
 
     if (m_fileHandle == nullptr)
-    {
         result = Result::ErrorUnavailable;
-    }
     else if (buffer == nullptr)
-    {
         result = Result::ErrorInvalidPointer;
-    }
     else if (bufferSize == 0)
-    {
         result = Result::ErrorInvalidValue;
-    }
     else
     {
         size_t bytesRead = 0;
@@ -255,9 +225,7 @@ Result File::readLine(
         }
 
         if (bytesReadOut != nullptr)
-        {
             *bytesReadOut = bytesRead;
-        }
     }
 
     return result;
@@ -279,13 +247,9 @@ Result File::printf(
 
         // Just use the traditional vfprintf.
         if (vfprintf(m_fileHandle, formatStr, argList) >= 0)
-        {
             result = Result::Success;
-        }
         else
-        {
             result = Result::ErrorUnknown;
-        }
 
         va_end(argList);
     }
@@ -305,13 +269,9 @@ Result File::vPrintf(
     {
         // Just use the traditional vfprintf.
         if (vfprintf(m_fileHandle, formatStr, argList) >= 0)
-        {
             result = Result::Success;
-        }
         else
-        {
             result = Result::ErrorUnknown;
-        }
     }
 
     return result;
@@ -324,13 +284,9 @@ Result File::flush() const
     Result result = Result::Success;
 
     if (m_fileHandle == nullptr)
-    {
         result = Result::ErrorUnavailable;
-    }
     else
-    {
         fflush(m_fileHandle);
-    }
 
     return result;
 }
@@ -340,9 +296,7 @@ Result File::flush() const
 void File::rewind()
 {
     if (m_fileHandle != nullptr)
-    {
         ::rewind(m_fileHandle);
-    }
 }
 
 // =====================================================================================================================

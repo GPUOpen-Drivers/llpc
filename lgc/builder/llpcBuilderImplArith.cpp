@@ -91,14 +91,10 @@ Value* BuilderImplArith::CreateFpTruncWithRounding(
     const Twine&      instName)           // [in] Name to give instruction(s)
 {
     if (value->getType()->getScalarType()->isDoubleTy())
-    {
         value = CreateFPTrunc(value, getConditionallyVectorizedTy(getFloatTy(), destTy));
-    }
 
     if (value->getType() == destTy)
-    {
         return value;
-    }
 
     assert(value->getType()->getScalarType()->isFloatTy() && destTy->getScalarType()->isHalfTy());
 
@@ -243,9 +239,7 @@ Value* BuilderImplArith::CreateSMod(
                 Value* pcHi = CreateExtractElement(CreateBitCast(pc, VectorType::get(getInt32Ty(), 2)), 1);
                 Value* nonConstantZero = CreateLShr(pcHi, getInt32(15));
                 if (auto vecTy = dyn_cast<VectorType>(divisor->getType()))
-                {
                     nonConstantZero = CreateVectorSplat(vecTy->getNumElements(), nonConstantZero);
-                }
                 // Add the non-constant 0 to the denominator to disable the optimization.
                 divisor = CreateAdd(divisor, nonConstantZero);
             }
@@ -611,15 +605,11 @@ Value* BuilderImplArith::CreatePower(
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
     if (x == ConstantFP::get(x->getType(), 2.0))
-    {
         return CreateUnaryIntrinsic(Intrinsic::exp2, y, nullptr, instName);
-    }
 
     // llvm.pow only works with (vector of) float.
     if (x->getType()->getScalarType()->isFloatTy())
-    {
         return CreateBinaryIntrinsic(Intrinsic::pow, x, y, nullptr, instName);
-    }
 
     // pow(x, y) = exp2(y * log2(x))
     Value *log = CreateUnaryIntrinsic(Intrinsic::log2, x);
@@ -748,13 +738,9 @@ Value* BuilderImplArith::CreateLdexp(
 {
     // Ensure exponent is i32.
     if (exp->getType()->getScalarType()->isIntegerTy(16))
-    {
         exp = CreateSExt(exp, getConditionallyVectorizedTy(getInt32Ty(), exp->getType()));
-    }
     else if (exp->getType()->getScalarType()->isIntegerTy(64))
-    {
         exp = CreateTrunc(exp, getConditionallyVectorizedTy(getInt32Ty(), exp->getType()));
-    }
 
     // We need to scalarize this ourselves.
     Value* result = scalarize(x,
@@ -857,9 +843,7 @@ Value* BuilderImplArith::CreateNormalizeVector(
                                [this, rsq](Value* x) -> Value*
                                {
                                   if (rsq->getType()->isFloatTy())
-                                  {
                                       return CreateIntrinsic(Intrinsic::amdgcn_fmul_legacy, {}, { x, rsq });
-                                  }
                                   return CreateFMul(x, rsq);
                                });
     result->setName(instName);
@@ -893,9 +877,7 @@ Value* BuilderImplArith::CreateReflect(
     Value* dot = CreateDotProduct(n, i);
     dot = CreateFMul(dot, ConstantFP::get(dot->getType(), 2.0));
     if (auto vecTy = dyn_cast<VectorType>(n->getType()))
-    {
         dot = CreateVectorSplat(vecTy->getNumElements(), dot);
-    }
     return CreateFSub(i, CreateFMul(dot, n), instName);
 }
 
@@ -975,9 +957,7 @@ Value* BuilderImplArith::CreateFClamp(
     // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
     // canonicalize the result here.
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    {
         result = canonicalize(result);
-    }
 
     result->setName(instName);
     return result;
@@ -999,9 +979,7 @@ Value* BuilderImplArith::CreateFMin(
     // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
     // canonicalize the result here.
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    {
         result = canonicalize(result);
-    }
 
     result->setName(instName);
     return result;
@@ -1023,9 +1001,7 @@ Value* BuilderImplArith::CreateFMax(
     // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
     // canonicalize the result here.
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    {
         result = canonicalize(result);
-    }
 
     result->setName(instName);
     return result;
@@ -1050,9 +1026,7 @@ Value* BuilderImplArith::CreateFMin3(
     // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
     // canonicalize the result here.
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    {
         result = canonicalize(result);
-    }
 
     result->setName(instName);
     return result;
@@ -1077,9 +1051,7 @@ Value* BuilderImplArith::CreateFMax3(
     // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
     // canonicalize the result here.
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    {
         result = canonicalize(result);
-    }
 
     result->setName(instName);
     return result;
@@ -1128,9 +1100,7 @@ Value* BuilderImplArith::CreateFMid3(
     // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
     // canonicalize the result here.
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    {
         result = canonicalize(result);
-    }
 
     result->setName(instName);
     return result;
@@ -1145,9 +1115,7 @@ Value* BuilderImplArith::fDivFast(
     Value* denominator)  // [in] Denominator
 {
     if (numerator->getType()->getScalarType()->isFloatTy() == false)
-    {
         return CreateFMul(numerator, CreateFDiv(ConstantFP::get(denominator->getType(), 1.0), denominator));
-    }
 
     // We have to scalarize fdiv.fast ourselves.
     return scalarize(numerator,
@@ -1215,13 +1183,9 @@ Value* BuilderImplArith::CreateInsertBitField(
     if (auto vecTy = dyn_cast<VectorType>(base->getType()))
     {
         if (isa<VectorType>(offset->getType()) == false)
-        {
             offset = CreateVectorSplat(vecTy->getNumElements(), offset);
-        }
         if (isa<VectorType>(count->getType()) == false)
-        {
             count = CreateVectorSplat(vecTy->getNumElements(), count);
-        }
     }
     offset = CreateZExtOrTrunc(offset, base->getType());
     count = CreateZExtOrTrunc(count, base->getType());
@@ -1254,13 +1218,9 @@ Value* BuilderImplArith::CreateExtractBitField(
     if (auto vecTy = dyn_cast<VectorType>(base->getType()))
     {
         if (isa<VectorType>(offset->getType()) == false)
-        {
             offset = CreateVectorSplat(vecTy->getNumElements(), offset);
-        }
         if (isa<VectorType>(count->getType()) == false)
-        {
             count = CreateVectorSplat(vecTy->getNumElements(), count);
-        }
     }
     offset = CreateZExtOrTrunc(offset, base->getType());
     count = CreateZExtOrTrunc(count, base->getType());
@@ -1293,13 +1253,9 @@ Value* BuilderImplArith::CreateExtractBitField(
     Value* shiftUp = CreateSub(shiftDown, offset);
     Value* result = CreateShl(base, shiftUp);
     if (isSigned)
-    {
         result = CreateAShr(result, shiftDown);
-    }
     else
-    {
         result = CreateLShr(result, shiftDown);
-    }
     Value* isZeroCount = CreateICmpEQ(count, Constant::getNullValue(count->getType()));
     return CreateSelect(isZeroCount, count, result, instName);
 }
@@ -1345,9 +1301,7 @@ Value* BuilderImplArith::createFMix(
     {
         // pX, pY => vector, but pA => scalar
         if (isa<VectorType>(a->getType()) == false)
-        {
             a = CreateVectorSplat(vectorResultTy->getVectorNumElements(), a);
-        }
     }
 
     FastMathFlags fastMathFlags = getFastMathFlags();

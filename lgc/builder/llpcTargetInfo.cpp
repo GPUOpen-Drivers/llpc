@@ -273,9 +273,7 @@ static void setGfx10Info(
         targetInfo->getGpuProperty().waveSize = NativeWaveSize;
     }
     else
-    {
         targetInfo->getGpuProperty().waveSize = 32;
-    }
 
     targetInfo->getGpuProperty().numShaderEngines = 2;
     targetInfo->getGpuProperty().supportShaderPowerProfiling = true;
@@ -367,9 +365,7 @@ bool TargetInfo::setTargetInfo(
         }
     }
     if (setTargetInfoFunc == nullptr)
-    {
         return false;   // Target not supported
-    }
 
     // Set up TargetInfo.gfxIp from the GPU name. This is the inverse of what happens to encode the
     // GPU name in PipelineContext::GetGpuNameString. But longer term we should remove all the uses of
@@ -378,9 +374,7 @@ bool TargetInfo::setTargetInfo(
     m_gfxIp.minor = gpuName[gpuName.size() - 2] - '0';
     m_gfxIp.stepping = gpuName[gpuName.size() - 1] - '0';
     if (m_gfxIp.stepping >= 10)
-    {
         m_gfxIp.stepping = gpuName[gpuName.size() - 1] - 'A' + 0xFFFA;
-    }
 
     // Set up the rest of TargetInfo.
     (*setTargetInfoFunc)(this);

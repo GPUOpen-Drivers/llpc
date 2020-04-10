@@ -200,15 +200,11 @@ NggLdsManager::NggLdsManager(
 
             // NOTE: LDS size of ES-GS ring is calculated (by rounding it up to 16-byte alignment)
             if (region == LdsRegionEsGsRing)
-            {
                 ldsRegionSize = esGsRingLdsSize;
-            }
 
             // NOTE: LDS size of ES-GS ring is calculated
             if (region == LdsRegionGsVsRing)
-            {
                 ldsRegionSize = gsVsRingLdsSize;
-            }
 
             m_ldsRegionStart[region] = ldsRegionStart;
             assert(ldsRegionSize != InvalidValue);
@@ -250,41 +246,31 @@ NggLdsManager::NggLdsManager(
             {
                 // NOTE: For NGG non pass-through mode, primitive ID region is overlapped with position data.
                 if (region == LdsRegionDistribPrimId)
-                {
                     continue;
-                }
 
                 // NOTE: If cull distance culling is disabled, skip this region
                 if ((region == LdsRegionCullDistance) && (nggControl->enableCullDistanceCulling == false))
-                {
                     continue;
-                }
 
                 // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
                 // skipped.
                 if ((nggControl->compactMode == NggCompactSubgroup) &&
                     ((region >= LdsRegionCompactBeginRange) && (region <= LdsRegionCompactEndRange)))
-                {
                     continue;
-                }
 
                 if (hasTs)
                 {
                     // Skip those regions that are for VS only
                     if ((region == LdsRegionCompactVertexId) || (region == LdsRegionCompactInstanceId) ||
                         (region == LdsRegionCompactPrimId))
-                    {
                         continue;
-                    }
                 }
                 else
                 {
                     // Skip those regions that are for TES only
                     if ((region == LdsRegionCompactTessCoordX) || (region == LdsRegionCompactTessCoordY) ||
                         (region == LdsRegionCompactRelPatchId) || (region == LdsRegionCompactPatchId))
-                    {
                         continue;
-                    }
                 }
 
                 m_ldsRegionStart[region] = ldsRegionStart;
@@ -307,9 +293,7 @@ unsigned NggLdsManager::calcEsExtraLdsSize(
 {
     const auto nggControl = pipelineState->getNggControl();
     if (nggControl->enableNgg == false)
-    {
         return 0;
-    }
 
     const unsigned stageMask = pipelineState->getShaderStageMask();
     const bool hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
@@ -343,41 +327,31 @@ unsigned NggLdsManager::calcEsExtraLdsSize(
         {
             // NOTE: For NGG non pass-through mode, primitive ID region is overlapped with position data.
             if (region == LdsRegionDistribPrimId)
-            {
                 continue;
-            }
 
             // NOTE: If cull distance culling is disabled, skip this region
             if ((region == LdsRegionCullDistance) && (nggControl->enableCullDistanceCulling == false))
-            {
                 continue;
-            }
 
             // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
             // skipped.
             if ((nggControl->compactMode == NggCompactSubgroup) &&
                 ((region >= LdsRegionCompactBeginRange) && (region <= LdsRegionCompactEndRange)))
-            {
                 continue;
-            }
 
             if (hasTs)
             {
                 // Skip those regions that are for VS only
                 if ((region == LdsRegionCompactVertexId) || (region == LdsRegionCompactInstanceId) ||
                     (region == LdsRegionCompactPrimId))
-                {
                     continue;
-                }
             }
             else
             {
                 // Skip those regions that are for TES only
                 if ((region == LdsRegionCompactTessCoordX) || (region == LdsRegionCompactTessCoordY) ||
                     (region == LdsRegionCompactRelPatchId) || (region == LdsRegionCompactPatchId))
-                {
                     continue;
-                }
             }
 
             esExtraLdsSize += LdsRegionSizes[region];
@@ -394,9 +368,7 @@ unsigned NggLdsManager::calcGsExtraLdsSize(
 {
     const auto nggControl = pipelineState->getNggControl();
     if (nggControl->enableNgg == false)
-    {
         return 0;
-    }
 
     const unsigned stageMask = pipelineState->getShaderStageMask();
     const bool hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
@@ -433,9 +405,7 @@ Value* NggLdsManager::readValueFromLds(
         compCount = readBits / 128;
 
         if (useDs128)
-        {
             alignment = 16; // Set alignment to 16-byte to use 128-bit LDS load
-        }
     }
     else if (readBits % 64 == 0)
     {
@@ -470,31 +440,21 @@ Value* NggLdsManager::readValueFromLds(
     {
         Value* loadPtr = m_builder->CreateGEP(lds, ldsOffset);
         if (bitWidth != 8)
-        {
             loadPtr = m_builder->CreateBitCast(loadPtr, PointerType::get(compTy, ADDR_SPACE_LOCAL));
-        }
 
         Value* loadValue = m_builder->CreateAlignedLoad(loadPtr, MaybeAlign(alignment));
 
         if (compCount > 1)
-        {
             readValue = m_builder->CreateInsertElement(readValue, loadValue, i);
-        }
         else
-        {
             readValue = loadValue;
-        }
 
         if (compCount > 1)
-        {
             ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(bitWidth / 8));
-        }
     }
 
     if (readValue->getType() != readTy)
-    {
         readValue = m_builder->CreateBitCast(readValue, readTy);
-    }
 
     return readValue;
 }
@@ -523,9 +483,7 @@ void NggLdsManager::writeValueToLds(
         compCount = writeBits / 128;
 
         if (useDs128)
-        {
             alignment = 16; // Set alignment to 16-byte to use 128-bit LDS store
-        }
     }
     else if (writeBits % 64 == 0)
     {
@@ -553,9 +511,7 @@ void NggLdsManager::writeValueToLds(
     writeTy = (compCount > 1) ? VectorType::get(compTy, compCount) : compTy;
 
     if (writeValue->getType() != writeTy)
-    {
         writeValue = m_builder->CreateBitCast(writeValue, writeTy);
-    }
 
     // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
     auto lds = ConstantExpr::getBitCast(m_lds,
@@ -565,26 +521,18 @@ void NggLdsManager::writeValueToLds(
     {
         Value* storePtr = m_builder->CreateGEP(lds, ldsOffset);
         if (bitWidth != 8)
-        {
             storePtr = m_builder->CreateBitCast(storePtr, PointerType::get(compTy, ADDR_SPACE_LOCAL));
-        }
 
         Value* storeValue = nullptr;
         if (compCount > 1)
-        {
             storeValue = m_builder->CreateExtractElement(writeValue, i);
-        }
         else
-        {
             storeValue = writeValue;
-        }
 
         m_builder->CreateAlignedStore(storeValue, storePtr, MaybeAlign(alignment));
 
         if (compCount > 1)
-        {
             ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(bitWidth / 8));
-        }
     }
 }
 

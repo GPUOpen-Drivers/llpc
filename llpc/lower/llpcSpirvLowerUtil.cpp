@@ -71,9 +71,7 @@ ShaderStage getShaderStageFromModule(
     // Check for the execution model metadata that is added by the SPIR-V reader.
     MDNode* execModelNode = func->getMetadata(gSPIRVMD::ExecutionModel);
     if (execModelNode == nullptr)
-    {
         return ShaderStageInvalid;
-    }
     auto execModel = mdconst::dyn_extract<ConstantInt>(execModelNode->getOperand(0))->getZExtValue();
     return convertToStageShage(execModel);
 }

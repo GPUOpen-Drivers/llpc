@@ -65,9 +65,7 @@ ConfigBuilderBase::ConfigBuilderBase(
     // from 13 to 32 at that point, and not using MsgPack metadata before that avoids some compatibility
     // problems.
     if (m_pipelineState->getPalAbiVersion() < 477)
-    {
         report_fatal_error("PAL ABI version less than 477 not supported");
-    }
     m_document = std::make_unique<msgpack::Document>();
 
     m_pipelineNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines]
@@ -96,9 +94,7 @@ void ConfigBuilderBase::addApiHwShaderMapping(
     for (unsigned hwStage = 0; hwStage < unsigned(Util::Abi::HardwareStage::Count); ++hwStage)
     {
         if (hwStages & (1 << hwStage))
-        {
             hwMappingNode.push_back(m_document->getNode(HwStageNames[hwStage]));
-        }
     }
 }
 
@@ -167,9 +163,7 @@ void ConfigBuilderBase::setUsesViewportArrayIndex(
     bool value)   // Value to set
 {
     if (value == false)
-    {
         return; // Optional
-    }
 
     m_pipelineNode[Util::Abi::PipelineMetadataKey::UsesViewportArrayIndex] = m_document->getNode(value);
 }
@@ -180,9 +174,7 @@ void ConfigBuilderBase::setPsUsesUavs(
     bool value)   // Value to set
 {
     if (value == false)
-    {
         return; // Optional
-    }
 
     getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::UsesUavs] =
         m_document->getNode(value);
@@ -194,9 +186,7 @@ void ConfigBuilderBase::setPsWritesUavs(
     bool value)   // Value to set
 {
     if (value == false)
-    {
         return; // Optional
-    }
 
     getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesUavs] =
         m_document->getNode(value);
@@ -209,9 +199,7 @@ void ConfigBuilderBase::setPsWritesDepth(
     bool value)   // Value to set
 {
     if (value == false)
-    {
         return; // Optional
-    }
 
     getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesDepth] =
         m_document->getNode(value);
@@ -296,9 +284,7 @@ void ConfigBuilderBase::setLdsSizeByteSize(
     unsigned                 value)   // Value to set
 {
     if (value == 0)
-    {
         return; // Optional
-    }
 
     auto hwShaderNode = getHwShaderNode(hwStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = hwShaderNode.getDocument()->getNode(value);
@@ -310,9 +296,7 @@ void ConfigBuilderBase::setEsGsLdsSize(
     unsigned value) // Value to set
 {
     if (value == 0)
-    {
         return; // Optional
-    }
 
     m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = m_document->getNode(value);
 }
@@ -377,9 +361,7 @@ void ConfigBuilderBase::appendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config
     for (const auto &entry : config)
     {
         if (entry.key != InvalidMetadataKey)
-        {
             m_config[idx++] = entry;
-        }
     }
 }
 

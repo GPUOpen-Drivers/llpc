@@ -126,21 +126,13 @@ void getTypeName(
         ty = vectorTy->getElementType();
     }
     if (ty->isFloatingPointTy())
-    {
         nameStream << "f" << ty->getScalarSizeInBits();
-    }
     else if (ty->isIntegerTy())
-    {
         nameStream << "i" << ty->getScalarSizeInBits();
-    }
     else if (ty->isVoidTy())
-    {
         nameStream << "V";
-    }
     else
-    {
         llvm_unreachable("Should never be called!");
-    }
 }
 
 // =====================================================================================================================
@@ -191,9 +183,7 @@ ShaderStage getShaderStageFromFunction(
     // Check for the metadata that is added by the builder. This works in the patch phase.
     MDNode* stageMetaNode = func->getMetadata(lgcName::ShaderStageMetadata);
     if (stageMetaNode != nullptr)
-    {
         return ShaderStage(mdconst::dyn_extract<ConstantInt>(stageMetaNode->getOperand(0))->getZExtValue());
-    }
     return ShaderStageInvalid;
 }
 
@@ -250,9 +240,7 @@ Value* getFunctionArgument(
 {
     Argument* arg = &func->arg_begin()[idx];
     if ((name.isTriviallyEmpty() == false) && (arg->getName() == ""))
-    {
         arg->setName(name);
-    }
     return arg;
 }
 
@@ -265,9 +253,7 @@ bool canBitCast(
     bool valid = false;
 
     if (ty1 == ty2)
-    {
         valid = true;
-    }
     else if (ty1->isSingleValueType() && ty2->isSingleValueType())
     {
         const Type* compTy1 = ty1->isVectorTy() ? ty1->getVectorElementType() : ty1;
@@ -293,9 +279,7 @@ bool isDontCareValue(
     bool isDontCare = false;
 
     if (isa<ConstantInt>(value))
-    {
         isDontCare = (static_cast<unsigned>(cast<ConstantInt>(value)->getZExtValue()) == InvalidValue);
-    }
 
     return isDontCare;
 }

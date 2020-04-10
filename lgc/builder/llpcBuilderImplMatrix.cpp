@@ -60,16 +60,12 @@ Value* BuilderImplMatrix::CreateTransposeMatrix(
     SmallVector<Value*, 4> columns;
 
     for (unsigned column = 0; column < columnCount; column++)
-    {
         columns.push_back(CreateExtractValue(matrix, column));
-    }
 
     SmallVector<Value*, 4> newColumns;
 
     for (unsigned row = 0; row < rowCount; row++)
-    {
         newColumns.push_back(UndefValue::get(newColumnVectorType));
-    }
 
     for (unsigned column = 0; column < columnCount; column++)
     {
@@ -83,9 +79,7 @@ Value* BuilderImplMatrix::CreateTransposeMatrix(
     Value* newMatrix = UndefValue::get(newMatrixType);
 
     for (unsigned row = 0; row < rowCount; row++)
-    {
         newMatrix = CreateInsertValue(newMatrix, newColumns[row], row);
-    }
 
     newMatrix->setName(instName);
     return newMatrix;
@@ -156,13 +150,9 @@ Value* BuilderImplMatrix::CreateMatrixTimesVector(
         auto partialResult = CreateShuffleVector(vector, vector, shuffleMask);
         partialResult = CreateFMul(CreateExtractValue(matrix, i), partialResult);
         if (result != nullptr)
-        {
             result = CreateFAdd(result, partialResult);
-        }
         else
-        {
             result = partialResult;
-        }
     }
 
     result->setName(instName);
@@ -230,9 +220,7 @@ Value* BuilderImplMatrix::CreateDeterminant(
     {
         Value* column = CreateExtractValue(matrix, columnIdx);
         for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
-        {
             elements.push_back(CreateExtractElement(column, rowIdx));
-        }
     }
 
     Value* result = determinant(elements, order);
@@ -247,9 +235,7 @@ Value* BuilderImplMatrix::determinant(
     unsigned            order)        // Order of matrix
 {
     if (order == 1)
-    {
         return elements[0];
-    }
 
     if (order == 2)
     {
@@ -272,19 +258,13 @@ Value* BuilderImplMatrix::determinant(
         getSubmatrix(elements, submatrix, order, leadRowIdx, 0);
         Value* subdeterminant = CreateFMul(elements[leadRowIdx], determinant(submatrix, order - 1));
         if ((leadRowIdx & 1) != 0)
-        {
             result = CreateFSub(result, subdeterminant);
-        }
         else
         {
             if (result == nullptr)
-            {
                 result = subdeterminant;
-            }
             else
-            {
                 result = CreateFAdd(result, subdeterminant);
-            }
         }
     }
     return result;
@@ -305,9 +285,7 @@ void BuilderImplMatrix::getSubmatrix(
         for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
         {
             if ((rowIdx != rowToDelete) && (columnIdx != columnToDelete))
-            {
                 submatrix[outElementIdx++] = matrix[inElementIdx];
-            }
             ++inElementIdx;
         }
     }
@@ -330,9 +308,7 @@ Value* BuilderImplMatrix::CreateMatrixInverse(
     {
         Value* column = CreateExtractValue(matrix, columnIdx);
         for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
-        {
             elements.push_back(CreateExtractElement(column, rowIdx));
-        }
     }
 
     // [ x0   x1   x2 ]                   [ Adj(x0) Adj(x1) Adj(x2) ] T
@@ -376,9 +352,7 @@ Value* BuilderImplMatrix::CreateMatrixInverse(
     {
         Value* column = UndefValue::get(matrix->getType()->getArrayElementType());
         for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
-        {
             column = CreateInsertElement(column, resultElements[rowIdx + columnIdx * order], rowIdx);
-        }
         result = CreateInsertValue(result, column, columnIdx);
     }
 

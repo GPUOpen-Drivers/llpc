@@ -158,9 +158,7 @@ public:
     void FlushDenormToZero()
     {
         if ((m_bits.exp == 0) && (m_bits.mantissa != 0))
-        {
             m_bits.mantissa = 0;
-        }
     }
 
     // Whether the value is NaN
@@ -226,13 +224,9 @@ public:
                 // Normalized (exponent = exp + 14, mantissa = abs(int(value * 2^(11 - exp))))
                 m_bits.exp = exp + 14;
                 if (exp <= 11)
-                {
                     m_bits.mantissa = Math::Absu(static_cast<int>(value * (1u << (11 - exp))));
-                }
                 else
-                {
                     m_bits.mantissa = Math::Absu(static_cast<int>(value / (1u << (exp - 11))));
-                }
             }
         }
     }
@@ -269,13 +263,9 @@ public:
             {
                 // Normalized (value = (mantissa | 0x400) * 2^(exponent - 25))
                 if (m_bits.exp >= 25)
-                {
                     value = (m_bits.mantissa | 0x400) * static_cast<float>(1u << (m_bits.exp - 25));
-                }
                 else
-                {
                     value = (m_bits.mantissa | 0x400) / static_cast<float>(1u << (25 - m_bits.exp));
-                }
             }
             else
             {
@@ -291,9 +281,7 @@ public:
     void FlushDenormToZero()
     {
         if ((m_bits.exp == 0) && (m_bits.mantissa != 0))
-        {
             m_bits.mantissa = 0;
-        }
     }
 
     // Whether the value is NaN

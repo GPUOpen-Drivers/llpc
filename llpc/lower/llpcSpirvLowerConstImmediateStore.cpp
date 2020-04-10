@@ -79,9 +79,7 @@ bool SpirvLowerConstImmediateStore::runOnModule(
         if (auto func = dyn_cast<Function>(&*funcIt))
         {
             if (func->empty() == false)
-            {
                 processAllocaInsts(func);
-            }
         }
     }
 
@@ -149,9 +147,7 @@ StoreInst* SpirvLowerConstImmediateStore::findSingleStore(
                 storeInstFound = storeInst;
             }
             else if (auto getElemPtrInst = dyn_cast<GetElementPtrInst>(user))
-            {
                 pointers.push_back(getElemPtrInst);
-            }
             else if (isa<LoadInst>(user) == false)
             {
                 // Pointer escapes by being used in some way other than "load/store/getelementptr".
@@ -160,9 +156,7 @@ StoreInst* SpirvLowerConstImmediateStore::findSingleStore(
         }
 
         if (pointers.empty())
-        {
             break;
-        }
 
         pointer = pointers.back();
         pointers.pop_back();
@@ -210,9 +204,7 @@ void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(
                 SmallVector<Value*, 4> indices;
                 for (auto idxIt = origGetElemPtrInst->idx_begin(),
                         idxItEnd = origGetElemPtrInst->idx_end(); idxIt != idxItEnd; ++idxIt)
-                {
                     indices.push_back(*idxIt);
-                }
                 auto newGetElemPtrInst = GetElementPtrInst::Create(nullptr,
                                                                     global,
                                                                     indices,
@@ -227,9 +219,7 @@ void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(
                 *useIt = UndefValue::get(allocaInst->getType());
             }
             else
-            {
                 *useIt = global;
-            }
         }
         // Visit next map pair.
     } while (allocaToGlobalMap.empty() == false);

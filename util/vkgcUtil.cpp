@@ -48,9 +48,7 @@ const char* getShaderStageAbbreviation(
     const char* abbr = nullptr;
 
     if (shaderStage == ShaderStageCopyShader)
-    {
         abbr = upper ? "COPY" : "Copy";
-    }
     else if (shaderStage < ShaderStageCount)
     {
         if (upper)
@@ -83,9 +81,7 @@ const char* getShaderStageAbbreviation(
         }
     }
     else
-    {
         abbr = "Bad";
-    }
 
     return abbr;
 }

@@ -120,9 +120,7 @@ void PatchPeepholeOpt::visitBitCast(
 {
     // If the bit cast has no users, no point trying to optimize it!
     if (bitCast.user_empty())
-    {
         return;
-    }
 
     // First run through the thing we are bit casting and see if there are multiple bit casts we can combine.
     unsigned numCombinableUsers = 0;
@@ -133,29 +131,21 @@ void PatchPeepholeOpt::visitBitCast(
 
         // If we don't have a bit cast, skip.
         if (otherBitCast == nullptr)
-        {
             continue;
-        }
 
         // If the other bit cast has no users, no point optimizating it.
         if (otherBitCast->user_empty())
-        {
             continue;
-        }
 
         // If the other bit cast doesn't match our type, skip.
         if (otherBitCast->getDestTy() != bitCast.getDestTy())
-        {
             continue;
-        }
 
         numCombinableUsers++;
 
         // If we have at least two bit casts we can combine, skip checking and just do the optimization.
         if (numCombinableUsers > 1)
-        {
             break;
-        }
     }
 
     // If we have at least 2 users, optimize!
@@ -170,29 +160,21 @@ void PatchPeepholeOpt::visitBitCast(
             {
                 // Skip ourselves.
                 if (user == &bitCast)
-                {
                     continue;
-                }
 
                 BitCastInst* const otherBitCast = dyn_cast<BitCastInst>(user);
 
                 // If we don't have a bit cast, skip.
                 if (otherBitCast == nullptr)
-                {
                     continue;
-                }
 
                 // If the other bit cast has no users, no point optimizating it.
                 if (otherBitCast->user_empty())
-                {
                     continue;
-                }
 
                 // If the other bit cast doesn't match our type, skip.
                 if (otherBitCast->getDestTy() != bitCast.getDestTy())
-                {
                     continue;
-                }
 
                 // Replace the other bit cast with our one.
                 otherBitCast->replaceAllUsesWith(&bitCast);
@@ -208,9 +190,7 @@ void PatchPeepholeOpt::visitBitCast(
     {
         // Only check bit casts where the element types match to make porting the shuffle vector more trivial.
         if (bitCast.getSrcTy()->getScalarSizeInBits() != bitCast.getDestTy()->getScalarSizeInBits())
-        {
             return;
-        }
 
         // Bit cast the LHS of the original shuffle.
         Value* const shuffleVectorLhs = shuffleVector->getOperand(0);
@@ -238,13 +218,9 @@ void PatchPeepholeOpt::visitBitCast(
         SmallVector<Constant*, 8> masks;
         for (unsigned i = 0; i < maskVals.size(); ++i) {
             if (maskVals[i] == -1)
-            {
                 masks.push_back(UndefValue::get(int32Type));
-            }
             else
-            {
                 masks.push_back(ConstantInt::get(int32Type, maskVals[i]));
-            }
         }
         ShuffleVectorInst* const newShuffleVector = new ShuffleVectorInst(
             bitCastLhs, bitCastRhs, ConstantVector::get(masks), shuffleVector->getName());
@@ -267,9 +243,7 @@ void PatchPeepholeOpt::visitBitCast(
     {
         // We only want to push bitcasts where the PHI node is an i8, as it'll save us PHI nodes later.
         if (phiNode->getType()->getScalarSizeInBits() != 8)
-        {
             return;
-        }
 
         // Push the bit cast to each of the PHI's incoming values instead.
         const unsigned numIncomings = phiNode->getNumIncomingValues();
@@ -298,9 +272,7 @@ void PatchPeepholeOpt::visitBitCast(
                 newPhiNode->addIncoming(newBitCast, basicBlock);
             }
             else
-            {
                 llvm_unreachable("Should never be called!");
-            }
         }
 
         // Replace the bit cast with the new PHI node.
@@ -346,9 +318,7 @@ void PatchPeepholeOpt::visitICmp(
 
     // If we don't have a constant we are comparing against, or the constant is the maximum representable, bail.
     if ((constantVal == nullptr) || constantVal->isMaxValue(false))
-    {
         return;
-    }
 
     const uint64_t constant = constantVal->getZExtValue();
 
@@ -374,16 +344,12 @@ void PatchPeepholeOpt::visitICmp(
             branch->swapSuccessors();
         }
         else if (Instruction* const inst = dyn_cast<Instruction>(user))
-        {
             instsWithOpsToReplace.push_back(inst);
-        }
     }
 
     // If we have no other instructions we need to deal with, bail.
     if (instsWithOpsToReplace.empty())
-    {
         return;
-    }
 
     Instruction* const iCmpNot = BinaryOperator::CreateNot(&iCmp);
     insertAfter(*iCmpNot, iCmp);
@@ -395,9 +361,7 @@ void PatchPeepholeOpt::visitICmp(
         for (unsigned operandIndex = 0; operandIndex < numOperands; operandIndex++)
         {
             if (&iCmp == inst->getOperand(operandIndex))
-            {
                 inst->setOperand(operandIndex, iCmpNot);
-            }
         }
     }
 }
@@ -409,9 +373,7 @@ void PatchPeepholeOpt::visitExtractElement(
 {
     // If the extract has no users, no point trying to optimize it!
     if (extractElement.user_empty())
-    {
         return;
-    }
 
     Value* const vector = extractElement.getVectorOperand();
 
@@ -419,9 +381,7 @@ void PatchPeepholeOpt::visitExtractElement(
 
     // We only handle constant indices.
     if (indexVal == nullptr)
-    {
         return;
-    }
 
     const uint64_t index = indexVal->getZExtValue();
 
@@ -436,9 +396,7 @@ void PatchPeepholeOpt::visitExtractElement(
 
         // If the vector was inserting at a non-constant index, bail.
         if (nextIndex == nullptr)
-        {
             break;
-        }
 
         // If the index of the insertion matches the index we were extracting, forward the insert!
         if (nextIndex->equalsInt(index))
@@ -463,37 +421,27 @@ void PatchPeepholeOpt::visitExtractElement(
 
         // If we don't have an extract element, skip.
         if (otherExtractElement == nullptr)
-        {
             continue;
-        }
 
         // If the other extract has no users, no point optimizating it.
         if (otherExtractElement->user_empty())
-        {
             continue;
-        }
 
         ConstantInt* const otherIndex = dyn_cast<ConstantInt>(otherExtractElement->getIndexOperand());
 
         // If the other index is not a constant integer, skip.
         if (otherIndex == nullptr)
-        {
             continue;
-        }
 
         // If the indices do not match, skip.
         if (otherIndex->equalsInt(index) == false)
-        {
             continue;
-        }
 
         numCombinableUsers++;
 
         // If we have at least two extracts we can combine, skip checking and just do the optimization.
         if (numCombinableUsers > 1)
-        {
             break;
-        }
     }
 
     // If we have at least 2 users, optimize!
@@ -513,35 +461,25 @@ void PatchPeepholeOpt::visitExtractElement(
 
                 // If we don't have an extract element, skip.
                 if (otherExtractElement == nullptr)
-                {
                     continue;
-                }
 
                 // If the other extract has no users, no point optimizating it.
                 if (otherExtractElement->user_empty())
-                {
                     continue;
-                }
 
                 // If the extract element is the new one we just inserted, skip.
                 if (newExtractElement == otherExtractElement)
-                {
                     continue;
-                }
 
                 ConstantInt* const otherIndex = dyn_cast<ConstantInt>(otherExtractElement->getIndexOperand());
 
                 // If the other index is not a constant integer, skip.
                 if (otherIndex == nullptr)
-                {
                     continue;
-                }
 
                 // If the indices do not match, skip.
                 if (otherIndex->equalsInt(index) == false)
-                {
                     continue;
-                }
 
                 // Replace the other extraction with our new one.
                 otherExtractElement->replaceAllUsesWith(newExtractElement);
@@ -562,9 +500,7 @@ void PatchPeepholeOpt::visitPHINode(
 {
     // If the PHI has no users, no point trying to optimize it!
     if (phiNode.user_empty())
-    {
         return;
-    }
 
     const unsigned numIncomings = phiNode.getNumIncomingValues();
 
@@ -619,9 +555,7 @@ void PatchPeepholeOpt::visitPHINode(
                     Value* newIncomingValue = nullptr;
                     auto it = incomingPairMap.find(basicBlock);
                     if (it != incomingPairMap.end())
-                    {
                         newIncomingValue = it->second;
-                    }
                     else
                     {
                         ExtractElementInst* const extractElement =
@@ -641,9 +575,7 @@ void PatchPeepholeOpt::visitPHINode(
                     newPhiNode->addIncoming(extractElement, basicBlock);
                 }
                 else
-                {
                     llvm_unreachable("Should never be called!");
-                }
             }
         }
 
@@ -743,47 +675,33 @@ void PatchPeepholeOpt::visitPHINode(
 
                     // If its not a PHI node, skip.
                     if (otherPhiNode == nullptr)
-                    {
                         continue;
-                    }
 
                     // Skip our PHI node in the user list.
                     if (otherPhiNode == &phiNode)
-                    {
                         continue;
-                    }
 
                     // If both PHI nodes are not in the same parent block, skip.
                     if (otherPhiNode->getParent() != phiNode.getParent())
-                    {
                         continue;
-                    }
 
                     // If the PHI does not match the number of incomings as us, skip.
                     if (otherPhiNode->getNumIncomingValues() != numIncomings)
-                    {
                         continue;
-                    }
 
                     PHINode* const otherSubPhiNode = dyn_cast<PHINode>(otherPhiNode->getIncomingValue(1));
 
                     // If the other incomings don't match, its not like our PHI node, skip.
                     if (otherSubPhiNode != otherPhiNode->getIncomingValue(2))
-                    {
                         continue;
-                    }
 
                     // If both sub PHI nodes are not in the same parent block, skip.
                     if (otherSubPhiNode->getParent() != subPhiNode->getParent())
-                    {
                         continue;
-                    }
 
                     // If the sub PHI nodes don't have the same incomings, we can't fold them so we skip.
                     if (otherSubPhiNode->getNumIncomingValues() != numSubIncomings)
-                    {
                         continue;
-                    }
 
                     for (unsigned subIncomingIndex = 0; subIncomingIndex < numSubIncomings; subIncomingIndex++)
                     {
@@ -846,17 +764,11 @@ void PatchPeepholeOpt::visitPHINode(
                 Value* sinkableValue = nullptr;
 
                 if (otherIncoming == operands[0])
-                {
                     sinkableValue = operands[1];
-                }
                 else if (otherIncoming == operands[1])
-                {
                     sinkableValue = operands[0];
-                }
                 else
-                {
                     continue;
-                }
 
                 // Create a constant for the other incoming that won't affect the result when the operator is applied.
                 Constant* noEffectConstant = nullptr;
@@ -910,9 +822,7 @@ void PatchPeepholeOpt::visitCallInst(
 {
     auto callee = callInst.getCalledFunction();
     if (callee == nullptr)
-    {
         return;
-    }
 
     // Optimization for call @llvm.amdgcn.kill(). Pattern:
     //   %29 = fcmp olt float %28, 0.000000e+00
@@ -979,13 +889,9 @@ void PatchPeepholeOpt::moveAfter(
 {
     // Special case for if the instruction is a PHI node, we need to move after all other PHIs.
     if (isa<PHINode>(&after))
-    {
         move.moveBefore(after.getParent()->getFirstNonPHI());
-    }
     else
-    {
         move.moveAfter(&after);
-    }
 }
 
 // =====================================================================================================================
@@ -997,13 +903,9 @@ void PatchPeepholeOpt::insertAfter(
 {
     // Special case for if the instruction is a PHI node, we need to insert after all other PHIs.
     if (isa<PHINode>(&after))
-    {
         insert.insertBefore(after.getParent()->getFirstNonPHI());
-    }
     else
-    {
         insert.insertAfter(&after);
-    }
 }
 
 } // lgc

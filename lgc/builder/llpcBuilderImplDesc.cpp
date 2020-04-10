@@ -251,9 +251,7 @@ Value* BuilderImplDesc::scalarizeIfUniform(
     {
         // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
         if (getPipelineState()->getTargetInfo().getGfxIpVersion().major > 6)
-        {
             value = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, value);
-        }
     }
     return value;
 }

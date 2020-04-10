@@ -271,9 +271,7 @@ Result VKAPI_CALL ICompiler::Create(
                 // All compiler instances are destroyed, we can reset LLVM options in safe
                 auto& options = cl::getRegisteredOptions();
                 for (auto it = options.begin(); it != options.end(); ++it)
-                {
                     it->second->reset();
-                }
                 parseCmdOption = true;
             }
             else
@@ -292,9 +290,7 @@ Result VKAPI_CALL ICompiler::Create(
                                         options,
                                         "AMD LLPC compiler",
                                         ignoreErrors ? &nullStream : nullptr) == false)
-        {
             result = Result::ErrorInvalidValue;
-        }
     }
 
     if (result == Result::Success)
@@ -337,14 +333,10 @@ Compiler::Compiler(
     m_gfxIp(gfxIp)
 {
     for (unsigned i = 0; i < optionCount; ++i)
-    {
         m_options.push_back(options[i]);
-    }
 
     if (m_outRedirectCount == 0)
-    {
         redirectLogOutput(false, optionCount, options);
-    }
 
     if (m_instanceCount == 0)
     {
@@ -403,9 +395,7 @@ Compiler::~Compiler()
             char*  maxResidentContextsEnv = getenv("AMD_RESIDENT_CONTEXTS");
 
             if (maxResidentContextsEnv != nullptr)
-            {
                 maxResidentContexts = strtoul(maxResidentContextsEnv, nullptr, 0);
-            }
 
             if ((context->isInUse() == false) && (m_contextPool->size() > maxResidentContexts))
             {
@@ -413,9 +403,7 @@ Compiler::~Compiler()
                 delete context;
             }
             else
-            {
                 ++it;
-            }
         }
     }
 
@@ -424,9 +412,7 @@ Compiler::~Compiler()
         std::lock_guard<sys::Mutex> lock(*SCompilerMutex);
         -- m_outRedirectCount;
         if (m_outRedirectCount == 0)
-        {
             redirectLogOutput(true, 0, nullptr);
-        }
 
         ShaderCacheManager::getShaderCacheManager()->releaseShaderCacheObject(m_shaderCache);
     }
@@ -436,9 +422,7 @@ Compiler::~Compiler()
         std::lock_guard<sys::Mutex> lock(*SCompilerMutex);
         -- m_instanceCount;
         if (m_instanceCount == 0)
-        {
             shutdown = true;
-        }
     }
 
     if (shutdown)
@@ -513,9 +497,7 @@ Result Compiler::BuildShaderModule(
         }
         moduleDataEx.common.binCode.codeSize = shaderInfo->shaderBin.codeSize;
         if (cl::TrimDebugInfo)
-        {
             moduleDataEx.common.binCode.codeSize -= debugInfoSize;
-        }
     }
     else if (ShaderModuleHelper::isLlvmBitcode(&shaderInfo->shaderBin))
     {
@@ -523,9 +505,7 @@ Result Compiler::BuildShaderModule(
         moduleDataEx.common.binCode = shaderInfo->shaderBin;
     }
     else
-    {
         result = Result::ErrorInvalidShader;
-    }
 
     if (moduleDataEx.common.binType == BinaryType::Spirv)
     {
@@ -545,9 +525,7 @@ Result Compiler::BuildShaderModule(
             moduleDataEx.common.binCode.pCode = trimmedCode;
         }
         else
-        {
             moduleDataEx.common.binCode.pCode = shaderInfo->shaderBin.pCode;
-        }
 
         // Calculate SPIR-V cache hash
         MetroHash::Hash cacheHash = {};
@@ -569,9 +547,7 @@ Result Compiler::BuildShaderModule(
             // times in async-compile mode.
             cacheEntryState = m_shaderCache->findShader(cacheHash, true, &hEntry);
             if (cacheEntryState == ShaderEntryState::Ready)
-            {
                 result = m_shaderCache->retrieveShader(hEntry, &cacheData, &allocSize);
-            }
             if (cacheEntryState != ShaderEntryState::Ready)
             {
                 Context* context = acquireContext();
@@ -673,9 +649,7 @@ Result Compiler::BuildShaderModule(
                         moduleEntryData.pushConstSize = resCollectPass->getPushConstSize();
                         auto& fsOutInfosFromPass = resCollectPass->getFsOutInfos();
                         for (auto& fsOutInfo : fsOutInfosFromPass)
-                        {
                             fsOutInfos.push_back(fsOutInfo);
-                        }
                     }
                     moduleEntries.push_back(moduleEntry);
                     moduleEntryDatas.push_back(moduleEntryData);
@@ -704,9 +678,7 @@ Result Compiler::BuildShaderModule(
             if (cacheEntryState != ShaderEntryState::Ready)
             {
                 for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i)
-                {
                     totalNodeCount += moduleEntryDatas[i].resNodeDataCount;
-                }
 
                 allocSize = sizeof(ShaderModuleDataEx) +
                     moduleDataEx.common.binCode.codeSize +
@@ -754,9 +726,7 @@ Result Compiler::BuildShaderModule(
             moduleDataExCopy->fsOutInfoOffset   = fsOutInfoOffset;
         }
         else
-        {
             memcpy(moduleDataExCopy, cacheData, allocSize);
-        }
 
         ShaderModuleEntry* entry = reinterpret_cast<ShaderModuleEntry*>(voidPtrInc(allocBuf,
                                                                          moduleDataExCopy->entryOffset));
@@ -797,15 +767,11 @@ Result Compiler::BuildShaderModule(
             // Copy fragment shader output variables
             moduleDataExCopy->extra.fsOutInfoCount = fsOutInfos.size();
             if (fsOutInfos.size() > 0)
-            {
                 memcpy(fsOutInfo, &fsOutInfos[0], fsOutInfos.size() * sizeof(FsOutInfo));
-            }
             if (cacheEntryState == ShaderEntryState::Compiling)
             {
                 if (hEntry != nullptr)
-                {
                     m_shaderCache->insertShader(hEntry, moduleDataExCopy, allocSize);
-                }
             }
         }
         else
@@ -825,9 +791,7 @@ Result Compiler::BuildShaderModule(
     else
     {
         if (hEntry != nullptr)
-        {
             m_shaderCache->resetShader(hEntry);
-        }
     }
 
     return result;
@@ -853,9 +817,7 @@ Result Compiler::buildPipelineWithRelocatableElf(
     for (unsigned stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
     {
         if (shaderInfo[stage] == nullptr || shaderInfo[stage]->pModuleData == nullptr)
-        {
             continue;
-        }
 
         context->getPipelineContext()->setShaderStageMask(shaderStageToMask(static_cast<ShaderStage>(stage)));
 
@@ -930,9 +892,8 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(
     const ArrayRef<const PipelineShaderInfo*>& shaderInfo  // Shader info for the pipeline to be built
     ) const
 {
-    if (!cl::UseRelocatableShaderElf) {
+    if (!cl::UseRelocatableShaderElf)
         return false;
-    }
 
     bool useRelocatableShaderElf = true;
     for (unsigned stage = 0; stage < shaderInfo.size(); ++stage)
@@ -940,9 +901,7 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(
         if (stage != ShaderStageVertex && stage != ShaderStageFragment)
         {
             if ((shaderInfo[stage] != nullptr) && (shaderInfo[stage]->pModuleData != nullptr))
-            {
                 useRelocatableShaderElf = false;
-            }
         }
         else if (shaderInfo[stage] == nullptr || shaderInfo[stage]->pModuleData == nullptr)
         {
@@ -955,22 +914,16 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(
     {
         const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo[0]->pModuleData);
         if ((moduleData != nullptr) && (moduleData->binType != BinaryType::Spirv))
-        {
             useRelocatableShaderElf = false;
-        }
     }
 
     if (useRelocatableShaderElf && cl::RelocatableShaderElfLimit != -1)
     {
         static unsigned RelocatableElfCounter = 0;
         if (RelocatableElfCounter >= cl::RelocatableShaderElfLimit)
-        {
             useRelocatableShaderElf = false;
-        }
         else
-        {
             ++RelocatableElfCounter;
-        }
     }
     return useRelocatableShaderElf;
 }
@@ -982,31 +935,23 @@ bool Compiler::canUseRelocatableComputeShaderElf(
     ) const
 {
     if (!llvm::cl::UseRelocatableShaderElf)
-    {
         return false;
-    }
 
     bool useRelocatableShaderElf = true;
     if (useRelocatableShaderElf && shaderInfo != nullptr)
     {
         const ShaderModuleData* moduleData = reinterpret_cast<const ShaderModuleData*>(shaderInfo->pModuleData);
         if ((moduleData != nullptr) && (moduleData->binType != BinaryType::Spirv))
-        {
             useRelocatableShaderElf = false;
-        }
     }
 
     if (useRelocatableShaderElf && cl::RelocatableShaderElfLimit != -1)
     {
         static unsigned RelocatableElfCounter = 0;
         if (RelocatableElfCounter >= cl::RelocatableShaderElfLimit)
-        {
             useRelocatableShaderElf = false;
-        }
         else
-        {
             ++RelocatableElfCounter;
-        }
     }
     return useRelocatableShaderElf;
 }
@@ -1071,9 +1016,7 @@ Result Compiler::buildPipelineInternal(
         {
             const PipelineShaderInfo* shaderInfoEntry = shaderInfo[shaderIndex];
             if ((shaderInfoEntry == nullptr) || (shaderInfoEntry->pModuleData == nullptr))
-            {
                 continue;
-            }
 
             const ShaderModuleDataEx* moduleDataEx =
                 reinterpret_cast<const ShaderModuleDataEx*>(shaderInfoEntry->pModuleData);
@@ -1111,9 +1054,7 @@ Result Compiler::buildPipelineInternal(
                     stageSkipMask |= (1 << shaderIndex);
                 }
                 else
-                {
                     result = Result::ErrorInvalidShader;
-                }
 
                  timerProfiler.startStopTimer(TimerLoadBc, false);
             }
@@ -1134,15 +1075,11 @@ Result Compiler::buildPipelineInternal(
             ShaderStage entryStage = (shaderInfoEntry != nullptr) ? shaderInfoEntry->entryStage : ShaderStageInvalid;
 
             if (entryStage == ShaderStageFragment)
-            {
                 fragmentShaderInfo = shaderInfoEntry;
-            }
             if ((shaderInfoEntry == nullptr) ||
                 (shaderInfoEntry->pModuleData == nullptr) ||
                 (stageSkipMask & shaderStageToMask(entryStage)))
-            {
                 continue;
-            }
 
             std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
             lowerPassMgr->setPassIndex(&passIndex);
@@ -1180,9 +1117,7 @@ Result Compiler::buildPipelineInternal(
             if ((shaderInfoEntry == nullptr) ||
                 (shaderInfoEntry->pModuleData == nullptr) ||
                 (stageSkipMask & shaderStageToMask(entryStage)))
-            {
                 continue;
-            }
 
             context->getBuilder()->setShaderStage(getLgcShaderStage(entryStage));
             std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
@@ -1229,9 +1164,7 @@ Result Compiler::buildPipelineInternal(
                               (context->getShaderStageMask() &
                                (shaderStageToMask(ShaderStageVertex) | shaderStageToMask(ShaderStageFragment)));
     if (checkPerStageCache == false)
-    {
         checkShaderCacheFunc = nullptr;
-    }
 
     // Generate pipeline.
     raw_svector_ostream elfStream(*pipelineElf);
@@ -1269,9 +1202,7 @@ Result Compiler::buildPipelineInternal(
         fragmentShaderInfo &&
         fragmentShaderInfo->options.updateDescInElf &&
         (context->getShaderStageMask() & shaderStageToMask(ShaderStageFragment)))
-    {
         graphicsShaderCacheChecker.updateRootUserDateOffset(pipelineElf);
-    }
 
     context->setDiagnosticHandlerCallBack(nullptr);
 
@@ -1382,9 +1313,7 @@ void GraphicsShaderCacheChecker::updateAndMerge(
         // Determine where the fragment / non-fragment parts come from (cache or just-compiled).
         BinaryData fragmentElf = {};
         if (m_fragmentCacheEntryState == ShaderEntryState::Ready)
-        {
             fragmentElf = m_fragmentElf;
-        }
         else
         {
             fragmentElf.pCode = compiledPipelineElf.data();
@@ -1393,9 +1322,7 @@ void GraphicsShaderCacheChecker::updateAndMerge(
 
         BinaryData nonFragmentElf = {};
         if (m_nonFragmentCacheEntryState == ShaderEntryState::Ready)
-        {
             nonFragmentElf = m_nonFragmentElf;
-        }
         else
         {
             nonFragmentElf.pCode = compiledPipelineElf.data();
@@ -1452,13 +1379,9 @@ Result Compiler::buildGraphicsPipelineInternal(
 
     Result result = Result::Success;
     if (buildingRelocatableElf)
-    {
         result = buildPipelineWithRelocatableElf(context, shaderInfo, forceLoopUnrollCount, pipelineElf);
-    }
     else
-    {
         result = buildPipelineInternal(context, shaderInfo, forceLoopUnrollCount, pipelineElf);
-    }
     releaseContext(context);
     return result;
 }
@@ -1483,9 +1406,7 @@ Result Compiler::BuildGraphicsPipeline(
     };
 
     for (unsigned i = 0; (i < ShaderStageGfxCount) && (result == Result::Success); ++i)
-    {
         result = validatePipelineShaderInfo(shaderInfo[i]);
-    }
 
     MetroHash::Hash cacheHash = {};
     MetroHash::Hash pipelineHash = {};
@@ -1516,9 +1437,7 @@ Result Compiler::BuildGraphicsPipeline(
         std::stringstream strStream;
         strStream << ";Compiler Options: ";
         for (auto& option : m_options)
-        {
             strStream << option << " ";
-        }
         std::string extraInfo = strStream.str();
         PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pipelineDumpFile), &extraInfo);
     }
@@ -1533,13 +1452,9 @@ Result Compiler::BuildGraphicsPipeline(
     CacheEntryHandle hEntry = nullptr;
 
     if (!buildingRelocatableElf)
-    {
         cacheEntryState = lookUpShaderCaches(appCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
-    }
     else
-    {
         cacheEntryState = ShaderEntryState::Compiling;
-    }
 
     ElfPackage candidateElf;
 
@@ -1571,9 +1486,7 @@ Result Compiler::BuildGraphicsPipeline(
     {
         void* allocBuf = nullptr;
         if (pipelineInfo->pfnOutputAlloc != nullptr)
-        {
             allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, elfBin.codeSize);
-        }
         else
         {
             // Allocator is not specified
@@ -1614,13 +1527,9 @@ Result Compiler::buildComputePipelineInternal(
 
     Result result;
     if (buildingRelocatableElf)
-    {
         result = buildPipelineWithRelocatableElf(context, shaderInfo, forceLoopUnrollCount, pipelineElf);
-    }
     else
-    {
         result = buildPipelineInternal(context, shaderInfo, forceLoopUnrollCount, pipelineElf);
-    }
     releaseContext(context);
     return result;
 }
@@ -1660,9 +1569,7 @@ Result Compiler::BuildComputePipeline(
         std::stringstream strStream;
         strStream << ";Compiler Options: ";
         for (auto& option : m_options)
-        {
             strStream << option << " ";
-        }
         std::string extraInfo = strStream.str();
         PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pipelineDumpFile), &extraInfo);
     }
@@ -1676,13 +1583,9 @@ Result Compiler::BuildComputePipeline(
     CacheEntryHandle hEntry = nullptr;
 
     if (!buildingRelocatableElf)
-    {
         cacheEntryState = lookUpShaderCaches(appCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
-    }
     else
-    {
         cacheEntryState = ShaderEntryState::Compiling;
-    }
 
     ElfPackage candidateElf;
 
@@ -1707,9 +1610,7 @@ Result Compiler::BuildComputePipeline(
             elfBin.pCode = candidateElf.data();
         }
         if (!buildingRelocatableElf)
-        {
             updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
-        }
     }
 
     if (result == Result::Success)
@@ -1727,9 +1628,7 @@ Result Compiler::BuildComputePipeline(
                 pipelineOut->pipelineBin.pCode = code;
             }
             else
-            {
                 result = Result::ErrorOutOfMemory;
-            }
         }
         else
         {
@@ -1778,18 +1677,14 @@ MetroHash::Hash Compiler::generateHashForCompileOptions(
         }
 
         if (ignore == false)
-        {
             effectingOptions.insert(option);
-        }
     }
 
     MetroHash64 hasher;
 
     // Build hash code from effecting options
     for (auto option : effectingOptions)
-    {
         hasher.Update(reinterpret_cast<const uint8_t*>(option.data()), option.size());
-    }
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
@@ -2033,9 +1928,7 @@ void Compiler::updateShaderCache(
         shaderCache->insertShader(hEntry, elfBin->pCode, elfBin->codeSize);
     }
     else
-    {
         shaderCache->resetShader(hEntry);
-    }
 }
 
 // =====================================================================================================================
@@ -2056,9 +1949,7 @@ void Compiler::buildShaderCacheHash(
     for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1))
     {
         if ((stageMask & shaderStageToMask(stage)) == 0)
-        {
             continue;
-        }
 
         auto shaderInfo = context->getPipelineShaderInfo(stage);
         MetroHash64 hasher;
@@ -2072,9 +1963,7 @@ void Compiler::buildShaderCacheHash(
 
         // Update vertex input state
         if (stage == ShaderStageVertex)
-        {
             PipelineDumper::updateHashForVertexInputState(pipelineInfo->pVertexInput, &hasher);
-        }
 
         MetroHash::Hash  hash = {};
         hasher.Finalize(hash.bytes);
@@ -2082,13 +1971,9 @@ void Compiler::buildShaderCacheHash(
         // Add per stage hash code to fragmentHasher or nonFragmentHaser per shader stage
         auto shaderHashCode = MetroHash::compact64(&hash);
         if (stage == ShaderStageFragment)
-        {
             fragmentHasher.Update(shaderHashCode);
-        }
         else
-        {
             nonFragmentHasher.Update(shaderHashCode);
-        }
     }
 
     // Add addtional pipeline state to final hasher
@@ -2134,9 +2019,7 @@ void Compiler::linkRelocatableShaderElf(
             size_t codeSize = shaderElfs[ShaderStageVertex].size_in_bytes();
             result = vsReader.ReadFromBuffer(shaderElfs[ShaderStageVertex].data(), &codeSize);
             if (result != Result::Success)
-            {
                 return;
-            }
         }
 
         if (!shaderElfs[ShaderStageFragment].empty())
@@ -2144,9 +2027,7 @@ void Compiler::linkRelocatableShaderElf(
             size_t codeSize = shaderElfs[ShaderStageFragment].size_in_bytes();
             result = fsReader.ReadFromBuffer(shaderElfs[ShaderStageFragment].data(), &codeSize);
             if (result != Result::Success)
-            {
                 return;
-            }
         }
 
         result = writer.linkGraphicsRelocatableElf({&vsReader, &fsReader}, context);
@@ -2157,16 +2038,12 @@ void Compiler::linkRelocatableShaderElf(
         size_t codeSize = shaderElfs[ShaderStageCompute].size_in_bytes();
         result = csReader.ReadFromBuffer(shaderElfs[ShaderStageCompute].data(), &codeSize);
         if (result != Result::Success)
-        {
             return;
-        }
         result = writer.linkComputeRelocatableElf(csReader, context);
     }
 
     if (result != Result::Success)
-    {
         return;
-    }
     writer.writeToBuffer(pipelineElf);
 }
 

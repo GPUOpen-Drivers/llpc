@@ -84,14 +84,10 @@ void ShaderSystemValues::initialize(
 
         // Command line options override pipeline options.
         if (EnableShadowDescriptorTable.getNumOccurrences() > 0)
-        {
             m_enableShadowDescTable = EnableShadowDescriptorTable;
-        }
 
         if (ShadowDescTablePtrHigh.getNumOccurrences() > 0)
-        {
             m_shadowDescTablePtrHigh = ShadowDescTablePtrHigh;
-        }
     }
 }
 
@@ -289,9 +285,7 @@ Value* ShaderSystemValues::getGsVsRingBufDesc(
 {
     assert((m_shaderStage == ShaderStageGeometry) || (m_shaderStage == ShaderStageCopyShader));
     if (m_gsVsRingBufDescs.size() <= streamId)
-    {
         m_gsVsRingBufDescs.resize(streamId + 1);
-    }
     if (m_gsVsRingBufDescs[streamId] == nullptr)
     {
         BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
@@ -389,9 +383,7 @@ Value* ShaderSystemValues::getDescTablePtr(
     unsigned        descSet)        // Descriptor set ID
 {
     if (m_descTablePtrs.size() <= descSet)
-    {
         m_descTablePtrs.resize(descSet + 1);
-    }
     if (m_descTablePtrs[descSet] == nullptr)
     {
         // Find the node.
@@ -415,9 +407,7 @@ Value* ShaderSystemValues::getShadowDescTablePtr(
     unsigned        descSet)        // Descriptor set ID
 {
     if (m_shadowDescTablePtrs.size() <= descSet)
-    {
         m_shadowDescTablePtrs.resize(descSet + 1);
-    }
     if (m_shadowDescTablePtrs[descSet] == nullptr)
     {
         // Find the node.
@@ -543,9 +533,7 @@ Value* ShaderSystemValues::getStreamOutBufDesc(
     unsigned        xfbBuffer)      // Transform feedback buffer ID
 {
     if (m_streamOutBufDescs.size() <= xfbBuffer)
-    {
         m_streamOutBufDescs.resize(xfbBuffer + 1);
-    }
 
     if (m_streamOutBufDescs[xfbBuffer] == nullptr)
     {
@@ -633,13 +621,9 @@ Instruction* ShaderSystemValues::makePointer(
     Instruction* insertPos = nullptr;
     auto lowValueInst = dyn_cast<Instruction>(lowValue);
     if (lowValueInst != nullptr)
-    {
         insertPos = lowValueInst->getNextNode();
-    }
     else
-    {
         insertPos = &*m_entryPoint->front().getFirstInsertionPt();
-    }
 
     Value* extendedPtrValue = nullptr;
     if (highValue == InvalidValue)
@@ -663,9 +647,7 @@ Instruction* ShaderSystemValues::makePointer(
             m_pc = new BitCastInst(pc, VectorType::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
         }
         else
-        {
             insertPos = m_pc->getNextNode();
-        }
         extendedPtrValue = m_pc;
     }
     else
@@ -750,9 +732,7 @@ Value* ShaderSystemValues::getResourceNodeValue(
                                             node->sizeInDwords)->getPointerTo(ADDR_SPACE_CONST);
         }
         else
-        {
             resNodePtrTy = Type::getInt32Ty(*m_context)->getPointerTo(ADDR_SPACE_CONST);
-        }
 
         auto resNodePtr = BitCastInst::CreatePointerCast(elemPtr, resNodePtrTy, "", insertPos);
         resNodePtr->setMetadata(MetaNameUniform, MDNode::get(resNodePtr->getContext(), {}));
@@ -830,9 +810,7 @@ const ResourceNode* ShaderSystemValues::findResourceNodeByType(
     {
         auto node = &userDataNodes[i];
         if (node->type == type)
-        {
             return node;
-        }
     }
     return nullptr;
 }
@@ -848,9 +826,7 @@ unsigned ShaderSystemValues::findResourceNodeByDescSet(
         auto node = &userDataNodes[i];
         if ((node->type == ResourceNodeType::DescriptorTableVaPtr) &&
               (node->innerTable[0].set == descSet))
-        {
             return i;
-        }
     }
     return InvalidValue;
 }

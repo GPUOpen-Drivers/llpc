@@ -118,9 +118,7 @@ bool PatchInOutImportExport::runOnModule(
     // Create the global variable that is to model LDS
     // NOTE: ES -> GS ring is always on-chip on GFX9.
     if (m_hasTs || (m_hasGs && (m_pipelineState->isGsOnChip() || (m_gfxIp.major >= 9))))
-    {
         m_lds = Patch::getLdsVariable(m_pipelineState, m_module);
-    }
 
     // Process each shader in turn, in reverse order (because for example VS uses inOutUsage.tcs.calcFactor
     // set by TCS).
@@ -161,9 +159,7 @@ bool PatchInOutImportExport::runOnModule(
     m_vertexFetch = nullptr;
 
     for (auto& fragColors : m_expFragColors)
-    {
         fragColors.clear();
-    }
     m_pipelineSysValues.clear();
 
     return true;
@@ -190,9 +186,7 @@ void PatchInOutImportExport::processShader()
     if (m_shaderStage == ShaderStageVertex)
     {
         if (builtInUsage.vs.primitiveId)
-        {
             m_primitiveId = getFunctionArgument(m_entryPoint, entryArgIdxs.vs.primitiveId);
-        }
     }
     else if (m_shaderStage == ShaderStageTessEval)
     {
@@ -356,9 +350,7 @@ void PatchInOutImportExport::visitCallInst(
 {
     auto callee = callInst.getCalledFunction();
     if (callee == nullptr)
-    {
         return;
-    }
 
     auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
@@ -423,14 +415,10 @@ void PatchInOutImportExport::visitCallInst(
                     // Builtin Call has different number of operands
                     Value* elemIdx = nullptr; Value* vertexIdx = nullptr;
                     if (callInst.getNumArgOperands() > 1)
-                    {
                         elemIdx = isDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
-                    }
 
                     if (callInst.getNumArgOperands() > 2)
-                    {
                         vertexIdx = isDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
-                    }
 
                     input = patchTcsBuiltInInputImport(inputTy, builtInId, elemIdx, vertexIdx, &callInst);
                     break;
@@ -440,14 +428,10 @@ void PatchInOutImportExport::visitCallInst(
                     // Builtin Call has different number of operands
                     Value *elemIdx = nullptr; Value* vertexIdx = nullptr;
                     if (callInst.getNumArgOperands() > 1)
-                    {
                         elemIdx = isDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
-                    }
 
                     if (callInst.getNumArgOperands() > 2)
-                    {
                         vertexIdx = isDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
-                    }
                     input = patchTesBuiltInInputImport(inputTy, builtInId, elemIdx, vertexIdx, &callInst);
                     break;
                 }
@@ -456,9 +440,7 @@ void PatchInOutImportExport::visitCallInst(
                     // Builtin Call has different number of operands
                     Value* vertexIdx = nullptr;
                     if (callInst.getNumArgOperands() > 1)
-                    {
                         vertexIdx = isDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
-                    }
 
                     input = patchGsBuiltInInputImport(inputTy, builtInId, vertexIdx, &callInst);
                     break;
@@ -467,9 +449,7 @@ void PatchInOutImportExport::visitCallInst(
                 {
                     Value* sampleId = nullptr;
                     if (callInst.getNumArgOperands() >= 2)
-                    {
                         sampleId = callInst.getArgOperand(1);
-                    }
                     input = patchFsBuiltInInputImport(inputTy, builtInId, sampleId, &callInst);
                     break;
                 }
@@ -518,9 +498,7 @@ void PatchInOutImportExport::visitCallInst(
                     // NOTE: For generic inputs of tessellation evaluation shader, they could be per-patch ones.
                     if (resUsage->inOutUsage.inputLocMap.find(value) !=
                         resUsage->inOutUsage.inputLocMap.end())
-                    {
                         loc = resUsage->inOutUsage.inputLocMap[value];
-                    }
                     else
                     {
                         assert(resUsage->inOutUsage.perPatchInputLocMap.find(value) !=
@@ -679,9 +657,7 @@ void PatchInOutImportExport::visitCallInst(
 
             // NOTE: For generic outputs of tessellation control shader, they could be per-patch ones.
             if (resUsage->inOutUsage.outputLocMap.find(value) != resUsage->inOutUsage.outputLocMap.end())
-            {
                 loc = resUsage->inOutUsage.outputLocMap[value];
-            }
             else
             {
                 assert(resUsage->inOutUsage.perPatchOutputLocMap.find(value) !=
@@ -731,18 +707,14 @@ void PatchInOutImportExport::visitCallInst(
                 {
                     // No TS/GS pipeline, VS is the last stage
                     if ((m_hasGs == false) && (m_hasTs == false))
-                    {
                         patchXfbOutputExport(output, xfbBuffer, xfbOffset, xfbExtraOffset, &callInst);
-                    }
                     break;
                 }
             case ShaderStageTessEval:
                 {
                     // TS-only pipeline, TES is the last stage
                     if (m_hasGs == false)
-                    {
                         patchXfbOutputExport(output, xfbBuffer, xfbOffset, xfbExtraOffset, &callInst);
-                    }
                     break;
                 }
             case ShaderStageGeometry:
@@ -998,9 +970,7 @@ void PatchInOutImportExport::visitReturnInst(
 {
     // We only handle the "ret" of shader entry point
     if (m_shaderStage == ShaderStageInvalid)
-    {
         return;
-    }
 
     const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
     const bool enableXfb = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
@@ -1112,42 +1082,30 @@ void PatchInOutImportExport::visitReturnInst(
             // Extract elements of gl_ClipDistance[] and gl_CullDistance[]
             std::vector<Value*> clipDistance;
             for (unsigned i = 0; i < clipDistanceCount; ++i)
-            {
                 clipDistance.push_back(ExtractValueInst::Create(m_clipDistance, { i }, "", insertPos));
-            }
 
             std::vector<Value*> cullDistance;
             for (unsigned i = 0; i < cullDistanceCount; ++i)
-            {
                 cullDistance.push_back(ExtractValueInst::Create(m_cullDistance, { i }, "", insertPos));
-            }
 
             // Merge gl_ClipDistance[] and gl_CullDistance[]
             std::vector<Value*> clipCullDistance;
             for (auto clipDistanceElement : clipDistance)
-            {
                 clipCullDistance.push_back(clipDistanceElement);
-            }
 
             for (auto cullDistanceElement : cullDistance)
-            {
                 clipCullDistance.push_back(cullDistanceElement);
-            }
 
             // Do array padding
             if (clipCullDistance.size() <= 4)
             {
                 while (clipCullDistance.size() < 4) // [4 x float]
-                {
                     clipCullDistance.push_back(undef);
-                }
             }
             else
             {
                 while (clipCullDistance.size() < 8) // [8 x float]
-                {
                     clipCullDistance.push_back(undef);
-                }
             }
 
             // NOTE: When gl_PointSize, gl_Layer, or gl_ViewportIndex is used, gl_ClipDistance[] or gl_CullDistance[]
@@ -1205,34 +1163,24 @@ void PatchInOutImportExport::visitReturnInst(
 
                     clipCullDistance.clear();
                     for (unsigned i = 0; i < clipDistanceCount; ++i)
-                    {
                         clipCullDistance.push_back(clipDistance[i]);
-                    }
 
                     for (unsigned i = clipDistanceCount; i < nextBuiltInUsage.clipDistance; ++i)
-                    {
                         clipCullDistance.push_back(undef);
-                    }
 
                     for (unsigned i = 0; i < cullDistanceCount; ++i)
-                    {
                         clipCullDistance.push_back(cullDistance[i]);
-                    }
 
                     // Do array padding
                     if (clipCullDistance.size() <= 4)
                     {
                         while (clipCullDistance.size() < 4) // [4 x float]
-                        {
                             clipCullDistance.push_back(undef);
-                        }
                     }
                     else
                     {
                         while (clipCullDistance.size() < 8) // [8 x float]
-                        {
                             clipCullDistance.push_back(undef);
-                        }
                     }
                 }
             }
@@ -1244,9 +1192,7 @@ void PatchInOutImportExport::visitReturnInst(
                 {
                     if (inOutUsage.gs.builtInOutLocs.find(BuiltInClipDistance) !=
                         inOutUsage.gs.builtInOutLocs.end())
-                    {
                         loc = inOutUsage.gs.builtInOutLocs[BuiltInClipDistance];
-                    }
                     else
                     {
                         assert(inOutUsage.gs.builtInOutLocs.find(BuiltInCullDistance) !=
@@ -1258,9 +1204,7 @@ void PatchInOutImportExport::visitReturnInst(
                 {
                     if (inOutUsage.builtInOutputLocMap.find(BuiltInClipDistance) !=
                         inOutUsage.builtInOutputLocMap.end())
-                    {
                         loc = inOutUsage.builtInOutputLocMap[BuiltInClipDistance];
-                    }
                     else
                     {
                         assert(inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) !=
@@ -1536,9 +1480,7 @@ void PatchInOutImportExport::visitReturnInst(
             for(auto locMap : resUsage->inOutUsage.outputLocMap)
             {
                 if (m_expLocs.count(locMap.second) != 0)
-                {
                     continue;
-                }
                 ++inOutUsage.expCount;
             }
         }
@@ -1623,17 +1565,13 @@ void PatchInOutImportExport::visitReturnInst(
                 const unsigned channelMask = ((1 << compCount) - 1);
                 const unsigned origLoc = resUsage->inOutUsage.fs.outputOrigLocs[location];
                 if (origLoc == InvalidValue)
-                {
                     continue;
-                }
 
                 resUsage->inOutUsage.fs.cbShaderMask |= (channelMask << (4 * origLoc));
 
                 // Construct exported fragment colors
                 if (compCount == 1)
-                {
                     output = expFragColor[0];
-                }
                 else
                 {
                     const auto compTy = expFragColor[0]->getType();
@@ -1653,9 +1591,7 @@ void PatchInOutImportExport::visitReturnInst(
                 // Do fragment color exporting
                 auto exportInst = m_fragColorExport->run(output, location, insertPos);
                 if (exportInst != nullptr)
-                {
                     m_lastExport = cast<CallInst>(exportInst);
-                }
             }
         }
 
@@ -1687,9 +1623,7 @@ void PatchInOutImportExport::visitReturnInst(
         // Set "done" flag
         auto exportName = m_lastExport->getCalledFunction()->getName();
         if (exportName == "llvm.amdgcn.exp.f32")
-        {
             m_lastExport->setOperand(6, ConstantInt::get(Type::getInt1Ty(*m_context), true));
-        }
         else
         {
             assert(exportName == "llvm.amdgcn.exp.compr.v2f16");
@@ -1720,9 +1654,7 @@ Value* PatchInOutImportExport::patchVsGenericInputImport(
         input = new BitCastInst(vertex, inputTy, "", insertPos);
     }
     else
-    {
         input = vertex;
-    }
 
     return input;
 }
@@ -1783,9 +1715,7 @@ Value* PatchInOutImportExport::patchGsGenericInputImport(
         inputTy = VectorType::get(Type::getFloatTy(*m_context), compCount * 2);
     }
     else
-    {
         assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
-    }
 
     Value* input = loadValueFromEsGsRing(inputTy, location, compIdx, vertexIdx, insertPos);
 
@@ -1822,9 +1752,7 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
 
     const unsigned locCount = (inputTy->getPrimitiveSizeInBits() / 8 > SizeOfVec4) ? 2 : 1;
     while (interpInfo.size() <= location + locCount - 1)
-    {
         interpInfo.push_back(InvalidFsInterpInfo);
-    }
     interpInfo[location] =
     {
         location,
@@ -1866,9 +1794,7 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
                                            insertPos);
                 }
                 else if (interpLoc == InOutInfo::InterpLocSample)
-                {
                     ij = getFunctionArgument(m_entryPoint, entryArgIdxs.perspInterp.sample);
-                }
                 else
                 {
                     assert(interpLoc == InOutInfo::InterpLocCenter);
@@ -1885,9 +1811,7 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
                                            insertPos);
                 }
                 else if (interpLoc == InOutInfo::InterpLocSample)
-                {
                     ij = getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.sample);
-                }
                 else
                 {
                     assert(interpLoc == InOutInfo::InterpLocCenter);
@@ -1918,24 +1842,16 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
         interpTy = Type::getInt8Ty(*m_context);
     }
     else if (bitWidth == 16)
-    {
         interpTy = Type::getHalfTy(*m_context);
-    }
     else
-    {
         interpTy = Type::getFloatTy(*m_context);
-    }
     if (numChannels > 1)
-    {
         interpTy = VectorType::get(interpTy, numChannels);
-    }
     Value* interp = UndefValue::get(interpTy);
 
     unsigned startChannel = 0;
     if (compIdx != nullptr)
-    {
         startChannel = cast<ConstantInt>(compIdx)->getZExtValue();
-    }
 
     Value* loc = ConstantInt::get(Type::getInt32Ty(*m_context), location);
     if (locOffset != nullptr)
@@ -2036,9 +1952,7 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
                 }
             }
             else
-            {
                 assert(interpMode == InOutInfo::InterpModeFlat);
-            }
 
             Value* args[] = {
                 ConstantInt::get(Type::getInt32Ty(*m_context), interpParam),           // param
@@ -2068,9 +1982,7 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
         }
 
         if (numChannels == 1)
-        {
             interp = compValue;
-        }
         else
         {
             interp = InsertElementInst::Create(interp,
@@ -2083,9 +1995,7 @@ Value* PatchInOutImportExport::patchFsGenericInputImport(
 
     // Store interpolation results to inputs
     if (interpTy == inputTy)
-    {
         input = interp;
-    }
     else
     {
         assert(canBitCast(interpTy, inputTy));
@@ -2146,16 +2056,12 @@ void PatchInOutImportExport::patchVsGenericOutputExport(
                 output = new BitCastInst(output, outputTy, "", insertPos);
             }
             else
-            {
                 assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
-            }
 
             storeValueToEsGsRing(output, location, compIdx, insertPos);
         }
         else
-        {
             addExportInstForGenericOutput(output, location, compIdx, insertPos);
-        }
     }
 }
 
@@ -2201,16 +2107,12 @@ void PatchInOutImportExport::patchTesGenericOutputExport(
             output = new BitCastInst(output, outputTy, "", insertPos);
         }
         else
-        {
             assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
-        }
 
         storeValueToEsGsRing(output, location, compIdx, insertPos);
     }
     else
-    {
         addExportInstForGenericOutput(output, location, compIdx, insertPos);
-    }
 }
 
 // =====================================================================================================================
@@ -2232,29 +2134,21 @@ void PatchInOutImportExport::patchGsGenericOutputExport(
         compIdx *= 2;
 
         if (outputTy->isVectorTy())
-        {
             outputTy = VectorType::get(Type::getFloatTy(*m_context), outputTy->getVectorNumElements() * 2);
-        }
         else
-        {
             outputTy = VectorType::get(Type::getFloatTy(*m_context), 2);
-        }
 
         output = new BitCastInst(output, outputTy, "", insertPos);
     }
     else
-    {
         assert((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
-    }
 
     const unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() : 1;
     // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD to DWORD and
     // store DWORD to GS-VS ring. So for 8-bit/16-bit data type, the actual byte size is based on number of DWORDs.
     unsigned byteSize = (outputTy->getScalarSizeInBits() / 8) * compCount;
     if ((bitWidth == 8) || (bitWidth == 16))
-    {
         byteSize *= (32 / bitWidth);
-    }
 
     assert(compIdx <= 4);
 
@@ -2290,9 +2184,7 @@ void PatchInOutImportExport::patchFsGenericOutputExport(
     {
         Value* outputComp = nullptr;
         if (compCount == 1)
-        {
             outputComp = output;
-        }
         else
         {
             outputComp = ExtractElementInst::Create(output,
@@ -2308,14 +2200,10 @@ void PatchInOutImportExport::patchFsGenericOutputExport(
     auto& expFragColor = m_expFragColors[location];
 
     while (compIdx + compCount > expFragColor.size())
-    {
         expFragColor.push_back(UndefValue::get(compTy));
-    }
 
     for (unsigned i = 0; i < compCount; ++i)
-    {
         expFragColor[compIdx + i] = outputComps[i];
-    }
 }
 
 // =====================================================================================================================
@@ -2536,9 +2424,7 @@ Value* PatchInOutImportExport::patchTesBuiltInInputImport(
             unsigned patchVertices = MaxTessPatchVertices;
             const bool hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);
             if (hasTcs)
-            {
                 patchVertices = m_pipelineState->getShaderModes()->getTessellationMode().outputVertices;
-            }
 
             input = ConstantInt::get(Type::getInt32Ty(*m_context), patchVertices);
 
@@ -2554,13 +2440,9 @@ Value* PatchInOutImportExport::patchTesBuiltInInputImport(
             auto tessCoord = m_pipelineSysValues.get(m_entryPoint)->getTessCoord();
 
             if (elemIdx != nullptr)
-            {
                 input = ExtractElementInst::Create(tessCoord, elemIdx, "", insertPos);
-            }
             else
-            {
                 input = tessCoord;
-            }
 
             break;
         }
@@ -2791,9 +2673,7 @@ Value* PatchInOutImportExport::patchFsBuiltInInputImport(
 
             auto& interpInfo = inOutUsage.fs.interpInfo;
             while (interpInfo.size() <= loc)
-            {
                 interpInfo.push_back(InvalidFsInterpInfo);
-            }
             interpInfo[loc] = { loc, false, false, false };
 
             // Emulation for "in vec2 gl_PointCoord"
@@ -2850,9 +2730,7 @@ Value* PatchInOutImportExport::patchFsBuiltInInputImport(
 
             auto& interpInfo = inOutUsage.fs.interpInfo;
             while (interpInfo.size() <= loc)
-            {
                 interpInfo.push_back(InvalidFsInterpInfo);
-            }
             interpInfo[loc] = { loc, true, false }; // Flat interpolation
 
             // Emulation for "in int gl_PrimitiveID" or "in int gl_Layer" or "in int gl_ViewportIndex"
@@ -2897,15 +2775,11 @@ Value* PatchInOutImportExport::patchFsBuiltInInputImport(
 
             auto& interpInfo = inOutUsage.fs.interpInfo;
             while (interpInfo.size() <= loc + locCount -1)
-            {
                 interpInfo.push_back(InvalidFsInterpInfo);
-            }
 
             interpInfo[loc] = { loc, false, false };
             if (locCount > 1)
-            {
                 interpInfo[loc + 1] = { loc + 1, false, false };
-            }
 
             // Emulation for "in float gl_ClipDistance[]" or "in float gl_CullDistance[]"
             auto primMask = getFunctionArgument(m_entryPoint, entryArgIdxs.primMask);
@@ -3413,9 +3287,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
     case BuiltInPosition:
         {
             if (builtInUsage.position == false)
-            {
                 return;
-            }
 
             if (m_hasTs)
             {
@@ -3433,9 +3305,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
                     storeValueToEsGsRing(output, loc, 0, insertPos);
                 }
                 else
-                {
                     addExportInstForBuiltInOutput(output, builtInId, insertPos);
-                }
             }
 
             break;
@@ -3443,9 +3313,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
     case BuiltInPointSize:
         {
             if (builtInUsage.pointSize == false)
-            {
                 return;
-            }
 
             if (isa<UndefValue>(output))
             {
@@ -3471,9 +3339,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
                     storeValueToEsGsRing(output, loc, 0, insertPos);
                 }
                 else
-                {
                     addExportInstForBuiltInOutput(output, builtInId, insertPos);
-                }
             }
 
             break;
@@ -3481,9 +3347,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
     case BuiltInClipDistance:
         {
             if (builtInUsage.clipDistance == 0)
-            {
                 return;
-            }
 
             if (isa<UndefValue>(output))
             {
@@ -3532,9 +3396,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
     case BuiltInCullDistance:
         {
             if (builtInUsage.cullDistance == 0)
-            {
                 return;
-            }
 
             if (isa<UndefValue>(output))
             {
@@ -3583,9 +3445,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
     case BuiltInLayer:
         {
             if (builtInUsage.layer == false)
-            {
                 return;
-            }
 
             const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
 
@@ -3593,9 +3453,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
             if ((m_hasTs == false) && (m_hasGs == false) && (enableMultiView == false))
             {
                 if (m_gfxIp.major <= 8)
-                {
                     addExportInstForBuiltInOutput(output, builtInId, insertPos);
-                }
                 else
                 {
                     // NOTE: The export of gl_Layer is delayed and is done before entry-point returns.
@@ -3608,17 +3466,13 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(
     case BuiltInViewportIndex:
         {
             if (builtInUsage.viewportIndex == false)
-            {
                 return;
-            }
 
             // NOTE: Only last non-fragment shader stage has to export the value of gl_ViewportIndex.
             if ((m_hasTs == false) && (m_hasGs == false))
             {
                 if (m_gfxIp.major <= 8)
-                {
                     addExportInstForBuiltInOutput(output, builtInId, insertPos);
-                }
                 else
                 {
                     // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
@@ -3657,9 +3511,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(
     case BuiltInPosition:
         {
             if (builtInUsage.position == false)
-            {
                 return;
-            }
 
             assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
             unsigned loc = builtInOutLocMap[builtInId];
@@ -3672,9 +3524,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(
     case BuiltInPointSize:
         {
             if (builtInUsage.pointSize == false)
-            {
                 return;
-            }
 
             assert(elemIdx == nullptr);
             assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
@@ -3690,9 +3540,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(
         {
             if (((builtInId == BuiltInClipDistance) && (builtInUsage.clipDistance == 0)) ||
                 ((builtInId == BuiltInCullDistance) && (builtInUsage.cullDistance == 0)))
-            {
                 return;
-            }
 
             assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
             unsigned loc = builtInOutLocMap[builtInId];
@@ -3885,9 +3733,7 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(
     case BuiltInPosition:
         {
             if (builtInUsage.position == false)
-            {
                 return;
-            }
 
             if (m_hasGs)
             {
@@ -3897,18 +3743,14 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(
                 storeValueToEsGsRing(output, loc, 0, insertPos);
             }
             else
-            {
                 addExportInstForBuiltInOutput(output, builtInId, insertPos);
-            }
 
             break;
         }
     case BuiltInPointSize:
         {
             if (builtInUsage.pointSize == false)
-            {
                 return;
-            }
 
             if (isa<UndefValue>(output))
             {
@@ -3926,18 +3768,14 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(
                 storeValueToEsGsRing(output, loc, 0, insertPos);
             }
             else
-            {
                 addExportInstForBuiltInOutput(output, builtInId, insertPos);
-            }
 
             break;
         }
     case BuiltInClipDistance:
         {
             if (builtInUsage.clipDistance == 0)
-            {
                 return;
-            }
 
             if (isa<UndefValue>(output))
             {
@@ -3965,9 +3803,7 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(
     case BuiltInCullDistance:
         {
             if (builtInUsage.cullDistance == 0)
-            {
                 return;
-            }
 
             if (isa<UndefValue>(output))
             {
@@ -3995,9 +3831,7 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(
     case BuiltInLayer:
         {
             if (builtInUsage.layer == false)
-            {
                 return;
-            }
 
             const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
 
@@ -4005,9 +3839,7 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(
             if ((m_hasGs == false) && (enableMultiView == false))
             {
                 if (m_gfxIp.major <= 8)
-                {
                     addExportInstForBuiltInOutput(output, builtInId, insertPos);
-                }
                 else
                 {
                     // NOTE: The export of gl_Layer is delayed and is done before entry-point returns.
@@ -4020,17 +3852,13 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(
     case BuiltInViewportIndex:
         {
             if (builtInUsage.viewportIndex == false)
-            {
                 return;
-            }
 
             // NOTE: Only last non-fragment shader stage has to export the value of gl_ViewportIndex.
             if (m_hasGs == false)
             {
                 if (m_gfxIp.major <= 8)
-                {
                     addExportInstForBuiltInOutput(output, builtInId, insertPos);
-                }
                 else
                 {
                     // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
@@ -4179,9 +4007,7 @@ void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(
             const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
 
             if ((m_gfxIp.major <= 8) && (enableMultiView == false))
-            {
                 addExportInstForBuiltInOutput(output, builtInId, insertPos);
-            }
             else
             {
                 // NOTE: The export of gl_Layer is delayed and is done before entry-point returns.
@@ -4193,9 +4019,7 @@ void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(
     case BuiltInViewportIndex:
         {
             if (m_gfxIp.major <= 8)
-            {
                 addExportInstForBuiltInOutput(output, builtInId, insertPos);
-            }
             else
             {
                 // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
@@ -4403,9 +4227,7 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(
         unsigned outofRangeValue = 0xFFFFFFFF;
         // Divide outofRangeValue by xfbStride only for GFX8.
         if (m_gfxIp.major == 8)
-        {
             outofRangeValue /= xfbStride;
-        }
         outofRangeValue -= (m_pipelineState->getShaderWaveSize(m_shaderStage) - 1);
         writeIndex = SelectInst::Create(threadValid,
                                          writeIndex,
@@ -4415,9 +4237,7 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(
         BranchInst::Create(storeBlock, entryBlock);
     }
     else
-    {
         BranchInst::Create(storeBlock, endBlock, threadValid, entryBlock);
-    }
 
     auto storeTy = storeValue->getType();
 
@@ -4464,21 +4284,13 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(
     if (m_gfxIp.major >= 10)
     {
         if (compCount == 4)
-        {
             format = (bitWidth == 32) ? BUF_FORMAT_32_32_32_32_FLOAT : BUF_FORMAT_16_16_16_16_FLOAT;
-        }
         else if (compCount == 2)
-        {
             format = (bitWidth == 32) ? BUF_FORMAT_32_32_FLOAT : BUF_FORMAT_16_16_FLOAT;
-        }
         else if (compCount == 1)
-        {
             format = (bitWidth == 32) ? BUF_FORMAT_32_FLOAT : BUF_FORMAT_16_FLOAT;
-        }
         else
-        {
             llvm_unreachable("Should never be called!");
-        }
     }
 
     // byteOffset = streamOffsets[xfbBuffer] * 4 +
@@ -4536,9 +4348,7 @@ unsigned PatchInOutImportExport::combineBufferStore(
         };
     }
     else
-    {
         llvm_unreachable("Not implemented!");
-    }
 
     Type* storeTys[4] =
     {
@@ -4577,9 +4387,7 @@ unsigned PatchInOutImportExport::combineBufferStore(
                 }
             }
             else
-            {
                 storeValue = storeValues[startIdx];
-            }
 
             auto writeOffset = BinaryOperator::CreateAdd(storeOffset,
                                                           ConstantInt::get(Type::getInt32Ty(*m_context),
@@ -4637,9 +4445,7 @@ unsigned PatchInOutImportExport::combineBufferLoad(
         };
     }
     else
-    {
         llvm_unreachable("Not implemented!");
-    }
 
     Type* loadTyps[4] =
     {
@@ -4691,9 +4497,7 @@ unsigned PatchInOutImportExport::combineBufferLoad(
                 }
             }
             else
-            {
                 loadValues[startIdx] = loadValue;
-            }
 
             break;
         }
@@ -4724,9 +4528,7 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(
     {
         Type* bitCastTy = (bitWidth == 32) ? Type::getFloatTy(*m_context) : Type::getHalfTy(*m_context);
         if (compCount > 1)
-        {
             bitCastTy = VectorType::get(bitCastTy, compCount);
-        }
         storeValue = new BitCastInst(storeValue, bitCastTy, "", insertPos);
     }
 
@@ -4761,9 +4563,7 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(
         for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i)
         {
             if (inoutUsage.xfbStrides[i] > 0)
-            {
                 streamOffsets[i] = streamOffset++;
-            }
         }
     }
 
@@ -4793,9 +4593,7 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(
     auto writeIndexVal = getFunctionArgument(m_entryPoint, writeIndex);
 
     if (m_gfxIp.major >= 9)
-    {
         writeIndexVal = BinaryOperator::CreateAdd(writeIndexVal, m_threadId, "", insertPos);
-    }
 
     std::string funcName = lgcName::StreamOutBufferStore;
     createStreamOutBufferStoreFunction(storeValue, xfbStride, funcName);
@@ -4824,13 +4622,9 @@ void PatchInOutImportExport::storeValueToEsGsRing(
 
     Type* elemTy = storeTy;
     if (storeTy->isArrayTy())
-    {
         elemTy = storeTy->getArrayElementType();
-    }
     else if (storeTy->isVectorTy())
-    {
         elemTy = storeTy->getVectorElementType();
-    }
 
     const uint64_t bitWidth = elemTy->getScalarSizeInBits();
     assert((elemTy->isFloatingPointTy() || elemTy->isIntegerTy()) &&
@@ -4845,9 +4639,7 @@ void PatchInOutImportExport::storeValueToEsGsRing(
         {
             Value* storeElem = nullptr;
             if (storeTy->isArrayTy())
-            {
                 storeElem = ExtractValueInst::Create(storeValue, { i }, "", insertPos);
-            }
             else
             {
                 storeElem = ExtractElementInst::Create(storeValue,
@@ -4875,18 +4667,14 @@ void PatchInOutImportExport::storeValueToEsGsRing(
         {
             assert(bitWidth == 32);
             if (storeTy->isFloatingPointTy())
-            {
                 storeValue = new BitCastInst(storeValue, Type::getInt32Ty(*m_context), "", insertPos);
-            }
         }
 
         // Call buffer store intrinsic or LDS store
         const auto& entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs;
         Value* esGsOffset = nullptr;
         if (m_shaderStage == ShaderStageVertex)
-        {
             esGsOffset = getFunctionArgument(m_entryPoint, entryArgIdxs.vs.esGsOffset);
-        }
         else
         {
             assert(m_shaderStage == ShaderStageTessEval);
@@ -4942,13 +4730,9 @@ Value* PatchInOutImportExport::loadValueFromEsGsRing(
 {
     Type* elemTy = loadTy;
     if (loadTy->isArrayTy())
-    {
         elemTy = loadTy->getArrayElementType();
-    }
     else if (loadTy->isVectorTy())
-    {
         elemTy = loadTy->getVectorElementType();
-    }
 
     const uint64_t bitWidth = elemTy->getScalarSizeInBits();
     assert((elemTy->isFloatingPointTy() || elemTy->isIntegerTy()) &&
@@ -4970,9 +4754,7 @@ Value* PatchInOutImportExport::loadValueFromEsGsRing(
                                                    insertPos);
 
             if (loadTy->isArrayTy())
-            {
                 loadValue = InsertValueInst::Create(loadValue, loadElem, { i }, "", insertPos);
-            }
             else
             {
                 loadValue = InsertElementInst::Create(loadValue,
@@ -4998,18 +4780,12 @@ Value* PatchInOutImportExport::loadValueFromEsGsRing(
             loadValue = loadInst;
 
             if (bitWidth == 8)
-            {
                 loadValue = new TruncInst(loadValue, Type::getInt8Ty(*m_context), "", insertPos);
-            }
             else if (bitWidth == 16)
-            {
                 loadValue = new TruncInst(loadValue, Type::getInt16Ty(*m_context), "", insertPos);
-            }
 
             if (loadTy->isFloatingPointTy())
-            {
                 loadValue = new BitCastInst(loadValue, loadTy, "", insertPos);
-            }
         }
         else
         {
@@ -5042,17 +4818,13 @@ Value* PatchInOutImportExport::loadValueFromEsGsRing(
                 loadValue = new TruncInst(loadValue, Type::getInt16Ty(*m_context), "", insertPos);
 
                 if (loadTy->isFloatingPointTy())
-                {
                     loadValue = new BitCastInst(loadValue, loadTy, "", insertPos);
-                }
             }
             else
             {
                 assert(bitWidth == 32);
                 if (loadTy->isIntegerTy())
-                {
                     loadValue = new BitCastInst(loadValue, loadTy, "", insertPos);
-                }
             }
         }
     }
@@ -5073,13 +4845,9 @@ void PatchInOutImportExport::storeValueToGsVsRing(
 
     Type* elemTy = storeTy;
     if (storeTy->isArrayTy())
-    {
         elemTy = storeTy->getArrayElementType();
-    }
     else if (storeTy->isVectorTy())
-    {
         elemTy = storeTy->getVectorElementType();
-    }
 
     const unsigned bitWidth = elemTy->getScalarSizeInBits();
     assert((elemTy->isFloatingPointTy() || elemTy->isIntegerTy()) &&
@@ -5109,9 +4877,7 @@ void PatchInOutImportExport::storeValueToGsVsRing(
         {
             Value* storeElem = nullptr;
             if (storeTy->isArrayTy())
-            {
                 storeElem = ExtractValueInst::Create(storeValue, { i }, "", insertPos);
-            }
             else
             {
                 storeElem = ExtractElementInst::Create(storeValue,
@@ -5142,9 +4908,7 @@ void PatchInOutImportExport::storeValueToGsVsRing(
         {
             assert(bitWidth == 32);
             if (storeTy->isFloatingPointTy())
-            {
                 storeValue = new BitCastInst(storeValue, Type::getInt32Ty(*m_context), "", insertPos);
-            }
         }
 
         const auto& entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs;
@@ -5207,9 +4971,7 @@ void PatchInOutImportExport::storeValueToGsVsRing(
                 emitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_context), args, {}, insertPos);
             }
             else
-            {
                 llvm_unreachable("Not implemented!");
-            }
         }
     }
 }
@@ -5432,18 +5194,14 @@ Value* PatchInOutImportExport::readValueFromLds(
 
         CoherentFlag coherent = {};
         if (m_gfxIp.major <= 9)
-        {
             coherent.bits.glc = true;
-        }
         else if (m_gfxIp.major == 10)
         {
             coherent.bits.glc = true;
             coherent.bits.dlc = true;
         }
         else
-        {
             llvm_unreachable("Not implemented!");
-        }
 
         for (unsigned i = 0, combineCount = 0; i < numChannels; i += combineCount)
         {
@@ -5458,13 +5216,9 @@ Value* PatchInOutImportExport::readValueFromLds(
             for (unsigned j = i; j < i + combineCount; ++j)
             {
                 if (bitWidth == 8)
-                {
                     loadValues[j] = new TruncInst(loadValues[j], Type::getInt8Ty(*m_context), "", insertPos);
-                }
                 else if (bitWidth == 16)
-                {
                     loadValues[j] = new TruncInst(loadValues[j], Type::getInt16Ty(*m_context), "", insertPos);
-                }
             }
         }
     }
@@ -5482,13 +5236,9 @@ Value* PatchInOutImportExport::readValueFromLds(
             loadValues[i]=loadInst;
 
             if (bitWidth == 8)
-            {
                 loadValues[i] = new TruncInst(loadValues[i], Type::getInt8Ty(*m_context), "", insertPos);
-            }
             else if (bitWidth == 16)
-            {
                 loadValues[i] = new TruncInst(loadValues[i], Type::getInt16Ty(*m_context), "", insertPos);
-            }
 
             ldsOffset = BinaryOperator::CreateAdd(ldsOffset,
                                                    ConstantInt::get(Type::getInt32Ty(*m_context), 1),
@@ -5517,9 +5267,7 @@ Value* PatchInOutImportExport::readValueFromLds(
         }
     }
     else
-    {
         castValue = loadValues[0];
-    }
 
     // Cast <n x i8>, <n x i16> or <n x i32> vector to read value
     return new BitCastInst(castValue, readTy, "", insertPos);
@@ -5561,9 +5309,7 @@ void PatchInOutImportExport::writeValueToLds(
                                                         insertPos);
 
             if ((bitWidth == 8) || (bitWidth == 16))
-            {
                 storeValues[i] = new ZExtInst(storeValues[i], Type::getInt32Ty(*m_context), "", insertPos);
-            }
         }
     }
     else
@@ -5571,9 +5317,7 @@ void PatchInOutImportExport::writeValueToLds(
         storeValues[0] = castValue;
 
         if ((bitWidth == 8) || (bitWidth == 16))
-        {
             storeValues[0] = new ZExtInst(storeValues[0], Type::getInt32Ty(*m_context), "", insertPos);
-        }
     }
 
     if (m_pipelineState->isTessOffChip() && (m_shaderStage == ShaderStageTessControl))     // Write to off-chip LDS buffer
@@ -5786,9 +5530,7 @@ void PatchInOutImportExport::storeTessFactorToBuffer(
         auto tfBufDesc = m_pipelineSysValues.get(m_entryPoint)->getTessFactorBufDesc();
         std::vector<Value*> tfValues(tessFactors.size());
         for (unsigned i = 0; i < tessFactors.size(); i++)
-        {
             tfValues[i] = new BitCastInst(tessFactors[i], Type::getInt32Ty(*m_context), "", insertPos);
-        }
 
         CoherentFlag coherent = {};
         coherent.bits.glc = true;
@@ -5817,9 +5559,7 @@ void PatchInOutImportExport::storeTessFactorToBuffer(
         assert(tessFactors.size() == 1);
 
         if (m_module->getFunction(lgcName::TfBufferStore) == nullptr)
-        {
             createTessBufferStoreFunction();
-        }
 
         if (m_pipelineState->isTessOffChip())
         {
@@ -6006,9 +5746,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTcsInput(
     Value* attribOffset = ConstantInt::get(Type::getInt32Ty(*m_context), location);
 
     if (locOffset != nullptr)
-    {
         attribOffset = BinaryOperator::CreateAdd(attribOffset, locOffset, "", insertPos);
-    }
 
     attribOffset = BinaryOperator::CreateMul(attribOffset,
                                               ConstantInt::get(Type::getInt32Ty(*m_context), 4),
@@ -6073,9 +5811,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTcsOutput(
     Value* attibOffset = ConstantInt::get(Type::getInt32Ty(*m_context), location);
 
     if (locOffset != nullptr)
-    {
         attibOffset = BinaryOperator::CreateAdd(attibOffset, locOffset, "", insertPos);
-    }
 
     attibOffset = BinaryOperator::CreateMul(attibOffset,
                                              ConstantInt::get(Type::getInt32Ty(*m_context), 4),
@@ -6164,9 +5900,7 @@ Value* PatchInOutImportExport::calcLdsOffsetForTesInput(
     Value* attibOffset = ConstantInt::get(Type::getInt32Ty(*m_context), location);
 
     if (locOffset != nullptr)
-    {
         attibOffset = BinaryOperator::CreateAdd(attibOffset, locOffset, "", insertPos);
-    }
 
     attibOffset = BinaryOperator::CreateMul(attibOffset,
                                              ConstantInt::get(Type::getInt32Ty(*m_context), 4),
@@ -6399,17 +6133,13 @@ void PatchInOutImportExport::addExportInstForGenericOutput(
         }
     }
     else
-    {
         exportInst = output;
-    }
 
     assert(numChannels <= 8);
     Value* exportValues[8] = { nullptr };
 
     if (numChannels == 1)
-    {
         exportValues[0] = exportInst;
-    }
     else
     {
         for (unsigned i = 0; i < numChannels; ++i)
@@ -6440,9 +6170,7 @@ void PatchInOutImportExport::addExportInstForGenericOutput(
         }
 
         for (unsigned i = startChannel; i < startChannel + numChannels; ++i)
-        {
             args.push_back(exportValues[i - startChannel]);
-        }
 
         for (unsigned i = startChannel + numChannels; i < 4; ++i)
         {
@@ -6469,9 +6197,7 @@ void PatchInOutImportExport::addExportInstForGenericOutput(
 
         // src0 ~ src3
         for (unsigned i = 0; i < 4; ++i)
-        {
             args.push_back(exportValues[i]);
-        }
 
         args.push_back(ConstantInt::get(Type::getInt1Ty(*m_context), false));  // done
         args.push_back(ConstantInt::get(Type::getInt1Ty(*m_context), false));  // vm
@@ -6488,9 +6214,7 @@ void PatchInOutImportExport::addExportInstForGenericOutput(
 
         // src0 ~ src3
         for (unsigned i = 4; i < numChannels; ++i)
-        {
             args.push_back(exportValues[i]);
-        }
 
         for (unsigned i = numChannels; i < 8; ++i)
         {
@@ -6737,9 +6461,7 @@ Value* PatchInOutImportExport::adjustCentroidIj(
         ij = SelectInst::Create(cond, centerIj, centroidIj, "", insertPos);
     }
     else
-    {
         ij = centroidIj;
-    }
 
     return ij;
 }
@@ -6792,9 +6514,7 @@ WorkgroupLayout PatchInOutImportExport::calculateWorkgroupLayout()
             // If no configuration has been specified, apply a reconfigure if the compute shader uses images and the
             // pipeline option was enabled.
             if (resUsage.useImages)
-            {
                 reconfig = m_pipelineState->getOptions().reconfigWorkgroupLayout;
-            }
             break;
         case WorkgroupLayout::Linear:
             // The hardware by default applies the linear rules, so just ban reconfigure and we're done.
@@ -7170,9 +6890,7 @@ Value* PatchInOutImportExport::getInLocalInvocationId(
     // do the reconfiguration for this workgroup.
     if ((workgroupLayout != WorkgroupLayout::Unknown) &&
         (workgroupLayout != WorkgroupLayout::Linear))
-    {
         locaInvocatioId = reconfigWorkgroup(locaInvocatioId, insertPos);
-    }
     else
     {
         if (builtInUsage.workgroupSizeZ > 1)

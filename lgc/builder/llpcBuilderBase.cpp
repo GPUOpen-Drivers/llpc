@@ -49,9 +49,7 @@ CallInst* BuilderBase::createNamedCall(
         SmallVector<Type*, 8> argTys;
         argTys.reserve(args.size());
         for (auto arg : args)
-        {
             argTys.push_back(arg->getType());
-        }
 
         auto funcTy = FunctionType::get(retTy, argTys, false);
         func = Function::Create(funcTy, GlobalValue::ExternalLinkage, funcName, module);
@@ -60,9 +58,7 @@ CallInst* BuilderBase::createNamedCall(
         func->addFnAttr(Attribute::NoUnwind);
 
         for (auto attrib : attribs)
-        {
             func->addFnAttr(attrib);
-        }
     }
 
     auto call = CreateCall(func, args);

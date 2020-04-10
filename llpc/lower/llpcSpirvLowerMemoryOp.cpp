@@ -176,9 +176,7 @@ void SpirvLowerMemoryOp::visitGetElementPtrInst(
         // Copy users, ExpandStoreInst/ExpandLoadInst change getElemPtrInst's user
         std::vector<User*> users;
         for (auto user : getElemPtrInst.users())
-        {
             users.push_back(user);
-        }
 
         // Replace the original "getelementptr" instructions with a group of newly-created "getelementptr" instructions
         for (auto user : users)
@@ -187,17 +185,11 @@ void SpirvLowerMemoryOp::visitGetElementPtrInst(
             auto storeInst = dyn_cast<StoreInst>(user);
 
             if (loadInst != nullptr)
-            {
                 expandLoadInst(loadInst, getElemPtrs, dynIndex);
-            }
             else if (storeInst != nullptr)
-            {
                 recordStoreExpandInfo(storeInst, getElemPtrs, dynIndex);
-            }
             else
-            {
                 llvm_unreachable("Should never be called!");
-            }
         }
 
         // Collect replaced instructions that will be removed
@@ -223,9 +215,7 @@ bool SpirvLowerMemoryOp::needExpandDynamicIndex(
 
     // NOTE: We only handle local variables.
     if (ptrVal->getType()->getPointerAddressSpace() != SPIRAS_Private)
-    {
         allowExpand = false;
-    }
 
     for (unsigned i = 1, operandCount = getElemPtr->getNumOperands(); allowExpand && (i < operandCount); ++i)
     {
@@ -252,9 +242,7 @@ bool SpirvLowerMemoryOp::needExpandDynamicIndex(
                             allowExpand = false;
                         }
                         else
-                        {
                             *dynIndexBound = arrayTy->getArrayNumElements();
-                        }
                     }
                     else if (isa<VectorType>(indexedTy))
                     {
@@ -281,9 +269,7 @@ bool SpirvLowerMemoryOp::needExpandDynamicIndex(
             }
         }
         else
-        {
             idxs.push_back(index);
-        }
     }
 
     if (needExpand && allowExpand)
@@ -356,9 +342,7 @@ void SpirvLowerMemoryOp::recordStoreExpandInfo(
     expandInfo.dynIndex  = dynIndex;
 
     for (unsigned i = 0; i < getElemPtrs.size(); ++i)
-    {
         expandInfo.getElemPtrs.push_back(getElemPtrs[i]);
-    }
 
     m_storeExpandInfo.push_back(expandInfo);
 }

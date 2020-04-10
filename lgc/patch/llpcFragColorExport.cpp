@@ -73,9 +73,7 @@ Value* FragColorExport::run(
         expFmt= computeExportFormat(outputTy, 0);
     }
     else
-    {
         expFmt = computeExportFormat(outputTy, origLoc);
-    }
 
     resUsage->inOutUsage.fs.expFmts[location] = expFmt;
     if (expFmt == EXP_FORMAT_ZERO)
@@ -95,9 +93,7 @@ Value* FragColorExport::run(
 
     Value* comps[4] = { nullptr };
     if (compCount == 1)
-    {
         comps[0] = output;
-    }
     else
     {
         for (unsigned i = 0; i < compCount; ++i)
@@ -174,14 +170,10 @@ Value* FragColorExport::run(
     case EXP_FORMAT_32_ABGR:
        {
             for (unsigned i = 0; i < compCount; ++i)
-            {
                 comps[i] = convertToFloat(comps[i], signedness, insertPos);
-            }
 
             for (unsigned i = compCount; i < 4; ++i)
-            {
                 comps[i] = undefFloat;
-            }
             break;
         }
     case EXP_FORMAT_FP16_ABGR:
@@ -212,9 +204,7 @@ Value* FragColorExport::run(
                 }
 
                 for (unsigned i = compCount; i < 4; ++i)
-                {
                     comps[i] = undefFloat16;
-                }
             }
             else if (bitWidth == 16)
             {
@@ -231,9 +221,7 @@ Value* FragColorExport::run(
                 }
 
                 for (unsigned i = compCount; i < 4; ++i)
-                {
                     comps[i] = undefFloat16;
-                }
             }
             else
             {
@@ -248,9 +236,7 @@ Value* FragColorExport::run(
                 }
 
                 for (unsigned i = compCount; i < 4; ++i)
-                {
                     comps[i] = undefFloat;
-                }
 
                 Attribute::AttrKind attribs[] = {
                     Attribute::ReadNone
@@ -272,9 +258,7 @@ Value* FragColorExport::run(
                                         insertPos);
                 }
                 else
-                {
                     comps[1] = undefFloat16x2;
-                }
             }
 
             break;
@@ -328,9 +312,7 @@ Value* FragColorExport::run(
             }
 
             for (unsigned i = compCount; i < 4; ++i)
-            {
                 comps[i] = undefFloat16;
-            }
 
             break;
         }
@@ -382,9 +364,7 @@ Value* FragColorExport::run(
             }
 
             for (unsigned i = compCount; i < 4; ++i)
-            {
                 comps[i] = undefFloat16;
-            }
 
             break;
         }
@@ -439,9 +419,7 @@ Value* FragColorExport::run(
                                                      insertPos);
             }
             else
-            {
                 comps[1] = undefFloat16x2;
-            }
         }
 
         Value* args[] = {
@@ -519,14 +497,10 @@ ExportFormat FragColorExport::computeExportFormat(
 
     bool gfx8RbPlusEnable = false;
     if ((gfxIp.major == 8) && (gfxIp.minor == 1))
-    {
         gfx8RbPlusEnable = true;
-    }
 
     if (target->dfmt == BufDataFormatInvalid)
-    {
         expFmt = EXP_FORMAT_ZERO;
-    }
     else if ((compSetting == CompSetting::OneCompRed) &&
              (alphaExport == false)                   &&
              (isSrgbFormat == false)                        &&
@@ -539,9 +513,7 @@ ExportFormat FragColorExport::computeExportFormat(
     else if (((isUnormFormat || isSnormFormat) && (maxCompBitCount <= 10)) ||
              (isFloatFormat && (maxCompBitCount <= 16)) ||
              (isSrgbFormat && (maxCompBitCount == 8)))
-    {
         expFmt = EXP_FORMAT_FP16_ABGR;
-    }
     else if (isSintFormat &&
              ((maxCompBitCount == 16) ||
               ((gpuWorkarounds->gfx6.cbNoLt16BitIntClamp == false) && (maxCompBitCount < 16))) &&
@@ -554,9 +526,7 @@ ExportFormat FragColorExport::computeExportFormat(
         expFmt = EXP_FORMAT_SINT16_ABGR;
     }
     else if (isSnormFormat && (maxCompBitCount == 16) && (blendEnabled == false))
-    {
         expFmt = EXP_FORMAT_SNORM16_ABGR;
-    }
     else if (isUintFormat &&
              ((maxCompBitCount == 16) ||
               ((gpuWorkarounds->gfx6.cbNoLt16BitIntClamp == false) && (maxCompBitCount < 16))) &&
@@ -569,31 +539,23 @@ ExportFormat FragColorExport::computeExportFormat(
         expFmt = EXP_FORMAT_UINT16_ABGR;
     }
     else if (isUnormFormat && (maxCompBitCount == 16) && (blendEnabled == false))
-    {
         expFmt = EXP_FORMAT_UNORM16_ABGR;
-    }
     else if (((isUintFormat || isSintFormat) ||
               (isFloatFormat && (maxCompBitCount > 16)) ||
               ((isUnormFormat || isSnormFormat) && (maxCompBitCount == 16)))  &&
              ((compSetting == CompSetting::OneCompRed) ||
               (compSetting == CompSetting::OneCompAlpha) ||
               (compSetting == CompSetting::TwoCompAlphaRed)))
-    {
         expFmt = EXP_FORMAT_32_AR;
-    }
     else if (((isUintFormat || isSintFormat) ||
               (isFloatFormat && (maxCompBitCount > 16)) ||
               ((isUnormFormat || isSnormFormat) && (maxCompBitCount == 16)))  &&
              (compSetting == CompSetting::TwoCompGreenRed) && (alphaExport == false))
-    {
         expFmt = EXP_FORMAT_32_GR;
-    }
     else if (((isUnormFormat || isSnormFormat) && (maxCompBitCount == 16)) ||
              (isUintFormat || isSintFormat) ||
              (isFloatFormat && (maxCompBitCount >  16)))
-    {
         expFmt = EXP_FORMAT_32_ABGR;
-    }
 
     return expFmt;
 }

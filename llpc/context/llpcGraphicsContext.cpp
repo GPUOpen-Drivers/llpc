@@ -135,9 +135,7 @@ void GraphicsContext::doUserDataNodeMerge()
 
     // No need to merge if there is only one shader stage.
     if (isPowerOf2_32(stageMask))
-    {
         return;
-    }
 
     // Collect user data nodes from all shader stages into one big table.
     for (unsigned stage = 0; stage < ShaderStageNativeStageCount; ++stage)
@@ -147,9 +145,7 @@ void GraphicsContext::doUserDataNodeMerge()
             auto shaderInfo = getPipelineShaderInfo(ShaderStage(stage));
             for (const ResourceMappingNode& node : ArrayRef<ResourceMappingNode>(shaderInfo->pUserDataNodes,
                                                                                  shaderInfo->userDataNodeCount))
-            {
                 allNodes.push_back(node);
-            }
         }
     }
 
@@ -166,9 +162,7 @@ void GraphicsContext::doUserDataNodeMerge()
             for (const DescriptorRangeValue& rangeValue :
                         ArrayRef<DescriptorRangeValue>(shaderInfo->pDescriptorRangeValues,
                                                        shaderInfo->descriptorRangeValueCount))
-            {
                 allRangeValues.push_back(rangeValue);
-            }
         }
     }
 
@@ -178,9 +172,7 @@ void GraphicsContext::doUserDataNodeMerge()
               [](const DescriptorRangeValue& left, const DescriptorRangeValue& right)
               {
                   if (left.set != right.set)
-                  {
                       return left.set < right.set;
-                  }
                   return left.binding < right.binding;
               });
 
@@ -198,9 +190,7 @@ void GraphicsContext::doUserDataNodeMerge()
             for (; duplicateCount != rangeValues.size(); ++duplicateCount)
             {
                 if ((rangeValues[0].set != rangeValues[duplicateCount].set) || (rangeValues[0].binding != rangeValues[duplicateCount].binding))
-                {
                     break;
-                }
                 assert((rangeValues[0].type == rangeValues[duplicateCount].type) &&
                             "Descriptor range value merge conflict: type");
                 assert((rangeValues[0].arraySize == rangeValues[duplicateCount].arraySize) &&
@@ -259,9 +249,7 @@ ArrayRef<ResourceMappingNode> GraphicsContext::mergeUserDataNodeTable(
         for (; duplicatesCount != nodes.size(); ++duplicatesCount)
         {
             if (nodes[0].offsetInDwords != nodes[duplicatesCount].offsetInDwords)
-            {
                 break;
-            }
             assert((nodes[0].type == nodes[duplicatesCount].type) && "User data merge conflict: type");
             assert((nodes[0].sizeInDwords == nodes[duplicatesCount].sizeInDwords) &&
                         "User data merge conflict: size");

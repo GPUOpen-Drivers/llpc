@@ -85,23 +85,17 @@ template<class Elf>
 ElfWriter<Elf>::~ElfWriter()
 {
     for (auto& section : m_sections)
-    {
         delete[] section.data;
-    }
     m_sections.clear();
 
     for (auto& note : m_notes)
-    {
         delete[] note.data;
-    }
     m_notes.clear();
 
     for (auto& sym : m_symbols)
     {
         if (sym.nameOffset == InvalidValue)
-        {
             delete[] sym.pSymName;
-        }
     }
     m_symbols.clear();
 }
@@ -177,9 +171,7 @@ void ElfWriter<Elf>::mergeSection(
         constexpr unsigned nop = 0xBF800000;
         unsigned* dataDw = reinterpret_cast<unsigned*>(data);
         for (unsigned i = 0; i < (section1Size - baseCopySize) / sizeof(unsigned); ++i)
-        {
             dataDw[i] = nop;
-        }
         data += (section1Size - baseCopySize);
     }
 
@@ -265,9 +257,7 @@ void ElfWriter<Elf>::mergeMetaNote(
     // Copy .num_interpolants
     auto srcNumIterpIt = srcPipeline.getMap(true).find(StringRef(Util::Abi::PipelineMetadataKey::NumInterpolants));
     if (srcNumIterpIt != srcPipeline.getMap(true).end())
-    {
         destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::NumInterpolants] = srcNumIterpIt->second;
-    }
 
     // Copy .spill_threshold
     auto destSpillThreshold = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::SpillThreshold].getUInt();
@@ -333,24 +323,18 @@ void ElfWriter<Elf>::mergeMetaNote(
     auto srcRegisters = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
 
     for (unsigned regNumber : ArrayRef<unsigned>(PsRegNumbers))
-    {
         mergeMapItem(destRegisters, srcRegisters, regNumber);
-    }
 
     const unsigned mmSpiPsInputCntl0 = 0xa191;
     const unsigned mmSpiPsInputCntl31 = 0xa1b0;
     for (unsigned regNumber = mmSpiPsInputCntl0; regNumber != mmSpiPsInputCntl31 + 1; ++regNumber)
-    {
         mergeMapItem(destRegisters, srcRegisters, regNumber);
-    }
 
     const unsigned mmSpiShaderUserDataPs0 = 0x2c0c;
     unsigned psUserDataCount = (pContext->getGfxIpVersion().major < 9) ? 16 : 32;
     for (unsigned regNumber = mmSpiShaderUserDataPs0;
          regNumber != mmSpiShaderUserDataPs0 + psUserDataCount; ++regNumber)
-    {
         mergeMapItem(destRegisters, srcRegisters, regNumber);
-    }
 
     std::string destBlob;
     destDocument.writeToBlob(destBlob);
@@ -370,9 +354,7 @@ ElfSymbol* ElfWriter<Elf>::getSymbol(
     for (auto& symbol : m_symbols)
     {
         if (strcmp(pSymbolName, symbol.pSymName) == 0)
-        {
             return &symbol;
-        }
     }
 
     // Create new symbol
@@ -399,9 +381,7 @@ ElfNote ElfWriter<Elf>::getNote(
     for (auto& note : m_notes)
     {
         if (note.hdr.type == noteType)
-        {
             return note;
-        }
     }
 
     ElfNote note = {};
@@ -455,9 +435,7 @@ size_t ElfWriter<Elf>::getRequiredBufferSizeBytes()
 
     // Iterate through the section list
     for (auto& section : m_sections)
-    {
         totalBytes += alignTo(section.secHead.shSize, sizeof(unsigned));
-    }
 
     totalBytes += m_header.eShentsize * m_header.eShnum;
     totalBytes += m_header.ePhentsize * m_header.ePhnum;
@@ -471,9 +449,7 @@ template<class Elf>
 void ElfWriter<Elf>::assembleNotes()
 {
     if (m_noteSecIdx == InvalidValue)
-    {
         return;
-    }
     auto noteSection = &m_sections[m_noteSecIdx];
     const unsigned noteHeaderSize = sizeof(NoteHeader) - 8;
     unsigned noteSize = 0;
@@ -510,23 +486,17 @@ template<class Elf>
 void ElfWriter<Elf>::assembleSymbols()
 {
     if (m_symSecIdx == InvalidValue)
-    {
         return;
-    }
     auto strTabSection = &m_sections[m_strtabSecIdx];
     auto newStrTabSize = 0;
     unsigned symbolCount = 0;
     for (auto& symbol : m_symbols)
     {
         if (symbol.nameOffset == InvalidValue)
-        {
             newStrTabSize += strlen(symbol.pSymName) + 1;
-        }
 
         if (symbol.secIdx != InvalidValue)
-        {
             symbolCount++;
-        }
     }
 
     if (newStrTabSize > 0)
@@ -557,9 +527,7 @@ void ElfWriter<Elf>::assembleSymbols()
     auto symbolSection = &m_sections[m_symSecIdx];
 
     if (symbolSection->data == nullptr)
-    {
         symbolSection->data = new uint8_t[symSectionSize];
-    }
     else if (symSectionSize > symbolSection->secHead.shSize)
     {
         delete[] symbolSection->data;
@@ -747,9 +715,7 @@ Result ElfWriter<Elf>::ReadFromBuffer(
     ElfReader<Elf> reader(m_gfxIp);
     auto result = reader.ReadFromBuffer(pBuffer, &bufSize);
     if (result != Llpc::Result::Success)
-    {
         return result;
-    }
     return copyFromReader(reader);
 }
 
@@ -849,9 +815,7 @@ void ElfWriter<Elf>::GetSymbolsBySectionIndex(
     for (unsigned idx = 0; idx < symCount; ++idx)
     {
         if (m_symbols[idx].secIdx == secIdx)
-        {
             secSymbols.push_back(&m_symbols[idx]);
-        }
     }
 }
 
@@ -924,20 +888,14 @@ void ElfWriter<Elf>::mergeElfBinary(
             // NOTE: Entry name of the first shader stage is missed in disassembly section, we have to add it back
             // when merge disassembly sections.
             if (strncmp(symbol->pSymName, "_amdgpu_", strlen("_amdgpu_")) == 0)
-            {
                 firstIsaSymbolName = symbol->pSymName;
-            }
         }
 
         if (strcmp(symbol->pSymName, fragmentIsaSymbolName) == 0)
-        {
             nonFragmentIsaSymbol = symbol;
-        }
 
         if (nonFragmentIsaSymbol == nullptr)
-        {
             continue;
-        }
 
         // Reset all symbols after _amdgpu_ps_main
         symbol->secIdx = InvalidValue;
@@ -964,9 +922,7 @@ void ElfWriter<Elf>::mergeElfBinary(
         }
 
         if (fragmentIsaSymbol == nullptr)
-        {
             continue;
-        }
 
         // Update fragment shader related symbols
         ElfSymbol* symbol = nullptr;

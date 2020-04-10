@@ -133,13 +133,9 @@ Instruction* BuilderImplMisc::CreateReadClock(
 {
     CallInst* readClock = nullptr;
     if (realtime)
-    {
         readClock = CreateIntrinsic(Intrinsic::amdgcn_s_memrealtime, {}, {}, nullptr, instName);
-    }
     else
-    {
         readClock = CreateIntrinsic(Intrinsic::readcyclecounter, {}, {}, nullptr, instName);
-    }
     readClock->addAttribute(AttributeList::FunctionIndex, Attribute::ReadOnly);
 
     // NOTE: The inline ASM is to prevent optimization of backend compiler.

@@ -72,14 +72,10 @@ void CodeGenManager::setupTargetFeatures(
     std::string globalFeatures = "";
 
     if (pipelineState->getOptions().includeDisassembly)
-    {
         globalFeatures += ",+DumpCode";
-    }
 
     if (cl::DisableFp32Denormals)
-    {
         globalFeatures += ",-fp32-denormals";
-    }
 
     for (auto func = module->begin(), end = module->end(); func != end; ++func)
     {
@@ -106,9 +102,7 @@ void CodeGenManager::setupTargetFeatures(
                 // read/write. This usage must enable the feature of using CI+ additional instructions.
                 const auto nggControl = pipelineState->getNggControl();
                 if (nggControl->enableNgg && (nggControl->passthroughMode == false))
-                {
                     targetFeatures += ",+ci-insts,+enable-ds128";
-                }
             }
 
             if (func->getCallingConv() == CallingConv::AMDGPU_HS)
@@ -129,9 +123,7 @@ void CodeGenManager::setupTargetFeatures(
 
             auto gfxIp = pipelineState->getTargetInfo().getGfxIpVersion();
             if (gfxIp.major >= 9)
-            {
                 targetFeatures += ",+enable-scratch-bounds-checks";
-            }
 
             if (gfxIp.major >= 10)
             {
@@ -152,26 +144,18 @@ void CodeGenManager::setupTargetFeatures(
                     (shaderMode.fp16DenormMode == FpDenormMode::FlushIn) ||
                     (shaderMode.fp64DenormMode == FpDenormMode::FlushNone) ||
                     (shaderMode.fp64DenormMode == FpDenormMode::FlushIn))
-                {
                     targetFeatures += ",+fp64-fp16-denormals";
-                }
                 else if ((shaderMode.fp16DenormMode == FpDenormMode::FlushOut) ||
                          (shaderMode.fp16DenormMode == FpDenormMode::FlushInOut) ||
                          (shaderMode.fp64DenormMode == FpDenormMode::FlushOut) ||
                          (shaderMode.fp64DenormMode == FpDenormMode::FlushInOut))
-                {
                     targetFeatures += ",-fp64-fp16-denormals";
-                }
                 if ((shaderMode.fp32DenormMode == FpDenormMode::FlushNone) ||
                     (shaderMode.fp32DenormMode == FpDenormMode::FlushIn))
-                {
                     targetFeatures += ",+fp32-denormals";
-                }
                 else if ((shaderMode.fp32DenormMode == FpDenormMode::FlushOut) ||
                          (shaderMode.fp32DenormMode == FpDenormMode::FlushInOut))
-                {
                     targetFeatures += ",-fp32-denormals";
-                }
             }
 
             builder.addAttribute("target-features", targetFeatures);

@@ -171,14 +171,10 @@ bool SpirvLowerResourceCollect::runOnModule(
         {
             Value* initializer = nullptr;
             if (global->hasInitializer())
-            {
                 initializer = global->getInitializer();
-            }
 
             if ((initializer == nullptr) || isa<UndefValue>(initializer))
-            {
                 removedGlobals.insert(&*global);
-            }
         }
     }
 
@@ -206,9 +202,7 @@ bool SpirvLowerResourceCollect::runOnModule(
                 {
                     // Only collect resource node data when requested
                     if (m_collectDetailUsage == true)
-                    {
                         collectResourceNodeData(&*global);
-                    }
                 }
                 break;
             }
@@ -224,9 +218,7 @@ bool SpirvLowerResourceCollect::runOnModule(
                 // Only collect FS out info when requested.
                 Type* globalTy = global->getType()->getContainedType(0);
                 if (m_collectDetailUsage == false || globalTy->isSingleValueType() == false)
-                {
                     break;
-                }
 
                 FsOutInfo fsOutInfo = {};
                 MDNode* metaNode = global->getMetadata(gSPIRVMD::InOut);
@@ -251,13 +243,9 @@ bool SpirvLowerResourceCollect::runOnModule(
                 {
                     // Integer type
                     if (bitWidth == 8)
-                    {
                         basicTy = signedness ? BasicType::Int8 : BasicType::Uint8;
-                    }
                     else if (bitWidth == 16)
-                    {
                         basicTy = signedness ? BasicType::Int16 : BasicType::Uint16;
-                    }
                     else
                     {
                         assert(bitWidth == 32);
@@ -268,9 +256,7 @@ bool SpirvLowerResourceCollect::runOnModule(
                 {
                     // Floating-point type
                     if (bitWidth == 16)
-                    {
                         basicTy = BasicType::Float16;
-                    }
                     else
                     {
                         assert(bitWidth == 32);
@@ -278,9 +264,7 @@ bool SpirvLowerResourceCollect::runOnModule(
                     }
                 }
                 else
-                {
                     llvm_unreachable("Should never be called!");
-                }
 
                 fsOutInfo.location = location;
                 fsOutInfo.location = index;
@@ -293,9 +277,7 @@ bool SpirvLowerResourceCollect::runOnModule(
             {
                 // Only collect resource node data when requested
                 if (m_collectDetailUsage == true)
-                {
                     collectResourceNodeData(&*global);
-                }
                 break;
             }
         default:
@@ -307,13 +289,9 @@ bool SpirvLowerResourceCollect::runOnModule(
     }
 
     if (m_collectDetailUsage)
-    {
         visitCalls(module);
-    }
     if (!m_fsOutInfos.empty() || !m_resNodeDatas.empty())
-    {
         m_detailUsageValid = true;
-    }
 
     return true;
 }
@@ -362,9 +340,7 @@ Value* SpirvLowerResourceCollect::findCallAndGetIndexValue(
     {
         // Skip non-declarations that are definitely not LLPC builder calls.
         if (func.isDeclaration() == false)
-        {
             continue;
-        }
 
         const MDNode* const funcMeta = func.getMetadata(module.getMDKindID(BuilderCallOpcodeMetadataName));
 
@@ -389,9 +365,7 @@ Value* SpirvLowerResourceCollect::findCallAndGetIndexValue(
                 auto args = ArrayRef<Use>(&call->getOperandList()[0], call->getNumArgOperands());
 
                 if (args[0] == targetCall)
-                {
                     return args[1];
-                }
             }
         }
     }
@@ -408,9 +382,7 @@ void SpirvLowerResourceCollect::visitCalls(
     {
         // Skip non-declarations that are definitely not LLPC builder calls.
         if (func.isDeclaration() == false)
-        {
             continue;
-        }
 
         const MDNode* const funcMeta = func.getMetadata(module.getMDKindID(BuilderCallOpcodeMetadataName));
 
@@ -465,9 +437,7 @@ void SpirvLowerResourceCollect::visitCalls(
                 nodeData.value.arraySize = 1;
                 auto index = findCallAndGetIndexValue(module, call);
                 if (index != nullptr)
-                {
                     nodeData.value.arraySize = cast<ConstantInt>(index)->getZExtValue();
-                }
 
                 auto result = m_resNodeDatas.insert(std::pair<ResourceNodeDataKey, ResourceMappingNodeType>(nodeData, nodeType));
 

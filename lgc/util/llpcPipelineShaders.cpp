@@ -61,9 +61,7 @@ bool PipelineShaders::runOnModule(
 
     m_entryPointMap.clear();
     for (auto& entryPoint : m_entryPoints)
-    {
         entryPoint = nullptr;
-    }
 
     for (auto& func : module)
     {
@@ -99,9 +97,7 @@ ShaderStage PipelineShaders::getShaderStage(
 {
     auto entryMapIt = m_entryPointMap.find(func);
     if (entryMapIt == m_entryPointMap.end())
-    {
         return ShaderStageInvalid;
-    }
     return entryMapIt->second;
 }
 

@@ -108,9 +108,7 @@ Type* Builder::getConditionallyVectorizedTy(
     Type* maybeVecTy)          // [in] Possible vector type to get number of elements from
 {
     if (auto vecTy = dyn_cast<VectorType>(maybeVecTy))
-    {
         return VectorType::get(elementTy, vecTy->getNumElements());
-    }
     return elementTy;
 }
 
@@ -131,9 +129,7 @@ Value* Builder::CreateMapToInt32(
 
     // Check the massage types all match.
     for (unsigned i = 1; i < mappedArgs.size(); i++)
-    {
         assert(mappedArgs[i]->getType() == type);
-    }
 
     if (mappedArgs[0]->getType()->isVectorTy())
     {
@@ -147,9 +143,7 @@ Value* Builder::CreateMapToInt32(
             SmallVector<Value*, 4> newMappedArgs;
 
             for (Value* const mappedArg : mappedArgs)
-            {
                 newMappedArgs.push_back(CreateExtractElement(mappedArg, i));
-            }
 
             results.push_back(CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs));
         }
@@ -157,9 +151,7 @@ Value* Builder::CreateMapToInt32(
         Value* result = UndefValue::get(VectorType::get(results[0]->getType(), compCount));
 
         for (unsigned i = 0; i < compCount; i++)
-        {
             result = CreateInsertElement(result, results[i], i);
-        }
 
         return result;
     }
@@ -168,9 +160,7 @@ Value* Builder::CreateMapToInt32(
         SmallVector<Value*, 4> newMappedArgs;
 
         for (Value* const mappedArg : mappedArgs)
-        {
             newMappedArgs.push_back(CreateZExt(mappedArg, getInt32Ty()));
-        }
 
         Value* const result = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
         return CreateTrunc(result, getInt1Ty());
@@ -196,9 +186,7 @@ Value* Builder::CreateMapToInt32(
         SmallVector<Value*, 4> castMappedArgs;
 
         for (Value* const mappedArg : mappedArgs)
-        {
             castMappedArgs.push_back(CreateBitCast(mappedArg, VectorType::get(getInt32Ty(), 2)));
-        }
 
         Value* result = UndefValue::get(castMappedArgs[0]->getType());
 
@@ -207,9 +195,7 @@ Value* Builder::CreateMapToInt32(
             SmallVector<Value*, 4> newMappedArgs;
 
             for (Value* const castMappedArg : castMappedArgs)
-            {
                 newMappedArgs.push_back(CreateExtractElement(castMappedArg, i));
-            }
 
             Value* const resultComp = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
 
@@ -223,17 +209,13 @@ Value* Builder::CreateMapToInt32(
         SmallVector<Value*, 4> newMappedArgs;
 
         for (Value* const mappedArg : mappedArgs)
-        {
             newMappedArgs.push_back(CreateBitCast(mappedArg, getIntNTy(mappedArg->getType()->getPrimitiveSizeInBits())));
-        }
 
         Value* const result = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
         return CreateBitCast(result, type);
     }
     else if (type->isIntegerTy(32))
-    {
         return mapFunc(*this, mappedArgs, passthroughArgs);
-    }
     else
     {
         llvm_unreachable("Should never be called!");
@@ -400,13 +382,9 @@ Constant* Builder::getFpConstant(
     const fltSemantics* semantics = &APFloat::IEEEdouble();
     Type* scalarTy = ty->getScalarType();
     if (scalarTy->isHalfTy())
-    {
         semantics = &APFloat::IEEEhalf();
-    }
     else if (scalarTy->isFloatTy())
-    {
         semantics = &APFloat::IEEEsingle();
-    }
     bool ignored = true;
     value.convert(*semantics, APFloat::rmNearestTiesToEven, &ignored);
     return ConstantFP::get(ty, value);
@@ -501,9 +479,7 @@ CallInst* Builder::CreateBinaryIntrinsic(
 {
     CallInst* result = IRBuilder<>::CreateBinaryIntrinsic(id, value1, value2, fmfSource, name);
     if ((fmfSource == nullptr) && isa<FPMathOperator>(result))
-    {
         result->setFastMathFlags(getFastMathFlags());
-    }
     return result;
 }
 
@@ -520,9 +496,7 @@ CallInst* Builder::CreateIntrinsic(
 {
     CallInst* result = IRBuilder<>::CreateIntrinsic(id, types, args, fmfSource, name);
     if ((fmfSource == nullptr) && isa<FPMathOperator>(result))
-    {
         result->setFastMathFlags(getFastMathFlags());
-    }
     return result;
 }
 

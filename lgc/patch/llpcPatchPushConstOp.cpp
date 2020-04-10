@@ -89,16 +89,12 @@ bool PatchPushConstOp::runOnModule(
     for (auto& func : module)
     {
         if (func.getName().startswith(lgcName::DescriptorLoadSpillTable))
-        {
             spillTableFuncs.push_back(&func);
-        }
     }
 
     // If there was no spill table load, bail.
     if (spillTableFuncs.empty())
-    {
         return false;
-    }
 
     m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
     const PipelineShaders& pipelineShaders = getAnalysis<PipelineShaders>();
@@ -108,9 +104,7 @@ bool PatchPushConstOp::runOnModule(
 
         // If we don't have an entry point for the shader stage, bail.
         if (m_entryPoint == nullptr)
-        {
             continue;
-        }
 
         m_shaderStage = static_cast<ShaderStage>(shaderStage);
 
@@ -122,15 +116,11 @@ bool PatchPushConstOp::runOnModule(
 
                 // If the user is not a call, bail.
                 if (call == nullptr)
-                {
                     continue;
-                }
 
                 // If the call is not in the entry point, bail.
                 if (call->getFunction() != m_entryPoint)
-                {
                     continue;
-                }
 
                 visitCallInst(*call);
             }
@@ -150,9 +140,7 @@ bool PatchPushConstOp::runOnModule(
     for (Function* func : spillTableFuncs)
     {
         if (func->user_empty())
-        {
             func->eraseFromParent();
-        }
     }
 
     return changed;
@@ -194,9 +182,7 @@ void PatchPushConstOp::visitCallInst(
         SmallVector<Value*, 8> workList;
 
         for (User* const user : callInst.users())
-        {
             workList.push_back(user);
-        }
 
         m_instsToRemove.push_back(&callInst);
 
@@ -206,9 +192,7 @@ void PatchPushConstOp::visitCallInst(
 
             // If the value is not an instruction, bail.
             if (inst == nullptr)
-            {
                 continue;
-            }
 
             m_instsToRemove.push_back(inst);
 
@@ -226,9 +210,7 @@ void PatchPushConstOp::visitCallInst(
                 valueMap[bitCast] = builder.CreateBitCast(valueMap[bitCast->getOperand(0)], newType);
 
                 for (User* const user : bitCast->users())
-                {
                     workList.push_back(user);
-                }
             }
             else if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(inst))
             {
@@ -237,18 +219,14 @@ void PatchPushConstOp::visitCallInst(
                 SmallVector<Value*, 8> indices;
 
                 for (Value* const index : getElemPtr->indices())
-                {
                     indices.push_back(index);
-                }
 
                 builder.SetInsertPoint(getElemPtr);
                 valueMap[getElemPtr] = builder.CreateInBoundsGEP(valueMap[getElemPtr->getPointerOperand()],
                                                                     indices);
 
                 for (User* const user : getElemPtr->users())
-                {
                     workList.push_back(user);
-                }
             }
             else if (LoadInst* const load = dyn_cast<LoadInst>(inst))
             {
@@ -263,9 +241,7 @@ void PatchPushConstOp::visitCallInst(
                 load->replaceAllUsesWith(newLoad);
             }
             else
-            {
                 llvm_unreachable("Should never be called!");
-            }
         }
     }
 }

@@ -144,9 +144,7 @@ void redirectLogOutput(
             {
                 StringRef option = options[i];
                 if (option.startswith("-debug") || option.startswith("-print"))
-                {
                     needDebugOut = true;
-                }
             }
 
             if (needDebugOut)

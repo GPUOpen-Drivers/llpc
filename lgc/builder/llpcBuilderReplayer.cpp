@@ -120,9 +120,7 @@ bool BuilderReplayer::runOnModule(
     {
         // Skip non-declarations that are definitely not LLPC intrinsics.
         if (func.isDeclaration() == false)
-        {
             continue;
-        }
 
         const MDNode* const funcMeta = func.getMetadata(opcodeMetaKindId);
 
@@ -153,9 +151,7 @@ bool BuilderReplayer::runOnModule(
     }
 
     for (Function* const func : funcsToRemove)
-    {
         func->eraseFromParent();
-    }
 
     return true;
 }
@@ -180,9 +176,7 @@ void BuilderReplayer::replayCall(
             m_shaderStageMap[enclosingFunc] = stage;
         }
         else
-        {
             stage = mapIt->second;
-        }
         m_builder->setShaderStage(stage);
     }
 
@@ -201,9 +195,7 @@ void BuilderReplayer::replayCall(
         if (auto newInst = dyn_cast<Instruction>(newValue))
         {
             if (call->getName() != "")
-            {
                 newInst->takeName(call);
-            }
         }
     }
     call->eraseFromParent();
@@ -219,13 +211,9 @@ Value* BuilderReplayer::processCall(
 {
     // Set builder fast math flags from the recorded call.
     if (isa<FPMathOperator>(call))
-    {
         m_builder->setFastMathFlags(call->getFastMathFlags());
-    }
     else
-    {
         m_builder->clearFastMathFlags();
-    }
 
     // Get the args.
     auto args = ArrayRef<Use>(&call->getOperandList()[0], call->getNumArgOperands());

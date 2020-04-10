@@ -75,24 +75,18 @@ void SpirvLower::replaceConstWithInsts(
     for (User* const user : constVal->users())
     {
         if (Constant* const otherConst = dyn_cast<Constant>(user))
-        {
             otherConsts.insert(otherConst);
-        }
     }
 
     for (Constant* const otherConst : otherConsts)
-    {
         replaceConstWithInsts(context, otherConst);
-    }
 
     otherConsts.clear();
 
     SmallVector<Value*, 8> users;
 
     for (User* const user : constVal->users())
-    {
         users.push_back(user);
-    }
 
     for (Value* const user : users)
     {
@@ -113,9 +107,7 @@ void SpirvLower::replaceConstWithInsts(
             }
         }
         else
-        {
             builder->SetInsertPoint(inst);
-        }
 
         if (ConstantExpr* const constExpr = dyn_cast<ConstantExpr>(constVal))
         {
@@ -136,9 +128,7 @@ void SpirvLower::replaceConstWithInsts(
             inst->replaceUsesOfWith(constVector, resultValue);
         }
         else
-        {
             llvm_unreachable("Should never be called!");
-        }
     }
 
     constVal->removeDeadConstantUsers();
@@ -156,15 +146,11 @@ void SpirvLower::removeConstantExpr(
     for (User* const user : global->users())
     {
         if (Constant* const pConst = dyn_cast<Constant>(user))
-        {
             constantUsers.push_back(pConst);
-        }
     }
 
     for (Constant* const constVal : constantUsers)
-    {
         replaceConstWithInsts(context, constVal);
-    }
 }
 
 // =====================================================================================================================
@@ -181,9 +167,7 @@ void SpirvLower::addPasses(
 
     // Start timer for lowering passes.
     if (lowerTimer != nullptr)
-    {
         passMgr.add(BuilderContext::createStartStopTimer(lowerTimer, true));
-    }
 
     // Lower SPIR-V resource collecting
     passMgr.add(createSpirvLowerResourceCollect(false));
@@ -233,9 +217,7 @@ void SpirvLower::addPasses(
 
     // Stop timer for lowering passes.
     if (lowerTimer != nullptr)
-    {
         passMgr.add(BuilderContext::createStartStopTimer(lowerTimer, false));
-    }
 
     // Dump the result
     if (EnableOuts())

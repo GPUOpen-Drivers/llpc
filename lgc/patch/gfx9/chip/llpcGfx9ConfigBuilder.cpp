@@ -65,9 +65,7 @@ namespace Gfx9
 void ConfigBuilder::buildPalMetadata()
 {
     if (m_pipelineState->isGraphics() == false)
-    {
         buildPipelineCsRegConfig();
-    }
     else
     {
         const bool hasTs = (m_hasTcs || m_hasTes);
@@ -77,49 +75,33 @@ void ConfigBuilder::buildPalMetadata()
         {
             // VS-FS pipeline
             if ((m_gfxIp.major >= 10) && enableNgg)
-            {
                 buildPipelineNggVsFsRegConfig();
-            }
             else
-            {
                 buildPipelineVsFsRegConfig();
-            }
         }
         else if (hasTs && (m_hasGs == false))
         {
             // VS-TS-FS pipeline
             if ((m_gfxIp.major >= 10) && enableNgg)
-            {
                 buildPipelineNggVsTsFsRegConfig();
-            }
             else
-            {
                 buildPipelineVsTsFsRegConfig();
-            }
         }
         else if ((hasTs == false) && m_hasGs)
         {
             // VS-GS-FS pipeline
             if ((m_gfxIp.major >= 10) && enableNgg)
-            {
                 buildPipelineNggVsGsFsRegConfig();
-            }
             else
-            {
                 buildPipelineVsGsFsRegConfig();
-            }
         }
         else
         {
             // VS-TS-GS-FS pipeline
             if ((m_gfxIp.major >= 10) && enableNgg)
-            {
                 buildPipelineNggVsTsGsFsRegConfig();
-            }
             else
-            {
                 buildPipelineVsTsGsFsRegConfig();
-            }
         }
     }
 
@@ -155,9 +137,7 @@ void ConfigBuilder::buildPipelineVsFsRegConfig()      // [out] Size of register 
         }
 
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
-        }
 
         unsigned checksum = setShaderHash(ShaderStageVertex);
         SET_REG(&config, VGT_GS_ONCHIP_CNTL, 0);
@@ -187,9 +167,7 @@ void ConfigBuilder::buildPipelineVsFsRegConfig()      // [out] Size of register 
     unsigned primGroupSize = 128;
     unsigned numShaderEngines = m_pipelineState->getTargetInfo().getGpuProperty().numShaderEngines;
     if (numShaderEngines > 2)
-    {
         primGroupSize = alignTo(primGroupSize, 2);
-    }
 
     iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
 
@@ -254,9 +232,7 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig()
         }
 
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
-        }
     }
 
     if (stageMask & shaderStageToMask(ShaderStageTessEval))
@@ -271,9 +247,7 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig()
             SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
         }
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
-        }
 
         unsigned checksum = setShaderHash(ShaderStageTessEval);
 
@@ -367,9 +341,7 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig()      // [out] Size of registe
             SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
         }
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
-        }
     }
 
     if (stageMask & shaderStageToMask(ShaderStageFragment))
@@ -396,9 +368,7 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig()      // [out] Size of registe
             SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
         }
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
-        }
     }
 
     // Set up IA_MULTI_VGT_PARAM
@@ -464,9 +434,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig()
             SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
         }
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
-        }
 
         //  In GEN_TWO the only supported mode is fully distributed tessellation. The programming model is expected
         //  to set VGT_SHADER_STAGES_EN.DYNAMIC_HS=1 and VGT_TF_PARAM.NUM_DS_WAVES_PER_SIMD=0
@@ -501,9 +469,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig()
         }
 
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
-        }
     }
 
     if (stageMask & shaderStageToMask(ShaderStageFragment))
@@ -530,9 +496,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig()
             SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
         }
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
-        }
     }
 
     // Set up IA_MULTI_VGT_PARAM
@@ -544,9 +508,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig()
 
     // With tessellation, SWITCH_ON_EOI and PARTIAL_ES_WAVE_ON must be set if primitive ID is used by either the TCS, TES, or GS.
     if (tcsBuiltInUsage.primitiveId || tesBuiltInUsage.primitiveId || gsBuiltInUsage.primitiveIdIn)
-    {
         iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
-    }
 
     if (gfxIp.major >= 10)
     {
@@ -602,9 +564,7 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig()
             SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
         }
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
-        }
 
         unsigned checksum = setShaderHash(ShaderStageVertex);
 
@@ -633,9 +593,7 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig()
     unsigned primGroupSize = 128;
     unsigned numShaderEngines = m_pipelineState->getTargetInfo().getGpuProperty().numShaderEngines;
     if (numShaderEngines > 2)
-    {
         primGroupSize = alignTo(primGroupSize, 2);
-    }
 
     iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
 
@@ -696,9 +654,7 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig()
             SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
         }
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
-        }
     }
 
     if (stageMask & shaderStageToMask(ShaderStageTessEval))
@@ -715,9 +671,7 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig()
             SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
         }
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
-        }
 
         unsigned checksum = setShaderHash(ShaderStageTessEval);
 
@@ -745,9 +699,7 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig()
     const auto& tcsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
 
     if (tcsBuiltInUsage.primitiveId)
-    {
         iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
-    }
 
     SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
 
@@ -808,9 +760,7 @@ void ConfigBuilder::buildPipelineNggVsGsFsRegConfig()
             SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
         }
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
-        }
     }
 
     if (stageMask & shaderStageToMask(ShaderStageFragment))
@@ -891,9 +841,7 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig()
             SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
         }
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
-        }
     }
 
     if (stageMask & (shaderStageToMask(ShaderStageTessEval) | shaderStageToMask(ShaderStageGeometry)))
@@ -923,9 +871,7 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig()
             SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
         }
         if (gfxIp.major >= 10)
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
-        }
     }
 
     if (stageMask & shaderStageToMask(ShaderStageFragment))
@@ -947,9 +893,7 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig()
     const auto& gsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
 
     if (tcsBuiltInUsage.primitiveId || gsBuiltInUsage.primitiveIdIn)
-    {
         iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
-    }
 
     SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
 
@@ -1067,9 +1011,7 @@ void ConfigBuilder::buildVsRegConfig(
 
     unsigned streamBufferConfig = 0;
     for (auto i = 0; i < MaxGsStreams; ++i)
-    {
         streamBufferConfig |= (resUsage->inOutUsage.streamXfbBuffers[i] << (i * 4));
-    }
     SET_REG(&pConfig->vsRegs, VGT_STRMOUT_BUFFER_CONFIG, streamBufferConfig);
 
     if (gfxIp.major == 10)
@@ -1227,9 +1169,7 @@ void ConfigBuilder::buildVsRegConfig(
     }
 
     if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waTessIncorrectRelativeIndex)
-    {
         disableVertexReuse = true;
-    }
 
     SET_REG_FIELD(&pConfig->vsRegs, VGT_REUSE_OFF, REUSE_OFF, disableVertexReuse);
 
@@ -1250,9 +1190,7 @@ void ConfigBuilder::buildVsRegConfig(
         {
         }
         else
-        {
             llvm_unreachable("Not implemented!");
-        }
     }
 
     if ((clipDistanceCount > 0) || (cullDistanceCount > 0))
@@ -1275,17 +1213,13 @@ void ConfigBuilder::buildVsRegConfig(
 
     unsigned posCount = 1; // gl_Position is always exported
     if (usePointSize || useLayer || useViewportIndex)
-    {
         ++posCount;
-    }
 
     if (clipDistanceCount + cullDistanceCount > 0)
     {
         ++posCount;
         if (clipDistanceCount + cullDistanceCount > 4)
-        {
             ++posCount;
-        }
     }
 
     SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS0_EXPORT_FORMAT, SPI_SHADER_4COMP);
@@ -1337,9 +1271,7 @@ void ConfigBuilder::buildLsHsRegConfig(
 
     unsigned lsVgtCompCnt = 1;
     if (vsBuiltInUsage.instanceIndex)
-    {
         lsVgtCompCnt += 2; // Enable instance ID
-    }
     SET_REG_FIELD(&pConfig->lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, LS_VGPR_COMP_CNT, lsVgtCompCnt);
 
     const auto& vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
@@ -1372,9 +1304,7 @@ void ConfigBuilder::buildLsHsRegConfig(
     unsigned ldsSizeInDwords = calcFactor.onChip.patchConstStart +
                                calcFactor.patchConstSize * calcFactor.patchCountPerThreadGroup;
     if (m_pipelineState->isTessOffChip())
-    {
         ldsSizeInDwords = calcFactor.inPatchSize * calcFactor.patchCountPerThreadGroup;
-    }
 
     const unsigned ldsSizeDwordGranularity = 128u;
     const unsigned ldsSizeDwordGranularityShift = 7u;
@@ -1389,9 +1319,7 @@ void ConfigBuilder::buildLsHsRegConfig(
         SET_REG_GFX10_FIELD(&pConfig->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
     }
     else
-    {
         llvm_unreachable("Not implemented!");
-    }
 
     setLdsSizeByteSize(Util::Abi::HardwareStage::Hs, ldsSizeInDwords * 4);
 
@@ -1440,9 +1368,7 @@ void ConfigBuilder::buildLsHsRegConfig(
                      Gfx10::mmSPI_SHADER_USER_DATA_HS_0);
     }
     else
-    {
         llvm_unreachable("Not implemented!");
-    }
 }
 
 // =====================================================================================================================
@@ -1477,17 +1403,11 @@ void ConfigBuilder::buildEsGsRegConfig(
 
     unsigned gsVgprCompCnt = 0;
     if ((calcFactor.inputVertices > 4) || gsBuiltInUsage.invocationId)
-    {
         gsVgprCompCnt = 3;
-    }
     else if (gsBuiltInUsage.primitiveIdIn)
-    {
         gsVgprCompCnt = 2;
-    }
     else if (calcFactor.inputVertices > 2)
-    {
         gsVgprCompCnt = 1;
-    }
 
     SET_REG_FIELD(&pConfig->esGsRegs, SPI_SHADER_PGM_RSRC1_GS, GS_VGPR_COMP_CNT, gsVgprCompCnt);
 
@@ -1528,13 +1448,9 @@ void ConfigBuilder::buildEsGsRegConfig(
     {
         // NOTE: when primitive ID is used, set vgtCompCnt to 3 directly because primitive ID is the last VGPR.
         if (tesBuiltInUsage.primitiveId)
-        {
             esVgprCompCnt = 3;
-        }
         else
-        {
             esVgprCompCnt = 2;
-        }
 
         if (m_pipelineState->isTessOffChip())
         {
@@ -1544,9 +1460,7 @@ void ConfigBuilder::buildEsGsRegConfig(
     else
     {
         if (vsBuiltInUsage.instanceIndex)
-        {
             esVgprCompCnt = 3; // Enable instance ID
-        }
     }
 
     SET_REG_FIELD(&pConfig->esGsRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
@@ -1637,17 +1551,11 @@ void ConfigBuilder::buildEsGsRegConfig(
 
     VGT_GS_OUTPRIM_TYPE gsOutputPrimitiveType = TRISTRIP;
     if (gsInOutUsage.outputMapLocCount == 0)
-    {
         gsOutputPrimitiveType = POINTLIST;
-    }
     else if (geometryMode.outputPrimitive == OutputPrimitives::Points)
-    {
         gsOutputPrimitiveType = POINTLIST;
-    }
     else if (geometryMode.outputPrimitive == OutputPrimitives::LineStrip)
-    {
         gsOutputPrimitiveType = LINESTRIP;
-    }
 
     SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
 
@@ -1685,9 +1593,7 @@ void ConfigBuilder::buildEsGsRegConfig(
                       maxPrimsPerSubgroup);
     }
     else
-    {
         llvm_unreachable("Not implemented!");
-    }
 
     setNumAvailSgprs(Util::Abi::HardwareStage::Gs, gsResUsage->numSgprsAvailable);
     setNumAvailVgprs(Util::Abi::HardwareStage::Gs, gsResUsage->numVgprsAvailable);
@@ -1715,9 +1621,7 @@ void ConfigBuilder::buildEsGsRegConfig(
                      Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
     }
     else
-    {
         llvm_unreachable("Not implemented!");
-    }
 }
 
 // =====================================================================================================================
@@ -1762,17 +1666,11 @@ void ConfigBuilder::buildPrimShaderRegConfig(
     if (hasGs)
     {
         if ((calcFactor.inputVertices > 4) || gsBuiltInUsage.invocationId)
-        {
             gsVgprCompCnt = 3;
-        }
         else if (gsBuiltInUsage.primitiveIdIn)
-        {
             gsVgprCompCnt = 2;
-        }
         else if (calcFactor.inputVertices > 2)
-        {
             gsVgprCompCnt = 1;
-        }
     }
     else
     {
@@ -1797,9 +1695,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(
     const auto& gsShaderOptions = m_pipelineState->getShaderOptions(ShaderStageGeometry);
     bool wgpMode = getShaderWgpMode(hasTs ? ShaderStageTessEval : ShaderStageVertex);
     if (hasGs)
-    {
         wgpMode = (wgpMode || getShaderWgpMode(ShaderStageGeometry));
-    }
 
     SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_PGM_RSRC1_GS, DEBUG_MODE, gsShaderOptions.debugMode);
     SET_REG_GFX10_FIELD(&pConfig->primShaderRegs, SPI_SHADER_PGM_RSRC1_GS, MEM_ORDERED, true);
@@ -1824,13 +1720,9 @@ void ConfigBuilder::buildPrimShaderRegConfig(
     {
         // NOTE: when primitive ID is used, set vgtCompCnt to 3 directly because primitive ID is the last VGPR.
         if (tesBuiltInUsage.primitiveId)
-        {
             esVgprCompCnt = 3;
-        }
         else
-        {
             esVgprCompCnt = 2;
-        }
 
         if (m_pipelineState->isTessOffChip())
         {
@@ -1840,9 +1732,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(
     else
     {
         if (vsBuiltInUsage.instanceIndex)
-        {
             esVgprCompCnt = 3; // Enable instance ID
-        }
     }
 
     SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
@@ -1895,75 +1785,49 @@ void ConfigBuilder::buildPrimShaderRegConfig(
     {
         // GS present
         if (gsInOutUsage.outputMapLocCount == 0)
-        {
             gsOutputPrimitiveType = POINTLIST;
-        }
         else if (geometryMode.outputPrimitive == OutputPrimitives::Points)
-        {
             gsOutputPrimitiveType = POINTLIST;
-        }
         else if (geometryMode.outputPrimitive == OutputPrimitives::LineStrip)
-        {
             gsOutputPrimitiveType = LINESTRIP;
-        }
         else if (geometryMode.outputPrimitive == OutputPrimitives::TriangleStrip)
-        {
             gsOutputPrimitiveType = TRISTRIP;
-        }
         else
-        {
             llvm_unreachable("Should never be called!");
-        }
     }
     else if (hasTs)
     {
         // With tessellation
         const auto& tessMode = m_pipelineState->getShaderModes()->getTessellationMode();
         if (tessMode.pointMode)
-        {
             gsOutputPrimitiveType = POINTLIST;
-        }
         else if (tessMode.primitiveMode == PrimitiveMode::Isolines)
-        {
             gsOutputPrimitiveType = LINESTRIP;
-        }
         else if ((tessMode.primitiveMode == PrimitiveMode::Triangles) ||
                  (tessMode.primitiveMode == PrimitiveMode::Quads))
-        {
             gsOutputPrimitiveType = TRISTRIP;
-        }
         else
-        {
             llvm_unreachable("Should never be called!");
-        }
     }
     else
     {
         // Without tessellation
         const auto topology = m_pipelineState->getInputAssemblyState().topology;
         if (topology == PrimitiveTopology::PointList)
-        {
             gsOutputPrimitiveType = POINTLIST;
-        }
         else if ((topology == PrimitiveTopology::LineList) ||
                  (topology == PrimitiveTopology::LineStrip) ||
                  (topology == PrimitiveTopology::LineListWithAdjacency) ||
                  (topology == PrimitiveTopology::LineStripWithAdjacency))
-        {
             gsOutputPrimitiveType = LINESTRIP;
-        }
         else if ((topology == PrimitiveTopology::TriangleList) ||
                  (topology == PrimitiveTopology::TriangleStrip) ||
                  (topology == PrimitiveTopology::TriangleFan) ||
                  (topology == PrimitiveTopology::TriangleListWithAdjacency) ||
                  (topology == PrimitiveTopology::TriangleStripWithAdjacency))
-        {
             gsOutputPrimitiveType = TRISTRIP;
-        }
         else
-        {
             llvm_unreachable("Should never be called!");
-        }
     }
 
     // TODO: Multiple output streams are not supported.
@@ -2057,13 +1921,9 @@ void ConfigBuilder::buildPrimShaderRegConfig(
 
         // NOTE: For ES-GS merged shader, the actual use of primitive ID should take both ES and GS into consideration.
         if (hasTs)
-        {
             usePrimitiveId = usePrimitiveId || tesBuiltInUsage.primitiveId;
-        }
         else
-        {
             usePrimitiveId = usePrimitiveId || vsBuiltInUsage.primitiveId;
-        }
     }
     else
     {
@@ -2162,17 +2022,13 @@ void ConfigBuilder::buildPrimShaderRegConfig(
 
     unsigned posCount = 1; // gl_Position is always exported
     if (usePointSize || useLayer || useViewportIndex)
-    {
         ++posCount;
-    }
 
     if (clipDistanceCount + cullDistanceCount > 0)
     {
         ++posCount;
         if (clipDistanceCount + cullDistanceCount > 4)
-        {
             ++posCount;
-        }
     }
 
     SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_POS_FORMAT, POS0_EXPORT_FORMAT, SPI_SHADER_4COMP);
@@ -2255,9 +2111,7 @@ void ConfigBuilder::buildPsRegConfig(
         SET_REG_GFX10_FIELD(&pConfig->psRegs, SPI_SHADER_PGM_RSRC1_PS, MEM_ORDERED, true);
 
         if (shaderOptions.waveBreakSize == lgc::WaveBreak::DrawTime)
-        {
             setCalcWaveBreakSizeAtDrawTime(true);
-        }
         else
         {
             SET_REG_GFX10_FIELD(&pConfig->psRegs, PA_SC_SHADER_CONTROL, WAVE_BREAK_REGION_SIZE,
@@ -2302,22 +2156,16 @@ void ConfigBuilder::buildPsRegConfig(
     ZOrder zOrder = LATE_Z;
     bool execOnHeirFail = false;
     if (fragmentMode.earlyFragmentTests)
-    {
         zOrder = EARLY_Z_THEN_LATE_Z;
-    }
     else if (resUsage->resourceWrite)
     {
         zOrder = LATE_Z;
         execOnHeirFail = true;
     }
     else if (shaderOptions.allowReZ)
-    {
         zOrder = EARLY_Z_THEN_RE_Z;
-    }
     else
-    {
         zOrder = EARLY_Z_THEN_LATE_Z;
-    }
 
     SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, Z_ORDER, zOrder);
     SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, KILL_ENABLE, builtInUsage.discard);
@@ -2340,17 +2188,11 @@ void ConfigBuilder::buildPsRegConfig(
 
     unsigned depthExpFmt = EXP_FORMAT_ZERO;
     if (builtInUsage.sampleMask)
-    {
         depthExpFmt = EXP_FORMAT_32_ABGR;
-    }
     else if (builtInUsage.fragStencilRef)
-    {
         depthExpFmt = EXP_FORMAT_32_GR;
-    }
     else if (builtInUsage.fragDepth)
-    {
         depthExpFmt = EXP_FORMAT_32_R;
-    }
     SET_REG_FIELD(&pConfig->psRegs, SPI_SHADER_Z_FORMAT, Z_EXPORT_FORMAT, depthExpFmt);
 
     unsigned spiShaderColFormat = 0;
@@ -2384,9 +2226,7 @@ void ConfigBuilder::buildPsRegConfig(
     }
 
     if (gfxIp.major >= 10)
-    {
         setWaveFrontSize(Util::Abi::HardwareStage::Ps, waveFrontSize);
-    }
 
     unsigned pointCoordLoc = InvalidValue;
     if (resUsage->inOutUsage.builtInInputLocMap.find(BuiltInPointCoord) !=
@@ -2408,9 +2248,8 @@ void ConfigBuilder::buildPsRegConfig(
         if (((interpInfoElem.loc     == InvalidFsInterpInfo.loc) &&
              (interpInfoElem.flat    == InvalidFsInterpInfo.flat) &&
              (interpInfoElem.custom  == InvalidFsInterpInfo.custom) &&
-             (interpInfoElem.is16bit == InvalidFsInterpInfo.is16bit))) {
+             (interpInfoElem.is16bit == InvalidFsInterpInfo.is16bit)))
           interpInfoElem.loc = i;
-        }
 
         regSPI_PS_INPUT_CNTL_0 spiPsInputCntl = {};
         spiPsInputCntl.bits.FLAT_SHADE = interpInfoElem.flat;
@@ -2461,9 +2300,7 @@ void ConfigBuilder::buildPsRegConfig(
         setPsWritesDepth(builtInUsage.fragDepth);
     }
     else
-    {
         setPsUsesUavs(static_cast<unsigned>(resUsage->resourceWrite));
-    }
 
     if (m_pipelineState->getRasterizerState().innerCoverage)
     {
@@ -2552,9 +2389,7 @@ void ConfigBuilder::buildCsRegConfig(
             }
         }
         else
-        {
             setWaveFrontSize(Util::Abi::HardwareStage::Cs, waveSize);
-        }
     }
 
     // Set registers based on shader interface data
@@ -2568,13 +2403,9 @@ void ConfigBuilder::buildCsRegConfig(
     // 0 = X, 1 = XY, 2 = XYZ
     unsigned tidigCompCnt = 0;
     if (workgroupSizes[2] > 1)
-    {
         tidigCompCnt = 2;
-    }
     else if (workgroupSizes[1] > 1)
-    {
         tidigCompCnt = 1;
-    }
     SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TIDIG_COMP_CNT, tidigCompCnt);
 
 
@@ -2618,9 +2449,7 @@ void ConfigBuilder::buildUserDataConfig(
     {
         if (((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageTessEval)) &&
             (shaderStage2 == ShaderStageInvalid))
-        {
             enableXfb = m_pipelineState->getShaderResourceUsage(shaderStage1)->inOutUsage.enableXfb;
-        }
     }
 
     const bool enableNgg = m_pipelineState->isGraphics() ? m_pipelineState->getNggControl()->enableNgg : false;
@@ -2697,9 +2526,7 @@ void ConfigBuilder::buildUserDataConfig(
                              static_cast<unsigned>(Util::Abi::UserDataMapping::ViewId));
             }
             else
-            {
                 llvm_unreachable("Should never be called!");
-            }
         }
 
         if (shaderStage2 == ShaderStageGeometry)
@@ -2794,9 +2621,7 @@ void ConfigBuilder::buildUserDataConfig(
     appendConfig(startUserData, static_cast<unsigned>(Util::Abi::UserDataMapping::GlobalTable));
 
     if (resUsage1->perShaderTable)
-    {
         appendConfig(startUserData + 1, static_cast<unsigned>(Util::Abi::UserDataMapping::PerShaderTable));
-    }
 
     // NOTE: For copy shader, we use fixed number of user data SGPRs. Thus, there is no need of building user data
     // registers here.
@@ -2811,9 +2636,7 @@ void ConfigBuilder::buildUserDataConfig(
             {
                 appendConfig(startUserData + i, intfData1->userDataMap[i]);
                 if ((intfData1->userDataMap[i] & DescRelocMagicMask) != DescRelocMagic)
-                {
                     userDataLimit = std::max(userDataLimit, intfData1->userDataMap[i] + 1);
-                }
 
             }
         }
@@ -2835,9 +2658,7 @@ void ConfigBuilder::buildUserDataConfig(
             {
                 if ((node.type != ResourceNodeType::IndirectUserDataVaPtr) &&
                     (node.type != ResourceNodeType::StreamOutTableVaPtr))
-                {
                     userDataLimit = std::max(userDataLimit, node.offsetInDwords + node.sizeInDwords);
-                }
             }
         }
 
@@ -2859,62 +2680,38 @@ void ConfigBuilder::setupVgtTfParam(
 
     assert(tessMode.primitiveMode != PrimitiveMode::Unknown);
     if (tessMode.primitiveMode == PrimitiveMode::Isolines)
-    {
         primType = TESS_ISOLINE;
-    }
     else if (tessMode.primitiveMode == PrimitiveMode::Triangles)
-    {
         primType = TESS_TRIANGLE;
-    }
     else if (tessMode.primitiveMode == PrimitiveMode::Quads)
-    {
         primType = TESS_QUAD;
-    }
     assert(primType != InvalidValue);
 
     assert(tessMode.vertexSpacing != VertexSpacing::Unknown);
     if (tessMode.vertexSpacing == VertexSpacing::Equal)
-    {
         partition = PART_INTEGER;
-    }
     else if (tessMode.vertexSpacing == VertexSpacing::FractionalOdd)
-    {
         partition = PART_FRAC_ODD;
-    }
     else if (tessMode.vertexSpacing == VertexSpacing::FractionalEven)
-    {
         partition = PART_FRAC_EVEN;
-    }
     assert(partition != InvalidValue);
 
     assert(tessMode.vertexOrder != VertexOrder::Unknown);
     if (tessMode.pointMode)
-    {
         topology = OUTPUT_POINT;
-    }
     else if (tessMode.primitiveMode == PrimitiveMode::Isolines)
-    {
         topology = OUTPUT_LINE;
-    }
     else if (tessMode.vertexOrder == VertexOrder::Cw)
-    {
         topology = OUTPUT_TRIANGLE_CW;
-    }
     else if (tessMode.vertexOrder == VertexOrder::Ccw)
-    {
         topology = OUTPUT_TRIANGLE_CCW;
-    }
 
     if (m_pipelineState->getInputAssemblyState().switchWinding)
     {
         if (topology == OUTPUT_TRIANGLE_CW)
-        {
             topology = OUTPUT_TRIANGLE_CCW;
-        }
         else if (topology == OUTPUT_TRIANGLE_CCW)
-        {
             topology = OUTPUT_TRIANGLE_CW;
-        }
     }
 
     assert(topology != InvalidValue);

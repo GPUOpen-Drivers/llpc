@@ -141,14 +141,10 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(
     }
 
     if (capabilities.find(CapabilityVariablePointersStorageBuffer) != capabilities.end())
-    {
         shaderModuleUsage->enableVarPtrStorageBuf = true;
-    }
 
     if (capabilities.find(CapabilityVariablePointers) != capabilities.end())
-    {
         shaderModuleUsage->enableVarPtr = true;
-    }
 
     return result;
 }
@@ -313,9 +309,7 @@ unsigned ShaderModuleHelper::getStageMaskFromSpirvBinary(
 
             // All "OpEntryPoint" are before "OpFunction"
             if (opCode == OpFunction)
-            {
                 break;
-            }
 
             codePos += wordCount;
         }
@@ -368,9 +362,7 @@ const char* ShaderModuleHelper::getEntryPointNameFromSpirvBinary(
 
             // All "OpEntryPoint" are before "OpFunction"
             if (opCode == OpFunction)
-            {
                 break;
-            }
 
             codePos += wordCount;
         }
@@ -444,9 +436,7 @@ bool ShaderModuleHelper::isSpirvBinary(
     {
         const SpirvHeader* header = reinterpret_cast<const SpirvHeader*>(shaderBin->pCode);
         if ((header->magicNumber == MagicNumber) && (header->spvVersion <= spv::Version) && (header->reserved == 0))
-        {
             isSpvBinary = true;
-        }
     }
 
     return isSpvBinary;
@@ -461,9 +451,7 @@ bool ShaderModuleHelper::isLlvmBitcode(
     bool isLlvmBitcode = false;
     if ((shaderBin->codeSize > 4) &&
         (*reinterpret_cast<const unsigned*>(shaderBin->pCode) == BitcodeMagicNumber))
-    {
         isLlvmBitcode = true;
-    }
 
     return isLlvmBitcode;
 }

@@ -102,9 +102,7 @@ private:
     inline void extractDwordIfNecessary(unsigned index)
     {
         if (m_dwords[index] == nullptr)
-        {
             m_dwords[index] = m_builder->CreateExtractElement(m_reg, m_builder->getInt64(index));
-        }
     }
 
 protected:

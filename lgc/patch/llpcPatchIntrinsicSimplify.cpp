@@ -104,30 +104,22 @@ bool PatchIntrinsicSimplify::runOnFunction(
     {
         // Skip non intrinsics.
         if (otherFunc.isIntrinsic() == false)
-        {
             continue;
-        }
 
         for (Value* const user : otherFunc.users())
         {
             IntrinsicInst* const intrinsicCall = dyn_cast<IntrinsicInst>(user);
 
             if (intrinsicCall == nullptr)
-            {
                 continue;
-            }
 
             // Skip calls not from our own function.
             if (intrinsicCall->getFunction() != &func)
-            {
                 continue;
-            }
 
             // Record intrinsic only if it can be simplified.
             if (canSimplify(*intrinsicCall))
-            {
                 candidateCalls.push_back(intrinsicCall);
-            }
         }
     }
 
@@ -137,9 +129,7 @@ bool PatchIntrinsicSimplify::runOnFunction(
 
         // We did not simplify the intrinsic call.
         if (simplifiedValue == nullptr)
-        {
             continue;
-        }
 
         changed = true;
 
@@ -176,24 +166,18 @@ bool PatchIntrinsicSimplify::canSafelyConvertTo16Bit(
         Value* const castSrc = cast<Instruction>(&value)->getOperand(0);
         Type* const castSrcTy = castSrc->getType();
         if (castSrcTy->isHalfTy() || castSrcTy->isIntegerTy(16))
-        {
             return true;
-        }
     }
     else
     {
         // Bail out if the type is not able to be used in scalar evolution.
         if (m_scalarEvolution->isSCEVable(valueTy) == false)
-        {
             return false;
-        }
 
         const SCEV* const scev = m_scalarEvolution->getSCEV(&value);
 
         if (valueTy->isIntegerTy() && (m_scalarEvolution->getUnsignedRangeMax(scev).ule(UINT16_MAX)))
-        {
             return true;
-        }
     }
 
     return false;
@@ -208,17 +192,11 @@ Value* PatchIntrinsicSimplify::convertTo16Bit(
 {
     Type* valueTy = value.getType();
     if (isa<FPExtInst>(&value) || isa<SExtInst>(&value) || isa<ZExtInst>(&value))
-    {
         return cast<Instruction>(&value)->getOperand(0);
-    }
     else if (valueTy->isIntegerTy())
-    {
         return builder.CreateIntCast(&value, Type::getInt16Ty(*m_context), false);
-    }
     else if (valueTy->isFloatingPointTy())
-    {
         return builder.CreateFPCast(&value, Type::getHalfTy(*m_context));
-    }
 
     llvm_unreachable("Should never be called!");
     return nullptr;
@@ -233,9 +211,7 @@ Value* PatchIntrinsicSimplify::simplifyImage(
 {
     // If we're not on GFX9 or above, bail.
     if (m_gfxIp.major < 9)
-    {
         return nullptr;
-    }
 
     bool floatCoord = false;
 
@@ -244,9 +220,7 @@ Value* PatchIntrinsicSimplify::simplifyImage(
         Value* const coord = intrinsicCall.getOperand(operandIndex);
         // If the values are not derived from 16-bit values, we cannot optimize.
         if (canSafelyConvertTo16Bit(*coord) == false)
-        {
             return nullptr;
-        }
 
         assert(operandIndex == coordOperandIndices[0]
             || floatCoord == coord->getType()->isFloatingPointTy());
@@ -266,9 +240,7 @@ Value* PatchIntrinsicSimplify::simplifyImage(
     IRBuilder<> builder(&intrinsicCall);
 
     for (unsigned operandIndex : coordOperandIndices)
-    {
         args[operandIndex] = convertTo16Bit(*intrinsicCall.getOperand(operandIndex), builder);
-    }
 
     return builder.CreateCall(intrinsic, args);
 }
@@ -290,17 +262,13 @@ Value* PatchIntrinsicSimplify::simplifyTrigonometric(
 
     // If the clamped value was not a binary operator, bail.
     if (binOp == nullptr)
-    {
         return nullptr;
-    }
 
     ConstantFP* const constMultiplicator = dyn_cast<ConstantFP>(binOp->getOperand(1));
 
     // If the multiplicator was not a constant, bail.
     if (constMultiplicator == nullptr)
-    {
         return nullptr;
-    }
 
     APFloat multiplicator(constMultiplicator->getValueAPF());
 
@@ -335,9 +303,7 @@ Value* PatchIntrinsicSimplify::simplifyTrigonometric(
 
     // If the value specified as two * pi was not nearly equal to ours, bail.
     if (diff.compare(tolerance) != APFloat::cmpLessThan)
-    {
         return nullptr;
-    }
 
     Intrinsic::ID intrinsicId = Intrinsic::not_intrinsic;
 

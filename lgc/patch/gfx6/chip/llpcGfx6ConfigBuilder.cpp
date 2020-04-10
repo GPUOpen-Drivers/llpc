@@ -65,9 +65,7 @@ namespace Gfx6
 void ConfigBuilder::buildPalMetadata()
 {
     if (m_pipelineState->isGraphics() == false)
-    {
         buildPipelineCsRegConfig();
-    }
     else
     {
         const bool hasTs = (m_hasTcs || m_hasTes);
@@ -450,9 +448,7 @@ void ConfigBuilder::buildVsRegConfig(
 
     unsigned streamBufferConfig = 0;
     for (auto i = 0; i < MaxGsStreams; ++i)
-    {
         streamBufferConfig |= (resUsage->inOutUsage.streamXfbBuffers[i] << (i * 4));
-    }
     SET_REG(&pConfig->vsRegs, VGT_STRMOUT_BUFFER_CONFIG, streamBufferConfig);
 
     uint8_t usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
@@ -613,17 +609,13 @@ void ConfigBuilder::buildVsRegConfig(
 
     unsigned posCount = 1; // gl_Position is always exported
     if (usePointSize || useLayer || useViewportIndex)
-    {
         ++posCount;
-    }
 
     if (clipDistanceCount + cullDistanceCount > 0)
     {
         ++posCount;
         if (clipDistanceCount + cullDistanceCount > 4)
-        {
             ++posCount;
-        }
     }
 
     SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS0_EXPORT_FORMAT, SPI_SHADER_4COMP);
@@ -734,9 +726,7 @@ void ConfigBuilder::buildEsRegConfig(
     if (shaderStage == ShaderStageVertex)
     {
         if (builtInUsage.vs.instanceIndex)
-        {
             vgprCompCnt = 3; // Enable instance ID
-        }
     }
     else
     {
@@ -744,13 +734,9 @@ void ConfigBuilder::buildEsRegConfig(
 
         // NOTE: when primitive ID is used, set vgtCompCnt to 3 directly because primitive ID is the last VGPR.
         if (builtInUsage.tes.primitiveId)
-        {
             vgprCompCnt = 3;
-        }
         else
-        {
             vgprCompCnt = 2;
-        }
 
         if (m_pipelineState->isTessOffChip())
         {
@@ -793,9 +779,7 @@ void ConfigBuilder::buildLsRegConfig(
 
     unsigned vgtCompCnt = 1;
     if (builtInUsage.instanceIndex)
-    {
         vgtCompCnt += 2; // Enable instance ID
-    }
     SET_REG_FIELD(&pConfig->lsRegs, SPI_SHADER_PGM_RSRC1_LS, VGPR_COMP_CNT, vgtCompCnt);
 
     SET_REG_FIELD(&pConfig->lsRegs, SPI_SHADER_PGM_RSRC2_LS, USER_SGPR, intfData->userDataCount);
@@ -805,9 +789,7 @@ void ConfigBuilder::buildLsRegConfig(
     unsigned ldsSizeInDwords = calcFactor.onChip.patchConstStart +
                                calcFactor.patchConstSize * calcFactor.patchCountPerThreadGroup;
     if (m_pipelineState->isTessOffChip())
-    {
         ldsSizeInDwords = calcFactor.inPatchSize * calcFactor.patchCountPerThreadGroup;
-    }
 
     auto gpuWorkarounds = &m_pipelineState->getTargetInfo().getGpuWorkarounds();
 
@@ -890,9 +872,7 @@ void ConfigBuilder::buildGsRegConfig(
 
     // This limit is halved if the primitive topology is adjacency-typed
     if (primAdjacency)
-    {
         maxGsPerEs >>= 1;
-    }
 
     unsigned maxVertOut = std::max(1u, static_cast<unsigned>(geometryMode.outputVertices));
     SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
@@ -980,17 +960,11 @@ void ConfigBuilder::buildGsRegConfig(
 
     VGT_GS_OUTPRIM_TYPE gsOutputPrimitiveType = TRISTRIP;
     if (inOutUsage.outputMapLocCount == 0)
-    {
         gsOutputPrimitiveType = POINTLIST;
-    }
     else if (geometryMode.outputPrimitive == OutputPrimitives::Points)
-    {
         gsOutputPrimitiveType = POINTLIST;
-    }
     else if (geometryMode.outputPrimitive == OutputPrimitives::LineStrip)
-    {
         gsOutputPrimitiveType = LINESTRIP;
-    }
 
     SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
 
@@ -1069,22 +1043,16 @@ void ConfigBuilder::buildPsRegConfig(
     ZOrder zOrder = LATE_Z;
     bool execOnHeirFail = false;
     if (fragmentMode.earlyFragmentTests)
-    {
         zOrder = EARLY_Z_THEN_LATE_Z;
-    }
     else if (resUsage->resourceWrite)
     {
         zOrder = LATE_Z;
         execOnHeirFail = true;
     }
     else if (shaderOptions.allowReZ)
-    {
         zOrder = EARLY_Z_THEN_RE_Z;
-    }
     else
-    {
         zOrder = EARLY_Z_THEN_LATE_Z;
-    }
 
     SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, Z_ORDER, zOrder);
     SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, KILL_ENABLE, builtInUsage.discard);
@@ -1099,17 +1067,11 @@ void ConfigBuilder::buildPsRegConfig(
 
     unsigned depthExpFmt = EXP_FORMAT_ZERO;
     if (builtInUsage.sampleMask)
-    {
         depthExpFmt = EXP_FORMAT_32_ABGR;
-    }
     else if (builtInUsage.fragStencilRef)
-    {
         depthExpFmt = EXP_FORMAT_32_GR;
-    }
     else if (builtInUsage.fragDepth)
-    {
         depthExpFmt = EXP_FORMAT_32_R;
-    }
     SET_REG_FIELD(&pConfig->psRegs, SPI_SHADER_Z_FORMAT, Z_EXPORT_FORMAT, depthExpFmt);
 
     unsigned spiShaderColFormat = 0;
@@ -1257,13 +1219,9 @@ void ConfigBuilder::buildCsRegConfig(
     // 0 = X, 1 = XY, 2 = XYZ
     unsigned tidigCompCnt = 0;
     if (workgroupSizes[2] > 1)
-    {
         tidigCompCnt = 2;
-    }
     else if (workgroupSizes[1] > 1)
-    {
         tidigCompCnt = 1;
-    }
     SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TIDIG_COMP_CNT, tidigCompCnt);
 
     SET_REG_FIELD(config, COMPUTE_NUM_THREAD_X, NUM_THREAD_FULL, workgroupSizes[0]);
@@ -1375,9 +1333,7 @@ void ConfigBuilder::buildUserDataConfig(
     appendConfig(startUserData, static_cast<unsigned>(Util::Abi::UserDataMapping::GlobalTable));
 
     if (resUsage->perShaderTable)
-    {
         appendConfig(startUserData + 1, static_cast<unsigned>(Util::Abi::UserDataMapping::PerShaderTable));
-    }
 
     unsigned userDataLimit = 0;
     unsigned spillThreshold = UINT32_MAX;
@@ -1390,9 +1346,7 @@ void ConfigBuilder::buildUserDataConfig(
             {
                 appendConfig(startUserData + i, intfData->userDataMap[i]);
                 if ((intfData->userDataMap[i] & DescRelocMagicMask) != DescRelocMagic)
-                {
                     userDataLimit = std::max(userDataLimit, intfData->userDataMap[i] + 1);
-                }
             }
         }
 
@@ -1413,9 +1367,7 @@ void ConfigBuilder::buildUserDataConfig(
             {
                 if ((node.type != ResourceNodeType::IndirectUserDataVaPtr) &&
                     (node.type != ResourceNodeType::StreamOutTableVaPtr))
-                {
                     userDataLimit = std::max(userDataLimit, node.offsetInDwords + node.sizeInDwords);
-                }
             }
         }
     }
@@ -1438,62 +1390,38 @@ void ConfigBuilder::setupVgtTfParam(
 
     assert(tessMode.primitiveMode != PrimitiveMode::Unknown);
     if (tessMode.primitiveMode == PrimitiveMode::Isolines)
-    {
         primType = TESS_ISOLINE;
-    }
     else if (tessMode.primitiveMode == PrimitiveMode::Triangles)
-    {
         primType = TESS_TRIANGLE;
-    }
     else if (tessMode.primitiveMode == PrimitiveMode::Quads)
-    {
         primType = TESS_QUAD;
-    }
     assert(primType != InvalidValue);
 
     assert(tessMode.vertexSpacing != VertexSpacing::Unknown);
     if (tessMode.vertexSpacing == VertexSpacing::Equal)
-    {
         partition = PART_INTEGER;
-    }
     else if (tessMode.vertexSpacing == VertexSpacing::FractionalOdd)
-    {
         partition = PART_FRAC_ODD;
-    }
     else if (tessMode.vertexSpacing == VertexSpacing::FractionalEven)
-    {
         partition = PART_FRAC_EVEN;
-    }
     assert(partition != InvalidValue);
 
     assert(tessMode.vertexOrder != VertexOrder::Unknown);
     if (tessMode.pointMode)
-    {
         topology = OUTPUT_POINT;
-    }
     else if (tessMode.primitiveMode == PrimitiveMode::Isolines)
-    {
         topology = OUTPUT_LINE;
-    }
     else if (tessMode.vertexOrder == VertexOrder::Cw)
-    {
         topology = OUTPUT_TRIANGLE_CW;
-    }
     else if (tessMode.vertexOrder == VertexOrder::Ccw)
-    {
         topology = OUTPUT_TRIANGLE_CCW;
-    }
 
     if (m_pipelineState->getInputAssemblyState().switchWinding)
     {
         if (topology == OUTPUT_TRIANGLE_CW)
-        {
             topology = OUTPUT_TRIANGLE_CCW;
-        }
         else if (topology == OUTPUT_TRIANGLE_CCW)
-        {
             topology = OUTPUT_TRIANGLE_CW;
-        }
     }
 
     assert(topology != InvalidValue);

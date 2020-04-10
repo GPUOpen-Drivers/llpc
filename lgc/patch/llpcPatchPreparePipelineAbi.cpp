@@ -134,15 +134,11 @@ bool PatchPreparePipelineAbi::runOnModule(
 
     // If we've only to set the calling conventions, do that now.
     if (MOnlySetCallingConvs)
-    {
         setCallingConvs(module);
-    }
     else
     {
         if (m_gfxIp.major >= 9)
-        {
             mergeShaderAndSetCallingConvs(module);
-        }
 
         setAbiEntryNames(module);
 
@@ -279,9 +275,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(
                 }
             }
             else
-            {
                 setCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_VS);
-            }
         }
         else if (m_hasGs)
         {
@@ -324,9 +318,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(
                 }
             }
             else
-            {
                 setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
-            }
         }
     }
 }
@@ -339,9 +331,7 @@ void PatchPreparePipelineAbi::setCallingConv(
 {
     auto entryPoint = m_pipelineShaders->getEntryPoint(shaderStage);
     if (entryPoint != nullptr)
-    {
         entryPoint->setCallingConv(callingConv);
-    }
 }
 
 // =====================================================================================================================

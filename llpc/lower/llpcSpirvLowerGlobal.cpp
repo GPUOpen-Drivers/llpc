@@ -139,17 +139,11 @@ bool SpirvLowerGlobal::runOnModule(
     for (auto global = m_module->global_begin(), end = m_module->global_end(); global != end; ++global)
     {
         if (global->getType()->getAddressSpace() == SPIRAS_Private)
-        {
             mapGlobalVariableToProxy(&*global);
-        }
         else if (global->getType()->getAddressSpace() == SPIRAS_Input)
-        {
             mapInputToProxy(&*global);
-        }
         else if (global->getType()->getAddressSpace() == SPIRAS_Output)
-        {
             mapOutputToProxy(&*global);
-        }
     }
 
     // NOTE: Global variable, inlcude general global variable, input and output is a special constant variable, so if
@@ -163,9 +157,7 @@ bool SpirvLowerGlobal::runOnModule(
         bool isGlobalVar = (addrSpace == SPIRAS_Private) || (addrSpace == SPIRAS_Input) || (addrSpace == SPIRAS_Output);
 
         if (isGlobalVar == false)
-        {
             continue;
-        }
         removeConstantExpr(m_context, &global);
     }
 
@@ -181,22 +173,14 @@ bool SpirvLowerGlobal::runOnModule(
     {
         // Either input or output has to be lowered in-place, not both
         if (m_lowerInputInPlace)
-        {
             lowerInOutInPlace();
-        }
         else
-        {
             lowerInput();
-        }
 
         if (m_lowerOutputInPlace)
-        {
             lowerInOutInPlace();
-        }
         else
-        {
             lowerOutput();
-        }
     }
 
     lowerBufferBlock();
@@ -214,15 +198,11 @@ void SpirvLowerGlobal::visitReturnInst(
 {
     // Skip if "return" instructions are not expected to be handled.
     if (m_instVisitFlags.checkReturn == false)
-    {
         return;
-    }
 
     // We only handle the "return" in entry point
     if (retInst.getParent()->getParent()->getLinkage() == GlobalValue::InternalLinkage)
-    {
         return;
-    }
 
     assert(m_retBlock != nullptr); // Must have been created
     BranchInst::Create(m_retBlock, retInst.getParent());
@@ -236,15 +216,11 @@ void SpirvLowerGlobal::visitCallInst(
 {
     // Skip if "emit" and interpolaton calls are not expected to be handled
     if ((m_instVisitFlags.checkEmitCall == false) && (m_instVisitFlags.checkInterpCall == false))
-    {
         return;
-    }
 
     auto callee = callInst.getCalledFunction();
     if (callee == nullptr)
-    {
         return;
-    }
 
     auto mangledName = callee->getName();
 
@@ -252,9 +228,7 @@ void SpirvLowerGlobal::visitCallInst(
     {
         if (mangledName.startswith(gSPIRVName::EmitVertex) ||
             mangledName.startswith(gSPIRVName::EmitStreamVertex))
-        {
             m_emitCalls.insert(&callInst);
-        }
     }
     else
     {
@@ -271,9 +245,7 @@ void SpirvLowerGlobal::visitCallInst(
             Value* auxInterpValue = nullptr;
 
             if (mangledName.startswith(gSPIRVName::InterpolateAtCentroid))
-            {
                 interpLoc = InterpLocCentroid;
-            }
             else if (mangledName.startswith(gSPIRVName::InterpolateAtSample))
             {
                 interpLoc = InterpLocSample;
@@ -335,9 +307,7 @@ void SpirvLowerGlobal::visitLoadInst(
     const unsigned addrSpace = loadSrc->getType()->getPointerAddressSpace();
 
     if ((addrSpace != SPIRAS_Input) && (addrSpace != SPIRAS_Output))
-    {
         return;
-    }
 
     // Skip if "load" instructions are not expected to be handled
     const bool isTcsInput  = ((m_shaderStage == ShaderStageTessControl) && (addrSpace == SPIRAS_Input));
@@ -346,9 +316,7 @@ void SpirvLowerGlobal::visitLoadInst(
 
     if ((m_instVisitFlags.checkLoad == false) ||
         ((isTcsInput == false) && (isTcsOutput == false) && (isTesInput == false)))
-    {
         return;
-    }
 
     if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(loadSrc))
     {
@@ -366,16 +334,12 @@ void SpirvLowerGlobal::visitLoadInst(
             // If we have previous index operands, we need to remove the first operand (a zero index into the pointer)
             // when concatenating two GEP indices together.
             if (indexOperands.empty() == false)
-            {
                 indexOperands.erase(indexOperands.begin());
-            }
 
             SmallVector<Value*, 8> indices;
 
             for (Value* const index : currGetElemPtr->indices())
-            {
                 indices.push_back(toInt32Value(index, &loadInst));
-            }
 
             indexOperands.insert(indexOperands.begin(), indices.begin(), indices.end());
 
@@ -416,9 +380,7 @@ void SpirvLowerGlobal::visitLoadInst(
                                (builtInId == spv::BuiltInCullDistance));
             }
             else
-            {
                 isVertexIdx = (inOutMeta.PerPatch == false);
-            }
 
             if (isVertexIdx)
             {
@@ -478,9 +440,7 @@ void SpirvLowerGlobal::visitLoadInst(
                                 (builtInId == spv::BuiltInCullDistance));
             }
             else
-            {
                 hasVertexIdx = (inOutMeta.PerPatch == false);
-            }
         }
 
         if (hasVertexIdx)
@@ -537,16 +497,12 @@ void SpirvLowerGlobal::visitStoreInst(
     const unsigned addrSpace = storeDest->getType()->getPointerAddressSpace();
 
     if ((addrSpace != SPIRAS_Input) && (addrSpace != SPIRAS_Output))
-    {
         return;
-    }
 
     // Skip if "store" instructions are not expected to be handled
     const bool isTcsOutput = ((m_shaderStage == ShaderStageTessControl) && (addrSpace == SPIRAS_Output));
     if ((m_instVisitFlags.checkStore == false) || (isTcsOutput == false))
-    {
         return;
-    }
 
     if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(storeDest))
     {
@@ -564,16 +520,12 @@ void SpirvLowerGlobal::visitStoreInst(
             // If we have previous index operands, we need to remove the first operand (a zero index into the pointer)
             // when concatenating two GEP indices together.
             if (indexOperands.empty() == false)
-            {
                 indexOperands.erase(indexOperands.begin());
-            }
 
             SmallVector<Value*, 8> indices;
 
             for (Value* const index : currGetElemPtr->indices())
-            {
                 indices.push_back(toInt32Value(index, &storeInst));
-            }
 
             indexOperands.insert(indexOperands.begin(), indices.begin(), indices.end());
 
@@ -610,9 +562,7 @@ void SpirvLowerGlobal::visitStoreInst(
                                (builtInId == spv::BuiltInCullDistance));
             }
             else
-            {
                 isVertexIdx = (outputMeta.PerPatch == false);
-            }
 
             if (isVertexIdx)
             {
@@ -667,9 +617,7 @@ void SpirvLowerGlobal::visitStoreInst(
                                 (builtInId == spv::BuiltInCullDistance));
             }
             else
-            {
                 hasVertexIdx = (outputMeta.PerPatch == false);
-            }
         }
 
         if (hasVertexIdx)
@@ -871,9 +819,7 @@ void SpirvLowerGlobal::lowerInput()
         {
             GetElementPtrInst* getElemPtr = dyn_cast<GetElementPtrInst>(interpCall->getArgOperand(0));
             if (getElemPtr != nullptr)
-            {
                 getElemInsts.insert(getElemPtr);
-            }
 
             assert(interpCall->use_empty());
             interpCall->dropAllReferences();
@@ -933,9 +879,7 @@ void SpirvLowerGlobal::lowerOutput()
         m_instVisitFlags.checkReturn = true;
     }
     else
-    {
         m_instVisitFlags.checkReturn = true;
-    }
     visit(m_module);
 
     auto retInst = ReturnInst::Create(*m_context, m_retBlock);
@@ -981,13 +925,9 @@ void SpirvLowerGlobal::lowerOutput()
 
                 auto mangledName = emitCall->getCalledFunction()->getName();
                 if (mangledName.startswith(gSPIRVName::EmitStreamVertex))
-                {
                     emitStreamId = cast<ConstantInt>(emitCall->getOperand(0))->getZExtValue();
-                }
                 else
-                {
                     assert(mangledName.startswith(gSPIRVName::EmitVertex));
-                }
 
                 Value* outputValue = new LoadInst(proxy, "", emitCall);
                 addCallInstForOutputExport(outputValue,
@@ -1054,9 +994,7 @@ void SpirvLowerGlobal::lowerInOutInPlace()
     m_instVisitFlags.u32All = 0;
     m_instVisitFlags.checkLoad = true;
     if (m_shaderStage == ShaderStageTessControl)
-    {
         m_instVisitFlags.checkStore = true;
-    }
     visit(m_module);
 
     llvm::DenseSet<GetElementPtrInst*> getElemInsts;
@@ -1066,9 +1004,7 @@ void SpirvLowerGlobal::lowerInOutInPlace()
     {
         GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(loadInst->getPointerOperand());
         if (getElemPtr != nullptr)
-        {
             getElemInsts.insert(getElemPtr);
-        }
 
         assert(loadInst->use_empty());
         loadInst->dropAllReferences();
@@ -1082,9 +1018,7 @@ void SpirvLowerGlobal::lowerInOutInPlace()
     {
         GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(storeInst->getPointerOperand());
         if (getElemPtr != nullptr)
-        {
             getElemInsts.insert(getElemPtr);
-        }
 
         assert(storeInst->use_empty());
         storeInst->dropAllReferences();
@@ -1101,15 +1035,11 @@ void SpirvLowerGlobal::lowerInOutInPlace()
 
         // If the GEP still has any uses, skip processing it.
         if (getElemPtr->use_empty() == false)
-        {
             continue;
-        }
 
         // If the GEP is GEPing into another GEP, record that GEP as something we need to visit too.
         if (GetElementPtrInst* const otherGetElemInst = dyn_cast<GetElementPtrInst>(getElemPtr->getPointerOperand()))
-        {
             getElemInsts.insert(otherGetElemInst);
-        }
 
         getElemPtr->dropAllReferences();
         getElemPtr->eraseFromParent();
@@ -1274,9 +1204,7 @@ Value* SpirvLowerGlobal::addCallInstForInOutImport(
             {
                 // NOTE: If the relative location offset is not specified, initialize it to 0.
                 if (locOffset == nullptr)
-                {
                     locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
-                }
 
                 for (unsigned idx = 0; idx < elemCount; ++idx)
                 {
@@ -1349,13 +1277,9 @@ Value* SpirvLowerGlobal::addCallInstForInOutImport(
             lgc::InOutInfo inOutInfo;
             inOutInfo.setArraySize(maxLocOffset);
             if (addrSpace == SPIRAS_Input)
-            {
                 inOutValue = m_builder->CreateReadBuiltInInput(builtIn, inOutInfo, vertexIdx, elemIdx);
-            }
             else
-            {
                 inOutValue = m_builder->CreateReadBuiltInOutput(builtIn, inOutInfo, vertexIdx, elemIdx);
-            }
 
             if (((builtIn == lgc::BuiltInSubgroupEqMask)     ||
                  (builtIn == lgc::BuiltInSubgroupGeMask)     ||
@@ -1390,9 +1314,7 @@ Value* SpirvLowerGlobal::addCallInstForInOutImport(
 
             lgc::InOutInfo inOutInfo;
             if (locOffset == nullptr)
-            {
                 locOffset = m_builder->getInt32(0);
-            }
 
             if (addrSpace == SPIRAS_Input)
             {
@@ -1406,9 +1328,7 @@ Value* SpirvLowerGlobal::addCallInstForInOutImport(
                         inOutInfo.setHasInterpAux();
                     }
                     else
-                    {
                         interpLoc = inOutMeta.InterpLoc;
-                    }
                     inOutInfo.setInterpLoc(interpLoc);
                     inOutInfo.setInterpMode(inOutMeta.InterpMode);
                 }
@@ -1486,9 +1406,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(
             auto builtInId = static_cast<lgc::BuiltInKind>(outputMeta.Value);
             lgc::InOutInfo outputInfo;
             if (emitStreamId != InvalidValue)
-            {
                 outputInfo.setStreamId(emitStreamId);
-            }
             outputInfo.setArraySize(outputTy->getArrayNumElements());
             m_builder->SetInsertPoint(insertPos);
             m_builder->CreateWriteBuiltInOutput(outputValue, builtInId, outputInfo, vertexIdx, nullptr);
@@ -1542,9 +1460,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(
         {
             // NOTE: If the relative location offset is not specified, initialize it to 0.
             if (locOffset == nullptr)
-            {
                 locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
-            }
 
             auto elemMeta = cast<Constant>(outputMetaVal->getOperand(1));
 
@@ -1630,9 +1546,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(
 
         lgc::InOutInfo outputInfo;
         if (emitStreamId != InvalidValue)
-        {
             outputInfo.setStreamId(emitStreamId);
-        }
         outputInfo.setIsSigned(outputMeta.Signedness);
 
         if (outputMeta.IsBuiltIn)
@@ -1784,9 +1698,7 @@ Value* SpirvLowerGlobal::loadInOutMember(
             {
                 // NOTE: If the relative location offset is not specified, initialize it to 0.
                 if (locOffset == nullptr)
-                {
                     locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
-                }
 
                 // elemLocOffset = locOffset + stride * elemIdx
                 unsigned stride = cast<ConstantInt>(inOutMetaVal->getOperand(0))->getZExtValue();
@@ -1928,9 +1840,7 @@ void SpirvLowerGlobal::storeOutputMember(
             {
                 // NOTE: If the relative location offset is not specified, initialize it.
                 if (locOffset == nullptr)
-                {
                     locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
-                }
 
                 // elemLocOffset = locOffset + stride * elemIdx
                 unsigned stride = cast<ConstantInt>(outputMetaVal->getOperand(0))->getZExtValue();
@@ -2027,9 +1937,7 @@ void SpirvLowerGlobal::lowerBufferBlock()
     {
         // Skip anything that is not a block.
         if (global.getAddressSpace() != SPIRAS_Uniform)
-        {
             continue;
-        }
 
         MDNode* const resMetaNode = global.getMetadata(gSPIRVMD::Resource);
         assert(resMetaNode != nullptr);
@@ -2042,15 +1950,11 @@ void SpirvLowerGlobal::lowerBufferBlock()
         for (User* const user : global.users())
         {
             if (Constant* const constVal = dyn_cast<Constant>(user))
-            {
                 constantUsers.push_back(constVal);
-            }
         }
 
         for (Constant* const constVal : constantUsers)
-        {
             replaceConstWithInsts(m_context, constVal);
-        }
 
         // Record of all the functions that our global is used within.
         SmallSet<Function*, 4> funcsUsedIn;
@@ -2058,9 +1962,7 @@ void SpirvLowerGlobal::lowerBufferBlock()
         for (User* const user : global.users())
         {
             if (Instruction* const inst = dyn_cast<Instruction>(user))
-            {
                 funcsUsedIn.insert(inst->getFunction());
-            }
         }
 
         for (Function* const func : funcsUsedIn)
@@ -2079,9 +1981,7 @@ void SpirvLowerGlobal::lowerBufferBlock()
                 {
                     // Skip over non-instructions.
                     if (isa<Instruction>(user) == false)
-                    {
                         continue;
-                    }
 
                     GetElementPtrInst* getElemPtr = dyn_cast<GetElementPtrInst>(user);
 
@@ -2091,9 +1991,7 @@ void SpirvLowerGlobal::lowerBufferBlock()
                         for (BitCastInst* bitCast = dyn_cast<BitCastInst>(user);
                              bitCast != nullptr;
                              bitCast = dyn_cast<BitCastInst>(bitCast->getOperand(0)))
-                        {
                             getElemPtr = dyn_cast<GetElementPtrInst>(bitCast);
-                        }
 
                         // If even after we've stripped away all the bitcasts we did not find a GEP, we need to modify
                         // the bitcast instead.
@@ -2109,9 +2007,7 @@ void SpirvLowerGlobal::lowerBufferBlock()
 
                     // Skip instructions in other functions.
                     if (getElemPtr->getFunction() != func)
-                    {
                         continue;
-                    }
 
                     getElemPtrsToReplace.push_back(getElemPtr);
                 }
@@ -2132,9 +2028,7 @@ void SpirvLowerGlobal::lowerBufferBlock()
 
                     // If the global variable is a constant, the data it points to is invariant.
                     if (global.isConstant())
-                    {
                         m_builder->CreateInvariantStart(bufferDesc);
-                    }
 
                     bitCast->replaceUsesOfWith(&global, m_builder->CreateBitCast(bufferDesc, blockType));
                 }
@@ -2149,9 +2043,7 @@ void SpirvLowerGlobal::lowerBufferBlock()
                     SmallVector<Value*, 8> indices;
 
                     for (Value* const index : getElemPtr->indices())
-                    {
                         indices.push_back(index);
-                    }
 
                     // The first index should always be zero.
                     assert(isa<ConstantInt>(indices[0]) && (cast<ConstantInt>(indices[0])->getZExtValue() == 0));
@@ -2168,9 +2060,7 @@ void SpirvLowerGlobal::lowerBufferBlock()
 
                         // If the user is not a call, bail.
                         if (call == nullptr)
-                        {
                             continue;
-                        }
 
                         // If the call is our non uniform decoration, record we are non uniform.
                         if (call->getCalledFunction()->getName().startswith(gSPIRVName::NonUniform))
@@ -2189,9 +2079,7 @@ void SpirvLowerGlobal::lowerBufferBlock()
 
                     // If the global variable is a constant, the data it points to is invariant.
                     if (global.isConstant())
-                    {
                         m_builder->CreateInvariantStart(bufferDesc);
-                    }
 
                     Value* const bitCast = m_builder->CreateBitCast(bufferDesc, blockType);
 
@@ -2204,13 +2092,9 @@ void SpirvLowerGlobal::lowerBufferBlock()
                     Value* newGetElemPtr = nullptr;
 
                     if (getElemPtr->isInBounds())
-                    {
                         newGetElemPtr = m_builder->CreateInBoundsGEP(bitCast, newIndices);
-                    }
                     else
-                    {
                         newGetElemPtr = m_builder->CreateGEP(bitCast, newIndices);
-                    }
 
                     getElemPtr->replaceAllUsesWith(newGetElemPtr);
                     getElemPtr->eraseFromParent();
@@ -2229,9 +2113,7 @@ void SpirvLowerGlobal::lowerBufferBlock()
 
                 // If the global variable is a constant, the data it points to is invariant.
                 if (global.isConstant())
-                {
                     m_builder->CreateInvariantStart(bufferDesc);
-                }
 
                 Value* const bitCast = m_builder->CreateBitCast(bufferDesc, global.getType());
 
@@ -2241,25 +2123,19 @@ void SpirvLowerGlobal::lowerBufferBlock()
                 {
                     // Skip over non-instructions that we've already made useless.
                     if (isa<Instruction>(user) == false)
-                    {
                         continue;
-                    }
 
                     Instruction* const inst = cast<Instruction>(user);
 
                     // Skip instructions in other functions.
                     if (inst->getFunction() != func)
-                    {
                         continue;
-                    }
 
                     usesToReplace.push_back(inst);
                 }
 
                 for (Instruction* const use : usesToReplace)
-                {
                     use->replaceUsesOfWith(&global, bitCast);
-                }
             }
         }
 
@@ -2283,9 +2159,7 @@ void SpirvLowerGlobal::lowerPushConsts()
     {
         // Skip anything that is not a push constant.
         if ((global.getAddressSpace() != SPIRAS_Constant) || (global.hasMetadata(gSPIRVMD::PushConst) == false))
-        {
             continue;
-        }
 
         // There should only be a single push constant variable!
         assert(globalsToRemove.empty());
@@ -2295,15 +2169,11 @@ void SpirvLowerGlobal::lowerPushConsts()
         for (User* const user : global.users())
         {
             if (Constant* const constVal = dyn_cast<Constant>(user))
-            {
                 constantUsers.push_back(constVal);
-            }
         }
 
         for (Constant* const constVal : constantUsers)
-        {
             replaceConstWithInsts(m_context, constVal);
-        }
 
         // Record of all the functions that our global is used within.
         SmallSet<Function*, 4> funcsUsedIn;
@@ -2311,9 +2181,7 @@ void SpirvLowerGlobal::lowerPushConsts()
         for (User* const user : global.users())
         {
             if (Instruction* const inst = dyn_cast<Instruction>(user))
-            {
                 funcsUsedIn.insert(inst->getFunction());
-            }
         }
 
         for (Function* const func : funcsUsedIn)
@@ -2335,25 +2203,19 @@ void SpirvLowerGlobal::lowerPushConsts()
             {
                 // Skip over non-instructions that we've already made useless.
                 if (isa<Instruction>(user) == false)
-                {
                     continue;
-                }
 
                 Instruction* const inst = cast<Instruction>(user);
 
                 // Skip instructions in other functions.
                 if (inst->getFunction() != func)
-                {
                     continue;
-                }
 
                 usesToReplace.push_back(inst);
             }
 
             for (Instruction* const inst : usesToReplace)
-            {
                 inst->replaceUsesOfWith(&global, pushConstants);
-            }
         }
 
         globalsToRemove.push_back(&global);
@@ -2372,14 +2234,10 @@ void SpirvLowerGlobal::lowerPushConsts()
 void SpirvLowerGlobal::cleanupReturnBlock()
 {
     if (m_retBlock == nullptr)
-    {
         return;
-    }
 
     if (MergeBlockIntoPredecessor(m_retBlock))
-    {
         m_retBlock = nullptr;
-    }
 }
 
 // =====================================================================================================================
@@ -2397,9 +2255,7 @@ void SpirvLowerGlobal::interpolateInputElement(
 
     std::vector<Value*> indexOperands;
     for (unsigned i = 0, indexOperandCount = getElemPtr->getNumIndices(); i < indexOperandCount; ++i)
-    {
         indexOperands.push_back(toInt32Value(getElemPtr->getOperand(1 + i), &callInst));
-    }
     unsigned operandIdx = 0;
 
     auto input = cast<GlobalVariable>(getElemPtr->getPointerOperand());
@@ -2458,9 +2314,7 @@ void SpirvLowerGlobal::interpolateInputElement(
         SmallVector<unsigned, 4> elemStrides;
         elemStrides.resize(arraySizeCount, 1);
         for (unsigned i = arraySizeCount - 1; i > 0; --i)
-        {
             elemStrides[i - 1] = arraySizes[i] * elemStrides[i];
-        }
 
         std::vector<Value*> newIndexOperands = indexOperands;
         Value* interpValue = UndefValue::get(interpValueTy);
@@ -2491,9 +2345,7 @@ void SpirvLowerGlobal::interpolateInputElement(
 
             std::vector<unsigned> idxs;
             for (auto indexIt = newIndexOperands.begin() + 1; indexIt != newIndexOperands.end(); ++indexIt)
-            {
                 idxs.push_back((cast<ConstantInt>(*indexIt))->getZExtValue());
-            }
             interpValue = InsertValueInst::Create(interpValue, loadValue, idxs, "", &callInst);
         }
         new StoreInst(interpValue, interpPtr, &callInst);

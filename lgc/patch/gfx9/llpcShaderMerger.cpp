@@ -167,9 +167,7 @@ Function* ShaderMerger::generateLsHsEntryPoint(
     {
         auto argIdx = arg.getArgNo();
         if (inRegMask & (1ull << argIdx))
-        {
             arg.addAttr(Attribute::InReg);
-        }
     }
 
     // define dllexport amdgpu_hs @_amdgpu_hs_main(
@@ -339,9 +337,7 @@ Function* ShaderMerger::generateLsHsEntryPoint(
 
                 std::vector<Constant*> shuffleMask;
                 for (unsigned i = 0; i < userDataSize; ++i)
-                {
                     shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx + i));
-                }
 
                 userDataIdx += userDataSize;
 
@@ -437,9 +433,7 @@ Function* ShaderMerger::generateLsHsEntryPoint(
 
                 std::vector<Constant*> shuffleMask;
                 for (unsigned i = 0; i < userDataSize; ++i)
-                {
                     shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx + i));
-                }
 
                 userDataIdx += userDataSize;
 
@@ -638,9 +632,7 @@ Function* ShaderMerger::generateEsGsEntryPoint(
     {
         auto argIdx = arg.getArgNo();
         if (inRegMask & (1ull << argIdx))
-        {
             arg.addAttr(Attribute::InReg);
-        }
     }
 
     // define dllexport amdgpu_gs @_amdgpu_gs_main(
@@ -835,9 +827,7 @@ Function* ShaderMerger::generateEsGsEntryPoint(
 
                 std::vector<Constant*> shuffleMask;
                 for (unsigned i = 0; i < userDataSize; ++i)
-                {
                     shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx + i));
-                }
 
                 userDataIdx += userDataSize;
 
@@ -1018,9 +1008,7 @@ Function* ShaderMerger::generateEsGsEntryPoint(
 
                 std::vector<Constant*> shuffleMask;
                 for (unsigned i = 0; i < userDataSize; ++i)
-                {
                     shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx + i));
-                }
 
                 userDataIdx += userDataSize;
 
@@ -1037,9 +1025,7 @@ Function* ShaderMerger::generateEsGsEntryPoint(
                     if (intfData->userDataUsage.spillTable == userDataIdx)
                     {
                         if (spillTableIdx > 0)
-                        {
                             actualUserDataIdx = spillTableIdx;
-                        }
                     }
                 }
                 auto gsUserData = ExtractElementInst::Create(userData,

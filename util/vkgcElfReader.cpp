@@ -58,9 +58,7 @@ template<class Elf>
 ElfReader<Elf>::~ElfReader()
 {
     for (auto section : m_sections)
-    {
         delete section;
-    }
     m_sections.clear();
 }
 
@@ -97,9 +95,7 @@ Result ElfReader<Elf>::ReadFromBuffer(
     result = (header->eIdent32[EI_MAG0] == ElfMagic) ?  Result::Success : Result::ErrorInvalidValue;
 
     if (result == Result::Success)
-    {
         result = (header->eMachine == EM_AMDGPU) ? Result::Success : Result::ErrorInvalidValue;
-    }
 
     if (result == Result::Success)
     {
@@ -280,9 +276,7 @@ Result ElfReader<Elf>::getSectionDataBySortingIndex(
     {
         auto it = m_map.begin();
         for (unsigned i = 0; i < sortIdx; ++i)
-        {
             ++it;
-        }
         *pSecIdx = it->second;
         *ppSectionData = m_sections[it->second];
         result = Result::Success;
@@ -412,9 +406,7 @@ template<class Elf>
 bool ElfReader<Elf>::getNextMsgNode()
 {
     if (m_iteratorStack.empty())
-    {
         return false;
-    }
 
     MsgPackIterator curIter = m_iteratorStack.back();
     bool skipPostCheck = false;
@@ -450,9 +442,7 @@ bool ElfReader<Elf>::getNextMsgNode()
             curIter.node = array;
         }
         else
-        {
             curIter.status = MsgPackIteratorMapValue;
-        }
         m_iteratorStack.back() = curIter;
         skipPostCheck = true;
     }
@@ -474,20 +464,14 @@ bool ElfReader<Elf>::getNextMsgNode()
             curIter.node = array;
         }
         else
-        {
             curIter.status = MsgPackIteratorArrayValue;
-        }
         m_iteratorStack.push_back(curIter);
         skipPostCheck = true;
     }
     else if (curIter.status == MsgPackIteratorMapValue)
-    {
         m_iteratorStack.pop_back();
-    }
     else if (curIter.status == MsgPackIteratorArrayValue)
-    {
         m_iteratorStack.pop_back();
-    }
     else if (curIter.status == MsgPackIteratorMapEnd)
     {
         m_iteratorStack.pop_back();
@@ -508,18 +492,14 @@ bool ElfReader<Elf>::getNextMsgNode()
         {
             nextIter->mapIt++;
             if (nextIter->mapIt == nextIter->mapEnd)
-            {
                 nextIter->status = MsgPackIteratorMapEnd;
-            }
         }
         else if (nextIter->status == MsgPackIteratorArray)
         {
             nextIter->arrayIt++;
             curIter = *nextIter;
             if (curIter.arrayIt == curIter.arrayEnd)
-            {
                 curIter.status = MsgPackIteratorArrayEnd;
-            }
             else if (curIter.arrayIt->isMap())
             {
                 curIter.status = MsgPackIteratorMapBegin;
@@ -534,9 +514,7 @@ bool ElfReader<Elf>::getNextMsgNode()
                 curIter.node = array;
             }
             else
-            {
                 curIter.status = MsgPackIteratorArrayValue;
-            }
             m_iteratorStack.push_back(curIter);
         }
     }
@@ -552,21 +530,13 @@ const llvm::msgpack::DocNode* ElfReader<Elf>::getMsgNode() const
     assert(m_iteratorStack.size() > 0);
     auto curIter = &(m_iteratorStack.back());
     if (curIter->status == MsgPackIteratorArrayValue)
-    {
         return &(*curIter->arrayIt);
-    }
     else if (curIter->status == MsgPackIteratorMapValue)
-    {
         return &(curIter->mapIt->second);
-    }
     else if (curIter->status == MsgPackIteratorMapKey)
-    {
         return &(curIter->mapIt->first);
-    }
     else
-    {
         return curIter->node;
-    }
 }
 
 // =====================================================================================================================

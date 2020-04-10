@@ -70,17 +70,13 @@ Value* BuilderImplBase::CreateDotProduct(
 {
     Value* product = CreateFMul(vector1, vector2);
     if (isa<VectorType>(product->getType()) == false)
-    {
         return product;
-    }
 
     const unsigned compCount = product->getType()->getVectorNumElements();
     Value* scalar = CreateExtractElement(product, uint64_t(0));
 
     for (unsigned i = 1; i < compCount; ++i)
-    {
         scalar = CreateFAdd(scalar, CreateExtractElement(product, i));
-    }
 
     scalar->setName(instName);
     return scalar;
@@ -138,14 +134,10 @@ BranchInst* BuilderImplBase::createIf(
     for (auto& use : endIfBlock->uses())
     {
         if (isa<PHINode>(use.getUser()) == false)
-        {
             nonPhiUses.push_back(&use);
-        }
     }
     for (auto use : nonPhiUses)
-    {
         use->set(ifBlock);
-    }
 
     // Create "then" and "else" blocks.
     BasicBlock* thenBlock = BasicBlock::Create(getContext(),
@@ -169,9 +161,7 @@ BranchInst* BuilderImplBase::createIf(
     branch->setDebugLoc(getCurrentDebugLocation());
     BranchInst::Create(endIfBlock, thenBlock)->setDebugLoc(getCurrentDebugLocation());
     if (elseBlock != nullptr)
-    {
         BranchInst::Create(endIfBlock, elseBlock)->setDebugLoc(getCurrentDebugLocation());
-    }
 
     // Set Builder's insert point to the branch at the end of the "then" block.
     SetInsertPoint(thenBlock->getTerminator());
@@ -203,9 +193,7 @@ Instruction* BuilderImplBase::createWaterfallLoop(
                     call = dyn_cast<CallInst>(call->getArgOperand(0)); // The descriptor pointer
                     if ((call != nullptr) &&
                         call->getCalledFunction()->getName().startswith(lgcName::DescriptorIndex))
-                    {
                         nonUniformVal = call->getArgOperand(1); // The index operand
-                    }
                 }
             }
         }
@@ -224,15 +212,11 @@ Instruction* BuilderImplBase::createWaterfallLoop(
         assert(nonUniformIndices.size() == 2);
         SmallVector<Type*, 2> indexTys;
         for (Value* nonUniformIndex : nonUniformIndices)
-        {
             indexTys.push_back(nonUniformIndex->getType());
-        }
         auto waterfallIndexTy = StructType::get(getContext(), indexTys);
         waterfallIndex = UndefValue::get(waterfallIndexTy);
         for (unsigned structIndex = 0; structIndex < nonUniformIndices.size(); ++structIndex)
-        {
             waterfallIndex = CreateInsertValue(waterfallIndex, nonUniformIndices[structIndex], structIndex);
-        }
     }
 
     // Start the waterfall loop using the waterfall index.
@@ -284,9 +268,7 @@ Instruction* BuilderImplBase::createWaterfallLoop(
                 assert((vecTy->getNumElements() % 4) == 0);
                 waterfallEndTy = getInt32Ty();
                 if (vecTy->getNumElements() != 4)
-                {
                     waterfallEndTy = VectorType::get(getInt32Ty(), vecTy->getNumElements() / 4);
-                }
                 resultValue = cast<Instruction>(CreateBitCast(resultValue, waterfallEndTy, instName));
                 useOfNonUniformInst = &resultValue->getOperandUse(0);
             }
@@ -297,13 +279,9 @@ Instruction* BuilderImplBase::createWaterfallLoop(
                                   nullptr,
                                   instName);
         if (useOfNonUniformInst == nullptr)
-        {
             useOfNonUniformInst = &resultValue->getOperandUse(1);
-        }
         if (waterfallEndTy != nonUniformInst->getType())
-        {
             resultValue = cast<Instruction>(CreateBitCast(resultValue, nonUniformInst->getType(), instName));
-        }
 
         // Replace all uses of pNonUniformInst with the result of this code.
         *useOfNonUniformInst = UndefValue::get(nonUniformInst->getType());
@@ -328,9 +306,7 @@ Value* BuilderImplBase::scalarize(
         Value* result = UndefValue::get(VectorType::get(result0->getType(), vecTy->getNumElements()));
         result = CreateInsertElement(result, result0, uint64_t(0));
         for (unsigned idx = 1, end = vecTy->getNumElements(); idx != end; ++idx)
-        {
             result = CreateInsertElement(result, callback(CreateExtractElement(value, idx)), idx);
-        }
         return result;
     }
     Value* result = callback(value);
@@ -352,9 +328,7 @@ Value* BuilderImplBase::scalarizeInPairs(
                                                          vecTy->getNumElements()));
         result = CreateInsertElement(result, CreateExtractElement(resultComps, uint64_t(0)), uint64_t(0));
         if (vecTy->getNumElements() > 1)
-        {
             result = CreateInsertElement(result, CreateExtractElement(resultComps, 1), 1);
-        }
 
         for (unsigned idx = 2, end = vecTy->getNumElements(); idx < end; idx += 2)
         {
@@ -363,9 +337,7 @@ Value* BuilderImplBase::scalarizeInPairs(
             resultComps = callback(inComps);
             result = CreateInsertElement(result, CreateExtractElement(resultComps, uint64_t(0)), idx);
             if (idx + 1 < end)
-            {
                 result = CreateInsertElement(result, CreateExtractElement(resultComps, 1), idx + 1);
-            }
         }
         return result;
     }

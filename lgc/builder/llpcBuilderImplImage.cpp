@@ -884,9 +884,7 @@ static Type* convertToFloatingPointType(
         llvm_unreachable("Should never be called!");
     }
     if (isa<VectorType>(origTy))
-    {
         newTy = VectorType::get(newTy, origTy->getVectorNumElements());
-    }
     return newTy;
 }
 
@@ -909,9 +907,7 @@ Value* BuilderImplImage::CreateImageLoad(
     unsigned dmask = 1;
     Type* origTexelTy = resultTy;
     if (auto structResultTy = dyn_cast<StructType>(resultTy))
-    {
         origTexelTy = structResultTy->getElementType(0);
-    }
 
     Type* texelTy = origTexelTy;
     if (origTexelTy->isIntOrIntVectorTy(64))
@@ -921,9 +917,7 @@ Value* BuilderImplImage::CreateImageLoad(
     }
 
     if (auto vectorResultTy = dyn_cast<VectorType>(texelTy))
-    {
         dmask = (1U << vectorResultTy->getNumElements()) - 1;
-    }
 
     // Prepare the coordinate, which might also change the dimension.
     SmallVector<Value*, 4> coords;
@@ -943,9 +937,7 @@ Value* BuilderImplImage::CreateImageLoad(
         intrinsicDataTy = StructType::get(texelTy->getContext(), { texelTy, getInt32Ty() });
     }
     else
-    {
         intrinsicDataTy = texelTy;
-    }
 
     SmallVector<Value*, 16> args;
     Value* result = nullptr;
@@ -959,9 +951,7 @@ Value* BuilderImplImage::CreateImageLoad(
         args.insert(args.end(), coords.begin(), coords.end());
 
         if (mipLevel != nullptr)
-        {
             args.push_back(mipLevel);
-        }
         imageDescArgIndex = args.size();
         args.push_back(imageDesc);
         args.push_back(getInt32(tfe));
@@ -997,9 +987,7 @@ Value* BuilderImplImage::CreateImageLoad(
     {
         Value* texel = result;
         if (isa<StructType>(resultTy))
-        {
             texel = CreateExtractValue(result, uint64_t(0));
-        }
         texel = CreateBitCast(texel, getInt64Ty()); // Casted to i64
 
         if (origTexelTy->isVectorTy())
@@ -1008,9 +996,7 @@ Value* BuilderImplImage::CreateImageLoad(
 
             SmallVector<Value*, 3> defaults = { getInt64(0), getInt64(0), getInt64(1) };
             for (unsigned i = 1; i < origTexelTy->getVectorNumElements(); ++i)
-            {
                 texel = CreateInsertElement(texel, defaults[i - 1], i);
-            }
         }
 
         if (isa<StructType>(resultTy))
@@ -1030,9 +1016,7 @@ Value* BuilderImplImage::CreateImageLoad(
 
     // Add a waterfall loop if needed.
     if (flags & ImageFlagNonUniformImage)
-    {
         result = createWaterfallLoop(cast<Instruction>(result), imageDescArgIndex);
-    }
 
     return result;
 }
@@ -1120,9 +1104,7 @@ Value* BuilderImplImage::CreateImageStore(
     if (texel->getType()->isIntOrIntVectorTy(64))
     {
         if (texel->getType()->isVectorTy())
-        {
             texel = CreateExtractElement(texel, uint64_t(0));
-        }
         texel = CreateBitCast(texel, VectorType::get(getFloatTy(), 2)); // Casted to <2 x float>
     }
 
@@ -1155,18 +1137,14 @@ Value* BuilderImplImage::CreateImageStore(
         // Build the intrinsic arguments.
         unsigned dmask = 1;
         if (auto vectorTexelTy = dyn_cast<VectorType>(texelTy))
-        {
             dmask = (1U << vectorTexelTy->getNumElements()) - 1;
-        }
 
         // Build the intrinsic arguments.
         args.push_back(texel);
         args.push_back(getInt32(dmask));
         args.insert(args.end(), coords.begin(), coords.end());
         if (mipLevel != nullptr)
-        {
             args.push_back(mipLevel);
-        }
         imageDescArgIndex = args.size();
         args.push_back(imageDesc);
         args.push_back(getInt32(0));    // tfe/lwe
@@ -1194,9 +1172,7 @@ Value* BuilderImplImage::CreateImageStore(
             }
         }
         else
-        {
             texel = CreateInsertElement(Constant::getNullValue(VectorType::get(texelTy, 4)), texel, uint64_t(0));
-        }
 
         // Do the buffer store.
         args.push_back(texel);
@@ -1215,9 +1191,7 @@ Value* BuilderImplImage::CreateImageStore(
 
     // Add a waterfall loop if needed.
     if (flags & ImageFlagNonUniformImage)
-    {
         createWaterfallLoop(imageStore, imageDescArgIndex);
-    }
 
     return imageStore;
 }
@@ -1336,9 +1310,7 @@ Value* BuilderImplImage::CreateImageGather(
     Value* needDescPatch = nullptr;
     Type* texelTy = resultTy;
     if (auto structResultTy = dyn_cast<StructType>(resultTy))
-    {
         texelTy = structResultTy->getElementType(0);
-    }
     Type* texelComponentTy = texelTy->getScalarType();
     Type* gatherTy = resultTy;
 
@@ -1347,9 +1319,7 @@ Value* BuilderImplImage::CreateImageGather(
         // Handle integer texel component type.
         gatherTy = VectorType::get(getFloatTy(), 4);
         if (resultTy != texelTy)
-        {
             gatherTy = StructType::get(getContext(), { gatherTy, getInt32Ty() });
-        }
 
         // For integer gather on pre-GFX9, patch descriptor or coordinate.
         needDescPatch = preprocessIntegerImageGather(dim, imageDesc, coord);
@@ -1427,9 +1397,7 @@ Value* BuilderImplImage::CreateImageGather(
         result = CreateInsertValue(result, tfe, 1);
     }
     else
-    {
         result = cast<Instruction>(CreateBitCast(result, texelTy));
-    }
 
     return result;
 }
@@ -1531,18 +1499,12 @@ Value* BuilderImplImage::postprocessIntegerImageGather(
         texel = CreateExtractValue(result, 0);
     }
     if (flags & ImageFlagSignedResult)
-    {
         texel = CreateFPToSI(texel, texelTy);
-    }
     else
-    {
         texel = CreateFPToUI(texel, texelTy);
-    }
     Value* patchedResult = CreateBitCast(texel, VectorType::get(getFloatTy(), 4));
     if (tfe)
-    {
         patchedResult = CreateInsertValue(result, patchedResult, 0);
-    }
 
     patchedResult = CreateSelect(needDescPatch, patchedResult, result);
 
@@ -1586,9 +1548,7 @@ Value* BuilderImplImage::CreateImageSampleGather(
     SmallVector<Value*, 6> derivatives;
     Value* projective = address[ImageAddressIdxProjective];
     if (projective != nullptr)
-    {
         projective = CreateFDiv(ConstantFP::get(projective->getType(), 1.0), projective);
-    }
 
     dim = prepareCoordinate(dim,
                             coord,
@@ -1606,16 +1566,12 @@ Value* BuilderImplImage::CreateImageSampleGather(
     // Dmask.
     unsigned dmask = 15;
     if (address[ImageAddressIdxZCompare] != nullptr)
-    {
         dmask = 1;
-    }
     else if (isSample == false)
     {
         dmask = 1;
         if (address[ImageAddressIdxZCompare] == nullptr)
-        {
             dmask = 1U << cast<ConstantInt>(address[ImageAddressIdxComponent])->getZExtValue();
-        }
     }
     args.push_back(getInt32(dmask));
 
@@ -1642,9 +1598,7 @@ Value* BuilderImplImage::CreateImageSampleGather(
             }
         }
         else
-        {
             singleOffsetVal = CreateAnd(offsetVal, getInt32(0x3F));
-        }
         args.push_back(singleOffsetVal);
     }
 
@@ -1659,9 +1613,7 @@ Value* BuilderImplImage::CreateImageSampleGather(
     if (Value* zCompareVal = address[ImageAddressIdxZCompare])
     {
         if (projective != nullptr)
-        {
             zCompareVal = CreateFMul(zCompareVal, projective);
-        }
         args.push_back(zCompareVal);
     }
 
@@ -1678,15 +1630,11 @@ Value* BuilderImplImage::CreateImageSampleGather(
 
     // LodClamp
     if (Value* lodClampVal = address[ImageAddressIdxLodClamp])
-    {
         args.push_back(lodClampVal);
-    }
 
     // Lod
     if (Value* lodVal = address[ImageAddressIdxLod])
-    {
         args.push_back(lodVal);
-    }
 
     // Image and sampler
     unsigned imageDescArgIndex = args.size();
@@ -1709,9 +1657,7 @@ Value* BuilderImplImage::CreateImageSampleGather(
     {
         assert((table->matchMask != 0) && "Image sample/gather intrinsic ID not found");
         if (table->matchMask == addressMask)
-        {
             break;
-        }
     }
     Intrinsic::ID intrinsicId = table->ids[dim];
 
@@ -1725,17 +1671,11 @@ Value* BuilderImplImage::CreateImageSampleGather(
     // Add a waterfall loop if needed.
     SmallVector<unsigned, 2> nonUniformArgIndexes;
     if (flags & ImageFlagNonUniformImage)
-    {
         nonUniformArgIndexes.push_back(imageDescArgIndex);
-    }
     if (flags & ImageFlagNonUniformSampler)
-    {
         nonUniformArgIndexes.push_back(imageDescArgIndex + 1);
-    }
     if (nonUniformArgIndexes.empty() == false)
-    {
         imageOp = createWaterfallLoop(imageOp, nonUniformArgIndexes);
-    }
     return imageOp;
 }
 
@@ -1833,9 +1773,7 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
         imageDesc = patchCubeDescriptor(imageDesc, dim);
         args.push_back(inputValue);
         if (atomicOp == AtomicOpCompareSwap)
-        {
             args.push_back(comparatorValue);
-        }
         args.insert(args.end(), coords.begin(), coords.end());
         imageDescArgIndex = args.size();
         args.push_back(imageDesc);
@@ -1855,9 +1793,7 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
         // Texel buffer descriptor. Use the buffer atomic instruction.
         args.push_back(inputValue);
         if (atomicOp == AtomicOpCompareSwap)
-        {
             args.push_back(comparatorValue);
-        }
         imageDescArgIndex = args.size();
         args.push_back(imageDesc);
         args.push_back(coords[0]);
@@ -1871,9 +1807,7 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
                                       instName);
     }
     if (flags & ImageFlagNonUniformImage)
-    {
         atomicInst = createWaterfallLoop(atomicInst, imageDescArgIndex);
-    }
 
     switch (ordering)
     {
@@ -1903,9 +1837,7 @@ Value* BuilderImplImage::CreateImageQueryLevels(
                                             { getFloatTy(), getInt32Ty() },
                                             { getInt32(8), UndefValue::get(getInt32Ty()), imageDesc, zero, zero });
     if (flags & ImageFlagNonUniformImage)
-    {
         resInfo = createWaterfallLoop(resInfo, 2);
-    }
     return CreateBitCast(resInfo, getInt32Ty(), instName);
 }
 
@@ -1963,9 +1895,7 @@ Value* BuilderImplImage::CreateImageQuerySize(
             numRecords = CreateUDiv(numRecords, stride);
         }
         if (instName.isTriviallyEmpty() == false)
-        {
             numRecords->setName(instName);
-        }
         return numRecords;
     }
 
@@ -1976,17 +1906,13 @@ Value* BuilderImplImage::CreateImageQuerySize(
                                             { VectorType::get(getFloatTy(), 4), getInt32Ty() },
                                             { getInt32(15), lod, imageDesc, zero, zero });
     if (flags & ImageFlagNonUniformImage)
-    {
         resInfo = createWaterfallLoop(resInfo, 2);
-    }
     Value* intResInfo = CreateBitCast(resInfo, VectorType::get(getInt32Ty(), 4));
 
     unsigned sizeComponentCount = getImageQuerySizeComponentCount(dim);
 
     if (sizeComponentCount == 1)
-    {
         return CreateExtractElement(intResInfo, uint64_t(0), instName);
-    }
 
     if (dim == DimCubeArray)
     {
@@ -2062,18 +1988,12 @@ Value* BuilderImplImage::CreateImageGetLod(
     // Add a waterfall loop if needed.
     SmallVector<unsigned, 2> nonUniformArgIndexes;
     if (flags & ImageFlagNonUniformImage)
-    {
         nonUniformArgIndexes.push_back(imageDescArgIndex);
-    }
     if (flags & ImageFlagNonUniformSampler)
-    {
         nonUniformArgIndexes.push_back(imageDescArgIndex + 1);
-    }
 
     if (nonUniformArgIndexes.empty() == false)
-    {
         result = createWaterfallLoop(result, nonUniformArgIndexes);
-    }
     return result;
 }
 
@@ -2123,9 +2043,7 @@ unsigned BuilderImplImage::prepareCoordinate(
 
         // Push the components.
         for (unsigned i = 0; i != getImageNumCoords(dim); ++i)
-        {
             outCoords.push_back(CreateExtractElement(coord, i));
-        }
     }
 
     // Divide the projective value into each component.
@@ -2133,9 +2051,7 @@ unsigned BuilderImplImage::prepareCoordinate(
     if (projective != nullptr)
     {
         for (unsigned i = 0; i != outCoords.size(); ++i)
-        {
             outCoords[i] = CreateFMul(outCoords[i], projective);
-        }
     }
 
     // For 1D or 1DArray on GFX9+, change to 2D or 2DArray and add the extra component. The
@@ -2148,14 +2064,10 @@ unsigned BuilderImplImage::prepareCoordinate(
         Value* extraComponent = getInt32(0);
         needExtraDerivativeDim = true;
         if (coordScalarTy->isIntegerTy() == false)
-        {
             extraComponent = ConstantFP::get(coordScalarTy, 0.5);
-        }
 
         if (dim == Dim2D)
-        {
             outCoords.push_back(extraComponent);
-        }
         else
         {
             outCoords.push_back(outCoords.back());
@@ -2180,9 +2092,7 @@ unsigned BuilderImplImage::prepareCoordinate(
     // FP coordinates, possibly with explicit derivatives.
     // Round the array slice.
     if ((dim == Dim1DArray) || (dim == Dim2DArray) || (dim == DimCubeArray))
-    {
         outCoords.back() = CreateIntrinsic(Intrinsic::rint, coordScalarTy, outCoords.back());
-    }
 
     Value* cubeSc = nullptr;
     Value* cubeTc = nullptr;
@@ -2231,14 +2141,10 @@ unsigned BuilderImplImage::prepareCoordinate(
         if (auto vectorDerivativeXTy = dyn_cast<VectorType>(derivativeX->getType()))
         {
             for (unsigned i = 0; i != vectorDerivativeXTy->getNumElements(); ++i)
-            {
                 outDerivatives.push_back(CreateExtractElement(derivativeX, i));
-            }
         }
         else
-        {
             outDerivatives.push_back(derivativeX);
-        }
 
         if (needExtraDerivativeDim)
         {
@@ -2250,14 +2156,10 @@ unsigned BuilderImplImage::prepareCoordinate(
         if (auto vectorDerivativeYTy = dyn_cast<VectorType>(derivativeY->getType()))
         {
             for (unsigned i = 0; i != vectorDerivativeYTy->getNumElements(); ++i)
-            {
                 outDerivatives.push_back(CreateExtractElement(derivativeY, i));
-            }
         }
         else
-        {
             outDerivatives.push_back(derivativeY);
-        }
 
         if (needExtraDerivativeDim)
         {
@@ -2266,9 +2168,7 @@ unsigned BuilderImplImage::prepareCoordinate(
         }
     }
     if (outDerivatives.empty() || (dim != DimCube))
-    {
         return dim;
-    }
 
     // When sampling cubemap with explicit gradient value, API supplied gradients are cube vectors,
     // need to transform them to face gradients for the selected face.
@@ -2444,9 +2344,7 @@ Value* BuilderImplImage::patchCubeDescriptor(
 {
     if (((dim != DimCube) && (dim != DimCubeArray)) ||
         (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9))
-    {
         return desc;
-    }
 
     // Extract the depth.
     Value* elem4 = CreateExtractElement(desc, 4);

@@ -142,9 +142,7 @@ void TimerProfiler::addTimerStartStopPass(
     bool              start)          // Start or  stop timer
 {
     if (TimePassesIsEnabled || cl::EnableTimerProfile)
-    {
         passMgr->add(lgc::BuilderContext::createStartStopTimer(&m_phaseTimers[timerKind], start));
-    }
 }
 
 // =====================================================================================================================
@@ -156,13 +154,9 @@ void TimerProfiler::startStopTimer(
     if (TimePassesIsEnabled || cl::EnableTimerProfile)
     {
         if (start)
-        {
             m_phaseTimers[timerKind].startTimer();
-        }
         else
-        {
             m_phaseTimers[timerKind].stopTimer();
-        }
     }
 }
 

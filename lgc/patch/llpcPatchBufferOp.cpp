@@ -105,9 +105,7 @@ bool PatchBufferOp::runOnFunction(
 
     // If the function is not a valid shader stage, bail.
     if (pipelineShaders->getShaderStage(&function) == ShaderStageInvalid)
-    {
         return false;
-    }
 
     m_divergenceAnalysis = &getAnalysis<LegacyDivergenceAnalysis>();
 
@@ -115,21 +113,15 @@ bool PatchBufferOp::runOnFunction(
     // visiting a use of a fat pointer before it was actually defined.
     ReversePostOrderTraversal<Function*> traversal(&function);
     for (BasicBlock* const block : traversal)
-    {
         visit(*block);
-    }
 
     // Some instructions can modify the CFG and thus have to be performed after the normal visitors.
     for (Instruction* const inst : m_postVisitInsts)
     {
         if (MemSetInst* const memSet = dyn_cast<MemSetInst>(inst))
-        {
             postVisitMemSetInst(*memSet);
-        }
         else if (MemCpyInst* const memCpy = dyn_cast<MemCpyInst>(inst))
-        {
             postVisitMemCpyInst(*memCpy);
-        }
     }
     m_postVisitInsts.clear();
 
@@ -140,14 +132,10 @@ bool PatchBufferOp::runOnFunction(
         Instruction* const inst = dyn_cast<Instruction>(replaceMap.first);
 
         if (inst == nullptr)
-        {
             continue;
-        }
 
         if (isa<StoreInst>(inst) == false)
-        {
             inst->replaceAllUsesWith(UndefValue::get(inst->getType()));
-        }
 
         inst->eraseFromParent();
     }
@@ -166,9 +154,7 @@ void PatchBufferOp::visitAtomicCmpXchgInst(
 {
     // If the type we are doing an atomic operation on is not a fat pointer, bail.
     if (atomicCmpXchgInst.getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    {
         return;
-    }
 
     m_builder->SetInsertPoint(&atomicCmpXchgInst);
 
@@ -294,9 +280,7 @@ void PatchBufferOp::visitAtomicRMWInst(
 {
     // If the type we are doing an atomic operation on is not a fat pointer, bail.
     if (atomicRmwInst.getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    {
         return;
-    }
 
     m_builder->SetInsertPoint(&atomicRmwInst);
 
@@ -437,15 +421,11 @@ void PatchBufferOp::visitBitCastInst(
 
     // If the type is not a pointer type, bail.
     if (destType->isPointerTy() == false)
-    {
         return;
-    }
 
     // If the pointer is not a fat pointer, bail.
     if (destType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    {
         return;
-    }
 
     m_builder->SetInsertPoint(&bitCastInst);
 
@@ -468,17 +448,13 @@ void PatchBufferOp::visitCallInst(
 
     // If the call does not have a called function, bail.
     if (calledFunc == nullptr)
-    {
         return;
-    }
 
     const StringRef callName(calledFunc->getName());
 
     // If the call is not a late intrinsic call we need to replace, bail.
     if (callName.startswith(lgcName::LaterCallPrefix) == false)
-    {
         return;
-    }
 
     m_builder->SetInsertPoint(&callInst);
 
@@ -489,15 +465,11 @@ void PatchBufferOp::visitCallInst(
 
         // Check for any invariant starts that use the pointer.
         if (removeUsersForInvariantStarts(&callInst))
-        {
             m_invariantSet.insert(callInst.getArgOperand(0));
-        }
 
         // If the incoming index to the fat pointer launder was divergent, remember it.
         if (m_divergenceAnalysis->isDivergent(callInst.getArgOperand(0)))
-        {
             m_divergenceSet.insert(callInst.getArgOperand(0));
-        }
     }
     else if (callName.startswith(lgcName::LateBufferLength))
     {
@@ -511,9 +483,7 @@ void PatchBufferOp::visitCallInst(
         callInst.replaceAllUsesWith(bufferLength);
     }
     else
-    {
         llvm_unreachable("Should never be called!");
-    }
 }
 
 // =====================================================================================================================
@@ -525,15 +495,11 @@ void PatchBufferOp::visitExtractElementInst(
 
     // If the extract element is not extracting a pointer, bail.
     if (pointerType == nullptr)
-    {
         return;
-    }
 
     // If the type we are GEPing into is not a fat pointer, bail.
     if (pointerType->getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    {
         return;
-    }
 
     m_builder->SetInsertPoint(&extractElementInst);
 
@@ -553,9 +519,7 @@ void PatchBufferOp::visitGetElementPtrInst(
 {
     // If the type we are GEPing into is not a fat pointer, bail.
     if (getElemPtrInst.getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    {
         return;
-    }
 
     m_builder->SetInsertPoint(&getElemPtrInst);
 
@@ -566,13 +530,9 @@ void PatchBufferOp::visitGetElementPtrInst(
     Value* newGetElemPtr = nullptr;
 
     if (getElemPtrInst.isInBounds())
-    {
         newGetElemPtr = m_builder->CreateInBoundsGEP(m_replacementMap[pointer].second, indices);
-    }
     else
-    {
         newGetElemPtr = m_builder->CreateGEP(m_replacementMap[pointer].second, indices);
-    }
 
     copyMetadata(newGetElemPtr, pointer);
 
@@ -588,23 +548,17 @@ void PatchBufferOp::visitInsertElementInst(
 
     // If the type is not a vector, bail.
     if (type->isVectorTy() == false)
-    {
         return;
-    }
 
     PointerType* const pointerType = dyn_cast<PointerType>(type->getVectorElementType());
 
     // If the extract element is not extracting from a vector of pointers, bail.
     if (pointerType == nullptr)
-    {
         return;
-    }
 
     // If the type we are GEPing into is not a fat pointer, bail.
     if (pointerType->getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    {
         return;
-    }
 
     m_builder->SetInsertPoint(&insertElementInst);
 
@@ -614,13 +568,9 @@ void PatchBufferOp::visitInsertElementInst(
     Value* indexVector = nullptr;
 
     if (isa<UndefValue>(insertElementInst.getOperand(0)))
-    {
         indexVector = UndefValue::get(VectorType::get(index->getType(), type->getVectorNumElements()));
-    }
     else
-    {
         indexVector = m_replacementMap[getPointerOperandAsInst(insertElementInst.getOperand(0))].second;
-    }
 
     indexVector = m_builder->CreateInsertElement(indexVector, index, insertElementInst.getOperand(2));
     copyMetadata(indexVector, pointer);
@@ -643,15 +593,11 @@ void PatchBufferOp::visitLoadInst(
 
         // If the load is not a pointer type, bail.
         if (loadType->isPointerTy() == false)
-        {
             return;
-        }
 
         // If the address space of the loaded pointer is not a buffer fat pointer, bail.
         if (loadType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-        {
             return;
-        }
 
         assert(loadInst.isVolatile() == false);
         assert(loadInst.getOrdering() == AtomicOrdering::NotAtomic);
@@ -675,15 +621,11 @@ void PatchBufferOp::visitLoadInst(
 
         // If we removed an invariant load, remember that our new load is invariant.
         if (removeUsersForInvariantStarts(&loadInst))
-        {
             m_invariantSet.insert(newLoad);
-        }
 
         // If the original load was divergent, it means we are using descriptor indexing and need to remember it.
         if (m_divergenceAnalysis->isDivergent(&loadInst))
-        {
             m_divergenceSet.insert(newLoad);
-        }
     }
     else if (addrSpace == ADDR_SPACE_BUFFER_FAT_POINTER)
     {
@@ -730,9 +672,7 @@ void PatchBufferOp::visitMemMoveInst(
     // If either of the address spaces are not fat pointers, bail.
     if ((destAddrSpace != ADDR_SPACE_BUFFER_FAT_POINTER) &&
         (srcAddrSpace != ADDR_SPACE_BUFFER_FAT_POINTER))
-    {
         return;
-    }
 
     m_builder->SetInsertPoint(&memMoveInst);
 
@@ -765,14 +705,10 @@ void PatchBufferOp::visitMemMoveInst(
 
     // Visit the load and store instructions to fold away fat pointer load/stores we might have just created.
     if (BitCastInst* const cast = dyn_cast<BitCastInst>(castDest))
-    {
         visitBitCastInst(*cast);
-    }
 
     if (BitCastInst* const cast = dyn_cast<BitCastInst>(castSrc))
-    {
         visitBitCastInst(*cast);
-    }
 
     visitLoadInst(*srcLoad);
     visitStoreInst(*destStore);
@@ -804,15 +740,11 @@ void PatchBufferOp::visitPHINode(
 
     // If the type is not a pointer type, bail.
     if (type->isPointerTy() == false)
-    {
         return;
-    }
 
     // If the pointer is not a fat pointer, bail.
     if (type->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    {
         return;
-    }
 
     SmallVector<Value*, 8> incomings;
 
@@ -831,9 +763,7 @@ void PatchBufferOp::visitPHINode(
         Value* const incomingBufferDesc = m_replacementMap[incoming].first;
 
         if (bufferDesc == nullptr)
-        {
             bufferDesc = incomingBufferDesc;
-        }
         else if (bufferDesc != incomingBufferDesc)
         {
             bufferDesc = nullptr;
@@ -864,27 +794,19 @@ void PatchBufferOp::visitPHINode(
 
             // If the incoming buffer descriptor is not invariant, the PHI cannot be marked invariant either.
             if (m_invariantSet.count(incomingBufferDesc) == 0)
-            {
                 isInvariant = false;
-            }
 
             if ((m_divergenceSet.count(incomingBufferDesc) > 0) || m_divergenceAnalysis->isDivergent(&phiNode))
-            {
                 isDivergent = true;
-            }
         }
 
         bufferDesc = newPhiNode;
 
         if (isInvariant)
-        {
             m_invariantSet.insert(bufferDesc);
-        }
 
         if (isDivergent)
-        {
             m_divergenceSet.insert(bufferDesc);
-        }
     }
 
     PHINode* const newPhiNode = m_builder->CreatePHI(getRemappedType(phiNode.getType()), incomings.size());
@@ -923,15 +845,11 @@ void PatchBufferOp::visitSelectInst(
 
     // If the type is not a pointer type, bail.
     if (destType->isPointerTy() == false)
-    {
         return;
-    }
 
     // If the pointer is not a fat pointer, bail.
     if (destType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    {
         return;
-    }
 
     m_builder->SetInsertPoint(&selectInst);
 
@@ -961,9 +879,7 @@ void PatchBufferOp::visitSelectInst(
 
         // If both incomings are invariant, mark the new select as invariant too.
         if ((m_invariantSet.count(bufferDesc1) > 0) && (m_invariantSet.count(bufferDesc2) > 0))
-        {
             m_invariantSet.insert(bufferDesc);
-        }
     }
 
     Value* const index1 = m_replacementMap[value1].second;
@@ -976,9 +892,7 @@ void PatchBufferOp::visitSelectInst(
 
     // If either of the incoming buffer descriptors are divergent, mark the new buffer descriptor as divergent too.
     if ((m_divergenceSet.count(bufferDesc1) > 0) || (m_divergenceSet.count(bufferDesc2) > 0))
-    {
         m_divergenceSet.insert(bufferDesc);
-    }
     else if (m_divergenceAnalysis->isDivergent(&selectInst) && (bufferDesc1 != bufferDesc2))
     {
         // Otherwise is the selection is divergent and the buffer descriptors do not match, mark divergent.
@@ -993,9 +907,7 @@ void PatchBufferOp::visitStoreInst(
 {
     // If the address space of the store pointer is not a buffer fat pointer, bail.
     if (storeInst.getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    {
         return;
-    }
 
     replaceLoadStore(storeInst);
 
@@ -1012,15 +924,11 @@ void PatchBufferOp::visitICmpInst(
 
     // If the type is not a pointer type, bail.
     if (type->isPointerTy() == false)
-    {
         return;
-    }
 
     // If the pointer is not a fat pointer, bail.
     if (type->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    {
         return;
-    }
 
     Value* const newICmp = replaceICmp(&icmpInst);
 
@@ -1041,15 +949,11 @@ void PatchBufferOp::visitPtrToIntInst(
 
     // If the type is not a pointer type, bail.
     if (type->isPointerTy() == false)
-    {
         return;
-    }
 
     // If the pointer is not a fat pointer, bail.
     if (type->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    {
         return;
-    }
 
     m_builder->SetInsertPoint(&ptrToIntInst);
 
@@ -1102,9 +1006,7 @@ void PatchBufferOp::postVisitMemCpyInst(
             // We only care about DWORD alignment (4 bytes) so clamp the max check here to that.
             const unsigned minStride = std::min(stride, 4u);
             if ((destAlignment >= minStride) && (srcAlignment >= minStride) && ((constantLength % stride) == 0))
-            {
                 break;
-            }
 
             stride /= 2;
         }
@@ -1157,24 +1059,16 @@ void PatchBufferOp::postVisitMemCpyInst(
 
         // Visit the newly added instructions to turn them into fat pointer variants.
         if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(srcPtr))
-        {
             visitGetElementPtrInst(*getElemPtr);
-        }
 
         if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(destPtr))
-        {
             visitGetElementPtrInst(*getElemPtr);
-        }
 
         if (BitCastInst* const cast = dyn_cast<BitCastInst>(castSrc))
-        {
             visitBitCastInst(*cast);
-        }
 
         if (BitCastInst* const cast = dyn_cast<BitCastInst>(castDest))
-        {
             visitBitCastInst(*cast);
-        }
 
         visitLoadInst(*srcLoad);
 
@@ -1201,14 +1095,10 @@ void PatchBufferOp::postVisitMemCpyInst(
 
         // Visit the newly added instructions to turn them into fat pointer variants.
         if (BitCastInst* const cast = dyn_cast<BitCastInst>(castDest))
-        {
             visitBitCastInst(*cast);
-        }
 
         if (BitCastInst* const cast = dyn_cast<BitCastInst>(castSrc))
-        {
             visitBitCastInst(*cast);
-        }
 
         visitLoadInst(*srcLoad);
         visitStoreInst(*destStore);
@@ -1254,9 +1144,7 @@ void PatchBufferOp::postVisitMemSetInst(
             // We only care about DWORD alignment (4 bytes) so clamp the max check here to that.
             const unsigned minStride = std::min(stride, 4u);
             if ((destAlignment >= minStride) && ((constantLength % stride) == 0))
-            {
                 break;
-            }
 
             stride /= 2;
         }
@@ -1264,9 +1152,7 @@ void PatchBufferOp::postVisitMemSetInst(
         Type* castDestType = nullptr;
 
         if (stride == 16)
-        {
             castDestType = VectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(destAddrSpace);
-        }
         else
         {
             assert(stride < 8);
@@ -1321,14 +1207,10 @@ void PatchBufferOp::postVisitMemSetInst(
         copyMetadata(destStore, &memSetInst);
 
         if (GetElementPtrInst* const getElemPtr = dyn_cast<GetElementPtrInst>(destPtr))
-        {
             visitGetElementPtrInst(*getElemPtr);
-        }
 
         if (BitCastInst* const cast = dyn_cast<BitCastInst>(castDest))
-        {
             visitBitCastInst(*cast);
-        }
 
         visitStoreInst(*destStore);
     }
@@ -1340,9 +1222,7 @@ void PatchBufferOp::postVisitMemSetInst(
         Value* newValue = nullptr;
 
         if (Constant* const constVal = dyn_cast<Constant>(value))
-        {
             newValue = ConstantVector::getSplat(memoryType->getVectorElementCount(), constVal);
-        }
         else
         {
             Value* const memoryPointer = m_builder->CreateAlloca(memoryType);
@@ -1367,9 +1247,7 @@ void PatchBufferOp::postVisitMemSetInst(
         copyMetadata(castDest, &memSetInst);
 
         if (BitCastInst* const cast = dyn_cast<BitCastInst>(castDest))
-        {
             visitBitCastInst(*cast);
-        }
 
         StoreInst* const destStore = m_builder->CreateAlignedStore(newValue, castDest, MaybeAlign(destAlignment));
         copyMetadata(destStore, &memSetInst);
@@ -1387,9 +1265,7 @@ Value* PatchBufferOp::getPointerOperandAsInst(
 {
     // If the value is already an instruction, return it.
     if (Instruction* const inst = dyn_cast<Instruction>(value))
-    {
         return inst;
-    }
 
     // If the value is a constant (i.e., null pointer), return it.
     if (isa<Constant>(value))
@@ -1449,25 +1325,19 @@ void PatchBufferOp::copyMetadata(
 
     // If the destination is not an instruction, bail.
     if (destInst == nullptr)
-    {
         return;
-    }
 
     const Instruction* const srcInst = dyn_cast<Instruction>(src);
 
     // If the source is not an instruction, bail.
     if (srcInst == nullptr)
-    {
         return;
-    }
 
     SmallVector<std::pair<unsigned, MDNode*>, 8> allMetaNodes;
     srcInst->getAllMetadata(allMetaNodes);
 
     for (auto metaNode : allMetaNodes)
-    {
         destInst->setMetadata(metaNode.first, metaNode.second);
-    }
 }
 
 // =====================================================================================================================
@@ -1495,9 +1365,7 @@ bool PatchBufferOp::removeUsersForInvariantStarts(
         {
             // Remove any users of the bitcast too.
             if (removeUsersForInvariantStarts(bitCast))
-            {
                 modified = true;
-            }
         }
         else
         {
@@ -1505,15 +1373,11 @@ bool PatchBufferOp::removeUsersForInvariantStarts(
 
             // If the user isn't an intrinsic, bail.
             if (intrinsic == nullptr)
-            {
                 continue;
-            }
 
             // If the intrinsic is not an invariant load, bail.
             if (intrinsic->getIntrinsicID() != Intrinsic::invariant_start)
-            {
                 continue;
-            }
 
             // Remember the intrinsic because we will want to delete it.
             m_replacementMap[intrinsic] = std::make_pair(nullptr, nullptr);
@@ -1569,9 +1433,7 @@ Value* PatchBufferOp::replaceLoadStore(
     const unsigned bytesToHandle = static_cast<unsigned>(dataLayout.getTypeStoreSize(type));
 
     if (alignment == 0)
-    {
         alignment = dataLayout.getABITypeAlignment(type);
-    }
 
     bool isInvariant = false;
     if (isLoad)
@@ -1612,9 +1474,7 @@ Value* PatchBufferOp::replaceLoadStore(
             copyMetadata(newLoad, loadInst);
 
             if (isInvariant)
-            {
                 newLoad->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, None));
-            }
 
             return newLoad;
         }
@@ -1739,9 +1599,7 @@ Value* PatchBufferOp::replaceLoadStore(
         CoherentFlag coherent = {};
         coherent.bits.glc = isGlc;
         if (!isInvariant)
-        {
             coherent.bits.slc = isSlc;
-        }
 
         if (isLoad)
         {
@@ -1801,9 +1659,7 @@ Value* PatchBufferOp::replaceLoadStore(
 
         copyMetadata(part, &inst);
         if (isLoad)
-        {
             parts.push_back(part);
-        }
 
         remainingBytes -= accessSize;
     }
@@ -1899,9 +1755,7 @@ Value* PatchBufferOp::replaceICmp(
 
     Value* bufferDescICmp = m_builder->getFalse();
     if ((bufferDescs[0] == nullptr) && (bufferDescs[1] == nullptr))
-    {
         bufferDescICmp = m_builder->getTrue();
-    }
     else if ((bufferDescs[0] != nullptr) && (bufferDescs[1] != nullptr))
     {
         Value* const bufferDescEqual = m_builder->CreateICmpEQ(bufferDescs[0], bufferDescs[1]);
@@ -1919,9 +1773,7 @@ Value* PatchBufferOp::replaceICmp(
     Value* newICmp = m_builder->CreateAnd(bufferDescICmp, indexICmp);
 
     if (iCmpInst->getPredicate() == ICmpInst::ICMP_NE)
-    {
         newICmp = m_builder->CreateNot(newICmp);
-    }
 
     return newICmp;
 }
