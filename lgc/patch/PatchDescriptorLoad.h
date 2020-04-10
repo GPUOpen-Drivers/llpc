@@ -82,6 +82,7 @@ private:
   // Descriptor size
   static const unsigned DescriptorSizeResource = 8 * sizeof(unsigned);
   static const unsigned DescriptorSizeSampler = 4 * sizeof(unsigned);
+  static const unsigned DescriptorSizeSamplerYCbCr = 8 * sizeof(unsigned);
   static const unsigned DescriptorSizeBuffer = 4 * sizeof(unsigned);
   static const unsigned DescriptorSizeBufferCompact = 2 * sizeof(unsigned);
 
