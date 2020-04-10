@@ -28,18 +28,16 @@
  * @brief LLPC source file: contains implementation of class lgc::PatchLlvmIrInclusion.
  ***********************************************************************************************************************
  */
+#include "llpcPatchLlvmIrInclusion.h"
 #include "llpcAbi.h"
 #include "llvm/IR/Constants.h"
-
-#include "llpcPatchLlvmIrInclusion.h"
 
 #define DEBUG_TYPE "llpc-patch-llvm-ir-inclusion"
 
 using namespace llvm;
 using namespace lgc;
 
-namespace lgc
-{
+namespace lgc {
 
 // =====================================================================================================================
 // Initializes static members.
@@ -47,17 +45,10 @@ char PatchLlvmIrInclusion::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations of including LLVM IR as a separate section in the ELF.
-ModulePass* createPatchLlvmIrInclusion()
-{
-    return new PatchLlvmIrInclusion();
-}
+ModulePass *createPatchLlvmIrInclusion() { return new PatchLlvmIrInclusion(); }
 
 // =====================================================================================================================
-PatchLlvmIrInclusion::PatchLlvmIrInclusion()
-    :
-    Patch(ID)
-{
-}
+PatchLlvmIrInclusion::PatchLlvmIrInclusion() : Patch(ID) {}
 
 // =====================================================================================================================
 // Executes this patching pass on the specified LLVM module.
@@ -66,38 +57,29 @@ PatchLlvmIrInclusion::PatchLlvmIrInclusion()
 // section.
 //
 // @param [in,out] module : LLVM module to be run on
-bool PatchLlvmIrInclusion::runOnModule(
-    Module& module)
-{
-    Patch::init(&module);
+bool PatchLlvmIrInclusion::runOnModule(Module &module) {
+  Patch::init(&module);
 
-    std::string moduleStr;
-    raw_string_ostream llvmIr(moduleStr);
-    llvmIr << *m_module;
-    llvmIr.flush();
+  std::string moduleStr;
+  raw_string_ostream llvmIr(moduleStr);
+  llvmIr << *m_module;
+  llvmIr.flush();
 
-    auto globalTy = ArrayType::get(Type::getInt8Ty(*m_context), moduleStr.size());
-    auto initializer = ConstantDataArray::getString(m_module->getContext(), moduleStr, false);
-    auto global = new GlobalVariable(*m_module,
-                                      globalTy,
-                                      true,
-                                      GlobalValue::ExternalLinkage,
-                                      initializer,
-                                      "llvmir",
-                                      nullptr,
-                                      GlobalValue::NotThreadLocal,
-                                      false);
-    assert(global );
+  auto globalTy = ArrayType::get(Type::getInt8Ty(*m_context), moduleStr.size());
+  auto initializer = ConstantDataArray::getString(m_module->getContext(), moduleStr, false);
+  auto global = new GlobalVariable(*m_module, globalTy, true, GlobalValue::ExternalLinkage, initializer, "llvmir",
+                                   nullptr, GlobalValue::NotThreadLocal, false);
+  assert(global);
 
-    std::string namePrefix = Util::Abi::AmdGpuCommentName;
-    global->setSection(namePrefix + "llvmir");
+  std::string namePrefix = Util::Abi::AmdGpuCommentName;
+  global->setSection(namePrefix + "llvmir");
 
-    return true;
+  return true;
 }
 
-} // lgc
+} // namespace lgc
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching operations of including LLVM IR as a separate section in the ELF binary.
-INITIALIZE_PASS(PatchLlvmIrInclusion, DEBUG_TYPE,
-                "Include LLVM IR as a separate section in the ELF binary", false, false)
+INITIALIZE_PASS(PatchLlvmIrInclusion, DEBUG_TYPE, "Include LLVM IR as a separate section in the ELF binary", false,
+                false)

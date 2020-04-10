@@ -32,49 +32,45 @@
 
 #include "llpcPipelineContext.h"
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Represents LLPC context for compute pipeline compilation. Derived from the base class Llpc::Context.
-class ComputeContext: public PipelineContext
-{
+class ComputeContext : public PipelineContext {
 public:
-    ComputeContext(GfxIpVersion                    gfxIp,
-                   const ComputePipelineBuildInfo* pipelineInfo,
-                   MetroHash::Hash*                pipelineHash,
-                   MetroHash::Hash*                cacheHash);
-    virtual ~ComputeContext() {}
+  ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInfo *pipelineInfo, MetroHash::Hash *pipelineHash,
+                 MetroHash::Hash *cacheHash);
+  virtual ~ComputeContext() {}
 
-    virtual const PipelineShaderInfo* getPipelineShaderInfo(ShaderStage shaderStage) const;
+  virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const;
 
-    // Checks whether the pipeline is graphics or compute
-    virtual bool isGraphics() const { return false; }
+  // Checks whether the pipeline is graphics or compute
+  virtual bool isGraphics() const { return false; }
 
-    // Gets pipeline build info
-    virtual const void* getPipelineBuildInfo() const { return m_pipelineInfo; }
+  // Gets pipeline build info
+  virtual const void *getPipelineBuildInfo() const { return m_pipelineInfo; }
 
-    // Gets the mask of active shader stages bound to this pipeline
-    virtual unsigned getShaderStageMask() const { return shaderStageToMask(ShaderStageCompute); }
+  // Gets the mask of active shader stages bound to this pipeline
+  virtual unsigned getShaderStageMask() const { return shaderStageToMask(ShaderStageCompute); }
 
-    // Sets the mask of active shader stages bound to this pipeline
-    void setShaderStageMask(unsigned mask) { assert(mask == getShaderStageMask()); }
+  // Sets the mask of active shader stages bound to this pipeline
+  void setShaderStageMask(unsigned mask) { assert(mask == getShaderStageMask()); }
 
-    // Gets the count of active shader stages
-    virtual unsigned getActiveShaderStageCount() const { return 1; }
+  // Gets the count of active shader stages
+  virtual unsigned getActiveShaderStageCount() const { return 1; }
 
-    // Does user data node merging for all shader stages
-    virtual void doUserDataNodeMerge() { }
+  // Does user data node merging for all shader stages
+  virtual void doUserDataNodeMerge() {}
 
-    // Gets per pipeline options
-    virtual const PipelineOptions* getPipelineOptions() const { return &m_pipelineInfo->options; }
+  // Gets per pipeline options
+  virtual const PipelineOptions *getPipelineOptions() const { return &m_pipelineInfo->options; }
 
 private:
-    ComputeContext() = delete;
-    ComputeContext(const ComputeContext&) = delete;
-    ComputeContext& operator=(const ComputeContext&) = delete;
+  ComputeContext() = delete;
+  ComputeContext(const ComputeContext &) = delete;
+  ComputeContext &operator=(const ComputeContext &) = delete;
 
-    const ComputePipelineBuildInfo*     m_pipelineInfo; // Info to build a compute pipeline
+  const ComputePipelineBuildInfo *m_pipelineInfo; // Info to build a compute pipeline
 };
 
-} // Llpc
+} // namespace Llpc

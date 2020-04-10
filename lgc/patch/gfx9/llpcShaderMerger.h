@@ -30,86 +30,80 @@
  */
 #pragma once
 
-#include "llvm/IR/Module.h"
-
 #include "llpcInternal.h"
 #include "llpcNggPrimShader.h"
 #include "llpcPipelineShaders.h"
 #include "llpcTargetInfo.h"
+#include "llvm/IR/Module.h"
 
-namespace lgc
-{
+namespace lgc {
 
 class PipelineState;
 
 // Enumerates special system values for the LS-HS merged shader (the assigned numeric values are identical to SGPR
 // numbers defined by hardware).
-enum LsHsSpecialSysValue
-{
-    LsHsSysValueUserDataAddrLow     = 0,
-    LsHsSysValueUserDataAddrHigh    = 1,
-    LsHsSysValueOffChipLdsBase      = 2,
-    LsHsSysValueMergedWaveInfo      = 3,
-    LsHsSysValueTfBufferBase        = 4,
-    LsHsSysValueSharedScratchOffset = 5,
-    LsHsSysValueLsShaderAddrLow     = 6,
-    LsHsSysValueLsShaderAddrHigh    = 7,
+enum LsHsSpecialSysValue {
+  LsHsSysValueUserDataAddrLow = 0,
+  LsHsSysValueUserDataAddrHigh = 1,
+  LsHsSysValueOffChipLdsBase = 2,
+  LsHsSysValueMergedWaveInfo = 3,
+  LsHsSysValueTfBufferBase = 4,
+  LsHsSysValueSharedScratchOffset = 5,
+  LsHsSysValueLsShaderAddrLow = 6,
+  LsHsSysValueLsShaderAddrHigh = 7,
 
-    LsHsSpecialSysValueCount,
+  LsHsSpecialSysValueCount,
 };
 
 // Enumerates special system values for the ES-GS merged shader (the assigned numeric values are identical to SGPR
 // numbers defined by hardware).
-enum EsGsSpecialSysValue
-{
-    EsGsSysValueUserDataAddrLow         = 0,
-    EsGsSysValueUserDataAddrHigh        = 1,
-    EsGsSysValueGsVsOffset              = 2,
-    EsGsSysValueMergedGroupInfo         = 2,
-    EsGsSysValueMergedWaveInfo          = 3,
-    EsGsSysValueOffChipLdsBase          = 4,
-    EsGsSysValueSharedScratchOffset     = 5,
-    EsGsSysValueGsShaderAddrLow         = 6,
-    EsGsSysValueGsShaderAddrHigh        = 7,
-    EsGsSysValuePrimShaderTableAddrLow  = 6,
-    EsGsSysValuePrimShaderTableAddrHigh = 7,
+enum EsGsSpecialSysValue {
+  EsGsSysValueUserDataAddrLow = 0,
+  EsGsSysValueUserDataAddrHigh = 1,
+  EsGsSysValueGsVsOffset = 2,
+  EsGsSysValueMergedGroupInfo = 2,
+  EsGsSysValueMergedWaveInfo = 3,
+  EsGsSysValueOffChipLdsBase = 4,
+  EsGsSysValueSharedScratchOffset = 5,
+  EsGsSysValueGsShaderAddrLow = 6,
+  EsGsSysValueGsShaderAddrHigh = 7,
+  EsGsSysValuePrimShaderTableAddrLow = 6,
+  EsGsSysValuePrimShaderTableAddrHigh = 7,
 
-    EsGsSpecialSysValueCount,
+  EsGsSpecialSysValueCount,
 };
 
 // =====================================================================================================================
 // Represents the manager doing shader merge operations.
-class ShaderMerger
-{
+class ShaderMerger {
 public:
-    ShaderMerger(PipelineState* pipelineState, PipelineShaders* pipelineShaders);
+  ShaderMerger(PipelineState *pipelineState, PipelineShaders *pipelineShaders);
 
-    llvm::Function* generateLsHsEntryPoint(llvm::Function* lsEntryPoint, llvm::Function* hsEntryPoint);
-    llvm::Function* generateEsGsEntryPoint(llvm::Function* esEntryPoint, llvm::Function* gsEntryPoint);
-    llvm::Function* buildPrimShader(llvm::Function* esEntryPoint,
-                                    llvm::Function* gsEntryPoint,
-                                    llvm::Function* copyShaderEntryPoint);
+  llvm::Function *generateLsHsEntryPoint(llvm::Function *lsEntryPoint, llvm::Function *hsEntryPoint);
+  llvm::Function *generateEsGsEntryPoint(llvm::Function *esEntryPoint, llvm::Function *gsEntryPoint);
+  llvm::Function *buildPrimShader(llvm::Function *esEntryPoint, llvm::Function *gsEntryPoint,
+                                  llvm::Function *copyShaderEntryPoint);
 
 private:
-    ShaderMerger() = delete;
-    ShaderMerger(const ShaderMerger&) = delete;
-    ShaderMerger& operator=(const ShaderMerger&) = delete;
+  ShaderMerger() = delete;
+  ShaderMerger(const ShaderMerger &) = delete;
+  ShaderMerger &operator=(const ShaderMerger &) = delete;
 
-    llvm::FunctionType* generateLsHsEntryPointType(uint64_t* inRegMask) const;
-    llvm::FunctionType* generateEsGsEntryPointType(uint64_t* inRegMask) const;
+  llvm::FunctionType *generateLsHsEntryPointType(uint64_t *inRegMask) const;
+  llvm::FunctionType *generateEsGsEntryPointType(uint64_t *inRegMask) const;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    PipelineState*    m_pipelineState;     // Pipeline state
-    llvm::LLVMContext*m_context;           // LLVM context
-    GfxIpVersion      m_gfxIp;              // Graphics IP version info
+  PipelineState *m_pipelineState; // Pipeline state
+  llvm::LLVMContext *m_context;   // LLVM context
+  GfxIpVersion m_gfxIp;           // Graphics IP version info
 
-    NggPrimShader     m_primShader; // Manager of NGG primitive shader
+  NggPrimShader m_primShader; // Manager of NGG primitive shader
 
-    bool        m_hasVs;        // Whether the pipeline has vertex shader
-    bool        m_hasTcs;       // Whether the pipeline has tessellation control shader
-    bool        m_hasTes;       // Whether the pipeline has tessellation evaluation shader
-    bool        m_hasGs;        // Whether the pipeline has geometry shader
+  bool m_hasVs;  // Whether the pipeline has vertex shader
+  bool m_hasTcs; // Whether the pipeline has tessellation control shader
+  bool m_hasTes; // Whether the pipeline has tessellation evaluation shader
+  bool m_hasGs;  // Whether the pipeline has geometry shader
 };
 
-} // lgc
+} // namespace lgc

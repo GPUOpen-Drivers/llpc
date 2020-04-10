@@ -29,15 +29,14 @@
  ***********************************************************************************************************************
  */
 #include "llpcComputeContext.h"
-#include "lgc/llpcPipeline.h"
 #include "SPIRVInternal.h"
+#include "lgc/llpcPipeline.h"
 
 #define DEBUG_TYPE "llpc-compute-context"
 
 using namespace llvm;
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 //
@@ -45,27 +44,17 @@ namespace Llpc
 // @param pipelineInfo : Compute pipeline build info
 // @param pipelineHash : Pipeline hash code
 // @param cacheHash : Cache hash code
-ComputeContext::ComputeContext(
-    GfxIpVersion                    gfxIp,
-    const ComputePipelineBuildInfo* pipelineInfo,
-    MetroHash::Hash*                pipelineHash,
-    MetroHash::Hash*                cacheHash)
-    :
-    PipelineContext(gfxIp, pipelineHash, cacheHash),
-    m_pipelineInfo(pipelineInfo)
-{
-}
+ComputeContext::ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInfo *pipelineInfo,
+                               MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
+    : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo) {}
 
 // =====================================================================================================================
 // Gets pipeline shader info of the specified shader stage
 //
 // @param shaderStage : Shader stage
-const PipelineShaderInfo* ComputeContext::getPipelineShaderInfo(
-    ShaderStage shaderStage
-    ) const
-{
-    assert(shaderStage == ShaderStageCompute);
-    return &m_pipelineInfo->cs;
+const PipelineShaderInfo *ComputeContext::getPipelineShaderInfo(ShaderStage shaderStage) const {
+  assert(shaderStage == ShaderStageCompute);
+  return &m_pipelineInfo->cs;
 }
 
-} // Llpc
+} // namespace Llpc

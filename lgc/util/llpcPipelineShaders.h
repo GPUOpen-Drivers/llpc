@@ -35,40 +35,33 @@
 #include "llvm/Pass.h"
 #include <map>
 
-namespace lgc
-{
+namespace lgc {
 
 // =====================================================================================================================
 // Simple analysis pass that finds the shaders in the pipeline module
-class PipelineShaders : public llvm::ModulePass
-{
+class PipelineShaders : public llvm::ModulePass {
 public:
-    static char ID;
-    PipelineShaders() : llvm::ModulePass(ID)
-    {
-    }
+  static char ID;
+  PipelineShaders() : llvm::ModulePass(ID) {}
 
-    bool runOnModule(llvm::Module& module) override;
+  bool runOnModule(llvm::Module &module) override;
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
-    {
-        analysisUsage.setPreservesAll();
-    }
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override { analysisUsage.setPreservesAll(); }
 
-    llvm::Function* getEntryPoint(ShaderStage shaderStage) const;
+  llvm::Function *getEntryPoint(ShaderStage shaderStage) const;
 
-    ShaderStage getShaderStage(const llvm::Function* func) const;
+  ShaderStage getShaderStage(const llvm::Function *func) const;
 
 private:
-    PipelineShaders(const PipelineShaders&) = delete;
-    PipelineShaders& operator=(const PipelineShaders&) = delete;
+  PipelineShaders(const PipelineShaders &) = delete;
+  PipelineShaders &operator=(const PipelineShaders &) = delete;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::Function* m_entryPoints[ShaderStageCountInternal];      // The entry-point for each shader stage.
-    std::map<const llvm::Function*, ShaderStage> m_entryPointMap; // Map from shader entry-point to shader stage.
+  llvm::Function *m_entryPoints[ShaderStageCountInternal];       // The entry-point for each shader stage.
+  std::map<const llvm::Function *, ShaderStage> m_entryPointMap; // Map from shader entry-point to shader stage.
 };
 
-llvm::ModulePass* createPipelineShaders();
+llvm::ModulePass *createPipelineShaders();
 
-} // lgc
+} // namespace lgc

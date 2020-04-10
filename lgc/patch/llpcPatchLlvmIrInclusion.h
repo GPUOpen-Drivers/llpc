@@ -32,30 +32,25 @@
 
 #include "llpcPatch.h"
 
-namespace lgc
-{
+namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LLVM patch operations of including LLVM IR as a separate section in the ELF binary.
-class PatchLlvmIrInclusion: public Patch
-{
+class PatchLlvmIrInclusion : public Patch {
 public:
-    PatchLlvmIrInclusion();
+  PatchLlvmIrInclusion();
 
-    bool runOnModule(llvm::Module& module) override;
+  bool runOnModule(llvm::Module &module) override;
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
-    {
-        analysisUsage.setPreservesAll();
-    }
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override { analysisUsage.setPreservesAll(); }
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    PatchLlvmIrInclusion(const PatchLlvmIrInclusion&) = delete;
-    PatchLlvmIrInclusion& operator=(const PatchLlvmIrInclusion&) = delete;
+  PatchLlvmIrInclusion(const PatchLlvmIrInclusion &) = delete;
+  PatchLlvmIrInclusion &operator=(const PatchLlvmIrInclusion &) = delete;
 };
 
-} // lgc
+} // namespace lgc

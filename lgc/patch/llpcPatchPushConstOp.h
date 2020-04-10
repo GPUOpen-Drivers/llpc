@@ -32,43 +32,39 @@
 
 #include "llpcPatch.h"
 
-namespace llvm
-{
+namespace llvm {
 
 class CallInst;
 
 }
 
-namespace lgc
-{
+namespace lgc {
 
 class PipelineState;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for push constant operations.
-class PatchPushConstOp:
-    public Patch
-{
+class PatchPushConstOp : public Patch {
 public:
-    PatchPushConstOp();
+  PatchPushConstOp();
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override;
-    bool runOnModule(llvm::Module& module) override;
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
+  bool runOnModule(llvm::Module &module) override;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID; // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    PatchPushConstOp(const PatchPushConstOp&) = delete;
-    PatchPushConstOp& operator=(const PatchPushConstOp&) = delete;
+  PatchPushConstOp(const PatchPushConstOp &) = delete;
+  PatchPushConstOp &operator=(const PatchPushConstOp &) = delete;
 
-    void visitCallInst(llvm::CallInst& callInst);
+  void visitCallInst(llvm::CallInst &callInst);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::SmallVector<llvm::Instruction*, 8> m_instsToRemove;   // List of instructions to remove.
-    PipelineState*  m_pipelineState = nullptr;                 // Pipeline state from PipelineStateWrapper pass
+  llvm::SmallVector<llvm::Instruction *, 8> m_instsToRemove; // List of instructions to remove.
+  PipelineState *m_pipelineState = nullptr;                  // Pipeline state from PipelineStateWrapper pass
 };
 
-} // lgc
+} // namespace lgc

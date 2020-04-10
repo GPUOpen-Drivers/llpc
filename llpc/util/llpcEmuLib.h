@@ -37,67 +37,57 @@
 #include <unordered_map>
 #include <vector>
 
-namespace llvm
-{
+namespace llvm {
 class Function;
 class Module;
-} // llvm
+} // namespace llvm
 
-namespace std
-{
+namespace std {
 
-template<>
-struct hash<llvm::StringRef>
-{
-    typedef llvm::StringRef argument_type;
-    typedef std::size_t result_type;
-    result_type operator()(argument_type const& str) const noexcept
-    {
-        return llvm::hash_value(str);
-    }
+template <> struct hash<llvm::StringRef> {
+  typedef llvm::StringRef argument_type;
+  typedef std::size_t result_type;
+  result_type operator()(argument_type const &str) const noexcept { return llvm::hash_value(str); }
 };
 
-} // std
+} // namespace std
 
-namespace Llpc
-{
+namespace Llpc {
 class Context;
 
 // =====================================================================================================================
 // Represents an emulation archive library, together with already-loaded modules from it.
-class EmuLib
-{
-    // An already-loaded function from the emulation library.
-    struct EmuLibFunction
-    {
-        llvm::Function* function;    // Function in Module parsed from library module
-        bool isNative;                // Whether the function is native according to criteria in llpcEmuLib.cpp
+class EmuLib {
+  // An already-loaded function from the emulation library.
+  struct EmuLibFunction {
+    llvm::Function *function; // Function in Module parsed from library module
+    bool isNative;            // Whether the function is native according to criteria in llpcEmuLib.cpp
 
-        EmuLibFunction() : function(nullptr), isNative(true) {}
-        EmuLibFunction(llvm::Function* function, bool isNative) : function(function), isNative(isNative) {}
-    };
+    EmuLibFunction() : function(nullptr), isNative(true) {}
+    EmuLibFunction(llvm::Function *function, bool isNative) : function(function), isNative(isNative) {}
+  };
 
-    // An archive in the emulation library. The map of already-loaded functions from the archive needs
-    // to be per-archive, because multiple archives can have the same named function and we need to
-    // avoid accidentally getting the wrong one if the module containing that function from a later
-    // archive in search order has already been loaded.
-    struct EmuLibArchive
-    {
-        std::unique_ptr<llvm::object::Archive> archive;       // The bitcode archive
-        std::unordered_map<llvm::StringRef, EmuLibFunction> functions;  // Store of already-parsed functions from this archive
+  // An archive in the emulation library. The map of already-loaded functions from the archive needs
+  // to be per-archive, because multiple archives can have the same named function and we need to
+  // avoid accidentally getting the wrong one if the module containing that function from a later
+  // archive in search order has already been loaded.
+  struct EmuLibArchive {
+    std::unique_ptr<llvm::object::Archive> archive; // The bitcode archive
+    std::unordered_map<llvm::StringRef, EmuLibFunction>
+        functions; // Store of already-parsed functions from this archive
 
-        EmuLibArchive(std::unique_ptr<llvm::object::Archive> archive) : archive(std::move(archive)) {}
-    };
+    EmuLibArchive(std::unique_ptr<llvm::object::Archive> archive) : archive(std::move(archive)) {}
+  };
 
-    Context* m_context;                                    // The LLPC context
-    std::vector<EmuLibArchive> m_archives;                // Bitcode archives that make up this EmuLib
-    std::vector<std::unique_ptr<llvm::Module>> m_modules; // Modules that have been parsed out of archives
-    std::unordered_map<llvm::StringRef, size_t> m_symbolIndices;    // All available symbols in this EmuLib and the indices
-                                                          // in m_archives
+  Context *m_context;                                          // The LLPC context
+  std::vector<EmuLibArchive> m_archives;                       // Bitcode archives that make up this EmuLib
+  std::vector<std::unique_ptr<llvm::Module>> m_modules;        // Modules that have been parsed out of archives
+  std::unordered_map<llvm::StringRef, size_t> m_symbolIndices; // All available symbols in this EmuLib and the indices
+                                                               // in m_archives
 public:
-    EmuLib(Context* context) : m_context(context) {}
-    void addArchive(llvm::MemoryBufferRef buffer);
-    llvm::Function* getFunction(llvm::StringRef funcName, bool nativeOnly);
+  EmuLib(Context *context) : m_context(context) {}
+  void addArchive(llvm::MemoryBufferRef buffer);
+  llvm::Function *getFunction(llvm::StringRef funcName, bool nativeOnly);
 };
 
-} // Llpc
+} // namespace Llpc

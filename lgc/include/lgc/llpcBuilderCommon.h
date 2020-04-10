@@ -32,25 +32,23 @@
 
 #include <stdint.h>
 
-namespace lgc
-{
+namespace lgc {
 
 /// Enumerates LGC shader stages.
-enum ShaderStage : unsigned
-{
-    ShaderStageVertex = 0,                                ///< Vertex shader
-    ShaderStageTessControl,                               ///< Tessellation control shader
-    ShaderStageTessEval,                                  ///< Tessellation evaluation shader
-    ShaderStageGeometry,                                  ///< Geometry shader
-    ShaderStageFragment,                                  ///< Fragment shader
-    ShaderStageCompute,                                   ///< Compute shader
-    ShaderStageCount,                                     ///< Count of shader stages
-    ShaderStageInvalid = ~0u,                             ///< Invalid shader stage
-    ShaderStageNativeStageCount = ShaderStageCompute + 1, ///< Native supported shader stage count
-    ShaderStageGfxCount = ShaderStageFragment + 1,        ///< Count of shader stages for graphics pipeline
+enum ShaderStage : unsigned {
+  ShaderStageVertex = 0,                                ///< Vertex shader
+  ShaderStageTessControl,                               ///< Tessellation control shader
+  ShaderStageTessEval,                                  ///< Tessellation evaluation shader
+  ShaderStageGeometry,                                  ///< Geometry shader
+  ShaderStageFragment,                                  ///< Fragment shader
+  ShaderStageCompute,                                   ///< Compute shader
+  ShaderStageCount,                                     ///< Count of shader stages
+  ShaderStageInvalid = ~0u,                             ///< Invalid shader stage
+  ShaderStageNativeStageCount = ShaderStageCompute + 1, ///< Native supported shader stage count
+  ShaderStageGfxCount = ShaderStageFragment + 1,        ///< Count of shader stages for graphics pipeline
 
-    ShaderStageCopyShader = ShaderStageCount,             ///< Copy shader (internal-use)
-    ShaderStageCountInternal,                             ///< Count of shader stages (internal-use)
+  ShaderStageCopyShader = ShaderStageCount, ///< Copy shader (internal-use)
+  ShaderStageCountInternal,                 ///< Count of shader stages (internal-use)
 };
 
-} // lgc
+} // namespace lgc

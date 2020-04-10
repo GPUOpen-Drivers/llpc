@@ -29,55 +29,48 @@
  ***********************************************************************************************************************
  */
 
-#include "llpcSpirvLower.h"
 #include "llpcSpirvLowerUtil.h"
-#include "llpcUtil.h"
 #include "SPIRVInternal.h"
+#include "llpcSpirvLower.h"
+#include "llpcUtil.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 
 using namespace llvm;
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Gets the entry point (valid for AMD GPU) of a LLVM module.
 //
 // @param module : LLVM module
-Function* getEntryPoint(
-    Module* module)
-{
-    Function* entryPoint = nullptr;
+Function *getEntryPoint(Module *module) {
+  Function *entryPoint = nullptr;
 
-    for (auto func = module->begin(), end = module->end(); func != end; ++func)
-    {
-        if (!func->empty() && func->getLinkage() == GlobalValue::ExternalLinkage)
-        {
-            entryPoint = &*func;
-            break;
-        }
+  for (auto func = module->begin(), end = module->end(); func != end; ++func) {
+    if (!func->empty() && func->getLinkage() == GlobalValue::ExternalLinkage) {
+      entryPoint = &*func;
+      break;
     }
+  }
 
-    assert(entryPoint );
-    return entryPoint;
+  assert(entryPoint);
+  return entryPoint;
 }
 
 // =====================================================================================================================
 // Gets the shader stage from the specified single-shader LLVM module.
 //
 // @param module : LLVM module
-ShaderStage getShaderStageFromModule(
-    Module* module)
-{
-    Function* func = getEntryPoint(module);
+ShaderStage getShaderStageFromModule(Module *module) {
+  Function *func = getEntryPoint(module);
 
-    // Check for the execution model metadata that is added by the SPIR-V reader.
-    MDNode* execModelNode = func->getMetadata(gSPIRVMD::ExecutionModel);
-    if (!execModelNode )
-        return ShaderStageInvalid;
-    auto execModel = mdconst::dyn_extract<ConstantInt>(execModelNode->getOperand(0))->getZExtValue();
-    return convertToStageShage(execModel);
+  // Check for the execution model metadata that is added by the SPIR-V reader.
+  MDNode *execModelNode = func->getMetadata(gSPIRVMD::ExecutionModel);
+  if (!execModelNode)
+    return ShaderStageInvalid;
+  auto execModel = mdconst::dyn_extract<ConstantInt>(execModelNode->getOperand(0))->getZExtValue();
+  return convertToStageShage(execModel);
 }
 
 // =====================================================================================================================
@@ -85,18 +78,13 @@ ShaderStage getShaderStageFromModule(
 //
 // @param module : LLVM module to set shader stage
 // @param shaderStage : Shader stage
-void setShaderStageToModule(
-    Module*     module,
-    ShaderStage shaderStage)
-{
-    LLVMContext& context = module->getContext();
-    Function* func = getEntryPoint(module);
-    auto execModel = convertToExecModel(shaderStage);
-    Metadata* execModelMeta[] = {
-        ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(context), execModel))
-    };
-    auto execModelMetaNode = MDNode::get(context, execModelMeta);
-    func->setMetadata(gSPIRVMD::ExecutionModel, execModelMetaNode);
+void setShaderStageToModule(Module *module, ShaderStage shaderStage) {
+  LLVMContext &context = module->getContext();
+  Function *func = getEntryPoint(module);
+  auto execModel = convertToExecModel(shaderStage);
+  Metadata *execModelMeta[] = {ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(context), execModel))};
+  auto execModelMetaNode = MDNode::get(context, execModelMeta);
+  func->setMetadata(gSPIRVMD::ExecutionModel, execModelMetaNode);
 }
 
-} // Llpc
+} // namespace Llpc

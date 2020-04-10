@@ -31,13 +31,11 @@
  */
 #pragma once
 
-#include "spirv.hpp"
-
 #include "llpc.h"
+#include "spirv.hpp"
 #include "vkgcUtil.h"
 
-namespace Llpc
-{
+namespace Llpc {
 
 using Vkgc::InvalidValue;
 using Vkgc::voidPtrInc;
@@ -46,12 +44,12 @@ using Vkgc::voidPtrInc;
 static const unsigned SizeOfVec4 = sizeof(float) * 4;
 
 // Descriptor offset reloc magic number
-static const unsigned DescRelocMagic        = 0xA5A5A500;
-static const unsigned DescRelocMagicMask    = 0xFFFFFF00;
-static const unsigned DescSetMask           = 0x000000FF;
+static const unsigned DescRelocMagic = 0xA5A5A500;
+static const unsigned DescRelocMagicMask = 0xFFFFFF00;
+static const unsigned DescSetMask = 0x000000FF;
 
 // Gets the name string of shader stage.
-const char* getShaderStageName(ShaderStage shaderStage);
+const char *getShaderStageName(ShaderStage shaderStage);
 
 // Translates shader stage to corresponding stage mask.
 unsigned shaderStageToMask(ShaderStage stage);
@@ -66,11 +64,9 @@ ShaderStage convertToStageShage(unsigned execModel);
 // Gets module ID according to the index
 //
 // @param index : Index in stage array
-inline unsigned getModuleIdByIndex(
-    unsigned index)
-{
-    static const unsigned BaseModuleId = 1;
-    return BaseModuleId + index;
+inline unsigned getModuleIdByIndex(unsigned index) {
+  static const unsigned BaseModuleId = 1;
+  return BaseModuleId + index;
 }
 
 // =====================================================================================================================
@@ -80,12 +76,9 @@ inline unsigned getModuleIdByIndex(
 //
 // @param p : Pointer to be decremented.
 // @param numBytes : Number of bytes to decrement the pointer by
-inline void* voidPtrDec(
-    const void* p,
-    size_t      numBytes)
-{
-    void* ptr = const_cast<void*>(p);
-    return (static_cast<uint8_t*>(ptr) - numBytes);
+inline void *voidPtrDec(const void *p, size_t numBytes) {
+  void *ptr = const_cast<void *>(p);
+  return (static_cast<uint8_t *>(ptr) - numBytes);
 }
 
 // =====================================================================================================================
@@ -97,11 +90,8 @@ inline void* voidPtrDec(
 //
 // @param p1 : First pointer (higher address).
 // @param p2 : Second pointer (lower address).
-inline size_t voidPtrDiff(
-    const void* p1,
-    const void* p2)
-{
-    return (static_cast<const uint8_t*>(p1) - static_cast<const uint8_t*>(p2));
+inline size_t voidPtrDiff(const void *p1, const void *p2) {
+  return (static_cast<const uint8_t *>(p1) - static_cast<const uint8_t *>(p2));
 }
 
 // =====================================================================================================================
@@ -110,22 +100,18 @@ inline size_t voidPtrDiff(
 // If the given integer is not a power of 2, this function will not provide an exact answer.
 //
 // Returns log2(u)
-template< typename T>
+template <typename T>
 //
 // @param u : Value to compute the logarithm of.
-inline unsigned log2(
-    T u)
-{
-    unsigned logValue = 0;
+inline unsigned log2(T u) {
+  unsigned logValue = 0;
 
-    while (u > 1)
-    {
-        ++logValue;
-        u >>= 1;
-    }
+  while (u > 1) {
+    ++logValue;
+    u >>= 1;
+  }
 
-    return logValue;
+  return logValue;
 }
 
-} // Llpc
-
+} // namespace Llpc

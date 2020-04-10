@@ -30,41 +30,36 @@
  */
 #pragma once
 
+#include "llpcPatch.h"
+#include "lgc/llpcBuilder.h"
 #include "llvm/IR/InstVisitor.h"
 
-#include "lgc/llpcBuilder.h"
-#include "llpcPatch.h"
-
-namespace lgc
-{
+namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for scalarize load.
-class PatchLoadScalarizer final:
-    public llvm::FunctionPass,
-    public llvm::InstVisitor<PatchLoadScalarizer>
-{
+class PatchLoadScalarizer final : public llvm::FunctionPass, public llvm::InstVisitor<PatchLoadScalarizer> {
 public:
-    explicit PatchLoadScalarizer();
+  explicit PatchLoadScalarizer();
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override;
-    bool runOnFunction(llvm::Function& function) override;
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
+  bool runOnFunction(llvm::Function &function) override;
 
-    void visitLoadInst(llvm::LoadInst& loadInst);
+  void visitLoadInst(llvm::LoadInst &loadInst);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    PatchLoadScalarizer(const PatchLoadScalarizer&) = delete;
-    PatchLoadScalarizer& operator=(const PatchLoadScalarizer&) = delete;
+  PatchLoadScalarizer(const PatchLoadScalarizer &) = delete;
+  PatchLoadScalarizer &operator=(const PatchLoadScalarizer &) = delete;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::SmallVector<llvm::Instruction*, 8>        m_instsToErase;         // Instructions to erase
-    std::unique_ptr<llvm::IRBuilder<>>              m_builder;             // The IRBuilder.
-    unsigned                                        m_scalarThreshold;      // The threshold for load scalarizer
+  llvm::SmallVector<llvm::Instruction *, 8> m_instsToErase; // Instructions to erase
+  std::unique_ptr<llvm::IRBuilder<>> m_builder;             // The IRBuilder.
+  unsigned m_scalarThreshold;                               // The threshold for load scalarizer
 };
 
-} // lgc
+} // namespace lgc

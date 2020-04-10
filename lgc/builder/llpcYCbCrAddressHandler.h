@@ -30,60 +30,60 @@
   */
 
 #pragma once
-#include "llpcGfxRegHandler.h"
 #include "llpcBuilderImpl.h"
+#include "llpcGfxRegHandler.h"
 
-namespace lgc
-{
+namespace lgc {
 
 // =====================================================================================================================
 // The class is used for calculating and mantain the base address of each plane in YCbCr image.
 // Note: There are at most 3 planes, and the index for plane is start from zero
-class YCbCrAddressHandler
-{
+class YCbCrAddressHandler {
 public:
-    YCbCrAddressHandler(Builder* builder, SqImgRsrcRegHandler* sqImgRsrcRegHelper, GfxIpVersion* gfxIp)
-    {
-        pBuilder = builder;
-        pRegHelper = sqImgRsrcRegHelper;
-        pGfxIp = gfxIp;
-        planeBaseAddresses.clear();
-        pOne = builder->getInt32(1);
-    }
+  YCbCrAddressHandler(Builder *builder, SqImgRsrcRegHandler *sqImgRsrcRegHelper, GfxIpVersion *gfxIp) {
+    pBuilder = builder;
+    pRegHelper = sqImgRsrcRegHelper;
+    pGfxIp = gfxIp;
+    planeBaseAddresses.clear();
+    pOne = builder->getInt32(1);
+  }
 
-    // Generate base address for image planes
-    void genBaseAddress(unsigned planeCount);
+  // Generate base address for image planes
+  void genBaseAddress(unsigned planeCount);
 
-    // Generate height and pitch
-    void genHeightAndPitch(unsigned bits, unsigned bpp, unsigned xBitCount, bool isTileOptimal, unsigned planeNum);
+  // Generate height and pitch
+  void genHeightAndPitch(unsigned bits, unsigned bpp, unsigned xBitCount, bool isTileOptimal, unsigned planeNum);
 
-    // Power2Align operation
-    llvm::Value* power2Align(llvm::Value* x, unsigned align);
+  // Power2Align operation
+  llvm::Value *power2Align(llvm::Value *x, unsigned align);
 
-    // Get specific plane
-    llvm::Value* getPlane(unsigned idx) { assert(idx < 3); return planeBaseAddresses[idx]; }
+  // Get specific plane
+  llvm::Value *getPlane(unsigned idx) {
+    assert(idx < 3);
+    return planeBaseAddresses[idx];
+  }
 
-    // Get pitch for Y plane
-    llvm::Value* getPitchY() { return pPitchY; }
+  // Get pitch for Y plane
+  llvm::Value *getPitchY() { return pPitchY; }
 
-    // Get pitch for Cb plane
-    llvm::Value* getPitchCb() { return pPitchCb; }
+  // Get pitch for Cb plane
+  llvm::Value *getPitchCb() { return pPitchCb; }
 
-    // Get height for Y plane
-    llvm::Value* getHeightY() { return pHeightY; }
+  // Get height for Y plane
+  llvm::Value *getHeightY() { return pHeightY; }
 
-    // Get Height for Cb plane
-    llvm::Value* getHeightCb() { return pHeightCb; }
+  // Get Height for Cb plane
+  llvm::Value *getHeightCb() { return pHeightCb; }
 
-    SqImgRsrcRegHandler*               pRegHelper;
-    Builder*                           pBuilder;
-    llvm::SmallVector<llvm::Value*, 3> planeBaseAddresses;
-    llvm::Value*                       pPitchY;
-    llvm::Value*                       pHeightY;
-    llvm::Value*                       pPitchCb;
-    llvm::Value*                       pHeightCb;
-    llvm::Value*                       pOne;
-    GfxIpVersion*                      pGfxIp;
+  SqImgRsrcRegHandler *pRegHelper;
+  Builder *pBuilder;
+  llvm::SmallVector<llvm::Value *, 3> planeBaseAddresses;
+  llvm::Value *pPitchY;
+  llvm::Value *pHeightY;
+  llvm::Value *pPitchCb;
+  llvm::Value *pHeightCb;
+  llvm::Value *pOne;
+  GfxIpVersion *pGfxIp;
 };
 
-} // lgc
+} // namespace lgc

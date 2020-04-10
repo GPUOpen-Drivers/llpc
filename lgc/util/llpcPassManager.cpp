@@ -28,172 +28,141 @@
  * @brief LLPC source file: contains implementation of class lgc::PassManagerImpl.
  ***********************************************************************************************************************
  */
+#include "lgc/llpcPassManager.h"
+#include "llpcBuilderDebug.h"
 #include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/CommandLine.h"
 
-#include "llpcBuilderDebug.h"
-#include "lgc/llpcPassManager.h"
-
-namespace llvm
-{
-namespace cl
-{
+namespace llvm {
+namespace cl {
 
 // -verify-ir : verify the IR after each pass
-static cl::opt<bool> VerifyIr("verify-ir",
-                              cl::desc("Verify IR after each pass"),
-                              cl::init(false));
+static cl::opt<bool> VerifyIr("verify-ir", cl::desc("Verify IR after each pass"), cl::init(false));
 
 // -dump-cfg-after : dump CFG as .dot files after specified pass
-static cl::opt<std::string> DumpCfgAfter("dump-cfg-after",
-                                         cl::desc("Dump CFG as .dot files after specified pass"),
+static cl::opt<std::string> DumpCfgAfter("dump-cfg-after", cl::desc("Dump CFG as .dot files after specified pass"),
                                          cl::init(""));
 
 // -dump-pass-name : dump executed pass name
 static cl::opt<bool> DumpPassName("dump-pass-name", cl::desc("Dump executed pass name"), cl::init(false));
 
 // -disable-pass-indices: indices of passes to be disabled
-static cl::list<unsigned> DisablePassIndices("disable-pass-indices", cl::ZeroOrMore, cl::desc("Indices of passes to be disabled"));
+static cl::list<unsigned> DisablePassIndices("disable-pass-indices", cl::ZeroOrMore,
+                                             cl::desc("Indices of passes to be disabled"));
 
-} // cl
+} // namespace cl
 
-} // llvm
+} // namespace llvm
 
 using namespace lgc;
 using namespace llvm;
 
-namespace
-{
+namespace {
 
 // =====================================================================================================================
 // LLPC's legacy::PassManager override.
 // This is the implementation subclass of the PassManager class declared in llpcPassManager.h
-class PassManagerImpl final :
-    public lgc::PassManager
-{
+class PassManagerImpl final : public lgc::PassManager {
 public:
-    PassManagerImpl();
-    ~PassManagerImpl() override {}
+  PassManagerImpl();
+  ~PassManagerImpl() override {}
 
-    void setPassIndex(unsigned* passIndex) override { m_passIndex = passIndex; }
-    void add(llvm::Pass* pass) override;
-    void stop() override;
+  void setPassIndex(unsigned *passIndex) override { m_passIndex = passIndex; }
+  void add(llvm::Pass *pass) override;
+  void stop() override;
 
 private:
-    bool              m_stopped = false;         // Whether we have already stopped adding new passes.
-    llvm::AnalysisID  m_dumpCfgAfter = nullptr;  // -dump-cfg-after pass id
-    llvm::AnalysisID  m_printModule = nullptr;   // Pass id of dump pass "Print Module IR"
-    llvm::AnalysisID  m_jumpThreading = nullptr; // Pass id of opt pass "Jump Threading"
-    unsigned*         m_passIndex = nullptr;    // Pass Index
+  bool m_stopped = false;                     // Whether we have already stopped adding new passes.
+  llvm::AnalysisID m_dumpCfgAfter = nullptr;  // -dump-cfg-after pass id
+  llvm::AnalysisID m_printModule = nullptr;   // Pass id of dump pass "Print Module IR"
+  llvm::AnalysisID m_jumpThreading = nullptr; // Pass id of opt pass "Jump Threading"
+  unsigned *m_passIndex = nullptr;            // Pass Index
 };
 
-} // anonymous
+} // namespace
 
 // =====================================================================================================================
 // Get the PassInfo for a registered pass given short name
 //
 // @param passName : Short name of pass
-static const PassInfo* getPassInfo(
-    StringRef passName)
-{
-    if (passName.empty())
-        return nullptr;
+static const PassInfo *getPassInfo(StringRef passName) {
+  if (passName.empty())
+    return nullptr;
 
-    const PassRegistry& passRegistry = *PassRegistry::getPassRegistry();
-    const PassInfo* passInfo = passRegistry.getPassInfo(passName);
-    if (!passInfo )
-    {
-        report_fatal_error(Twine('\"') + Twine(passName) +
-                           Twine("\" pass is not registered."));
-    }
-    return passInfo;
+  const PassRegistry &passRegistry = *PassRegistry::getPassRegistry();
+  const PassInfo *passInfo = passRegistry.getPassInfo(passName);
+  if (!passInfo) {
+    report_fatal_error(Twine('\"') + Twine(passName) + Twine("\" pass is not registered."));
+  }
+  return passInfo;
 }
 
 // =====================================================================================================================
 // Get the ID for a registered pass given short name
 //
 // @param passName : Short name of pass
-static AnalysisID getPassIdFromName(
-    StringRef passName)
-{
-  const PassInfo* passInfo = getPassInfo(passName);
+static AnalysisID getPassIdFromName(StringRef passName) {
+  const PassInfo *passInfo = getPassInfo(passName);
   return passInfo ? passInfo->getTypeInfo() : nullptr;
 }
 
 // =====================================================================================================================
 // Create a PassManagerImpl
-lgc::PassManager* lgc::PassManager::Create()
-{
-    return new PassManagerImpl;
-}
+lgc::PassManager *lgc::PassManager::Create() { return new PassManagerImpl; }
 
 // =====================================================================================================================
-PassManagerImpl::PassManagerImpl()
-    :
-    PassManager()
-{
-    if (!cl::DumpCfgAfter.empty())
-        m_dumpCfgAfter = getPassIdFromName(cl::DumpCfgAfter);
+PassManagerImpl::PassManagerImpl() : PassManager() {
+  if (!cl::DumpCfgAfter.empty())
+    m_dumpCfgAfter = getPassIdFromName(cl::DumpCfgAfter);
 
-    m_jumpThreading = getPassIdFromName("jump-threading");
-    m_printModule = getPassIdFromName("print-module");
+  m_jumpThreading = getPassIdFromName("jump-threading");
+  m_printModule = getPassIdFromName("print-module");
 }
 
 // =====================================================================================================================
 // Add a pass to the pass manager.
 //
 // @param pass : Pass to add to the pass manager
-void PassManagerImpl::add(
-    Pass* pass)
-{
-    // Do not add any passes after calling stop(), except immutable passes.
-    if (m_stopped && !pass->getAsImmutablePass() )
+void PassManagerImpl::add(Pass *pass) {
+  // Do not add any passes after calling stop(), except immutable passes.
+  if (m_stopped && !pass->getAsImmutablePass())
+    return;
+
+  AnalysisID passId = pass->getPassID();
+
+  // Skip the jump threading pass as it interacts really badly with the structurizer.
+  if (passId == m_jumpThreading)
+    return;
+
+  if (passId != m_printModule && m_passIndex) {
+    unsigned passIndex = (*m_passIndex)++;
+
+    for (auto disableIndex : cl::DisablePassIndices) {
+      if (disableIndex == passIndex) {
+        LLPC_OUTS("Pass[" << passIndex << "] = " << pass->getPassName() << " (disabled)\n");
         return;
-
-    AnalysisID passId = pass->getPassID();
-
-    // Skip the jump threading pass as it interacts really badly with the structurizer.
-    if (passId == m_jumpThreading)
-        return;
-
-    if (passId != m_printModule && m_passIndex )
-    {
-        unsigned passIndex = (*m_passIndex)++;
-
-        for (auto disableIndex : cl::DisablePassIndices)
-        {
-            if (disableIndex == passIndex)
-            {
-                LLPC_OUTS("Pass[" << passIndex << "] = " << pass->getPassName() << " (disabled)\n");
-                return;
-            }
-        }
-
-        if (cl::DumpPassName)
-            LLPC_OUTS("Pass[" << passIndex << "] = " << pass->getPassName() << "\n");
+      }
     }
 
-    // Add the pass to the superclass pass manager.
-    legacy::PassManager::add(pass);
+    if (cl::DumpPassName)
+      LLPC_OUTS("Pass[" << passIndex << "] = " << pass->getPassName() << "\n");
+  }
 
-    if (cl::VerifyIr)
-    {
-        // Add a verify pass after it.
-        legacy::PassManager::add(createVerifierPass(true)); // FatalErrors=true
-    }
+  // Add the pass to the superclass pass manager.
+  legacy::PassManager::add(pass);
 
-    if (passId == m_dumpCfgAfter)
-    {
-        // Add a CFG printer pass after it.
-        legacy::PassManager::add(createCFGPrinterLegacyPassPass());
-    }
+  if (cl::VerifyIr) {
+    // Add a verify pass after it.
+    legacy::PassManager::add(createVerifierPass(true)); // FatalErrors=true
+  }
+
+  if (passId == m_dumpCfgAfter) {
+    // Add a CFG printer pass after it.
+    legacy::PassManager::add(createCFGPrinterLegacyPassPass());
+  }
 }
 
 // =====================================================================================================================
 // Stop adding passes to the pass manager, except immutable ones.
-void PassManagerImpl::stop()
-{
-    m_stopped = true;
-}
-
+void PassManagerImpl::stop() { m_stopped = true; }

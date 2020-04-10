@@ -28,72 +28,60 @@
 * @brief LLPC source file: contains declaration and implementation of class lgc::PatchSetupTargetFeatures.
 ***********************************************************************************************************************
 */
-#include "llvm/Pass.h"
-#include "llvm/Support/Debug.h"
-
 #include "llpcCodeGenManager.h"
 #include "llpcPatch.h"
 #include "llpcPipelineState.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "llpc-patch-setup-target-features"
 
 using namespace llvm;
 using namespace lgc;
 
-namespace lgc
-{
+namespace lgc {
 
 // =====================================================================================================================
 // Pass to set up target features on shader entry-points
-class PatchSetupTargetFeatures : public Patch
-{
+class PatchSetupTargetFeatures : public Patch {
 public:
-    static char ID;
-    PatchSetupTargetFeatures() : Patch(ID)
-    {
-    }
+  static char ID;
+  PatchSetupTargetFeatures() : Patch(ID) {}
 
-    void getAnalysisUsage(AnalysisUsage& analysisUsage) const override
-    {
-        analysisUsage.addRequired<PipelineStateWrapper>();
-    }
+  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
+    analysisUsage.addRequired<PipelineStateWrapper>();
+  }
 
-    bool runOnModule(Module& module) override;
+  bool runOnModule(Module &module) override;
 
 private:
-    PatchSetupTargetFeatures(const PatchSetupTargetFeatures&) = delete;
-    PatchSetupTargetFeatures& operator=(const PatchSetupTargetFeatures&) = delete;
+  PatchSetupTargetFeatures(const PatchSetupTargetFeatures &) = delete;
+  PatchSetupTargetFeatures &operator=(const PatchSetupTargetFeatures &) = delete;
 };
 
 char PatchSetupTargetFeatures::ID = 0;
 
-} // lgc
+} // namespace lgc
 
 // =====================================================================================================================
 // Create pass to set up target features
-ModulePass* lgc::createPatchSetupTargetFeatures()
-{
-    return new PatchSetupTargetFeatures();
-}
+ModulePass *lgc::createPatchSetupTargetFeatures() { return new PatchSetupTargetFeatures(); }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
 // @param [in,out] module : LLVM module to be run on
-bool PatchSetupTargetFeatures::runOnModule(
-    Module& module)
-{
-    LLVM_DEBUG(dbgs() << "Run the pass Patch-Setup-Target-Features\n");
+bool PatchSetupTargetFeatures::runOnModule(Module &module) {
+  LLVM_DEBUG(dbgs() << "Run the pass Patch-Setup-Target-Features\n");
 
-    Patch::init(&module);
+  Patch::init(&module);
 
-    auto pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
-    CodeGenManager::setupTargetFeatures(pipelineState, &module);
+  auto pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  CodeGenManager::setupTargetFeatures(pipelineState, &module);
 
-    return true; // Modified the module.
+  return true; // Modified the module.
 }
 
 // =====================================================================================================================
 // Initializes the pass
 INITIALIZE_PASS(PatchSetupTargetFeatures, DEBUG_TYPE, "Patch LLVM to set up target features", false, false)
-

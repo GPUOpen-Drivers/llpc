@@ -31,8 +31,7 @@
 
 #pragma once
 
-namespace Vfx
-{
-bool getEnumValue(const char* string, int& value);
+namespace Vfx {
+bool getEnumValue(const char *string, int &value);
 void initEnumMap();
-}
+} // namespace Vfx

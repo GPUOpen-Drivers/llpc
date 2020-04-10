@@ -31,15 +31,13 @@
 
 #pragma once
 
-namespace lgc
-{
+namespace lgc {
 
 // Define built-in kind enum.
-enum BuiltInKind
-{
-#define BUILTIN(name, number, out, in, type) BuiltIn ## name = number,
+enum BuiltInKind {
+#define BUILTIN(name, number, out, in, type) BuiltIn##name = number,
 #include "lgc/llpcBuilderBuiltInDefs.h"
 #undef BUILTIN
-}; \
+};
 
-} // lgc
+} // namespace lgc

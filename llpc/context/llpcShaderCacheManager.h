@@ -30,52 +30,44 @@
  */
 #pragma once
 
-#include <list>
-
 #include "llpc.h"
 #include "llpcShaderCache.h"
+#include <list>
 
-namespace Llpc
-{
+namespace Llpc {
 
 typedef std::shared_ptr<ShaderCache> ShaderCachePtr;
 
 // =====================================================================================================================
 // This class manages shader cache instances for different GFXIP
-class ShaderCacheManager
-{
+class ShaderCacheManager {
 public:
-    // Constructor
-    ShaderCacheManager()
-    {
+  // Constructor
+  ShaderCacheManager() {}
 
-    }
+  ~ShaderCacheManager();
 
-    ~ShaderCacheManager();
+  // Get the global ShaderCacheManager object
+  static ShaderCacheManager *getShaderCacheManager() {
+    if (!m_manager)
+      m_manager = new ShaderCacheManager();
+    return m_manager;
+  }
 
-    // Get the global ShaderCacheManager object
-    static ShaderCacheManager* getShaderCacheManager()
-    {
-        if (!m_manager )
-            m_manager = new ShaderCacheManager();
-        return m_manager;
-    }
+  static void shutdown() {
+    delete m_manager;
+    m_manager = nullptr;
+  }
 
-    static void shutdown()
-    {
-        delete m_manager;
-        m_manager = nullptr;
-    }
+  ShaderCachePtr getShaderCacheObject(const ShaderCacheCreateInfo *createInfo,
+                                      const ShaderCacheAuxCreateInfo *auxCreateInfo);
 
-    ShaderCachePtr getShaderCacheObject(const ShaderCacheCreateInfo*    createInfo,
-                                        const ShaderCacheAuxCreateInfo* auxCreateInfo);
-
-    void releaseShaderCacheObject(ShaderCachePtr& shaderCachePtr);
+  void releaseShaderCacheObject(ShaderCachePtr &shaderCachePtr);
 
 private:
-    std::list<ShaderCachePtr>  m_shaderCaches;    // ShaderCache instances for all GFXIP
+  std::list<ShaderCachePtr> m_shaderCaches; // ShaderCache instances for all GFXIP
 
-    static ShaderCacheManager* m_manager;              // Static manager
+  static ShaderCacheManager *m_manager; // Static manager
 };
 
-} // Llpc
+} // namespace Llpc

@@ -30,57 +30,51 @@
  */
 #pragma once
 
-#include "llvm/IR/InstVisitor.h"
-
 #include "llpcPatch.h"
 #include "llpcPipelineState.h"
+#include "llvm/IR/InstVisitor.h"
 
-namespace lgc
-{
+namespace lgc {
 
 class PipelineShaders;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for entry-point mutation.
-class PatchEntryPointMutate:
-    public Patch,
-    public llvm::InstVisitor<PatchEntryPointMutate>
-{
+class PatchEntryPointMutate : public Patch, public llvm::InstVisitor<PatchEntryPointMutate> {
 public:
-    PatchEntryPointMutate();
+  PatchEntryPointMutate();
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
-    {
-        analysisUsage.addRequired<PipelineStateWrapper>();
-        analysisUsage.addRequired<PipelineShaders>();
-        // Does not preserve PipelineShaders because it replaces the entrypoints.
-    }
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
+    analysisUsage.addRequired<PipelineStateWrapper>();
+    analysisUsage.addRequired<PipelineShaders>();
+    // Does not preserve PipelineShaders because it replaces the entrypoints.
+  }
 
-    virtual bool runOnModule(llvm::Module& module) override;
+  virtual bool runOnModule(llvm::Module &module) override;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    PatchEntryPointMutate(const PatchEntryPointMutate&) = delete;
-    PatchEntryPointMutate& operator=(const PatchEntryPointMutate&) = delete;
+  PatchEntryPointMutate(const PatchEntryPointMutate &) = delete;
+  PatchEntryPointMutate &operator=(const PatchEntryPointMutate &) = delete;
 
-    void processShader();
+  void processShader();
 
-    llvm::FunctionType* generateEntryPointType(uint64_t* inRegMask) const;
+  llvm::FunctionType *generateEntryPointType(uint64_t *inRegMask) const;
 
-    bool isResourceNodeActive(const ResourceNode* node, bool isRootNode) const;
+  bool isResourceNodeActive(const ResourceNode *node, bool isRootNode) const;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    // Reserved argument count for single DWORD descriptor table pointer
-    static const unsigned   TablePtrReservedArgCount = 2;
+  // Reserved argument count for single DWORD descriptor table pointer
+  static const unsigned TablePtrReservedArgCount = 2;
 
-    bool    m_hasTs;    // Whether the pipeline has tessllation shader
-    bool    m_hasGs;    // Whether the pipeline has geometry shader
-    PipelineState*  m_pipelineState = nullptr;
-                        // Pipeline state from PipelineStateWrapper pass
+  bool m_hasTs; // Whether the pipeline has tessllation shader
+  bool m_hasGs; // Whether the pipeline has geometry shader
+  PipelineState *m_pipelineState = nullptr;
+  // Pipeline state from PipelineStateWrapper pass
 };
 
-} // lgc
+} // namespace lgc

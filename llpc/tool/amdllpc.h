@@ -35,18 +35,12 @@
 // Lay out dummy descriptors and other information for one shader stage. This is used when running amdllpc on a single
 // SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be leaked, but that does not
 // matter because we are running a short-lived command-line utility.
-void doAutoLayoutDesc(Llpc::ShaderStage                 shaderStage,
-                      Llpc::BinaryData                  spirvBin,
-                      Llpc::GraphicsPipelineBuildInfo*  pipelineInfo,
-                      Llpc::PipelineShaderInfo*         shaderInfo,
-                      unsigned&                         topLevelOffset,
-                      bool                              checkAutoLayoutCompatible);
+void doAutoLayoutDesc(Llpc::ShaderStage shaderStage, Llpc::BinaryData spirvBin,
+                      Llpc::GraphicsPipelineBuildInfo *pipelineInfo, Llpc::PipelineShaderInfo *shaderInfo,
+                      unsigned &topLevelOffset, bool checkAutoLayoutCompatible);
 
-bool checkShaderInfoComptible(Llpc::PipelineShaderInfo*        shaderInfo,
-                              unsigned                         autoLayoutUserDataNodeCount,
-                              const Llpc::ResourceMappingNode* autoLayoutUserDataNodes);
+bool checkShaderInfoComptible(Llpc::PipelineShaderInfo *shaderInfo, unsigned autoLayoutUserDataNodeCount,
+                              const Llpc::ResourceMappingNode *autoLayoutUserDataNodes);
 
-bool checkPipelineStateCompatible(const Llpc::ICompiler*            compiler,
-                                  Llpc::GraphicsPipelineBuildInfo*  pipelineInfo,
-                                  Llpc::GraphicsPipelineBuildInfo*  autoLayoutPipelineInfo,
-                                  Llpc::GfxIpVersion                gfxIp);
+bool checkPipelineStateCompatible(const Llpc::ICompiler *compiler, Llpc::GraphicsPipelineBuildInfo *pipelineInfo,
+                                  Llpc::GraphicsPipelineBuildInfo *autoLayoutPipelineInfo, Llpc::GfxIpVersion gfxIp);

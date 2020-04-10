@@ -30,15 +30,13 @@
  */
 #pragma once
 
-#include "llvm/IR/InstVisitor.h"
-
-#include <unordered_set>
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
+#include "llvm/IR/InstVisitor.h"
+#include <unordered_set>
 
-namespace lgc
-{
+namespace lgc {
 
 struct NggControl;
 struct InOutLocation;
@@ -46,160 +44,148 @@ class InOutLocationMapManager;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for resource collecting
-class PatchResourceCollect:
-    public Patch,
-    public llvm::InstVisitor<PatchResourceCollect>
-{
+class PatchResourceCollect : public Patch, public llvm::InstVisitor<PatchResourceCollect> {
 public:
-    PatchResourceCollect();
+  PatchResourceCollect();
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
-    {
-        analysisUsage.addRequired<PipelineStateWrapper>();
-        analysisUsage.addRequired<PipelineShaders>();
-        analysisUsage.addPreserved<PipelineShaders>();
-    }
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
+    analysisUsage.addRequired<PipelineStateWrapper>();
+    analysisUsage.addRequired<PipelineShaders>();
+    analysisUsage.addPreserved<PipelineShaders>();
+  }
 
-    virtual bool runOnModule(llvm::Module& module) override;
-    virtual void visitCallInst(llvm::CallInst& callInst);
+  virtual bool runOnModule(llvm::Module &module) override;
+  virtual void visitCallInst(llvm::CallInst &callInst);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    PatchResourceCollect(const PatchResourceCollect&) = delete;
-    PatchResourceCollect& operator=(const PatchResourceCollect&) = delete;
+  PatchResourceCollect(const PatchResourceCollect &) = delete;
+  PatchResourceCollect &operator=(const PatchResourceCollect &) = delete;
 
-    // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
-    bool checkGsOnChipValidity();
+  // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
+  bool checkGsOnChipValidity();
 
-    // Sets NGG control settings
-    void setNggControl();
-    void buildNggCullingControlRegister(NggControl& nggControl);
-    unsigned getVerticesPerPrimitive() const;
+  // Sets NGG control settings
+  void setNggControl();
+  void buildNggCullingControlRegister(NggControl &nggControl);
+  unsigned getVerticesPerPrimitive() const;
 
-    void processShader();
+  void processShader();
 
-    bool isVertexReuseDisabled();
+  bool isVertexReuseDisabled();
 
-    void clearInactiveInput();
-    void clearInactiveOutput();
+  void clearInactiveInput();
+  void clearInactiveOutput();
 
-    void matchGenericInOut();
-    void mapBuiltInToGenericInOut();
+  void matchGenericInOut();
+  void mapBuiltInToGenericInOut();
 
-    void mapGsGenericOutput(GsOutLocInfo outLocInfo);
-    void mapGsBuiltInOutput(unsigned builtInId, unsigned elemCount);
+  void mapGsGenericOutput(GsOutLocInfo outLocInfo);
+  void mapGsBuiltInOutput(unsigned builtInId, unsigned elemCount);
 
-    bool canPackInOut() const;
-    void packInOutLocation();
-    void reviseInputImportCalls();
-    void reassembleOutputExportCalls();
+  bool canPackInOut() const;
+  void packInOutLocation();
+  void reviseInputImportCalls();
+  void reassembleOutputExportCalls();
 
-    // Input/output scalarizing
-    void scalarizeForInOutPacking(llvm::Module* module);
-    void scalarizeGenericInput(llvm::CallInst* call);
-    void scalarizeGenericOutput(llvm::CallInst* call);
+  // Input/output scalarizing
+  void scalarizeForInOutPacking(llvm::Module *module);
+  void scalarizeGenericInput(llvm::CallInst *call);
+  void scalarizeGenericOutput(llvm::CallInst *call);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    PipelineShaders*                m_pipelineShaders;         // Pipeline shaders
-    PipelineState*                  m_pipelineState;           // Pipeline state
+  PipelineShaders *m_pipelineShaders; // Pipeline shaders
+  PipelineState *m_pipelineState;     // Pipeline state
 
-    std::unordered_set<llvm::CallInst*> m_deadCalls;            // Dead calls
+  std::unordered_set<llvm::CallInst *> m_deadCalls; // Dead calls
 
-    std::unordered_set<unsigned>    m_activeInputLocs;          // Locations of active generic inputs
-    std::unordered_set<unsigned>    m_activeInputBuiltIns;      // IDs of active built-in inputs
-    std::unordered_set<unsigned>    m_activeOutputBuiltIns;     // IDs of active built-in outputs
+  std::unordered_set<unsigned> m_activeInputLocs;      // Locations of active generic inputs
+  std::unordered_set<unsigned> m_activeInputBuiltIns;  // IDs of active built-in inputs
+  std::unordered_set<unsigned> m_activeOutputBuiltIns; // IDs of active built-in outputs
 
-    std::unordered_set<unsigned>    m_importedOutputLocs;       // Locations of imported generic outputs
-    std::unordered_set<unsigned>    m_importedOutputBuiltIns;   // IDs of imported built-in outputs
+  std::unordered_set<unsigned> m_importedOutputLocs;     // Locations of imported generic outputs
+  std::unordered_set<unsigned> m_importedOutputBuiltIns; // IDs of imported built-in outputs
 
-    std::vector<llvm::CallInst*>    m_inOutCalls;               // The import or export calls
+  std::vector<llvm::CallInst *> m_inOutCalls; // The import or export calls
 
-    bool            m_hasPushConstOp;           // Whether push constant is active
-    bool            m_hasDynIndexedInput;       // Whether dynamic indices are used in generic input addressing (valid
-                                                // for tessellation shader, fragment shader with input interpolation)
-    bool            m_hasDynIndexedOutput;      // Whether dynamic indices are used in generic output addressing (valid
-                                                // for tessellation control shader)
-    ResourceUsage*  m_resUsage;                // Pointer to shader resource usage
-    std::unique_ptr<InOutLocationMapManager> m_locationMapManager; // Pointer to InOutLocationMapManager instance
+  bool m_hasPushConstOp;      // Whether push constant is active
+  bool m_hasDynIndexedInput;  // Whether dynamic indices are used in generic input addressing (valid
+                              // for tessellation shader, fragment shader with input interpolation)
+  bool m_hasDynIndexedOutput; // Whether dynamic indices are used in generic output addressing (valid
+                              // for tessellation control shader)
+  ResourceUsage *m_resUsage;  // Pointer to shader resource usage
+  std::unique_ptr<InOutLocationMapManager> m_locationMapManager; // Pointer to InOutLocationMapManager instance
 };
 
 // Represents the location info of input/output
-union InOutLocationInfo
-{
-    struct
-    {
-        uint16_t location  : 13; // The location
-        uint16_t component : 2;  // The component index
-        uint16_t half      : 1;  // High half in case of 16-bit attriburtes
-    };
-    uint16_t u16All;
+union InOutLocationInfo {
+  struct {
+    uint16_t location : 13; // The location
+    uint16_t component : 2; // The component index
+    uint16_t half : 1;      // High half in case of 16-bit attriburtes
+  };
+  uint16_t u16All;
 };
 
 // Represents the compatibility info of input/output
-union InOutCompatibilityInfo
-{
-    struct
-    {
-        uint16_t halfComponentCount : 9; // The number of components measured in times of 16-bits.
-                                         // A single 32-bit component will be halfComponentCount=2
-        uint16_t isFlat             : 1; // Flat shading or not
-        uint16_t is16Bit            : 1; // Half float or not
-        uint16_t isCustom           : 1; // Custom interpolation mode or not
-    };
-    uint16_t u16All;
+union InOutCompatibilityInfo {
+  struct {
+    uint16_t halfComponentCount : 9; // The number of components measured in times of 16-bits.
+                                     // A single 32-bit component will be halfComponentCount=2
+    uint16_t isFlat : 1;             // Flat shading or not
+    uint16_t is16Bit : 1;            // Half float or not
+    uint16_t isCustom : 1;           // Custom interpolation mode or not
+  };
+  uint16_t u16All;
 };
 
 // Represents the wrapper of input/output locatoin info, along with handlers
-struct InOutLocation
-{
-    uint16_t asIndex() const { return locationInfo.u16All; }
+struct InOutLocation {
+  uint16_t asIndex() const { return locationInfo.u16All; }
 
-    bool operator<(const InOutLocation& rhs) const { return this->asIndex() < rhs.asIndex(); }
+  bool operator<(const InOutLocation &rhs) const { return this->asIndex() < rhs.asIndex(); }
 
-    InOutLocationInfo locationInfo; // The location info of an input or output
+  InOutLocationInfo locationInfo; // The location info of an input or output
 };
 
 // =====================================================================================================================
 // Represents the manager of input/output locationMap generation
-class InOutLocationMapManager
-{
+class InOutLocationMapManager {
 public:
-    InOutLocationMapManager() {}
+  InOutLocationMapManager() {}
 
-    bool addSpan(llvm::CallInst* call);
-    void buildLocationMap();
+  bool addSpan(llvm::CallInst *call);
+  void buildLocationMap();
 
-    bool findMap(const InOutLocation& originalLocation, const InOutLocation*& newLocation);
+  bool findMap(const InOutLocation &originalLocation, const InOutLocation *&newLocation);
 
-    struct LocationSpan
-    {
-        uint16_t getCompatibilityKey() const { return compatibilityInfo.u16All; }
+  struct LocationSpan {
+    uint16_t getCompatibilityKey() const { return compatibilityInfo.u16All; }
 
-        unsigned asIndex() const { return ((getCompatibilityKey() << 16) | firstLocation.asIndex()); }
+    unsigned asIndex() const { return ((getCompatibilityKey() << 16) | firstLocation.asIndex()); }
 
-        bool operator==(const LocationSpan& rhs) const { return this->asIndex() == rhs.asIndex(); }
+    bool operator==(const LocationSpan &rhs) const { return this->asIndex() == rhs.asIndex(); }
 
-        bool operator<(const LocationSpan& rhs) const { return this->asIndex() < rhs.asIndex(); }
+    bool operator<(const LocationSpan &rhs) const { return this->asIndex() < rhs.asIndex(); }
 
-        InOutLocation firstLocation;
-        InOutCompatibilityInfo compatibilityInfo;
-    };
+    InOutLocation firstLocation;
+    InOutCompatibilityInfo compatibilityInfo;
+  };
 
 private:
-    InOutLocationMapManager(const InOutLocationMapManager&) = delete;
-    InOutLocationMapManager& operator=(const InOutLocationMapManager&) = delete;
+  InOutLocationMapManager(const InOutLocationMapManager &) = delete;
+  InOutLocationMapManager &operator=(const InOutLocationMapManager &) = delete;
 
-    bool isCompatible(const LocationSpan& rSpan, const LocationSpan& lSpan) const
-    {
-        return rSpan.getCompatibilityKey() == lSpan.getCompatibilityKey();
-    }
+  bool isCompatible(const LocationSpan &rSpan, const LocationSpan &lSpan) const {
+    return rSpan.getCompatibilityKey() == lSpan.getCompatibilityKey();
+  }
 
-    std::vector<LocationSpan> m_locationSpans; // Tracks spans of contiguous components in the generic input space
-    std::map<InOutLocation, InOutLocation> m_locationMap; // The map between original location and new location
+  std::vector<LocationSpan> m_locationSpans; // Tracks spans of contiguous components in the generic input space
+  std::map<InOutLocation, InOutLocation> m_locationMap; // The map between original location and new location
 };
 
-} // lgc
+} // namespace lgc

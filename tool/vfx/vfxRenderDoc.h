@@ -31,29 +31,21 @@
 
 #include "vfxParser.h"
 
-namespace Vfx
-{
+namespace Vfx {
 
 // =====================================================================================================================
 // Represents the render state result of Vfx parser
-class RenderDocument : public Document
-{
+class RenderDocument : public Document {
 public:
-    RenderDocument()
-    {
-        memset(&m_renderState, 0, sizeof(m_renderState));
-    };
+  RenderDocument() { memset(&m_renderState, 0, sizeof(m_renderState)); };
 
-    virtual unsigned getMaxSectionCount(SectionType type)
-    {
-        return m_maxSectionCount[type];
-    }
+  virtual unsigned getMaxSectionCount(SectionType type) { return m_maxSectionCount[type]; }
 
-    virtual VfxRenderStatePtr getDocument();
+  virtual VfxRenderStatePtr getDocument();
 
 private:
-    static unsigned m_maxSectionCount[SectionTypeNameNum]; // Contants max section count for each section type
-    VfxRenderState  m_renderState;                         // Contants the render state
+  static unsigned m_maxSectionCount[SectionTypeNameNum]; // Contants max section count for each section type
+  VfxRenderState m_renderState;                          // Contants the render state
 };
 
-}
+} // namespace Vfx

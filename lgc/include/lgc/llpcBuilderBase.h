@@ -32,34 +32,29 @@
 
 #include "llvm/IR/IRBuilder.h"
 
-namespace lgc
-{
+namespace lgc {
 
 // =====================================================================================================================
 // BuilderBase extends IRBuilder<>, and provides a few utility methods used in both the LLPC front-end and in LGC (the
 // LLPC middle-end). LGC code outside of Builder subclasses would use BuilderBase directly; LLPC front-end code gets
 // to use BuilderBase methods because it uses Builder, which inherits from BuilderBase.
 //
-class BuilderBase : public llvm::IRBuilder<>
-{
+class BuilderBase : public llvm::IRBuilder<> {
 public:
-    // Constructors
-    BuilderBase(llvm::LLVMContext& context) : IRBuilder(context) {}
-    BuilderBase(llvm::BasicBlock* block) : IRBuilder(block) {}
-    BuilderBase(llvm::Instruction* inst) : IRBuilder(inst) {}
+  // Constructors
+  BuilderBase(llvm::LLVMContext &context) : IRBuilder(context) {}
+  BuilderBase(llvm::BasicBlock *block) : IRBuilder(block) {}
+  BuilderBase(llvm::Instruction *inst) : IRBuilder(inst) {}
 
-    // Create an LLVM function call to the named function. The callee is built automically based on return
-    // type and its parameters.
-    //
-    // @param funcName : Name of the callee
-    // @param retTy : Return type of the callee
-    // @param args : Arguments to pass to the callee
-    // @param attribs : Function attributes
-    llvm::CallInst* createNamedCall(
-        llvm::StringRef                           funcName,
-        llvm::Type*                               retTy,
-        llvm::ArrayRef<llvm::Value *>             args,
-        llvm::ArrayRef<llvm::Attribute::AttrKind> attribs);
+  // Create an LLVM function call to the named function. The callee is built automically based on return
+  // type and its parameters.
+  //
+  // @param funcName : Name of the callee
+  // @param retTy : Return type of the callee
+  // @param args : Arguments to pass to the callee
+  // @param attribs : Function attributes
+  llvm::CallInst *createNamedCall(llvm::StringRef funcName, llvm::Type *retTy, llvm::ArrayRef<llvm::Value *> args,
+                                  llvm::ArrayRef<llvm::Attribute::AttrKind> attribs);
 };
 
-} // lgc
+} // namespace lgc

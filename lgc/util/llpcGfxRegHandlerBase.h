@@ -22,103 +22,93 @@
  *  SOFTWARE.
  *
  **********************************************************************************************************************/
- /**
-  ***********************************************************************************************************************
-  * @file  llpcGfxRegHandlerBase.h
-  * @brief LLPC header file: contains the definition of LLPC utility class GfxRegHandlerBase.
-  ***********************************************************************************************************************
-  */
+/**
+ ***********************************************************************************************************************
+ * @file  llpcGfxRegHandlerBase.h
+ * @brief LLPC header file: contains the definition of LLPC utility class GfxRegHandlerBase.
+ ***********************************************************************************************************************
+ */
 
 #pragma once
 #include "llpcBuilderImpl.h"
 #include "llpcPipelineState.h"
 
-namespace lgc
-{
+namespace lgc {
 
 // General bits info for indexed DWORD
-struct BitsInfo
-{
-    unsigned index;
-    unsigned offset;
-    unsigned count;
+struct BitsInfo {
+  unsigned index;
+  unsigned offset;
+  unsigned count;
 };
 
 // =====================================================================================================================
 // Base class for handling GFX-specific registers
-class GfxRegHandlerBase
-{
+class GfxRegHandlerBase {
 public:
-    // Set register
-    void setRegister(llvm::Value* newRegister);
+  // Set register
+  void setRegister(llvm::Value *newRegister);
 
-    // Get register
-    llvm::Value* getRegister();
-
-protected:
-    // Constructor
-    inline GfxRegHandlerBase(Builder* builder, llvm::Value* reg)
-    {
-        m_builder = builder;
-        setRegister(reg);
-    }
-
-    // Return new DWORD with replacing the specific range of bits in old DWORD
-    llvm::Value* replaceBits(llvm::Value* dword, unsigned offset, unsigned count, llvm::Value* newBits);
-
-    // Return the size of registered DWORDs
-    inline unsigned getDwordsCount() { return m_dwords.size(); }
-
-    // Get indexed DWORD
-    inline llvm::Value* getDword(unsigned index)
-    {
-        extractDwordIfNecessary(index);
-        return m_dwords[index];
-    }
-
-    // Set indexed DWORD
-    inline void setDword(unsigned index, llvm::Value* dword)
-    {
-        // Set the whole 32bits data
-        m_dwords[index] = dword;
-        // If assign successfully, set corresponding mask bit to 1
-        m_dirtyDwords |= 1 << index;
-    }
-
-    // Return if the specific DWORD is modified or not
-    inline bool isDwordModified(unsigned index)
-    {
-        return (m_dirtyDwords & (1 << index));
-    }
-
-    // Get data from a range of bits in indexed DWORD according to BitsInfo
-    llvm::Value* getBits(const BitsInfo& bitsInfo);
-
-    // Set data to a range of bits in indexed DWORD according to BitsInfo
-    void setBits(const BitsInfo& bitsInfo, llvm::Value* newBits);
-
-private:
-    // Load indexed DWORD from <n x i32> vector, if the specific DWORD is nullptr
-    inline void extractDwordIfNecessary(unsigned index)
-    {
-        if (!m_dwords[index] )
-            m_dwords[index] = m_builder->CreateExtractElement(m_reg, m_builder->getInt64(index));
-    }
+  // Get register
+  llvm::Value *getRegister();
 
 protected:
-    Builder* m_builder;
+  // Constructor
+  inline GfxRegHandlerBase(Builder *builder, llvm::Value *reg) {
+    m_builder = builder;
+    setRegister(reg);
+  }
+
+  // Return new DWORD with replacing the specific range of bits in old DWORD
+  llvm::Value *replaceBits(llvm::Value *dword, unsigned offset, unsigned count, llvm::Value *newBits);
+
+  // Return the size of registered DWORDs
+  inline unsigned getDwordsCount() { return m_dwords.size(); }
+
+  // Get indexed DWORD
+  inline llvm::Value *getDword(unsigned index) {
+    extractDwordIfNecessary(index);
+    return m_dwords[index];
+  }
+
+  // Set indexed DWORD
+  inline void setDword(unsigned index, llvm::Value *dword) {
+    // Set the whole 32bits data
+    m_dwords[index] = dword;
+    // If assign successfully, set corresponding mask bit to 1
+    m_dirtyDwords |= 1 << index;
+  }
+
+  // Return if the specific DWORD is modified or not
+  inline bool isDwordModified(unsigned index) { return (m_dirtyDwords & (1 << index)); }
+
+  // Get data from a range of bits in indexed DWORD according to BitsInfo
+  llvm::Value *getBits(const BitsInfo &bitsInfo);
+
+  // Set data to a range of bits in indexed DWORD according to BitsInfo
+  void setBits(const BitsInfo &bitsInfo, llvm::Value *newBits);
 
 private:
-    // Contains (possibly updated) dwords for the register value. Each element will be a nullptr until it
-    // is requested or updated for the first time.
-    llvm::SmallVector<llvm::Value*, 8> m_dwords;
+  // Load indexed DWORD from <n x i32> vector, if the specific DWORD is nullptr
+  inline void extractDwordIfNecessary(unsigned index) {
+    if (!m_dwords[index])
+      m_dwords[index] = m_builder->CreateExtractElement(m_reg, m_builder->getInt64(index));
+  }
 
-    // Combined <n x i32> vector containing the register value, which does not yet reflect the dwords
-    // that are marked as dirty.
-    llvm::Value* m_reg;
+protected:
+  Builder *m_builder;
 
-    // Bit-mask of dwords whose value was changed but is not yet reflected in m_pReg.
-    unsigned m_dirtyDwords;
+private:
+  // Contains (possibly updated) dwords for the register value. Each element will be a nullptr until it
+  // is requested or updated for the first time.
+  llvm::SmallVector<llvm::Value *, 8> m_dwords;
+
+  // Combined <n x i32> vector containing the register value, which does not yet reflect the dwords
+  // that are marked as dirty.
+  llvm::Value *m_reg;
+
+  // Bit-mask of dwords whose value was changed but is not yet reflected in m_pReg.
+  unsigned m_dirtyDwords;
 };
 
-} // lgc
+} // namespace lgc

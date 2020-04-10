@@ -31,90 +31,76 @@
 #include "vkgcUtil.h"
 #include "vkgcElfReader.h"
 
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #define DEBUG_TYPE "vkgc-util"
 
-namespace Vkgc
-{
+namespace Vkgc {
 
 // =====================================================================================================================
 // Gets name string of the abbreviation for the specified shader stage
 //
 // @param shaderStage : Shader stage
 // @param upper : Whether to use uppercase for the abbreviation (default is lowercase)
-const char* getShaderStageAbbreviation(
-    ShaderStage shaderStage,
-    bool        upper)
-{
-    const char* abbr = nullptr;
+const char *getShaderStageAbbreviation(ShaderStage shaderStage, bool upper) {
+  const char *abbr = nullptr;
 
-    if (shaderStage == ShaderStageCopyShader)
-        abbr = upper ? "COPY" : "Copy";
-    else if (shaderStage < ShaderStageCount)
-    {
-        if (upper)
-        {
-            static const char* ShaderStageAbbrs[] =
-            {
-                "VS",
-                "TCS",
-                "TES",
-                "GS",
-                "FS",
-                "CS",
-            };
+  if (shaderStage == ShaderStageCopyShader)
+    abbr = upper ? "COPY" : "Copy";
+  else if (shaderStage < ShaderStageCount) {
+    if (upper) {
+      static const char *ShaderStageAbbrs[] = {
+        "VS",
+        "TCS",
+        "TES",
+        "GS",
+        "FS",
+        "CS",
+      };
 
-            abbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
-        }
-        else
-        {
-            static const char* ShaderStageAbbrs[] =
-            {
-                "Vs",
-                "Tcs",
-                "Tes",
-                "Gs",
-                "Fs",
-                "Cs",
-            };
+      abbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
+    } else {
+      static const char *ShaderStageAbbrs[] = {
+        "Vs",
+        "Tcs",
+        "Tes",
+        "Gs",
+        "Fs",
+        "Cs",
+      };
 
-            abbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
-        }
+      abbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
     }
-    else
-        abbr = "Bad";
+  } else
+    abbr = "Bad";
 
-    return abbr;
+  return abbr;
 }
 
 // =====================================================================================================================
 // Create directory.
 //
 // @param dir : the path of directory
-bool createDirectory(
-    const char* dir)
-{
-    int result = mkdir(dir, S_IRWXU);
-    return result == 0;
+bool createDirectory(const char *dir) {
+  int result = mkdir(dir, S_IRWXU);
+  return result == 0;
 }
 
 // =====================================================================================================================
 // Helper macro
-#define CASE_CLASSENUM_TO_STRING(TYPE, ENUM) \
-    case TYPE::ENUM: string = #ENUM; break;
+#define CASE_CLASSENUM_TO_STRING(TYPE, ENUM)                                                                           \
+  case TYPE::ENUM:                                                                                                     \
+    string = #ENUM;                                                                                                    \
+    break;
 
 // =====================================================================================================================
 // Translate enum "ResourceMappingNodeType" to string
 //
 // @param type : Resource map node type
-const char* getResourceMappingNodeTypeName(
-    ResourceMappingNodeType type)
-{
-    const char* string = nullptr;
-    switch (type)
-    {
+const char *getResourceMappingNodeTypeName(ResourceMappingNodeType type) {
+  const char *string = nullptr;
+  switch (type) {
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, Unknown)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorResource)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorSampler)
@@ -128,12 +114,12 @@ const char* getResourceMappingNodeTypeName(
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, PushConst)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorBufferCompact)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, StreamOutTableVaPtr)
-        break;
-    default:
-        llvm_unreachable("Should never be called!");
-        break;
-    }
-    return string;
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+  return string;
 }
 
-} // Vkgc
+} // namespace Vkgc

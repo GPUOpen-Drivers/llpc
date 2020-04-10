@@ -30,14 +30,12 @@
  */
 #pragma once
 
+#include "llpcPatch.h"
+#include "llpcTargetInfo.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/IRBuilder.h"
 
-#include "llpcPatch.h"
-#include "llpcTargetInfo.h"
-
-namespace llvm
-{
+namespace llvm {
 
 class AnalysisUsage;
 class Function;
@@ -47,47 +45,43 @@ class IntrinsicInst;
 class ScalarEvolution;
 class Value;
 
-} // llvm
+} // namespace llvm
 
-namespace lgc
-{
+namespace lgc {
 
 class Context;
 class PipelineState;
 
 // =====================================================================================================================
 // Represents the LLVM pass for intrinsic simplifications.
-class PatchIntrinsicSimplify final:
-    public llvm::FunctionPass
-{
+class PatchIntrinsicSimplify final : public llvm::FunctionPass {
 public:
-    explicit PatchIntrinsicSimplify();
+  explicit PatchIntrinsicSimplify();
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override;
-    bool runOnFunction(llvm::Function& func) override;
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
+  bool runOnFunction(llvm::Function &func) override;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
-    PatchIntrinsicSimplify(const PatchIntrinsicSimplify&) = delete;
-    PatchIntrinsicSimplify& operator=(const PatchIntrinsicSimplify&) = delete;
+  PatchIntrinsicSimplify(const PatchIntrinsicSimplify &) = delete;
+  PatchIntrinsicSimplify &operator=(const PatchIntrinsicSimplify &) = delete;
 
 private:
-    bool canSafelyConvertTo16Bit(llvm::Value& value) const;
-    llvm::Value* convertTo16Bit(llvm::Value& value, llvm::IRBuilder<>& builder) const;
-    llvm::Value* simplifyImage(llvm::IntrinsicInst& intrinsicCall,
-                               llvm::ArrayRef<unsigned> coordOperandIndices) const;
-    llvm::Value* simplifyTrigonometric(llvm::IntrinsicInst& intrinsicCall) const;
-    bool canSimplify(llvm::IntrinsicInst& intrinsicCall) const;
-    llvm::Value* simplify(llvm::IntrinsicInst& intrinsicCall) const;
+  bool canSafelyConvertTo16Bit(llvm::Value &value) const;
+  llvm::Value *convertTo16Bit(llvm::Value &value, llvm::IRBuilder<> &builder) const;
+  llvm::Value *simplifyImage(llvm::IntrinsicInst &intrinsicCall, llvm::ArrayRef<unsigned> coordOperandIndices) const;
+  llvm::Value *simplifyTrigonometric(llvm::IntrinsicInst &intrinsicCall) const;
+  bool canSimplify(llvm::IntrinsicInst &intrinsicCall) const;
+  llvm::Value *simplify(llvm::IntrinsicInst &intrinsicCall) const;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::ScalarEvolution* m_scalarEvolution = nullptr;
-    llvm::LLVMContext*     m_context         = nullptr;
-    llvm::Module*          m_module          = nullptr;
-    GfxIpVersion m_gfxIp;
+  llvm::ScalarEvolution *m_scalarEvolution = nullptr;
+  llvm::LLVMContext *m_context = nullptr;
+  llvm::Module *m_module = nullptr;
+  GfxIpVersion m_gfxIp;
 };
 
-} // lgc
+} // namespace lgc

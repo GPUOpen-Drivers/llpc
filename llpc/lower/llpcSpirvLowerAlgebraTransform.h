@@ -30,53 +30,47 @@
  */
 #pragma once
 
-#include "llvm/IR/InstVisitor.h"
-#include "llvm/Analysis/TargetLibraryInfo.h"
-
 #include "llpcSpirvLower.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/IR/InstVisitor.h"
 
-namespace Llpc
-{
+namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for algebraic transformation.
-class SpirvLowerAlgebraTransform:
-    public SpirvLower,
-    public llvm::InstVisitor<SpirvLowerAlgebraTransform>
-{
+class SpirvLowerAlgebraTransform : public SpirvLower, public llvm::InstVisitor<SpirvLowerAlgebraTransform> {
 public:
-    SpirvLowerAlgebraTransform(bool enableConstFolding = true, bool enableFloatOpt = true);
+  SpirvLowerAlgebraTransform(bool enableConstFolding = true, bool enableFloatOpt = true);
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const
-    {
-        analysisUsage.addRequired<llvm::TargetLibraryInfoWrapperPass>();
-    }
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const {
+    analysisUsage.addRequired<llvm::TargetLibraryInfoWrapperPass>();
+  }
 
-    virtual bool runOnModule(llvm::Module& module);
-    virtual void visitBinaryOperator(llvm::BinaryOperator& binaryOp);
-    virtual void visitUnaryOperator(llvm::UnaryOperator& unaryOp);
-    virtual void visitCallInst(llvm::CallInst& callInst);
-    virtual void visitFPTruncInst(llvm::FPTruncInst& fptruncInst);
-    void flushDenormIfNeeded(llvm::Instruction *inst);
+  virtual bool runOnModule(llvm::Module &module);
+  virtual void visitBinaryOperator(llvm::BinaryOperator &binaryOp);
+  virtual void visitUnaryOperator(llvm::UnaryOperator &unaryOp);
+  virtual void visitCallInst(llvm::CallInst &callInst);
+  virtual void visitFPTruncInst(llvm::FPTruncInst &fptruncInst);
+  void flushDenormIfNeeded(llvm::Instruction *inst);
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+  static char ID; // ID of this pass
 
 private:
-    SpirvLowerAlgebraTransform(const SpirvLowerAlgebraTransform&) = delete;
-    SpirvLowerAlgebraTransform& operator=(const SpirvLowerAlgebraTransform&) = delete;
+  SpirvLowerAlgebraTransform(const SpirvLowerAlgebraTransform &) = delete;
+  SpirvLowerAlgebraTransform &operator=(const SpirvLowerAlgebraTransform &) = delete;
 
-    bool isOperandNoContract(llvm::Value* operand);
-    void disableFastMath(llvm::Value* value);
+  bool isOperandNoContract(llvm::Value *operand);
+  void disableFastMath(llvm::Value *value);
 
-    bool m_enableConstFolding; // Whether enable constant folding in this pass
-    bool m_enableFloatOpt;     // Whether enable floating point optimization in this pass
-    bool m_changed;  // Whether the module is changed
-    bool m_fp16DenormFlush;    // Whether FP mode wants f16 denorms to be flushed to zero
-    bool m_fp32DenormFlush;    // Whether FP mode wants f32 denorms to be flushed to zero
-    bool m_fp64DenormFlush;    // Whether FP mode wants f64 denorms to be flushed to zero
-    bool m_fp16Rtz;            // Whether FP mode wants f16 round-to-zero
+  bool m_enableConstFolding; // Whether enable constant folding in this pass
+  bool m_enableFloatOpt;     // Whether enable floating point optimization in this pass
+  bool m_changed;            // Whether the module is changed
+  bool m_fp16DenormFlush;    // Whether FP mode wants f16 denorms to be flushed to zero
+  bool m_fp32DenormFlush;    // Whether FP mode wants f32 denorms to be flushed to zero
+  bool m_fp64DenormFlush;    // Whether FP mode wants f64 denorms to be flushed to zero
+  bool m_fp16Rtz;            // Whether FP mode wants f16 round-to-zero
 };
 
-} // Llpc
+} // namespace Llpc

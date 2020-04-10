@@ -30,58 +30,55 @@
  */
 #pragma once
 
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/IRBuilder.h"
-
 #include "llpcInternal.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/Module.h"
 
-namespace lgc
-{
+namespace lgc {
 
 class PipelineState;
 
 // Enumerates the types of LDS regions used in NGG.
-enum NggLdsRegionType
-{
-    // LDS region for ES only (no GS)
-    LdsRegionDistribPrimId = 0,         // Distributed primitive ID (a special region, overlapped with the region of
-                                        //   position data in NGG non pass-through mode)
-    LdsRegionPosData,                   // Position data to export
-    LdsRegionDrawFlag,                  // Draw flag indicating whether the vertex survives
-    LdsRegionPrimCountInWaves,          // Primitive count accumulated per wave (8 potential waves) and per sub-group
-    LdsRegionVertCountInWaves,          // Vertex count accumulated per wave (8 potential waves) and per sub-group
-    LdsRegionCullDistance,              // Aggregated sign value of cull distance (bitmask)
-    // Below regions are for vertex compaction
-    LdsRegionVertThreadIdMap,           // Vertex thread ID map (uncompacted -> compacted)
-    LdsRegionCompactVertexId,           // Vertex ID (VS only)
-    LdsRegionCompactInstanceId,         // Instance ID (VS only)
-    LdsRegionCompactPrimId,             // Primitive ID (VS only)
-    LdsRegionCompactTessCoordX,         // X of tessCoord (U) (TES only)
-    LdsRegionCompactTessCoordY,         // Y of tessCoord (V) (TES only)
-    LdsRegionCompactPatchId,            // Patch ID (TES only)
-    LdsRegionCompactRelPatchId,         // Relative patch ID (TES only)
+enum NggLdsRegionType {
+  // LDS region for ES only (no GS)
+  LdsRegionDistribPrimId = 0, // Distributed primitive ID (a special region, overlapped with the region of
+                              //   position data in NGG non pass-through mode)
+  LdsRegionPosData,           // Position data to export
+  LdsRegionDrawFlag,          // Draw flag indicating whether the vertex survives
+  LdsRegionPrimCountInWaves,  // Primitive count accumulated per wave (8 potential waves) and per sub-group
+  LdsRegionVertCountInWaves,  // Vertex count accumulated per wave (8 potential waves) and per sub-group
+  LdsRegionCullDistance,      // Aggregated sign value of cull distance (bitmask)
+                         // Below regions are for vertex compaction
+  LdsRegionVertThreadIdMap,   // Vertex thread ID map (uncompacted -> compacted)
+  LdsRegionCompactVertexId,   // Vertex ID (VS only)
+  LdsRegionCompactInstanceId, // Instance ID (VS only)
+  LdsRegionCompactPrimId,     // Primitive ID (VS only)
+  LdsRegionCompactTessCoordX, // X of tessCoord (U) (TES only)
+  LdsRegionCompactTessCoordY, // Y of tessCoord (V) (TES only)
+  LdsRegionCompactPatchId,    // Patch ID (TES only)
+  LdsRegionCompactRelPatchId, // Relative patch ID (TES only)
 
-    LdsRegionCompactBeginRange = LdsRegionVertThreadIdMap,
-    LdsRegionCompactEndRange = LdsRegionCompactRelPatchId,
+  LdsRegionCompactBeginRange = LdsRegionVertThreadIdMap,
+  LdsRegionCompactEndRange = LdsRegionCompactRelPatchId,
 
-    LdsRegionEsBeginRange = LdsRegionDistribPrimId,
-    LdsRegionEsEndRange = LdsRegionCompactRelPatchId,
+  LdsRegionEsBeginRange = LdsRegionDistribPrimId,
+  LdsRegionEsEndRange = LdsRegionCompactRelPatchId,
 
-    // LDS region for ES-GS
-    LdsRegionEsGsRing,                  // ES-GS ring
-    LdsRegionOutPrimData,               // GS output primitive data
-    LdsRegionOutVertCountInWaves,       // GS output vertex count accumulated per wave (8 potential waves) and per
-                                        //   sub-group for each stream (4 GS streams)
-    LdsRegionOutVertOffset,             // GS output vertex (exported vertex data) offset in GS-VS ring
-                                        //   (overlapped with the region of exported primitive data, LDS reused)
-    LdsRegionGsVsRing,                  // GS-VS ring
+  // LDS region for ES-GS
+  LdsRegionEsGsRing,            // ES-GS ring
+  LdsRegionOutPrimData,         // GS output primitive data
+  LdsRegionOutVertCountInWaves, // GS output vertex count accumulated per wave (8 potential waves) and per
+                                //   sub-group for each stream (4 GS streams)
+  LdsRegionOutVertOffset,       // GS output vertex (exported vertex data) offset in GS-VS ring
+                                //   (overlapped with the region of exported primitive data, LDS reused)
+  LdsRegionGsVsRing,            // GS-VS ring
 
-    LdsRegionGsBeginRange = LdsRegionEsGsRing,
-    LdsRegionGsEndRange = LdsRegionGsVsRing,
+  LdsRegionGsBeginRange = LdsRegionEsGsRing,
+  LdsRegionGsEndRange = LdsRegionGsVsRing,
 
-    // Total
-    LdsRegionCount
+  // Total
+  LdsRegionCount
 };
 
 // Size of a DWORD
@@ -89,47 +86,45 @@ static const unsigned SizeOfDword = sizeof(unsigned);
 
 // =====================================================================================================================
 // Represents the manager doing shader merge operations.
-class NggLdsManager
-{
+class NggLdsManager {
 public:
-    NggLdsManager(llvm::Module* module, PipelineState* pipelineState, llvm::IRBuilder<>* builder);
+  NggLdsManager(llvm::Module *module, PipelineState *pipelineState, llvm::IRBuilder<> *builder);
 
-    static unsigned calcEsExtraLdsSize(PipelineState* pipelineState);
-    static unsigned calcGsExtraLdsSize(PipelineState* pipelineState);
+  static unsigned calcEsExtraLdsSize(PipelineState *pipelineState);
+  static unsigned calcGsExtraLdsSize(PipelineState *pipelineState);
 
-    // Gets the LDS starting offset for the specified region
-    unsigned getLdsRegionStart(NggLdsRegionType region) const
-    {
-        unsigned regionStart = m_ldsRegionStart[region];
-        assert(regionStart != InvalidValue);
-        return regionStart;
-    }
+  // Gets the LDS starting offset for the specified region
+  unsigned getLdsRegionStart(NggLdsRegionType region) const {
+    unsigned regionStart = m_ldsRegionStart[region];
+    assert(regionStart != InvalidValue);
+    return regionStart;
+  }
 
-    llvm::Value* readValueFromLds(llvm::Type* readTy, llvm::Value* ldsOffset, bool useDs128 = false);
-    void writeValueToLds(llvm::Value* writeValue, llvm::Value* ldsOffset, bool useDs128 = false);
+  llvm::Value *readValueFromLds(llvm::Type *readTy, llvm::Value *ldsOffset, bool useDs128 = false);
+  void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset, bool useDs128 = false);
 
-    void atomicOpWithLds(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value* atomicValue, llvm::Value* ldsOffset);
+  void atomicOpWithLds(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value *atomicValue, llvm::Value *ldsOffset);
 
 private:
-    NggLdsManager() = delete;
-    NggLdsManager(const NggLdsManager&) = delete;
-    NggLdsManager& operator=(const NggLdsManager&) = delete;
+  NggLdsManager() = delete;
+  NggLdsManager(const NggLdsManager &) = delete;
+  NggLdsManager &operator=(const NggLdsManager &) = delete;
 
-    // -----------------------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------------------
 
-    static const unsigned LdsRegionSizes[LdsRegionCount];  // LDS sizes for all LDS region types (in BYTEs)
-    static const char*    m_ldsRegionNames[LdsRegionCount];  // Name strings for all LDS region types
+  static const unsigned LdsRegionSizes[LdsRegionCount]; // LDS sizes for all LDS region types (in BYTEs)
+  static const char *m_ldsRegionNames[LdsRegionCount];  // Name strings for all LDS region types
 
-    PipelineState*  m_pipelineState; // Pipeline state
-    llvm::LLVMContext*        m_context;     // LLVM context
+  PipelineState *m_pipelineState; // Pipeline state
+  llvm::LLVMContext *m_context;   // LLVM context
 
-    llvm::GlobalValue*  m_lds;     // Global variable to model NGG LDS
+  llvm::GlobalValue *m_lds; // Global variable to model NGG LDS
 
-    unsigned        m_ldsRegionStart[LdsRegionCount]; // Start LDS offsets for all available LDS region types (in BYTEs)
+  unsigned m_ldsRegionStart[LdsRegionCount]; // Start LDS offsets for all available LDS region types (in BYTEs)
 
-    unsigned        m_waveCountInSubgroup; // Wave count in sub-group
+  unsigned m_waveCountInSubgroup; // Wave count in sub-group
 
-    llvm::IRBuilder<>*  m_builder; // LLVM IR builder
+  llvm::IRBuilder<> *m_builder; // LLVM IR builder
 };
 
-} // lgc
+} // namespace lgc
