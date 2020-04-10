@@ -24,11 +24,11 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  BuilderContext.cpp
- * @brief LLPC source file: implementation of llpc::BuilderContext class for creating and using lgc::Builder
+ * @file  LgcContext.cpp
+ * @brief LLPC source file: implementation of llpc::LgcContext class for creating and using lgc::Builder
  ***********************************************************************************************************************
  */
-#include "lgc/BuilderContext.h"
+#include "lgc/LgcContext.h"
 #include "BuilderImpl.h"
 #include "BuilderRecorder.h"
 #include "Internal.h"
@@ -55,7 +55,7 @@ static codegen::RegisterCodeGenFlags CGF;
 static bool Initialized;
 #endif
 
-raw_ostream *BuilderContext::m_llpcOuts;
+raw_ostream *LgcContext::m_llpcOuts;
 
 // -emit-llvm: emit LLVM assembly instead of ISA
 static cl::opt<bool> EmitLlvm("emit-llvm", cl::desc("Emit LLVM assembly instead of AMD GPU ISA"), cl::init(false));
@@ -64,11 +64,11 @@ static cl::opt<bool> EmitLlvm("emit-llvm", cl::desc("Emit LLVM assembly instead 
 static cl::opt<bool> EmitLlvmBc("emit-llvm-bc", cl::desc("Emit LLVM bitcode instead of AMD GPU ISA"), cl::init(false));
 
 // =====================================================================================================================
-// Initialize the middle-end. This must be called before the first BuilderContext::Create, although you are
+// Initialize the middle-end. This must be called before the first LgcContext::Create, although you are
 // allowed to call it again after that. It must also be called before LLVM command-line processing, so
 // that you can use a pass name in an option such as -print-after. If multiple concurrent compiles are
 // possible, this should be called in a thread-safe way.
-void BuilderContext::initialize() {
+void LgcContext::initialize() {
 #ifndef NDEBUG
   Initialized = true;
 #endif
@@ -103,15 +103,15 @@ void BuilderContext::initialize() {
 }
 
 // =====================================================================================================================
-// Create the BuilderContext. Returns nullptr on failure to recognize the AMDGPU target whose name is specified
+// Create the LgcContext. Returns nullptr on failure to recognize the AMDGPU target whose name is specified
 //
 // @param context : LLVM context to give each Builder
 // @param gpuName : LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
 // @param palAbiVersion : PAL pipeline ABI version to compile for
-BuilderContext *BuilderContext::Create(LLVMContext &context, StringRef gpuName, unsigned palAbiVersion) {
-  assert(Initialized && "Must call BuilderContext::Initialize before BuilderContext::Create");
+LgcContext *LgcContext::Create(LLVMContext &context, StringRef gpuName, unsigned palAbiVersion) {
+  assert(Initialized && "Must call LgcContext::Initialize before LgcContext::Create");
 
-  BuilderContext *builderContext = new BuilderContext(context, palAbiVersion);
+  LgcContext *builderContext = new LgcContext(context, palAbiVersion);
 
   std::string mcpuName = codegen::getMCPU(); // -mcpu setting from llvm/CodeGen/CommandFlags.h
   if (gpuName == "")
@@ -142,11 +142,11 @@ BuilderContext *BuilderContext::Create(LLVMContext &context, StringRef gpuName, 
 //
 // @param context : LLVM context to give each Builder
 // @param palAbiVersion : PAL pipeline ABI version to compile for
-BuilderContext::BuilderContext(LLVMContext &context, unsigned palAbiVersion) : m_context(context) {
+LgcContext::LgcContext(LLVMContext &context, unsigned palAbiVersion) : m_context(context) {
 }
 
 // =====================================================================================================================
-BuilderContext::~BuilderContext() {
+LgcContext::~LgcContext() {
   delete m_targetMachine;
   delete m_targetInfo;
 }
@@ -155,7 +155,7 @@ BuilderContext::~BuilderContext() {
 // Create a Pipeline object for a pipeline compile.
 // This actually creates a PipelineState, but returns the Pipeline superclass that is visible to
 // the front-end.
-Pipeline *BuilderContext::createPipeline() {
+Pipeline *LgcContext::createPipeline() {
   return new PipelineState(this);
 }
 
@@ -165,7 +165,7 @@ Pipeline *BuilderContext::createPipeline() {
 //
 // @param pipeline : Pipeline object for pipeline compile, nullptr for shader compile
 // @param useBuilderRecorder : true to use BuilderRecorder, false to use BuilderImpl
-Builder *BuilderContext::createBuilder(Pipeline *pipeline, bool useBuilderRecorder) {
+Builder *LgcContext::createBuilder(Pipeline *pipeline, bool useBuilderRecorder) {
   if (!pipeline || useBuilderRecorder)
     return new BuilderRecorder(this, pipeline);
   return new BuilderImpl(this, pipeline);
@@ -176,7 +176,7 @@ Builder *BuilderContext::createBuilder(Pipeline *pipeline, bool useBuilderRecord
 // we have library functions.
 //
 // @param [in/out] passMgr : Pass manager
-void BuilderContext::preparePassManager(legacy::PassManager *passMgr) {
+void LgcContext::preparePassManager(legacy::PassManager *passMgr) {
   TargetLibraryInfoImpl targetLibInfo(getTargetMachine()->getTargetTriple());
 
   // Adjust it to allow memcpy and memset.
@@ -203,7 +203,7 @@ void BuilderContext::preparePassManager(legacy::PassManager *passMgr) {
 // @param [in/out] passMgr : pass manager to add passes to
 // @param codeGenTimer : Timer to time target passes with, nullptr if not timing
 // @param [out] outStream : Output stream
-void BuilderContext::addTargetPasses(lgc::PassManager &passMgr, Timer *codeGenTimer, raw_pwrite_stream &outStream) {
+void LgcContext::addTargetPasses(lgc::PassManager &passMgr, Timer *codeGenTimer, raw_pwrite_stream &outStream) {
   // Start timer for codegen passes.
   if (codeGenTimer)
     passMgr.add(createStartStopTimer(codeGenTimer, true));

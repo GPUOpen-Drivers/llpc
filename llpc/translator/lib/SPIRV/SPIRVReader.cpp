@@ -224,7 +224,7 @@ public:
 
   DebugLoc getDebugLoc(SPIRVInstruction *bi, Function *f);
 
-  void updateBuilderDebugLoc(SPIRVValue *bv, Function *f);
+  void updateDebugLoc(SPIRVValue *bv, Function *f);
 
   Type *transType(SPIRVType *bt, unsigned matrixStride = 0, bool columnMajor = true, bool parentIsPointer = false,
                   bool explicitlyLaidOut = false);
@@ -1584,7 +1584,7 @@ DebugLoc SPIRVToLLVM::getDebugLoc(SPIRVInstruction *bi, Function *f) {
   return DebugLoc::get(line->getLine(), line->getColumn(), m_dbgTran.getDISubprogram(bi->getParent()->getParent(), f));
 }
 
-void SPIRVToLLVM::updateBuilderDebugLoc(SPIRVValue *bv, Function *f) {
+void SPIRVToLLVM::updateDebugLoc(SPIRVValue *bv, Function *f) {
   if (bv->isInst()) {
     SPIRVInstruction *bi = static_cast<SPIRVInstruction *>(bv);
     getBuilder()->SetCurrentDebugLocation(getDebugLoc(bi, f));
@@ -4176,7 +4176,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   case (OpVariable):
     if (bb) {
       getBuilder()->SetInsertPoint(bb);
-      updateBuilderDebugLoc(bv, f);
+      updateDebugLoc(bv, f);
     }
     return mapValue(bv, transValueWithOpcode<OpVariable>(bv));
 
@@ -4204,7 +4204,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   // Translation of instructions
   if (bb) {
     getBuilder()->SetInsertPoint(bb);
-    updateBuilderDebugLoc(bv, f);
+    updateDebugLoc(bv, f);
     setFastMathFlags(bv);
   }
 

@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "NggLdsManager.h"
-#include "BuilderDebug.h"
+#include "Debug.h"
 #include "Gfx9Chip.h"
 #include "Patch.h"
 #include "PipelineState.h"

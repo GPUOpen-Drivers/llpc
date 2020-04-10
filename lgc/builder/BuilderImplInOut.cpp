@@ -31,7 +31,7 @@
 #include "BuilderImpl.h"
 #include "Internal.h"
 #include "PipelineState.h"
-#include "lgc/BuilderContext.h"
+#include "lgc/LgcContext.h"
 
 #define DEBUG_TYPE "llpc-builder-impl-inout"
 
@@ -306,7 +306,7 @@ void BuilderImplInOut::markGenericInputOutputUsage(bool isOutput, unsigned locat
 
   if (!isOutput || m_shaderStage != ShaderStageGeometry) {
     bool keepAllLocations = false;
-    if (getBuilderContext()->buildingRelocatableElf()) {
+    if (getLgcContext()->buildingRelocatableElf()) {
       if (m_shaderStage == ShaderStageVertex && isOutput)
         keepAllLocations = true;
       if (m_shaderStage == ShaderStageFragment && !isOutput)
@@ -586,7 +586,7 @@ Instruction *BuilderImplInOut::CreateWriteXfbOutput(Value *valueToWrite, bool is
 
 // =====================================================================================================================
 // Create a read of (part of) a built-in input value.
-// The type of the returned value is the fixed type of the specified built-in (see BuilderBuiltInDefs.h),
+// The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
 // or the element type if pIndex is not nullptr. For ClipDistance or CullDistance when pIndex is nullptr,
 // the array size is determined by inputInfo.GetArraySize().
 //
@@ -603,7 +603,7 @@ Value *BuilderImplInOut::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo i
 
 // =====================================================================================================================
 // Create a read of (part of) a built-in output value.
-// The type of the returned value is the fixed type of the specified built-in (see BuilderBuiltInDefs.h),
+// The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
 // or the element type if pIndex is not nullptr.
 //
 // @param builtIn : Built-in kind, one of the BuiltIn* constants
@@ -735,7 +735,7 @@ Value *BuilderImplInOut::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutIn
 
 // =====================================================================================================================
 // Create a write of (part of) a built-in output value.
-// The type of the value to write must be the fixed type of the specified built-in (see BuilderBuiltInDefs.h),
+// The type of the value to write must be the fixed type of the specified built-in (see BuiltInDefs.h),
 // or the element type if pIndex is not nullptr.
 //
 // @param valueToWrite : Value to write
@@ -826,7 +826,7 @@ StringRef BuilderImplInOut::getBuiltInName(BuiltInKind builtIn) {
 #define BUILTIN(name, number, out, in, type)                                                                           \
   case BuiltIn##name:                                                                                                  \
     return #name;
-#include "lgc/BuilderBuiltInDefs.h"
+#include "lgc/BuiltInDefs.h"
 #undef BUILTIN
 
   // Internal built-ins.
@@ -1280,7 +1280,7 @@ void BuilderImplInOut::markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arra
 // @param builtIn : Built-in kind, one of the BuiltIn* constants
 // @param isOutput : True to get the mask for output rather than input
 unsigned BuilderImplInOut::getBuiltInValidMask(BuiltInKind builtIn, bool isOutput) {
-  // See BuilderBuiltInDefs.h for an explanation of the letter codes.
+  // See BuiltInDefs.h for an explanation of the letter codes.
   enum class StageValidMask : unsigned {
     C = (1 << ShaderStageCompute),
     D = (1 << ShaderStageTessEval),
@@ -1310,7 +1310,7 @@ unsigned BuilderImplInOut::getBuiltInValidMask(BuiltInKind builtIn, bool isOutpu
   case BuiltIn##name:                                                                                                  \
     validMask = static_cast<unsigned>(StageValidMask::in) | (static_cast<unsigned>(StageValidMask::out) << 16);        \
     break;
-#include "lgc/BuilderBuiltInDefs.h"
+#include "lgc/BuiltInDefs.h"
 #undef BUILTIN
   default:
     llvm_unreachable("Should never be called!");

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,20 +24,25 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  BuilderBuiltIns.h
- * @brief LLPC header file: declaration of BuiltIns supported by the Builder interface
+ * @file  Debug.h
+ * @brief LLPC header file: declaration of LLPC_OUTS for use in the middle-end
  ***********************************************************************************************************************
  */
-
 #pragma once
+
+#include "llvm/Support/raw_ostream.h"
 
 namespace lgc {
 
-// Define built-in kind enum.
-enum BuiltInKind {
-#define BUILTIN(name, number, out, in, type) BuiltIn##name = number,
-#include "lgc/BuilderBuiltInDefs.h"
-#undef BUILTIN
-};
+// Get pointer to stream for LLPC_OUTS, or nullptr if disabled.
+llvm::raw_ostream *getLgcOuts();
 
 } // namespace lgc
+
+// Output general message
+#define LLPC_OUTS(msg)                                                                                                 \
+  do                                                                                                                   \
+    if (llvm::raw_ostream *pStream = getLgcOuts()) {                                                                   \
+      *pStream << msg;                                                                                                 \
+    }                                                                                                                  \
+  while (false)

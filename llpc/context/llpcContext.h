@@ -33,7 +33,7 @@
 #include "llpcEmuLib.h"
 #include "llpcPipelineContext.h"
 #include "spirvExt.h"
-#include "lgc/BuilderContext.h"
+#include "lgc/LgcContext.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Type.h"
@@ -70,8 +70,8 @@ public:
   // Get LLPC builder
   lgc::Builder *getBuilder() const { return m_builder; }
 
-  // Get (create if necessary) BuilderContext
-  lgc::BuilderContext *getBuilderContext();
+  // Get (create if necessary) LgcContext
+  lgc::LgcContext *getLgcContext();
 
   // Set value of scalarBlockLayout option. This gets called with the value from PipelineOptions when
   // starting a pipeline compile.
@@ -137,7 +137,7 @@ private:
   EmuLib m_glslEmuLib;                                   // LLVM library for GLSL emulation
   volatile bool m_isInUse;                               // Whether this context is in use
   lgc::Builder *m_builder = nullptr;                     // LLPC builder object
-  std::unique_ptr<lgc::BuilderContext> m_builderContext; // Builder context
+  std::unique_ptr<lgc::LgcContext> m_builderContext; // Builder context
 
   std::unique_ptr<llvm::TargetMachine> m_targetMachine; // Target machine
   bool m_scalarBlockLayout = false;                     // scalarBlockLayout option from last pipeline compile

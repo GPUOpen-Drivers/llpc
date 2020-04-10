@@ -33,7 +33,7 @@
 #include "IntrinsDefs.h"
 #include "PipelineState.h"
 #include "ShaderModes.h"
-#include "lgc/BuilderContext.h"
+#include "lgc/LgcContext.h"
 
 #define DEBUG_TYPE "llpc-builder-recorder"
 
@@ -309,7 +309,7 @@ BuilderRecorderMetadataKinds::BuilderRecorderMetadataKinds(llvm::LLVMContext &co
 //
 // @param builderContext : Builder context
 // @param pipeline : PipelineState, or nullptr for shader compile
-BuilderRecorder::BuilderRecorder(BuilderContext *builderContext, Pipeline *pipeline)
+BuilderRecorder::BuilderRecorder(LgcContext *builderContext, Pipeline *pipeline)
     : Builder(builderContext), BuilderRecorderMetadataKinds(builderContext->getContext()),
       m_pipelineState(reinterpret_cast<PipelineState *>(pipeline)) {
   m_isBuilderRecorder = true;
@@ -1424,7 +1424,7 @@ Instruction *BuilderRecorder::CreateWriteXfbOutput(Value *valueToWrite, bool isB
 
 // =====================================================================================================================
 // Create a read of (part of) a built-in input value.
-// The type of the returned value is the fixed type of the specified built-in (see BuilderBuiltInDefs.h),
+// The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
 // or the element type if pIndex is not nullptr.
 //
 // @param builtIn : Built-in kind, one of the BuiltIn* constants
@@ -1453,7 +1453,7 @@ Value *BuilderRecorder::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo in
 
 // =====================================================================================================================
 // Create a read of (part of) a built-in output value.
-// The type of the returned value is the fixed type of the specified built-in (see BuilderBuiltInDefs.h),
+// The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
 // or the element type if pIndex is not nullptr.
 //
 // @param builtIn : Built-in kind, one of the BuiltIn* constants

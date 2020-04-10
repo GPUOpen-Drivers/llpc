@@ -29,7 +29,7 @@
 ***********************************************************************************************************************
 */
 #include "Internal.h"
-#include "lgc/BuilderContext.h"
+#include "lgc/LgcContext.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Timer.h"
 
@@ -65,12 +65,12 @@ char StartStopTimer::ID = 0;
 } // namespace
 
 // =====================================================================================================================
-// Create a start/stop timer pass. This is a static method in BuilderContext, so it can be accessed by
+// Create a start/stop timer pass. This is a static method in LgcContext, so it can be accessed by
 // the front-end to add to its pass manager.
 //
 // @param timer : The timer to start or stop when the pass is run
 // @param starting : True to start the timer, false to stop it
-ModulePass *BuilderContext::createStartStopTimer(Timer *timer, bool starting) {
+ModulePass *LgcContext::createStartStopTimer(Timer *timer, bool starting) {
   return new StartStopTimer(timer, starting);
 }
 

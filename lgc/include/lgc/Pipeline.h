@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "BuilderCommon.h"
+#include "CommonDefs.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
@@ -43,7 +43,7 @@ class Timer;
 
 namespace lgc {
 
-class BuilderContext;
+class LgcContext;
 
 // =====================================================================================================================
 // Per-pipeline and per-shader options for setting in pipeline state
@@ -496,12 +496,12 @@ struct ComputeShaderMode {
 // generating the pipeline
 class Pipeline {
 public:
-  Pipeline(BuilderContext *builderContext) : m_builderContext(builderContext) {}
+  Pipeline(LgcContext *builderContext) : m_builderContext(builderContext) {}
 
   virtual ~Pipeline() {}
 
-  // Get BuilderContext
-  BuilderContext *getBuilderContext() const { return m_builderContext; }
+  // Get LgcContext
+  LgcContext *getLgcContext() const { return m_builderContext; }
 
   // Get LLVMContext
   llvm::LLVMContext &getContext() const;
@@ -597,7 +597,7 @@ public:
   virtual unsigned computeExportFormat(llvm::Type *outputTy, unsigned location) = 0;
 
 private:
-  BuilderContext *m_builderContext; // Builder context
+  LgcContext *m_builderContext; // Builder context
 };
 
 } // namespace lgc

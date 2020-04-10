@@ -32,7 +32,7 @@
 #include "IntrinsDefs.h"
 #include "Patch.h"
 #include "PipelineState.h"
-#include "lgc/BuilderContext.h"
+#include "lgc/LgcContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
@@ -97,7 +97,7 @@ bool PatchNullFragShader::runOnModule(llvm::Module &module) {
 
   PipelineState *pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
-  if (cl::DisableNullFragShader || pipelineState->getBuilderContext()->buildingRelocatableElf()) {
+  if (cl::DisableNullFragShader || pipelineState->getLgcContext()->buildingRelocatableElf()) {
     // NOTE: If the option -disable-null-frag-shader is set to TRUE, we skip this pass. This is done by
     // standalone compiler.
     return false;

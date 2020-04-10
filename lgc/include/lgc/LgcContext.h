@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  BuilderContext.h
- * @brief LLPC header file: declaration of llpc::BuilderContext class for creating and using lgc::Builder
+ * @file  LgcContext.h
+ * @brief LLPC header file: declaration of llpc::LgcContext class for creating and using lgc::Builder
  ***********************************************************************************************************************
  */
 #pragma once
@@ -56,24 +56,24 @@ class Pipeline;
 class TargetInfo;
 
 // =====================================================================================================================
-// BuilderContext class, used to create Pipeline and Builder objects. State shared between multiple compiles
+// LgcContext class, used to create Pipeline and Builder objects. State shared between multiple compiles
 // is kept here.
-class BuilderContext {
+class LgcContext {
 public:
-  // Initialize the middle-end. This must be called before the first BuilderContext::Create, although you are
+  // Initialize the middle-end. This must be called before the first LgcContext::Create, although you are
   // allowed to call it again after that. It must also be called before LLVM command-line processing, so
   // that you can use a pass name in an option such as -print-after. If multiple concurrent compiles are
   // possible, this should be called in a thread-safe way.
   static void initialize();
 
-  // Create the BuilderContext. Returns nullptr on failure to recognize the AMDGPU target whose name is specified
+  // Create the LgcContext. Returns nullptr on failure to recognize the AMDGPU target whose name is specified
   //
   // @param context : LLVM context to use on all compiles
   // @param gpuName : LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
   // @param palAbiVersion : PAL pipeline ABI version to compile for
-  static BuilderContext *Create(llvm::LLVMContext &context, llvm::StringRef gpuName, unsigned palAbiVersion);
+  static LgcContext *Create(llvm::LLVMContext &context, llvm::StringRef gpuName, unsigned palAbiVersion);
 
-  ~BuilderContext();
+  ~LgcContext();
 
   // Get LLVM context
   llvm::LLVMContext &getContext() const { return m_context; }
@@ -121,11 +121,11 @@ public:
   static llvm::raw_ostream *getLgcOuts() { return m_llpcOuts; }
 
 private:
-  BuilderContext() = delete;
-  BuilderContext(const BuilderContext &) = delete;
-  BuilderContext &operator=(const BuilderContext &) = delete;
+  LgcContext() = delete;
+  LgcContext(const LgcContext &) = delete;
+  LgcContext &operator=(const LgcContext &) = delete;
 
-  BuilderContext(llvm::LLVMContext &context, unsigned palAbiVersion);
+  LgcContext(llvm::LLVMContext &context, unsigned palAbiVersion);
 
   // -----------------------------------------------------------------------------------------------------------------
   static llvm::raw_ostream *m_llpcOuts;           // nullptr or stream for LLPC_OUTS

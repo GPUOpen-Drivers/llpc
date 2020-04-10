@@ -35,7 +35,7 @@
 #include "llpcShaderModuleHelper.h"
 #include "vkgcElfReader.h"
 #include "vkgcMetroHash.h"
-#include "lgc/BuilderCommon.h"
+#include "lgc/CommonDefs.h"
 
 namespace llvm {
 

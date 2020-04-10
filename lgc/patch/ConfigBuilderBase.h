@@ -32,7 +32,7 @@
 
 #include "AbiMetadata.h"
 #include "TargetInfo.h"
-#include "lgc/BuilderCommon.h"
+#include "lgc/CommonDefs.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 
 namespace llvm {

@@ -33,7 +33,7 @@
 #include "Internal.h"
 #include "PipelineState.h"
 #include "ShaderModes.h"
-#include "lgc/BuilderContext.h"
+#include "lgc/LgcContext.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include <set>
 
@@ -45,7 +45,7 @@ using namespace llvm;
 // =====================================================================================================================
 //
 // @param builderContext : Builder context
-Builder::Builder(BuilderContext *builderContext)
+Builder::Builder(LgcContext *builderContext)
     : BuilderBase(builderContext->getContext()), m_builderContext(builderContext) {
 }
 
@@ -313,7 +313,7 @@ Type *Builder::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
   case BuiltIn##name:                                                                                                  \
     typeCode = TypeCode::type;                                                                                         \
     break;
-#include "lgc/BuilderBuiltInDefs.h"
+#include "lgc/BuiltInDefs.h"
 #undef BUILTIN
   default:
     llvm_unreachable("Should never be called!");

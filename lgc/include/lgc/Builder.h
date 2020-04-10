@@ -31,13 +31,13 @@
 #pragma once
 
 #include "lgc/BuilderBase.h"
-#include "lgc/BuilderBuiltIns.h"
-#include "lgc/BuilderCommon.h"
+#include "lgc/BuiltIns.h"
+#include "lgc/CommonDefs.h"
 #include "llvm/Support/AtomicOrdering.h"
 
 namespace lgc {
 
-class BuilderContext;
+class LgcContext;
 struct CommonShaderMode;
 struct ComputeShaderMode;
 struct FragmentShaderMode;
@@ -133,8 +133,8 @@ public:
   // is a vector type.
   static llvm::Type *getConditionallyVectorizedTy(llvm::Type *elementTy, llvm::Type *maybeVecTy);
 
-  // Get the BuilderContext
-  BuilderContext *getBuilderContext() const { return m_builderContext; }
+  // Get the LgcContext
+  LgcContext *getLgcContext() const { return m_builderContext; }
 
   // Set the current shader stage, clamp shader stage to the ShaderStageCompute
   void setShaderStage(ShaderStage stage) { m_shaderStage = stage > ShaderStageCompute ? ShaderStageCompute : stage; }
@@ -1139,7 +1139,7 @@ public:
   llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo);
 
   // Create a read of (part of) a built-in input value.
-  // The type of the returned value is the fixed type of the specified built-in (see BuilderBuiltInDefs.h),
+  // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
   // or the element type if pIndex is not nullptr. For ClipDistance or CullDistance when pIndex is nullptr,
   // the array size is determined by inputInfo.GetArraySize().
   //
@@ -1152,7 +1152,7 @@ public:
                                               llvm::Value *index, const llvm::Twine &instName = "") = 0;
 
   // Create a read of (part of) a built-in output value.
-  // The type of the returned value is the fixed type of the specified built-in (see BuilderBuiltInDefs.h),
+  // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
   // or the element type if pIndex is not nullptr.
   // This operation is only supported for TCS; other shader stages do not have per-vertex outputs, and
   // the frontend is expected to do its own cacheing of a written output if the shader wants to read it back again.
@@ -1166,7 +1166,7 @@ public:
                                                llvm::Value *index, const llvm::Twine &instName = "") = 0;
 
   // Create a write of (part of) a built-in output value.
-  // The type of the value to write must be the fixed type of the specified built-in (see BuilderBuiltInDefs.h),
+  // The type of the value to write must be the fixed type of the specified built-in (see BuiltInDefs.h),
   // or the element type if pIndex is not nullptr.
   //
   // @param valueToWrite : Value to write
@@ -1513,7 +1513,7 @@ public:
   // -----------------------------------------------------------------------------------------------------------------
 
 protected:
-  Builder(BuilderContext *builderContext);
+  Builder(LgcContext *builderContext);
 
   // Get the ShaderModes object. For a pipeline compilation, it comes from the PipelineState. For a shader
   // compilation, there is no PipelineState, so BuilderRecorder creates its own ShaderModes.
@@ -1550,7 +1550,7 @@ private:
 
   // -----------------------------------------------------------------------------------------------------------------
 
-  BuilderContext *m_builderContext; // Builder context
+  LgcContext *m_builderContext; // Builder context
 };
 
 } // namespace lgc
