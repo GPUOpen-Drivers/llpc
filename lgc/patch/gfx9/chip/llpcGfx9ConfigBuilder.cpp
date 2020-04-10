@@ -115,7 +115,7 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() // [out] Size of register confi
   if (stageMask & shaderStageToMask(ShaderStageVertex)) {
     buildVsRegConfig<PipelineVsFsRegConfig>(ShaderStageVertex, &config);
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, Pal::Gfx9::Chip::VS_STAGE_REAL);
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageVertex);
     if (waveFrontSize == 32) {
       SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
@@ -142,7 +142,7 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() // [out] Size of register confi
     }
   }
 
-  regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
+  Pal::Gfx9::Chip::regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
 
   // When non-patch primitives are used without tessellation enabled, PRIMGROUP_SIZE must be at least 4, and must be
   // even if there are more than 2 shader engines on the GPU.
@@ -197,8 +197,8 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
       SET_REG_FIELD(&config.lsHsRegs, SPI_SHADER_PGM_CHKSUM_HS, CHECKSUM, checksum);
     }
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, Pal::Gfx9::Chip::HS_STAGE_ON);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, Pal::Gfx9::Chip::LS_STAGE_ON);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
     if (waveFrontSize == 32) {
@@ -212,7 +212,7 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
   if (stageMask & shaderStageToMask(ShaderStageTessEval)) {
     buildVsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageTessEval, &config);
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_DS);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, Pal::Gfx9::Chip::VS_STAGE_DS);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessEval);
     if (waveFrontSize == 32) {
@@ -239,7 +239,7 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
   }
 
   // Set up IA_MULTI_VGT_PARAM
-  regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
+  Pal::Gfx9::Chip::regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
 
   const auto &tcsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
   const auto &tesBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
@@ -294,8 +294,8 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() // [out] Size of register con
       SET_REG_FIELD(&config.esGsRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
     }
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, Pal::Gfx9::Chip::ES_STAGE_REAL);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, Pal::Gfx9::Chip::GS_STAGE_ON);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
     if (waveFrontSize == 32) {
@@ -318,7 +318,7 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() // [out] Size of register con
   if (stageMask & shaderStageToMask(ShaderStageCopyShader)) {
     buildVsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageCopyShader, &config);
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, Pal::Gfx9::Chip::VS_STAGE_COPY_SHADER);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageCopyShader);
     if (waveFrontSize == 32) {
@@ -329,7 +329,7 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() // [out] Size of register con
   }
 
   // Set up IA_MULTI_VGT_PARAM
-  regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
+  Pal::Gfx9::Chip::regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
 
   const unsigned primGroupSize = 128;
   iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
@@ -376,8 +376,8 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
       SET_REG_FIELD(&config.lsHsRegs, SPI_SHADER_PGM_CHKSUM_HS, CHECKSUM, checksum);
     }
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, Pal::Gfx9::Chip::HS_STAGE_ON);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, Pal::Gfx9::Chip::LS_STAGE_ON);
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
     if (waveFrontSize == 32) {
       SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
@@ -404,8 +404,8 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
       SET_REG_FIELD(&config.esGsRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
     }
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, Pal::Gfx9::Chip::ES_STAGE_DS);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, Pal::Gfx9::Chip::GS_STAGE_ON);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
     if (waveFrontSize == 32) {
@@ -429,7 +429,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
   if (stageMask & shaderStageToMask(ShaderStageCopyShader)) {
     buildVsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageCopyShader, &config);
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, Pal::Gfx9::Chip::VS_STAGE_COPY_SHADER);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageCopyShader);
     if (waveFrontSize == 32) {
@@ -440,7 +440,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
   }
 
   // Set up IA_MULTI_VGT_PARAM
-  regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
+  Pal::Gfx9::Chip::regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
 
   const auto &tcsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
   const auto &tesBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
@@ -489,8 +489,8 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
   if (stageMask & shaderStageToMask(ShaderStageVertex)) {
     buildPrimShaderRegConfig<PipelineNggVsFsRegConfig>(ShaderStageVertex, ShaderStageInvalid, &config);
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, Pal::Gfx9::Chip::ES_STAGE_REAL);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, Pal::Gfx9::Chip::VS_STAGE_REAL);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageVertex);
     if (waveFrontSize == 32) {
@@ -516,7 +516,7 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
     }
   }
 
-  regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
+  Pal::Gfx9::Chip::regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
 
   // When non-patch primitives are used without tessellation enabled, PRIMGROUP_SIZE must be at least 4, and must be
   // even if there are more than 2 shader engines on the GPU.
@@ -571,8 +571,8 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
       SET_REG_FIELD(&config.lsHsRegs, SPI_SHADER_PGM_CHKSUM_HS, CHECKSUM, checksum);
     }
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, Pal::Gfx9::Chip::HS_STAGE_ON);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, Pal::Gfx9::Chip::LS_STAGE_ON);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
     if (waveFrontSize == 32) {
@@ -585,8 +585,8 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
   if (stageMask & shaderStageToMask(ShaderStageTessEval)) {
     buildPrimShaderRegConfig<PipelineNggVsTsFsRegConfig>(ShaderStageTessEval, ShaderStageInvalid, &config);
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, Pal::Gfx9::Chip::ES_STAGE_DS);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, Pal::Gfx9::Chip::VS_STAGE_REAL);
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessEval);
     if (waveFrontSize == 32) {
       SET_REG_GFX10_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
@@ -612,7 +612,7 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
   }
 
   // Set up IA_MULTI_VGT_PARAM
-  regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
+  Pal::Gfx9::Chip::regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
 
   const auto &tcsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
 
@@ -664,9 +664,9 @@ void ConfigBuilder::buildPipelineNggVsGsFsRegConfig() {
       SET_REG_FIELD(&config.primShaderRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
     }
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, Pal::Gfx9::Chip::ES_STAGE_REAL);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, Pal::Gfx9::Chip::GS_STAGE_ON);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, Pal::Gfx9::Chip::VS_STAGE_REAL);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
     if (waveFrontSize == 32) {
@@ -687,7 +687,7 @@ void ConfigBuilder::buildPipelineNggVsGsFsRegConfig() {
   }
 
   // Set up IA_MULTI_VGT_PARAM
-  regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
+  Pal::Gfx9::Chip::regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
 
   const unsigned primGroupSize = 128;
   iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
@@ -739,8 +739,8 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
       SET_REG_FIELD(&config.lsHsRegs, SPI_SHADER_PGM_CHKSUM_HS, CHECKSUM, checksum);
     }
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, Pal::Gfx9::Chip::HS_STAGE_ON);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, Pal::Gfx9::Chip::LS_STAGE_ON);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
     if (waveFrontSize == 32) {
@@ -764,9 +764,9 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
       SET_REG_FIELD(&config.primShaderRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
     }
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, Pal::Gfx9::Chip::ES_STAGE_DS);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, Pal::Gfx9::Chip::GS_STAGE_ON);
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, Pal::Gfx9::Chip::VS_STAGE_REAL);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
     if (waveFrontSize == 32) {
@@ -787,7 +787,7 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
   }
 
   // Set up IA_MULTI_VGT_PARAM
-  regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
+  Pal::Gfx9::Chip::regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
 
   const auto &tcsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
   const auto &gsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
@@ -998,13 +998,13 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
     if (m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize) {
       assert(gsIntfData->userDataUsage.gs.copyShaderEsGsLdsSize != 0);
 
-      appendConfig(mmSPI_SHADER_USER_DATA_VS_0 + gsIntfData->userDataUsage.gs.copyShaderEsGsLdsSize,
+      appendConfig(Pal::Gfx9::Chip::mmSPI_SHADER_USER_DATA_VS_0 + gsIntfData->userDataUsage.gs.copyShaderEsGsLdsSize,
                    static_cast<unsigned>(Util::Abi::UserDataMapping::EsGsLdsSize));
     }
 
     if (enableXfb) {
       assert(gsIntfData->userDataUsage.gs.copyShaderStreamOutTable != 0);
-      appendConfig(mmSPI_SHADER_USER_DATA_VS_0 + gsIntfData->userDataUsage.gs.copyShaderStreamOutTable,
+      appendConfig(Pal::Gfx9::Chip::mmSPI_SHADER_USER_DATA_VS_0 + gsIntfData->userDataUsage.gs.copyShaderStreamOutTable,
                    static_cast<unsigned>(Util::Abi::UserDataMapping::StreamOutTable));
     }
   }
@@ -1078,15 +1078,15 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
       ++posCount;
   }
 
-  SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS0_EXPORT_FORMAT, SPI_SHADER_4COMP);
+  SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS0_EXPORT_FORMAT, Pal::Gfx9::Chip::SPI_SHADER_4COMP);
   if (posCount > 1) {
-    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS1_EXPORT_FORMAT, SPI_SHADER_4COMP);
+    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS1_EXPORT_FORMAT, Pal::Gfx9::Chip::SPI_SHADER_4COMP);
   }
   if (posCount > 2) {
-    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS2_EXPORT_FORMAT, SPI_SHADER_4COMP);
+    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS2_EXPORT_FORMAT, Pal::Gfx9::Chip::SPI_SHADER_4COMP);
   }
   if (posCount > 3) {
-    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS3_EXPORT_FORMAT, SPI_SHADER_4COMP);
+    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS3_EXPORT_FORMAT, Pal::Gfx9::Chip::SPI_SHADER_4COMP);
   }
 
   if (m_pipelineState->getTargetInfo().getGpuProperty().supportSpiPrefPriority) {
@@ -1097,7 +1097,7 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
   }
 
   // Set shader user data maping
-  buildUserDataConfig(shaderStage, ShaderStageInvalid, mmSPI_SHADER_USER_DATA_VS_0);
+  buildUserDataConfig(shaderStage, ShaderStageInvalid, Pal::Gfx9::Chip::mmSPI_SHADER_USER_DATA_VS_0);
 }
 
 // =====================================================================================================================
@@ -1196,11 +1196,11 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   if (gfxIp.major == 9) {
     buildUserDataConfig(shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
                         shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
-                        Gfx09::mmSPI_SHADER_USER_DATA_LS_0);
+                        Pal::Gfx9::Chip::Gfx09::mmSPI_SHADER_USER_DATA_LS_0);
   } else if (gfxIp.major == 10) {
     buildUserDataConfig(shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
                         shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
-                        Gfx10::mmSPI_SHADER_USER_DATA_HS_0);
+                        Pal::Gfx9::Chip::Gfx10::mmSPI_SHADER_USER_DATA_HS_0);
   } else
     llvm_unreachable("Not implemented!");
 }
@@ -1303,7 +1303,7 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
 
   // TODO: Currently only support offchip GS
-  SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_MODE, MODE, GS_SCENARIO_G);
+  SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_MODE, MODE, Pal::Gfx9::Chip::GS_SCENARIO_G);
 
   if (m_pipelineState->isGsOnChip()) {
     SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_MODE, ONCHIP, VGT_GS_MODE_ONCHIP_ON);
@@ -1318,13 +1318,13 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   }
 
   if (geometryMode.outputVertices <= 128) {
-    SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_128);
+    SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_MODE, CUT_MODE, Pal::Gfx9::Chip::GS_CUT_128);
   } else if (geometryMode.outputVertices <= 256) {
-    SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_256);
+    SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_MODE, CUT_MODE, Pal::Gfx9::Chip::GS_CUT_256);
   } else if (geometryMode.outputVertices <= 512) {
-    SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_512);
+    SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_MODE, CUT_MODE, Pal::Gfx9::Chip::GS_CUT_512);
   } else {
-    SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_1024);
+    SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_MODE, CUT_MODE, Pal::Gfx9::Chip::GS_CUT_1024);
   }
 
   SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, calcFactor.esVertsPerSubgroup);
@@ -1363,13 +1363,13 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   }
   SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_PER_VS, GS_PER_VS, GsThreadsPerVsThread);
 
-  VGT_GS_OUTPRIM_TYPE gsOutputPrimitiveType = TRISTRIP;
+  Pal::Gfx9::Chip::VGT_GS_OUTPRIM_TYPE gsOutputPrimitiveType = Pal::Gfx9::Chip::TRISTRIP;
   if (gsInOutUsage.outputMapLocCount == 0)
-    gsOutputPrimitiveType = POINTLIST;
+      gsOutputPrimitiveType = Pal::Gfx9::Chip::POINTLIST;
   else if (geometryMode.outputPrimitive == OutputPrimitives::Points)
-    gsOutputPrimitiveType = POINTLIST;
+      gsOutputPrimitiveType = Pal::Gfx9::Chip::POINTLIST;
   else if (geometryMode.outputPrimitive == OutputPrimitives::LineStrip)
-    gsOutputPrimitiveType = LINESTRIP;
+      gsOutputPrimitiveType = Pal::Gfx9::Chip::LINESTRIP;
 
   SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
 
@@ -1411,11 +1411,11 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   if (gfxIp.major == 9) {
     buildUserDataConfig(shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
                         shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
-                        Gfx09::mmSPI_SHADER_USER_DATA_ES_0);
+                        Pal::Gfx9::Chip::Gfx09::mmSPI_SHADER_USER_DATA_ES_0);
   } else if (gfxIp.major == 10) {
     buildUserDataConfig(shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
                         shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
-                        Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
+                        Pal::Gfx9::Chip::Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
   } else
     llvm_unreachable("Not implemented!");
 }
@@ -1533,7 +1533,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   unsigned maxVertOut = std::max(1u, static_cast<unsigned>(geometryMode.outputVertices));
   SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
 
-  SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_MODE, MODE, GS_SCENARIO_G);
+  SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_MODE, MODE, Pal::Gfx9::Chip::GS_SCENARIO_G);
   SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_MODE, ONCHIP, VGT_GS_MODE_ONCHIP_OFF);
   SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_MODE, ES_WRITE_OPTIMIZE, false);
   SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_MODE, GS_WRITE_OPTIMIZE, true);
@@ -1553,49 +1553,49 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
     SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_INSTANCE_CNT, ENABLE, true);
     SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_INSTANCE_CNT, CNT, geometryMode.invocations);
     if (gfxIp.major > 10 || (gfxIp.major == 10 && gfxIp.minor >= 1)) {
-      SET_REG_GFX10_1_PLUS_FIELD(&pConfig->primShaderRegs, VGT_GS_INSTANCE_CNT, EN_MAX_VERT_OUT_PER_GS_INSTANCE,
+      SET_REG_GFX10_FIELD(&pConfig->primShaderRegs, VGT_GS_INSTANCE_CNT, EN_MAX_VERT_OUT_PER_GS_INSTANCE,
                                  calcFactor.enableMaxVertOut);
     }
   }
   SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_PER_VS, GS_PER_VS, GsThreadsPerVsThread);
 
-  VGT_GS_OUTPRIM_TYPE gsOutputPrimitiveType = POINTLIST;
+  Pal::Gfx9::Chip::VGT_GS_OUTPRIM_TYPE gsOutputPrimitiveType = Pal::Gfx9::Chip::POINTLIST;
   if (hasGs) {
     // GS present
     if (gsInOutUsage.outputMapLocCount == 0)
-      gsOutputPrimitiveType = POINTLIST;
+      gsOutputPrimitiveType = Pal::Gfx9::Chip::POINTLIST;
     else if (geometryMode.outputPrimitive == OutputPrimitives::Points)
-      gsOutputPrimitiveType = POINTLIST;
+      gsOutputPrimitiveType = Pal::Gfx9::Chip::POINTLIST;
     else if (geometryMode.outputPrimitive == OutputPrimitives::LineStrip)
-      gsOutputPrimitiveType = LINESTRIP;
+      gsOutputPrimitiveType = Pal::Gfx9::Chip::LINESTRIP;
     else if (geometryMode.outputPrimitive == OutputPrimitives::TriangleStrip)
-      gsOutputPrimitiveType = TRISTRIP;
+      gsOutputPrimitiveType = Pal::Gfx9::Chip::TRISTRIP;
     else
       llvm_unreachable("Should never be called!");
   } else if (hasTs) {
     // With tessellation
     const auto &tessMode = m_pipelineState->getShaderModes()->getTessellationMode();
     if (tessMode.pointMode)
-      gsOutputPrimitiveType = POINTLIST;
+      gsOutputPrimitiveType = Pal::Gfx9::Chip::POINTLIST;
     else if (tessMode.primitiveMode == PrimitiveMode::Isolines)
-      gsOutputPrimitiveType = LINESTRIP;
+      gsOutputPrimitiveType = Pal::Gfx9::Chip::LINESTRIP;
     else if (tessMode.primitiveMode == PrimitiveMode::Triangles || tessMode.primitiveMode == PrimitiveMode::Quads)
-      gsOutputPrimitiveType = TRISTRIP;
+      gsOutputPrimitiveType = Pal::Gfx9::Chip::TRISTRIP;
     else
       llvm_unreachable("Should never be called!");
   } else {
     // Without tessellation
     const auto topology = m_pipelineState->getInputAssemblyState().topology;
     if (topology == PrimitiveTopology::PointList)
-      gsOutputPrimitiveType = POINTLIST;
+      gsOutputPrimitiveType = Pal::Gfx9::Chip::POINTLIST;
     else if (topology == PrimitiveTopology::LineList || topology == PrimitiveTopology::LineStrip ||
              topology == PrimitiveTopology::LineListWithAdjacency ||
              topology == PrimitiveTopology::LineStripWithAdjacency)
-      gsOutputPrimitiveType = LINESTRIP;
+      gsOutputPrimitiveType = Pal::Gfx9::Chip::LINESTRIP;
     else if (topology == PrimitiveTopology::TriangleList || topology == PrimitiveTopology::TriangleStrip ||
              topology == PrimitiveTopology::TriangleFan || topology == PrimitiveTopology::TriangleListWithAdjacency ||
              topology == PrimitiveTopology::TriangleStripWithAdjacency)
-      gsOutputPrimitiveType = TRISTRIP;
+      gsOutputPrimitiveType = Pal::Gfx9::Chip::TRISTRIP;
     else
       llvm_unreachable("Should never be called!");
   }
@@ -1777,15 +1777,15 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
       ++posCount;
   }
 
-  SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_POS_FORMAT, POS0_EXPORT_FORMAT, SPI_SHADER_4COMP);
+  SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_POS_FORMAT, POS0_EXPORT_FORMAT, Pal::Gfx9::Chip::SPI_SHADER_4COMP);
   if (posCount > 1) {
-    SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_POS_FORMAT, POS1_EXPORT_FORMAT, SPI_SHADER_4COMP);
+    SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_POS_FORMAT, POS1_EXPORT_FORMAT, Pal::Gfx9::Chip::SPI_SHADER_4COMP);
   }
   if (posCount > 2) {
-    SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_POS_FORMAT, POS2_EXPORT_FORMAT, SPI_SHADER_4COMP);
+    SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_POS_FORMAT, POS2_EXPORT_FORMAT, Pal::Gfx9::Chip::SPI_SHADER_4COMP);
   }
   if (posCount > 3) {
-    SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_POS_FORMAT, POS3_EXPORT_FORMAT, SPI_SHADER_4COMP);
+    SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_POS_FORMAT, POS3_EXPORT_FORMAT, Pal::Gfx9::Chip::SPI_SHADER_4COMP);
   }
 
   //
@@ -1796,7 +1796,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   SET_REG_FIELD(&pConfig->primShaderRegs, GE_NGG_SUBGRP_CNTL, THDS_PER_SUBGRP, NggMaxThreadsPerSubgroup);
 
   // TODO: Support PIPELINE_PRIM_ID.
-  SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_IDX_FORMAT, IDX0_EXPORT_FORMAT, SPI_SHADER_1COMP);
+  SET_REG_FIELD(&pConfig->primShaderRegs, SPI_SHADER_IDX_FORMAT, IDX0_EXPORT_FORMAT, Pal::Gfx9::Chip::SPI_SHADER_1COMP);
 
   if (nggControl->passthroughMode) {
     INVALIDATE_REG(&pConfig->primShaderRegs, SPI_SHADER_PGM_LO_GS);
@@ -1815,7 +1815,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   //
   buildUserDataConfig(shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
                       shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
-                      Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
+                      Pal::Gfx9::Chip::Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
 }
 
 // =====================================================================================================================
@@ -1882,17 +1882,17 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
   SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, FORCE_EOV_CNTDWN_ENABLE, true);
   SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, FORCE_EOV_REZ_ENABLE, true);
 
-  ZOrder zOrder = LATE_Z;
+  Pal::Gfx9::Chip::ZOrder zOrder = Pal::Gfx9::Chip::LATE_Z;
   bool execOnHeirFail = false;
   if (fragmentMode.earlyFragmentTests)
-    zOrder = EARLY_Z_THEN_LATE_Z;
+    zOrder = Pal::Gfx9::Chip::EARLY_Z_THEN_LATE_Z;
   else if (resUsage->resourceWrite) {
-    zOrder = LATE_Z;
+    zOrder = Pal::Gfx9::Chip::LATE_Z;
     execOnHeirFail = true;
   } else if (shaderOptions.allowReZ)
-    zOrder = EARLY_Z_THEN_RE_Z;
+    zOrder = Pal::Gfx9::Chip::EARLY_Z_THEN_RE_Z;
   else
-    zOrder = EARLY_Z_THEN_LATE_Z;
+    zOrder = Pal::Gfx9::Chip::EARLY_Z_THEN_LATE_Z;
 
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, Z_ORDER, zOrder);
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, KILL_ENABLE, builtInUsage.discard);
@@ -1934,7 +1934,7 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
     // If both SPI_SHADER_Z_FORMAT and SPI_SHADER_COL_FORMAT are zero, we need to override
     // SPI_SHADER_COL_FORMAT to export one channel to MRT0. This dummy export format will be masked
     // off by CB_SHADER_MASK.
-    spiShaderColFormat = SPI_SHADER_32_R;
+    spiShaderColFormat = Pal::Gfx9::Chip::SPI_SHADER_32_R;
   }
 
   SET_REG(&pConfig->psRegs, SPI_SHADER_COL_FORMAT, spiShaderColFormat);
@@ -1969,7 +1969,7 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
          interpInfoElem.custom == InvalidFsInterpInfo.custom && interpInfoElem.is16bit == InvalidFsInterpInfo.is16bit))
       interpInfoElem.loc = i;
 
-    regSPI_PS_INPUT_CNTL_0 spiPsInputCntl = {};
+    Pal::Gfx9::Chip::regSPI_PS_INPUT_CNTL_0 spiPsInputCntl = {};
     spiPsInputCntl.bits.FLAT_SHADE = interpInfoElem.flat;
     spiPsInputCntl.bits.OFFSET = interpInfoElem.loc;
 
@@ -1994,15 +1994,15 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
       spiPsInputCntl.bits.OFFSET = UseDefaultVal;
     }
 
-    appendConfig(mmSPI_PS_INPUT_CNTL_0 + i, spiPsInputCntl.u32All);
+    appendConfig(Pal::Gfx9::Chip::mmSPI_PS_INPUT_CNTL_0 + i, spiPsInputCntl.u32All);
   }
 
   if (pointCoordLoc != InvalidValue) {
     SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_ENA, true);
-    SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_X, SPI_PNT_SPRITE_SEL_S);
-    SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_Y, SPI_PNT_SPRITE_SEL_T);
-    SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_Z, SPI_PNT_SPRITE_SEL_0);
-    SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_W, SPI_PNT_SPRITE_SEL_1);
+    SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_X, Pal::Gfx9::Chip::SPI_PNT_SPRITE_SEL_S);
+    SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_Y, Pal::Gfx9::Chip::SPI_PNT_SPRITE_SEL_T);
+    SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_Z, Pal::Gfx9::Chip::SPI_PNT_SPRITE_SEL_0);
+    SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_W, Pal::Gfx9::Chip::SPI_PNT_SPRITE_SEL_1);
   }
 
   if (m_pipelineState->getPalAbiVersion() >= 456) {
@@ -2013,9 +2013,9 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
     setPsUsesUavs(static_cast<unsigned>(resUsage->resourceWrite));
 
   if (m_pipelineState->getRasterizerState().innerCoverage) {
-    SET_REG_FIELD(&pConfig->psRegs, PA_SC_AA_CONFIG, COVERAGE_TO_SHADER_SELECT, INPUT_INNER_COVERAGE);
+    SET_REG_FIELD(&pConfig->psRegs, PA_SC_AA_CONFIG, COVERAGE_TO_SHADER_SELECT, Pal::Gfx9::Chip::INPUT_INNER_COVERAGE);
   } else {
-    SET_REG_FIELD(&pConfig->psRegs, PA_SC_AA_CONFIG, COVERAGE_TO_SHADER_SELECT, INPUT_COVERAGE);
+    SET_REG_FIELD(&pConfig->psRegs, PA_SC_AA_CONFIG, COVERAGE_TO_SHADER_SELECT, Pal::Gfx9::Chip::INPUT_COVERAGE);
   }
 
   const unsigned loadCollisionWaveId = GET_REG_FIELD(&pConfig->psRegs, SPI_SHADER_PGM_RSRC2_PS, LOAD_COLLISION_WAVEID);
@@ -2036,7 +2036,7 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
   }
 
   // Set shader user data mapping
-  buildUserDataConfig(shaderStage, ShaderStageInvalid, mmSPI_SHADER_USER_DATA_PS_0);
+  buildUserDataConfig(shaderStage, ShaderStageInvalid, Pal::Gfx9::Chip::mmSPI_SHADER_USER_DATA_PS_0);
 }
 
 // =====================================================================================================================
@@ -2124,7 +2124,7 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
   }
 
   // Set shader user data mapping
-  buildUserDataConfig(shaderStage, ShaderStageInvalid, mmCOMPUTE_USER_DATA_0);
+  buildUserDataConfig(shaderStage, ShaderStageInvalid, Pal::Gfx9::Chip::mmCOMPUTE_USER_DATA_0);
 }
 
 // =====================================================================================================================
@@ -2337,37 +2337,37 @@ void ConfigBuilder::setupVgtTfParam(LsHsRegConfig *config) {
 
   assert(tessMode.primitiveMode != PrimitiveMode::Unknown);
   if (tessMode.primitiveMode == PrimitiveMode::Isolines)
-    primType = TESS_ISOLINE;
+    primType = Pal::Gfx9::Chip::TESS_ISOLINE;
   else if (tessMode.primitiveMode == PrimitiveMode::Triangles)
-    primType = TESS_TRIANGLE;
+    primType = Pal::Gfx9::Chip::TESS_TRIANGLE;
   else if (tessMode.primitiveMode == PrimitiveMode::Quads)
-    primType = TESS_QUAD;
+    primType = Pal::Gfx9::Chip::TESS_QUAD;
   assert(primType != InvalidValue);
 
   assert(tessMode.vertexSpacing != VertexSpacing::Unknown);
   if (tessMode.vertexSpacing == VertexSpacing::Equal)
-    partition = PART_INTEGER;
+    partition = Pal::Gfx9::Chip::PART_INTEGER;
   else if (tessMode.vertexSpacing == VertexSpacing::FractionalOdd)
-    partition = PART_FRAC_ODD;
+    partition = Pal::Gfx9::Chip::PART_FRAC_ODD;
   else if (tessMode.vertexSpacing == VertexSpacing::FractionalEven)
-    partition = PART_FRAC_EVEN;
+    partition = Pal::Gfx9::Chip::PART_FRAC_EVEN;
   assert(partition != InvalidValue);
 
   assert(tessMode.vertexOrder != VertexOrder::Unknown);
   if (tessMode.pointMode)
-    topology = OUTPUT_POINT;
+    topology = Pal::Gfx9::Chip::OUTPUT_POINT;
   else if (tessMode.primitiveMode == PrimitiveMode::Isolines)
-    topology = OUTPUT_LINE;
+    topology = Pal::Gfx9::Chip::OUTPUT_LINE;
   else if (tessMode.vertexOrder == VertexOrder::Cw)
-    topology = OUTPUT_TRIANGLE_CW;
+    topology = Pal::Gfx9::Chip::OUTPUT_TRIANGLE_CW;
   else if (tessMode.vertexOrder == VertexOrder::Ccw)
-    topology = OUTPUT_TRIANGLE_CCW;
+    topology = Pal::Gfx9::Chip::OUTPUT_TRIANGLE_CCW;
 
   if (m_pipelineState->getInputAssemblyState().switchWinding) {
-    if (topology == OUTPUT_TRIANGLE_CW)
-      topology = OUTPUT_TRIANGLE_CCW;
-    else if (topology == OUTPUT_TRIANGLE_CCW)
-      topology = OUTPUT_TRIANGLE_CW;
+    if (topology == Pal::Gfx9::Chip::OUTPUT_TRIANGLE_CW)
+      topology = Pal::Gfx9::Chip::OUTPUT_TRIANGLE_CCW;
+    else if (topology == Pal::Gfx9::Chip::OUTPUT_TRIANGLE_CCW)
+      topology = Pal::Gfx9::Chip::OUTPUT_TRIANGLE_CW;
   }
 
   assert(topology != InvalidValue);
@@ -2377,7 +2377,7 @@ void ConfigBuilder::setupVgtTfParam(LsHsRegConfig *config) {
   SET_REG_FIELD(config, VGT_TF_PARAM, TOPOLOGY, topology);
 
   if (m_pipelineState->isTessOffChip()) {
-    SET_REG_FIELD(config, VGT_TF_PARAM, DISTRIBUTION_MODE, TRAPEZOIDS);
+    SET_REG_FIELD(config, VGT_TF_PARAM, DISTRIBUTION_MODE, Pal::Gfx9::Chip::TRAPEZOIDS);
   }
 }
 

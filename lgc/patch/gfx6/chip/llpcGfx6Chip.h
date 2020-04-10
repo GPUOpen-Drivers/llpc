@@ -49,17 +49,17 @@ namespace Gfx6 {
 // Defines fields: register ID (byte-based) and its value
 #define DEF_REG(_reg)                                                                                                  \
   unsigned _reg##_ID;                                                                                                  \
-  reg##_reg _reg##_VAL;
+  Pal::Gfx6::Chip::reg##_reg _reg##_VAL;
 
 // Initializes register ID and its value
 #define INIT_REG(_reg)                                                                                                 \
   {                                                                                                                    \
-    _reg##_ID = mm##_reg;                                                                                              \
+    _reg##_ID = Pal::Gfx6::Chip::mm##_reg;                                                                                              \
     _reg##_VAL.u32All = 0;                                                                                             \
   }
 
 // Adds an entry for the map from register ID to its name string
-#define ADD_REG_MAP(_reg) RegNameMap[mm##_reg * 4] = #_reg;
+#define ADD_REG_MAP(_reg) RegNameMap[Pal::Gfx6::Chip::mm##_reg * 4] = #_reg;
 
 // Gets register value
 #define GET_REG(_stage, _reg) ((_stage)->_reg##_VAL.u32All)
