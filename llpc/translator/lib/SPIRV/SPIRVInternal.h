@@ -422,7 +422,9 @@ typedef SPIRVMap<Op, SPIRVImageOpInfo> SPIRVImageOpInfoMap;
 
 // "<" operator overloading, just to pass compilation for "SPIRVMap::rmap",
 // not actually used
-inline bool operator<(const SPIRVImageOpInfo &L, const SPIRVImageOpInfo &R) { return L.U32All < R.U32All; }
+inline bool operator<(const SPIRVImageOpInfo &L, const SPIRVImageOpInfo &R) {
+  return L.U32All < R.U32All;
+}
 
 /// \returns a vector of types for a collection of values.
 template <class T> std::vector<Type *> getTypes(T V) {

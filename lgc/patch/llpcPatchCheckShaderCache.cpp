@@ -45,7 +45,9 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for checking shader cache
-PatchCheckShaderCache *createPatchCheckShaderCache() { return new PatchCheckShaderCache(); }
+PatchCheckShaderCache *createPatchCheckShaderCache() {
+  return new PatchCheckShaderCache();
+}
 
 } // namespace lgc
 
@@ -69,7 +71,8 @@ static void streamMapEntries(MapType &map, raw_ostream &stream) {
 } // namespace
 
 // =====================================================================================================================
-PatchCheckShaderCache::PatchCheckShaderCache() : Patch(ID) {}
+PatchCheckShaderCache::PatchCheckShaderCache() : Patch(ID) {
+}
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.

@@ -61,10 +61,13 @@ char PatchBufferOp::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching for buffer operations
-FunctionPass *createPatchBufferOp() { return new PatchBufferOp(); }
+FunctionPass *createPatchBufferOp() {
+  return new PatchBufferOp();
+}
 
 // =====================================================================================================================
-PatchBufferOp::PatchBufferOp() : FunctionPass(ID) {}
+PatchBufferOp::PatchBufferOp() : FunctionPass(ID) {
+}
 
 // =====================================================================================================================
 // Get the analysis usage of this pass.

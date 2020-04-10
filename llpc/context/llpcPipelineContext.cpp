@@ -94,10 +94,12 @@ namespace Llpc {
 // @param pipelineHash : Pipeline hash code
 // @param cacheHash : Cache hash code
 PipelineContext::PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
-    : m_gfxIp(gfxIp), m_pipelineHash(*pipelineHash), m_cacheHash(*cacheHash) {}
+    : m_gfxIp(gfxIp), m_pipelineHash(*pipelineHash), m_cacheHash(*cacheHash) {
+}
 
 // =====================================================================================================================
-PipelineContext::~PipelineContext() {}
+PipelineContext::~PipelineContext() {
+}
 
 // =====================================================================================================================
 // Gets the name string of GPU target according to graphics IP version info.

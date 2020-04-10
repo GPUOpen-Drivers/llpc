@@ -366,13 +366,17 @@ Instruction *BuilderRecorder::CreateEndPrimitive(unsigned streamId) {
 
 // =====================================================================================================================
 // Create a workgroup control barrier.
-Instruction *BuilderRecorder::CreateBarrier() { return record(Opcode::Barrier, nullptr, {}, ""); }
+Instruction *BuilderRecorder::CreateBarrier() {
+  return record(Opcode::Barrier, nullptr, {}, "");
+}
 
 // =====================================================================================================================
 // Create a "kill". Only allowed in a fragment shader.
 //
 // @param instName : Name to give final instruction
-Instruction *BuilderRecorder::CreateKill(const Twine &instName) { return record(Opcode::Kill, nullptr, {}, instName); }
+Instruction *BuilderRecorder::CreateKill(const Twine &instName) {
+  return record(Opcode::Kill, nullptr, {}, instName);
+}
 
 // =====================================================================================================================
 // Create a matrix transpose.

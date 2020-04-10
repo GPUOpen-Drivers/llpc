@@ -44,7 +44,9 @@ using namespace llvm;
 // Create a subgroup get subgroup size.
 //
 // @param instName : Name to give final instruction.
-Value *BuilderImplSubgroup::CreateGetSubgroupSize(const Twine &instName) { return getInt32(getShaderSubgroupSize()); }
+Value *BuilderImplSubgroup::CreateGetSubgroupSize(const Twine &instName) {
+  return getInt32(getShaderSubgroupSize());
+}
 
 // =====================================================================================================================
 // Get the shader subgroup size for the current insertion block.

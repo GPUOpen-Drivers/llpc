@@ -48,10 +48,13 @@ char SpirvLowerInstMetaRemove::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering opertions for removing the instruction metadata
-ModulePass *createSpirvLowerInstMetaRemove() { return new SpirvLowerInstMetaRemove(); }
+ModulePass *createSpirvLowerInstMetaRemove() {
+  return new SpirvLowerInstMetaRemove();
+}
 
 // =====================================================================================================================
-SpirvLowerInstMetaRemove::SpirvLowerInstMetaRemove() : SpirvLower(ID), m_changed(false) {}
+SpirvLowerInstMetaRemove::SpirvLowerInstMetaRemove() : SpirvLower(ID), m_changed(false) {
+}
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.

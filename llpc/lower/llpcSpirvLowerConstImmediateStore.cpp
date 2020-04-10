@@ -49,10 +49,13 @@ char SpirvLowerConstImmediateStore::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for constant immediate store
-ModulePass *createSpirvLowerConstImmediateStore() { return new SpirvLowerConstImmediateStore(); }
+ModulePass *createSpirvLowerConstImmediateStore() {
+  return new SpirvLowerConstImmediateStore();
+}
 
 // =====================================================================================================================
-SpirvLowerConstImmediateStore::SpirvLowerConstImmediateStore() : SpirvLower(ID) {}
+SpirvLowerConstImmediateStore::SpirvLowerConstImmediateStore() : SpirvLower(ID) {
+}
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.

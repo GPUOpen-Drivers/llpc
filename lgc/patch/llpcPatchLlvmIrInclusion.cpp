@@ -45,10 +45,13 @@ char PatchLlvmIrInclusion::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations of including LLVM IR as a separate section in the ELF.
-ModulePass *createPatchLlvmIrInclusion() { return new PatchLlvmIrInclusion(); }
+ModulePass *createPatchLlvmIrInclusion() {
+  return new PatchLlvmIrInclusion();
+}
 
 // =====================================================================================================================
-PatchLlvmIrInclusion::PatchLlvmIrInclusion() : Patch(ID) {}
+PatchLlvmIrInclusion::PatchLlvmIrInclusion() : Patch(ID) {
+}
 
 // =====================================================================================================================
 // Executes this patching pass on the specified LLVM module.

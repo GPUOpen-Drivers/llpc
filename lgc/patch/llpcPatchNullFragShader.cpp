@@ -82,7 +82,9 @@ char PatchNullFragShader::ID = 0;
 
 // =====================================================================================================================
 // Create the pass that generates a null fragment shader if required.
-ModulePass *lgc::createPatchNullFragShader() { return new PatchNullFragShader(); }
+ModulePass *lgc::createPatchNullFragShader() {
+  return new PatchNullFragShader();
+}
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.

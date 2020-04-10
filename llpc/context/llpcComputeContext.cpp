@@ -46,7 +46,8 @@ namespace Llpc {
 // @param cacheHash : Cache hash code
 ComputeContext::ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInfo *pipelineInfo,
                                MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
-    : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo) {}
+    : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo) {
+}
 
 // =====================================================================================================================
 // Gets pipeline shader info of the specified shader stage

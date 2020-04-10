@@ -81,14 +81,17 @@ char BuilderReplayer::ID = 0;
 // Create BuilderReplayer pass
 //
 // @param pipeline : Pipeline object
-ModulePass *lgc::createBuilderReplayer(Pipeline *pipeline) { return new BuilderReplayer(pipeline); }
+ModulePass *lgc::createBuilderReplayer(Pipeline *pipeline) {
+  return new BuilderReplayer(pipeline);
+}
 
 // =====================================================================================================================
 // Constructor
 //
 // @param pipeline : Pipeline object
 BuilderReplayer::BuilderReplayer(Pipeline *pipeline)
-    : ModulePass(ID), BuilderRecorderMetadataKinds(static_cast<LLVMContext &>(pipeline->getContext())) {}
+    : ModulePass(ID), BuilderRecorderMetadataKinds(static_cast<LLVMContext &>(pipeline->getContext())) {
+}
 
 // =====================================================================================================================
 // Run the BuilderReplayer pass on a module

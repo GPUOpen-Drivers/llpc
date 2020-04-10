@@ -73,11 +73,15 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Gets the value of option "allow-out".
-bool EnableOuts() { return cl::EnableOuts || cl::Verbose; }
+bool EnableOuts() {
+  return cl::EnableOuts || cl::Verbose;
+}
 
 // =====================================================================================================================
 // Gets the value of option "allow-err".
-bool EnableErrs() { return cl::EnableErrs; }
+bool EnableErrs() {
+  return cl::EnableErrs;
+}
 
 // =====================================================================================================================
 // Redirects the output of logs. It affects the behavior of llvm::outs(), dbgs() and errs().

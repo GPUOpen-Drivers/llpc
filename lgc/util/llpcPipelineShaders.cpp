@@ -43,7 +43,9 @@ char PipelineShaders::ID = 0;
 
 // =====================================================================================================================
 // Create an instance of the pass.
-ModulePass *createPipelineShaders() { return new PipelineShaders(); }
+ModulePass *createPipelineShaders() {
+  return new PipelineShaders();
+}
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.

@@ -1,5 +1,6 @@
 BasedOnStyle: LLVM
 ColumnLimit: 120
+AllowShortFunctionsOnASingleLine: InlineOnly
 IncludeBlocks: Merge
 IncludeCategories:
   - Regex:           '^"lgc/'

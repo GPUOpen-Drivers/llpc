@@ -65,7 +65,9 @@ char PatchSetupTargetFeatures::ID = 0;
 
 // =====================================================================================================================
 // Create pass to set up target features
-ModulePass *lgc::createPatchSetupTargetFeatures() { return new PatchSetupTargetFeatures(); }
+ModulePass *lgc::createPatchSetupTargetFeatures() {
+  return new PatchSetupTargetFeatures();
+}
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.

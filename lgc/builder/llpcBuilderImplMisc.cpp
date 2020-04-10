@@ -76,7 +76,9 @@ Instruction *BuilderImplMisc::CreateEndPrimitive(unsigned streamId) {
 
 // =====================================================================================================================
 // Create a workgroup control barrier.
-Instruction *BuilderImplMisc::CreateBarrier() { return CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {}); }
+Instruction *BuilderImplMisc::CreateBarrier() {
+  return CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+}
 
 // =====================================================================================================================
 // Create a "kill". Only allowed in a fragment shader.

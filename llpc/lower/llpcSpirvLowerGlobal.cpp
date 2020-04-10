@@ -153,11 +153,14 @@ char SpirvLowerGlobal::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for globals
-ModulePass *createSpirvLowerGlobal() { return new SpirvLowerGlobal(); }
+ModulePass *createSpirvLowerGlobal() {
+  return new SpirvLowerGlobal();
+}
 
 // =====================================================================================================================
 SpirvLowerGlobal::SpirvLowerGlobal()
-    : SpirvLower(ID), m_retBlock(nullptr), m_lowerInputInPlace(false), m_lowerOutputInPlace(false) {}
+    : SpirvLower(ID), m_retBlock(nullptr), m_lowerInputInPlace(false), m_lowerOutputInPlace(false) {
+}
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.

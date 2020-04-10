@@ -687,4 +687,6 @@ unsigned ShaderSystemValues::findResourceNodeByDescSet(unsigned descSet) {
 
 // =====================================================================================================================
 // Test if shadow descriptor table is enabled
-bool ShaderSystemValues::isShadowDescTableEnabled() const { return m_enableShadowDescTable; }
+bool ShaderSystemValues::isShadowDescTableEnabled() const {
+  return m_enableShadowDescTable;
+}

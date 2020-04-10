@@ -364,7 +364,9 @@ PipelineDumpFile *PipelineDumper::BeginPipelineDump(const PipelineDumpOptions *d
 // Ends to dump graphics/compute pipeline info.
 //
 // @param dumpFile : Dump file
-void PipelineDumper::EndPipelineDump(PipelineDumpFile *dumpFile) { delete dumpFile; }
+void PipelineDumper::EndPipelineDump(PipelineDumpFile *dumpFile) {
+  delete dumpFile;
+}
 
 // =====================================================================================================================
 // Dumps resource mapping node to dumpFile.

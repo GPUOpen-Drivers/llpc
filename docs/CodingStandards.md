@@ -155,6 +155,7 @@ The LLPC coding standard uses a clang-format configuration based on the LLVM one
 with the following changes:
 
 - 120 column limit (rather than 80)
+- No putting an out-of-line function/method definition onto a single line
 - `#include` blocks are merged together (removing blank lines) before sorting
 - `#include` directives are sorted in this order:
   - the `.h` file for the current `.cpp` file;

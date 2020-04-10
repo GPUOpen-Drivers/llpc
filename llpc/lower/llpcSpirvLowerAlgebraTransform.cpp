@@ -68,7 +68,8 @@ ModulePass *createSpirvLowerAlgebraTransform(bool enableConstFolding, bool enabl
 // @param enableConstFolding : Whether enable constant folding
 // @param enableFloatOpt : Whether enable floating point optimization
 SpirvLowerAlgebraTransform::SpirvLowerAlgebraTransform(bool enableConstFolding, bool enableFloatOpt)
-    : SpirvLower(ID), m_enableConstFolding(enableConstFolding), m_enableFloatOpt(enableFloatOpt), m_changed(false) {}
+    : SpirvLower(ID), m_enableConstFolding(enableConstFolding), m_enableFloatOpt(enableFloatOpt), m_changed(false) {
+}
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.

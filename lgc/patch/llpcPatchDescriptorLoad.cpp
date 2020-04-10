@@ -48,10 +48,13 @@ char PatchDescriptorLoad::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for descriptor load
-ModulePass *createPatchDescriptorLoad() { return new PatchDescriptorLoad(); }
+ModulePass *createPatchDescriptorLoad() {
+  return new PatchDescriptorLoad();
+}
 
 // =====================================================================================================================
-PatchDescriptorLoad::PatchDescriptorLoad() : Patch(ID) {}
+PatchDescriptorLoad::PatchDescriptorLoad() : Patch(ID) {
+}
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.

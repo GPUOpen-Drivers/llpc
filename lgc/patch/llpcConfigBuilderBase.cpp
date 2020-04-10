@@ -70,7 +70,8 @@ ConfigBuilderBase::ConfigBuilderBase(llvm::Module *module, PipelineState *pipeli
 }
 
 // =====================================================================================================================
-ConfigBuilderBase::~ConfigBuilderBase() {}
+ConfigBuilderBase::~ConfigBuilderBase() {
+}
 
 // =====================================================================================================================
 /// Adds the .shaders.$(apiStage).hardware_mapping node to the PAL metadata.

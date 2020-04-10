@@ -47,7 +47,8 @@ namespace lgc {
 // @param pipelineState : Pipeline state
 // @param module : LLVM module
 FragColorExport::FragColorExport(PipelineState *pipelineState, Module *module)
-    : m_pipelineState(pipelineState), m_context(module ? &module->getContext() : nullptr) {}
+    : m_pipelineState(pipelineState), m_context(module ? &module->getContext() : nullptr) {
+}
 
 // =====================================================================================================================
 // Executes fragment color export operations based on the specified output type and its location.

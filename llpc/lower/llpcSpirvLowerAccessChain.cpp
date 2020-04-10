@@ -49,10 +49,13 @@ char SpirvLowerAccessChain::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for access chain
-ModulePass *createSpirvLowerAccessChain() { return new SpirvLowerAccessChain(); }
+ModulePass *createSpirvLowerAccessChain() {
+  return new SpirvLowerAccessChain();
+}
 
 // =====================================================================================================================
-SpirvLowerAccessChain::SpirvLowerAccessChain() : SpirvLower(ID) {}
+SpirvLowerAccessChain::SpirvLowerAccessChain() : SpirvLower(ID) {
+}
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.

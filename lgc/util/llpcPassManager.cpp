@@ -109,7 +109,9 @@ static AnalysisID getPassIdFromName(StringRef passName) {
 
 // =====================================================================================================================
 // Create a PassManagerImpl
-lgc::PassManager *lgc::PassManager::Create() { return new PassManagerImpl; }
+lgc::PassManager *lgc::PassManager::Create() {
+  return new PassManagerImpl;
+}
 
 // =====================================================================================================================
 PassManagerImpl::PassManagerImpl() : PassManager() {
@@ -165,4 +167,6 @@ void PassManagerImpl::add(Pass *pass) {
 
 // =====================================================================================================================
 // Stop adding passes to the pass manager, except immutable ones.
-void PassManagerImpl::stop() { m_stopped = true; }
+void PassManagerImpl::stop() {
+  m_stopped = true;
+}

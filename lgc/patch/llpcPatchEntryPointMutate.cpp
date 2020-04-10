@@ -64,10 +64,13 @@ char PatchEntryPointMutate::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching opertions for entry-point mutation
-ModulePass *createPatchEntryPointMutate() { return new PatchEntryPointMutate(); }
+ModulePass *createPatchEntryPointMutate() {
+  return new PatchEntryPointMutate();
+}
 
 // =====================================================================================================================
-PatchEntryPointMutate::PatchEntryPointMutate() : Patch(ID), m_hasTs(false), m_hasGs(false) {}
+PatchEntryPointMutate::PatchEntryPointMutate() : Patch(ID), m_hasTs(false), m_hasGs(false) {
+}
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
