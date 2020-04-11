@@ -100,6 +100,7 @@ void LgcContext::initialize() {
 
   // Initialize LGC passes so they can be referenced by -stop-before etc.
   initializeUtilPasses(passRegistry);
+  initializeStatePasses(passRegistry);
   initializeBuilderReplayerPass(passRegistry);
   initializePatchPasses(passRegistry);
 }

@@ -63,7 +63,10 @@ public:
   PatchSetupTargetFeatures &operator=(const PatchSetupTargetFeatures &) = delete;
 
 private:
-  void setupTargetFeatures(PipelineState *pipelineState, Module *module);
+  void setupTargetFeatures(Module *module);
+  ShaderStage getShaderStageFromCallingConv(CallingConv::ID callConv);
+
+  PipelineState *m_pipelineState;
 };
 
 char PatchSetupTargetFeatures::ID = 0;
@@ -85,8 +88,8 @@ bool PatchSetupTargetFeatures::runOnModule(Module &module) {
 
   Patch::init(&module);
 
-  auto pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
-  setupTargetFeatures(pipelineState, &module);
+  m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  setupTargetFeatures(&module);
 
   return true; // Modified the module.
 }
@@ -94,12 +97,11 @@ bool PatchSetupTargetFeatures::runOnModule(Module &module) {
 // =====================================================================================================================
 // Setup LLVM target features, target features are set per entry point function.
 //
-// @param pipelineState : Pipeline state
 // @param [in, out] module : LLVM module
-void PatchSetupTargetFeatures::setupTargetFeatures(PipelineState *pipelineState, Module *module) {
+void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
   std::string globalFeatures = "";
 
-  if (pipelineState->getOptions().includeDisassembly)
+  if (m_pipelineState->getOptions().includeDisassembly)
     globalFeatures += ",+DumpCode";
 
   if (DisableFp32Denormals)
@@ -110,10 +112,9 @@ void PatchSetupTargetFeatures::setupTargetFeatures(PipelineState *pipelineState,
       std::string targetFeatures(globalFeatures);
       AttrBuilder builder;
 
-      ShaderStage shaderStage =
-          getShaderStageFromCallingConv(pipelineState->getShaderStageMask(), func->getCallingConv());
+      ShaderStage shaderStage = getShaderStageFromCallingConv(func->getCallingConv());
 
-      bool useSiScheduler = pipelineState->getShaderOptions(shaderStage).useSiScheduler;
+      bool useSiScheduler = m_pipelineState->getShaderOptions(shaderStage).useSiScheduler;
       if (useSiScheduler) {
         // It was found that enabling both SIScheduler and SIFormClauses was bad on one particular
         // game. So we disable the latter here. That only affects XNACK targets.
@@ -124,7 +125,7 @@ void PatchSetupTargetFeatures::setupTargetFeatures(PipelineState *pipelineState,
       if (func->getCallingConv() == CallingConv::AMDGPU_GS) {
         // NOTE: For NGG primitive shader, enable 128-bit LDS load/store operations to optimize gvec4 data
         // read/write. This usage must enable the feature of using CI+ additional instructions.
-        const auto nggControl = pipelineState->getNggControl();
+        const auto nggControl = m_pipelineState->getNggControl();
         if (nggControl->enableNgg && !nggControl->passthroughMode)
           targetFeatures += ",+ci-insts,+enable-ds128";
       }
@@ -135,20 +136,20 @@ void PatchSetupTargetFeatures::setupTargetFeatures(PipelineState *pipelineState,
       }
       if (func->getCallingConv() == CallingConv::AMDGPU_CS) {
         // Set the work group size
-        const auto &csBuiltInUsage = pipelineState->getShaderModes()->getComputeShaderMode();
+        const auto &csBuiltInUsage = m_pipelineState->getShaderModes()->getComputeShaderMode();
         unsigned flatWorkGroupSize =
             csBuiltInUsage.workgroupSizeX * csBuiltInUsage.workgroupSizeY * csBuiltInUsage.workgroupSizeZ;
         auto flatWorkGroupSizeString = std::to_string(flatWorkGroupSize);
         builder.addAttribute("amdgpu-flat-work-group-size", flatWorkGroupSizeString + "," + flatWorkGroupSizeString);
       }
 
-      auto gfxIp = pipelineState->getTargetInfo().getGfxIpVersion();
+      auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
       if (gfxIp.major >= 9)
         targetFeatures += ",+enable-scratch-bounds-checks";
 
       if (gfxIp.major >= 10) {
         // Setup wavefront size per shader stage
-        unsigned waveSize = pipelineState->getShaderWaveSize(shaderStage);
+        unsigned waveSize = m_pipelineState->getShaderWaveSize(shaderStage);
 
         targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
 
@@ -158,7 +159,7 @@ void PatchSetupTargetFeatures::setupTargetFeatures(PipelineState *pipelineState,
       }
 
       if (shaderStage != ShaderStageCopyShader) {
-        const auto &shaderMode = pipelineState->getShaderModes()->getCommonShaderMode(shaderStage);
+        const auto &shaderMode = m_pipelineState->getShaderModes()->getCommonShaderMode(shaderStage);
         if (shaderMode.fp16DenormMode == FpDenormMode::FlushNone ||
             shaderMode.fp16DenormMode == FpDenormMode::FlushIn ||
             shaderMode.fp64DenormMode == FpDenormMode::FlushNone || shaderMode.fp64DenormMode == FpDenormMode::FlushIn)
@@ -180,6 +181,49 @@ void PatchSetupTargetFeatures::setupTargetFeatures(PipelineState *pipelineState,
       func->addAttributes(attribIdx, builder);
     }
   }
+}
+
+// =====================================================================================================================
+// Gets the shader stage from the specified calling convention.
+//
+// @param callConv : Calling convention
+ShaderStage PatchSetupTargetFeatures::getShaderStageFromCallingConv(CallingConv::ID callConv) {
+  ShaderStage shaderStage = ShaderStageInvalid;
+  auto stageMask = m_pipelineState->getShaderStageMask();
+
+  bool hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry)) != 0;
+  bool hasTs = ((stageMask & shaderStageToMask(ShaderStageTessControl)) != 0 ||
+                (stageMask & shaderStageToMask(ShaderStageTessEval)) != 0);
+
+  switch (callConv) {
+  case CallingConv::AMDGPU_PS:
+    shaderStage = ShaderStageFragment;
+    break;
+  case CallingConv::AMDGPU_LS:
+    shaderStage = ShaderStageVertex;
+    break;
+  case CallingConv::AMDGPU_HS:
+    shaderStage = ShaderStageTessControl;
+    break;
+  case CallingConv::AMDGPU_ES:
+    shaderStage = hasTs ? ShaderStageTessEval : ShaderStageVertex;
+    break;
+  case CallingConv::AMDGPU_GS:
+    // NOTE: If GS is not present, this must be NGG.
+    shaderStage = hasGs ? ShaderStageGeometry : (hasTs ? ShaderStageTessEval : ShaderStageVertex);
+    break;
+  case CallingConv::AMDGPU_VS:
+    shaderStage = hasGs ? ShaderStageCopyShader : (hasTs ? ShaderStageTessEval : ShaderStageVertex);
+    break;
+  case CallingConv::AMDGPU_CS:
+    shaderStage = ShaderStageCompute;
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+
+  return shaderStage;
 }
 
 // =====================================================================================================================

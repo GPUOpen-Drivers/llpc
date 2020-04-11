@@ -54,7 +54,7 @@ static cl::opt<unsigned> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
 void ShaderSystemValues::initialize(PipelineState *pipelineState, Function *entryPoint) {
   if (!m_entryPoint) {
     m_entryPoint = entryPoint;
-    m_shaderStage = getShaderStageFromFunction(entryPoint);
+    m_shaderStage = getShaderStage(entryPoint);
     m_context = &entryPoint->getParent()->getContext();
     m_pipelineState = pipelineState;
 

@@ -86,7 +86,7 @@ bool BuilderImplBase::supportDpp() const {
 bool BuilderImplBase::supportBPermute() const {
   auto gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion().major;
   auto supportBPermute = gfxIp == 8 || gfxIp == 9;
-  auto waveSize = getPipelineState()->getShaderWaveSize(getShaderStageFromFunction(GetInsertBlock()->getParent()));
+  auto waveSize = getPipelineState()->getShaderWaveSize(getShaderStage(GetInsertBlock()->getParent()));
   supportBPermute = supportBPermute || (gfxIp == 10 && waveSize == 32);
   return supportBPermute;
 }

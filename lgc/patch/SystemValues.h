@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "Internal.h"
+#include "Defs.h"
 #include "lgc/BuilderBase.h"
 #include "lgc/Pipeline.h"
 #include "llvm/ADT/ArrayRef.h"

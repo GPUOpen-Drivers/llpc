@@ -1638,8 +1638,8 @@ void PatchResourceCollect::matchGenericInOut() {
 
   // Do location mapping
   LLPC_OUTS("===============================================================================\n");
-  LLPC_OUTS("// LLPC location input/output mapping results ("
-            << PipelineState::getShaderStageAbbreviation(m_shaderStage) << " shader)\n\n");
+  LLPC_OUTS("// LLPC location input/output mapping results (" << getShaderStageAbbreviation(m_shaderStage)
+                                                              << " shader)\n\n");
   unsigned nextMapLoc = 0;
   if (!inLocMap.empty()) {
     assert(inOutUsage.inputMapLocCount == 0);
@@ -1648,7 +1648,7 @@ void PatchResourceCollect::matchGenericInOut() {
       // NOTE: For vertex shader, the input location mapping is actually trivial.
       locMap.second = m_shaderStage == ShaderStageVertex ? locMap.first : nextMapLoc++;
       inOutUsage.inputMapLocCount = std::max(inOutUsage.inputMapLocCount, locMap.second + 1);
-      LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input:  loc = " << locMap.first
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input:  loc = " << locMap.first
                     << "  =>  Mapped = " << locMap.second << "\n");
     }
     LLPC_OUTS("\n");
@@ -1685,7 +1685,7 @@ void PatchResourceCollect::matchGenericInOut() {
         } else
           assert(m_shaderStage == ShaderStageTessControl);
         inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, locMap.second + 1);
-        LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Output: loc = " << locMap.first
+        LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: loc = " << locMap.first
                       << "  =>  Mapped = " << locMap.second << "\n");
 
         if (m_shaderStage == ShaderStageFragment)
@@ -1704,8 +1704,8 @@ void PatchResourceCollect::matchGenericInOut() {
       assert(locMap.second == InvalidValue);
       locMap.second = nextMapLoc++;
       inOutUsage.perPatchInputMapLocCount = std::max(inOutUsage.perPatchInputMapLocCount, locMap.second + 1);
-      LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
-                    << ") Input (per-patch):  loc = " << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  loc = " << locMap.first
+                    << "  =>  Mapped = " << locMap.second << "\n");
     }
     LLPC_OUTS("\n");
   }
@@ -1720,20 +1720,20 @@ void PatchResourceCollect::matchGenericInOut() {
       } else
         assert(m_shaderStage == ShaderStageTessControl);
       inOutUsage.perPatchOutputMapLocCount = std::max(inOutUsage.perPatchOutputMapLocCount, locMap.second + 1);
-      LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
-                    << ") Output (per-patch): loc = " << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): loc = " << locMap.first
+                    << "  =>  Mapped = " << locMap.second << "\n");
     }
     LLPC_OUTS("\n");
   }
 
   LLPC_OUTS("// LLPC location count results (after input/output matching) \n\n");
-  LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
-                << ") Input:  loc count = " << inOutUsage.inputMapLocCount << "\n");
-  LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
-                << ") Output: loc count = " << inOutUsage.outputMapLocCount << "\n");
-  LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
+  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input:  loc count = " << inOutUsage.inputMapLocCount
+                << "\n");
+  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: loc count = " << inOutUsage.outputMapLocCount
+                << "\n");
+  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
                 << ") Input (per-patch):  loc count = " << inOutUsage.perPatchInputMapLocCount << "\n");
-  LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
+  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
                 << ") Output (per-patch): loc count = " << inOutUsage.perPatchOutputMapLocCount << "\n");
   LLPC_OUTS("\n");
 }
@@ -2413,13 +2413,13 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
 
   // Do builtin-to-generic mapping
   LLPC_OUTS("===============================================================================\n");
-  LLPC_OUTS("// LLPC builtin-to-generic mapping results (" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
+  LLPC_OUTS("// LLPC builtin-to-generic mapping results (" << getShaderStageAbbreviation(m_shaderStage)
                                                            << " shader)\n\n");
   if (!inOutUsage.builtInInputLocMap.empty()) {
     for (const auto &builtInMap : inOutUsage.builtInInputLocMap) {
       const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
       const unsigned loc = builtInMap.second;
-      LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input:  builtin = "
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input:  builtin = "
                     << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
     }
     LLPC_OUTS("\n");
@@ -2431,12 +2431,11 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       const unsigned loc = builtInMap.second;
 
       if (m_shaderStage == ShaderStageGeometry) {
-        LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
+        LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
                       << ") Output: stream = " << inOutUsage.gs.rasterStream << " , "
-                      << "builtin = " << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc
-                      << "\n");
+                      << "builtin = " << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
       } else {
-        LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Output: builtin = "
+        LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: builtin = "
                       << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
       }
     }
@@ -2447,7 +2446,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
     for (const auto &builtInMap : inOutUsage.perPatchBuiltInInputLocMap) {
       const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
       const unsigned loc = builtInMap.second;
-      LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  builtin = "
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  builtin = "
                     << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
     }
     LLPC_OUTS("\n");
@@ -2457,20 +2456,20 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
     for (const auto &builtInMap : inOutUsage.perPatchBuiltInOutputLocMap) {
       const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
       const unsigned loc = builtInMap.second;
-      LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): builtin = "
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): builtin = "
                     << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
     }
     LLPC_OUTS("\n");
   }
 
   LLPC_OUTS("// LLPC location count results (after builtin-to-generic mapping)\n\n");
-  LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
-                << ") Input:  loc count = " << inOutUsage.inputMapLocCount << "\n");
-  LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
-                << ") Output: loc count = " << inOutUsage.outputMapLocCount << "\n");
-  LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
+  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input:  loc count = " << inOutUsage.inputMapLocCount
+                << "\n");
+  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: loc count = " << inOutUsage.outputMapLocCount
+                << "\n");
+  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
                 << ") Input (per-patch):  loc count = " << inOutUsage.perPatchInputMapLocCount << "\n");
-  LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
+  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
                 << ") Output (per-patch): loc count = " << inOutUsage.perPatchOutputMapLocCount << "\n");
   LLPC_OUTS("\n");
 }
@@ -2492,8 +2491,7 @@ void PatchResourceCollect::mapGsGenericOutput(GsOutLocInfo outLocInfo) {
 
   resUsage->inOutUsage.outputMapLocCount = std::max(resUsage->inOutUsage.outputMapLocCount, assignedLocCount);
 
-  LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
-                << ") Output: stream = " << outLocInfo.streamId << ", "
+  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: stream = " << outLocInfo.streamId << ", "
                 << " loc = " << outLocInfo.location
                 << "  =>  Mapped = " << resUsage->inOutUsage.outputLocMap[outLocInfo.u32All] << "\n");
 }

@@ -161,7 +161,7 @@ void BuilderReplayer::replayCall(unsigned opcode, CallInst *call) {
     auto mapIt = m_shaderStageMap.find(enclosingFunc);
     ShaderStage stage = ShaderStageInvalid;
     if (mapIt == m_shaderStageMap.end()) {
-      stage = getShaderStageFromFunction(enclosingFunc);
+      stage = getShaderStage(enclosingFunc);
       m_shaderStageMap[enclosingFunc] = stage;
     } else
       stage = mapIt->second;

@@ -166,8 +166,8 @@ const ComputeShaderMode &ShaderModes::getComputeShaderMode() {
 void ShaderModes::record(Module *module) {
   // First the common state.
   for (unsigned stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage) {
-    std::string metadataName = std::string(CommonShaderModeMetadataPrefix) +
-                               PipelineState::getShaderStageAbbreviation(static_cast<ShaderStage>(stage));
+    std::string metadataName =
+        std::string(CommonShaderModeMetadataPrefix) + getShaderStageAbbreviation(static_cast<ShaderStage>(stage));
     PipelineState::setNamedMetadataToArrayOfInt32(module, m_commonShaderModes[stage], metadataName);
   }
 
@@ -191,8 +191,8 @@ void ShaderModes::readModesFromShader(Module *module, ShaderStage stage) {
     return;
 
   // First the common state.
-  std::string metadataName = std::string(CommonShaderModeMetadataPrefix) +
-                             PipelineState::getShaderStageAbbreviation(static_cast<ShaderStage>(stage));
+  std::string metadataName =
+      std::string(CommonShaderModeMetadataPrefix) + getShaderStageAbbreviation(static_cast<ShaderStage>(stage));
   PipelineState::readNamedMetadataArrayOfInt32(module, metadataName, m_commonShaderModes[stage]);
 
   // Then the specific shader modes.
@@ -222,8 +222,8 @@ void ShaderModes::readModesFromShader(Module *module, ShaderStage stage) {
 void ShaderModes::readModesFromPipeline(Module *module) {
   // First the common state.
   for (unsigned stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage) {
-    std::string metadataName = std::string(CommonShaderModeMetadataPrefix) +
-                               PipelineState::getShaderStageAbbreviation(static_cast<ShaderStage>(stage));
+    std::string metadataName =
+        std::string(CommonShaderModeMetadataPrefix) + getShaderStageAbbreviation(static_cast<ShaderStage>(stage));
     PipelineState::readNamedMetadataArrayOfInt32(module, metadataName, m_commonShaderModes[stage]);
   }
 

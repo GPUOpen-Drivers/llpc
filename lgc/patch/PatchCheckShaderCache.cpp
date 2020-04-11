@@ -101,7 +101,7 @@ bool PatchCheckShaderCache::runOnModule(Module &module) {
               vals.push_back(user);
               continue;
             }
-            if (getShaderStageFromFunction(cast<Instruction>(user)->getFunction()) != ShaderStageFragment)
+            if (getShaderStage(cast<Instruction>(user)->getFunction()) != ShaderStageFragment)
               return false;
           }
         }
@@ -153,7 +153,7 @@ bool PatchCheckShaderCache::runOnModule(Module &module) {
   // "Remove" a shader stage by making its entry-point function internal, so it gets removed later.
   for (auto &func : module) {
     if (!func.empty() && func.getLinkage() != GlobalValue::InternalLinkage) {
-      auto stage = getShaderStageFromFunction(&func);
+      auto stage = getShaderStage(&func);
       if (stage != ShaderStageInvalid && (shaderStageToMask(stage) & ~modifiedStageMask) != 0)
         func.setLinkage(GlobalValue::InternalLinkage);
     }

@@ -29,6 +29,7 @@
 ***********************************************************************************************************************
 */
 #include "PipelineShaders.h"
+#include "PipelineState.h"
 #include "Internal.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
@@ -63,7 +64,7 @@ bool PipelineShaders::runOnModule(Module &module) {
 
   for (auto &func : module) {
     if (!func.empty() && func.getLinkage() != GlobalValue::InternalLinkage) {
-      auto shaderStage = getShaderStageFromFunction(&func);
+      auto shaderStage = lgc::getShaderStage(&func);
 
       if (shaderStage != ShaderStageInvalid) {
         m_entryPoints[shaderStage] = &func;

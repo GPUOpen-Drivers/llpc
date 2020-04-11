@@ -222,8 +222,10 @@ target_sources(LLVMlgc PRIVATE
 # lgc/state
 target_sources(LLVMlgc PRIVATE
     state/LgcContext.cpp
+    state/PipelineShaders.cpp
     state/PipelineState.cpp
     state/ShaderModes.cpp
+    state/ShaderStage.cpp
     state/TargetInfo.cpp
 )
 
@@ -234,6 +236,5 @@ target_sources(LLVMlgc PRIVATE
     util/GfxRegHandler.cpp
     util/Internal.cpp
     util/PassManager.cpp
-    util/PipelineShaders.cpp
     util/StartStopTimer.cpp
 )

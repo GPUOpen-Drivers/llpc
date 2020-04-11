@@ -34,6 +34,7 @@
 #include "Defs.h"
 #include "ResourceUsage.h"
 #include "ShaderModes.h"
+#include "ShaderStage.h"
 #include "lgc/Pipeline.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
@@ -43,8 +44,14 @@
 namespace llvm {
 
 class MDString;
+class ModulePass;
 class NamedMDNode;
+class PassRegistry;
 class Timer;
+
+void initializePipelineShadersPass(PassRegistry &);
+void initializePipelineStateClearerPass(PassRegistry &);
+void initializePipelineStateWrapperPass(PassRegistry &);
 
 } // namespace llvm
 
@@ -53,6 +60,15 @@ namespace lgc {
 class TargetInfo;
 
 llvm::ModulePass *createPipelineStateClearer();
+
+// Initialize passes in state directory
+//
+// @param passRegistry : Pass registry
+inline static void initializeStatePasses(llvm::PassRegistry &passRegistry) {
+  initializePipelineShadersPass(passRegistry);
+  initializePipelineStateClearerPass(passRegistry);
+  initializePipelineStateWrapperPass(passRegistry);
+}
 
 // =====================================================================================================================
 // Represents NGG (implicit primitive shader) control settings (valid for GFX10+)
@@ -231,9 +247,6 @@ public:
 
   // -----------------------------------------------------------------------------------------------------------------
   // Utility methods
-
-  // Gets name string of the abbreviation for the specified shader stage
-  static const char *getShaderStageAbbreviation(ShaderStage shaderStage);
 
   // Translate enum "ResourceNodeType" to string
   static const char *getResourceNodeTypeName(ResourceNodeType type);

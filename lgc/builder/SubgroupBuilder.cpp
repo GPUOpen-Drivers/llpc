@@ -51,7 +51,7 @@ Value *SubgroupBuilder::CreateGetSubgroupSize(const Twine &instName) {
 // =====================================================================================================================
 // Get the shader subgroup size for the current insertion block.
 unsigned SubgroupBuilder::getShaderSubgroupSize() {
-  return getPipelineState()->getShaderWaveSize(getShaderStageFromFunction(GetInsertBlock()->getParent()));
+  return getPipelineState()->getShaderWaveSize(getShaderStage(GetInsertBlock()->getParent()));
 }
 
 // =====================================================================================================================

@@ -148,10 +148,8 @@ bool PatchNullFragShader::runOnModule(llvm::Module &module) {
   addTypeMangling(Type::getVoidTy(*m_context), exportArgs, exportName);
   emitCall(exportName, Type::getVoidTy(*m_context), exportArgs, {}, insertPos);
 
-  // Add execution model metadata to the function.
-  auto execModelMeta = ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_context), ShaderStageFragment));
-  auto execModelMetaNode = MDNode::get(*m_context, execModelMeta);
-  entryPoint->addMetadata(lgcName::ShaderStageMetadata, *execModelMetaNode);
+  // Set the shader stage on the new function.
+  setShaderStage(entryPoint, ShaderStageFragment);
 
   // Initialize shader info.
   auto resUsage = pipelineState->getShaderResourceUsage(ShaderStageFragment);
