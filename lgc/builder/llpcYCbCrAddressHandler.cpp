@@ -48,17 +48,18 @@ void YCbCrAddressHandler::genBaseAddress(unsigned planeCount) {
   assert(planeCount > 0 && planeCount < 4);
 
   // PlaneBaseAddresses[0] is the same as original base addressed as passed in SRD
-  planeBaseAddresses.push_back(pRegHelper->getReg(SqRsrcRegs::BaseAddress));
+  m_planeBaseAddresses.push_back(m_regHandler->getReg(SqRsrcRegs::BaseAddress));
 
   if (planeCount > 1) {
     // PlaneBaseAddresses[1] = PlaneBaseAddresses[0] + addr256B(PitchY * HeightY)
-    planeBaseAddresses.push_back(pBuilder->CreateAdd(
-        planeBaseAddresses[0], pBuilder->CreateLShr(pBuilder->CreateMul(pPitchY, pHeightY), pBuilder->getInt32(8))));
+    m_planeBaseAddresses.push_back(
+        m_builder->CreateAdd(m_planeBaseAddresses[0],
+                             m_builder->CreateLShr(m_builder->CreateMul(m_pitchY, m_heightY), m_builder->getInt32(8))));
     if (planeCount > 2) {
       // PlaneBaseAddresses[2] = PlaneBaseAddresses[1] + addr256B(PitchCb * HeightCb)
-      planeBaseAddresses.push_back(
-          pBuilder->CreateAdd(planeBaseAddresses[1],
-                              pBuilder->CreateLShr(pBuilder->CreateMul(pPitchCb, pHeightCb), pBuilder->getInt32(8))));
+      m_planeBaseAddresses.push_back(m_builder->CreateAdd(
+          m_planeBaseAddresses[1],
+          m_builder->CreateLShr(m_builder->CreateMul(m_pitchCb, m_heightCb), m_builder->getInt32(8))));
     }
   }
 }
@@ -72,8 +73,8 @@ Value *YCbCrAddressHandler::power2Align(Value *x, unsigned align) {
   // Check if align is a power of 2
   assert(align != 0 && (align & (align - 1)) == 0);
 
-  Value *result = pBuilder->CreateAdd(x, pBuilder->getInt32(align - 1));
-  return pBuilder->CreateAnd(result, pBuilder->getInt32(~(align - 1)));
+  Value *result = m_builder->CreateAdd(x, m_builder->getInt32(align - 1));
+  return m_builder->CreateAnd(result, m_builder->getInt32(~(align - 1)));
 }
 
 // =====================================================================================================================
@@ -86,39 +87,40 @@ Value *YCbCrAddressHandler::power2Align(Value *x, unsigned align) {
 // @param planeNum : Number of planes
 void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigned xBitCount, bool isTileOptimal,
                                             unsigned planeNum) {
-  switch (pGfxIp->major) {
+  switch (m_gfxIp->major) {
   case 9: {
     // Height = SqRsrcRegs::Height
-    Value *height = pRegHelper->getReg(SqRsrcRegs::Height);
+    Value *height = m_regHandler->getReg(SqRsrcRegs::Height);
     // HeightHalf = Height * 0.5
-    Value *heightHalf = pBuilder->CreateLShr(height, pOne);
+    Value *heightHalf = m_builder->CreateLShr(height, m_one);
 
-    pHeightY = height;
-    pHeightCb = heightHalf;
+    m_heightY = height;
+    m_heightCb = heightHalf;
 
     // Pitch = SqRsrcRegs::Pitch
-    Value *pitch = pRegHelper->getReg(SqRsrcRegs::Pitch);
+    Value *pitch = m_regHandler->getReg(SqRsrcRegs::Pitch);
     // PitchHalf = Pitch * 0.5
-    Value *pitchHalf = pBuilder->CreateLShr(pitch, pOne);
+    Value *pitchHalf = m_builder->CreateLShr(pitch, m_one);
 
     // PitchY * (xBitCount >> 3)
-    pPitchY = pBuilder->CreateMul(pitch, pBuilder->CreateLShr(pBuilder->getInt32(xBitCount), 3));
+    m_pitchY = m_builder->CreateMul(pitch, m_builder->CreateLShr(m_builder->getInt32(xBitCount), 3));
 
     // PitchCb = PitchCb * (xBitCount >> 3)
-    pPitchCb = pBuilder->CreateMul(pitchHalf, pBuilder->CreateLShr(pBuilder->getInt32(xBitCount), 3));
+    m_pitchCb = m_builder->CreateMul(pitchHalf, m_builder->CreateLShr(m_builder->getInt32(xBitCount), 3));
 
     if (isTileOptimal) {
-      Value *isTileOpt = pRegHelper->getReg(SqRsrcRegs::IsTileOpt);
+      Value *isTileOpt = m_regHandler->getReg(SqRsrcRegs::IsTileOpt);
 
       // PtchYOpt = PitchY * (bits[0] >> 3)
-      Value *ptchYOpt = pBuilder->CreateMul(pitch, pBuilder->CreateLShr(pBuilder->getInt32(bits), 3));
+      Value *ptchYOpt = m_builder->CreateMul(pitch, m_builder->CreateLShr(m_builder->getInt32(bits), 3));
       // PitchY = IsTileOpt ? (PtchYOpt << 5) : PitchY
-      pPitchY = pBuilder->CreateSelect(isTileOpt, pBuilder->CreateShl(ptchYOpt, pBuilder->getInt32(5)), pPitchY);
+      m_pitchY = m_builder->CreateSelect(isTileOpt, m_builder->CreateShl(ptchYOpt, m_builder->getInt32(5)), m_pitchY);
 
       // PitchCbOpt = PitchCb * (bits[0] >> 3)
-      Value *pitchCbOpt = pBuilder->CreateMul(pitchHalf, pBuilder->CreateLShr(pBuilder->getInt32(bits), 3));
+      Value *pitchCbOpt = m_builder->CreateMul(pitchHalf, m_builder->CreateLShr(m_builder->getInt32(bits), 3));
       // PitchCb = IsTileOpt ? (PitchCbOpt << 5) : PitchCb
-      pPitchCb = pBuilder->CreateSelect(isTileOpt, pBuilder->CreateShl(pitchCbOpt, pBuilder->getInt32(5)), pPitchCb);
+      m_pitchCb =
+          m_builder->CreateSelect(isTileOpt, m_builder->CreateShl(pitchCbOpt, m_builder->getInt32(5)), m_pitchCb);
     }
     break;
   }
@@ -127,26 +129,26 @@ void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigne
     const unsigned pitchAlign = (256 / elementBytes);
 
     // Height = SqRsrcRegs::Height
-    Value *height = pRegHelper->getReg(SqRsrcRegs::Height);
-    pHeightY = height;
+    Value *height = m_regHandler->getReg(SqRsrcRegs::Height);
+    m_heightY = height;
 
     // Width = SqRsrcRegs::Width
-    Value *width = pRegHelper->getReg(SqRsrcRegs::Width);
+    Value *width = m_regHandler->getReg(SqRsrcRegs::Width);
 
-    pPitchY = power2Align(width, pitchAlign);
+    m_pitchY = power2Align(width, pitchAlign);
     // PitchY = PitchY * ElementBytes
-    pPitchY = pBuilder->CreateMul(pPitchY, pBuilder->getInt32(elementBytes));
+    m_pitchY = m_builder->CreateMul(m_pitchY, m_builder->getInt32(elementBytes));
 
     // HeightHalf = Height * 0.5
-    Value *heightHalf = pBuilder->CreateLShr(height, pOne);
-    pHeightCb = heightHalf;
+    Value *heightHalf = m_builder->CreateLShr(height, m_one);
+    m_heightCb = heightHalf;
 
     // WidthHalf = Width * 0.5
-    Value *widthHalf = pBuilder->CreateLShr(width, pOne);
+    Value *widthHalf = m_builder->CreateLShr(width, m_one);
 
-    pPitchCb = power2Align(widthHalf, pitchAlign);
+    m_pitchCb = power2Align(widthHalf, pitchAlign);
     // PitchCb = PitchCb * ElementBytes
-    pPitchCb = pBuilder->CreateMul(pPitchCb, pBuilder->getInt32(elementBytes));
+    m_pitchCb = m_builder->CreateMul(m_pitchCb, m_builder->getInt32(elementBytes));
 
     if (isTileOptimal) {
       const unsigned log2BlkSize = 16;
@@ -158,17 +160,18 @@ void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigne
       const unsigned heightAlignOpt = 1u << (log2NumEle - log2Width);
 
       // PitchY = PitchY * ElementBytes
-      Value *ptchYOpt = pBuilder->CreateMul(power2Align(width, pitchAlignOpt), pBuilder->getInt32(elementBytes));
+      Value *ptchYOpt = m_builder->CreateMul(power2Align(width, pitchAlignOpt), m_builder->getInt32(elementBytes));
 
       // PitchCb = PitchCb * ElementBytes
-      Value *pitchCbOpt = pBuilder->CreateMul(power2Align(widthHalf, pitchAlignOpt), pBuilder->getInt32(elementBytes));
+      Value *pitchCbOpt =
+          m_builder->CreateMul(power2Align(widthHalf, pitchAlignOpt), m_builder->getInt32(elementBytes));
 
-      Value *isTileOpt = pRegHelper->getReg(SqRsrcRegs::IsTileOpt);
-      pPitchY = pBuilder->CreateSelect(isTileOpt, ptchYOpt, pPitchY);
-      pHeightY = pBuilder->CreateSelect(isTileOpt, power2Align(height, heightAlignOpt), height);
+      Value *isTileOpt = m_regHandler->getReg(SqRsrcRegs::IsTileOpt);
+      m_pitchY = m_builder->CreateSelect(isTileOpt, ptchYOpt, m_pitchY);
+      m_heightY = m_builder->CreateSelect(isTileOpt, power2Align(height, heightAlignOpt), height);
 
-      pPitchCb = pBuilder->CreateSelect(isTileOpt, pitchCbOpt, pPitchCb);
-      pHeightCb = pBuilder->CreateSelect(isTileOpt, power2Align(heightHalf, heightAlignOpt), heightHalf);
+      m_pitchCb = m_builder->CreateSelect(isTileOpt, pitchCbOpt, m_pitchCb);
+      m_heightCb = m_builder->CreateSelect(isTileOpt, power2Align(heightHalf, heightAlignOpt), heightHalf);
     }
     break;
   }
