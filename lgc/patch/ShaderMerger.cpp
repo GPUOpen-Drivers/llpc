@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "ShaderMerger.h"
-#include "CodeGenManager.h"
 #include "NggPrimShader.h"
 #include "Patch.h"
 #include "PipelineShaders.h"

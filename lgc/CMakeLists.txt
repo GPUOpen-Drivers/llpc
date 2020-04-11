@@ -193,7 +193,6 @@ target_sources(LLVMlgc PRIVATE
 
 # lgc/patch
 target_sources(LLVMlgc PRIVATE
-    patch/CodeGenManager.cpp
     patch/ConfigBuilderBase.cpp
     patch/FragColorExport.cpp
     patch/Gfx6Chip.cpp

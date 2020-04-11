@@ -29,7 +29,6 @@
 ***********************************************************************************************************************
 */
 #include "AbiMetadata.h"
-#include "CodeGenManager.h"
 #include "Gfx6ConfigBuilder.h"
 #include "Gfx9ConfigBuilder.h"
 #include "Patch.h"
