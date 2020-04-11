@@ -40,12 +40,12 @@ namespace lgc {
 // Note: There are at most 3 planes, and the index for plane is start from zero
 class YCbCrAddressHandler {
 public:
-  YCbCrAddressHandler(Builder *builder, SqImgRsrcRegHandler *sqImgRsrcRegHelper, GfxIpVersion *gfxIp) {
-    pBuilder = builder;
-    pRegHelper = sqImgRsrcRegHelper;
-    pGfxIp = gfxIp;
-    planeBaseAddresses.clear();
-    pOne = builder->getInt32(1);
+  YCbCrAddressHandler(Builder *builder, SqImgRsrcRegHandler *sqImgRsrcRegHandler, GfxIpVersion *gfxIp) {
+    m_builder = builder;
+    m_regHandler = sqImgRsrcRegHandler;
+    m_gfxIp = gfxIp;
+    m_planeBaseAddresses.clear();
+    m_one = builder->getInt32(1);
   }
 
   // Generate base address for image planes
@@ -60,30 +60,31 @@ public:
   // Get specific plane
   llvm::Value *getPlane(unsigned idx) {
     assert(idx < 3);
-    return planeBaseAddresses[idx];
+    return m_planeBaseAddresses[idx];
   }
 
   // Get pitch for Y plane
-  llvm::Value *getPitchY() { return pPitchY; }
+  llvm::Value *getPitchY() { return m_pitchY; }
 
   // Get pitch for Cb plane
-  llvm::Value *getPitchCb() { return pPitchCb; }
+  llvm::Value *getPitchCb() { return m_pitchCb; }
 
   // Get height for Y plane
-  llvm::Value *getHeightY() { return pHeightY; }
+  llvm::Value *getHeightY() { return m_heightY; }
 
   // Get Height for Cb plane
-  llvm::Value *getHeightCb() { return pHeightCb; }
+  llvm::Value *getHeightCb() { return m_heightCb; }
 
-  SqImgRsrcRegHandler *pRegHelper;
-  Builder *pBuilder;
-  llvm::SmallVector<llvm::Value *, 3> planeBaseAddresses;
-  llvm::Value *pPitchY;
-  llvm::Value *pHeightY;
-  llvm::Value *pPitchCb;
-  llvm::Value *pHeightCb;
-  llvm::Value *pOne;
-  GfxIpVersion *pGfxIp;
+private:
+  SqImgRsrcRegHandler *m_regHandler;
+  Builder *m_builder;
+  llvm::SmallVector<llvm::Value *, 3> m_planeBaseAddresses;
+  llvm::Value *m_pitchY = nullptr;
+  llvm::Value *m_heightY = nullptr;
+  llvm::Value *m_pitchCb = nullptr;
+  llvm::Value *m_heightCb = nullptr;
+  llvm::Value *m_one;
+  GfxIpVersion *m_gfxIp;
 };
 
 } // namespace lgc
