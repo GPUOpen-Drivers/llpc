@@ -15,7 +15,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: [4 x <2 x float>] (...) @llpc.call.matrix.times.scalar.a4v2f32
+; SHADERTEST: [4 x <2 x float>] (...) @lgc.create.matrix.times.scalar.a4v2f32
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 0, i32 immarg 15, float 1.000000e+00, float 5.000000e-01, float 0.000000e+00, float 0.000000e+00, i1 immarg true, i1 immarg true)

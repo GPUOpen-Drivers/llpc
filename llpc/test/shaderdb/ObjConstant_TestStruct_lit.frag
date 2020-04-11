@@ -35,7 +35,7 @@ void main()
 ; SHADERTEST: load i32, i32 addrspace(5)* %{{[0-9]*}}
 ; SHADERTEST: trunc i32 %{{[0-9]*}} to i1
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call void @llpc.output.export.generic{{.*}}v4f32
+; SHADERTEST: call void @lgc.output.export.generic{{.*}}v4f32
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

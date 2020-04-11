@@ -60,39 +60,39 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call {{.*}} half @llvm.fabs.f16(half
-; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<2 x half>
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<2 x half>
 ; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
-; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<3 x half>
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<3 x half>
 ; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
-; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<4 x half>
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<4 x half>
 ; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
 ; SHADERTEST: = call {{.*}} half @llvm.fabs.f16(half
-; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<2 x half>
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<2 x half>
 ; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
-; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<3 x half>
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<3 x half>
 ; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
-; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<4 x half>
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<4 x half>
 ; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
-; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<3 x half> %{{.*}}, <3 x half> %{{.*}})
-; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<4 x half> %{{.*}}, <4 x half> %{{.*}})
-; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<2 x half> %{{.*}}, <2 x half> %{{.*}})
-; SHADERTEST: = call {{.*}} <3 x half> (...) @llpc.call.cross.product.v3f16(<3 x half>
-; SHADERTEST: = call {{.*}} half (...) @llpc.call.normalize.vector.f16(half
-; SHADERTEST: = call {{.*}} <2 x half> (...) @llpc.call.normalize.vector.v2f16(<2 x half>
-; SHADERTEST: = call {{.*}} <3 x half> (...) @llpc.call.normalize.vector.v3f16(<3 x half>
-; SHADERTEST: = call {{.*}} <4 x half> (...) @llpc.call.normalize.vector.v4f16(<4 x half>
-; SHADERTEST: = call {{.*}} half (...) @llpc.call.face.forward.f16(half
-; SHADERTEST: = call {{.*}} <2 x half> (...) @llpc.call.face.forward.v2f16(<2 x half>
-; SHADERTEST: = call {{.*}} <3 x half> (...) @llpc.call.face.forward.v3f16(<3 x half>
-; SHADERTEST: = call {{.*}} <4 x half> (...) @llpc.call.face.forward.v4f16(<4 x half>
-; SHADERTEST: = call {{.*}} half (...) @llpc.call.reflect.f16(half
-; SHADERTEST: = call {{.*}} <2 x half> (...) @llpc.call.reflect.v2f16(<2 x half>
-; SHADERTEST: = call {{.*}} <3 x half> (...) @llpc.call.reflect.v3f16(<3 x half>
-; SHADERTEST: = call {{.*}} <4 x half> (...) @llpc.call.reflect.v4f16(<4 x half>
-; SHADERTEST: = call {{.*}} half (...) @llpc.call.refract.f16(half
-; SHADERTEST: = call {{.*}} <2 x half> (...) @llpc.call.refract.v2f16(<2 x half>
-; SHADERTEST: = call {{.*}} <3 x half> (...) @llpc.call.refract.v3f16(<3 x half>
-; SHADERTEST: = call {{.*}} <4 x half> (...) @llpc.call.refract.v4f16(<4 x half>
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<3 x half> %{{.*}}, <3 x half> %{{.*}})
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<4 x half> %{{.*}}, <4 x half> %{{.*}})
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<2 x half> %{{.*}}, <2 x half> %{{.*}})
+; SHADERTEST: = call {{.*}} <3 x half> (...) @lgc.create.cross.product.v3f16(<3 x half>
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.normalize.vector.f16(half
+; SHADERTEST: = call {{.*}} <2 x half> (...) @lgc.create.normalize.vector.v2f16(<2 x half>
+; SHADERTEST: = call {{.*}} <3 x half> (...) @lgc.create.normalize.vector.v3f16(<3 x half>
+; SHADERTEST: = call {{.*}} <4 x half> (...) @lgc.create.normalize.vector.v4f16(<4 x half>
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.face.forward.f16(half
+; SHADERTEST: = call {{.*}} <2 x half> (...) @lgc.create.face.forward.v2f16(<2 x half>
+; SHADERTEST: = call {{.*}} <3 x half> (...) @lgc.create.face.forward.v3f16(<3 x half>
+; SHADERTEST: = call {{.*}} <4 x half> (...) @lgc.create.face.forward.v4f16(<4 x half>
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.reflect.f16(half
+; SHADERTEST: = call {{.*}} <2 x half> (...) @lgc.create.reflect.v2f16(<2 x half>
+; SHADERTEST: = call {{.*}} <3 x half> (...) @lgc.create.reflect.v3f16(<3 x half>
+; SHADERTEST: = call {{.*}} <4 x half> (...) @lgc.create.reflect.v4f16(<4 x half>
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.refract.f16(half
+; SHADERTEST: = call {{.*}} <2 x half> (...) @lgc.create.refract.v2f16(<2 x half>
+; SHADERTEST: = call {{.*}} <3 x half> (...) @lgc.create.refract.v3f16(<3 x half>
+; SHADERTEST: = call {{.*}} <4 x half> (...) @lgc.create.refract.v4f16(<4 x half>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

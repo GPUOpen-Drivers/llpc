@@ -19,10 +19,10 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: %{{[0-9]*}} = call <2 x float> @llpc.input.import.builtin.InterpPerspCentroid(i32 {{.*}})
-; SHADERTEST: %{{[0-9]*}} = call <4 x half> @llpc.input.import.interpolant.v4f16.i32.i32.i32.i32.v2f32(i32 0, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST: = call <2 x float> @llpc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(
-; SHADERTEST: = call <3 x float> @llpc.input.import.builtin.InterpPullMode
+; SHADERTEST: %{{[0-9]*}} = call <2 x float> @lgc.input.import.builtin.InterpPerspCentroid(i32 {{.*}})
+; SHADERTEST: %{{[0-9]*}} = call <4 x half> @lgc.input.import.interpolant.v4f16.i32.i32.i32.i32.v2f32(i32 0, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
+; SHADERTEST: = call <2 x float> @lgc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(
+; SHADERTEST: = call <3 x float> @lgc.input.import.builtin.InterpPullMode
 ; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS

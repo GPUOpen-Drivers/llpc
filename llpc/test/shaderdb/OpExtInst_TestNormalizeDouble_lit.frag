@@ -20,8 +20,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call reassoc nnan nsz arcp contract double (...) @llpc.call.normalize.vector.f64(double
-; SHADERTEST: = call reassoc nnan nsz arcp contract <4 x double> (...) @llpc.call.normalize.vector.v4f64(<4 x double>
+; SHADERTEST: = call reassoc nnan nsz arcp contract double (...) @lgc.create.normalize.vector.f64(double
+; SHADERTEST: = call reassoc nnan nsz arcp contract <4 x double> (...) @lgc.create.normalize.vector.v4f64(<4 x double>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

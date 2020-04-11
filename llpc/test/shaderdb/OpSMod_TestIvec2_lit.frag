@@ -18,7 +18,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call <2 x i32> (...) @llpc.call.smod.v2i32(<2 x i32>
+; SHADERTEST: = call <2 x i32> (...) @lgc.create.smod.v2i32(<2 x i32>
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

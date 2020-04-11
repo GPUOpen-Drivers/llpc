@@ -18,10 +18,10 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 
 
-call { <8 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0)
-call { <8 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.fmask.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0)
-call { <4 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.sampler.desc.ptr.s[p4v4i32,i32]"(i32 0, i32 0)
-call <4 x float> (...) @llpc.call.image.load.with.fmask.v4f32(i32 7, i32 0,{{.*}}, i32 2)
+call { <8 x i32> addrspace(4)*, i32 } (...) @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0)
+call { <8 x i32> addrspace(4)*, i32 } (...) @"lgc.create.get.fmask.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0)
+call { <4 x i32> addrspace(4)*, i32 } (...) @"lgc.create.get.sampler.desc.ptr.s[p4v4i32,i32]"(i32 0, i32 0)
+call <4 x float> (...) @lgc.create.image.load.with.fmask.v4f32(i32 7, i32 0,{{.*}}, i32 2)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 call i32 @llvm.amdgcn.image.load.3d.i32.i32(i32 1,{{.*}}, i32 0, i32 0)

@@ -25,9 +25,9 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @interpolateAtOffset.p64f32.v2f32(float addrspace(64)* @{{.*}}, <2 x float> %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @interpolateAtOffset.p64v4f32.v2f32(<4 x float> addrspace(64)* @{{.*}}, <2 x float> %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: = call <3 x float> @llpc.input.import.builtin.InterpPullMode
+; SHADERTEST: = call <3 x float> @lgc.input.import.builtin.InterpPullMode
 ; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
-; SHADERTEST: = call float @llpc.input.import.interpolant.f32{{.*}}v2f32(
+; SHADERTEST: = call float @lgc.input.import.interpolant.f32{{.*}}v2f32(
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p1(float %{{.*}}, i32 immarg 0, i32 immarg 0, i32 %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p2(float %{{.*}}, float %{{.*}}, i32 immarg 0, i32 immarg 0, i32 %{{.*}})

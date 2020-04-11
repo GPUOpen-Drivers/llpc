@@ -20,8 +20,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call reassoc nnan nsz arcp contract float (...) @llpc.call.tanh.f32(float
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> (...) @llpc.call.tanh.v3f32(<3 x float>
+; SHADERTEST: = call reassoc nnan nsz arcp contract float (...) @lgc.create.tanh.f32(float
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> (...) @lgc.create.tanh.v3f32(<3 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract float %{{.*}}, 0x3FF7154760000000
 ; SHADERTEST: %{{.*}} = {{fsub|fneg}} reassoc nnan nsz arcp contract float {{(-0.000000e+00, )?}}%{{.*}}

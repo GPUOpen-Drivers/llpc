@@ -13,8 +13,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call i32 (...) @llpc.call.extract.bit.field.i32(i32 {{.*}}, i1 true)
-; SHADERTEST: call i32 (...) @llpc.call.extract.bit.field.i32(i32 3423, i32 0, i32 32, i1 true)
+; SHADERTEST: call i32 (...) @lgc.create.extract.bit.field.i32(i32 {{.*}}, i1 true)
+; SHADERTEST: call i32 (...) @lgc.create.extract.bit.field.i32(i32 3423, i32 0, i32 32, i1 true)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.sbfe.i32

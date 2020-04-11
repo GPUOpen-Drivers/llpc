@@ -20,8 +20,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call i32 (...) @llpc.call.ssign.i32(i32
-; SHADERTEST: = call <3 x i32> (...) @llpc.call.ssign.v3i32(<3 x i32>
+; SHADERTEST: = call i32 (...) @lgc.create.ssign.i32(i32
+; SHADERTEST: = call <3 x i32> (...) @lgc.create.ssign.v3i32(<3 x i32>
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: = icmp slt i32 %{{.*}}, 1
 ; SHADERTEST: = select i1 %{{.*}}, i32 %{{.*}}, i32 1

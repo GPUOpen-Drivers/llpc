@@ -26,9 +26,9 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.fmin3.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.fmax3.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.fmid3.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.fmin3.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.fmax3.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.fmid3.v3f16(<3 x half>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.minnum.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.minnum.v3f16(<3 x half>
