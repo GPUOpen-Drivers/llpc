@@ -73,7 +73,7 @@ struct BitsState {
 //       };                              };                                       };
 class GfxRegHandler : public GfxRegHandlerBase {
 protected:
-  GfxRegHandler(Builder *builder, llvm::Value *reg);
+  GfxRegHandler(llvm::IRBuilder<> *builder, llvm::Value *reg);
 
   // Common function for getting the current value for the hardware register
   llvm::Value *getRegCommon(unsigned regId);
@@ -120,7 +120,7 @@ enum class SqSampRegs {
 // Helper class for handling Registers defined in SQ_IMG_SAMP_WORD
 class SqImgSampRegHandler : public GfxRegHandler {
 public:
-  SqImgSampRegHandler(Builder *builder, llvm::Value *reg, GfxIpVersion *gfxIpVersion);
+  SqImgSampRegHandler(llvm::IRBuilder<> *builder, llvm::Value *reg, GfxIpVersion *gfxIpVersion);
 
   // Get the current value for the hardware register
   llvm::Value *getReg(SqSampRegs regId);
@@ -157,7 +157,7 @@ enum class SqRsrcRegs {
 // Helper class for handling Registers defined in SQ_IMG_RSRC_WORD
 class SqImgRsrcRegHandler : public GfxRegHandler {
 public:
-  SqImgRsrcRegHandler(Builder *builder, llvm::Value *reg, GfxIpVersion *gfxIpVersion);
+  SqImgRsrcRegHandler(llvm::IRBuilder<> *builder, llvm::Value *reg, GfxIpVersion *gfxIpVersion);
 
   // Get the current value for the hardware register
   llvm::Value *getReg(SqRsrcRegs regId);

@@ -721,12 +721,12 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
   }
 
   std::string callName = isOutput ? lgcName::OutputImportBuiltIn : lgcName::InputImportBuiltIn;
-  callName += getBuiltInName(builtIn);
+  callName += PipelineState::getBuiltInName(builtIn);
   addTypeMangling(resultTy, args, callName);
   Value *result = emitCall(callName, resultTy, args, Attribute::ReadOnly, &*GetInsertPoint());
 
   if (instName.isTriviallyEmpty())
-    result->setName(getBuiltInName(builtIn));
+    result->setName(PipelineState::getBuiltInName(builtIn));
   else
     result->setName(instName);
 
@@ -795,7 +795,7 @@ Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltIn
   args.push_back(valueToWrite);
 
   std::string callName = lgcName::OutputExportBuiltIn;
-  callName += getBuiltInName(builtIn);
+  callName += PipelineState::getBuiltInName(builtIn);
   addTypeMangling(nullptr, args, callName);
   return cast<Instruction>(emitCall(callName, getVoidTy(), args, {}, &*GetInsertPoint()));
 }
@@ -814,32 +814,6 @@ Type *InOutBuilder::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
     return VectorType::get(getFloatTy(), 3);
   default:
     return Builder::getBuiltInTy(builtIn, inOutInfo);
-  }
-}
-
-// =====================================================================================================================
-// Get name of built-in
-//
-// @param builtIn : Built-in type, one of the BuiltIn* constants
-StringRef InOutBuilder::getBuiltInName(BuiltInKind builtIn) {
-  switch (static_cast<unsigned>(builtIn)) {
-#define BUILTIN(name, number, out, in, type)                                                                           \
-  case BuiltIn##name:                                                                                                  \
-    return #name;
-#include "lgc/BuiltInDefs.h"
-#undef BUILTIN
-
-  // Internal built-ins.
-  case BuiltInSamplePosOffset:
-    return "SamplePosOffset";
-  case BuiltInInterpLinearCenter:
-    return "InterpLinearCenter";
-  case BuiltInInterpPullMode:
-    return "InterpPullMode";
-
-  default:
-    llvm_unreachable("Should never be called!");
-    return "unknown";
   }
 }
 

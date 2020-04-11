@@ -28,13 +28,13 @@
  * @brief LLPC source file: contains declaration and implementation of class lgc::PatchCopyShader.
  ***********************************************************************************************************************
  */
-#include "BuilderImpl.h"
 #include "Internal.h"
 #include "IntrinsDefs.h"
 #include "Patch.h"
 #include "PipelineShaders.h"
 #include "PipelineState.h"
 #include "TargetInfo.h"
+#include "lgc/BuilderBase.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -625,7 +625,7 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
 
   if (resUsage->inOutUsage.gs.rasterStream == streamId) {
     std::string callName = lgcName::OutputExportBuiltIn;
-    callName += InOutBuilder::getBuiltInName(builtInId);
+    callName += PipelineState::getBuiltInName(builtInId);
     Value *args[] = {builder.getInt32(builtInId), outputValue};
     addTypeMangling(nullptr, args, callName);
     builder.createNamedCall(callName, builder.getVoidTy(), args, {});
