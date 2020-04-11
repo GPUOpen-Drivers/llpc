@@ -465,7 +465,7 @@ public:
   llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName) override final;
 
   // -----------------------------------------------------------------------------------------------------------------
-  // Builder methods implemented in BuilderImplMatrix
+  // Builder methods implemented in MatrixBuilder
   llvm::Value *CreateTransposeMatrix(llvm::Value *const matrix, const llvm::Twine &instName = "") override final;
   llvm::Value *CreateMatrixTimesScalar(llvm::Value *const matrix, llvm::Value *const scalar,
                                        const llvm::Twine &instName = "") override final;

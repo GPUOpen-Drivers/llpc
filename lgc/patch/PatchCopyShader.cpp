@@ -625,7 +625,7 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
 
   if (resUsage->inOutUsage.gs.rasterStream == streamId) {
     std::string callName = lgcName::OutputExportBuiltIn;
-    callName += BuilderImplInOut::getBuiltInName(builtInId);
+    callName += InOutBuilder::getBuiltInName(builtInId);
     Value *args[] = {builder.getInt32(builtInId), outputValue};
     addTypeMangling(nullptr, args, callName);
     builder.createNamedCall(callName, builder.getVoidTy(), args, {});

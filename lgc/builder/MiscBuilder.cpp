@@ -24,7 +24,7 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  BuilderImplMisc.cpp
+ * @file  MiscBuilder.cpp
  * @brief LLPC source file: implementation of miscellaneous Builder methods
  ***********************************************************************************************************************
  */
@@ -42,7 +42,7 @@ using namespace llvm;
 // the current output primitive in the specified output-primitive stream number.
 //
 // @param streamId : Stream number, 0 if only one stream is present
-Instruction *BuilderImplMisc::CreateEmitVertex(unsigned streamId) {
+Instruction *MiscBuilder::CreateEmitVertex(unsigned streamId) {
   assert(m_shaderStage == ShaderStageGeometry);
 
   // Get GsWaveId
@@ -60,7 +60,7 @@ Instruction *BuilderImplMisc::CreateEmitVertex(unsigned streamId) {
 // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
 //
 // @param streamId : Stream number, 0 if only one stream is present
-Instruction *BuilderImplMisc::CreateEndPrimitive(unsigned streamId) {
+Instruction *MiscBuilder::CreateEndPrimitive(unsigned streamId) {
   assert(m_shaderStage == ShaderStageGeometry);
 
   // Get GsWaveId
@@ -76,7 +76,7 @@ Instruction *BuilderImplMisc::CreateEndPrimitive(unsigned streamId) {
 
 // =====================================================================================================================
 // Create a workgroup control barrier.
-Instruction *BuilderImplMisc::CreateBarrier() {
+Instruction *MiscBuilder::CreateBarrier() {
   return CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 }
 
@@ -84,7 +84,7 @@ Instruction *BuilderImplMisc::CreateBarrier() {
 // Create a "kill". Only allowed in a fragment shader.
 //
 // @param instName : Name to give instruction(s)
-Instruction *BuilderImplMisc::CreateKill(const Twine &instName) {
+Instruction *MiscBuilder::CreateKill(const Twine &instName) {
   // This tells the config builder to set KILL_ENABLE in DB_SHADER_CONTROL.
   // Doing it here is suboptimal, as it does not allow for subsequent middle-end optimizations removing the
   // section of code containing the kill.
@@ -98,7 +98,7 @@ Instruction *BuilderImplMisc::CreateKill(const Twine &instName) {
 // Create a demote to helper invocation operation. Only allowed in a fragment shader.
 //
 // @param instName : Name to give instruction(s)
-Instruction *BuilderImplMisc::CreateDemoteToHelperInvocation(const Twine &instName) {
+Instruction *MiscBuilder::CreateDemoteToHelperInvocation(const Twine &instName) {
   // Treat a demote as a kill for the purposes of disabling middle-end optimizations.
   auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
   resUsage->builtInUsage.fs.discard = true;
@@ -110,7 +110,7 @@ Instruction *BuilderImplMisc::CreateDemoteToHelperInvocation(const Twine &instNa
 // Create a helper invocation query. Only allowed in a fragment shader.
 //
 // @param instName : Name to give instruction(s)
-Value *BuilderImplMisc::CreateIsHelperInvocation(const Twine &instName) {
+Value *MiscBuilder::CreateIsHelperInvocation(const Twine &instName) {
   auto isNotHelper = CreateIntrinsic(Intrinsic::amdgcn_wqm_helper, {}, {}, nullptr, instName);
   return CreateNot(isNotHelper);
 }
@@ -120,7 +120,7 @@ Value *BuilderImplMisc::CreateIsHelperInvocation(const Twine &instName) {
 //
 // @param realtime : Whether to read real-time clock counter
 // @param instName : Name to give instruction(s)
-Instruction *BuilderImplMisc::CreateReadClock(bool realtime, const Twine &instName) {
+Instruction *MiscBuilder::CreateReadClock(bool realtime, const Twine &instName) {
   CallInst *readClock = nullptr;
   if (realtime)
     readClock = CreateIntrinsic(Intrinsic::amdgcn_s_memrealtime, {}, {}, nullptr, instName);
@@ -144,7 +144,7 @@ Instruction *BuilderImplMisc::CreateReadClock(bool realtime, const Twine &instNa
 // @param isFine : True for "fine" calculation, where the value in the current fragment is used. False for "coarse"
 // calculation, where it might use fewer locations to calculate.
 // @param instName : Name to give instruction(s)
-Value *BuilderImplMisc::CreateDerivative(Value *value, bool isDirectionY, bool isFine, const Twine &instName) {
+Value *MiscBuilder::CreateDerivative(Value *value, bool isDirectionY, bool isFine, const Twine &instName) {
   unsigned tableIdx = isDirectionY * 2 + isFine;
   Value *result = nullptr;
   if (supportDpp()) {

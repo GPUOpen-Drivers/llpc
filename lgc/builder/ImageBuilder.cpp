@@ -24,7 +24,7 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  BuilderImplImage.cpp
+ * @file  ImageBuilder.cpp
  * @brief LLPC source file: implementation of Builder methods for image operations
  ***********************************************************************************************************************
  */
@@ -417,7 +417,7 @@ static Type *convertToFloatingPointType(Type *origTy) {
 // @param coord : Coordinates: scalar or vector i32
 // @param mipLevel : Mipmap level if doing load_mip, otherwise nullptr
 // @param instName : Name to give instruction(s)
-Value *BuilderImplImage::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc, Value *coord,
+Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc, Value *coord,
                                          Value *mipLevel, const Twine &instName) {
   getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceRead = true;
   assert(coord->getType()->getScalarType()->isIntegerTy(32));
@@ -531,7 +531,7 @@ Value *BuilderImplImage::CreateImageLoad(Type *resultTy, unsigned dim, unsigned 
 // @param coord : Coordinates: scalar or vector i32, exactly right width for given dimension excluding sample
 // @param sampleNum : Sample number, i32
 // @param instName : Name to give instruction(s)
-Value *BuilderImplImage::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
+Value *ImageBuilder::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
                                                   Value *fmaskDesc, Value *coord, Value *sampleNum,
                                                   const Twine &instName) {
   // Load texel from F-mask image.
@@ -581,7 +581,7 @@ Value *BuilderImplImage::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, 
 // @param coord : Coordinates: scalar or vector i32
 // @param mipLevel : Mipmap level if doing load_mip, otherwise nullptr
 // @param instName : Name to give instruction(s)
-Value *BuilderImplImage::CreateImageStore(Value *texel, unsigned dim, unsigned flags, Value *imageDesc, Value *coord,
+Value *ImageBuilder::CreateImageStore(Value *texel, unsigned dim, unsigned flags, Value *imageDesc, Value *coord,
                                           Value *mipLevel, const Twine &instName) {
   getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceWrite = true;
   assert(coord->getType()->getScalarType()->isIntegerTy(32));
@@ -673,7 +673,7 @@ Value *BuilderImplImage::CreateImageStore(Value *texel, unsigned dim, unsigned f
 // @param samplerDesc : Sampler descriptor
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
-Value *BuilderImplImage::CreateImageSample(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
+Value *ImageBuilder::CreateImageSample(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
                                            Value *samplerDesc, ArrayRef<Value *> address, const Twine &instName) {
   Value *coord = address[ImageAddressIdxCoordinate];
   assert(coord->getType()->getScalarType()->isFloatTy() || coord->getType()->getScalarType()->isHalfTy());
@@ -728,7 +728,7 @@ Value *BuilderImplImage::CreateImageSample(Type *resultTy, unsigned dim, unsigne
 // @param convertingSamplerDesc : Converting sampler descriptor (v8i32)
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
-Value *BuilderImplImage::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
+Value *ImageBuilder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
                                                   Value *convertingSamplerDesc, ArrayRef<Value *> address,
                                                   const Twine &instName) {
   llvm_unreachable("Not yet implemented");
@@ -746,7 +746,7 @@ Value *BuilderImplImage::CreateImageSampleConvert(Type *resultTy, unsigned dim, 
 // @param samplerDesc : Sampler descriptor
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
-Value *BuilderImplImage::CreateImageGather(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
+Value *ImageBuilder::CreateImageGather(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
                                            Value *samplerDesc, ArrayRef<Value *> address, const Twine &instName) {
   Value *coord = address[ImageAddressIdxCoordinate];
   assert(coord->getType()->getScalarType()->isFloatTy() || coord->getType()->getScalarType()->isHalfTy());
@@ -830,7 +830,7 @@ Value *BuilderImplImage::CreateImageGather(Type *resultTy, unsigned dim, unsigne
 // @param dim : Image dimension
 // @param [in/out] imageDesc : Image descriptor
 // @param [in/out] coord : Coordinate
-Value *BuilderImplImage::preprocessIntegerImageGather(unsigned dim, Value *&imageDesc, Value *&coord) {
+Value *ImageBuilder::preprocessIntegerImageGather(unsigned dim, Value *&imageDesc, Value *&coord) {
   if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9) {
     // GFX9+: Workaround not needed.
     return nullptr;
@@ -897,7 +897,7 @@ Value *BuilderImplImage::preprocessIntegerImageGather(unsigned dim, Value *&imag
 // @param imageDesc : Image descriptor
 // @param texelTy : Type of returned texel
 // @param result : Returned texel value, or struct containing texel and TFE
-Value *BuilderImplImage::postprocessIntegerImageGather(Value *needDescPatch, unsigned flags, Value *imageDesc,
+Value *ImageBuilder::postprocessIntegerImageGather(Value *needDescPatch, unsigned flags, Value *imageDesc,
                                                        Type *texelTy, Value *result) {
   // Post-processing of result for integer return type.
   // Create the if..endif, where the condition is whether the descriptor was patched. If it was,
@@ -946,7 +946,7 @@ Value *BuilderImplImage::postprocessIntegerImageGather(Value *needDescPatch, uns
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
 // @param isSample : Is sample rather than gather
-Value *BuilderImplImage::CreateImageSampleGather(Type *resultTy, unsigned dim, unsigned flags, Value *coord,
+Value *ImageBuilder::CreateImageSampleGather(Type *resultTy, unsigned dim, unsigned flags, Value *coord,
                                                  Value *imageDesc, Value *samplerDesc, ArrayRef<Value *> address,
                                                  const Twine &instName, bool isSample) {
   // Set up the mask of address components provided, for use in searching the intrinsic ID table
@@ -1083,7 +1083,7 @@ Value *BuilderImplImage::CreateImageSampleGather(Type *resultTy, unsigned dim, u
 // @param coord : Coordinates: scalar or vector i32
 // @param inputValue : Input value: i32
 // @param instName : Name to give instruction(s)
-Value *BuilderImplImage::CreateImageAtomic(unsigned atomicOp, unsigned dim, unsigned flags, AtomicOrdering ordering,
+Value *ImageBuilder::CreateImageAtomic(unsigned atomicOp, unsigned dim, unsigned flags, AtomicOrdering ordering,
                                            Value *imageDesc, Value *coord, Value *inputValue, const Twine &instName) {
   return CreateImageAtomicCommon(atomicOp, dim, flags, ordering, imageDesc, coord, inputValue, nullptr, instName);
 }
@@ -1099,7 +1099,7 @@ Value *BuilderImplImage::CreateImageAtomic(unsigned atomicOp, unsigned dim, unsi
 // @param inputValue : Input value: i32
 // @param comparatorValue : Value to compare against: i32
 // @param instName : Name to give instruction(s)
-Value *BuilderImplImage::CreateImageAtomicCompareSwap(unsigned dim, unsigned flags, AtomicOrdering ordering,
+Value *ImageBuilder::CreateImageAtomicCompareSwap(unsigned dim, unsigned flags, AtomicOrdering ordering,
                                                       Value *imageDesc, Value *coord, Value *inputValue,
                                                       Value *comparatorValue, const Twine &instName) {
   return CreateImageAtomicCommon(AtomicOpCompareSwap, dim, flags, ordering, imageDesc, coord, inputValue,
@@ -1118,7 +1118,7 @@ Value *BuilderImplImage::CreateImageAtomicCompareSwap(unsigned dim, unsigned fla
 // @param inputValue : Input value: i32
 // @param comparatorValue : Value to compare against: i32; ignored if not compare-swap
 // @param instName : Name to give instruction(s)
-Value *BuilderImplImage::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, unsigned flags,
+Value *ImageBuilder::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, unsigned flags,
                                                  AtomicOrdering ordering, Value *imageDesc, Value *coord,
                                                  Value *inputValue, Value *comparatorValue, const Twine &instName) {
   getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceWrite = true;
@@ -1196,7 +1196,7 @@ Value *BuilderImplImage::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim
 // @param flags : ImageFlag* flags
 // @param imageDesc : Image descriptor or texel buffer descriptor
 // @param instName : Name to give instruction(s)
-Value *BuilderImplImage::CreateImageQueryLevels(unsigned dim, unsigned flags, Value *imageDesc, const Twine &instName) {
+Value *ImageBuilder::CreateImageQueryLevels(unsigned dim, unsigned flags, Value *imageDesc, const Twine &instName) {
   dim = dim == DimCubeArray ? DimCube : dim;
   Value *zero = getInt32(0);
   Instruction *resInfo = CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim], {getFloatTy(), getInt32Ty()},
@@ -1213,7 +1213,7 @@ Value *BuilderImplImage::CreateImageQueryLevels(unsigned dim, unsigned flags, Va
 // @param flags : ImageFlag* flags
 // @param imageDesc : Image descriptor or texel buffer descriptor
 // @param instName : Name to give instruction(s)
-Value *BuilderImplImage::CreateImageQuerySamples(unsigned dim, unsigned flags, Value *imageDesc,
+Value *ImageBuilder::CreateImageQuerySamples(unsigned dim, unsigned flags, Value *imageDesc,
                                                  const Twine &instName) {
   // Extract LAST_LEVEL (SQ_IMG_RSRC_WORD3, [19:16])
   Value *descWord3 = CreateExtractElement(imageDesc, 3);
@@ -1240,7 +1240,7 @@ Value *BuilderImplImage::CreateImageQuerySamples(unsigned dim, unsigned flags, V
 // @param imageDesc : Image descriptor or texel buffer descriptor
 // @param lod : LOD
 // @param instName : Name to give instruction(s)
-Value *BuilderImplImage::CreateImageQuerySize(unsigned dim, unsigned flags, Value *imageDesc, Value *lod,
+Value *ImageBuilder::CreateImageQuerySize(unsigned dim, unsigned flags, Value *imageDesc, Value *lod,
                                               const Twine &instName) {
   if (imageDesc->getType() == getTexelBufferDescTy()) {
     // Texel buffer.
@@ -1298,7 +1298,7 @@ Value *BuilderImplImage::CreateImageQuerySize(unsigned dim, unsigned flags, Valu
 // @param samplerDesc : Sampler descriptor
 // @param coord : Coordinates: scalar or vector f32, exactly right width without array layer
 // @param instName : Name to give instruction(s)
-Value *BuilderImplImage::CreateImageGetLod(unsigned dim, unsigned flags, Value *imageDesc, Value *samplerDesc,
+Value *ImageBuilder::CreateImageGetLod(unsigned dim, unsigned flags, Value *imageDesc, Value *samplerDesc,
                                            Value *coord, const Twine &instName) {
   // Remove array from dimension if any.
   switch (dim) {
@@ -1352,7 +1352,7 @@ Value *BuilderImplImage::CreateImageGetLod(unsigned dim, unsigned flags, Value *
 // Change 1D or 1DArray dimension to 2D or 2DArray if needed as a workaround on GFX9+
 //
 // @param dim : Image dimension
-unsigned BuilderImplImage::change1DTo2DIfNeeded(unsigned dim) {
+unsigned ImageBuilder::change1DTo2DIfNeeded(unsigned dim) {
   if (getPipelineState()->getTargetInfo().getGpuWorkarounds().gfx9.treat1dImagesAs2d) {
     switch (dim) {
     case Dim1D:
@@ -1378,7 +1378,7 @@ unsigned BuilderImplImage::change1DTo2DIfNeeded(unsigned dim) {
 // @param derivativeY : Scalar or vector Y derivative value, nullptr if none
 // @param [out] outCoords : Vector to push coordinate components into
 // @param [out] outDerivatives : Vector to push derivative components into
-unsigned BuilderImplImage::prepareCoordinate(unsigned dim, Value *coord, Value *projective, Value *derivativeX,
+unsigned ImageBuilder::prepareCoordinate(unsigned dim, Value *coord, Value *projective, Value *derivativeX,
                                              Value *derivativeY, SmallVectorImpl<Value *> &outCoords,
                                              SmallVectorImpl<Value *> &outDerivatives) {
   // Push the coordinate components.
@@ -1619,7 +1619,7 @@ unsigned BuilderImplImage::prepareCoordinate(unsigned dim, Value *coord, Value *
 //
 // @param coord : Coordinate as vector value
 // @param [in/out] coords : Coordinate components
-void BuilderImplImage::combineCubeArrayFaceAndSlice(Value *coord, SmallVectorImpl<Value *> &coords) {
+void ImageBuilder::combineCubeArrayFaceAndSlice(Value *coord, SmallVectorImpl<Value *> &coords) {
   // See if we can find the face and slice components in a chain of insertelements.
   Constant *multiplier = getInt32(6);
   Value *face = nullptr;
@@ -1669,7 +1669,7 @@ void BuilderImplImage::combineCubeArrayFaceAndSlice(Value *coord, SmallVectorImp
 //
 // @param desc : Descriptor before patching
 // @param dim : Image dimensions
-Value *BuilderImplImage::patchCubeDescriptor(Value *desc, unsigned dim) {
+Value *ImageBuilder::patchCubeDescriptor(Value *desc, unsigned dim) {
   if ((dim != DimCube && dim != DimCubeArray) || getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9)
     return desc;
 
@@ -1700,7 +1700,7 @@ Value *BuilderImplImage::patchCubeDescriptor(Value *desc, unsigned dim) {
 // @param coord : Coordinate, scalar or vector i32
 // @param flags : Image flags
 // @param [in,out] dim : Image dimension
-Value *BuilderImplImage::handleFragCoordViewIndex(Value *coord, unsigned flags, unsigned &dim) {
+Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsigned &dim) {
   bool useViewIndex = false;
   if (flags & ImageFlagCheckMultiView) {
     if (getPipelineState()->getInputAssemblyState().enableMultiView) {

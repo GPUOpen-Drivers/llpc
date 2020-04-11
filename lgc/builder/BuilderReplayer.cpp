@@ -211,7 +211,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return nullptr;
   }
 
-  // Replayer implementation of BuilderImplArith methods
+  // Replayer implementation of ArithBuilder methods
   case BuilderRecorder::CubeFaceCoord: {
     return m_builder->CreateCubeFaceCoord(args[0]);
   }
@@ -407,7 +407,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->createFMix(args[0], args[1], args[2]);
   }
 
-  // Replayer implementations of BuilderImplDesc methods
+  // Replayer implementations of DescBuilder methods
   case BuilderRecorder::Opcode::LoadBufferDesc: {
     return m_builder->CreateLoadBufferDesc(cast<ConstantInt>(args[0])->getZExtValue(), // descSet
                                            cast<ConstantInt>(args[1])->getZExtValue(), // binding
@@ -456,7 +456,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateGetBufferDescLength(args[0]);
   }
 
-  // Replayer implementations of BuilderImplImage methods
+  // Replayer implementations of ImageBuilder methods
   case BuilderRecorder::Opcode::ImageLoad: {
     unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();
     unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
@@ -575,7 +575,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateImageGetLod(dim, flags, imageDesc, samplerDesc, coord);
   }
 
-  // Replayer implementations of BuilderImplInOut methods
+  // Replayer implementations of InOutBuilder methods
   case BuilderRecorder::Opcode::ReadGenericInput: {
     InOutInfo inputInfo(cast<ConstantInt>(args[4])->getZExtValue());
     return m_builder->CreateReadGenericInput(call->getType(),                                 // Result type
@@ -648,7 +648,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
                                                isa<UndefValue>(args[4]) ? nullptr : &*args[4]); // Index
   }
 
-  // Replayer implementations of BuilderImplMisc methods
+  // Replayer implementations of MiscBuilder methods
   case BuilderRecorder::Opcode::EmitVertex: {
     return m_builder->CreateEmitVertex(cast<ConstantInt>(args[0])->getZExtValue());
   }
@@ -702,7 +702,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateMatrixInverse(args[0]);
   }
 
-  // Replayer implementations of BuilderImplSubgroup methods
+  // Replayer implementations of SubgroupBuilder methods
   case BuilderRecorder::Opcode::GetSubgroupSize: {
     return m_builder->CreateGetSubgroupSize();
   }
