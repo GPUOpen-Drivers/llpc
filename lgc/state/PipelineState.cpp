@@ -95,7 +95,6 @@ unsigned PipelineState::getPalAbiVersion() const {
 Module *PipelineState::link(ArrayRef<Module *> modules) {
   // Processing for each shader module before linking.
   IRBuilder<> builder(getContext());
-  unsigned metaKindId = getContext().getMDKindID(lgcName::ShaderStageMetadata);
   Module *anyModule = nullptr;
   for (unsigned stage = 0; stage < modules.size(); ++stage) {
     Module *module = modules[stage];
@@ -109,14 +108,11 @@ Module *PipelineState::link(ArrayRef<Module *> modules) {
 
     // Add IR metadata for the shader stage to each function in the shader, and rename the entrypoint to
     // ensure there is no clash on linking.
-    auto stageMetaNode = MDNode::get(getContext(), {ConstantAsMetadata::get(builder.getInt32(stage))});
+    setShaderStage(module, static_cast<ShaderStage>(stage));
     for (Function &func : *module) {
-      if (!func.isDeclaration()) {
-        func.setMetadata(metaKindId, stageMetaNode);
-        if (func.getLinkage() != GlobalValue::InternalLinkage) {
-          func.setName(Twine(lgcName::EntryPointPrefix) + getShaderStageAbbreviation(static_cast<ShaderStage>(stage)) +
-                       "." + func.getName());
-        }
+      if (!func.isDeclaration() && func.getLinkage() != GlobalValue::InternalLinkage) {
+        func.setName(Twine(lgcName::EntryPointPrefix) + getShaderStageAbbreviation(static_cast<ShaderStage>(stage)) +
+                     "." + func.getName());
       }
     }
   }
@@ -289,8 +285,7 @@ void PipelineState::readShaderStageMask(Module *module) {
   m_stageMask = 0;
   for (auto &func : *module) {
     if (!func.empty() && func.getLinkage() != GlobalValue::InternalLinkage) {
-      auto shaderStage = getShaderStageFromFunction(&func);
-
+      auto shaderStage = getShaderStage(&func);
       if (shaderStage != ShaderStageInvalid)
         m_stageMask |= 1 << shaderStage;
     }
@@ -1082,20 +1077,6 @@ void PipelineState::initShaderInterfaceData(InterfaceData *intfData) {
 unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(this, nullptr));
   return fragColorExport->computeExportFormat(outputTy, location);
-}
-
-// =====================================================================================================================
-// Gets name string of the abbreviation for the specified shader stage
-//
-// @param shaderStage : Shader stage
-const char *PipelineState::getShaderStageAbbreviation(ShaderStage shaderStage) {
-  if (shaderStage == ShaderStageCopyShader)
-    return "COPY";
-  if (shaderStage > ShaderStageCompute)
-    return "Bad";
-
-  static const char *ShaderStageAbbrs[] = {"VS", "TCS", "TES", "GS", "FS", "CS"};
-  return ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
 }
 
 // =====================================================================================================================

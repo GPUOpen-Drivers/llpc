@@ -167,61 +167,6 @@ void addTypeMangling(Type *returnTy, ArrayRef<Value *> args, std::string &name) 
 }
 
 // =====================================================================================================================
-// Gets the shader stage from the specified LLVM function. Returns ShaderStageInvalid if not shader entrypoint.
-//
-// @param func : LLVM function
-ShaderStage getShaderStageFromFunction(const Function *func) {
-  // Check for the metadata that is added by the builder. This works in the patch phase.
-  MDNode *stageMetaNode = func->getMetadata(lgcName::ShaderStageMetadata);
-  if (stageMetaNode)
-    return ShaderStage(mdconst::dyn_extract<ConstantInt>(stageMetaNode->getOperand(0))->getZExtValue());
-  return ShaderStageInvalid;
-}
-
-// =====================================================================================================================
-// Gets the shader stage from the specified calling convention.
-//
-// @param stageMask : Shader stage mask for the pipeline
-// @param callConv : Calling convention
-ShaderStage getShaderStageFromCallingConv(unsigned stageMask, CallingConv::ID callConv) {
-  ShaderStage shaderStage = ShaderStageInvalid;
-
-  bool hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry)) != 0;
-  bool hasTs = ((stageMask & shaderStageToMask(ShaderStageTessControl)) != 0 ||
-                (stageMask & shaderStageToMask(ShaderStageTessEval)) != 0);
-
-  switch (callConv) {
-  case CallingConv::AMDGPU_PS:
-    shaderStage = ShaderStageFragment;
-    break;
-  case CallingConv::AMDGPU_LS:
-    shaderStage = ShaderStageVertex;
-    break;
-  case CallingConv::AMDGPU_HS:
-    shaderStage = ShaderStageTessControl;
-    break;
-  case CallingConv::AMDGPU_ES:
-    shaderStage = hasTs ? ShaderStageTessEval : ShaderStageVertex;
-    break;
-  case CallingConv::AMDGPU_GS:
-    // NOTE: If GS is not present, this must be NGG.
-    shaderStage = hasGs ? ShaderStageGeometry : (hasTs ? ShaderStageTessEval : ShaderStageVertex);
-    break;
-  case CallingConv::AMDGPU_VS:
-    shaderStage = hasGs ? ShaderStageCopyShader : (hasTs ? ShaderStageTessEval : ShaderStageVertex);
-    break;
-  case CallingConv::AMDGPU_CS:
-    shaderStage = ShaderStageCompute;
-    break;
-  default:
-    llvm_unreachable("Should never be called!");
-    break;
-  }
-
-  return shaderStage;
-}
-
-// =====================================================================================================================
 // Gets the argument from the specified function according to the argument index.
 //
 // @param func : LLVM function

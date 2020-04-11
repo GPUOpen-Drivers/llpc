@@ -49,4 +49,103 @@ static const BuiltInKind BuiltInNumSamples = static_cast<BuiltInKind>(0x10000008
 static const BuiltInKind BuiltInSamplePatternIdx = static_cast<BuiltInKind>(0x10000009);
 static const BuiltInKind BuiltInWaveId = static_cast<BuiltInKind>(0x1000000A);
 
+// Names used for calls added to IR to represent various actions internally.
+namespace lgcName {
+const static char InputCallPrefix[] = "lgc.input.";
+const static char InputImportGeneric[] = "lgc.input.import.generic.";
+const static char InputImportBuiltIn[] = "lgc.input.import.builtin.";
+const static char InputImportInterpolant[] = "lgc.input.import.interpolant.";
+const static char OutputCallPrefix[] = "lgc.output.";
+const static char OutputImportGeneric[] = "lgc.output.import.generic.";
+const static char OutputImportBuiltIn[] = "lgc.output.import.builtin.";
+const static char OutputExportGeneric[] = "lgc.output.export.generic.";
+const static char OutputExportBuiltIn[] = "lgc.output.export.builtin.";
+const static char OutputExportXfb[] = "lgc.output.export.xfb.";
+const static char BufferCallPrefix[] = "lgc.buffer.";
+const static char BufferAtomic[] = "lgc.buffer.atomic.";
+const static char BufferLoad[] = "lgc.buffer.load.";
+const static char BufferLoadUniform[] = "lgc.buffer.load.uniform.";
+const static char BufferLoadScalarAligned[] = "lgc.buffer.load.scalar.aligned.";
+const static char BufferStore[] = "lgc.buffer.store.";
+const static char BufferStoreScalarAligned[] = "lgc.buffer.store.scalar.aligned.";
+const static char InlineConstLoadUniform[] = "lgc.inlineconst.load.uniform.";
+const static char InlineConstLoad[] = "lgc.inlineconst.load.";
+const static char PushConstLoad[] = "lgc.pushconst.load.";
+const static char TfBufferStore[] = "lgc.tfbuffer.store.f32";
+const static char StreamOutBufferStore[] = "lgc.streamoutbuffer.store";
+
+const static char DescriptorCallPrefix[] = "lgc.descriptor.";
+const static char DescriptorIndex[] = "lgc.descriptor.index";
+const static char DescriptorLoadFromPtr[] = "lgc.descriptor.load.from.ptr";
+const static char DescriptorLoadPrefix[] = "lgc.descriptor.load.";
+const static char DescriptorGetPtrPrefix[] = "lgc.descriptor.get.";
+const static char DescriptorGetResourcePtr[] = "lgc.descriptor.get.resource.ptr";
+const static char DescriptorGetSamplerPtr[] = "lgc.descriptor.get.sampler.ptr";
+const static char DescriptorGetFmaskPtr[] = "lgc.descriptor.get.fmask.ptr";
+const static char DescriptorLoadBuffer[] = "lgc.descriptor.load.buffer";
+const static char DescriptorGetTexelBufferPtr[] = "lgc.descriptor.get.texelbuffer.ptr";
+const static char DescriptorLoadSpillTable[] = "lgc.descriptor.load.spilltable";
+
+const static char LaterCallPrefix[] = "lgc.late.";
+const static char LateLaunderFatPointer[] = "lgc.late.launder.fat.pointer";
+const static char LateBufferLength[] = "lgc.late.buffer.desc.length";
+
+// Names of entry-points for merged shader
+const static char EsGsEntryPoint[] = "lgc.shader.ESGS.main";
+const static char LsHsEntryPoint[] = "lgc.shader.LSHS.main";
+
+const static char NggEsEntryPoint[] = "lgc.ngg.ES.main";
+const static char NggEsEntryVariant[] = "lgc.ngg.ES.variant";
+const static char NggEsEntryVariantPos[] = "lgc.ngg.ES.variant.pos";
+const static char NggEsEntryVariantParam[] = "lgc.ngg.ES.variant.param";
+
+const static char NggGsEntryPoint[] = "lgc.ngg.GS.main";
+const static char NggGsEntryVariant[] = "lgc.ngg.GS.variant";
+const static char NggGsOutputExport[] = "lgc.ngg.GS.output.export.";
+const static char NggGsOutputImport[] = "lgc.ngg.GS.output.import.";
+const static char NggGsEmit[] = "lgc.ngg.GS.emit";
+const static char NggGsCut[] = "lgc.ngg.GS.cut";
+
+const static char NggCopyShaderEntryPoint[] = "lgc.ngg.COPY.main";
+const static char NggPrimShaderEntryPoint[] = "lgc.shader.PRIM.main";
+
+const static char NggCullingFetchReg[] = "lgc.ngg.culling.fetchreg";
+const static char NggCullingBackface[] = "lgc.ngg.culling.backface";
+const static char NggCullingFrustum[] = "lgc.ngg.culling.frustum";
+const static char NggCullingBoxFilter[] = "lgc.ngg.culling.boxfilter";
+const static char NggCullingSphere[] = "lgc.ngg.culling.sphere";
+const static char NggCullingSmallPrimFilter[] = "lgc.ngg.culling.smallprimfilter";
+const static char NggCullingCullDistance[] = "lgc.ngg.culling.culldistance";
+
+const static char EntryPointPrefix[] = "lgc.shader.";
+const static char CopyShaderEntryPoint[] = "lgc.shader.COPY.main";
+const static char NullFsEntryPoint[] = "lgc.shader.FS.null.main";
+
+} // namespace lgcName
+
+// Well-known metadata names
+const static char MetaNameUniform[] = "amdgpu.uniform";
+
+// Maximum count of input/output locations that a shader stage (except fragment shader outputs) is allowed to specify
+static const unsigned MaxInOutLocCount = 32;
+
+// Maximum array size of gl_ClipDistance[] and gl_CullDistance[]
+static const unsigned MaxClipCullDistanceCount = 8;
+
+// Maximum transform feedback buffers
+static const unsigned MaxTransformFeedbackBuffers = 4;
+
+// Maximum GS output vertex streams
+static const unsigned MaxGsStreams = 4;
+static_assert(MaxGsStreams == MaxTransformFeedbackBuffers, "Unexpected value!");
+
+// Internal resource table's virtual descriptor sets
+static const unsigned InternalResourceTable = 0x10000000;
+static const unsigned InternalPerShaderTable = 0x10000001;
+
+// Descriptor offset reloc magic number
+static const unsigned DescRelocMagic = 0xA5A5A500;
+static const unsigned DescRelocMagicMask = 0xFFFFFF00;
+static const unsigned DescSetMask = 0x000000FF;
+
 } // namespace lgc

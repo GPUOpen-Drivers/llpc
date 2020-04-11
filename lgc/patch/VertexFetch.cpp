@@ -244,7 +244,7 @@ const BufFormat VertexFetch::MVertexFormatMap[] = {
 VertexFetch::VertexFetch(Function *entryPoint, ShaderSystemValues *shaderSysValues, PipelineState *pipelineState)
     : m_module(entryPoint->getParent()), m_context(&m_module->getContext()), m_shaderSysValues(shaderSysValues),
       m_pipelineState(pipelineState) {
-  assert(getShaderStageFromFunction(entryPoint) == ShaderStageVertex); // Must be vertex shader
+  assert(getShaderStage(entryPoint) == ShaderStageVertex); // Must be vertex shader
 
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
   auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
