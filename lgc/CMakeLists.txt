@@ -173,18 +173,18 @@ PRIVATE
 
 # lgc/builder
 target_sources(LLVMlgc PRIVATE
+    builder/ArithBuilder.cpp
     builder/Builder.cpp
     builder/BuilderBase.cpp
     builder/BuilderImpl.cpp
-    builder/BuilderImplArith.cpp
-    builder/BuilderImplDesc.cpp
-    builder/BuilderImplImage.cpp
-    builder/BuilderImplInOut.cpp
-    builder/BuilderImplMatrix.cpp
-    builder/BuilderImplMisc.cpp
-    builder/BuilderImplSubgroup.cpp
     builder/BuilderRecorder.cpp
     builder/BuilderReplayer.cpp
+    builder/DescBuilder.cpp
+    builder/ImageBuilder.cpp
+    builder/InOutBuilder.cpp
+    builder/MatrixBuilder.cpp
+    builder/MiscBuilder.cpp
+    builder/SubgroupBuilder.cpp
     builder/YCbCrAddressHandler.cpp
 )
 

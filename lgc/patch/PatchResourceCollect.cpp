@@ -2420,7 +2420,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
       const unsigned loc = builtInMap.second;
       LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input:  builtin = "
-                    << BuilderImplInOut::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
+                    << InOutBuilder::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
     }
     LLPC_OUTS("\n");
   }
@@ -2433,11 +2433,11 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       if (m_shaderStage == ShaderStageGeometry) {
         LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage)
                       << ") Output: stream = " << inOutUsage.gs.rasterStream << " , "
-                      << "builtin = " << BuilderImplInOut::getBuiltInName(builtInId) << "  =>  Mapped = " << loc
+                      << "builtin = " << InOutBuilder::getBuiltInName(builtInId) << "  =>  Mapped = " << loc
                       << "\n");
       } else {
         LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Output: builtin = "
-                      << BuilderImplInOut::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
+                      << InOutBuilder::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
       }
     }
     LLPC_OUTS("\n");
@@ -2448,7 +2448,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
       const unsigned loc = builtInMap.second;
       LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  builtin = "
-                    << BuilderImplInOut::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
+                    << InOutBuilder::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
     }
     LLPC_OUTS("\n");
   }
@@ -2458,7 +2458,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
       const unsigned loc = builtInMap.second;
       LLPC_OUTS("(" << PipelineState::getShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): builtin = "
-                    << BuilderImplInOut::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
+                    << InOutBuilder::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
     }
     LLPC_OUTS("\n");
   }

@@ -24,7 +24,7 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  BuilderImplDesc.cpp
+ * @file  DescBuilder.cpp
  * @brief LLPC source file: implementation of Builder methods for descriptor loads
  ***********************************************************************************************************************
  */
@@ -49,7 +49,7 @@ using namespace llvm;
 // @param isWritten : Whether the buffer is (or might be) written to
 // @param pointeeTy : Type that the returned pointer should point to.
 // @param instName : Name to give instruction(s)
-Value *BuilderImplDesc::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, bool isNonUniform,
+Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, bool isNonUniform,
                                              bool isWritten, Type *const pointeeTy, const Twine &instName) {
   assert(pointeeTy);
 
@@ -85,7 +85,7 @@ Value *BuilderImplDesc::CreateLoadBufferDesc(unsigned descSet, unsigned binding,
 // @param index : Index value
 // @param isNonUniform : Whether the descriptor index is non-uniform
 // @param instName : Name to give instruction(s)
-Value *BuilderImplDesc::CreateIndexDescPtr(Value *descPtr, Value *index, bool isNonUniform, const Twine &instName) {
+Value *DescBuilder::CreateIndexDescPtr(Value *descPtr, Value *index, bool isNonUniform, const Twine &instName) {
   if (index != getInt32(0)) {
     index = scalarizeIfUniform(index, isNonUniform);
     std::string name = lgcName::DescriptorIndex;
@@ -107,7 +107,7 @@ Value *BuilderImplDesc::CreateIndexDescPtr(Value *descPtr, Value *index, bool is
 //
 // @param descPtr : Descriptor pointer, as returned by CreateIndexDescPtr or one of the CreateGet*DescPtr methods
 // @param instName : Name to give instruction(s)
-Value *BuilderImplDesc::CreateLoadDescFromPtr(Value *descPtr, const Twine &instName) {
+Value *DescBuilder::CreateLoadDescFromPtr(Value *descPtr, const Twine &instName) {
   // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
   getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
 
@@ -126,7 +126,7 @@ Value *BuilderImplDesc::CreateLoadDescFromPtr(Value *descPtr, const Twine &instN
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
-Value *BuilderImplDesc::CreateGetSamplerDescPtr(unsigned descSet, unsigned binding, const Twine &instName) {
+Value *DescBuilder::CreateGetSamplerDescPtr(unsigned descSet, unsigned binding, const Twine &instName) {
   // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
   // look up the descSet/binding and generate the code directly.
   auto descPtr = emitCall(lgcName::DescriptorGetSamplerPtr, getSamplerDescPtrTy(),
@@ -145,7 +145,7 @@ Value *BuilderImplDesc::CreateGetSamplerDescPtr(unsigned descSet, unsigned bindi
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
-Value *BuilderImplDesc::CreateGetImageDescPtr(unsigned descSet, unsigned binding, const Twine &instName) {
+Value *DescBuilder::CreateGetImageDescPtr(unsigned descSet, unsigned binding, const Twine &instName) {
   // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
   // look up the descSet/binding and generate the code directly.
   auto descPtr = emitCall(lgcName::DescriptorGetResourcePtr, getImageDescPtrTy(),
@@ -164,7 +164,7 @@ Value *BuilderImplDesc::CreateGetImageDescPtr(unsigned descSet, unsigned binding
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
-Value *BuilderImplDesc::CreateGetTexelBufferDescPtr(unsigned descSet, unsigned binding, const Twine &instName) {
+Value *DescBuilder::CreateGetTexelBufferDescPtr(unsigned descSet, unsigned binding, const Twine &instName) {
   // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
   // look up the descSet/binding and generate the code directly.
   auto descPtr = emitCall(lgcName::DescriptorGetTexelBufferPtr, getTexelBufferDescPtrTy(),
@@ -183,7 +183,7 @@ Value *BuilderImplDesc::CreateGetTexelBufferDescPtr(unsigned descSet, unsigned b
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
-Value *BuilderImplDesc::CreateGetFmaskDescPtr(unsigned descSet, unsigned binding, const Twine &instName) {
+Value *DescBuilder::CreateGetFmaskDescPtr(unsigned descSet, unsigned binding, const Twine &instName) {
   // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
   // look up the descSet/binding and generate the code directly.
   auto descPtr = emitCall(lgcName::DescriptorGetFmaskPtr, getFmaskDescPtrTy(),
@@ -203,7 +203,7 @@ Value *BuilderImplDesc::CreateGetFmaskDescPtr(unsigned descSet, unsigned binding
 //
 // @param pushConstantsTy : Type of the push constants table that the returned pointer will point to
 // @param instName : Name to give instruction(s)
-Value *BuilderImplDesc::CreateLoadPushConstantsPtr(Type *pushConstantsTy, const Twine &instName) {
+Value *DescBuilder::CreateLoadPushConstantsPtr(Type *pushConstantsTy, const Twine &instName) {
   // Remember the size of push constants.
   unsigned pushConstSize = GetInsertPoint()->getModule()->getDataLayout().getTypeStoreSize(pushConstantsTy);
   ResourceUsage *resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
@@ -225,7 +225,7 @@ Value *BuilderImplDesc::CreateLoadPushConstantsPtr(Type *pushConstantsTy, const 
 //
 // @param value : 32-bit integer value to scalarize
 // @param isNonUniform : Whether value is marked as non-uniform
-Value *BuilderImplDesc::scalarizeIfUniform(Value *value, bool isNonUniform) {
+Value *DescBuilder::scalarizeIfUniform(Value *value, bool isNonUniform) {
   assert(value->getType()->isIntegerTy(32));
   if (!isNonUniform && !isa<Constant>(value)) {
     // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
@@ -240,7 +240,7 @@ Value *BuilderImplDesc::scalarizeIfUniform(Value *value, bool isNonUniform) {
 //
 // @param bufferDesc : The buffer descriptor to query.
 // @param instName : Name to give instruction(s).
-Value *BuilderImplDesc::CreateGetBufferDescLength(Value *const bufferDesc, const Twine &instName) {
+Value *DescBuilder::CreateGetBufferDescLength(Value *const bufferDesc, const Twine &instName) {
   // In future this should become a full LLVM intrinsic, but for now we patch in a late intrinsic that is cleaned up
   // in patch buffer op.
   Instruction *const insertPos = &*GetInsertPoint();

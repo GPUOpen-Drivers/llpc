@@ -41,9 +41,9 @@ using namespace llvm;
 // @param builderContext : LgcContext
 // @param pipeline : PipelineState (as public superclass Pipeline)
 BuilderImpl::BuilderImpl(LgcContext *builderContext, Pipeline *pipeline)
-    : BuilderImplBase(builderContext), BuilderImplArith(builderContext), BuilderImplDesc(builderContext),
-      BuilderImplImage(builderContext), BuilderImplInOut(builderContext), BuilderImplMatrix(builderContext),
-      BuilderImplMisc(builderContext), BuilderImplSubgroup(builderContext) {
+    : BuilderImplBase(builderContext), ArithBuilder(builderContext), DescBuilder(builderContext),
+      ImageBuilder(builderContext), InOutBuilder(builderContext), MatrixBuilder(builderContext),
+      MiscBuilder(builderContext), SubgroupBuilder(builderContext) {
   m_pipelineState = reinterpret_cast<PipelineState *>(pipeline);
   m_pipelineState->setNoReplayer();
 }

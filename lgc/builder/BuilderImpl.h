@@ -92,9 +92,9 @@ private:
 
 // =====================================================================================================================
 // Builder implementation subclass for arithmetic operations
-class BuilderImplArith : virtual public BuilderImplBase {
+class ArithBuilder : virtual public BuilderImplBase {
 public:
-  BuilderImplArith(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  ArithBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
   // the given cube map texture coordinates.
@@ -192,9 +192,9 @@ public:
                           const llvm::Twine &instName = "") override final;
 
 private:
-  BuilderImplArith() = delete;
-  BuilderImplArith(const BuilderImplArith &) = delete;
-  BuilderImplArith &operator=(const BuilderImplArith &) = delete;
+  ArithBuilder() = delete;
+  ArithBuilder(const ArithBuilder &) = delete;
+  ArithBuilder &operator=(const ArithBuilder &) = delete;
 
   // Common code for asin and acos
   llvm::Value *aSinACosCommon(llvm::Value *x, llvm::Constant *coefP0, llvm::Constant *coefP1);
@@ -203,7 +203,7 @@ private:
   llvm::Value *fDivFast(llvm::Value *numerator, llvm::Value *denominator);
 
   // Helper method to create call to llvm.amdgcn.class, scalarizing if necessary. This is not exposed outside of
-  // BuilderImplArith.
+  // ArithBuilder.
   llvm::Value *createCallAmdgcnClass(llvm::Value *value, unsigned flags, const llvm::Twine &instName = "");
 
   // Methods to get various FP constants as scalar or vector. Any needed directly by a client should be moved
@@ -251,9 +251,9 @@ private:
 
 // =====================================================================================================================
 // Builder implementation subclass for descriptors
-class BuilderImplDesc : virtual public BuilderImplBase {
+class DescBuilder : virtual public BuilderImplBase {
 public:
-  BuilderImplDesc(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  DescBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // Create a load of a buffer descriptor.
   llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, bool isNonUniform,
@@ -287,18 +287,18 @@ public:
                                          const llvm::Twine &instName = "") override final;
 
 private:
-  BuilderImplDesc() = delete;
-  BuilderImplDesc(const BuilderImplDesc &) = delete;
-  BuilderImplDesc &operator=(const BuilderImplDesc &) = delete;
+  DescBuilder() = delete;
+  DescBuilder(const DescBuilder &) = delete;
+  DescBuilder &operator=(const DescBuilder &) = delete;
 
   llvm::Value *scalarizeIfUniform(llvm::Value *value, bool isNonUniform);
 };
 
 // =====================================================================================================================
 // Builder implementation subclass for image operations
-class BuilderImplImage : virtual public BuilderImplBase {
+class ImageBuilder : virtual public BuilderImplBase {
 public:
-  BuilderImplImage(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  ImageBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // Create an image load.
   llvm::Value *CreateImageLoad(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
@@ -361,9 +361,9 @@ public:
                                  llvm::Value *coord, const llvm::Twine &instName = "") override final;
 
 private:
-  BuilderImplImage() = delete;
-  BuilderImplImage(const BuilderImplImage &) = delete;
-  BuilderImplImage &operator=(const BuilderImplImage &) = delete;
+  ImageBuilder() = delete;
+  ImageBuilder(const ImageBuilder &) = delete;
+  ImageBuilder &operator=(const ImageBuilder &) = delete;
 
   // Implement pre-GFX9 integer gather workaround to patch descriptor or coordinate before the gather
   llvm::Value *preprocessIntegerImageGather(unsigned dim, llvm::Value *&imageDesc, llvm::Value *&coord);
@@ -415,9 +415,9 @@ private:
 
 // =====================================================================================================================
 // Builder implementation subclass for input/output operations
-class BuilderImplInOut : virtual public BuilderImplBase {
+class InOutBuilder : virtual public BuilderImplBase {
 public:
-  BuilderImplInOut(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  InOutBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // Create a read of (part of) a user input value.
   llvm::Value *CreateReadGenericInput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
@@ -455,9 +455,9 @@ public:
   static llvm::StringRef getBuiltInName(BuiltInKind builtIn);
 
 private:
-  BuilderImplInOut() = delete;
-  BuilderImplInOut(const BuilderImplInOut &) = delete;
-  BuilderImplInOut &operator=(const BuilderImplInOut &) = delete;
+  InOutBuilder() = delete;
+  InOutBuilder(const InOutBuilder &) = delete;
+  InOutBuilder &operator=(const InOutBuilder &) = delete;
 
   // Read (a part of) a generic (user) input/output value.
   llvm::Value *readGenericInputOutput(bool isOutput, llvm::Type *resultTy, unsigned location,
@@ -507,9 +507,9 @@ private:
 
 // =====================================================================================================================
 // Builder implementation subclass for matrix operations
-class BuilderImplMatrix : virtual public BuilderImplBase {
+class MatrixBuilder : virtual public BuilderImplBase {
 public:
-  BuilderImplMatrix(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  MatrixBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // Create a matrix transpose.
   llvm::Value *CreateTransposeMatrix(llvm::Value *const matrix, const llvm::Twine &instName = "") override final;
@@ -541,9 +541,9 @@ public:
   llvm::Value *CreateMatrixInverse(llvm::Value *const matrix, const llvm::Twine &instName = "") override final;
 
 private:
-  BuilderImplMatrix() = delete;
-  BuilderImplMatrix(const BuilderImplMatrix &) = delete;
-  BuilderImplMatrix &operator=(const BuilderImplMatrix &) = delete;
+  MatrixBuilder() = delete;
+  MatrixBuilder(const MatrixBuilder &) = delete;
+  MatrixBuilder &operator=(const MatrixBuilder &) = delete;
 
   // Helper function for determinant calculation
   llvm::Value *determinant(llvm::ArrayRef<llvm::Value *> elements, unsigned order);
@@ -555,9 +555,9 @@ private:
 
 // =====================================================================================================================
 // Builder implementation subclass for misc. operations
-class BuilderImplMisc : virtual public BuilderImplBase {
+class MiscBuilder : virtual public BuilderImplBase {
 public:
-  BuilderImplMisc(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  MiscBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
   // the current output primitive in the specified output-primitive stream.
@@ -586,16 +586,16 @@ public:
   llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName) override final;
 
 private:
-  BuilderImplMisc() = delete;
-  BuilderImplMisc(const BuilderImplMisc &) = delete;
-  BuilderImplMisc &operator=(const BuilderImplMisc &) = delete;
+  MiscBuilder() = delete;
+  MiscBuilder(const MiscBuilder &) = delete;
+  MiscBuilder &operator=(const MiscBuilder &) = delete;
 };
 
 // =====================================================================================================================
 // Builder implementation subclass for subgroup operations
-class BuilderImplSubgroup : virtual public BuilderImplBase {
+class SubgroupBuilder : virtual public BuilderImplBase {
 public:
-  BuilderImplSubgroup(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  SubgroupBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // Create a get subgroup size query.
   llvm::Value *CreateGetSubgroupSize(const llvm::Twine &instName) override final;
@@ -706,9 +706,9 @@ public:
   llvm::Value *CreateSubgroupMbcnt(llvm::Value *const mask, const llvm::Twine &instName) override final;
 
 private:
-  BuilderImplSubgroup() = delete;
-  BuilderImplSubgroup(const BuilderImplSubgroup &) = delete;
-  BuilderImplSubgroup &operator=(const BuilderImplSubgroup &) = delete;
+  SubgroupBuilder() = delete;
+  SubgroupBuilder(const SubgroupBuilder &) = delete;
+  SubgroupBuilder &operator=(const SubgroupBuilder &) = delete;
 
   enum class DppCtrl : unsigned {
     DppQuadPerm0000 = 0x000,
@@ -758,13 +758,13 @@ private:
 
 // =====================================================================================================================
 // The Builder implementation, encompassing all the individual builder implementation subclasses
-class BuilderImpl final : public BuilderImplArith,
-                          BuilderImplDesc,
-                          BuilderImplImage,
-                          BuilderImplInOut,
-                          BuilderImplMatrix,
-                          BuilderImplMisc,
-                          BuilderImplSubgroup {
+class BuilderImpl final : public ArithBuilder,
+                          DescBuilder,
+                          ImageBuilder,
+                          InOutBuilder,
+                          MatrixBuilder,
+                          MiscBuilder,
+                          SubgroupBuilder {
   friend LgcContext;
 
 public:
