@@ -36,7 +36,7 @@
 #include "llpcShaderCache.h"
 #include "llpcShaderCacheManager.h"
 #include "vkgcMetroHash.h"
-#include "lgc/llpcBuilder.h"
+#include "lgc/Builder.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitstream/BitstreamReader.h"

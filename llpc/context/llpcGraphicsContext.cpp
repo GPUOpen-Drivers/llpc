@@ -31,7 +31,7 @@
 #include "llpcGraphicsContext.h"
 #include "SPIRVInternal.h"
 #include "llpcCompiler.h"
-#include "lgc/llpcBuilder.h"
+#include "lgc/Builder.h"
 #include "llvm/Support/Format.h"
 
 #define DEBUG_TYPE "llpc-graphics-context"

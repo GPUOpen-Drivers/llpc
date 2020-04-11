@@ -33,7 +33,7 @@
 #include "llpcEmuLib.h"
 #include "llpcPipelineContext.h"
 #include "spirvExt.h"
-#include "lgc/llpcBuilderContext.h"
+#include "lgc/BuilderContext.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Type.h"

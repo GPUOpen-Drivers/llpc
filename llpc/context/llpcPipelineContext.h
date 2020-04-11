@@ -34,7 +34,7 @@
 #include "llpcCompiler.h"
 #include "spirvExt.h"
 #include "vkgcMetroHash.h"
-#include "lgc/llpcPipeline.h"
+#include "lgc/Pipeline.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Type.h"

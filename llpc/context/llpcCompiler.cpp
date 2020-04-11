@@ -36,7 +36,7 @@
 #include "llpcDebug.h"
 #include "llpcGraphicsContext.h"
 #include "spirvExt.h"
-#include "lgc/llpcBuilder.h"
+#include "lgc/Builder.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/DiagnosticInfo.h"
@@ -59,7 +59,7 @@
 #include "llpcTimerProfiler.h"
 #include "vkgcElfReader.h"
 #include "vkgcPipelineDumper.h"
-#include "lgc/llpcPassManager.h"
+#include "lgc/PassManager.h"
 #include <mutex>
 #include <set>
 #include <unordered_set>

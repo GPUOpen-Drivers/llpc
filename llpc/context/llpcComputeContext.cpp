@@ -30,7 +30,7 @@
  */
 #include "llpcComputeContext.h"
 #include "SPIRVInternal.h"
-#include "lgc/llpcPipeline.h"
+#include "lgc/Pipeline.h"
 
 #define DEBUG_TYPE "llpc-compute-context"
 
