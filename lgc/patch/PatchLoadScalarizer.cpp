@@ -29,8 +29,8 @@
  ***********************************************************************************************************************
  */
 #include "PatchLoadScalarizer.h"
-#include "PipelineShaders.h"
-#include "PipelineState.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/state/PipelineState.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"

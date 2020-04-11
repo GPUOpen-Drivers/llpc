@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "Patch.h"
+#include "lgc/patch/Patch.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"

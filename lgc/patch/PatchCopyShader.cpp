@@ -28,13 +28,13 @@
  * @brief LLPC source file: contains declaration and implementation of class lgc::PatchCopyShader.
  ***********************************************************************************************************************
  */
-#include "Internal.h"
-#include "IntrinsDefs.h"
-#include "Patch.h"
-#include "PipelineShaders.h"
-#include "PipelineState.h"
-#include "TargetInfo.h"
 #include "lgc/BuilderBase.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"

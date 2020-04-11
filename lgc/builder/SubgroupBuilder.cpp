@@ -29,8 +29,8 @@
  ***********************************************************************************************************************
  */
 #include "BuilderImpl.h"
-#include "Internal.h"
-#include "PipelineState.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"

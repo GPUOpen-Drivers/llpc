@@ -29,8 +29,8 @@
 ***********************************************************************************************************************
 */
 #include "YCbCrAddressHandler.h"
-#include "GfxRegHandler.h"
-#include "Internal.h"
+#include "lgc/util/GfxRegHandler.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 

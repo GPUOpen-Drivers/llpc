@@ -30,8 +30,8 @@
  */
 #pragma once
 
-#include "Patch.h"
-#include "PipelineState.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/PipelineState.h"
 #include "llvm/IR/InstVisitor.h"
 
 namespace lgc {

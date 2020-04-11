@@ -28,7 +28,7 @@
  * @brief LLPC header file: middle-end debug functions
  ***********************************************************************************************************************
  */
-#include "Debug.h"
+#include "lgc/util/Debug.h"
 #include "lgc/LgcContext.h"
 
 using namespace llvm;

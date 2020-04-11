@@ -29,8 +29,8 @@
  ***********************************************************************************************************************
  */
 #include "BuilderImpl.h"
-#include "Internal.h"
-#include "TargetInfo.h"
+#include "lgc/state/TargetInfo.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 

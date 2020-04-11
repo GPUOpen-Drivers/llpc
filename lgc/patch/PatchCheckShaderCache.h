@@ -30,9 +30,9 @@
  */
 #pragma once
 
-#include "Patch.h"
-#include "PipelineShaders.h"
-#include "PipelineState.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/state/PipelineState.h"
 
 namespace lgc {
 

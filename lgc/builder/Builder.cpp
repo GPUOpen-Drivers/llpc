@@ -30,10 +30,10 @@
  */
 #include "BuilderImpl.h"
 #include "BuilderRecorder.h"
-#include "Internal.h"
-#include "PipelineState.h"
-#include "ShaderModes.h"
 #include "lgc/LgcContext.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/ShaderModes.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include <set>
 

@@ -29,9 +29,9 @@
  ***********************************************************************************************************************
  */
 #include "Gfx9ConfigBuilder.h"
-#include "PipelineState.h"
-#include "TargetInfo.h"
 #include "lgc/BuiltIns.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "llpc-gfx9-config-builder"
@@ -52,8 +52,8 @@ namespace lgc {
 
 namespace Gfx9 {
 
-#include "gfx9_plus_merged_enum.h"
-#include "gfx9_plus_merged_offset.h"
+#include "chip/gfx9/gfx9_plus_merged_enum.h"
+#include "chip/gfx9/gfx9_plus_merged_offset.h"
 
 // =====================================================================================================================
 // Builds PAL metadata for pipeline.

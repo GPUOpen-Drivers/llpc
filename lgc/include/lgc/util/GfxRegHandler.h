@@ -36,8 +36,8 @@
  */
 
 #pragma once
-#include "GfxRegHandlerBase.h"
-#include "TargetInfo.h"
+#include "lgc/state/TargetInfo.h"
+#include "lgc/util/GfxRegHandlerBase.h"
 
 namespace lgc {
 

@@ -28,8 +28,8 @@
  * @brief LLPC source file: utility functions for shader stage
  ***********************************************************************************************************************
  */
-#include "ShaderStage.h"
-#include "Internal.h"
+#include "lgc/state/ShaderStage.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Metadata.h"

@@ -29,11 +29,11 @@
  ***********************************************************************************************************************
  */
 #include "BuilderRecorder.h"
-#include "Internal.h"
-#include "IntrinsDefs.h"
-#include "PipelineState.h"
-#include "ShaderModes.h"
 #include "lgc/LgcContext.h"
+#include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/ShaderModes.h"
+#include "lgc/util/Internal.h"
 
 #define DEBUG_TYPE "llpc-builder-recorder"
 

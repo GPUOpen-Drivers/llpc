@@ -30,9 +30,9 @@
  */
 #include "ShaderMerger.h"
 #include "NggPrimShader.h"
-#include "Patch.h"
-#include "PipelineShaders.h"
-#include "PipelineState.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/state/PipelineState.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LegacyPassManager.h"

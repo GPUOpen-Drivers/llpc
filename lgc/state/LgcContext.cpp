@@ -29,12 +29,12 @@
  ***********************************************************************************************************************
  */
 #include "lgc/LgcContext.h"
-#include "Internal.h"
-#include "Patch.h"
-#include "PipelineState.h"
-#include "TargetInfo.h"
 #include "lgc/Builder.h"
 #include "lgc/PassManager.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
+#include "lgc/util/Internal.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/CommandFlags.h"

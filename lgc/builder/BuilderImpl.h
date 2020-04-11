@@ -30,8 +30,8 @@
  */
 #pragma once
 
-#include "PipelineState.h"
 #include "lgc/Builder.h"
+#include "lgc/state/PipelineState.h"
 
 namespace lgc {
 

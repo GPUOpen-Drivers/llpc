@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "Patch.h"
+#include "lgc/patch/Patch.h"
 
 namespace llvm {
 

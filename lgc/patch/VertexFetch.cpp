@@ -29,9 +29,9 @@
  ***********************************************************************************************************************
  */
 #include "VertexFetch.h"
-#include "PipelineState.h"
 #include "SystemValues.h"
-#include "TargetInfo.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"

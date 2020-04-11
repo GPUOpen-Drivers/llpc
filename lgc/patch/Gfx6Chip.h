@@ -32,7 +32,7 @@
 
 #include "AbiMetadata.h"
 #include "ConfigBuilderBase.h"
-#include "TargetInfo.h"
+#include "lgc/state/TargetInfo.h"
 #include <cstdint>
 #include <unordered_map>
 
@@ -40,8 +40,8 @@ namespace lgc {
 
 namespace Gfx6 {
 
-#include "si_ci_vi_merged_registers.h"
-#include "si_ci_vi_merged_typedef.h"
+#include "chip/gfx6/si_ci_vi_merged_registers.h"
+#include "chip/gfx6/si_ci_vi_merged_typedef.h"
 
 // =====================================================================================================================
 // Helper macros to operate registers

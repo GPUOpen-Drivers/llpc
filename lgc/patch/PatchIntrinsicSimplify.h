@@ -30,8 +30,8 @@
  */
 #pragma once
 
-#include "Patch.h"
-#include "TargetInfo.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/IRBuilder.h"
 

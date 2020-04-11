@@ -29,9 +29,9 @@
  ***********************************************************************************************************************
  */
 #include "BuilderRecorder.h"
-#include "Internal.h"
-#include "PipelineState.h"
 #include "lgc/LgcContext.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/util/Internal.h"
 #include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "llpc-builder-replayer"

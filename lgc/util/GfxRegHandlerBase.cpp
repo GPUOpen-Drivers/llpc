@@ -28,8 +28,8 @@
 * @brief LLPC source file: Implementation of LLPC utility class GfxRegHandlerBase
 ***********************************************************************************************************************
 */
-#include "GfxRegHandlerBase.h"
-#include "TargetInfo.h"
+#include "lgc/util/GfxRegHandlerBase.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
 using namespace lgc;

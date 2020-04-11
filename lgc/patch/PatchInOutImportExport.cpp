@@ -29,12 +29,12 @@
  ***********************************************************************************************************************
  */
 #include "PatchInOutImportExport.h"
-#include "Debug.h"
-#include "FragColorExport.h"
-#include "PipelineShaders.h"
 #include "VertexFetch.h"
 #include "lgc/BuiltIns.h"
 #include "lgc/LgcContext.h"
+#include "lgc/patch/FragColorExport.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/util/Debug.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"

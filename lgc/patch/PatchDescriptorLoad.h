@@ -30,10 +30,10 @@
  */
 #pragma once
 
-#include "Patch.h"
-#include "PipelineShaders.h"
-#include "PipelineState.h"
 #include "SystemValues.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/state/PipelineState.h"
 #include "llvm/IR/InstVisitor.h"
 #include <unordered_set>
 

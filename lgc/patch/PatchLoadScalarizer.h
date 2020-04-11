@@ -30,8 +30,8 @@
  */
 #pragma once
 
-#include "Patch.h"
 #include "lgc/Builder.h"
+#include "lgc/patch/Patch.h"
 #include "llvm/IR/InstVisitor.h"
 
 namespace lgc {
