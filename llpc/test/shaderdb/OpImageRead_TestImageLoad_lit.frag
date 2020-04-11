@@ -29,15 +29,15 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0) 
-; SHADERTEST: call {{.*}} @llpc.call.image.load.v4f32(i32 0, i32 0, {{.*}}, i32 1) 
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 1) 
-; SHADERTEST: call {{.*}} @llpc.call.image.load.v4f32(i32 1, i32 0, {{.*}}, <2 x i32> <i32 2, i32 3>) 
-; SHADERTEST: call {{.*}} @llpc.call.image.load.v4f32(i32 0, i32 0, {{.*}}, i32 4) 
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 2, i32 0) 
-; SHADERTEST: call {{.*}} @llpc.call.image.load.v4f32(i32 8, i32 0, {{.*}}, <4 x i32> <i32 5, i32 6, i32 1, i32 1>) 
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 2) 
-; SHADERTEST: call {{.*}} @llpc.call.image.load.v4f32(i32 6, i32 0, {{.*}}, <3 x i32> <i32 8, i32 9, i32 2>) 
+; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0) 
+; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 0, i32 0, {{.*}}, i32 1) 
+; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 1) 
+; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 1, i32 0, {{.*}}, <2 x i32> <i32 2, i32 3>) 
+; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 0, i32 0, {{.*}}, i32 4) 
+; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 2, i32 0) 
+; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 8, i32 0, {{.*}}, <4 x i32> <i32 5, i32 6, i32 1, i32 1>) 
+; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 2) 
+; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 6, i32 0, {{.*}}, <3 x i32> <i32 8, i32 9, i32 2>) 
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.1d.v4f32.i32(i32 15, i32 1,{{.*}}, i32 0, i32 0)

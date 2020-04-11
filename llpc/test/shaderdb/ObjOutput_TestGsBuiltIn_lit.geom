@@ -29,13 +29,13 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call void @llpc.output.export.builtin.Position{{.*}}.v4f32
-; SHADERTEST: call void @llpc.output.export.builtin.PointSize{{.*}}f32
-; SHADERTEST: call void @llpc.output.export.builtin.ClipDistance{{.*}}a3f32
-; SHADERTEST: call void @llpc.output.export.builtin.CullDistance{{.*}}a2f32
-; SHADERTEST: call void @llpc.output.export.builtin.PrimitiveId{{.*}}
-; SHADERTEST: call void @llpc.output.export.builtin.Layer{{.*}}
-; SHADERTEST: call void @llpc.output.export.builtin.ViewportIndex{{.*}}
+; SHADERTEST: call void @lgc.output.export.builtin.Position{{.*}}.v4f32
+; SHADERTEST: call void @lgc.output.export.builtin.PointSize{{.*}}f32
+; SHADERTEST: call void @lgc.output.export.builtin.ClipDistance{{.*}}a3f32
+; SHADERTEST: call void @lgc.output.export.builtin.CullDistance{{.*}}a2f32
+; SHADERTEST: call void @lgc.output.export.builtin.PrimitiveId{{.*}}
+; SHADERTEST: call void @lgc.output.export.builtin.Layer{{.*}}
+; SHADERTEST: call void @lgc.output.export.builtin.ViewportIndex{{.*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -44,8 +44,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call <3 x i64> (...) @llpc.call.sabs.v3i64(<3 x i64>
-; SHADERTEST: call <3 x i64> (...) @llpc.call.ssign.v3i64(<3 x i64>
+; SHADERTEST: = call <3 x i64> (...) @lgc.create.sabs.v3i64(<3 x i64>
+; SHADERTEST: call <3 x i64> (...) @lgc.create.ssign.v3i64(<3 x i64>
 
 ; SHADERTEST: %[[UMINCMP:.*]] = icmp ult <3 x i64> %[[UMIN1:.*]], %[[UMIN2:.*]]
 ; SHADERTEST: = select <3 x i1> %[[UMINCMP]], <3 x i64> %[[UMIN1]], <3 x i64> %[[UMIN2]]

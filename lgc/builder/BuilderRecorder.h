@@ -48,11 +48,11 @@ namespace lgc {
 
 class PipelineState;
 
-// Prefix of all recorded calls.
-static const char BuilderCallPrefix[] = "llpc.call.";
+// Prefix of all recorded Create* calls.
+static const char BuilderCallPrefix[] = "lgc.create.";
 
 // LLPC call opcode metadata name.
-static const char BuilderCallOpcodeMetadataName[] = "llpc.call.opcode";
+static const char BuilderCallOpcodeMetadataName[] = "lgc.create.opcode";
 
 // =====================================================================================================================
 // A class that caches the metadata kind IDs used by BuilderRecorder and BuilderReplayer.
@@ -216,7 +216,7 @@ public:
     SubgroupMbcnt,
   };
 
-  // Given an opcode, get the call name (without the "llpc.call." prefix)
+  // Given an opcode, get the call name (without the "lgc.create." prefix)
   static llvm::StringRef getCallName(Opcode opcode);
 
   // Record shader modes into IR metadata if this is a shader compile (no PipelineState).

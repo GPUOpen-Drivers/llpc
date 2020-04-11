@@ -22,8 +22,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call i32 (...) @llpc.call.insert.bit.field.i32(i32
-; SHADERTEST: call <3 x i32> (...) @llpc.call.insert.bit.field.v3i32(<3 x i32
+; SHADERTEST: call i32 (...) @lgc.create.insert.bit.field.i32(i32
+; SHADERTEST: call <3 x i32> (...) @lgc.create.insert.bit.field.v3i32(<3 x i32
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

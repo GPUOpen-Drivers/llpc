@@ -74,77 +74,77 @@ inline static void initializeUtilPasses(llvm::PassRegistry &passRegistry) {
 }
 
 namespace lgcName {
-const static char InputCallPrefix[] = "llpc.input.";
-const static char InputImportGeneric[] = "llpc.input.import.generic.";
-const static char InputImportBuiltIn[] = "llpc.input.import.builtin.";
-const static char InputImportInterpolant[] = "llpc.input.import.interpolant.";
-const static char OutputCallPrefix[] = "llpc.output.";
-const static char OutputImportGeneric[] = "llpc.output.import.generic.";
-const static char OutputImportBuiltIn[] = "llpc.output.import.builtin.";
-const static char OutputExportGeneric[] = "llpc.output.export.generic.";
-const static char OutputExportBuiltIn[] = "llpc.output.export.builtin.";
-const static char OutputExportXfb[] = "llpc.output.export.xfb.";
-const static char BufferCallPrefix[] = "llpc.buffer.";
-const static char BufferAtomic[] = "llpc.buffer.atomic.";
-const static char BufferLoad[] = "llpc.buffer.load.";
-const static char BufferLoadUniform[] = "llpc.buffer.load.uniform.";
-const static char BufferLoadScalarAligned[] = "llpc.buffer.load.scalar.aligned.";
-const static char BufferStore[] = "llpc.buffer.store.";
-const static char BufferStoreScalarAligned[] = "llpc.buffer.store.scalar.aligned.";
-const static char InlineConstLoadUniform[] = "llpc.inlineconst.load.uniform.";
-const static char InlineConstLoad[] = "llpc.inlineconst.load.";
-const static char PushConstLoad[] = "llpc.pushconst.load.";
-const static char TfBufferStore[] = "llpc.tfbuffer.store.f32";
-const static char StreamOutBufferStore[] = "llpc.streamoutbuffer.store";
+const static char InputCallPrefix[] = "lgc.input.";
+const static char InputImportGeneric[] = "lgc.input.import.generic.";
+const static char InputImportBuiltIn[] = "lgc.input.import.builtin.";
+const static char InputImportInterpolant[] = "lgc.input.import.interpolant.";
+const static char OutputCallPrefix[] = "lgc.output.";
+const static char OutputImportGeneric[] = "lgc.output.import.generic.";
+const static char OutputImportBuiltIn[] = "lgc.output.import.builtin.";
+const static char OutputExportGeneric[] = "lgc.output.export.generic.";
+const static char OutputExportBuiltIn[] = "lgc.output.export.builtin.";
+const static char OutputExportXfb[] = "lgc.output.export.xfb.";
+const static char BufferCallPrefix[] = "lgc.buffer.";
+const static char BufferAtomic[] = "lgc.buffer.atomic.";
+const static char BufferLoad[] = "lgc.buffer.load.";
+const static char BufferLoadUniform[] = "lgc.buffer.load.uniform.";
+const static char BufferLoadScalarAligned[] = "lgc.buffer.load.scalar.aligned.";
+const static char BufferStore[] = "lgc.buffer.store.";
+const static char BufferStoreScalarAligned[] = "lgc.buffer.store.scalar.aligned.";
+const static char InlineConstLoadUniform[] = "lgc.inlineconst.load.uniform.";
+const static char InlineConstLoad[] = "lgc.inlineconst.load.";
+const static char PushConstLoad[] = "lgc.pushconst.load.";
+const static char TfBufferStore[] = "lgc.tfbuffer.store.f32";
+const static char StreamOutBufferStore[] = "lgc.streamoutbuffer.store";
 
-const static char DescriptorCallPrefix[] = "llpc.descriptor.";
-const static char DescriptorIndex[] = "llpc.descriptor.index";
-const static char DescriptorLoadFromPtr[] = "llpc.descriptor.load.from.ptr";
-const static char DescriptorLoadPrefix[] = "llpc.descriptor.load.";
-const static char DescriptorGetPtrPrefix[] = "llpc.descriptor.get.";
-const static char DescriptorGetResourcePtr[] = "llpc.descriptor.get.resource.ptr";
-const static char DescriptorGetSamplerPtr[] = "llpc.descriptor.get.sampler.ptr";
-const static char DescriptorGetFmaskPtr[] = "llpc.descriptor.get.fmask.ptr";
-const static char DescriptorLoadBuffer[] = "llpc.descriptor.load.buffer";
-const static char DescriptorGetTexelBufferPtr[] = "llpc.descriptor.get.texelbuffer.ptr";
-const static char DescriptorLoadSpillTable[] = "llpc.descriptor.load.spilltable";
+const static char DescriptorCallPrefix[] = "lgc.descriptor.";
+const static char DescriptorIndex[] = "lgc.descriptor.index";
+const static char DescriptorLoadFromPtr[] = "lgc.descriptor.load.from.ptr";
+const static char DescriptorLoadPrefix[] = "lgc.descriptor.load.";
+const static char DescriptorGetPtrPrefix[] = "lgc.descriptor.get.";
+const static char DescriptorGetResourcePtr[] = "lgc.descriptor.get.resource.ptr";
+const static char DescriptorGetSamplerPtr[] = "lgc.descriptor.get.sampler.ptr";
+const static char DescriptorGetFmaskPtr[] = "lgc.descriptor.get.fmask.ptr";
+const static char DescriptorLoadBuffer[] = "lgc.descriptor.load.buffer";
+const static char DescriptorGetTexelBufferPtr[] = "lgc.descriptor.get.texelbuffer.ptr";
+const static char DescriptorLoadSpillTable[] = "lgc.descriptor.load.spilltable";
 
-const static char LaterCallPrefix[] = "llpc.late.";
-const static char LateLaunderFatPointer[] = "llpc.late.launder.fat.pointer";
-const static char LateBufferLength[] = "llpc.late.buffer.desc.length";
+const static char LaterCallPrefix[] = "lgc.late.";
+const static char LateLaunderFatPointer[] = "lgc.late.launder.fat.pointer";
+const static char LateBufferLength[] = "lgc.late.buffer.desc.length";
 
 // Names of entry-points for merged shader
-const static char EsGsEntryPoint[] = "llpc.shader.ESGS.main";
-const static char LsHsEntryPoint[] = "llpc.shader.LSHS.main";
+const static char EsGsEntryPoint[] = "lgc.shader.ESGS.main";
+const static char LsHsEntryPoint[] = "lgc.shader.LSHS.main";
 
-const static char NggEsEntryPoint[] = "llpc.ngg.ES.main";
-const static char NggEsEntryVariant[] = "llpc.ngg.ES.variant";
-const static char NggEsEntryVariantPos[] = "llpc.ngg.ES.variant.pos";
-const static char NggEsEntryVariantParam[] = "llpc.ngg.ES.variant.param";
+const static char NggEsEntryPoint[] = "lgc.ngg.ES.main";
+const static char NggEsEntryVariant[] = "lgc.ngg.ES.variant";
+const static char NggEsEntryVariantPos[] = "lgc.ngg.ES.variant.pos";
+const static char NggEsEntryVariantParam[] = "lgc.ngg.ES.variant.param";
 
-const static char NggGsEntryPoint[] = "llpc.ngg.GS.main";
-const static char NggGsEntryVariant[] = "llpc.ngg.GS.variant";
-const static char NggGsOutputExport[] = "llpc.ngg.GS.output.export.";
-const static char NggGsOutputImport[] = "llpc.ngg.GS.output.import.";
-const static char NggGsEmit[] = "llpc.ngg.GS.emit";
-const static char NggGsCut[] = "llpc.ngg.GS.cut";
+const static char NggGsEntryPoint[] = "lgc.ngg.GS.main";
+const static char NggGsEntryVariant[] = "lgc.ngg.GS.variant";
+const static char NggGsOutputExport[] = "lgc.ngg.GS.output.export.";
+const static char NggGsOutputImport[] = "lgc.ngg.GS.output.import.";
+const static char NggGsEmit[] = "lgc.ngg.GS.emit";
+const static char NggGsCut[] = "lgc.ngg.GS.cut";
 
-const static char NggCopyShaderEntryPoint[] = "llpc.ngg.COPY.main";
-const static char NggPrimShaderEntryPoint[] = "llpc.shader.PRIM.main";
+const static char NggCopyShaderEntryPoint[] = "lgc.ngg.COPY.main";
+const static char NggPrimShaderEntryPoint[] = "lgc.shader.PRIM.main";
 
-const static char NggCullingFetchReg[] = "llpc.ngg.culling.fetchreg";
-const static char NggCullingBackface[] = "llpc.ngg.culling.backface";
-const static char NggCullingFrustum[] = "llpc.ngg.culling.frustum";
-const static char NggCullingBoxFilter[] = "llpc.ngg.culling.boxfilter";
-const static char NggCullingSphere[] = "llpc.ngg.culling.sphere";
-const static char NggCullingSmallPrimFilter[] = "llpc.ngg.culling.smallprimfilter";
-const static char NggCullingCullDistance[] = "llpc.ngg.culling.culldistance";
+const static char NggCullingFetchReg[] = "lgc.ngg.culling.fetchreg";
+const static char NggCullingBackface[] = "lgc.ngg.culling.backface";
+const static char NggCullingFrustum[] = "lgc.ngg.culling.frustum";
+const static char NggCullingBoxFilter[] = "lgc.ngg.culling.boxfilter";
+const static char NggCullingSphere[] = "lgc.ngg.culling.sphere";
+const static char NggCullingSmallPrimFilter[] = "lgc.ngg.culling.smallprimfilter";
+const static char NggCullingCullDistance[] = "lgc.ngg.culling.culldistance";
 
-const static char EntryPointPrefix[] = "llpc.shader.";
-const static char CopyShaderEntryPoint[] = "llpc.shader.COPY.main";
-const static char NullFsEntryPoint[] = "llpc.shader.FS.null.main";
+const static char EntryPointPrefix[] = "lgc.shader.";
+const static char CopyShaderEntryPoint[] = "lgc.shader.COPY.main";
+const static char NullFsEntryPoint[] = "lgc.shader.FS.null.main";
 
-const static char ShaderStageMetadata[] = "llpc.shaderstage";
+const static char ShaderStageMetadata[] = "lgc.shaderstage";
 } // namespace lgcName
 
 // Well-known metadata names

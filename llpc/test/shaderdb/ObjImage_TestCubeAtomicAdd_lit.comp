@@ -18,10 +18,10 @@ void main (void)
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call i32 (...) @llpc.call.image.atomic.i32(i32 2, i32 8, i32 0, i32 0, <8 x i32>
+; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 8, i32 0, i32 0, <8 x i32>
 
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
-; SHADERTEST: call i32 (...) @llpc.call.image.atomic.i32(i32 2, i32 8, i32 0, i32 0, <8 x i32>
+; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 8, i32 0, i32 0, <8 x i32>
 
 ; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.add.cube.i32.i32

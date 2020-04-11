@@ -7,7 +7,7 @@
 ; SHADERTEST: getelementptr [4 x float], [4 x float] addrspace({{.*}})* %{{[0-9]*}}, i32 0, i32 1
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: @llpc.call.load.buffer.desc{{.*}}(i32 0, i32 0, i32 0, i1 false,
+; SHADERTEST: @lgc.create.load.buffer.desc{{.*}}(i32 0, i32 0, i32 0, i1 false,
 ; SHADERTEST: load i32, i32 addrspace({{.*}})* {{.*}}
 ; SHADERTEST: load float, float addrspace({{.*}})* {{.*}}
 

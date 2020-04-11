@@ -17,7 +17,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: [3 x <2 x double>] {{.*}}@llpc.call.transpose.matrix.a3v2f64
+; SHADERTEST: [3 x <2 x double>] {{.*}}@lgc.create.transpose.matrix.a3v2f64
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

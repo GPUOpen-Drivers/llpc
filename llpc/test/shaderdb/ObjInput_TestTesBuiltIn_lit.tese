@@ -27,15 +27,15 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call <3 x float> @llpc.input.import.builtin.TessCoord.v3f32{{.*}}
-; SHADERTEST: call <4 x float> @llpc.input.import.builtin.Position.v4f32{{.*}}
-; SHADERTEST: call float @llpc.input.import.builtin.PointSize.f32{{.*}}
-; SHADERTEST: call float @llpc.input.import.builtin.ClipDistance.f32{{.*}}
-; SHADERTEST: call float @llpc.input.import.builtin.CullDistance.f32{{.*}}
-; SHADERTEST: call i32 @llpc.input.import.builtin.PatchVertices{{.*}}
-; SHADERTEST: call i32 @llpc.input.import.builtin.PrimitiveId{{.*}}
-; SHADERTEST: call float @llpc.input.import.builtin.TessLevelOuter.f32{{.*}}
-; SHADERTEST: call float @llpc.input.import.builtin.TessLevelInner.f32{{.*}}
+; SHADERTEST: call <3 x float> @lgc.input.import.builtin.TessCoord.v3f32{{.*}}
+; SHADERTEST: call <4 x float> @lgc.input.import.builtin.Position.v4f32{{.*}}
+; SHADERTEST: call float @lgc.input.import.builtin.PointSize.f32{{.*}}
+; SHADERTEST: call float @lgc.input.import.builtin.ClipDistance.f32{{.*}}
+; SHADERTEST: call float @lgc.input.import.builtin.CullDistance.f32{{.*}}
+; SHADERTEST: call i32 @lgc.input.import.builtin.PatchVertices{{.*}}
+; SHADERTEST: call i32 @lgc.input.import.builtin.PrimitiveId{{.*}}
+; SHADERTEST: call float @lgc.input.import.builtin.TessLevelOuter.f32{{.*}}
+; SHADERTEST: call float @lgc.input.import.builtin.TessLevelInner.f32{{.*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

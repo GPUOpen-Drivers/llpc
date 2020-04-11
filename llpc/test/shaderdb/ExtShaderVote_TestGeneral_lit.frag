@@ -34,10 +34,10 @@ void main(void)
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call i1 (...) @llpc.call.subgroup.any.i1(
-; SHADERTEST: call i1 (...) @llpc.call.subgroup.all.i1(
-; SHADERTEST: call i1 (...) @llpc.call.subgroup.all.equal.i1(
-; SHADERTEST: call void @llpc.output.export.generic{{.*}}v2f32
+; SHADERTEST: call i1 (...) @lgc.create.subgroup.any.i1(
+; SHADERTEST: call i1 (...) @lgc.create.subgroup.all.i1(
+; SHADERTEST: call i1 (...) @lgc.create.subgroup.all.equal.i1(
+; SHADERTEST: call void @lgc.output.export.generic{{.*}}v2f32
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

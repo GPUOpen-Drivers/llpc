@@ -15,9 +15,9 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call void @llpc.output.export.builtin.FragDepth{{.*}}f32
-; SHADERTEST: call void @llpc.output.export.builtin.SampleMask.i32.a1i32
-; SHADERTEST: call void @llpc.output.export.builtin.FragStencilRef
+; SHADERTEST: call void @lgc.output.export.builtin.FragDepth{{.*}}f32
+; SHADERTEST: call void @lgc.output.export.builtin.SampleMask.i32.a1i32
+; SHADERTEST: call void @lgc.output.export.builtin.FragStencilRef
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call void @llvm.amdgcn.exp.f32
 ; SHADERTEST: AMDLLPC SUCCESS

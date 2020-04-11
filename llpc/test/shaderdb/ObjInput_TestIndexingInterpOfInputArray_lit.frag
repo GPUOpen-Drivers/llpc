@@ -38,7 +38,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: = call <3 x float> @llpc.input.import.builtin.InterpPullMode.v3f32.i32(i32 268435459)
+; SHADERTEST: = call <3 x float> @lgc.input.import.builtin.InterpPullMode.v3f32.i32(i32 268435459)
 ; SHADERTEST: = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %{{.*}}, i32 245, i32 15, i32 15, i1 true)
 ; SHADERTEST: = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %{{.*}}, i32 160, i32 15, i32 15, i1 true)
 ; SHADERTEST: call {{.*}}float @llvm.amdgcn.wqm.f32
@@ -57,7 +57,7 @@ void main()
 ; SHADERTEST: = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %{{.*}}, i32 238, i32 15, i32 15, i1 true)
 ; SHADERTEST: = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %{{.*}}, i32 68, i32 15, i32 15, i1 true)
 ; SHADERTEST: call {{.*}}float @llvm.amdgcn.wqm.f32
-; SHADERTEST: = call <4 x float> @llpc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 4, i32 0, i32 0, i32 0, <2 x float>
+; SHADERTEST: = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 4, i32 0, i32 0, i32 0, <2 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST-COUNT-2: call float @llvm.amdgcn.interp.p1
 ; SHADERTEST: call i32 @llvm.amdgcn.mov.dpp.i32

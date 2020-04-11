@@ -20,7 +20,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: <3 x float> (...) @llpc.call.matrix.times.vector.v3f32
+; SHADERTEST: <3 x float> (...) @lgc.create.matrix.times.vector.v3f32
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: fmul reassoc nnan nsz arcp contract float
