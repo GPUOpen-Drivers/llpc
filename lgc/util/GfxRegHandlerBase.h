@@ -30,8 +30,8 @@
  */
 
 #pragma once
-#include "BuilderImpl.h"
 #include "PipelineState.h"
+#include "llvm/IR/IRBuilder.h"
 
 namespace lgc {
 
@@ -54,7 +54,7 @@ public:
 
 protected:
   // Constructor
-  inline GfxRegHandlerBase(Builder *builder, llvm::Value *reg) {
+  inline GfxRegHandlerBase(llvm::IRBuilder<> *builder, llvm::Value *reg) {
     m_builder = builder;
     setRegister(reg);
   }
@@ -96,7 +96,7 @@ private:
   }
 
 protected:
-  Builder *m_builder;
+  llvm::IRBuilder<> *m_builder;
 
 private:
   // Contains (possibly updated) dwords for the register value. Each element will be a nullptr until it

@@ -31,6 +31,7 @@
 #pragma once
 
 #include "Abi.h"
+#include "Defs.h"
 #include "ResourceUsage.h"
 #include "ShaderModes.h"
 #include "lgc/Pipeline.h"
@@ -236,6 +237,9 @@ public:
 
   // Translate enum "ResourceNodeType" to string
   static const char *getResourceNodeTypeName(ResourceNodeType type);
+
+  // Get name of built-in
+  static llvm::StringRef getBuiltInName(BuiltInKind builtIn);
 
   // -----------------------------------------------------------------------------------------------------------------
   // Utility method templates to read and write IR metadata, used by PipelineState and ShaderModes

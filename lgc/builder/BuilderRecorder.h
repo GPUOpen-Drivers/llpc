@@ -219,6 +219,12 @@ public:
   // Given an opcode, get the call name (without the "lgc.create." prefix)
   static llvm::StringRef getCallName(Opcode opcode);
 
+  // Constructors
+  BuilderRecorder(LgcContext *builderContext, Pipeline *pipeline);
+  BuilderRecorder() = delete;
+  BuilderRecorder(const BuilderRecorder &) = delete;
+  BuilderRecorder &operator=(const BuilderRecorder &) = delete;
+
   // Record shader modes into IR metadata if this is a shader compile (no PipelineState).
   void recordShaderModes(llvm::Module *module) override final;
 
@@ -537,12 +543,6 @@ protected:
   ShaderModes *getShaderModes() override final;
 
 private:
-  BuilderRecorder() = delete;
-  BuilderRecorder(const BuilderRecorder &) = delete;
-  BuilderRecorder &operator=(const BuilderRecorder &) = delete;
-
-  BuilderRecorder(LgcContext *builderContext, Pipeline *pipeline);
-
   // Record one Builder call
   llvm::Instruction *record(Opcode opcode, llvm::Type *returnTy, llvm::ArrayRef<llvm::Value *> args,
                             const llvm::Twine &instName, llvm::ArrayRef<llvm::Attribute::AttrKind> attribs = {});

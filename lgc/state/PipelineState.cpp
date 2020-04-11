@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "PipelineState.h"
-#include "BuilderRecorder.h"
 #include "FragColorExport.h"
 #include "Internal.h"
 #include "Patch.h"
@@ -64,6 +63,11 @@ static const char VpStateMetadataName[] = "llpc.viewport.state";
 static const char RsStateMetadataName[] = "llpc.rasterizer.state";
 static const char ColorExportFormatsMetadataName[] = "llpc.color.export.formats";
 static const char ColorExportStateMetadataName[] = "llpc.color.export.state";
+
+namespace lgc {
+// Create BuilderReplayer pass
+ModulePass *createBuilderReplayer(Pipeline *pipeline);
+} // namespace lgc
 
 // =====================================================================================================================
 // Get LLVMContext
@@ -1130,6 +1134,32 @@ const char *PipelineState::getResourceNodeTypeName(ResourceNodeType type) {
     break;
   }
   return string;
+}
+
+// =====================================================================================================================
+// Get name of built-in
+//
+// @param builtIn : Built-in type, one of the BuiltIn* constants
+StringRef PipelineState::getBuiltInName(BuiltInKind builtIn) {
+  switch (static_cast<unsigned>(builtIn)) {
+#define BUILTIN(name, number, out, in, type)                                                                           \
+  case BuiltIn##name:                                                                                                  \
+    return #name;
+#include "lgc/BuiltInDefs.h"
+#undef BUILTIN
+
+  // Internal built-ins.
+  case BuiltInSamplePosOffset:
+    return "SamplePosOffset";
+  case BuiltInInterpLinearCenter:
+    return "InterpLinearCenter";
+  case BuiltInInterpPullMode:
+    return "InterpPullMode";
+
+  default:
+    llvm_unreachable("Should never be called!");
+    return "unknown";
+  }
 }
 
 // =====================================================================================================================

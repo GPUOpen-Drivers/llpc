@@ -29,8 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "lgc/LgcContext.h"
-#include "BuilderImpl.h"
-#include "BuilderRecorder.h"
 #include "Internal.h"
 #include "Patch.h"
 #include "PipelineState.h"
@@ -48,6 +46,10 @@
 
 using namespace lgc;
 using namespace llvm;
+
+namespace llvm {
+void initializeBuilderReplayerPass(PassRegistry &);
+} // namespace llvm
 
 static codegen::RegisterCodeGenFlags CGF;
 
@@ -167,8 +169,8 @@ Pipeline *LgcContext::createPipeline() {
 // @param useBuilderRecorder : true to use BuilderRecorder, false to use BuilderImpl
 Builder *LgcContext::createBuilder(Pipeline *pipeline, bool useBuilderRecorder) {
   if (!pipeline || useBuilderRecorder)
-    return new BuilderRecorder(this, pipeline);
-  return new BuilderImpl(this, pipeline);
+    return Builder::createBuilderRecorder(this, pipeline);
+  return Builder::createBuilderImpl(this, pipeline);
 }
 
 // =====================================================================================================================

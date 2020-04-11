@@ -43,6 +43,24 @@ using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
+// Static method to create a BuilderImpl
+//
+// @param context : LGC context
+// @param pipeline : Pipeline object
+Builder *Builder::createBuilderImpl(LgcContext *context, Pipeline *pipeline) {
+  return new BuilderImpl(context, pipeline);
+}
+
+// =====================================================================================================================
+// Static method to create a BuilderRecorder
+//
+// @param context : LGC context
+// @param pipeline : Pipeline object, can be nullptr
+Builder *Builder::createBuilderRecorder(LgcContext *context, Pipeline *pipeline) {
+  return new BuilderRecorder(context, pipeline);
+}
+
+// =====================================================================================================================
 //
 // @param builderContext : Builder context
 Builder::Builder(LgcContext *builderContext)

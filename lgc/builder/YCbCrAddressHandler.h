@@ -30,7 +30,6 @@
  */
 
 #pragma once
-#include "BuilderImpl.h"
 #include "GfxRegHandler.h"
 
 namespace lgc {
@@ -40,7 +39,7 @@ namespace lgc {
 // Note: There are at most 3 planes, and the index for plane is start from zero
 class YCbCrAddressHandler {
 public:
-  YCbCrAddressHandler(Builder *builder, SqImgRsrcRegHandler *sqImgRsrcRegHandler, GfxIpVersion *gfxIp) {
+  YCbCrAddressHandler(llvm::IRBuilder<> *builder, SqImgRsrcRegHandler *sqImgRsrcRegHandler, GfxIpVersion *gfxIp) {
     m_builder = builder;
     m_regHandler = sqImgRsrcRegHandler;
     m_gfxIp = gfxIp;
@@ -77,7 +76,7 @@ public:
 
 private:
   SqImgRsrcRegHandler *m_regHandler;
-  Builder *m_builder;
+  llvm::IRBuilder<> *m_builder;
   llvm::SmallVector<llvm::Value *, 3> m_planeBaseAddresses;
   llvm::Value *m_pitchY = nullptr;
   llvm::Value *m_heightY = nullptr;
