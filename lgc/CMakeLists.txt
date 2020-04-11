@@ -120,6 +120,7 @@ elseif(WIN32)
                 /wd4505 # unreferenced local function has been removed
                 /wd4510 # default constructor could not be generated
                 /wd4512 # assignment operator could not be generated
+                /wd4589 # constructor of abstract class 'type' ignores initializer for virtual base class 'type'
                 /wd4610 # struct 'X' can never be instantiated - user defined constructor required
                 /wd4624 # destructor could not be generated because a base class destructor is inaccessible or deleted
                 /wd4702 # unreachable code
