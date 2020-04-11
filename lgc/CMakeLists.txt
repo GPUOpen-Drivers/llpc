@@ -162,15 +162,10 @@ endif()
 target_include_directories(LLVMlgc
 PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/builder
     ${CMAKE_CURRENT_SOURCE_DIR}/imported/chip/gfx6
     ${CMAKE_CURRENT_SOURCE_DIR}/imported/chip/gfx9
     ${CMAKE_CURRENT_SOURCE_DIR}/patch
-    ${CMAKE_CURRENT_SOURCE_DIR}/patch/gfx6/chip
-    ${CMAKE_CURRENT_SOURCE_DIR}/patch/gfx9/chip
-    ${CMAKE_CURRENT_SOURCE_DIR}/patch/gfx9
-    ${CMAKE_CURRENT_SOURCE_DIR}/patch/generate
     ${CMAKE_CURRENT_SOURCE_DIR}/util
 )
 
@@ -197,16 +192,15 @@ target_sources(LLVMlgc PRIVATE
 
 # lgc/patch
 target_sources(LLVMlgc PRIVATE
-    patch/gfx6/chip/Gfx6Chip.cpp
-    patch/gfx6/chip/Gfx6ConfigBuilder.cpp
-    patch/gfx9/chip/Gfx9Chip.cpp
-    patch/gfx9/chip/Gfx9ConfigBuilder.cpp
-    patch/gfx9/NggLdsManager.cpp
-    patch/gfx9/NggPrimShader.cpp
-    patch/gfx9/ShaderMerger.cpp
     patch/CodeGenManager.cpp
     patch/ConfigBuilderBase.cpp
     patch/FragColorExport.cpp
+    patch/Gfx6Chip.cpp
+    patch/Gfx6ConfigBuilder.cpp
+    patch/Gfx9Chip.cpp
+    patch/Gfx9ConfigBuilder.cpp
+    patch/NggLdsManager.cpp
+    patch/NggPrimShader.cpp
     patch/Patch.cpp
     patch/PatchBufferOp.cpp
     patch/PatchCheckShaderCache.cpp
@@ -223,6 +217,7 @@ target_sources(LLVMlgc PRIVATE
     patch/PatchPushConstOp.cpp
     patch/PatchResourceCollect.cpp
     patch/PatchSetupTargetFeatures.cpp
+    patch/ShaderMerger.cpp
     patch/SystemValues.cpp
     patch/VertexFetch.cpp
 )
