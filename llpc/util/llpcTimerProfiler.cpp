@@ -31,8 +31,8 @@
 
 #include "llpcTimerProfiler.h"
 #include "llpc.h"
-#include "lgc/llpcBuilderContext.h"
-#include "lgc/llpcPassManager.h"
+#include "lgc/BuilderContext.h"
+#include "lgc/PassManager.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"

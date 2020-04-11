@@ -32,7 +32,7 @@
 #include "LLVMSPIRVLib.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
-#include "lgc/llpcBuilder.h"
+#include "lgc/Builder.h"
 #include <sstream>
 #include <string>
 

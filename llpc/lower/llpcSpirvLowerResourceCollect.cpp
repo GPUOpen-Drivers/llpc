@@ -29,14 +29,14 @@
  ***********************************************************************************************************************
  */
 #include "SPIRVInternal.h"
-#include "lgc/llpcBuilder.h"
+#include "lgc/Builder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 // TODO: Fix the code in this file so it does not break the builder abstraction. It should
 // not be including files directly in the LGC directory tree like this.
-#include "../../lgc/builder/llpcBuilderRecorder.h"
+#include "../../lgc/builder/BuilderRecorder.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerResourceCollect.h"
 

@@ -33,7 +33,7 @@
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcSpirvLowerUtil.h"
-#include "lgc/llpcBuilder.h"
+#include "lgc/Builder.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Instructions.h"

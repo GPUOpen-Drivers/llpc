@@ -181,7 +181,7 @@ PipelineState stores two kinds of outside-IR state:
 
 * The second kind of outside-IR state is the state set in middle-end passes (and BuilderImpl).
   This is `ResourceUsage` and `InterfaceData`, which are declared in their own separate file
-  `llpcResourceUsage.h`.
+  `ResourceUsage.h`.
   This state does not get written into IR metadata. In theory we could add a facility to write
   the state into IR metadata and read it back, and that would allow us to support lit testing of
   individual middle-end passes with `-stop-before` and `-run-pass` options like `llc`. But
