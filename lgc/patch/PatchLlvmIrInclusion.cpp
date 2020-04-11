@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "PatchLlvmIrInclusion.h"
-#include "Abi.h"
+#include "lgc/state/Abi.h"
 #include "llvm/IR/Constants.h"
 
 #define DEBUG_TYPE "llpc-patch-llvm-ir-inclusion"

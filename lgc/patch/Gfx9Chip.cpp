@@ -36,8 +36,8 @@
 namespace lgc {
 
 namespace Gfx9 {
-#include "gfx9_plus_merged_enum.h"
-#include "gfx9_plus_merged_offset.h"
+#include "chip/gfx9/gfx9_plus_merged_enum.h"
+#include "chip/gfx9/gfx9_plus_merged_offset.h"
 
 // =====================================================================================================================
 // Initializer

@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "Internal.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/Pass.h"
 

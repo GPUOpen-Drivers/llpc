@@ -29,10 +29,10 @@
  ***********************************************************************************************************************
  */
 #include "PatchPushConstOp.h"
-#include "IntrinsDefs.h"
-#include "PipelineShaders.h"
-#include "PipelineState.h"
 #include "lgc/Builder.h"
+#include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/state/PipelineState.h"
 #include "llvm/IR/ValueMap.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"

@@ -30,12 +30,12 @@
  */
 #pragma once
 
-#include "Abi.h"
-#include "Defs.h"
-#include "ResourceUsage.h"
-#include "ShaderModes.h"
-#include "ShaderStage.h"
 #include "lgc/Pipeline.h"
+#include "lgc/state/Abi.h"
+#include "lgc/state/Defs.h"
+#include "lgc/state/ResourceUsage.h"
+#include "lgc/state/ShaderModes.h"
+#include "lgc/state/ShaderStage.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Pass.h"

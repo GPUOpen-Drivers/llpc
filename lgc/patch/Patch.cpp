@@ -28,15 +28,15 @@
  * @brief LLPC source file: contains implementation of class lgc::Patch.
  ***********************************************************************************************************************
  */
-#include "Patch.h"
-#include "Debug.h"
-#include "Internal.h"
+#include "lgc/patch/Patch.h"
 #include "PatchCheckShaderCache.h"
-#include "PipelineState.h"
-#include "TargetInfo.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
+#include "lgc/util/Debug.h"
+#include "lgc/util/Internal.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitstream/BitstreamReader.h"

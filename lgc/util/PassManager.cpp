@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/PassManager.h"
-#include "Debug.h"
+#include "lgc/util/Debug.h"
 #include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/CommandLine.h"

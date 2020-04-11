@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "PatchDescriptorLoad.h"
-#include "TargetInfo.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"

@@ -30,10 +30,10 @@
  */
 #pragma once
 
-#include "Internal.h"
 #include "NggPrimShader.h"
-#include "PipelineShaders.h"
-#include "TargetInfo.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/state/TargetInfo.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/Module.h"
 
 namespace lgc {

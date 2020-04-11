@@ -29,9 +29,9 @@
  ***********************************************************************************************************************
  */
 
-#include "ShaderModes.h"
-#include "IntrinsDefs.h"
-#include "PipelineState.h"
+#include "lgc/state/ShaderModes.h"
+#include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PipelineState.h"
 
 #define DEBUG_TYPE "llpc-shader-modes"
 

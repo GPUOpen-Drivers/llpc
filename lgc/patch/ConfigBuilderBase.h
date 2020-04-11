@@ -31,8 +31,8 @@
 #pragma once
 
 #include "AbiMetadata.h"
-#include "TargetInfo.h"
 #include "lgc/CommonDefs.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 
 namespace llvm {

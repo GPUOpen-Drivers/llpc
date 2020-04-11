@@ -29,9 +29,9 @@
  ***********************************************************************************************************************
  */
 #include "BuilderImpl.h"
-#include "Internal.h"
-#include "PipelineState.h"
 #include "lgc/LgcContext.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/util/Internal.h"
 
 #define DEBUG_TYPE "llpc-builder-impl-inout"
 

@@ -28,7 +28,7 @@
 * @brief LLPC source file: Implementation of LLPC utility class GfxRegHandler
 ***********************************************************************************************************************
 */
-#include "GfxRegHandler.h"
+#include "lgc/util/GfxRegHandler.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
 using namespace lgc;

@@ -28,13 +28,13 @@
  * @brief LLPC source file: contains implementation of class lgc::PipelineState.
  ***********************************************************************************************************************
  */
-#include "PipelineState.h"
-#include "FragColorExport.h"
-#include "Internal.h"
-#include "Patch.h"
-#include "TargetInfo.h"
+#include "lgc/state/PipelineState.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
+#include "lgc/patch/FragColorExport.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/TargetInfo.h"
+#include "lgc/util/Internal.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"

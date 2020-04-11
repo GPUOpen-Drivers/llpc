@@ -28,9 +28,9 @@
 * @brief LLPC source file: contains declaration and implementation of class lgc::PatchSetupTargetFeatures.
 ***********************************************************************************************************************
 */
-#include "Patch.h"
-#include "PipelineState.h"
-#include "TargetInfo.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"

@@ -162,13 +162,9 @@ endif()
 
 target_include_directories(LLVMlgc
 PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/interface
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/builder
-    ${CMAKE_CURRENT_SOURCE_DIR}/imported/chip/gfx6
-    ${CMAKE_CURRENT_SOURCE_DIR}/imported/chip/gfx9
-    ${CMAKE_CURRENT_SOURCE_DIR}/patch
-    ${CMAKE_CURRENT_SOURCE_DIR}/state
-    ${CMAKE_CURRENT_SOURCE_DIR}/util
+    ${CMAKE_CURRENT_SOURCE_DIR}/imported
 )
 
 # lgc/builder

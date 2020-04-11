@@ -29,11 +29,11 @@
  ***********************************************************************************************************************
  */
 #include "NggLdsManager.h"
-#include "Debug.h"
 #include "Gfx9Chip.h"
-#include "Patch.h"
-#include "PipelineState.h"
-#include "TargetInfo.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
+#include "lgc/util/Debug.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Verifier.h"

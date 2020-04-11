@@ -175,7 +175,7 @@ endif()
 target_include_directories(llpc
     PUBLIC
         ${PROJECT_SOURCE_DIR}/include
-        ${PROJECT_SOURCE_DIR}/../lgc/include
+        ${PROJECT_SOURCE_DIR}/../lgc/interface
     PRIVATE
         ${PROJECT_SOURCE_DIR}/context
         ${PROJECT_SOURCE_DIR}/include

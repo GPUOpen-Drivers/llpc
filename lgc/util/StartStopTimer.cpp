@@ -28,8 +28,8 @@
 * @brief LLPC source file: pass to start or stop a timer
 ***********************************************************************************************************************
 */
-#include "Internal.h"
 #include "lgc/LgcContext.h"
+#include "lgc/util/Internal.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Timer.h"
 

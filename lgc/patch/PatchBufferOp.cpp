@@ -29,11 +29,11 @@
  ***********************************************************************************************************************
  */
 #include "PatchBufferOp.h"
-#include "IntrinsDefs.h"
-#include "PipelineShaders.h"
-#include "PipelineState.h"
-#include "TargetInfo.h"
 #include "lgc/Builder.h"
+#include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Analysis/LegacyDivergenceAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"

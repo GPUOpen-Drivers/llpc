@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "Internal.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"

@@ -36,7 +36,7 @@
 #endif
 
 #include "PatchIntrinsicSimplify.h"
-#include "PipelineState.h"
+#include "lgc/state/PipelineState.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/IR/Intrinsics.h"

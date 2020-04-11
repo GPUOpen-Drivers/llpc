@@ -32,7 +32,7 @@
 
 #include "AbiMetadata.h"
 #include "ConfigBuilderBase.h"
-#include "TargetInfo.h"
+#include "lgc/state/TargetInfo.h"
 #include <cstdint>
 #include <unordered_map>
 
@@ -42,9 +42,9 @@ namespace Gfx9 {
 
 #undef CS_ENABLE
 
-#include "gfx9_plus_merged_offset.h"
-#include "gfx9_plus_merged_registers.h"
-#include "gfx9_plus_merged_typedef.h"
+#include "chip/gfx9/gfx9_plus_merged_offset.h"
+#include "chip/gfx9/gfx9_plus_merged_registers.h"
+#include "chip/gfx9/gfx9_plus_merged_typedef.h"
 
 // =====================================================================================================================
 // Helper macros to operate registers

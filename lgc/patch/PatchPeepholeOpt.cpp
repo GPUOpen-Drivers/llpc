@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "PatchPeepholeOpt.h"
-#include "Patch.h"
+#include "lgc/patch/Patch.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"

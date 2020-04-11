@@ -30,8 +30,8 @@
  */
 #pragma once
 
-#include "Internal.h"
-#include "IntrinsDefs.h"
+#include "lgc/state/IntrinsDefs.h"
+#include "lgc/util/Internal.h"
 #include <unordered_map>
 #include <unordered_set>
 

@@ -28,7 +28,7 @@
  * @brief LLPC source file: code to set up TargetInfo
  ***********************************************************************************************************************
  */
-#include "TargetInfo.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/CommandLine.h"
 

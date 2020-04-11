@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "PatchCheckShaderCache.h"
-#include "PipelineShaders.h"
+#include "lgc/state/PipelineShaders.h"
 #include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "llpc-patch-check-shader-cache"

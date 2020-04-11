@@ -28,11 +28,11 @@
  * @brief LLPC source file: contains declaration and implementation of class lgc::PatchNullFragShader.
  ***********************************************************************************************************************
  */
-#include "Internal.h"
-#include "IntrinsDefs.h"
-#include "Patch.h"
-#include "PipelineState.h"
 #include "lgc/LgcContext.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/util/Internal.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"

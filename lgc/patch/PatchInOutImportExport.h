@@ -30,12 +30,12 @@
  */
 #pragma once
 
-#include "IntrinsDefs.h"
-#include "Patch.h"
-#include "PipelineShaders.h"
-#include "PipelineState.h"
 #include "SystemValues.h"
-#include "TargetInfo.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/IR/InstVisitor.h"
 #include <set>
 

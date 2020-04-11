@@ -28,10 +28,10 @@
  * @brief LLPC source file: contains implementation of class lgc::FragColorExport.
  ***********************************************************************************************************************
  */
-#include "FragColorExport.h"
-#include "IntrinsDefs.h"
-#include "PipelineState.h"
-#include "TargetInfo.h"
+#include "lgc/patch/FragColorExport.h"
+#include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"

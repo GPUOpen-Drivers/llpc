@@ -39,8 +39,8 @@
 #include <mach/mach_time.h>
 #endif
 
-#include "Internal.h"
 #include "lgc/BuilderBase.h"
+#include "lgc/util/Internal.h"
 
 #define DEBUG_TYPE "llpc-internal"
 

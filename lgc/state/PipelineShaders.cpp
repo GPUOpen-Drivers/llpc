@@ -28,9 +28,9 @@
 * @brief LLPC source file: contains implementation of class Llpc::PipelineShaders
 ***********************************************************************************************************************
 */
-#include "PipelineShaders.h"
-#include "PipelineState.h"
-#include "Internal.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"

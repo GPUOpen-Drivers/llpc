@@ -29,9 +29,9 @@
  ***********************************************************************************************************************
  */
 #include "BuilderImpl.h"
-#include "Internal.h"
-#include "PipelineState.h"
-#include "TargetInfo.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
 #define DEBUG_TYPE "llpc-builder-impl-desc"

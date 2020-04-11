@@ -30,9 +30,9 @@
  */
 #include "Gfx6ConfigBuilder.h"
 #include "AbiMetadata.h"
-#include "PipelineState.h"
-#include "TargetInfo.h"
 #include "lgc/BuiltIns.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "llpc-gfx6-config-builder"
@@ -52,8 +52,8 @@ namespace lgc {
 
 namespace Gfx6 {
 
-#include "si_ci_vi_merged_enum.h"
-#include "si_ci_vi_merged_offset.h"
+#include "chip/gfx6/si_ci_vi_merged_enum.h"
+#include "chip/gfx6/si_ci_vi_merged_offset.h"
 
 // =====================================================================================================================
 // Builds PAL metadata for pipeline.

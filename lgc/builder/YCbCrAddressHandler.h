@@ -30,7 +30,7 @@
  */
 
 #pragma once
-#include "GfxRegHandler.h"
+#include "lgc/util/GfxRegHandler.h"
 
 namespace lgc {
 
