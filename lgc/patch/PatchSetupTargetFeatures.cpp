@@ -28,16 +28,21 @@
 * @brief LLPC source file: contains declaration and implementation of class lgc::PatchSetupTargetFeatures.
 ***********************************************************************************************************************
 */
-#include "CodeGenManager.h"
 #include "Patch.h"
 #include "PipelineState.h"
+#include "TargetInfo.h"
 #include "llvm/Pass.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "llpc-patch-setup-target-features"
 
 using namespace llvm;
 using namespace lgc;
+
+// -disable-fp32-denormals: disable target option fp32-denormals
+static cl::opt<bool> DisableFp32Denormals("disable-fp32-denormals", cl::desc("Disable target option fp32-denormals"),
+                                          cl::init(false));
 
 namespace lgc {
 
@@ -54,9 +59,11 @@ public:
 
   bool runOnModule(Module &module) override;
 
-private:
   PatchSetupTargetFeatures(const PatchSetupTargetFeatures &) = delete;
   PatchSetupTargetFeatures &operator=(const PatchSetupTargetFeatures &) = delete;
+
+private:
+  void setupTargetFeatures(PipelineState *pipelineState, Module *module);
 };
 
 char PatchSetupTargetFeatures::ID = 0;
@@ -79,9 +86,100 @@ bool PatchSetupTargetFeatures::runOnModule(Module &module) {
   Patch::init(&module);
 
   auto pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
-  CodeGenManager::setupTargetFeatures(pipelineState, &module);
+  setupTargetFeatures(pipelineState, &module);
 
   return true; // Modified the module.
+}
+
+// =====================================================================================================================
+// Setup LLVM target features, target features are set per entry point function.
+//
+// @param pipelineState : Pipeline state
+// @param [in, out] module : LLVM module
+void PatchSetupTargetFeatures::setupTargetFeatures(PipelineState *pipelineState, Module *module) {
+  std::string globalFeatures = "";
+
+  if (pipelineState->getOptions().includeDisassembly)
+    globalFeatures += ",+DumpCode";
+
+  if (DisableFp32Denormals)
+    globalFeatures += ",-fp32-denormals";
+
+  for (auto func = module->begin(), end = module->end(); func != end; ++func) {
+    if (!func->empty() && func->getLinkage() == GlobalValue::ExternalLinkage) {
+      std::string targetFeatures(globalFeatures);
+      AttrBuilder builder;
+
+      ShaderStage shaderStage =
+          getShaderStageFromCallingConv(pipelineState->getShaderStageMask(), func->getCallingConv());
+
+      bool useSiScheduler = pipelineState->getShaderOptions(shaderStage).useSiScheduler;
+      if (useSiScheduler) {
+        // It was found that enabling both SIScheduler and SIFormClauses was bad on one particular
+        // game. So we disable the latter here. That only affects XNACK targets.
+        targetFeatures += ",+si-scheduler";
+        builder.addAttribute("amdgpu-max-memory-clause", "1");
+      }
+
+      if (func->getCallingConv() == CallingConv::AMDGPU_GS) {
+        // NOTE: For NGG primitive shader, enable 128-bit LDS load/store operations to optimize gvec4 data
+        // read/write. This usage must enable the feature of using CI+ additional instructions.
+        const auto nggControl = pipelineState->getNggControl();
+        if (nggControl->enableNgg && !nggControl->passthroughMode)
+          targetFeatures += ",+ci-insts,+enable-ds128";
+      }
+
+      if (func->getCallingConv() == CallingConv::AMDGPU_HS) {
+        // Force s_barrier to be present (ignore optimization)
+        builder.addAttribute("amdgpu-flat-work-group-size", "128,128");
+      }
+      if (func->getCallingConv() == CallingConv::AMDGPU_CS) {
+        // Set the work group size
+        const auto &csBuiltInUsage = pipelineState->getShaderModes()->getComputeShaderMode();
+        unsigned flatWorkGroupSize =
+            csBuiltInUsage.workgroupSizeX * csBuiltInUsage.workgroupSizeY * csBuiltInUsage.workgroupSizeZ;
+        auto flatWorkGroupSizeString = std::to_string(flatWorkGroupSize);
+        builder.addAttribute("amdgpu-flat-work-group-size", flatWorkGroupSizeString + "," + flatWorkGroupSizeString);
+      }
+
+      auto gfxIp = pipelineState->getTargetInfo().getGfxIpVersion();
+      if (gfxIp.major >= 9)
+        targetFeatures += ",+enable-scratch-bounds-checks";
+
+      if (gfxIp.major >= 10) {
+        // Setup wavefront size per shader stage
+        unsigned waveSize = pipelineState->getShaderWaveSize(shaderStage);
+
+        targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
+
+        // Allow driver setting for WGP by forcing backend to set 0
+        // which is then OR'ed with the driver set value
+        targetFeatures += ",+cumode";
+      }
+
+      if (shaderStage != ShaderStageCopyShader) {
+        const auto &shaderMode = pipelineState->getShaderModes()->getCommonShaderMode(shaderStage);
+        if (shaderMode.fp16DenormMode == FpDenormMode::FlushNone ||
+            shaderMode.fp16DenormMode == FpDenormMode::FlushIn ||
+            shaderMode.fp64DenormMode == FpDenormMode::FlushNone || shaderMode.fp64DenormMode == FpDenormMode::FlushIn)
+          targetFeatures += ",+fp64-fp16-denormals";
+        else if (shaderMode.fp16DenormMode == FpDenormMode::FlushOut ||
+                 shaderMode.fp16DenormMode == FpDenormMode::FlushInOut ||
+                 shaderMode.fp64DenormMode == FpDenormMode::FlushOut ||
+                 shaderMode.fp64DenormMode == FpDenormMode::FlushInOut)
+          targetFeatures += ",-fp64-fp16-denormals";
+        if (shaderMode.fp32DenormMode == FpDenormMode::FlushNone || shaderMode.fp32DenormMode == FpDenormMode::FlushIn)
+          targetFeatures += ",+fp32-denormals";
+        else if (shaderMode.fp32DenormMode == FpDenormMode::FlushOut ||
+                 shaderMode.fp32DenormMode == FpDenormMode::FlushInOut)
+          targetFeatures += ",-fp32-denormals";
+      }
+
+      builder.addAttribute("target-features", targetFeatures);
+      AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
+      func->addAttributes(attribIdx, builder);
+    }
+  }
 }
 
 // =====================================================================================================================

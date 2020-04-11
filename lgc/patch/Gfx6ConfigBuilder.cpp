@@ -30,7 +30,6 @@
  */
 #include "Gfx6ConfigBuilder.h"
 #include "AbiMetadata.h"
-#include "CodeGenManager.h"
 #include "PipelineState.h"
 #include "TargetInfo.h"
 #include "lgc/BuilderBuiltIns.h"

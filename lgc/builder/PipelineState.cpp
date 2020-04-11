@@ -30,7 +30,6 @@
  */
 #include "PipelineState.h"
 #include "BuilderRecorder.h"
-#include "CodeGenManager.h"
 #include "FragColorExport.h"
 #include "Internal.h"
 #include "Patch.h"

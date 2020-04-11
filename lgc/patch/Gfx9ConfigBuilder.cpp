@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "Gfx9ConfigBuilder.h"
-#include "CodeGenManager.h"
 #include "PipelineState.h"
 #include "TargetInfo.h"
 #include "lgc/BuilderBuiltIns.h"
