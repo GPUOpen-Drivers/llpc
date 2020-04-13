@@ -584,7 +584,10 @@ public:
   // @param pipelineModule : IR pipeline module
   // @param [in/out] outStream : Stream to write ELF or IR disassembly output
   // @param checkShaderCacheFunc : Function to check shader cache in graphics pipeline
-  // @param timers : Timers for: patch passes, llvm optimizations, codegen
+  // @param timers : Optional timers for 0 or more of:
+  //                 timers[0]: patch passes
+  //                 timers[1]: LLVM optimizations
+  //                 timers[2]: codegen
   virtual void generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
                         CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers) = 0;
 
