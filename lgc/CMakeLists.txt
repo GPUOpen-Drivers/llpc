@@ -215,6 +215,7 @@ target_sources(LLVMlgc PRIVATE
 
 # lgc/state
 target_sources(LLVMlgc PRIVATE
+    state/Compiler.cpp
     state/LgcContext.cpp
     state/PipelineShaders.cpp
     state/PipelineState.cpp
