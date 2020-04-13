@@ -55,15 +55,15 @@ static cl::opt<bool> EnableTessOffChip("enable-tess-offchip", cl::desc("Enable t
                                        cl::init(false));
 
 // Names for named metadata nodes when storing and reading back pipeline state
-static const char OptionsMetadataName[] = "llpc.options";
-static const char UserDataMetadataName[] = "llpc.user.data.nodes";
-static const char DeviceIndexMetadataName[] = "llpc.device.index";
-static const char VertexInputsMetadataName[] = "llpc.vertex.inputs";
-static const char IaStateMetadataName[] = "llpc.input.assembly.state";
-static const char VpStateMetadataName[] = "llpc.viewport.state";
-static const char RsStateMetadataName[] = "llpc.rasterizer.state";
-static const char ColorExportFormatsMetadataName[] = "llpc.color.export.formats";
-static const char ColorExportStateMetadataName[] = "llpc.color.export.state";
+static const char OptionsMetadataName[] = "lgc.options";
+static const char UserDataMetadataName[] = "lgc.user.data.nodes";
+static const char DeviceIndexMetadataName[] = "lgc.device.index";
+static const char VertexInputsMetadataName[] = "lgc.vertex.inputs";
+static const char IaStateMetadataName[] = "lgc.input.assembly.state";
+static const char VpStateMetadataName[] = "lgc.viewport.state";
+static const char RsStateMetadataName[] = "lgc.rasterizer.state";
+static const char ColorExportFormatsMetadataName[] = "lgc.color.export.formats";
+static const char ColorExportStateMetadataName[] = "lgc.color.export.state";
 
 namespace lgc {
 // Create BuilderReplayer pass
