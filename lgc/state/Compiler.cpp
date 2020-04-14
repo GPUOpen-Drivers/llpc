@@ -77,6 +77,16 @@ Module *PipelineState::irLink(ArrayRef<std::pair<Module *, ShaderStage>> modules
     }
   }
 
+#ifndef NDEBUG
+  // Assert that the front-end's call to setShaderStageMask was correct. (We want the front-end to call it
+  // before calling any builder calls in case it is using direct BuilderImpl and one of the builder calls needs
+  // the shader stage mask.)
+  unsigned shaderStageMask = 0;
+  for (auto moduleAndStage : modules)
+    shaderStageMask |= 1 << moduleAndStage.second;
+  assert(shaderStageMask == getShaderStageMask());
+#endif
+
   // If the front-end was using a BuilderRecorder, record pipeline state into IR metadata.
   if (!m_noReplayer)
     record(modules[0].first);
