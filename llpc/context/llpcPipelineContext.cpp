@@ -182,9 +182,15 @@ ShaderHash PipelineContext::getShaderHashCode(ShaderStage stage) const {
 //
 // @param [in/out] pipeline : Middle-end pipeline object
 void PipelineContext::setPipelineState(Pipeline *pipeline) const {
-  // Give the shader stage mask to the middle-end.
+  // Give the shader stage mask to the middle-end. We need to translate the Vkgc::ShaderStage bit numbers
+  // to lgc::ShaderStage bit numbers.
   unsigned stageMask = getShaderStageMask();
-  pipeline->setShaderStageMask(stageMask);
+  unsigned lgcStageMask = 0;
+  for (unsigned stage = 0; stage != ShaderStageCount; ++stage) {
+    if (stageMask & shaderStageToMask(static_cast<ShaderStage>(stage)))
+      lgcStageMask |= shaderStageToMask(static_cast<ShaderStage>(getLgcShaderStage(static_cast<ShaderStage>(stage))));
+  }
+  pipeline->setShaderStageMask(lgcStageMask);
 
   // Give the pipeline options to the middle-end.
   setOptionsInPipeline(pipeline);
