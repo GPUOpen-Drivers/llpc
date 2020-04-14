@@ -70,14 +70,14 @@ static cl::opt<unsigned> WavesPerEu("waves-per-eu", cl::desc("Maximum number of 
 
 // -enable-load-scalarizer: Enable the optimization for load scalarizer.
 static cl::opt<bool> EnableScalarLoad("enable-load-scalarizer",
-                                      cl::desc("Enable the optimization for load scalarizer."), cl::init(false));
+                                      cl::desc("Enable the optimization for load scalarizer."), cl::init(true));
 
 // The max threshold of load scalarizer.
 static const unsigned MaxScalarThreshold = 0xFFFFFFFF;
 
 // -scalar-threshold: Set the vector size threshold for load scalarizer.
 static cl::opt<unsigned> ScalarThreshold("scalar-threshold", cl::desc("The threshold for load scalarizer"),
-                                         cl::init(MaxScalarThreshold));
+                                         cl::init(3));
 
 // -enable-si-scheduler: enable target option si-scheduler
 static cl::opt<bool> EnableSiScheduler("enable-si-scheduler", cl::desc("Enable target option si-scheduler"),

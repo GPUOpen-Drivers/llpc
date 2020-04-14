@@ -40,6 +40,7 @@
 #include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/InitializePasses.h"
+#include "llvm/Support/CodeGen.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetOptions.h"
@@ -71,6 +72,25 @@ static cl::opt<bool> EmitLgc("emit-lgc", cl::desc("Emit LLVM assembly suitable f
 
 // -show-encoding: show the instruction encoding when emitting assembler. This mirrors llvm-mc behaviour
 static cl::opt<bool> ShowEncoding("show-encoding", cl::desc("Show instruction encodings"), cl::init(false));
+
+// =====================================================================================================================
+// Set default for a command-line option, but only if command-line processing has not happened yet, or did not see
+// an occurrence of this option.
+//
+// @param name : Option name
+// @param value : Default option value
+static void setOptionDefault(const char *name, StringRef value) {
+  auto optIterator = cl::getRegisteredOptions().find(name);
+  assert(optIterator != cl::getRegisteredOptions().end() && "Failed to find option to set default");
+  cl::Option *opt = optIterator->second;
+  if (opt->getNumOccurrences())
+    return;
+  // Setting MultiArg means that addOccurrence will not increment the option's occurrence count, so the user
+  // can still specify it to override our default here.
+  bool setFailed = opt->addOccurrence(0, opt->ArgStr, value, /*MultiArg=*/true);
+  assert(!setFailed && "Failed to set default for option");
+  ((void)setFailed);
+}
 
 // =====================================================================================================================
 // Initialize the middle-end. This must be called before the first LgcContext::Create, although you are
@@ -110,6 +130,16 @@ void LgcContext::initialize() {
   initializeStatePasses(passRegistry);
   initializeBuilderReplayerPass(passRegistry);
   initializePatchPasses(passRegistry);
+
+  // Initialize some command-line option defaults.
+  setOptionDefault("filetype", "obj");
+  setOptionDefault("unroll-max-percent-threshold-boost", "1000");
+  setOptionDefault("pragma-unroll-threshold", "1000");
+  setOptionDefault("unroll-allow-partial", "1");
+  setOptionDefault("simplifycfg-sink-common", "0");
+  setOptionDefault("amdgpu-vgpr-index-mode", "1"); // force VGPR indexing on GFX8
+  setOptionDefault("amdgpu-atomic-optimizations", "1");
+  setOptionDefault("use-gpu-divergence-analysis", "1");
 }
 
 // =====================================================================================================================
