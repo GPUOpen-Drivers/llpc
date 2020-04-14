@@ -47,4 +47,3 @@
                OpCopyMemory %9 %16
                OpReturn
                OpFunctionEnd
-

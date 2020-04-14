@@ -122,4 +122,3 @@ attribute[0].location = 0
 attribute[0].binding = 0
 attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
 attribute[0].offset = 0
-

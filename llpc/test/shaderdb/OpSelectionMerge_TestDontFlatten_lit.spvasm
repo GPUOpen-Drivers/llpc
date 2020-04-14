@@ -69,4 +69,3 @@
          %18 = OpLabel
                OpReturn
                OpFunctionEnd
-

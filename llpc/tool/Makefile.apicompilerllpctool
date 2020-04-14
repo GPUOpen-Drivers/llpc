@@ -170,4 +170,3 @@ ifneq ($(ICD_PLATFORM), win)
 endif
 
 include $(ICD_DEPTH)/make/icdrules
-

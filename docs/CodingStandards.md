@@ -172,4 +172,3 @@ You should use clang-format to format code modified or added in your change, but
 reformat any other code. Reviewers should reject a change that has spurious reformatting
 outside the lines affected by the substantive change, unless the whole point of the change
 is purely reformatting.
-

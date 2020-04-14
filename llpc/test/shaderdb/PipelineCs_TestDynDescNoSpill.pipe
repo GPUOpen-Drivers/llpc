@@ -36,5 +36,3 @@ userDataNode[1].offsetInDwords = 4
 userDataNode[1].sizeInDwords = 4
 userDataNode[1].set = 0
 userDataNode[1].binding = 1
-
-
