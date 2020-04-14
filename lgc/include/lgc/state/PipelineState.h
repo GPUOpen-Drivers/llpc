@@ -152,8 +152,8 @@ public:
   void setGraphicsState(const InputAssemblyState &iaState, const ViewportState &vpState,
                         const RasterizerState &rsState) override final;
 
-  // Link the individual shader modules into a single pipeline module
-  llvm::Module *link(llvm::ArrayRef<llvm::Module *> modules) override final;
+  // Link the individual shader IR modules into a single pipeline module
+  llvm::Module *irLink(llvm::ArrayRef<std::pair<llvm::Module *, ShaderStage>> modules) override final;
 
   // Generate pipeline module
   void generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,

@@ -552,7 +552,7 @@ public:
                                 const RasterizerState &rsState) = 0;
 
   // -----------------------------------------------------------------------------------------------------------------
-  // Link and generate pipeline methods
+  // IR link and generate pipeline methods
 
   // Link the individual shader modules into a single pipeline module. The front-end must have
   // finished calling Builder::Create* methods and finished building the IR. In the case that
@@ -562,9 +562,8 @@ public:
   // entrypoint, then all other functions with internal linkage.
   // Returns the pipeline module, or nullptr on link failure.
   //
-  // @param modules : Array of modules indexed by shader stage, with nullptr entry for any stage not present in the
-  // pipeline
-  virtual llvm::Module *link(llvm::ArrayRef<llvm::Module *> modules) = 0;
+  // @param modules : Array of {module, shaderStage} pairs
+  virtual llvm::Module *irLink(llvm::ArrayRef<std::pair<llvm::Module *, ShaderStage>> modules) = 0;
 
   // Typedef of function passed in to Generate to check the shader cache.
   // Returns the updated shader stage mask, allowing the client to decide not to compile shader stages
