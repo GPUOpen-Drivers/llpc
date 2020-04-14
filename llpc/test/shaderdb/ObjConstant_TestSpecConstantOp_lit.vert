@@ -5,7 +5,7 @@ layout(constant_id = 201) const int   i1  = -10;
 layout(constant_id = 202) const uint  u1  = 100;
 
 const int i1_1  = i1 + 2;
-const uint u1_1 = u1 % 5; 
+const uint u1_1 = u1 % 5;
 
 const ivec4 i4 = ivec4(20, 30, i1_1, i1_1);
 const ivec2 i2 = i4.yx;

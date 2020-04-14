@@ -15,7 +15,7 @@ void main()
     d4_1[1] = d1;
     fragColor += vec4(d4_1);
 }
- 
+
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s

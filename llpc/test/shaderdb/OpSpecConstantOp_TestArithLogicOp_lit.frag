@@ -198,7 +198,7 @@ void main()
     b = b || b_ine;
     b = b || b_i64ne;
     b = b || b_ult;
-    b = b || b_u64lt; 
+    b = b || b_u64lt;
     b = b || b_ilt;
     b = b || b_i64lt;
     b = b || b_ugt;
