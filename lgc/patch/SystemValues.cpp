@@ -388,7 +388,8 @@ Value *ShaderSystemValues::getNumWorkgroups() {
 
     auto numWorkgroupPtr =
         getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.cs.numWorkgroupsPtr, "numWorkgroupsPtr");
-    auto numWorkgroups = new LoadInst(numWorkgroupPtr, "", insertPos);
+    auto numWorkgroupTy = numWorkgroupPtr->getType()->getPointerElementType();
+    auto numWorkgroups = new LoadInst(numWorkgroupTy, numWorkgroupPtr, "", insertPos);
     numWorkgroups->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(insertPos->getContext(), {}));
     m_numWorkgroups = numWorkgroups;
   }
@@ -454,8 +455,9 @@ Value *ShaderSystemValues::getStreamOutBufDesc(unsigned xfbBuffer) {
 
     auto streamOutBufDescPtr = GetElementPtrInst::Create(nullptr, streamOutTablePtr, idxs, "", insertPos);
     streamOutBufDescPtr->setMetadata(MetaNameUniform, MDNode::get(streamOutBufDescPtr->getContext(), {}));
+    auto streamOutBufDescTy = streamOutBufDescPtr->getType()->getPointerElementType();
 
-    auto streamOutBufDesc = new LoadInst(streamOutBufDescPtr, "", insertPos);
+    auto streamOutBufDesc = new LoadInst(streamOutBufDescTy, streamOutBufDescPtr, "", insertPos);
     streamOutBufDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(streamOutBufDesc->getContext(), {}));
     streamOutBufDesc->setAlignment(MaybeAlign(16));
 
@@ -601,7 +603,7 @@ Value *ShaderSystemValues::getResourceNodeValue(unsigned resNodeIdx) {
     auto resNodePtr = BitCastInst::CreatePointerCast(elemPtr, resNodePtrTy, "", insertPos);
     resNodePtr->setMetadata(MetaNameUniform, MDNode::get(resNodePtr->getContext(), {}));
 
-    resNodeValue = new LoadInst(resNodePtr, "", insertPos);
+    resNodeValue = new LoadInst(resNodePtrTy->getPointerElementType(), resNodePtr, "", insertPos);
   }
   assert(resNodeValue);
   return resNodeValue;

@@ -122,7 +122,8 @@ void SpirvLowerMemoryOp::visitExtractElementInst(ExtractElementInst &extractElem
       auto castPtr = new BitCastInst(loadPtr, castPtrTy, "", &extractElementInst);
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), extractElementInst.getOperand(1)};
       auto elementPtr = GetElementPtrInst::Create(nullptr, castPtr, idxs, "", &extractElementInst);
-      auto newLoad = new LoadInst(elementPtr, "", &extractElementInst);
+      auto elementTy = elementPtr->getType()->getPointerElementType();
+      auto newLoad = new LoadInst(elementTy, elementPtr, "", &extractElementInst);
       extractElementInst.replaceAllUsesWith(newLoad);
 
       m_preRemoveInsts.insert(&extractElementInst);
@@ -276,13 +277,14 @@ void SpirvLowerMemoryOp::expandLoadInst(LoadInst *loadInst, ArrayRef<GetElementP
   //   loadValue   = firstValue
 
   bool isType64 = (dynIndex->getType()->getPrimitiveSizeInBits() == 64);
-  Instruction *firstLoadValue = new LoadInst(getElemPtrs[0], "", false, loadInst);
+  auto loadTy = loadInst->getType();
+  Instruction *firstLoadValue = new LoadInst(loadTy, getElemPtrs[0], "", false, loadInst);
 
   for (unsigned i = 1, getElemPtrCount = getElemPtrs.size(); i < getElemPtrCount; ++i) {
     auto constIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_context), i)
                                : ConstantInt::get(Type::getInt32Ty(*m_context), i);
 
-    auto secondLoadValue = new LoadInst(getElemPtrs[i], "", false, loadInst);
+    auto secondLoadValue = new LoadInst(loadTy, getElemPtrs[i], "", false, loadInst);
     auto cond = new ICmpInst(loadInst, ICmpInst::ICMP_EQ, dynIndex, constIndex);
     firstLoadValue = SelectInst::Create(cond, secondLoadValue, firstLoadValue, "", loadInst);
   }

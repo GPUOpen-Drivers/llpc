@@ -788,6 +788,7 @@ void SpirvLowerGlobal::lowerOutput() {
   for (auto outputMap : m_outputProxyMap) {
     auto output = cast<GlobalVariable>(outputMap.first);
     auto proxy = outputMap.second;
+    auto proxyTy = proxy->getType()->getPointerElementType();
 
     MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
     assert(metaNode);
@@ -796,7 +797,7 @@ void SpirvLowerGlobal::lowerOutput() {
 
     if (m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
         m_shaderStage == ShaderStageFragment) {
-      Value *outputValue = new LoadInst(proxy, "", retInst);
+      Value *outputValue = new LoadInst(proxyTy, proxy, "", retInst);
       addCallInstForOutputExport(outputValue, meta, nullptr, 0, 0, 0, nullptr, nullptr, InvalidValue, retInst);
     } else if (m_shaderStage == ShaderStageGeometry) {
       for (auto emitCall : m_emitCalls) {
@@ -808,7 +809,7 @@ void SpirvLowerGlobal::lowerOutput() {
         else
           assert(mangledName.startswith(gSPIRVName::EmitVertex));
 
-        Value *outputValue = new LoadInst(proxy, "", emitCall);
+        Value *outputValue = new LoadInst(proxyTy, proxy, "", emitCall);
         addCallInstForOutputExport(outputValue, meta, nullptr, 0, 0, 0, nullptr, nullptr, emitStreamId, emitCall);
       }
     }
@@ -1876,8 +1877,9 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
     new StoreInst(interpValue, interpPtr, &callInst);
 
     auto interpElemPtr = GetElementPtrInst::Create(nullptr, interpPtr, indexOperands, "", &callInst);
+    auto interpElemTy = interpElemPtr->getType()->getPointerElementType();
 
-    auto interpElemValue = new LoadInst(interpElemPtr, "", &callInst);
+    auto interpElemValue = new LoadInst(interpElemTy, interpElemPtr, "", &callInst);
     callInst.replaceAllUsesWith(interpElemValue);
 
     if (callInst.user_empty()) {

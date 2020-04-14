@@ -1168,8 +1168,8 @@ Value *SubgroupBuilder::createPermLane16(Value *const origValue, Value *const up
                                                           int32Ty, int1Ty, int1Ty);
 
     // TODO: Once GFX10 intrinsic amdgcn_permlane16 has been upstreamed, used CreateIntrinsic here.
-    return builder.CreateCall(function.getCallee(), {mappedArgs[0], mappedArgs[1], passthroughArgs[0],
-                                                     passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
+    return builder.CreateCall(function, {mappedArgs[0], mappedArgs[1], passthroughArgs[0],
+                                         passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
   };
 
   return CreateMapToInt32(
@@ -1202,8 +1202,8 @@ Value *SubgroupBuilder::createPermLaneX16(Value *const origValue, Value *const u
                                                           int32Ty, int1Ty, int1Ty);
 
     // TODO: Once GFX10 intrinsic amdgcn_permlanex16 has been upstreamed, used CreateIntrinsic here.
-    return builder.CreateCall(function.getCallee(), {mappedArgs[0], mappedArgs[1], passthroughArgs[0],
-                                                     passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
+    return builder.CreateCall(function, {mappedArgs[0], mappedArgs[1], passthroughArgs[0],
+                                         passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
   };
 
   return CreateMapToInt32(
