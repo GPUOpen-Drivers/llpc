@@ -16,8 +16,8 @@ void main()
 ; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 0, <8 x i32> %{{[-0-9A-Za0z_.]+}}, <4 x i32> %{{[-0-9A-Za0z_.]+}}, i32 1, <2 x float> zeroinitializer)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0) 
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0, {{.*}}, {{.*}}, i32 1, <2 x float> zeroinitializer) 
+; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0, {{.*}}, {{.*}}, i32 1, <2 x float> zeroinitializer)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}

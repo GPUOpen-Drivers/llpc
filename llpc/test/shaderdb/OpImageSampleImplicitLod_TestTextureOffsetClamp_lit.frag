@@ -49,16 +49,16 @@ void main()
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 5, i32 0, {{.*}}, {{.*}}, i32 385, <3 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000>, {{.*}}, <2 x i32> <i32 2, i32 2>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0) 
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 0, i32 0, {{.*}}, {{.*}}, i32 385, float 0x3FB99999A0000000, {{.*}}, i32 2) 
-; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 1, i32 0) 
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0, {{.*}}, {{.*}}, i32 385, <2 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000>, {{.*}}, <2 x i32> <i32 2, i32 2>) 
-; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 2, i32 0) 
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 2, i32 0, {{.*}}, {{.*}}, i32 385, <3 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000>, {{.*}}, <3 x i32> <i32 2, i32 2, i32 2>) 
-; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 4, i32 0) 
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 4, i32 0, {{.*}}, {{.*}}, i32 385, <2 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000>, {{.*}}, i32 2) 
-; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 5, i32 0) 
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 5, i32 0, {{.*}}, {{.*}}, i32 385, <3 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000>, {{.*}}, <2 x i32> <i32 2, i32 2>) 
+; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 0, i32 0, {{.*}}, {{.*}}, i32 385, float 0x3FB99999A0000000, {{.*}}, i32 2)
+; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 1, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0, {{.*}}, {{.*}}, i32 385, <2 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000>, {{.*}}, <2 x i32> <i32 2, i32 2>)
+; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 2, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 2, i32 0, {{.*}}, {{.*}}, i32 385, <3 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000>, {{.*}}, <3 x i32> <i32 2, i32 2, i32 2>)
+; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 4, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 4, i32 0, {{.*}}, {{.*}}, i32 385, <2 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000>, {{.*}}, i32 2)
+; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 5, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 5, i32 0, {{.*}}, {{.*}}, i32 385, <3 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000>, {{.*}}, <2 x i32> <i32 2, i32 2>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.readfirstlane
