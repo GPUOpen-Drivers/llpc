@@ -35,5 +35,3 @@ void main()
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
-
-

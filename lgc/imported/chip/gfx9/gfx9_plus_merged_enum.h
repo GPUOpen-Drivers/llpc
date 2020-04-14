@@ -15498,4 +15498,3 @@ constexpr unsigned int Nv10MaxPerfEventIds[MaxPerfCtrId] =
     0,
     0,
 };
-

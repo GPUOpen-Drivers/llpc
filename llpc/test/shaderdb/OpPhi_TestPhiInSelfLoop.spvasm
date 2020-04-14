@@ -67,4 +67,3 @@
                OpStore %27 %32
                OpReturn
                OpFunctionEnd
-

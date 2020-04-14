@@ -237,4 +237,3 @@ target_sources(LLVMlgc PRIVATE
     util/PipelineShaders.cpp
     util/StartStopTimer.cpp
 )
-

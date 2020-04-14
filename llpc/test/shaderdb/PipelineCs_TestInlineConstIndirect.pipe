@@ -42,5 +42,3 @@ userDataNode[0].next[1].offsetInDwords = 4
 userDataNode[0].next[1].sizeInDwords = 64
 userDataNode[0].next[1].set = 0
 userDataNode[0].next[1].binding = 1
-
-

@@ -202,4 +202,3 @@ When the front-end calls Builder methods to set shader modes, the information en
 object. In a shader compile, there is no PipelineState, and ShaderModes lives inside BuilderRecorder.
 For a pipeline compile, ShaderModes lives inside PipelineState, and middle-end code accesses it
 with `PipelineState::GetShaderModes`.
-

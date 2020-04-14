@@ -61,4 +61,3 @@ tool_dirs = [config.llvm_tools_dir, config.amdllpc_dir]
 tools = ['amdllpc']
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)
-

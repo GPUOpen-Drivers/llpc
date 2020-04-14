@@ -80,4 +80,3 @@ shader stages from the cache hit part zeroed out, so that part is not compiled a
 
 The result of that is still an ELF in the normal way. The front-end then combines the ELF it found
 in the cache with the ELF from this compile.
-

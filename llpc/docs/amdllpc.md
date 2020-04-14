@@ -138,4 +138,3 @@ When you need to investigate a test failure, run a single test from that same bu
 ```
 llvm/bin/llvm-lit -v llpc/test/shaderdb/OpAtomicIIncrement_TestVariablePointer_lit.spvasm
 ```
-

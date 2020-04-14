@@ -61,4 +61,3 @@
           %6 = OpLabel
                OpReturn
                OpFunctionEnd
-

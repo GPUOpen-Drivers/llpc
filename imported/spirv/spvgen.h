@@ -522,4 +522,3 @@ static inline void vfxPrintDoc(
 }
 
 #endif
-
