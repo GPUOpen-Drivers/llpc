@@ -50,27 +50,25 @@ ModulePass *createBuilderReplayer(Pipeline *pipeline);
 } // namespace lgc
 
 // =====================================================================================================================
-// Link shader modules into a pipeline module.
+// Link shader IR modules into a pipeline module.
 //
-// @param modules : Array of modules indexed by shader stage, with nullptr entry for any stage not present in the
-// pipeline. Modules are freed.
-Module *PipelineState::link(ArrayRef<Module *> modules) {
+// @param modules : Array of {module, shaderStage} pairs. Modules are freed
+Module *PipelineState::irLink(ArrayRef<std::pair<Module *, ShaderStage>> modules) {
   // Processing for each shader module before linking.
   IRBuilder<> builder(getContext());
-  Module *anyModule = nullptr;
-  for (unsigned stage = 0; stage < modules.size(); ++stage) {
-    Module *module = modules[stage];
+  for (auto moduleAndStage : modules) {
+    Module *module = moduleAndStage.first;
+    ShaderStage stage = moduleAndStage.second;
     if (!module)
       continue;
-    anyModule = module;
 
     // If this is a link of shader modules from earlier separate shader compiles, then the modes are
     // recorded in IR metadata. Read the modes here.
-    getShaderModes()->readModesFromShader(module, static_cast<ShaderStage>(stage));
+    getShaderModes()->readModesFromShader(module, stage);
 
     // Add IR metadata for the shader stage to each function in the shader, and rename the entrypoint to
     // ensure there is no clash on linking.
-    setShaderStage(module, static_cast<ShaderStage>(stage));
+    setShaderStage(module, stage);
     for (Function &func : *module) {
       if (!func.isDeclaration() && func.getLinkage() != GlobalValue::InternalLinkage) {
         func.setName(Twine(lgcName::EntryPointPrefix) + getShaderStageAbbreviation(static_cast<ShaderStage>(stage)) +
@@ -81,40 +79,30 @@ Module *PipelineState::link(ArrayRef<Module *> modules) {
 
   // If the front-end was using a BuilderRecorder, record pipeline state into IR metadata.
   if (!m_noReplayer)
-    record(anyModule);
+    record(modules[0].first);
 
   // If there is only one shader, just change the name on its module and return it.
   Module *pipelineModule = nullptr;
-  for (auto module : modules) {
-    if (!pipelineModule)
-      pipelineModule = module;
-    else if (module) {
-      pipelineModule = nullptr;
-      break;
-    }
-  }
-
-  if (pipelineModule)
-    pipelineModule->setModuleIdentifier("llpcPipeline");
-  else {
+  if (modules.size() == 1) {
+    pipelineModule = modules[0].first;
+    pipelineModule->setModuleIdentifier("lgcPipeline");
+  } else {
     // Create an empty module then link each shader module into it. We record pipeline state into IR
     // metadata before the link, to avoid problems with a Constant for an immutable descriptor value
     // disappearing when modules are deleted.
     bool result = true;
-    pipelineModule = new Module("llpcPipeline", getContext());
+    pipelineModule = new Module("lgcPipeline", getContext());
     TargetMachine *targetMachine = getLgcContext()->getTargetMachine();
     pipelineModule->setTargetTriple(targetMachine->getTargetTriple().getTriple());
     pipelineModule->setDataLayout(targetMachine->createDataLayout());
 
     Linker linker(*pipelineModule);
-
-    for (unsigned shaderIndex = 0; shaderIndex < modules.size(); ++shaderIndex) {
-      if (modules[shaderIndex]) {
-        // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
-        // linked into pipeline module.
-        if (linker.linkInModule(std::unique_ptr<Module>(modules[shaderIndex])))
-          result = false;
-      }
+    for (auto moduleAndStage : modules) {
+      Module *module = moduleAndStage.first;
+      // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
+      // linked into pipeline module.
+      if (linker.linkInModule(std::unique_ptr<Module>(module)))
+        result = false;
     }
 
     if (!result) {

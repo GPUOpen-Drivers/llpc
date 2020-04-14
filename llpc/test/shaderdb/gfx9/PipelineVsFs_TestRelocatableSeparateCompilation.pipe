@@ -5,11 +5,11 @@
 ; RUN: amdllpc -use-relocatable-shader-elf -auto-layout-desc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST-EMPTY:
-; SHADERTEST-NEXT: ; ModuleID = 'llpcPipeline'
+; SHADERTEST-NEXT: ; ModuleID = 'lgcPipeline'
 ; SHADERTEST-NEXT: source_filename = "llpcvertex
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST-EMPTY:
-; SHADERTEST-NEXT: ; ModuleID = 'llpcPipeline'
+; SHADERTEST-NEXT: ; ModuleID = 'lgcPipeline'
 ; SHADERTEST-NEXT: source_filename = "llpcfragment
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
