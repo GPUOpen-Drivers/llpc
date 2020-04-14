@@ -373,139 +373,71 @@ static Result init(int argc, char *argv[], ICompiler **ppCompiler) {
   Result result = Result::Success;
 
   if (result == Result::Success) {
-    // NOTE: For testing consistency, these options should be kept the same as those of Vulkan
-    // ICD (Device::InitLlpcCompiler()). Here, we check the specified options from command line.
-    // For each default option that is missing, we add it manually. This code to check whether
-    // the same option has been specified is not completely foolproof because it does not know
-    // which arguments are not option names.
-    static const char *DefaultOptions[] = {
-        // Name                                Option
-        "-gfxip",
-        "-gfxip=8.0.0",
-        "-unroll-max-percent-threshold-boost",
-        "-unroll-max-percent-threshold-boost=1000",
-        "-pragma-unroll-threshold",
-        "-pragma-unroll-threshold=1000",
-        "-unroll-allow-partial",
-        "-unroll-allow-partial",
-        "-simplifycfg-sink-common",
-        "-simplifycfg-sink-common=false",
-        "-amdgpu-vgpr-index-mode",
-        "-amdgpu-vgpr-index-mode", // Force VGPR indexing on GFX8
-        "-amdgpu-atomic-optimizations",
-        "-amdgpu-atomic-optimizations", // Enable atomic optimizations
-        "-use-gpu-divergence-analysis",
-        "-use-gpu-divergence-analysis", // Use new divergence analysis
-        "-filetype",
-        "-filetype=obj", // Target = obj, ELF binary; target = asm, ISA assembly text
-    };
-
-    // Build new arguments, starting with those supplied in command line
-    std::vector<const char *> newArgs;
-    for (int i = 0; i < argc; ++i)
-      newArgs.push_back(argv[i]);
-
-    static const size_t DefaultOptionCount = sizeof(DefaultOptions) / (2 * sizeof(DefaultOptions[0]));
-    for (unsigned optionIdx = 0; optionIdx != DefaultOptionCount; ++optionIdx) {
-      const char *name = DefaultOptions[2 * optionIdx];
-      const char *option = DefaultOptions[2 * optionIdx + 1];
-      size_t nameLen = strlen(name);
-      bool found = false;
-      const char *arg = nullptr;
-      for (int i = 1; i < argc; ++i) {
-        arg = argv[i];
-        if (strncmp(arg, name, nameLen) == 0 &&
-            (arg[nameLen] == '\0' || arg[nameLen] == '=' || isdigit((int)arg[nameLen]))) {
-          found = true;
-          break;
+    // Before we get to LLVM command-line option parsing, we need to find the -gfxip option value.
+    for (int i = 1; i != argc; ++i) {
+      StringRef arg = argv[i];
+      if (!arg.startswith("-gfxip"))
+        continue;
+      StringRef gfxipStr;
+      arg = arg.slice(strlen("-gfxip"), StringRef::npos);
+      if (arg.empty() && i + 1 != argc)
+        gfxipStr = argv[i + 1];
+      else if (arg[0] == '=')
+        gfxipStr = arg.slice(1, StringRef::npos);
+      else
+        continue;
+      if (!gfxipStr.consumeInteger(10, ParsedGfxIp.major) && gfxipStr.startswith(".")) {
+        gfxipStr = gfxipStr.slice(1, StringRef::npos);
+        if (!gfxipStr.consumeInteger(10, ParsedGfxIp.minor) && gfxipStr.startswith(".")) {
+          gfxipStr = gfxipStr.slice(1, StringRef::npos);
+          gfxipStr.consumeInteger(10, ParsedGfxIp.stepping);
         }
       }
-
-      if (!found)
-        newArgs.push_back(option);
-      else if (optionIdx == 0) // Find option -gfxip
-      {
-        size_t argLen = strlen(arg);
-        if (argLen > nameLen && arg[nameLen] == '=') {
-          // Extract tokens of graphics IP version info (delimiter is ".")
-          const unsigned len = argLen - nameLen - 1;
-          char *gfxIp = new char[len + 1];
-          memcpy(gfxIp, &arg[nameLen + 1], len);
-          gfxIp[len] = '\0';
-
-          char *tokens[3] = {}; // Format: major.minor.step
-          char *token = std::strtok(gfxIp, ".");
-          for (unsigned i = 0; i < 3 && token; ++i) {
-            tokens[i] = token;
-            token = std::strtok(nullptr, ".");
-          }
-
-          ParsedGfxIp.major = tokens[0] ? std::strtoul(tokens[0], nullptr, 10) : 0;
-          ParsedGfxIp.minor = tokens[1] ? std::strtoul(tokens[1], nullptr, 10) : 0;
-          ParsedGfxIp.stepping = tokens[2] ? std::strtoul(tokens[2], nullptr, 10) : 0;
-
-          delete[] gfxIp;
-        }
-      }
+      break;
     }
 
-    const char *name = "-shader-cache-file-dir";
-    size_t nameLen = strlen(name);
-    bool found = false;
-    const char *arg = nullptr;
-    for (int i = 1; i < argc; ++i) {
-      arg = argv[i];
-      if (strncmp(arg, name, nameLen) == 0 && (arg[nameLen] == '\0' || arg[nameLen] == '=')) {
-        found = true;
-        break;
-      }
-    }
-
-    if (!found) {
-      // Initialize the path for shader cache
-      constexpr unsigned maxFilePathLen = 512;
-      char shaderCacheFileDirOption[maxFilePathLen];
-
-      // Initialize the root path of cache files
-      // Steps:
-      //   1. Find AMD_SHADER_DISK_CACHE_PATH to keep backward compatibility.
-      const char *envString = getenv("AMD_SHADER_DISK_CACHE_PATH");
+    // Provide a default for -shader-cache-file-dir, as long as the environment variables below are
+    // not set.
+    // TODO: Was this code intended to set the default of -shader-cache-file-dir in the case that it
+    // does find an environment variable setting? It did not, so I have preserved that behavior.
+    // Steps:
+    //   1. Find AMD_SHADER_DISK_CACHE_PATH to keep backward compatibility.
+    const char *envString = getenv("AMD_SHADER_DISK_CACHE_PATH");
 
 #ifdef WIN_OS
-      //   2. Find LOCALAPPDATA.
-      if (envString == nullptr) {
-        envString = getenv("LOCALAPPDATA");
-      }
+    //   2. Find LOCALAPPDATA.
+    if (!envString)
+      envString = getenv("LOCALAPPDATA");
 #else
-      char shaderCacheFileRootDir[maxFilePathLen];
+    constexpr unsigned MaxFilePathLen = 512;
+    char shaderCacheFileRootDir[MaxFilePathLen];
 
-      //   2. Find XDG_CACHE_HOME.
-      //   3. If AMD_SHADER_DISK_CACHE_PATH and XDG_CACHE_HOME both not set,
-      //      use "$HOME/.cache".
-      if (!envString)
-        envString = getenv("XDG_CACHE_HOME");
+    //   2. Find XDG_CACHE_HOME.
+    //   3. If AMD_SHADER_DISK_CACHE_PATH and XDG_CACHE_HOME both not set,
+    //      use "$HOME/.cache".
+    if (!envString)
+      envString = getenv("XDG_CACHE_HOME");
 
-      if (!envString) {
-        envString = getenv("HOME");
-        if (envString) {
-          snprintf(shaderCacheFileRootDir, sizeof(shaderCacheFileRootDir), "%s/.cache", envString);
-          envString = &shaderCacheFileRootDir[0];
-        }
-      }
-#endif
-
+    if (!envString) {
+      envString = getenv("HOME");
       if (envString) {
-        snprintf(shaderCacheFileDirOption, sizeof(shaderCacheFileDirOption), "-shader-cache-file-dir=%s", envString);
-      } else
-        strncpy(shaderCacheFileDirOption, "-shader-cache-file-dir=.", sizeof(shaderCacheFileDirOption));
-      newArgs.push_back(shaderCacheFileDirOption);
+        snprintf(shaderCacheFileRootDir, sizeof(shaderCacheFileRootDir), "%s/.cache", envString);
+        envString = &shaderCacheFileRootDir[0];
+      }
+    }
+#endif
+    if (!envString) {
+      auto optIterator = cl::getRegisteredOptions().find("shader-cache-file-dir");
+      assert(optIterator != cl::getRegisteredOptions().end());
+      cl::Option *opt = optIterator->second;
+      *static_cast<cl::opt<std::string> *>(opt) = ".";
     }
 
     // NOTE: We set the option -disable-null-frag-shader to TRUE for standalone compiler as the default.
     // Subsequent command option parse will correct its value if this option is specified externally.
     cl::DisableNullFragShader.setValue(true);
 
-    result = ICompiler::Create(ParsedGfxIp, newArgs.size(), &newArgs[0], ppCompiler);
+    result = ICompiler::Create(ParsedGfxIp, argc, argv, ppCompiler);
   }
 
   if (result == Result::Success && SpvGenDir != "") {
