@@ -820,7 +820,8 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       if (emitStream != InvalidValue) {
         // Increment emit vertex counter
         auto emitCounterPtr = m_pipelineSysValues.get(m_entryPoint)->getEmitCounterPtr()[emitStream];
-        Value *emitCounter = new LoadInst(emitCounterPtr, "", &callInst);
+        auto emitCounterTy = emitCounterPtr->getType()->getPointerElementType();
+        Value *emitCounter = new LoadInst(emitCounterTy, emitCounterPtr, "", &callInst);
         emitCounter =
             BinaryOperator::CreateAdd(emitCounter, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", &callInst);
         new StoreInst(emitCounter, emitCounterPtr, &callInst);
@@ -4030,7 +4031,7 @@ Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned loca
     {
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ringOffset};
       Value *loadPtr = GetElementPtrInst::Create(nullptr, m_lds, idxs, "", insertPos);
-      auto loadInst = new LoadInst(loadPtr, "", false, insertPos);
+      auto loadInst = new LoadInst(loadPtr->getType()->getPointerElementType(), loadPtr, "", false, insertPos);
       loadInst->setAlignment(MaybeAlign(m_lds->getAlignment()));
       loadValue = loadInst;
 
@@ -4143,7 +4144,8 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
     Value *gsVsOffset = getFunctionArgument(m_entryPoint, entryArgIdxs.gs.gsVsOffset);
 
     auto emitCounterPtr = m_pipelineSysValues.get(m_entryPoint)->getEmitCounterPtr()[streamId];
-    auto emitCounter = new LoadInst(emitCounterPtr, "", insertPos);
+    auto emitCounterTy = emitCounterPtr->getType()->getPointerElementType();
+    auto emitCounter = new LoadInst(emitCounterTy, emitCounterPtr, "", insertPos);
 
     auto ringOffset = calcGsVsRingOffsetForOutput(location, compIdx, streamId, emitCounter, gsVsOffset, insertPos);
 
@@ -4389,7 +4391,8 @@ Value *PatchInOutImportExport::readValueFromLds(bool isOutput, Type *readTy, Val
     for (unsigned i = 0; i < numChannels; ++i) {
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ldsOffset};
       Value *loadPtr = GetElementPtrInst::Create(nullptr, m_lds, idxs, "", insertPos);
-      auto loadInst = new LoadInst(loadPtr, "", false, insertPos);
+      auto loadTy = loadPtr->getType()->getPointerElementType();
+      auto loadInst = new LoadInst(loadTy, loadPtr, "", false, insertPos);
       loadInst->setAlignment(MaybeAlign(m_lds->getAlignment()));
       loadValues[i] = loadInst;
 

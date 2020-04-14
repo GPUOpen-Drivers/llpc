@@ -4194,9 +4194,10 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
 
   // Creation of place holder
   if (createPlaceHolder) {
-    auto gv = new GlobalVariable(*m_m, transType(bv->getType()), false, GlobalValue::PrivateLinkage, nullptr,
+    auto gvType = transType(bv->getType());
+    auto gv = new GlobalVariable(*m_m, gvType, false, GlobalValue::PrivateLinkage, nullptr,
                                  std::string(KPlaceholderPrefix) + bv->getName(), 0, GlobalVariable::NotThreadLocal, 0);
-    auto ld = new LoadInst(gv, bv->getName(), bb);
+    auto ld = new LoadInst(gvType, gv, bv->getName(), bb);
     m_placeholderMap[bv] = ld;
     return mapValue(bv, ld);
   }
@@ -4344,17 +4345,17 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
 #endif
     SPIRVCopyBase *copy = static_cast<SPIRVCopyBase *>(bv);
     AllocaInst *ai = nullptr;
+    auto at = transType(copy->getOperand()->getType());
     // NOTE: Alloc instructions not in the entry block will prevent LLVM from doing function
     // inlining. Try to move those alloc instructions to the entry block.
     auto firstInst = bb->getParent()->getEntryBlock().getFirstInsertionPt();
     if (firstInst != bb->getParent()->getEntryBlock().end())
-      ai = new AllocaInst(transType(copy->getOperand()->getType()), m_m->getDataLayout().getAllocaAddrSpace(), "",
-                          &*firstInst);
+      ai = new AllocaInst(at, m_m->getDataLayout().getAllocaAddrSpace(), "", &*firstInst);
     else
-      ai = new AllocaInst(transType(copy->getOperand()->getType()), m_m->getDataLayout().getAllocaAddrSpace(), "", bb);
+      ai = new AllocaInst(at, m_m->getDataLayout().getAllocaAddrSpace(), "", bb);
 
     new StoreInst(transValue(copy->getOperand(), f, bb), ai, bb);
-    LoadInst *li = new LoadInst(ai, "", bb);
+    LoadInst *li = new LoadInst(at, ai, "", bb);
     return mapValue(bv, li);
   }
 

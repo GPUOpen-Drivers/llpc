@@ -678,8 +678,9 @@ Value *VertexFetch::loadVertexBufferDescriptor(unsigned binding, Instruction *in
   auto vbTablePtr = m_shaderSysValues->getVertexBufTablePtr();
   auto vbDescPtr = GetElementPtrInst::Create(nullptr, vbTablePtr, idxs, "", insertPos);
   vbDescPtr->setMetadata(MetaNameUniform, MDNode::get(vbDescPtr->getContext(), {}));
+  auto vbDescTy = vbDescPtr->getType()->getPointerElementType();
 
-  auto vbDesc = new LoadInst(vbDescPtr, "", insertPos);
+  auto vbDesc = new LoadInst(vbDescTy, vbDescPtr, "", insertPos);
   vbDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(vbDesc->getContext(), {}));
   vbDesc->setAlignment(MaybeAlign(16));
 
