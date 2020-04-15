@@ -46,7 +46,6 @@ amdllpc [<options>...] [<files>...]
 | `-enable-si-scheduler`           | Enable target option si-scheduler	      |                               |
 | `-disable-gs-onchip`             | Disable geometry shader on-chip mode	      |                               |
 | `-enable-tess-offchip`           | Enable tessellation off-chip mode	      |                               |
-| `-disable-fp32-denormals`        | Disable target option fp32-denormals	      |                               |
 | `-disable-llvm-patch`	           | Disable the patch for LLVM back-end issues	      |                               |
 | `-disable-lower-opt`             | Disable optimization for SPIR-V lowering	      |                               |
 | `-disable-licm`                  | Disable LLVM LICM pass	      |                               |
