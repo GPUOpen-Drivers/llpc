@@ -41,7 +41,10 @@ class PipelineState;
 
 // Enumerates the types of LDS regions used in NGG.
 enum NggLdsRegionType {
+  // clang-format off
+  //
   // LDS region for ES only (no GS)
+  //
   LdsRegionDistribPrimId = 0, // Distributed primitive ID (a special region, overlapped with the region of
                               //   position data in NGG non pass-through mode)
   LdsRegionPosData,           // Position data to export
@@ -49,7 +52,8 @@ enum NggLdsRegionType {
   LdsRegionPrimCountInWaves,  // Primitive count accumulated per wave (8 potential waves) and per sub-group
   LdsRegionVertCountInWaves,  // Vertex count accumulated per wave (8 potential waves) and per sub-group
   LdsRegionCullDistance,      // Aggregated sign value of cull distance (bitmask)
-                         // Below regions are for vertex compaction
+
+  // Below regions are for vertex compaction
   LdsRegionVertThreadIdMap,   // Vertex thread ID map (uncompacted -> compacted)
   LdsRegionCompactVertexId,   // Vertex ID (VS only)
   LdsRegionCompactInstanceId, // Instance ID (VS only)
@@ -65,7 +69,9 @@ enum NggLdsRegionType {
   LdsRegionEsBeginRange = LdsRegionDistribPrimId,
   LdsRegionEsEndRange = LdsRegionCompactRelPatchId,
 
+  //
   // LDS region for ES-GS
+  //
   LdsRegionEsGsRing,            // ES-GS ring
   LdsRegionOutPrimData,         // GS output primitive data
   LdsRegionOutVertCountInWaves, // GS output vertex count accumulated per wave (8 potential waves) and per
@@ -79,6 +85,7 @@ enum NggLdsRegionType {
 
   // Total
   LdsRegionCount
+  // clang-format on
 };
 
 // Size of a DWORD

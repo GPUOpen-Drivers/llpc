@@ -50,78 +50,86 @@ namespace lgc {
 // =====================================================================================================================
 // Initialize static members
 const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
+    // clang-format off
+    //
     // LDS region size for ES-only
+    //
+    // 1 DWORD (uint32) per thread
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionDistribPrimId
+    // 4 DWORDs (vec4) per thread
+    SizeOfVec4 * Gfx9::NggMaxThreadsPerSubgroup,              // LdsRegionPosData
+    // 1 BYTE (uint8) per thread
+    Gfx9::NggMaxThreadsPerSubgroup,                           // LdsRegionDrawFlag
+    // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group
+    SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionPrimCountInWaves
+    // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group
+    SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionVertCountInWaves
+    // 1 DWORD (uint32) per thread
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCullDistance
+    // 1 BYTE (uint8) per thread
+    Gfx9::NggMaxThreadsPerSubgroup,                           // LdsRegionVertThreadIdMap
+    // 1 DWORD (uint32) per thread
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactVertexId
+    // 1 DWORD (uint32) per thread
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactInstanceId
+    // 1 DWORD (uint32) per thread
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactPrimId
+    // 1 DWORD (float) per thread
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactTessCoordX
+    // 1 DWORD (float) per thread
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactTessCoordY
+    // 1 DWORD (uint32) per thread
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactPatchId
+    // 1 DWORD (uint32) per thread
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactRelPatchId
 
-    // 1 DWORD (unsigned) per thread
-    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionDistribPrimId
-                                                  // 4 DWORDs (vec4) per thread
-    SizeOfVec4 *Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionPosData
-                                                // 1 BYTE (uint8_t) per thread
-    Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionDrawFlag
-                                    // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group
-    SizeOfDword *Gfx9::NggMaxWavesPerSubgroup +
-        SizeOfDword, // LdsRegionPrimCountInWaves
-                     // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group
-    SizeOfDword *Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionVertCountInWaves
-                                                             // 1 DWORD (unsigned) per thread
-    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionCullDistance
-                                                 // 1 BYTE (uint8_t) per thread
-    Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionVertThreadIdMap
-                                    // 1 DWORD (unsigned) per thread
-    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionCompactVertexId
-                                                 // 1 DWORD (unsigned) per thread
-    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionCompactInstanceId
-                                                 // 1 DWORD (unsigned) per thread
-    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionCompactPrimId
-                                                 // 1 DWORD (unsigned) per thread
-    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionCompactTessCoordX
-                                                 // 1 DWORD (unsigned) per thread
-    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionCompactTessCoordY
-                                                 // 1 DWORD (unsigned) per thread
-    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionCompactPatchId
-                                                 // 1 DWORD (unsigned) per thread
-    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionCompactRelPatchId
-
+    //
     // LDS region size for ES-GS
-
+    //
     // ES-GS ring size is dynamically calculated (don't use it)
-    InvalidValue, // LdsRegionEsGsRing
-                  // 1 DWORD (unsigned) per thread
-    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionOutPrimData
-                                                 // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire
-                                                 // sub-group (4 GS streams)
+    InvalidValue,                                             // LdsRegionEsGsRing
+    // 1 DWORD (uint32) per thread
+    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup,              // LdsRegionOutPrimData
+    // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group (4 GS streams)
     MaxGsStreams *(SizeOfDword *Gfx9::NggMaxWavesPerSubgroup + SizeOfDword), // LdsRegionOutVertCountInWaves
-                                                                             // 1 DWORD (unsigned) per thread
-    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup, // LdsRegionOutVertOffset
-                                                 // GS-VS ring size is dynamically calculated (don't use it)
-    InvalidValue, // LdsRegionGsVsRing
+    // 1 DWORD (uint32) per thread
+    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup,              // LdsRegionOutVertOffset
+    // GS-VS ring size is dynamically calculated (don't use it)
+    InvalidValue,                                             // LdsRegionGsVsRing
+    // clang-format on
 };
 
 // =====================================================================================================================
 // Initialize static members
 const char *NggLdsManager::m_ldsRegionNames[LdsRegionCount] = {
+    // clang-format off
+    //
     // LDS region name for ES-only
-    "Distributed primitive ID",          // LdsRegionDistribPrimId
-    "Vertex position data",              // LdsRegionPosData
-    "Draw flag",                         // LdsRegionDrawFlag
-    "Primitive count in waves",          // LdsRegionPrimCountInWaves
-    "Vertex count in waves",             // LdsRegionVertCountInWaves
-    "Cull distance",                     // LdsRegionCullDistance
-    "Vertex thread ID map",              // LdsRegionVertThreadIdMap
-    "Compacted vertex ID (VS)",          // LdsRegionCompactVertexId
-    "Compacted instance ID (VS)",        // LdsRegionCompactInstanceId
-    "Compacted primitive ID (VS)",       // LdsRegionCompactPrimId
-    "Compacted tesscoord X (TES)",       // LdsRegionCompactTessCoordX
-    "Compacted tesscoord Y (TES)",       // LdsRegionCompactTessCoordY
-    "Compacted patch ID (TES)",          // LdsRegionCompactPatchId
-    "Compacted relative patch ID (TES)", // LdsRegionCompactRelPatchId
+    //
+    "Distributed primitive ID",             // LdsRegionDistribPrimId
+    "Vertex position data",                 // LdsRegionPosData
+    "Draw flag",                            // LdsRegionDrawFlag
+    "Primitive count in waves",             // LdsRegionPrimCountInWaves
+    "Vertex count in waves",                // LdsRegionVertCountInWaves
+    "Cull distance",                        // LdsRegionCullDistance
+    "Vertex thread ID map",                 // LdsRegionVertThreadIdMap
+    "Compacted vertex ID (VS)",             // LdsRegionCompactVertexId
+    "Compacted instance ID (VS)",           // LdsRegionCompactInstanceId
+    "Compacted primitive ID (VS)",          // LdsRegionCompactPrimId
+    "Compacted tesscoord X (TES)",          // LdsRegionCompactTessCoordX
+    "Compacted tesscoord Y (TES)",          // LdsRegionCompactTessCoordY
+    "Compacted patch ID (TES)",             // LdsRegionCompactPatchId
+    "Compacted relative patch ID (TES)",    // LdsRegionCompactRelPatchId
 
+    //
     // LDS region name for ES-GS
-    "ES-GS ring",                   // LdsRegionEsGsRing
-    "GS out primitive data",        // LdsRegionOutPrimData
-    "GS out vertex count in waves", // LdsRegionOutVertCountInWaves
-    "GS out vertex offset",         // LdsRegionOutVertOffset
-    "GS-VS ring",                   // LdsRegionGsVsRing
+    //
+    "ES-GS ring",                           // LdsRegionEsGsRing
+    "GS out primitive data",                // LdsRegionOutPrimData
+    "GS out vertex count in waves",         // LdsRegionOutVertCountInWaves
+    "GS out vertex offset",                 // LdsRegionOutVertOffset
+    "GS-VS ring",                           // LdsRegionGsVsRing
+    // clang-format on
 };
 
 // =====================================================================================================================
