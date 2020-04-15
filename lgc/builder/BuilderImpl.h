@@ -329,6 +329,11 @@ public:
                                         llvm::Value *convertingSamplerDesc, llvm::ArrayRef<llvm::Value *> address,
                                         const llvm::Twine &instName = "");
 
+  // Create an image sample with YCbCr conversion.
+  llvm::Value *CreateImageSampleConvertYCbCr(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
+                                             llvm::Value *convertingSamplerDesc, llvm::ArrayRef<llvm::Value *> address,
+                                             const llvm::Twine &instName = "");
+
   // Create an image gather
   llvm::Value *CreateImageGather(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
                                  llvm::Value *samplerDesc, llvm::ArrayRef<llvm::Value *> address,
