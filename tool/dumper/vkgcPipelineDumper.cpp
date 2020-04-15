@@ -1195,13 +1195,13 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
     if (strcmp(section->name, ShStrTabName) == 0 || strcmp(section->name, StrTabName) == 0 ||
         strcmp(section->name, SymTabName) == 0) {
       // Output system section
-      out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
+      out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
     } else if (strcmp(section->name, NoteName) == 0) {
       // Output .note section
-      out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
+      out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
       unsigned offset = 0;
       const unsigned noteHeaderSize = sizeof(NoteHeader) - 8;
-      while (offset < section->secHead.shSize) {
+      while (offset < section->secHead.sh_size) {
         const NoteHeader *node = reinterpret_cast<const NoteHeader *>(section->data + offset);
         const unsigned noteNameSize = alignTo(node->nameSize, 4);
         switch (static_cast<unsigned>(node->type)) {
@@ -1299,7 +1299,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
           break;
         }
         default: {
-          if (static_cast<unsigned>(node->type) == NtAmdAmdgpuIsa) {
+          if (static_cast<unsigned>(node->type) == NT_AMD_AMDGPU_ISA) {
             out << "    IsaVersion                   (name = " << node->name << "  size = " << node->descSize << ")\n";
             auto desc = section->data + offset + noteHeaderSize + noteNameSize;
             outputText(desc, 0, node->descSize, out);
@@ -1314,11 +1314,11 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
         }
         }
         offset += noteHeaderSize + noteNameSize + alignTo(node->descSize, sizeof(unsigned));
-        assert(offset <= section->secHead.shSize);
+        assert(offset <= section->secHead.sh_size);
       }
     } else if (strcmp(section->name, RelocName) == 0) {
       // Output .reloc section
-      out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
+      out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
       const unsigned relocCount = reader.getRelocationCount();
       for (unsigned i = 0; i < relocCount; ++i) {
         ElfReloc reloc = {};
@@ -1331,7 +1331,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
       }
     } else if (strncmp(section->name, AmdGpuConfigName, sizeof(AmdGpuConfigName) - 1) == 0) {
       // Output .AMDGPU.config section
-      const unsigned configCount = static_cast<unsigned>(section->secHead.shSize / sizeof(unsigned) / 2);
+      const unsigned configCount = static_cast<unsigned>(section->secHead.sh_size / sizeof(unsigned) / 2);
       const unsigned *config = reinterpret_cast<const unsigned *>(section->data);
       out << section->name << " (" << configCount << " registers)\n";
 
@@ -1345,18 +1345,18 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
                strncmp(section->name, AmdGpuCsdataName, sizeof(AmdGpuCsdataName) - 1) == 0 ||
                strncmp(section->name, CommentName, sizeof(CommentName) - 1) == 0) {
       // Output text based sections
-      out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
+      out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
 
       std::vector<ElfSymbol> symbols;
       reader.GetSymbolsBySectionIndex(secIdx, symbols);
       unsigned symIdx = 0;
       unsigned startPos = 0;
       unsigned endPos = 0;
-      while (startPos < section->secHead.shSize) {
+      while (startPos < section->secHead.sh_size) {
         if (symIdx < symbols.size())
           endPos = static_cast<unsigned>(symbols[symIdx].value);
         else
-          endPos = static_cast<unsigned>(section->secHead.shSize);
+          endPos = static_cast<unsigned>(section->secHead.sh_size);
 
         outputText(section->data, startPos, endPos, out);
         out << "\n";
@@ -1384,18 +1384,18 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
 #endif
       {
         // Output text based sections
-        out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
+        out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
 
         std::vector<ElfSymbol> symbols;
         reader.GetSymbolsBySectionIndex(secIdx, symbols);
         unsigned symIdx = 0;
         unsigned startPos = 0;
         unsigned endPos = 0;
-        while (startPos < section->secHead.shSize) {
+        while (startPos < section->secHead.sh_size) {
           if (symIdx < symbols.size())
             endPos = static_cast<unsigned>(symbols[symIdx].value);
           else
-            endPos = static_cast<unsigned>(section->secHead.shSize);
+            endPos = static_cast<unsigned>(section->secHead.sh_size);
 
           outputText(section->data, startPos, endPos, out);
           out << "\n";
@@ -1416,13 +1416,13 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
         }
       } else {
         // Output text based sections
-        out << section->name << " (size = " << section->secHead.shSize << " bytes)\n";
+        out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
 
-        outputText(section->data, 0, static_cast<unsigned>(section->secHead.shSize), out);
+        outputText(section->data, 0, static_cast<unsigned>(section->secHead.sh_size), out);
       }
     } else {
       // Output binary based sections
-      out << (section->name[0] == 0 ? "(null)" : section->name) << " (size = " << section->secHead.shSize
+      out << (section->name[0] == 0 ? "(null)" : section->name) << " (size = " << section->secHead.sh_size
           << " bytes)\n";
 
       std::vector<ElfSymbol> symbols;
@@ -1432,11 +1432,11 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
       unsigned startPos = 0;
       unsigned endPos = 0;
 
-      while (startPos < section->secHead.shSize) {
+      while (startPos < section->secHead.sh_size) {
         if (symIdx < symbols.size())
           endPos = static_cast<unsigned>(symbols[symIdx].value);
         else
-          endPos = static_cast<unsigned>(section->secHead.shSize);
+          endPos = static_cast<unsigned>(section->secHead.sh_size);
 
         outputBinary(section->data, startPos, endPos, out);
 

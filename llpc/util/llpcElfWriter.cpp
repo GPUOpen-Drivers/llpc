@@ -110,12 +110,12 @@ void ElfWriter<Elf>::mergeSection(const SectionBuffer *pSection1, size_t section
 
   // Build merged section
   size_t newSectionSize =
-      section1Size + (pSection2->secHead.shSize - section2Offset) + prefix1.length() + prefix2.length();
+      section1Size + (pSection2->secHead.sh_size - section2Offset) + prefix1.length() + prefix2.length();
 
   auto mergedData = new uint8_t[newSectionSize];
   *pNewSection = *pSection1;
   pNewSection->data = mergedData;
-  pNewSection->secHead.shSize = newSectionSize;
+  pNewSection->secHead.sh_size = newSectionSize;
 
   auto data = mergedData;
 
@@ -126,7 +126,7 @@ void ElfWriter<Elf>::mergeSection(const SectionBuffer *pSection1, size_t section
   }
 
   // Copy base section content
-  auto baseCopySize = std::min(section1Size, static_cast<size_t>(pSection1->secHead.shSize));
+  auto baseCopySize = std::min(section1Size, static_cast<size_t>(pSection1->secHead.sh_size));
   memcpy(data, pSection1->data, baseCopySize);
   data += baseCopySize;
 
@@ -148,7 +148,7 @@ void ElfWriter<Elf>::mergeSection(const SectionBuffer *pSection1, size_t section
   }
 
   // Copy append section content
-  memcpy(data, pSection2->data + section2Offset, pSection2->secHead.shSize - section2Offset);
+  memcpy(data, pSection2->data + section2Offset, pSection2->secHead.sh_size - section2Offset);
 }
 
 // =====================================================================================================================
@@ -376,10 +376,10 @@ template <class Elf> size_t ElfWriter<Elf>::getRequiredBufferSizeBytes() {
 
   // Iterate through the section list
   for (auto &section : m_sections)
-    totalBytes += alignTo(section.secHead.shSize, sizeof(unsigned));
+    totalBytes += alignTo(section.secHead.sh_size, sizeof(unsigned));
 
-  totalBytes += m_header.eShentsize * m_header.eShnum;
-  totalBytes += m_header.ePhentsize * m_header.ePhnum;
+  totalBytes += m_header.e_shentsize * m_header.e_shnum;
+  totalBytes += m_header.e_phentsize * m_header.e_phnum;
 
   return totalBytes;
 }
@@ -401,7 +401,7 @@ template <class Elf> void ElfWriter<Elf>::assembleNotes() {
   uint8_t *data = new uint8_t[std::max(noteSize, noteHeaderSize)];
   assert(data);
   noteSection->data = data;
-  noteSection->secHead.shSize = noteSize;
+  noteSection->secHead.sh_size = noteSize;
 
   for (auto &note : m_notes) {
     memcpy(data, &note.hdr, noteHeaderSize);
@@ -414,7 +414,7 @@ template <class Elf> void ElfWriter<Elf>::assembleNotes() {
     data += noteDescSize;
   }
 
-  assert(noteSection->secHead.shSize == static_cast<unsigned>(data - noteSection->data));
+  assert(noteSection->secHead.sh_size == static_cast<unsigned>(data - noteSection->data));
 }
 
 // =====================================================================================================================
@@ -434,13 +434,13 @@ template <class Elf> void ElfWriter<Elf>::assembleSymbols() {
   }
 
   if (newStrTabSize > 0) {
-    unsigned strTabOffset = strTabSection->secHead.shSize;
-    auto strTabBuffer = new uint8_t[strTabSection->secHead.shSize + newStrTabSize];
-    memcpy(strTabBuffer, strTabSection->data, strTabSection->secHead.shSize);
+    unsigned strTabOffset = strTabSection->secHead.sh_size;
+    auto strTabBuffer = new uint8_t[strTabSection->secHead.sh_size + newStrTabSize];
+    memcpy(strTabBuffer, strTabSection->data, strTabSection->secHead.sh_size);
     delete[] strTabSection->data;
 
     strTabSection->data = strTabBuffer;
-    strTabSection->secHead.shSize += newStrTabSize;
+    strTabSection->secHead.sh_size += newStrTabSize;
 
     for (auto &symbol : m_symbols) {
       if (symbol.nameOffset == InvalidValue) {
@@ -459,26 +459,26 @@ template <class Elf> void ElfWriter<Elf>::assembleSymbols() {
 
   if (!symbolSection->data)
     symbolSection->data = new uint8_t[symSectionSize];
-  else if (symSectionSize > symbolSection->secHead.shSize) {
+  else if (symSectionSize > symbolSection->secHead.sh_size) {
     delete[] symbolSection->data;
     symbolSection->data = new uint8_t[symSectionSize];
   }
-  symbolSection->secHead.shSize = symSectionSize;
+  symbolSection->secHead.sh_size = symSectionSize;
 
   auto symbolToWrite = reinterpret_cast<typename Elf::Symbol *>(const_cast<uint8_t *>(symbolSection->data));
   for (auto &symbol : m_symbols) {
     if (symbol.secIdx != InvalidValue) {
-      symbolToWrite->stName = symbol.nameOffset;
-      symbolToWrite->stInfo.all = symbol.info.all;
-      symbolToWrite->stOther = 0;
-      symbolToWrite->stShndx = symbol.secIdx;
-      symbolToWrite->stValue = symbol.value;
-      symbolToWrite->stSize = symbol.size;
+      symbolToWrite->st_name = symbol.nameOffset;
+      symbolToWrite->st_info.all = symbol.info.all;
+      symbolToWrite->st_other = 0;
+      symbolToWrite->st_shndx = symbol.secIdx;
+      symbolToWrite->st_value = symbol.value;
+      symbolToWrite->st_size = symbol.size;
       ++symbolToWrite;
     }
   }
 
-  assert(symbolSection->secHead.shSize ==
+  assert(symbolSection->secHead.sh_size ==
          static_cast<unsigned>(reinterpret_cast<uint8_t *>(symbolToWrite) - symbolSection->data));
 }
 
@@ -492,17 +492,17 @@ template <class Elf> void ElfWriter<Elf>::calcSectionHeaderOffset() {
   const unsigned hdrSize = sizeof(typename Elf::Phdr);
 
   sharedHdrOffset += elfHdrSize;
-  sharedHdrOffset += m_header.ePhnum * hdrSize;
+  sharedHdrOffset += m_header.e_phnum * hdrSize;
 
   for (auto &section : m_sections) {
-    const unsigned secSzBytes = alignTo(section.secHead.shSize, sizeof(unsigned));
+    const unsigned secSzBytes = alignTo(section.secHead.sh_size, sizeof(unsigned));
     sharedHdrOffset += secSzBytes;
   }
 
-  m_header.ePhoff = m_header.ePhnum > 0 ? elfHdrSize : 0;
-  m_header.eShoff = sharedHdrOffset;
-  m_header.eShstrndx = m_strtabSecIdx;
-  m_header.eShnum = m_sections.size();
+  m_header.e_phoff = m_header.e_phnum > 0 ? elfHdrSize : 0;
+  m_header.e_shoff = sharedHdrOffset;
+  m_header.e_shstrndx = m_strtabSecIdx;
+  m_header.e_shnum = m_sections.size();
 }
 
 // =====================================================================================================================
@@ -529,12 +529,12 @@ template <class Elf> void ElfWriter<Elf>::writeToBuffer(ElfPackage *pElf) {
   memcpy(buffer, &m_header, elfHdrSize);
   buffer += elfHdrSize;
 
-  assert(m_header.ePhnum == 0);
+  assert(m_header.e_phnum == 0);
 
   // Write each section buffer
   for (auto &section : m_sections) {
-    section.secHead.shOffset = static_cast<unsigned>(buffer - data);
-    const unsigned sizeBytes = section.secHead.shSize;
+    section.secHead.sh_offset = static_cast<unsigned>(buffer - data);
+    const unsigned sizeBytes = section.secHead.sh_size;
     memcpy(buffer, section.data, sizeBytes);
     buffer += alignTo(sizeBytes, sizeof(unsigned));
   }
@@ -560,14 +560,14 @@ template <class Elf> Result ElfWriter<Elf>::copyFromReader(const ElfReader<Elf> 
     auto section = reader.getSections()[i];
     m_sections[i].secHead = section->secHead;
     m_sections[i].name = section->name;
-    auto data = new uint8_t[section->secHead.shSize + 1];
-    memcpy(data, section->data, section->secHead.shSize);
-    data[section->secHead.shSize] = 0;
+    auto data = new uint8_t[section->secHead.sh_size + 1];
+    memcpy(data, section->data, section->secHead.sh_size);
+    data[section->secHead.sh_size] = 0;
     m_sections[i].data = data;
   }
 
   m_map = reader.getMap();
-  assert(m_header.ePhnum == 0);
+  assert(m_header.e_phnum == 0);
 
   m_noteSecIdx = m_map[NoteName];
   m_textSecIdx = m_map[TextName];
@@ -581,7 +581,7 @@ template <class Elf> Result ElfWriter<Elf>::copyFromReader(const ElfReader<Elf> 
   auto noteSection = &m_sections[m_noteSecIdx];
   const unsigned noteHeaderSize = sizeof(NoteHeader) - 8;
   size_t offset = 0;
-  while (offset < noteSection->secHead.shSize) {
+  while (offset < noteSection->secHead.sh_size) {
     const NoteHeader *note = reinterpret_cast<const NoteHeader *>(noteSection->data + offset);
     const unsigned noteNameSize = alignTo(note->nameSize, 4);
     ElfNote noteNode;
@@ -601,17 +601,17 @@ template <class Elf> Result ElfWriter<Elf>::copyFromReader(const ElfReader<Elf> 
   const char *strTab = reinterpret_cast<const char *>(m_sections[m_strtabSecIdx].data);
 
   auto symbols = reinterpret_cast<const typename Elf::Symbol *>(symSection->data);
-  auto symCount = static_cast<unsigned>(symSection->secHead.shSize / symSection->secHead.shEntsize);
+  auto symCount = static_cast<unsigned>(symSection->secHead.sh_size / symSection->secHead.sh_entsize);
 
   for (unsigned idx = 0; idx < symCount; ++idx) {
     ElfSymbol symbol = {};
-    symbol.secIdx = symbols[idx].stShndx;
+    symbol.secIdx = symbols[idx].st_shndx;
     symbol.secName = m_sections[symbol.secIdx].name;
-    symbol.pSymName = strTab + symbols[idx].stName;
-    symbol.size = symbols[idx].stSize;
-    symbol.value = symbols[idx].stValue;
-    symbol.info.all = symbols[idx].stInfo.all;
-    symbol.nameOffset = symbols[idx].stName;
+    symbol.pSymName = strTab + symbols[idx].st_name;
+    symbol.size = symbols[idx].st_size;
+    symbol.value = symbols[idx].st_value;
+    symbol.info.all = symbols[idx].st_info.all;
+    symbol.nameOffset = symbols[idx].st_name;
     m_symbols.push_back(symbol);
   }
 
@@ -803,7 +803,7 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   }
 
   size_t isaOffset =
-      !nonFragmentIsaSymbol ? alignTo(nonFragmentTextSection->secHead.shSize, 0x100) : nonFragmentIsaSymbol->value;
+      !nonFragmentIsaSymbol ? alignTo(nonFragmentTextSection->secHead.sh_size, 0x100) : nonFragmentIsaSymbol->value;
   for (auto &fragmentSymbol : fragmentSymbols) {
     if (strcmp(fragmentSymbol.pSymName, fragmentIsaSymbolName) == 0) {
       // Modify ISA code
@@ -849,7 +849,7 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
     // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
     // for all section data.
     auto fragmentDisassemblySectionEnd =
-        fragmentDisassemblySection->data + fragmentDisassemblySection->secHead.shSize - 1;
+        fragmentDisassemblySection->data + fragmentDisassemblySection->secHead.sh_size - 1;
     uint8_t lastChar = *fragmentDisassemblySectionEnd;
     const_cast<uint8_t *>(fragmentDisassemblySectionEnd)[0] = '\0';
     auto fragmentDisassembly =
@@ -863,7 +863,7 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
     auto disassemblyEnd =
         strstr(reinterpret_cast<const char *>(nonFragmentDisassemblySection->data), fragmentIsaSymbolName);
     auto disassemblySize = !disassemblyEnd
-                               ? nonFragmentDisassemblySection->secHead.shSize
+                               ? nonFragmentDisassemblySection->secHead.sh_size
                                : disassemblyEnd - reinterpret_cast<const char *>(nonFragmentDisassemblySection->data);
 
     ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
@@ -888,7 +888,7 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
     // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
     // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
     // for all section data.
-    auto fragmentLlvmIrSectionEnd = fragmentLlvmIrSection->data + fragmentLlvmIrSection->secHead.shSize - 1;
+    auto fragmentLlvmIrSectionEnd = fragmentLlvmIrSection->data + fragmentLlvmIrSection->secHead.sh_size - 1;
     uint8_t lastChar = *fragmentLlvmIrSectionEnd;
     const_cast<uint8_t *>(fragmentLlvmIrSectionEnd)[0] = '\0';
     auto fragmentLlvmIrStart =
@@ -899,7 +899,7 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
         !fragmentLlvmIrStart ? 0 : (fragmentLlvmIrStart - reinterpret_cast<const char *>(fragmentLlvmIrSection->data));
 
     auto llvmIrEnd = strstr(reinterpret_cast<const char *>(nonFragmentLlvmIrSection->data), fragmentIsaSymbolName);
-    auto llvmIrSize = !llvmIrEnd ? nonFragmentLlvmIrSection->secHead.shSize
+    auto llvmIrSize = !llvmIrEnd ? nonFragmentLlvmIrSection->secHead.sh_size
                                  : llvmIrEnd - reinterpret_cast<const char *>(nonFragmentLlvmIrSection->data);
 
     ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
@@ -969,7 +969,7 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> 
   ElfSectionBuffer<typename Elf::SectionHeader> *stringTable2 = nullptr;
   relocatableElfs[1]->getSectionDataBySectionIndex(relocatableElfs[1]->getStrtabSecIdx(), &stringTable2);
 
-  mergeSection(stringTable1, stringTable1->secHead.shSize, nullptr, stringTable2, 0, nullptr,
+  mergeSection(stringTable1, stringTable1->secHead.sh_size, nullptr, stringTable2, 0, nullptr,
                &m_sections[m_strtabSecIdx]);
 
   // Merge text sections
@@ -978,7 +978,7 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> 
   ElfSectionBuffer<typename Elf::SectionHeader> *textSection2 = nullptr;
   relocatableElfs[1]->getTextSectionData(&textSection2);
 
-  mergeSection(textSection1, alignTo(textSection1->secHead.shSize, 0x100), nullptr, textSection2, 0, nullptr,
+  mergeSection(textSection1, alignTo(textSection1->secHead.sh_size, 0x100), nullptr, textSection2, 0, nullptr,
                &m_sections[m_textSecIdx]);
 
   // Build the symbol table.  First set the symbol table section header.
@@ -1006,7 +1006,7 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> 
     // Update the offset for the next elf file.
     ElfSectionBuffer<typename Elf::SectionHeader> *textSection = nullptr;
     elf->getSectionDataBySectionIndex(relocElfTextSectionId, &textSection);
-    offset += alignTo(textSection->secHead.shSize, 0x100);
+    offset += alignTo(textSection->secHead.sh_size, 0x100);
   }
 
   // Apply relocations
