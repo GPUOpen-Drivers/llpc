@@ -190,8 +190,7 @@ Value *SubgroupBuilder::CreateSubgroupInverseBallot(Value *const value, const Tw
 // @param value : The ballot value to bit extract. Must be an <4 x i32> type.
 // @param index : The bit index to extract. Must be an i32 type.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupBallotBitExtract(Value *const value, Value *const index,
-                                                           const Twine &instName) {
+Value *SubgroupBuilder::CreateSubgroupBallotBitExtract(Value *const value, Value *const index, const Twine &instName) {
   if (getShaderSubgroupSize() <= 32) {
     Value *const indexMask = CreateShl(getInt32(1), index);
     Value *const valueAsInt32 = CreateExtractElement(value, getInt32(0));
@@ -356,7 +355,7 @@ Value *SubgroupBuilder::CreateSubgroupShuffleDown(Value *const value, Value *con
 // @param clusterSize : The cluster size.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, Value *const value,
-                                                             Value *const clusterSize, const Twine &instName) {
+                                                         Value *const clusterSize, const Twine &instName) {
   if (supportDpp()) {
     // Start the WWM section by setting the inactive lanes.
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
@@ -505,7 +504,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArith
 // @param clusterSize : The cluster size.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, Value *const value,
-                                                             Value *const clusterSize, const Twine &instName) {
+                                                         Value *const clusterSize, const Twine &instName) {
   if (supportDpp()) {
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
 
@@ -652,7 +651,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArith
 // @param clusterSize : The cluster size.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, Value *const value,
-                                                             Value *const clusterSize, const Twine &instName) {
+                                                         Value *const clusterSize, const Twine &instName) {
   if (supportDpp()) {
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
 
@@ -950,7 +949,7 @@ Value *SubgroupBuilder::CreateSubgroupSwizzleMask(Value *const value, Value *con
 // @param invocationIndex : The index of the invocation that gets the write value.
 // @param instName : Name to give instruction(s)
 Value *SubgroupBuilder::CreateSubgroupWriteInvocation(Value *const inputValue, Value *const writeValue,
-                                                          Value *const invocationIndex, const Twine &instName) {
+                                                      Value *const invocationIndex, const Twine &instName) {
   auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(Intrinsic::amdgcn_writelane, {},
                                    {
@@ -1109,7 +1108,7 @@ Value *SubgroupBuilder::createInlineAsmSideEffect(Value *const value) {
 // @param bankMask : The bank mask.
 // @param boundCtrl : Whether bound_ctrl is used or not.
 Value *SubgroupBuilder::createDppMov(Value *const value, DppCtrl dppCtrl, unsigned rowMask, unsigned bankMask,
-                                         bool boundCtrl) {
+                                     bool boundCtrl) {
   auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(
         Intrinsic::amdgcn_mov_dpp, builder.getInt32Ty(),
@@ -1131,7 +1130,7 @@ Value *SubgroupBuilder::createDppMov(Value *const value, DppCtrl dppCtrl, unsign
 // @param bankMask : The bank mask.
 // @param boundCtrl : Whether bound_ctrl is used or not.
 Value *SubgroupBuilder::createDppUpdate(Value *const origValue, Value *const updateValue, DppCtrl dppCtrl,
-                                            unsigned rowMask, unsigned bankMask, bool boundCtrl) {
+                                        unsigned rowMask, unsigned bankMask, bool boundCtrl) {
   auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(
         Intrinsic::amdgcn_update_dpp, builder.getInt32Ty(),
@@ -1157,7 +1156,7 @@ Value *SubgroupBuilder::createDppUpdate(Value *const origValue, Value *const upd
 // @param fetchInactive : FI mode, whether to fetch inactive lane.
 // @param boundCtrl : Whether bound_ctrl is used or not.
 Value *SubgroupBuilder::createPermLane16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
-                                             unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
+                                         unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
   auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     Module *const module = builder.GetInsertBlock()->getModule();
 
@@ -1168,8 +1167,8 @@ Value *SubgroupBuilder::createPermLane16(Value *const origValue, Value *const up
                                                           int32Ty, int1Ty, int1Ty);
 
     // TODO: Once GFX10 intrinsic amdgcn_permlane16 has been upstreamed, used CreateIntrinsic here.
-    return builder.CreateCall(function, {mappedArgs[0], mappedArgs[1], passthroughArgs[0],
-                                         passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
+    return builder.CreateCall(function, {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1],
+                                         passthroughArgs[2], passthroughArgs[3]});
   };
 
   return CreateMapToInt32(
@@ -1191,7 +1190,7 @@ Value *SubgroupBuilder::createPermLane16(Value *const origValue, Value *const up
 // @param fetchInactive : FI mode, whether to fetch inactive lane.
 // @param boundCtrl : Whether bound_ctrl is used or not.
 Value *SubgroupBuilder::createPermLaneX16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
-                                              unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
+                                          unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
   auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     Module *const module = builder.GetInsertBlock()->getModule();
 
@@ -1202,8 +1201,8 @@ Value *SubgroupBuilder::createPermLaneX16(Value *const origValue, Value *const u
                                                           int32Ty, int1Ty, int1Ty);
 
     // TODO: Once GFX10 intrinsic amdgcn_permlanex16 has been upstreamed, used CreateIntrinsic here.
-    return builder.CreateCall(function, {mappedArgs[0], mappedArgs[1], passthroughArgs[0],
-                                         passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
+    return builder.CreateCall(function, {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1],
+                                         passthroughArgs[2], passthroughArgs[3]});
   };
 
   return CreateMapToInt32(
@@ -1299,7 +1298,7 @@ Value *SubgroupBuilder::createThreadMask() {
 // @param value1 : The first value to select.
 // @param value2 : The second value to select.
 Value *SubgroupBuilder::createThreadMaskedSelect(Value *const threadMask, uint64_t andMask, Value *const value1,
-                                                     Value *const value2) {
+                                                 Value *const value2) {
   Value *const andMaskVal = getIntN(getShaderSubgroupSize(), andMask);
   Value *const zero = getIntN(getShaderSubgroupSize(), 0);
   return CreateSelect(CreateICmpNE(CreateAnd(threadMask, andMaskVal), zero), value1, value2);

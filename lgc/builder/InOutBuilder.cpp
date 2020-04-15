@@ -54,9 +54,9 @@ using namespace llvm;
 // @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index; for FS custom interpolated input: auxiliary
 // interpolation value; else nullptr
 // @param instName : Name to give instruction(s)
-Value *InOutBuilder::CreateReadGenericInput(Type *resultTy, unsigned location, Value *locationOffset,
-                                                Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,
-                                                Value *vertexIndex, const Twine &instName) {
+Value *InOutBuilder::CreateReadGenericInput(Type *resultTy, unsigned location, Value *locationOffset, Value *elemIdx,
+                                            unsigned locationCount, InOutInfo inputInfo, Value *vertexIndex,
+                                            const Twine &instName) {
   return readGenericInputOutput(false, resultTy, location, locationOffset, elemIdx, locationCount, inputInfo,
                                 vertexIndex, instName);
 }
@@ -77,9 +77,9 @@ Value *InOutBuilder::CreateReadGenericInput(Type *resultTy, unsigned location, V
 // @param outputInfo : Extra output info
 // @param vertexIndex : For TCS per-vertex output: vertex index; else nullptr
 // @param instName : Name to give instruction(s)
-Value *InOutBuilder::CreateReadGenericOutput(Type *resultTy, unsigned location, Value *locationOffset,
-                                                 Value *elemIdx, unsigned locationCount, InOutInfo outputInfo,
-                                                 Value *vertexIndex, const Twine &instName) {
+Value *InOutBuilder::CreateReadGenericOutput(Type *resultTy, unsigned location, Value *locationOffset, Value *elemIdx,
+                                             unsigned locationCount, InOutInfo outputInfo, Value *vertexIndex,
+                                             const Twine &instName) {
   return readGenericInputOutput(true, resultTy, location, locationOffset, elemIdx, locationCount, outputInfo,
                                 vertexIndex, instName);
 }
@@ -99,8 +99,8 @@ Value *InOutBuilder::CreateReadGenericOutput(Type *resultTy, unsigned location, 
 // interpolation value; else nullptr
 // @param instName : Name to give instruction(s)
 Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsigned location, Value *locationOffset,
-                                                Value *elemIdx, unsigned locationCount, InOutInfo inOutInfo,
-                                                Value *vertexIndex, const Twine &instName) {
+                                            Value *elemIdx, unsigned locationCount, InOutInfo inOutInfo,
+                                            Value *vertexIndex, const Twine &instName) {
   assert(resultTy->isAggregateType() == false);
   assert(isOutput == false || m_shaderStage == ShaderStageTessControl);
 
@@ -201,8 +201,8 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
 // @param outputInfo : Extra output info (GS stream ID, FS integer signedness)
 // @param vertexIndex : For TCS per-vertex output: vertex index; else nullptr
 Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigned location, Value *locationOffset,
-                                                        Value *elemIdx, unsigned locationCount, InOutInfo outputInfo,
-                                                        Value *vertexIndex) {
+                                                    Value *elemIdx, unsigned locationCount, InOutInfo outputInfo,
+                                                    Value *vertexIndex) {
   assert(valueToWrite->getType()->isAggregateType() == false);
 
   // Fold constant pLocationOffset into location. (Currently a variable pLocationOffset is only supported in
@@ -281,7 +281,7 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
 // @param vertexIndex : For TCS/TES/GS per-vertex input/output: vertex index; for FS custom-interpolated input:
 // auxiliary value; else nullptr. (This is just used to tell whether an input/output is per-vertex.)
 void InOutBuilder::markGenericInputOutputUsage(bool isOutput, unsigned location, unsigned locationCount,
-                                                   InOutInfo inOutInfo, Value *vertexIndex) {
+                                               InOutInfo inOutInfo, Value *vertexIndex) {
   auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
 
   // Mark the input or output locations as in use.
@@ -531,8 +531,8 @@ Value *InOutBuilder::adjustIj(Value *value, Value *offset) {
 // @param xfbOffset : XFB byte offset
 // @param outputInfo : Extra output info (GS stream ID)
 Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuiltIn, unsigned location,
-                                                    unsigned xfbBuffer, unsigned xfbStride, Value *xfbOffset,
-                                                    InOutInfo outputInfo) {
+                                                unsigned xfbBuffer, unsigned xfbStride, Value *xfbOffset,
+                                                InOutInfo outputInfo) {
   // Can currently only cope with constant pXfbOffset.
   assert(isa<ConstantInt>(xfbOffset));
 
@@ -595,8 +595,8 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
 // @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index, else nullptr
 // @param index : Array or vector index to access part of an input, else nullptr
 // @param instName : Name to give instruction(s)
-Value *InOutBuilder::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputInfo, Value *vertexIndex,
-                                                Value *index, const Twine &instName) {
+Value *InOutBuilder::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputInfo, Value *vertexIndex, Value *index,
+                                            const Twine &instName) {
   assert(isBuiltInInput(builtIn));
   return readBuiltIn(false, builtIn, inputInfo, vertexIndex, index, instName);
 }
@@ -612,7 +612,7 @@ Value *InOutBuilder::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo input
 // @param index : Array or vector index to access part of an input, else nullptr
 // @param instName : Name to give instruction(s)
 Value *InOutBuilder::CreateReadBuiltInOutput(BuiltInKind builtIn, InOutInfo outputInfo, Value *vertexIndex,
-                                                 Value *index, const Twine &instName) {
+                                             Value *index, const Twine &instName) {
   // Currently this only copes with reading an output in TCS.
   assert(m_shaderStage == ShaderStageTessControl);
   assert(isBuiltInOutput(builtIn));
@@ -631,7 +631,7 @@ Value *InOutBuilder::CreateReadBuiltInOutput(BuiltInKind builtIn, InOutInfo outp
 // @param index : Array or vector index to access part of an input, else nullptr
 // @param instName : Name to give instruction(s)
 Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo inOutInfo, Value *vertexIndex,
-                                     Value *index, const Twine &instName) {
+                                 Value *index, const Twine &instName) {
   // Mark usage.
   unsigned arraySize = inOutInfo.getArraySize();
   if (auto constIndex = dyn_cast_or_null<ConstantInt>(index))
@@ -744,7 +744,7 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
 // @param vertexIndex : For TCS per-vertex output: vertex index, else nullptr
 // @param index : Array or vector index to access part of an input, else nullptr
 Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltInKind builtIn, InOutInfo outputInfo,
-                                                        Value *vertexIndex, Value *index) {
+                                                    Value *vertexIndex, Value *index) {
   // Mark usage.
   unsigned streamId = outputInfo.hasStreamId() ? outputInfo.getStreamId() : InvalidValue;
   unsigned arraySize = outputInfo.getArraySize();

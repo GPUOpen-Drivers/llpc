@@ -50,7 +50,7 @@ using namespace llvm;
 // @param pointeeTy : Type that the returned pointer should point to.
 // @param instName : Name to give instruction(s)
 Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, bool isNonUniform,
-                                             bool isWritten, Type *const pointeeTy, const Twine &instName) {
+                                         bool isWritten, Type *const pointeeTy, const Twine &instName) {
   assert(pointeeTy);
 
   Instruction *const insertPos = &*GetInsertPoint();

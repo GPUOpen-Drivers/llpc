@@ -268,7 +268,7 @@ Value *MatrixBuilder::determinant(ArrayRef<Value *> elements, unsigned order) {
 // @param rowToDelete : Row index to delete
 // @param columnToDelete : Column index to delete
 void MatrixBuilder::getSubmatrix(ArrayRef<Value *> matrix, MutableArrayRef<Value *> submatrix, unsigned order,
-                                     unsigned rowToDelete, unsigned columnToDelete) {
+                                 unsigned rowToDelete, unsigned columnToDelete) {
   unsigned inElementIdx = 0, outElementIdx = 0;
   for (unsigned columnIdx = 0; columnIdx != order; ++columnIdx) {
     for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx) {
