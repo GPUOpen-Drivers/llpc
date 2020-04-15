@@ -771,7 +771,6 @@ public:
   BuilderImpl() = delete;
   BuilderImpl(const BuilderImpl &) = delete;
   BuilderImpl &operator=(const BuilderImpl &) = delete;
-
 };
 
 } // namespace lgc

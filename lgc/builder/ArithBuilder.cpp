@@ -89,7 +89,7 @@ Value *ArithBuilder::CreateCubeFaceIndex(Value *coord, const Twine &instName) {
 // @param roundingMode : Rounding mode
 // @param instName : Name to give instruction(s)
 Value *ArithBuilder::CreateFpTruncWithRounding(Value *value, Type *destTy, unsigned roundingMode,
-                                                   const Twine &instName) {
+                                               const Twine &instName) {
   if (value->getType()->getScalarType()->isDoubleTy())
     value = CreateFPTrunc(value, getConditionallyVectorizedTy(getFloatTy(), destTy));
 
@@ -1109,7 +1109,7 @@ Value *ArithBuilder::createCallAmdgcnClass(Value *value, unsigned flags, const T
 // @param count : Count of bits in bitfield
 // @param instName : Name to give instruction(s)
 Value *ArithBuilder::CreateInsertBitField(Value *base, Value *insert, Value *offset, Value *count,
-                                              const Twine &instName) {
+                                          const Twine &instName) {
   // Make pOffset and pCount vectors of the right integer type if necessary.
   if (auto vecTy = dyn_cast<VectorType>(base->getType())) {
     if (!isa<VectorType>(offset->getType()))
@@ -1143,7 +1143,7 @@ Value *ArithBuilder::CreateInsertBitField(Value *base, Value *insert, Value *off
 // @param isSigned : True for a signed int bitfield extract, false for unsigned
 // @param instName : Name to give instruction(s)
 Value *ArithBuilder::CreateExtractBitField(Value *base, Value *offset, Value *count, bool isSigned,
-                                               const Twine &instName) {
+                                           const Twine &instName) {
   // Make pOffset and pCount vectors of the right integer type if necessary.
   if (auto vecTy = dyn_cast<VectorType>(base->getType())) {
     if (!isa<VectorType>(offset->getType()))
