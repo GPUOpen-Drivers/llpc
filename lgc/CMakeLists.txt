@@ -180,6 +180,7 @@ target_sources(LLVMlgc PRIVATE
     builder/ResourceUsage.cpp
     builder/SubgroupBuilder.cpp
     builder/YCbCrAddressHandler.cpp
+    builder/YCbCrConverter.cpp
 )
 
 # lgc/patch
