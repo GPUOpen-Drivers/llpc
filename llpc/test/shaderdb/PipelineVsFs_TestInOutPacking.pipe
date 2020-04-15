@@ -1,0 +1,138 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 32, i32 immarg 15, float {{.*}}, float {{.*}}, float {{.*}}, float {{.*}}, i1 immarg false, i1 immarg false)
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 33, i32 immarg 15, float {{.*}}, float {{.*}}, float {{.*}}, float {{.*}}, i1 immarg false, i1 immarg false)
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 34, i32 immarg 15, float {{.*}}, float {{.*}}, float {{.*}}, float {{.*}}, i1 immarg false, i1 immarg false)
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 35, i32 immarg 7, float {{.*}}, float {{.*}}, float {{.*}}, float undef, i1 immarg false, i1 immarg false)
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 36, i32 immarg 15, float {{.*}}, float {{.*}}, float {{.*}}, float {{.*}}, i1 immarg false, i1 immarg false)
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 37, i32 immarg 7, float {{.*}}, float {{.*}}, float {{.*}}, float undef, i1 immarg false, i1 immarg false)
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 2, i32 immarg 4, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 3, i32 immarg 4, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 1, i32 immarg 4, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 0, i32 immarg 4, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1.f16(float %{{[0-9]*}}, i32 immarg 2, i32 immarg 1, i1 immarg false, i32 %{{[0-9]*}})
+; SHADERTEST: call half @llvm.amdgcn.interp.p2.f16(float %{{[0-9]*}}, float %{{[0-9]*}}, i32 immarg 2, i32 immarg 1, i1 immarg false, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1.f16(float %{{[0-9]*}}, i32 immarg 2, i32 immarg 1, i1 immarg true, i32 %{{[0-9]*}})
+; SHADERTEST: call half @llvm.amdgcn.interp.p2.f16(float %{{[0-9]*}}, float %{{[0-9]*}}, i32 immarg 2, i32 immarg 1, i1 immarg true, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1.f16(float %{{[0-9]*}}, i32 immarg 3, i32 immarg 1, i1 immarg false, i32 %{{[0-9]*}})
+; SHADERTEST: call half @llvm.amdgcn.interp.p2.f16(float %{{[0-9]*}}, float %{{[0-9]*}}, i32 immarg 3, i32 immarg 1, i1 immarg false, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1.f16(float %{{[0-9]*}}, i32 immarg 3, i32 immarg 1, i1 immarg true, i32 %{{[0-9]*}})
+; SHADERTEST: call half @llvm.amdgcn.interp.p2.f16(float %{{[0-9]*}}, float %{{[0-9]*}}, i32 immarg 3, i32 immarg 1, i1 immarg true, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1.f16(float %{{[0-9]*}}, i32 immarg 0, i32 immarg 1, i1 immarg false, i32 %{{[0-9]*}})
+; SHADERTEST: call half @llvm.amdgcn.interp.p2.f16(float %{{[0-9]*}}, float %{{[0-9]*}}, i32 immarg 0, i32 immarg 1, i1 immarg false, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1.f16(float %{{[0-9]*}}, i32 immarg 0, i32 immarg 1, i1 immarg true, i32 %{{[0-9]*}})
+; SHADERTEST: call half @llvm.amdgcn.interp.p2.f16(float %{{[0-9]*}}, float %{{[0-9]*}}, i32 immarg 0, i32 immarg 1, i1 immarg true, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1.f16(float %{{[0-9]*}}, i32 immarg 1, i32 immarg 1, i1 immarg false, i32 %{{[0-9]*}})
+; SHADERTEST: call half @llvm.amdgcn.interp.p2.f16(float %{{[0-9]*}}, float %{{[0-9]*}}, i32 immarg 1, i32 immarg 1, i1 immarg false, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1.f16(float %{{[0-9]*}}, i32 immarg 1, i32 immarg 1, i1 immarg true, i32 %{{[0-9]*}})
+; SHADERTEST: call half @llvm.amdgcn.interp.p2.f16(float %{{[0-9]*}}, float %{{[0-9]*}}, i32 immarg 1, i32 immarg 1, i1 immarg true, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 2, i32 immarg 3, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 0, i32 immarg 2, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 1, i32 immarg 2, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 2, i32 immarg 2, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 3, i32 immarg 2, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 0, i32 immarg 3, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 1, i32 immarg 3, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[0-9]*}}, i32 immarg 2, i32 immarg 0, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p2(float %{{[0-9]*}}, float %44, i32 immarg 2, i32 immarg 0, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[0-9]*}}, i32 immarg 3, i32 immarg 0, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p2(float %{{[0-9]*}}, float %44, i32 immarg 3, i32 immarg 0, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[0-9]*}}, i32 immarg 0, i32 immarg 0, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p2(float %{{[0-9]*}}, float %44, i32 immarg 0, i32 immarg 0, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[0-9]*}}, i32 immarg 1, i32 immarg 0, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p2(float %{{[0-9]*}}, float %44, i32 immarg 1, i32 immarg 0, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 0, i32 immarg 0, i32 immarg 5, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 0, i32 immarg 1, i32 immarg 5, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 0, i32 immarg 2, i32 immarg 5, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 1, i32 immarg 0, i32 immarg 5, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 1, i32 immarg 1, i32 immarg 5, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 1, i32 immarg 2, i32 immarg 5, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 0, i32 immarg 5, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 1, i32 immarg 5, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 2, i32 immarg 5, i32 %{{[0-9]*}})
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 6
+
+[VsGlsl]
+#version 450
+#extension GL_AMD_gpu_shader_half_float: enable
+#extension GL_ARB_gpu_shader_int64 : enable
+#extension GL_AMD_gpu_shader_int16 : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
+layout(location = 0) out vec2 v2f_0;
+layout(location = 1) out vec2 v2f_1;
+layout(location = 2) out f16vec4 v4f16_0;
+layout(location = 3) out f16vec4 v4f16_1;
+layout(location = 4) out i64vec3 v3i64_0;
+layout(location = 6) out int i32_0;
+layout(location = 7) out i8vec2 v2i8_0;
+layout(location = 8) out i16vec2 v2i16_0;
+layout(location = 9) out f16vec4 v4f16_2;
+layout(location = 10) out vec3 interp;
+void main()
+{
+    v2f_0 = vec2(1.0, 0.0);
+    v2f_1 = vec2(0.0, 1.0);
+    v4f16_0 = f16vec4(0.2, 0.2, 0.2, 1.0);
+    v4f16_1 = v4f16_0;
+    v3i64_0 = i64vec3(1, 1, 1);
+    i32_0 = 1;
+    v2i8_0 = i8vec2(0, 0);
+    v2i16_0 = i16vec2(1, 1);
+    v4f16_2 = f16vec4(0.1, 0.1, 0.1, 1.0);
+    interp = vec3(0.5, 0.5, 0.5);
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+#extension GL_AMD_gpu_shader_half_float: enable
+#extension GL_ARB_gpu_shader_int64 : enable
+#extension GL_AMD_gpu_shader_int16 : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
+#extension GL_AMD_shader_explicit_vertex_parameter : enable
+layout(location = 0) in vec2 v2f_0;
+layout(location = 1) in vec2 v2f_1;
+layout(location = 2) in f16vec4 v4f16_0;
+layout(location = 3) in f16vec4 v4f16_1;
+layout(location = 4) flat in i64vec3 v3i64_0;
+layout(location = 6) flat in int i32_0;
+layout(location = 7) flat in i8vec2 v2i8_0;
+layout(location = 8) flat in i16vec2 v2i16_0;
+layout(location = 9) flat in f16vec4 v4f16_2;
+layout(location = 10) __explicitInterpAMD in vec3 interp;
+layout(location = 0) out vec4 fragColor;
+
+void main()
+{
+    vec4 v0 = vec4(v2f_0, v2f_1) + vec4(float(v3i64_0.x), float(v3i64_0.y), float(v3i64_0.z), float(i32_0));
+    f16vec4 tmpV = v4f16_0 + v4f16_1;
+    vec4 v1 = vec4(float(tmpV.x), float(tmpV.y), float(tmpV.z), float(tmpV.w));
+    vec4 v2 = vec4(float(v2i8_0.x), float(v2i8_0.y), float(v2i16_0.x), float(v2i16_0.y)) + v4f16_2;
+    vec4 v = (v0 + v1 + v2) / 3.0;
+
+    vec3 result_0 = interpolateAtVertexAMD(interp, 1u);
+    vec3 result_1 = interpolateAtVertexAMD(interp, 2u);
+    vec3 result_2 = interpolateAtVertexAMD(interp, 0u);
+
+    vec3 expect_result = v.x * result_0 + v.y * result_1 + v.z * result_2;
+    fragColor =  all(lessThan(expect_result, vec3(v.w)))? vec4(1.0, 0.0, 0.0, 1.0) : vec4(0.0, 1.0, 0.0, 1.0);
+}
+
+[FsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+patchControlPoints = 0
+alphaToCoverageEnable = 0
+dualSourceBlendEnable = 0
+colorBuffer[0].format = VK_FORMAT_B8G8R8A8_UNORM
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0

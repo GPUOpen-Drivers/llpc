@@ -1977,11 +1977,16 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
       static const unsigned PassThroughMode = (1 << 5);
       spiPsInputCntl.bits.FLAT_SHADE = true;
       spiPsInputCntl.bits.OFFSET |= PassThroughMode;
-    } else {
-      if (interpInfoElem.is16bit) {
+    } else if (interpInfoElem.is16bit) {
+      if (!m_pipelineState->isPackInOut()) {
         // NOTE: Enable 16-bit interpolation mode for non-passthrough mode. Attribute 0 is always valid.
         spiPsInputCntl.bits.FP16_INTERP_MODE = true;
         spiPsInputCntl.bits.ATTR0_VALID = true;
+      } else if (!interpInfoElem.flat) {
+        // Attribute 0 and Attribute 1 are valid when two halfs are packed in a 32-bit attribute
+        spiPsInputCntl.bits.FP16_INTERP_MODE = true;
+        spiPsInputCntl.bits.ATTR0_VALID = true;
+        spiPsInputCntl.bits.ATTR1_VALID = true;
       }
     }
 

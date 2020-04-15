@@ -100,6 +100,16 @@ struct FsInterpInfo {
 // Invalid interpolation info
 static const FsInterpInfo InvalidFsInterpInfo = {InvalidValue, false, false, false};
 
+// Represents the location info of input/output
+union InOutLocationInfo {
+  struct {
+    uint16_t half : 1;      // High half in case of 16-bit attriburtes
+    uint16_t component : 2; // The component index
+    uint16_t location : 13; // The location
+  };
+  uint16_t u16All;
+};
+
 // Enumerate the workgroup layout options.
 enum class WorkgroupLayout : unsigned {
   Unknown = 0,   // ?x?

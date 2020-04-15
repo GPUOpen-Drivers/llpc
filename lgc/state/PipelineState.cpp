@@ -52,6 +52,8 @@ using namespace llvm;
 // -enable-tess-offchip: enable tessellation off-chip mode
 static cl::opt<bool> EnableTessOffChip("enable-tess-offchip", cl::desc("Enable tessellation off-chip mode"),
                                        cl::init(false));
+// -pack-in-out: pack input/output
+static cl::opt<bool> PackInOut("pack-in-out", cl::desc("Pack input/output"), cl::init(true));
 
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char OptionsMetadataName[] = "llpc.options";
@@ -189,8 +191,7 @@ void PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_
   // manager.
   std::unique_ptr<PassManager> patchPassMgr(PassManager::Create());
   patchPassMgr->setPassIndex(&passIndex);
-  patchPassMgr->add(
-      createTargetTransformInfoWrapperPass(getLgcContext()->getTargetMachine()->getTargetIRAnalysis()));
+  patchPassMgr->add(createTargetTransformInfoWrapperPass(getLgcContext()->getTargetMachine()->getTargetIRAnalysis()));
 
   // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
   getLgcContext()->preparePassManager(&*patchPassMgr);
@@ -897,6 +898,15 @@ void PipelineState::readGraphicsState(Module *module) {
 bool PipelineState::isTessOffChip() {
   // For GFX9+, always enable tessellation off-chip mode
   return EnableTessOffChip || getLgcContext()->getTargetInfo().getGfxIpVersion().major >= 9;
+}
+
+// =====================================================================================================================
+// Determine whether to use input/output packing
+bool PipelineState::isPackInOut() {
+  // Pack input/output requirements:
+  // 1) -pack-in-out option is on
+  // 2) It is a VS-FS pipeline
+  return PackInOut && (m_stageMask == (shaderStageToMask(ShaderStageVertex) | shaderStageToMask(ShaderStageFragment)));
 }
 
 // =====================================================================================================================
