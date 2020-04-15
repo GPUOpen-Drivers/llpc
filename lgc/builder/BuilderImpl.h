@@ -297,6 +297,8 @@ private:
 // =====================================================================================================================
 // Builder implementation subclass for image operations
 class ImageBuilder : virtual public BuilderImplBase {
+  friend class YCbCrConverter;
+
 public:
   ImageBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
