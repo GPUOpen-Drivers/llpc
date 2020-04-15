@@ -58,6 +58,8 @@ namespace Gfx9
 #include "gfx9_plus_merged_enum.h"
 #include "gfx9_plus_merged_offset.h"
 
+using namespace Pal::Gfx9::Chip;
+
 // =====================================================================================================================
 // Builds PAL metadata for pipeline.
 void ConfigBuilder::BuildPalMetadata()
@@ -1443,7 +1445,7 @@ void ConfigBuilder::BuildLsHsRegConfig(
         BuildUserDataConfig(
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
-                     Gfx10::mmSPI_SHADER_USER_DATA_HS_0);
+                     Pal::Gfx9::Chip::Gfx10::mmSPI_SHADER_USER_DATA_HS_0);
     }
     else
     {
@@ -1718,7 +1720,7 @@ void ConfigBuilder::BuildEsGsRegConfig(
         BuildUserDataConfig(
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
-                     Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
+                     Pal::Gfx9::Chip::Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
     }
     else
     {
@@ -1888,7 +1890,7 @@ void ConfigBuilder::BuildPrimShaderRegConfig(
         SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_INSTANCE_CNT, CNT, geometryMode.invocations);
         if ((gfxIp.major > 10) || ((gfxIp.major == 10) && (gfxIp.minor >= 1)))
         {
-            SET_REG_GFX10_1_PLUS_FIELD(&pConfig->m_primShaderRegs,
+            SET_REG_GFX10_FIELD(&pConfig->m_primShaderRegs,
                                        VGT_GS_INSTANCE_CNT,
                                        EN_MAX_VERT_OUT_PER_GS_INSTANCE,
                                        calcFactor.enableMaxVertOut);
@@ -2227,7 +2229,7 @@ void ConfigBuilder::BuildPrimShaderRegConfig(
     BuildUserDataConfig(
                  (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
                  (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
-                 Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
+                 Pal::Gfx9::Chip::Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
 }
 
 // =====================================================================================================================
@@ -2582,7 +2584,6 @@ void ConfigBuilder::BuildCsRegConfig(
         tidigCompCnt = 1;
     }
     SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC2, TIDIG_COMP_CNT, tidigCompCnt);
-
 
     SET_REG_FIELD(pConfig, COMPUTE_NUM_THREAD_X, NUM_THREAD_FULL, workgroupSizes[0]);
     SET_REG_FIELD(pConfig, COMPUTE_NUM_THREAD_Y, NUM_THREAD_FULL, workgroupSizes[1]);

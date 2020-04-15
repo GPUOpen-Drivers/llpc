@@ -28,7 +28,7 @@
  * @brief LLPC source file: contains implementation of class lgc::PatchIntrinsicSimplify.
  ***********************************************************************************************************************
  */
-#if defined(_MSC_VER) || defined(__MINGW32__)
+#if  defined(__MINGW32__)
 // According to Microsoft, one must set _USE_MATH_DEFINES in order to get M_PI
 // from the Visual C++ cmath / math.h headers:
 // https://docs.microsoft.com/en-us/cpp/c-runtime-library/math-constants?view=vs-2019

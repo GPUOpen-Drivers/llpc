@@ -32,6 +32,7 @@ add_dependencies(LLVMlgc
 )
 
 ### Cached Project Options #############################################################################################
+option(LLPC_BUILD_RENOIR   "LLPC support for Renoir?"   ON)
 
 ### Compiler Options ###################################################################################################
 if(UNIX)
@@ -138,6 +139,11 @@ elseif(WIN32)
     endif()
 endif()
 
+if (LLPC_BUILD_RENOIR)
+    target_compile_definitions(LLVMlgc PRIVATE LLPC_BUILD_RENOIR)
+    target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
+endif()
+
 ### Defines/Includes/Sources ###########################################################################################
 target_compile_definitions(LLVMlgc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
 if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
@@ -150,6 +156,11 @@ target_compile_definitions(LLVMlgc PRIVATE
         CHIP_HDR_RAVEN2
         CHIP_HDR_NAVI14
         )
+
+if (LLPC_BUILD_RENOIR)
+    target_compile_definitions(LLVMlgc PRIVATE LLPC_BUILD_RENOIR)
+    target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
+endif()
 
 if(WIN32)
     target_compile_definitions(LLVMlgc PRIVATE

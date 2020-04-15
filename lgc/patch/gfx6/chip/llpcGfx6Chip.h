@@ -45,6 +45,8 @@ namespace Gfx6
 #include "si_ci_vi_merged_registers.h"
 #include "si_ci_vi_merged_typedef.h"
 
+using namespace Pal::Gfx6::Chip;
+
 // =====================================================================================================================
 // Helper macros to operate registers
 
