@@ -152,7 +152,7 @@ static const char NoteName[] = ".note";         // Name of ".note" section
 static const char RelocName[] = ".reloc";       // Name of ".reloc" section
 static const char CommentName[] = ".comment";   // Name of ".comment" section
 
-static const uint32_t NtAmdAmdgpuIsa = 11; // Note type of AMDGPU ISA version
+static const uint32_t NT_AMD_AMDGPU_ISA = 11; // Note type of AMDGPU ISA version
 
 // Represents the layout of standard note header
 struct NoteHeader {
@@ -170,78 +170,78 @@ struct Elf32 {
   // ELF file header
   struct FormatHeader {
     union {
-      uint8_t eIdent[EI_NIDENT];        // ELF identification info
-      uint32_t eIdent32[EI_NIDENT / 4]; // Bytes grouped for easy magic number setting
+      uint8_t e_ident[EI_NIDENT];        // ELF identification info
+      uint32_t e_ident32[EI_NIDENT / 4]; // Bytes grouped for easy magic number setting
     };
 
-    uint16_t eType;      // 1 = relocatable, 3 = shared
-    uint16_t eMachine;   // Machine architecture constant, 0x3FD = AMD GPU, 0xE0 = LLVM AMD GCN
-    uint32_t eVersion;   // ELF format version (1)
-    uint32_t eEntry;     // Entry point if executable (0)
-    uint32_t ePhoff;     // File offset of program header (unused, 0)
-    uint32_t eShoff;     // File offset of section header
-    uint32_t eFlags;     // Architecture-specific flags
-    uint16_t eEhsize;    // Size of this ELF header
-    uint16_t ePhentsize; // Size of an entry in program header (unused, 0)
-    uint16_t ePhnum;     // # of entries in program header (0)
-    uint16_t eShentsize; // Size of an entry in section header
-    uint16_t eShnum;     // # of entries in section header
-    uint16_t eShstrndx;  // Section # that contains section name strings
+    uint16_t e_type;      // 1 = relocatable, 3 = shared
+    uint16_t e_machine;   // Machine architecture constant, 0x3FD = AMD GPU, 0xE0 = LLVM AMD GCN
+    uint32_t e_version;   // ELF format version (1)
+    uint32_t e_entry;     // Entry point if executable (0)
+    uint32_t e_phoff;     // File offset of program header (unused, 0)
+    uint32_t e_shoff;     // File offset of section header
+    uint32_t e_flags;     // Architecture-specific flags
+    uint16_t e_ehsize;    // Size of this ELF header
+    uint16_t e_phentsize; // Size of an entry in program header (unused, 0)
+    uint16_t e_phnum;     // # of entries in program header (0)
+    uint16_t e_shentsize; // Size of an entry in section header
+    uint16_t e_shnum;     // # of entries in section header
+    uint16_t e_shstrndx;  // Section # that contains section name strings
   };
 
   // ELF section header (used to locate each data section)
   struct SectionHeader {
-    uint32_t shName;      // Name (index into string table)
-    uint32_t shType;      // Section type
-    uint32_t shFlags;     // Flag bits (SectionHeaderFlags enum)
-    uint32_t shAddr;      // Base memory address if loadable (0)
-    uint32_t shOffset;    // File position of start of section
-    uint32_t shSize;      // Size of section in bytes
-    uint32_t shLink;      // Section # with related info (unused, 0)
-    uint32_t shInfo;      // More section-specific info
-    uint32_t shAddralign; // Alignment granularity in power of 2 (1)
-    uint32_t shEntsize;   // Size of entries if section is array
+    uint32_t sh_name;      // Name (index into string table)
+    uint32_t sh_type;      // Section type
+    uint32_t sh_flags;     // Flag bits (SectionHeaderFlags enum)
+    uint32_t sh_addr;      // Base memory address if loadable (0)
+    uint32_t sh_offset;    // File position of start of section
+    uint32_t sh_size;      // Size of section in bytes
+    uint32_t sh_link;      // Section # with related info (unused, 0)
+    uint32_t sh_info;      // More section-specific info
+    uint32_t sh_addralign; // Alignment granularity in power of 2 (1)
+    uint32_t sh_entsize;   // Size of entries if section is array
   };
 
   // ELF symbol table entry
   struct Symbol {
-    uint32_t stName;  // Symbol name (index into string table)
-    uint32_t stValue; // Value or address associated with the symbol
-    uint32_t stSize;  // Size of the symbol
+    uint32_t st_name;  // Symbol name (index into string table)
+    uint32_t st_value; // Value or address associated with the symbol
+    uint32_t st_size;  // Size of the symbol
     union {
       struct {
         uint8_t type : 4;    // Symbol Table Type
         uint8_t binding : 4; // Symbol Binding attributes
       };
       uint8_t all;
-    } stInfo;         // This field contains the symbol type and its binding attributes (that is,
-                      //  its scope).
-    uint8_t stOther;  // Must be zero, reserved
-    uint16_t stShndx; // Which section (header table index) it's defined in
+    } st_info;         // This field contains the symbol type and its binding attributes (that is,
+                       //  its scope).
+    uint8_t st_other;  // Must be zero, reserved
+    uint16_t st_shndx; // Which section (header table index) it's defined in
   };
 
   // ELF relocation entry (without explicit append)
   struct Reloc {
-    uint32_t rOffset; // Location (file byte offset, or program virtual address)
+    uint32_t r_offset; // Location (file byte offset, or program virtual address)
     union {
-      uint32_t rInfo; // Symbol table index and type of relocation to apply
+      uint32_t r_info; // Symbol table index and type of relocation to apply
       struct {
-        uint32_t rType : 8;    // Type of relocation
-        uint32_t rSymbol : 24; // Index of the symbol in the symbol table
+        uint32_t r_type : 8;    // Type of relocation
+        uint32_t r_symbol : 24; // Index of the symbol in the symbol table
       };
     };
   };
 
   // ELF program header
   struct Phdr {
-    uint32_t type;   // Type of segment
-    uint32_t offset; // File offset where segment is located, in bytes
-    uint32_t vaddr;  // Virtual address of beginning of segment
-    uint32_t paddr;  // Physical address of beginning of segment (OS-specific)
-    uint32_t filesz; // Num. of bytes in file image of segment (may be zero)
-    uint32_t memsz;  // Num. of bytes in mem image of segment (may be zero)
-    uint32_t flags;  // Segment flags
-    uint32_t align;  // Segment alignment constraint
+    uint32_t p_type;   // Type of segment
+    uint32_t p_offset; // File offset where segment is located, in bytes
+    uint32_t p_vaddr;  // Virtual address of beginning of segment
+    uint32_t p_paddr;  // Physical address of beginning of segment (OS-specific)
+    uint32_t p_filesz; // Num. of bytes in file image of segment (may be zero)
+    uint32_t p_memsz;  // Num. of bytes in mem image of segment (may be zero)
+    uint32_t p_flags;  // Segment flags
+    uint32_t p_align;  // Segment alignment constraint
   };
 };
 
@@ -250,78 +250,78 @@ struct Elf64 {
   // ELF file header
   struct FormatHeader {
     union {
-      uint8_t eIdent[EI_NIDENT];        // ELF identification info
-      uint32_t eIdent32[EI_NIDENT / 4]; // Bytes grouped for easy magic number setting
+      uint8_t e_ident[EI_NIDENT];        // ELF identification info
+      uint32_t e_ident32[EI_NIDENT / 4]; // Bytes grouped for easy magic number setting
     };
 
-    uint16_t eType;      // 1 = relocatable, 3 = shared
-    uint16_t eMachine;   // Machine architecture constant, 0x3FD = AMD GPU, 0xE0 = LLVM AMD GCN
-    uint32_t eVersion;   // ELF format version (1)
-    uint64_t eEntry;     // Entry point if executable (0)
-    uint64_t ePhoff;     // File offset of program header (unused, 0)
-    uint64_t eShoff;     // File offset of section header
-    uint32_t eFlags;     // Architecture-specific flags
-    uint16_t eEhsize;    // Size of this ELF header
-    uint16_t ePhentsize; // Size of an entry in program header (unused, 0)
-    uint16_t ePhnum;     // # of entries in program header (0)
-    uint16_t eShentsize; // Size of an entry in section header
-    uint16_t eShnum;     // # of entries in section header
-    uint16_t eShstrndx;  // Section # that contains section name strings
+    uint16_t e_type;      // 1 = relocatable, 3 = shared
+    uint16_t e_machine;   // Machine architecture constant, 0x3FD = AMD GPU, 0xE0 = LLVM AMD GCN
+    uint32_t e_version;   // ELF format version (1)
+    uint64_t e_entry;     // Entry point if executable (0)
+    uint64_t e_phoff;     // File offset of program header (unused, 0)
+    uint64_t e_shoff;     // File offset of section header
+    uint32_t e_flags;     // Architecture-specific flags
+    uint16_t e_ehsize;    // Size of this ELF header
+    uint16_t e_phentsize; // Size of an entry in program header (unused, 0)
+    uint16_t e_phnum;     // # of entries in program header (0)
+    uint16_t e_shentsize; // Size of an entry in section header
+    uint16_t e_shnum;     // # of entries in section header
+    uint16_t e_shstrndx;  // Section # that contains section name strings
   };
 
   // ELF section header (used to locate each data section)
   struct SectionHeader {
-    uint32_t shName;      // Name (index into string table)
-    uint32_t shType;      // Section type
-    uint64_t shFlags;     // Flag bits (SectionHeaderFlags enum)
-    uint64_t shAddr;      // Base memory address if loadable (0)
-    uint64_t shOffset;    // File position of start of section
-    uint64_t shSize;      // Size of section in bytes
-    uint32_t shLink;      // Section # with related info (unused, 0)
-    uint32_t shInfo;      // More section-specific info
-    uint64_t shAddralign; // Alignment granularity in power of 2 (1)
-    uint64_t shEntsize;   // Size of entries if section is array
+    uint32_t sh_name;      // Name (index into string table)
+    uint32_t sh_type;      // Section type
+    uint64_t sh_flags;     // Flag bits (SectionHeaderFlags enum)
+    uint64_t sh_addr;      // Base memory address if loadable (0)
+    uint64_t sh_offset;    // File position of start of section
+    uint64_t sh_size;      // Size of section in bytes
+    uint32_t sh_link;      // Section # with related info (unused, 0)
+    uint32_t sh_info;      // More section-specific info
+    uint64_t sh_addralign; // Alignment granularity in power of 2 (1)
+    uint64_t sh_entsize;   // Size of entries if section is array
   };
 
   // ELF symbol table entry
   struct Symbol {
-    uint32_t stName; // Symbol name (index into string table)
+    uint32_t st_name; // Symbol name (index into string table)
     union {
       struct {
         uint8_t type : 4;    // Symbol Table Type
         uint8_t binding : 4; // Symbol Binding attributes
       };
       uint8_t all;
-    } stInfo;         // This field contains the symbol type and its binding attributes (that is,
-                      //  its scope).
-    uint8_t stOther;  // Must be zero, reserved
-    uint16_t stShndx; // Which section (header table index) it's defined in
-    uint64_t stValue; // Value or address associated with the symbol
-    uint64_t stSize;  // Size of the symbol
+    } st_info;         // This field contains the symbol type and its binding attributes (that is,
+                       //  its scope).
+    uint8_t st_other;  // Must be zero, reserved
+    uint16_t st_shndx; // Which section (header table index) it's defined in
+    uint64_t st_value; // Value or address associated with the symbol
+    uint64_t st_size;  // Size of the symbol
   };
 
   // ELF relocation entry
   struct Reloc {
-    uint64_t rOffset; // Location (file byte offset, or program virtual address)
+    uint64_t r_offset; // Location (file byte offset, or program virtual address)
     union {
-      uint64_t rInfo; // Symbol table index and type of relocation to apply
+      uint64_t r_info; // Symbol table index and type of relocation to apply
       struct {
-        uint32_t rType;   // Type of relocation
-        uint32_t rSymbol; // Index of the symbol in the symbol table
+        uint32_t r_type;   // Type of relocation
+        uint32_t r_symbol; // Index of the symbol in the symbol table
       };
     };
   };
 
   // ELF program header
   struct Phdr {
-    uint32_t type;   // Type of segment
-    uint32_t flags;  // Segment flags
-    uint64_t offset; // File offset where segment is located, in bytes
-    uint64_t vaddr;  // Virtual address of beginning of segment
-    uint64_t paddr;  // Physical addr of beginning of segment (OS-specific)
-    uint64_t filesz; // Num. of bytes in file image of segment (may be zero)
-    uint64_t memsz;  // Num. of bytes in mem image of segment (may be zero)
-    uint64_t align;  // Segment alignment constraint
+    uint32_t p_type;   // Type of segment
+    uint32_t p_flags;  // Segment flags
+    uint64_t p_offset; // File offset where segment is located, in bytes
+    uint64_t p_vaddr;  // Virtual address of beginning of segment
+    uint64_t p_paddr;  // Physical addr of beginning of segment (OS-specific)
+    uint64_t p_filesz; // Num. of bytes in file image of segment (may be zero)
+    uint64_t p_memsz;  // Num. of bytes in mem image of segment (may be zero)
+    uint64_t p_align;  // Segment alignment constraint
   };
 };
 #pragma pack(pop)
@@ -335,12 +335,12 @@ template <class ElfSectionHeader> struct ElfSectionBuffer {
 
 // Represents info of ELF symbol
 struct ElfSymbol {
-  const char *secName;  // Name of the section this symbol's defined in
-  uint32_t secIdx;      // Index of the section this symbol's defined in
+  const char *secName; // Name of the section this symbol's defined in
+  uint32_t secIdx;     // Index of the section this symbol's defined in
   const char *pSymName; // Name of this symbol
-  uint32_t nameOffset;  // Symbol name offset in .strtab
-  uint64_t size;        // Size of this symbol
-  uint64_t value;       // Value associated with this symbol
+  uint32_t nameOffset; // Symbol name offset in .strtab
+  uint64_t size;       // Size of this symbol
+  uint64_t value;      // Value associated with this symbol
   union {
     struct {
       uint8_t type : 4;    // Symbol Table Type
@@ -400,12 +400,12 @@ public:
   ~ElfReader();
 
   // Gets architecture-specific flags
-  uint32_t getFlags() const { return m_header.eFlags; }
+  uint32_t getFlags() const { return m_header.e_flags; }
 
   // Gets graphics IP version info (used by ELF dump only)
   GfxIpVersion getGfxIpVersion() const { return m_gfxIp; }
 
-  Result ReadFromBuffer(const void *buffer, size_t *bufSize);
+  Result ReadFromBuffer(const void *pBuffer, size_t *bufSize);
 
   Result GetSectionData(const char *name, const void **ppData, size_t *dataLength) const;
 
@@ -434,7 +434,7 @@ public:
   // Gets the section index for the specified section name.
   int32_t GetSectionIndex(const char *name) const {
     auto entry = m_map.find(name);
-    return entry != m_map.end() ? entry->second : InvalidValue;
+    return (entry != m_map.end()) ? entry->second : InvalidValue;
   }
 
   void initMsgPackDocument(const void *buffer, uint32_t sizeInBytes);

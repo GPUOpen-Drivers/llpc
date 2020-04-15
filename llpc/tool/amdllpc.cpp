@@ -322,7 +322,7 @@ static bool isElfBinary(const void *data, size_t dataSize) {
   bool isElfBin = false;
   if (dataSize >= sizeof(Elf64::FormatHeader)) {
     auto header = reinterpret_cast<const Elf64::FormatHeader *>(data);
-    isElfBin = header->eIdent32[EI_MAG0] == ElfMagic;
+    isElfBin = header->e_ident32[EI_MAG0] == ElfMagic;
   }
   return isElfBin;
 }

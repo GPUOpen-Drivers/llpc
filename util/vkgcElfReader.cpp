@@ -70,37 +70,37 @@ template <class Elf> ElfReader<Elf>::~ElfReader() {
 // + Section Header (h1) [.shstrtab]
 // + ...            (h#) [...]
 //
-// @param pBuffer : Input ELF data buffer
-// @param [out] pBufSize : Size of the given read buffer (determined from the ELF header)
-template <class Elf> Result ElfReader<Elf>::ReadFromBuffer(const void *pBuffer, size_t *pBufSize) {
-  assert(pBuffer);
+// @param buffer : Input ELF data buffer
+// @param [out] bufSize : Size of the given read buffer (determined from the ELF header)
+template <class Elf> Result ElfReader<Elf>::ReadFromBuffer(const void *buffer, size_t *bufSize) {
+  assert(buffer);
 
   Result result = Result::Success;
 
-  const uint8_t *data = static_cast<const uint8_t *>(pBuffer);
+  const uint8_t *data = static_cast<const uint8_t *>(buffer);
 
   // ELF header is always located at the beginning of the file
-  auto header = static_cast<const typename Elf::FormatHeader *>(pBuffer);
+  auto header = static_cast<const typename Elf::FormatHeader *>(buffer);
 
   // If the identification info isn't the magic number, this isn't a valid file.
-  result = header->eIdent32[EI_MAG0] == ElfMagic ? Result::Success : Result::ErrorInvalidValue;
+  result = header->e_ident32[EI_MAG0] == ElfMagic ? Result::Success : Result::ErrorInvalidValue;
 
   if (result == Result::Success)
-    result = header->eMachine == EM_AMDGPU ? Result::Success : Result::ErrorInvalidValue;
+    result = header->e_machine == EM_AMDGPU ? Result::Success : Result::ErrorInvalidValue;
 
   if (result == Result::Success) {
     m_header = *header;
     size_t readSize = sizeof(typename Elf::FormatHeader);
 
     // Section header location information.
-    const unsigned sectionHeaderOffset = static_cast<unsigned>(header->eShoff);
-    const unsigned sectionHeaderNum = header->eShnum;
-    const unsigned sectionHeaderSize = header->eShentsize;
+    const unsigned sectionHeaderOffset = static_cast<unsigned>(header->e_shoff);
+    const unsigned sectionHeaderNum = header->e_shnum;
+    const unsigned sectionHeaderSize = header->e_shentsize;
 
-    const unsigned sectionStrTableHeaderOffset = sectionHeaderOffset + (header->eShstrndx * sectionHeaderSize);
+    const unsigned sectionStrTableHeaderOffset = sectionHeaderOffset + (header->e_shstrndx * sectionHeaderSize);
     auto sectionStrTableHeader =
         reinterpret_cast<const typename Elf::SectionHeader *>(data + sectionStrTableHeaderOffset);
-    const unsigned sectionStrTableOffset = static_cast<unsigned>(sectionStrTableHeader->shOffset);
+    const unsigned sectionStrTableOffset = static_cast<unsigned>(sectionStrTableHeader->sh_offset);
 
     for (unsigned section = 0; section < sectionHeaderNum; section++) {
       // Where the header is located for this section
@@ -109,11 +109,11 @@ template <class Elf> Result ElfReader<Elf>::ReadFromBuffer(const void *pBuffer, 
       readSize += sizeof(typename Elf::SectionHeader);
 
       // Where the name is located for this section
-      const unsigned sectionNameOffset = sectionStrTableOffset + sectionHeader->shName;
+      const unsigned sectionNameOffset = sectionStrTableOffset + sectionHeader->sh_name;
       const char *sectionName = reinterpret_cast<const char *>(data + sectionNameOffset);
 
       // Where the data is located for this section
-      const unsigned sectionDataOffset = static_cast<unsigned>(sectionHeader->shOffset);
+      const unsigned sectionDataOffset = static_cast<unsigned>(sectionHeader->sh_offset);
       auto buf = new SectionBuffer;
 
       result = buf ? Result::Success : Result::ErrorOutOfMemory;
@@ -123,14 +123,14 @@ template <class Elf> Result ElfReader<Elf>::ReadFromBuffer(const void *pBuffer, 
         buf->name = sectionName;
         buf->data = (data + sectionDataOffset);
 
-        readSize += static_cast<size_t>(sectionHeader->shSize);
+        readSize += static_cast<size_t>(sectionHeader->sh_size);
 
         m_sections.push_back(buf);
         m_map[sectionName] = section;
       }
     }
 
-    *pBufSize = readSize;
+    *bufSize = readSize;
   }
 
   // Get section index
@@ -145,18 +145,18 @@ template <class Elf> Result ElfReader<Elf>::ReadFromBuffer(const void *pBuffer, 
 // =====================================================================================================================
 // Retrieves the section data for the specified section name, if it exists.
 //
-// @param pName : Name of the section to look for
+// @param name : Name of the section to look for
 // @param [out] sectData : Pointer to section data
-// @param [out] pDataLength : Size of the section data
+// @param [out] dataLength : Size of the section data
 template <class Elf>
-Result ElfReader<Elf>::GetSectionData(const char *pName, const void **sectData, size_t *pDataLength) const {
+Result ElfReader<Elf>::GetSectionData(const char *name, const void **sectData, size_t *dataLength) const {
   Result result = Result::ErrorInvalidValue;
 
-  auto entry = m_map.find(pName);
+  auto entry = m_map.find(name);
 
   if (entry != m_map.end()) {
     *sectData = m_sections[entry->second]->data;
-    *pDataLength = static_cast<size_t>(m_sections[entry->second]->secHead.shSize);
+    *dataLength = static_cast<size_t>(m_sections[entry->second]->secHead.sh_size);
     result = Result::Success;
   }
 
@@ -169,7 +169,7 @@ template <class Elf> unsigned ElfReader<Elf>::getSymbolCount() const {
   unsigned symCount = 0;
   if (m_symSecIdx >= 0) {
     auto &section = m_sections[m_symSecIdx];
-    symCount = static_cast<unsigned>(section->secHead.shSize / section->secHead.shEntsize);
+    symCount = static_cast<unsigned>(section->secHead.sh_size / section->secHead.sh_entsize);
   }
   return symCount;
 }
@@ -178,18 +178,18 @@ template <class Elf> unsigned ElfReader<Elf>::getSymbolCount() const {
 // Gets info of the symbol in the symbol table section according to the specified index.
 //
 // @param idx : Symbol index
-// @param [out] pSymbol : Info of the symbol
-template <class Elf> void ElfReader<Elf>::getSymbol(unsigned idx, ElfSymbol *pSymbol) {
+// @param [out] symbol : Info of the symbol
+template <class Elf> void ElfReader<Elf>::getSymbol(unsigned idx, ElfSymbol *symbol) {
   auto &section = m_sections[m_symSecIdx];
   const char *strTab = reinterpret_cast<const char *>(m_sections[m_strtabSecIdx]->data);
 
   auto symbols = reinterpret_cast<const typename Elf::Symbol *>(section->data);
-  pSymbol->secIdx = symbols[idx].stShndx;
-  pSymbol->secName = m_sections[pSymbol->secIdx]->name;
-  pSymbol->pSymName = strTab + symbols[idx].stName;
-  pSymbol->size = symbols[idx].stSize;
-  pSymbol->value = symbols[idx].stValue;
-  pSymbol->info.all = symbols[idx].stInfo.all;
+  symbol->secIdx = symbols[idx].st_shndx;
+  symbol->secName = m_sections[symbol->secIdx]->name;
+  symbol->pSymName = strTab + symbols[idx].st_name;
+  symbol->size = symbols[idx].st_size;
+  symbol->value = symbols[idx].st_value;
+  symbol->info.all = symbols[idx].st_info.all;
 }
 
 // =====================================================================================================================
@@ -198,7 +198,7 @@ template <class Elf> unsigned ElfReader<Elf>::getRelocationCount() {
   unsigned relocCount = 0;
   if (m_relocSecIdx >= 0) {
     auto &section = m_sections[m_relocSecIdx];
-    relocCount = static_cast<unsigned>(section->secHead.shSize / section->secHead.shEntsize);
+    relocCount = static_cast<unsigned>(section->secHead.sh_size / section->secHead.sh_entsize);
   }
   return relocCount;
 }
@@ -207,13 +207,13 @@ template <class Elf> unsigned ElfReader<Elf>::getRelocationCount() {
 // Gets info of the relocation in the relocation section according to the specified index.
 //
 // @param idx : Relocation index
-// @param [out] pReloc : Info of the relocation
-template <class Elf> void ElfReader<Elf>::getRelocation(unsigned idx, ElfReloc *pReloc) {
+// @param [out] reloc : Info of the relocation
+template <class Elf> void ElfReader<Elf>::getRelocation(unsigned idx, ElfReloc *reloc) {
   auto &section = m_sections[m_relocSecIdx];
 
   auto relocs = reinterpret_cast<const typename Elf::Reloc *>(section->data);
-  pReloc->offset = relocs[idx].rOffset;
-  pReloc->symIdx = relocs[idx].rSymbol;
+  reloc->offset = relocs[idx].r_offset;
+  reloc->symIdx = relocs[idx].r_symbol;
 }
 
 // =====================================================================================================================
@@ -241,17 +241,17 @@ Result ElfReader<Elf>::getSectionDataBySectionIndex(unsigned secIdx, SectionBuff
 // Gets section data by sorting index (ordered map).
 //
 // @param sortIdx : Sorting index
-// @param [out] pSecIdx : Section index
+// @param [out] secIdx : Section index
 // @param [out] ppSectionData : Section data
 template <class Elf>
-Result ElfReader<Elf>::getSectionDataBySortingIndex(unsigned sortIdx, unsigned *pSecIdx,
+Result ElfReader<Elf>::getSectionDataBySortingIndex(unsigned sortIdx, unsigned *secIdx,
                                                     SectionBuffer **ppSectionData) const {
   Result result = Result::ErrorInvalidValue;
   if (sortIdx < m_sections.size()) {
     auto it = m_map.begin();
     for (unsigned i = 0; i < sortIdx; ++i)
       ++it;
-    *pSecIdx = it->second;
+    *secIdx = it->second;
     *ppSectionData = m_sections[it->second];
     result = Result::Success;
   }
@@ -274,13 +274,13 @@ void ElfReader<Elf>::GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSy
     ElfSymbol symbol = {};
 
     for (unsigned idx = 0; idx < symCount; ++idx) {
-      if (symbols[idx].stShndx == secIdx) {
-        symbol.secIdx = symbols[idx].stShndx;
+      if (symbols[idx].st_shndx == secIdx) {
+        symbol.secIdx = symbols[idx].st_shndx;
         symbol.secName = m_sections[symbol.secIdx]->name;
-        symbol.pSymName = strTab + symbols[idx].stName;
-        symbol.size = symbols[idx].stSize;
-        symbol.value = symbols[idx].stValue;
-        symbol.info.all = symbols[idx].stInfo.all;
+        symbol.pSymName = strTab + symbols[idx].st_name;
+        symbol.size = symbols[idx].st_size;
+        symbol.value = symbols[idx].st_value;
+        symbol.info.all = symbols[idx].st_info.all;
 
         secSymbols.push_back(symbol);
       }
@@ -294,8 +294,8 @@ void ElfReader<Elf>::GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSy
 // =====================================================================================================================
 // Checks whether the input name is a valid symbol.
 //
-// @param pSymbolName : Symbol name
-template <class Elf> bool ElfReader<Elf>::isValidSymbol(const char *pSymbolName) {
+// @param symbolName : Symbol name
+template <class Elf> bool ElfReader<Elf>::isValidSymbol(const char *symbolName) {
   auto &section = m_sections[m_symSecIdx];
   const char *strTab = reinterpret_cast<const char *>(m_sections[m_strtabSecIdx]->data);
 
@@ -303,8 +303,8 @@ template <class Elf> bool ElfReader<Elf>::isValidSymbol(const char *pSymbolName)
   unsigned symCount = getSymbolCount();
   bool findSymbol = false;
   for (unsigned idx = 0; idx < symCount; ++idx) {
-    auto name = strTab + symbols[idx].stName;
-    if (strcmp(name, pSymbolName) == 0) {
+    auto name = strTab + symbols[idx].st_name;
+    if (strcmp(name, symbolName) == 0) {
       findSymbol = true;
       break;
     }
@@ -325,7 +325,7 @@ template <class Elf> ElfNote ElfReader<Elf>::getNote(Util::Abi::PipelineAbiNoteT
   const unsigned noteHeaderSize = sizeof(NoteHeader) - 8;
 
   size_t offset = 0;
-  while (offset < noteSection->secHead.shSize) {
+  while (offset < noteSection->secHead.sh_size) {
     const NoteHeader *note = reinterpret_cast<const NoteHeader *>(noteSection->data + offset);
     const unsigned noteNameSize = alignTo(note->nameSize, 4);
     if (note->type == noteType) {
@@ -342,10 +342,10 @@ template <class Elf> ElfNote ElfReader<Elf>::getNote(Util::Abi::PipelineAbiNoteT
 // =====================================================================================================================
 // Initialize MsgPack document and related visitor iterators
 //
-// @param pBuffer : Message buffer
+// @param buffer : Message buffer
 // @param sizeInBytes : Buffer size in bytes
-template <class Elf> void ElfReader<Elf>::initMsgPackDocument(const void *pBuffer, unsigned sizeInBytes) {
-  m_document.readFromBlob(StringRef(reinterpret_cast<const char *>(pBuffer), sizeInBytes), false);
+template <class Elf> void ElfReader<Elf>::initMsgPackDocument(const void *buffer, unsigned sizeInBytes) {
+  m_document.readFromBlob(StringRef(reinterpret_cast<const char *>(buffer), sizeInBytes), false);
 
   auto root = &m_document.getRoot();
   assert(root->isMap());
