@@ -40,10 +40,6 @@
 using namespace llvm;
 using namespace lgc;
 
-// -disable-fp32-denormals: disable target option fp32-denormals
-static cl::opt<bool> DisableFp32Denormals("disable-fp32-denormals", cl::desc("Disable target option fp32-denormals"),
-                                          cl::init(false));
-
 namespace lgc {
 
 // =====================================================================================================================
@@ -104,9 +100,6 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
   if (m_pipelineState->getOptions().includeDisassembly)
     globalFeatures += ",+DumpCode";
 
-  if (DisableFp32Denormals)
-    globalFeatures += ",-fp32-denormals";
-
   for (auto func = module->begin(), end = module->end(); func != end; ++func) {
     if (!func->empty() && func->getLinkage() == GlobalValue::ExternalLinkage) {
       std::string targetFeatures(globalFeatures);
@@ -158,22 +151,39 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
         targetFeatures += ",+cumode";
       }
 
+      // Set up denormal mode attributes.
+
+      // In the backend, f32 denormals are handled by default, so request denormal flushing behavior.
+      builder.addAttribute("denormal-fp-math-f32", "preserve-sign");
+
       if (shaderStage != ShaderStageCopyShader) {
         const auto &shaderMode = m_pipelineState->getShaderModes()->getCommonShaderMode(shaderStage);
         if (shaderMode.fp16DenormMode == FpDenormMode::FlushNone ||
             shaderMode.fp16DenormMode == FpDenormMode::FlushIn ||
-            shaderMode.fp64DenormMode == FpDenormMode::FlushNone || shaderMode.fp64DenormMode == FpDenormMode::FlushIn)
+            shaderMode.fp64DenormMode == FpDenormMode::FlushNone || shaderMode.fp64DenormMode == FpDenormMode::FlushIn) {
+          // TODO: Remove targetFeatures modifications after D71358
           targetFeatures += ",+fp64-fp16-denormals";
+          builder.addAttribute("denormal-fp-math", "ieee");
+        }
         else if (shaderMode.fp16DenormMode == FpDenormMode::FlushOut ||
                  shaderMode.fp16DenormMode == FpDenormMode::FlushInOut ||
                  shaderMode.fp64DenormMode == FpDenormMode::FlushOut ||
-                 shaderMode.fp64DenormMode == FpDenormMode::FlushInOut)
+                 shaderMode.fp64DenormMode == FpDenormMode::FlushInOut) {
+          // TODO: Remove targetFeatures modifications after D71358
           targetFeatures += ",-fp64-fp16-denormals";
-        if (shaderMode.fp32DenormMode == FpDenormMode::FlushNone || shaderMode.fp32DenormMode == FpDenormMode::FlushIn)
+          builder.addAttribute("denormal-fp-math", "preserve-sign");
+        }
+        if (shaderMode.fp32DenormMode == FpDenormMode::FlushNone || shaderMode.fp32DenormMode == FpDenormMode::FlushIn) {
+          // TODO: Remove targetFeatures modifications after D71358
           targetFeatures += ",+fp32-denormals";
+          builder.addAttribute("denormal-fp-math-f32", "ieee");
+        }
         else if (shaderMode.fp32DenormMode == FpDenormMode::FlushOut ||
-                 shaderMode.fp32DenormMode == FpDenormMode::FlushInOut)
+                 shaderMode.fp32DenormMode == FpDenormMode::FlushInOut) {
+          // TODO: Remove targetFeatures modifications after D71358
           targetFeatures += ",-fp32-denormals";
+          builder.addAttribute("denormal-fp-math-f32", "preserve-sign");
+        }
       }
 
       builder.addAttribute("target-features", targetFeatures);
