@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "BuilderImpl.h"
+#include "YCbCrConverter.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
 #include "llvm/IR/Intrinsics.h"
@@ -730,7 +731,67 @@ Value *ImageBuilder::CreateImageSample(Type *resultTy, unsigned dim, unsigned fl
 Value *ImageBuilder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
                                               Value *convertingSamplerDesc, ArrayRef<Value *> address,
                                               const Twine &instName) {
-  llvm_unreachable("Not yet implemented");
+  return CreateImageSampleConvertYCbCr(resultTy, dim, flags, imageDesc, convertingSamplerDesc, address, instName);
+}
+
+// =====================================================================================================================
+// Create an image sample with a converting sampler.
+// The caller supplies all arguments to the image sample op in "address", in the order specified
+// by the indices defined as ImageAddressIdx* below.
+//
+// @param resultTy : Result type
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param convertingSamplerDesc : Converting sampler descriptor (v8i32)
+// @param address : Address and other arguments
+// @param instName : Name to give instruction(s)
+Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
+                                                   Value *convertingSamplerDesc, ArrayRef<Value *> address,
+                                                   const Twine &instName) {
+  Value *pResult = nullptr;
+  Value *ycbcrSamplerDesc = CreateExtractValue(convertingSamplerDesc, 0);
+
+  // Extract YCbCr meta data
+  const SamplerYCbCrConversionMetaData yCbCrMetaData = {
+      static_cast<unsigned>(dyn_cast<ConstantInt>(CreateExtractElement(ycbcrSamplerDesc, getInt64(4)))->getZExtValue()),
+      static_cast<unsigned>(dyn_cast<ConstantInt>(CreateExtractElement(ycbcrSamplerDesc, getInt64(5)))->getZExtValue()),
+      static_cast<unsigned>(dyn_cast<ConstantInt>(CreateExtractElement(ycbcrSamplerDesc, getInt64(6)))->getZExtValue()),
+      static_cast<unsigned>(dyn_cast<ConstantInt>(CreateExtractElement(ycbcrSamplerDesc, getInt64(7)))->getZExtValue()),
+  };
+
+  // Prepare the coordinate and derivatives, which might also change the dimension.
+  SmallVector<Value *, 4> coords;
+  SmallVector<Value *, 6> derivatives;
+
+  Value *projective = address[ImageAddressIdxProjective];
+  if (projective)
+    projective = CreateFDiv(ConstantFP::get(projective->getType(), 1.0), projective);
+
+  Value *coord = address[ImageAddressIdxCoordinate];
+  assert((coord->getType()->getScalarType()->isFloatTy()) || (coord->getType()->getScalarType()->isHalfTy()));
+
+  dim = prepareCoordinate(dim, coord, projective, address[ImageAddressIdxDerivativeX],
+                          address[ImageAddressIdxDerivativeY], coords, derivatives);
+
+  // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
+  // Init sample descriptor for luma channel
+  Value *samplerDescLuma = CreateShuffleVector(ycbcrSamplerDesc, ycbcrSamplerDesc, ArrayRef<unsigned>{0, 1, 2, 3});
+
+  YCbCrSampleInfo sampleInfoLuma = {resultTy, dim, flags, imageDesc, samplerDescLuma, address, instName.str(), true};
+
+  GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
+
+  // Init YCbCrConverterer
+  YCbCrConverter YCbCrConverter(this, yCbCrMetaData, &sampleInfoLuma, &gfxIp);
+  // Set sample coordinate ST and convert to UV and IJ coordinates
+  YCbCrConverter.setCoord(coords[0], coords[1]);
+  // Sample image source data
+  YCbCrConverter.sampleYCbCrData();
+  // Convert from YCbCr to RGB
+  pResult = YCbCrConverter.convertColorSpace();
+
+  return static_cast<Instruction *>(pResult);
 }
 
 // =====================================================================================================================
