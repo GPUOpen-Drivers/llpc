@@ -172,3 +172,14 @@ You should use clang-format to format code modified or added in your change, but
 reformat any other code. Reviewers should reject a change that has spurious reformatting
 outside the lines affected by the substantive change, unless the whole point of the change
 is purely reformatting.
+
+You can mark a section of source that you do not want clang-format to touch by surrounding
+it with
+
+```
+// clang-format off
+
+// clang-format on
+```
+
+lines. Use this for something like a table that you have custom formatted for readability.
