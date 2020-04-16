@@ -1253,8 +1253,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       }
     }
 
-    if (m_pipelineState->getLgcContext()->buildingRelocatableElf()) {
-      // If we are building relocatable shaders, it is possible there are
+    if (m_pipelineState->isUnlinked()) {
+      // If we are building unlinked relocatable shaders, it is possible there are
       // generic outputs that are not written to.  We need to count them in
       // the export count.
       auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
@@ -2424,7 +2424,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
   }
   // Handle internal-use built-ins for sample position emulation
   case BuiltInNumSamples: {
-    if (m_pipelineState->getLgcContext()->buildingRelocatableElf()) {
+    if (m_pipelineState->isUnlinked()) {
       input = builder.CreateRelocationConstant("$numSamples");
     } else {
       input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getRasterizerState().numSamples);
@@ -2432,7 +2432,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInSamplePatternIdx: {
-    if (m_pipelineState->getLgcContext()->buildingRelocatableElf()) {
+    if (m_pipelineState->isUnlinked()) {
       input = builder.CreateRelocationConstant("$samplePatternIdx");
     } else {
       input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getRasterizerState().samplePatternIdx);
@@ -5745,7 +5745,7 @@ Value *PatchInOutImportExport::getInLocalInvocationId(Instruction *insertPos) {
 //
 // @param insertPos : Where to insert instructions.
 Value *PatchInOutImportExport::getDeviceIndex(Instruction *insertPos) {
-  if (m_pipelineState->getLgcContext()->buildingRelocatableElf()) {
+  if (m_pipelineState->isUnlinked()) {
     BuilderBase builder(*m_context);
     builder.SetInsertPoint(insertPos);
     return builder.CreateRelocationConstant("$deviceIdx");

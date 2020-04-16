@@ -49,6 +49,7 @@ static cl::opt<bool> EnableTessOffChip("enable-tess-offchip", cl::desc("Enable t
                                        cl::init(false));
 
 // Names for named metadata nodes when storing and reading back pipeline state
+static const char UnlinkedMetadataName[] = "lgc.unlinked";
 static const char OptionsMetadataName[] = "lgc.options";
 static const char UserDataMetadataName[] = "lgc.user.data.nodes";
 static const char DeviceIndexMetadataName[] = "lgc.device.index";
@@ -243,11 +244,16 @@ const ShaderOptions &PipelineState::getShaderOptions(ShaderStage stage) {
 
 // =====================================================================================================================
 // Record pipeline and shader options into IR metadata.
+// This also records m_unlinked.
 // TODO: The options could be recorded in a more human-readable form, with a string for the option name for each
 // option.
 //
 // @param [in/out] module : Module to record metadata into
 void PipelineState::recordOptions(Module *module) {
+  if (m_unlinked) {
+    unsigned unlinkedAsInt = m_unlinked;
+    setNamedMetadataToArrayOfInt32(module, unlinkedAsInt, UnlinkedMetadataName);
+  }
   setNamedMetadataToArrayOfInt32(module, m_options, OptionsMetadataName);
   for (unsigned stage = 0; stage != m_shaderOptions.size(); ++stage) {
     std::string metadataName =
@@ -257,10 +263,15 @@ void PipelineState::recordOptions(Module *module) {
 }
 
 // =====================================================================================================================
-// Read pipeline and shader options from IR metadata
+// Read pipeline and shader options from IR metadata.
+// This also reads m_unlinked.
 //
 // @param module : Module to read metadata from
 void PipelineState::readOptions(Module *module) {
+  unsigned unlinkedAsInt = 0;
+  readNamedMetadataArrayOfInt32(module, UnlinkedMetadataName, unlinkedAsInt);
+  m_unlinked = unlinkedAsInt != 0;
+
   readNamedMetadataArrayOfInt32(module, OptionsMetadataName, m_options);
   for (unsigned stage = 0; stage != ShaderStageCompute + 1; ++stage) {
     std::string metadataName =

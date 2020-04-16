@@ -306,7 +306,7 @@ void InOutBuilder::markGenericInputOutputUsage(bool isOutput, unsigned location,
 
   if (!isOutput || m_shaderStage != ShaderStageGeometry) {
     bool keepAllLocations = false;
-    if (getLgcContext()->buildingRelocatableElf()) {
+    if (getPipelineState()->isUnlinked()) {
       if (m_shaderStage == ShaderStageVertex && isOutput)
         keepAllLocations = true;
       if (m_shaderStage == ShaderStageFragment && !isOutput)

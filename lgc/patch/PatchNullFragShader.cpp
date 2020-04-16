@@ -44,18 +44,6 @@
 using namespace lgc;
 using namespace llvm;
 
-namespace llvm {
-
-namespace cl {
-
-// -disable-null-frag-shader: disable to generate null fragment shader
-opt<bool> DisableNullFragShader("disable-null-frag-shader", cl::desc("Disable to add a null fragment shader"),
-                                cl::init(false));
-
-} // namespace cl
-
-} // namespace llvm
-
 namespace lgc {
 
 // =====================================================================================================================
@@ -97,11 +85,9 @@ bool PatchNullFragShader::runOnModule(llvm::Module &module) {
 
   PipelineState *pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
-  if (cl::DisableNullFragShader || pipelineState->getLgcContext()->buildingRelocatableElf()) {
-    // NOTE: If the option -disable-null-frag-shader is set to TRUE, we skip this pass. This is done by
-    // standalone compiler.
+  // Do not add a null fragment shader if generating an unlinked half-pipeline ELF.
+  if (pipelineState->isUnlinked())
     return false;
-  }
 
   const bool hasCs = pipelineState->hasShaderStage(ShaderStageCompute);
   const bool hasVs = pipelineState->hasShaderStage(ShaderStageVertex);

@@ -53,7 +53,10 @@ ModulePass *createBuilderReplayer(Pipeline *pipeline);
 // Link shader IR modules into a pipeline module.
 //
 // @param modules : Array of {module, shaderStage} pairs. Modules are freed
-Module *PipelineState::irLink(ArrayRef<std::pair<Module *, ShaderStage>> modules) {
+// @param unlinked : True if generating an "unlinked" half-pipeline ELF that then needs further linking to
+//                   generate a pipeline ELF
+Module *PipelineState::irLink(ArrayRef<std::pair<Module *, ShaderStage>> modules, bool unlinked) {
+  m_unlinked = unlinked;
   // Processing for each shader module before linking.
   IRBuilder<> builder(getContext());
   for (auto moduleAndStage : modules) {

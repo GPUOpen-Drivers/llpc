@@ -625,6 +625,7 @@ struct GraphicsPipelineBuildInfo {
 
   NggState nggState;       ///< NGG state used for tuning and debugging
   PipelineOptions options; ///< Per pipeline tuning/debugging options
+  bool unlinked;           ///< True to build an "unlinked" half-pipeline ELF
 };
 
 /// Represents info to build a compute pipeline.
@@ -638,6 +639,7 @@ struct ComputePipelineBuildInfo {
   unsigned deviceIndex;    ///< Device index for device group
   PipelineShaderInfo cs;   ///< Compute shader
   PipelineOptions options; ///< Per pipeline tuning options
+  bool unlinked;           ///< True to build an "unlinked" half-pipeline ELF
 };
 
 // =====================================================================================================================

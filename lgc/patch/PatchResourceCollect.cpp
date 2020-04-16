@@ -1258,10 +1258,9 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
 // =====================================================================================================================
 // Clears inactive (those actually unused) inputs.
 void PatchResourceCollect::clearInactiveInput() {
-  bool buildingRelocatableElf = m_pipelineState->getLgcContext()->buildingRelocatableElf();
   // Clear those inactive generic inputs, remove them from location mappings
   if (m_pipelineState->isGraphics() && !m_hasDynIndexedInput && m_shaderStage != ShaderStageTessEval &&
-      !buildingRelocatableElf) {
+      !m_pipelineState->isUnlinked()) {
     // TODO: Here, we keep all generic inputs of tessellation evaluation shader. This is because corresponding
     // generic outputs of tessellation control shader might involve in output import and dynamic indexing, which
     // is easy to cause incorrectness of location mapping.
@@ -1559,7 +1558,7 @@ void PatchResourceCollect::matchGenericInOut() {
   auto &perPatchOutLocMap = inOutUsage.perPatchOutputLocMap;
 
   // Do input/output matching
-  if (!m_pipelineState->getLgcContext()->buildingRelocatableElf() && m_shaderStage != ShaderStageFragment) {
+  if (!m_pipelineState->isUnlinked() && m_shaderStage != ShaderStageFragment) {
     const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
 
     // Do normal input/output matching
@@ -1644,7 +1643,7 @@ void PatchResourceCollect::matchGenericInOut() {
   if (!inLocMap.empty()) {
     assert(inOutUsage.inputMapLocCount == 0);
     for (auto &locMap : inLocMap) {
-      assert(locMap.second == InvalidValue || m_pipelineState->getLgcContext()->buildingRelocatableElf());
+      assert(locMap.second == InvalidValue || m_pipelineState->isUnlinked());
       // NOTE: For vertex shader, the input location mapping is actually trivial.
       locMap.second = m_shaderStage == ShaderStageVertex ? locMap.first : nextMapLoc++;
       inOutUsage.inputMapLocCount = std::max(inOutUsage.inputMapLocCount, locMap.second + 1);
