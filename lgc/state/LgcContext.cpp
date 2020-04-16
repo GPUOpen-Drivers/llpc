@@ -69,6 +69,9 @@ static cl::opt<bool> EmitLlvmBc("emit-llvm-bc", cl::desc("Emit LLVM bitcode inst
 static cl::opt<bool> EmitLgc("emit-lgc", cl::desc("Emit LLVM assembly suitable for input to LGC (middle-end compiler)"),
                              cl::init(false));
 
+// -show-encoding: show the instruction encoding when emitting assembler. This mirrors llvm-mc behaviour
+static cl::opt<bool> ShowEncoding("show-encoding", cl::desc("Show instruction encodings"), cl::init(false));
+
 // =====================================================================================================================
 // Initialize the middle-end. This must be called before the first LgcContext::Create, although you are
 // allowed to call it again after that. It must also be called before LLVM command-line processing, so
@@ -138,6 +141,13 @@ LgcContext *LgcContext::Create(LLVMContext &context, StringRef gpuName, unsigned
   // Allow no signed zeros - this enables omod modifiers (div:2, mul:2)
   TargetOptions targetOpts;
   targetOpts.NoSignedZerosFPMath = true;
+
+  // Enable instruction encoding output - outputs hex in comment mirroring
+  // llvm-mc behaviour
+  if (ShowEncoding) {
+    targetOpts.MCOptions.ShowMCEncoding = true;
+    targetOpts.MCOptions.AsmVerbose = true;
+  }
 
   builderContext->m_targetMachine =
       target->createTargetMachine(triple, gpuName, "", targetOpts, Optional<Reloc::Model>());
