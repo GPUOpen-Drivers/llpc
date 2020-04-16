@@ -46,6 +46,8 @@ namespace Gfx9 {
 #include "chip/gfx9/gfx9_plus_merged_registers.h"
 #include "chip/gfx9/gfx9_plus_merged_typedef.h"
 
+using namespace Pal::Gfx9::Chip;
+
 // =====================================================================================================================
 // Helper macros to operate registers
 
@@ -83,7 +85,7 @@ namespace Gfx9 {
       _reg##_ID = Gfx09::mm##_reg;                                                                                     \
       _reg##_VAL.u32All = 0;                                                                                           \
     } else if (_gfx == 10) {                                                                                           \
-      _reg##_ID = Gfx10::mm##_reg;                                                                                     \
+      _reg##_ID = Pal::Gfx9::Chip::Gfx10::mm##_reg;                                                                                     \
       _reg##_VAL.u32All = 0;                                                                                           \
     } else {                                                                                                           \
       INIT_REG_TO_INVALID(_reg);                                                                                       \
@@ -94,18 +96,18 @@ namespace Gfx9 {
 #define INIT_REG_GFX10_PLUS(_gfx, _reg)                                                                                \
   {                                                                                                                    \
     if (_gfx == 10) {                                                                                                  \
-      _reg##_ID = Gfx10::mm##_reg;                                                                                     \
+      _reg##_ID = Pal::Gfx9::Chip::Gfx10::mm##_reg;                                                                                     \
       _reg##_VAL.u32All = 0;                                                                                           \
     } else {                                                                                                           \
       INIT_REG_TO_INVALID(_reg);                                                                                       \
     }                                                                                                                  \
   }
 
-// GFX10.1 plus
-#define INIT_REG_GFX10_1_PLUS(_gfxMajor, _gfxMinor, _reg)                                                              \
+// Apu09.1x plus
+#define INIT_REG_APU09_1X_PLUS(_gfx, _reg)                                                              \
   {                                                                                                                    \
-    if ((_gfxMajor == 10) && (_gfxMinor > 0)) {                                                                        \
-      _reg##_ID = Gfx101Plus::mm##_reg;                                                                                \
+    if (_gfx == 10) {                                                                        \
+      _reg##_ID = Apu09_1xPlus::mm##_reg;                                                                                \
       _reg##_VAL.u32All = 0;                                                                                           \
     } else {                                                                                                           \
       INIT_REG_TO_INVALID(_reg);                                                                                       \
@@ -127,7 +129,7 @@ namespace Gfx9 {
 #define INIT_REG_GFX10(_gfx, _reg)                                                                                     \
   {                                                                                                                    \
     if (_gfx == 10) {                                                                                                  \
-      _reg##_ID = Gfx10::mm##_reg;                                                                                     \
+      _reg##_ID = Pal::Gfx9::Chip::Gfx10::mm##_reg;                                                                                     \
       _reg##_VAL.u32All = 0;                                                                                           \
     } else {                                                                                                           \
       INIT_REG_TO_INVALID(_reg);                                                                                       \
@@ -145,8 +147,8 @@ namespace Gfx9 {
 #define ADD_REG_MAP(_reg) RegNameMap[mm##_reg * 4] = #_reg;
 
 #define ADD_REG_MAP_GFX9(_reg) RegNameMapGfx9[Gfx09::mm##_reg * 4] = #_reg;
-#define ADD_REG_MAP_GFX10(_reg) RegNameMapGfx10[Gfx10::mm##_reg * 4] = #_reg;
-#define ADD_REG_MAP_GFX10_1_PLUS(_reg) RegNameMapGfx10[Gfx101Plus::mm##_reg * 4] = #_reg;
+#define ADD_REG_MAP_GFX10(_reg) RegNameMapGfx10[Pal::Gfx9::Chip::Gfx10::mm##_reg * 4] = #_reg;
+#define ADD_REG_MAP_APU09_1X_PLUS(_reg) RegNameMapGfx10[Apu09_1xPlus::mm##_reg * 4] = #_reg;
 
 // Gets register value
 #define GET_REG(_stage, _reg) ((_stage)->_reg##_VAL.u32All)

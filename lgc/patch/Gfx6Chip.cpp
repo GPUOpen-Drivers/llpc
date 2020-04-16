@@ -39,6 +39,8 @@ namespace Gfx6 {
 #include "chip/gfx6/si_ci_vi_merged_enum.h"
 #include "chip/gfx6/si_ci_vi_merged_offset.h"
 
+using namespace Pal::Gfx6::Chip;
+
 // =====================================================================================================================
 // Initializer
 VsRegConfig::VsRegConfig() {

@@ -55,6 +55,8 @@ namespace Gfx9 {
 #include "chip/gfx9/gfx9_plus_merged_enum.h"
 #include "chip/gfx9/gfx9_plus_merged_offset.h"
 
+using namespace Pal::Gfx9::Chip;
+
 // =====================================================================================================================
 // Builds PAL metadata for pipeline.
 void ConfigBuilder::buildPalMetadata() {
@@ -1199,7 +1201,7 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   } else if (gfxIp.major == 10) {
     buildUserDataConfig(shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
                         shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
-                        Gfx10::mmSPI_SHADER_USER_DATA_HS_0);
+                        Pal::Gfx9::Chip::Gfx10::mmSPI_SHADER_USER_DATA_HS_0);
   } else
     llvm_unreachable("Not implemented!");
 }
@@ -1414,7 +1416,7 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   } else if (gfxIp.major == 10) {
     buildUserDataConfig(shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
                         shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
-                        Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
+                        Pal::Gfx9::Chip::Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
   } else
     llvm_unreachable("Not implemented!");
 }
@@ -1552,7 +1554,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
     SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_INSTANCE_CNT, ENABLE, true);
     SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_INSTANCE_CNT, CNT, geometryMode.invocations);
     if (gfxIp.major > 10 || (gfxIp.major == 10 && gfxIp.minor >= 1)) {
-      SET_REG_GFX10_1_PLUS_FIELD(&pConfig->primShaderRegs, VGT_GS_INSTANCE_CNT, EN_MAX_VERT_OUT_PER_GS_INSTANCE,
+      SET_REG_GFX10_FIELD(&pConfig->primShaderRegs, VGT_GS_INSTANCE_CNT, EN_MAX_VERT_OUT_PER_GS_INSTANCE,
                                  calcFactor.enableMaxVertOut);
     }
   }
@@ -1814,7 +1816,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   //
   buildUserDataConfig(shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
                       shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
-                      Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
+                      Pal::Gfx9::Chip::Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
 }
 
 // =====================================================================================================================
