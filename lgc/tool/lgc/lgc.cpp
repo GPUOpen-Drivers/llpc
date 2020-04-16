@@ -223,7 +223,7 @@ int main(int argc, char **argv) {
       SmallString<16> outBuffer;
       raw_svector_ostream outStream(outBuffer);
       std::unique_ptr<Pipeline> pipeline(lgcContext->createPipeline());
-      pipeline->generate(std::move(module), outStream, nullptr, {});
+      pipeline->generate(std::move(module), outStream, nullptr, {}, {});
 
       // Output to stdout if applicable.
       if (outputToFile == false) {

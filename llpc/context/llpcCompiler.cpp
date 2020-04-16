@@ -34,9 +34,20 @@
 #include "llpcComputeContext.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
+#include "llpcElfWriter.h"
+#include "llpcFile.h"
 #include "llpcGraphicsContext.h"
+#include "llpcShaderModuleHelper.h"
+#include "llpcSpirvLower.h"
+#include "llpcSpirvLowerResourceCollect.h"
+#include "llpcSpirvLowerUtil.h"
+#include "llpcTimerProfiler.h"
 #include "spirvExt.h"
+#include "vkgcElfReader.h"
+#include "vkgcPipelineDumper.h"
 #include "lgc/Builder.h"
+#include "lgc/ElfLinker.h"
+#include "lgc/PassManager.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/DiagnosticInfo.h"
@@ -50,16 +61,6 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
-#include "llpcElfWriter.h"
-#include "llpcFile.h"
-#include "llpcShaderModuleHelper.h"
-#include "llpcSpirvLower.h"
-#include "llpcSpirvLowerResourceCollect.h"
-#include "llpcSpirvLowerUtil.h"
-#include "llpcTimerProfiler.h"
-#include "vkgcElfReader.h"
-#include "vkgcPipelineDumper.h"
-#include "lgc/PassManager.h"
 #include <mutex>
 #include <set>
 #include <unordered_set>
@@ -1079,7 +1080,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
           timerProfiler.getTimer(TimerCodeGen),
       };
 
-      pipeline->generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers);
+      pipeline->generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers, {});
       result = Result::Success;
     }
 #if LLPC_ENABLE_EXCEPTION

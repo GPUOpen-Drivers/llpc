@@ -43,6 +43,7 @@ class Timer;
 
 namespace lgc {
 
+class ElfLinker;
 class LgcContext;
 
 // =====================================================================================================================
@@ -586,11 +587,24 @@ public:
                                  )>
       CheckShaderCacheFunc;
 
-  // Generate pipeline module by running patch, middle-end optimization and backend codegen passes.
-  // The output is normally ELF, but IR disassembly if an option is used to stop compilation early.
+  // Do an early check for ability to use shader/half-pipeline compilation then ELF linking.
+  // Intended to be used when doing shader/half-pipeline compilation with pipeline state already available.
+  // It gives an early indication that there is something in the pipeline state (such as compact buffer
+  // descriptors) that stops ELF linking working. It does not necessarily spot all such conditions, but
+  // it can be useful in avoiding an unnecessary shader compile before falling back to full-pipeline
+  // compilation.
+  //
+  // @return : True for success, false if some reason for failure found, in which case getLastError()
+  //           returns a textual description
+  virtual bool checkElfLinkable() = 0;
+
+  // Generate pipeline module or unlinked half-pipeline module by running patch, middle-end optimization and
+  // backend codegen passes.
+  // The output is normally ELF, but IR assembly if an option is used to stop compilation early,
+  // or ISA assembly if -filetype=asm is specified.
   // Output is written to outStream.
-  // Like other Builder methods, on error, this calls report_fatal_error, which you can catch by setting
-  // a diagnostic handler with LLVMContext::setDiagnosticHandler.
+  //
+  // Like other LGC and LLVM library functions, an internal compiler error could cause an assert or report_fatal_error.
   //
   // @param pipelineModule : IR pipeline module
   // @param [in/out] outStream : Stream to write ELF or IR disassembly output
@@ -599,8 +613,29 @@ public:
   //                 timers[0]: patch passes
   //                 timers[1]: LLVM optimizations
   //                 timers[2]: codegen
-  virtual void generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
-                        CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers) = 0;
+  // @param otherElf : Optional ELF for the other half-pipeline when compiling an unlinked half-pipeline ELF.
+  //                   Supplying this could allow more optimal code for writing/reading attribute values between
+  //                   the two pipeline halves
+  // @return : True for success.
+  //           False if irLink asked for an "unlinked" shader or half-pipeline, and there is some reason why the
+  //           module cannot be compiled that way.  The client typically then does a whole-pipeline compilation
+  //           instead. The client can call getLastError() to get a textual representation of the error, for
+  //           use in logging or in error reporting in a command-line utility.
+  virtual bool generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
+                        CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers,
+                        llvm::MemoryBufferRef otherElf) = 0;
+
+  // Create an ELF linker object for linking unlinked half-pipeline ELFs into a pipeline ELF using the pipeline state.
+  // This needs to be deleted after use.
+  virtual ElfLinker *createElfLinker(llvm::ArrayRef<llvm::MemoryBufferRef> elfs) = 0;
+
+  // Get a textual error message for the last recoverable error caused by generate() or one of the ElfLinker
+  // methods finding something about the shaders or pipeline state that means that shader compilation then
+  // linking cannot be done. This error message is intended only for logging or command-line error reporting.
+  //
+  // @return : Error message from last such recoverable error; remains valid until next time generate() or
+  //           one of the ElfLinker methods is called, or the Pipeline object is destroyed
+  virtual llvm::StringRef getLastError() = 0;
 
   // -----------------------------------------------------------------------------------------------------------------
   // Non-compiling methods
