@@ -1008,6 +1008,8 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
 
   for (unsigned i = 0; i < interpInfo->size(); ++i) {
     const auto &interpInfoElem = (*interpInfo)[i];
+    if (m_pipelineState->isUnlinked() && interpInfoElem.loc == InvalidFsInterpInfo.loc)
+      continue;
     assert((interpInfoElem.loc == InvalidFsInterpInfo.loc && interpInfoElem.flat == InvalidFsInterpInfo.flat &&
             interpInfoElem.custom == InvalidFsInterpInfo.custom &&
             interpInfoElem.is16bit == InvalidFsInterpInfo.is16bit) == false);

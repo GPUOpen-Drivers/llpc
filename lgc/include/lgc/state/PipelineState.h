@@ -153,7 +153,7 @@ public:
                         const RasterizerState &rsState) override final;
 
   // Link the individual shader IR modules into a single pipeline module
-  llvm::Module *irLink(llvm::ArrayRef<std::pair<llvm::Module *, ShaderStage>> modules) override final;
+  llvm::Module *irLink(llvm::ArrayRef<std::pair<llvm::Module *, ShaderStage>> modules, bool unlinked) override final;
 
   // Generate pipeline module
   void generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
@@ -172,6 +172,9 @@ public:
   // Accessors for context information
   const TargetInfo &getTargetInfo() const;
   unsigned getPalAbiVersion() const;
+
+  // Return the "unlinked" flag, true if generating an unlinked half-pipeline ELF.
+  bool isUnlinked() const { return m_unlinked; }
 
   // Clear the pipeline state IR metadata.
   void clear(llvm::Module *module);
@@ -370,6 +373,7 @@ private:
   // -----------------------------------------------------------------------------------------------------------------
   bool m_noReplayer = false;                            // True if no BuilderReplayer needed
   bool m_emitLgc = false;                               // Whether -emit-lgc is on
+  bool m_unlinked = false;                              // Whether generating an unlinked half-pipeline ELF
   unsigned m_stageMask = 0;                             // Mask of active shader stages
   Options m_options = {};                               // Per-pipeline options
   std::vector<ShaderOptions> m_shaderOptions;           // Per-shader options

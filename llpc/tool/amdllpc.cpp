@@ -118,6 +118,9 @@ static cl::opt<std::string> OutFile("o", cl::desc("Output file"), cl::value_desc
 // -l: link pipeline
 static cl::opt<bool> ToLink("l", cl::desc("Link pipeline and generate ISA codes"), cl::init(true));
 
+// -unlinked : build an "unlinked" half-pipeline ELF that needs a further link step
+static cl::opt<bool> Unlinked("unlinked", cl::desc("Build \"unlinked\" half-pipeline ELF"), cl::init(false));
+
 // -val: validate input SPIR-V binary or text
 static cl::opt<bool> Validate("val", cl::desc("Validate input SPIR-V binary or text"), cl::init(true));
 
@@ -242,7 +245,6 @@ namespace cl {
 
 extern opt<bool> EnablePipelineDump;
 extern opt<std::string> PipelineDumpDir;
-extern opt<bool> DisableNullFragShader;
 extern opt<bool> EnableTimerProfile;
 
 // -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
@@ -308,6 +310,7 @@ struct CompileInfo {
   void *pipelineBuf;              // Alllocation buffer of building pipeline
   void *pipelineInfoFile;         // VFX-style file containing pipeline info
   const char *fileNames;          // Names of input shader source files
+  bool unlinked;                  // Whether to generate unlinked half-pipeline ELF
   bool doAutoLayout;              // Whether to auto layout descriptors
   bool checkAutoLayoutCompatible; // Whether to comapre if auto layout descriptors is
                                   // same as specified pipeline layout
@@ -432,10 +435,6 @@ static Result init(int argc, char *argv[], ICompiler **ppCompiler) {
       cl::Option *opt = optIterator->second;
       *static_cast<cl::opt<std::string> *>(opt) = ".";
     }
-
-    // NOTE: We set the option -disable-null-frag-shader to TRUE for standalone compiler as the default.
-    // Subsequent command option parse will correct its value if this option is specified externally.
-    cl::DisableNullFragShader.setValue(true);
 
     result = ICompiler::Create(ParsedGfxIp, argc, argv, ppCompiler);
   }
@@ -959,6 +958,7 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
     pipelineInfo->pInstance = nullptr; // Dummy, unused
     pipelineInfo->pUserData = &compileInfo->pipelineBuf;
     pipelineInfo->pfnOutputAlloc = allocateBuffer;
+    pipelineInfo->unlinked = compileInfo->unlinked;
 
     // NOTE: If number of patch control points is not specified, we set it to 3.
     if (pipelineInfo->iaState.patchControlPoints == 0)
@@ -1029,6 +1029,7 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
     pipelineInfo->pInstance = nullptr; // Dummy, unused
     pipelineInfo->pUserData = &compileInfo->pipelineBuf;
     pipelineInfo->pfnOutputAlloc = allocateBuffer;
+    pipelineInfo->unlinked = compileInfo->unlinked;
     pipelineInfo->options.robustBufferAccess = RobustBufferAccess;
 
     void *pipelineDumpHandle = nullptr;
@@ -1161,6 +1162,7 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
   Result result = Result::Success;
   CompileInfo compileInfo = {};
   std::string fileNames;
+  compileInfo.unlinked = true;
   compileInfo.doAutoLayout = true;
   compileInfo.checkAutoLayoutCompatible = CheckAutoLayoutCompatible;
 
@@ -1243,10 +1245,6 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
       }
 
     } else if (isPipelineInfoFile(inFile)) {
-      // NOTE: If the input file is pipeline file, we set the option -disable-null-frag-shader to FALSE
-      // unconditionally.
-      cl::DisableNullFragShader.setValue(false);
-
       const char *log = nullptr;
       bool vfxResult =
           Vfx::vfxParseFile(inFile.c_str(), 0, nullptr, VfxDocTypePipeline, &compileInfo.pipelineInfoFile, &log);
@@ -1316,6 +1314,8 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
           fileNames += inFile;
           fileNames += " ";
           *nextFile = i + 1;
+          // For a .pipe, build an "unlinked" half-pipeline ELF if -unlinked is on.
+          compileInfo.unlinked = Unlinked;
           compileInfo.doAutoLayout = false;
           break;
         }

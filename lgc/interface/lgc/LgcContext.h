@@ -106,9 +106,6 @@ public:
   // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
   void addTargetPasses(lgc::PassManager &passMgr, llvm::Timer *codeGenTimer, llvm::raw_pwrite_stream &outStream);
 
-  void setBuildRelocatableElf(bool buildRelocatableElf) { m_buildRelocatableElf = buildRelocatableElf; }
-  bool buildingRelocatableElf() { return m_buildRelocatableElf; }
-
   // Utility method to create a start/stop timer pass
   static llvm::ModulePass *createStartStopTimer(llvm::Timer *timer, bool starting);
 
@@ -132,7 +129,6 @@ private:
   llvm::LLVMContext &m_context;                   // LLVM context
   llvm::TargetMachine *m_targetMachine = nullptr; // Target machine
   TargetInfo *m_targetInfo = nullptr;             // Target info
-  bool m_buildRelocatableElf = false;             // Flag indicating whether we are building relocatable ELF
   unsigned m_palAbiVersion = 0xFFFFFFFF;          // PAL pipeline ABI version to compile for
 };
 

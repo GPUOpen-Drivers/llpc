@@ -200,7 +200,7 @@ Value *PatchDescriptorLoad::getDescPtrAndStride(ResourceNodeType resType, unsign
 
   if (!stride) {
     // Stride is not determinable just from the descriptor type requested by the Builder call.
-    if (m_pipelineState->getLgcContext()->buildingRelocatableElf()) {
+    if (m_pipelineState->isUnlinked()) {
       // Shader compilation: Get byte stride using a reloc.
       stride = builder.CreateRelocationConstant("dstride_" + Twine(descSet) + "_" + Twine(binding));
     } else {
@@ -292,7 +292,7 @@ Value *PatchDescriptorLoad::getDescPtr(ResourceNodeType resType, unsigned descSe
 
   // Add on the byte offset of the descriptor.
   Value *offset = nullptr;
-  bool useRelocationForOffsets = !node || m_pipelineState->getLgcContext()->buildingRelocatableElf();
+  bool useRelocationForOffsets = !node || m_pipelineState->isUnlinked();
   if (useRelocationForOffsets) {
     // Get the offset for the descriptor using a reloc. The reloc symbol name
     // needs to contain the descriptor set and binding, and, for image, fmask or sampler, whether it is

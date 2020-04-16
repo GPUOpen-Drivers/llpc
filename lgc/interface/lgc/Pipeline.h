@@ -561,7 +561,13 @@ public:
   // Returns the pipeline module, or nullptr on link failure.
   //
   // @param modules : Array of {module, shaderStage} pairs
-  virtual llvm::Module *irLink(llvm::ArrayRef<std::pair<llvm::Module *, ShaderStage>> modules) = 0;
+  // @param unlinked : True if generating an "unlinked" half-pipeline ELF that then needs further linking to
+  //                   generate a pipeline ELF. In that case, using the methods above to set pipeline state items
+  //                   (setUserDataNodes, setDeviceIndex, setVertexInputDescriptions, setColorExportState,
+  //                   setGraphicsState) becomes optional, as LGC will generate relocs or user data entries
+  //                   that are fixed up in the ELF link step.
+  //                   TODO: That isn't implemented yet.
+  virtual llvm::Module *irLink(llvm::ArrayRef<std::pair<llvm::Module *, ShaderStage>> modules, bool unlinked) = 0;
 
   // Typedef of function passed in to Generate to check the shader cache.
   // Returns the updated shader stage mask, allowing the client to decide not to compile shader stages

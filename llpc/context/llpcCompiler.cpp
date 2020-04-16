@@ -723,7 +723,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   // Merge the user data once for all stages.
   context->getPipelineContext()->doUserDataNodeMerge();
   unsigned originalShaderStageMask = context->getPipelineContext()->getShaderStageMask();
-  context->getLgcContext()->setBuildRelocatableElf(true);
+  context->getPipelineContext()->setUnlinked(true);
 
   ElfPackage elf[ShaderStageNativeStageCount];
   for (unsigned stage = 0; stage < shaderInfo.size() && result == Result::Success; ++stage) {
@@ -778,7 +778,6 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
   }
   context->getPipelineContext()->setShaderStageMask(originalShaderStageMask);
-  context->getLgcContext()->setBuildRelocatableElf(false);
 
   // Link the relocatable shaders into a single pipeline elf file.
   linkRelocatableShaderElf(elf, pipelineElf, context);
@@ -859,7 +858,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   unsigned passIndex = 0;
   const PipelineShaderInfo *fragmentShaderInfo = nullptr;
   TimerProfiler timerProfiler(context->getPiplineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
-  bool buildingRelocatableElf = context->getLgcContext()->buildingRelocatableElf();
+  bool buildingRelocatableElf = context->getPipelineContext()->isUnlinked();
 
   context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
 
@@ -1007,7 +1006,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
     }
 
     // Link the shader modules into a single pipeline module.
-    pipelineModule.reset(pipeline->irLink(modulesToLink));
+    pipelineModule.reset(pipeline->irLink(modulesToLink, context->getPipelineContext()->isUnlinked()));
     if (pipelineModule == nullptr) {
       LLPC_ERRS("Failed to link shader modules into pipeline module\n");
       result = Result::ErrorInvalidShader;

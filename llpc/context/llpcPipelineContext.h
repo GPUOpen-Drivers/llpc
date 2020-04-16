@@ -142,6 +142,12 @@ public:
   // VkFormat is not supported.
   static std::pair<lgc::BufDataFormat, lgc::BufNumFormat> mapVkFormat(VkFormat format, bool isColorExport);
 
+  // Set whether we are building a relocatable (unlinked) ElF
+  void setUnlinked(bool unlinked) { m_unlinked = unlinked; }
+
+  // Get whether we are building a relocatable (unlinked) ElF
+  bool isUnlinked() const { return m_unlinked; }
+
 protected:
   // Gets dummy vertex input create info
   virtual VkPipelineVertexInputStateCreateInfo *getDummyVertexInputInfo() { return nullptr; }
@@ -187,6 +193,7 @@ private:
   // -----------------------------------------------------------------------------------------------------------------
 
   ShaderFpMode m_shaderFpModes[ShaderStageCountInternal] = {};
+  bool m_unlinked = false; // Whether we are building an "unlinked" half-pipeline ELF
 };
 
 } // namespace Llpc
