@@ -57,6 +57,7 @@ void initializePipelineStateWrapperPass(PassRegistry &);
 
 namespace lgc {
 
+class ElfLinker;
 class PalMetadata;
 class TargetInfo;
 
@@ -157,8 +158,18 @@ public:
   llvm::Module *irLink(llvm::ArrayRef<std::pair<llvm::Module *, ShaderStage>> modules, bool unlinked) override final;
 
   // Generate pipeline module
-  void generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
-                CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers) override final;
+  bool generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
+                CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers,
+                llvm::MemoryBufferRef otherElf) override final;
+
+  // Create an ELF linker object for linking unlinked half-pipeline ELFs into a pipeline ELF using the pipeline state
+  ElfLinker *createElfLinker(llvm::ArrayRef<llvm::MemoryBufferRef> elfs) override final;
+
+  // Do an early check for ability to use shader/half-pipeline compilation then ELF linking.
+  bool checkElfLinkable() override final;
+
+  // Get a textual error message for the last recoverable error
+  llvm::StringRef getLastError() override final;
 
   // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
   // type. Only the number of elements of the type is significant.
@@ -257,6 +268,9 @@ public:
 
   // Accessor for PAL metadata
   PalMetadata *getPalMetadata();
+
+  // Set error message to be returned to the client by it calling getLastError
+  void setError(const llvm::Twine &message);
 
   // -----------------------------------------------------------------------------------------------------------------
   // Utility methods
@@ -380,6 +394,7 @@ private:
   void recordGraphicsState(llvm::Module *module);
   void readGraphicsState(llvm::Module *module);
 
+  std::string m_lastError;                              // Error to be reported by getLastError()
   bool m_noReplayer = false;                            // True if no BuilderReplayer needed
   bool m_emitLgc = false;                               // Whether -emit-lgc is on
   bool m_unlinked = false;                              // Whether generating an unlinked half-pipeline ELF
