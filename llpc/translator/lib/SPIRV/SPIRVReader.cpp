@@ -2305,6 +2305,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
     if (isSystemScope)
       isCoherent = true;
   }
+  if (spvCopyMemory->getMemoryAccessMask(true) & MemoryAccessNonPrivatePointerKHRMask)
+    isCoherent = true;
 
   if (spvCopyMemory->getMemoryAccessMask(false) & MemoryAccessMakePointerAvailableKHRMask) {
     SPIRVWord spvId = spvCopyMemory->getMakeAvailableScope(false);
@@ -2316,6 +2318,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
     if (isSystemScope)
       isCoherent = true;
   }
+  if (spvCopyMemory->getMemoryAccessMask(false) & MemoryAccessNonPrivatePointerKHRMask)
+    isCoherent = true;
 
   bool isNonTemporal = spvCopyMemory->SPIRVMemoryAccess::isNonTemporal(true);
 
@@ -2384,6 +2388,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
     if (isSystemScope)
       isCoherent = true;
   }
+  if (spvLoad->getMemoryAccessMask(true) & MemoryAccessNonPrivatePointerKHRMask)
+    isCoherent = true;
 
   const bool isNonTemporal = spvLoad->SPIRVMemoryAccess::isNonTemporal(true);
 
@@ -2538,6 +2544,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const 
     if (isSystemScope)
       isCoherent = true;
   }
+  if (spvStore->getMemoryAccessMask(false) & MemoryAccessNonPrivatePointerKHRMask)
+    isCoherent = true;
 
   const bool isNonTemporal = spvStore->SPIRVMemoryAccess::isNonTemporal(false);
 
@@ -5334,6 +5342,15 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
     return;
   }
 
+  if (bImageInst->getOpCode() == OpLoad) {
+    SPIRVLoad *load = static_cast<SPIRVLoad *>(bImageInst);
+
+    if (load->getSrc()->isCoherent())
+      info->flags |= lgc::Builder::ImageFlagCoherent;
+    if (load->getSrc()->isVolatile())
+      info->flags |= lgc::Builder::ImageFlagVolatile;
+  }
+
   // We need to scan back through OpImage/OpSampledImage just to find any
   // NonUniform decoration.
   SPIRVValue *scanBackInst = bImageInst;
@@ -5487,8 +5504,10 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *bi, unsigned maskI
     }
 
     // NonPrivateTexelKHR (0x400)
-    if (mask & ImageOperandsNonPrivateTexelKHRMask)
+    if (mask & ImageOperandsNonPrivateTexelKHRMask) {
       mask &= ~ImageOperandsNonPrivateTexelKHRMask;
+      imageInfo->flags |= lgc::Builder::ImageFlagCoherent;
+    }
 
     // VolatileTexelKHR (0x800)
     if (mask & ImageOperandsVolatileTexelKHRMask) {
