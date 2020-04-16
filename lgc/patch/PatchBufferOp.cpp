@@ -49,10 +49,6 @@
 using namespace llvm;
 using namespace lgc;
 
-// FIXME: Override -Werror temporarily to synchronize with LLVM updates. Remove this as soon as LLVM is updated and we
-//       can remove the use of getParamAlignment.
-#pragma GCC diagnostic warning "-Wdeprecated-declarations"
-
 namespace lgc {
 
 // =====================================================================================================================
@@ -618,8 +614,8 @@ void PatchBufferOp::visitMemMoveInst(MemMoveInst &memMoveInst) {
 
   m_builder->SetInsertPoint(&memMoveInst);
 
-  const unsigned destAlignment = memMoveInst.getParamAlignment(0);
-  const unsigned srcAlignment = memMoveInst.getParamAlignment(1);
+  const MaybeAlign destAlignment = memMoveInst.getParamAlign(0);
+  const MaybeAlign srcAlignment = memMoveInst.getParamAlign(1);
 
   // We assume LLVM is not introducing variable length mem moves.
   ConstantInt *const length = dyn_cast<ConstantInt>(memMoveInst.getArgOperand(2));
@@ -636,10 +632,10 @@ void PatchBufferOp::visitMemMoveInst(MemMoveInst &memMoveInst) {
   Value *const castSrc = m_builder->CreateBitCast(src, castSrcType);
   copyMetadata(castSrc, &memMoveInst);
 
-  LoadInst *const srcLoad = m_builder->CreateAlignedLoad(castSrc, MaybeAlign(srcAlignment));
+  LoadInst *const srcLoad = m_builder->CreateAlignedLoad(castSrc, srcAlignment);
   copyMetadata(srcLoad, &memMoveInst);
 
-  StoreInst *const destStore = m_builder->CreateAlignedStore(srcLoad, castDest, MaybeAlign(destAlignment));
+  StoreInst *const destStore = m_builder->CreateAlignedStore(srcLoad, castDest, destAlignment);
   copyMetadata(destStore, &memMoveInst);
 
   // Record the memmove instruction so we remember to delete it later.
@@ -908,8 +904,8 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
 
   m_builder->SetInsertPoint(&memCpyInst);
 
-  const unsigned destAlignment = memCpyInst.getParamAlignment(0);
-  const unsigned srcAlignment = memCpyInst.getParamAlignment(1);
+  const MaybeAlign destAlignment = memCpyInst.getParamAlign(0);
+  const MaybeAlign srcAlignment = memCpyInst.getParamAlign(1);
 
   ConstantInt *const lengthConstant = dyn_cast<ConstantInt>(memCpyInst.getArgOperand(2));
 
@@ -929,7 +925,7 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
     while (stride != 1) {
       // We only care about DWORD alignment (4 bytes) so clamp the max check here to that.
       const unsigned minStride = std::min(stride, 4u);
-      if (destAlignment >= minStride && srcAlignment >= minStride && (constantLength % stride) == 0)
+      if (destAlignment.valueOrOne() >= minStride && srcAlignment.valueOrOne() >= minStride && (constantLength % stride) == 0)
         break;
 
       stride /= 2;
@@ -1004,10 +1000,10 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
     Value *const castSrc = m_builder->CreateBitCast(src, castSrcType);
     copyMetadata(castSrc, &memCpyInst);
 
-    LoadInst *const srcLoad = m_builder->CreateAlignedLoad(castSrc, MaybeAlign(srcAlignment));
+    LoadInst *const srcLoad = m_builder->CreateAlignedLoad(castSrc, srcAlignment);
     copyMetadata(srcLoad, &memCpyInst);
 
-    StoreInst *const destStore = m_builder->CreateAlignedStore(srcLoad, castDest, MaybeAlign(destAlignment));
+    StoreInst *const destStore = m_builder->CreateAlignedStore(srcLoad, castDest, destAlignment);
     copyMetadata(destStore, &memCpyInst);
 
     // Visit the newly added instructions to turn them into fat pointer variants.
@@ -1038,7 +1034,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
 
   Value *const value = memSetInst.getArgOperand(1);
 
-  const unsigned destAlignment = memSetInst.getParamAlignment(0);
+  const MaybeAlign destAlignment = memSetInst.getParamAlign(0);
 
   ConstantInt *const lengthConstant = dyn_cast<ConstantInt>(memSetInst.getArgOperand(2));
 
@@ -1058,7 +1054,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
     while (stride != 1) {
       // We only care about DWORD alignment (4 bytes) so clamp the max check here to that.
       const unsigned minStride = std::min(stride, 4u);
-      if (destAlignment >= minStride && (constantLength % stride) == 0)
+      if (destAlignment.valueOrOne() >= minStride && (constantLength % stride) == 0)
         break;
 
       stride /= 2;
@@ -1150,7 +1146,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
     if (BitCastInst *const cast = dyn_cast<BitCastInst>(castDest))
       visitBitCastInst(*cast);
 
-    StoreInst *const destStore = m_builder->CreateAlignedStore(newValue, castDest, MaybeAlign(destAlignment));
+    StoreInst *const destStore = m_builder->CreateAlignedStore(newValue, castDest, destAlignment);
     copyMetadata(destStore, &memSetInst);
     visitStoreInst(*destStore);
   }
