@@ -466,7 +466,15 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
     imageDescArgIndex = args.size();
     args.push_back(imageDesc);
     args.push_back(getInt32(tfe));
-    args.push_back(getInt32(((flags & ImageFlagCoherent) ? 1 : 0) | ((flags & ImageFlagVolatile) ? 2 : 0)));
+
+    // glc/dlc bits
+    CoherentFlag coherent = {};
+    if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
+      coherent.bits.glc = true;
+      if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10)
+        coherent.bits.dlc = true;
+    }
+    args.push_back(getInt32(coherent.u32All));
 
     // Get the intrinsic ID from the load intrinsic ID table and call it.
     auto table = mipLevel ? &ImageLoadMipIntrinsicTable[0] : &ImageLoadIntrinsicTable[0];
@@ -627,7 +635,13 @@ Value *ImageBuilder::CreateImageStore(Value *texel, unsigned dim, unsigned flags
     imageDescArgIndex = args.size();
     args.push_back(imageDesc);
     args.push_back(getInt32(0)); // tfe/lwe
-    args.push_back(getInt32(((flags & ImageFlagCoherent) ? 1 : 0) | ((flags & ImageFlagVolatile) ? 2 : 0)));
+
+    // glc bit
+    CoherentFlag coherent = {};
+    if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
+      coherent.bits.glc = true;
+    }
+    args.push_back(getInt32(coherent.u32All));
 
     // Get the intrinsic ID from the store intrinsic ID table and call it.
     auto table = mipLevel ? &ImageStoreMipIntrinsicTable[0] : &ImageStoreIntrinsicTable[0];
@@ -1106,8 +1120,14 @@ Value *ImageBuilder::CreateImageSampleGather(Type *resultTy, unsigned dim, unsig
   bool tfe = isa<StructType>(resultTy);
   args.push_back(getInt32(tfe));
 
-  // glc/slc bits
-  args.push_back(getInt32(((flags & ImageFlagCoherent) ? 1 : 0) | ((flags & ImageFlagVolatile) ? 2 : 0)));
+  // glc/dlc bits
+  CoherentFlag coherent = {};
+  if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
+    coherent.bits.glc = true;
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10)
+      coherent.bits.dlc = true;
+  }
+  args.push_back(getInt32(coherent.u32All));
 
   // Search the intrinsic ID table.
   auto table = isSample ? &ImageSampleIntrinsicTable[0] : &ImageGather4IntrinsicTable[0];

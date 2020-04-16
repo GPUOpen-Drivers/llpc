@@ -379,6 +379,8 @@ public:
       ++DestMaskCount;
     if (TheMemoryAccess[0] & MemoryAccessMakePointerVisibleKHRMask)
       ++DestMaskCount;
+    if (TheMemoryAccess[0] & MemoryAccessNonPrivatePointerKHRMask)
+      ++DestMaskCount;
 
     // If HasBothMasks is false, the only one mask applies to both Source and Target
     // Otherwise, the first applies to Target and the second applies to Source
@@ -404,6 +406,11 @@ public:
       if (TheMemoryAccess[MaskIdx] & MemoryAccessMakePointerVisibleKHRMask) {
         assert(TheMemoryAccess.size() > Idx && "Scope operand is missing");
         MemoryAccess[I].MakeVisibleScope = TheMemoryAccess[Idx++];
+      }
+
+      if (TheMemoryAccess[MaskIdx] & MemoryAccessNonPrivatePointerKHRMask) {
+        // Note: Scope operand is not expected.
+        MemoryAccess[I].NonPrivatePointerScope = TheMemoryAccess[Idx++];
       }
     }
   }
@@ -438,7 +445,9 @@ protected:
     SPIRVWord Alignment = 0;
     SPIRVId MakeAvailableScope = SPIRVID_INVALID;
     SPIRVId MakeVisibleScope = SPIRVID_INVALID;
-  }MemoryAccess[2]; //[0]:destination, [1]:source
+    SPIRVId NonPrivatePointerScope = SPIRVID_INVALID;
+
+  } MemoryAccess[2]; // [0]:destination, [1]:source
 };
 
 class SPIRVVariable : public SPIRVInstruction {
