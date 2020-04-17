@@ -184,7 +184,7 @@ Value *PatchDescriptorLoad::getDescPtrAndStride(ResourceNodeType resType, unsign
     byteSize = DescriptorSizeBuffer;
     if (node && node->type == ResourceNodeType::DescriptorBufferCompact)
       byteSize = DescriptorSizeBufferCompact;
-    stride = builder.getInt32(byteSize / 4);
+    stride = builder.getInt32(byteSize);
     break;
   case ResourceNodeType::DescriptorSampler:
     byteSize = DescriptorSizeSampler;
@@ -208,17 +208,17 @@ Value *PatchDescriptorLoad::getDescPtrAndStride(ResourceNodeType resType, unsign
       assert(node && "expected valid user data node to determine descriptor stride.");
       switch (node->type) {
       case ResourceNodeType::DescriptorSampler:
-        stride = builder.getInt32(DescriptorSizeSampler / 4);
+        stride = builder.getInt32(DescriptorSizeSampler);
         break;
       case ResourceNodeType::DescriptorResource:
       case ResourceNodeType::DescriptorFmask:
-        stride = builder.getInt32(DescriptorSizeResource / 4);
+        stride = builder.getInt32(DescriptorSizeResource);
         break;
       case ResourceNodeType::DescriptorCombinedTexture:
-        stride = builder.getInt32((DescriptorSizeResource + DescriptorSizeSampler) / 4);
+        stride = builder.getInt32(DescriptorSizeResource + DescriptorSizeSampler);
         break;
       case ResourceNodeType::DescriptorYCbCrSampler:
-        stride = builder.getInt32(DescriptorSizeSamplerYCbCr / 4);
+        stride = builder.getInt32(DescriptorSizeSamplerYCbCr);
         break;
       default:
         llvm_unreachable("Unexpected resource node type");
@@ -243,7 +243,7 @@ Value *PatchDescriptorLoad::getDescPtrAndStride(ResourceNodeType resType, unsign
 
     // We need to change the stride to 4 dwords. It would otherwise be incorrectly set to 12 dwords
     // for a sampler in a combined texture.
-    stride = builder.getInt32(DescriptorSizeSampler / 4);
+    stride = builder.getInt32(DescriptorSizeSampler);
   } else {
     // Get a pointer to the descriptor.
     descPtr = getDescPtr(resType, descSet, binding, topNode, node, shadow, builder);
@@ -259,7 +259,7 @@ Value *PatchDescriptorLoad::getDescPtrAndStride(ResourceNodeType resType, unsign
 }
 
 // =====================================================================================================================
-// Get a pointer to a descriptor, as a pointer to i32
+// Get a pointer to a descriptor, as a pointer to i8
 //
 // @param resType : Resource type
 // @param descSet : Descriptor set
@@ -324,12 +324,12 @@ Value *PatchDescriptorLoad::getDescPtr(ResourceNodeType resType, unsigned descSe
   } else {
     // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
     // add on the size of the first part.
-    unsigned offsetInDwords = node->offsetInDwords;
+    unsigned offsetInBytes = node->offsetInDwords * 4;
     if (resType == ResourceNodeType::DescriptorSampler && node->type == ResourceNodeType::DescriptorCombinedTexture)
-      offsetInDwords += DescriptorSizeResource / 4;
-    offset = builder.getInt32(offsetInDwords);
-    descPtr = builder.CreateBitCast(descPtr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
-    descPtr = builder.CreateGEP(builder.getInt32Ty(), descPtr, offset);
+      offsetInBytes += DescriptorSizeResource;
+    offset = builder.getInt32(offsetInBytes);
+    descPtr = builder.CreateBitCast(descPtr, builder.getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
+    descPtr = builder.CreateGEP(builder.getInt8Ty(), descPtr, offset);
   }
   return descPtr;
 }
@@ -349,9 +349,9 @@ void PatchDescriptorLoad::processDescriptorIndex(CallInst *call) {
   Value *stride = builder.CreateExtractValue(descPtrStruct, 1);
   Value *descPtr = builder.CreateExtractValue(descPtrStruct, 0);
 
-  Value *bytePtr = builder.CreateBitCast(descPtr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
+  Value *bytePtr = builder.CreateBitCast(descPtr, builder.getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
   index = builder.CreateMul(index, stride);
-  bytePtr = builder.CreateGEP(builder.getInt32Ty(), bytePtr, index);
+  bytePtr = builder.CreateGEP(builder.getInt8Ty(), bytePtr, index);
   descPtr = builder.CreateBitCast(bytePtr, descPtr->getType());
 
   descPtrStruct = builder.CreateInsertValue(
@@ -507,7 +507,7 @@ Value *PatchDescriptorLoad::loadBufferDescriptor(unsigned descSet, unsigned bind
     }
   }
 
-  // Get a pointer to the descriptor, as a pointer to i32.
+  // Get a pointer to the descriptor, as a pointer to 8
   descPtr = getDescPtr(ResourceNodeType::DescriptorBuffer, descSet, binding, topNode, node,
                        /*shadow=*/false, builder);
 
@@ -517,13 +517,13 @@ Value *PatchDescriptorLoad::loadBufferDescriptor(unsigned descSet, unsigned bind
   }
 
   // Add on the index.
-  unsigned dwordStride = DescriptorSizeBuffer / 4;
+  unsigned byteStride = DescriptorSizeBuffer;
   if (node && node->type == ResourceNodeType::DescriptorBufferCompact)
-    dwordStride = DescriptorSizeBufferCompact / 4;
-  arrayOffset = builder.CreateMul(arrayOffset, builder.getInt32(dwordStride));
-  descPtr = builder.CreateGEP(builder.getInt32Ty(), descPtr, arrayOffset);
+    byteStride = DescriptorSizeBufferCompact;
+  arrayOffset = builder.CreateMul(arrayOffset, builder.getInt32(byteStride));
+  descPtr = builder.CreateGEP(builder.getInt8Ty(), descPtr, arrayOffset);
 
-  if (dwordStride == DescriptorSizeBufferCompact / 4) {
+  if (byteStride == DescriptorSizeBufferCompact) {
     // Load compact buffer descriptor and convert it into a normal buffer descriptor.
     Type *descTy = VectorType::get(builder.getInt32Ty(), DescriptorSizeBufferCompact / 4);
     descPtr = builder.CreateBitCast(descPtr, descTy->getPointerTo(ADDR_SPACE_CONST));
