@@ -1239,14 +1239,8 @@ BinaryOperator *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicB
 
   // NOTE: SPIR-V spec allows the operands "base" and "shift" to have different
   // bit width.
-  auto baseBitWidth = base->getType()->getScalarSizeInBits();
-  auto shiftBitWidth = shift->getType()->getScalarSizeInBits();
-  if (baseBitWidth != shiftBitWidth) {
-    if (baseBitWidth > shiftBitWidth)
-      shift = new ZExtInst(shift, base->getType(), "", bb);
-    else
-      shift = new TruncInst(shift, base->getType(), "", bb);
-  }
+  if (shift->getType()->isIntOrIntVectorTy())
+    shift = getBuilder()->CreateZExtOrTrunc(shift, base->getType());
 
   auto inst = BinaryOperator::Create(bo, base, shift, bv->getName(), bb);
   setFastMathFlags(inst);
@@ -5074,14 +5068,7 @@ void SPIRVToLLVM::truncConstantIndex(std::vector<Value *> &indices, BasicBlock *
         }
       }
     } else {
-      assert(isa<IntegerType>(index->getType()));
-      auto indexTy = dyn_cast<IntegerType>(index->getType());
-      if (indexTy->getBitWidth() < 32)
-        // Convert 16 or 8 bit index to 32 bit integer
-        indices[i] = new ZExtInst(index, int32Ty, "", bb);
-      else if (indexTy->getBitWidth() > 32)
-        // Convert 64 bit index to 32 bit integer
-        indices[i] = new TruncInst(index, int32Ty, "", bb);
+      indices[i] = getBuilder()->CreateZExtOrTrunc(index, int32Ty);
     }
   }
 }
