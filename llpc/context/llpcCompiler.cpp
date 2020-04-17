@@ -177,6 +177,7 @@ enum ShaderReplaceMode {
 };
 
 static ManagedStatic<sys::Mutex> SCompilerMutex;
+static bool HaveParsedOptions = false;
 static MetroHash::Hash SOptionHash = {};
 
 unsigned Compiler::m_instanceCount = 0;
@@ -243,16 +244,14 @@ Result VKAPI_CALL ICompiler::Create(GfxIpVersion gfxIp, unsigned optionCount, co
   LgcContext::initialize();
 
   bool parseCmdOption = true;
-  if (Compiler::getInstanceCount() > 0) {
+  if (HaveParsedOptions) {
     bool isSameOption = memcmp(&optionHash, &SOptionHash, sizeof(optionHash)) == 0;
 
     parseCmdOption = false;
     if (!isSameOption) {
       if (Compiler::getOutRedirectCount() == 0) {
-        // All compiler instances are destroyed, we can reset LLVM options in safe
-        auto &options = cl::getRegisteredOptions();
-        for (auto it = options.begin(); it != options.end(); ++it)
-          it->second->reset();
+        // All compiler instances are destroyed, we can reset LLVM options
+        cl::ResetAllOptionOccurrences();
         parseCmdOption = true;
       } else {
         LLPC_ERRS("Incompatible compiler options cross compiler instances!");
@@ -264,8 +263,11 @@ Result VKAPI_CALL ICompiler::Create(GfxIpVersion gfxIp, unsigned optionCount, co
 
   if (parseCmdOption) {
     // LLVM command options can't be parsed multiple times
-    if (!cl::ParseCommandLineOptions(optionCount, options, "AMD LLPC compiler", ignoreErrors ? &nullStream : nullptr))
+    if (cl::ParseCommandLineOptions(optionCount, options, "AMD LLPC compiler", ignoreErrors ? &nullStream : nullptr)) {
+      HaveParsedOptions = true;
+    } else {
       result = Result::ErrorInvalidValue;
+    }
   }
 
   if (result == Result::Success) {
@@ -391,6 +393,7 @@ Compiler::~Compiler() {
   if (shutdown) {
     ShaderCacheManager::shutdown();
     llvm_shutdown();
+    remove_fatal_error_handler();
     delete m_contextPool;
     m_contextPool = nullptr;
   }
