@@ -1,0 +1,38 @@
+name: Code formatting check
+
+on:
+  pull_request:
+
+jobs:
+  clang-format-check:
+    name: clang-format
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Setup environment
+        run: |
+          sudo apt-get install -yqq clang-format-9
+      - name: Checkout LLPC
+        run: |
+          git clone https://github.com/${GITHUB_REPOSITORY}.git .
+          git fetch origin +${GITHUB_SHA}:${GITHUB_REF} --update-head-ok
+          git checkout ${GITHUB_SHA}
+      - name: Run clang-format
+        run: |
+          git diff ${{ github.base_ref }} -U0 --no-color -- '**/*.cpp' '**/*.cc' '**/*.h' '**/*.hh' \
+            | clang-format-diff-9 -p1 >not-formatted.diff 2>&1
+      - name: Check formatting
+        run: |
+          if ! grep -q '[^[:space:]]' not-formatted.diff ; then
+            echo "Code formatted. Success."
+          else
+            echo "Code not formatted."
+            echo "Please run clang-format-diff on your changes and push again:"
+            echo "    git diff ${{ github.base_ref }} -U0 --no-color | clang-format-diff -p1 -i"
+            echo ""
+            echo "Tip: you can disable clang-format checks: https://clang.llvm.org/docs/ClangFormatStyleOptions.html#disabling-formatting-on-a-piece-of-code"
+            echo ""
+            echo "Diff:"
+            cat not-formatted.diff
+            echo ""
+            exit 3
+          fi
