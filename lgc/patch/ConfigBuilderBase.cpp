@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "ConfigBuilderBase.h"
+#include "lgc/LgcContext.h"
 #include "lgc/state/AbiMetadata.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
@@ -348,6 +349,25 @@ void ConfigBuilderBase::writePalMetadata() {
     if (regEntry.getKind() != msgpack::Type::Nil)
       oredValue = regEntry.getInt();
     regEntry = m_document->getNode(oredValue);
+  }
+
+  // Add a map containing the type of each vertex input.
+  VsInterfaceData *vsInterfaceData = m_pipelineState->getLgcContext()->getVsInterfaceData();
+  const auto &vsInputTypeInfo = vsInterfaceData->getVertexInputTypeInfo();
+  if (!vsInputTypeInfo.empty()) {
+    msgpack::MapDocNode vertexInputTypesDoc = m_pipelineNode[".vertexInputTypes"].getMap(true);
+    for (const auto &entry : vsInputTypeInfo) {
+      auto location = m_document->getNode(entry.first.first);
+      auto component = m_document->getNode(entry.first.second);
+      auto type = m_document->getArrayNode();
+      type.push_back(m_document->getNode(static_cast<int>(entry.second.elementType)));
+      type.push_back(m_document->getNode(entry.second.vectorSize));
+
+      auto value = m_document->getMapNode();
+      value[component] = type;
+
+      vertexInputTypesDoc[location] = value;
+    }
   }
 }
 

@@ -165,6 +165,7 @@ PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/interface
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/imported
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
 # lgc/builder
@@ -201,6 +202,7 @@ target_sources(LLVMlgc PRIVATE
     patch/PatchCopyShader.cpp
     patch/PatchDescriptorLoad.cpp
     patch/PatchEntryPointMutate.cpp
+    patch/PatchFetchShader.cpp
     patch/PatchInOutImportExport.cpp
     patch/PatchIntrinsicSimplify.cpp
     patch/PatchLlvmIrInclusion.cpp

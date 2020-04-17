@@ -383,7 +383,11 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
 void PipelineContext::setUserDataInPipeline(Pipeline *pipeline) const {
   const PipelineShaderInfo *shaderInfo = nullptr;
   unsigned stageMask = getShaderStageMask();
-    shaderInfo = getPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
+  shaderInfo = getPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
+
+  if (shaderInfo == nullptr) {
+    return;
+  }
 
   // Translate the resource nodes into the LGC format expected by Pipeline::SetUserDataNodes.
   ArrayRef<ResourceMappingNode> nodes(shaderInfo->pUserDataNodes, shaderInfo->userDataNodeCount);

@@ -156,7 +156,7 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       // In the backend, f32 denormals are handled by default, so request denormal flushing behavior.
       builder.addAttribute("denormal-fp-math-f32", "preserve-sign");
 
-      if (shaderStage != ShaderStageCopyShader) {
+      if (shaderStage != ShaderStageCopyShader && shaderStage != ShaderStageFetch) {
         const auto &shaderMode = m_pipelineState->getShaderModes()->getCommonShaderMode(shaderStage);
         if (shaderMode.fp16DenormMode == FpDenormMode::FlushNone ||
             shaderMode.fp16DenormMode == FpDenormMode::FlushIn ||

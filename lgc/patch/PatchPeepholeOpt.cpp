@@ -499,26 +499,29 @@ void PatchPeepholeOpt::visitPHINode(PHINode &phiNode) {
 
         BasicBlock *const basicBlock = phiNode.getIncomingBlock(incomingIndex);
 
-        if (Instruction *const inst = dyn_cast<Instruction>(incoming)) {
-          Value *newIncomingValue = nullptr;
-          auto it = incomingPairMap.find(basicBlock);
-          if (it != incomingPairMap.end())
-            newIncomingValue = it->second;
-          else {
+        Value *newIncomingValue = nullptr;
+        auto it = incomingPairMap.find(basicBlock);
+        if (it != incomingPairMap.end()) {
+          newIncomingValue = it->second;
+        } else {
+          if (Instruction *const inst = dyn_cast<Instruction>(incoming)) {
             ExtractElementInst *const extractElement = ExtractElementInst::Create(incoming, elementIndexVal);
 
             insertAfter(*extractElement, *inst);
             newIncomingValue = extractElement;
-            incomingPairMap.insert({basicBlock, newIncomingValue});
+          } else if (Constant *const constant = dyn_cast<Constant>(incoming)) {
+            newIncomingValue = ConstantExpr::getExtractElement(constant, elementIndexVal);
+          } else if (Argument *const argument = dyn_cast<Argument>(incoming)) {
+            ExtractElementInst *const extractElement = ExtractElementInst::Create(incoming, elementIndexVal);
+            insertAfter(*extractElement, *argument->getParent()->begin()->getFirstInsertionPt());
+            newIncomingValue = extractElement;
+          } else {
+            llvm_unreachable("Should never be called!");
           }
 
-          newPhiNode->addIncoming(newIncomingValue, basicBlock);
-        } else if (Constant *const constant = dyn_cast<Constant>(incoming)) {
-          Constant *const extractElement = ConstantExpr::getExtractElement(constant, elementIndexVal);
-          incomingPairMap.insert({basicBlock, extractElement});
-          newPhiNode->addIncoming(extractElement, basicBlock);
-        } else
-          llvm_unreachable("Should never be called!");
+          incomingPairMap.insert({basicBlock, newIncomingValue});
+        }
+        newPhiNode->addIncoming(newIncomingValue, basicBlock);
       }
     }
 

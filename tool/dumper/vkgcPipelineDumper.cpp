@@ -788,6 +788,9 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   case ShaderStageFragment:
     updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher, isRelocatableShader);
     break;
+  case ShaderStageFetch:
+    // TODO: Need to hash the info received from the compilation of the vertex shader
+    break;
   case ShaderStageInvalid:
     updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher, isRelocatableShader);
     updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher, isRelocatableShader);
@@ -803,7 +806,8 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   hasher.Update(pipeline->iaState.deviceIndex);
 
   if (stage != ShaderStageFragment) {
-    updateHashForVertexInputState(pipeline->pVertexInput, &hasher);
+    if (!isRelocatableShader || stage == ShaderStageFetch)
+      updateHashForVertexInputState(pipeline->pVertexInput, &hasher);
     updateHashForNonFragmentState(pipeline, isCacheHash, &hasher);
   }
 

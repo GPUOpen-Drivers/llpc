@@ -51,13 +51,7 @@ const char *getShaderStageName(ShaderStage shaderStage) {
     name = "copy";
   else if (shaderStage < ShaderStageCount) {
     static const char *ShaderStageNames[] = {
-      "vertex",
-      "tessellation control",
-      "tessellation evaluation",
-      "geometry",
-      "fragment",
-      "compute",
-    };
+        "vertex", "tessellation control", "tessellation evaluation", "geometry", "fragment", "compute", "fetch"};
 
     name = ShaderStageNames[static_cast<unsigned>(shaderStage)];
   } else

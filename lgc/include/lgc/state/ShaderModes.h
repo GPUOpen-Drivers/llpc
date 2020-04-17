@@ -90,7 +90,7 @@ public:
 
 private:
   bool m_anySet = false;                                             // Whether any Set*Mode method called
-  CommonShaderMode m_commonShaderModes[ShaderStageCompute + 1] = {}; // Per-shader FP modes
+  CommonShaderMode m_commonShaderModes[ShaderStageCount] = {};       // Per-shader FP modes
   TessellationMode m_tessellationMode = {};                          // Tessellation mode
   GeometryShaderMode m_geometryShaderMode = {};                      // Geometry shader mode
   FragmentShaderMode m_fragmentShaderMode = {};                      // Fragment shader mode

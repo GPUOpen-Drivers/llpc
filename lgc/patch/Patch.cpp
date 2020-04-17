@@ -112,6 +112,9 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   // Build null fragment shader if necessary
   passMgr.add(createPatchNullFragShader());
 
+  // Build fetch shader if necessary
+  passMgr.add(createPatchFetchShader());
+
   // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
   passMgr.add(createPatchResourceCollect());
 

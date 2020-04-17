@@ -40,6 +40,7 @@ enum ShaderStage : unsigned {
   ShaderStageGeometry,                                  ///< Geometry shader
   ShaderStageFragment,                                  ///< Fragment shader
   ShaderStageCompute,                                   ///< Compute shader
+  ShaderStageFetch,                                     ///< Fetch shader for vertex inputs
   ShaderStageCount,                                     ///< Count of shader stages
   ShaderStageInvalid = ~0u,                             ///< Invalid shader stage
   ShaderStageNativeStageCount = ShaderStageCompute + 1, ///< Native supported shader stage count

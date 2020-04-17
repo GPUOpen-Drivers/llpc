@@ -102,6 +102,7 @@ private:
   llvm::LLVMContext *m_context;          // LLVM context
   ShaderSystemValues *m_shaderSysValues; // ShaderSystemValues object for getting vertex buffer pointer from
   PipelineState *m_pipelineState;        // Pipeline state
+  ShaderStage m_shaderStage;             // The shader stage
 
   llvm::Value *m_vertexIndex;   // Vertex index
   llvm::Value *m_instanceIndex; // Instance index

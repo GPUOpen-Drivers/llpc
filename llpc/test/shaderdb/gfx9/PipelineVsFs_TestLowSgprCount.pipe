@@ -1,0 +1,125 @@
+; Test that the sgpr counts are set correctly in the .note section.  In this case the fetch shader uses more sgprs than the vertex shader.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -use-relocatable-shader-elf -auto-layout-desc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST: LLPC final ELF info
+; SHADERTEST: .vs:
+; SHADERTEST: .sgpr_count: 0x0000000000000010
+; SHADERTEST: .internal_pipeline_hash
+; SHADERTEST: .registers:
+; SHADERTEST: SPI_SHADER_PGM_RSRC1_VS                       0x00000000002C0042
+; SHADERTEST: .shaders:
+; END_SHADERTEST
+
+[Version]
+version = 40
+
+[VsSpirv]
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %main "main" %outColor %inColor %_ %inPos
+               OpSource GLSL 450
+               OpName %main "main"
+               OpName %outColor "outColor"
+               OpName %inColor "inColor"
+               OpName %gl_PerVertex "gl_PerVertex"
+               OpMemberName %gl_PerVertex 0 "gl_Position"
+               OpName %_ ""
+               OpName %inPos "inPos"
+               OpDecorate %outColor Location 0
+               OpDecorate %inColor Location 2
+               OpMemberDecorate %gl_PerVertex 0 BuiltIn Position
+               OpDecorate %gl_PerVertex Block
+               OpDecorate %inPos Location 0
+       %void = OpTypeVoid
+          %9 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v3float = OpTypeVector %float 3
+%_ptr_Output_v3float = OpTypePointer Output %v3float
+   %outColor = OpVariable %_ptr_Output_v3float Output
+%_ptr_Input_v3float = OpTypePointer Input %v3float
+    %inColor = OpVariable %_ptr_Input_v3float Input
+    %v4float = OpTypeVector %float 4
+        %int = OpTypeInt 32 1
+%gl_PerVertex = OpTypeStruct %v4float
+%_ptr_Output_gl_PerVertex = OpTypePointer Output %gl_PerVertex
+          %_ = OpVariable %_ptr_Output_gl_PerVertex Output
+      %int_0 = OpConstant %int 0
+      %inPos = OpVariable %_ptr_Input_v3float Input
+    %float_1 = OpConstant %float 1
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+       %main = OpFunction %void None %9
+         %20 = OpLabel
+         %21 = OpLoad %v3float %inColor
+               OpStore %outColor %21
+         %22 = OpLoad %v3float %inPos
+         %23 = OpCompositeExtract %float %22 0
+         %24 = OpCompositeExtract %float %22 1
+         %25 = OpCompositeExtract %float %22 2
+         %26 = OpCompositeConstruct %v4float %23 %24 %25 %float_1
+         %27 = OpAccessChain %_ptr_Output_v4float %_ %int_0
+               OpStore %27 %26
+               OpReturn
+               OpFunctionEnd
+
+[VsInfo]
+entryPoint = main
+userDataNode[0].type = IndirectUserDataVaPtr
+userDataNode[0].offsetInDwords = 1
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].indirectUserDataCount = 4
+
+[FsSpirv]
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %inColor %outFragColor
+               OpExecutionMode %main OriginUpperLeft
+               OpSource GLSL 450
+               OpName %main "main"
+               OpName %inColor "inColor"
+               OpName %outFragColor "outFragColor"
+               OpDecorate %inColor Location 0
+               OpDecorate %outFragColor Location 0
+       %void = OpTypeVoid
+          %6 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %float_1 = OpConstant %float 1
+    %v3float = OpTypeVector %float 3
+%_ptr_Input_v3float = OpTypePointer Input %v3float
+    %inColor = OpVariable %_ptr_Input_v3float Input
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+%outFragColor = OpVariable %_ptr_Output_v4float Output
+       %main = OpFunction %void None %6
+         %13 = OpLabel
+         %14 = OpLoad %v3float %inColor
+         %15 = OpCompositeConstruct %v4float %14 %float_1
+               OpStore %outFragColor %15
+               OpReturn
+               OpFunctionEnd
+
+[FsInfo]
+entryPoint = main
+
+
+[GraphicsPipelineState]
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 1
+
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 44
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32_SFLOAT
+attribute[0].offset = 0
+attribute[2].location = 2
+attribute[2].binding = 0
+attribute[2].format = VK_FORMAT_R32G32B32_SFLOAT
+attribute[2].offset = 20

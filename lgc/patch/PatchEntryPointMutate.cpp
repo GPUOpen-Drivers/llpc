@@ -31,6 +31,7 @@
 
 #include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
+#include "lgc/LgcContext.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
@@ -878,6 +879,22 @@ uint64_t PatchEntryPointMutate::pushFixedShaderArgTys(SmallVectorImpl<Type *> &a
 
     entryArgIdxs.vs.instanceId = argTys.size();
     argTys.push_back(Type::getInt32Ty(*m_context)); // Instance ID
+
+    // In relocatable shader, the vertex inputs are passed to the vertex shader
+    // in VGPRS.  Add them to the interface.
+    if (m_pipelineState->isUnlinked()) {
+      auto &vertexInputData = m_pipelineState->getLgcContext()->getVsInterfaceData()->getVertexInputTypeInfo();
+      for (auto &input : vertexInputData) {
+        unsigned location = input.first.first;
+        unsigned component = input.first.second;
+        Type *vertexType =
+            m_pipelineState->getLgcContext()->getVsInterfaceData()->getVertexInputType(location, component, m_context);
+        if (vertexType) {
+          argTys.push_back(vertexType);
+          input.second.argumentIndex = argTys.size() - 1;
+        }
+      }
+    }
 
     break;
   }

@@ -29,7 +29,10 @@
  ***********************************************************************************************************************
  */
 #include "llpcElfWriter.h"
+#include "../../lgc/imported/chip/gfx9/gfx9_plus_merged_offset.h"
+#include "../../lgc/imported/chip/gfx9/gfx9_plus_merged_registers.h"
 #include "llpcContext.h"
+#include "lgc/LgcContext.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include <algorithm>
@@ -1038,19 +1041,25 @@ template <class Elf> void ElfWriter<Elf>::reinitialize() {
 
   m_strtabSecIdx = m_sections.size();
   m_sections.push_back({});
+  m_sections.back().name = StrTabName;
   m_map[StrTabName] = m_strtabSecIdx;
 
   m_textSecIdx = m_sections.size();
   m_sections.push_back({});
+  m_sections.back().name = TextName;
   m_map[TextName] = m_textSecIdx;
 
   m_symSecIdx = m_sections.size();
   m_sections.push_back({});
+  m_sections.back().name = SymTabName;
   m_map[SymTabName] = m_symSecIdx;
 
   m_noteSecIdx = m_sections.size();
   m_sections.push_back({});
+  m_sections.back().name = NoteName;
   m_map[NoteName] = m_noteSecIdx;
+
+  m_relocSecIdx = InvalidValue;
 }
 
 // =====================================================================================================================
@@ -1320,48 +1329,65 @@ void fixUpRelocations(ElfWriter<Elf> *writer, const std::vector<RelocationEntry>
 // =====================================================================================================================
 // Link the relocatable ELF readers into a pipeline ELF.
 //
-// @param relocatableElfs : An array of relocatable ELF objects
+// @param relocatableElfs : An array of 3 relocatable ELF objects: {vertext, fragment, fetch}.
 // @param context : Acquired context
 template <class Elf>
 Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> *> &relocatableElfs, Context *context) {
+  assert(relocatableElfs.size() == 3 && "Can only handle VsPs pipeline with a fetch shader for now.");
+
+  // The alignment requirements for the text section.
+  const uint32_t vertexShaderAlignment = 0x10;
+  const uint32_t fragmentShaderAlignment = 0x100;
+
   reinitialize();
-  assert(relocatableElfs.size() == 2 && "Can only handle VsPs Shaders for now.");
 
   // Get the main data for the header, the parts that change will be updated when writing to buffer.
   m_header = relocatableElfs[0]->getHeader();
 
-  // Copy the contents of the string table
-  ElfSectionBuffer<typename Elf::SectionHeader> *stringTable1 = nullptr;
-  relocatableElfs[0]->getSectionDataBySectionIndex(relocatableElfs[0]->getStrtabSecIdx(), &stringTable1);
+  // Copy the contents of the string table.  We only merge the vertex and fragment shaders.
+  ElfSectionBuffer<typename Elf::SectionHeader> *vertexShaderStringTable = nullptr;
+  relocatableElfs[0]->getSectionDataBySectionIndex(relocatableElfs[0]->getStrtabSecIdx(), &vertexShaderStringTable);
+  ElfSectionBuffer<typename Elf::SectionHeader> *fragmentShaderStringTable = nullptr;
+  relocatableElfs[1]->getSectionDataBySectionIndex(relocatableElfs[1]->getStrtabSecIdx(), &fragmentShaderStringTable);
 
-  ElfSectionBuffer<typename Elf::SectionHeader> *stringTable2 = nullptr;
-  relocatableElfs[1]->getSectionDataBySectionIndex(relocatableElfs[1]->getStrtabSecIdx(), &stringTable2);
-
-  mergeSection(stringTable1, stringTable1->secHead.sh_size, nullptr, stringTable2, 0, nullptr,
-               &m_sections[m_strtabSecIdx]);
+  mergeSection(vertexShaderStringTable, vertexShaderStringTable->secHead.sh_size, nullptr, fragmentShaderStringTable, 0,
+               nullptr, &m_sections[m_strtabSecIdx]);
 
   // Merge text sections
-  ElfSectionBuffer<typename Elf::SectionHeader> *textSection1 = nullptr;
-  relocatableElfs[0]->getTextSectionData(&textSection1);
-  ElfSectionBuffer<typename Elf::SectionHeader> *textSection2 = nullptr;
-  relocatableElfs[1]->getTextSectionData(&textSection2);
+  ElfSectionBuffer<typename Elf::SectionHeader> *vertexShaderTextSection = nullptr;
+  relocatableElfs[0]->getTextSectionData(&vertexShaderTextSection);
+  ElfSectionBuffer<typename Elf::SectionHeader> *fragmentShaderTextSection = nullptr;
+  relocatableElfs[1]->getTextSectionData(&fragmentShaderTextSection);
+  ElfSectionBuffer<typename Elf::SectionHeader> *fetchShaderTextSection = nullptr;
+  relocatableElfs[2]->getTextSectionData(&fetchShaderTextSection);
 
-  mergeSection(textSection1, alignTo(textSection1->secHead.sh_size, 0x100), nullptr, textSection2, 0, nullptr,
-               &m_sections[m_textSecIdx]);
+  // First merge the fetch shader and the vertex shader, and then merge with the fragment shader.
+  ElfSectionBuffer<typename Elf::SectionHeader> fullVertexShaderTextSection;
+  mergeSection(fetchShaderTextSection, alignTo(fetchShaderTextSection->secHead.sh_size, vertexShaderAlignment), nullptr,
+               vertexShaderTextSection, 0, nullptr, &fullVertexShaderTextSection);
+  mergeSection(&fullVertexShaderTextSection,
+               alignTo(fullVertexShaderTextSection.secHead.sh_size, fragmentShaderAlignment), nullptr,
+               fragmentShaderTextSection, 0, nullptr, &m_sections[m_textSecIdx]);
+  delete[] fullVertexShaderTextSection.data;
+
+  // We do not copy the fetch shader's tring table, so we need to make sure we use the string table offset for the name
+  // from the vertex shader.
+  m_sections[m_textSecIdx].secHead.sh_name = vertexShaderTextSection->secHead.sh_name;
 
   // Build the symbol table.  First set the symbol table section header.
   ElfSectionBuffer<typename Elf::SectionHeader> *symbolTableSection = nullptr;
   relocatableElfs[0]->getSectionDataBySectionIndex(relocatableElfs[0]->getSymSecIdx(), &symbolTableSection);
   m_sections[m_symSecIdx].secHead = symbolTableSection->secHead;
 
-  // Now get the symbols that belong in the symbol table.
-  unsigned offset = 0;
   std::vector<RelocationEntry> relocations;
 
   // Insert a dummy symbol. The ELF spec requires the symbol table to begin with a dummy symbol.
   getSymbol("")->secIdx = 0;
 
-  for (const ElfReader<Elf> *elf : relocatableElfs) {
+  // Now get the symbols that belong in the symbol table.  No symbols from the fetch shader are needed.
+  unsigned offset = alignTo(fetchShaderTextSection->secHead.sh_size, vertexShaderAlignment);
+  for (unsigned i = 0; i < 2; ++i) {
+    const ElfReader<Elf> *elf = relocatableElfs[i];
     unsigned relocElfTextSectionId = elf->GetSectionIndex(TextName);
     std::vector<ElfSymbol> symbols;
     elf->GetSymbolsBySectionIndex(relocElfTextSectionId, symbols);
@@ -1369,8 +1395,6 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> 
       if (strncmp(sym.pSymName, "BB", 2) == 0) {
         continue;
       }
-      // When relocations start being used, we will have to filter out symbols related to relocations.
-      // We should be able to filter the BB* symbols as well.
       ElfSymbol *newSym = getSymbol(sym.pSymName);
       newSym->secIdx = m_textSecIdx;
       newSym->secName = nullptr;
@@ -1396,8 +1420,23 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> 
     // Update the offset for the next elf file.
     ElfSectionBuffer<typename Elf::SectionHeader> *textSection = nullptr;
     elf->getSectionDataBySectionIndex(relocElfTextSectionId, &textSection);
-    offset += alignTo(textSection->secHead.sh_size, 0x100);
+    offset = alignTo(offset + textSection->secHead.sh_size, fragmentShaderAlignment);
   }
+
+  // Update the size and offset of the vertex shader
+  const ElfReader<Elf> *pElf = relocatableElfs[2];
+  ElfSectionBuffer<typename Elf::SectionHeader> *pTextSection = nullptr;
+  unsigned relocElfTextSectionId = pElf->GetSectionIndex(TextName);
+  pElf->getSectionDataBySectionIndex(relocElfTextSectionId, &pTextSection);
+
+  ElfSymbol *vsShaderSym = getSymbol("_amdgpu_vs_main");
+  ElfSymbol *psShaderSym = getSymbol("_amdgpu_ps_main");
+
+  // The vertex shader will include the fetch shader, so it should always start at offset 0.
+  vsShaderSym->value = 0;
+
+  // It will finish no later than where the fragment shader starts, so this is a safe size.
+  vsShaderSym->size = psShaderSym->value;
 
   // Apply relocations
   fixUpRelocations(this, relocations, context, true);
@@ -1405,14 +1444,19 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> 
   // Set the .note section header
   ElfSectionBuffer<typename Elf::SectionHeader> *noteSection = nullptr;
   relocatableElfs[0]->getSectionDataBySectionIndex(relocatableElfs[0]->GetSectionIndex(NoteName), &noteSection);
+
   m_sections[m_noteSecIdx].secHead = noteSection->secHead;
 
   // Merge and update the .note data
   // The merged note info will be updated using data in the pipeline create info, but nothing needs to be done yet.
-  ElfNote noteInfo1 = relocatableElfs[0]->getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
-  ElfNote noteInfo2 = relocatableElfs[1]->getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+  ElfNote vertexShaderNote = relocatableElfs[0]->getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+  ElfNote fragmentShaderNote = relocatableElfs[1]->getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+  ElfNote fetchShaderNote = relocatableElfs[2]->getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+
   m_notes.push_back({});
-  mergeMetaNote(context, &noteInfo1, &noteInfo2, &m_notes.back());
+  vertexShaderNote = mergeVertexRegisterNote(&vertexShaderNote, &fetchShaderNote);
+  mergeMetaNote(context, &vertexShaderNote, &fragmentShaderNote, &m_notes.back());
+  delete[] vertexShaderNote.data;
 
   // Merge other sections.  For now, none of the other sections are important, so we will not do anything.
 
@@ -1450,6 +1494,156 @@ Result ElfWriter<Elf>::linkComputeRelocatableElf(const ElfReader<Elf> &relocatab
   setNote(&updatedNote);
 
   return Result::Success;
+}
+
+// =====================================================================================================================
+// Merge the metadata for the fetch shader and reloctable vertex shader to get the metadata for the resulting vertex
+// shader.
+//
+// @param vertexShaderNote [in]: The ElfNote for the relocatable vertex shader.
+// @param fetchShaderNote [in]: The ElfNote for the fetch shader.
+template <class Elf>
+ElfNote ElfWriter<Elf>::mergeVertexRegisterNote(ElfNote *vertextShaderNote, ElfNote *fetchShaderNote) {
+  msgpack::Document destDocument;
+  msgpack::Document srcDocument;
+
+  auto success = destDocument.readFromBlob(
+      StringRef(reinterpret_cast<const char *>(vertextShaderNote->data), vertextShaderNote->hdr.descSize), false);
+  assert(success);
+
+  success = srcDocument.readFromBlob(
+      StringRef(reinterpret_cast<const char *>(fetchShaderNote->data), fetchShaderNote->hdr.descSize), false);
+  assert(success);
+
+  auto destPipeline =
+      destDocument.getRoot().getMap(false)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(false)[0];
+  auto srcPipeline =
+      srcDocument.getRoot().getMap(false)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(false)[0];
+  (void(success)); // unused
+
+  auto destHwStages = destPipeline.getMap(false)[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(false);
+  auto srcHwStages = srcPipeline.getMap(false)[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(false);
+  auto pHwPsStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Vs)];
+  auto destVs = destHwStages[pHwPsStageName].getMap(false);
+  auto srcVs = srcHwStages[pHwPsStageName].getMap(false);
+
+  // Update the register counts
+  msgpack::DocNode &destSgprCount = destVs[".sgpr_count"];
+  msgpack::DocNode &srcSgprCount = srcVs[".sgpr_count"];
+  destVs[".sgpr_count"] = destDocument.getNode(std::max(destSgprCount.getUInt(), srcSgprCount.getUInt()));
+
+  msgpack::DocNode &destVgprCount = destVs[".vgpr_count"];
+  msgpack::DocNode &srcVgprCount = srcVs[".vgpr_count"];
+  destVs[".vgpr_count"] = destDocument.getNode(std::max(destVgprCount.getUInt(), srcVgprCount.getUInt()));
+
+  msgpack::DocNode &destRegisterInfoNode = destPipeline.getMap(false)[Util::Abi::PipelineMetadataKey::Registers];
+  msgpack::MapDocNode &destRegisterInfoMap = destRegisterInfoNode.getMap(false);
+  Pal::Gfx9::SPI_SHADER_PGM_RSRC1_VS destVSRegInfo;
+  destVSRegInfo.u32All = destRegisterInfoMap[destDocument.getNode(Pal::Gfx9::mmSPI_SHADER_PGM_RSRC1_VS)].getUInt();
+
+  msgpack::DocNode &srcRegisterInfoNode = srcPipeline.getMap(false)[Util::Abi::PipelineMetadataKey::Registers];
+  msgpack::MapDocNode &srcRegisterInfoMap = srcRegisterInfoNode.getMap(false);
+  Pal::Gfx9::SPI_SHADER_PGM_RSRC1_VS srcVSRegInfo;
+  srcVSRegInfo.u32All = srcRegisterInfoMap[srcDocument.getNode(Pal::Gfx9::mmSPI_SHADER_PGM_RSRC1_VS)].getUInt();
+
+  destVSRegInfo.bitfields.SGPRS = std::max(destVSRegInfo.bitfields.SGPRS, srcVSRegInfo.bitfields.SGPRS);
+  destVSRegInfo.bitfields.VGPRS = std::max(destVSRegInfo.bitfields.VGPRS, srcVSRegInfo.bitfields.VGPRS);
+  destRegisterInfoMap[destDocument.getNode(Pal::Gfx9::mmSPI_SHADER_PGM_RSRC1_VS)] =
+      destDocument.getNode(destVSRegInfo.u32All);
+
+  // Write the metadata back out
+  std::string destBlob;
+  destDocument.writeToBlob(destBlob);
+  ElfNote newNote = *vertextShaderNote;
+
+  auto data = new uint8_t[destBlob.size() + 4]; // 4 is for additional alignment spece
+  memcpy(data, destBlob.data(), destBlob.size());
+  newNote.hdr.descSize = destBlob.size();
+  newNote.data = data;
+  return newNote;
+}
+
+// =====================================================================================================================
+// Reads the .note section of the gieven elf package to retrieve the vertex shader interface information.
+//
+// @param elfPackage : The elf package that contains the elf for the vertex shader.
+// @param context : The acquired context.
+void readInterfaceData(const ElfPackage *elfPackage, Context *context, GfxIpVersion gfxIp) {
+  ElfReader<Elf64> reader(gfxIp);
+  size_t codeSize = elfPackage->size_in_bytes();
+  Result result = reader.ReadFromBuffer(elfPackage->data(), &codeSize);
+  assert(result == Result::Success);
+  (void(result)); // unused
+
+  ElfNote note = {};
+  note = reader.getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+
+  msgpack::Document document;
+  auto success = document.readFromBlob(StringRef(reinterpret_cast<const char *>(note.data), note.hdr.descSize), false);
+  assert(success);
+  (void(success)); // unused
+
+  msgpack::DocNode &rootNode = document.getRoot();
+
+  msgpack::DocNode &pipelineArrayNode = rootNode.getMap(false)[Util::Abi::PalCodeObjectMetadataKey::Pipelines];
+  msgpack::DocNode &pipelineInfoNode = pipelineArrayNode.getArray(false)[0];
+  msgpack::DocNode &registerInfoNode = pipelineInfoNode.getMap(false)[Util::Abi::PipelineMetadataKey::Registers];
+  msgpack::MapDocNode &registerInfoMap = registerInfoNode.getMap(false);
+
+  msgpack::DocNode &vertexInputInfoNode = pipelineInfoNode.getMap(false)[".vertexInputTypes"];
+
+  lgc::VsInterfaceData *vsInterfaceData = context->getLgcContext()->getVsInterfaceData();
+
+  unsigned maxUserData = Pal::Gfx9::mmSPI_SHADER_USER_DATA_VS_0;
+  for (auto registerInfo : registerInfoMap) {
+    unsigned infoType = registerInfo.first.getUInt();
+    if (infoType == Pal::Gfx9::mmSPI_SHADER_PGM_RSRC1_VS) {
+      // Get the comp cnt
+      Pal::Gfx9::SPI_SHADER_PGM_RSRC1_VS data;
+      data.u32All = registerInfo.second.getUInt();
+      vsInterfaceData->setVgprCompCnt(data.bitfields.VGPR_COMP_CNT);
+    } else if (infoType >= Pal::Gfx9::mmSPI_SHADER_USER_DATA_VS_0 &&
+               infoType <= Pal::Gfx9::mmSPI_SHADER_USER_DATA_VS_31) {
+      if (infoType > maxUserData) {
+        maxUserData = infoType;
+      }
+
+      switch (static_cast<Util::Abi::UserDataMapping>(registerInfo.second.getUInt())) {
+      case Util::Abi::UserDataMapping::BaseVertex:
+        vsInterfaceData->setBaseVertexRegister(infoType - Pal::Gfx9::mmSPI_SHADER_USER_DATA_VS_0);
+        break;
+      case Util::Abi::UserDataMapping::BaseInstance:
+        vsInterfaceData->setBaseInstanceRegister(infoType - Pal::Gfx9::mmSPI_SHADER_USER_DATA_VS_0);
+        break;
+      case Util::Abi::UserDataMapping::VertexBufferTable:
+        vsInterfaceData->setVertexBuffer(infoType - Pal::Gfx9::mmSPI_SHADER_USER_DATA_VS_0);
+        break;
+      default:
+        break;
+      }
+    }
+  }
+  // Add 1 for the offset of the scratch memory.
+  vsInterfaceData->setLastSgpr(maxUserData - Pal::Gfx9::mmSPI_SHADER_USER_DATA_VS_0 + 1);
+
+  if (vertexInputInfoNode.getKind() == msgpack::Type::Nil) {
+    return;
+  }
+
+  msgpack::MapDocNode &locationMap = vertexInputInfoNode.getMap(false);
+  for (auto locationInfo : locationMap) {
+    unsigned location = locationInfo.first.getUInt();
+
+    msgpack::MapDocNode &componentMap = locationInfo.second.getMap(false);
+    for (auto componentInfo : componentMap) {
+      unsigned component = componentInfo.first.getUInt();
+      msgpack::ArrayDocNode typeInfoMsg = componentInfo.second.getArray(false);
+      lgc::VertexInputTypeInfo typeInfo;
+      typeInfo.elementType = static_cast<lgc::BasicVertexInputType>(typeInfoMsg[0].getUInt());
+      typeInfo.vectorSize = typeInfoMsg[1].getUInt();
+      vsInterfaceData->setVertexInputType(location, component, typeInfo);
+    }
+  }
 }
 
 template class ElfWriter<Elf64>;

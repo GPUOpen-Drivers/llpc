@@ -34,9 +34,19 @@
 #include "llpcComputeContext.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
+#include "llpcElfWriter.h"
+#include "llpcFile.h"
 #include "llpcGraphicsContext.h"
+#include "llpcShaderModuleHelper.h"
+#include "llpcSpirvLower.h"
+#include "llpcSpirvLowerResourceCollect.h"
+#include "llpcSpirvLowerUtil.h"
+#include "llpcTimerProfiler.h"
 #include "spirvExt.h"
+#include "vkgcElfReader.h"
+#include "vkgcPipelineDumper.h"
 #include "lgc/Builder.h"
+#include "lgc/PassManager.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/DiagnosticInfo.h"
@@ -50,16 +60,6 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
-#include "llpcElfWriter.h"
-#include "llpcFile.h"
-#include "llpcShaderModuleHelper.h"
-#include "llpcSpirvLower.h"
-#include "llpcSpirvLowerResourceCollect.h"
-#include "llpcSpirvLowerUtil.h"
-#include "llpcTimerProfiler.h"
-#include "vkgcElfReader.h"
-#include "vkgcPipelineDumper.h"
-#include "lgc/PassManager.h"
 #include <mutex>
 #include <set>
 #include <unordered_set>
@@ -726,10 +726,18 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   unsigned originalShaderStageMask = context->getPipelineContext()->getShaderStageMask();
   context->getPipelineContext()->setUnlinked(true);
 
-  ElfPackage elf[ShaderStageNativeStageCount];
-  for (unsigned stage = 0; stage < shaderInfo.size() && result == Result::Success; ++stage) {
-    if (!shaderInfo[stage] || !shaderInfo[stage]->pModuleData)
-      continue;
+  ElfPackage elf[ShaderStageCount];
+  for (unsigned stage = 0; stage < ShaderStageCount && result == Result::Success; ++stage) {
+    if (stage != ShaderStageFetch) {
+      if (stage >= shaderInfo.size() || shaderInfo[stage] == nullptr || shaderInfo[stage]->pModuleData == nullptr) {
+        continue;
+      }
+    } else {
+      if (ShaderStageVertex >= shaderInfo.size() || shaderInfo[ShaderStageVertex] == nullptr ||
+          shaderInfo[ShaderStageVertex]->pModuleData == nullptr) {
+        continue;
+      }
+    }
 
     context->getPipelineContext()->setShaderStageMask(shaderStageToMask(static_cast<ShaderStage>(stage)));
 
@@ -755,19 +763,39 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
 
     ShaderCache *shaderCache;
     CacheEntryHandle hEntry;
-    cacheEntryState = lookUpShaderCaches(userShaderCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
 
-    if (cacheEntryState == ShaderEntryState::Ready) {
-      auto data = reinterpret_cast<const char *>(elfBin.pCode);
-      elf[stage].assign(data, data + elfBin.codeSize);
-      continue;
+    // TODO: Cache fetch shader.  The current hash function takes a PieplineBuildInfo object.  I do not want to add
+    // to that struct because I do not want the VsInterfaceData exist outside of lgc.  I want to wait until
+    // llpcElfWriter is moved to lgc and we have to new linking interface.  Then we can build the caching mechanism for
+    // fetch shaders.
+    if (stage != ShaderStageFetch) {
+      cacheEntryState = lookUpShaderCaches(userShaderCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
+
+      if (cacheEntryState == ShaderEntryState::Ready) {
+        auto pData = reinterpret_cast<const char *>(elfBin.pCode);
+        elf[stage].assign(pData, pData + elfBin.codeSize);
+        continue;
+      }
     }
+
+    context->getLgcContext()->getVsInterfaceData()->clearVertexInputTypeInfo();
 
     // There was a cache miss, so we need to build the relocatable shader for
     // this stage.
-    const PipelineShaderInfo *singleStageShaderInfo[ShaderStageNativeStageCount] = {nullptr, nullptr, nullptr,
-                                                                                    nullptr, nullptr, nullptr};
-    singleStageShaderInfo[stage] = shaderInfo[stage];
+    const PipelineShaderInfo *singleStageShaderInfo[ShaderStageCount] = {nullptr, nullptr, nullptr, nullptr,
+                                                                         nullptr, nullptr, nullptr};
+
+    std::unique_ptr<PipelineShaderInfo> fetchShaderInfo;
+    if (stage != ShaderStageFetch) {
+      singleStageShaderInfo[stage] = shaderInfo[stage];
+    } else {
+      // Create the shader info for the fetch shader
+      fetchShaderInfo = std::make_unique<PipelineShaderInfo>(*shaderInfo[ShaderStageVertex]);
+      fetchShaderInfo->entryStage = ShaderStageFetch;
+      singleStageShaderInfo[ShaderStageFetch] = fetchShaderInfo.get();
+      context->getLgcContext()->setBuildFetchShader(true);
+      readInterfaceData(&elf[ShaderStageVertex], context, m_gfxIp);
+    }
 
     result = buildPipelineInternal(context, singleStageShaderInfo, forceLoopUnrollCount, &elf[stage]);
 
@@ -776,7 +804,12 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
       elfBin.codeSize = elf[stage].size();
       elfBin.pCode = elf[stage].data();
     }
-    updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
+
+    if (stage != ShaderStageFetch) {
+      updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
+    } else {
+      context->getLgcContext()->setBuildFetchShader(false);
+    }
   }
   context->getPipelineContext()->setShaderStageMask(originalShaderStageMask);
 
@@ -977,7 +1010,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
       if (entryStage == ShaderStageFragment)
         fragmentShaderInfo = shaderInfoEntry;
-      if (!shaderInfoEntry || !shaderInfoEntry->pModuleData || (stageSkipMask & shaderStageToMask(entryStage)))
+      if (!shaderInfoEntry || !shaderInfoEntry->pModuleData || entryStage == ShaderStageFetch ||
+          (stageSkipMask & shaderStageToMask(entryStage)))
         continue;
 
       std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
@@ -1012,7 +1046,15 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       // Per-shader SPIR-V lowering passes.
       const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
       ShaderStage entryStage = shaderInfoEntry ? shaderInfoEntry->entryStage : ShaderStageInvalid;
-      if (!shaderInfoEntry || !shaderInfoEntry->pModuleData || (stageSkipMask & shaderStageToMask(entryStage)))
+
+      if (entryStage == ShaderStageFetch) {
+        auto fetchShaderModule = new Module("lgcFetch", *context);
+        modulesToLink.push_back({fetchShaderModule, getLgcShaderStage(static_cast<ShaderStage>(shaderIndex))});
+        context->setModuleTargetMachine(fetchShaderModule);
+      }
+
+      if (!shaderInfoEntry || !shaderInfoEntry->pModuleData || entryStage == ShaderStageFetch ||
+          (stageSkipMask & shaderStageToMask(entryStage)))
         continue;
 
       context->getBuilder()->setShaderStage(getLgcShaderStage(entryStage));
@@ -1801,12 +1843,13 @@ void Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
   if (shaderElfs[ShaderStageCompute].empty()) {
     ElfReader<Elf64> vsReader(m_gfxIp);
     ElfReader<Elf64> fsReader(m_gfxIp);
-    if (!shaderElfs[ShaderStageVertex].empty()) {
-      size_t codeSize = shaderElfs[ShaderStageVertex].size_in_bytes();
-      result = vsReader.ReadFromBuffer(shaderElfs[ShaderStageVertex].data(), &codeSize);
-      if (result != Result::Success)
-        return;
-    }
+    ElfReader<Elf64> fchReader(m_gfxIp);
+
+    assert(!shaderElfs[ShaderStageVertex].empty());
+    size_t codeSize = shaderElfs[ShaderStageVertex].size_in_bytes();
+    result = vsReader.ReadFromBuffer(shaderElfs[ShaderStageVertex].data(), &codeSize);
+    if (result != Result::Success)
+      return;
 
     if (!shaderElfs[ShaderStageFragment].empty()) {
       size_t codeSize = shaderElfs[ShaderStageFragment].size_in_bytes();
@@ -1815,7 +1858,13 @@ void Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
         return;
     }
 
-    result = writer.linkGraphicsRelocatableElf({&vsReader, &fsReader}, context);
+    assert(!shaderElfs[ShaderStageFetch].empty());
+    codeSize = shaderElfs[ShaderStageFetch].size_in_bytes();
+    result = fchReader.ReadFromBuffer(shaderElfs[ShaderStageFetch].data(), &codeSize);
+    if (result != Result::Success) {
+      return;
+    }
+    result = writer.linkGraphicsRelocatableElf({&vsReader, &fsReader, &fchReader}, context);
   } else {
     ElfReader<Elf64> csReader(m_gfxIp);
     size_t codeSize = shaderElfs[ShaderStageCompute].size_in_bytes();
@@ -1846,6 +1895,8 @@ lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
     return lgc::ShaderStageGeometry;
   case ShaderStageFragment:
     return lgc::ShaderStageFragment;
+  case ShaderStageFetch:
+    return lgc::ShaderStageFetch;
   default:
     llvm_unreachable("");
     return lgc::ShaderStageInvalid;

@@ -287,3 +287,110 @@ void LgcContext::addTargetPasses(lgc::PassManager &passMgr, Timer *codeGenTimer,
   if (codeGenTimer)
     passMgr.add(createStartStopTimer(codeGenTimer, false));
 }
+
+// =====================================================================================================================
+// Set the type for the vertext input at the given location, and return the number of locations consumed.
+//
+// @param location : the location of the vertex input.
+// @param type : the type of the vertex input.
+unsigned int VsInterfaceData::setVertexInputType(unsigned location, unsigned component, llvm::Type *type) {
+  VertexInputTypeInfo &vertexInputTypeInfo = m_vertexInputType[{location, component}];
+  unsigned locationsConsumed = 0;
+
+  if (type->isArrayTy()) {
+    unsigned arraySize = type->getArrayNumElements();
+    type = type->getArrayElementType();
+    for (unsigned i = 0; i < arraySize; ++i) {
+      locationsConsumed += setVertexInputType(location + locationsConsumed, component, type);
+    }
+    return locationsConsumed;
+  }
+
+  if (type->isStructTy()) {
+    for (unsigned i = 0; i < type->getStructNumElements(); ++i) {
+      locationsConsumed += setVertexInputType(location + locationsConsumed, component, type->getStructElementType(i));
+    }
+    return locationsConsumed;
+  }
+
+  if (type->isVectorTy()) {
+    vertexInputTypeInfo.vectorSize = cast<VectorType>(type)->getElementCount().Min;
+    type = cast<VectorType>(type)->getElementType();
+  } else {
+    vertexInputTypeInfo.vectorSize = 1;
+  }
+
+  locationsConsumed = 1;
+  if (type->isHalfTy()) {
+    vertexInputTypeInfo.elementType = BasicVertexInputType ::Float16;
+  } else if (type->isFloatTy()) {
+    vertexInputTypeInfo.elementType = BasicVertexInputType ::Float;
+  } else if (type->isDoubleTy()) {
+    vertexInputTypeInfo.elementType = BasicVertexInputType ::Double;
+    if (vertexInputTypeInfo.vectorSize >= 3)
+      locationsConsumed = 2;
+  } else if (type->isIntegerTy(8)) {
+    vertexInputTypeInfo.elementType = BasicVertexInputType ::Int8;
+  } else if (type->isIntegerTy(16)) {
+    vertexInputTypeInfo.elementType = BasicVertexInputType ::Int16;
+  } else if (type->isIntegerTy(32)) {
+    vertexInputTypeInfo.elementType = BasicVertexInputType ::Int;
+  } else if (type->isIntegerTy(64)) {
+    vertexInputTypeInfo.elementType = BasicVertexInputType ::Int64;
+    if (vertexInputTypeInfo.vectorSize >= 3)
+      locationsConsumed = 2;
+  } else {
+    // Matricies cover multiple locations.  Each location should be registered with the component types of the matrix.
+    assert(false && "Unsupported type for a vertex input.");
+  }
+  return locationsConsumed;
+}
+
+// =====================================================================================================================
+// Get the type for the vertext input at the given location.
+//
+// @param location : the location of the vertex input.
+Type *VsInterfaceData::getVertexInputType(unsigned location, unsigned component, LLVMContext *context) const {
+  auto locationType = m_vertexInputType.find({location, component});
+  if (locationType == m_vertexInputType.end()) {
+    return nullptr;
+  }
+  const VertexInputTypeInfo &vertexInputTypeInfo = locationType->second;
+
+  Type *vertexType = nullptr;
+  switch (vertexInputTypeInfo.elementType) {
+  case BasicVertexInputType ::Int8:
+    vertexType = Type::getInt8Ty(*context);
+    break;
+  case BasicVertexInputType ::Int16:
+    vertexType = Type::getInt16Ty(*context);
+    break;
+  case BasicVertexInputType ::Int:
+    vertexType = Type::getInt32Ty(*context);
+    break;
+  case BasicVertexInputType ::Int64:
+    vertexType = Type::getInt64Ty(*context);
+    break;
+  case BasicVertexInputType ::Float16:
+    vertexType = Type::getHalfTy(*context);
+    break;
+  case BasicVertexInputType ::Float:
+    vertexType = Type::getFloatTy(*context);
+    break;
+  case BasicVertexInputType ::Double:
+    vertexType = Type::getDoubleTy(*context);
+    break;
+  default:
+    assert(false && "Unexpected element type.");
+    break;
+  }
+
+  if (vertexInputTypeInfo.vectorSize > 1) {
+    vertexType = VectorType::get(vertexType, vertexInputTypeInfo.vectorSize);
+  }
+
+  return vertexType;
+}
+
+void VertexInputTypeInfo::setArgumentIndex(unsigned long idx) {
+}

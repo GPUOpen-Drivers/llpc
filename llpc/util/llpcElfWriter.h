@@ -131,6 +131,8 @@ private:
 
   void reinitialize();
 
+  ElfNote mergeVertexRegisterNote(ElfNote *vertextShaderNote, ElfNote *fetchShaderNote);
+
   // -----------------------------------------------------------------------------------------------------------------
 
   GfxIpVersion m_gfxIp;                  // Graphics IP version info (used by ELF dump only)
@@ -147,5 +149,7 @@ private:
   int m_symSecIdx;    // Section index of symbol table section
   int m_strtabSecIdx; // Section index of string table section
 };
+
+void readInterfaceData(const ElfPackage *elfPackage, Context *context, GfxIpVersion gfxIp);
 
 } // namespace Llpc

@@ -113,6 +113,9 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
   // set by TCS).
   auto pipelineShaders = &getAnalysis<PipelineShaders>();
   for (int shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage) {
+    if (shaderStage == ShaderStageFetch)
+      continue;
+
     auto entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
     if (entryPoint) {
       initPerShader();
@@ -1398,6 +1401,14 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 Value *PatchInOutImportExport::patchVsGenericInputImport(Type *inputTy, unsigned location, unsigned compIdx,
                                                          Instruction *insertPos) {
   Value *input = UndefValue::get(inputTy);
+
+  if (m_shaderStage != ShaderStageFetch && m_pipelineState->isUnlinked()) {
+    // The vertex inputs are arguments for unlinked elf.
+    const auto &vertexInputTypeInfo = m_pipelineState->getLgcContext()->getVsInterfaceData()->getVertexInputTypeInfo();
+    const VertexInputTypeInfo &inputTypeInfo = vertexInputTypeInfo.at({location, compIdx});
+    input = &insertPos->getFunction()->arg_begin()[inputTypeInfo.argumentIndex];
+    return input;
+  }
 
   // Do vertex fetch operations
   assert(m_vertexFetch);

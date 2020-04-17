@@ -50,25 +50,11 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage, bool upper) {
     abbr = upper ? "COPY" : "Copy";
   else if (shaderStage < ShaderStageCount) {
     if (upper) {
-      static const char *ShaderStageAbbrs[] = {
-        "VS",
-        "TCS",
-        "TES",
-        "GS",
-        "FS",
-        "CS",
-      };
+      static const char *ShaderStageAbbrs[] = {"VS", "TCS", "TES", "GS", "FS", "CS", "FCH"};
 
       abbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
     } else {
-      static const char *ShaderStageAbbrs[] = {
-        "Vs",
-        "Tcs",
-        "Tes",
-        "Gs",
-        "Fs",
-        "Cs",
-      };
+      static const char *ShaderStageAbbrs[] = {"Vs", "Tcs", "Tes", "Gs", "Fs", "Cs", "Fch"};
 
       abbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
     }

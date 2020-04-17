@@ -31,6 +31,8 @@
 #pragma once
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/DerivedTypes.h"
+#include <map>
 
 namespace llvm {
 
@@ -54,6 +56,85 @@ class Builder;
 class PassManager;
 class Pipeline;
 class TargetInfo;
+
+// TODO: Taken from vkgcDefs.h.  If I include that file vulkan.h cannot be found.  It is also defined in
+// ResourceUsage.h, which also cannot be inluded here.
+/// Represents the base data type
+enum class BasicVertexInputType : unsigned {
+  Unknown = 0, ///< Unknown
+  Float,       ///< Float
+  Double,      ///< Double
+  Int,         ///< Signed integer
+  Uint,        ///< Unsigned integer
+  Int64,       ///< 64-bit signed integer
+  Uint64,      ///< 64-bit unsigned integer
+  Float16,     ///< 16-bit floating-point
+  Int16,       ///< 16-bit signed integer
+  Uint16,      ///< 16-bit unsigned integer
+  Int8,        ///< 8-bit signed integer
+  Uint8,       ///< 8-bit unsigned integer
+};
+
+// Struct used to represent the type of a vertext input.
+struct VertexInputTypeInfo {
+  unsigned vectorSize;
+  BasicVertexInputType elementType;
+  uint32_t argumentIndex;
+
+  void setArgumentIndex(unsigned long idx);
+};
+
+// Information about the vertex shader used to generate the fetch shader.
+// TODO: This should moved to a new file.  Where should that file live?  It should also be part of the generic
+// interface data, but putting it there will require some changes that do not play well with caching.  I propose
+// we open and issue that is block by the refactoring of the linking code.  That issue will address the caching of fetch
+// shaders and hiding this class inside lgc.
+class VsInterfaceData {
+public:
+  typedef std::map<std::pair<unsigned, unsigned>, VertexInputTypeInfo> LocationToTypeMap;
+
+  // Record the type of the vertex input at the given location.
+  unsigned int setVertexInputType(unsigned location, unsigned component, llvm::Type *type);
+  void setVertexInputType(unsigned location, unsigned component, const VertexInputTypeInfo &typeInfo) {
+    m_vertexInputType[{location, component}] = typeInfo;
+  }
+
+  // Get the type of the vertex input at the given location.
+  llvm::Type *getVertexInputType(unsigned location, unsigned component, llvm::LLVMContext *context) const;
+  const LocationToTypeMap &getVertexInputTypeInfo() const { return m_vertexInputType; }
+  LocationToTypeMap &getVertexInputTypeInfo() { return m_vertexInputType; }
+
+  // Clears the types that have been recored for the vertex inputs.
+  void clearVertexInputTypeInfo() { m_vertexInputType.clear(); }
+
+  // Get and set the number of the last SGPR that is used as an input to the vertex shader.
+  unsigned getLastSgpr() const { return m_lastSgpr; }
+  void setLastSgpr(unsigned i) { m_lastSgpr = i; }
+
+  // Get and set the number of the SGPR in which the vertex shader is expecting the vertex offset.
+  unsigned getBaseVertexRegister() const { return m_baseVertexRegister; }
+  void setBaseVertexRegister(unsigned i) { m_baseVertexRegister = i; }
+
+  // Get and set the number of the SGPR in which the vertex shader is expecting the instance offset.
+  unsigned getBaseInstanceRegister() const { return m_baseInstanceRegister; }
+  void setBaseInstanceRegister(unsigned i) { m_baseInstanceRegister = i; }
+
+  // Get and set the value of VGPR_COMP_CNT entry for the vertex shader.
+  unsigned getVgprCompCnt() const { return m_vgrpCompCnt; }
+  void setVgprCompCnt(unsigned int i) { m_vgrpCompCnt = i; }
+
+  // Get and set the number of the SGPR in which the vertex shader is expecting the address of the vertex buffer table.
+  unsigned getVertexBufferRegister() const { return m_vertexBufferRegister; }
+  void setVertexBuffer(unsigned i) { m_vertexBufferRegister = i; }
+
+private:
+  unsigned m_lastSgpr;                 // The last SGPR used as an input to the vertext shader.
+  unsigned m_baseVertexRegister;       // The SGPR that contains the vertex offset.
+  unsigned m_baseInstanceRegister;     // The SGRP that contains the instance offset.
+  unsigned m_vgrpCompCnt;              // The value of the VGRP_COMP_CNT in the vertex shader.
+  unsigned m_vertexBufferRegister;     // The SGRP that contains the address of the vertex buffer table.
+  LocationToTypeMap m_vertexInputType; // A map from a location to the type of the vertex input at that location.
+};
 
 // =====================================================================================================================
 // LgcContext class, used to create Pipeline and Builder objects. State shared between multiple compiles
@@ -106,6 +187,12 @@ public:
   // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
   void addTargetPasses(lgc::PassManager &passMgr, llvm::Timer *codeGenTimer, llvm::raw_pwrite_stream &outStream);
 
+  // Tell the context whether or not a fetch shader is to be built.
+  void setBuildFetchShader(bool buildFetchShader) { m_buildFetchShader = buildFetchShader; }
+
+  // Returns true if a fetch shader should be built.
+  bool buildingFetchShader() { return m_buildFetchShader; }
+
   // Utility method to create a start/stop timer pass
   static llvm::ModulePass *createStartStopTimer(llvm::Timer *timer, bool starting);
 
@@ -116,6 +203,9 @@ public:
   // mapping.
   static void setLlpcOuts(llvm::raw_ostream *stream) { m_llpcOuts = stream; }
   static llvm::raw_ostream *getLgcOuts() { return m_llpcOuts; }
+
+  VsInterfaceData *getVsInterfaceData() { return &m_vsInterfaceData; }
+  const VsInterfaceData *getVsInterfaceData() const { return &m_vsInterfaceData; }
 
 private:
   LgcContext() = delete;
@@ -130,6 +220,10 @@ private:
   llvm::TargetMachine *m_targetMachine = nullptr; // Target machine
   TargetInfo *m_targetInfo = nullptr;             // Target info
   unsigned m_palAbiVersion = 0xFFFFFFFF;          // PAL pipeline ABI version to compile for
+  bool m_buildFetchShader = false;                // Flag indicating whether we are to generate a fetch shader
+
+  // TODO: These should be moved to the interface data if possible.
+  VsInterfaceData m_vsInterfaceData;
 };
 
 } // namespace lgc

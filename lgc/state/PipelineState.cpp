@@ -211,7 +211,7 @@ ShaderStage PipelineState::getPrevShaderStage(ShaderStage shaderStage) const {
 //
 // @param shaderStage : Current shader stage
 ShaderStage PipelineState::getNextShaderStage(ShaderStage shaderStage) const {
-  if (shaderStage == ShaderStageCompute)
+  if (shaderStage == ShaderStageCompute || shaderStage == ShaderStageFetch)
     return ShaderStageInvalid;
 
   if (shaderStage == ShaderStageCopyShader) {
@@ -238,7 +238,7 @@ ShaderStage PipelineState::getNextShaderStage(ShaderStage shaderStage) const {
 bool PipelineState::isGraphics() const {
   return (getShaderStageMask() &
           ((1U << ShaderStageVertex) | (1U << ShaderStageTessControl) | (1U << ShaderStageTessEval) |
-           (1U << ShaderStageGeometry) | (1U << ShaderStageFragment))) != 0;
+           (1U << ShaderStageGeometry) | (1U << ShaderStageFragment) | (1U << ShaderStageFetch))) != 0;
 }
 
 // =====================================================================================================================

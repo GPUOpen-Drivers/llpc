@@ -83,7 +83,7 @@ const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(ShaderStage sha
     shaderStage = ShaderStageGeometry;
   }
 
-  assert(shaderStage < ShaderStageGfxCount);
+  assert(shaderStage < ShaderStageGfxCount || shaderStage == ShaderStageFetch);
 
   const PipelineShaderInfo *shaderInfo = nullptr;
   switch (shaderStage) {
@@ -101,6 +101,9 @@ const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(ShaderStage sha
     break;
   case Llpc::ShaderStageFragment:
     shaderInfo = &m_pipelineInfo->fs;
+    break;
+  case Llpc::ShaderStageFetch:
+    shaderInfo = nullptr;
     break;
   default:
     llvm_unreachable("Should never be called!");

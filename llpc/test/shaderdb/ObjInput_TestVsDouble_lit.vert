@@ -22,15 +22,15 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-DAG: call <4 x double> @lgc.input.import.generic.v4f64{{.*}}
-; SHADERTEST-DAG: call <4 x double> @lgc.input.import.generic.v4f64{{.*}}
-; SHADERTEST-DAG: call <4 x double> @lgc.input.import.generic.v4f64{{.*}}
-; SHADERTEST-DAG: call <4 x double> @lgc.input.import.generic.v4f64{{.*}}
-; SHADERTEST-DAG: call <4 x double> @lgc.input.import.generic.v4f64{{.*}}
-; SHADERTEST-DAG: call <3 x double> @lgc.input.import.generic.v3f64{{.*}}
-; SHADERTEST-DAG: call <3 x double> @lgc.input.import.generic.v3f64{{.*}}
+; SHADERTEST-DAG: call <4 x double> (...) @lgc.create.read.generic.input.v4f64(i32 8, i32 0,{{.*}}
+; SHADERTEST-DAG: call <4 x double> (...) @lgc.create.read.generic.input.v4f64(i32 8, i32 2,{{.*}}
+; SHADERTEST-DAG: call <4 x double> (...) @lgc.create.read.generic.input.v4f64(i32 8, i32 4,{{.*}}
+; SHADERTEST-DAG: call <4 x double> (...) @lgc.create.read.generic.input.v4f64(i32 8, i32 6,{{.*}}
+; SHADERTEST-DAG: call <3 x double> (...) @lgc.create.read.generic.input.v3f64(i32 4, i32 0,{{.*}}
+; SHADERTEST-DAG: call <3 x double> (...) @lgc.create.read.generic.input.v3f64(i32 4, i32 2,{{.*}}
+; SHADERTEST-DAG: call <4 x double> (...) @lgc.create.read.generic.input.v4f64(i32 2, i32 0,{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST-COUNT-3: call <4 x i32> @llvm.amdgcn.struct.tbuffer.load.v4i32
+; SHADERTEST: define amdgpu_vs void @_amdgpu_vs_main({{.*}}, <4 x double> [[loc2:%[0-9]*]], <3 x double> [[loc4_0:%[0-9]*]], <3 x double> [[loc4_1:%[0-9]*]], <4 x double> [[loc8_0:%[0-9]*]], <4 x double> [[loc8_1:%[0-9]*]], <4 x double> [[loc8_2:%[0-9]*]], <4 x double> [[loc8_3:%[0-9]*]])
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -1000,7 +1000,7 @@ void PatchResourceCollect::processShader() {
       if (m_pipelineState->getRasterizerState().perSampleShading)
         m_resUsage->builtInUsage.fs.runAtSampleRate = true;
     }
-  } else if (m_shaderStage == ShaderStageVertex) {
+  } else if (m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageFetch) {
     // Collect resource usages from vertex input create info
     // TODO: In the future, we might check if the corresponding vertex attribute is active in vertex shader
     // and set the usage based on this info.

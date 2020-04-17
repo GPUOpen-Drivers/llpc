@@ -213,6 +213,7 @@ public:
 
   // Accessors for vertex input descriptions.
   llvm::ArrayRef<VertexInputDescription> getVertexInputDescriptions() const { return m_vertexInputDescriptions; }
+  std::vector<VertexInputDescription> &getVertexInputDescriptions() { return m_vertexInputDescriptions; }
   const VertexInputDescription *findVertexInputDescription(unsigned location) const;
 
   // Accessors for color export state
@@ -397,8 +398,8 @@ private:
   InputAssemblyState m_inputAssemblyState = {};                                // Input-assembly state
   ViewportState m_viewportState = {};                                          // Viewport state
   RasterizerState m_rasterizerState = {};                                      // Rasterizer state
-  std::unique_ptr<ResourceUsage> m_resourceUsage[ShaderStageCompute + 1] = {}; // Per-shader ResourceUsage
-  std::unique_ptr<InterfaceData> m_interfaceData[ShaderStageCompute + 1] = {}; // Per-shader InterfaceData
+  std::unique_ptr<ResourceUsage> m_resourceUsage[ShaderStageCount] = {};       // Per-shader ResourceUsage
+  std::unique_ptr<InterfaceData> m_interfaceData[ShaderStageCount] = {};       // Per-shader InterfaceData
   PalMetadata *m_palMetadata = nullptr;                                        // PAL metadata object
 };
 

@@ -243,11 +243,14 @@ const BufFormat VertexFetch::MVertexFormatMap[] = {
 // @param pipelineState : Pipeline state
 VertexFetch::VertexFetch(Function *entryPoint, ShaderSystemValues *shaderSysValues, PipelineState *pipelineState)
     : m_module(entryPoint->getParent()), m_context(&m_module->getContext()), m_shaderSysValues(shaderSysValues),
-      m_pipelineState(pipelineState) {
-  assert(getShaderStage(entryPoint) == ShaderStageVertex); // Must be vertex shader
+      m_pipelineState(pipelineState), m_vertexIndex(nullptr), m_instanceIndex(nullptr) {
+  m_shaderStage = getShaderStage(entryPoint);
 
-  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
-  auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
+  // Must be vertex or fetch shader
+  assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageFetch);
+
+  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs.vs;
+  auto &builtInUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->builtInUsage.vs;
   auto insertPos = entryPoint->begin()->getFirstInsertionPt();
 
   // VertexIndex = BaseVertex + VertexID

@@ -367,6 +367,7 @@ private:
   DenseMap<std::pair<BasicBlock *, BasicBlock *>, unsigned> m_blockPredecessorToCount;
   const ShaderModuleUsage *m_moduleUsage;
   unsigned m_spirvOpMetaKindId;
+  ExecutionModel m_entryExecutionModel;
 
   lgc::Builder *getBuilder() const { return m_builder; }
 
@@ -6146,6 +6147,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   if (!m_entryTarget)
     return false;
 
+  m_entryExecutionModel = entryExecModel;
   m_fpControlFlags.U32All = 0;
   static_assert(SPIRVTW_8Bit == (8 >> 3), "Unexpected value!");
   static_assert(SPIRVTW_16Bit == (16 >> 3), "Unexpected value!");
@@ -6580,6 +6582,14 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       if (bv->hasDecorate(DecorationLocation, 0, &loc)) {
         inOutDec.IsBuiltIn = false;
         inOutDec.Value.Loc = loc;
+
+        SPIRVWord component = 0;
+        if (!bv->hasDecorate(DecorationComponent, 0, &component))
+          component = 0;
+
+        if (as == SPIRAS_Input && m_entryExecutionModel == ExecutionModelVertex) {
+          m_builder->getLgcContext()->getVsInterfaceData()->setVertexInputType(loc, component, gv->getValueType());
+        }
       }
 
       SPIRVWord index = SPIRVID_INVALID;

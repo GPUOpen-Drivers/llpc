@@ -17,11 +17,11 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-DAG: call <2 x i32> @lgc.input.import.generic.v2i32{{.*}}
-; SHADERTEST-DAG: call i32 @lgc.input.import.generic{{.*}}
-; SHADERTEST-DAG: call <4 x float> @lgc.input.import.generic.v4f32{{.*}}
+; SHADERTEST-DAG: call <2 x i32> (...) @lgc.create.read.generic.input.v2i32{{.*}}
+; SHADERTEST-DAG: call i32 (...) @lgc.create.read.generic.input.i32{{.*}}
+; SHADERTEST-DAG: call <4 x float> (...) @lgc.create.read.generic.input.v4f32{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST-COUNT-3: call {{.*}} @llvm.amdgcn.struct.tbuffer.load
+; SHADERTEST: define amdgpu_vs void @_amdgpu_vs_main({{.*}}, <4 x float> [[loc0:%[0-9]*]], i32 [[loc1:%[0-9]*]], <2 x i32> [[loc2:%[0-9]*]])
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

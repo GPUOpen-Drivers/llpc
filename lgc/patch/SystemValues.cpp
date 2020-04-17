@@ -397,17 +397,14 @@ Value *ShaderSystemValues::getSpilledPushConstTablePtr() {
 // Get vertex buffer table pointer
 Value *ShaderSystemValues::getVertexBufTablePtr() {
   if (!m_vbTablePtr) {
-    // Find the node.
-    auto vbTableNode = findResourceNodeByType(ResourceNodeType::IndirectUserDataVaPtr);
-    if (vbTableNode) {
-      // Get the 64-bit extended node value.
-      auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-      auto vbTablePtrLow = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.vs.vbTablePtr, "vbTablePtr");
-      static const unsigned MaxVertexBufferSize = 0x10000000;
-      auto vbTablePtrTy = PointerType::get(
-          ArrayType::get(VectorType::get(Type::getInt32Ty(*m_context), 4), MaxVertexBufferSize), ADDR_SPACE_CONST);
-      m_vbTablePtr = makePointer(vbTablePtrLow, vbTablePtrTy, InvalidValue);
-    }
+    assert(m_shaderStage == ShaderStageFetch || findResourceNodeByType(ResourceNodeType::IndirectUserDataVaPtr));
+    // Get the 64-bit extended node value.
+    auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+    auto vbTablePtrLow = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.vs.vbTablePtr, "vbTablePtr");
+    static const unsigned MaxVertexBufferSize = 0x10000000;
+    auto vbTablePtrTy = PointerType::get(
+        ArrayType::get(VectorType::get(Type::getInt32Ty(*m_context), 4), MaxVertexBufferSize), ADDR_SPACE_CONST);
+    m_vbTablePtr = makePointer(vbTablePtrLow, vbTablePtrTy, InvalidValue);
   }
   return m_vbTablePtr;
 }
