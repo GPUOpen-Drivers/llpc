@@ -220,7 +220,7 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
 
   // Copy .user_data_limit
   auto destUserDataLimit = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
-  auto srcUserDataLimit = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
+  auto srcUserDataLimit = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
   destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit] =
       destDocument.getNode(std::max(destUserDataLimit, srcUserDataLimit));
 
