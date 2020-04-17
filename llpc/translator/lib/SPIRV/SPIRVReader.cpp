@@ -1403,10 +1403,11 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
 
             for (unsigned i = 0; i < pointerType->getVectorNumElements(); i++) {
               Value *const pointerElem = getBuilder()->CreateExtractElement(pointer, i);
+              Type *const newLoadElemType = pointerElem->getType()->getPointerElementType();
 
-              LoadInst *const newLoadElem = getBuilder()->CreateLoad(pointerElem, load->isVolatile());
+              LoadInst *const newLoadElem = getBuilder()->CreateAlignedLoad(
+                  newLoadElemType, pointerElem, MaybeAlign(load->getAlignment()), load->isVolatile());
               newLoadElem->setOrdering(load->getOrdering());
-              newLoadElem->setAlignment(MaybeAlign(load->getAlignment()));
               newLoadElem->setSyncScopeID(load->getSyncScopeID());
 
               if (load->getMetadata(LLVMContext::MD_nontemporal))
@@ -1431,10 +1432,11 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
               const unsigned addrSpace = pointerElem->getType()->getPointerAddressSpace();
               castType = castType->getPointerTo(addrSpace);
               pointerElem = getBuilder()->CreateBitCast(pointerElem, castType);
+              Type *const newLoadElemType = pointerElem->getType()->getPointerElementType();
 
-              LoadInst *const newLoadElem = getBuilder()->CreateLoad(pointerElem, load->isVolatile());
+              LoadInst *const newLoadElem = getBuilder()->CreateAlignedLoad(
+                  newLoadElemType, pointerElem, MaybeAlign(load->getAlignment()), load->isVolatile());
               newLoadElem->setOrdering(load->getOrdering());
-              newLoadElem->setAlignment(MaybeAlign(load->getAlignment()));
               newLoadElem->setSyncScopeID(load->getSyncScopeID());
 
               if (load->getMetadata(LLVMContext::MD_nontemporal))
@@ -1446,9 +1448,10 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             load->replaceAllUsesWith(getBuilder()->CreateTransposeMatrix(newLoad));
           } else {
             // Otherwise we are loading a single element and it's a simple load.
-            LoadInst *const newLoad = getBuilder()->CreateLoad(pointer, load->isVolatile());
+            Type *const newLoadType = pointer->getType()->getPointerElementType();
+            LoadInst *const newLoad = getBuilder()->CreateAlignedLoad(
+                newLoadType, pointer, MaybeAlign(load->getAlignment()), load->isVolatile());
             newLoad->setOrdering(load->getOrdering());
-            newLoad->setAlignment(MaybeAlign(load->getAlignment()));
             newLoad->setSyncScopeID(load->getSyncScopeID());
 
             if (load->getMetadata(LLVMContext::MD_nontemporal))
@@ -1480,10 +1483,9 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
 
               Value *const pointerElem = getBuilder()->CreateExtractElement(pointer, i);
 
-              StoreInst *const newStoreElem =
-                  getBuilder()->CreateStore(storeValueElem, pointerElem, store->isVolatile());
+              StoreInst *const newStoreElem = getBuilder()->CreateAlignedStore(
+                  storeValueElem, pointerElem, MaybeAlign(store->getAlignment()), store->isVolatile());
               newStoreElem->setOrdering(store->getOrdering());
-              newStoreElem->setAlignment(MaybeAlign(store->getAlignment()));
               newStoreElem->setSyncScopeID(store->getSyncScopeID());
 
               if (store->getMetadata(LLVMContext::MD_nontemporal))
@@ -1532,10 +1534,9 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
 
               Value *const storeValueElem = getBuilder()->CreateExtractValue(storeValue, i);
 
-              StoreInst *const newStoreElem =
-                  getBuilder()->CreateStore(storeValueElem, pointerElem, store->isVolatile());
+              StoreInst *const newStoreElem = getBuilder()->CreateAlignedStore(
+                  storeValueElem, pointerElem, MaybeAlign(store->getAlignment()), store->isVolatile());
               newStoreElem->setOrdering(store->getOrdering());
-              newStoreElem->setAlignment(MaybeAlign(store->getAlignment()));
               newStoreElem->setSyncScopeID(store->getSyncScopeID());
 
               if (store->getMetadata(LLVMContext::MD_nontemporal))
@@ -1543,10 +1544,9 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             }
           } else {
             // Otherwise we are storing a single element and it's a simple store.
-            StoreInst *const newStore =
-                getBuilder()->CreateStore(store->getValueOperand(), pointer, store->isVolatile());
+            StoreInst *const newStore = getBuilder()->CreateAlignedStore(
+                store->getValueOperand(), pointer, MaybeAlign(store->getAlignment()), store->isVolatile());
             newStore->setOrdering(store->getOrdering());
-            newStore->setAlignment(MaybeAlign(store->getAlignment()));
             newStore->setSyncScopeID(store->getSyncScopeID());
 
             if (store->getMetadata(LLVMContext::MD_nontemporal))
@@ -1707,6 +1707,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
       Type *const vectorType = transType(spvType, 0, false, true, false);
       Type *const castType = vectorType->getPointerTo(loadPointer->getType()->getPointerAddressSpace());
       loadPointer = getBuilder()->CreateBitCast(loadPointer, castType);
+      loadType = loadPointer->getType()->getPointerElementType();
 
       const bool scalarBlockLayout = static_cast<Llpc::Context &>(getBuilder()->getContext()).getScalarBlockLayout();
 
@@ -1714,8 +1715,8 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
         alignmentType = vectorType;
     }
 
-    LoadInst *const load = getBuilder()->CreateLoad(loadPointer, isVolatile);
-    load->setAlignment(MaybeAlign(m_m->getDataLayout().getABITypeAlignment(alignmentType)));
+    LoadInst *const load = getBuilder()->CreateAlignedLoad(
+        loadType, loadPointer, MaybeAlign(m_m->getDataLayout().getABITypeAlignment(alignmentType)), isVolatile);
 
     if (isCoherent)
       load->setAtomic(AtomicOrdering::Unordered);
@@ -1762,8 +1763,8 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
     Constant *const constStoreValue =
         buildConstStoreRecursively(spvType, storePointer->getType(), cast<Constant>(storeValue));
 
-    StoreInst *const store = getBuilder()->CreateStore(constStoreValue, storePointer, isVolatile);
-    store->setAlignment(MaybeAlign(alignment));
+    StoreInst *const store =
+        getBuilder()->CreateAlignedStore(constStoreValue, storePointer, MaybeAlign(alignment), isVolatile);
 
     if (isCoherent)
       store->setAtomic(AtomicOrdering::Unordered);
@@ -1831,8 +1832,8 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
         alignmentType = storeType;
     }
 
-    StoreInst *const store = getBuilder()->CreateStore(storeValue, storePointer, isVolatile);
-    store->setAlignment(MaybeAlign(m_m->getDataLayout().getABITypeAlignment(alignmentType)));
+    StoreInst *const store = getBuilder()->CreateAlignedStore(
+        storeValue, storePointer, MaybeAlign(m_m->getDataLayout().getABITypeAlignment(alignmentType)), isVolatile);
 
     if (isCoherent)
       store->setAtomic(AtomicOrdering::Unordered);
@@ -2013,11 +2014,11 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicLoad>(SPIRVValue *c
 
   Value *const loadPointer = transValue(spvAtomicLoad->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
                                         getBuilder()->GetInsertBlock());
+  Type *const loadType = loadPointer->getType()->getPointerElementType();
 
-  LoadInst *const load = getBuilder()->CreateLoad(loadPointer);
+  const unsigned loadAlignment = static_cast<unsigned>(m_m->getDataLayout().getTypeSizeInBits(loadType) / 8);
+  LoadInst *const load = getBuilder()->CreateAlignedLoad(loadType, loadPointer, MaybeAlign(loadAlignment));
 
-  const unsigned loadAlignment = static_cast<unsigned>(m_m->getDataLayout().getTypeSizeInBits(load->getType()) / 8);
-  load->setAlignment(MaybeAlign(loadAlignment));
   load->setAtomic(ordering, scope);
 
   return load;
@@ -2044,11 +2045,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicStore>(SPIRVValue *
   Value *const storeValue = transValue(spvAtomicStore->getOpValue(3), getBuilder()->GetInsertBlock()->getParent(),
                                        getBuilder()->GetInsertBlock());
 
-  StoreInst *const store = getBuilder()->CreateStore(storeValue, storePointer);
-
   const uint64_t storeSizeInBits = m_m->getDataLayout().getTypeSizeInBits(storeValue->getType());
   const unsigned storeAlignment = static_cast<unsigned>(storeSizeInBits / 8);
-  store->setAlignment(MaybeAlign(storeAlignment));
+  StoreInst *const store = getBuilder()->CreateAlignedStore(storeValue, storePointer, MaybeAlign(storeAlignment));
+
   store->setAtomic(ordering, scope);
 
   return store;
