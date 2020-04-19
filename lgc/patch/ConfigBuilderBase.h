@@ -30,8 +30,8 @@
  */
 #pragma once
 
-#include "AbiMetadata.h"
 #include "lgc/CommonDefs.h"
+#include "lgc/state/AbiMetadata.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 
@@ -122,7 +122,7 @@ private:
   void setPipelineHash();
 
   // -----------------------------------------------------------------------------------------------------------------
-  std::unique_ptr<llvm::msgpack::Document> m_document; // The MsgPack document
+  llvm::msgpack::Document *m_document;                 // The MsgPack document
   llvm::msgpack::MapDocNode m_pipelineNode;            // MsgPack map node for amdpal.pipelines[0]
   llvm::msgpack::MapDocNode m_apiShaderNodes[ShaderStageNativeStageCount];
   // MsgPack map node for each API shader's node in
