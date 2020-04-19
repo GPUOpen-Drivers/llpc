@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "Gfx6ConfigBuilder.h"
-#include "AbiMetadata.h"
 #include "lgc/BuiltIns.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"

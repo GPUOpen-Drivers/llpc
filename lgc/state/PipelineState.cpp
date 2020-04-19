@@ -32,6 +32,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/patch/FragColorExport.h"
+#include "lgc/state/PalMetadata.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
 #include "llvm/IR/IRBuilder.h"
@@ -66,6 +67,12 @@ ModulePass *createBuilderReplayer(Pipeline *pipeline);
 } // namespace lgc
 
 // =====================================================================================================================
+// Destructor
+PipelineState::~PipelineState() {
+  delete m_palMetadata;
+}
+
+// =====================================================================================================================
 // Get LLVMContext
 LLVMContext &Pipeline::getContext() const {
   return getLgcContext()->getContext();
@@ -84,7 +91,16 @@ unsigned PipelineState::getPalAbiVersion() const {
 }
 
 // =====================================================================================================================
+// Get PalMetadata object, creating an empty one if necessary
+PalMetadata *PipelineState::getPalMetadata() {
+  if (!m_palMetadata)
+    m_palMetadata = new PalMetadata;
+  return m_palMetadata;
+}
+
+// =====================================================================================================================
 // Clear the pipeline state IR metadata.
+// This does not clear PalMetadta, because we want that to persist into the back-end.
 //
 // @param [in/out] module : IR module
 void PipelineState::clear(Module *module) {
@@ -113,6 +129,8 @@ void PipelineState::record(Module *module) {
   recordVertexInputDescriptions(module);
   recordColorExportState(module);
   recordGraphicsState(module);
+  if (m_palMetadata)
+    m_palMetadata->record(module);
 }
 
 // =====================================================================================================================
@@ -128,6 +146,8 @@ void PipelineState::readState(Module *module) {
   readVertexInputDescriptions(module);
   readColorExportState(module);
   readGraphicsState(module);
+  if (!m_palMetadata)
+    m_palMetadata = new PalMetadata(module);
 }
 
 // =====================================================================================================================

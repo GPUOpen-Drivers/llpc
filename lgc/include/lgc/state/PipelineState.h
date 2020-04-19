@@ -57,6 +57,7 @@ void initializePipelineStateWrapperPass(PassRegistry &);
 
 namespace lgc {
 
+class PalMetadata;
 class TargetInfo;
 
 llvm::ModulePass *createPipelineStateClearer();
@@ -120,7 +121,7 @@ class PipelineState final : public Pipeline {
 public:
   PipelineState(LgcContext *builderContext, bool emitLgc = false) : Pipeline(builderContext), m_emitLgc(emitLgc) {}
 
-  ~PipelineState() override final {}
+  ~PipelineState() override final;
 
   // -----------------------------------------------------------------------------------------------------------------
   // Implementations of Pipeline methods exposed to the front-end
@@ -247,6 +248,9 @@ public:
 
   // Gets interface data of the specified shader stage
   InterfaceData *getShaderInterfaceData(ShaderStage shaderStage);
+
+  // Accessor for PAL metadata
+  PalMetadata *getPalMetadata();
 
   // -----------------------------------------------------------------------------------------------------------------
   // Utility methods
@@ -395,6 +399,7 @@ private:
   RasterizerState m_rasterizerState = {};                                      // Rasterizer state
   std::unique_ptr<ResourceUsage> m_resourceUsage[ShaderStageCompute + 1] = {}; // Per-shader ResourceUsage
   std::unique_ptr<InterfaceData> m_interfaceData[ShaderStageCompute + 1] = {}; // Per-shader InterfaceData
+  PalMetadata *m_palMetadata = nullptr;                                        // PAL metadata object
 };
 
 // =====================================================================================================================

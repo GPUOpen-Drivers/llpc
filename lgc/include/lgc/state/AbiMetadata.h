@@ -26,6 +26,10 @@
  ***********************************************************************************************************************
  * @file  AbiMetadata.h
  * @brief LLPC header file: contains declaration of keys used as PAL ABI metadata
+ *
+ * This file contains declarations for PAL ABI metadata. (Non-metadata PAL ABI declarations are in Abi.h.)
+ * It is a copy of a subset of g_palPipelineAbiMetadata.h in PAL, together with some other PAL metadata
+ * related declarations.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -165,5 +169,9 @@ static const char *const ApiStageNames[] = {".vertex", ".hull", ".domain", ".geo
 
 // The names of hardware shader stages used in PAL metadata, in Util::Abi::HardwareStage order.
 static const char *const HwStageNames[] = {".ls", ".hs", ".es", ".gs", ".vs", ".ps", ".cs"};
+
+// The name of the metadata node containing PAL metadata. This name is part of the interface from LGC into
+// the LLVM AMDGPU back-end when compiling for PAL ABI.
+static const char PalMetadataName[] = "amdgpu.pal.metadata.msgpack";
 
 } // namespace lgc

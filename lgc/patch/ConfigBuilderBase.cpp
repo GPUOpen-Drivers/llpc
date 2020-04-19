@@ -29,12 +29,11 @@
  ***********************************************************************************************************************
  */
 #include "ConfigBuilderBase.h"
-#include "AbiMetadata.h"
+#include "lgc/state/AbiMetadata.h"
+#include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/Metadata.h"
-#include "llvm/IR/Module.h"
 
 #define DEBUG_TYPE "llpc-config-builder-base"
 
@@ -61,7 +60,7 @@ ConfigBuilderBase::ConfigBuilderBase(llvm::Module *module, PipelineState *pipeli
   // problems.
   if (m_pipelineState->getPalAbiVersion() < 477)
     report_fatal_error("PAL ABI version less than 477 not supported");
-  m_document = std::make_unique<msgpack::Document>();
+  m_document = m_pipelineState->getPalMetadata()->getDocument();
 
   m_pipelineNode =
       m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0].getMap(true);
@@ -344,7 +343,7 @@ void ConfigBuilderBase::appendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config
 }
 
 // =====================================================================================================================
-// Write the config into PAL metadata in the LLVM IR module
+// Finish ConfigBuilder processing by writing into the PalMetadata document
 void ConfigBuilderBase::writePalMetadata() {
   // Set whole-pipeline values.
   setUserDataLimit();
@@ -352,27 +351,18 @@ void ConfigBuilderBase::writePalMetadata() {
   setPipelineHash();
 
   // Generating MsgPack metadata.
-  // Add the register values to the MsgPack document.
+  // Add the register values to the MsgPack document. The value is ORed in because an earlier pass may have
+  // already set some bits in the same register.
   msgpack::MapDocNode registers = m_pipelineNode[".registers"].getMap(true);
   for (const auto &entry : m_config) {
     assert(entry.key != InvalidMetadataKey);
     auto key = m_document->getNode(entry.key);
-    auto value = m_document->getNode(entry.value);
-    registers[key] = value;
+    auto &regEntry = registers[key];
+    unsigned oredValue = entry.value;
+    if (regEntry.getKind() != msgpack::Type::Nil)
+      oredValue = regEntry.getInt();
+    regEntry = m_document->getNode(oredValue);
   }
-
-  // Add the metadata version number.
-  auto versionNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Version].getArray(true);
-  versionNode[0] = m_document->getNode(Util::Abi::PipelineMetadataMajorVersion);
-  versionNode[1] = m_document->getNode(Util::Abi::PipelineMetadataMinorVersion);
-
-  // Write the MsgPack document into an IR metadata node.
-  std::string blob;
-  m_document->writeToBlob(blob);
-  auto abiMetaString = MDString::get(m_module->getContext(), blob);
-  auto abiMetaNode = MDNode::get(m_module->getContext(), abiMetaString);
-  auto namedMeta = m_module->getOrInsertNamedMetadata("amdgpu.pal.metadata.msgpack");
-  namedMeta->addOperand(abiMetaNode);
 }
 
 // =====================================================================================================================

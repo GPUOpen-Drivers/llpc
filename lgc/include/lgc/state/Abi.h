@@ -26,6 +26,9 @@
  ***********************************************************************************************************************
  * @file  Abi.h
  * @brief LLPC header file: contains declarations for parts of PAL pipeline ABI
+ *
+ * This file contains declarations for the PAL pipeline ABI, other than declarations relating to PAL metadata,
+ * which are in AbiMetadata.h. It is a copy of a subset of palPipelineAbi.h in PAL.
  ***********************************************************************************************************************
  */
 #pragma once

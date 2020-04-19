@@ -220,6 +220,7 @@ target_sources(LLVMlgc PRIVATE
 target_sources(LLVMlgc PRIVATE
     state/Compiler.cpp
     state/LgcContext.cpp
+    state/PalMetadata.cpp
     state/PipelineShaders.cpp
     state/PipelineState.cpp
     state/ResourceUsage.cpp

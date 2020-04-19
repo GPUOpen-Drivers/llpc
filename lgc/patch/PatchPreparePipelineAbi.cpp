@@ -28,7 +28,6 @@
 * @brief LLPC source file: contains declaration and implementation of class lgc::PatchPreparePipelineAbi.
 ***********************************************************************************************************************
 */
-#include "AbiMetadata.h"
 #include "Gfx6ConfigBuilder.h"
 #include "Gfx9ConfigBuilder.h"
 #include "ShaderMerger.h"
