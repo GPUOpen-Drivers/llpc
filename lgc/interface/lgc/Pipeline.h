@@ -181,11 +181,12 @@ enum class ResourceNodeType : unsigned {
   DescriptorBuffer,          ///< Generic descriptor: buffer, including uniform buffer and shader storage buffer
   DescriptorTableVaPtr,      ///< Descriptor table VA pointer
   IndirectUserDataVaPtr,     ///< Indirect user data VA pointer
-  PushConst,                 ///< Push constant
+  PushConst,                 ///< Push constant; only a single PushConst in the root table is allowed
   DescriptorBufferCompact,   ///< Compact buffer descriptor, only contains the buffer address
   StreamOutTableVaPtr,       ///< Stream-out buffer table VA pointer
   DescriptorReserved12,
   DescriptorYCbCrSampler, ///< Generic descriptor: YCbCr sampler
+  InlineBuffer,           ///< Inline buffer, with descriptor set and binding
   Count,                  ///< Count of resource mapping node types.
 };
 

@@ -475,7 +475,7 @@ Value *PatchDescriptorLoad::loadBufferDescriptor(unsigned descSet, unsigned bind
   }
 
   // Normal buffer descriptor load.
-  // Find the descriptor node, either a DescriptorBuffer or PushConst (inline buffer).
+  // Find the descriptor node, either a DescriptorBuffer or InlineBuffer.
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
   std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorBuffer, descSet, binding);
@@ -513,7 +513,7 @@ Value *PatchDescriptorLoad::loadBufferDescriptor(unsigned descSet, unsigned bind
   descPtr = getDescPtr(ResourceNodeType::DescriptorBuffer, descSet, binding, topNode, node,
                        /*shadow=*/false, builder);
 
-  if (node && node->type == ResourceNodeType::PushConst) {
+  if (node && node->type == ResourceNodeType::InlineBuffer) {
     // Inline buffer.
     return buildInlineBufferDesc(descPtr, builder);
   }

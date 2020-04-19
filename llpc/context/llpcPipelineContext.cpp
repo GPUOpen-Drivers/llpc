@@ -407,7 +407,7 @@ void PipelineContext::setUserDataInPipeline(Pipeline *pipeline) const {
   ResourceNode *destTable = allocUserDataNodes.get();
   ResourceNode *destInnerTable = destTable + nodeCount;
   auto userDataNodes = ArrayRef<ResourceNode>(destTable, nodes.size());
-  setUserDataNodesTable(pipeline->getContext(), nodes, immutableNodesMap, destTable, destInnerTable);
+  setUserDataNodesTable(pipeline->getContext(), nodes, immutableNodesMap, /*isRoot=*/true, destTable, destInnerTable);
   assert(destInnerTable == destTable + nodes.size());
 
   // Give the table to the LGC Pipeline interface.
@@ -421,11 +421,12 @@ void PipelineContext::setUserDataInPipeline(Pipeline *pipeline) const {
 // @param context : LLVM context
 // @param nodes : The resource mapping nodes
 // @param immutableNodesMap : Map of immutable nodes
+// @param isRoot : Whether this is the root table
 // @param [out] destTable : Where to write nodes
 // @param [in/out] destInnerTable : End of space available for inner tables
 void PipelineContext::setUserDataNodesTable(LLVMContext &context, ArrayRef<ResourceMappingNode> nodes,
-                                            const ImmutableNodesMap &immutableNodesMap, ResourceNode *destTable,
-                                            ResourceNode *&destInnerTable) const {
+                                            const ImmutableNodesMap &immutableNodesMap, bool isRoot,
+                                            ResourceNode *destTable, ResourceNode *&destInnerTable) const {
   for (unsigned idx = 0; idx != nodes.size(); ++idx) {
     auto &node = nodes[idx];
     auto &destNode = destTable[idx];
@@ -440,7 +441,7 @@ void PipelineContext::setUserDataNodesTable(LLVMContext &context, ArrayRef<Resou
       destInnerTable -= node.tablePtr.nodeCount;
       destNode.innerTable = ArrayRef<ResourceNode>(destInnerTable, node.tablePtr.nodeCount);
       setUserDataNodesTable(context, ArrayRef<ResourceMappingNode>(node.tablePtr.pNext, node.tablePtr.nodeCount),
-                            immutableNodesMap, destInnerTable, destInnerTable);
+                            immutableNodesMap, /*isRoot=*/false, destInnerTable, destInnerTable);
       break;
     }
     case ResourceMappingNodeType::IndirectUserDataVaPtr: {
@@ -482,7 +483,10 @@ void PipelineContext::setUserDataNodesTable(LLVMContext &context, ArrayRef<Resou
       static_assert(ResourceNodeType::DescriptorBufferCompact ==
                         static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorBufferCompact),
                     "mismatch");
-      if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
+      // A "PushConst" is in fact an InlineBuffer when it appears in a non-root table.
+      if (node.type == ResourceMappingNodeType::PushConst && !isRoot)
+        destNode.type = ResourceNodeType::InlineBuffer;
+      else if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
         destNode.type = ResourceNodeType::DescriptorYCbCrSampler;
       else
         destNode.type = static_cast<ResourceNodeType>(node.type);
