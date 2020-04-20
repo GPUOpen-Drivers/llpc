@@ -204,6 +204,9 @@ public:
   std::pair<const ResourceNode *, const ResourceNode *> findResourceNode(ResourceNodeType nodeType, unsigned descSet,
                                                                          unsigned binding) const;
 
+  // Find the single root resource node of the given type
+  const ResourceNode *findSingleRootResourceNode(ResourceNodeType nodeType) const;
+
   // Return whether we have a converting sampler in the user data nodes.
   bool haveConvertingSampler() const { return m_haveConvertingSampler; }
 

@@ -692,45 +692,42 @@ Value *ImageBuilder::CreateImageSample(Type *resultTy, unsigned dim, unsigned fl
   Value *coord = address[ImageAddressIdxCoordinate];
   assert(coord->getType()->getScalarType()->isFloatTy() || coord->getType()->getScalarType()->isHalfTy());
 
-  // Find the {set,desc} for the sampler and see if it is a YCbCr converting sampler.
+  // See if the descriptor is an immutable converting sampler, by tracing the load address back through
+  // bitcasts and constant GEPs to a global variable whose name starts with "_immutable_converting_sampler",
+  // which is where DescBuilder would have put the immutable sampler value.
   // This is a hack to cope with the design of the Vulkan YCbCr conversion extension, in which
   // you cannot see in the SPIR-V that a sampler is a converting sampler. It does not work
   // if the sampler pointer is passed through a non-inlined function arg or a phi node.
   // If using BuilderRecorder, it relies on the order in which recorded builder calls are
   // processed in BuilderReplayer.
   if (m_pipelineState->haveConvertingSampler()) {
-    if (auto loadFromPtr = dyn_cast<CallInst>(samplerDesc)) {
-      if (Function *loadFromPtrFunc = loadFromPtr->getCalledFunction()) {
-        if (loadFromPtrFunc->getName().startswith(lgcName::DescriptorLoadFromPtr)) {
-          Value *descPtr = loadFromPtr->getOperand(0);
-          if (auto descPtrCall = dyn_cast<CallInst>(descPtr)) {
-            if (Function *descPtrCallFunc = descPtrCall->getCalledFunction()) {
-              if (descPtrCallFunc->getName().startswith(lgcName::DescriptorGetSamplerPtr) ||
-                  descPtrCallFunc->getName().startswith(lgcName::DescriptorIndex)) {
-                // Set index to 0 by default for non-array sampler.
-                unsigned index = 0;
-                // If encounter sampler array, we need to parse the index first.
-                if (descPtrCallFunc->getName().startswith(lgcName::DescriptorIndex)) {
-                  index = cast<ConstantInt>(descPtrCall->getArgOperand(1))->getZExtValue();
-                  descPtrCall = dyn_cast<CallInst>(descPtrCall->getOperand(0));
-                }
-                // We have found the call that tells us the descriptor set and binding.
-                unsigned descSet = cast<ConstantInt>(descPtrCall->getArgOperand(0))->getZExtValue();
-                unsigned binding = cast<ConstantInt>(descPtrCall->getArgOperand(1))->getZExtValue();
-                const ResourceNode *node =
-                    m_pipelineState->findResourceNode(ResourceNodeType::DescriptorYCbCrSampler, descSet, binding)
-                        .second;
-                if (node) {
-                  Value *convertingSamplerDesc = CreateExtractValue(node->immutableValue, index);
-                  // It is a YCbCr converting sampler. Get the immutable converter and call the
-                  // appropriate function for a converting image sample.
-                  return CreateImageSampleConvert(resultTy, dim, flags, imageDesc, convertingSamplerDesc, address,
-                                                  instName);
-                }
-              }
-            }
+    if (auto load = dyn_cast<LoadInst>(samplerDesc)) {
+      Value *addr = load->getOperand(0);
+      unsigned byteOffset = 0;
+      for (;;) {
+        if (auto bitcast = dyn_cast<BitCastInst>(addr)) {
+          addr = bitcast->getOperand(0);
+          continue;
+        }
+        if (auto gep = dyn_cast<GetElementPtrInst>(addr)) {
+          APInt gepOffset;
+          if (gep->accumulateConstantOffset(GetInsertPoint()->getModule()->getDataLayout(), gepOffset)) {
+            byteOffset += gepOffset.getZExtValue();
+            continue;
           }
         }
+        if (auto global = dyn_cast<GlobalVariable>(addr)) {
+          if (global->getName().startswith(lgcName::ImmutableConvertingSamplerGlobal)) {
+            // The initializer of the global variable is an array of v8i32 immutable sampler values. We need
+            // to extract the right one, then call the appropriate function for a converting image sample.
+            auto initializer = cast<ConstantArray>(global->getInitializer());
+            Constant *convertingSamplerDesc = cast<Constant>(CreateExtractValue(
+                initializer,
+                byteOffset / (initializer->getType()->getArrayElementType()->getPrimitiveSizeInBits() / 8)));
+            return CreateImageSampleConvert(resultTy, dim, flags, imageDesc, convertingSamplerDesc, address, instName);
+          }
+        }
+        break;
       }
     }
   }

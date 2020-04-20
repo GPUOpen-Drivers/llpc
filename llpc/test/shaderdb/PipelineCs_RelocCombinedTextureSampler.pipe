@@ -6,9 +6,9 @@
   // Test that correct relocated offsets are in the linked texture fetching code.
 ; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_cs_main>:
   // Matching the relocation entry for the resource descriptor
-; SHADERTEST-DAG: s_mov_b32 s[[RELOREG_RESOURCE:[0-9]+]], 16 //{{.*}}
+; SHADERTEST: s_mov_b32 s[[RELOREG_RESOURCE:[0-9]+]], 16 //{{.*}}
   // Matching the relocation entry for the sampler descriptor
-; SHADERTEST-DAG: s_mov_b32 s[[RELOREG_SAMPLER:[0-9]+]], 48 //{{.*}}
+; SHADERTEST: s_mov_b32 s[[RELOREG_SAMPLER:[0-9]+]], 48 //{{.*}}
   // Loading the resource descriptor
 ; SHADERTEST-DAG: s_load_dwordx8 s[[RESOURCE_REG:\[[0-9]+:[0-9]+\]]], s[{{.*}}:{{.*}}], s[[RELOREG_RESOURCE]] //{{.*}}
   // Loading the sampler descriptor

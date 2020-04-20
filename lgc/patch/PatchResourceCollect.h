@@ -112,7 +112,6 @@ private:
 
   std::vector<llvm::CallInst *> m_inOutCalls; // The import or export calls
 
-  bool m_hasPushConstOp;      // Whether push constant is active
   bool m_hasDynIndexedInput;  // Whether dynamic indices are used in generic input addressing (valid
                               // for tessellation shader, fragment shader with input interpolation)
   bool m_hasDynIndexedOutput; // Whether dynamic indices are used in generic output addressing (valid

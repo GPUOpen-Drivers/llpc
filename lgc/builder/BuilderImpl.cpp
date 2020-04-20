@@ -166,13 +166,53 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
   SmallVector<Value *, 2> nonUniformIndices;
   for (unsigned operandIdx : operandIdxs) {
     Value *nonUniformVal = nonUniformInst->getOperand(operandIdx);
-    if (auto call = dyn_cast<CallInst>(nonUniformVal)) {
-      if (auto calledFunc = call->getCalledFunction()) {
-        if (calledFunc->getName().startswith(lgcName::DescriptorLoadFromPtr)) {
-          call = dyn_cast<CallInst>(call->getArgOperand(0)); // The descriptor pointer
-          if (call && call->getCalledFunction()->getName().startswith(lgcName::DescriptorIndex))
-            nonUniformVal = call->getArgOperand(1); // The index operand
+    if (auto load = dyn_cast<LoadInst>(nonUniformVal)) {
+      Value *base = load->getOperand(0);
+      Value *index = nullptr;
+      for (;;) {
+        if (auto bitcast = dyn_cast<BitCastInst>(base)) {
+          base = bitcast->getOperand(0);
+          continue;
         }
+        if (auto gep = dyn_cast<GetElementPtrInst>(base)) {
+          if (gep->hasAllConstantIndices()) {
+            base = gep->getPointerOperand();
+            continue;
+          }
+          // Variable GEP, to provide the index for the waterfall.
+          if (index || gep->getNumIndices() != 1)
+            break;
+          index = *gep->idx_begin();
+          base = gep->getPointerOperand();
+          continue;
+        }
+        if (auto extract = dyn_cast<ExtractValueInst>(base)) {
+          if (extract->getIndices().size() == 1 && extract->getIndices()[0] == 0) {
+            base = extract->getAggregateOperand();
+            continue;
+          }
+          break;
+        }
+        if (auto insert = dyn_cast<InsertValueInst>(base)) {
+          if (insert->getIndices()[0] != 0) {
+            base = insert->getAggregateOperand();
+            continue;
+          }
+          if (insert->getIndices().size() == 1 && insert->getIndices()[0] == 0) {
+            base = insert->getInsertedValueOperand();
+            continue;
+          }
+          break;
+        }
+        if (auto call = dyn_cast<CallInst>(base)) {
+          if (index) {
+            if (auto calledFunc = call->getCalledFunction()) {
+              if (calledFunc->getName().startswith(lgcName::DescriptorSet))
+                nonUniformVal = index;
+            }
+          }
+        }
+        break;
       }
     }
     nonUniformIndices.push_back(nonUniformVal);

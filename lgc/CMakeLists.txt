@@ -199,7 +199,6 @@ target_sources(LLVMlgc PRIVATE
     patch/PatchBufferOp.cpp
     patch/PatchCheckShaderCache.cpp
     patch/PatchCopyShader.cpp
-    patch/PatchDescriptorLoad.cpp
     patch/PatchEntryPointMutate.cpp
     patch/PatchInOutImportExport.cpp
     patch/PatchIntrinsicSimplify.cpp
@@ -208,7 +207,6 @@ target_sources(LLVMlgc PRIVATE
     patch/PatchNullFragShader.cpp
     patch/PatchPeepholeOpt.cpp
     patch/PatchPreparePipelineAbi.cpp
-    patch/PatchPushConstOp.cpp
     patch/PatchResourceCollect.cpp
     patch/PatchSetupTargetFeatures.cpp
     patch/ShaderMerger.cpp
