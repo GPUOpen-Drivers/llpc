@@ -90,11 +90,9 @@ enum class WaveBreak : unsigned {
   DrawTime = 0xF, ///< Choose wave break size per draw
 };
 
-/// Values for shadowDescriptorTableUsage pipeline option.
-enum class ShadowDescriptorTableUsage : unsigned {
-  Auto = 0, ///< Use 0 for auto setting so null initialized structures default to auto.
-  Enable = 1,
-  Disable = 2,
+// Values for shadowDescriptorTable pipeline option.
+enum class ShadowDescriptorTable : unsigned {
+  Disable = ~0U // Disable shadow descriptor tables
 };
 
 // Middle-end per-pipeline options to pass to SetOptions.
@@ -116,8 +114,8 @@ struct Options {
   NggSubgroupSizing nggSubgroupSizing; // NGG subgroup sizing type
   unsigned nggVertsPerSubgroup;        // How to determine NGG verts per subgroup
   unsigned nggPrimsPerSubgroup;        // How to determine NGG prims per subgroup
-  ShadowDescriptorTableUsage shadowDescriptorTableUsage; // Shadow descriptor table setting
-  unsigned shadowDescriptorTablePtrHigh;                 // High part of VA ptr.
+  unsigned shadowDescriptorTable;      // High dword of shadow descriptor table address, or
+                                       //   ShadowDescriptorTable::Disable to disable shadow descriptor tables
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.

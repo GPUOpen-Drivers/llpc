@@ -40,12 +40,6 @@
 using namespace lgc;
 using namespace llvm;
 
-// -enable-shadow-desc: enable shadow descriptor table
-static cl::opt<bool> EnableShadowDescriptorTable("enable-shadow-desc", cl::desc("Enable shadow descriptor table"));
-// -shadow-desc-table-ptr-high: high part of VA for shadow descriptor table pointer
-static cl::opt<unsigned> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
-                                                cl::desc("High part of VA for shadow descriptor table pointer"));
-
 // =====================================================================================================================
 // Initialize this ShaderSystemValues if it was previously uninitialized.
 //
@@ -60,30 +54,6 @@ void ShaderSystemValues::initialize(PipelineState *pipelineState, Function *entr
 
     assert(m_shaderStage != ShaderStageInvalid);
     assert(m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs.initialized);
-
-    // Load shadow descriptor table settings from pipeline options.
-    const auto pipelineOptions = &m_pipelineState->getOptions();
-    switch (pipelineOptions->shadowDescriptorTableUsage) {
-    case ShadowDescriptorTableUsage::Auto: // Use defaults defined in class
-      break;
-    case ShadowDescriptorTableUsage::Enable:
-      m_enableShadowDescTable = true;
-      m_shadowDescTablePtrHigh = pipelineOptions->shadowDescriptorTablePtrHigh;
-      break;
-    case ShadowDescriptorTableUsage::Disable:
-      m_enableShadowDescTable = false;
-      break;
-    default:
-      llvm_unreachable("Unsupported value of shadowDescriptorTableUsage");
-      break;
-    }
-
-    // Command line options override pipeline options.
-    if (EnableShadowDescriptorTable.getNumOccurrences() > 0)
-      m_enableShadowDescTable = EnableShadowDescriptorTable;
-
-    if (ShadowDescTablePtrHigh.getNumOccurrences() > 0)
-      m_shadowDescTablePtrHigh = ShadowDescTablePtrHigh;
   }
 }
 
@@ -349,8 +319,8 @@ Value *ShaderSystemValues::getShadowDescTablePtr(unsigned descSet) {
     if (resNodeIdx != InvalidValue) {
       // Get the 64-bit extended node value.
       auto descTablePtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_context), UINT32_MAX), ADDR_SPACE_CONST);
-      m_shadowDescTablePtrs[descSet] =
-          getExtendedResourceNodeValue(resNodeIdx, descTablePtrTy, m_shadowDescTablePtrHigh);
+      unsigned shadowDescTablePtrHigh = m_pipelineState->getOptions().shadowDescriptorTable;
+      m_shadowDescTablePtrs[descSet] = getExtendedResourceNodeValue(resNodeIdx, descTablePtrTy, shadowDescTablePtrHigh);
     }
   }
   return m_shadowDescTablePtrs[descSet];
@@ -690,5 +660,5 @@ unsigned ShaderSystemValues::findResourceNodeByDescSet(unsigned descSet) {
 // =====================================================================================================================
 // Test if shadow descriptor table is enabled
 bool ShaderSystemValues::isShadowDescTableEnabled() const {
-  return m_enableShadowDescTable;
+  return m_pipelineState->getOptions().shadowDescriptorTable != static_cast<unsigned>(ShadowDescriptorTable::Disable);
 }
