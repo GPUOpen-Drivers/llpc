@@ -77,8 +77,7 @@ public:
   static void DumpPipelineExtraInfo(PipelineDumpFile *binaryFile, const std::string *str);
 
   static MetroHash::Hash generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
-                                                        bool isRelocatableShader,
-                                                        unsigned stage = ShaderStageInvalid);
+                                                         bool isRelocatableShader, unsigned stage = ShaderStageInvalid);
 
   static MetroHash::Hash generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline, bool isCacheHash,
                                                         bool isRelocatableShader);

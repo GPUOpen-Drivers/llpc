@@ -97,7 +97,7 @@ public:
 
   Result getSectionDataBySectionIndex(unsigned secIdx, const SectionBuffer **ppSectionData) const;
 
-  Result getSectionData(const char* pName, const void** ppData, size_t* pDataLength) const;
+  Result getSectionData(const char *name, const void **data, size_t *dataLength) const;
 
   void GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol *> &secSymbols);
 
