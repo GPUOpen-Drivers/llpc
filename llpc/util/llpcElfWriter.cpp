@@ -1212,6 +1212,36 @@ bool getDeviceIndexRelocationValue(Context *context, RelocationEntry relocEntry,
 }
 
 // =====================================================================================================================
+// Get value of a numSamples relocation ($numSamples symbol).
+//
+// @param context : [in] Pipeline compilation context
+// @param relocEntry : The relocation entry to fixup
+// @param isGraphicsPipeline : Whether we are processing a compute or graphics pipeline
+// @param value : [out] The value of the relocation
+bool getNumSamplesRelocationValue(Context *context, RelocationEntry relocEntry, bool isGraphicsPipeline,
+                                  unsigned *value) {
+  auto pipelineBuildInfo = context->getPipelineContext()->getPipelineBuildInfo();
+  assert(isGraphicsPipeline && "numSamples relocation is for graphics pipeline only.");
+  *value = static_cast<const GraphicsPipelineBuildInfo *>(pipelineBuildInfo)->rsState.numSamples;
+  return true;
+}
+
+// =====================================================================================================================
+// Get value of a numSamples relocation ($samplePatternIdx symbol).
+//
+// @param context : [in] Pipeline compilation context
+// @param relocEntry : The relocation entry to fixup
+// @param isGraphicsPipeline : Whether we are processing a compute or graphics pipeline
+// @param value : [out] The value of the relocation
+bool getSamplePatternIdxRelocationValue(Context *context, RelocationEntry relocEntry, bool isGraphicsPipeline,
+                                        unsigned *value) {
+  auto pipelineBuildInfo = context->getPipelineContext()->getPipelineBuildInfo();
+  assert(isGraphicsPipeline && "samplePatternIdx relocation is for graphics pipeline only.");
+  *value = static_cast<const GraphicsPipelineBuildInfo *>(pipelineBuildInfo)->rsState.samplePatternIdx;
+  return true;
+}
+
+// =====================================================================================================================
 // Get the value of a relocation symbol. Returns true if success, and false if the symbol is unknown.
 //
 // @param context : [in] Pipeline compilation context
@@ -1225,6 +1255,10 @@ bool getRelocationSymbolValue(Context *context, RelocationEntry relocEntry, bool
     return getDescriptorStrideRelocationValue(context, relocEntry, isGraphicsPipeline, value);
   } else if (strcmp(relocEntry.name, "$deviceIdx") == 0) {
     return getDeviceIndexRelocationValue(context, relocEntry, isGraphicsPipeline, value);
+  } else if (strcmp(relocEntry.name, "$numSamples") == 0) {
+    return getNumSamplesRelocationValue(context, relocEntry, isGraphicsPipeline, value);
+  } else if (strcmp(relocEntry.name, "$samplePatternIdx") == 0) {
+    return getSamplePatternIdxRelocationValue(context, relocEntry, isGraphicsPipeline, value);
   }
   return false;
 }
