@@ -100,6 +100,8 @@ cl::opt<bool> SPIRVWorkaroundBadSPIRV("spirv-workaround-bad-spirv", cl::init(tru
 // Prefix for placeholder global variable name.
 const char *KPlaceholderPrefix = "placeholder.";
 
+const char *MetaNameSpirvOp = "spirv.op";
+
 // Prefix for row major matrix helpers.
 static const char SpirvLaunderRowMajor[] = "spirv.launder.row_major";
 
@@ -220,6 +222,7 @@ public:
         m_moduleUsage(reinterpret_cast<const ShaderModuleUsage *>(moduleUsage)) {
     assert(m_m);
     m_context = &m_m->getContext();
+    m_spirvOpMetaKindId = m_context->getMDKindID(MetaNameSpirvOp);
   }
 
   DebugLoc getDebugLoc(SPIRVInstruction *bi, Function *f);
@@ -363,6 +366,7 @@ private:
   DenseMap<std::pair<SPIRVType *, unsigned>, Type *> m_overlappingStructTypeWorkaroundMap;
   DenseMap<std::pair<BasicBlock *, BasicBlock *>, unsigned> m_blockPredecessorToCount;
   const ShaderModuleUsage *m_moduleUsage;
+  unsigned m_spirvOpMetaKindId;
 
   lgc::Builder *getBuilder() const { return m_builder; }
 
@@ -5188,7 +5192,7 @@ static void printTypeName(Type *ty, raw_ostream &nameStream) {
     nameStream << "i" << ty->getScalarSizeInBits();
     return;
   }
-  assert(ty->isVoidTy());
+  assert(ty->isVoidTy() || ty->isArrayTy() || ty->isStructTy());
   nameStream << "V";
 }
 
@@ -5245,6 +5249,8 @@ Instruction *SPIRVToLLVM::transBuiltinFromInst(const std::string &funcName, SPIR
     func->setCallingConv(CallingConv::SPIR_FUNC);
     if (isFuncNoUnwind())
       func->addFnAttr(Attribute::NoUnwind);
+    MDNode *const funcMeta = MDNode::get(*m_context, ConstantAsMetadata::get(m_builder->getInt32(bi->getOpCode())));
+    func->setMetadata(m_spirvOpMetaKindId, funcMeta);
   }
   auto call = CallInst::Create(func, args, "", bb);
   setName(call, bi);
