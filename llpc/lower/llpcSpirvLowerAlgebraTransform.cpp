@@ -313,10 +313,10 @@ void SpirvLowerAlgebraTransform::visitCallInst(CallInst &callInst) {
     auto calleeName = callee->getName();
     unsigned builtIn = InvalidValue;
     Value *valueWritten = nullptr;
-    if (calleeName.startswith("llpc.output.export.builtin.")) {
+    if (calleeName.startswith("lgc.output.export.builtin.")) {
       builtIn = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
       valueWritten = callInst.getOperand(callInst.getNumArgOperands() - 1);
-    } else if (calleeName.startswith("llpc.call.write.builtin")) {
+    } else if (calleeName.startswith("lgc.create.write.builtin")) {
       builtIn = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
       valueWritten = callInst.getOperand(0);
     }
