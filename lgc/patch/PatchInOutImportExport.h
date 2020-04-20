@@ -202,6 +202,7 @@ private:
   llvm::Value *reconfigWorkgroup(llvm::Value *localInvocationId, llvm::Instruction *insertPos);
   llvm::Value *getWorkgroupSize();
   llvm::Value *getInLocalInvocationId(llvm::Instruction *insertPos);
+  llvm::Value *getDeviceIndex(llvm::Instruction *insertPos);
 
   // -----------------------------------------------------------------------------------------------------------------
 

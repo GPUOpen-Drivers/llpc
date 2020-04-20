@@ -1192,6 +1192,24 @@ bool getDescriptorStrideRelocationValue(Context *context, RelocationEntry relocE
 }
 
 // =====================================================================================================================
+// Get value a device index relocation ($deviceIdx symbol).
+//
+// @param context : [in] Pipeline compilation context
+// @param relocEntry : The relocation entry to fixup
+// @param isGraphicsPipeline : Whether we are processing a compute or graphics pipeline
+// @param value : [out] The value of the relocation
+bool getDeviceIndexRelocationValue(Context *context, RelocationEntry relocEntry, bool isGraphicsPipeline,
+                                   unsigned *value) {
+  auto pipelineBuildInfo = context->getPipelineContext()->getPipelineBuildInfo();
+  if (isGraphicsPipeline) {
+    *value = static_cast<const GraphicsPipelineBuildInfo *>(pipelineBuildInfo)->iaState.deviceIndex;
+  } else {
+    *value = static_cast<const ComputePipelineBuildInfo *>(pipelineBuildInfo)->deviceIndex;
+  }
+  return true;
+}
+
+// =====================================================================================================================
 // Get the value of a relocation symbol. Returns true if success, and false if the symbol is unknown.
 //
 // @param context : [in] Pipeline compilation context
@@ -1203,6 +1221,8 @@ bool getRelocationSymbolValue(Context *context, RelocationEntry relocEntry, bool
     return getDescriptorOffsetRelocationValue(context, relocEntry, isGraphicsPipeline, value);
   } else if (strncmp(relocEntry.name, "dstride_", 8) == 0) {
     return getDescriptorStrideRelocationValue(context, relocEntry, isGraphicsPipeline, value);
+  } else if (strcmp(relocEntry.name, "$deviceIdx") == 0) {
+    return getDeviceIndexRelocationValue(context, relocEntry, isGraphicsPipeline, value);
   }
   return false;
 }
