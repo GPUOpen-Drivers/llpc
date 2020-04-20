@@ -1916,7 +1916,7 @@ Value *PatchInOutImportExport::patchVsBuiltInInputImport(Type *inputTy, unsigned
   case BuiltInSubgroupLocalInvocationId:
     return getSubgroupLocalInvocationId(insertPos);
   case BuiltInDeviceIndex:
-    return ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getDeviceIndex());
+    return getDeviceIndex(insertPos);
   default:
     llvm_unreachable("Should never be called!");
     return UndefValue::get(inputTy);
@@ -2003,7 +2003,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
     break;
   }
   case BuiltInDeviceIndex: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getDeviceIndex());
+    input = getDeviceIndex(insertPos);
     break;
   }
   default: {
@@ -2138,7 +2138,7 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
     break;
   }
   case BuiltInDeviceIndex: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getDeviceIndex());
+    input = getDeviceIndex(insertPos);
     break;
   }
   default: {
@@ -2196,7 +2196,7 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInDeviceIndex: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getDeviceIndex());
+    input = getDeviceIndex(insertPos);
     break;
   }
   // Handle internal-use built-ins
@@ -2416,7 +2416,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInDeviceIndex: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getDeviceIndex());
+    input = getDeviceIndex(insertPos);
     break;
   }
   // Handle internal-use built-ins for sample position emulation
@@ -2570,7 +2570,7 @@ Value *PatchInOutImportExport::patchCsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInDeviceIndex: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getDeviceIndex());
+    input = getDeviceIndex(insertPos);
     break;
   }
   case BuiltInNumSubgroups: {
@@ -5727,6 +5727,20 @@ Value *PatchInOutImportExport::getInLocalInvocationId(Instruction *insertPos) {
     }
   }
   return locaInvocatioId;
+}
+
+// =====================================================================================================================
+// Get device index from pipeline state
+//
+// @param insertPos : Where to insert instructions.
+Value *PatchInOutImportExport::getDeviceIndex(Instruction *insertPos) {
+  if (m_pipelineState->getLgcContext()->buildingRelocatableElf()) {
+    BuilderBase builder(*m_context);
+    builder.SetInsertPoint(insertPos);
+    return builder.CreateRelocationConstant("$deviceIdx");
+  } else {
+    return ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getDeviceIndex());
+  }
 }
 
 } // namespace lgc
