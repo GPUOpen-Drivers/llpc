@@ -2230,6 +2230,9 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
 
   Attribute::AttrKind attribs[] = {Attribute::ReadNone};
 
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(insertPos);
+
   switch (builtInId) {
   case BuiltInSampleMask: {
     assert(inputTy->isArrayTy());
@@ -2421,11 +2424,19 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
   }
   // Handle internal-use built-ins for sample position emulation
   case BuiltInNumSamples: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getRasterizerState().numSamples);
+    if (m_pipelineState->getLgcContext()->buildingRelocatableElf()) {
+      input = builder.CreateRelocationConstant("$numSamples");
+    } else {
+      input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getRasterizerState().numSamples);
+    }
     break;
   }
   case BuiltInSamplePatternIdx: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getRasterizerState().samplePatternIdx);
+    if (m_pipelineState->getLgcContext()->buildingRelocatableElf()) {
+      input = builder.CreateRelocationConstant("$samplePatternIdx");
+    } else {
+      input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getRasterizerState().samplePatternIdx);
+    }
     break;
   }
   // Handle internal-use built-ins for interpolation functions and AMD extension (AMD_shader_explicit_vertex_parameter)
