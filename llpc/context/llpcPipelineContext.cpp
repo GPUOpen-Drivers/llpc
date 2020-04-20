@@ -86,6 +86,15 @@ static cl::opt<bool> EnableSiScheduler("enable-si-scheduler", cl::desc("Enable t
 // -subgroup-size: sub-group size exposed via Vulkan API.
 static cl::opt<int> SubgroupSize("subgroup-size", cl::desc("Sub-group size exposed via Vulkan API"), cl::init(64));
 
+// -enable-shadow-desc: enable shadow descriptor table
+static cl::opt<bool> EnableShadowDescriptorTable("enable-shadow-desc", cl::desc("Enable shadow descriptor table"));
+
+// -shadow-desc-table-ptr-high: high part of VA for shadow descriptor table pointer.
+// Default of 2 is for use by standalone amdllpc.
+static cl::opt<unsigned> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
+                                                cl::desc("High part of VA for shadow descriptor table pointer"),
+                                                cl::init(2));
+
 namespace Llpc {
 
 // =====================================================================================================================
@@ -224,18 +233,26 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
   options.reconfigWorkgroupLayout = getPipelineOptions()->reconfigWorkgroupLayout;
   options.includeIr = (IncludeLlvmIr || getPipelineOptions()->includeIr);
 
-  static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Vkgc::ShadowDescriptorTableUsage::Auto) ==
-                    lgc::ShadowDescriptorTableUsage::Auto,
-                "mismatch");
-  static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Vkgc::ShadowDescriptorTableUsage::Enable) ==
-                    lgc::ShadowDescriptorTableUsage::Enable,
-                "mismatch");
-  static_assert(static_cast<lgc::ShadowDescriptorTableUsage>(Vkgc::ShadowDescriptorTableUsage::Disable) ==
-                    lgc::ShadowDescriptorTableUsage::Disable,
-                "mismatch");
-  options.shadowDescriptorTableUsage =
-      static_cast<lgc::ShadowDescriptorTableUsage>(getPipelineOptions()->shadowDescriptorTableUsage);
-  options.shadowDescriptorTablePtrHigh = getPipelineOptions()->shadowDescriptorTablePtrHigh;
+  switch (getPipelineOptions()->shadowDescriptorTableUsage) {
+  case Vkgc::ShadowDescriptorTableUsage::Auto:
+    // Use default of 2 for standalone amdllpc.
+    options.shadowDescriptorTable = ShadowDescTablePtrHigh;
+    break;
+  case Vkgc::ShadowDescriptorTableUsage::Enable:
+    options.shadowDescriptorTable = getPipelineOptions()->shadowDescriptorTablePtrHigh;
+    break;
+  case Vkgc::ShadowDescriptorTableUsage::Disable:
+    options.shadowDescriptorTable = static_cast<unsigned>(ShadowDescriptorTable::Disable);
+    break;
+  }
+
+  // Shadow descriptor command line options override pipeline options.
+  if (EnableShadowDescriptorTable.getNumOccurrences() > 0) {
+    if (!EnableShadowDescriptorTable)
+      options.shadowDescriptorTable = static_cast<unsigned>(ShadowDescriptorTable::Disable);
+    else
+      options.shadowDescriptorTable = ShadowDescTablePtrHigh;
+  }
 
   if (isGraphics() && getGfxIpVersion().major >= 10) {
     // Only set NGG options for a GFX10+ graphics pipeline.
