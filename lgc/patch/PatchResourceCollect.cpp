@@ -70,8 +70,7 @@ ModulePass *createPatchResourceCollect() {
 
 // =====================================================================================================================
 PatchResourceCollect::PatchResourceCollect()
-    : Patch(ID), m_hasPushConstOp(false), m_hasDynIndexedInput(false), m_hasDynIndexedOutput(false),
-      m_resUsage(nullptr) {
+    : Patch(ID), m_hasDynIndexedInput(false), m_hasDynIndexedOutput(false), m_resUsage(nullptr) {
   m_locationMapManager.reset(new InOutLocationMapManager);
 }
 
@@ -955,17 +954,12 @@ unsigned PatchResourceCollect::getVerticesPerPrimitive() const {
 // =====================================================================================================================
 // Process a single shader
 void PatchResourceCollect::processShader() {
-  m_hasPushConstOp = false;
   m_hasDynIndexedInput = false;
   m_hasDynIndexedOutput = false;
   m_resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
   // Invoke handling of "call" instruction
   visit(m_entryPoint);
-
-  // Disable push constant if not used
-  if (!m_hasPushConstOp)
-    m_resUsage->pushConstSizeInBytes = 0;
 
   clearInactiveInput();
   clearInactiveOutput();
@@ -1042,25 +1036,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
 
   auto mangledName = callee->getName();
 
-  if (mangledName.startswith(lgcName::PushConstLoad) || mangledName.startswith(lgcName::DescriptorLoadSpillTable)) {
-    // Push constant operations
-    if (isDeadCall)
-      m_deadCalls.insert(&callInst);
-    else
-      m_hasPushConstOp = true;
-  } else if (mangledName.startswith(lgcName::DescriptorLoadBuffer) ||
-             mangledName.startswith(lgcName::DescriptorGetTexelBufferPtr) ||
-             mangledName.startswith(lgcName::DescriptorGetResourcePtr) ||
-             mangledName.startswith(lgcName::DescriptorGetFmaskPtr) ||
-             mangledName.startswith(lgcName::DescriptorGetSamplerPtr)) {
-    unsigned descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-    unsigned binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-    DescriptorPair descPair = {descSet, binding};
-    m_resUsage->descPairs.insert(descPair.u64All);
-  } else if (mangledName.startswith(lgcName::BufferLoad)) {
-    if (isDeadCall)
-      m_deadCalls.insert(&callInst);
-  } else if (mangledName.startswith(lgcName::InputImportGeneric)) {
+  if (mangledName.startswith(lgcName::InputImportGeneric)) {
     // Generic input import
     if (isDeadCall)
       m_deadCalls.insert(&callInst);

@@ -114,7 +114,6 @@ enum class WorkgroupLayout : unsigned {
 // NOTE: All fields must be initialized in InitShaderResourceUsage().
 struct ResourceUsage {
   std::unordered_set<uint64_t> descPairs;  // Pairs of descriptor set/binding
-  unsigned pushConstSizeInBytes = 0;       // Push constant size (in bytes)
   bool resourceWrite = false;              // Whether shader does resource-write operations (UAV)
   bool resourceRead = false;               // Whether shader does resource-read operrations (UAV)
   bool perShaderTable = false;             // Whether per shader stage table is used
@@ -445,7 +444,6 @@ struct InterfaceData {
   static const unsigned MaxEsGsOffsetCount = 6;
   static const unsigned MaxCsUserDataCount = 10;
   static const unsigned CsStartUserData = 2;
-  static const unsigned UserDataUnmapped = InvalidValue;
 
   unsigned userDataCount = 0;                  // User data count
 
@@ -554,8 +552,6 @@ struct InterfaceData {
       } cs;
     };
 
-    unsigned resNodeValues[MaxDescTableCount]; // Resource node values
-    unsigned spillTable;                       // Spill table
     bool initialized;                          // Whether entryArgIdxs has been initialized
                                                //   by PatchEntryPointMutate
   } entryArgIdxs = {};

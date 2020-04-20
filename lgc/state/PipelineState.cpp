@@ -529,6 +529,7 @@ void PipelineState::readUserDataNodes(Module *module) {
 // For nodeType == Sampler, it matches Sampler or CombinedTexture.
 // For nodeType == Buffer, it matches Buffer, BufferCompact or InlineBuffer.
 // For other nodeType, only a node of the specified type is returned.
+// For nodeType == DescriptorTableVaPtr, the node is returned whose first child matches descSet.
 // Returns {topNode, node} where "node" is the found user data node, and "topNode" is the top-level user data
 // node that contains it (or is equal to it).
 //
@@ -539,18 +540,23 @@ std::pair<const ResourceNode *, const ResourceNode *>
 PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, unsigned binding) const {
   for (const ResourceNode &node : getUserDataNodes()) {
     if (node.type == ResourceNodeType::DescriptorTableVaPtr) {
-      for (const ResourceNode &innerNode : node.innerTable) {
-        if (innerNode.set == descSet && innerNode.binding == binding) {
-          if (nodeType == ResourceNodeType::Unknown || nodeType == innerNode.type ||
-              (nodeType == ResourceNodeType::DescriptorBuffer &&
-               (innerNode.type == ResourceNodeType::DescriptorBufferCompact ||
-                innerNode.type == ResourceNodeType::InlineBuffer)) ||
-              ((innerNode.type == ResourceNodeType::DescriptorCombinedTexture ||
-                innerNode.type == ResourceNodeType::DescriptorYCbCrSampler) &&
-               (nodeType == ResourceNodeType::DescriptorResource ||
-                nodeType == ResourceNodeType::DescriptorTexelBuffer ||
-                nodeType == ResourceNodeType::DescriptorSampler)))
-            return {&node, &innerNode};
+      if (nodeType == node.type) {
+        if (!node.innerTable.empty() && node.innerTable[0].set == descSet)
+          return {&node, &node};
+      } else {
+        for (const ResourceNode &innerNode : node.innerTable) {
+          if (innerNode.set == descSet && innerNode.binding == binding) {
+            if (nodeType == ResourceNodeType::Unknown || nodeType == innerNode.type ||
+                (nodeType == ResourceNodeType::DescriptorBuffer &&
+                 (innerNode.type == ResourceNodeType::DescriptorBufferCompact ||
+                  innerNode.type == ResourceNodeType::InlineBuffer)) ||
+                ((innerNode.type == ResourceNodeType::DescriptorCombinedTexture ||
+                  innerNode.type == ResourceNodeType::DescriptorYCbCrSampler) &&
+                 (nodeType == ResourceNodeType::DescriptorResource ||
+                  nodeType == ResourceNodeType::DescriptorTexelBuffer ||
+                  nodeType == ResourceNodeType::DescriptorSampler)))
+              return {&node, &innerNode};
+          }
         }
       }
     } else if (node.set == descSet && node.binding == binding) {
@@ -564,6 +570,18 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
     }
   }
   return {nullptr, nullptr};
+}
+
+// =====================================================================================================================
+// Find the single root resource node of the given type
+//
+// @param nodeType : Type of the resource mapping node
+const ResourceNode *PipelineState::findSingleRootResourceNode(ResourceNodeType nodeType) const {
+  for (const ResourceNode &node : getUserDataNodes()) {
+    if (node.type == nodeType)
+      return &node;
+  }
+  return nullptr;
 }
 
 // =====================================================================================================================

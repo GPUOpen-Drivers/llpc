@@ -121,18 +121,12 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   // Patch entry-point mutation (should be done before external library link)
   passMgr.add(createPatchEntryPointMutate());
 
-  // Patch push constant loading (should be done before external library link)
-  passMgr.add(createPatchPushConstOp());
-
   // Function inlining and remove dead functions after it
   passMgr.add(createAlwaysInlinerLegacyPass());
   passMgr.add(createGlobalDCEPass());
 
   // Patch input import and output export operations
   passMgr.add(createPatchInOutImportExport());
-
-  // Patch descriptor load operations
-  passMgr.add(createPatchDescriptorLoad());
 
   // Prior to general optimization, do function inlining and dead function removal once again
   passMgr.add(createAlwaysInlinerLegacyPass());

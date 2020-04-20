@@ -40,6 +40,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -104,23 +105,121 @@ private:
     bool mustSpill;         // Whether this is an arg that must be spilled
   };
 
+  // User data usage for one user data node
+  struct UserDataNodeUsage {
+    unsigned entryArgIdx = 0;
+    unsigned dwordSize = 0; // Only used in pushConstOffsets
+    SmallVector<Instruction *, 4> users;
+  };
+
+  // Per-merged-shader-stage gathered user data usage information.
+  struct UserDataUsage {
+    // List of lgc.spill.table calls
+    UserDataNodeUsage spillTable;
+    // List of lgc.push.const calls. There is no direct attempt to unspill these; instead we attempt to
+    // unspill the pushConstOffsets loads.
+    UserDataNodeUsage pushConst;
+    // True means that we did not succeed in putting all loads into pushConstOffsets, so lgc.push.const
+    // calls must be kept.
+    bool pushConstSpill = false;
+    // Per-push-const-offset lists of loads from push const. We attempt to unspill these.
+    SmallVector<UserDataNodeUsage, 8> pushConstOffsets;
+    // Per-user-data-offset lists of lgc.root.descriptor calls
+    SmallVector<UserDataNodeUsage, 8> rootDescriptors;
+    // Per-descriptor-set lists of lgc.descriptor.set calls
+    SmallVector<UserDataNodeUsage, 8> descriptorSets;
+    // Minimum offset at which spill table is used.
+    unsigned spillUsage = UINT_MAX;
+  };
+
+  // Gather user data usage in all shaders.
+  void gatherUserDataUsage(llvm::Module *module);
+
+  // Fix up user data uses.
+  void fixupUserDataUses(Module &module);
+
   void processShader();
 
-  FunctionType *generateEntryPointType(uint64_t *inRegMask) const;
+  FunctionType *generateEntryPointType(uint64_t *inRegMask);
 
   void addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs,
                               SmallVectorImpl<UserDataArg> &specialUserDataArgs, IRBuilder<> &builder) const;
-  void addUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs, IRBuilder<> &builder) const;
+  void addUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs, IRBuilder<> &builder);
+  unsigned addUserDataArg(SmallVectorImpl<UserDataArg> &userDataArgs, unsigned userDataValue, unsigned sizeInDwords,
+                          unsigned *argIndex, bool useFixedLayout, unsigned userDataSize, IRBuilder<> &builder);
+
   void determineUnspilledUserDataArgs(ArrayRef<UserDataArg> userDataArgs, ArrayRef<UserDataArg> specialUserDataArgs,
-                                      IRBuilder<> &builder, SmallVectorImpl<UserDataArg> &unspilledArgs) const;
+                                      IRBuilder<> &builder, SmallVectorImpl<UserDataArg> &unspilledArgs);
 
   uint64_t pushFixedShaderArgTys(SmallVectorImpl<Type *> &argTys) const;
 
-  bool isResourceNodeActive(const ResourceNode *node, bool isRootNode) const;
+  // Get UserDataUsage struct for the merged shader stage that contains the given shader stage
+  UserDataUsage *getUserDataUsage(ShaderStage stage);
+
+  // Get the shader stage that the given shader stage is merged into.
+  ShaderStage getMergedShaderStage(ShaderStage stage) const;
 
   bool m_hasTs;                             // Whether the pipeline has tessllation shader
   bool m_hasGs;                             // Whether the pipeline has geometry shader
   PipelineState *m_pipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
+  // Per-HW-shader-stage gathered user data usage information.
+  llvm::SmallVector<std::unique_ptr<UserDataUsage>, ShaderStageCount> m_userDataUsage;
+};
+
+// =====================================================================================================================
+// Utility class to generate code to extend an i32 address into a 64-bit pointer, using either PC or a given
+// constant high half value.
+class AddressExtender {
+public:
+  // Constructor
+  AddressExtender(Function *func) : m_func(func) {}
+
+  // Get first insertion point in the function, after PC-getting code if already inserted.
+  Instruction *getFirstInsertionPt() {
+    if (m_pc)
+      return m_pc->getNextNode();
+    return &*m_func->front().getFirstInsertionPt();
+  }
+
+  // Extend an i32 into a 64-bit pointer
+  //
+  // @param addr32 : Address as 32-bit value
+  // @param highHalf : Value to use for high half; ShadowDescriptorTable::Disable to use PC
+  // @param ptrTy : Type to cast pointer to
+  // @param builder : IRBuilder to use, already set to the required insert point
+  // @return : 64-bit pointer value
+  Instruction *extend(Value *addr32, unsigned highHalf, Type *ptrTy, IRBuilder<> &builder) {
+    Value *ptr = nullptr;
+    if (highHalf == static_cast<unsigned>(ShadowDescriptorTable::Disable)) {
+      // Extend with PC.
+      ptr = builder.CreateInsertElement(getPc(), addr32, uint64_t(0));
+    } else {
+      // Extend with given value
+      ptr = builder.CreateInsertElement(UndefValue::get(VectorType::get(builder.getInt32Ty(), 2)), addr32, uint64_t(0));
+      ptr = builder.CreateInsertElement(ptr, builder.getInt32(highHalf), 1);
+    }
+    ptr = builder.CreateBitCast(ptr, builder.getInt64Ty());
+    return cast<Instruction>(builder.CreateIntToPtr(ptr, ptrTy));
+  }
+
+private:
+  // Get PC value as v2i32. The caller is only using the high half, so this only writes a single instance of the
+  // code at the start of the function.
+  Instruction *getPc() {
+    if (!m_pc) {
+      // This uses its own builder, as it wants to insert at the start of the function, whatever the caller
+      // is doing.
+      IRBuilder<> builder(m_func->getContext());
+      builder.SetInsertPoint(&*m_func->front().getFirstInsertionPt());
+      Value *pc = builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
+      pc = cast<Instruction>(builder.CreateBitCast(pc, VectorType::get(builder.getInt32Ty(), 2)));
+      m_pc = cast<Instruction>(pc);
+    }
+    return m_pc;
+  }
+
+  Function *m_func;
+  Instruction *m_pc = nullptr;
 };
 
 } // anonymous namespace
@@ -154,6 +253,9 @@ bool PatchEntryPointMutate::runOnModule(Module &module) {
   m_hasTs = (stageMask & (shaderStageToMask(ShaderStageTessControl) | shaderStageToMask(ShaderStageTessEval))) != 0;
   m_hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry)) != 0;
 
+  // Gather user data usage.
+  gatherUserDataUsage(&module);
+
   // Process each shader in turn, but not the copy shader.
   auto pipelineShaders = &getAnalysis<PipelineShaders>();
   for (unsigned shaderStage = ShaderStageVertex; shaderStage < ShaderStageNativeStageCount; ++shaderStage) {
@@ -164,7 +266,309 @@ bool PatchEntryPointMutate::runOnModule(Module &module) {
     }
   }
 
+  // Fix up user data uses to use entry args.
+  fixupUserDataUses(*m_module);
+  m_userDataUsage.clear();
+
   return true;
+}
+
+// =====================================================================================================================
+// Gather user data usage in all shaders
+//
+// @param module : IR module
+void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
+  // Find lgc.spill.table, lgc.push.constants, lgc.root.descriptor, lgc.descriptor.set functions, and from
+  // there all calls to them. Add each call to the applicable list in the UserDataUsage struct for the
+  // (merged) shader stage.
+  for (Function &func : *module) {
+    if (!func.isDeclaration())
+      continue;
+    if (func.getName().startswith(lgcName::SpillTable)) {
+      for (User *user : func.users()) {
+        CallInst *call = cast<CallInst>(user);
+        ShaderStage stage = getShaderStage(call->getFunction());
+        assert(stage != ShaderStageCopyShader);
+        getUserDataUsage(stage)->spillTable.users.push_back(call);
+      }
+      continue;
+    }
+
+    if (func.getName().startswith(lgcName::PushConst)) {
+      for (User *user : func.users()) {
+        // For this call to lgc.push.const, attempt to find all loads with a constant dword-aligned offset and
+        // push into userDataUsage->pushConstOffsets. If we fail, set userDataUsage->pushConstSpill to indicate that
+        // we need to keep the pointer to the push const, derived as an offset into the spill table.
+        CallInst *call = cast<CallInst>(user);
+        ShaderStage stage = getShaderStage(call->getFunction());
+        assert(stage != ShaderStageCopyShader);
+        auto userDataUsage = getUserDataUsage(stage);
+        userDataUsage->pushConst.users.push_back(call);
+        SmallVector<std::pair<Instruction *, unsigned>, 4> users;
+        users.push_back({call, 0});
+        for (unsigned i = 0; i != users.size(); ++i) {
+          Instruction *inst = users[i].first;
+          for (User *user : inst->users()) {
+            unsigned dwordOffset = users[i].second;
+            if (auto bitcast = dyn_cast<BitCastInst>(user)) {
+              // See through a bitcast.
+              users.push_back({bitcast, dwordOffset});
+              continue;
+            }
+            if (isa<LoadInst>(user) && !user->getType()->isAggregateType()) {
+              unsigned bitSize = user->getType()->getPrimitiveSizeInBits();
+              if (bitSize % 32 == 0) {
+                // This is a scalar or vector load with dword-aligned size. We can attempt to unspill it, but, for
+                // a particular dword offset, we only attempt to unspill ones with the same (minimum) size.
+                unsigned dwordSize = bitSize / 32;
+                userDataUsage->pushConstOffsets.resize(
+                    std::max(unsigned(userDataUsage->pushConstOffsets.size()), dwordOffset + 1));
+                auto &pushConstOffset = userDataUsage->pushConstOffsets[dwordOffset];
+                if (pushConstOffset.dwordSize == 0 || pushConstOffset.dwordSize >= dwordSize) {
+                  if (pushConstOffset.dwordSize != 0 && pushConstOffset.dwordSize != dwordSize) {
+                    // This load type is smaller than previously seen ones at this offset. Forget the earlier
+                    // ones (and mark that some uses of the push const pointer remain).
+                    userDataUsage->pushConstSpill = true;
+                    pushConstOffset.users.clear();
+                  }
+                  // Remember this load for possible unspilling.
+                  pushConstOffset.dwordSize = dwordSize;
+                  userDataUsage->pushConstOffsets[dwordOffset].users.push_back(cast<Instruction>(user));
+                  continue;
+                }
+              }
+            } else if (auto gep = dyn_cast<GetElementPtrInst>(user)) {
+              // For a gep, calculate the new constant offset.
+              APInt gepOffset(64, 0);
+              if (gep->accumulateConstantOffset(module->getDataLayout(), gepOffset)) {
+                unsigned gepByteOffset = gepOffset.getZExtValue();
+                if (gepByteOffset % 4 == 0) {
+                  // We still have a constant offset that is 4-aligned. Push it so we look at its users.
+                  dwordOffset += gepByteOffset / 4;
+                  users.push_back({gep, dwordOffset});
+                  continue;
+                }
+              }
+            }
+            // We have found some user we can't handle. Mark that we need to keep the push const pointer.
+            userDataUsage->pushConstSpill = true;
+          }
+        }
+      }
+      continue;
+    }
+
+    if (func.getName().startswith(lgcName::RootDescriptor)) {
+      for (User *user : func.users()) {
+        CallInst *call = cast<CallInst>(user);
+        unsigned dwordOffset = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
+        ShaderStage stage = getShaderStage(call->getFunction());
+        assert(stage != ShaderStageCopyShader);
+        auto &rootDescriptors = getUserDataUsage(stage)->rootDescriptors;
+        rootDescriptors.resize(std::max(rootDescriptors.size(), size_t(dwordOffset + 1)));
+        rootDescriptors[dwordOffset].users.push_back(call);
+      }
+      continue;
+    }
+
+    if (func.getName().startswith(lgcName::DescriptorSet)) {
+      for (User *user : func.users()) {
+        CallInst *call = cast<CallInst>(user);
+        unsigned set = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
+        ShaderStage stage = getShaderStage(call->getFunction());
+        assert(stage != ShaderStageCopyShader);
+        auto &descriptorSets = getUserDataUsage(stage)->descriptorSets;
+        descriptorSets.resize(std::max(descriptorSets.size(), size_t(set + 1)));
+        descriptorSets[set].users.push_back(call);
+      }
+    }
+  }
+}
+
+// =====================================================================================================================
+// Fix up user data uses in all shaders: For unspilled ones, use the entry arg directly; for spilled ones,
+// insert a load from the spill table, shared for the function.
+// This uses the entryArgIdx fields in UserDataUsage, that were set indirectly in determineUnspilledUserDataArgs,
+// because addUserDataArgs passed a pointer to one in each UserDataArg constructor call.
+void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
+  IRBuilder<> builder(module.getContext());
+
+  // For each function definition...
+  for (Function &func : module) {
+    if (func.isDeclaration())
+      continue;
+
+    ShaderStage stage = getShaderStage(&func);
+    auto userDataUsage = getUserDataUsage(stage);
+
+    // If needed, generate code for the spill table pointer (as pointer to i8) at the start of the function.
+    Instruction *spillTable = nullptr;
+    AddressExtender addressExtender(&func);
+    if (userDataUsage->spillTable.entryArgIdx != 0) {
+      builder.SetInsertPoint(addressExtender.getFirstInsertionPt());
+      Argument *arg = func.getArg(userDataUsage->spillTable.entryArgIdx);
+      arg->setName("spillTable");
+      spillTable = addressExtender.extend(arg, static_cast<unsigned>(ShadowDescriptorTable::Disable),
+                                          builder.getInt8Ty()->getPointerTo(ADDR_SPACE_CONST), builder);
+    }
+
+    // Handle direct uses of the spill table that were generated in DescBuilder.
+    for (Instruction *&call : userDataUsage->spillTable.users) {
+      if (call && call->getFunction() == &func) {
+        call->replaceAllUsesWith(spillTable);
+        call->eraseFromParent();
+        call = nullptr;
+      }
+    }
+
+    // Handle unspilled parts of the push constant.
+    for (unsigned dwordOffset = 0; dwordOffset != userDataUsage->pushConstOffsets.size(); ++dwordOffset) {
+      UserDataNodeUsage &pushConstOffset = userDataUsage->pushConstOffsets[dwordOffset];
+      if (!pushConstOffset.users.empty()) {
+        if (pushConstOffset.entryArgIdx) {
+          // This offset into the push constant is unspilled. Replace the loads with the entry arg, with a
+          // bitcast. (We know that all loads are non-aggregates of the same size, so we can bitcast.)
+          Argument *arg = func.getArg(pushConstOffset.entryArgIdx);
+          arg->setName("pushConst_" + Twine(dwordOffset));
+          for (Instruction *&load : pushConstOffset.users) {
+            if (load && load->getFunction() == &func) {
+              builder.SetInsertPoint(load);
+              Value *replacement = builder.CreateBitCast(arg, load->getType());
+              load->replaceAllUsesWith(replacement);
+              load->eraseFromParent();
+              load = nullptr;
+            }
+          }
+        } else {
+          // This offset into the push constant is spilled. All we need to do is ensure that the push constant
+          // pointer (derived as an offset into the spill table) remains.
+          userDataUsage->pushConstSpill = true;
+        }
+      }
+    }
+
+    // Handle the push constant pointer.
+    if (!userDataUsage->pushConst.users.empty()) {
+      // If all uses of the push constant pointer are unspilled, we can just replace the lgc.push.const call
+      // with undef, as the address is ultimately not used anywhere.
+      Value *replacementVal = nullptr;
+      if (userDataUsage->pushConstSpill) {
+        // At least one use of the push constant pointer remains.
+        // TODO Shader compilation: If there is no user data layout, we need a reloc here.
+        assert(!m_pipelineState->getUserDataNodes().empty() && "Spill with no user data layout not implemented yet");
+        const ResourceNode *node = m_pipelineState->findSingleRootResourceNode(ResourceNodeType::PushConst);
+        Value *byteOffset = nullptr;
+        if (node) {
+          byteOffset = builder.getInt32(node->offsetInDwords * 4);
+          // Ensure we mark spill table usage.
+          m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
+        } else {
+          byteOffset = UndefValue::get(builder.getInt32Ty());
+        }
+        builder.SetInsertPoint(spillTable->getNextNode());
+        replacementVal = builder.CreateGEP(builder.getInt8Ty(), spillTable, byteOffset);
+      }
+      for (Instruction *&call : userDataUsage->pushConst.users) {
+        if (call && call->getFunction() == &func) {
+          Value *thisReplacementVal = replacementVal;
+          if (!thisReplacementVal) {
+            // No use of the push constant pointer remains. Just replace with undef.
+            thisReplacementVal = UndefValue::get(call->getType());
+          } else {
+            builder.SetInsertPoint(call);
+            thisReplacementVal = builder.CreateBitCast(thisReplacementVal, call->getType());
+          }
+          call->replaceAllUsesWith(thisReplacementVal);
+          call->eraseFromParent();
+          call = nullptr;
+        }
+      }
+    }
+
+    // Root descriptors ("dynamic descriptors").
+    for (unsigned dwordOffset = 0; dwordOffset != userDataUsage->rootDescriptors.size(); ++dwordOffset) {
+      auto &rootDescriptor = userDataUsage->rootDescriptors[dwordOffset];
+      if (rootDescriptor.users.empty())
+        continue;
+      if (rootDescriptor.entryArgIdx != 0) {
+        // The root descriptor is unspilled, and uses an entry arg.
+        Argument *arg = func.getArg(rootDescriptor.entryArgIdx);
+        arg->setName("rootDesc" + Twine(dwordOffset));
+        for (Instruction *&call : rootDescriptor.users) {
+          if (call && call->getFunction() == &func) {
+            call->replaceAllUsesWith(arg);
+            call->eraseFromParent();
+            call = nullptr;
+          }
+        }
+      } else {
+        // The root descriptor is spilled. Ensure we mark spill table usage.
+        m_pipelineState->getPalMetadata()->setUserDataSpillUsage(dwordOffset);
+        Value *byteOffset = builder.getInt32(dwordOffset * 4);
+        for (Instruction *&call : rootDescriptor.users) {
+          if (call && call->getFunction() == &func) {
+            builder.SetInsertPoint(call);
+            Value *descPtr = builder.CreateGEP(builder.getInt8Ty(), spillTable, byteOffset);
+            descPtr = builder.CreateBitCast(descPtr, call->getType()->getPointerTo(ADDR_SPACE_CONST));
+            Value *desc = builder.CreateLoad(call->getType(), descPtr);
+            desc->setName("rootDesc" + Twine(dwordOffset));
+            call->replaceAllUsesWith(desc);
+            call->eraseFromParent();
+            call = nullptr;
+          }
+        }
+      }
+    }
+
+    // Descriptor sets.
+    for (unsigned descSetIdx = 0; descSetIdx != userDataUsage->descriptorSets.size(); ++descSetIdx) {
+      auto &descriptorSet = userDataUsage->descriptorSets[descSetIdx];
+      Instruction *load = nullptr;
+      for (Instruction *&inst : descriptorSet.users) {
+        Value *descSetVal = nullptr;
+        if (inst && inst->getFunction() == &func) {
+          auto call = cast<CallInst>(inst);
+          if (descriptorSet.entryArgIdx != 0) {
+            // The descriptor set is unspilled, and uses an entry arg.
+            descSetVal = func.getArg(descriptorSet.entryArgIdx);
+          } else {
+            // The descriptor set is spilled, so we to GEP an offset from the spill table and load from that. For all
+            // users, we share a single load at the start of the function.
+            if (!load) {
+              // This is the first use we have seen in this function. Create the GEP and load, straight after the
+              // code at the start of the function that extends the spill table pointer.
+              // TODO Shader compilation: The GEP offset needs to be a reloc.
+              assert(!m_pipelineState->getUserDataNodes().empty() &&
+                     "Spill with no user data layout not implemented yet");
+              builder.SetInsertPoint(spillTable->getNextNode());
+              const ResourceNode *node;
+              const ResourceNode *innerNode;
+              std::tie(node, innerNode) =
+                  m_pipelineState->findResourceNode(ResourceNodeType::DescriptorTableVaPtr, descSetIdx, 0);
+              ((void)innerNode);
+              m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
+              Value *offset = builder.getInt32(node->offsetInDwords * 4);
+              Value *addr = builder.CreateGEP(builder.getInt8Ty(), spillTable, offset);
+              addr = builder.CreateBitCast(addr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
+              load = builder.CreateLoad(builder.getInt32Ty(), addr);
+            }
+            descSetVal = load;
+          }
+          descSetVal->setName("descSet" + Twine(descSetIdx));
+
+          // Now we want to extend the loaded 32-bit value to a 64-bit pointer, using either PC or the provided
+          // high half.
+          builder.SetInsertPoint(call);
+          unsigned highHalf = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+          descSetVal = addressExtender.extend(descSetVal, highHalf, call->getType(), builder);
+          // Replace uses of the call and erase it.
+          call->replaceAllUsesWith(descSetVal);
+          call->eraseFromParent();
+          inst = nullptr;
+        }
+      }
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -278,78 +682,6 @@ void PatchEntryPointMutate::processShader() {
 }
 
 // =====================================================================================================================
-// Checks whether the specified resource mapping node is active.
-//
-// @param node : Resource mapping node
-// @param isRootNode : TRUE if node is in root level
-bool PatchEntryPointMutate::isResourceNodeActive(const ResourceNode *node, bool isRootNode) const {
-  bool active = false;
-
-  const ResourceUsage *resUsage1 = m_pipelineState->getShaderResourceUsage(m_shaderStage);
-  const ResourceUsage *resUsage2 = nullptr;
-
-  const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  if (gfxIp.major >= 9) {
-    // NOTE: For LS-HS/ES-GS merged shader, resource mapping nodes of the two shader stages are merged as a whole.
-    // So we have to check activeness of both shader stages at the same time. Here, we determine the second shader
-    // stage and get its resource usage accordingly.
-    unsigned stageMask = m_pipelineState->getShaderStageMask();
-    const bool hasTs =
-        ((stageMask & (shaderStageToMask(ShaderStageTessControl) | shaderStageToMask(ShaderStageTessEval))) != 0);
-    const bool hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
-
-    if (hasTs || hasGs) {
-      const auto shaderStage1 = m_shaderStage;
-      auto shaderStage2 = ShaderStageInvalid;
-
-      if (shaderStage1 == ShaderStageVertex) {
-        shaderStage2 = hasTs ? ShaderStageTessControl : (hasGs ? ShaderStageGeometry : ShaderStageInvalid);
-      } else if (shaderStage1 == ShaderStageTessControl)
-        shaderStage2 = ShaderStageVertex;
-      else if (shaderStage1 == ShaderStageTessEval)
-        shaderStage2 = hasGs ? ShaderStageGeometry : ShaderStageInvalid;
-      else if (shaderStage1 == ShaderStageGeometry)
-        shaderStage2 = hasTs ? ShaderStageTessEval : ShaderStageVertex;
-
-      if (shaderStage2 != ShaderStageInvalid)
-        resUsage2 = m_pipelineState->getShaderResourceUsage(shaderStage2);
-    }
-  }
-
-  if (node->type == ResourceNodeType::PushConst && isRootNode) {
-    active = resUsage1->pushConstSizeInBytes > 0;
-    if (!active && resUsage2)
-      active = resUsage2->pushConstSizeInBytes > 0;
-  } else if (node->type == ResourceNodeType::DescriptorTableVaPtr) {
-    // Check if any contained descriptor node is active
-    for (unsigned i = 0; i < node->innerTable.size(); ++i) {
-      if (isResourceNodeActive(&node->innerTable[i], false)) {
-        active = true;
-        break;
-      }
-    }
-  } else if (node->type == ResourceNodeType::IndirectUserDataVaPtr) {
-    // NOTE: We assume indirect user data is always active.
-    active = true;
-  } else if (node->type == ResourceNodeType::StreamOutTableVaPtr)
-    active = true;
-  else {
-    assert(node->type != ResourceNodeType::DescriptorTableVaPtr &&
-           node->type != ResourceNodeType::IndirectUserDataVaPtr);
-
-    DescriptorPair descPair = {};
-    descPair.descSet = node->set;
-    descPair.binding = node->binding;
-
-    active = resUsage1->descPairs.find(descPair.u64All) != resUsage1->descPairs.end();
-    if (!active && resUsage2)
-      active = resUsage2->descPairs.find(descPair.u64All) != resUsage2->descPairs.end();
-  }
-
-  return active;
-}
-
-// =====================================================================================================================
 // Generates the type for the new entry-point based on already-collected info.
 // This is what decides what SGPRs and VGPRs are passed to the shader at wave dispatch:
 //
@@ -380,7 +712,7 @@ bool PatchEntryPointMutate::isResourceNodeActive(const ResourceNode *node, bool 
 //                          arg needs to have an "inreg" attribute to put the arg into SGPRs rather than VGPRs
 // @return : The newly-constructed function type
 //
-FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask) const {
+FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask) {
   SmallVector<Type *, 8> argTys;
 
   IRBuilder<> builder(*m_context);
@@ -461,7 +793,6 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
   auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
   auto &entryArgIdxs = intfData->entryArgIdxs;
   auto &builtInUsage = resUsage->builtInUsage;
-  bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
   bool enableNgg = m_pipelineState->isGraphics() ? m_pipelineState->getNggControl()->enableNgg : false;
 
   // See if there is a vertex buffer and/or streamout in the root user data layout.
@@ -483,104 +814,93 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
     }
   }
 
-  switch (m_shaderStage) {
-  case ShaderStageVertex:
-  case ShaderStageTessControl: {
-    // NOTE: On GFX9+, Vertex shader (LS) and tessellation control shader (HS) are merged into a single shader.
-    // The user data count of tessellation control shader should be same as vertex shader.
-    auto currIntfData = intfData;
-    auto currResUsage = resUsage;
-
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 && m_shaderStage == ShaderStageTessControl &&
-        (m_pipelineState->getShaderStageMask() & shaderStageToMask(ShaderStageVertex))) {
-      currIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
-      currResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
-    }
+  if (m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessControl ||
+      m_shaderStage == ShaderStageTessEval || m_shaderStage == ShaderStageGeometry) {
+    // Shader stage in the vertex-processing half of a graphics pipeline.
+    // We need to ensure that the layout is the same between two shader stages that will be merged on GFX9+,
+    // that is, VS-TCS, VS-GS (if no tessellation), TES-GS.
 
     // NOTE: The user data to emulate gl_ViewIndex is somewhat common. To make it consistent for GFX9
-    // merged shader, we place it prior to any other special user data. We only add it to PAL metadata
-    // for VS, not TCS.
-    if (enableMultiView) {
-      auto userDataValue = Util::Abi::UserDataMapping::Invalid;
-      if (m_shaderStage == ShaderStageVertex)
-        userDataValue = Util::Abi::UserDataMapping::ViewId;
-      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), userDataValue, &entryArgIdxs.vs.viewIndex));
+    // merged shader, we place it prior to any other special user data. We do not add it to PAL metadata
+    // for TCS.
+    if (m_pipelineState->getInputAssemblyState().enableMultiView) {
+      unsigned *argIdx = nullptr;
+      auto userDataValue = Util::Abi::UserDataMapping::ViewId;
+      switch (m_shaderStage) {
+      case ShaderStageVertex:
+        argIdx = &entryArgIdxs.vs.viewIndex;
+        break;
+      case ShaderStageTessControl:
+        userDataValue = Util::Abi::UserDataMapping::Invalid;
+        break;
+      case ShaderStageTessEval:
+        argIdx = &entryArgIdxs.tes.viewIndex;
+        break;
+      case ShaderStageGeometry:
+        argIdx = &entryArgIdxs.gs.viewIndex;
+        break;
+      default:
+        llvm_unreachable("Unexpected shader stage");
+      }
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), userDataValue, argIdx));
     }
 
     // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
     // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
-    const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-    if ((gfxIp.major >= 9 && (m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize)) || (enableNgg && !m_hasTs)) {
+    bool wantEsGsLdsSize = false;
+    switch (getMergedShaderStage(m_shaderStage)) {
+    case ShaderStageVertex:
+      wantEsGsLdsSize = enableNgg;
+      break;
+    case ShaderStageTessControl:
+      wantEsGsLdsSize = m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
+                        m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize;
+      break;
+    case ShaderStageTessEval:
+      wantEsGsLdsSize = enableNgg;
+      break;
+    case ShaderStageGeometry:
+      wantEsGsLdsSize = (m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize) || enableNgg;
+      break;
+    default:
+      llvm_unreachable("Unexpected shader stage");
+    }
+    if (wantEsGsLdsSize) {
       auto userDataValue = Util::Abi::UserDataMapping::EsGsLdsSize;
       // For a standalone TCS (which can only happen in unit testing, not in a real pipeline), don't add
       // the PAL metadata for it, for consistency with the old code.
-      if (!m_pipelineState->hasShaderStage(ShaderStageVertex))
+      if (m_shaderStage == ShaderStageVertex && !m_pipelineState->hasShaderStage(ShaderStageVertex))
         userDataValue = Util::Abi::UserDataMapping::Invalid;
       specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), userDataValue));
     }
 
-    // Vertex buffer table. Only add to PAL metadata for VS, in case this is a <=GFX8 unmerged TCS.
-    if (reserveVertexBufferTable) {
-      auto userDataValue = Util::Abi::UserDataMapping::Invalid;
-      if (m_shaderStage == ShaderStageVertex)
-        userDataValue = Util::Abi::UserDataMapping::VertexBufferTable;
-      specialUserDataArgs.push_back(
-          UserDataArg(builder.getInt32Ty(), userDataValue, &currIntfData->entryArgIdxs.vs.vbTablePtr));
+    if (getMergedShaderStage(m_shaderStage) == getMergedShaderStage(ShaderStageVertex)) {
+      // This is the VS, or the shader that VS is merged into on GFX9+.
+      auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+      auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
+
+      // Vertex buffer table.
+      if (reserveVertexBufferTable) {
+        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::VertexBufferTable,
+                                                  &vsIntfData->entryArgIdxs.vs.vbTablePtr));
+      }
+
+      // Base vertex and base instance.
+      if (vsResUsage->builtInUsage.vs.baseVertex || vsResUsage->builtInUsage.vs.baseInstance) {
+        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::BaseVertex,
+                                                  &vsIntfData->entryArgIdxs.vs.baseVertex));
+        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::BaseInstance,
+                                                  &vsIntfData->entryArgIdxs.vs.baseInstance));
+      }
+
+      // Draw index.
+      if (vsResUsage->builtInUsage.vs.drawIndex) {
+        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::DrawIndex,
+                                                  &vsIntfData->entryArgIdxs.vs.drawIndex));
+      }
     }
 
-    // Base vertex and base instance. Only add to PAL metadata for VS, in case this is a <=GFX8 unmerged TCS.
-    if (currResUsage->builtInUsage.vs.baseVertex || currResUsage->builtInUsage.vs.baseInstance) {
-      auto userDataValue = Util::Abi::UserDataMapping::Invalid;
-      if (m_shaderStage == ShaderStageVertex)
-        userDataValue = Util::Abi::UserDataMapping::BaseVertex;
-      specialUserDataArgs.push_back(
-          UserDataArg(builder.getInt32Ty(), userDataValue, &currIntfData->entryArgIdxs.vs.baseVertex));
-      if (m_shaderStage == ShaderStageVertex)
-        userDataValue = Util::Abi::UserDataMapping::BaseInstance;
-      specialUserDataArgs.push_back(
-          UserDataArg(builder.getInt32Ty(), userDataValue, &currIntfData->entryArgIdxs.vs.baseInstance));
-    }
-
-    // Draw index. Only add to PAL metadata for VS, in case this is a <=GFX8 unmerged TCS.
-    if (currResUsage->builtInUsage.vs.drawIndex) {
-      auto userDataValue = Util::Abi::UserDataMapping::Invalid;
-      if (m_shaderStage == ShaderStageVertex)
-        userDataValue = Util::Abi::UserDataMapping::DrawIndex;
-      specialUserDataArgs.push_back(
-          UserDataArg(builder.getInt32Ty(), userDataValue, &currIntfData->entryArgIdxs.vs.drawIndex));
-    }
-
-    break;
-  }
-  case ShaderStageTessEval: {
-    // NOTE: The user data to emulate gl_ViewIndex is somewhat common. To make it consistent for GFX9
-    // merged shader, we place it prior to any other special user data.
-    if (enableMultiView) {
-      specialUserDataArgs.push_back(
-          UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::ViewId, &entryArgIdxs.tes.viewIndex));
-    }
-
-    // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
-    // with PAL's GS on-chip behavior (TES is in NGG primitive shader).
-    if (enableNgg)
-      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::EsGsLdsSize));
-    break;
-  }
-  case ShaderStageGeometry: {
-    // NOTE: The user data to emulate gl_ViewIndex is somewhat common. To make it consistent for GFX9
-    // merged shader, we place it prior to any other special user data.
-    if (enableMultiView) {
-      specialUserDataArgs.push_back(
-          UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::ViewId, &entryArgIdxs.gs.viewIndex));
-    }
-
-    // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
-    // with PAL's GS on-chip behavior. i.e. GS is GFX8, or GS is in NGG primitive shader
-    if ((m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize) || enableNgg)
-      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::EsGsLdsSize));
-    break;
-  }
-  case ShaderStageCompute: {
+  } else if (m_shaderStage == ShaderStageCompute) {
     // Emulate gl_NumWorkGroups via user data registers.
     // Later code needs to ensure that this starts on an even numbered register.
     if (builtInUsage.cs.numWorkgroups) {
@@ -588,16 +908,6 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       specialUserDataArgs.push_back(
           UserDataArg(numWorkgroupsPtrTy, Util::Abi::UserDataMapping::Workgroup, &entryArgIdxs.cs.numWorkgroupsPtr));
     }
-    break;
-  }
-  case ShaderStageFragment: {
-    // Do nothing
-    break;
-  }
-  default: {
-    llvm_unreachable("Should never be called!");
-    break;
-  }
   }
 
   // Allocate register for stream-out buffer table, to go before the user data node args (unlike all the ones
@@ -632,41 +942,41 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
 // =====================================================================================================================
 // Add a UserDataArg to the vector for each user data node needed in user data SGPRs.
 //
-// This function does not check if it needs to spill because of running out of SGPRs. However it does
-// check if a node needs to be loaded from the spill table anyway because of its type, and in that case marks
-// it as "mustSpill".
-//
 // This function handles CS "fixed layout" by inserting an extra padding arg before a real user data arg if
 // necessary.
 //
 // @param userDataArgs : Vector to add args to
 // @param builder : IRBuilder to get types from
-void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs, IRBuilder<> &builder) const {
+void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs, IRBuilder<> &builder) {
 
   // Add entries from the root user data layout (not vertex buffer or streamout, and not unused ones).
-  auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
   // TODO Shader compilation: This should not be conditional on isUnlinked(). Once we have shader compilation
   // without user data layout working, we can instead make it conditional on having a user data layout.
   bool useFixedLayout = m_shaderStage == ShaderStageCompute && !m_pipelineState->isUnlinked();
+  auto userDataUsage = getUserDataUsage(m_shaderStage);
 
-  // userDataIdx counts how many SGPRs we have already added, so we can tell if we need padding before
+  // userDataSize counts how many SGPRs we have already added, so we can tell if we need padding before
   // an arg in a compute shader. We initialize with userDataArgs.size(), relying on the fact that all the
   // ones added so far (global table, per-shader table, streamout table for graphics) use one register each.
-  unsigned userDataIdx = userDataArgs.size();
+  unsigned userDataSize = userDataArgs.size();
 
   for (unsigned i = 0; i != m_pipelineState->getUserDataNodes().size(); ++i) {
     const ResourceNode &node = m_pipelineState->getUserDataNodes()[i];
-    if (node.type == ResourceNodeType::IndirectUserDataVaPtr || node.type == ResourceNodeType::StreamOutTableVaPtr)
-      continue;
-    if (!isResourceNodeActive(&node, true))
-      continue;
-
-    unsigned *argIndex = &intfData->entryArgIdxs.resNodeValues[i];
-    unsigned userDataValue = node.offsetInDwords;
-    bool mustSpill = false;
     switch (node.type) {
 
-    case ResourceNodeType::DescriptorTableVaPtr:
+    case ResourceNodeType::IndirectUserDataVaPtr:
+    case ResourceNodeType::StreamOutTableVaPtr:
+      break;
+
+    case ResourceNodeType::DescriptorTableVaPtr: {
+      // Check if the descriptor set is in use.
+      if (userDataUsage->descriptorSets.size() <= node.innerTable[0].set)
+        break;
+      auto &descSetUsage = userDataUsage->descriptorSets[node.innerTable[0].set];
+      if (descSetUsage.users.empty())
+        break;
+
+      unsigned userDataValue = node.offsetInDwords;
       if (m_pipelineState->getShaderOptions(m_shaderStage).updateDescInElf &&
           (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageVertex ||
            m_shaderStage == ShaderStageCompute)) {
@@ -675,35 +985,127 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
         // If there are more individual shader compile in future, we can add more stages here
         userDataValue = DescRelocMagic | node.innerTable[0].set;
       }
+      // Add the arg (descriptor set pointer) that we can potentially unspill.
+      userDataSize = addUserDataArg(userDataArgs, userDataValue, node.sizeInDwords, &descSetUsage.entryArgIdx,
+                                    useFixedLayout, userDataSize, builder);
       break;
+    }
 
     case ResourceNodeType::PushConst:
-    case ResourceNodeType::DescriptorBufferCompact:
+      // For CS fixed layout, only attempt to unspill the push constant if uses of it use the whole push constant.
+      // Trying to do anything else runs into problems with the push constant being split between unspilled parts
+      // and spilled parts, which PAL does not like.
+      if (useFixedLayout && (userDataUsage->pushConstOffsets.size() != 1 ||
+                             userDataUsage->pushConstOffsets[0].dwordSize != node.sizeInDwords)) {
+        // Add an arg entry with "mustSpill". In CS fixed layout, that causes later entries to be spilled too.
+        userDataSize = addUserDataArg(userDataArgs, node.offsetInDwords, node.sizeInDwords, nullptr, useFixedLayout,
+                                      userDataSize, builder);
+        userDataArgs.back().mustSpill = true;
+        userDataUsage->pushConstSpill = true;
+        break;
+      }
+
+      // We add a potential unspilled arg for each separate dword offset of the push const at which there is a load.
+      // We already know that loads we have on our pushConstOffsets lists are at dword-aligned offset and dword-aligned
+      // size. We need to ensure that all loads are the same size, by removing ones that are bigger than the
+      // minimum size.
+      for (unsigned dwordOffset = 0,
+                    dwordEndOffset = std::min(unsigned(userDataUsage->pushConstOffsets.size()), node.sizeInDwords);
+           dwordOffset != dwordEndOffset; ++dwordOffset) {
+        UserDataNodeUsage &pushConstOffset = userDataUsage->pushConstOffsets[dwordOffset];
+        if (pushConstOffset.users.empty())
+          continue;
+
+        // Check that the load size does not overlap with the next used offset in the push constant.
+        bool haveOverlap = false;
+        unsigned endOffset =
+            std::min(dwordOffset + pushConstOffset.dwordSize, unsigned(userDataUsage->pushConstOffsets.size()));
+        for (unsigned followingOffset = dwordOffset + 1; followingOffset != endOffset; ++followingOffset) {
+          if (!userDataUsage->pushConstOffsets[followingOffset].users.empty()) {
+            haveOverlap = true;
+            break;
+          }
+        }
+        if (haveOverlap) {
+          userDataUsage->pushConstSpill = true;
+          continue;
+        }
+
+        // Add the arg (part of the push const) that we can potentially unspill.
+        userDataSize = addUserDataArg(userDataArgs, node.offsetInDwords + dwordOffset, pushConstOffset.dwordSize,
+                                      &pushConstOffset.entryArgIdx, useFixedLayout, userDataSize, builder);
+      }
+
+      // Ensure we mark the push constant's part of the spill table as used.
+      if (userDataUsage->pushConstSpill)
+        userDataUsage->spillUsage = std::min(userDataUsage->spillUsage, node.offsetInDwords);
+
       break;
 
     default:
-      // Any other descriptor type in the root table is accessed via the spill table.
-      mustSpill = true;
-    }
+      // Descriptor in the root table. If it is an array of descriptors, there could be multiple entries in
+      // the rootDescriptors array.
+      // For CS fixed layout, only attempt to unspill if it is a single descriptor, not an array. Trying to
+      // do anything else runs into problems with the array being split between unspilled parts and spilled
+      // parts, which PAL does not like.
+      if (useFixedLayout &&
+          (userDataUsage->rootDescriptors.size() <= node.offsetInDwords ||
+           userDataUsage->rootDescriptors[node.offsetInDwords].users.empty() ||
+           userDataUsage->rootDescriptors[node.offsetInDwords].users[0]->getType()->getPrimitiveSizeInBits() / 32 !=
+               node.sizeInDwords)) {
+        // Add an arg entry with "mustSpill". In CS fixed layout, that causes later entries to be spilled too.
+        userDataSize = addUserDataArg(userDataArgs, node.offsetInDwords, node.sizeInDwords, nullptr, useFixedLayout,
+                                      userDataSize, builder);
+        userDataArgs.back().mustSpill = true;
+        break;
+      }
 
-    if (useFixedLayout && userDataIdx != node.offsetInDwords + InterfaceData::CsStartUserData) {
-      // With useFixedLayout, we need a padding arg before the node's arg.
-      assert(node.offsetInDwords + InterfaceData::CsStartUserData > userDataIdx);
-      userDataArgs.push_back(UserDataArg(
-          VectorType::get(builder.getInt32Ty(), node.offsetInDwords + InterfaceData::CsStartUserData - userDataIdx),
-          Util::Abi::UserDataMapping::Invalid, nullptr, /*isPadding=*/true));
-      userDataIdx = node.offsetInDwords + InterfaceData::CsStartUserData;
+      for (unsigned dwordOffset = node.offsetInDwords; dwordOffset != node.offsetInDwords + node.sizeInDwords;
+           ++dwordOffset) {
+        if (userDataUsage->rootDescriptors.size() <= dwordOffset)
+          break;
+        auto &rootDescUsage = userDataUsage->rootDescriptors[dwordOffset];
+        if (rootDescUsage.users.empty())
+          continue;
+        unsigned dwordSize = rootDescUsage.users[0]->getType()->getPrimitiveSizeInBits() / 32;
+        // Add the arg (root descriptor) that we can potentially unspill.
+        userDataSize = addUserDataArg(userDataArgs, dwordOffset, dwordSize, &rootDescUsage.entryArgIdx, useFixedLayout,
+                                      userDataSize, builder);
+      }
+      break;
     }
-    // Now the node arg itself.
-    Type *argTy = builder.getInt32Ty();
-    if (node.sizeInDwords != 1)
-      argTy = VectorType::get(argTy, node.sizeInDwords);
-    userDataArgs.push_back(UserDataArg(argTy, userDataValue, argIndex));
-    if (mustSpill)
-      userDataArgs.back().mustSpill = true;
-    else
-      userDataIdx += node.sizeInDwords;
   }
+}
+
+// =====================================================================================================================
+// Add a single UserDataArg, preceded by padding if needed for CS fixed layout
+//
+// @param userDataArgs : Vector to add UserDataArg to
+// @param userDataValue : PAL metadata user data value, ~0U (Util::Abi::UserDataMapping::Invalid) for none
+// @param sizeInDwords : Size of argument in dwords
+// @param argIndex : Where to store arg index once it is allocated, nullptr for none
+// @param useFixedLayout : True to insert padding before if required
+// @param userDataSize : Size so far of user data in dwords
+// @param builder : IRBuilder (just for getting types)
+// @return : Updated size so far of user data in dwords
+unsigned PatchEntryPointMutate::addUserDataArg(SmallVectorImpl<UserDataArg> &userDataArgs, unsigned userDataValue,
+                                               unsigned sizeInDwords, unsigned *argIndex, bool useFixedLayout,
+                                               unsigned userDataSize, IRBuilder<> &builder) {
+  if (useFixedLayout && userDataSize != userDataValue + InterfaceData::CsStartUserData) {
+    // With useFixedLayout, we need a padding arg before the node's arg.
+    assert(userDataValue + InterfaceData::CsStartUserData > userDataSize);
+    userDataArgs.push_back(UserDataArg(
+        VectorType::get(builder.getInt32Ty(), userDataValue + InterfaceData::CsStartUserData - userDataSize),
+        Util::Abi::UserDataMapping::Invalid, nullptr, /*isPadding=*/true));
+    userDataSize = userDataValue + InterfaceData::CsStartUserData;
+  }
+  // Now the node arg itself.
+  Type *argTy = builder.getInt32Ty();
+  if (sizeInDwords != 1)
+    argTy = VectorType::get(argTy, sizeInDwords);
+  userDataArgs.push_back(UserDataArg(argTy, userDataValue, argIndex));
+  userDataSize += sizeInDwords;
+  return userDataSize;
 }
 
 // =====================================================================================================================
@@ -719,10 +1121,45 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
 void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg> userDataArgs,
                                                            ArrayRef<UserDataArg> specialUserDataArgs,
                                                            IRBuilder<> &builder,
-                                                           SmallVectorImpl<UserDataArg> &unspilledArgs) const {
+                                                           SmallVectorImpl<UserDataArg> &unspilledArgs) {
 
-  auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
   SmallVector<UserDataArg, 1> spillTableArg;
+
+  auto userDataUsage = getUserDataUsage(m_shaderStage);
+  if (!userDataUsage->spillTable.users.empty() || userDataUsage->pushConstSpill ||
+      userDataUsage->spillUsage != UINT_MAX) {
+    // Spill table is already in use by code added in DescBuilder, or by uses of the push const pointer not
+    // all being of the form that can be unspilled, or by push const uses or descriptor array entries not even
+    // being considered for unspilling in CS fixed layout.
+    spillTableArg.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::SpillTable,
+                                        &userDataUsage->spillTable.entryArgIdx));
+
+    // Determine the lowest offset at which the spill table is used, so we can set PAL metadata accordingly.
+    // (This only covers uses of the spill table generated by DescBuilder. It excludes the push const and args
+    // that are unspill candidates but we decide to spill; those ones are separately set in userDataUsage->spillUsage.)
+    SmallVector<Instruction *, 4> spillUsers;
+    spillUsers.insert(spillUsers.end(), userDataUsage->spillTable.users.begin(), userDataUsage->spillTable.users.end());
+    unsigned minByteOffset = UINT_MAX;
+    for (unsigned i = 0; i != spillUsers.size(); ++i) {
+      for (User *user : spillUsers[i]->users()) {
+        auto inst = cast<Instruction>(user);
+        if (isa<BitCastInst>(inst)) {
+          spillUsers.push_back(inst);
+          continue;
+        }
+        if (auto gep = dyn_cast<GetElementPtrInst>(inst)) {
+          APInt gepOffset(64, 0);
+          if (gep->accumulateConstantOffset(m_module->getDataLayout(), gepOffset)) {
+            minByteOffset = std::min(minByteOffset, unsigned(gepOffset.getZExtValue()));
+            continue;
+          }
+        }
+        minByteOffset = 0;
+        break;
+      }
+    }
+    m_pipelineState->getPalMetadata()->setUserDataSpillUsage(std::min(userDataUsage->spillUsage, minByteOffset / 4));
+  }
 
   // Figure out how many sgprs we have available for userDataArgs.
   unsigned userDataEnd = 0;
@@ -737,20 +1174,21 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
     userDataEnd = m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
     for (auto &userDataArg : specialUserDataArgs)
       userDataEnd -= userDataArg.argDwordSize;
+    // ... and the one used by the spill table if already added.
+    userDataEnd -= spillTableArg.size();
   }
 
   // See if we need to spill any user data nodes in userDataArgs, copying the unspilled ones across to unspilledArgs.
   bool useFixedLayout = m_shaderStage == ShaderStageCompute;
-  bool fixedLayoutSpilling = false;
   unsigned userDataIdx = 0;
 
   for (const UserDataArg &userDataArg : userDataArgs) {
     unsigned afterUserDataIdx = userDataIdx + userDataArg.argDwordSize;
-    if (fixedLayoutSpilling || userDataArg.mustSpill || afterUserDataIdx > userDataEnd) {
+    if (userDataArg.mustSpill || afterUserDataIdx > userDataEnd) {
       // Spill this node. Allocate the spill table arg.
       if (spillTableArg.empty()) {
         spillTableArg.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::SpillTable,
-                                            &intfData->entryArgIdxs.spillTable));
+                                            &userDataUsage->spillTable.entryArgIdx));
         // Only decrement the number of available sgprs in a graphics shader. In a compute shader,
         // the spill table arg goes in s12, beyond the s2-s11 range allowed for user data.
         if (m_shaderStage != ShaderStageCompute)
@@ -761,7 +1199,7 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
           // Remove the last unspilled node (and any padding arg before that), and ensure that spill usage is
           // set correctly so that PAL metadata spill threshold is correct.
           userDataIdx -= unspilledArgs.back().argDwordSize;
-          m_pipelineState->getPalMetadata()->setUserDataSpillUsage(unspilledArgs.back().userDataValue);
+          userDataUsage->spillUsage = std::min(userDataUsage->spillUsage, unspilledArgs.back().userDataValue);
           unspilledArgs.pop_back();
           if (!unspilledArgs.empty() && unspilledArgs.back().isPadding) {
             userDataIdx -= unspilledArgs.back().argDwordSize;
@@ -771,14 +1209,13 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
       }
       // Ensure that spillUsage includes this offset. (We might be on a compute shader padding node, in which
       // case userDataArg.userDataValue is Invalid, and this call has no effect.)
-      m_pipelineState->getPalMetadata()->setUserDataSpillUsage(userDataArg.userDataValue);
+      userDataUsage->spillUsage = std::min(userDataUsage->spillUsage, userDataArg.userDataValue);
 
-      if (!userDataArg.mustSpill && useFixedLayout) {
-        // On a compute shader, if we spilled because we ran out of SGPRs (rather than because the node is
-        // marked "mustspill"), stop trying to allocate nodes to SGPRs. If we didn't do this, a later node
-        // that is smaller than the current one might succeed in not spilling, but that would be wrong
+      if (useFixedLayout) {
+        // On a compute shader, on spilling, stop trying to allocate nodes to SGPRs. If we didn't do this, a
+        // later node that is smaller than the current one might succeed in not spilling, but that would be wrong
         // because it would not have the right padding before it for fixed layout.
-        fixedLayoutSpilling = true;
+        break;
       }
 
       continue;
@@ -1067,6 +1504,44 @@ uint64_t PatchEntryPointMutate::pushFixedShaderArgTys(SmallVectorImpl<Type *> &a
   }
 
   return inRegMask;
+}
+
+// =====================================================================================================================
+// Get UserDataUsage struct for the merged shader stage that contains the given shader stage
+//
+// @param stage : Shader stage
+PatchEntryPointMutate::UserDataUsage *PatchEntryPointMutate::getUserDataUsage(ShaderStage stage) {
+  stage = getMergedShaderStage(stage);
+  m_userDataUsage.resize(std::max(m_userDataUsage.size(), static_cast<size_t>(stage) + 1));
+  if (!m_userDataUsage[stage])
+    m_userDataUsage[stage] = std::make_unique<UserDataUsage>();
+  return &*m_userDataUsage[stage];
+}
+
+// =====================================================================================================================
+// Get the shader stage that the given shader stage is merged into.
+// For GFX9+:
+// VS -> TCS (if it exists)
+// VS -> GS (if it exists)
+// TES -> GS (if it exists)
+//
+// @param stage : Shader stage
+ShaderStage PatchEntryPointMutate::getMergedShaderStage(ShaderStage stage) const {
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
+    switch (stage) {
+    case ShaderStageVertex:
+      if (m_pipelineState->hasShaderStage(ShaderStageTessControl))
+        return ShaderStageTessControl;
+      LLVM_FALLTHROUGH;
+    case ShaderStageTessEval:
+      if (m_pipelineState->hasShaderStage(ShaderStageGeometry))
+        return ShaderStageGeometry;
+      break;
+    default:
+      break;
+    }
+  }
+  return stage;
 }
 
 // =====================================================================================================================

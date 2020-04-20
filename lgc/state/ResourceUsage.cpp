@@ -68,5 +68,4 @@ ResourceUsage::ResourceUsage(ShaderStage shaderStage) {
 
 // =====================================================================================================================
 InterfaceData::InterfaceData() {
-  entryArgIdxs.spillTable = InvalidValue;
 }

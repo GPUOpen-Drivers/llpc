@@ -47,7 +47,6 @@ class PassManager;
 void initializePatchBufferOpPass(PassRegistry &);
 void initializePatchCheckShaderCachePass(PassRegistry &);
 void initializePatchCopyShaderPass(PassRegistry &);
-void initializePatchDescriptorLoadPass(PassRegistry &);
 void initializePatchEntryPointMutatePass(PassRegistry &);
 void initializePatchInOutImportExportPass(PassRegistry &);
 void initializePatchIntrinsicSimplifyPass(PassRegistry &);
@@ -56,7 +55,6 @@ void initializePatchLoadScalarizerPass(PassRegistry &);
 void initializePatchNullFragShaderPass(PassRegistry &);
 void initializePatchPeepholeOptPass(PassRegistry &);
 void initializePatchPreparePipelineAbiPass(PassRegistry &);
-void initializePatchPushConstOpPass(PassRegistry &);
 void initializePatchResourceCollectPass(PassRegistry &);
 void initializePatchSetupTargetFeaturesPass(PassRegistry &);
 
@@ -73,7 +71,6 @@ inline static void initializePatchPasses(llvm::PassRegistry &passRegistry) {
   initializePatchBufferOpPass(passRegistry);
   initializePatchCheckShaderCachePass(passRegistry);
   initializePatchCopyShaderPass(passRegistry);
-  initializePatchDescriptorLoadPass(passRegistry);
   initializePatchEntryPointMutatePass(passRegistry);
   initializePatchInOutImportExportPass(passRegistry);
   initializePatchIntrinsicSimplifyPass(passRegistry);
@@ -82,7 +79,6 @@ inline static void initializePatchPasses(llvm::PassRegistry &passRegistry) {
   initializePatchNullFragShaderPass(passRegistry);
   initializePatchPeepholeOptPass(passRegistry);
   initializePatchPreparePipelineAbiPass(passRegistry);
-  initializePatchPushConstOpPass(passRegistry);
   initializePatchResourceCollectPass(passRegistry);
   initializePatchSetupTargetFeaturesPass(passRegistry);
 }
@@ -90,7 +86,6 @@ inline static void initializePatchPasses(llvm::PassRegistry &passRegistry) {
 llvm::FunctionPass *createPatchBufferOp();
 PatchCheckShaderCache *createPatchCheckShaderCache();
 llvm::ModulePass *createPatchCopyShader();
-llvm::ModulePass *createPatchDescriptorLoad();
 llvm::ModulePass *createPatchEntryPointMutate();
 llvm::ModulePass *createPatchInOutImportExport();
 llvm::FunctionPass *createPatchIntrinsicSimplify();
@@ -99,7 +94,6 @@ llvm::FunctionPass *createPatchLoadScalarizer();
 llvm::ModulePass *createPatchNullFragShader();
 llvm::FunctionPass *createPatchPeepholeOpt(bool enableDiscardOpt = false);
 llvm::ModulePass *createPatchPreparePipelineAbi(bool onlySetCallingConvs);
-llvm::ModulePass *createPatchPushConstOp();
 llvm::ModulePass *createPatchResourceCollect();
 llvm::ModulePass *createPatchSetupTargetFeatures();
 

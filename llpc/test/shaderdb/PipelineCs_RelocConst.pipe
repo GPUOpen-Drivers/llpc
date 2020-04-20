@@ -14,7 +14,7 @@
 ; SHADERTEST1: %[[RELOCONSTEXT:[0-9]+]] = zext i32 %[[RELOCONST]] to i64
 ; SHADERTEST1: %[[BUFFFERDESCADDR:[0-9]+]] = add i64 %{{[0-9]+}}, %[[RELOCONSTEXT]]
 ; SHADERTEST1: %[[BUFFERDESCPTR:[0-9]+]] = inttoptr i64 %[[BUFFFERDESCADDR]] {{.*}}
-; SHADERTEST1: %{{[0-9]+}} = load <4 x i32>, <4 x i32> addrspace(4)* %[[BUFFERDESCPTR]], align 16, !invariant.load !{{.*}}
+; SHADERTEST1: %{{[0-9]+}} = load <4 x i32>, <4 x i32> addrspace(4)* %[[BUFFERDESCPTR]], align 16
 ; SHADERTEST1: COMPUTE_USER_DATA_{{.}} 0x0000000000000006
 ; SHADERTEST1: COMPUTE_USER_DATA_{{.}} 0x0000000000000007
 ; SHADERTEST1: AMDLLPC SUCCESS
