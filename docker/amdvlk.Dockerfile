@@ -44,6 +44,7 @@ RUN cmake "/vulkandriver/drivers/xgl" \
           -G "$GENERATOR" \
           -DXGL_BUILD_LIT=ON \
           -DCMAKE_BUILD_TYPE="$CONFIG" \
+          -DLLPC_ENABLE_WERROR=ON \
     && cmake --build . \
     && cmake --build . --target amdllpc \
     && cmake --build . --target spvgen \
