@@ -209,7 +209,7 @@ bool SpirvLowerResourceCollect::runOnModule(Module &module) {
       // Collect basic types of fragment outputs
       BasicType basicTy = BasicType::Unknown;
 
-      const auto compTy = globalTy->isVectorTy() ? globalTy->getVectorElementType() : globalTy;
+      const auto compTy = globalTy->isVectorTy() ? cast<VectorType>(globalTy)->getElementType() : globalTy;
       const unsigned bitWidth = compTy->getScalarSizeInBits();
       const bool signedness = (inOutMeta.Signedness != 0);
 
@@ -236,7 +236,7 @@ bool SpirvLowerResourceCollect::runOnModule(Module &module) {
 
       fsOutInfo.location = location;
       fsOutInfo.location = index;
-      fsOutInfo.componentCount = globalTy->isVectorTy() ? globalTy->getVectorNumElements() : 1;
+      fsOutInfo.componentCount = globalTy->isVectorTy() ? cast<VectorType>(globalTy)->getNumElements() : 1;
       ;
       fsOutInfo.basicType = basicTy;
       m_fsOutInfos.push_back(fsOutInfo);

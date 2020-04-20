@@ -121,7 +121,7 @@ Value *SubgroupBuilder::CreateSubgroupAllEqual(Value *const value, bool wqm, con
   if (type->isVectorTy()) {
     Value *result = CreateExtractElement(compare, getInt32(0));
 
-    for (unsigned i = 1, compCount = type->getVectorNumElements(); i < compCount; i++)
+    for (unsigned i = 1, compCount = cast<VectorType>(type)->getNumElements(); i < compCount; i++)
       result = CreateAnd(result, CreateExtractElement(compare, i));
 
     return CreateSubgroupAll(result, wqm, instName);
@@ -170,9 +170,8 @@ Value *SubgroupBuilder::CreateSubgroupBallot(Value *const value, const Twine &in
   // Ballot expects a <4 x i32> return, so we need to turn the i64 into that.
   ballot = CreateBitCast(ballot, VectorType::get(getInt32Ty(), 2));
 
-  ElementCount elementCount = ballot->getType()->getVectorElementCount();
-  return CreateShuffleVector(ballot, ConstantVector::getSplat(elementCount, getInt32(0)),
-                             ArrayRef<unsigned>{0, 1, 2, 3});
+  ElementCount elementCount = cast<VectorType>(ballot->getType())->getElementCount();
+  return CreateShuffleVector(ballot, ConstantVector::getSplat(elementCount, getInt32(0)), ArrayRef<int>{0, 1, 2, 3});
 }
 
 // =====================================================================================================================
@@ -199,7 +198,7 @@ Value *SubgroupBuilder::CreateSubgroupBallotBitExtract(Value *const value, Value
   } else {
     Value *indexMask = CreateZExtOrTrunc(index, getInt64Ty());
     indexMask = CreateShl(getInt64(1), indexMask);
-    Value *valueAsInt64 = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<unsigned>{0, 1});
+    Value *valueAsInt64 = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<int>{0, 1});
     valueAsInt64 = CreateBitCast(valueAsInt64, getInt64Ty());
     Value *const result = CreateAnd(indexMask, valueAsInt64);
     return CreateICmpNE(result, getInt64(0));
@@ -215,7 +214,7 @@ Value *SubgroupBuilder::CreateSubgroupBallotBitCount(Value *const value, const T
   if (getShaderSubgroupSize() <= 32)
     return CreateUnaryIntrinsic(Intrinsic::ctpop, CreateExtractElement(value, getInt32(0)));
   else {
-    Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<unsigned>{0, 1});
+    Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<int>{0, 1});
     result = CreateBitCast(result, getInt64Ty());
     result = CreateUnaryIntrinsic(Intrinsic::ctpop, result);
     return CreateZExtOrTrunc(result, getInt32Ty());
@@ -243,7 +242,7 @@ Value *SubgroupBuilder::CreateSubgroupBallotExclusiveBitCount(Value *const value
   if (getShaderSubgroupSize() <= 32)
     return CreateSubgroupMbcnt(CreateExtractElement(value, getInt32(0)), "");
   else {
-    Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<unsigned>{0, 1});
+    Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<int>{0, 1});
     result = CreateBitCast(result, getInt64Ty());
     return CreateSubgroupMbcnt(result, "");
   }
@@ -259,7 +258,7 @@ Value *SubgroupBuilder::CreateSubgroupBallotFindLsb(Value *const value, const Tw
     Value *const result = CreateExtractElement(value, getInt32(0));
     return CreateIntrinsic(Intrinsic::cttz, getInt32Ty(), {result, getTrue()});
   } else {
-    Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<unsigned>{0, 1});
+    Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<int>{0, 1});
     result = CreateBitCast(result, getInt64Ty());
     result = CreateIntrinsic(Intrinsic::cttz, getInt64Ty(), {result, getTrue()});
     return CreateZExtOrTrunc(result, getInt32Ty());
@@ -277,7 +276,7 @@ Value *SubgroupBuilder::CreateSubgroupBallotFindMsb(Value *const value, const Tw
     result = CreateIntrinsic(Intrinsic::ctlz, getInt32Ty(), {result, getTrue()});
     return CreateSub(getInt32(31), result);
   } else {
-    Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<unsigned>{0, 1});
+    Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<int>{0, 1});
     result = CreateBitCast(result, getInt64Ty());
     result = CreateIntrinsic(Intrinsic::ctlz, getInt64Ty(), {result, getTrue()});
     result = CreateZExtOrTrunc(result, getInt32Ty());

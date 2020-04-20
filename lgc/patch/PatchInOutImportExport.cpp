@@ -1460,7 +1460,7 @@ Value *PatchInOutImportExport::patchGsGenericInputImport(Type *inputTy, unsigned
                                                          Value *vertexIdx, Instruction *insertPos) {
   assert(vertexIdx);
 
-  const unsigned compCount = inputTy->isVectorTy() ? inputTy->getVectorNumElements() : 1;
+  const unsigned compCount = inputTy->isVectorTy() ? cast<VectorType>(inputTy)->getNumElements() : 1;
   const unsigned bitWidth = inputTy->getScalarSizeInBits();
 
   Type *origInputTy = inputTy;
@@ -1565,9 +1565,9 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
 
   Attribute::AttrKind attribs[] = {Attribute::ReadNone};
 
-  Type *basicTy = inputTy->isVectorTy() ? inputTy->getVectorElementType() : inputTy;
+  Type *basicTy = inputTy->isVectorTy() ? cast<VectorType>(inputTy)->getElementType() : inputTy;
 
-  const unsigned compCout = inputTy->isVectorTy() ? inputTy->getVectorNumElements() : 1;
+  const unsigned compCout = inputTy->isVectorTy() ? cast<VectorType>(inputTy)->getNumElements() : 1;
   const unsigned bitWidth = inputTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
@@ -1742,7 +1742,7 @@ void PatchInOutImportExport::patchVsGenericOutputExport(Value *output, unsigned 
         // For 64-bit data type, the component indexing must multiply by 2
         compIdx *= 2;
 
-        unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() * 2 : 2;
+        unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() * 2 : 2;
 
         outputTy = VectorType::get(Type::getFloatTy(*m_context), compCount);
         output = new BitCastInst(output, outputTy, "", insertPos);
@@ -1791,7 +1791,7 @@ void PatchInOutImportExport::patchTesGenericOutputExport(Value *output, unsigned
       // For 64-bit data type, the component indexing must multiply by 2
       compIdx *= 2;
 
-      unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() * 2 : 2;
+      unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() * 2 : 2;
       outputTy = VectorType::get(Type::getFloatTy(*m_context), compCount);
 
       output = new BitCastInst(output, outputTy, "", insertPos);
@@ -1822,7 +1822,7 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
     compIdx *= 2;
 
     if (outputTy->isVectorTy())
-      outputTy = VectorType::get(Type::getFloatTy(*m_context), outputTy->getVectorNumElements() * 2);
+      outputTy = VectorType::get(Type::getFloatTy(*m_context), cast<VectorType>(outputTy)->getNumElements() * 2);
     else
       outputTy = VectorType::get(Type::getFloatTy(*m_context), 2);
 
@@ -1830,7 +1830,7 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
   } else
     assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
 
-  const unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() : 1;
+  const unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
   // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD to DWORD and
   // store DWORD to GS-VS ring. So for 8-bit/16-bit data type, the actual byte size is based on number of DWORDs.
   unsigned byteSize = (outputTy->getScalarSizeInBits() / 8) * compCount;
@@ -1864,8 +1864,8 @@ void PatchInOutImportExport::patchFsGenericOutputExport(Value *output, unsigned 
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
   (void(bitWidth)); // unused
 
-  auto compTy = outputTy->isVectorTy() ? outputTy->getVectorElementType() : outputTy;
-  unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() : 1;
+  auto compTy = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getElementType() : outputTy;
+  unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
 
   std::vector<Value *> outputComps;
   for (unsigned i = 0; i < compCount; ++i) {
@@ -3442,7 +3442,7 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
   unsigned xfbStride = xfbStrides[xfbBuffer];
 
   auto outputTy = output->getType();
-  unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() : 1;
+  unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
   unsigned bitWidth = outputTy->getScalarSizeInBits();
 
   xfbOffset = xfbOffset + xfbExtraOffset;
@@ -3596,7 +3596,7 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(Value *storeValu
 
   auto storeTy = storeValue->getType();
 
-  unsigned compCount = storeTy->isVectorTy() ? storeTy->getVectorNumElements() : 1;
+  unsigned compCount = storeTy->isVectorTy() ? cast<VectorType>(storeTy)->getNumElements() : 1;
   assert(compCount <= 4);
 
   const uint64_t bitWidth = storeTy->getScalarSizeInBits();
@@ -3827,7 +3827,7 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
                                                          Instruction *insertPos) {
   auto storeTy = storeValue->getType();
 
-  unsigned compCount = storeTy->isVectorTy() ? storeTy->getVectorNumElements() : 1;
+  unsigned compCount = storeTy->isVectorTy() ? cast<VectorType>(storeTy)->getNumElements() : 1;
   assert(compCount <= 4);
 
   const uint64_t bitWidth = storeTy->getScalarSizeInBits();
@@ -3911,15 +3911,16 @@ void PatchInOutImportExport::storeValueToEsGsRing(Value *storeValue, unsigned lo
 
   Type *elemTy = storeTy;
   if (storeTy->isArrayTy())
-    elemTy = storeTy->getArrayElementType();
+    elemTy = cast<ArrayType>(storeTy)->getElementType();
   else if (storeTy->isVectorTy())
-    elemTy = storeTy->getVectorElementType();
+    elemTy = cast<VectorType>(storeTy)->getElementType();
 
   const uint64_t bitWidth = elemTy->getScalarSizeInBits();
   assert((elemTy->isFloatingPointTy() || elemTy->isIntegerTy()) && (bitWidth == 8 || bitWidth == 16 || bitWidth == 32));
 
   if (storeTy->isArrayTy() || storeTy->isVectorTy()) {
-    const unsigned elemCount = storeTy->isArrayTy() ? storeTy->getArrayNumElements() : storeTy->getVectorNumElements();
+    const unsigned elemCount =
+        storeTy->isArrayTy() ? cast<ArrayType>(storeTy)->getNumElements() : cast<VectorType>(storeTy)->getNumElements();
 
     for (unsigned i = 0; i < elemCount; ++i) {
       Value *storeElem = nullptr;
@@ -4001,9 +4002,9 @@ Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned loca
                                                      Value *vertexIdx, Instruction *insertPos) {
   Type *elemTy = loadTy;
   if (loadTy->isArrayTy())
-    elemTy = loadTy->getArrayElementType();
+    elemTy = cast<ArrayType>(loadTy)->getElementType();
   else if (loadTy->isVectorTy())
-    elemTy = loadTy->getVectorElementType();
+    elemTy = cast<VectorType>(loadTy)->getElementType();
 
   const uint64_t bitWidth = elemTy->getScalarSizeInBits();
   assert((elemTy->isFloatingPointTy() || elemTy->isIntegerTy()) && (bitWidth == 8 || bitWidth == 16 || bitWidth == 32));
@@ -4011,7 +4012,8 @@ Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned loca
   Value *loadValue = UndefValue::get(loadTy);
 
   if (loadTy->isArrayTy() || loadTy->isVectorTy()) {
-    const unsigned elemCount = loadTy->isArrayTy() ? loadTy->getArrayNumElements() : loadTy->getVectorNumElements();
+    const unsigned elemCount =
+        loadTy->isArrayTy() ? cast<ArrayType>(loadTy)->getNumElements() : cast<VectorType>(loadTy)->getNumElements();
 
     for (unsigned i = 0; i < elemCount; ++i) {
       auto loadElem =
@@ -4090,9 +4092,9 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
 
   Type *elemTy = storeTy;
   if (storeTy->isArrayTy())
-    elemTy = storeTy->getArrayElementType();
+    elemTy = cast<ArrayType>(storeTy)->getElementType();
   else if (storeTy->isVectorTy())
-    elemTy = storeTy->getVectorElementType();
+    elemTy = cast<VectorType>(storeTy)->getElementType();
 
   const unsigned bitWidth = elemTy->getScalarSizeInBits();
   assert((elemTy->isFloatingPointTy() || elemTy->isIntegerTy()) && (bitWidth == 8 || bitWidth == 16 || bitWidth == 32));
@@ -4109,7 +4111,8 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
   }
 
   if (storeTy->isArrayTy() || storeTy->isVectorTy()) {
-    const unsigned elemCount = storeTy->isArrayTy() ? storeTy->getArrayNumElements() : storeTy->getVectorNumElements();
+    const unsigned elemCount =
+        storeTy->isArrayTy() ? cast<ArrayType>(storeTy)->getNumElements() : cast<VectorType>(storeTy)->getNumElements();
 
     for (unsigned i = 0; i < elemCount; ++i) {
       Value *storeElem = nullptr;
@@ -4342,7 +4345,7 @@ Value *PatchInOutImportExport::readValueFromLds(bool isOutput, Type *readTy, Val
   assert(readTy->isSingleValueType());
 
   // Read DWORDs from LDS
-  const unsigned compCount = readTy->isVectorTy() ? readTy->getVectorNumElements() : 1;
+  const unsigned compCount = readTy->isVectorTy() ? cast<VectorType>(readTy)->getNumElements() : 1;
   const unsigned bitWidth = readTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
   const unsigned numChannels = compCount * (bitWidth == 64 ? 2 : 1);
@@ -4437,7 +4440,7 @@ void PatchInOutImportExport::writeValueToLds(Value *writeValue, Value *ldsOffset
   auto writeTy = writeValue->getType();
   assert(writeTy->isSingleValueType());
 
-  const unsigned compCout = writeTy->isVectorTy() ? writeTy->getVectorNumElements() : 1;
+  const unsigned compCout = writeTy->isVectorTy() ? cast<VectorType>(writeTy)->getNumElements() : 1;
   const unsigned bitWidth = writeTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
   const unsigned numChannels = compCout * (bitWidth == 64 ? 2 : 1);
@@ -5122,7 +5125,7 @@ void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsign
 
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
 
-  const unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() : 1;
+  const unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
   const unsigned bitWidth = outputTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 

@@ -345,7 +345,7 @@ ShaderModes *BuilderRecorder::getShaderModes() {
 // @param vector2 : The vector 2
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateDotProduct(Value *const vector1, Value *const vector2, const Twine &instName) {
-  Type *const scalarType = vector1->getType()->getVectorElementType();
+  Type *const scalarType = cast<VectorType>(vector1->getType())->getElementType();
   return record(Opcode::DotProduct, scalarType, {vector1, vector2}, instName);
 }
 
@@ -407,7 +407,7 @@ Value *BuilderRecorder::CreateMatrixTimesScalar(Value *const matrix, Value *cons
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateVectorTimesMatrix(Value *const vector, Value *const matrix, const Twine &instName) {
   Type *const matrixType = matrix->getType();
-  Type *const compType = matrixType->getArrayElementType()->getVectorElementType();
+  Type *const compType = cast<VectorType>(cast<ArrayType>(matrixType)->getElementType())->getElementType();
   const unsigned columnCount = matrixType->getArrayNumElements();
   Type *const resultTy = VectorType::get(compType, columnCount);
   return record(Opcode::VectorTimesMatrix, resultTy, {vector, matrix}, instName);
@@ -421,8 +421,8 @@ Value *BuilderRecorder::CreateVectorTimesMatrix(Value *const vector, Value *cons
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateMatrixTimesVector(Value *const matrix, Value *const vector, const Twine &instName) {
   Type *const columnType = matrix->getType()->getArrayElementType();
-  Type *const compType = columnType->getVectorElementType();
-  const unsigned rowCount = columnType->getVectorNumElements();
+  Type *const compType = cast<VectorType>(columnType)->getElementType();
+  const unsigned rowCount = cast<VectorType>(columnType)->getNumElements();
   Type *const vectorType = VectorType::get(compType, rowCount);
   return record(Opcode::MatrixTimesVector, vectorType, {matrix, vector}, instName);
 }
@@ -447,7 +447,7 @@ Value *BuilderRecorder::CreateMatrixTimesMatrix(Value *const matrix1, Value *con
 // @param vector2 : The vector 2
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateOuterProduct(Value *const vector1, Value *const vector2, const Twine &instName) {
-  const unsigned colCount = vector2->getType()->getVectorNumElements();
+  const unsigned colCount = cast<VectorType>(vector2->getType())->getNumElements();
   Type *const resultTy = ArrayType::get(vector1->getType(), colCount);
   return record(Opcode::OuterProduct, resultTy, {vector1, vector2}, instName);
 }
@@ -458,7 +458,8 @@ Value *BuilderRecorder::CreateOuterProduct(Value *const vector1, Value *const ve
 // @param matrix : Matrix
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateDeterminant(Value *const matrix, const Twine &instName) {
-  return record(Determinant, matrix->getType()->getArrayElementType()->getVectorElementType(), matrix, instName);
+  return record(Determinant, cast<VectorType>(cast<ArrayType>(matrix->getType())->getElementType())->getElementType(),
+                matrix, instName);
 }
 
 // =====================================================================================================================
@@ -1439,9 +1440,9 @@ Value *BuilderRecorder::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo in
   Type *resultTy = getBuiltInTy(builtIn, inputInfo);
   if (index) {
     if (isa<ArrayType>(resultTy))
-      resultTy = resultTy->getArrayElementType();
+      resultTy = cast<ArrayType>(resultTy)->getElementType();
     else
-      resultTy = resultTy->getVectorElementType();
+      resultTy = cast<VectorType>(resultTy)->getElementType();
   }
   return record(Opcode::ReadBuiltInInput, resultTy,
                 {
@@ -1468,9 +1469,9 @@ Value *BuilderRecorder::CreateReadBuiltInOutput(BuiltInKind builtIn, InOutInfo o
   Type *resultTy = getBuiltInTy(builtIn, outputInfo);
   if (index) {
     if (isa<ArrayType>(resultTy))
-      resultTy = resultTy->getArrayElementType();
+      resultTy = cast<ArrayType>(resultTy)->getElementType();
     else
-      resultTy = resultTy->getVectorElementType();
+      resultTy = cast<VectorType>(resultTy)->getElementType();
   }
   return record(Opcode::ReadBuiltInOutput, resultTy,
                 {

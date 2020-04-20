@@ -50,9 +50,9 @@ Value *MatrixBuilder::CreateTransposeMatrix(Value *const matrix, const Twine &in
   assert(columnVectorType->isVectorTy());
 
   const unsigned columnCount = matrixType->getArrayNumElements();
-  const unsigned rowCount = columnVectorType->getVectorNumElements();
+  const unsigned rowCount = cast<VectorType>(columnVectorType)->getNumElements();
 
-  Type *const elementType = columnVectorType->getVectorElementType();
+  Type *const elementType = cast<VectorType>(columnVectorType)->getElementType();
 
   Type *const newColumnVectorType = VectorType::get(elementType, columnCount);
   Type *const newMatrixType = ArrayType::get(newColumnVectorType, rowCount);
@@ -92,7 +92,7 @@ Value *MatrixBuilder::CreateTransposeMatrix(Value *const matrix, const Twine &in
 Value *MatrixBuilder::CreateMatrixTimesScalar(Value *const matrix, Value *const scalar, const Twine &instName) {
   Type *const matrixTy = matrix->getType();
   Type *const columnTy = matrixTy->getArrayElementType();
-  const unsigned rowCount = columnTy->getVectorNumElements();
+  const unsigned rowCount = cast<VectorType>(columnTy)->getNumElements();
   unsigned columnCount = matrixTy->getArrayNumElements();
   auto smearScalar = CreateVectorSplat(rowCount, scalar);
 
@@ -115,7 +115,7 @@ Value *MatrixBuilder::CreateMatrixTimesScalar(Value *const matrix, Value *const 
 // @param instName : Name to give instruction(s)
 Value *MatrixBuilder::CreateVectorTimesMatrix(Value *const vector, Value *const matrix, const Twine &instName) {
   Type *const matrixTy = matrix->getType();
-  Type *const compTy = matrixTy->getArrayElementType()->getVectorElementType();
+  Type *const compTy = cast<VectorType>(cast<ArrayType>(matrixTy)->getElementType())->getElementType();
   const unsigned columnCount = matrixTy->getArrayNumElements();
   Type *const resultTy = VectorType::get(compTy, columnCount);
   Value *result = UndefValue::get(resultTy);
@@ -137,11 +137,11 @@ Value *MatrixBuilder::CreateVectorTimesMatrix(Value *const vector, Value *const 
 // @param instName : Name to give instruction(s)
 Value *MatrixBuilder::CreateMatrixTimesVector(Value *const matrix, Value *const vector, const Twine &instName) {
   Type *const columnTy = matrix->getType()->getArrayElementType();
-  const unsigned rowCount = columnTy->getVectorNumElements();
+  const unsigned rowCount = cast<VectorType>(columnTy)->getNumElements();
   Value *result = nullptr;
 
   for (unsigned i = 0; i < matrix->getType()->getArrayNumElements(); ++i) {
-    SmallVector<unsigned, 4> shuffleMask(rowCount, i);
+    SmallVector<int, 4> shuffleMask(rowCount, i);
     auto partialResult = CreateShuffleVector(vector, vector, shuffleMask);
     partialResult = CreateFMul(CreateExtractValue(matrix, i), partialResult);
     if (result)
@@ -182,13 +182,13 @@ Value *MatrixBuilder::CreateMatrixTimesMatrix(Value *const matrix1, Value *const
 // @param vector2 : The float vector 2
 // @param instName : Name to give instruction(s)
 Value *MatrixBuilder::CreateOuterProduct(Value *const vector1, Value *const vector2, const Twine &instName) {
-  const unsigned rowCount = vector1->getType()->getVectorNumElements();
-  const unsigned colCount = vector2->getType()->getVectorNumElements();
+  const unsigned rowCount = cast<VectorType>(vector1->getType())->getNumElements();
+  const unsigned colCount = cast<VectorType>(vector2->getType())->getNumElements();
   Type *const resultTy = ArrayType::get(vector1->getType(), colCount);
   Value *result = UndefValue::get(resultTy);
 
   for (unsigned i = 0; i < colCount; ++i) {
-    SmallVector<unsigned, 4> shuffleIdx(rowCount, i);
+    SmallVector<int, 4> shuffleIdx(rowCount, i);
     Value *columnVector = CreateFMul(vector1, CreateShuffleVector(vector2, vector2, shuffleIdx));
     result = CreateInsertValue(result, columnVector, i);
   }
@@ -204,7 +204,7 @@ Value *MatrixBuilder::CreateOuterProduct(Value *const vector1, Value *const vect
 // @param instName : Name to give instruction(s)
 Value *MatrixBuilder::CreateDeterminant(Value *const matrix, const Twine &instName) {
   unsigned order = matrix->getType()->getArrayNumElements();
-  assert(matrix->getType()->getArrayElementType()->getVectorNumElements() == order);
+  assert(cast<VectorType>(cast<ArrayType>(matrix->getType())->getElementType())->getNumElements() == order);
   assert(order >= 2);
 
   // Extract matrix elements.
@@ -287,7 +287,7 @@ void MatrixBuilder::getSubmatrix(ArrayRef<Value *> matrix, MutableArrayRef<Value
 // @param instName : Name to give instruction(s)
 Value *MatrixBuilder::CreateMatrixInverse(Value *const matrix, const Twine &instName) {
   unsigned order = matrix->getType()->getArrayNumElements();
-  assert(matrix->getType()->getArrayElementType()->getVectorNumElements() == order);
+  assert(cast<VectorType>(cast<ArrayType>(matrix->getType())->getElementType())->getNumElements() == order);
   assert(order >= 2);
 
   // Extract matrix elements.

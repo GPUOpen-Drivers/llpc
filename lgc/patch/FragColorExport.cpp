@@ -80,8 +80,8 @@ Value *FragColorExport::run(Value *output, unsigned location, Instruction *inser
   const bool signedness =
       (outputType == BasicType::Int8 || outputType == BasicType::Int16 || outputType == BasicType::Int);
 
-  auto compTy = outputTy->isVectorTy() ? outputTy->getVectorElementType() : outputTy;
-  unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() : 1;
+  auto compTy = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getElementType() : outputTy;
+  unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
 
   Value *comps[4] = {nullptr};
   if (compCount == 1)
@@ -361,7 +361,7 @@ Value *FragColorExport::run(Value *output, unsigned location, Instruction *inser
 ExportFormat FragColorExport::computeExportFormat(Type *outputTy, unsigned location) const {
   GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
   auto gpuWorkarounds = &m_pipelineState->getTargetInfo().getGpuWorkarounds();
-  unsigned outputMask = outputTy->isVectorTy() ? (1 << outputTy->getVectorNumElements()) - 1 : 1;
+  unsigned outputMask = outputTy->isVectorTy() ? (1 << cast<VectorType>(outputTy)->getNumElements()) - 1 : 1;
   const auto cbState = &m_pipelineState->getColorExportState();
   const auto target = &m_pipelineState->getColorExportFormat(location);
   // NOTE: Alpha-to-coverage only takes effect for outputs from color target 0.

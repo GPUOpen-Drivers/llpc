@@ -403,7 +403,7 @@ static Type *convertToFloatingPointType(Type *origTy) {
     llvm_unreachable("Should never be called!");
   }
   if (isa<VectorType>(origTy))
-    newTy = VectorType::get(newTy, origTy->getVectorNumElements());
+    newTy = VectorType::get(newTy, cast<VectorType>(origTy)->getNumElements());
   return newTy;
 }
 
@@ -493,7 +493,7 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
       texel = CreateInsertElement(UndefValue::get(origTexelTy), texel, uint64_t(0));
 
       SmallVector<Value *, 3> defaults = {getInt64(0), getInt64(0), getInt64(1)};
-      for (unsigned i = 1; i < origTexelTy->getVectorNumElements(); ++i)
+      for (unsigned i = 1; i < cast<VectorType>(origTexelTy)->getNumElements(); ++i)
         texel = CreateInsertElement(texel, defaults[i - 1], i);
     }
 
@@ -563,8 +563,8 @@ Value *ImageBuilder::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsi
   // Use that to select the calculated sample number or the provided one, then append that to the coordinates.
   sampleNum = CreateSelect(fmaskValidFormat, calcSampleNum, sampleNum);
   sampleNum = CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
-  static const unsigned Idxs[] = {0, 1, 2, 3};
-  coord = CreateShuffleVector(coord, sampleNum, ArrayRef<unsigned>(Idxs).slice(0, dim == Dim2DArrayMsaa ? 4 : 3));
+  static const int Idxs[] = {0, 1, 2, 3};
+  coord = CreateShuffleVector(coord, sampleNum, ArrayRef<int>(Idxs).slice(0, dim == Dim2DArrayMsaa ? 4 : 3));
 
   // Now do the normal load.
   return dyn_cast<Instruction>(CreateImageLoad(resultTy, dim, flags, imageDesc, coord, nullptr, instName));
@@ -636,7 +636,7 @@ Value *ImageBuilder::CreateImageStore(Value *texel, unsigned dim, unsigned flags
     // First widen texel to vec4 if necessary.
     if (auto vectorTexelTy = dyn_cast<VectorType>(texelTy)) {
       if (vectorTexelTy->getNumElements() != 4) {
-        texel = CreateShuffleVector(texel, Constant::getNullValue(texelTy), ArrayRef<unsigned>{0, 1, 2, 3});
+        texel = CreateShuffleVector(texel, Constant::getNullValue(texelTy), ArrayRef<int>{0, 1, 2, 3});
       }
     } else
       texel = CreateInsertElement(Constant::getNullValue(VectorType::get(texelTy, 4)), texel, uint64_t(0));
@@ -769,7 +769,7 @@ Value *ImageBuilder::CreateImageGather(Type *resultTy, unsigned dim, unsigned fl
   }
 
   // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
-  samplerDesc = CreateShuffleVector(samplerDesc, samplerDesc, ArrayRef<unsigned>{0, 1, 2, 3});
+  samplerDesc = CreateShuffleVector(samplerDesc, samplerDesc, ArrayRef<int>{0, 1, 2, 3});
 
   Value *result = nullptr;
   Value *addrOffset = address[ImageAddressIdxOffset];
@@ -862,13 +862,13 @@ Value *ImageBuilder::preprocessIntegerImageGather(unsigned dim, Value *&imageDes
                                    {getInt32(15), zero, imageDesc, zero, zero});
   resInfo = CreateBitCast(resInfo, VectorType::get(getInt32Ty(), 4));
 
-  Value *widthHeight = CreateShuffleVector(resInfo, resInfo, ArrayRef<unsigned>{0, 1});
+  Value *widthHeight = CreateShuffleVector(resInfo, resInfo, ArrayRef<int>{0, 1});
   widthHeight = CreateSIToFP(widthHeight, VectorType::get(getFloatTy(), 2));
   Value *valueToAdd = CreateFDiv(ConstantFP::get(widthHeight->getType(), -0.5), widthHeight);
-  unsigned coordCount = coord->getType()->getVectorNumElements();
+  unsigned coordCount = cast<VectorType>(coord->getType())->getNumElements();
   if (coordCount > 2) {
     valueToAdd = CreateShuffleVector(valueToAdd, Constant::getNullValue(valueToAdd->getType()),
-                                     ArrayRef<unsigned>({0, 1, 2, 3}).slice(0, coordCount));
+                                     ArrayRef<int>({0, 1, 2, 3}).slice(0, coordCount));
   }
   Value *patchedCoord = CreateFAdd(coord, valueToAdd);
 
@@ -989,10 +989,10 @@ Value *ImageBuilder::CreateImageSampleGather(Type *resultTy, unsigned dim, unsig
     Value *singleOffsetVal = nullptr;
     if (isa<VectorType>((offsetVal)->getType())) {
       singleOffsetVal = CreateAnd(CreateExtractElement(offsetVal, uint64_t(0)), getInt32(0x3F));
-      if (offsetVal->getType()->getVectorNumElements() >= 2) {
+      if (cast<VectorType>(offsetVal->getType())->getNumElements() >= 2) {
         singleOffsetVal = CreateOr(
             singleOffsetVal, CreateShl(CreateAnd(CreateExtractElement(offsetVal, 1), getInt32(0x3F)), getInt32(8)));
-        if (offsetVal->getType()->getVectorNumElements() >= 3) {
+        if (cast<VectorType>(offsetVal->getType())->getNumElements() >= 3) {
           singleOffsetVal = CreateOr(
               singleOffsetVal, CreateShl(CreateAnd(CreateExtractElement(offsetVal, 2), getInt32(0x3F)), getInt32(16)));
         }
@@ -1279,10 +1279,9 @@ Value *ImageBuilder::CreateImageQuerySize(unsigned dim, unsigned flags, Value *i
 
   if (dim == Dim1DArray && modifiedDim == Dim2DArray) {
     // For a 1D array on gfx9+ that we treated as a 2D array, we want components 0 and 2.
-    return CreateShuffleVector(intResInfo, intResInfo, ArrayRef<unsigned>{0, 2}, instName);
+    return CreateShuffleVector(intResInfo, intResInfo, ArrayRef<int>{0, 2}, instName);
   }
-  return CreateShuffleVector(intResInfo, intResInfo, ArrayRef<unsigned>({0, 1, 2}).slice(0, sizeComponentCount),
-                             instName);
+  return CreateShuffleVector(intResInfo, intResInfo, ArrayRef<int>({0, 1, 2}).slice(0, sizeComponentCount), instName);
 }
 
 // =====================================================================================================================
@@ -1320,7 +1319,7 @@ Value *ImageBuilder::CreateImageGetLod(unsigned dim, unsigned flags, Value *imag
   dim = prepareCoordinate(dim, coord, nullptr, nullptr, nullptr, coords, derivatives);
 
   // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
-  samplerDesc = CreateShuffleVector(samplerDesc, samplerDesc, ArrayRef<unsigned>{0, 1, 2, 3});
+  samplerDesc = CreateShuffleVector(samplerDesc, samplerDesc, ArrayRef<int>{0, 1, 2, 3});
 
   SmallVector<Value *, 9> args;
   args.push_back(getInt32(3)); // dmask
@@ -1388,7 +1387,7 @@ unsigned ImageBuilder::prepareCoordinate(unsigned dim, Value *coord, Value *proj
     assert(getImageNumCoords(dim) == 1);
     outCoords.push_back(coord);
   } else {
-    assert(getImageNumCoords(dim) == coordTy->getVectorNumElements());
+    assert(getImageNumCoords(dim) == cast<VectorType>(coordTy)->getNumElements());
 
     // Push the components.
     for (unsigned i = 0; i != getImageNumCoords(dim); ++i)
@@ -1704,9 +1703,9 @@ Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsi
     if (getPipelineState()->getInputAssemblyState().enableMultiView) {
       useViewIndex = true;
       dim = Dim2DArray;
-      unsigned coordCount = coord->getType()->getVectorNumElements();
+      unsigned coordCount = cast<VectorType>(coord->getType())->getNumElements();
       if (coordCount < 3) {
-        const static unsigned Indexes[] = {0, 1, 1};
+        const static int Indexes[] = {0, 1, 1};
         coord = CreateShuffleVector(coord, Constant::getNullValue(coord->getType()), Indexes);
       }
     }
@@ -1724,13 +1723,13 @@ Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsi
     addTypeMangling(builtInTy, {}, callName);
     Value *fragCoord = emitCall(callName, builtInTy, getInt32(BuiltInFragCoord), {}, &*GetInsertPoint());
     fragCoord->setName("FragCoord");
-    fragCoord = CreateShuffleVector(fragCoord, fragCoord, ArrayRef<unsigned>{0, 1});
+    fragCoord = CreateShuffleVector(fragCoord, fragCoord, ArrayRef<int>{0, 1});
     fragCoord = CreateFPToSI(fragCoord, VectorType::get(getInt32Ty(), 2));
-    unsigned coordCount = coord->getType()->getVectorNumElements();
+    unsigned coordCount = cast<VectorType>(coord->getType())->getNumElements();
     if (coordCount > 2) {
-      const static unsigned Indexes[] = {0, 1, 2, 3};
+      const static int Indexes[] = {0, 1, 2, 3};
       fragCoord = CreateShuffleVector(fragCoord, Constant::getNullValue(fragCoord->getType()),
-                                      ArrayRef<unsigned>(Indexes).slice(0, coordCount));
+                                      ArrayRef<int>(Indexes).slice(0, coordCount));
     }
     coord = CreateAdd(coord, fragCoord);
   }

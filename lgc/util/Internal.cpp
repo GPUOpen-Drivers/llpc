@@ -190,12 +190,12 @@ bool canBitCast(const Type *ty1, const Type *ty2) {
   if (ty1 == ty2)
     valid = true;
   else if (ty1->isSingleValueType() && ty2->isSingleValueType()) {
-    const Type *compTy1 = ty1->isVectorTy() ? ty1->getVectorElementType() : ty1;
-    const Type *compTy2 = ty2->isVectorTy() ? ty2->getVectorElementType() : ty2;
+    const Type *compTy1 = ty1->isVectorTy() ? cast<VectorType>(ty1)->getElementType() : ty1;
+    const Type *compTy2 = ty2->isVectorTy() ? cast<VectorType>(ty2)->getElementType() : ty2;
     if ((compTy1->isFloatingPointTy() || compTy1->isIntegerTy()) &&
         (compTy2->isFloatingPointTy() || compTy2->isIntegerTy())) {
-      const unsigned compCount1 = ty1->isVectorTy() ? ty1->getVectorNumElements() : 1;
-      const unsigned compCount2 = ty2->isVectorTy() ? ty2->getVectorNumElements() : 1;
+      const unsigned compCount1 = ty1->isVectorTy() ? cast<VectorType>(ty1)->getNumElements() : 1;
+      const unsigned compCount2 = ty2->isVectorTy() ? cast<VectorType>(ty2)->getNumElements() : 1;
 
       valid = compCount1 * compTy1->getScalarSizeInBits() == compCount2 * compTy2->getScalarSizeInBits();
     }

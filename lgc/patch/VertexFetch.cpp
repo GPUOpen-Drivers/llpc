@@ -364,7 +364,7 @@ Value *VertexFetch::run(Type *inputTy, unsigned location, unsigned compIdx, Inst
     }
 
     if (patchA2S) {
-      assert(vertexFetches[0]->getType()->getVectorNumElements() == 4);
+      assert(cast<VectorType>(vertexFetches[0]->getType())->getNumElements() == 4);
 
       // Extract alpha channel: %a = extractelement %vf0, 3
       Value *alpha = ExtractElementInst::Create(vertexFetches[0], ConstantInt::get(Type::getInt32Ty(*m_context), 3), "",
@@ -451,9 +451,9 @@ Value *VertexFetch::run(Type *inputTy, unsigned location, unsigned compIdx, Inst
     // NOTE: If we performs vertex fetch operations twice, we have to coalesce result values of the two
     // fetch operations and generate a combined one.
     assert(vertexFetches[0] && vertexFetches[1]);
-    assert(vertexFetches[0]->getType()->getVectorNumElements() == 4);
+    assert(cast<VectorType>(vertexFetches[0]->getType())->getNumElements() == 4);
 
-    unsigned compCount = vertexFetches[1]->getType()->getVectorNumElements();
+    unsigned compCount = cast<VectorType>(vertexFetches[1]->getType())->getNumElements();
     assert(compCount == 2 || compCount == 4); // Should be <2 x i32> or <4 x i32>
 
     if (compCount == 2) {
@@ -479,7 +479,7 @@ Value *VertexFetch::run(Type *inputTy, unsigned location, unsigned compIdx, Inst
     vertexFetch = vertexFetches[0];
 
   // Finalize vertex fetch
-  Type *basicTy = inputTy->isVectorTy() ? inputTy->getVectorElementType() : inputTy;
+  Type *basicTy = inputTy->isVectorTy() ? cast<VectorType>(inputTy)->getElementType() : inputTy;
   const unsigned bitWidth = basicTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
@@ -509,7 +509,7 @@ Value *VertexFetch::run(Type *inputTy, unsigned location, unsigned compIdx, Inst
   } else
     llvm_unreachable("Should never be called!");
 
-  const unsigned defaultCompCount = defaults->getType()->getVectorNumElements();
+  const unsigned defaultCompCount = cast<VectorType>(defaults->getType())->getNumElements();
   std::vector<Value *> defaultValues(defaultCompCount);
 
   for (unsigned i = 0; i < defaultValues.size(); ++i) {
@@ -519,7 +519,7 @@ Value *VertexFetch::run(Type *inputTy, unsigned location, unsigned compIdx, Inst
 
   // Get vertex fetch values
   const unsigned fetchCompCount =
-      vertexFetch->getType()->isVectorTy() ? vertexFetch->getType()->getVectorNumElements() : 1;
+      vertexFetch->getType()->isVectorTy() ? cast<VectorType>(vertexFetch->getType())->getNumElements() : 1;
   std::vector<Value *> fetchValues(fetchCompCount);
 
   if (fetchCompCount == 1)
@@ -532,7 +532,7 @@ Value *VertexFetch::run(Type *inputTy, unsigned location, unsigned compIdx, Inst
   }
 
   // Construct vertex fetch results
-  const unsigned inputCompCount = inputTy->isVectorTy() ? inputTy->getVectorNumElements() : 1;
+  const unsigned inputCompCount = inputTy->isVectorTy() ? cast<VectorType>(inputTy)->getNumElements() : 1;
   const unsigned vertexCompCount = inputCompCount * (bitWidth == 64 ? 2 : 1);
 
   std::vector<Value *> vertexValues(vertexCompCount);
@@ -571,14 +571,18 @@ Value *VertexFetch::run(Type *inputTy, unsigned location, unsigned compIdx, Inst
 
     Type *vertexTy = vertex->getType();
     Type *truncTy = Type::getInt8Ty(*m_context);
-    truncTy = vertexTy->isVectorTy() ? cast<Type>(VectorType::get(truncTy, vertexTy->getVectorNumElements())) : truncTy;
+    truncTy = vertexTy->isVectorTy()
+                  ? cast<Type>(VectorType::get(truncTy, cast<VectorType>(vertexTy)->getNumElements()))
+                  : truncTy;
     vertex = new TruncInst(vertex, truncTy, "", insertPos);
   } else if (is16bitFetch) {
     // NOTE: The vertex fetch results are represented as <n x i32> now. For 16-bit vertex fetch, we have to
     // convert them to <n x i16> and the 16 high bits is truncated.
     Type *vertexTy = vertex->getType();
     Type *truncTy = Type::getInt16Ty(*m_context);
-    truncTy = vertexTy->isVectorTy() ? cast<Type>(VectorType::get(truncTy, vertexTy->getVectorNumElements())) : truncTy;
+    truncTy = vertexTy->isVectorTy()
+                  ? cast<Type>(VectorType::get(truncTy, cast<VectorType>(vertexTy)->getNumElements()))
+                  : truncTy;
     vertex = new TruncInst(vertex, truncTy, "", insertPos);
   }
 

@@ -309,9 +309,9 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
       auto lsArgTy = lsArg->getType();
       if (lsArgTy->isVectorTy()) {
-        assert(lsArgTy->getVectorElementType()->isIntegerTy());
+        assert(cast<VectorType>(lsArgTy)->getElementType()->isIntegerTy());
 
-        const unsigned userDataSize = lsArgTy->getVectorNumElements();
+        const unsigned userDataSize = cast<VectorType>(lsArgTy)->getNumElements();
 
         std::vector<Constant *> shuffleMask;
         for (unsigned i = 0; i < userDataSize; ++i)
@@ -392,9 +392,9 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
       auto hsArgTy = hsArg->getType();
       if (hsArgTy->isVectorTy()) {
-        assert(hsArgTy->getVectorElementType()->isIntegerTy());
+        assert(cast<VectorType>(hsArgTy)->getElementType()->isIntegerTy());
 
-        const unsigned userDataSize = hsArgTy->getVectorNumElements();
+        const unsigned userDataSize = cast<VectorType>(hsArgTy)->getNumElements();
 
         std::vector<Constant *> shuffleMask;
         for (unsigned i = 0; i < userDataSize; ++i)
@@ -745,9 +745,9 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
       auto esArgTy = esArg->getType();
       if (esArgTy->isVectorTy()) {
-        assert(esArgTy->getVectorElementType()->isIntegerTy());
+        assert(cast<VectorType>(esArgTy)->getElementType()->isIntegerTy());
 
-        const unsigned userDataSize = esArgTy->getVectorNumElements();
+        const unsigned userDataSize = cast<VectorType>(esArgTy)->getNumElements();
 
         std::vector<Constant *> shuffleMask;
         for (unsigned i = 0; i < userDataSize; ++i)
@@ -904,9 +904,9 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
       auto gsArgTy = gsArg->getType();
       if (gsArgTy->isVectorTy()) {
-        assert(gsArgTy->getVectorElementType()->isIntegerTy());
+        assert(cast<VectorType>(gsArgTy)->getElementType()->isIntegerTy());
 
-        const unsigned userDataSize = gsArgTy->getVectorNumElements();
+        const unsigned userDataSize = cast<VectorType>(gsArgTy)->getNumElements();
 
         std::vector<Constant *> shuffleMask;
         for (unsigned i = 0; i < userDataSize; ++i)

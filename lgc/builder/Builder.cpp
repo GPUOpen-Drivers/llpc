@@ -148,7 +148,7 @@ Value *Builder::CreateMapToInt32(PFN_MapToInt32Func mapFunc, ArrayRef<Value *> m
 
   if (mappedArgs[0]->getType()->isVectorTy()) {
     // For vectors we extract each vector component and map them individually.
-    const unsigned compCount = type->getVectorNumElements();
+    const unsigned compCount = cast<VectorType>(type)->getNumElements();
 
     SmallVector<Value *, 4> results;
 
@@ -235,9 +235,9 @@ Type *Builder::getTransposedMatrixTy(Type *const matrixType) const {
   assert(columnVectorType->isVectorTy());
 
   const unsigned columnCount = matrixType->getArrayNumElements();
-  const unsigned rowCount = columnVectorType->getVectorNumElements();
+  const unsigned rowCount = cast<VectorType>(columnVectorType)->getNumElements();
 
-  return ArrayType::get(VectorType::get(columnVectorType->getVectorElementType(), columnCount), rowCount);
+  return ArrayType::get(VectorType::get(cast<VectorType>(columnVectorType)->getElementType(), columnCount), rowCount);
 }
 
 // =====================================================================================================================
