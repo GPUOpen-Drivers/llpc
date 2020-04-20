@@ -116,8 +116,8 @@ void SpirvLowerMemoryOp::visitExtractElementInst(ExtractElementInst &extractElem
     auto addrSpace = loadPtr->getType()->getPointerAddressSpace();
 
     if (addrSpace == SPIRAS_Local || addrSpace == SPIRAS_Uniform) {
-      auto srcTy = src->getType();
-      auto castTy = ArrayType::get(srcTy->getVectorElementType(), srcTy->getVectorNumElements());
+      auto srcTy = cast<VectorType>(src->getType());
+      auto castTy = ArrayType::get(srcTy->getElementType(), srcTy->getNumElements());
       auto castPtrTy = castTy->getPointerTo(addrSpace);
       auto castPtr = new BitCastInst(loadPtr, castPtrTy, "", &extractElementInst);
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), extractElementInst.getOperand(1)};
@@ -212,15 +212,15 @@ bool SpirvLowerMemoryOp::needExpandDynamicIndex(GetElementPtrInst *getElemPtr, u
           // Check the upper bound of dynamic index
           if (isa<ArrayType>(indexedTy)) {
             auto arrayTy = dyn_cast<ArrayType>(indexedTy);
-            if (arrayTy->getArrayNumElements() > MaxDynIndexBound) {
+            if (arrayTy->getNumElements() > MaxDynIndexBound) {
               // Skip expand if array size greater than threshold
               allowExpand = false;
             } else
-              *dynIndexBound = arrayTy->getArrayNumElements();
+              *dynIndexBound = arrayTy->getNumElements();
           } else if (isa<VectorType>(indexedTy)) {
             // Always expand for vector
             auto vectorTy = dyn_cast<VectorType>(indexedTy);
-            *dynIndexBound = vectorTy->getVectorNumElements();
+            *dynIndexBound = vectorTy->getNumElements();
           } else {
             llvm_unreachable("Should never be called!");
             allowExpand = false;

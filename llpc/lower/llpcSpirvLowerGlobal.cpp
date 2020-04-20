@@ -1418,7 +1418,7 @@ Value *SpirvLowerGlobal::loadInOutMember(Type *inOutTy, unsigned addrSpace, cons
                              vertexIdx, interpLoc, auxInterpValue, insertPos);
     } else if (inOutTy->isVectorTy()) {
       // Vector type
-      auto compTy = inOutTy->getVectorElementType();
+      auto compTy = cast<VectorType>(inOutTy)->getElementType();
 
       assert(operandIdx + 1 == indexOperands.size() - 1);
       auto compIdx = indexOperands[operandIdx + 1];

@@ -179,16 +179,16 @@ void PatchPeepholeOpt::visitBitCast(BitCastInst &bitCast) {
 
     // Bit cast the LHS of the original shuffle.
     Value *const shuffleVectorLhs = shuffleVector->getOperand(0);
-    Type *const bitCastLhsType = VectorType::get(bitCast.getDestTy()->getVectorElementType(),
-                                                 shuffleVectorLhs->getType()->getVectorNumElements());
+    Type *const bitCastLhsType = VectorType::get(cast<VectorType>(bitCast.getDestTy())->getElementType(),
+                                                 cast<VectorType>(shuffleVectorLhs->getType())->getNumElements());
     BitCastInst *const bitCastLhs =
         new BitCastInst(shuffleVectorLhs, bitCastLhsType, shuffleVectorLhs->getName() + ".bitcast");
     insertAfter(*bitCastLhs, *shuffleVector);
 
     // Bit cast the RHS of the original shuffle.
     Value *const shuffleVectorRhs = shuffleVector->getOperand(1);
-    Type *const bitCastRhsType = VectorType::get(bitCast.getDestTy()->getVectorElementType(),
-                                                 shuffleVectorRhs->getType()->getVectorNumElements());
+    Type *const bitCastRhsType = VectorType::get(cast<VectorType>(bitCast.getDestTy())->getElementType(),
+                                                 cast<VectorType>(shuffleVectorRhs->getType())->getNumElements());
     BitCastInst *const bitCastRhs =
         new BitCastInst(shuffleVectorRhs, bitCastRhsType, shuffleVectorRhs->getName() + ".bitcast");
     insertAfter(*bitCastRhs, *bitCastLhs);
@@ -482,10 +482,10 @@ void PatchPeepholeOpt::visitPHINode(PHINode &phiNode) {
     Type *const type = phiNode.getType();
 
     // The number of elements in the vector type (which will result in N new scalar PHI nodes).
-    const unsigned numElements = type->getVectorNumElements();
+    const unsigned numElements = cast<VectorType>(type)->getNumElements();
 
     // The element type of the vector.
-    Type *const elementType = type->getVectorElementType();
+    Type *const elementType = cast<VectorType>(type)->getElementType();
 
     Value *result = UndefValue::get(type);
 

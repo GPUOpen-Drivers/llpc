@@ -764,7 +764,7 @@ Value *ArithBuilder::CreateExtractExponent(Value *value, const Twine &instName) 
 // @param y : Input value Y
 // @param instName : Name to give instruction(s)
 Value *ArithBuilder::CreateCrossProduct(Value *x, Value *y, const Twine &instName) {
-  assert(x->getType() == y->getType() && x->getType()->getVectorNumElements() == 3);
+  assert(x->getType() == y->getType() && cast<VectorType>(x->getType())->getNumElements() == 3);
 
   Value *left = UndefValue::get(x->getType());
   Value *right = UndefValue::get(x->getType());
@@ -1217,7 +1217,7 @@ Value *ArithBuilder::createFMix(Value *x, Value *y, Value *a, const Twine &instN
   if (auto vectorResultTy = dyn_cast<VectorType>(ySubX->getType())) {
     // pX, pY => vector, but pA => scalar
     if (!isa<VectorType>(a->getType()))
-      a = CreateVectorSplat(vectorResultTy->getVectorNumElements(), a);
+      a = CreateVectorSplat(vectorResultTy->getNumElements(), a);
   }
 
   FastMathFlags fastMathFlags = getFastMathFlags();

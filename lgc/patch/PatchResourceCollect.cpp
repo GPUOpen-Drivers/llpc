@@ -2798,8 +2798,8 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
   }
 
   // Now we know we're reading a vector.
-  Type *elementTy = resultTy->getVectorElementType();
-  unsigned scalarizeBy = resultTy->getVectorNumElements();
+  Type *elementTy = cast<VectorType>(resultTy)->getElementType();
+  unsigned scalarizeBy = cast<VectorType>(resultTy)->getNumElements();
 
   // Find trivially unused elements.
   // This is not quite as good as the previous version of this code that scalarized in the

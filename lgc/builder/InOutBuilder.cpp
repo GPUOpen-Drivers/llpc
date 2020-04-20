@@ -477,7 +477,7 @@ Value *InOutBuilder::evalIjOffsetSmooth(Value *offset) {
   // Adjust each coefficient by offset.
   Value *adjusted = adjustIj(pullModel, offset);
   // Extract <I/W, J/W, 1/W> part of that
-  Value *ijDivW = CreateShuffleVector(adjusted, adjusted, ArrayRef<unsigned>{0, 1});
+  Value *ijDivW = CreateShuffleVector(adjusted, adjusted, ArrayRef<int>{0, 1});
   Value *rcpW = CreateExtractElement(adjusted, 2);
   // Get W by making a reciprocal of 1/W
   Value *w = CreateFDiv(ConstantFP::get(getFloatTy(), 1.0), rcpW);
@@ -648,7 +648,7 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
     if (isa<ArrayType>(resultTy))
       resultTy = resultTy->getArrayElementType();
     else
-      resultTy = resultTy->getVectorElementType();
+      resultTy = cast<VectorType>(resultTy)->getElementType();
   }
 
   // Handle the subgroup mask built-ins directly.
@@ -757,9 +757,9 @@ Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltIn
   Type *expectedTy = getBuiltInTy(builtIn, outputInfo);
   if (index) {
     if (isa<ArrayType>(expectedTy))
-      expectedTy = expectedTy->getArrayElementType();
+      expectedTy = cast<ArrayType>(expectedTy)->getElementType();
     else
-      expectedTy = expectedTy->getVectorElementType();
+      expectedTy = cast<VectorType>(expectedTy)->getElementType();
   }
   assert(expectedTy == valueToWrite->getType() ||
          ((builtIn == BuiltInClipDistance || builtIn == BuiltInCullDistance) &&

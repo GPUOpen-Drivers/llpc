@@ -1376,7 +1376,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
           } else {
             // If we get here it means we are doing a subsequent GEP on a matrix row.
             assert(remappedValue->getType()->isVectorTy());
-            assert(remappedValue->getType()->getVectorElementType()->isPointerTy());
+            assert(cast<VectorType>(remappedValue->getType())->getElementType()->isPointerTy());
             valueMap[getElemPtr] = getBuilder()->CreateExtractElement(remappedValue, indices[1]);
           }
 
@@ -1399,7 +1399,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
 
             Value *newLoad = UndefValue::get(load->getType());
 
-            for (unsigned i = 0; i < pointerType->getVectorNumElements(); i++) {
+            for (unsigned i = 0; i < cast<VectorType>(pointerType)->getNumElements(); i++) {
               Value *const pointerElem = getBuilder()->CreateExtractElement(pointer, i);
 
               LoadInst *const newLoadElem = getBuilder()->CreateLoad(pointerElem, load->isVolatile());
@@ -1468,7 +1468,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             Type *const pointerType = pointer->getType();
             assert(pointerType->isVectorTy());
 
-            for (unsigned i = 0; i < pointerType->getVectorNumElements(); i++) {
+            for (unsigned i = 0; i < cast<VectorType>(pointerType)->getNumElements(); i++) {
               Value *storeValueElem = store->getValueOperand();
 
               if (storeValueElem->getType()->isArrayTy())
@@ -4328,7 +4328,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     auto scalar = transValue(vts->getScalar(), f, bb);
     auto vector = transValue(vts->getVector(), f, bb);
     assert(vector->getType()->isVectorTy() && "Invalid type");
-    unsigned vecSize = vector->getType()->getVectorNumElements();
+    unsigned vecSize = cast<VectorType>(vector->getType())->getNumElements();
     auto newVec = getBuilder()->CreateVectorSplat(vecSize, scalar, scalar->getName());
     newVec->takeName(scalar);
     auto scale = getBuilder()->CreateFMul(vector, newVec, "scale");
@@ -4372,7 +4372,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
           // NOTE: It is allowed to construct a vector from several "smaller"
           // scalars or vectors, such as vec4 = (vec2, vec2) or vec4 = (float,
           // vec3).
-          auto compCount = constituents[i]->getType()->getVectorNumElements();
+          auto compCount = cast<VectorType>(constituents[i]->getType())->getNumElements();
           for (unsigned j = 0; j < compCount; ++j) {
             auto comp = ExtractElementInst::Create(constituents[i], ConstantInt::get(*m_context, APInt(32, j)), "", bb);
             v = InsertElementInst::Create(v, comp, ConstantInt::get(*m_context, APInt(32, idx)), "", bb);
@@ -4495,7 +4495,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     auto newVecCompCount = vs->getComponents().size();
 
     IntegerType *int32Ty = IntegerType::get(*m_context, 32);
-    Type *newVecTy = VectorType::get(v1->getType()->getVectorElementType(), newVecCompCount);
+    Type *newVecTy = VectorType::get(cast<VectorType>(v1->getType())->getElementType(), newVecCompCount);
     Value *newVec = UndefValue::get(newVecTy);
 
     for (size_t i = 0; i < newVecCompCount; ++i) {
@@ -4653,7 +4653,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     if (!isa<VectorType>(val->getType()))
       return val;
     Value *result = getBuilder()->CreateExtractElement(val, uint64_t(0));
-    for (unsigned i = 1, e = val->getType()->getVectorNumElements(); i != e; ++i) {
+    for (unsigned i = 1, e = cast<VectorType>(val->getType())->getNumElements(); i != e; ++i) {
       Value *elem = getBuilder()->CreateExtractElement(val, i);
       if (oc == OpAny)
         result = getBuilder()->CreateOr(result, elem);
@@ -5404,8 +5404,8 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *bi, unsigned maskI
       addr[lgc::Builder::ImageAddressIdxProjective] = getBuilder()->CreateExtractElement(coord, numCoords);
     }
     if (numCoords < coordVecTy->getNumElements()) {
-      static const unsigned Indexes[] = {0, 1, 2, 3};
-      coord = getBuilder()->CreateShuffleVector(coord, coord, ArrayRef<unsigned>(Indexes).slice(0, numCoords));
+      static const int Indexes[] = {0, 1, 2, 3};
+      coord = getBuilder()->CreateShuffleVector(coord, coord, ArrayRef<int>(Indexes).slice(0, numCoords));
       addr[lgc::Builder::ImageAddressIdxCoordinate] = coord;
     }
   }
@@ -5535,10 +5535,11 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *bi, Extracted
     if (isa<VectorType>(coord->getType())) {
       if (!isa<VectorType>(offset->getType())) {
         offset = getBuilder()->CreateInsertElement(Constant::getNullValue(coord->getType()), offset, uint64_t(0));
-      } else if (coord->getType()->getVectorNumElements() != offset->getType()->getVectorNumElements()) {
+      } else if (cast<VectorType>(coord->getType())->getNumElements() !=
+                 cast<VectorType>(offset->getType())->getNumElements()) {
         offset = getBuilder()->CreateShuffleVector(
             offset, Constant::getNullValue(offset->getType()),
-            ArrayRef<unsigned>({0, 1, 2, 3}).slice(0, coord->getType()->getVectorNumElements()));
+            ArrayRef<int>({0, 1, 2, 3}).slice(0, cast<VectorType>(coord->getType())->getNumElements()));
       }
     }
     coord = getBuilder()->CreateAdd(coord, offset);
@@ -5678,12 +5679,12 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicB
   // For a multi-sampled image, put the sample ID on the end.
   if (imageInfo.desc->MS) {
     sampleNum = getBuilder()->CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
-    SmallVector<unsigned, 4> idxs;
+    SmallVector<int, 4> idxs;
     idxs.push_back(0);
     idxs.push_back(1);
     if (imageInfo.desc->Arrayed)
       idxs.push_back(2);
-    idxs.push_back(coord->getType()->getVectorNumElements());
+    idxs.push_back(cast<VectorType>(coord->getType())->getNumElements());
     coord = getBuilder()->CreateShuffleVector(coord, sampleNum, idxs);
   }
 
@@ -6000,7 +6001,7 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *bi, Basic
       sampleNum = getBuilder()->CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
       coord = getBuilder()->CreateShuffleVector(
           coord, sampleNum,
-          ArrayRef<unsigned>({0, 1, 2, 3}).slice(0, cast<VectorType>(coord->getType())->getNumElements() + 1));
+          ArrayRef<int>({0, 1, 2, 3}).slice(0, cast<VectorType>(coord->getType())->getNumElements() + 1));
     }
   }
 
@@ -6048,7 +6049,7 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *bi, BasicBloc
     sampleNum = getBuilder()->CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
     coord = getBuilder()->CreateShuffleVector(
         coord, sampleNum,
-        ArrayRef<unsigned>({0, 1, 2, 3}).slice(0, cast<VectorType>(coord->getType())->getNumElements() + 1));
+        ArrayRef<int>({0, 1, 2, 3}).slice(0, cast<VectorType>(coord->getType())->getNumElements() + 1));
   }
 
   // Do the image store.

@@ -438,11 +438,11 @@ Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, u
   Type *elemTy = loadTy;
 
   if (loadTy->isArrayTy()) {
-    elemCount = loadTy->getArrayNumElements();
-    elemTy = loadTy->getArrayElementType();
+    elemCount = cast<ArrayType>(loadTy)->getNumElements();
+    elemTy = cast<ArrayType>(loadTy)->getElementType();
   } else if (loadTy->isVectorTy()) {
-    elemCount = loadTy->getVectorNumElements();
-    elemTy = loadTy->getVectorElementType();
+    elemCount = cast<VectorType>(loadTy)->getNumElements();
+    elemTy = cast<VectorType>(loadTy)->getElementType();
   }
   assert(elemTy->isIntegerTy(32) || elemTy->isFloatTy()); // Must be 32-bit type
 
@@ -559,7 +559,7 @@ void PatchCopyShader::exportGenericOutput(Value *outputValue, unsigned location,
         auto outputTy = outputValue->getType();
         assert(outputTy->isFPOrFPVectorTy() && outputTy->getScalarSizeInBits() == 32);
 
-        const unsigned compCount = outputTy->isVectorTy() ? outputTy->getVectorNumElements() : 1;
+        const unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
         if (compCount > 1) {
           outputValue = builder.CreateBitCast(outputValue, VectorType::get(builder.getInt32Ty(), compCount));
           outputValue = builder.CreateTrunc(outputValue, VectorType::get(builder.getInt16Ty(), compCount));

@@ -494,7 +494,7 @@ void PatchBufferOp::visitInsertElementInst(InsertElementInst &insertElementInst)
   if (!type->isVectorTy())
     return;
 
-  PointerType *const pointerType = dyn_cast<PointerType>(type->getVectorElementType());
+  PointerType *const pointerType = dyn_cast<PointerType>(cast<VectorType>(type)->getElementType());
 
   // If the extract element is not extracting from a vector of pointers, bail.
   if (!pointerType)
@@ -512,7 +512,7 @@ void PatchBufferOp::visitInsertElementInst(InsertElementInst &insertElementInst)
   Value *indexVector = nullptr;
 
   if (isa<UndefValue>(insertElementInst.getOperand(0)))
-    indexVector = UndefValue::get(VectorType::get(index->getType(), type->getVectorNumElements()));
+    indexVector = UndefValue::get(VectorType::get(index->getType(), cast<VectorType>(type)->getNumElements()));
   else
     indexVector = m_replacementMap[getPointerOperandAsInst(insertElementInst.getOperand(0))].second;
 
@@ -1122,7 +1122,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
     Value *newValue = nullptr;
 
     if (Constant *const constVal = dyn_cast<Constant>(value))
-      newValue = ConstantVector::getSplat(memoryType->getVectorElementCount(), constVal);
+      newValue = ConstantVector::getSplat(cast<VectorType>(memoryType)->getElementCount(), constVal);
     else {
       Value *const memoryPointer = m_builder->CreateAlloca(memoryType);
       copyMetadata(memoryPointer, &memSetInst);
@@ -1132,7 +1132,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
       copyMetadata(castMemoryPointer, &memSetInst);
 
       Value *const memSet =
-          m_builder->CreateMemSet(castMemoryPointer, value, memoryType->getVectorNumElements(), Align());
+          m_builder->CreateMemSet(castMemoryPointer, value, cast<VectorType>(memoryType)->getNumElements(), Align());
       copyMetadata(memSet, &memSetInst);
 
       newValue = m_builder->CreateLoad(memoryPointer);
@@ -1193,11 +1193,11 @@ Value *PatchBufferOp::getBaseAddressFromBufferDesc(Value *const bufferDesc) cons
   Type *const descType = bufferDesc->getType();
 
   assert(descType->isVectorTy());
-  assert(descType->getVectorNumElements() == 4);
-  assert(descType->getVectorElementType()->isIntegerTy(32));
+  assert(cast<VectorType>(descType)->getNumElements() == 4);
+  assert(cast<VectorType>(descType)->getElementType()->isIntegerTy(32));
 
   // Get the base address of our buffer by extracting the two components with the 48-bit address, and masking.
-  Value *baseAddr = m_builder->CreateShuffleVector(bufferDesc, UndefValue::get(descType), ArrayRef<unsigned>{0, 1});
+  Value *baseAddr = m_builder->CreateShuffleVector(bufferDesc, UndefValue::get(descType), ArrayRef<int>{0, 1});
   Value *const baseAddrMask = ConstantVector::get({m_builder->getInt32(0xFFFFFFFF), m_builder->getInt32(0xFFFF)});
   baseAddr = m_builder->CreateAnd(baseAddr, baseAddrMask);
   baseAddr = m_builder->CreateBitCast(baseAddr, m_builder->getInt64Ty());
@@ -1566,8 +1566,8 @@ Value *PatchBufferOp::replaceICmp(ICmpInst *const iCmpInst) {
   Type *const bufferDescTy = bufferDescs[0]->getType();
 
   assert(bufferDescTy->isVectorTy());
-  assert(bufferDescTy->getVectorNumElements() == 4);
-  assert(bufferDescTy->getVectorElementType()->isIntegerTy(32));
+  assert(cast<VectorType>(bufferDescTy)->getNumElements() == 4);
+  assert(cast<VectorType>(bufferDescTy)->getElementType()->isIntegerTy(32));
   (void(bufferDescTy)); // unused
   assert(iCmpInst->getPredicate() == ICmpInst::ICMP_EQ || iCmpInst->getPredicate() == ICmpInst::ICMP_NE);
 

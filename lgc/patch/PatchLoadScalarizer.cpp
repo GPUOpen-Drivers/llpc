@@ -132,7 +132,7 @@ void PatchLoadScalarizer::visitLoadInst(LoadInst &loadInst) {
     if (compCount > m_scalarThreshold)
       return;
 
-    Type *compTy = loadTy->getVectorElementType();
+    Type *compTy = cast<VectorType>(loadTy)->getElementType();
     uint64_t compSize = loadInst.getModule()->getDataLayout().getTypeStoreSize(compTy);
 
     Value *loadValue = UndefValue::get(loadTy);

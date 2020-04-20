@@ -65,7 +65,7 @@ Value *BuilderImplBase::CreateDotProduct(Value *const vector1, Value *const vect
   if (!isa<VectorType>(product->getType()))
     return product;
 
-  const unsigned compCount = product->getType()->getVectorNumElements();
+  const unsigned compCount = cast<VectorType>(product->getType())->getNumElements();
   Value *scalar = CreateExtractElement(product, uint64_t(0));
 
   for (unsigned i = 1; i < compCount; ++i)
@@ -273,15 +273,15 @@ Value *BuilderImplBase::scalarize(Value *value, std::function<Value *(Value *)> 
 // @param callback : Callback function
 Value *BuilderImplBase::scalarizeInPairs(Value *value, std::function<Value *(Value *)> callback) {
   if (auto vecTy = dyn_cast<VectorType>(value->getType())) {
-    Value *inComps = CreateShuffleVector(value, value, ArrayRef<unsigned>{0, 1});
+    Value *inComps = CreateShuffleVector(value, value, ArrayRef<int>{0, 1});
     Value *resultComps = callback(inComps);
     Value *result = UndefValue::get(VectorType::get(resultComps->getType()->getScalarType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, CreateExtractElement(resultComps, uint64_t(0)), uint64_t(0));
     if (vecTy->getNumElements() > 1)
       result = CreateInsertElement(result, CreateExtractElement(resultComps, 1), 1);
 
-    for (unsigned idx = 2, end = vecTy->getNumElements(); idx < end; idx += 2) {
-      unsigned indices[2] = {idx, idx + 1};
+    for (int idx = 2, end = vecTy->getNumElements(); idx < end; idx += 2) {
+      int indices[2] = {idx, idx + 1};
       inComps = CreateShuffleVector(value, value, indices);
       resultComps = callback(inComps);
       result = CreateInsertElement(result, CreateExtractElement(resultComps, uint64_t(0)), idx);
