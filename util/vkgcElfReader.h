@@ -408,9 +408,15 @@ public:
   // Gets graphics IP version info (used by ELF dump only)
   GfxIpVersion getGfxIpVersion() const { return m_gfxIp; }
 
-  Result readFromBuffer(const void *buffer, size_t *bufSize);
+  // Reads ELF data in from the given buffer into the context.
+  // NOTE: Do not change the name or API of this method as it is used by AMD internal code and we need to
+  // maintain compatibility.
+  Result ReadFromBuffer(const void *buffer, size_t *bufSize);
 
-  Result getSectionData(const char *name, const void **ppData, size_t *dataLength) const;
+  // Retrieves the section data for the specified section name, if it exists.
+  // NOTE: Do not change the name or API of this method as it is used by AMD internal code and we need to
+  // maintain compatibility.
+  Result GetSectionData(const char *name, const void **ppData, size_t *dataLength) const;
 
   uint32_t getSectionCount();
   Result getSectionDataBySectionIndex(uint32_t secIdx, SectionBuffer **ppSectionData) const;
@@ -429,13 +435,18 @@ public:
 
   ElfNote getNote(Util::Abi::PipelineAbiNoteType noteType) const;
 
-  void getSymbolsBySectionIndex(uint32_t secIndx, std::vector<ElfSymbol> &secSymbols) const;
+  // Gets all associated symbols by section index.
+  // NOTE: Do not change the name or API of this method as it is used by AMD internal code and we need to
+  // maintain compatibility.
+  void GetSymbolsBySectionIndex(uint32_t secIndx, std::vector<ElfSymbol> &secSymbols) const;
 
   uint32_t getRelocationCount() const;
   void getRelocation(uint32_t idx, ElfReloc *reloc) const;
 
   // Gets the section index for the specified section name.
-  int32_t getSectionIndex(const char *name) const {
+  // NOTE: Do not change the name or API of this method as it is used by AMD internal code and we need to
+  // maintain compatibility.
+  int32_t GetSectionIndex(const char *name) const {
     auto entry = m_map.find(name);
     return (entry != m_map.end()) ? entry->second : InvalidValue;
   }

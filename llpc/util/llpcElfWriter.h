@@ -74,7 +74,7 @@ public:
 
   static void updateMetaNote(Context *context, const ElfNote *note, ElfNote *newNote);
 
-  Result readFromBuffer(const void *buffer, size_t bufSize);
+  Result ReadFromBuffer(const void *buffer, size_t bufSize);
   Result copyFromReader(const ElfReader<Elf> &reader);
 
   void updateElfBinary(Context *context, ElfPackage *pipelineElf);
@@ -82,7 +82,7 @@ public:
   void mergeElfBinary(Context *context, const BinaryData *fragmentElf, ElfPackage *pipelineElf);
 
   // Gets the section index for the specified section name.
-  int getSectionIndex(const char *name) const {
+  int GetSectionIndex(const char *name) const {
     auto entry = m_map.find(name);
     return entry != m_map.end() ? entry->second : InvalidValue;
   }
@@ -99,7 +99,7 @@ public:
 
   Result getSectionData(const char* pName, const void** ppData, size_t* pDataLength) const;
 
-  void getSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol *> &secSymbols);
+  void GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol *> &secSymbols);
 
   void writeToBuffer(ElfPackage *elf);
 
@@ -109,7 +109,7 @@ public:
 
   unsigned getRelocationCount();
 
-  void getRelocation(unsigned idx, ElfReloc *reloc);
+  void getRelocation(unsigned idx, Vkgc::ElfReloc *reloc);
 
   Result linkGraphicsRelocatableElf(const llvm::ArrayRef<ElfReader<Elf> *> &relocatableElfs, Context *context);
 

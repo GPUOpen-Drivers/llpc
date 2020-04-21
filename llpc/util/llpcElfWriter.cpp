@@ -49,7 +49,7 @@ static constexpr unsigned DescriptorSizeSampler = 4 * sizeof(unsigned);
 
 // Represent a relocation entry. Used internally for pipeline linking.
 struct RelocationEntry {
-  Llpc::ElfReloc reloc; // The relocation entry from the ELF
+  Vkgc::ElfReloc reloc; // The relocation entry from the ELF
   const char *name;     // Name of the symbol associated with the relocation
 };
 
@@ -645,9 +645,9 @@ template <class Elf> Result ElfWriter<Elf>::copyFromReader(const ElfReader<Elf> 
 //
 // @param pBuffer : Buffer to read data from
 // @param bufSize : Size of the buffer
-template <class Elf> Result ElfWriter<Elf>::readFromBuffer(const void *pBuffer, size_t bufSize) {
+template <class Elf> Result ElfWriter<Elf>::ReadFromBuffer(const void *pBuffer, size_t bufSize) {
   ElfReader<Elf> reader(m_gfxIp);
-  auto result = reader.readFromBuffer(pBuffer, &bufSize);
+  auto result = reader.ReadFromBuffer(pBuffer, &bufSize);
   if (result != Llpc::Result::Success)
     return result;
   return copyFromReader(reader);
@@ -795,7 +795,7 @@ Result ElfWriter<Elf>::getSectionData(const char *pName, const void **ppData, si
 // @param secIdx : Section index
 // @param [out] secSymbols : ELF symbols
 template <class Elf>
-void ElfWriter<Elf>::getSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol *> &secSymbols) {
+void ElfWriter<Elf>::GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol *> &secSymbols) {
   unsigned symCount = m_symbols.size();
 
   for (unsigned idx = 0; idx < symCount; ++idx) {
@@ -844,7 +844,7 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   ElfReader<Elf64> reader(m_gfxIp);
 
   auto fragmentCodesize = pFragmentElf->codeSize;
-  auto result = reader.readFromBuffer(pFragmentElf->pCode, &fragmentCodesize);
+  auto result = reader.ReadFromBuffer(pFragmentElf->pCode, &fragmentCodesize);
   assert(result == Result::Success);
   (void(result)); // unused
 
@@ -854,13 +854,13 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   std::vector<ElfSymbol> fragmentSymbols;
   std::vector<ElfSymbol *> nonFragmentSymbols;
 
-  auto fragmentTextSecIndex = reader.getSectionIndex(TextName);
-  auto nonFragmentSecIndex = getSectionIndex(TextName);
+  auto fragmentTextSecIndex = reader.GetSectionIndex(TextName);
+  auto nonFragmentSecIndex = GetSectionIndex(TextName);
   reader.getSectionDataBySectionIndex(fragmentTextSecIndex, &fragmentTextSection);
-  reader.getSymbolsBySectionIndex(fragmentTextSecIndex, fragmentSymbols);
+  reader.GetSymbolsBySectionIndex(fragmentTextSecIndex, fragmentSymbols);
 
   getSectionDataBySectionIndex(nonFragmentSecIndex, &nonFragmentTextSection);
-  getSymbolsBySectionIndex(nonFragmentSecIndex, nonFragmentSymbols);
+  GetSymbolsBySectionIndex(nonFragmentSecIndex, nonFragmentSymbols);
   ElfSymbol *fragmentIsaSymbol = nullptr;
   ElfSymbol *nonFragmentIsaSymbol = nullptr;
   std::string firstIsaSymbolName;
@@ -918,8 +918,8 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   (void(fragmentAmdIlSymbolName));       // unused
 
   // Merge ISA disassemble
-  auto fragmentDisassemblySecIndex = reader.getSectionIndex(Util::Abi::AmdGpuDisassemblyName);
-  auto nonFragmentDisassemblySecIndex = getSectionIndex(Util::Abi::AmdGpuDisassemblyName);
+  auto fragmentDisassemblySecIndex = reader.GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
+  auto nonFragmentDisassemblySecIndex = GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
   ElfSectionBuffer<Elf64::SectionHeader> *fragmentDisassemblySection = nullptr;
   const ElfSectionBuffer<Elf64::SectionHeader> *nonFragmentDisassemblySection = nullptr;
   reader.getSectionDataBySectionIndex(fragmentDisassemblySecIndex, &fragmentDisassemblySection);
@@ -958,8 +958,8 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   ElfSectionBuffer<Elf64::SectionHeader> *fragmentLlvmIrSection = nullptr;
   const ElfSectionBuffer<Elf64::SectionHeader> *nonFragmentLlvmIrSection = nullptr;
 
-  auto fragmentLlvmIrSecIndex = reader.getSectionIndex(llvmIrSectionName.c_str());
-  auto nonFragmentLlvmIrSecIndex = getSectionIndex(llvmIrSectionName.c_str());
+  auto fragmentLlvmIrSecIndex = reader.GetSectionIndex(llvmIrSectionName.c_str());
+  auto nonFragmentLlvmIrSecIndex = GetSectionIndex(llvmIrSectionName.c_str());
   reader.getSectionDataBySectionIndex(fragmentLlvmIrSecIndex, &fragmentLlvmIrSection);
   getSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &nonFragmentLlvmIrSection);
 
@@ -1226,7 +1226,7 @@ void fixUpRelocations(ElfWriter<Elf> *writer, const std::vector<RelocationEntry>
     auto &reloc = relocations[i];
     unsigned relocationValue = 0;
     if (getRelocationSymbolValue(context, reloc, isGraphicsPipeline, &relocationValue)) {
-      assert(pData != nullptr && dataLength >= reloc.reloc.offset);
+      assert(data != nullptr && dataLength >= reloc.reloc.offset);
       assert(reloc.reloc.type == R_AMDGPU_ABS32 && "can only handle R_AMDGPU_ABS32 typed relocations.");
       unsigned *targetDword = reinterpret_cast<unsigned *>(data + reloc.reloc.offset);
       if (reloc.reloc.useExplicitAddend) {
@@ -1286,9 +1286,9 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> 
   getSymbol("")->secIdx = 0;
 
   for (const ElfReader<Elf> *elf : relocatableElfs) {
-    unsigned relocElfTextSectionId = elf->getSectionIndex(TextName);
+    unsigned relocElfTextSectionId = elf->GetSectionIndex(TextName);
     std::vector<ElfSymbol> symbols;
-    elf->getSymbolsBySectionIndex(relocElfTextSectionId, symbols);
+    elf->GetSymbolsBySectionIndex(relocElfTextSectionId, symbols);
     for (auto sym : symbols) {
       if (strncmp(sym.pSymName, "BB", 2) == 0) {
         continue;
@@ -1328,7 +1328,7 @@ Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> 
 
   // Set the .note section header
   ElfSectionBuffer<typename Elf::SectionHeader> *noteSection = nullptr;
-  relocatableElfs[0]->getSectionDataBySectionIndex(relocatableElfs[0]->getSectionIndex(NoteName), &noteSection);
+  relocatableElfs[0]->getSectionDataBySectionIndex(relocatableElfs[0]->GetSectionIndex(NoteName), &noteSection);
   m_sections[m_noteSecIdx].secHead = noteSection->secHead;
 
   // Merge and update the .note data
