@@ -31,8 +31,6 @@
 #pragma once
 
 #include "lgc/CommonDefs.h"
-#include "../interface/lgc/BuilderBase.h"
-
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
@@ -76,9 +74,6 @@ llvm::CallInst *emitCall(llvm::StringRef funcName, llvm::Type *retTy, llvm::Arra
 // type and its parameters.
 llvm::CallInst *emitCall(llvm::StringRef funcName, llvm::Type *retTy, llvm::ArrayRef<llvm::Value *> args,
                          llvm::ArrayRef<llvm::Attribute::AttrKind> attribs, llvm::BasicBlock *insertAtEnd);
-
-// Emits a amdgcn.reloc.constant intrinsics that represents a relocatable value with the given symbol name.
-llvm::CallInst* emitRelocationConstant(llvm::IRBuilderBase *builder, const llvm::Twine &symbolName);
 
 // Adds LLVM-style type mangling suffix for the specified return type and args to the name.
 void addTypeMangling(llvm::Type *returnTy, llvm::ArrayRef<llvm::Value *> args, std::string &name);

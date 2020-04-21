@@ -41,7 +41,6 @@
 
 #include "lgc/BuilderBase.h"
 #include "lgc/util/Internal.h"
-#include "llvm/IR/IntrinsicsAMDGPU.h"
 
 #define DEBUG_TYPE "llpc-internal"
 
@@ -81,17 +80,6 @@ CallInst *emitCall(StringRef funcName, Type *retTy, ArrayRef<Value *> args, Arra
                    BasicBlock *insertAtEnd) {
   BuilderBase builder(insertAtEnd);
   return builder.createNamedCall(funcName, retTy, args, attribs);
-}
-
-// =====================================================================================================================
-// Emits a amdgcn.reloc.constant intrinsics that represents a relocatable value with the given symbol name.
-//
-// @param builder : [in,out] An IRBuilder for instruction insertion
-// @param symbolName : Name of the relocation symbol associated with this relocation
-llvm::CallInst *emitRelocationConstant(llvm::IRBuilderBase *builder, const llvm::Twine &symbolName) {
-  auto mdNode = llvm::MDNode::get(builder->getContext(), llvm::MDString::get(builder->getContext(), symbolName.str()));
-  return builder->CreateIntrinsic(llvm::Intrinsic::amdgcn_reloc_constant, {},
-                                  {llvm::MetadataAsValue::get(builder->getContext(), mdNode)});
 }
 
 // =====================================================================================================================

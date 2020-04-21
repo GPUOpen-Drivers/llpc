@@ -1143,15 +1143,15 @@ bool getDescriptorOffsetRelocationValue(Context *context, RelocationEntry relocE
   if (isGraphicsPipeline) {
     auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
     *value = getDescriptorResourceOffset(descSet, binding, type, pPipelineInfo->vs.pUserDataNodes,
-                                          pPipelineInfo->vs.userDataNodeCount);
+                                         pPipelineInfo->vs.userDataNodeCount);
     if (*value == InvalidValue) {
       *value = getDescriptorResourceOffset(descSet, binding, type, pPipelineInfo->fs.pUserDataNodes,
-                                            pPipelineInfo->fs.userDataNodeCount);
+                                           pPipelineInfo->fs.userDataNodeCount);
     }
   } else {
     auto pPipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
     *value = getDescriptorResourceOffset(descSet, binding, type, pPipelineInfo->cs.pUserDataNodes,
-                                          pPipelineInfo->cs.userDataNodeCount);
+                                         pPipelineInfo->cs.userDataNodeCount);
   }
 
   return *value != InvalidValue;
@@ -1177,15 +1177,15 @@ bool getDescriptorStrideRelocationValue(Context *context, RelocationEntry relocE
   if (isGraphicsPipeline) {
     auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
     *value = getDescriptorResourceStride(descSet, binding, pPipelineInfo->vs.pUserDataNodes,
-                                          pPipelineInfo->vs.userDataNodeCount);
+                                         pPipelineInfo->vs.userDataNodeCount);
     if (*value == InvalidValue) {
       *value = getDescriptorResourceStride(descSet, binding, pPipelineInfo->fs.pUserDataNodes,
-                                            pPipelineInfo->fs.userDataNodeCount);
+                                           pPipelineInfo->fs.userDataNodeCount);
     }
   } else {
     auto pPipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
     *value = getDescriptorResourceStride(descSet, binding, pPipelineInfo->cs.pUserDataNodes,
-                                          pPipelineInfo->cs.userDataNodeCount);
+                                         pPipelineInfo->cs.userDataNodeCount);
   }
 
   return *value != InvalidValue;
@@ -1198,8 +1198,7 @@ bool getDescriptorStrideRelocationValue(Context *context, RelocationEntry relocE
 // @param relocEntry : The relocation entry to fixup
 // @param isGraphicsPipeline : Whether we are processing a compute or graphics pipeline
 // @param value : [out] The value of the relocation
-bool getRelocationSymbolValue(Context *context, RelocationEntry relocEntry, bool isGraphicsPipeline,
-                              unsigned *value) {
+bool getRelocationSymbolValue(Context *context, RelocationEntry relocEntry, bool isGraphicsPipeline, unsigned *value) {
   if (strncmp(relocEntry.name, "doff_", 5) == 0) {
     return getDescriptorOffsetRelocationValue(context, relocEntry, isGraphicsPipeline, value);
   } else if (strncmp(relocEntry.name, "dstride_", 8) == 0) {
@@ -1246,8 +1245,7 @@ void fixUpRelocations(ElfWriter<Elf> *writer, const std::vector<RelocationEntry>
 // @param relocatableElfs : An array of relocatable ELF objects
 // @param context : Acquired context
 template <class Elf>
-Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> *> &relocatableElfs,
-                                                  Context *context) {
+Result ElfWriter<Elf>::linkGraphicsRelocatableElf(const ArrayRef<ElfReader<Elf> *> &relocatableElfs, Context *context) {
   reinitialize();
   assert(relocatableElfs.size() == 2 && "Can only handle VsPs Shaders for now.");
 

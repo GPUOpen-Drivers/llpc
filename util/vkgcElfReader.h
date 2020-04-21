@@ -355,9 +355,9 @@ struct ElfSymbol {
 struct ElfReloc {
   uint64_t offset; // Location
   uint32_t symIdx; // Index of this symbol in the symbol table
-  uint32_t type; // Type of this relocation
+  uint32_t type;   // Type of this relocation
   bool useExplicitAddend; // Whether an explicit addend is used
-  uint32_t addend; // The value of the explicit addend
+  uint32_t addend;        // The value of the explicit addend
 };
 
 // Represents info of ELF note

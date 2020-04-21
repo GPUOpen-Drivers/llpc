@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/BuilderBase.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 
 using namespace lgc;
 using namespace llvm;
@@ -66,4 +67,13 @@ CallInst *BuilderBase::createNamedCall(StringRef funcName, Type *retTy, ArrayRef
   call->setAttributes(func->getAttributes());
 
   return call;
+}
+
+// =====================================================================================================================
+// Emits a amdgcn.reloc.constant intrinsic that represents a relocatable i32 value with the given symbol name
+//
+// @param symbolName : Name of the relocation symbol associated with this relocation
+Value *BuilderBase::CreateRelocationConstant(const Twine &symbolName) {
+  auto mdNode = MDNode::get(getContext(), MDString::get(getContext(), symbolName.str()));
+  return CreateIntrinsic(Intrinsic::amdgcn_reloc_constant, {}, {MetadataAsValue::get(getContext(), mdNode)});
 }
