@@ -551,7 +551,7 @@ void PipelineDumper::DumpPipelineBinary(PipelineDumpFile *dumpFile, GfxIpVersion
   if (dumpFile) {
     ElfReader<Elf64> reader(gfxIp);
     size_t codeSize = pipelineBin->codeSize;
-    auto result = reader.readFromBuffer(pipelineBin->pCode, &codeSize);
+    auto result = reader.ReadFromBuffer(pipelineBin->pCode, &codeSize);
     assert(result == Result::Success);
     (void(result)); // unused
 
@@ -1350,7 +1350,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
       out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
 
       std::vector<ElfSymbol> symbols;
-      reader.getSymbolsBySectionIndex(secIdx, symbols);
+      reader.GetSymbolsBySectionIndex(secIdx, symbols);
       unsigned symIdx = 0;
       unsigned startPos = 0;
       unsigned endPos = 0;
@@ -1389,7 +1389,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
         out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
 
         std::vector<ElfSymbol> symbols;
-        reader.getSymbolsBySectionIndex(secIdx, symbols);
+        reader.GetSymbolsBySectionIndex(secIdx, symbols);
         unsigned symIdx = 0;
         unsigned startPos = 0;
         unsigned endPos = 0;
@@ -1428,7 +1428,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
           << " bytes)\n";
 
       std::vector<ElfSymbol> symbols;
-      reader.getSymbolsBySectionIndex(secIdx, symbols);
+      reader.GetSymbolsBySectionIndex(secIdx, symbols);
 
       unsigned symIdx = 0;
       unsigned startPos = 0;

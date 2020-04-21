@@ -80,8 +80,8 @@ public:
                                                         bool isRelocatableShader,
                                                         unsigned stage = ShaderStageInvalid);
 
-  static MetroHash::Hash generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline,
-                                                        bool isRelocatableShader, bool isCacheHash);
+  static MetroHash::Hash generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline, bool isCacheHash,
+                                                        bool isRelocatableShader);
 
   static std::string getPipelineInfoFileName(PipelineBuildInfo pipelineInfo, const MetroHash::Hash *hash);
 

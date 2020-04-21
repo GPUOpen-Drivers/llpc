@@ -1115,7 +1115,7 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, unsigned stageM
 void GraphicsShaderCacheChecker::updateRootUserDateOffset(ElfPackage *pipelineElf) {
   ElfWriter<Elf64> writer(m_context->getGfxIpVersion());
   // Load ELF binary
-  auto result = writer.readFromBuffer(pipelineElf->data(), pipelineElf->size());
+  auto result = writer.ReadFromBuffer(pipelineElf->data(), pipelineElf->size());
   assert(result == Result::Success);
   (void(result)); // unused
   writer.updateElfBinary(m_context, pipelineElf);
@@ -1171,7 +1171,7 @@ void GraphicsShaderCacheChecker::updateAndMerge(Result result, ElfPackage *outpu
 
     // Merge and store the result in pPipelineElf
     ElfWriter<Elf64> writer(m_context->getGfxIpVersion());
-    auto result = writer.readFromBuffer(nonFragmentElf.pCode, nonFragmentElf.codeSize);
+    auto result = writer.ReadFromBuffer(nonFragmentElf.pCode, nonFragmentElf.codeSize);
     assert(result == Result::Success);
     (void(result)); // unused
     writer.mergeElfBinary(m_context, &fragmentElf, outputPipelineElf);
@@ -1774,14 +1774,14 @@ void Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
     ElfReader<Elf64> fsReader(m_gfxIp);
     if (!shaderElfs[ShaderStageVertex].empty()) {
       size_t codeSize = shaderElfs[ShaderStageVertex].size_in_bytes();
-      result = vsReader.readFromBuffer(shaderElfs[ShaderStageVertex].data(), &codeSize);
+      result = vsReader.ReadFromBuffer(shaderElfs[ShaderStageVertex].data(), &codeSize);
       if (result != Result::Success)
         return;
     }
 
     if (!shaderElfs[ShaderStageFragment].empty()) {
       size_t codeSize = shaderElfs[ShaderStageFragment].size_in_bytes();
-      result = fsReader.readFromBuffer(shaderElfs[ShaderStageFragment].data(), &codeSize);
+      result = fsReader.ReadFromBuffer(shaderElfs[ShaderStageFragment].data(), &codeSize);
       if (result != Result::Success)
         return;
     }
@@ -1790,7 +1790,7 @@ void Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
   } else {
     ElfReader<Elf64> csReader(m_gfxIp);
     size_t codeSize = shaderElfs[ShaderStageCompute].size_in_bytes();
-    result = csReader.readFromBuffer(shaderElfs[ShaderStageCompute].data(), &codeSize);
+    result = csReader.ReadFromBuffer(shaderElfs[ShaderStageCompute].data(), &codeSize);
     if (result != Result::Success)
       return;
     result = writer.linkComputeRelocatableElf(csReader, context);
