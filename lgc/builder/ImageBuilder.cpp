@@ -766,13 +766,17 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
   Value *pResult = nullptr;
   Value *ycbcrSamplerDesc = CreateExtractValue(convertingSamplerDesc, 0);
 
-  // Extract YCbCr meta data
-  const SamplerYCbCrConversionMetaData yCbCrMetaData = {
-      static_cast<unsigned>(dyn_cast<ConstantInt>(CreateExtractElement(ycbcrSamplerDesc, getInt64(4)))->getZExtValue()),
-      static_cast<unsigned>(dyn_cast<ConstantInt>(CreateExtractElement(ycbcrSamplerDesc, getInt64(5)))->getZExtValue()),
-      static_cast<unsigned>(dyn_cast<ConstantInt>(CreateExtractElement(ycbcrSamplerDesc, getInt64(6)))->getZExtValue()),
-      static_cast<unsigned>(dyn_cast<ConstantInt>(CreateExtractElement(ycbcrSamplerDesc, getInt64(7)))->getZExtValue()),
+  // Helper function to extract YCbCr meta data from ycbcrSamplerDesc
+  auto getYCbCrMetaElement = [this, &ycbcrSamplerDesc](unsigned idx) -> unsigned {
+    return cast<ConstantInt>(CreateExtractElement(ycbcrSamplerDesc, idx))->getZExtValue();
   };
+
+  // Extract YCbCr meta data, which is the last 4 DWORDs of convertingSamplerDesc
+  SamplerYCbCrConversionMetaData yCbCrMetaData;
+  yCbCrMetaData.word0.u32All = getYCbCrMetaElement(4);
+  yCbCrMetaData.word1.u32All = getYCbCrMetaElement(5);
+  yCbCrMetaData.word2.u32All = getYCbCrMetaElement(6);
+  yCbCrMetaData.word3.u32All = getYCbCrMetaElement(7);
 
   // Prepare the coordinate and derivatives, which might also change the dimension.
   SmallVector<Value *, 4> coords;
