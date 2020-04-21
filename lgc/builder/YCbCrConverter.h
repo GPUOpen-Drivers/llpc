@@ -158,7 +158,7 @@ public:
   constexpr bool operator!=(ComponentSwizzle::Channel op) const { return m_value != op; }
   constexpr bool operator==(ComponentSwizzle::Channel op) const { return m_value == op; }
 
-  const unsigned getChannel() { return m_channel; }
+  unsigned getChannel() const { return m_channel; }
 
 private:
   ComponentSwizzle::Channel m_value;
@@ -215,8 +215,8 @@ public:
   YCbCrConverter(ImageBuilder *builder, const SamplerYCbCrConversionMetaData &ycbcrMetaData,
                  YCbCrSampleInfo *ycbcrSampleInfo, GfxIpVersion *gfxIp);
 
-  // Set default constructor unchanged
-  YCbCrConverter() = default;
+  // Make sure default constructor deleted - const ref can't be initialized
+  YCbCrConverter() = delete;
 
   // Set YCbCr sample infomation
   void setYCbCrSampleInfo(YCbCrSampleInfo *ycbcrSampleInfo);
