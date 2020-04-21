@@ -123,7 +123,7 @@ bool PatchDescriptorLoad::runOnModule(Module &module) {
 // @param descPtrCallName : Name of that call
 void PatchDescriptorLoad::processDescriptorGetPtr(CallInst *descPtrCall, StringRef descPtrCallName) {
   m_entryPoint = descPtrCall->getFunction();
-  IRBuilder<> builder(*m_context);
+  BuilderBase builder(*m_context);
   builder.SetInsertPoint(descPtrCall);
 
   // Find the resource node for the descriptor set and binding.
@@ -174,7 +174,7 @@ void PatchDescriptorLoad::processDescriptorGetPtr(CallInst *descPtrCall, StringR
 // @param [in/out] builder : IRBuilder
 Value *PatchDescriptorLoad::getDescPtrAndStride(ResourceNodeType resType, unsigned descSet, unsigned binding,
                                                 const ResourceNode *topNode, const ResourceNode *node, bool shadow,
-                                                IRBuilder<> &builder) {
+                                                BuilderBase &builder) {
   // Determine the stride if possible without looking at the resource node.
   unsigned byteSize = 0;
   Value *stride = nullptr;
@@ -202,7 +202,7 @@ Value *PatchDescriptorLoad::getDescPtrAndStride(ResourceNodeType resType, unsign
     // Stride is not determinable just from the descriptor type requested by the Builder call.
     if (m_pipelineState->getLgcContext()->buildingRelocatableElf()) {
       // Shader compilation: Get byte stride using a reloc.
-      stride = emitRelocationConstant(&builder, "dstride_" + Twine(descSet) + "_" + Twine(binding));
+      stride = builder.CreateRelocationConstant("dstride_" + Twine(descSet) + "_" + Twine(binding));
     } else {
       // Pipeline compilation: Get the stride from the resource type in the node.
       assert(node && "expected valid user data node to determine descriptor stride.");
@@ -270,7 +270,7 @@ Value *PatchDescriptorLoad::getDescPtrAndStride(ResourceNodeType resType, unsign
 // @param [in/out] builder : IRBuilder
 Value *PatchDescriptorLoad::getDescPtr(ResourceNodeType resType, unsigned descSet, unsigned binding,
                                        const ResourceNode *topNode, const ResourceNode *node, bool shadow,
-                                       IRBuilder<> &builder) {
+                                       BuilderBase &builder) {
   Value *descPtr = nullptr;
   // Get the descriptor table pointer.
   auto sysValues = m_pipelineSysValues.get(builder.GetInsertPoint()->getFunction());
@@ -313,14 +313,14 @@ Value *PatchDescriptorLoad::getDescPtr(ResourceNodeType resType, unsigned descSe
       relocNameSuffix = "_x";
       break;
     }
-    offset = emitRelocationConstant(&builder, "doff_" + Twine(descSet) + "_" + Twine(binding) + relocNameSuffix);
+    offset = builder.CreateRelocationConstant("doff_" + Twine(descSet) + "_" + Twine(binding) + relocNameSuffix);
     // The LLVM's internal handling of GEP instruction results in a lot of junk code and prevented selection
     // of the offset-from-register variant of the s_load_dwordx4 instruction. To workaround this issue,
     // we use integer arithmetic here so the amdgpu backend can pickup the optimal instruction.
     // When relocation is used, offset is in bytes, not in dwords.
     descPtr = builder.CreatePtrToInt(descPtr, builder.getInt64Ty());
     descPtr = builder.CreateAdd(descPtr, builder.CreateZExt(offset, builder.getInt64Ty()));
-    descPtr = builder.CreateIntToPtr(descPtr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
+    descPtr = builder.CreateIntToPtr(descPtr, builder.getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
   } else {
     // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
     // add on the size of the first part.
@@ -451,7 +451,7 @@ void PatchDescriptorLoad::visitCallInst(CallInst &callInst) {
 // @param insertPoint : Insert point
 Value *PatchDescriptorLoad::loadBufferDescriptor(unsigned descSet, unsigned binding, Value *arrayOffset,
                                                  Instruction *insertPoint) {
-  IRBuilder<> builder(*m_context);
+  BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPoint);
 
   // Handle the special cases. First get a pointer to the global/per-shader table as pointer to i8.

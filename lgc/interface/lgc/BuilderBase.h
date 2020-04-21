@@ -55,6 +55,11 @@ public:
   // @param attribs : Function attributes
   llvm::CallInst *createNamedCall(llvm::StringRef funcName, llvm::Type *retTy, llvm::ArrayRef<llvm::Value *> args,
                                   llvm::ArrayRef<llvm::Attribute::AttrKind> attribs);
+
+  // Emits a amdgcn.reloc.constant intrinsic that represents an i32 relocatable value with the given symbol name
+  //
+  // @param symbolName : Name of the relocation symbol associated with this relocation
+  llvm::Value *CreateRelocationConstant(const llvm::Twine &symbolName);
 };
 
 } // namespace lgc

@@ -65,9 +65,9 @@ private:
   void processDescriptorGetPtr(llvm::CallInst *descPtrCall, llvm::StringRef descPtrCallName);
   llvm::Value *getDescPtrAndStride(ResourceNodeType resType, unsigned descSet, unsigned binding,
                                    const ResourceNode *topNode, const ResourceNode *node, bool shadow,
-                                   llvm::IRBuilder<> &builder);
+                                   BuilderBase &builder);
   llvm::Value *getDescPtr(ResourceNodeType resType, unsigned descSet, unsigned binding, const ResourceNode *topNode,
-                          const ResourceNode *node, bool shadow, llvm::IRBuilder<> &builder);
+                          const ResourceNode *node, bool shadow, BuilderBase &builder);
 
   void processDescriptorIndex(llvm::CallInst *call);
   void processLoadDescFromPtr(llvm::CallInst *loadFromPtr);
