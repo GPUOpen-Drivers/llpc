@@ -159,6 +159,7 @@ enum class UserDataMapping : unsigned {
   NggCullingData = 0x10000011,    // 64-bit pointer to GPU memory containing the hardware register data needed by
                                   //  some NGG pipelines to perform culling.  This value contains the address of the
                                   //  first of two consecutive registers which provide the full GPU address.
+  Invalid = ~0U                   // Invalid value used internally in LGC.
 };
 
 } // namespace Abi

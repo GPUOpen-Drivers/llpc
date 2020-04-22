@@ -173,6 +173,7 @@ void addTypeMangling(Type *returnTy, ArrayRef<Value *> args, std::string &name) 
 // @param idx : Index of the query argument
 // @param name : Name to give the argument if currently empty
 Value *getFunctionArgument(Function *func, unsigned idx, const Twine &name) {
+  assert(idx < func->arg_end() - func->arg_begin() && "Out of range function argument");
   Argument *arg = &func->arg_begin()[idx];
   if (!name.isTriviallyEmpty() && arg->getName() == "")
     arg->setName(name);

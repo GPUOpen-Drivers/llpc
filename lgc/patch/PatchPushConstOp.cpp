@@ -143,13 +143,17 @@ void PatchPushConstOp::visitCallInst(CallInst &callInst) {
   assert(callee->getName().startswith(lgcName::DescriptorLoadSpillTable));
   (void(callee)); // unused
 
-  auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-  unsigned pushConstNodeIdx = intfData->pushConst.resNodeIdx;
-  assert(pushConstNodeIdx != InvalidValue);
-  auto pushConstNode = &m_pipelineState->getUserDataNodes()[pushConstNodeIdx];
+  // Find the push constant resource node.
+  auto userDataNodes = m_pipelineState->getUserDataNodes();
+  unsigned pushConstNodeIdx = 0;
+  for (; userDataNodes[pushConstNodeIdx].type != ResourceNodeType::PushConst; ++pushConstNodeIdx)
+    assert(pushConstNodeIdx < userDataNodes.size());
 
-  if (pushConstNode->offsetInDwords < intfData->spillTable.offsetInDwords) {
-    auto pushConst = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.resNodeValues[pushConstNodeIdx]);
+  auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+  unsigned entryArgIdx = intfData->entryArgIdxs.resNodeValues[pushConstNodeIdx];
+  if (entryArgIdx != 0) {
+    // Push const node is not spilled.
+    auto pushConst = getFunctionArgument(m_entryPoint, entryArgIdx);
 
     IRBuilder<> builder(*m_context);
     builder.SetInsertPoint(callInst.getFunction()->getEntryBlock().getFirstNonPHI());
