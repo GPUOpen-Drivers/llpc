@@ -198,6 +198,60 @@ void ElfWriter<Elf>::mergeMapItem(llvm::msgpack::MapDocNode &destMap, llvm::msgp
 }
 
 // =====================================================================================================================
+// Update descriptor offset to USER_DATA in metaNote, in place in the messagepack document.
+//
+// @param context : context related to ElfNote
+// @param document : [in, out] The parsed message pack document of the metadata note.
+static void updateRootDescriptorRegisters(Context *context, msgpack::Document &document) {
+  auto pipeline = document.getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0];
+  auto registers = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
+  const unsigned mmSpiShaderUserDataVs0 = 0x2C4C;
+  const unsigned mmSpiShaderUserDataPs0 = 0x2c0c;
+  const unsigned mmComputeUserData0 = 0x2E40;
+  unsigned userDataBaseRegisters[] = {mmSpiShaderUserDataVs0, mmSpiShaderUserDataPs0, mmComputeUserData0};
+  const unsigned vsPsUserDataCount = context->getGfxIpVersion().major < 9 ? 16 : 32;
+  unsigned userDataCount[] = {vsPsUserDataCount, vsPsUserDataCount, 16};
+  for (auto stage = 0; stage < sizeof(userDataBaseRegisters) / sizeof(unsigned); ++stage) {
+    unsigned baseRegister = userDataBaseRegisters[stage];
+    unsigned registerCount = userDataCount[stage];
+    for (unsigned i = 0; i < registerCount; ++i) {
+      unsigned key = baseRegister + i;
+      auto keyNode = registers.getDocument()->getNode(key);
+      auto keyIt = registers.find(keyNode);
+      if (keyIt != registers.end()) {
+        assert(keyIt->first.getUInt() == key);
+        // Reloc Descriptor user data value is consisted by DescRelocMagic | set.
+        unsigned regValue = keyIt->second.getUInt();
+        if (DescRelocMagic == (regValue & DescRelocMagicMask)) {
+          const PipelineShaderInfo *shaderInfo = nullptr;
+          if (baseRegister == mmComputeUserData0) {
+            auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
+            shaderInfo = &pipelineInfo->cs;
+          } else {
+            auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
+            shaderInfo = baseRegister == mmSpiShaderUserDataVs0 ? &pipelineInfo->vs : &pipelineInfo->fs;
+          }
+          unsigned set = regValue & DescSetMask;
+          for (unsigned j = 0; j < shaderInfo->userDataNodeCount; ++j) {
+            if (shaderInfo->pUserDataNodes[j].type == ResourceMappingNodeType::DescriptorTableVaPtr &&
+                set == shaderInfo->pUserDataNodes[j].tablePtr.pNext[0].srdRange.set) {
+              // If it's descriptor user data, then update its offset to it.
+              unsigned value = shaderInfo->pUserDataNodes[j].offsetInDwords;
+              keyIt->second = registers.getDocument()->getNode(value);
+              // Update userDataLimit if neccessary
+              unsigned userDataLimit = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
+              pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit] =
+                  document.getNode(std::max(userDataLimit, value + 1));
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// =====================================================================================================================
 // Merges fragment shader related info for meta notes.
 //
 // @param pContext : The first note section to merge
@@ -302,6 +356,8 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
   unsigned psUserDataCount = pContext->getGfxIpVersion().major < 9 ? 16 : 32;
   for (unsigned regNumber = mmSpiShaderUserDataPs0; regNumber != mmSpiShaderUserDataPs0 + psUserDataCount; ++regNumber)
     mergeMapItem(destRegisters, srcRegisters, regNumber);
+
+  updateRootDescriptorRegisters(pContext, destDocument);
 
   std::string destBlob;
   destDocument.writeToBlob(destBlob);
@@ -726,41 +782,7 @@ template <class Elf> void ElfWriter<Elf>::updateMetaNote(Context *pContext, cons
   assert(success);
   (void(success)); // unused
 
-  auto pipeline = document.getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0];
-
-  auto registers = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
-
-  const unsigned mmSpiShaderUserDataPs0 = 0x2c0c;
-  unsigned psUserDataBase = mmSpiShaderUserDataPs0;
-  unsigned psUserDataCount = pContext->getGfxIpVersion().major < 9 ? 16 : 32;
-  auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(pContext->getPipelineBuildInfo());
-
-  for (unsigned i = 0; i < psUserDataCount; ++i) {
-    unsigned key = psUserDataBase + i;
-    auto keyNode = registers.getDocument()->getNode(key);
-    auto keyIt = registers.find(keyNode);
-    if (keyIt != registers.end()) {
-      assert(keyIt->first.getUInt() == key);
-      // Reloc Descriptor user data value is consisted by DescRelocMagic | set.
-      unsigned regValue = keyIt->second.getUInt();
-      if (DescRelocMagic == (regValue & DescRelocMagicMask)) {
-        unsigned set = regValue & DescSetMask;
-        for (unsigned j = 0; j < pipelineInfo->fs.userDataNodeCount; ++j) {
-          if (pipelineInfo->fs.pUserDataNodes[j].type == ResourceMappingNodeType::DescriptorTableVaPtr &&
-              set == pipelineInfo->fs.pUserDataNodes[j].tablePtr.pNext[0].srdRange.set) {
-            // If it's descriptor user data, then update its offset to it.
-            unsigned value = pipelineInfo->fs.pUserDataNodes[j].offsetInDwords;
-            keyIt->second = registers.getDocument()->getNode(value);
-            // Update userDataLimit if neccessary
-            unsigned userDataLimit = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
-            pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit] =
-                document.getNode(std::max(userDataLimit, value + 1));
-            break;
-          }
-        }
-      }
-    }
-  }
+  updateRootDescriptorRegisters(pContext, document);
 
   std::string blob;
   document.writeToBlob(blob);
@@ -1420,6 +1442,12 @@ Result ElfWriter<Elf>::linkComputeRelocatableElf(const ElfReader<Elf> &relocatab
     relocations.push_back(relocEntry);
   }
   fixUpRelocations(this, relocations, context, false);
+
+  // Update root descriptor register value in metadata note
+  ElfNote metadataNote = getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+  ElfNote updatedNote;
+  updateMetaNote(context, &metadataNote, &updatedNote);
+  setNote(&updatedNote);
 
   return Result::Success;
 }

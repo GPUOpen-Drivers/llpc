@@ -15,6 +15,8 @@
 ; SHADERTEST1: %[[BUFFFERDESCADDR:[0-9]+]] = add i64 %{{[0-9]+}}, %[[RELOCONSTEXT]]
 ; SHADERTEST1: %[[BUFFERDESCPTR:[0-9]+]] = inttoptr i64 %[[BUFFFERDESCADDR]] {{.*}}
 ; SHADERTEST1: %{{[0-9]+}} = load <4 x i32>, <4 x i32> addrspace(4)* %[[BUFFERDESCPTR]], align 16, !invariant.load !{{.*}}
+; SHADERTEST1: COMPUTE_USER_DATA_{{.}} 0x0000000000000006
+; SHADERTEST1: COMPUTE_USER_DATA_{{.}} 0x0000000000000007
 ; SHADERTEST1: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
@@ -40,7 +42,7 @@ void main() {
 [CsInfo]
 entryPoint = main
 userDataNode[0].type = DescriptorTableVaPtr
-userDataNode[0].offsetInDwords = 0
+userDataNode[0].offsetInDwords = 6
 userDataNode[0].sizeInDwords = 1
 userDataNode[0].set = 0
 userDataNode[0].next[0].type = DescriptorBuffer
@@ -49,7 +51,7 @@ userDataNode[0].next[0].sizeInDwords = 8
 userDataNode[0].next[0].set = 0
 userDataNode[0].next[0].binding = 0
 userDataNode[1].type = DescriptorTableVaPtr
-userDataNode[1].offsetInDwords = 1
+userDataNode[1].offsetInDwords = 7
 userDataNode[1].sizeInDwords = 1
 userDataNode[1].set = 1
 userDataNode[1].next[0].type = DescriptorBuffer

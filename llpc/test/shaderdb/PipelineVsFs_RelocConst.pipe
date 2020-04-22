@@ -19,6 +19,8 @@
 ; SHADERTEST1: %[[BUFFFERDESCADDR:[0-9]+]] = add i64 %{{[0-9]+}}, %[[RELOCONSTEXT]]
 ; SHADERTEST1: %[[BUFFERDESCPTR:[0-9]+]] = inttoptr i64 %[[BUFFFERDESCADDR]] {{.*}}
 ; SHADERTEST1: %{{[0-9]+}} = load <4 x i32>, <4 x i32> addrspace(4)* %[[BUFFERDESCPTR]], align 16, !invariant.load !{{.*}}
+; SHADERTEST1-DAG: SPI_SHADER_USER_DATA_VS_{{.}} 0x000000000000000B
+; SHADERTEST1-DAG: SPI_SHADER_USER_DATA_PS_{{.}} 0x000000000000000B
 ; SHADERTEST1: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
@@ -50,7 +52,7 @@ userDataNode[0].offsetInDwords = 0
 userDataNode[0].sizeInDwords = 1
 userDataNode[0].indirectUserDataCount = 0
 userDataNode[1].type = DescriptorTableVaPtr
-userDataNode[1].offsetInDwords = 1
+userDataNode[1].offsetInDwords = 11
 userDataNode[1].sizeInDwords = 1
 userDataNode[1].set = 0
 userDataNode[1].next[0].type = DescriptorBuffer
@@ -112,7 +114,7 @@ colorBuffer[0].channelWriteMask = 15
 colorBuffer[0].blendEnable = 1
 colorBuffer[0].blendSrcAlphaToColor = 1
 userDataNode[0].type = DescriptorTableVaPtr
-userDataNode[0].offsetInDwords = 1
+userDataNode[0].offsetInDwords = 11
 userDataNode[0].sizeInDwords = 1
 userDataNode[0].set = 0
 userDataNode[0].next[0].type = DescriptorBuffer

@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "PatchEntryPointMutate.h"
+#include "../interface/lgc/LgcContext.h"
 #include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
 #include "lgc/state/IntrinsDefs.h"
@@ -308,7 +309,8 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
   unsigned availUserDataCount = maxUserDataCount - userDataIdx;
   unsigned requiredRemappedUserDataCount = 0; // Maximum required user data
   unsigned requiredUserDataCount = 0;         // Maximum required user data without remapping
-  bool useFixedLayout = (m_shaderStage == ShaderStageCompute);
+  bool useFixedLayout =
+      (m_shaderStage == ShaderStageCompute && !m_pipelineState->getLgcContext()->buildingRelocatableElf());
   bool reserveVbTable = false;
   bool reserveStreamOutTable = false;
   bool reserveEsGsLdsSize = false;
@@ -550,7 +552,9 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
         assert(node->sizeInDwords == 1);
 
         auto shaderOptions = &m_pipelineState->getShaderOptions(m_shaderStage);
-        if (shaderOptions->updateDescInElf && m_shaderStage == ShaderStageFragment) {
+        if (shaderOptions->updateDescInElf &&
+            (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageVertex ||
+             m_shaderStage == ShaderStageCompute)) {
           // Put set number to register first, will update offset after merge ELFs
           // For partial pipeline compile, only fragment shader needs to adjust offset of root descriptor
           // If there are more individual shader compile in future, we can add more stages here

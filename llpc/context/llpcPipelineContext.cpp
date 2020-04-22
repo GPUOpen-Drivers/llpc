@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "llpcPipelineContext.h"
+#include "../interface/lgc/LgcContext.h"
 #include "SPIRVInternal.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
@@ -366,7 +367,8 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
 #endif
 
       shaderOptions.useSiScheduler = EnableSiScheduler || shaderInfo->options.useSiScheduler;
-      shaderOptions.updateDescInElf = shaderInfo->options.updateDescInElf;
+      shaderOptions.updateDescInElf =
+          shaderInfo->options.updateDescInElf || pipeline->getLgcContext()->buildingRelocatableElf();
       shaderOptions.unrollThreshold = shaderInfo->options.unrollThreshold;
 
       pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), shaderOptions);
