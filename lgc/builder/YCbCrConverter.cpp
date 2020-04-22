@@ -62,18 +62,18 @@ Value *YCbCrConverter::wrappedSample(YCbCrWrappedSampleInfo &wrapInfo) {
     sampleInfo->imageDesc = wrapInfo.subsampledX ? wrapInfo.imageDesc2 : wrapInfo.imageDesc1;
 
     Instruction *imageOp = cast<Instruction>(createImageSampleInternal(coordsChroma, sampleInfo));
-    result = m_builder->CreateShuffleVector(imageOp, imageOp, ArrayRef<unsigned>{0, 2});
+    result = m_builder->CreateShuffleVector(imageOp, imageOp, ArrayRef<int>{0, 2});
   } else if (wrapInfo.planeCount == 2) {
     sampleInfo->imageDesc = wrapInfo.imageDesc2;
     Instruction *imageOp = cast<Instruction>(createImageSampleInternal(coordsChroma, sampleInfo));
-    result = m_builder->CreateShuffleVector(imageOp, imageOp, ArrayRef<unsigned>{0, 2});
+    result = m_builder->CreateShuffleVector(imageOp, imageOp, ArrayRef<int>{0, 2});
   } else if (wrapInfo.planeCount == 3) {
     sampleInfo->imageDesc = wrapInfo.imageDesc2;
     Instruction *pImageOp1 = cast<Instruction>(createImageSampleInternal(coordsChroma, sampleInfo));
 
     sampleInfo->imageDesc = wrapInfo.imageDesc3;
     Instruction *pImageOp2 = cast<Instruction>(createImageSampleInternal(coordsChroma, sampleInfo));
-    result = m_builder->CreateShuffleVector(pImageOp2, pImageOp1, ArrayRef<unsigned>{0, 6});
+    result = m_builder->CreateShuffleVector(pImageOp2, pImageOp1, ArrayRef<int>{0, 6});
   } else {
     llvm_unreachable("Out of ranged plane count!");
   }
@@ -124,7 +124,7 @@ Value *YCbCrConverter::reconstructLinearXChromaSample(XChromaSampleInfo &xChroma
 
   Value *result = m_builder->createFMix(pImageOpB, pImageOpA, alpha);
 
-  return m_builder->CreateShuffleVector(result, result, ArrayRef<unsigned>{0, 2});
+  return m_builder->CreateShuffleVector(result, result, ArrayRef<int>{0, 2});
 }
 
 // =====================================================================================================================
@@ -214,7 +214,7 @@ Value *YCbCrConverter::reconstructLinearXYChromaSample(XYChromaSampleInfo &xyChr
 
     // Linear interpolate
     result = bilinearBlend(alpha, beta, coordTL, coordTR, coordBL, coordBR);
-    result = m_builder->CreateShuffleVector(result, result, ArrayRef<unsigned>{0, 2});
+    result = m_builder->CreateShuffleVector(result, result, ArrayRef<int>{0, 2});
   } else if (xyChromaInfo.planeCount == 3) {
     // Sample TL
     coordsChromaTL.push_back(m_builder->CreateFDiv(subCoordI, width));
@@ -224,7 +224,7 @@ Value *YCbCrConverter::reconstructLinearXYChromaSample(XYChromaSampleInfo &xyChr
 
     sampleInfo->imageDesc = xyChromaInfo.imageDesc2;
     Value *coordTLr = cast<Instruction>(createImageSampleInternal(coordsChromaTL, sampleInfo));
-    Value *coordTL = m_builder->CreateShuffleVector(coordTLr, coordTLb, ArrayRef<unsigned>{0, 6});
+    Value *coordTL = m_builder->CreateShuffleVector(coordTLr, coordTLb, ArrayRef<int>{0, 6});
 
     // Sample TR
     coordsChromaTR.push_back(
@@ -235,7 +235,7 @@ Value *YCbCrConverter::reconstructLinearXYChromaSample(XYChromaSampleInfo &xyChr
 
     sampleInfo->imageDesc = xyChromaInfo.imageDesc2;
     Value *coordTRr = cast<Instruction>(createImageSampleInternal(coordsChromaTR, sampleInfo));
-    Value *coordTR = m_builder->CreateShuffleVector(coordTRr, coordTRb, ArrayRef<unsigned>{0, 6});
+    Value *coordTR = m_builder->CreateShuffleVector(coordTRr, coordTRb, ArrayRef<int>{0, 6});
 
     // Sample BL
     coordsChromaBL.push_back(m_builder->CreateFDiv(subCoordI, width));
@@ -245,7 +245,7 @@ Value *YCbCrConverter::reconstructLinearXYChromaSample(XYChromaSampleInfo &xyChr
     Value *coordBLb = cast<Instruction>(createImageSampleInternal(coordsChromaBL, sampleInfo));
     sampleInfo->imageDesc = xyChromaInfo.imageDesc2;
     Value *coordBLr = cast<Instruction>(createImageSampleInternal(coordsChromaBL, sampleInfo));
-    Value *coordBL = m_builder->CreateShuffleVector(coordBLr, coordBLb, ArrayRef<unsigned>{0, 6});
+    Value *coordBL = m_builder->CreateShuffleVector(coordBLr, coordBLb, ArrayRef<int>{0, 6});
 
     // Sample BR
     coordsChromaBR.push_back(
@@ -256,7 +256,7 @@ Value *YCbCrConverter::reconstructLinearXYChromaSample(XYChromaSampleInfo &xyChr
     Value *coordBRb = cast<Instruction>(createImageSampleInternal(coordsChromaBR, sampleInfo));
     sampleInfo->imageDesc = xyChromaInfo.imageDesc2;
     Value *coordBRr = cast<Instruction>(createImageSampleInternal(coordsChromaBR, sampleInfo));
-    Value *coordBR = m_builder->CreateShuffleVector(coordBRr, coordBRb, ArrayRef<unsigned>{0, 6});
+    Value *coordBR = m_builder->CreateShuffleVector(coordBRr, coordBRb, ArrayRef<int>{0, 6});
 
     // Linear interpolate
     result = bilinearBlend(alpha, beta, coordTL, coordTR, coordBL, coordBR);
@@ -527,7 +527,7 @@ void YCbCrConverter::sampleYCbCrData() {
 
   // Sample Y and A channels
   Value *imageOpLuma = cast<Instruction>(createImageSampleInternal(coordsLuma, m_ycbcrSampleInfo));
-  imageOpLuma = m_builder->CreateShuffleVector(imageOpLuma, imageOpLuma, ArrayRef<unsigned>{1, 3});
+  imageOpLuma = m_builder->CreateShuffleVector(imageOpLuma, imageOpLuma, ArrayRef<int>{1, 3});
 
   // Init sample chroma info
   m_ycbcrSampleInfo->samplerDesc = m_samplerDescChroma;
@@ -695,15 +695,16 @@ void YCbCrConverter::sampleYCbCrData() {
   }
 
   // Adjust channel sequence to R,G,B,A
-  m_ycbcrData = m_builder->CreateShuffleVector(imageOpLuma, imageOpChroma, ArrayRef<unsigned>{2, 0, 3, 1});
+  m_ycbcrData = m_builder->CreateShuffleVector(imageOpLuma, imageOpChroma, ArrayRef<int>{2, 0, 3, 1});
 
   // Shuffle channels if necessary
   m_ycbcrData = m_builder->CreateShuffleVector(
       m_ycbcrData, m_ycbcrData,
-      ArrayRef<unsigned>{static_cast<ComponentSwizzle>(m_metaData.word0.componentMapping.swizzleR).getChannel(),
-                         static_cast<ComponentSwizzle>(m_metaData.word0.componentMapping.swizzleG).getChannel(),
-                         static_cast<ComponentSwizzle>(m_metaData.word0.componentMapping.swizzleB).getChannel(),
-                         static_cast<ComponentSwizzle>(m_metaData.word0.componentMapping.swizzleA).getChannel()});
+      ArrayRef<int>{
+          static_cast<int>(static_cast<ComponentSwizzle>(m_metaData.word0.componentMapping.swizzleR).getChannel()),
+          static_cast<int>(static_cast<ComponentSwizzle>(m_metaData.word0.componentMapping.swizzleG).getChannel()),
+          static_cast<int>(static_cast<ComponentSwizzle>(m_metaData.word0.componentMapping.swizzleB).getChannel()),
+          static_cast<int>(static_cast<ComponentSwizzle>(m_metaData.word0.componentMapping.swizzleA).getChannel())});
 }
 
 // =====================================================================================================================
@@ -716,7 +717,7 @@ void YCbCrConverter::sampleYCbCrData() {
 // @param imageOp : Results which need color conversion, in sequence => Cr, Y, Cb
 Value *YCbCrConverter::convertColor(Type *resultTy, SamplerYCbCrModelConversion colorModel, SamplerYCbCrRange range,
                                     unsigned *channelBits, Value *imageOp) {
-  Value *subImage = m_builder->CreateShuffleVector(imageOp, imageOp, ArrayRef<unsigned>{0, 1, 2});
+  Value *subImage = m_builder->CreateShuffleVector(imageOp, imageOp, ArrayRef<int>{0, 1, 2});
 
   Value *minVec = UndefValue::get(VectorType::get(m_builder->getFloatTy(), 3));
   minVec = m_builder->CreateInsertElement(minVec, ConstantFP::get(m_builder->getFloatTy(), -0.5), uint64_t(0));
