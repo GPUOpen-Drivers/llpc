@@ -82,6 +82,12 @@ bool BuilderImplBase::supportDpp() const {
 }
 
 // =====================================================================================================================
+// Get whether the context we are building in supports DPP ROW_XMASK operations.
+bool BuilderImplBase::supportDppRowXmask() const {
+  return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 10;
+}
+
+// =====================================================================================================================
 // Get whether the context we are building in support the bpermute operation.
 bool BuilderImplBase::supportBPermute() const {
   auto gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion().major;

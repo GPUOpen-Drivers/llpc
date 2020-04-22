@@ -317,9 +317,101 @@ Value *SubgroupBuilder::CreateSubgroupShuffle(Value *const value, Value *const i
 // @param mask : The mask to shuffle with.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupShuffleXor(Value *const value, Value *const mask, const Twine &instName) {
-  Value *index = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
-  index = CreateXor(index, mask);
-  return CreateSubgroupShuffle(value, index, instName);
+  bool canOptimize = false;
+  unsigned maskValue = ~0;
+  DppCtrl dppCtrl = DppCtrl::DppQuadPerm0000;
+
+  // issue dpp_mov for some simple quad/row shuffle cases;
+  // then issue ds_permlane_x16 if supported or ds_swizzle, if maskValue < 32
+  // default to call SubgroupShuffle, which may issue waterfallloops to handle complex cases.
+  if (cast<ConstantInt>(mask)) {
+    maskValue = cast<ConstantInt>(mask)->getZExtValue();
+
+    if (maskValue < 32) {
+      canOptimize = true;
+      switch (maskValue) {
+      case 0:
+        dppCtrl = DppCtrl::DppQuadPerm0123;
+        break;
+      case 1:
+        dppCtrl = DppCtrl::DppQuadPerm1032;
+        break;
+      case 2:
+        dppCtrl = DppCtrl::DppQuadPerm2301;
+        break;
+      case 3:
+        dppCtrl = DppCtrl::DppQuadPerm3210;
+        break;
+      case 7:
+        dppCtrl = DppCtrl::DppRowHalfMirror;
+        break;
+      case 8:
+        dppCtrl = DppCtrl::DppRowRr8;
+        break;
+      case 15:
+        dppCtrl = DppCtrl::DppRowMirror;
+        break;
+      default:
+        canOptimize = false;
+        break;
+      }
+
+      if (!canOptimize && supportDppRowXmask()) {
+        canOptimize = true;
+        switch (maskValue) {
+        case 4:
+          dppCtrl = DppCtrl::DppRowXmask4;
+          break;
+        case 5:
+          dppCtrl = DppCtrl::DppRowXmask5;
+          break;
+        case 6:
+          dppCtrl = DppCtrl::DppRowXmask6;
+          break;
+        case 9:
+          dppCtrl = DppCtrl::DppRowXmask9;
+          break;
+        case 10:
+          dppCtrl = DppCtrl::DppRowXmask10;
+          break;
+        case 11:
+          dppCtrl = DppCtrl::DppRowXmask11;
+          break;
+        case 12:
+          dppCtrl = DppCtrl::DppRowXmask12;
+          break;
+        case 13:
+          dppCtrl = DppCtrl::DppRowXmask13;
+          break;
+        case 14:
+          dppCtrl = DppCtrl::DppRowXmask14;
+          break;
+        default:
+          canOptimize = false;
+          break;
+        }
+      }
+    }
+  }
+
+  if (maskValue < 32) {
+    if (supportDpp() && canOptimize)
+      return createDppMov(value, dppCtrl, 0xF, 0xF, true);
+    else if (supportPermLaneDpp() && (maskValue >= 16)) {
+      static const unsigned LaneSelBits[16][2] = {
+          {0x76543210, 0xfedcba98}, {0x67452301, 0xefcdab89}, {0x54761032, 0xdcfe98ba}, {0x45670123, 0xcdef89ab},
+          {0x32107654, 0xba98fedc}, {0x23016745, 0xab89efcd}, {0x10325476, 0x98badcfe}, {0x1234567, 0x89abcdef},
+          {0xfedcba98, 0x76543210}, {0xefcdab89, 0x67452301}, {0xdcfe98ba, 0x54761032}, {0xcdef89ab, 0x45670123},
+          {0xba98fedc, 0x32107654}, {0xab89efcd, 0x23016745}, {0x98badcfe, 0x10325476}, {0x89abcdef, 0x1234567}};
+      return createPermLaneX16(value, value, LaneSelBits[maskValue - 16][0], LaneSelBits[maskValue - 16][1], false,
+                               false);
+    } else
+      return createDsSwizzle(value, getDsSwizzleBitMode(maskValue, 0x00, 0x1F));
+  } else {
+    Value *index = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
+    index = CreateXor(index, mask);
+    return CreateSubgroupShuffle(value, index, instName);
+  }
 }
 
 // =====================================================================================================================
@@ -902,7 +994,7 @@ Value *SubgroupBuilder::CreateSubgroupQuadSwapVertical(Value *const value, const
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupQuadSwapDiagonal(Value *const value, const Twine &instName) {
   if (supportDpp())
-    return createDppMov(value, DppCtrl::DppQuadPerm0123, 0xF, 0xF, false);
+    return createDppMov(value, DppCtrl::DppQuadPerm3210, 0xF, 0xF, false);
   else
     return createDsSwizzle(value, getDsSwizzleQuadMode(3, 2, 1, 0));
 }
