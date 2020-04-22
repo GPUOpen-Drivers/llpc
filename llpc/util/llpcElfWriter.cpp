@@ -776,13 +776,13 @@ template <class Elf> void ElfWriter<Elf>::updateMetaNote(Context *pContext, cons
 // @param ppData : [out] Pointer to section data
 // @param pDataLength : [out] Size of the section data
 template <class Elf>
-Result ElfWriter<Elf>::getSectionData(const char *pName, const void **ppData, size_t *pDataLength) const {
+Result ElfWriter<Elf>::getSectionData(const char *name, const void **ppData, size_t *dataLength) const {
   Result result = Result::ErrorInvalidValue;
 
-  auto pEntry = m_map.find(pName);
-  if (pEntry != m_map.end()) {
-    *ppData = m_sections[pEntry->second].data;
-    *pDataLength = static_cast<size_t>(m_sections[pEntry->second].secHead.sh_size);
+  auto entry = m_map.find(name);
+  if (entry != m_map.end()) {
+    *ppData = m_sections[entry->second].data;
+    *dataLength = static_cast<size_t>(m_sections[entry->second].secHead.sh_size);
     result = Result::Success;
   }
 
@@ -1141,17 +1141,17 @@ bool getDescriptorOffsetRelocationValue(Context *context, RelocationEntry relocE
   }
 
   if (isGraphicsPipeline) {
-    auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
-    *value = getDescriptorResourceOffset(descSet, binding, type, pPipelineInfo->vs.pUserDataNodes,
-                                         pPipelineInfo->vs.userDataNodeCount);
+    auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
+    *value = getDescriptorResourceOffset(descSet, binding, type, pipelineInfo->vs.pUserDataNodes,
+                                         pipelineInfo->vs.userDataNodeCount);
     if (*value == InvalidValue) {
-      *value = getDescriptorResourceOffset(descSet, binding, type, pPipelineInfo->fs.pUserDataNodes,
-                                           pPipelineInfo->fs.userDataNodeCount);
+      *value = getDescriptorResourceOffset(descSet, binding, type, pipelineInfo->fs.pUserDataNodes,
+                                           pipelineInfo->fs.userDataNodeCount);
     }
   } else {
-    auto pPipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
-    *value = getDescriptorResourceOffset(descSet, binding, type, pPipelineInfo->cs.pUserDataNodes,
-                                         pPipelineInfo->cs.userDataNodeCount);
+    auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
+    *value = getDescriptorResourceOffset(descSet, binding, type, pipelineInfo->cs.pUserDataNodes,
+                                         pipelineInfo->cs.userDataNodeCount);
   }
 
   return *value != InvalidValue;
@@ -1175,17 +1175,17 @@ bool getDescriptorStrideRelocationValue(Context *context, RelocationEntry relocE
   relocName += idx + 1;
 
   if (isGraphicsPipeline) {
-    auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
-    *value = getDescriptorResourceStride(descSet, binding, pPipelineInfo->vs.pUserDataNodes,
-                                         pPipelineInfo->vs.userDataNodeCount);
+    auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
+    *value = getDescriptorResourceStride(descSet, binding, pipelineInfo->vs.pUserDataNodes,
+                                         pipelineInfo->vs.userDataNodeCount);
     if (*value == InvalidValue) {
-      *value = getDescriptorResourceStride(descSet, binding, pPipelineInfo->fs.pUserDataNodes,
-                                           pPipelineInfo->fs.userDataNodeCount);
+      *value = getDescriptorResourceStride(descSet, binding, pipelineInfo->fs.pUserDataNodes,
+                                           pipelineInfo->fs.userDataNodeCount);
     }
   } else {
-    auto pPipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
-    *value = getDescriptorResourceStride(descSet, binding, pPipelineInfo->cs.pUserDataNodes,
-                                         pPipelineInfo->cs.userDataNodeCount);
+    auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
+    *value = getDescriptorResourceStride(descSet, binding, pipelineInfo->cs.pUserDataNodes,
+                                         pipelineInfo->cs.userDataNodeCount);
   }
 
   return *value != InvalidValue;
