@@ -450,12 +450,7 @@ struct InterfaceData {
   unsigned userDataCount = 0;                  // User data count
 
   struct {
-    unsigned resNodeIdx = InvalidValue; // Resource node index for push constant
-  } pushConst;
-
-  struct {
     unsigned sizeInDwords = 0;              // Spill table size in dwords
-    unsigned offsetInDwords = InvalidValue; // Start offset of Spill table
   } spillTable;
 
   // Usage of user data registers for internal-use variables

@@ -370,15 +370,19 @@ Value *ShaderSystemValues::getNumWorkgroups() {
 // Get spilled push constant pointer
 Value *ShaderSystemValues::getSpilledPushConstTablePtr() {
   if (!m_spilledPushConstTablePtr) {
-    auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-    assert(intfData->pushConst.resNodeIdx != InvalidValue);
-    assert(intfData->entryArgIdxs.spillTable != InvalidValue);
+    // Find the push constant resource node.
+    auto userDataNodes = m_pipelineState->getUserDataNodes();
+    unsigned pushConstNodeIdx = 0;
+    for (; userDataNodes[pushConstNodeIdx].type != ResourceNodeType::PushConst; ++pushConstNodeIdx)
+      ;
+    const ResourceNode *pushConstNode = &userDataNodes[pushConstNodeIdx];
 
     Instruction *insertPos = &*m_entryPoint->front().getFirstInsertionPt();
 
-    auto pushConstNode = &m_pipelineState->getUserDataNodes()[intfData->pushConst.resNodeIdx];
-    unsigned pushConstOffset = pushConstNode->offsetInDwords * sizeof(unsigned);
+    unsigned pushConstOffset = pushConstNode->offsetInDwords * sizeof(uint32_t);
 
+    auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+    assert(intfData->entryArgIdxs.spillTable != InvalidValue);
     auto spillTablePtrLow = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.spillTable, "spillTable");
     auto spilledPushConstTablePtrLow = BinaryOperator::CreateAdd(
         spillTablePtrLow, ConstantInt::get(Type::getInt32Ty(*m_context), pushConstOffset), "", insertPos);

@@ -28,13 +28,18 @@
  * @brief LLPC source file: contains implementation of class lgc::PatchEntryPointMutate.
  ***********************************************************************************************************************
  */
-#include "PatchEntryPointMutate.h"
+
 #include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
+#include "lgc/patch/Patch.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
+#include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InstVisitor.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -46,7 +51,6 @@ using namespace llvm;
 using namespace lgc;
 
 namespace llvm {
-
 namespace cl {
 
 // -inreg-esgs-lds-size: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent with PAL's
@@ -54,10 +58,72 @@ namespace cl {
 opt<bool> InRegEsGsLdsSize("inreg-esgs-lds-size", desc("For GS on-chip, add esGsLdsSize in user data"), init(true));
 
 } // namespace cl
-
 } // namespace llvm
 
-namespace lgc {
+namespace {
+
+// =====================================================================================================================
+// The entry-point mutation pass
+class PatchEntryPointMutate : public Patch {
+public:
+  PatchEntryPointMutate();
+  PatchEntryPointMutate(const PatchEntryPointMutate &) = delete;
+  PatchEntryPointMutate &operator=(const PatchEntryPointMutate &) = delete;
+
+  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
+    analysisUsage.addRequired<PipelineStateWrapper>();
+    analysisUsage.addRequired<PipelineShaders>();
+    // Does not preserve PipelineShaders because it replaces the entrypoints.
+  }
+
+  virtual bool runOnModule(Module &module) override;
+
+  static char ID; // ID of this pass
+
+private:
+  // A shader entry-point user data argument
+  struct UserDataArg {
+    UserDataArg(Type *argTy, unsigned userDataValue = static_cast<unsigned>(Util::Abi::UserDataMapping::Invalid),
+                unsigned *argIndex = nullptr, bool isPadding = false)
+        : argTy(argTy), userDataValue(userDataValue), argIndex(argIndex), isPadding(isPadding), mustSpill(false) {
+      if (isa<PointerType>(argTy))
+        argDwordSize = argTy->getPointerAddressSpace() == ADDR_SPACE_CONST_32BIT ? 1 : 2;
+      else
+        argDwordSize = argTy->getPrimitiveSizeInBits() / 32;
+    }
+
+    UserDataArg(Type *argTy, Util::Abi::UserDataMapping userDataValue, unsigned *argIndex = nullptr,
+                bool isPadding = false)
+        : UserDataArg(argTy, static_cast<unsigned>(userDataValue), argIndex, isPadding) {}
+
+    Type *argTy;            // IR type of the argument
+    unsigned argDwordSize;  // Size of argument in dwords
+    unsigned userDataValue; // PAL metadata user data value, ~0U (Util::Abi::UserDataMapping::Invalid) for none
+    unsigned *argIndex;     // Where to store arg index once it is allocated, nullptr for none
+    bool isPadding;         // Whether this is a padding arg to maintain fixed layout
+    bool mustSpill;         // Whether this is an arg that must be spilled
+  };
+
+  void processShader();
+
+  FunctionType *generateEntryPointType(uint64_t *inRegMask) const;
+
+  void addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs,
+                              SmallVectorImpl<UserDataArg> &specialUserDataArgs, IRBuilder<> &builder) const;
+  void addUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs, IRBuilder<> &builder) const;
+  void determineUnspilledUserDataArgs(ArrayRef<UserDataArg> userDataArgs, ArrayRef<UserDataArg> specialUserDataArgs,
+                                      IRBuilder<> &builder, SmallVectorImpl<UserDataArg> &unspilledArgs) const;
+
+  uint64_t pushFixedShaderArgTys(SmallVectorImpl<Type *> &argTys) const;
+
+  bool isResourceNodeActive(const ResourceNode *node, bool isRootNode) const;
+
+  bool m_hasTs;                             // Whether the pipeline has tessllation shader
+  bool m_hasGs;                             // Whether the pipeline has geometry shader
+  PipelineState *m_pipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
+};
+
+} // anonymous namespace
 
 // =====================================================================================================================
 // Initializes static members.
@@ -65,7 +131,7 @@ char PatchEntryPointMutate::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching opertions for entry-point mutation
-ModulePass *createPatchEntryPointMutate() {
+ModulePass *lgc::createPatchEntryPointMutate() {
   return new PatchEntryPointMutate();
 }
 
@@ -284,349 +350,137 @@ bool PatchEntryPointMutate::isResourceNodeActive(const ResourceNode *node, bool 
 }
 
 // =====================================================================================================================
-// Generates the type for the new entry-point based on already-collected info in LLVM context.
+// Generates the type for the new entry-point based on already-collected info.
+// This is what decides what SGPRs and VGPRs are passed to the shader at wave dispatch:
+//
+// * (For a GFX9+ merged shader or NGG primitive shader, the 8 system SGPRs at the start are not accounted for here.)
+// * The "user data" SGPRs, up to 32 (GFX9+ non-compute shader) or 16 (compute shader or <=GFX8). Many of the values
+//   here are pointers, but are passed as a single 32-bit register and then expanded to 64-bit in the shader code:
+//   - The "global information table", containing various descriptors such as the inter-shader rings
+//   - The "per-shader table", which is added here but appears to be unused
+//   - The streamout table if needed
+//   - Nodes from the root user data layout, including pointers to descriptor sets. In a compute shader, these
+//     must have the same layout as the root user data layout, even if that would mean leaving gaps in register
+//     usage, and are limited to 10 SGPRs s2-s11
+//   - For a compute shader, the spill table pointer if needed, which always goes into s12. (This is possibly
+//     not a strict requirement of PAL, but it might avoid extraneous HW register writes.)
+//   - For a compute shader, the NumWorkgroupsPtr register pair if needed, which must start at a 2-aligned
+//     register number, although it can be earlier than s14 if there is no spill table pointer
+//   - Various other system values set up by PAL, such as the vertex buffer table and the vertex base index
+//   - For a graphics shader, the spill table pointer if needed. This is typically in the last register
+//     (s15 or s31), but not necessarily.
+// * The system value SGPRs and VGPRs determined by hardware, some of which are enabled or disabled by bits in SPI
+//   registers.
+//
 // In GFX9+ shader merging, shaders have not yet been merged, and this function is called for each
 // unmerged shader stage. The code here needs to ensure that it gets the same SGPR user data layout for
 // both shaders that are going to be merged (VS-HS, VS-GS if no tessellation, ES-GS).
 //
-// @param [out] inRegMask : "Inreg" bit mask for the arguments
+// @param [out] inRegMask : "Inreg" bit mask for the arguments, with a bit set to indicate that the corresponding
+//                          arg needs to have an "inreg" attribute to put the arg into SGPRs rather than VGPRs
+// @return : The newly-constructed function type
+//
 FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask) const {
-  unsigned userDataIdx = 0;
-  std::vector<Type *> argTys;
+  SmallVector<Type *, 8> argTys;
 
-  auto userDataNodes = m_pipelineState->getUserDataNodes();
+  IRBuilder<> builder(*m_context);
   auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-  auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
-
-  // Global internal table
-  *inRegMask |= 1ull << argTys.size();
-  argTys.push_back(Type::getInt32Ty(*m_context));
-  m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
-                                                      Util::Abi::UserDataMapping::GlobalTable);
-
-  // TODO: We need add per shader table per real usage after switch to PAL new interface.
-  // if (pResUsage->perShaderTable)
-  {
-    *inRegMask |= 1ull << argTys.size();
-    argTys.push_back(Type::getInt32Ty(*m_context));
-    ++userDataIdx;
-  }
-
-  auto &builtInUsage = resUsage->builtInUsage;
   auto &entryArgIdxs = intfData->entryArgIdxs;
   entryArgIdxs.initialized = true;
 
-  // Estimated available user data count
-  unsigned maxUserDataCount = m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
-  unsigned availUserDataCount = maxUserDataCount - userDataIdx;
-  unsigned requiredRemappedUserDataCount = 0; // Maximum required user data
-  unsigned requiredUserDataCount = 0;         // Maximum required user data without remapping
-  bool useFixedLayout = m_shaderStage == ShaderStageCompute && !m_pipelineState->isUnlinked();
-  bool reserveVbTable = false;
+  // First we collect the user data args in two vectors:
+  // - userDataArgs: global table, per-shader table and streamout table, followed by the nodes from the root user
+  //   data layout (excluding vertex buffer and streamout tables). Some of these are marked mustSpill; some of them
+  //   may need to be spilled anyway due to running out of entry SGPRs
+  // - specialUserDataArgs: special values that go at the end, such as ViewId.
+  //
+  // The UserDataArg for each arg pushed into these vectors contains:
+  // - argTy: The IR type of the arg
+  // - argDwordSize: Size of the arg in dwords
+  // - userDataValue: The PAL metadata value to be passed to PalMetadata::setUserDataEntry, or Invalid for none
+  // - argIndex: Pointer to the location where we will store the actual arg number, or nullptr
+  // - isPadding: Whether this is a padding argument for compute shader fixed layout
+  // - mustSpill: The node must be loaded from the spill table; do not attempt to unspill
+
+  SmallVector<UserDataArg, 8> userDataArgs;
+  SmallVector<UserDataArg, 4> specialUserDataArgs;
+
+  // Global internal table
+  userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::GlobalTable));
+
+  // Per-shader table
+  // TODO: We need add per shader table per real usage after switch to PAL new interface.
+  // if (pResUsage->perShaderTable)
+  userDataArgs.push_back(UserDataArg(builder.getInt32Ty()));
+
+  addSpecialUserDataArgs(userDataArgs, specialUserDataArgs, builder);
+
+  addUserDataArgs(userDataArgs, builder);
+
+  // Determine which user data args are going to be "unspilled", and put them in unspilledArgs.
+  SmallVector<UserDataArg, 8> unspilledArgs;
+  determineUnspilledUserDataArgs(userDataArgs, specialUserDataArgs, builder, unspilledArgs);
+
+  // Scan unspilledArgs: for each one:
+  // * add it to the arg type array
+  // * set user data PAL metadata
+  // * store the arg index into the pointer provided to the xxxArgs.push().
+  unsigned userDataIdx = 0;
+  for (const auto &userDataArg : unspilledArgs) {
+    if (userDataArg.argIndex)
+      *userDataArg.argIndex = argTys.size();
+    argTys.push_back(userDataArg.argTy);
+    unsigned dwordSize = userDataArg.argDwordSize;
+    if (userDataArg.userDataValue != static_cast<unsigned>(Util::Abi::UserDataMapping::Invalid)) {
+      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx, userDataArg.userDataValue,
+                                                          dwordSize);
+    }
+    userDataIdx += dwordSize;
+  }
+
+  intfData->userDataCount = userDataIdx;
+  *inRegMask = (1ull << argTys.size()) - 1;
+
+  // Push the fixed system (not user data) register args.
+  *inRegMask |= pushFixedShaderArgTys(argTys);
+
+  return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
+}
+
+// =====================================================================================================================
+// Add a UserDataArg to the appropriate vector for each special argument (e.g. ViewId) needed in user data SGPRs
+//
+// @param userDataArgs : Vector to add args to when they need to go before user data nodes (just streamout)
+// @param specialUserDataArgs : Vector to add args to when they need to go after user data nodes (all the rest)
+// @param builder : IRBuilder to get types from
+void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs,
+                                                   SmallVectorImpl<UserDataArg> &specialUserDataArgs,
+                                                   IRBuilder<> &builder) const {
+
+  auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+  auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
+  auto &entryArgIdxs = intfData->entryArgIdxs;
+  auto &builtInUsage = resUsage->builtInUsage;
+  bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
+  bool enableNgg = m_pipelineState->isGraphics() ? m_pipelineState->getNggControl()->enableNgg : false;
+
+  // See if there is a vertex buffer and/or streamout in the root user data layout.
+  bool reserveVertexBufferTable = false;
   bool reserveStreamOutTable = false;
-  bool reserveEsGsLdsSize = false;
-  bool needSpill = false;
-
-  if (userDataNodes.size() > 0) {
-    for (unsigned i = 0; i < userDataNodes.size(); ++i) {
-      auto node = &userDataNodes[i];
-      // NOTE: Per PAL request, the value of IndirectTableEntry is the node offset + 1.
-      // and indirect user data should not be counted in possible spilled user data.
-      if (node->type == ResourceNodeType::IndirectUserDataVaPtr) {
-        // Only the vertex shader needs a vertex buffer table.
-        if (m_shaderStage == ShaderStageVertex)
-          reserveVbTable = true;
-        else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
-          // On GFX9+, the shader stage that the vertex shader is merged in to needs a vertex buffer
-          // table, to ensure that the merged shader gets one.
-          if (m_shaderStage == ShaderStageTessControl || (m_shaderStage == ShaderStageGeometry && !m_hasTs))
-            reserveVbTable = true;
-        }
-        continue;
-      }
-
-      if (node->type == ResourceNodeType::StreamOutTableVaPtr) {
-        // Only the last shader stage before fragment (ignoring copy shader) needs a stream out table.
-        if (m_shaderStage == m_pipelineState->getLastVertexProcessingStage() || m_shaderStage == ShaderStageGeometry)
+  for (auto &node : m_pipelineState->getUserDataNodes()) {
+    if (node.type == ResourceNodeType::IndirectUserDataVaPtr) {
+      reserveVertexBufferTable = true;
+    } else if (node.type == ResourceNodeType::StreamOutTableVaPtr) {
+      // Only the last shader stage before fragment (ignoring copy shader) needs a stream out table.
+      if (m_shaderStage == m_pipelineState->getLastVertexProcessingStage() || m_shaderStage == ShaderStageGeometry)
+        reserveStreamOutTable = true;
+      else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
+        // On GFX9+, the shader stage that the last shader is merged in to needs a stream out
+        // table, to ensure that the merged shader gets one.
+        if (m_shaderStage == ShaderStageTessEval || (m_shaderStage == ShaderStageVertex && !m_hasTs))
           reserveStreamOutTable = true;
-        else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
-          // On GFX9+, the shader stage that the last shader is merged in to needs a stream out
-          // table, to ensure that the merged shader gets one.
-          if (m_shaderStage == ShaderStageTessEval || (m_shaderStage == ShaderStageVertex && !m_hasTs))
-            reserveStreamOutTable = true;
-        }
-        continue;
-      }
-
-      if (!isResourceNodeActive(node, true))
-        continue;
-
-      switch (node->type) {
-      case ResourceNodeType::DescriptorBuffer:
-      case ResourceNodeType::DescriptorResource:
-      case ResourceNodeType::DescriptorSampler:
-      case ResourceNodeType::DescriptorTexelBuffer:
-      case ResourceNodeType::DescriptorFmask:
-        // Where an image or sampler descriptor appears in the top-level table, it is accesssed
-        // via the spill table, rather than directly placed in sgprs.
-        needSpill = true;
-        break;
-      case ResourceNodeType::PushConst:
-        intfData->pushConst.resNodeIdx = i;
-        break;
-      default:
-        break;
-      }
-
-      requiredUserDataCount = std::max(requiredUserDataCount, node->offsetInDwords + node->sizeInDwords);
-      requiredRemappedUserDataCount += node->sizeInDwords;
-    }
-  }
-
-  auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
-
-  const bool enableNgg = m_pipelineState->isGraphics() ? m_pipelineState->getNggControl()->enableNgg : false;
-
-  switch (m_shaderStage) {
-  case ShaderStageVertex:
-  case ShaderStageTessControl: {
-    if (enableMultiView)
-      availUserDataCount -= 1;
-
-    // Reserve register for "IndirectUserDataVaPtr"
-    if (reserveVbTable)
-      availUserDataCount -= 1;
-
-    // Reserve for stream-out table
-    if (reserveStreamOutTable)
-      availUserDataCount -= 1;
-
-    // NOTE: On GFX9+, Vertex shader (LS) and tessellation control shader (HS) are merged into a single shader.
-    // The user data count of tessellation control shader should be same as vertex shader.
-    auto currResUsage = resUsage;
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 && m_shaderStage == ShaderStageTessControl &&
-        (m_pipelineState->getShaderStageMask() & shaderStageToMask(ShaderStageVertex)))
-      currResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
-
-    if (currResUsage->builtInUsage.vs.baseVertex || currResUsage->builtInUsage.vs.baseInstance)
-      availUserDataCount -= 2;
-
-    if (currResUsage->builtInUsage.vs.drawIndex)
-      availUserDataCount -= 1;
-
-    // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
-    // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
-    const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-    if ((gfxIp.major >= 9 && (m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize)) || (enableNgg && !m_hasTs)) {
-      availUserDataCount -= 1;
-      reserveEsGsLdsSize = true;
-    }
-    break;
-  }
-  case ShaderStageTessEval: {
-    if (enableMultiView)
-      availUserDataCount -= 1;
-
-    // Reserve for stream-out table
-    if (reserveStreamOutTable)
-      availUserDataCount -= 1;
-
-    // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
-    // with PAL's GS on-chip behavior (TES is in NGG primitive shader).
-    if (enableNgg) {
-      availUserDataCount -= 1;
-      reserveEsGsLdsSize = true;
-    }
-
-    break;
-  }
-  case ShaderStageGeometry: {
-    if (enableMultiView)
-      availUserDataCount -= 1;
-
-    // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
-    // with PAL's GS on-chip behavior. i.e. GS is GFX8
-    if ((m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize) || enableNgg) {
-      // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
-      // with PAL's GS on-chip behavior.
-      availUserDataCount -= 1;
-      reserveEsGsLdsSize = true;
-    }
-    break;
-  }
-  case ShaderStageFragment: {
-    // Do nothing
-    break;
-  }
-  case ShaderStageCompute: {
-    // Emulate gl_NumWorkGroups via user data registers
-    if (builtInUsage.cs.numWorkgroups)
-      availUserDataCount -= 2;
-    break;
-  }
-  default: {
-    llvm_unreachable("Should never be called!");
-    break;
-  }
-  }
-
-  // NOTE: We have to spill user data to memory when available user data is less than required.
-  if (useFixedLayout) {
-    assert(m_shaderStage == ShaderStageCompute);
-    needSpill |= (requiredUserDataCount > InterfaceData::MaxCsUserDataCount);
-    availUserDataCount = InterfaceData::MaxCsUserDataCount;
-  } else {
-    needSpill |= (requiredRemappedUserDataCount > availUserDataCount - needSpill);
-    intfData->spillTable.offsetInDwords = InvalidValue;
-    if (needSpill) {
-      // Spill table need an addtional user data
-      --availUserDataCount;
-    }
-  }
-
-  // Allocate register for stream-out buffer table
-  if (reserveStreamOutTable) {
-    for (unsigned i = 0; i < userDataNodes.size(); ++i) {
-      auto node = &userDataNodes[i];
-      if (node->type == ResourceNodeType::StreamOutTableVaPtr) {
-        assert(node->sizeInDwords == 1);
-        switch (m_shaderStage) {
-        case ShaderStageVertex:
-          intfData->entryArgIdxs.vs.streamOutData.tablePtr = argTys.size();
-          break;
-        case ShaderStageTessEval:
-          intfData->entryArgIdxs.tes.streamOutData.tablePtr = argTys.size();
-          break;
-        // Allocate dummpy stream-out register for Geometry shader
-        case ShaderStageGeometry:
-          break;
-        default:
-          llvm_unreachable("Should never be called!");
-          break;
-        }
-        // If the user data layout has an entry for the stream-out buffer table, but it is not used, then we
-        // still reserve space for it but we do not add it to PAL metadata. This is probably unnecessary, but it
-        // is what the old code did. (We do add it to the PAL metadata for <=GFX8.)
-        // We do not add it to PAL metadata in any case for a GS, presumably because it will be added to
-        // VS-as-copy-shader.
-        *inRegMask |= 1ull << argTys.size();
-        argTys.push_back(Type::getInt32Ty(*m_context));
-
-        if ((m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9 || resUsage->inOutUsage.enableXfb) &&
-            m_shaderStage != ShaderStageGeometry) {
-          m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx,
-                                                              Util::Abi::UserDataMapping::StreamOutTable);
-        }
-        ++userDataIdx;
-        break;
       }
     }
-  }
-
-  // Descriptor table and vertex buffer table
-  unsigned actualAvailUserDataCount = 0;
-  for (unsigned i = 0; i < userDataNodes.size(); ++i) {
-    auto node = &userDataNodes[i];
-
-    // "IndirectUserDataVaPtr" can't be spilled, it is treated as internal user data
-    if (node->type == ResourceNodeType::IndirectUserDataVaPtr)
-      continue;
-
-    if (node->type == ResourceNodeType::StreamOutTableVaPtr)
-      continue;
-
-    if (!isResourceNodeActive(node, true))
-      continue;
-
-    if (useFixedLayout) {
-      // NOTE: For fixed user data layout (for compute shader), we could not pack those user data and dummy
-      // entry-point arguments are added once DWORD offsets of user data are not continuous.
-      assert(m_shaderStage == ShaderStageCompute);
-
-      while (userDataIdx < (node->offsetInDwords + InterfaceData::CsStartUserData) &&
-             userDataIdx < (availUserDataCount + InterfaceData::CsStartUserData)) {
-        *inRegMask |= 1ull << argTys.size();
-        argTys.push_back(Type::getInt32Ty(*m_context));
-        ++userDataIdx;
-        ++actualAvailUserDataCount;
-      }
-    }
-
-    if (actualAvailUserDataCount + node->sizeInDwords <= availUserDataCount) {
-      // User data isn't spilled
-      assert(i < InterfaceData::MaxDescTableCount);
-      intfData->entryArgIdxs.resNodeValues[i] = argTys.size();
-      *inRegMask |= 1ull << argTys.size();
-      actualAvailUserDataCount += node->sizeInDwords;
-      switch (node->type) {
-      case ResourceNodeType::DescriptorTableVaPtr: {
-        argTys.push_back(Type::getInt32Ty(*m_context));
-
-        assert(node->sizeInDwords == 1);
-
-        unsigned userDataValue = node->offsetInDwords;
-        auto shaderOptions = &m_pipelineState->getShaderOptions(m_shaderStage);
-        if (shaderOptions->updateDescInElf &&
-            (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageVertex ||
-             m_shaderStage == ShaderStageCompute)) {
-          // Put set number to register first, will update offset after merge ELFs
-          // For partial pipeline compile, only fragment shader needs to adjust offset of root descriptor
-          // If there are more individual shader compile in future, we can add more stages here
-          userDataValue = DescRelocMagic | node->innerTable[0].set;
-        }
-        m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++, userDataValue);
-        break;
-      }
-
-      case ResourceNodeType::DescriptorBuffer:
-      case ResourceNodeType::DescriptorResource:
-      case ResourceNodeType::DescriptorSampler:
-      case ResourceNodeType::DescriptorTexelBuffer:
-      case ResourceNodeType::DescriptorFmask:
-        // Where a descriptor appears in the top-level table, it is accesssed
-        // via the spill table, rather than directly placed in sgprs.
-        assert(needSpill);
-        if (intfData->spillTable.offsetInDwords == InvalidValue)
-          intfData->spillTable.offsetInDwords = node->offsetInDwords;
-        m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
-        break;
-
-      case ResourceNodeType::PushConst:
-      case ResourceNodeType::DescriptorBufferCompact: {
-        argTys.push_back(VectorType::get(Type::getInt32Ty(*m_context), node->sizeInDwords));
-        m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx, node->offsetInDwords,
-                                                            node->sizeInDwords);
-        userDataIdx += node->sizeInDwords;
-        break;
-      }
-      default: {
-        llvm_unreachable("Should never be called!");
-        break;
-      }
-      }
-    } else {
-      if (needSpill && intfData->spillTable.offsetInDwords == InvalidValue)
-        intfData->spillTable.offsetInDwords = node->offsetInDwords;
-      m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
-    }
-  }
-
-  // Internal user data
-  if (needSpill && useFixedLayout) {
-    // Add spill table
-    assert(intfData->spillTable.offsetInDwords != InvalidValue);
-    assert(userDataIdx <= (InterfaceData::MaxCsUserDataCount + InterfaceData::CsStartUserData));
-    while (userDataIdx <= (InterfaceData::MaxCsUserDataCount + InterfaceData::CsStartUserData)) {
-      *inRegMask |= 1ull << argTys.size();
-      argTys.push_back(Type::getInt32Ty(*m_context));
-      ++userDataIdx;
-    }
-    m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx - 1,
-                                                        Util::Abi::UserDataMapping::SpillTable);
-    intfData->userDataUsage.spillTable = userDataIdx - 1;
-    intfData->entryArgIdxs.spillTable = argTys.size() - 1;
-
-    intfData->spillTable.sizeInDwords = requiredUserDataCount;
   }
 
   switch (m_shaderStage) {
@@ -644,67 +498,56 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
     }
 
     // NOTE: The user data to emulate gl_ViewIndex is somewhat common. To make it consistent for GFX9
-    // merged shader, we place it prior to any other special user data.
+    // merged shader, we place it prior to any other special user data. We only add it to PAL metadata
+    // for VS, not TCS.
     if (enableMultiView) {
-      *inRegMask |= 1ull << argTys.size();
-      entryArgIdxs.vs.viewIndex = argTys.size();
-      argTys.push_back(Type::getInt32Ty(*m_context)); // View Index
-      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
-                                                          Util::Abi::UserDataMapping::ViewId);
+      auto userDataValue = Util::Abi::UserDataMapping::Invalid;
+      if (m_shaderStage == ShaderStageVertex)
+        userDataValue = Util::Abi::UserDataMapping::ViewId;
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), userDataValue, &entryArgIdxs.vs.viewIndex));
     }
 
-    if (reserveEsGsLdsSize) {
-      *inRegMask |= 1ull << argTys.size();
-      argTys.push_back(Type::getInt32Ty(*m_context));
-      if (m_shaderStage == ShaderStageVertex) {
-        m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx,
-                                                            Util::Abi::UserDataMapping::EsGsLdsSize);
-      }
-      ++userDataIdx;
+    // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
+    // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
+    const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+    if ((gfxIp.major >= 9 && (m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize)) || (enableNgg && !m_hasTs)) {
+      auto userDataValue = Util::Abi::UserDataMapping::EsGsLdsSize;
+      // For a standalone TCS (which can only happen in unit testing, not in a real pipeline), don't add
+      // the PAL metadata for it, for consistency with the old code.
+      if (!m_pipelineState->hasShaderStage(ShaderStageVertex))
+        userDataValue = Util::Abi::UserDataMapping::Invalid;
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), userDataValue));
     }
 
-    for (unsigned i = 0; i < userDataNodes.size(); ++i) {
-      auto node = &userDataNodes[i];
-      if (node->type == ResourceNodeType::IndirectUserDataVaPtr) {
-        assert(node->sizeInDwords == 1);
-        currIntfData->entryArgIdxs.vs.vbTablePtr = argTys.size();
-        *inRegMask |= 1ull << argTys.size();
-        argTys.push_back(Type::getInt32Ty(*m_context));
-        if (m_shaderStage == ShaderStageVertex) {
-          m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx,
-                                                              Util::Abi::UserDataMapping::VertexBufferTable);
-        }
-        ++userDataIdx;
-        break;
-      }
+    // Vertex buffer table. Only add to PAL metadata for VS, in case this is a <=GFX8 unmerged TCS.
+    if (reserveVertexBufferTable) {
+      auto userDataValue = Util::Abi::UserDataMapping::Invalid;
+      if (m_shaderStage == ShaderStageVertex)
+        userDataValue = Util::Abi::UserDataMapping::VertexBufferTable;
+      specialUserDataArgs.push_back(
+          UserDataArg(builder.getInt32Ty(), userDataValue, &currIntfData->entryArgIdxs.vs.vbTablePtr));
     }
 
+    // Base vertex and base instance. Only add to PAL metadata for VS, in case this is a <=GFX8 unmerged TCS.
     if (currResUsage->builtInUsage.vs.baseVertex || currResUsage->builtInUsage.vs.baseInstance) {
-      *inRegMask |= 1ull << argTys.size();
-      entryArgIdxs.vs.baseVertex = argTys.size();
-      argTys.push_back(Type::getInt32Ty(*m_context)); // Base vertex
-      if (m_shaderStage == ShaderStageVertex) {
-        m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx,
-                                                            Util::Abi::UserDataMapping::BaseVertex);
-      }
-      ++userDataIdx;
-
-      *inRegMask |= 1ull << argTys.size();
-      entryArgIdxs.vs.baseInstance = argTys.size();
-      argTys.push_back(Type::getInt32Ty(*m_context)); // Base instance
-      if (m_shaderStage == ShaderStageVertex) {
-        m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx,
-                                                            Util::Abi::UserDataMapping::BaseInstance);
-      }
-      ++userDataIdx;
+      auto userDataValue = Util::Abi::UserDataMapping::Invalid;
+      if (m_shaderStage == ShaderStageVertex)
+        userDataValue = Util::Abi::UserDataMapping::BaseVertex;
+      specialUserDataArgs.push_back(
+          UserDataArg(builder.getInt32Ty(), userDataValue, &currIntfData->entryArgIdxs.vs.baseVertex));
+      if (m_shaderStage == ShaderStageVertex)
+        userDataValue = Util::Abi::UserDataMapping::BaseInstance;
+      specialUserDataArgs.push_back(
+          UserDataArg(builder.getInt32Ty(), userDataValue, &currIntfData->entryArgIdxs.vs.baseInstance));
     }
 
+    // Draw index. Only add to PAL metadata for VS, in case this is a <=GFX8 unmerged TCS.
     if (currResUsage->builtInUsage.vs.drawIndex) {
-      *inRegMask |= 1ull << argTys.size();
-      entryArgIdxs.vs.drawIndex = argTys.size();
-      argTys.push_back(Type::getInt32Ty(*m_context)); // Draw index
-      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
-                                                          Util::Abi::UserDataMapping::DrawIndex);
+      auto userDataValue = Util::Abi::UserDataMapping::Invalid;
+      if (m_shaderStage == ShaderStageVertex)
+        userDataValue = Util::Abi::UserDataMapping::DrawIndex;
+      specialUserDataArgs.push_back(
+          UserDataArg(builder.getInt32Ty(), userDataValue, &currIntfData->entryArgIdxs.vs.drawIndex));
     }
 
     break;
@@ -713,58 +556,37 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
     // NOTE: The user data to emulate gl_ViewIndex is somewhat common. To make it consistent for GFX9
     // merged shader, we place it prior to any other special user data.
     if (enableMultiView) {
-      *inRegMask |= 1ull << argTys.size();
-      entryArgIdxs.tes.viewIndex = argTys.size();
-      argTys.push_back(Type::getInt32Ty(*m_context)); // View Index
-      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
-                                                          Util::Abi::UserDataMapping::ViewId);
+      specialUserDataArgs.push_back(
+          UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::ViewId, &entryArgIdxs.tes.viewIndex));
     }
 
-    if (reserveEsGsLdsSize) {
-      *inRegMask |= 1ull << argTys.size();
-      argTys.push_back(Type::getInt32Ty(*m_context));
-      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
-                                                          Util::Abi::UserDataMapping::EsGsLdsSize);
-    }
+    // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
+    // with PAL's GS on-chip behavior (TES is in NGG primitive shader).
+    if (enableNgg)
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::EsGsLdsSize));
     break;
   }
   case ShaderStageGeometry: {
     // NOTE: The user data to emulate gl_ViewIndex is somewhat common. To make it consistent for GFX9
     // merged shader, we place it prior to any other special user data.
     if (enableMultiView) {
-      *inRegMask |= 1ull << argTys.size();
-      entryArgIdxs.gs.viewIndex = argTys.size();
-      argTys.push_back(Type::getInt32Ty(*m_context)); // View Index
-      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
-                                                          Util::Abi::UserDataMapping::ViewId);
-      ++userDataIdx;
+      specialUserDataArgs.push_back(
+          UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::ViewId, &entryArgIdxs.gs.viewIndex));
     }
 
-    if (reserveEsGsLdsSize) {
-      *inRegMask |= 1ull << argTys.size();
-      argTys.push_back(Type::getInt32Ty(*m_context));
-      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
-                                                          Util::Abi::UserDataMapping::EsGsLdsSize);
-    }
+    // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
+    // with PAL's GS on-chip behavior. i.e. GS is GFX8, or GS is in NGG primitive shader
+    if ((m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize) || enableNgg)
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::EsGsLdsSize));
     break;
   }
   case ShaderStageCompute: {
-    // Emulate gl_NumWorkGroups via user data registers
+    // Emulate gl_NumWorkGroups via user data registers.
+    // Later code needs to ensure that this starts on an even numbered register.
     if (builtInUsage.cs.numWorkgroups) {
-      // NOTE: Pointer must be placed in even index according to LLVM backend compiler.
-      if ((userDataIdx % 2) != 0) {
-        *inRegMask |= 1ull << argTys.size();
-        argTys.push_back(Type::getInt32Ty(*m_context));
-        userDataIdx += 1;
-      }
-
-      auto numWorkgroupsPtrTy = PointerType::get(VectorType::get(Type::getInt32Ty(*m_context), 3), ADDR_SPACE_CONST);
-      *inRegMask |= 1ull << argTys.size();
-      entryArgIdxs.cs.numWorkgroupsPtr = argTys.size();
-      argTys.push_back(numWorkgroupsPtrTy); // NumWorkgroupsPtr
-      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx,
-                                                          Util::Abi::UserDataMapping::Workgroup);
-      userDataIdx += 2;
+      auto numWorkgroupsPtrTy = PointerType::get(VectorType::get(builder.getInt32Ty(), 3), ADDR_SPACE_CONST);
+      specialUserDataArgs.push_back(
+          UserDataArg(numWorkgroupsPtrTy, Util::Abi::UserDataMapping::Workgroup, &entryArgIdxs.cs.numWorkgroupsPtr));
     }
     break;
   }
@@ -778,45 +600,265 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
   }
   }
 
-  if (needSpill && !useFixedLayout) {
-    *inRegMask |= 1ull << argTys.size();
-    intfData->entryArgIdxs.spillTable = argTys.size();
-    argTys.push_back(Type::getInt32Ty(*m_context));
-
-    intfData->userDataUsage.spillTable = userDataIdx;
-    m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
-                                                        Util::Abi::UserDataMapping::SpillTable);
-    intfData->spillTable.sizeInDwords = requiredUserDataCount;
+  // Allocate register for stream-out buffer table, to go before the user data node args (unlike all the ones
+  // above, which go after the user data node args).
+  // If the user data layout has an entry for the stream-out buffer table, but it is not used, then we
+  // still reserve space for it but we do not add it to PAL metadata. This is probably unnecessary, but it
+  // is what the old code did. On <=GFX8, we add it to PAL metadata even if unused.
+  if (reserveStreamOutTable) {
+    auto userDataValue = Util::Abi::UserDataMapping::Invalid;
+    if (resUsage->inOutUsage.enableXfb || m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9)
+      userDataValue = Util::Abi::UserDataMapping::StreamOutTable;
+    switch (m_shaderStage) {
+    case ShaderStageVertex:
+      userDataArgs.push_back(
+          UserDataArg(builder.getInt32Ty(), userDataValue, &intfData->entryArgIdxs.vs.streamOutData.tablePtr));
+      break;
+    case ShaderStageTessEval:
+      userDataArgs.push_back(
+          UserDataArg(builder.getInt32Ty(), userDataValue, &intfData->entryArgIdxs.tes.streamOutData.tablePtr));
+      break;
+    // Allocate dummy stream-out register for Geometry shader
+    case ShaderStageGeometry:
+      userDataArgs.push_back(UserDataArg(builder.getInt32Ty()));
+      break;
+    default:
+      llvm_unreachable("Should never be called!");
+      break;
+    }
   }
-  intfData->userDataCount = userDataIdx;
+}
 
+// =====================================================================================================================
+// Add a UserDataArg to the vector for each user data node needed in user data SGPRs.
+//
+// This function does not check if it needs to spill because of running out of SGPRs. However it does
+// check if a node needs to be loaded from the spill table anyway because of its type, and in that case marks
+// it as "mustSpill".
+//
+// This function handles CS "fixed layout" by inserting an extra padding arg before a real user data arg if
+// necessary.
+//
+// @param userDataArgs : Vector to add args to
+// @param builder : IRBuilder to get types from
+void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs, IRBuilder<> &builder) const {
+
+  // Add entries from the root user data layout (not vertex buffer or streamout, and not unused ones).
+  auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+  // TODO Shader compilation: This should not be conditional on isUnlinked(). Once we have shader compilation
+  // without user data layout working, we can instead make it conditional on having a user data layout.
+  bool useFixedLayout = m_shaderStage == ShaderStageCompute && !m_pipelineState->isUnlinked();
+
+  // userDataIdx counts how many SGPRs we have already added, so we can tell if we need padding before
+  // an arg in a compute shader. We initialize with userDataArgs.size(), relying on the fact that all the
+  // ones added so far (global table, per-shader table, streamout table for graphics) use one register each.
+  unsigned userDataIdx = userDataArgs.size();
+
+  for (unsigned i = 0; i != m_pipelineState->getUserDataNodes().size(); ++i) {
+    const ResourceNode &node = m_pipelineState->getUserDataNodes()[i];
+    if (node.type == ResourceNodeType::IndirectUserDataVaPtr || node.type == ResourceNodeType::StreamOutTableVaPtr)
+      continue;
+    if (!isResourceNodeActive(&node, true))
+      continue;
+
+    unsigned *argIndex = &intfData->entryArgIdxs.resNodeValues[i];
+    unsigned userDataValue = node.offsetInDwords;
+    bool mustSpill = false;
+    switch (node.type) {
+
+    case ResourceNodeType::DescriptorTableVaPtr:
+      if (m_pipelineState->getShaderOptions(m_shaderStage).updateDescInElf &&
+          (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageVertex ||
+           m_shaderStage == ShaderStageCompute)) {
+        // Put set number to register first, will update offset after merge ELFs
+        // For partial pipeline compile, only fragment shader needs to adjust offset of root descriptor
+        // If there are more individual shader compile in future, we can add more stages here
+        userDataValue = DescRelocMagic | node.innerTable[0].set;
+      }
+      break;
+
+    case ResourceNodeType::PushConst:
+    case ResourceNodeType::DescriptorBufferCompact:
+      break;
+
+    default:
+      // Any other descriptor type in the root table is accessed via the spill table.
+      mustSpill = true;
+    }
+
+    if (useFixedLayout && userDataIdx != node.offsetInDwords + InterfaceData::CsStartUserData) {
+      // With useFixedLayout, we need a padding arg before the node's arg.
+      assert(node.offsetInDwords + InterfaceData::CsStartUserData > userDataIdx);
+      userDataArgs.push_back(UserDataArg(
+          VectorType::get(builder.getInt32Ty(), node.offsetInDwords + InterfaceData::CsStartUserData - userDataIdx),
+          Util::Abi::UserDataMapping::Invalid, nullptr, /*isPadding=*/true));
+      userDataIdx = node.offsetInDwords + InterfaceData::CsStartUserData;
+    }
+    // Now the node arg itself.
+    Type *argTy = builder.getInt32Ty();
+    if (node.sizeInDwords != 1)
+      argTy = VectorType::get(argTy, node.sizeInDwords);
+    userDataArgs.push_back(UserDataArg(argTy, userDataValue, argIndex));
+    if (mustSpill)
+      userDataArgs.back().mustSpill = true;
+    else
+      userDataIdx += node.sizeInDwords;
+  }
+}
+
+// =====================================================================================================================
+// Determine which user data args are going to be "unspilled" (passed in shader entry SGPRs rather than loaded
+// from spill table)
+//
+// @param userDataArgs : First array of UserDataArg structs for candidate args
+// @param specialUserDataArgs : Second array of UserDataArg structs for candidate args
+// @param builder : IRBuilder to get types from
+// @param [out] unspilledArgs : Output vector of UserDataArg structs that will be "unspilled". Mostly these are
+//                              copied from the input arrays, plus an extra one for the spill table pointer if
+//                              needed. For compute shader fixed layout there may be extra nodes for padding.
+void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg> userDataArgs,
+                                                           ArrayRef<UserDataArg> specialUserDataArgs,
+                                                           IRBuilder<> &builder,
+                                                           SmallVectorImpl<UserDataArg> &unspilledArgs) const {
+
+  auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+  SmallVector<UserDataArg, 1> spillTableArg;
+
+  // Figure out how many sgprs we have available for userDataArgs.
+  unsigned userDataEnd = 0;
+  if (m_shaderStage == ShaderStageCompute) {
+    // For a compute shader, s0-s1 are taken by the global table, and we need to get the user data nodes
+    // into s2-s11. There are enough registers available after that for the spill table arg and
+    // specialUserDataArgs up to s15, so we can ignore them here.
+    userDataEnd = InterfaceData::CsStartUserData + InterfaceData::MaxCsUserDataCount;
+  } else {
+    // For a graphics shader, we have s0-s31 (s0-s15 for <=GFX8) for everything, so take off the number
+    // of registers used by specialUserDataArgs.
+    userDataEnd = m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
+    for (auto &userDataArg : specialUserDataArgs)
+      userDataEnd -= userDataArg.argDwordSize;
+  }
+
+  // See if we need to spill any user data nodes in userDataArgs, copying the unspilled ones across to unspilledArgs.
+  bool useFixedLayout = m_shaderStage == ShaderStageCompute;
+  bool fixedLayoutSpilling = false;
+  unsigned userDataIdx = 0;
+
+  for (const UserDataArg &userDataArg : userDataArgs) {
+    unsigned afterUserDataIdx = userDataIdx + userDataArg.argDwordSize;
+    if (fixedLayoutSpilling || userDataArg.mustSpill || afterUserDataIdx > userDataEnd) {
+      // Spill this node. Allocate the spill table arg.
+      if (spillTableArg.empty()) {
+        spillTableArg.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::SpillTable,
+                                            &intfData->entryArgIdxs.spillTable));
+        // Only decrement the number of available sgprs in a graphics shader. In a compute shader,
+        // the spill table arg goes in s12, beyond the s2-s11 range allowed for user data.
+        if (m_shaderStage != ShaderStageCompute)
+          --userDataEnd;
+
+        if (userDataIdx > userDataEnd) {
+          // We over-ran the available SGPRs by filling them up and then realizing we needed a spill table pointer.
+          // Remove the last unspilled node (and any padding arg before that), and ensure that spill usage is
+          // set correctly so that PAL metadata spill threshold is correct.
+          userDataIdx -= unspilledArgs.back().argDwordSize;
+          m_pipelineState->getPalMetadata()->setUserDataSpillUsage(unspilledArgs.back().userDataValue);
+          unspilledArgs.pop_back();
+          if (!unspilledArgs.empty() && unspilledArgs.back().isPadding) {
+            userDataIdx -= unspilledArgs.back().argDwordSize;
+            unspilledArgs.pop_back();
+          }
+        }
+      }
+      // Ensure that spillUsage includes this offset. (We might be on a compute shader padding node, in which
+      // case userDataArg.userDataValue is Invalid, and this call has no effect.)
+      m_pipelineState->getPalMetadata()->setUserDataSpillUsage(userDataArg.userDataValue);
+
+      if (!userDataArg.mustSpill && useFixedLayout) {
+        // On a compute shader, if we spilled because we ran out of SGPRs (rather than because the node is
+        // marked "mustspill"), stop trying to allocate nodes to SGPRs. If we didn't do this, a later node
+        // that is smaller than the current one might succeed in not spilling, but that would be wrong
+        // because it would not have the right padding before it for fixed layout.
+        fixedLayoutSpilling = true;
+      }
+
+      continue;
+    }
+    // Keep this node on the unspilled list.
+    userDataIdx = afterUserDataIdx;
+    unspilledArgs.push_back(userDataArg);
+  }
+
+  // Remove trailing padding nodes (compute shader).
+  while (!unspilledArgs.empty() && unspilledArgs.back().isPadding) {
+    userDataIdx -= unspilledArgs.back().argDwordSize;
+    unspilledArgs.pop_back();
+  }
+
+  // Add the spill table pointer and the special args to unspilledArgs. How that is done is different between
+  // a compute shader and a graphics shader.
+  if (m_shaderStage == ShaderStageCompute) {
+    // For compute shader:
+    // If we need the spill table pointer, it must go into s12. Insert padding if necessary.
+    if (!spillTableArg.empty()) {
+      if (userDataIdx != userDataEnd) {
+        assert(userDataIdx <= userDataEnd);
+        unspilledArgs.push_back(UserDataArg(VectorType::get(builder.getInt32Ty(), userDataEnd - userDataIdx),
+                                            Util::Abi::UserDataMapping::Invalid, nullptr, /*padding=*/true));
+      }
+      unspilledArgs.push_back(spillTableArg.front());
+      userDataIdx = userDataEnd + 1;
+    }
+    if (!specialUserDataArgs.empty()) {
+      // The special args start with workgroupSize, which needs to start at a 2-aligned reg. Insert a single padding
+      // reg if needed.
+      if (userDataIdx & 1) {
+        unspilledArgs.push_back(
+            UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::Invalid, nullptr, /*padding=*/true));
+      }
+      unspilledArgs.insert(unspilledArgs.end(), specialUserDataArgs.begin(), specialUserDataArgs.end());
+    }
+  } else {
+    // For graphics shader: add the special user data args, then the spill table pointer (if any).
+    unspilledArgs.insert(unspilledArgs.end(), specialUserDataArgs.begin(), specialUserDataArgs.end());
+    unspilledArgs.insert(unspilledArgs.end(), spillTableArg.begin(), spillTableArg.end());
+  }
+}
+
+// =====================================================================================================================
+// Push argument types for fixed system shader arguments
+//
+// @param [in/out] argTys : Argument types vector to add to
+// @return : Bitmap with bits set for SGPR arguments so caller can set "inreg" attribute on the args
+uint64_t PatchEntryPointMutate::pushFixedShaderArgTys(SmallVectorImpl<Type *> &argTys) const {
+  uint64_t inRegMask = 0;
+  auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+  auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
+  auto &entryArgIdxs = intfData->entryArgIdxs;
   const auto &xfbStrides = resUsage->inOutUsage.xfbStrides;
-
   const bool enableXfb = resUsage->inOutUsage.enableXfb;
 
-  // NOTE: Here, we start to add system values, they should be behind user data.
   switch (m_shaderStage) {
   case ShaderStageVertex: {
     if (m_hasGs && !m_hasTs) // VS acts as hardware ES
     {
-      *inRegMask |= 1ull << argTys.size();
+      inRegMask |= 1ull << argTys.size();
       entryArgIdxs.vs.esGsOffset = argTys.size();
       argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offset
     } else if (!m_hasGs && !m_hasTs)                  // VS acts as hardware VS
     {
       if (enableXfb) // If output to stream-out buffer
       {
-        *inRegMask |= 1ull << argTys.size();
+        inRegMask |= 1ull << argTys.size();
         entryArgIdxs.vs.streamOutData.streamInfo = argTys.size();
         argTys.push_back(Type::getInt32Ty(*m_context)); // Stream-out info (ID, vertex count, enablement)
 
-        *inRegMask |= 1ull << argTys.size();
+        inRegMask |= 1ull << argTys.size();
         entryArgIdxs.vs.streamOutData.writeIndex = argTys.size();
         argTys.push_back(Type::getInt32Ty(*m_context)); // Stream-out write Index
 
         for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
           if (xfbStrides[i] > 0) {
-            *inRegMask |= 1ull << argTys.size();
+            inRegMask |= 1ull << argTys.size();
             entryArgIdxs.vs.streamOutData.streamOffsets[i] = argTys.size();
             argTys.push_back(Type::getInt32Ty(*m_context)); // Stream-out offset
           }
@@ -841,12 +883,12 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
   }
   case ShaderStageTessControl: {
     if (m_pipelineState->isTessOffChip()) {
-      *inRegMask |= 1ull << argTys.size();
+      inRegMask |= 1ull << argTys.size();
       entryArgIdxs.tcs.offChipLdsBase = argTys.size();
       argTys.push_back(Type::getInt32Ty(*m_context)); // Off-chip LDS buffer base
     }
 
-    *inRegMask |= 1ull << argTys.size();
+    inRegMask |= 1ull << argTys.size();
     entryArgIdxs.tcs.tfBufferBase = argTys.size();
     argTys.push_back(Type::getInt32Ty(*m_context)); // TF buffer base
 
@@ -862,32 +904,32 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
     if (m_hasGs) // TES acts as hardware ES
     {
       if (m_pipelineState->isTessOffChip()) {
-        *inRegMask |= 1ull << argTys.size();
+        inRegMask |= 1ull << argTys.size();
         entryArgIdxs.tes.offChipLdsBase = argTys.size(); // Off-chip LDS buffer base
         argTys.push_back(Type::getInt32Ty(*m_context));
 
-        *inRegMask |= 1ull << argTys.size();
+        inRegMask |= 1ull << argTys.size();
         argTys.push_back(Type::getInt32Ty(*m_context)); // If is_offchip enabled
       }
-      *inRegMask |= 1ull << argTys.size();
+      inRegMask |= 1ull << argTys.size();
       entryArgIdxs.tes.esGsOffset = argTys.size();
       argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offset
     } else                                            // TES acts as hardware VS
     {
       if (m_pipelineState->isTessOffChip() || enableXfb) {
-        *inRegMask |= 1ull << argTys.size();
+        inRegMask |= 1ull << argTys.size();
         entryArgIdxs.tes.streamOutData.streamInfo = argTys.size();
         argTys.push_back(Type::getInt32Ty(*m_context));
       }
 
       if (enableXfb) {
-        *inRegMask |= 1ull << argTys.size();
+        inRegMask |= 1ull << argTys.size();
         entryArgIdxs.tes.streamOutData.writeIndex = argTys.size();
         argTys.push_back(Type::getInt32Ty(*m_context)); // Stream-out write Index
 
         for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
           if (xfbStrides[i] > 0) {
-            *inRegMask |= 1ull << argTys.size();
+            inRegMask |= 1ull << argTys.size();
             entryArgIdxs.tes.streamOutData.streamOffsets[i] = argTys.size();
             argTys.push_back(Type::getInt32Ty(*m_context)); // Stream-out offset
           }
@@ -896,7 +938,7 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
 
       if (m_pipelineState->isTessOffChip()) // Off-chip LDS buffer base
       {
-        *inRegMask |= 1ull << argTys.size();
+        inRegMask |= 1ull << argTys.size();
         entryArgIdxs.tes.offChipLdsBase = argTys.size();
         argTys.push_back(Type::getInt32Ty(*m_context));
       }
@@ -917,11 +959,11 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
     break;
   }
   case ShaderStageGeometry: {
-    *inRegMask |= 1ull << argTys.size();
+    inRegMask |= 1ull << argTys.size();
     entryArgIdxs.gs.gsVsOffset = argTys.size();
     argTys.push_back(Type::getInt32Ty(*m_context)); // GS to VS offset
 
-    *inRegMask |= 1ull << argTys.size();
+    inRegMask |= 1ull << argTys.size();
     entryArgIdxs.gs.waveId = argTys.size();
     argTys.push_back(Type::getInt32Ty(*m_context)); // GS wave ID
 
@@ -952,7 +994,7 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
     break;
   }
   case ShaderStageFragment: {
-    *inRegMask |= 1ull << argTys.size();
+    inRegMask |= 1ull << argTys.size();
     entryArgIdxs.fs.primMask = argTys.size();
     argTys.push_back(Type::getInt32Ty(*m_context)); // Primitive mask
 
@@ -1006,11 +1048,11 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
   }
   case ShaderStageCompute: {
     // Add system values in SGPR
-    *inRegMask |= 1ull << argTys.size();
+    inRegMask |= 1ull << argTys.size();
     entryArgIdxs.cs.workgroupId = argTys.size();
     argTys.push_back(VectorType::get(Type::getInt32Ty(*m_context), 3)); // WorkgroupId
 
-    *inRegMask |= 1ull << argTys.size();
+    inRegMask |= 1ull << argTys.size();
     argTys.push_back(Type::getInt32Ty(*m_context)); // Multiple dispatch info, include TG_SIZE and etc.
 
     // Add system value in VGPR
@@ -1024,10 +1066,8 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
   }
   }
 
-  return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
+  return inRegMask;
 }
-
-} // namespace lgc
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching opertions for entry-point mutation.
