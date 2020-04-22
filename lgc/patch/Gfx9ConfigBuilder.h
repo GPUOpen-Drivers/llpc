@@ -77,8 +77,6 @@ private:
 
   void buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *config);
 
-  void buildUserDataConfig(ShaderStage shaderStage1, ShaderStage shaderStage2, unsigned startUserData);
-
   void setupVgtTfParam(LsHsRegConfig *config);
 
   bool getShaderWgpMode(ShaderStage shaderStage) const;

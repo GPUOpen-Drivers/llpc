@@ -32,6 +32,7 @@
 #include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
 #include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/Support/CommandLine.h"
@@ -284,6 +285,9 @@ bool PatchEntryPointMutate::isResourceNodeActive(const ResourceNode *node, bool 
 
 // =====================================================================================================================
 // Generates the type for the new entry-point based on already-collected info in LLVM context.
+// In GFX9+ shader merging, shaders have not yet been merged, and this function is called for each
+// unmerged shader stage. The code here needs to ensure that it gets the same SGPR user data layout for
+// both shaders that are going to be merged (VS-HS, VS-GS if no tessellation, ES-GS).
 //
 // @param [out] inRegMask : "Inreg" bit mask for the arguments
 FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask) const {
@@ -297,7 +301,8 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
   // Global internal table
   *inRegMask |= 1ull << argTys.size();
   argTys.push_back(Type::getInt32Ty(*m_context));
-  ++userDataIdx;
+  m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
+                                                      Util::Abi::UserDataMapping::GlobalTable);
 
   // TODO: We need add per shader table per real usage after switch to PAL new interface.
   // if (pResUsage->perShaderTable)
@@ -342,9 +347,7 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
 
       if (node->type == ResourceNodeType::StreamOutTableVaPtr) {
         // Only the last shader stage before fragment (ignoring copy shader) needs a stream out table.
-        if ((m_pipelineState->getShaderStageMask() &
-             (shaderStageToMask(ShaderStageFragment) - shaderStageToMask(m_shaderStage))) ==
-            shaderStageToMask(m_shaderStage))
+        if (m_shaderStage == m_pipelineState->getLastVertexProcessingStage() || m_shaderStage == ShaderStageGeometry)
           reserveStreamOutTable = true;
         else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
           // On GFX9+, the shader stage that the last shader is merged in to needs a stream out
@@ -449,7 +452,6 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
       availUserDataCount -= 1;
       reserveEsGsLdsSize = true;
     }
-
     break;
   }
   case ShaderStageFragment: {
@@ -489,27 +491,32 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
       if (node->type == ResourceNodeType::StreamOutTableVaPtr) {
         assert(node->sizeInDwords == 1);
         switch (m_shaderStage) {
-        case ShaderStageVertex: {
-          intfData->userDataUsage.vs.streamOutTablePtr = userDataIdx;
+        case ShaderStageVertex:
           intfData->entryArgIdxs.vs.streamOutData.tablePtr = argTys.size();
           break;
-        }
-        case ShaderStageTessEval: {
-          intfData->userDataUsage.tes.streamOutTablePtr = userDataIdx;
+        case ShaderStageTessEval:
           intfData->entryArgIdxs.tes.streamOutData.tablePtr = argTys.size();
           break;
-        }
         // Allocate dummpy stream-out register for Geometry shader
-        case ShaderStageGeometry: {
+        case ShaderStageGeometry:
           break;
-        }
-        default: {
+        default:
           llvm_unreachable("Should never be called!");
           break;
         }
-        }
+        // If the user data layout has an entry for the stream-out buffer table, but it is not used, then we
+        // still reserve space for it but we do not add it to PAL metadata. This is probably unnecessary, but it
+        // is what the old code did. (We do add it to the PAL metadata for <=GFX8.)
+        // We do not add it to PAL metadata in any case for a GS, presumably because it will be added to
+        // VS-as-copy-shader.
         *inRegMask |= 1ull << argTys.size();
         argTys.push_back(Type::getInt32Ty(*m_context));
+
+        if ((m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9 || resUsage->inOutUsage.enableXfb) &&
+            m_shaderStage != ShaderStageGeometry) {
+          m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx,
+                                                              Util::Abi::UserDataMapping::StreamOutTable);
+        }
         ++userDataIdx;
         break;
       }
@@ -557,6 +564,7 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
 
         assert(node->sizeInDwords == 1);
 
+        unsigned userDataValue = node->offsetInDwords;
         auto shaderOptions = &m_pipelineState->getShaderOptions(m_shaderStage);
         if (shaderOptions->updateDescInElf &&
             (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageVertex ||
@@ -564,11 +572,9 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
           // Put set number to register first, will update offset after merge ELFs
           // For partial pipeline compile, only fragment shader needs to adjust offset of root descriptor
           // If there are more individual shader compile in future, we can add more stages here
-          intfData->userDataMap[userDataIdx] = DescRelocMagic | node->innerTable[0].set;
-        } else
-          intfData->userDataMap[userDataIdx] = node->offsetInDwords;
-
-        ++userDataIdx;
+          userDataValue = DescRelocMagic | node->innerTable[0].set;
+        }
+        m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++, userDataValue);
         break;
       }
 
@@ -582,13 +588,14 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
         assert(needSpill);
         if (intfData->spillTable.offsetInDwords == InvalidValue)
           intfData->spillTable.offsetInDwords = node->offsetInDwords;
+        m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
         break;
 
       case ResourceNodeType::PushConst:
       case ResourceNodeType::DescriptorBufferCompact: {
         argTys.push_back(VectorType::get(Type::getInt32Ty(*m_context), node->sizeInDwords));
-        for (unsigned j = 0; j < node->sizeInDwords; ++j)
-          intfData->userDataMap[userDataIdx + j] = node->offsetInDwords + j;
+        m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx, node->offsetInDwords,
+                                                            node->sizeInDwords);
         userDataIdx += node->sizeInDwords;
         break;
       }
@@ -597,8 +604,11 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
         break;
       }
       }
-    } else if (needSpill && intfData->spillTable.offsetInDwords == InvalidValue)
-      intfData->spillTable.offsetInDwords = node->offsetInDwords;
+    } else {
+      if (needSpill && intfData->spillTable.offsetInDwords == InvalidValue)
+        intfData->spillTable.offsetInDwords = node->offsetInDwords;
+      m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
+    }
   }
 
   // Internal user data
@@ -611,6 +621,8 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
       argTys.push_back(Type::getInt32Ty(*m_context));
       ++userDataIdx;
     }
+    m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx - 1,
+                                                        Util::Abi::UserDataMapping::SpillTable);
     intfData->userDataUsage.spillTable = userDataIdx - 1;
     intfData->entryArgIdxs.spillTable = argTys.size() - 1;
 
@@ -637,14 +649,17 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
       *inRegMask |= 1ull << argTys.size();
       entryArgIdxs.vs.viewIndex = argTys.size();
       argTys.push_back(Type::getInt32Ty(*m_context)); // View Index
-      currIntfData->userDataUsage.vs.viewIndex = userDataIdx;
-      ++userDataIdx;
+      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
+                                                          Util::Abi::UserDataMapping::ViewId);
     }
 
     if (reserveEsGsLdsSize) {
       *inRegMask |= 1ull << argTys.size();
       argTys.push_back(Type::getInt32Ty(*m_context));
-      currIntfData->userDataUsage.vs.esGsLdsSize = userDataIdx;
+      if (m_shaderStage == ShaderStageVertex) {
+        m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx,
+                                                            Util::Abi::UserDataMapping::EsGsLdsSize);
+      }
       ++userDataIdx;
     }
 
@@ -652,10 +667,13 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
       auto node = &userDataNodes[i];
       if (node->type == ResourceNodeType::IndirectUserDataVaPtr) {
         assert(node->sizeInDwords == 1);
-        currIntfData->userDataUsage.vs.vbTablePtr = userDataIdx;
         currIntfData->entryArgIdxs.vs.vbTablePtr = argTys.size();
         *inRegMask |= 1ull << argTys.size();
         argTys.push_back(Type::getInt32Ty(*m_context));
+        if (m_shaderStage == ShaderStageVertex) {
+          m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx,
+                                                              Util::Abi::UserDataMapping::VertexBufferTable);
+        }
         ++userDataIdx;
         break;
       }
@@ -665,13 +683,19 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
       *inRegMask |= 1ull << argTys.size();
       entryArgIdxs.vs.baseVertex = argTys.size();
       argTys.push_back(Type::getInt32Ty(*m_context)); // Base vertex
-      currIntfData->userDataUsage.vs.baseVertex = userDataIdx;
+      if (m_shaderStage == ShaderStageVertex) {
+        m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx,
+                                                            Util::Abi::UserDataMapping::BaseVertex);
+      }
       ++userDataIdx;
 
       *inRegMask |= 1ull << argTys.size();
       entryArgIdxs.vs.baseInstance = argTys.size();
       argTys.push_back(Type::getInt32Ty(*m_context)); // Base instance
-      currIntfData->userDataUsage.vs.baseInstance = userDataIdx;
+      if (m_shaderStage == ShaderStageVertex) {
+        m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx,
+                                                            Util::Abi::UserDataMapping::BaseInstance);
+      }
       ++userDataIdx;
     }
 
@@ -679,8 +703,8 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
       *inRegMask |= 1ull << argTys.size();
       entryArgIdxs.vs.drawIndex = argTys.size();
       argTys.push_back(Type::getInt32Ty(*m_context)); // Draw index
-      currIntfData->userDataUsage.vs.drawIndex = userDataIdx;
-      ++userDataIdx;
+      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
+                                                          Util::Abi::UserDataMapping::DrawIndex);
     }
 
     break;
@@ -692,15 +716,15 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
       *inRegMask |= 1ull << argTys.size();
       entryArgIdxs.tes.viewIndex = argTys.size();
       argTys.push_back(Type::getInt32Ty(*m_context)); // View Index
-      intfData->userDataUsage.tes.viewIndex = userDataIdx;
-      ++userDataIdx;
+      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
+                                                          Util::Abi::UserDataMapping::ViewId);
     }
 
     if (reserveEsGsLdsSize) {
       *inRegMask |= 1ull << argTys.size();
       argTys.push_back(Type::getInt32Ty(*m_context));
-      intfData->userDataUsage.tes.esGsLdsSize = userDataIdx;
-      ++userDataIdx;
+      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
+                                                          Util::Abi::UserDataMapping::EsGsLdsSize);
     }
     break;
   }
@@ -711,15 +735,16 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
       *inRegMask |= 1ull << argTys.size();
       entryArgIdxs.gs.viewIndex = argTys.size();
       argTys.push_back(Type::getInt32Ty(*m_context)); // View Index
-      intfData->userDataUsage.gs.viewIndex = userDataIdx;
+      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
+                                                          Util::Abi::UserDataMapping::ViewId);
       ++userDataIdx;
     }
 
     if (reserveEsGsLdsSize) {
       *inRegMask |= 1ull << argTys.size();
       argTys.push_back(Type::getInt32Ty(*m_context));
-      intfData->userDataUsage.gs.esGsLdsSize = userDataIdx;
-      ++userDataIdx;
+      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
+                                                          Util::Abi::UserDataMapping::EsGsLdsSize);
     }
     break;
   }
@@ -737,7 +762,8 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
       *inRegMask |= 1ull << argTys.size();
       entryArgIdxs.cs.numWorkgroupsPtr = argTys.size();
       argTys.push_back(numWorkgroupsPtrTy); // NumWorkgroupsPtr
-      intfData->userDataUsage.cs.numWorkgroupsPtr = userDataIdx;
+      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx,
+                                                          Util::Abi::UserDataMapping::Workgroup);
       userDataIdx += 2;
     }
     break;
@@ -757,7 +783,9 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
     intfData->entryArgIdxs.spillTable = argTys.size();
     argTys.push_back(Type::getInt32Ty(*m_context));
 
-    intfData->userDataUsage.spillTable = userDataIdx++;
+    intfData->userDataUsage.spillTable = userDataIdx;
+    m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx++,
+                                                        Util::Abi::UserDataMapping::SpillTable);
     intfData->spillTable.sizeInDwords = requiredUserDataCount;
   }
   intfData->userDataCount = userDataIdx;

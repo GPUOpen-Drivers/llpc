@@ -146,7 +146,6 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(uint64_t *inRegMas
       if (m_hasTes) {
         userDataCount = std::max(tesIntfData->userDataCount, userDataCount);
 
-        assert(tesIntfData->userDataUsage.tes.viewIndex == gsIntfData->userDataUsage.gs.viewIndex);
         if (gsIntfData->spillTable.sizeInDwords > 0 && tesIntfData->spillTable.sizeInDwords == 0) {
           tesIntfData->userDataUsage.spillTable = userDataCount;
           ++userDataCount;
@@ -157,7 +156,6 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(uint64_t *inRegMas
       if (m_hasVs) {
         userDataCount = std::max(vsIntfData->userDataCount, userDataCount);
 
-        assert(vsIntfData->userDataUsage.vs.viewIndex == gsIntfData->userDataUsage.gs.viewIndex);
         if (gsIntfData->spillTable.sizeInDwords > 0 && vsIntfData->spillTable.sizeInDwords == 0) {
           vsIntfData->userDataUsage.spillTable = userDataCount;
           ++userDataCount;
