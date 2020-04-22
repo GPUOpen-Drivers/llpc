@@ -68,6 +68,5 @@ ResourceUsage::ResourceUsage(ShaderStage shaderStage) {
 
 // =====================================================================================================================
 InterfaceData::InterfaceData() {
-  memset(userDataMap, InterfaceData::UserDataUnmapped, sizeof(userDataMap));
   entryArgIdxs.spillTable = InvalidValue;
 }

@@ -35,22 +35,25 @@
  */
 #pragma once
 
+#include "lgc/CommonDefs.h"
+#include "lgc/state/AbiMetadata.h"
+#include "llvm/BinaryFormat/MsgPackDocument.h"
+
 namespace llvm {
 class Module;
-namespace msgpack {
-class Document;
-} // namespace msgpack
 } // namespace llvm
 
 namespace lgc {
+
+class PipelineState;
 
 // =====================================================================================================================
 // Class for manipulating PAL metadata through LGC
 class PalMetadata {
 public:
   // Constructors
-  PalMetadata();
-  PalMetadata(llvm::Module *module);
+  PalMetadata(PipelineState *pipelineState);
+  PalMetadata(PipelineState *pipelineState, llvm::Module *module);
   PalMetadata(const PalMetadata &) = delete;
   PalMetadata &operator=(const PalMetadata &) = delete;
 
@@ -62,8 +65,40 @@ public:
   // Get the MsgPack document for explicit manipulation. Only ConfigBuilder* uses this.
   llvm::msgpack::Document *getDocument() { return m_document; }
 
+  // Set the PAL metadata SPI register for one user data entry
+  void setUserDataEntry(ShaderStage stage, unsigned userDataIndex, unsigned userDataValue, unsigned dwordCount = 1);
+  void setUserDataEntry(ShaderStage stage, unsigned userDataIndex, Util::Abi::UserDataMapping userDataValue,
+                        unsigned dwordCount = 1) {
+    setUserDataEntry(stage, userDataIndex, static_cast<unsigned>(userDataValue), dwordCount);
+  }
+
+  // Mark that the user data spill table is used at the given offset. The SpillThreshold PAL metadata entry is
+  // set to the minimum of any call to this function in any shader.
+  void setUserDataSpillUsage(unsigned dwordOffset);
+
+  // Finalize PAL metadata for pipeline.
+  // TODO Shader compilation: The idea is that this will be called at the end of a pipeline compilation, or in
+  // an ELF link, but not at the end of a shader/half-pipeline compile.
+  void finalizePipeline();
+
 private:
-  llvm::msgpack::Document *m_document;
+  // Initialize the PalMetadata object after reading in already-existing PAL metadata if any
+  void initialize();
+
+  // Get the first user data register number for the given shader stage.
+  unsigned getUserDataReg0(ShaderStage stage);
+
+  // Set userDataLimit to maximum
+  void setUserDataLimit();
+
+  PipelineState *m_pipelineState;           // PipelineState
+  llvm::msgpack::Document *m_document;      // The MsgPack document
+  llvm::msgpack::MapDocNode m_pipelineNode; // MsgPack map node for amdpal.pipelines[0]
+  llvm::msgpack::MapDocNode m_registers;    // MsgPack map node for amdpal.pipelines[0].registers
+  // Mapping from ShaderStage to SPI user data register start, allowing for merged shaders and NGG.
+  unsigned m_userDataRegMapping[ShaderStageCountInternal] = {};
+  llvm::msgpack::DocNode *m_userDataLimit;  // Maximum so far number of user data dwords used
+  llvm::msgpack::DocNode *m_spillThreshold; // Minimum so far dword offset used in user data spill table
 };
 
 } // namespace lgc

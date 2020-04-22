@@ -45,7 +45,7 @@ using namespace llvm;
 // @param [in/out] module : LLVM module
 // @param pipelineState : Pipeline state
 ConfigBuilderBase::ConfigBuilderBase(llvm::Module *module, PipelineState *pipelineState)
-    : m_module(module), m_pipelineState(pipelineState), m_userDataLimit(0), m_spillThreshold(UINT32_MAX) {
+    : m_module(module), m_pipelineState(pipelineState) {
   m_context = &module->getContext();
 
   m_hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
@@ -286,18 +286,6 @@ void ConfigBuilderBase::setEsGsLdsSize(unsigned value) {
 }
 
 // =====================================================================================================================
-// Set USER_DATA_LIMIT (called once for the whole pipeline)
-void ConfigBuilderBase::setUserDataLimit() {
-  m_pipelineNode[Util::Abi::PipelineMetadataKey::UserDataLimit] = m_document->getNode(m_userDataLimit);
-}
-
-// =====================================================================================================================
-// Set SPILL_THRESHOLD (called once for the whole pipeline)
-void ConfigBuilderBase::setSpillThreshold() {
-  m_pipelineNode[Util::Abi::PipelineMetadataKey::SpillThreshold] = m_document->getNode(m_spillThreshold);
-}
-
-// =====================================================================================================================
 // Set PIPELINE_HASH (called once for the whole pipeline)
 void ConfigBuilderBase::setPipelineHash() {
   const auto &options = m_pipelineState->getOptions();
@@ -346,8 +334,6 @@ void ConfigBuilderBase::appendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config
 // Finish ConfigBuilder processing by writing into the PalMetadata document
 void ConfigBuilderBase::writePalMetadata() {
   // Set whole-pipeline values.
-  setUserDataLimit();
-  setSpillThreshold();
   setPipelineHash();
 
   // Generating MsgPack metadata.

@@ -73,8 +73,6 @@ private:
 
   void buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *config);
 
-  void buildUserDataConfig(ShaderStage shaderStage, unsigned startUserData);
-
   template <typename T> void setupVgtTfParam(T *config);
 };
 

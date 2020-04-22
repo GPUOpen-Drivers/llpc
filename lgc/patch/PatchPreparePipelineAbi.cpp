@@ -32,6 +32,7 @@
 #include "Gfx9ConfigBuilder.h"
 #include "ShaderMerger.h"
 #include "lgc/patch/Patch.h"
+#include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -129,6 +130,9 @@ bool PatchPreparePipelineAbi::runOnModule(Module &module) {
     setAbiEntryNames(module);
 
     addAbiMetadata(module);
+
+    // TODO Shader compilation: Only do this if doing a whole-pipeline compilation
+    m_pipelineState->getPalMetadata()->finalizePipeline();
   }
 
   return true; // Modified the module.

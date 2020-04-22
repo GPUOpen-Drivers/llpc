@@ -489,7 +489,6 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
   if (hasTs) {
     if (m_hasTes) {
       const auto tesIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval);
-      assert(tesIntfData->userDataUsage.tes.viewIndex == intfData->userDataUsage.gs.viewIndex);
       if (intfData->spillTable.sizeInDwords > 0 && tesIntfData->spillTable.sizeInDwords == 0) {
         tesIntfData->userDataUsage.spillTable = userDataCount;
         ++userDataCount;
@@ -499,7 +498,6 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
   } else {
     if (m_hasVs) {
       const auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
-      assert(vsIntfData->userDataUsage.vs.viewIndex == intfData->userDataUsage.gs.viewIndex);
       if (intfData->spillTable.sizeInDwords > 0 && vsIntfData->spillTable.sizeInDwords == 0) {
         vsIntfData->userDataUsage.spillTable = userDataCount;
         ++userDataCount;

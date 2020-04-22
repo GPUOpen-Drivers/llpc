@@ -106,18 +106,11 @@ protected:
   bool m_hasTes; // Whether the pipeline has tessellation evaluation shader
   bool m_hasGs;  // Whether the pipeline has geometry shader
 
-  unsigned m_userDataLimit;  // User data limit for shaders seen so far
-  unsigned m_spillThreshold; // Spill threshold for shaders seen so far
-
 private:
   // Get the MsgPack map node for the specified API shader in the ".shaders" map
   llvm::msgpack::MapDocNode getApiShaderNode(unsigned apiStage);
   // Get the MsgPack map node for the specified HW shader in the ".hardware_stages" map
   llvm::msgpack::MapDocNode getHwShaderNode(Util::Abi::HardwareStage hwStage);
-  // Set USER_DATA_LIMIT (called once for the whole pipeline)
-  void setUserDataLimit();
-  // Set SPILL_THRESHOLD (called once for the whole pipeline)
-  void setSpillThreshold();
   // Set PIPELINE_HASH (called once for the whole pipeline)
   void setPipelineHash();
 

@@ -31,6 +31,7 @@
 #include "lgc/BuilderBase.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -41,6 +42,14 @@
 #include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "llpc-patch-copy-shader"
+
+namespace llvm {
+namespace cl {
+
+extern opt<bool> InRegEsGsLdsSize;
+
+} // namespace cl
+} // namespace llvm
 
 using namespace lgc;
 using namespace llvm;
@@ -174,12 +183,29 @@ bool PatchCopyShader::runOnModule(Module &module) {
     intfData->userDataUsage.gs.copyShaderEsGsLdsSize = 2;
   }
 
+  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
+
+  if (!m_pipelineState->getNggControl()->enableNgg) {
+    // If no NGG, the copy shader will become a real hardware VS. Set the user data entries in the
+    // PAL metadata here.
+    m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader, 0,
+                                                        Util::Abi::UserDataMapping::GlobalTable);
+    if (resUsage->inOutUsage.enableXfb) {
+      m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader,
+                                                          intfData->userDataUsage.gs.copyShaderStreamOutTable,
+                                                          Util::Abi::UserDataMapping::StreamOutTable);
+    }
+    if (cl::InRegEsGsLdsSize && m_pipelineState->isGsOnChip()) {
+      m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader,
+                                                          intfData->userDataUsage.gs.copyShaderEsGsLdsSize,
+                                                          Util::Abi::UserDataMapping::EsGsLdsSize);
+    }
+  }
+
   if (m_pipelineState->isGsOnChip())
     m_lds = Patch::getLdsVariable(m_pipelineState, &module);
   else
     m_gsVsRingBufDesc = loadGsVsRingBufferDescriptor(builder);
-
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
   unsigned outputStreamCount = 0;
   unsigned outputStreamId = InvalidValue;

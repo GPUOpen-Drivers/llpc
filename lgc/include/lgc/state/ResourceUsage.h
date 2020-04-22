@@ -448,7 +448,6 @@ struct InterfaceData {
   static const unsigned UserDataUnmapped = InvalidValue;
 
   unsigned userDataCount = 0;                  // User data count
-  unsigned userDataMap[MaxUserDataCount] = {}; // User data map (from SGPR No. to API logical ID)
 
   struct {
     unsigned resNodeIdx = InvalidValue; // Resource node index for push constant
@@ -461,37 +460,11 @@ struct InterfaceData {
 
   // Usage of user data registers for internal-use variables
   struct {
-    union {
-      // Vertex shader
-      struct {
-        unsigned baseVertex;        // Base vertex
-        unsigned baseInstance;      // Base instance
-        unsigned drawIndex;         // Draw index
-        unsigned vbTablePtr;        // Pointer of vertex buffer table
-        unsigned viewIndex;         // View Index
-        unsigned streamOutTablePtr; // Pointer of stream-out buffer table
-        unsigned esGsLdsSize;       // ES -> GS ring LDS size for GS on-chip mode (for GFX9 and NGG)
-      } vs;
-
-      struct {
-        unsigned viewIndex;         // View Index
-        unsigned streamOutTablePtr; // Pointer of stream-out buffer table
-        unsigned esGsLdsSize;       // ES -> GS ring LDS size for GS on-chip mode (for NGG)
-      } tes;
-
-      // Geometry shader
-      struct {
-        unsigned esGsLdsSize;              // ES -> GS ring LDS size for GS on-chip mode (for GFX8 and NGG)
-        unsigned viewIndex;                // View Index
-        unsigned copyShaderEsGsLdsSize;    // ES -> GS ring LDS size (for copy shader)
-        unsigned copyShaderStreamOutTable; // Stream-out table (for copy shader)
-      } gs;
-
-      // Compute shader
-      struct {
-        unsigned numWorkgroupsPtr; // Pointer of NumWorkGroups
-      } cs;
-    };
+    // Geometry shader
+    struct {
+      unsigned copyShaderEsGsLdsSize;    // ES -> GS ring LDS size (for copy shader)
+      unsigned copyShaderStreamOutTable; // Stream-out table (for copy shader)
+    } gs;
 
     unsigned spillTable; // Spill table user data map
 

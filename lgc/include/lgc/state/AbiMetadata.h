@@ -68,7 +68,8 @@ enum class HardwareStage : unsigned {
   Vs,     ///< Hardware VS stage
   Ps,     ///< Hardware PS stage
   Cs,     ///< Hardware CS stage
-  Count
+  Count,
+  Invalid = ~0U
 };
 
 // Used to represent hardware shader stage.
@@ -173,5 +174,25 @@ static const char *const HwStageNames[] = {".ls", ".hs", ".es", ".gs", ".vs", ".
 // The name of the metadata node containing PAL metadata. This name is part of the interface from LGC into
 // the LLVM AMDGPU back-end when compiling for PAL ABI.
 static const char PalMetadataName[] = "amdgpu.pal.metadata.msgpack";
+
+// PAL metadata SPI register numbers for the start of user data.
+//
+// Note on LS/HS confusion:
+// <=GFX8 claims LS registers are from 0x2D4C and HS registers are from 0x2D0C
+// GFX9 claims LS registers are from 0x2D0C, and the LS-HS merged shader uses them
+// GFX10 claims HS registers are from 0x2D0C, and the LS-HS merged shader uses them.
+// So here we call the registers from 0x2D0C "HS" and have the LS-HS merged shader using them, for
+// consistency. That contradicts the GFX9 docs, but has the same effect.
+//
+// First the ones that only apply up to GFX8
+constexpr unsigned int mmSPI_SHADER_USER_DATA_LS_0 = 0x2D4C;
+// Up to GFX9 only
+constexpr unsigned int mmSPI_SHADER_USER_DATA_ES_0 = 0x2CCC; // For GXF9, used for ES-GS merged shader
+// Then the ones that apply to all hardware.
+constexpr unsigned int mmCOMPUTE_USER_DATA_0 = 0x2E40;
+constexpr unsigned int mmSPI_SHADER_USER_DATA_GS_0 = 0x2C8C; // For GFX10, used for ES-GS merged shader and NGG
+constexpr unsigned int mmSPI_SHADER_USER_DATA_HS_0 = 0x2D0C; // For GFX9+, Used for LS-HS merged shader
+constexpr unsigned int mmSPI_SHADER_USER_DATA_PS_0 = 0x2C0C;
+constexpr unsigned int mmSPI_SHADER_USER_DATA_VS_0 = 0x2C4C;
 
 } // namespace lgc

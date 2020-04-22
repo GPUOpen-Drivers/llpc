@@ -94,7 +94,7 @@ unsigned PipelineState::getPalAbiVersion() const {
 // Get PalMetadata object, creating an empty one if necessary
 PalMetadata *PipelineState::getPalMetadata() {
   if (!m_palMetadata)
-    m_palMetadata = new PalMetadata;
+    m_palMetadata = new PalMetadata(this);
   return m_palMetadata;
 }
 
@@ -147,7 +147,7 @@ void PipelineState::readState(Module *module) {
   readColorExportState(module);
   readGraphicsState(module);
   if (!m_palMetadata)
-    m_palMetadata = new PalMetadata(module);
+    m_palMetadata = new PalMetadata(this, module);
 }
 
 // =====================================================================================================================

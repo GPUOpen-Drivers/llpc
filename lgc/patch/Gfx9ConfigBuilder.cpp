@@ -36,16 +36,6 @@
 
 #define DEBUG_TYPE "llpc-gfx9-config-builder"
 
-namespace llvm {
-
-namespace cl {
-
-extern opt<bool> InRegEsGsLdsSize;
-
-} // namespace cl
-
-} // namespace llvm
-
 using namespace llvm;
 
 namespace lgc {
@@ -994,20 +984,6 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
       const auto &vsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
       usePrimitiveId = usePrimitiveId || vsBuiltInUsage.primitiveId;
     }
-
-    const auto gsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
-    if (m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize) {
-      assert(gsIntfData->userDataUsage.gs.copyShaderEsGsLdsSize != 0);
-
-      appendConfig(mmSPI_SHADER_USER_DATA_VS_0 + gsIntfData->userDataUsage.gs.copyShaderEsGsLdsSize,
-                   static_cast<unsigned>(Util::Abi::UserDataMapping::EsGsLdsSize));
-    }
-
-    if (enableXfb) {
-      assert(gsIntfData->userDataUsage.gs.copyShaderStreamOutTable != 0);
-      appendConfig(mmSPI_SHADER_USER_DATA_VS_0 + gsIntfData->userDataUsage.gs.copyShaderStreamOutTable,
-                   static_cast<unsigned>(Util::Abi::UserDataMapping::StreamOutTable));
-    }
   }
 
   SET_REG_FIELD(&pConfig->vsRegs, VGT_PRIMITIVEID_EN, PRIMITIVEID_EN, usePrimitiveId);
@@ -1093,9 +1069,6 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
     SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_USER_ACCUM_VS_2, CONTRIBUTION, 1);
     SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_USER_ACCUM_VS_3, CONTRIBUTION, 1);
   }
-
-  // Set shader user data maping
-  buildUserDataConfig(shaderStage, ShaderStageInvalid, mmSPI_SHADER_USER_DATA_VS_0);
 }
 
 // =====================================================================================================================
@@ -1190,17 +1163,6 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
     SET_REG_FIELD(&pConfig->lsHsRegs, SPI_SHADER_USER_ACCUM_LSHS_2, CONTRIBUTION, 1);
     SET_REG_FIELD(&pConfig->lsHsRegs, SPI_SHADER_USER_ACCUM_LSHS_3, CONTRIBUTION, 1);
   }
-
-  if (gfxIp.major == 9) {
-    buildUserDataConfig(shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
-                        shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
-                        Gfx09::mmSPI_SHADER_USER_DATA_LS_0);
-  } else if (gfxIp.major == 10) {
-    buildUserDataConfig(shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
-                        shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
-                        Pal::Gfx9::Chip::Gfx10::mmSPI_SHADER_USER_DATA_HS_0);
-  } else
-    llvm_unreachable("Not implemented!");
 }
 
 // =====================================================================================================================
@@ -1405,17 +1367,6 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
     SET_REG_FIELD(&pConfig->esGsRegs, SPI_SHADER_USER_ACCUM_ESGS_2, CONTRIBUTION, 1);
     SET_REG_FIELD(&pConfig->esGsRegs, SPI_SHADER_USER_ACCUM_ESGS_3, CONTRIBUTION, 1);
   }
-
-  if (gfxIp.major == 9) {
-    buildUserDataConfig(shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
-                        shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
-                        Gfx09::mmSPI_SHADER_USER_DATA_ES_0);
-  } else if (gfxIp.major == 10) {
-    buildUserDataConfig(shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
-                        shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
-                        Pal::Gfx9::Chip::Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
-  } else
-    llvm_unreachable("Not implemented!");
 }
 
 // =====================================================================================================================
@@ -1807,13 +1758,6 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
     SET_REG(&pConfig->primShaderRegs, SPI_SHADER_PGM_LO_GS,
             static_cast<unsigned>(Util::Abi::UserDataMapping::NggCullingData));
   }
-
-  //
-  // Build use data configuration
-  //
-  buildUserDataConfig(shaderStage1 != ShaderStageInvalid ? shaderStage1 : shaderStage2,
-                      shaderStage1 != ShaderStageInvalid ? shaderStage2 : ShaderStageInvalid,
-                      Pal::Gfx9::Chip::Gfx10::mmSPI_SHADER_USER_DATA_GS_0);
 }
 
 // =====================================================================================================================
@@ -2041,9 +1985,6 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
     SET_REG_FIELD(&pConfig->psRegs, SPI_SHADER_USER_ACCUM_PS_2, CONTRIBUTION, 1);
     SET_REG_FIELD(&pConfig->psRegs, SPI_SHADER_USER_ACCUM_PS_3, CONTRIBUTION, 1);
   }
-
-  // Set shader user data mapping
-  buildUserDataConfig(shaderStage, ShaderStageInvalid, mmSPI_SHADER_USER_DATA_PS_0);
 }
 
 // =====================================================================================================================
@@ -2127,206 +2068,6 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
     SET_REG_FIELD(config, COMPUTE_USER_ACCUM_1, CONTRIBUTION, 1);
     SET_REG_FIELD(config, COMPUTE_USER_ACCUM_2, CONTRIBUTION, 1);
     SET_REG_FIELD(config, COMPUTE_USER_ACCUM_3, CONTRIBUTION, 1);
-  }
-
-  // Set shader user data mapping
-  buildUserDataConfig(shaderStage, ShaderStageInvalid, mmCOMPUTE_USER_DATA_0);
-}
-
-// =====================================================================================================================
-// Builds user data configuration for the specified shader stage.
-//
-// @param shaderStage1 : Current first shader stage (from API side)
-// @param shaderStage2 : Current second shader stage (from API side)
-// @param startUserData : Starting user data
-void ConfigBuilder::buildUserDataConfig(ShaderStage shaderStage1, ShaderStage shaderStage2, unsigned startUserData) {
-  assert(shaderStage1 != ShaderStageInvalid); // The first shader stage must be a valid one
-
-  // NOTE: For merged shader, the second shader stage should be tessellation control shader (LS-HS) or geometry
-  // shader (ES-GS).
-  assert(shaderStage2 == ShaderStageTessControl || shaderStage2 == ShaderStageGeometry ||
-         shaderStage2 == ShaderStageInvalid);
-
-  bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
-
-  bool enableXfb = false;
-  if (m_pipelineState->isGraphics()) {
-    if ((shaderStage1 == ShaderStageVertex || shaderStage1 == ShaderStageTessEval) &&
-        shaderStage2 == ShaderStageInvalid)
-      enableXfb = m_pipelineState->getShaderResourceUsage(shaderStage1)->inOutUsage.enableXfb;
-  }
-
-  const bool enableNgg = m_pipelineState->isGraphics() ? m_pipelineState->getNggControl()->enableNgg : false;
-  (void(enableNgg)); // unused
-
-  const auto intfData1 = m_pipelineState->getShaderInterfaceData(shaderStage1);
-  const auto &entryArgIdxs1 = intfData1->entryArgIdxs;
-  (void(entryArgIdxs1)); // unused
-
-  const auto resUsage1 = m_pipelineState->getShaderResourceUsage(shaderStage1);
-  const auto &builtInUsage1 = resUsage1->builtInUsage;
-
-  const auto intfData2 =
-      shaderStage2 != ShaderStageInvalid ? m_pipelineState->getShaderInterfaceData(shaderStage2) : nullptr;
-
-  // Stage-specific processing
-  if (shaderStage1 == ShaderStageVertex) {
-    // TODO: PAL only check BaseVertex now, we need update code once PAL check them separately.
-    if (builtInUsage1.vs.baseVertex || builtInUsage1.vs.baseInstance) {
-      assert(entryArgIdxs1.vs.baseVertex > 0);
-      appendConfig(startUserData + intfData1->userDataUsage.vs.baseVertex,
-                   static_cast<unsigned>(Util::Abi::UserDataMapping::BaseVertex));
-
-      assert(entryArgIdxs1.vs.baseInstance > 0);
-      appendConfig(startUserData + intfData1->userDataUsage.vs.baseInstance,
-                   static_cast<unsigned>(Util::Abi::UserDataMapping::BaseInstance));
-    }
-
-    if (builtInUsage1.vs.drawIndex) {
-      assert(entryArgIdxs1.vs.drawIndex > 0);
-      appendConfig(startUserData + intfData1->userDataUsage.vs.drawIndex,
-                   static_cast<unsigned>(Util::Abi::UserDataMapping::DrawIndex));
-    }
-
-    if (intfData1->userDataUsage.vs.vbTablePtr > 0) {
-      assert(intfData1->userDataMap[intfData1->userDataUsage.vs.vbTablePtr] == InterfaceData::UserDataUnmapped);
-
-      appendConfig(startUserData + intfData1->userDataUsage.vs.vbTablePtr,
-                   static_cast<unsigned>(Util::Abi::UserDataMapping::VertexBufferTable));
-    }
-
-    if (enableXfb && intfData1->userDataUsage.vs.streamOutTablePtr > 0 && shaderStage2 == ShaderStageInvalid) {
-      assert(intfData1->userDataMap[intfData1->userDataUsage.vs.streamOutTablePtr] == InterfaceData::UserDataUnmapped);
-
-      appendConfig(startUserData + intfData1->userDataUsage.vs.streamOutTablePtr,
-                   static_cast<unsigned>(Util::Abi::UserDataMapping::StreamOutTable));
-    }
-
-    if (enableMultiView) {
-      if (shaderStage2 == ShaderStageInvalid || shaderStage2 == ShaderStageTessControl) {
-        // Act as hardware VS or LS-HS merged shader
-        assert(entryArgIdxs1.vs.viewIndex > 0);
-        appendConfig(startUserData + intfData1->userDataUsage.vs.viewIndex,
-                     static_cast<unsigned>(Util::Abi::UserDataMapping::ViewId));
-      } else if (shaderStage2 == ShaderStageGeometry) {
-        // Act as hardware ES-GS merged shader
-        const auto &entryArgIdxs2 = intfData2->entryArgIdxs;
-
-        assert(entryArgIdxs1.vs.viewIndex > 0 && entryArgIdxs2.gs.viewIndex > 0);
-        (void(entryArgIdxs2)); // unused
-        assert(intfData1->userDataUsage.vs.viewIndex == intfData2->userDataUsage.gs.viewIndex);
-        appendConfig(startUserData + intfData1->userDataUsage.vs.viewIndex,
-                     static_cast<unsigned>(Util::Abi::UserDataMapping::ViewId));
-      } else
-        llvm_unreachable("Should never be called!");
-    }
-
-    if (shaderStage2 == ShaderStageGeometry) {
-      if (intfData2->userDataUsage.gs.esGsLdsSize > 0) {
-        appendConfig(startUserData + intfData2->userDataUsage.gs.esGsLdsSize,
-                     static_cast<unsigned>(Util::Abi::UserDataMapping::EsGsLdsSize));
-      }
-    } else if (shaderStage2 == ShaderStageInvalid) {
-      if (intfData1->userDataUsage.vs.esGsLdsSize > 0) {
-        assert(enableNgg);
-        appendConfig(startUserData + intfData1->userDataUsage.vs.esGsLdsSize,
-                     static_cast<unsigned>(Util::Abi::UserDataMapping::EsGsLdsSize));
-      }
-    }
-  } else if (shaderStage1 == ShaderStageTessEval) {
-    if (enableXfb && intfData1->userDataUsage.tes.streamOutTablePtr > 0 && shaderStage2 == ShaderStageInvalid) {
-      assert(intfData1->userDataMap[intfData1->userDataUsage.tes.streamOutTablePtr] == InterfaceData::UserDataUnmapped);
-
-      appendConfig(startUserData + intfData1->userDataUsage.tes.streamOutTablePtr,
-                   static_cast<unsigned>(Util::Abi::UserDataMapping::StreamOutTable));
-    }
-
-    if (enableMultiView) {
-      if (shaderStage2 == ShaderStageInvalid) {
-        // Act as hardware VS
-        assert(entryArgIdxs1.tes.viewIndex > 0);
-        appendConfig(startUserData + intfData1->userDataUsage.tes.viewIndex,
-                     static_cast<unsigned>(Util::Abi::UserDataMapping::ViewId));
-      } else if (shaderStage2 == ShaderStageGeometry) {
-        // Act as hardware ES-GS merged shader
-        const auto &entryArgIdxs2 = intfData2->entryArgIdxs;
-
-        assert(entryArgIdxs1.tes.viewIndex > 0 && entryArgIdxs2.gs.viewIndex > 0);
-        (void(entryArgIdxs2)); // unused
-        assert(intfData1->userDataUsage.tes.viewIndex == intfData2->userDataUsage.gs.viewIndex);
-        appendConfig(startUserData + intfData1->userDataUsage.tes.viewIndex,
-                     static_cast<unsigned>(Util::Abi::UserDataMapping::ViewId));
-      }
-    }
-
-    if (intfData1->userDataUsage.tes.esGsLdsSize > 0) {
-      assert(enableNgg);
-      appendConfig(startUserData + intfData1->userDataUsage.tes.esGsLdsSize,
-                   static_cast<unsigned>(Util::Abi::UserDataMapping::EsGsLdsSize));
-    }
-  } else if (shaderStage1 == ShaderStageGeometry) {
-    assert(shaderStage2 == ShaderStageInvalid);
-
-    if (enableMultiView) {
-      assert(entryArgIdxs1.gs.viewIndex > 0);
-      appendConfig(startUserData + intfData1->userDataUsage.gs.viewIndex,
-                   static_cast<unsigned>(Util::Abi::UserDataMapping::ViewId));
-    }
-
-    if (intfData1->userDataUsage.gs.esGsLdsSize > 0) {
-      appendConfig(startUserData + intfData1->userDataUsage.gs.esGsLdsSize,
-                   static_cast<unsigned>(Util::Abi::UserDataMapping::EsGsLdsSize));
-    }
-  } else if (shaderStage1 == ShaderStageCompute) {
-    assert(shaderStage2 == ShaderStageInvalid);
-
-    if (builtInUsage1.cs.numWorkgroups > 0) {
-      appendConfig(startUserData + intfData1->userDataUsage.cs.numWorkgroupsPtr,
-                   static_cast<unsigned>(Util::Abi::UserDataMapping::Workgroup));
-    }
-  }
-
-  // NOTE: After user data nodes are merged together, any stage of merged shader are ought to have the same
-  // configuration for general user data (apart from those special). In this sense, we are safe to use the first
-  // shader stage to build user data register settings here.
-  appendConfig(startUserData, static_cast<unsigned>(Util::Abi::UserDataMapping::GlobalTable));
-
-  if (resUsage1->perShaderTable)
-    appendConfig(startUserData + 1, static_cast<unsigned>(Util::Abi::UserDataMapping::PerShaderTable));
-
-  // NOTE: For copy shader, we use fixed number of user data SGPRs. Thus, there is no need of building user data
-  // registers here.
-  if (shaderStage1 != ShaderStageCopyShader) {
-    unsigned userDataLimit = 0;
-    unsigned spillThreshold = UINT32_MAX;
-    unsigned maxUserDataCount = m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
-    for (unsigned i = 0; i < maxUserDataCount; ++i) {
-      if (intfData1->userDataMap[i] != InterfaceData::UserDataUnmapped) {
-        appendConfig(startUserData + i, intfData1->userDataMap[i]);
-        if ((intfData1->userDataMap[i] & DescRelocMagicMask) != DescRelocMagic)
-          userDataLimit = std::max(userDataLimit, intfData1->userDataMap[i] + 1);
-      }
-    }
-
-    if (intfData1->userDataUsage.spillTable > 0) {
-      appendConfig(startUserData + intfData1->userDataUsage.spillTable,
-                   static_cast<unsigned>(Util::Abi::UserDataMapping::SpillTable));
-      spillThreshold = intfData1->spillTable.offsetInDwords;
-    }
-
-    // If spill is in use, just say that all of the top-level resource node
-    // table is in use except the vertex buffer table and streamout table.
-    // Also do this if no user data nodes are used; PAL does not like userDataLimit being 0
-    // if there are any user data nodes.
-    if (intfData1->userDataUsage.spillTable > 0 || userDataLimit == 0) {
-      for (auto &node : m_pipelineState->getUserDataNodes()) {
-        if (node.type != ResourceNodeType::IndirectUserDataVaPtr && node.type != ResourceNodeType::StreamOutTableVaPtr)
-          userDataLimit = std::max(userDataLimit, node.offsetInDwords + node.sizeInDwords);
-      }
-    }
-
-    m_userDataLimit = std::max(m_userDataLimit, userDataLimit);
-    m_spillThreshold = std::min(m_spillThreshold, spillThreshold);
   }
 }
 
