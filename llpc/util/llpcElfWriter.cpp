@@ -42,7 +42,9 @@ using namespace Vkgc;
 
 namespace {
 
-static constexpr unsigned R_AMDGPU_ABS32 = 6;
+// R_AMDGPU_ABS32 is only used in asserts, so it is unused in release builds, which does not work well with -Werror.
+// Therefore, this is a define instead of a constexpr.
+#define R_AMDGPU_ABS32 6
 // Descriptor size
 static constexpr unsigned DescriptorSizeResource = 8 * sizeof(unsigned);
 static constexpr unsigned DescriptorSizeSampler = 4 * sizeof(unsigned);
