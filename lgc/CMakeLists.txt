@@ -177,7 +177,6 @@ target_sources(LLVMlgc PRIVATE
     builder/InOutBuilder.cpp
     builder/MatrixBuilder.cpp
     builder/MiscBuilder.cpp
-    builder/ResourceUsage.cpp
     builder/SubgroupBuilder.cpp
     builder/YCbCrAddressHandler.cpp
     builder/YCbCrConverter.cpp
@@ -220,6 +219,7 @@ target_sources(LLVMlgc PRIVATE
     state/LgcContext.cpp
     state/PipelineShaders.cpp
     state/PipelineState.cpp
+    state/ResourceUsage.cpp
     state/ShaderModes.cpp
     state/ShaderStage.cpp
     state/TargetInfo.cpp
