@@ -110,14 +110,22 @@ void PatchEntryPointMutate::processShader() {
 
   Function *origEntryPoint = m_entryPoint;
 
+  // Create new function, empty for now.
   Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, "", m_module);
   entryPoint->setCallingConv(origEntryPoint->getCallingConv());
-  entryPoint->addFnAttr(Attribute::NoUnwind);
   entryPoint->takeName(origEntryPoint);
 
-  ValueToValueMapTy valueMap;
-  SmallVector<ReturnInst *, 8> retInsts;
-  CloneFunctionInto(entryPoint, origEntryPoint, valueMap, false, retInsts);
+  // Transfer code from old function to new function.
+  while (!origEntryPoint->empty()) {
+    BasicBlock *block = &origEntryPoint->front();
+    block->removeFromParent();
+    block->insertInto(entryPoint);
+  }
+
+  // Copy attributes and shader stage from the old function.
+  entryPoint->setAttributes(origEntryPoint->getAttributes());
+  entryPoint->addFnAttr(Attribute::NoUnwind);
+  setShaderStage(entryPoint, getShaderStage(origEntryPoint));
 
   // Set Attributes on cloned function here as some are overwritten during CloneFunctionInto otherwise
   AttrBuilder builder;
