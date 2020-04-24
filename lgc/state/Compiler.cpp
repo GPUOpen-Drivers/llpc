@@ -145,31 +145,26 @@ void PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_
   Timer *codeGenTimer = timers.size() >= 3 ? timers[2] : nullptr;
 
   // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
-  //
-  // TODO: The "whole pipeline" passes are supposed to include code generation passes. However, there is a CTS issue.
-  // In the case "dEQP-VK.spirv_assembly.instruction.graphics.16bit_storage.struct_mixed_types.uniform_geom", GS gets
-  // unrolled to such a size that backend compilation takes too long. Thus, we put code generation in its own pass
-  // manager.
-  std::unique_ptr<PassManager> patchPassMgr(PassManager::Create());
-  patchPassMgr->setPassIndex(&passIndex);
-  patchPassMgr->add(createTargetTransformInfoWrapperPass(getLgcContext()->getTargetMachine()->getTargetIRAnalysis()));
+  std::unique_ptr<PassManager> passMgr(PassManager::Create());
+  passMgr->setPassIndex(&passIndex);
+  passMgr->add(createTargetTransformInfoWrapperPass(getLgcContext()->getTargetMachine()->getTargetIRAnalysis()));
 
   // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-  getLgcContext()->preparePassManager(&*patchPassMgr);
+  getLgcContext()->preparePassManager(&*passMgr);
 
   // Manually add a PipelineStateWrapper pass.
   // If we were not using BuilderRecorder, give our PipelineState to it. (In the BuilderRecorder case,
   // the first time PipelineStateWrapper is used, it allocates its own PipelineState and populates
   // it by reading IR metadata.)
   PipelineStateWrapper *pipelineStateWrapper = new PipelineStateWrapper(getLgcContext());
-  patchPassMgr->add(pipelineStateWrapper);
+  passMgr->add(pipelineStateWrapper);
   if (m_noReplayer)
     pipelineStateWrapper->setPipelineState(this);
 
   if (m_emitLgc) {
     // -emit-lgc: Just write the module.
-    patchPassMgr->add(createPrintModulePass(outStream));
-    patchPassMgr->stop();
+    passMgr->add(createPrintModulePass(outStream));
+    passMgr->stop();
   }
 
   // Get a BuilderReplayer pass if needed.
@@ -178,25 +173,14 @@ void PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_
     replayerPass = createBuilderReplayer(this);
 
   // Patching.
-  Patch::addPasses(this, *patchPassMgr, replayerPass, patchTimer, optTimer, checkShaderCacheFunc);
+  Patch::addPasses(this, *passMgr, replayerPass, patchTimer, optTimer, checkShaderCacheFunc);
 
   // Add pass to clear pipeline state from IR
-  patchPassMgr->add(createPipelineStateClearer());
-
-  // Run the "whole pipeline" passes, excluding the target backend. Stop here if the pass manager was stopped
-  // by -emit-lgc
-  patchPassMgr->run(*pipelineModule);
-  if (m_emitLgc)
-    return;
-  patchPassMgr.reset(nullptr);
-
-  // A separate "whole pipeline" pass manager for code generation.
-  std::unique_ptr<PassManager> codeGenPassMgr(PassManager::Create());
-  codeGenPassMgr->setPassIndex(&passIndex);
+  passMgr->add(createPipelineStateClearer());
 
   // Code generation.
-  getLgcContext()->addTargetPasses(*codeGenPassMgr, codeGenTimer, outStream);
+  getLgcContext()->addTargetPasses(*passMgr, codeGenTimer, outStream);
 
-  // Run the target backend codegen passes.
-  codeGenPassMgr->run(*pipelineModule);
+  // Run the "whole pipeline" passes.
+  passMgr->run(*pipelineModule);
 }
