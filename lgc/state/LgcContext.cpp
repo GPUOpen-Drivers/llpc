@@ -204,12 +204,6 @@ void LgcContext::preparePassManager(legacy::PassManager *passMgr) {
   targetLibInfo.setAvailable(LibFunc_memcpy);
   targetLibInfo.setAvailable(LibFunc_memset);
 
-  // Also disallow tan functions.
-  // TODO: This can be removed once we have LLVM fix D67406.
-  targetLibInfo.setUnavailable(LibFunc_tan);
-  targetLibInfo.setUnavailable(LibFunc_tanf);
-  targetLibInfo.setUnavailable(LibFunc_tanl);
-
   auto targetLibInfoPass = new TargetLibraryInfoWrapperPass(targetLibInfo);
   passMgr->add(targetLibInfoPass);
 }
