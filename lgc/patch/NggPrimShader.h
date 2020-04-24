@@ -147,6 +147,9 @@ private:
   llvm::Value *doDppUpdate(llvm::Value *oldValue, llvm::Value *srcValue, unsigned dppCtrl, unsigned rowMask,
                            unsigned bankMask, bool boundCtrl = false);
 
+  llvm::Value *fetchVertexPositionData(llvm::Value *vertexId);
+  llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertexId);
+
   // Checks if NGG culling operations are enabled
   bool enableCulling() const {
     return m_nggControl->enableBackfaceCulling || m_nggControl->enableFrustumCulling ||
@@ -155,8 +158,6 @@ private:
   }
 
   llvm::BasicBlock *createBlock(llvm::Function *parent, const llvm::Twine &blockName = "");
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   static const unsigned NullPrim = (1u << 31); // Null primitive data (invalid)
 

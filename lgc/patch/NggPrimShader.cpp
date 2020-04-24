@@ -2372,84 +2372,96 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
 Value *NggPrimShader::doCulling(Module *module) {
   Value *cullFlag = m_builder->getFalse();
 
-  // Skip culling if it is not requested
+  Value *primData = nullptr;
+  if (m_hasGs) {
+    // NOTE: GS could produce invalid primitives during the processing of GS_CUT. If the primitive is not a valid one,
+    // we initialize the cull flag to TRUE to skip later culling.
+    primData = readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData);
+    cullFlag = m_builder->CreateICmpEQ(primData, m_builder->getInt32(NullPrim));
+  }
+
+  // Skip following culling if it is not requested
   if (!enableCulling())
     return cullFlag;
 
-  auto esGsOffset0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                {
-                                                    m_nggFactor.esGsOffsets01,
-                                                    m_builder->getInt32(0),
-                                                    m_builder->getInt32(16),
-                                                });
-  auto vertexId0 = m_builder->CreateLShr(esGsOffset0, 2);
+  Value *vertexId0 = nullptr;
+  Value *vertexId1 = nullptr;
+  Value *vertexId2 = nullptr;
 
-  auto esGsOffset1 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                {
-                                                    m_nggFactor.esGsOffsets01,
-                                                    m_builder->getInt32(16),
-                                                    m_builder->getInt32(16),
-                                                });
-  auto vertexId1 = m_builder->CreateLShr(esGsOffset1, 2);
+  if (m_hasGs) {
+    assert(primData);
+    assert(m_pipelineState->getShaderModes()->getGeometryShaderMode().outputPrimitive ==
+           OutputPrimitives::TriangleStrip);
 
-  auto esGsOffset2 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                {
-                                                    m_nggFactor.esGsOffsets23,
-                                                    m_builder->getInt32(0),
-                                                    m_builder->getInt32(16),
-                                                });
-  auto vertexId2 = m_builder->CreateLShr(esGsOffset2, 2);
+    // Primitive data layout [31:0]
+    //   [31]    = null primitive flag
+    //   [28:20] = vertexId2 (in bytes)
+    //   [18:10] = vertexId1 (in bytes)
+    //   [8:0]   = vertexId0 (in bytes)
+    vertexId0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
+                                           {primData, m_builder->getInt32(0), m_builder->getInt32(9)});
 
-  Value *vertexId[3] = {vertexId0, vertexId1, vertexId2};
-  Value *vertex[3] = {};
+    vertexId1 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
+                                           {primData, m_builder->getInt32(10), m_builder->getInt32(9)});
 
-  const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionPosData);
-  assert(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
-  auto regionStartVal = m_builder->getInt32(regionStart);
+    vertexId2 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
+                                           {primData, m_builder->getInt32(20), m_builder->getInt32(9)});
+  } else {
+    vertexId0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
+                                           {
+                                               m_nggFactor.esGsOffsets01,
+                                               m_builder->getInt32(0),
+                                               m_builder->getInt32(16),
+                                           });
+    vertexId0 = m_builder->CreateLShr(vertexId0, 2);
 
-  for (unsigned i = 0; i < 3; ++i) {
-    Value *ldsOffset = m_builder->CreateMul(vertexId[i], m_builder->getInt32(SizeOfVec4));
-    ldsOffset = m_builder->CreateAdd(ldsOffset, regionStartVal);
+    vertexId1 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
+                                           {
+                                               m_nggFactor.esGsOffsets01,
+                                               m_builder->getInt32(16),
+                                               m_builder->getInt32(16),
+                                           });
+    vertexId1 = m_builder->CreateLShr(vertexId1, 2);
 
-    // Use 128-bit LDS load
-    vertex[i] = m_ldsManager->readValueFromLds(VectorType::get(Type::getFloatTy(*m_context), 4), ldsOffset, true);
+    vertexId2 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
+                                           {
+                                               m_nggFactor.esGsOffsets23,
+                                               m_builder->getInt32(0),
+                                               m_builder->getInt32(16),
+                                           });
+    vertexId2 = m_builder->CreateLShr(vertexId2, 2);
   }
+
+  Value *vertex0 = fetchVertexPositionData(vertexId0);
+  Value *vertex1 = fetchVertexPositionData(vertexId1);
+  Value *vertex2 = fetchVertexPositionData(vertexId2);
 
   // Handle backface culling
   if (m_nggControl->enableBackfaceCulling)
-    cullFlag = doBackfaceCulling(module, cullFlag, vertex[0], vertex[1], vertex[2]);
+    cullFlag = doBackfaceCulling(module, cullFlag, vertex0, vertex1, vertex2);
 
   // Handle frustum culling
   if (m_nggControl->enableFrustumCulling)
-    cullFlag = doFrustumCulling(module, cullFlag, vertex[0], vertex[1], vertex[2]);
+    cullFlag = doFrustumCulling(module, cullFlag, vertex0, vertex1, vertex2);
 
   // Handle box filter culling
   if (m_nggControl->enableBoxFilterCulling)
-    cullFlag = doBoxFilterCulling(module, cullFlag, vertex[0], vertex[1], vertex[2]);
+    cullFlag = doBoxFilterCulling(module, cullFlag, vertex0, vertex1, vertex2);
 
   // Handle sphere culling
   if (m_nggControl->enableSphereCulling)
-    cullFlag = doSphereCulling(module, cullFlag, vertex[0], vertex[1], vertex[2]);
+    cullFlag = doSphereCulling(module, cullFlag, vertex0, vertex1, vertex2);
 
   // Handle small primitive filter culling
   if (m_nggControl->enableSmallPrimFilter)
-    cullFlag = doSmallPrimFilterCulling(module, cullFlag, vertex[0], vertex[1], vertex[2]);
+    cullFlag = doSmallPrimFilterCulling(module, cullFlag, vertex0, vertex1, vertex2);
 
   // Handle cull distance culling
   if (m_nggControl->enableCullDistanceCulling) {
-    Value *signMask[3] = {};
-
-    const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionCullDistance);
-    auto regionStartVal = m_builder->getInt32(regionStart);
-
-    for (unsigned i = 0; i < 3; ++i) {
-      Value *ldsOffset = m_builder->CreateShl(vertexId[i], 2);
-      ldsOffset = m_builder->CreateAdd(ldsOffset, regionStartVal);
-
-      signMask[i] = m_ldsManager->readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
-    }
-
-    cullFlag = doCullDistanceCulling(module, cullFlag, signMask[0], signMask[1], signMask[2]);
+    Value *signMask0 = fetchCullDistanceSignMask(vertexId0);
+    Value *signMask1 = fetchCullDistanceSignMask(vertexId1);
+    Value *signMask2 = fetchCullDistanceSignMask(vertexId2);
+    cullFlag = doCullDistanceCulling(module, cullFlag, signMask0, signMask1, signMask2);
   }
 
   return cullFlag;
@@ -5996,6 +6008,70 @@ Value *NggPrimShader::doDppUpdate(Value *oldValue, Value *srcValue, unsigned dpp
   return m_builder->CreateIntrinsic(Intrinsic::amdgcn_update_dpp, m_builder->getInt32Ty(),
                                     {oldValue, srcValue, m_builder->getInt32(dppCtrl), m_builder->getInt32(rowMask),
                                      m_builder->getInt32(bankMask), m_builder->getInt1(boundCtrl)});
+}
+
+// =====================================================================================================================
+// Fetches the position data for the specified vertex ID.
+//
+// @param vertexId : Vertex thread ID in sub-group.
+Value *NggPrimShader::fetchVertexPositionData(Value *vertexId) {
+  if (!m_hasGs) {
+    // ES-only
+    return readPerThreadDataFromLds(VectorType::get(m_builder->getFloatTy(), 4), vertexId, LdsRegionPosData);
+  }
+
+  // ES-GS
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
+  assert(inOutUsage.builtInOutputLocMap.find(BuiltInPosition) != inOutUsage.builtInOutputLocMap.end());
+  const unsigned loc = inOutUsage.builtInOutputLocMap[BuiltInPosition];
+  const unsigned rasterStream = inOutUsage.gs.rasterStream;
+
+  const unsigned vertexItemSize = 4 * inOutUsage.gs.outLocCount[rasterStream];
+  auto vertexOffset = m_builder->CreateMul(vertexId, m_builder->getInt32(vertexItemSize));
+  vertexOffset = m_builder->CreateShl(vertexOffset, 2);
+
+  return importGsOutput(VectorType::get(m_builder->getFloatTy(), 4), loc, 0, rasterStream, vertexOffset);
+}
+
+// =====================================================================================================================
+// Fetches the aggregated sign mask of cull distances for the specified vertex ID.
+//
+// @param vertexId : Vertex thread ID in sub-group.
+Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexId) {
+  assert(m_nggControl->enableCullDistanceCulling);
+
+  if (!m_hasGs) {
+    // ES-only
+    return readPerThreadDataFromLds(m_builder->getInt32Ty(), vertexId, LdsRegionCullDistance);
+  }
+
+  // ES-GS
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
+  assert(inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInOutputLocMap.end());
+  const unsigned loc = inOutUsage.builtInOutputLocMap[BuiltInCullDistance];
+  const unsigned rasterStream = inOutUsage.gs.rasterStream;
+
+  const unsigned vertexItemSize = 4 * inOutUsage.gs.outLocCount[rasterStream];
+  auto vertexOffset = m_builder->CreateMul(vertexId, m_builder->getInt32(vertexItemSize));
+  vertexOffset = m_builder->CreateShl(vertexOffset, 2);
+
+  auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
+  auto cullDistances = importGsOutput(ArrayType::get(m_builder->getFloatTy(), builtInUsage.cullDistance), loc, 0,
+                                      rasterStream, vertexOffset);
+
+  // Calculate the sign mask for all cull distances
+  Value *signMask = m_builder->getInt32(0);
+  for (unsigned i = 0; i < builtInUsage.cullDistance; ++i) {
+    auto cullDistance = m_builder->CreateExtractValue(cullDistances, i);
+    cullDistance = m_builder->CreateBitCast(cullDistance, m_builder->getInt32Ty());
+
+    Value *signBit = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
+                                                {cullDistance, m_builder->getInt32(31), m_builder->getInt32(1)});
+    signBit = m_builder->CreateShl(signBit, i);
+    signMask = m_builder->CreateOr(signMask, signBit);
+  }
+
+  return signMask;
 }
 
 // =====================================================================================================================
