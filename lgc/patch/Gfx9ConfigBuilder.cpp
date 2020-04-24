@@ -1032,9 +1032,6 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
     SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, VTE_VPORT_PROVOKE_DISABLE, false);
   }
 
-  if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waTessIncorrectRelativeIndex)
-    disableVertexReuse = true;
-
   SET_REG_FIELD(&pConfig->vsRegs, VGT_REUSE_OFF, REUSE_OFF, disableVertexReuse);
 
   useLayer = useLayer || m_pipelineState->getInputAssemblyState().enableMultiView;
