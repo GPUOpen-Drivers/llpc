@@ -218,7 +218,7 @@ Value *PatchDescriptorLoad::getDescPtrAndStride(ResourceNodeType resType, unsign
         stride = builder.getInt32(DescriptorSizeResource + DescriptorSizeSampler);
         break;
       case ResourceNodeType::DescriptorYCbCrSampler:
-        stride = builder.getInt32(DescriptorSizeSamplerYCbCr);
+        stride = builder.getInt32(0);
         break;
       default:
         llvm_unreachable("Unexpected resource node type");
@@ -243,7 +243,9 @@ Value *PatchDescriptorLoad::getDescPtrAndStride(ResourceNodeType resType, unsign
 
     // We need to change the stride to 4 dwords. It would otherwise be incorrectly set to 12 dwords
     // for a sampler in a combined texture.
-    stride = builder.getInt32(DescriptorSizeSampler);
+    stride = builder.getInt32(node->type == ResourceNodeType::DescriptorYCbCrSampler ? DescriptorSizeSamplerYCbCr
+                                                                                     : DescriptorSizeSampler);
+
   } else {
     // Get a pointer to the descriptor.
     descPtr = getDescPtr(resType, descSet, binding, topNode, node, shadow, builder);
@@ -325,7 +327,8 @@ Value *PatchDescriptorLoad::getDescPtr(ResourceNodeType resType, unsigned descSe
     // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
     // add on the size of the first part.
     unsigned offsetInBytes = node->offsetInDwords * 4;
-    if (resType == ResourceNodeType::DescriptorSampler && node->type == ResourceNodeType::DescriptorCombinedTexture)
+    if (resType == ResourceNodeType::DescriptorSampler && (node->type == ResourceNodeType::DescriptorCombinedTexture ||
+                                                           node->type == ResourceNodeType::DescriptorYCbCrSampler))
       offsetInBytes += DescriptorSizeResource;
     offset = builder.getInt32(offsetInBytes);
     descPtr = builder.CreateBitCast(descPtr, builder.getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
