@@ -161,27 +161,19 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
         if (shaderMode.fp16DenormMode == FpDenormMode::FlushNone ||
             shaderMode.fp16DenormMode == FpDenormMode::FlushIn ||
             shaderMode.fp64DenormMode == FpDenormMode::FlushNone || shaderMode.fp64DenormMode == FpDenormMode::FlushIn) {
-          // TODO: Remove targetFeatures modifications after D71358
-          targetFeatures += ",+fp64-fp16-denormals";
           builder.addAttribute("denormal-fp-math", "ieee");
         }
         else if (shaderMode.fp16DenormMode == FpDenormMode::FlushOut ||
                  shaderMode.fp16DenormMode == FpDenormMode::FlushInOut ||
                  shaderMode.fp64DenormMode == FpDenormMode::FlushOut ||
                  shaderMode.fp64DenormMode == FpDenormMode::FlushInOut) {
-          // TODO: Remove targetFeatures modifications after D71358
-          targetFeatures += ",-fp64-fp16-denormals";
           builder.addAttribute("denormal-fp-math", "preserve-sign");
         }
         if (shaderMode.fp32DenormMode == FpDenormMode::FlushNone || shaderMode.fp32DenormMode == FpDenormMode::FlushIn) {
-          // TODO: Remove targetFeatures modifications after D71358
-          targetFeatures += ",+fp32-denormals";
           builder.addAttribute("denormal-fp-math-f32", "ieee");
         }
         else if (shaderMode.fp32DenormMode == FpDenormMode::FlushOut ||
                  shaderMode.fp32DenormMode == FpDenormMode::FlushInOut) {
-          // TODO: Remove targetFeatures modifications after D71358
-          targetFeatures += ",-fp32-denormals";
           builder.addAttribute("denormal-fp-math-f32", "preserve-sign");
         }
       }
