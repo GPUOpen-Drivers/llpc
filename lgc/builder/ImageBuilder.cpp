@@ -705,7 +705,15 @@ Value *ImageBuilder::CreateImageSample(Type *resultTy, unsigned dim, unsigned fl
           Value *descPtr = loadFromPtr->getOperand(0);
           if (auto descPtrCall = dyn_cast<CallInst>(descPtr)) {
             if (Function *descPtrCallFunc = descPtrCall->getCalledFunction()) {
-              if (descPtrCallFunc->getName().startswith(lgcName::DescriptorGetSamplerPtr)) {
+              if (descPtrCallFunc->getName().startswith(lgcName::DescriptorGetSamplerPtr) ||
+                  descPtrCallFunc->getName().startswith(lgcName::DescriptorIndex)) {
+                // Set index to 0 by default for non-array sampler.
+                unsigned index = 0;
+                // If encounter sampler array, we need to parse the index first.
+                if (descPtrCallFunc->getName().startswith(lgcName::DescriptorIndex)) {
+                  index = cast<ConstantInt>(descPtrCall->getArgOperand(1))->getZExtValue();
+                  descPtrCall = dyn_cast<CallInst>(descPtrCall->getOperand(0));
+                }
                 // We have found the call that tells us the descriptor set and binding.
                 unsigned descSet = cast<ConstantInt>(descPtrCall->getArgOperand(0))->getZExtValue();
                 unsigned binding = cast<ConstantInt>(descPtrCall->getArgOperand(1))->getZExtValue();
@@ -713,9 +721,10 @@ Value *ImageBuilder::CreateImageSample(Type *resultTy, unsigned dim, unsigned fl
                     m_pipelineState->findResourceNode(ResourceNodeType::DescriptorYCbCrSampler, descSet, binding)
                         .second;
                 if (node) {
+                  Value *convertingSamplerDesc = CreateExtractValue(node->immutableValue, index);
                   // It is a YCbCr converting sampler. Get the immutable converter and call the
                   // appropriate function for a converting image sample.
-                  return CreateImageSampleConvert(resultTy, dim, flags, imageDesc, node->immutableValue, address,
+                  return CreateImageSampleConvert(resultTy, dim, flags, imageDesc, convertingSamplerDesc, address,
                                                   instName);
                 }
               }
@@ -763,12 +772,11 @@ Value *ImageBuilder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsi
 Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
                                                    Value *convertingSamplerDesc, ArrayRef<Value *> address,
                                                    const Twine &instName) {
-  Value *pResult = nullptr;
-  Value *ycbcrSamplerDesc = CreateExtractValue(convertingSamplerDesc, 0);
+  Value *result = nullptr;
 
   // Helper function to extract YCbCr meta data from ycbcrSamplerDesc
-  auto getYCbCrMetaElement = [this, &ycbcrSamplerDesc](unsigned idx) -> unsigned {
-    return cast<ConstantInt>(CreateExtractElement(ycbcrSamplerDesc, idx))->getZExtValue();
+  auto getYCbCrMetaElement = [this, &convertingSamplerDesc](unsigned idx) -> unsigned {
+    return cast<ConstantInt>(CreateExtractElement(convertingSamplerDesc, idx))->getZExtValue();
   };
 
   // Extract YCbCr meta data, which is the last 4 DWORDs of convertingSamplerDesc
@@ -794,7 +802,8 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
 
   // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
   // Init sample descriptor for luma channel
-  Value *samplerDescLuma = CreateShuffleVector(ycbcrSamplerDesc, ycbcrSamplerDesc, ArrayRef<int>{0, 1, 2, 3});
+  Value *samplerDescLuma =
+      CreateShuffleVector(convertingSamplerDesc, convertingSamplerDesc, ArrayRef<unsigned>{0, 1, 2, 3});
 
   YCbCrSampleInfo sampleInfoLuma = {resultTy, dim, flags, imageDesc, samplerDescLuma, address, instName.str(), true};
 
@@ -807,9 +816,9 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
   // Sample image source data
   YCbCrConverter.sampleYCbCrData();
   // Convert from YCbCr to RGB
-  pResult = YCbCrConverter.convertColorSpace();
+  result = YCbCrConverter.convertColorSpace();
 
-  return static_cast<Instruction *>(pResult);
+  return static_cast<Instruction *>(result);
 }
 
 // =====================================================================================================================
