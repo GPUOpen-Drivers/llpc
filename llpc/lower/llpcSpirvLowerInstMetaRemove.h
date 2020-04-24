@@ -31,18 +31,16 @@
 #pragma once
 
 #include "llpcSpirvLower.h"
-#include "llvm/IR/InstVisitor.h"
 
 namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for removing the instruction metadata.
-class SpirvLowerInstMetaRemove : public SpirvLower, public llvm::InstVisitor<SpirvLowerInstMetaRemove> {
+class SpirvLowerInstMetaRemove : public SpirvLower {
 public:
   SpirvLowerInstMetaRemove();
 
   virtual bool runOnModule(llvm::Module &module);
-  virtual void visitCallInst(llvm::CallInst &callInst);
 
   // -----------------------------------------------------------------------------------------------------------------
 

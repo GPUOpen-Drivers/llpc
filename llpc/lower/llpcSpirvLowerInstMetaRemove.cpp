@@ -66,7 +66,23 @@ bool SpirvLowerInstMetaRemove::runOnModule(Module &module) {
   SpirvLower::init(&module);
   m_changed = false;
 
-  visit(m_module);
+  // Remove calls to functions whose names start with "spirv.NonUniform".
+  SmallVector<CallInst *, 8> callsToRemove;
+  for (auto &func : *m_module) {
+    if (func.getName().startswith(gSPIRVName::NonUniform)) {
+      for (auto &use : func.uses()) {
+        if (auto *callInst = dyn_cast<CallInst>(use.getUser())) {
+          if (callInst->isCallee(&use))
+            callsToRemove.push_back(callInst);
+        }
+      }
+    }
+  }
+  for (auto *callInst : callsToRemove) {
+    callInst->dropAllReferences();
+    callInst->eraseFromParent();
+    m_changed = true;
+  }
 
   // Remove any named metadata in the module that starts "spirv.".
   SmallVector<NamedMDNode *, 8> nodesToRemove;
@@ -80,23 +96,6 @@ bool SpirvLowerInstMetaRemove::runOnModule(Module &module) {
   }
 
   return m_changed;
-}
-
-// =====================================================================================================================
-// Visits "call" instruction.
-//
-// @param callInst : "Call" instruction
-void SpirvLowerInstMetaRemove::visitCallInst(CallInst &callInst) {
-  auto callee = callInst.getCalledFunction();
-  if (!callee)
-    return;
-
-  auto mangledName = callee->getName();
-  if (mangledName.startswith(gSPIRVName::NonUniform)) {
-    callInst.dropAllReferences();
-    callInst.eraseFromParent();
-    m_changed = true;
-  }
 }
 
 } // namespace Llpc
