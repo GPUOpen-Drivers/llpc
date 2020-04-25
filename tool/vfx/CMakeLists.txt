@@ -35,6 +35,10 @@ if(LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
     target_compile_definitions(vfx PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
 endif()
 
+if(LLPC_ENABLE_SHADER_CACHE)
+    target_compile_definitions(vfx PRIVATE LLPC_ENABLE_SHADER_CACHE=1)
+endif()
+
 target_sources(vfx PRIVATE
     vfxParser.cpp
     vfxPipelineDoc.cpp

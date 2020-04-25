@@ -114,8 +114,11 @@ opt<int> RelocatableShaderElfLimit("relocatable-shader-elf-limit",
 // 0 - Disable
 // 1 - Runtime cache
 // 2 - Cache to disk
+// 3 - Use internal on-disk cache in read/write mode.
+// 4 - Use internal on-disk cache in read-only mode.
 static opt<unsigned> ShaderCacheMode("shader-cache-mode",
-                                     desc("Shader cache mode, 0 - disable, 1 - runtime cache, 2 - cache to disk "),
+                                     desc("Shader cache mode, 0 - disable, 1 - runtime cache, 2 - cache to disk, 3 - "
+                                          "load on-disk cache for read/write, 4 - load on-disk cache for read only"),
                                      init(0));
 
 // -executable-name: executable file name
@@ -739,14 +742,14 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     if (context->isGraphics()) {
       auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
       cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true, stage);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-      userShaderCache = pipelineInfo->pShaderCache;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
+      userShaderCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
     } else {
       auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
       cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true, true);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-      userShaderCache = pipelineInfo->pShaderCache;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
+      userShaderCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
     }
 
@@ -1112,9 +1115,9 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, unsigned stageM
   Compiler::buildShaderCacheHash(m_context, stageMask, stageHashes, &fragmentHash, &nonFragmentHash);
 
   IShaderCache *appCache = nullptr;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-  auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
-  appCache = pPipelineInfo->pShaderCache;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
+  auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  appCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
   if (stageMask & shaderStageToMask(ShaderStageFragment)) {
     m_fragmentCacheEntryState = m_compiler->lookUpShaderCaches(appCache, &fragmentHash, &m_fragmentElf,
@@ -1309,8 +1312,8 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 
   ShaderEntryState cacheEntryState = ShaderEntryState::New;
   IShaderCache *appCache = nullptr;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-  appCache = pipelineInfo->pShaderCache;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
+  appCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
   ShaderCache *shaderCache = nullptr;
   CacheEntryHandle hEntry = nullptr;
@@ -1425,8 +1428,8 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
 
   ShaderEntryState cacheEntryState = ShaderEntryState::New;
   IShaderCache *appCache = nullptr;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-  appCache = pipelineInfo->pShaderCache;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
+  appCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
   ShaderCache *shaderCache = nullptr;
   CacheEntryHandle hEntry = nullptr;
@@ -1550,12 +1553,13 @@ Result Compiler::validatePipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   return result;
 }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
 // =====================================================================================================================
 // Creates shader cache object with the requested properties.
-Result Compiler::CreateShaderCache(const ShaderCacheCreateInfo *pCreateInfo, // [in] Shader cache create info
-                                   IShaderCache **ppShaderCache)             // [out] Shader cache object
-{
+// @param : Shader cache create info.
+// @param [out] : Shader cache object
+// @returns : Result::Success if creation succeeedds, error status otherwise.
+Result Compiler::CreateShaderCache(const ShaderCacheCreateInfo *pCreateInfo, IShaderCache **ppShaderCache) {
   Result result = Result::Success;
 
   ShaderCacheAuxCreateInfo auxCreateInfo = {};
@@ -1563,19 +1567,20 @@ Result Compiler::CreateShaderCache(const ShaderCacheCreateInfo *pCreateInfo, // 
   auxCreateInfo.gfxIp = m_gfxIp;
   auxCreateInfo.hash = m_optionHash;
 
-  ShaderCache *pShaderCache = new ShaderCache();
+  ShaderCache *shaderCache = new ShaderCache();
 
-  if (pShaderCache != nullptr) {
-    result = pShaderCache->init(pCreateInfo, &auxCreateInfo);
+  if (shaderCache) {
+    result = shaderCache->init(pCreateInfo, &auxCreateInfo);
     if (result != Result::Success) {
-      pShaderCache->Destroy();
-      pShaderCache = nullptr;
+      shaderCache->Destroy();
+      delete shaderCache;
+      shaderCache = nullptr;
     }
   } else {
     result = Result::ErrorOutOfMemory;
   }
 
-  *ppShaderCache = pShaderCache;
+  *ppShaderCache = shaderCache;
 
   if ((result == Result::Success) &&
       ((cl::ShaderCacheMode == ShaderCacheEnableRuntime) || (cl::ShaderCacheMode == ShaderCacheEnableOnDisk)) &&
