@@ -50,6 +50,13 @@ config.test_source_root = os.path.dirname(__file__)
 # test_exec_root: The root path where tests should be run.
 config.test_exec_root = os.path.join(config.test_run_dir, 'test_output')
 
+# Propagate options for lit feature tests. These can be used in XFAIL, REQUIRES, and UNSUPPORTED.
+if config.llvm_assertions == 'ON' or config.llvm_assertions == '1':
+    config.available_features.add('assertions')
+
+if config.llpc_enable_shader_cache == 'ON' or config.llpc_enable_shader_cache == '1':
+    config.available_features.add('llpc-shader-cache')
+
 llvm_config.use_default_substitutions()
 
 config.substitutions.append(('%PATH%', config.environment['PATH']))

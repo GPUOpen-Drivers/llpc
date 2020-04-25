@@ -548,28 +548,33 @@ void PipelineDumper::DumpSpirvBinary(const char *dumpDir, const BinaryData *spir
 // @param gfxIp : Graphics IP version info
 // @param pipelineBin : Pipeline binary (ELF)
 void PipelineDumper::DumpPipelineBinary(PipelineDumpFile *dumpFile, GfxIpVersion gfxIp, const BinaryData *pipelineBin) {
-  if (dumpFile) {
-    ElfReader<Elf64> reader(gfxIp);
-    size_t codeSize = pipelineBin->codeSize;
-    auto result = reader.ReadFromBuffer(pipelineBin->pCode, &codeSize);
-    assert(result == Result::Success);
-    (void(result)); // unused
+  if (!dumpFile)
+    return;
 
-    dumpFile->dumpFile << "\n[CompileLog]\n";
-    dumpFile->dumpFile << reader;
+  if (!pipelineBin->pCode || pipelineBin->codeSize == 0)
+    return;
 
-    std::string binaryFileName = dumpFile->binaryFileName;
-    if (dumpFile->binaryIndex > 0) {
-      char suffixBuffer[32] = {};
-      snprintf(suffixBuffer, sizeof(suffixBuffer), ".%u", dumpFile->binaryIndex);
-      binaryFileName += suffixBuffer;
-    }
-    dumpFile->binaryIndex++;
-    dumpFile->binaryFile.open(binaryFileName.c_str(), std::ostream::out | std::ostream::binary);
-    if (!dumpFile->binaryFile.bad()) {
-      dumpFile->binaryFile.write(reinterpret_cast<const char *>(pipelineBin->pCode), pipelineBin->codeSize);
-      dumpFile->binaryFile.close();
-    }
+  ElfReader<Elf64> reader(gfxIp);
+  size_t codeSize = pipelineBin->codeSize;
+  auto result = reader.ReadFromBuffer(pipelineBin->pCode, &codeSize);
+  assert(result == Result::Success);
+  (void(result)); // unused
+
+  dumpFile->dumpFile << "\n[CompileLog]\n";
+  dumpFile->dumpFile << reader;
+
+  std::string binaryFileName = dumpFile->binaryFileName;
+  if (dumpFile->binaryIndex > 0) {
+    char suffixBuffer[32] = {};
+    snprintf(suffixBuffer, sizeof(suffixBuffer), ".%u", dumpFile->binaryIndex);
+    binaryFileName += suffixBuffer;
+  }
+
+  dumpFile->binaryIndex++;
+  dumpFile->binaryFile.open(binaryFileName.c_str(), std::ostream::out | std::ostream::binary);
+  if (!dumpFile->binaryFile.bad()) {
+    dumpFile->binaryFile.write(reinterpret_cast<const char *>(pipelineBin->pCode), pipelineBin->codeSize);
+    dumpFile->binaryFile.close();
   }
 }
 
