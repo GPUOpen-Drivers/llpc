@@ -226,7 +226,7 @@ public:
   virtual Result BuildComputePipeline(const ComputePipelineBuildInfo *pPipelineInfo,
                                       ComputePipelineBuildOut *pPipelineOut, void *pPipelineDumpFile = nullptr) = 0;
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
   /// Creates a shader cache object with the requested properties.
   ///
   /// @param [in]  pCreateInfo    Create info of the shader cache.

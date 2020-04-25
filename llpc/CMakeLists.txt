@@ -196,6 +196,11 @@ if(ICD_BUILD_LLPC)
     target_compile_definitions(llpc PRIVATE ICD_BUILD_LLPC)
 endif()
 
+option(LLPC_ENABLE_SHADER_CACHE "Enable experimental shader cache" OFF)
+if(LLPC_ENABLE_SHADER_CACHE)
+    target_compile_definitions(llpc PRIVATE LLPC_ENABLE_SHADER_CACHE=1)
+endif()
+
 if(ICD_BUILD_LLPC)
     if(XGL_LLVM_UPSTREAM)
         target_compile_definitions(llpc PRIVATE XGL_LLVM_UPSTREAM)
@@ -349,6 +354,10 @@ if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
 endif()
 
 target_compile_definitions(amdllpc PRIVATE ICD_BUILD_LLPC)
+
+if(LLPC_ENABLE_SHADER_CACHE)
+    target_compile_definitions(amdllpc PRIVATE LLPC_ENABLE_SHADER_CACHE=1)
+endif()
 
 target_include_directories(amdllpc
 PUBLIC

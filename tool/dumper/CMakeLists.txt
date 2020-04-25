@@ -143,6 +143,10 @@ else()
     target_compile_definitions(dumper PUBLIC SINGLE_EXTERNAL_METROHASH)
 endif()
 
+if(LLPC_ENABLE_SHADER_CACHE)
+    target_compile_definitions(dumper PRIVATE LLPC_ENABLE_SHADER_CACHE=1)
+endif()
+
 target_link_libraries(dumper PRIVATE cwpack)
 
 target_include_directories(dumper
