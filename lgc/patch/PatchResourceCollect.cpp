@@ -2710,7 +2710,7 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
     std::string callName(lgcName::OutputExportGeneric);
     addTypeMangling(builder.getVoidTy(), args, callName);
 
-    builder.createNamedCall(callName, builder.getVoidTy(), args, {});
+    builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
 
     outputLocMap[consectiveLocation] = InvalidValue;
     ++consectiveLocation;
@@ -2789,7 +2789,7 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
     for (unsigned i = 0; i != 2; ++i) {
       args[elemIdxArgIdx] = builder.getInt32(elemIdx * 2 + i);
       result = builder.CreateInsertElement(
-          result, builder.createNamedCall(callName, builder.getInt32Ty(), args, Attribute::ReadOnly), i);
+          result, builder.CreateNamedCall(callName, builder.getInt32Ty(), args, Attribute::ReadOnly), i);
     }
     result = builder.CreateBitCast(result, call->getType());
     call->replaceAllUsesWith(result);
@@ -2847,7 +2847,7 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
       continue; // Omit trivially unused element
     args[elemIdxArgIdx] = builder.getInt32(elemIdx + i);
 
-    CallInst *element = builder.createNamedCall(callName, elementTy, args, Attribute::ReadOnly);
+    CallInst *element = builder.CreateNamedCall(callName, elementTy, args, Attribute::ReadOnly);
     result = builder.CreateInsertElement(result, element, i);
     if (elementTy->getPrimitiveSizeInBits() == 64) {
       // If scalarizing with 64 bit elements, further split each element.
@@ -2905,7 +2905,7 @@ void PatchResourceCollect::scalarizeGenericOutput(CallInst *call) {
       callName = lgcName::OutputExportGeneric;
       addTypeMangling(nullptr, args, callName);
     }
-    builder.createNamedCall(callName, builder.getVoidTy(), args, {});
+    builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
   }
 
   call->eraseFromParent();

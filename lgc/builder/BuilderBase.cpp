@@ -42,8 +42,9 @@ using namespace llvm;
 // @param retTy : Return type of the callee
 // @param args : Arguments to pass to the callee
 // @param attribs : Function attributes
-CallInst *BuilderBase::createNamedCall(StringRef funcName, Type *retTy, ArrayRef<Value *> args,
-                                       ArrayRef<Attribute::AttrKind> attribs) {
+// @param instName : Name to give instruction
+CallInst *BuilderBase::CreateNamedCall(StringRef funcName, Type *retTy, ArrayRef<Value *> args,
+                                       ArrayRef<Attribute::AttrKind> attribs, const Twine &instName) {
   Module *module = GetInsertBlock()->getParent()->getParent();
   Function *func = dyn_cast_or_null<Function>(module->getFunction(funcName));
   if (!func) {
@@ -62,7 +63,7 @@ CallInst *BuilderBase::createNamedCall(StringRef funcName, Type *retTy, ArrayRef
       func->addFnAttr(attrib);
   }
 
-  auto call = CreateCall(func, args);
+  auto call = CreateCall(func, args, instName);
   call->setCallingConv(CallingConv::C);
   call->setAttributes(func->getAttributes());
 

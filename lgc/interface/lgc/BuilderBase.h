@@ -53,8 +53,9 @@ public:
   // @param retTy : Return type of the callee
   // @param args : Arguments to pass to the callee
   // @param attribs : Function attributes
-  llvm::CallInst *createNamedCall(llvm::StringRef funcName, llvm::Type *retTy, llvm::ArrayRef<llvm::Value *> args,
-                                  llvm::ArrayRef<llvm::Attribute::AttrKind> attribs);
+  // @param instName : Name to give instruction
+  llvm::CallInst *CreateNamedCall(llvm::StringRef funcName, llvm::Type *retTy, llvm::ArrayRef<llvm::Value *> args,
+                                  llvm::ArrayRef<llvm::Attribute::AttrKind> attribs, const llvm::Twine &instName = "");
 
   // Emits a amdgcn.reloc.constant intrinsic that represents an i32 relocatable value with the given symbol name
   //

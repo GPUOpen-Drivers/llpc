@@ -451,7 +451,7 @@ Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, u
     // real instructions when when NGG primitive shader is generated.
     std::string callName(lgcName::NggGsOutputImport);
     callName += getTypeName(loadTy);
-    return builder.createNamedCall(callName, loadTy,
+    return builder.CreateNamedCall(callName, loadTy,
                                    {builder.getInt32(location), builder.getInt32(0), builder.getInt32(streamId)}, {});
   }
 
@@ -576,7 +576,7 @@ void PatchCopyShader::exportGenericOutput(Value *outputValue, unsigned location,
 
       std::string instName(lgcName::OutputExportXfb);
       addTypeMangling(nullptr, args, instName);
-      builder.createNamedCall(instName, builder.getVoidTy(), args, {});
+      builder.CreateNamedCall(instName, builder.getVoidTy(), args, {});
     }
   }
 
@@ -587,7 +587,7 @@ void PatchCopyShader::exportGenericOutput(Value *outputValue, unsigned location,
     std::string instName(lgcName::OutputExportGeneric);
     instName += getTypeName(outputTy);
 
-    builder.createNamedCall(instName, builder.getVoidTy(), {builder.getInt32(location), outputValue}, {});
+    builder.CreateNamedCall(instName, builder.getVoidTy(), {builder.getInt32(location), outputValue}, {});
   }
 }
 
@@ -617,7 +617,7 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
       Value *args[] = {builder.getInt32(xfbOutInfo->xfbBuffer), builder.getInt32(xfbOutInfo->xfbOffset),
                        builder.getInt32(0), outputValue};
       addTypeMangling(nullptr, args, instName);
-      builder.createNamedCall(instName, builder.getVoidTy(), args, {});
+      builder.CreateNamedCall(instName, builder.getVoidTy(), args, {});
     }
   }
 
@@ -626,7 +626,7 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
     callName += PipelineState::getBuiltInName(builtInId);
     Value *args[] = {builder.getInt32(builtInId), outputValue};
     addTypeMangling(nullptr, args, callName);
-    builder.createNamedCall(callName, builder.getVoidTy(), args, {});
+    builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
   }
 }
 

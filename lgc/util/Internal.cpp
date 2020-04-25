@@ -62,7 +62,7 @@ namespace lgc {
 CallInst *emitCall(StringRef funcName, Type *retTy, ArrayRef<Value *> args, ArrayRef<Attribute::AttrKind> attribs,
                    Instruction *insertPos) {
   BuilderBase builder(insertPos);
-  return builder.createNamedCall(funcName, retTy, args, attribs);
+  return builder.CreateNamedCall(funcName, retTy, args, attribs);
 }
 
 // =====================================================================================================================
@@ -79,7 +79,7 @@ CallInst *emitCall(StringRef funcName, Type *retTy, ArrayRef<Value *> args, Arra
 CallInst *emitCall(StringRef funcName, Type *retTy, ArrayRef<Value *> args, ArrayRef<Attribute::AttrKind> attribs,
                    BasicBlock *insertAtEnd) {
   BuilderBase builder(insertAtEnd);
-  return builder.createNamedCall(funcName, retTy, args, attribs);
+  return builder.CreateNamedCall(funcName, retTy, args, attribs);
 }
 
 // =====================================================================================================================
