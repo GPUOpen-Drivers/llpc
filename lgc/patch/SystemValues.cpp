@@ -633,7 +633,7 @@ Instruction *ShaderSystemValues::loadDescFromDriverTable(unsigned tableOffset, B
       builder.getInt32(tableOffset),
       builder.getInt32(0),
   };
-  return builder.createNamedCall(lgcName::DescriptorLoadBuffer, VectorType::get(Type::getInt32Ty(*m_context), 4), args,
+  return builder.CreateNamedCall(lgcName::DescriptorLoadBuffer, VectorType::get(Type::getInt32Ty(*m_context), 4), args,
                                  {});
 }
 

@@ -114,7 +114,7 @@ Value *DescBuilder::CreateLoadDescFromPtr(Value *descPtr, const Twine &instName)
   // Use llpc.descriptor.load.from.ptr.
   std::string name = lgcName::DescriptorLoadFromPtr;
   addTypeMangling(descPtr->getType(), {}, name);
-  auto desc = createNamedCall(name, cast<StructType>(descPtr->getType())->getElementType(0)->getPointerElementType(),
+  auto desc = CreateNamedCall(name, cast<StructType>(descPtr->getType())->getElementType(0)->getPointerElementType(),
                               descPtr, {});
   desc->setName(instName);
   return desc;
@@ -215,7 +215,7 @@ Value *DescBuilder::CreateLoadPushConstantsPtr(Type *pushConstantsTy, const Twin
   // generate the code directly.
   std::string callName = lgcName::DescriptorLoadSpillTable;
   addTypeMangling(pushConstantsPtrTy, {}, callName);
-  auto pushConstantsLoadCall = createNamedCall(callName, pushConstantsPtrTy, {}, {});
+  auto pushConstantsLoadCall = CreateNamedCall(callName, pushConstantsPtrTy, {}, {});
   pushConstantsLoadCall->setName(instName);
   return pushConstantsLoadCall;
 }
