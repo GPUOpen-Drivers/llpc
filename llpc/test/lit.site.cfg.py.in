@@ -12,6 +12,10 @@ config.python_executable = "@PYTHON_EXECUTABLE@"
 config.test_run_dir = "@CMAKE_CURRENT_BINARY_DIR@"
 config.gfxip = "@AMDLLPC_DEFAULT_TARGET@"
 
+# Propagate CMake options used in lit feature tests.
+config.llvm_assertions = "@LLVM_ENABLE_ASSERTIONS@"
+config.llpc_enable_shader_cache = "@LLPC_ENABLE_SHADER_CACHE@"
+
 # Support substitution of the tools and libs dirs with user parameters. This is
 # used when we can't determine the tool dir at configuration time.
 try:

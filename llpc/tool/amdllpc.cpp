@@ -246,6 +246,7 @@ namespace cl {
 extern opt<bool> EnablePipelineDump;
 extern opt<std::string> PipelineDumpDir;
 extern opt<bool> EnableTimerProfile;
+extern opt<bool> BuildShaderCache;
 
 // -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
 static opt<unsigned> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
@@ -1546,9 +1547,35 @@ int main(int argc, char *argv[]) {
   if (isFailure())
     return onFailure();
 
-  // The first input file is a pipeline file or LLVM IR file. Assume they all are, and compile each one
-  // separately but in the same context.
-  if (isPipelineInfoFile(expandedInputFiles[0]) || isLlvmIrFile(expandedInputFiles[0])) {
+  if (llvm::cl::BuildShaderCache) {
+    // Build relocatable shader cache. We require all inputs to be .pipe files.
+    // This is work in progress and will be extended to handle shader inputs in the
+    // future.
+#if !LLPC_ENABLE_SHADER_CACHE
+    {
+      LLPC_ERRS("Relocatable shaders can only be built with ShaderCache enabled.\n");
+      result = Result::Unsupported;
+      return onFailure();
+    }
+#endif // LLPC_ENABLE_SHADER_CACHE
+
+    auto nonPipeIt =
+        llvm::find_if_not(expandedInputFiles, [](const std::string &filename) { return isPipelineInfoFile(filename); });
+    if (nonPipeIt != expandedInputFiles.end()) {
+      LLPC_ERRS(format("A non-pipeline file passed cannot be used to build shader cache: %s\n", nonPipeIt->c_str()));
+      result = Result::ErrorInvalidValue;
+      return onFailure();
+    }
+
+    unsigned nextFile = 0;
+    for (const std::string &file : expandedInputFiles) {
+      result = processPipeline(compiler, {file}, 0, &nextFile);
+      if (isFailure())
+        return onFailure();
+    }
+  } else if (isPipelineInfoFile(expandedInputFiles[0]) || isLlvmIrFile(expandedInputFiles[0])) {
+    // The first input file is a pipeline file or LLVM IR file. Assume they all are, and compile each one
+    // separately but in the same context.
     unsigned nextFile = 0;
 
     for (const std::string &file : expandedInputFiles) {
