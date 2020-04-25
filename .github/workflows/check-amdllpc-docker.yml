@@ -9,27 +9,34 @@ on:
 
 jobs:
   build-and-test:
-    name: Branch ${{ matrix.branch }}, base image ${{ matrix.base-image }}, config ${{ matrix.config }}
+    name: "Features: ${{ matrix.feature-set }}, assertions: ${{ matrix.assertions }}"
     runs-on: ${{ matrix.host-os }}
     strategy:
       matrix:
-        host-os:      ["ubuntu-latest"]
-        base-image:   ["gcr.io/stadia-open-source/amdvlk_dev_release:nightly"]
-        branch:       [dev]
-        config:       [Release]
-        generator:    [Ninja]
+        host-os:             ["ubuntu-18.04"]
+        base-image-template: ["gcr.io/stadia-open-source/amdvlk_%s%s_%s:nightly"]
+        config:              [Release]
+        assertions:          ["OFF", "ON"]
+        feature-set:         ["+gcc", "+clang"]
     steps:
       - name: Checkout LLPC
         run: |
           git clone https://github.com/${GITHUB_REPOSITORY}.git .
           git fetch origin +${GITHUB_SHA}:${GITHUB_REF} --update-head-ok
           git checkout ${GITHUB_SHA}
-      - name: Fetch the latest prebuilt AMDVLK
+      - name: Generate Docker base image tag string
         run: |
-          docker pull "${{ matrix.base-image }}"
+          CONFIG_LOWER=$(echo "${{ matrix.config }}" | tr "[:upper:]" "[:lower:]")
+          FEATURES_LOWER=$(echo "${{ matrix.feature-set }}" | tr "+" "_")
+          ASSERTS_LOWER=$(echo "${{ matrix.assertions }}" | tr "[:upper:]" "[:lower:]")
+          TAG=$(printf "${{ matrix.base-image-template }}" "$CONFIG_LOWER" "$FEATURES_LOWER" "$ASSERTS_LOWER")
+          echo "IMAGE_TAG: $TAG"
+          echo "::set-env name=IMAGE_TAG::$TAG"
+      - name: Fetch the latest prebuilt AMDVLK
+        run: docker pull "$IMAGE_TAG"
       - name: Build and Test with Docker
         run: docker build . --file docker/llpc.Dockerfile
-                            --build-arg AMDVLK_IMAGE="${{ matrix.base-image }}"
+                            --build-arg AMDVLK_IMAGE="$IMAGE_TAG"
                             --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
                             --build-arg LLPC_REPO_REF="${GITHUB_REF}"
                             --build-arg LLPC_REPO_SHA="${GITHUB_SHA}"
