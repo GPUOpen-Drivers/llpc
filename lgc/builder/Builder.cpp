@@ -115,6 +115,12 @@ void Builder::setComputeShaderMode(const ComputeShaderMode &computeShaderMode) {
 }
 
 // =====================================================================================================================
+// Get the compute shader mode (workgroup size)
+const ComputeShaderMode &Builder::getComputeShaderMode() {
+  return getShaderModes()->getComputeShaderMode();
+}
+
+// =====================================================================================================================
 // Get the type pElementTy, turned into a vector of the same vector width as pMaybeVecTy if the latter
 // is a vector type.
 //
