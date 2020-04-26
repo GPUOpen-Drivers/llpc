@@ -32,9 +32,9 @@ RUN cat /vulkandriver/build_info.txt \
 
 # Build LLPC.
 WORKDIR /vulkandriver/builds/ci-build
-RUN cmake -DCMAKE_BUILD_TYPE=Debug --build . \
-    && cmake -DCMAKE_BUILD_TYPE=Debug --build . --target amdllpc \
-    && cmake -DCMAKE_BUILD_TYPE=Debug --build . --target spvgen
+RUN cmake --build . \
+    && cmake --build . --target amdllpc \
+    && cmake --build . --target spvgen
 
 # Run the lit test suite.
-RUN cmake -DCMAKE_BUILD_TYPE=Debug --build . --target check-amdllpc -- -v
+RUN cmake --build . --target check-amdllpc -- -v

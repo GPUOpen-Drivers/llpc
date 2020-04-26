@@ -16,7 +16,7 @@ jobs:
         host-os:      ["ubuntu-latest"]
         base-image:   ["gcr.io/stadia-open-source/amdvlk_dev_release:nightly"]
         branch:       [dev]
-        config:       [Release]
+        config:       [Debug,Release]
         generator:    [Ninja]
     steps:
       - name: Checkout LLPC
