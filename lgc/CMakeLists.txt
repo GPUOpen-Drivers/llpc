@@ -88,7 +88,7 @@ function(lgc_set_compiler_options PROJECT_NAME)
                     -Wno-class-memaccess
                 )
             endif()
-        elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             target_compile_options("${PROJECT_NAME}" PRIVATE
                 -Wno-covered-switch-default
                 -Wno-extra-semi
