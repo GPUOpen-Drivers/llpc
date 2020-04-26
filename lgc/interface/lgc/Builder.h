@@ -180,6 +180,9 @@ public:
   // add more fields. A local struct variable can be zero-initialized with " = {}".
   void setComputeShaderMode(const ComputeShaderMode &computeShaderMode);
 
+  // Get the compute shader mode (workgroup size)
+  const ComputeShaderMode &getComputeShaderMode();
+
   // Record shader modes into IR metadata if this is a shader compile (no PipelineState).
   virtual void recordShaderModes(llvm::Module *module) {}
 
