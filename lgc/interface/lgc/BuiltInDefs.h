@@ -102,7 +102,7 @@ BUILTIN(TessCoord, 13, N, D, v3f32)         // (u,v,w) coord of tessellated vert
 BUILTIN(TessLevelInner, 12, H, D, a2f32)    // Tessellation inner levels
 BUILTIN(TessLevelOuter, 11, H, D, a4f32)    // Tessellation outer levels
 BUILTIN(VertexIndex, 42, N, V, i32)         // Index of current vertex
-BUILTIN(ViewIndex, 4440, N, P, i32)         // View index
+BUILTIN(ViewIndex, 4440, N, VHDGP, i32)     // View index
 BUILTIN(ViewportIndex, 10, MVDG, P, i32)    // Viewport index
 BUILTIN(WorkgroupId, 26, N, TMC, v3i32)     // ID of global workgroup
 BUILTIN(WorkgroupSize, 25, N, C, v3i32)     // Size of global workgroup
