@@ -469,6 +469,9 @@ struct GeometryShaderMode {
   unsigned outputVertices;          // Max number of vertices the shader will emit in one invocation
 };
 
+// Kind of conservative depth
+enum class ConservativeDepth : unsigned { Any, LessEqual, GreaterEqual };
+
 // Struct to pass to SetFragmentShaderMode.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
 // All fields are unsigned, even those that could be bool, because the way the state is written to and read
@@ -477,6 +480,7 @@ struct FragmentShaderMode {
   unsigned pixelCenterInteger;
   unsigned earlyFragmentTests;
   unsigned postDepthCoverage;
+  ConservativeDepth conservativeDepth;
 };
 
 // Struct to pass to SetComputeShaderMode.
