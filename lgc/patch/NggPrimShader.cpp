@@ -2705,8 +2705,9 @@ void NggPrimShader::runEsOrEsVariant(Module *module, StringRef entryName, Argume
   Value *esGsOffset = nullptr;
   if (m_hasGs) {
     auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
-    esGsOffset =
-        m_builder->CreateMul(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(64 * 4 * calcFactor.esGsRingItemSize));
+    unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+    unsigned esGsBytesPerWave = waveSize * 4 * calcFactor.esGsRingItemSize;
+    esGsOffset = m_builder->CreateMul(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(esGsBytesPerWave));
   }
 
   Value *offChipLdsBase = (arg + EsGsSysValueOffChipLdsBase);
