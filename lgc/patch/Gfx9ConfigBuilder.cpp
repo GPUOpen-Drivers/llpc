@@ -1892,6 +1892,12 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
   else
     zOrder = EARLY_Z_THEN_LATE_Z;
 
+  ConservativeZExport conservativeZExport = EXPORT_ANY_Z;
+  if (fragmentMode.conservativeDepth == ConservativeDepth::LessEqual)
+    conservativeZExport = EXPORT_LESS_THAN_Z;
+  else if (fragmentMode.conservativeDepth == ConservativeDepth::GreaterEqual)
+    conservativeZExport = EXPORT_GREATER_THAN_Z;
+
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, Z_ORDER, zOrder);
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, KILL_ENABLE, builtInUsage.discard);
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, Z_EXPORT_ENABLE, builtInUsage.fragDepth);
@@ -1903,6 +1909,7 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, EXEC_ON_NOOP,
                 (fragmentMode.earlyFragmentTests && resUsage->resourceWrite));
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, EXEC_ON_HIER_FAIL, execOnHeirFail);
+  SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, CONSERVATIVE_Z_EXPORT, conservativeZExport);
 
   if (gfxIp.major == 10) {
     SET_REG_GFX10_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, PRE_SHADER_DEPTH_COVERAGE_ENABLE,

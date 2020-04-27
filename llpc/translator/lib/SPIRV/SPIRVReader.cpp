@@ -6474,6 +6474,11 @@ bool SPIRVToLLVM::transMetadata() {
         fragmentMode.pixelCenterInteger = execModeMd.fs.PixelCenterInteger;
         fragmentMode.earlyFragmentTests = execModeMd.fs.EarlyFragmentTests;
         fragmentMode.postDepthCoverage = execModeMd.fs.PostDepthCoverage;
+        fragmentMode.conservativeDepth = ConservativeDepth::Any;
+        if (execModeMd.fs.DepthLess)
+          fragmentMode.conservativeDepth = ConservativeDepth::LessEqual;
+        else if (execModeMd.fs.DepthGreater)
+          fragmentMode.conservativeDepth = ConservativeDepth::GreaterEqual;
         getBuilder()->setFragmentShaderMode(fragmentMode);
 
       } else if (execModel == ExecutionModelGLCompute) {
