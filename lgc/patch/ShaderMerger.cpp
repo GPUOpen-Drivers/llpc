@@ -685,9 +685,9 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
   auto waveInSubgroup = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
 
+  unsigned esGsBytesPerWave = waveSize * 4 * calcFactor.esGsRingItemSize;
   auto esGsOffset = BinaryOperator::CreateMul(
-      waveInSubgroup, ConstantInt::get(Type::getInt32Ty(*m_context), 64 * 4 * calcFactor.esGsRingItemSize), "",
-      entryBlock);
+      waveInSubgroup, ConstantInt::get(Type::getInt32Ty(*m_context), esGsBytesPerWave), "", entryBlock);
 
   auto esEnable = new ICmpInst(*entryBlock, ICmpInst::ICMP_ULT, threadId, esVertCount, "");
   BranchInst::Create(beginEsBlock, endEsBlock, esEnable, entryBlock);
