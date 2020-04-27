@@ -390,8 +390,8 @@ struct ResourceUsage {
       unsigned rasterStream = 0;
 
       struct {
-        unsigned esGsRingItemSize;   // Size of each vertex written to the ES -> GS Ring.
-        unsigned gsVsRingItemSize;   // Size of each primitive written to the GS -> VS Ring.
+        unsigned esGsRingItemSize;   // Size of each vertex written to the ES -> GS Ring, in DWORDs.
+        unsigned gsVsRingItemSize;   // Size of each primitive written to the GS -> VS Ring, in DWORDs.
         unsigned esVertsPerSubgroup; // Number of vertices ES exports.
         unsigned gsPrimsPerSubgroup; // Number of prims GS exports.
         unsigned esGsLdsSize;        // ES -> GS ring LDS size (GS in)
