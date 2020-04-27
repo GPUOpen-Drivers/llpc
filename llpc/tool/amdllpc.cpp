@@ -1598,6 +1598,7 @@ int main(int argc, char *argv[]) {
   auto isFailure = [result] { return result != Result::Success; };
   auto onFailure = [compiler, result] {
     assert(result != Result::Success);
+    (void)result;
     compiler->Destroy();
     LLPC_ERRS("\n=====  AMDLLPC FAILED  =====\n");
     return 1;
