@@ -168,6 +168,51 @@ void ElfWriter<Elf>::mergeSection(const SectionBuffer *pSection1, size_t section
 }
 
 // =====================================================================================================================
+// Patches metadata notes with settings from runtime PipelineInfo.
+//
+// @param context : pipeline compilation context
+// @param [in,out] document : the parsed msgpack document to patch
+static void patchMetaNoteDocument(Context *context, llvm::msgpack::Document &document) {
+  auto destPipeline = document.getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0];
+  auto destRegisters = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
+
+  // Patch the fields of PA_CL_CLIP_CNTL register.
+  const unsigned mmPA_CL_CLIP_CNTL = 0xA204;
+  auto clipControlKey = document.getNode(mmPA_CL_CLIP_CNTL);
+  auto clipControlIter = destRegisters.find(clipControlKey);
+  if (clipControlIter != destRegisters.end()) {
+    assert(clipControlIter->first.getUInt() == mmPA_CL_CLIP_CNTL);
+    auto buildInfo =
+        reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineContext()->getPipelineBuildInfo());
+    auto regValue = destRegisters[clipControlKey].getUInt();
+
+    // Patch usrClipPlaneMask
+    unsigned usrClipPlaneMaskBits = 0x3F;
+    regValue = ((regValue & ~usrClipPlaneMaskBits) | buildInfo->rsState.usrClipPlaneMask);
+
+    // Patch zClipEnable
+    const unsigned zclipNearDisableBit = 1 << 26;
+    const unsigned zclipFarDisableBit = 1 << 27;
+    const unsigned zclipDisableMask = zclipNearDisableBit | zclipFarDisableBit;
+    if (buildInfo->vpState.depthClipEnable) {
+      regValue &= ~zclipDisableMask;
+    } else {
+      regValue |= zclipDisableMask;
+    }
+
+    // Patch rasterizerDiscardEnable
+    const unsigned dxRasterizationKillBit = 1 << 22;
+    if (buildInfo->rsState.rasterizerDiscardEnable) {
+      regValue |= dxRasterizationKillBit;
+    } else {
+      regValue &= ~dxRasterizationKillBit;
+    }
+
+    destRegisters[clipControlKey] = document.getNode(regValue);
+  }
+}
+
+// =====================================================================================================================
 // A woarkaround to support erase in llvm::msgpack::MapDocNode.
 class MapDocNode : public llvm::msgpack::MapDocNode {
 public:
@@ -358,6 +403,7 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
     mergeMapItem(destRegisters, srcRegisters, regNumber);
 
   updateRootDescriptorRegisters(pContext, destDocument);
+  patchMetaNoteDocument(pContext, destDocument);
 
   std::string destBlob;
   destDocument.writeToBlob(destBlob);
