@@ -53,9 +53,6 @@ using namespace lgc;
 // -disable-gs-onchip: disable geometry shader on-chip mode
 cl::opt<bool> DisableGsOnChip("disable-gs-onchip", cl::desc("Disable geometry shader on-chip mode"), cl::init(false));
 
-// -pack-in-out: pack input/output
-static cl::opt<bool> PackInOut("pack-in-out", cl::desc("Pack input/output"), cl::init(false));
-
 namespace lgc {
 
 // =====================================================================================================================
@@ -86,7 +83,7 @@ bool PatchResourceCollect::runOnModule(Module &module) {
   m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
   // If packing final vertex stage outputs and FS inputs, scalarize those outputs and inputs now.
-  if (canPackInOut())
+  if (m_pipelineState->isPackInOut())
     scalarizeForInOutPacking(&module);
 
   // Process each shader stage, in reverse order.
@@ -1197,14 +1194,13 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     }
   }
 
-  if (canPackInOut()) {
-    if (m_shaderStage == ShaderStageFragment && !isDeadCall) {
+  if (m_pipelineState->isPackInOut()) {
+    if (m_shaderStage == ShaderStageFragment && !isDeadCall &&
+        (mangledName.startswith(lgcName::InputImportGeneric) ||
+         mangledName.startswith(lgcName::InputImportInterpolant))) {
       // Collect LocationSpans according to each FS' input call
-      bool isInput = m_locationMapManager->addSpan(&callInst);
-      if (isInput) {
-        m_inOutCalls.push_back(&callInst);
-        m_deadCalls.insert(&callInst);
-      }
+      m_locationMapManager->addSpan(&callInst);
+      m_inOutCalls.push_back(&callInst);
     } else if (m_shaderStage == ShaderStageVertex && mangledName.startswith(lgcName::OutputExportGeneric)) {
       m_inOutCalls.push_back(&callInst);
       m_deadCalls.insert(&callInst);
@@ -1587,7 +1583,7 @@ void PatchResourceCollect::matchGenericInOut() {
     }
   }
 
-  if (canPackInOut()) {
+  if (m_pipelineState->isPackInOut()) {
     // Do packing input/output
     packInOutLocation();
   }
@@ -2475,23 +2471,11 @@ void PatchResourceCollect::mapGsBuiltInOutput(unsigned builtInId, unsigned elemC
 }
 
 // =====================================================================================================================
-// Determine whether the requirements of packing input/output is satisfied in patch phase
-bool PatchResourceCollect::canPackInOut() const {
-  // Pack input/output requirements:
-  // 1) -pack-in-out option is on
-  // 2) It is a VS-FS pipeline
-  return PackInOut && m_pipelineState->getShaderStageMask() ==
-                          (shaderStageToMask(ShaderStageVertex) | shaderStageToMask(ShaderStageFragment));
-}
-
-// =====================================================================================================================
 // The process of packing input/output
 void PatchResourceCollect::packInOutLocation() {
   if (m_shaderStage == ShaderStageFragment) {
     m_locationMapManager->buildLocationMap();
-
-    reviseInputImportCalls();
-
+    fillInOutLocMap();
     m_inOutCalls.clear(); // It will hold XX' output calls
   } else if (m_shaderStage == ShaderStageVertex) {
     reassembleOutputExportCalls();
@@ -2506,8 +2490,8 @@ void PatchResourceCollect::packInOutLocation() {
 }
 
 // =====================================================================================================================
-// Revise the location and element index fields of the fragment shaders input import functions
-void PatchResourceCollect::reviseInputImportCalls() {
+// Fill inOutLocMap based on FS input import calls
+void PatchResourceCollect::fillInOutLocMap() {
   if (m_inOutCalls.empty())
     return;
 
@@ -2517,76 +2501,29 @@ void PatchResourceCollect::reviseInputImportCalls() {
   auto &inputLocMap = inOutUsage.inputLocMap;
   inputLocMap.clear();
 
-  BuilderBase builder(*m_context);
-
+  // FS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
+  //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
+  //
   for (auto call : m_inOutCalls) {
-    auto argCount = call->arg_size();
-    const bool isInterpolant = (argCount == 5);
-    unsigned compIdx = 1;
-    unsigned locOffset = 0;
-    if (isInterpolant) {
-      compIdx = 2;
-      locOffset = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
-    }
+    const bool isInterpolant = call->arg_size() != 4;
+    const unsigned compIdxArgIdx = isInterpolant ? 2 : 1;
+    assert(!isInterpolant || (isInterpolant && isa<ConstantInt>(call->getOperand(1))));
+    const unsigned locOffset = isInterpolant ? cast<ConstantInt>(call->getOperand(1))->getZExtValue() : 0;
 
     // Construct original InOutLocation from the location and elemIdx operands of the FS' input import call
     InOutLocation origInLoc = {};
     origInLoc.locationInfo.location = cast<ConstantInt>(call->getOperand(0))->getZExtValue() + locOffset;
-    origInLoc.locationInfo.component = cast<ConstantInt>(call->getOperand(compIdx))->getZExtValue();
+    origInLoc.locationInfo.component = cast<ConstantInt>(call->getOperand(compIdxArgIdx))->getZExtValue();
     origInLoc.locationInfo.half = false;
 
     // Get the packed InOutLocation from locationMap
     const InOutLocation *newInLoc = nullptr;
-    m_locationMapManager->findMap(origInLoc, newInLoc);
     assert(m_locationMapManager->findMap(origInLoc, newInLoc));
+    m_locationMapManager->findMap(origInLoc, newInLoc);
 
     // TODO: inputLocMap can be removed
     inputLocMap[newInLoc->locationInfo.location] = InvalidValue;
     inOutUsage.inOutLocMap[origInLoc.asIndex()] = newInLoc->asIndex();
-
-    // Re-write the input import call by using the new InOutLocation
-    SmallVector<Value *, 5> args;
-    std::string callName;
-    if (!isInterpolant) {
-      args.push_back(builder.getInt32(newInLoc->locationInfo.location));
-      args.push_back(builder.getInt32(newInLoc->locationInfo.component));
-      args.push_back(call->getOperand(2));
-      args.push_back(call->getOperand(3));
-
-      callName = lgcName::InputImportGeneric;
-    } else {
-      args.push_back(builder.getInt32(newInLoc->locationInfo.location));
-      args.push_back(builder.getInt32(0));
-      args.push_back(builder.getInt32(newInLoc->locationInfo.component));
-      args.push_back(call->getOperand(3));
-      args.push_back(call->getOperand(4));
-
-      callName = lgcName::InputImportInterpolant;
-    }
-
-    // Previous stage converts non-float type to float type when outputs
-    Type *returnTy = builder.getFloatTy();
-    addTypeMangling(returnTy, args, callName);
-    Value *outValue = emitCall(callName, returnTy, args, {}, call);
-
-    // Restore float type to original type
-    builder.SetInsertPoint(call);
-
-    auto callee = call->getCalledFunction();
-    Type *origReturnTy = callee->getReturnType();
-    if (origReturnTy->isIntegerTy()) {
-      // float -> i32
-      outValue = builder.CreateBitCast(outValue, builder.getInt32Ty());
-      if (origReturnTy->getScalarSizeInBits() < 32) {
-        // i32 -> i16 or i8
-        outValue = builder.CreateTrunc(outValue, origReturnTy);
-      }
-    } else if (origReturnTy->isHalfTy()) {
-      // float -> f16
-      outValue = builder.CreateFPTrunc(outValue, origReturnTy);
-    }
-
-    call->replaceAllUsesWith(outValue);
   }
 }
 
@@ -2596,11 +2533,24 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
   if (m_inOutCalls.empty())
     return;
 
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(m_inOutCalls.back());
+
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
 
-  // Collect the components of a vector exported from each packed location
-  // Assume each location exports a vector with four components
-  std::vector<std::array<Value *, 4>> packedComponents(m_inOutCalls.size());
+  // ElementsInfo represents the info of composing a vector in a location
+  struct ElementsInfo {
+    // Elements to be packed in one location, where 32-bit element is placed at the even index
+    Value *elements[8];
+    // Element number
+    unsigned elemCount;
+    // Wether it is a 16-bit element array or not
+    bool is16Bit;
+  };
+
+  // Collect ElementsInfo in each packed location
+  ElementsInfo elemsInfo = {{nullptr}, 0, false};
+  std::vector<ElementsInfo> elementsInfoArray(m_inOutCalls.size(), elemsInfo);
   for (auto call : m_inOutCalls) {
     InOutLocation origOutLoc = {};
     origOutLoc.locationInfo.location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
@@ -2608,68 +2558,90 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
     origOutLoc.locationInfo.half = false;
 
     const InOutLocation *newInLoc = nullptr;
-    const bool isFound = m_locationMapManager->findMap(origOutLoc, newInLoc);
-    if (!isFound)
+    if (!m_locationMapManager->findMap(origOutLoc, newInLoc)) {
+      // An unused export call
       continue;
+    }
 
-    auto &components = packedComponents[newInLoc->locationInfo.location];
-    components[newInLoc->locationInfo.component] = call->getOperand(2);
+    const unsigned newLoc = newInLoc->locationInfo.location;
+    auto &elementsInfo = elementsInfoArray[newLoc];
+    unsigned elemIdx = newInLoc->locationInfo.component * 2 + newInLoc->locationInfo.half;
+
+    // Bit cast i8/i16/f16 to i32 for packing in a 32-bit component
+    Value *element = call->getOperand(2);
+    Type *elementTy = element->getType();
+    unsigned bitWidth = elementTy->getScalarSizeInBits();
+    if (bitWidth == 8) {
+      element = builder.CreateZExt(element, builder.getInt32Ty());
+    } else if (bitWidth == 16) {
+      if (elementTy->isHalfTy())
+        element = builder.CreateBitCast(element, builder.getInt16Ty());
+      element = builder.CreateZExt(element, builder.getInt32Ty());
+    } else if (elementTy->isIntegerTy()) {
+      // i32 -> float
+      element = builder.CreateBitCast(element, builder.getFloatTy());
+    }
+    elementsInfo.is16Bit = bitWidth < 32;
+    elementsInfo.elements[elemIdx] = element;
+    ++elementsInfo.elemCount;
   }
 
   // Re-assamble XX' output export calls for each packed location
-  BuilderBase builder(*m_context);
-  builder.SetInsertPoint(m_inOutCalls.back());
-
   auto &outputLocMap = inOutUsage.outputLocMap;
   outputLocMap.clear();
 
   Value *args[3] = {};
-  unsigned consectiveLocation = 0;
-  for (auto components : packedComponents) {
-    unsigned compCount = 0;
-    for (auto comp : components) {
-      if (comp)
-        ++compCount;
-    }
-
-    if (compCount == 0)
+  unsigned newLoc = 0;
+  for (auto &elementsInfo : elementsInfoArray) {
+    if (elementsInfo.elemCount == 0) {
+      // It's the end of the packed location
       break;
-
-    // Construct the output vector
-    Value *outValue =
-        compCount == 1 ? components[0] : UndefValue::get(VectorType::get(builder.getFloatTy(), compCount));
-    for (auto compIdx = 0; compIdx < compCount; ++compIdx) {
-      // Type conversion from non-float to float
-      Value *comp = components[compIdx];
-      Type *compTy = comp->getType();
-      if (compTy->isIntegerTy()) {
-        // i8/i16 -> i32
-        if (compTy->getScalarSizeInBits() < 32)
-          comp = builder.CreateZExt(comp, builder.getInt32Ty());
-        // i32 -> float
-        comp = builder.CreateBitCast(comp, builder.getFloatTy());
-      } else if (compTy->isHalfTy()) {
-        // f16 -> float
-        comp = builder.CreateFPExt(comp, builder.getFloatTy());
-      }
-
-      if (compCount > 1)
-        outValue = builder.CreateInsertElement(outValue, comp, compIdx);
-      else
-        outValue = comp;
     }
 
-    args[0] = builder.getInt32(consectiveLocation);
+    // Construct the output value - a scalar or a vector
+    Value *outValue = nullptr;
+    const unsigned compCount = elementsInfo.is16Bit ? (elementsInfo.elemCount + 1) / 2 : elementsInfo.elemCount;
+
+    if (elementsInfo.elemCount == 1) {
+      // the single element is i32 or float
+      outValue = elementsInfo.elements[0];
+      if (outValue->getType() != builder.getFloatTy()) {
+        outValue = builder.CreateBitCast(outValue, builder.getFloatTy());
+      }
+    } else {
+      outValue = UndefValue::get(VectorType::get(builder.getFloatTy(), compCount));
+      if (elementsInfo.is16Bit) {
+        // Pack two elements for a component
+        unsigned compIdx = 0;
+        for (auto elemIdx = 0; elemIdx < elementsInfo.elemCount; elemIdx += 2) {
+          Value *lowElem = elementsInfo.elements[elemIdx];
+          Value *component = lowElem;
+          Value *highElem = elementsInfo.elements[elemIdx + 1];
+          if (highElem != nullptr) {
+            highElem = builder.CreateShl(highElem, 16);
+            component = builder.CreateOr(lowElem, highElem);
+          }
+          component = builder.CreateBitCast(component, builder.getFloatTy());
+          outValue =
+              elementsInfo.elemCount == 2 ? component : builder.CreateInsertElement(outValue, component, compIdx++);
+        }
+      } else {
+        // Each element is seen as a component
+        for (auto compIdx = 0; compIdx < compCount; ++compIdx) {
+          outValue = builder.CreateInsertElement(outValue, elementsInfo.elements[compIdx * 2], compIdx);
+        }
+      }
+    }
+
+    args[0] = builder.getInt32(newLoc);
     args[1] = builder.getInt32(0);
     args[2] = outValue;
 
     std::string callName(lgcName::OutputExportGeneric);
-    addTypeMangling(builder.getVoidTy(), args, callName);
-
+    addTypeMangling(nullptr, args, callName);
     builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
 
-    outputLocMap[consectiveLocation] = InvalidValue;
-    ++consectiveLocation;
+    outputLocMap[newLoc++] = InvalidValue;
   }
 }
 
@@ -2798,10 +2770,17 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
   Value *result = UndefValue::get(resultTy);
   std::string callName = isInterpolant ? lgcName::InputImportInterpolant : lgcName::InputImportGeneric;
   addTypeMangling(elementTy, args, callName);
+  const unsigned nextLocIdx = cast<ConstantInt>(args[0])->getZExtValue() + 1;
+  const bool is64Bit = elementTy->getPrimitiveSizeInBits() == 64;
   for (unsigned i = 0; i != scalarizeBy; ++i) {
     if (!unknownElementsUsed && !elementUsed[i])
       continue; // Omit trivially unused element
-    args[elemIdxArgIdx] = builder.getInt32(elemIdx + i);
+    unsigned newElemIdx = elemIdx + i;
+    if (is64Bit && i > 1) {
+      args[0] = builder.getInt32(nextLocIdx);
+      newElemIdx = newElemIdx - 2;
+    }
+    args[elemIdxArgIdx] = builder.getInt32(newElemIdx);
 
     CallInst *element = builder.CreateNamedCall(callName, elementTy, args, Attribute::ReadOnly);
     result = builder.CreateInsertElement(result, element, i);
@@ -2854,8 +2833,14 @@ void PatchResourceCollect::scalarizeGenericOutput(CallInst *call) {
 
   // Extract and store the individual elements.
   std::string callName;
+  const unsigned nextLocIdx = cast<ConstantInt>(args[0])->getZExtValue() + 1;
   for (unsigned i = 0; i != scalarizeBy; ++i) {
-    args[ElemIdxArgIdx] = builder.getInt32(elemIdx + i);
+    unsigned newElemIdx = elemIdx + i;
+    if (i >= 4) {
+      args[0] = builder.getInt32(nextLocIdx);
+      newElemIdx = newElemIdx - 4;
+    }
+    args[ElemIdxArgIdx] = builder.getInt32(newElemIdx);
     args[valArgIdx] = builder.CreateExtractElement(outputVal, i);
     if (i == 0) {
       callName = lgcName::OutputExportGeneric;
@@ -2871,56 +2856,31 @@ void PatchResourceCollect::scalarizeGenericOutput(CallInst *call) {
 // Fill the locationSpan container by constructing a LocationSpan from each input import call
 //
 // @param call : Call to process
-bool InOutLocationMapManager::addSpan(CallInst *call) {
-  auto callee = call->getCalledFunction();
-  auto mangledName = callee->getName();
-  bool isInput = false;
-  if (mangledName.startswith(lgcName::InputImportGeneric)) {
-    LocationSpan span = {};
+void InOutLocationMapManager::addSpan(CallInst *call) {
+  LocationSpan span = {};
+  const bool isInterpolant = call->getNumArgOperands() != 4;
 
-    span.firstLocation.locationInfo.location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-    span.firstLocation.locationInfo.component = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
-    span.firstLocation.locationInfo.half = false;
+  assert(!isInterpolant || (isInterpolant && isa<ConstantInt>(call->getOperand(1))));
+  const unsigned locOffset = isInterpolant ? cast<ConstantInt>(call->getOperand(1))->getZExtValue() : 0;
+  span.firstLocation.locationInfo.location = cast<ConstantInt>(call->getOperand(0))->getZExtValue() + locOffset;
+  const unsigned compIdxArgIdx = isInterpolant ? 2 : 1;
+  span.firstLocation.locationInfo.component = cast<ConstantInt>(call->getOperand(compIdxArgIdx))->getZExtValue();
+  span.firstLocation.locationInfo.half = false;
 
-    const unsigned bitWidth = callee->getReturnType()->getScalarSizeInBits();
-    span.compatibilityInfo.halfComponentCount = bitWidth < 64 ? 2 : 4;
+  const unsigned interpMode = cast<ConstantInt>(call->getOperand(compIdxArgIdx + 1))->getZExtValue();
+  span.compatibilityInfo.isFlat = interpMode == InOutInfo::InterpModeFlat;
+  span.compatibilityInfo.isCustom = interpMode == InOutInfo::InterpModeCustom;
+  unsigned bitWidth = call->getType()->getScalarSizeInBits();
+  // int8 is treated as 16-bit
+  bitWidth = (bitWidth == 8) ? 16 : bitWidth;
+  span.compatibilityInfo.halfComponentCount = bitWidth / 16;
+  span.compatibilityInfo.is16Bit = (bitWidth == 16);
 
-    span.compatibilityInfo.isFlat = cast<ConstantInt>(call->getOperand(2))->getZExtValue() == InOutInfo::InterpModeFlat;
-    span.compatibilityInfo.is16Bit = false;
-    span.compatibilityInfo.isCustom =
-        cast<ConstantInt>(call->getOperand(2))->getZExtValue() == InOutInfo::InterpModeCustom;
-
-    assert(std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end());
+  assert(isInterpolant ||
+         (!isInterpolant && std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end()));
+  if (std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end()) {
     m_locationSpans.push_back(span);
-
-    isInput = true;
   }
-  if (mangledName.startswith(lgcName::InputImportInterpolant)) {
-    auto locOffset = call->getOperand(1);
-    assert(isa<ConstantInt>(locOffset));
-
-    LocationSpan span = {};
-
-    span.firstLocation.locationInfo.location =
-        cast<ConstantInt>(call->getOperand(0))->getZExtValue() + cast<ConstantInt>(locOffset)->getZExtValue();
-    span.firstLocation.locationInfo.component = cast<ConstantInt>(call->getOperand(2))->getZExtValue();
-    span.firstLocation.locationInfo.half = false;
-
-    const unsigned bitWidth = callee->getReturnType()->getScalarSizeInBits();
-    span.compatibilityInfo.halfComponentCount = bitWidth < 64 ? 2 : 4;
-
-    span.compatibilityInfo.isFlat = cast<ConstantInt>(call->getOperand(3))->getZExtValue() == InOutInfo::InterpModeFlat;
-    span.compatibilityInfo.is16Bit = false;
-    span.compatibilityInfo.isCustom =
-        cast<ConstantInt>(call->getOperand(3))->getZExtValue() == InOutInfo::InterpModeCustom;
-
-    if (std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end())
-      m_locationSpans.push_back(span);
-
-    isInput = true;
-  }
-
-  return isInput;
 }
 
 // =====================================================================================================================
@@ -2932,27 +2892,33 @@ void InOutLocationMapManager::buildLocationMap() {
   // Map original InOutLocation to new InOutLocation
   unsigned consectiveLocation = 0;
   unsigned compIdx = 0;
+  bool isHighHalf = false;
   for (auto spanIt = m_locationSpans.begin(); spanIt != m_locationSpans.end(); ++spanIt) {
-    // Increase consectiveLocation when halfComponentCount is up to 8 or the span isn't compatible to previous
+    // Increase consectiveLocation when a vec4 is full or the span isn't compatible to previous
     // Otherwise, increase the compIdx in a packed vector
     if (spanIt != m_locationSpans.begin()) {
       const auto &prevSpan = *(--spanIt);
       ++spanIt;
-      if (!isCompatible(prevSpan, *spanIt) || compIdx == 3) {
+      if (!isCompatible(prevSpan, *spanIt) || compIdx > 3) {
         ++consectiveLocation;
         compIdx = 0;
-      } else if (spanIt->compatibilityInfo.halfComponentCount > 1)
-        compIdx += spanIt->compatibilityInfo.halfComponentCount / 2;
-      else if (spanIt->firstLocation.locationInfo.half) {
-        // 16-bit attribute
-        compIdx += 1;
+        isHighHalf = false;
+      } else {
+        isHighHalf = spanIt->compatibilityInfo.is16Bit ? !isHighHalf : false;
       }
     }
 
     InOutLocation newLocation = {};
     newLocation.locationInfo.location = consectiveLocation;
     newLocation.locationInfo.component = compIdx;
-    newLocation.locationInfo.half = false;
+    newLocation.locationInfo.half = isHighHalf;
+
+    // Update component index
+    if (spanIt->compatibilityInfo.is16Bit)
+      compIdx = isHighHalf ? compIdx + 1 : compIdx;
+    else
+      compIdx += spanIt->compatibilityInfo.halfComponentCount / 2;
+    assert(compIdx <= 4);
 
     InOutLocation &origLocation = spanIt->firstLocation;
     m_locationMap[origLocation] = newLocation;

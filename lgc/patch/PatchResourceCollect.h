@@ -86,9 +86,8 @@ private:
   void mapGsGenericOutput(GsOutLocInfo outLocInfo);
   void mapGsBuiltInOutput(unsigned builtInId, unsigned elemCount);
 
-  bool canPackInOut() const;
   void packInOutLocation();
-  void reviseInputImportCalls();
+  void fillInOutLocMap();
   void reassembleOutputExportCalls();
 
   // Input/output scalarizing
@@ -120,23 +119,13 @@ private:
   std::unique_ptr<InOutLocationMapManager> m_locationMapManager; // Pointer to InOutLocationMapManager instance
 };
 
-// Represents the location info of input/output
-union InOutLocationInfo {
-  struct {
-    uint16_t location : 13; // The location
-    uint16_t component : 2; // The component index
-    uint16_t half : 1;      // High half in case of 16-bit attriburtes
-  };
-  uint16_t u16All;
-};
-
 // Represents the compatibility info of input/output
 union InOutCompatibilityInfo {
   struct {
     uint16_t halfComponentCount : 9; // The number of components measured in times of 16-bits.
                                      // A single 32-bit component will be halfComponentCount=2
+    uint16_t is16Bit : 1;            // 16-bit (i8/i16/f16, i8 is treated as 16-bit) or not
     uint16_t isFlat : 1;             // Flat shading or not
-    uint16_t is16Bit : 1;            // Half float or not
     uint16_t isCustom : 1;           // Custom interpolation mode or not
   };
   uint16_t u16All;
@@ -157,7 +146,7 @@ class InOutLocationMapManager {
 public:
   InOutLocationMapManager() {}
 
-  bool addSpan(llvm::CallInst *call);
+  void addSpan(llvm::CallInst *call);
   void buildLocationMap();
 
   bool findMap(const InOutLocation &originalLocation, const InOutLocation *&newLocation);

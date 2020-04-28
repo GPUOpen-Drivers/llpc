@@ -240,6 +240,9 @@ public:
   // ring is on-chip.
   bool isGsOnChip() const { return m_gsOnChip; }
 
+  // Determine whether to use input/output packing
+  bool isPackInOut();
+
   // Gets wave size for the specified shader stage
   unsigned getShaderWaveSize(ShaderStage stage);
 

@@ -22,110 +22,142 @@ Additionally:
 - Output exports must be re-vectorized for performance.
 - Certain factors can limit the extent to which inputs can be packed:
   - Flat inputs cannot be packed together with non-flat inputs.
+  - 16-bit inputs (less than 32-bit) cannot be packed together with 32-bit inputs (64-bit will be split into two 32-bits)
+  - Custom interpolation mode inputs cannot be packed together with other interpolation modes inputs.
   - Dynamic indexing into inputs must be considered. The initial version of this feature can simply fall back to not packing anything when dynamic indexing is used.
 ### 4.1 Packing overview
 We will have two core data structures for the packing.
 1. The LocationMap answers the question "given an original (location, elemIdx) pair, what is the re-written (location, elemIdx)"? An instance of this data structure exists once per pipeline throughout the packing process.
 2. The LocationSpans answers the question which contiguous sequences of components are used together, and in which interpMode. An instance of this data structure exists temporarily while computing the LocationMap.
 
-With these data structures in place, the packing itself proceeds in three steps:
+With these data structures in place, the packing itself proceeds in middle-end in three steps:
 1. Compute the mapping.
-   1. Collect the required information in a LocationSpans structure by iterating over relevant input/output calls.
-   2. Iterate over the collected spans to produce the new mapping.
-2.	Modify the input import calls in the fragment shader.
-3.	Modify the (generic) output export calls in the previous shader stage.
-4.	Add the mapping as a part of shader hash code.
+   - Collect the required information in a LocationSpans structure by iterating over relevant input/output calls.
+   - Iterate over the collected spans to produce the new mapping and fill the InOutLocMap in the fragment shader.
+2.	Modify the (generic) output export calls in the previous shader stage.
+3.	Add the mapping as a part of shader hash code.
+
+```
+                                The workflow of input/output packing
+Example:
+layout(location = 0) in vec3 v1;
+layout(location = 1) in float v2;
+layout(location = 2) flat in int64_t v3;
+layout(location = 3) flat in i16vec2 v4;
+layout(location = 4) in float16_t v5;
+layout(location = 5) in float16_t v6;
+layout(location = 6) in float16_t v7;
+layout(location = 7) in float16_t v8;
+
 
                     VS Output                              FS Input
-        vec3,vec4,float,i64vec3,vec2            vec3,vec4,float,i64vec3,vec2
                        |                                      |
+                       |      (Patch resource collect pass)   |
                        |            (Scalarization)           |
-            export.generic.*.f32x10                 import.generic.f32.*x8
-            export.generic.*.i32x10                 import.generic.i32.*x6
-                                                 import.interpolant.f32.*x2
+            export.generic.*.f32x4                 import.generic.f32.*x4
+            export.generic.*.i32x6                 import.interpolant.i32.*x6
+            export.generic.*.f16x6                 import.interpolant.f16.*x6
                        |                                      |
-                       |          (Lower gloabl pass)         |
-                       ----------------------------------------
-                                          |
-                                Preparation for packing
-                                          |
-                       ----------------------------------------
-                       |     (Patch resource collect pass)    |
+                       |                             (Add locationSpans)
+                       |                      (Build LocationMap from LocationSpans)
                        |                                      |
-            export.generic.*.v4f32------->0<-------import.generic.f32.*x4
-            export.generic.*.v4f32------->1<-------import.generic.f32.*x4
-            export.generic.*.v4f32------->2<-------import.generic.f32.*x4
-            export.generic.*.v4f32------->3<-------import.generic.f32.*x4
-            export.generic.*.v2f32------->4<-------import.generic.f32.*x2
-            export.generic.*.v2f32------->5<-------import.interpolant.f32.*x4
+                       |                            (0,0,false) <-> (0,0,false)
+                       |                            (0,1,false) <-> (0,1,false)
+                       |                            (0,2,false) <-> (0,2,false)
+                       |                            (1,0,false) <-> (0,3,false)
+                                                    (4,0,false) <-> (1,0,false)
+                       |                            (5,0,false) <-> (1,0,true)
+                       |                            (6,0,false) <-> (1,1,false)
+                       |                            (7,0,false) <-> (1,1,true)
+                       |                            (2,0,false) <-> (2,0,false)
+                       |                            (2,1,false) <-> (2,1,false)
+                       |                            (3,0,false) <-> (2,2,false)
+                       |                            (3,1,false) <-> (2,2,true)
+                       |                                      |
+                       |``````````````````````````````````````|
+            (Ressemble output export)               (Fill InOutLocMap with AsIndex() of origin and new)
+                       |                                      |
+            export.generic.*.v4f32                            |
+            export.generic.*.v4f32                            |
+            export.generic.*.v4f32                            |
+                       |                                      |
+                       ----------------------------------------
+                       |       (PatchInOutImportExport pass)  |
+        exp.f32(i32 immarg 32, i32 immarg 15)       interp.p1.f16(,,,highHalf,)
+        exp.f32(i32 immarg 33, i32 immarg 15)       interp.p2.f16(,,,highHalf,)
+        exp.f32(i32 immarg 34, i32 immarg 15)       interp.mov.* (ubfe for 16-bit)
+                       |                                      |
+                       ----------------------------------------
+                                                              |
+                                                      BuildPsRegConfig()
+                                                (set FP16_INTERP_MODE/ATTR0_VALID/ATTR0_VALID for non-flat 16-bit)
 
+```
 ### 4.2 LocationMap
 The LocationMap deals in (location, component, half) tuples:
 ```cpp
+// in llpcResourceUsage.h
 // Represents the location info of input/output
-union InOutLocationInfo
-{
-    struct
-    {
-        uint16_t location  : 13; // The location
-        uint16_t component : 2;  // The component index
-        uint16_t half      : 1;  // High half in case of 16-bit attriburtes
-    };
-    uint16_t u16All;
+union InOutLocationInfo {
+  struct {
+    uint16_t half : 1;      // High half in case of 16-bit attriburtes
+    uint16_t component : 2; // The component index
+    uint16_t location : 13; // The location
+  };
+  uint16_t u16All;
 };
+
+// In llpcPatchResourceCollect.h
 // Represents the wrapper of input/output locatoin info, along with handlers
-struct InOutLocation
-{
-    uint16_t AsIndex() const { return locationInfo.u16All; }
+struct InOutLocation {
+  uint16_t asIndex() const { return locationInfo.u16All; }
 
-    bool operator<(const InOutLocation& rhs) const { return (this->AsIndex() < rhs.AsIndex()); }
+  bool operator<(const InOutLocation &rhs) const { return this->asIndex() < rhs.asIndex(); }
 
-    InOutLocationInfo locationInfo; // The location info of an input or output
+  InOutLocationInfo locationInfo; // The location info of an input or output
 };
 ```
 The interface of the LocationMap is:
 ```cpp
 // Represents the manager of input/output locationMap generation
-class InOutLocationMapManager
-{
+class InOutLocationMapManager {
 public:
-    InOutLocationMapManager() {}
+  InOutLocationMapManager() {}
 
-    bool AddSpan(CallInst* pCall);
-    void BuildLocationMap();
+  void addSpan(llvm::CallInst* pCall);
+  void buildLocationMap();
 
-    bool FindMap(const InOutLocation& originalLocation, const InOutLocation*& pNewLocation);
+  bool findMap(const InOutLocation &originalLocation, const InOutLocation *&newLocation);
 
-    struct LocationSpan
-    {
-        uint16_t GetCompatibilityKey() const { return compatibilityInfo.u16All; }
+  struct LocationSpan {
+    uint16_t getCompatibilityKey() const { return compatibilityInfo.u16All; }
 
-        uint32_t AsIndex() const { return ((GetCompatibilityKey() << 16) | firstLocation.AsIndex()); }
+    unsigned asIndex() const { return ((getCompatibilityKey() << 16) | firstLocation.asIndex()); }
 
-        bool operator==(const LocationSpan& rhs) const { return (this->AsIndex() == rhs.AsIndex()); }
+    bool operator==(const LocationSpan &rhs) const { return this->asIndex() == rhs.asIndex(); }
 
-        bool operator<(const LocationSpan& rhs) const { return (this->AsIndex() < rhs.AsIndex()); }
+    bool operator<(const LocationSpan &rhs) const { return this->asIndex() < rhs.asIndex(); }
 
-        InOutLocation firstLocation;
-        InOutCompatibilityInfo compatibilityInfo;
-    };
+    InOutLocation firstLocation;
+    InOutCompatibilityInfo compatibilityInfo;
+  };
 
 private:
-    bool isCompatible(const LocationSpan& rSpan, const LocationSpan& lSpan) const
-    {
-        return rSpan.GetCompatibilityKey() == lSpan.GetCompatibilityKey();
-    }
+  InOutLocationMapManager(const InOutLocationMapManager &) = delete;
+  InOutLocationMapManager &operator=(const InOutLocationMapManager &) = delete;
 
-    LLPC_DISALLOW_COPY_AND_ASSIGN(InOutLocationMapManager);
+  bool isCompatible(const LocationSpan &rSpan, const LocationSpan &lSpan) const {
+    return rSpan.getCompatibilityKey() == lSpan.getCompatibilityKey();
+  }
 
-    std::vector<LocationSpan> m_locationSpans; // Tracks spans of contiguous components in the generic input space
-    std::map<InOutLocation, InOutLocation> m_locationMap; // The map between original location and new location
+  std::vector<LocationSpan> m_locationSpans; // Tracks spans of contiguous components in the generic input space
+  std::map<InOutLocation, InOutLocation> m_locationMap; // The map between original location and new location
 };
 ```
 ### 4.3 LocationSpans
 The LocationSpans structure tracks spans (or intervals) of contiguous components in the generic input space that:
 - Are used.
-- Can be allocated to the same attribute vec4 (i.e., they are compatible on flat/non-flat, 16-bit/non-16-bit).
+- Can be allocated to the same attribute vec4 (i.e., they are have the same value of InOutCompatibilityInfo, When they are compatible on bitWidth, Smooth and linear interpolant mode can be packed together, flat and custom interpolant modes are packed seperately).
 - Must be remapped contiguously and:
   - If the span is <= 4 components, cannot be moved to straddle a vec4 boundary.
   - If the span is > 4 components, can only be moved in a way that preserves the component and half parts of the triple.
@@ -137,34 +169,32 @@ Spans are added to the structure while iterating over existing input/output call
 Interface of LocationSpans:
 ```cpp
 // Represents the compatibility info of input/output
-union InOutCompatibilityInfo
-{
-    struct
-    {
-        uint16_t halfComponentCount : 9; // The number of components measured in times of 16-bits.
-                                         // A single 32-bit component will be halfComponentCount=2
-        uint16_t isFlat             : 1; // Flat shading or not
-        uint16_t is16Bit            : 1; // Half float or not
-        uint16_t isCustom           : 1; // Custom interpolation mode or not
-    };
-    uint16_t u16All;
+union InOutCompatibilityInfo {
+  struct {
+    uint16_t halfComponentCount : 9; // The number of components measured in times of 16-bits.
+                                     // A single 32-bit component will be halfComponentCount=2
+    uint16_t isFlat : 1;             // Flat shading or not
+    uint16_t is16Bit : 1;            // 16-bit (i8/i16/f16, i8 is treated as 16-bit) or not
+    uint16_t isCustom : 1;           // Custom interpolation mode or not
+  };
+  uint16_t u16All;
 };
-struct LocationSpan
-{
-    uint16_t GetCompatibilityKey() const { return compatibilityInfo.u16All; }
+// Defined in InOutLocationMapManager
+struct LocationSpan {
+uint16_t getCompatibilityKey() const { return compatibilityInfo.u16All; }
 
-    uint32_t AsIndex() const { return ((GetCompatibilityKey() << 16) | firstLocation.AsIndex()); }
+unsigned asIndex() const { return ((getCompatibilityKey() << 16) | firstLocation.asIndex()); }
 
-    bool operator==(const LocationSpan& rhs) const { return (this->AsIndex() == rhs.AsIndex()); }
+bool operator==(const LocationSpan &rhs) const { return this->asIndex() == rhs.asIndex(); }
 
-    bool operator<(const LocationSpan& rhs) const { return (this->AsIndex() < rhs.AsIndex()); }
+bool operator<(const LocationSpan &rhs) const { return this->asIndex() < rhs.asIndex(); }
 
-    InOutLocation firstLocation;
-    InOutCompatibilityInfo compatibilityInfo;
+InOutLocation firstLocation;
+InOutCompatibilityInfo compatibilityInfo;
 };
 ```
 ### 4.4 Scalarizaiton
-Scalarization is done while lowering SPIR-V inputs of FS and outputs of the previous stage. This allows intermediate passes to clean up transparently, perform dead-code elimination, other cross-stage optimizations such as constant propagation, and so on.
+Scalarization is done before processShader() in the resource collect pass. Hence, we need find unused elements by traversing each call users. In the future, we can fix this properly by doing the whole of generic input/output assignment later on in the middle-end, somewhere in the LLVM middle-end optimization pass flow.
 ### 4.5 Re-vectorization
 Fragment shader input instructions do not benefit from re-vectorization.
 Output instructions of the previous shader stage do benefit from re-vectorization, since export instructions are expensive. In general, we should strive to combine export instructions as much as possible. Furthermore, parameter exports should generally be done at the end of the hardware vertex or primitive shader stage.
@@ -185,3 +215,4 @@ Implementation have four phases in rough.
 - Phase 3: Enable packing all XX-FS pipelines (~3 weeks)
 ### 5.2 Status
 - Phase1 is completed with all tests passed.
+- Phase2 is under review.

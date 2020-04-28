@@ -1908,7 +1908,7 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
 
   // NOTE: PAL expects at least one mmSPI_PS_INPUT_CNTL_0 register set, so we always patch it at least one if none
   // were identified in the shader.
-  const std::vector<FsInterpInfo> dummyInterpInfo{{0, false, false, false}};
+  const std::vector<FsInterpInfo> dummyInterpInfo{{0, false, false, false, false, false}};
   const auto &fsInterpInfo = resUsage->inOutUsage.fs.interpInfo;
   const auto *interpInfo = fsInterpInfo.size() == 0 ? &dummyInterpInfo : &fsInterpInfo;
 
@@ -1929,12 +1929,10 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
       static const unsigned PassThroughMode = (1 << 5);
       spiPsInputCntl.bits.FLAT_SHADE = true;
       spiPsInputCntl.bits.OFFSET |= PassThroughMode;
-    } else {
-      if (interpInfoElem.is16bit) {
-        // NOTE: Enable 16-bit interpolation mode for non-passthrough mode. Attribute 0 is always valid.
-        spiPsInputCntl.bits.FP16_INTERP_MODE = true;
-        spiPsInputCntl.bits.ATTR0_VALID = true;
-      }
+    } else if (!interpInfoElem.flat && interpInfoElem.is16bit) {
+      spiPsInputCntl.bits.FP16_INTERP_MODE = true;
+      spiPsInputCntl.bits.ATTR0_VALID = interpInfoElem.attr0Valid;
+      spiPsInputCntl.bits.ATTR1_VALID = interpInfoElem.attr1Valid;
     }
 
     if (pointCoordLoc == i) {

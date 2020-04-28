@@ -142,7 +142,7 @@ bool PatchNullFragShader::runOnModule(llvm::Module &module) {
   pipelineState->setShaderStageMask(pipelineState->getShaderStageMask() | shaderStageToMask(ShaderStageFragment));
 
   // Add usage info for dummy input
-  FsInterpInfo interpInfo = {0, false, false, false};
+  FsInterpInfo interpInfo = {0, false, false, false, false, false};
   resUsage->builtInUsage.fs.smooth = true;
   resUsage->inOutUsage.inputLocMap[0] = InvalidValue;
   resUsage->inOutUsage.fs.interpInfo.push_back(interpInfo);
