@@ -48,6 +48,8 @@ using namespace llvm;
 // -enable-tess-offchip: enable tessellation off-chip mode
 static cl::opt<bool> EnableTessOffChip("enable-tess-offchip", cl::desc("Enable tessellation off-chip mode"),
                                        cl::init(false));
+// -pack-in-out: pack input/output
+static cl::opt<bool> PackInOut("pack-in-out", cl::desc("Pack input/output"), cl::init(false));
 
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char UnlinkedMetadataName[] = "lgc.unlinked";
@@ -780,6 +782,15 @@ void PipelineState::readGraphicsState(Module *module) {
 bool PipelineState::isTessOffChip() {
   // For GFX9+, always enable tessellation off-chip mode
   return EnableTessOffChip || getLgcContext()->getTargetInfo().getGfxIpVersion().major >= 9;
+}
+
+// =====================================================================================================================
+// Determine whether to use input/output packing
+bool PipelineState::isPackInOut() {
+  // Pack input/output requirements:
+  // 1) -pack-in-out option is on
+  // 2) It is a VS-FS pipeline
+  return PackInOut && (m_stageMask == (shaderStageToMask(ShaderStageVertex) | shaderStageToMask(ShaderStageFragment)));
 }
 
 // =====================================================================================================================

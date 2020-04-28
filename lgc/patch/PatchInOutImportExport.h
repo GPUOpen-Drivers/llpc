@@ -83,7 +83,7 @@ private:
                                          llvm::Value *vertexIdx, llvm::Instruction *insertPos);
   llvm::Value *patchFsGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
                                          llvm::Value *compIdx, llvm::Value *auxInterpValue, unsigned interpMode,
-                                         unsigned interpLoc, llvm::Instruction *insertPos);
+                                         unsigned interpLoc, bool highHalf, llvm::Instruction *insertPos);
 
   llvm::Value *patchTcsGenericOutputImport(llvm::Type *outputTy, unsigned location, llvm::Value *locOffset,
                                            llvm::Value *compIdx, llvm::Value *vertexIdx, llvm::Instruction *insertPos);

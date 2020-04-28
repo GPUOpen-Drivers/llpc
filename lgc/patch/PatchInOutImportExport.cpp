@@ -317,6 +317,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
   if (!callee)
     return;
 
+  IRBuilder<> builder(*m_context);
   auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
   auto mangledName = callee->getName();
@@ -425,6 +426,8 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
       unsigned loc = InvalidValue;
       Value *locOffset = nullptr;
+      Value *elemIdx = nullptr;
+      bool highHalf = false;
 
       if (m_shaderStage == ShaderStageVertex) {
         // NOTE: For vertex shader, generic inputs are not mapped.
@@ -452,8 +455,23 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
             loc = resUsage->inOutUsage.perPatchInputLocMap[value];
           }
         } else {
-          assert(resUsage->inOutUsage.inputLocMap.find(value) != resUsage->inOutUsage.inputLocMap.end());
-          loc = resUsage->inOutUsage.inputLocMap[value];
+          if ((m_shaderStage == ShaderStageFragment) && m_pipelineState->isPackInOut()) {
+            InOutLocationInfo origLocInfo = {};
+            origLocInfo.location = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
+            const uint32_t elemIdxArgIdx = isInterpolantInputImport ? 2 : 1;
+            origLocInfo.component = cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue();
+            origLocInfo.half = false;
+            assert(resUsage->inOutUsage.inOutLocMap.find(origLocInfo.u16All) != resUsage->inOutUsage.inOutLocMap.end());
+
+            InOutLocationInfo newLocInfo = {};
+            newLocInfo.u16All = resUsage->inOutUsage.inOutLocMap[origLocInfo.u16All];
+            loc = newLocInfo.location;
+            elemIdx = builder.getInt32(newLocInfo.component);
+            highHalf = newLocInfo.half;
+          } else {
+            assert(resUsage->inOutUsage.inputLocMap.find(value) != resUsage->inOutUsage.inputLocMap.end());
+            loc = resUsage->inOutUsage.inputLocMap[value];
+          }
         }
       }
       assert(loc != InvalidValue);
@@ -503,7 +521,8 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         unsigned interpMode = InOutInfo::InterpModeSmooth;
         unsigned interpLoc = InOutInfo::InterpLocCenter;
 
-        Value *elemIdx = callInst.getOperand(isInterpolantInputImport ? 2 : 1);
+        if (!elemIdx)
+          elemIdx = callInst.getOperand(isInterpolantInputImport ? 2 : 1);
         assert(isDontCareValue(elemIdx) == false);
 
         Value *auxInterpValue = nullptr;
@@ -524,7 +543,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         }
 
         input = patchFsGenericInputImport(inputTy, loc, locOffset, elemIdx, auxInterpValue, interpMode, interpLoc,
-                                          &callInst);
+                                          highHalf, &callInst);
         break;
       }
       case ShaderStageCompute: {
@@ -1497,10 +1516,13 @@ Value *PatchInOutImportExport::patchGsGenericInputImport(Type *inputTy, unsigned
 // calculated I/J; for "custom" interpolation, it is vertex no. (could be null)
 // @param interpMode : Interpolation mode
 // @param interpLoc : Interpolation location
+// @param highHalf : Whether it is a high half in a 16-bit attribute
 // @param insertPos : Where to insert the patch instruction
 Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned location, Value *locOffset,
                                                          Value *compIdx, Value *auxInterpValue, unsigned interpMode,
-                                                         unsigned interpLoc, Instruction *insertPos) {
+                                                         unsigned interpLoc, bool highHalf, Instruction *insertPos) {
+  IRBuilder<> builder(*m_context);
+  builder.SetInsertPoint(insertPos);
   Value *input = UndefValue::get(inputTy);
 
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
@@ -1509,12 +1531,18 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
   const unsigned locCount = inputTy->getPrimitiveSizeInBits() / 8 > SizeOfVec4 ? 2 : 1;
   while (interpInfo.size() <= location + locCount - 1)
     interpInfo.push_back(InvalidFsInterpInfo);
-  interpInfo[location] = {
-      location,
-      (interpMode == InOutInfo::InterpModeFlat),
-      (interpMode == InOutInfo::InterpModeCustom),
-      (inputTy->getScalarSizeInBits() == 16),
-  };
+  // Set the fields of FsInterpInfo except attr1Valid at location when it is not a high half
+  if (!highHalf) {
+    auto &interpInfoAtLoc = interpInfo[location];
+    interpInfoAtLoc.loc = location;
+    interpInfoAtLoc.flat = interpMode == InOutInfo::InterpModeFlat;
+    interpInfoAtLoc.custom = interpMode == InOutInfo::InterpModeCustom;
+    interpInfoAtLoc.is16bit = inputTy->getScalarSizeInBits() == 16;
+    interpInfoAtLoc.attr0Valid = true;
+  } else {
+    // attr1Valid is false by default and set it true when it is realy a high half
+    interpInfo[location].attr1Valid = true;
+  }
 
   if (locCount > 1) {
     // The input occupies two consecutive locations
@@ -1604,21 +1632,21 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
 
       if (bitWidth == 16) {
         Value *args1[] = {
-            iCoord,                                               // i
-            ConstantInt::get(Type::getInt32Ty(*m_context), i),    // attr_chan
-            loc,                                                  // attr
-            ConstantInt::get(Type::getInt1Ty(*m_context), false), // high
-            primMask                                              // m0
+            iCoord,                     // i
+            builder.getInt32(i),        // attr_chan
+            loc,                        // attr
+            builder.getInt32(highHalf), // high
+            primMask                    // m0
         };
         compValue = emitCall("llvm.amdgcn.interp.p1.f16", Type::getFloatTy(*m_context), args1, attribs, insertPos);
 
         Value *args2[] = {
-            compValue,                                            // p1
-            jCoord,                                               // j
-            ConstantInt::get(Type::getInt32Ty(*m_context), i),    // attr_chan
-            loc,                                                  // attr
-            ConstantInt::get(Type::getInt1Ty(*m_context), false), // high
-            primMask                                              // m0
+            compValue,                  // p1
+            jCoord,                     // j
+            builder.getInt32(i),        // attr_chan
+            loc,                        // attr
+            builder.getInt32(highHalf), // high
+            primMask                    // m0
         };
         compValue = emitCall("llvm.amdgcn.interp.p2.f16", Type::getHalfTy(*m_context), args2, attribs, insertPos);
       } else {
@@ -1671,13 +1699,18 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
       };
       compValue = emitCall("llvm.amdgcn.interp.mov", Type::getFloatTy(*m_context), args, attribs, insertPos);
 
-      if (bitWidth == 8) {
-        compValue = new BitCastInst(compValue, Type::getInt32Ty(*m_context), "", insertPos);
-        compValue = new TruncInst(compValue, Type::getInt8Ty(*m_context), "", insertPos);
-      } else if (bitWidth == 16) {
-        compValue = new BitCastInst(compValue, Type::getInt32Ty(*m_context), "", insertPos);
-        compValue = new TruncInst(compValue, Type::getInt16Ty(*m_context), "", insertPos);
-        compValue = new BitCastInst(compValue, Type::getHalfTy(*m_context), "", insertPos);
+      // Two int8s are also packed like 16-bit in a 32-bit channel in previous export stage
+      if (bitWidth == 8 || bitWidth == 16) {
+        compValue = builder.CreateBitCast(compValue, builder.getInt32Ty());
+        if (highHalf)
+          compValue = builder.CreateLShr(compValue, 16);
+
+        if (bitWidth == 8) {
+          compValue = builder.CreateTrunc(compValue, builder.getInt8Ty());
+        } else {
+          compValue = builder.CreateTrunc(compValue, builder.getInt16Ty());
+          compValue = builder.CreateBitCast(compValue, builder.getHalfTy());
+        }
       }
     }
 
@@ -2294,7 +2327,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     // Emulation for "in vec2 gl_PointCoord"
     const bool perSampleShading = m_pipelineState->getRasterizerState().perSampleShading;
     input = patchFsGenericInputImport(inputTy, loc, nullptr, nullptr, nullptr, InOutInfo::InterpModeSmooth,
-                                      perSampleShading ? InOutInfo::InterpLocSample : InOutInfo::InterpLocCenter,
+                                      perSampleShading ? InOutInfo::InterpLocSample : InOutInfo::InterpLocCenter, false,
                                       insertPos);
     break;
   }
@@ -2334,7 +2367,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     // Emulation for "in int gl_PrimitiveID" or "in int gl_Layer" or "in int gl_ViewportIndex"
     // or "in int gl_ViewIndex"
     input = patchFsGenericInputImport(inputTy, loc, nullptr, nullptr, nullptr, InOutInfo::InterpModeFlat,
-                                      InOutInfo::InterpLocCenter, insertPos);
+                                      InOutInfo::InterpLocCenter, false, insertPos);
     break;
   }
   case BuiltInClipDistance:
