@@ -34,7 +34,7 @@
 namespace lgc {
 
 // Define built-in kind enum.
-enum BuiltInKind {
+enum BuiltInKind : unsigned {
 #define BUILTIN(name, number, out, in, type) BuiltIn##name = number,
 #include "lgc/BuiltInDefs.h"
 #undef BUILTIN
