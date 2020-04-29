@@ -787,6 +787,24 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
 }
 
 // =====================================================================================================================
+// Returns true if userDataNode contains descriptor types that are unsupported by relocatable shader compilation.
+//
+// @param [in] nodes : user data nodes
+// @param nodeCount : number of user data nodes
+static bool hasUnrelocatableDescriptorNode(const ResourceMappingNode *nodes, unsigned nodeCount) {
+  for (unsigned i = 0; i < nodeCount; ++i) {
+    const ResourceMappingNode *node = nodes + i;
+    if (node->type == ResourceMappingNodeType::DescriptorTableVaPtr) {
+      if (hasUnrelocatableDescriptorNode(node->tablePtr.pNext, node->tablePtr.nodeCount))
+        return true;
+    } else if (node->type == ResourceMappingNodeType::DescriptorBufferCompact) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// =====================================================================================================================
 // Returns true if a graphics pipeline can be built out of the given shader info.
 //
 // @param shaderInfo : Shader info for the pipeline to be built
@@ -802,6 +820,10 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineS
     } else if (!shaderInfo[stage] || !shaderInfo[stage]->pModuleData) {
       // TODO: Generate pass-through shaders when the fragment or vertex shaders are missing.
       useRelocatableShaderElf = false;
+    } else {
+      // Check UserDataNode for unsupported Descriptor types.
+      useRelocatableShaderElf =
+          !hasUnrelocatableDescriptorNode(shaderInfo[stage]->pUserDataNodes, shaderInfo[stage]->userDataNodeCount);
     }
   }
 
@@ -834,6 +856,11 @@ bool Compiler::canUseRelocatableComputeShaderElf(const PipelineShaderInfo *shade
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
     if (moduleData && moduleData->binType != BinaryType::Spirv)
       useRelocatableShaderElf = false;
+    else {
+      // Check UserDataNode for unsupported Descriptor types.
+      useRelocatableShaderElf =
+          !hasUnrelocatableDescriptorNode(shaderInfo->pUserDataNodes, shaderInfo->userDataNodeCount);
+    }
   }
 
   if (useRelocatableShaderElf && cl::RelocatableShaderElfLimit != -1) {
