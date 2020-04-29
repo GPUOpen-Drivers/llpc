@@ -5235,12 +5235,9 @@ Instruction *SPIRVToLLVM::transBuiltinFromInst(const std::string &funcName, SPIR
   Type *retTy = bi->hasType() ? transType(retBTy) : Type::getVoidTy(*m_context);
   std::vector<Type *> argTys = transTypeVector(SPIRVInstruction::getOperandTypes(ops));
   std::vector<Value *> args = transValue(ops, bb->getParent(), bb);
-  bool hasFuncPtrArg = false;
   for (auto &i : argTys) {
-    if (isa<FunctionType>(i)) {
+    if (isa<FunctionType>(i))
       i = PointerType::get(i, SPIRAS_Private);
-      hasFuncPtrArg = true;
-    }
   }
   std::string mangledName(funcName);
   appendTypeMangling(nullptr, args, mangledName);
