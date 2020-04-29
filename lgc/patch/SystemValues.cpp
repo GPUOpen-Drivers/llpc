@@ -335,17 +335,15 @@ Value *ShaderSystemValues::getNumWorkgroups() {
 // Get vertex buffer table pointer
 Value *ShaderSystemValues::getVertexBufTablePtr() {
   if (!m_vbTablePtr) {
-    // Find the node.
-    auto vbTableNode = findResourceNodeByType(ResourceNodeType::IndirectUserDataVaPtr);
-    if (vbTableNode) {
-      // Get the 64-bit extended node value.
-      auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-      auto vbTablePtrLow = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.vs.vbTablePtr, "vbTablePtr");
-      static const unsigned MaxVertexBufferSize = 0x10000000;
-      auto vbTablePtrTy = PointerType::get(
-          ArrayType::get(VectorType::get(Type::getInt32Ty(*m_context), 4), MaxVertexBufferSize), ADDR_SPACE_CONST);
-      m_vbTablePtr = makePointer(vbTablePtrLow, vbTablePtrTy, InvalidValue);
-    }
+    auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+    assert(intfData->entryArgIdxs.vs.vbTablePtr != 0);
+
+    // Get the 64-bit extended node value.
+    auto vbTablePtrLow = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.vs.vbTablePtr, "vbTablePtr");
+    static const unsigned MaxVertexBufferSize = 0x10000000;
+    auto vbTablePtrTy = PointerType::get(
+        ArrayType::get(VectorType::get(Type::getInt32Ty(*m_context), 4), MaxVertexBufferSize), ADDR_SPACE_CONST);
+    m_vbTablePtr = makePointer(vbTablePtrLow, vbTablePtrTy, InvalidValue);
   }
   return m_vbTablePtr;
 }
@@ -388,30 +386,22 @@ Instruction *ShaderSystemValues::getStreamOutTablePtr() {
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
     unsigned entryArgIdx = 0;
 
-    if (m_shaderStage != ShaderStageCopyShader) {
-      // Find the node.
-      auto node = findResourceNodeByType(ResourceNodeType::StreamOutTableVaPtr);
-      if (node) {
-        // Get the SGPR number of the stream-out table pointer.
-        switch (m_shaderStage) {
-        case ShaderStageVertex:
-          entryArgIdx = intfData->entryArgIdxs.vs.streamOutData.tablePtr;
-          break;
-        case ShaderStageTessEval:
-          entryArgIdx = intfData->entryArgIdxs.tes.streamOutData.tablePtr;
-          break;
-        case ShaderStageCopyShader:
-          entryArgIdx = intfData->userDataUsage.gs.copyShaderStreamOutTable;
-          break;
-        default:
-          llvm_unreachable("Should never be called!");
-          break;
-        }
-      }
-    } else {
-      // Special case code for the copy shader.
+    // Get the SGPR number of the stream-out table pointer.
+    switch (m_shaderStage) {
+    case ShaderStageVertex:
+      entryArgIdx = intfData->entryArgIdxs.vs.streamOutData.tablePtr;
+      break;
+    case ShaderStageTessEval:
+      entryArgIdx = intfData->entryArgIdxs.tes.streamOutData.tablePtr;
+      break;
+    case ShaderStageCopyShader:
       entryArgIdx = intfData->userDataUsage.gs.copyShaderStreamOutTable;
+      break;
+    default:
+      llvm_unreachable("Should never be called!");
+      break;
     }
+    assert(entryArgIdx != 0);
 
     // Get the 64-bit extended node value.
     auto streamOutTablePtrLow = getFunctionArgument(m_entryPoint, entryArgIdx, "streamOutTable");
@@ -504,20 +494,6 @@ Value *ShaderSystemValues::setRingBufferDataFormat(Value *bufDesc, unsigned data
   elem3 = builder.CreateOr(elem3, builder.getInt32(dataFormatSetValue.u32All));
 
   return builder.CreateInsertElement(bufDesc, elem3, (uint64_t)3);
-}
-
-// =====================================================================================================================
-// Find resource node by type
-//
-// @param type : Resource node type to find
-const ResourceNode *ShaderSystemValues::findResourceNodeByType(ResourceNodeType type) {
-  auto userDataNodes = m_pipelineState->getUserDataNodes();
-  for (unsigned i = 0; i < userDataNodes.size(); ++i) {
-    auto node = &userDataNodes[i];
-    if (node->type == type)
-      return node;
-  }
-  return nullptr;
 }
 
 // =====================================================================================================================

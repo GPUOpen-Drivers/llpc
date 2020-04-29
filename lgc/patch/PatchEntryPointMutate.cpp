@@ -31,6 +31,7 @@
 
 #include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
+#include "lgc/BuilderBase.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
@@ -43,6 +44,7 @@
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
@@ -130,6 +132,9 @@ private:
     SmallVector<UserDataNodeUsage, 8> descriptorSets;
     // Minimum offset at which spill table is used.
     unsigned spillUsage = UINT_MAX;
+    // Usage of vertex buffer table and streamout table
+    bool usesVertexBufferTable = false;
+    bool usesStreamOutTable = false;
   };
 
   // Gather user data usage in all shaders.
@@ -143,7 +148,7 @@ private:
   FunctionType *generateEntryPointType(uint64_t *inRegMask);
 
   void addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs,
-                              SmallVectorImpl<UserDataArg> &specialUserDataArgs, IRBuilder<> &builder) const;
+                              SmallVectorImpl<UserDataArg> &specialUserDataArgs, IRBuilder<> &builder);
   void addUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs, IRBuilder<> &builder);
   unsigned addUserDataArg(SmallVectorImpl<UserDataArg> &userDataArgs, unsigned userDataValue, unsigned sizeInDwords,
                           unsigned *argIndex, bool useFixedLayout, unsigned userDataSize, IRBuilder<> &builder);
@@ -281,6 +286,9 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
   // Find lgc.spill.table, lgc.push.constants, lgc.root.descriptor, lgc.descriptor.set functions, and from
   // there all calls to them. Add each call to the applicable list in the UserDataUsage struct for the
   // (merged) shader stage.
+  // Also find lgc.input.import.generic calls in VS, indicating that the vertex buffer table is needed.
+  // Also find lgc.output.export.xfb calls anywhere, indicating that the streamout table is needed in the
+  // last vertex-processing stage.
   for (Function &func : *module) {
     if (!func.isDeclaration())
       continue;
@@ -381,6 +389,18 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
         descriptorSets.resize(std::max(descriptorSets.size(), size_t(set + 1)));
         descriptorSets[set].users.push_back(call);
       }
+    } else if (func.getName().startswith(lgcName::InputImportGeneric)) {
+      for (User *user : func.users()) {
+        CallInst *call = cast<CallInst>(user);
+        if (getShaderStage(call->getFunction()) == ShaderStageVertex) {
+          getUserDataUsage(ShaderStageVertex)->usesVertexBufferTable = true;
+          break;
+        }
+      }
+    } else if (func.getName().startswith(lgcName::OutputExportXfb) && !func.use_empty()) {
+      auto lastVertexStage = m_pipelineState->getLastVertexProcessingStage();
+      lastVertexStage = lastVertexStage == ShaderStageCopyShader ? ShaderStageGeometry : lastVertexStage;
+      getUserDataUsage(lastVertexStage)->usesStreamOutTable = true;
     }
   }
 }
@@ -388,10 +408,16 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
 // =====================================================================================================================
 // Fix up user data uses in all shaders: For unspilled ones, use the entry arg directly; for spilled ones,
 // insert a load from the spill table, shared for the function.
-// This uses the entryArgIdx fields in UserDataUsage, that were set indirectly in determineUnspilledUserDataArgs,
-// because addUserDataArgs passed a pointer to one in each UserDataArg constructor call.
+// This uses the entryArgIdx fields in UserDataUsage; each one was set as follows:
+// 1. addUserDataArgs constructed a UserDataArg for it, giving it a pointer to the applicable entryArgIdx field;
+// 2. In determineUnspilledUserDataArgs, where it decides to unspill (i.e. keep in shader entry SGPR), it stores the
+//    argument index into that pointed to value;
+// 3. In this function, we use the entryArgIdx field to get the argument index. If it is 0, then the item was
+//    spilled.
+//
+// @param module : IR module
 void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
-  IRBuilder<> builder(module.getContext());
+  BuilderBase builder(module.getContext());
 
   // For each function definition...
   for (Function &func : module) {
@@ -454,18 +480,19 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
       Value *replacementVal = nullptr;
       if (userDataUsage->pushConstSpill) {
         // At least one use of the push constant pointer remains.
-        // TODO Shader compilation: If there is no user data layout, we need a reloc here.
-        assert(!m_pipelineState->getUserDataNodes().empty() && "Spill with no user data layout not implemented yet");
         const ResourceNode *node = m_pipelineState->findSingleRootResourceNode(ResourceNodeType::PushConst);
         Value *byteOffset = nullptr;
+        builder.SetInsertPoint(spillTable->getNextNode());
         if (node) {
           byteOffset = builder.getInt32(node->offsetInDwords * 4);
           // Ensure we mark spill table usage.
           m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
-        } else {
+        } else if (!m_pipelineState->isUnlinked()) {
           byteOffset = UndefValue::get(builder.getInt32Ty());
+        } else {
+          // Unlinked shader compilation: Use a reloc.
+          byteOffset = builder.CreateRelocationConstant("pushconst");
         }
-        builder.SetInsertPoint(spillTable->getNextNode());
         replacementVal = builder.CreateGEP(builder.getInt8Ty(), spillTable, byteOffset);
       }
       for (Instruction *&call : userDataUsage->pushConst.users) {
@@ -537,17 +564,22 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
             if (!load) {
               // This is the first use we have seen in this function. Create the GEP and load, straight after the
               // code at the start of the function that extends the spill table pointer.
-              // TODO Shader compilation: The GEP offset needs to be a reloc.
-              assert(!m_pipelineState->getUserDataNodes().empty() &&
-                     "Spill with no user data layout not implemented yet");
               builder.SetInsertPoint(spillTable->getNextNode());
               const ResourceNode *node;
               const ResourceNode *innerNode;
               std::tie(node, innerNode) =
                   m_pipelineState->findResourceNode(ResourceNodeType::DescriptorTableVaPtr, descSetIdx, 0);
               ((void)innerNode);
-              m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
-              Value *offset = builder.getInt32(node->offsetInDwords * 4);
+              Value *offset = nullptr;
+              if (node) {
+                // We have the user data node for the desciptor set. Use the offset from that.
+                m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
+                offset = builder.getInt32(node->offsetInDwords * 4);
+              } else {
+                // Shader compilation. Use a reloc.
+                assert(m_pipelineState->isUnlinked());
+                offset = builder.CreateRelocationConstant("descset_" + Twine(descSetIdx));
+              }
               Value *addr = builder.CreateGEP(builder.getInt8Ty(), spillTable, offset);
               addr = builder.CreateBitCast(addr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
               load = builder.CreateLoad(builder.getInt32Ty(), addr);
@@ -787,32 +819,14 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
 // @param builder : IRBuilder to get types from
 void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs,
                                                    SmallVectorImpl<UserDataArg> &specialUserDataArgs,
-                                                   IRBuilder<> &builder) const {
+                                                   IRBuilder<> &builder) {
 
+  auto userDataUsage = getUserDataUsage(m_shaderStage);
   auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
   auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
   auto &entryArgIdxs = intfData->entryArgIdxs;
   auto &builtInUsage = resUsage->builtInUsage;
   bool enableNgg = m_pipelineState->isGraphics() ? m_pipelineState->getNggControl()->enableNgg : false;
-
-  // See if there is a vertex buffer and/or streamout in the root user data layout.
-  bool reserveVertexBufferTable = false;
-  bool reserveStreamOutTable = false;
-  for (auto &node : m_pipelineState->getUserDataNodes()) {
-    if (node.type == ResourceNodeType::IndirectUserDataVaPtr) {
-      reserveVertexBufferTable = true;
-    } else if (node.type == ResourceNodeType::StreamOutTableVaPtr) {
-      // Only the last shader stage before fragment (ignoring copy shader) needs a stream out table.
-      if (m_shaderStage == m_pipelineState->getLastVertexProcessingStage() || m_shaderStage == ShaderStageGeometry)
-        reserveStreamOutTable = true;
-      else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
-        // On GFX9+, the shader stage that the last shader is merged in to needs a stream out
-        // table, to ensure that the merged shader gets one.
-        if (m_shaderStage == ShaderStageTessEval || (m_shaderStage == ShaderStageVertex && !m_hasTs))
-          reserveStreamOutTable = true;
-      }
-    }
-  }
 
   if (m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessControl ||
       m_shaderStage == ShaderStageTessEval || m_shaderStage == ShaderStageGeometry) {
@@ -880,7 +894,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
 
       // Vertex buffer table.
-      if (reserveVertexBufferTable) {
+      if (userDataUsage->usesVertexBufferTable) {
         specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::VertexBufferTable,
                                                   &vsIntfData->entryArgIdxs.vs.vbTablePtr));
       }
@@ -912,13 +926,8 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
 
   // Allocate register for stream-out buffer table, to go before the user data node args (unlike all the ones
   // above, which go after the user data node args).
-  // If the user data layout has an entry for the stream-out buffer table, but it is not used, then we
-  // still reserve space for it but we do not add it to PAL metadata. This is probably unnecessary, but it
-  // is what the old code did. On <=GFX8, we add it to PAL metadata even if unused.
-  if (reserveStreamOutTable) {
-    auto userDataValue = Util::Abi::UserDataMapping::Invalid;
-    if (resUsage->inOutUsage.enableXfb || m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9)
-      userDataValue = Util::Abi::UserDataMapping::StreamOutTable;
+  if (userDataUsage->usesStreamOutTable) {
+    auto userDataValue = Util::Abi::UserDataMapping::StreamOutTable;
     switch (m_shaderStage) {
     case ShaderStageVertex:
       userDataArgs.push_back(
@@ -949,15 +958,60 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
 // @param builder : IRBuilder to get types from
 void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs, IRBuilder<> &builder) {
 
-  // Add entries from the root user data layout (not vertex buffer or streamout, and not unused ones).
-  // TODO Shader compilation: This should not be conditional on isUnlinked(). Once we have shader compilation
-  // without user data layout working, we can instead make it conditional on having a user data layout.
-  bool useFixedLayout = m_shaderStage == ShaderStageCompute && !m_pipelineState->isUnlinked();
   auto userDataUsage = getUserDataUsage(m_shaderStage);
+  if (m_pipelineState->isUnlinked() && m_pipelineState->getUserDataNodes().empty()) {
+    // Shader compilation with no user data layout. Add descriptor sets directly from the user data usage
+    // gathered at the start of this pass.
+    for (unsigned descSetIdx = 0; descSetIdx != userDataUsage->descriptorSets.size(); ++descSetIdx) {
+      auto &descriptorSet = userDataUsage->descriptorSets[descSetIdx];
+      if (!descriptorSet.users.empty()) {
+        // Set the PAL metadata user data value to indicate that it needs modifying at link time.
+        unsigned userDataValue = DescRelocMagic | descSetIdx;
+        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), userDataValue, &descriptorSet.entryArgIdx));
+      }
+    }
+
+    // Add push constants (if used).
+    // We add a potential unspilled arg for each separate dword offset of the push const at which there is a load.
+    // We already know that loads we have on our pushConstOffsets lists are at dword-aligned offset and dword-aligned
+    // size. We need to ensure that all loads are the same size, by removing ones that are bigger than the
+    // minimum size.
+    for (unsigned dwordOffset = 0, dwordEndOffset = userDataUsage->pushConstOffsets.size();
+         dwordOffset != dwordEndOffset; ++dwordOffset) {
+      UserDataNodeUsage &pushConstOffset = userDataUsage->pushConstOffsets[dwordOffset];
+      if (pushConstOffset.users.empty())
+        continue;
+
+      // Check that the load size does not overlap with the next used offset in the push constant.
+      bool haveOverlap = false;
+      unsigned endOffset =
+          std::min(dwordOffset + pushConstOffset.dwordSize, unsigned(userDataUsage->pushConstOffsets.size()));
+      for (unsigned followingOffset = dwordOffset + 1; followingOffset != endOffset; ++followingOffset) {
+        if (!userDataUsage->pushConstOffsets[followingOffset].users.empty()) {
+          haveOverlap = true;
+          break;
+        }
+      }
+      if (haveOverlap) {
+        userDataUsage->pushConstSpill = true;
+        continue;
+      }
+
+      // Add the arg (part of the push const) that we can potentially unspill.
+      addUserDataArg(userDataArgs, DescRelocPushConst + dwordOffset, pushConstOffset.dwordSize,
+                     &pushConstOffset.entryArgIdx, /*useFixedLayout=*/0, /*userDataSize=*/0, builder);
+    }
+
+    return;
+  }
+
+  // We do have user data layout.
+  // Add entries from the root user data layout (not vertex buffer or streamout, and not unused ones).
 
   // userDataSize counts how many SGPRs we have already added, so we can tell if we need padding before
   // an arg in a compute shader. We initialize with userDataArgs.size(), relying on the fact that all the
   // ones added so far (global table, per-shader table, streamout table for graphics) use one register each.
+  bool useFixedLayout = m_shaderStage == ShaderStageCompute;
   unsigned userDataSize = userDataArgs.size();
 
   for (unsigned i = 0; i != m_pipelineState->getUserDataNodes().size(); ++i) {

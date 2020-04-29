@@ -114,9 +114,6 @@ private:
   // Explicitly set the DATA_FORMAT of ring buffer descriptor.
   llvm::Value *setRingBufferDataFormat(llvm::Value *bufDesc, unsigned dataFormat, BuilderBase &builder) const;
 
-  // Find resource node by type
-  const ResourceNode *findResourceNodeByType(ResourceNodeType type);
-
   // Find resource node by descriptor set ID
   unsigned findResourceNodeByDescSet(unsigned descSet);
 
