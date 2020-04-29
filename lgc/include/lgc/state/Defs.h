@@ -139,5 +139,6 @@ static const unsigned InternalPerShaderTable = 0x10000001;
 static const unsigned DescRelocMagic = 0xA5A5A500;
 static const unsigned DescRelocMagicMask = 0xFFFFFF00;
 static const unsigned DescSetMask = 0x000000FF;
+static const unsigned DescRelocPushConst = 0xA5A5A600;
 
 } // namespace lgc
