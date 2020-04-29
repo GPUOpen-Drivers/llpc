@@ -1120,13 +1120,13 @@ static unsigned getDescriptorResourceStride(unsigned descSet, unsigned binding, 
 
     switch (resource->type) {
     case ResourceMappingNodeType::DescriptorSampler:
-      return DescriptorSizeSampler / 4;
+      return DescriptorSizeSampler;
       break;
     case ResourceMappingNodeType::DescriptorResource:
     case ResourceMappingNodeType::DescriptorFmask:
-      return DescriptorSizeResource / 4;
+      return DescriptorSizeResource;
     case ResourceMappingNodeType::DescriptorCombinedTexture:
-      return (DescriptorSizeResource + DescriptorSizeSampler) / 4;
+      return (DescriptorSizeResource + DescriptorSizeSampler);
     default:
       llvm_unreachable("Unexpected resource node type");
       break;
