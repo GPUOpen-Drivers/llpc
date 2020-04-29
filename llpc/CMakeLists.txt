@@ -76,7 +76,6 @@ function(llpc_set_compiler_options PROJECT_NAME)
             -fno-rtti
             -fPIC
             -std=c++14
-            -Wno-unused
             -Wno-ignored-qualifiers
             -Wno-missing-field-initializers
             -Wno-invalid-offsetof           # offsetof within non-standard-layout type 'x' is undefined

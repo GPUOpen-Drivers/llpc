@@ -882,14 +882,11 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
   // NOTE: If input is LLVM IR, read it now. There is now only ever one IR module representing the
   // whole pipeline.
-  bool isLlvmBc = false;
   const PipelineShaderInfo *shaderInfoEntry = shaderInfo[0] ? shaderInfo[0] : shaderInfo.back();
   if (shaderInfoEntry) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
-    if (moduleData && moduleData->binType == BinaryType::LlvmBc) {
-      isLlvmBc = true;
+    if (moduleData && moduleData->binType == BinaryType::LlvmBc)
       pipelineModule.reset(context->loadLibary(&moduleData->binCode).release());
-    }
   }
 
   // If not IR input, run the per-shader passes, including SPIR-V translation, and then link the modules

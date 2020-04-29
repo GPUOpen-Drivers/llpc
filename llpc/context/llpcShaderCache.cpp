@@ -344,6 +344,7 @@ Result ShaderCache::buildFileName(const char *executableName, const char *cacheF
       result = Result::Success;
   }
 
+  ((void)length);
   return result;
 }
 
