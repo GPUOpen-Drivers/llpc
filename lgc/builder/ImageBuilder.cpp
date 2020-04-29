@@ -802,8 +802,7 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
 
   // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
   // Init sample descriptor for luma channel
-  Value *samplerDescLuma =
-      CreateShuffleVector(convertingSamplerDesc, convertingSamplerDesc, ArrayRef<unsigned>{0, 1, 2, 3});
+  Value *samplerDescLuma = CreateShuffleVector(convertingSamplerDesc, convertingSamplerDesc, ArrayRef<int>{0, 1, 2, 3});
 
   YCbCrSampleInfo sampleInfoLuma = {resultTy, dim, flags, imageDesc, samplerDescLuma, address, instName.str(), true};
 
