@@ -29,11 +29,11 @@
  ***********************************************************************************************************************
  */
 #include "llpcPipelineContext.h"
-#include "../interface/lgc/LgcContext.h"
 #include "SPIRVInternal.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "lgc/Builder.h"
+#include "lgc/LgcContext.h"
 #include "lgc/Pipeline.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Module.h"
