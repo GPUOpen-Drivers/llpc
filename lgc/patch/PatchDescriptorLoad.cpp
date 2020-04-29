@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "PatchDescriptorLoad.h"
-#include "../interface/lgc/LgcContext.h"
+#include "lgc/LgcContext.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
 #include "llvm/IR/IRBuilder.h"

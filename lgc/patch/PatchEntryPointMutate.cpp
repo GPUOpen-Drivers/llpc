@@ -29,9 +29,9 @@
  ***********************************************************************************************************************
  */
 #include "PatchEntryPointMutate.h"
-#include "../interface/lgc/LgcContext.h"
 #include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
+#include "lgc/LgcContext.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/TargetInfo.h"
