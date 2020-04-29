@@ -31,7 +31,6 @@
 #include "PatchEntryPointMutate.h"
 #include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
-#include "lgc/LgcContext.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/TargetInfo.h"
@@ -309,8 +308,7 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(uint64_t *inRegMask)
   unsigned availUserDataCount = maxUserDataCount - userDataIdx;
   unsigned requiredRemappedUserDataCount = 0; // Maximum required user data
   unsigned requiredUserDataCount = 0;         // Maximum required user data without remapping
-  bool useFixedLayout =
-      (m_shaderStage == ShaderStageCompute && !m_pipelineState->getLgcContext()->buildingRelocatableElf());
+  bool useFixedLayout = m_shaderStage == ShaderStageCompute && !m_pipelineState->isUnlinked();
   bool reserveVbTable = false;
   bool reserveStreamOutTable = false;
   bool reserveEsGsLdsSize = false;
