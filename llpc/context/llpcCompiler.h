@@ -124,7 +124,7 @@ public:
                                          unsigned forceLoopUnrollCount, ElfPackage *pipelineElf);
 
   Result buildPipelineInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
-                               unsigned forceLoopUnrollCount, ElfPackage *pipelineElf);
+                               unsigned forceLoopUnrollCount, bool unlinked, ElfPackage *pipelineElf);
 
   // Gets the count of compiler instance.
   static unsigned getInstanceCount() { return m_instanceCount; }

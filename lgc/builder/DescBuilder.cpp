@@ -71,7 +71,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   // look. Later code will use relocs.
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
-  if (!m_pipelineState->isUnlinked() /* TODO: Shader compilation: || !m_pipelineState->getUserDataNodes().empty()*/) {
+  if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     // We have the user data layout. Find the node.
     std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorBuffer, descSet, binding);
     if (!node) {
@@ -189,7 +189,7 @@ Value *DescBuilder::CreateGetSamplerDescPtr(unsigned descSet, unsigned binding, 
   // look. Later code will use relocs.
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
-  if (!m_pipelineState->isUnlinked() /* TODO: Shader compilation: || !m_pipelineState->getUserDataNodes().empty()*/) {
+  if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorSampler, descSet, binding);
     if (!node) {
       // We did not find the resource node. Return an undef value.
@@ -212,7 +212,7 @@ Value *DescBuilder::CreateGetImageDescPtr(unsigned descSet, unsigned binding, co
   // look. Later code will use relocs.
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
-  if (!m_pipelineState->isUnlinked() /* TODO: Shader compilation: || !m_pipelineState->getUserDataNodes().empty()*/) {
+  if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorResource, descSet, binding);
     if (!node) {
       // We did not find the resource node. Return an undef value.
@@ -235,7 +235,7 @@ Value *DescBuilder::CreateGetTexelBufferDescPtr(unsigned descSet, unsigned bindi
   // look. Later code will use relocs.
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
-  if (!m_pipelineState->isUnlinked() /* TODO: Shader compilation: || !m_pipelineState->getUserDataNodes().empty()*/) {
+  if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) =
         m_pipelineState->findResourceNode(ResourceNodeType::DescriptorTexelBuffer, descSet, binding);
     if (!node) {
@@ -262,7 +262,7 @@ Value *DescBuilder::CreateGetFmaskDescPtr(unsigned descSet, unsigned binding, co
   const ResourceNode *node = nullptr;
   bool shadow =
       m_pipelineState->getOptions().shadowDescriptorTable != static_cast<unsigned>(ShadowDescriptorTable::Disable);
-  if (!m_pipelineState->isUnlinked() /* TODO: Shader compilation: || !m_pipelineState->getUserDataNodes().empty()*/) {
+  if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorFmask, descSet, binding);
     if (!node && shadow) {
       // For fmask with -enable-shadow-descriptor-table, if no fmask descriptor is found, look for a resource
@@ -338,7 +338,7 @@ Value *DescBuilder::getDescPtrAndStride(ResourceNodeType resType, unsigned descS
 
   if (!stride) {
     // Stride is not determinable just from the descriptor type requested by the Builder call.
-    if (m_pipelineState->isUnlinked() /* TODO: Shader compilation:  && m_pipelineState->getUserDataNodes().empty()*/) {
+    if (m_pipelineState->isUnlinked() && m_pipelineState->getUserDataNodes().empty()) {
       // Shader compilation: Get byte stride using a reloc.
       stride = CreateRelocationConstant("dstride_" + Twine(descSet) + "_" + Twine(binding));
     } else {
@@ -439,14 +439,11 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
   }
 
   // Add on the byte offset of the descriptor.
-  // TODO: This should be conditional just on !node, as it will be possible to do shader compilation
-  // with available user data layout.
   Value *offset = nullptr;
-  bool useRelocationForOffsets = !node || m_pipelineState->isUnlinked();
-  if (useRelocationForOffsets) {
-    // Get the offset for the descriptor using a reloc. The reloc symbol name
-    // needs to contain the descriptor set and binding, and, for image, fmask or sampler, whether it is
-    // a sampler.
+  if (!node) {
+    // Shader compilation with no user data layout. Get the offset for the descriptor using a reloc. The
+    // reloc symbol name needs to contain the descriptor set and binding, and, for image, fmask or sampler,
+    // whether it is a sampler.
     StringRef relocNameSuffix = "";
     switch (resType) {
     case ResourceNodeType::DescriptorSampler:

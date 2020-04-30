@@ -190,7 +190,8 @@ ShaderHash PipelineContext::getShaderHashCode(ShaderStage stage) const {
 // Set pipeline state in Pipeline object for middle-end
 //
 // @param [in/out] pipeline : Middle-end pipeline object
-void PipelineContext::setPipelineState(Pipeline *pipeline) const {
+// @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs
+void PipelineContext::setPipelineState(Pipeline *pipeline, bool unlinked) const {
   // Give the shader stage mask to the middle-end. We need to translate the Vkgc::ShaderStage bit numbers
   // to lgc::ShaderStage bit numbers.
   unsigned stageMask = getShaderStageMask();
@@ -204,8 +205,10 @@ void PipelineContext::setPipelineState(Pipeline *pipeline) const {
   // Give the pipeline options to the middle-end.
   setOptionsInPipeline(pipeline);
 
-  // Give the user data nodes to the middle-end.
-  setUserDataInPipeline(pipeline);
+  if (!unlinked) {
+    // Give the user data nodes to the middle-end.
+    setUserDataInPipeline(pipeline);
+  }
 
   if (isGraphics()) {
     // Set vertex input descriptions to the middle-end.
