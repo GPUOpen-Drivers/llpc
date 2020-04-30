@@ -39,6 +39,39 @@ if(ICD_BUILD_LLPC)
     set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR} )
 endif()
 
+### Set Options and build LLVM #########################################################################################
+if(ICD_BUILD_LLPC)
+    # Set LLVM options and build LLVM
+    # Add LGC as an LLVM external project, but only if its CMakeLists.txt exists.
+    set(LLVM_EXTERNAL_PROJECTS lgc)
+    set(LLVM_EXTERNAL_LGC_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../lgc)
+
+    # Set other LLVM settings.
+    set(LLVM_ENABLE_ASSERTIONS ${CMAKE_BUILD_TYPE_DEBUG} CACHE BOOL Force)
+    set(LLVM_TARGETS_TO_BUILD AMDGPU CACHE STRING Force)
+    set(LLVM_BUILD_TESTS OFF CACHE BOOL Force)
+    set(LLVM_BUILD_TOOLS ON CACHE BOOL Force)
+    set(LLVM_BUILD_UTILS OFF CACHE BOOL Force)
+    set(LLVM_INCLUDE_DOCS OFF CACHE BOOL Force)
+    set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL Force)
+    set(LLVM_INCLUDE_GO_TESTS OFF CACHE BOOL Force)
+    set(LLVM_INCLUDE_TESTS OFF CACHE BOOL Force)
+    set(LLVM_INCLUDE_TOOLS ON CACHE BOOL Force)
+    set(LLVM_INCLUDE_UTILS ON CACHE BOOL Force)
+    set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL Force)
+    set(LLVM_ENABLE_ZLIB OFF CACHE BOOL Force)
+    # confict with PAL
+    #set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
+
+    set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
+
+    add_subdirectory(${XGL_LLVM_SRC_PATH} ${PROJECT_BINARY_DIR}/llvm)
+    set(XGL_LLVM_BUILD_PATH ${PROJECT_BINARY_DIR}/llvm)
+
+    llvm_map_components_to_libnames(llvm_libs lgc amdgpucodegen amdgpuinfo amdgpuasmparser amdgpudisassembler LTO ipo analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils coroutines)
+    target_link_libraries(llpc PUBLIC ${llvm_libs})
+endif()
+
 ### Compiler Options ###################################################################################################
 if(UNIX)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -295,7 +328,6 @@ target_vs_filters(llpc)
 if(ICD_BUILD_LLPC)
     add_subdirectory(${PROJECT_SOURCE_DIR}/../tool/vfx ${PROJECT_BINARY_DIR}/../vfx)
 endif()
-
 ### Create Standalone Compiler ############################################################################################
 if(ICD_BUILD_LLPC)
 add_executable(amdllpc

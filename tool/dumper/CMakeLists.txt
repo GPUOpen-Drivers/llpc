@@ -134,22 +134,27 @@ if(ICD_BUILD_LLPC)
     target_compile_definitions(dumper PRIVATE ICD_BUILD_LLPC)
 endif()
 
-# metrohash
-target_link_libraries(dumper PUBLIC metrohash)
-target_compile_definitions(dumper PUBLIC SINGLE_EXTERNAL_METROHASH)
+# imported/metrohash
+if(NOT TARGET metrohash)
+    add_subdirectory(../../imported/metrohash ${PROJECT_BINARY_DIR}/../metrohash)
+    target_link_libraries(dumper PUBLIC llpc_metrohash)
+else()
+    target_link_libraries(dumper PUBLIC metrohash)
+    target_compile_definitions(dumper PUBLIC SINGLE_EXTERNAL_METROHASH)
+endif()
 
 target_link_libraries(dumper PRIVATE cwpack)
 
 target_include_directories(dumper
     PUBLIC
-        ${XGL_LLPC_PATH}/../include
+        ${XGL_VKGC_PATH}/include
     PRIVATE
-        ${XGL_LLPC_PATH}/../include
+        ${XGL_VKGC_PATH}/include
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
         ${LLVM_INCLUDE_DIRS}
         ${XGL_ICD_PATH}/api/include/khronos
-        ${XGL_LLPC_PATH}/../util
+        ${XGL_VKGC_PATH}/util
 )
 
 target_sources(dumper PRIVATE

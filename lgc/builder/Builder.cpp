@@ -502,3 +502,4 @@ CallInst *Builder::CreateIntrinsic(Intrinsic::ID id, ArrayRef<Type *> types, Arr
     result->setFastMathFlags(getFastMathFlags());
   return result;
 }
+

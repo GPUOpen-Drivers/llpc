@@ -25,8 +25,6 @@
 
 #pragma once
 
-
-
 namespace Pal
 {
 namespace Gfx9
