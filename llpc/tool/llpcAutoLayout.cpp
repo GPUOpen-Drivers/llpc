@@ -56,8 +56,6 @@ struct ResourceNodeSet {
 };
 
 // -auto-layout-desc: automatically create descriptor layout based on resource usages
-//
-// NOTE: This option is deprecated and will be ignored, and is present only for compatibility.
 static cl::opt<bool> AutoLayoutDesc("auto-layout-desc",
                                     cl::desc("Automatically create descriptor layout based on resource usages"));
 
@@ -538,6 +536,10 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
       colorTarget->channelWriteMask = (1U << elemCount) - 1;
     }
   }
+
+  // Only auto-layout descriptors if -auto-layout-desc is on.
+  if (!AutoLayoutDesc)
+    return;
 
   // Collect ResourceMappingNode entries in sets.
   std::map<unsigned, ResourceNodeSet> resNodeSets;

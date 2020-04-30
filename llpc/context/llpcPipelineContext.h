@@ -133,7 +133,7 @@ public:
   virtual const PipelineOptions *getPipelineOptions() const = 0;
 
   // Set pipeline state in lgc::Pipeline object for middle-end
-  void setPipelineState(lgc::Pipeline *pipeline) const;
+  void setPipelineState(lgc::Pipeline *pipeline, bool unlinked) const;
 
   // Get ShaderFpMode struct for the given shader stage
   ShaderFpMode &getShaderFpMode(ShaderStage stage) { return m_shaderFpModes[stage]; }
