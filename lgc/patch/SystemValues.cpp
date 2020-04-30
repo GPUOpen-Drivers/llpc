@@ -75,7 +75,8 @@ Value *ShaderSystemValues::getEsGsRingBufDesc() {
       break;
     }
 
-    BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+    // Ensure we have got the global table pointer first, and insert new code after that.
+    BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
     m_esGsRingBufDesc = loadDescFromDriverTable(tableOffset, builder);
     if (m_shaderStage != ShaderStageGeometry && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 8) {
       // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor for
@@ -91,7 +92,8 @@ Value *ShaderSystemValues::getEsGsRingBufDesc() {
 Value *ShaderSystemValues::getTessFactorBufDesc() {
   assert(m_shaderStage == ShaderStageTessControl);
   if (!m_tfBufDesc) {
-    BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+    // Ensure we have got the global table pointer first, and insert new code after that.
+    BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
     m_tfBufDesc = loadDescFromDriverTable(SiDrvTableTfBufferOffs, builder);
   }
   return m_tfBufDesc;
@@ -147,7 +149,8 @@ Value *ShaderSystemValues::getRelativeId() {
 Value *ShaderSystemValues::getOffChipLdsDesc() {
   assert(m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval);
   if (!m_offChipLdsDesc) {
-    BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+    // Ensure we have got the global table pointer first, and insert new code after that.
+    BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
     m_offChipLdsDesc = loadDescFromDriverTable(SiDrvTableHsBuffeR0Offs, builder);
   }
   return m_offChipLdsDesc;
@@ -211,7 +214,8 @@ Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
   if (m_gsVsRingBufDescs.size() <= streamId)
     m_gsVsRingBufDescs.resize(streamId + 1);
   if (!m_gsVsRingBufDescs[streamId]) {
-    BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+    // Ensure we have got the global table pointer first, and insert new code after that.
+    BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
 
     if (m_shaderStage == ShaderStageGeometry) {
       const auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
@@ -328,7 +332,7 @@ Value *ShaderSystemValues::getShadowDescTablePtr(unsigned descSet) {
 
 // =====================================================================================================================
 // Get internal global table pointer as pointer to i8.
-Value *ShaderSystemValues::getInternalGlobalTablePtr() {
+Instruction *ShaderSystemValues::getInternalGlobalTablePtr() {
   if (!m_internalGlobalTablePtr) {
     auto ptrTy = Type::getInt8Ty(*m_context)->getPointerTo(ADDR_SPACE_CONST);
     // Global table is always the first function argument
@@ -597,7 +601,10 @@ Instruction *ShaderSystemValues::getSpillTablePtr() {
 }
 
 // =====================================================================================================================
-// Load descriptor from driver table
+// Load descriptor from driver table.
+// If the caller sets builder's insert point to the start of the function, it should ensure that it first calls
+// getInternalGlobalTablePtr(). Otherwise there is a danger that code is inserted in the wrong order, giving
+// invalid IR.
 //
 // @param tableOffset : Byte offset in driver table
 // @param builder : Builder to use for insertion
