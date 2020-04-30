@@ -85,7 +85,7 @@ using namespace Pal::Gfx9::Chip;
       _reg##_ID = Gfx09::mm##_reg;                                                                                     \
       _reg##_VAL.u32All = 0;                                                                                           \
     } else if (_gfx == 10) {                                                                                           \
-      _reg##_ID = Pal::Gfx9::Chip::Gfx10::mm##_reg;                                                                                     \
+      _reg##_ID = Pal::Gfx9::Chip::Gfx10::mm##_reg;                                                                    \
       _reg##_VAL.u32All = 0;                                                                                           \
     } else {                                                                                                           \
       INIT_REG_TO_INVALID(_reg);                                                                                       \
@@ -96,7 +96,7 @@ using namespace Pal::Gfx9::Chip;
 #define INIT_REG_GFX10_PLUS(_gfx, _reg)                                                                                \
   {                                                                                                                    \
     if (_gfx == 10) {                                                                                                  \
-      _reg##_ID = Pal::Gfx9::Chip::Gfx10::mm##_reg;                                                                                     \
+      _reg##_ID = Pal::Gfx9::Chip::Gfx10::mm##_reg;                                                                    \
       _reg##_VAL.u32All = 0;                                                                                           \
     } else {                                                                                                           \
       INIT_REG_TO_INVALID(_reg);                                                                                       \
@@ -104,10 +104,10 @@ using namespace Pal::Gfx9::Chip;
   }
 
 // Apu09.1x plus
-#define INIT_REG_APU09_1X_PLUS(_gfx, _reg)                                                              \
+#define INIT_REG_APU09_1X_PLUS(_gfx, _reg)                                                                             \
   {                                                                                                                    \
-    if (_gfx == 10) {                                                                        \
-      _reg##_ID = Apu09_1xPlus::mm##_reg;                                                                                \
+    if (_gfx == 10) {                                                                                                  \
+      _reg##_ID = Apu09_1xPlus::mm##_reg;                                                                              \
       _reg##_VAL.u32All = 0;                                                                                           \
     } else {                                                                                                           \
       INIT_REG_TO_INVALID(_reg);                                                                                       \
@@ -129,7 +129,7 @@ using namespace Pal::Gfx9::Chip;
 #define INIT_REG_GFX10(_gfx, _reg)                                                                                     \
   {                                                                                                                    \
     if (_gfx == 10) {                                                                                                  \
-      _reg##_ID = Pal::Gfx9::Chip::Gfx10::mm##_reg;                                                                                     \
+      _reg##_ID = Pal::Gfx9::Chip::Gfx10::mm##_reg;                                                                    \
       _reg##_VAL.u32All = 0;                                                                                           \
     } else {                                                                                                           \
       INIT_REG_TO_INVALID(_reg);                                                                                       \

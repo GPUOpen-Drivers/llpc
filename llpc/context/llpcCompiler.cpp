@@ -553,7 +553,8 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
           // Per-shader SPIR-V lowering passes.
           SpirvLower::addPasses(context, static_cast<ShaderStage>(entryNames[i].stage), *lowerPassMgr,
-                                timerProfiler.getTimer(TimerLower), cl::ForceLoopUnrollCount);
+                                timerProfiler.getTimer(TimerLower), cl::ForceLoopUnrollCount
+                                 );
 
           lowerPassMgr->add(createBitcodeWriterPass(moduleBinaryStream));
 
@@ -938,7 +939,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         timerProfiler.startStopTimer(TimerLoadBc, false);
       } else {
         module = new Module((Twine("llpc") + getShaderStageName(shaderInfoEntry->entryStage)).str() +
-                                std::to_string(getModuleIdByIndex(shaderIndex)),
+                            std::to_string(getModuleIdByIndex(shaderIndex)),
                             *context);
       }
 
@@ -995,7 +996,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       lowerPassMgr->setPassIndex(&passIndex);
 
       SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower),
-                            forceLoopUnrollCount);
+                            forceLoopUnrollCount
+                            );
       // Run the passes.
       bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       if (!success) {
@@ -1346,15 +1348,14 @@ Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
   Context *context = acquireContext();
   context->attachPipelineContext(computeContext);
 
-  const PipelineShaderInfo *shaderInfo[ShaderStageNativeStageCount] = {
+  std::vector<const PipelineShaderInfo *> shadersInfo = {
       nullptr, nullptr, nullptr, nullptr, nullptr, &pipelineInfo->cs,
   };
-
   Result result;
   if (buildingRelocatableElf)
-    result = buildPipelineWithRelocatableElf(context, shaderInfo, forceLoopUnrollCount, pipelineElf);
+    result = buildPipelineWithRelocatableElf(context, shadersInfo, forceLoopUnrollCount, pipelineElf);
   else
-    result = buildPipelineInternal(context, shaderInfo, forceLoopUnrollCount, pipelineElf);
+    result = buildPipelineInternal(context, shadersInfo, forceLoopUnrollCount, pipelineElf);
   releaseContext(context);
   return result;
 }
