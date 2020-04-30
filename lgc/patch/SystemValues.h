@@ -90,7 +90,7 @@ public:
   llvm::Value *getShadowDescTablePtr(unsigned descSet);
 
   // Get global internal table pointer as pointer to i8.
-  llvm::Value *getInternalGlobalTablePtr();
+  llvm::Instruction *getInternalGlobalTablePtr();
 
   // Get internal per shader table pointer as pointer to i8.
   llvm::Value *getInternalPerShaderTablePtr();
@@ -162,12 +162,9 @@ private:
 
   llvm::SmallVector<llvm::Value *, 8> m_descTablePtrs;       // Descriptor table pointers
   llvm::SmallVector<llvm::Value *, 8> m_shadowDescTablePtrs; // Shadow descriptor table pointers
-  llvm::Value *m_internalGlobalTablePtr = nullptr;
-  // Internal global table pointer
-  llvm::Value *m_internalPerShaderTablePtr = nullptr;
-  // Internal per shader table pointer
-  llvm::Value *m_spilledPushConstTablePtr = nullptr;
-  // Spilled push constant pointer
+  llvm::Instruction *m_internalGlobalTablePtr = nullptr;     // Internal global table pointer
+  llvm::Value *m_internalPerShaderTablePtr = nullptr;        // Internal per shader table pointer
+  llvm::Value *m_spilledPushConstTablePtr = nullptr;         // Spilled push constant pointer
   llvm::Value *m_vbTablePtr = nullptr;          // Vertex buffer table pointer
   llvm::Instruction *m_streamOutTablePtr;       // Stream-out buffer table pointer
   llvm::Instruction *m_spillTablePtr = nullptr; // Spill table pointer
