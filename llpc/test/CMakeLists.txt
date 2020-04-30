@@ -40,6 +40,10 @@ if(DEFINED XGL_LLVM_SRC_PATH)
 endif()
 
 if(DEFINED LLVM_DIR)
+  # Hack to allow for LLVM_DIR being set incorrectly in GPUOpen CI builds.
+  if(NOT EXISTS ${LLVM_DIR}/LLVMConfig)
+    string(REPLACE llvm/lib/cmake llpc/llvm/lib/cmake LLVM_DIR ${LLVM_DIR})
+  endif()
   set(BUILD_EXTERNAL NO)
 else()
   set(BUILD_EXTERNAL YES)
