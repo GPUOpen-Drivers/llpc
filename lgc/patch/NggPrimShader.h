@@ -75,7 +75,8 @@ private:
 
   llvm::Value *doCulling(llvm::Module *module);
   void doParamCacheAllocRequest();
-  void doPrimitiveExport(llvm::Value *cullFlag = nullptr);
+  void doPrimitiveExportWithoutGs(llvm::Value *cullFlag = nullptr);
+  void doPrimitiveExportWithGs(llvm::Value *vertexId);
 
   void doEarlyExit(unsigned fullyCullThreadCount, unsigned expPosCount);
 
@@ -84,30 +85,27 @@ private:
 
   llvm::Function *mutateEsToVariant(llvm::Module *module, llvm::StringRef entryName, std::vector<ExpData> &expDataSet);
 
-  llvm::Value *runGsVariant(llvm::Module *module, llvm::Argument *sysValueStart, llvm::BasicBlock *insertAtEnd);
+  void runGs(llvm::Module *module, llvm::Argument *sysValueStart);
 
-  llvm::Function *mutateGsToVariant(llvm::Module *module);
+  llvm::Function *mutateGs(llvm::Module *module);
 
-  void runCopyShader(llvm::Module *module, llvm::BasicBlock *insertAtEnd);
+  void runCopyShader(llvm::Module *module, llvm::Value *vertCompacted);
+
+  llvm::Function *mutateCopyShader(llvm::Module *module);
 
   void exportGsOutput(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
-                      llvm::Value *threadIdInSubgroup, llvm::Value *outVertCounter);
+                      llvm::Value *threadIdInSubgroup, llvm::Value *emitVerts);
 
   llvm::Value *importGsOutput(llvm::Type *outputTy, unsigned location, unsigned compIdx, unsigned streamId,
                               llvm::Value *threadIdInSubgroup);
 
   void processGsEmit(llvm::Module *module, unsigned streamId, llvm::Value *threadIdInSubgroup,
-                     llvm::Value *emitCounterPtr, llvm::Value *outVertCounterPtr, llvm::Value *outPrimCounterPtr,
-                     llvm::Value *outstandingVertCounterPtr, llvm::Value *flipVertOrderPtr);
+                     llvm::Value *emitVertsPtr, llvm::Value *outVertsPtr);
 
-  void processGsCut(llvm::Module *module, unsigned streamId, llvm::Value *threadIdInSubgroup,
-                    llvm::Value *emitCounterPtr, llvm::Value *outVertCounterPtr, llvm::Value *outPrimCounterPtr,
-                    llvm::Value *outstandingVertCounterPtr, llvm::Value *flipVertOrderPtr);
+  void processGsCut(llvm::Module *module, unsigned streamId, llvm::Value *outVertsPtr);
 
   llvm::Function *createGsEmitHandler(llvm::Module *module, unsigned streamId);
   llvm::Function *createGsCutHandler(llvm::Module *module, unsigned streamId);
-
-  void reviseOutputPrimitiveData(llvm::Value *outPrimId, llvm::Value *vertexIdAdjust);
 
   llvm::Value *readPerThreadDataFromLds(llvm::Type *readDataTy, llvm::Value *threadId, NggLdsRegionType region);
 
@@ -143,12 +141,11 @@ private:
   llvm::Function *createFetchCullingRegister(llvm::Module *module);
 
   llvm::Value *doSubgroupBallot(llvm::Value *value);
-  llvm::Value *doSubgroupInclusiveAdd(llvm::Value *value, llvm::Value **ppWwmResult = nullptr);
-  llvm::Value *doDppUpdate(llvm::Value *oldValue, llvm::Value *srcValue, unsigned dppCtrl, unsigned rowMask,
-                           unsigned bankMask, bool boundCtrl = false);
 
   llvm::Value *fetchVertexPositionData(llvm::Value *vertexId);
   llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertexId);
+
+  unsigned getOutputVerticesPerPrimitive() const;
 
   // Checks if NGG culling operations are enabled
   bool enableCulling() const {
@@ -199,6 +196,9 @@ private:
   bool m_hasTcs; // Whether the pipeline has tessellation control shader
   bool m_hasTes; // Whether the pipeline has tessellation evaluation shader
   bool m_hasGs;  // Whether the pipeline has geometry shader
+
+  // Base offsets (in DWORDS) of GS output vertex streams in GS-VS ring
+  uint32_t m_gsStreamBases[MaxGsStreams];
 
   std::unique_ptr<llvm::IRBuilder<>> m_builder; // LLVM IR builder
 };

@@ -100,7 +100,6 @@ const static char NggEsEntryVariantPos[] = "lgc.ngg.ES.variant.pos";
 const static char NggEsEntryVariantParam[] = "lgc.ngg.ES.variant.param";
 
 const static char NggGsEntryPoint[] = "lgc.ngg.GS.main";
-const static char NggGsEntryVariant[] = "lgc.ngg.GS.variant";
 const static char NggGsOutputExport[] = "lgc.ngg.GS.output.export.";
 const static char NggGsOutputImport[] = "lgc.ngg.GS.output.import.";
 const static char NggGsEmit[] = "lgc.ngg.GS.emit";

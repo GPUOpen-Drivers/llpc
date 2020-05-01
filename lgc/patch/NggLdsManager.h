@@ -74,10 +74,8 @@ enum NggLdsRegionType {
   //
   LdsRegionEsGsRing,            // ES-GS ring
   LdsRegionOutPrimData,         // GS output primitive data
-  LdsRegionOutVertCountInWaves, // GS output vertex count accumulated per wave (8 potential waves) and per
-                                //   sub-group for each stream (4 GS streams)
-  LdsRegionOutVertOffset,       // GS output vertex (exported vertex data) offset in GS-VS ring
-                                //   (overlapped with the region of exported primitive data, LDS reused)
+  LdsRegionOutVertCountInWaves, // GS output vertex count accumulated per wave (8 potential waves) and per sub-group
+  LdsRegionOutVertThreadIdMap,  // GS output vertex thread ID map (compacted -> uncompacted)
   LdsRegionGsVsRing,            // GS-VS ring
 
   LdsRegionGsBeginRange = LdsRegionEsGsRing,

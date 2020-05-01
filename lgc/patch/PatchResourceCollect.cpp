@@ -407,22 +407,6 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
   gsResUsage->inOutUsage.gs.calcFactor.inputVertices = inVertsPerPrim;
 
-  unsigned outVertsPerPrim = 0;
-  switch (geometryMode.outputPrimitive) {
-  case OutputPrimitives::Points:
-    outVertsPerPrim = 1;
-    break;
-  case OutputPrimitives::LineStrip:
-    outVertsPerPrim = 2;
-    break;
-  case OutputPrimitives::TriangleStrip:
-    outVertsPerPrim = 3;
-    break;
-  default:
-    llvm_unreachable("Should never be called!");
-    break;
-  }
-
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 8) {
     unsigned gsPrimsPerSubgroup = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipDefaultPrimsPerSubgroup;
 
@@ -550,13 +534,10 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       const unsigned esExtraLdsSize = NggLdsManager::calcEsExtraLdsSize(m_pipelineState) / 4; // In DWORDs
       const unsigned gsExtraLdsSize = NggLdsManager::calcGsExtraLdsSize(m_pipelineState) / 4; // In DWORDs
 
-      // NOTE: Primitive amplification factor must be at least 1. If the maximum number of GS output vertices
-      // is too small to form a complete primitive, set the factor to 1.
-      unsigned primAmpFactor = 1;
-      if (hasGs && geometryMode.outputVertices > (outVertsPerPrim - 1)) {
-        // primAmpFactor = outputVertices - (outVertsPerPrim - 1)
-        primAmpFactor = geometryMode.outputVertices - (outVertsPerPrim - 1);
-      }
+      // NOTE: Primitive amplification factor must be at least 1. And for NGG GS mode, we force number of output
+      // primitives to be equal to that of output vertices regardless of the output primitive type by emitting
+      // invalid primitives. This is to simplify the algorithmic design of NGG GS and improve its efficiency.
+      unsigned primAmpFactor = std::max(1u, geometryMode.outputVertices);
 
       const unsigned vertsPerPrimitive = getVerticesPerPrimitive();
 

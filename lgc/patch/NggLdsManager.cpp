@@ -89,11 +89,11 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
     // ES-GS ring size is dynamically calculated (don't use it)
     InvalidValue,                                             // LdsRegionEsGsRing
     // 1 DWORD (uint32) per thread
-    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup,              // LdsRegionOutPrimData
-    // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group (4 GS streams)
-    MaxGsStreams *(SizeOfDword *Gfx9::NggMaxWavesPerSubgroup + SizeOfDword), // LdsRegionOutVertCountInWaves
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionOutPrimData
+    // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group
+    SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionOutVertCountInWaves
     // 1 DWORD (uint32) per thread
-    SizeOfDword *Gfx9::NggMaxThreadsPerSubgroup,              // LdsRegionOutVertOffset
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionOutVertThreadIdMap
     // GS-VS ring size is dynamically calculated (don't use it)
     InvalidValue,                                             // LdsRegionGsVsRing
     // clang-format on
@@ -127,7 +127,7 @@ const char *NggLdsManager::m_ldsRegionNames[LdsRegionCount] = {
     "ES-GS ring",                           // LdsRegionEsGsRing
     "GS out primitive data",                // LdsRegionOutPrimData
     "GS out vertex count in waves",         // LdsRegionOutVertCountInWaves
-    "GS out vertex offset",                 // LdsRegionOutVertOffset
+    "GS out vertex thread ID map",          // LdsRegionOutVertThreadIdMap
     "GS-VS ring",                           // LdsRegionGsVsRing
     // clang-format on
 };
@@ -172,11 +172,9 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
     //
     // The LDS layout is something like this:
     //
-    // +------------+-----------------------+--------------------------------+------------+
-    // | ES-GS ring | GS out primitive data | GS out vertex count (in waves) | GS-VS ring |
-    // +------------+-----------------------+--------------------------------+------------+
-    //              | GS out vertex  offset |
-    //              +-----------------------+
+    // +------------+-----------------------+------------------------------+-----------------------------+------------+
+    // | ES-GS ring | GS out primitive data | GS out vertex counts (waves) | GS out vertex thread ID map | GS-VS ring |
+    // +------------+-----------------------+------------------------------+-----------------------------+------------+
     //
 
     // NOTE: We round ES-GS LDS size to 4-DWORD alignment. This is for later LDS read/write operations of mutilple
@@ -189,17 +187,6 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
 
     for (unsigned region = LdsRegionGsBeginRange; region <= LdsRegionGsEndRange; ++region) {
       unsigned ldsRegionSize = LdsRegionSizes[region];
-
-      if (region == LdsRegionOutVertOffset) {
-        // An overlapped region, reused
-        m_ldsRegionStart[LdsRegionOutVertOffset] = m_ldsRegionStart[LdsRegionOutPrimData];
-
-        LLPC_OUTS(format("%-40s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32, m_ldsRegionNames[region],
-                         m_ldsRegionStart[region], ldsRegionSize)
-                  << "\n");
-
-        continue;
-      }
 
       // NOTE: LDS size of ES-GS ring is calculated (by rounding it up to 16-byte alignment)
       if (region == LdsRegionEsGsRing)
@@ -359,17 +346,16 @@ unsigned NggLdsManager::calcGsExtraLdsSize(PipelineState *pipelineState) {
   if (!nggControl->enableNgg)
     return 0;
 
-  const unsigned stageMask = pipelineState->getShaderStageMask();
-  const bool hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
+  const bool hasGs = pipelineState->hasShaderStage(ShaderStageGeometry);
   if (!hasGs) {
     // NOTE: Not need GS extra LDS when GS is not present.
     return 0;
   }
 
-  unsigned gsExtraLdsSize = LdsRegionSizes[LdsRegionOutPrimData] + LdsRegionSizes[LdsRegionOutVertCountInWaves];
-
-  return gsExtraLdsSize;
+  return LdsRegionSizes[LdsRegionOutPrimData] + LdsRegionSizes[LdsRegionOutVertCountInWaves] +
+         LdsRegionSizes[LdsRegionOutVertThreadIdMap];
 }
+
 // =====================================================================================================================
 // Reads value from LDS.
 //
@@ -387,8 +373,8 @@ Value *NggLdsManager::readValueFromLds(Type *readTy, Value *ldsOffset, bool useD
 
   // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
   assert(m_lds);
-  auto lds = ConstantExpr::getBitCast(m_lds, PointerType::get(Type::getInt8Ty(*m_context),
-                                      m_lds->getType()->getPointerAddressSpace()));
+  auto lds = ConstantExpr::getBitCast(
+      m_lds, PointerType::get(Type::getInt8Ty(*m_context), m_lds->getType()->getPointerAddressSpace()));
 
   Value *readPtr = m_builder->CreateGEP(lds, ldsOffset);
   readPtr = m_builder->CreateBitCast(readPtr, PointerType::get(readTy, ADDR_SPACE_LOCAL));
@@ -414,8 +400,8 @@ void NggLdsManager::writeValueToLds(Value *writeValue, Value *ldsOffset, bool us
 
   // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
   assert(m_lds != nullptr);
-  auto lds = ConstantExpr::getBitCast(m_lds, PointerType::get(Type::getInt8Ty(*m_context),
-                                      m_lds->getType()->getPointerAddressSpace()));
+  auto lds = ConstantExpr::getBitCast(
+      m_lds, PointerType::get(Type::getInt8Ty(*m_context), m_lds->getType()->getPointerAddressSpace()));
 
   Value* writePtr = m_builder->CreateGEP(lds, ldsOffset);
   writePtr = m_builder->CreateBitCast(writePtr, PointerType::get(writeTy, ADDR_SPACE_LOCAL));
