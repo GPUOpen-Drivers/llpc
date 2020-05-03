@@ -60,6 +60,8 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
       m_ldsManager(nullptr), m_builder(new IRBuilder<>(*m_context)) {
   assert(m_pipelineState->isGraphics());
 
+  buildPrimShaderCbLayoutLookupTable();
+
   memset(&m_nggFactor, 0, sizeof(m_nggFactor));
 
   m_hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
@@ -290,6 +292,50 @@ Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
   }
 
   return entryPoint;
+}
+
+// =====================================================================================================================
+// Builds layout lookup table of NGG primitive shader constant buffer, setting up a collection of buffer offsets
+// according to the definition of this constant buffer in ABI.
+void NggPrimShader::buildPrimShaderCbLayoutLookupTable() {
+  m_cbLayoutTable = {}; // Initialized to all-zeros
+
+  const unsigned pipelineStateOffset = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
+  m_cbLayoutTable.gsAddressLo = pipelineStateOffset + offsetof(Util::Abi::PrimShaderPsoCb, gsAddressLo);
+  m_cbLayoutTable.gsAddressHi = pipelineStateOffset + offsetof(Util::Abi::PrimShaderPsoCb, gsAddressHi);
+  m_cbLayoutTable.paClVteCntl = pipelineStateOffset + offsetof(Util::Abi::PrimShaderPsoCb, paClVteCntl);
+  m_cbLayoutTable.paSuVtxCntl = pipelineStateOffset + offsetof(Util::Abi::PrimShaderPsoCb, paSuVtxCntl);
+  m_cbLayoutTable.paClClipCntl = pipelineStateOffset + offsetof(Util::Abi::PrimShaderPsoCb, paClClipCntl);
+  m_cbLayoutTable.paSuScModeCntl = pipelineStateOffset + offsetof(Util::Abi::PrimShaderPsoCb, paSuScModeCntl);
+  m_cbLayoutTable.paClGbHorzClipAdj = pipelineStateOffset + offsetof(Util::Abi::PrimShaderPsoCb, paClGbHorzClipAdj);
+  m_cbLayoutTable.paClGbVertClipAdj = pipelineStateOffset + offsetof(Util::Abi::PrimShaderPsoCb, paClGbVertClipAdj);
+  m_cbLayoutTable.paClGbHorzDiscAdj = pipelineStateOffset + offsetof(Util::Abi::PrimShaderPsoCb, paClGbHorzDiscAdj);
+  m_cbLayoutTable.paClGbVertDiscAdj = pipelineStateOffset + offsetof(Util::Abi::PrimShaderPsoCb, paClGbVertDiscAdj);
+  m_cbLayoutTable.vgtPrimitiveType = pipelineStateOffset + offsetof(Util::Abi::PrimShaderPsoCb, vgtPrimitiveType);
+
+  const unsigned renderStateOffset = offsetof(Util::Abi::PrimShaderCbLayout, renderStateCb);
+  m_cbLayoutTable.primitiveRestartEnable =
+      renderStateOffset + offsetof(Util::Abi::PrimShaderRenderCb, primitiveRestartEnable);
+  m_cbLayoutTable.primitiveRestartIndex =
+      renderStateOffset + offsetof(Util::Abi::PrimShaderRenderCb, primitiveRestartIndex);
+  m_cbLayoutTable.matchAllBits = renderStateOffset + offsetof(Util::Abi::PrimShaderRenderCb, matchAllBits);
+
+  const unsigned vportStateOffset = offsetof(Util::Abi::PrimShaderCbLayout, viewportStateCb);
+  const unsigned vportControlSize = sizeof(Util::Abi::PrimShaderVportCb) / Util::Abi::MaxViewports;
+  for (unsigned i = 0; i < Util::Abi::MaxViewports; ++i) {
+    m_cbLayoutTable.vportControls[i].paClVportXscale =
+        vportStateOffset + vportControlSize * i +
+        offsetof(Util::Abi::PrimShaderVportCb, vportControls[0].paClVportXscale);
+    m_cbLayoutTable.vportControls[i].paClVportXoffset =
+        vportStateOffset + vportControlSize * i +
+        offsetof(Util::Abi::PrimShaderVportCb, vportControls[0].paClVportXoffset);
+    m_cbLayoutTable.vportControls[i].paClVportYscale =
+        vportStateOffset + vportControlSize * i +
+        offsetof(Util::Abi::PrimShaderVportCb, vportControls[0].paClVportYscale);
+    m_cbLayoutTable.vportControls[i].paClVportYoffset =
+        vportStateOffset + vportControlSize * i +
+        offsetof(Util::Abi::PrimShaderVportCb, vportControls[0].paClVportYoffset);
+  }
 }
 
 // =====================================================================================================================
@@ -4155,26 +4201,18 @@ Value *NggPrimShader::doBackfaceCulling(Module *module, Value *cullFlag, Value *
   if (!backfaceCuller)
     backfaceCuller = createBackfaceCuller(module);
 
-  unsigned regOffset = 0;
-
   // Get register PA_SU_SC_MODE_CNTL
   Value *paSuScModeCntl = nullptr;
-  if (m_nggControl->alwaysUsePrimShaderTable) {
-    regOffset = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
-    regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paSuScModeCntl);
-    paSuScModeCntl = fetchCullingControlRegister(module, regOffset);
-  } else
+  if (m_nggControl->alwaysUsePrimShaderTable)
+    paSuScModeCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paSuScModeCntl);
+  else
     paSuScModeCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paSuScModeCntl);
 
   // Get register PA_CL_VPORT_XSCALE
-  regOffset = offsetof(Util::Abi::PrimShaderCbLayout, viewportStateCb);
-  regOffset += offsetof(Util::Abi::PrimShaderVportCb, vportControls[0].paClVportXscale);
-  auto paClVportXscale = fetchCullingControlRegister(module, regOffset);
+  auto paClVportXscale = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportXscale);
 
   // Get register PA_CL_VPORT_YSCALE
-  regOffset = offsetof(Util::Abi::PrimShaderCbLayout, viewportStateCb);
-  regOffset += offsetof(Util::Abi::PrimShaderVportCb, vportControls[0].paClVportYscale);
-  auto paClVportYscale = fetchCullingControlRegister(module, regOffset);
+  auto paClVportYscale = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportYscale);
 
   // Do backface culling
   return m_builder->CreateCall(backfaceCuller, {cullFlag, vertex0, vertex1, vertex2,
@@ -4198,26 +4236,18 @@ Value *NggPrimShader::doFrustumCulling(Module *module, Value *cullFlag, Value *v
   if (!frustumCuller)
     frustumCuller = createFrustumCuller(module);
 
-  unsigned regOffset = 0;
-
   // Get register PA_CL_CLIP_CNTL
   Value *paClClipCntl = nullptr;
-  if (m_nggControl->alwaysUsePrimShaderTable) {
-    regOffset = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
-    regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClClipCntl);
-    paClClipCntl = fetchCullingControlRegister(module, regOffset);
-  } else
+  if (m_nggControl->alwaysUsePrimShaderTable)
+    paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
+  else
     paClClipCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClClipCntl);
 
   // Get register PA_CL_GB_HORZ_DISC_ADJ
-  regOffset = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
-  regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClGbHorzDiscAdj);
-  auto paClGbHorzDiscAdj = fetchCullingControlRegister(module, regOffset);
+  auto paClGbHorzDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbHorzDiscAdj);
 
   // Get register PA_CL_GB_VERT_DISC_ADJ
-  regOffset = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
-  regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClGbVertDiscAdj);
-  auto paClGbVertDiscAdj = fetchCullingControlRegister(module, regOffset);
+  auto paClGbVertDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbVertDiscAdj);
 
   // Do frustum culling
   return m_builder->CreateCall(
@@ -4240,29 +4270,21 @@ Value *NggPrimShader::doBoxFilterCulling(Module *module, Value *cullFlag, Value 
   if (!boxFilterCuller)
     boxFilterCuller = createBoxFilterCuller(module);
 
-  unsigned regOffset = 0;
-
   // Get register PA_CL_VTE_CNTL
   Value *paClVteCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClVteCntl);
 
   // Get register PA_CL_CLIP_CNTL
   Value *paClClipCntl = nullptr;
-  if (m_nggControl->alwaysUsePrimShaderTable) {
-    regOffset = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
-    regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClClipCntl);
-    paClClipCntl = fetchCullingControlRegister(module, regOffset);
-  } else
+  if (m_nggControl->alwaysUsePrimShaderTable)
+    paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
+  else
     paClClipCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClClipCntl);
 
   // Get register PA_CL_GB_HORZ_DISC_ADJ
-  regOffset = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
-  regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClGbHorzDiscAdj);
-  auto paClGbHorzDiscAdj = fetchCullingControlRegister(module, regOffset);
+  auto paClGbHorzDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbHorzDiscAdj);
 
   // Get register PA_CL_GB_VERT_DISC_ADJ
-  regOffset = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
-  regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClGbVertDiscAdj);
-  auto paClGbVertDiscAdj = fetchCullingControlRegister(module, regOffset);
+  auto paClGbVertDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbVertDiscAdj);
 
   // Do box filter culling
   return m_builder->CreateCall(boxFilterCuller, {cullFlag, vertex0, vertex1, vertex2, paClVteCntl, paClClipCntl,
@@ -4284,29 +4306,21 @@ Value *NggPrimShader::doSphereCulling(Module *module, Value *cullFlag, Value *ve
   if (!sphereCuller)
     sphereCuller = createSphereCuller(module);
 
-  unsigned regOffset = 0;
-
   // Get register PA_CL_VTE_CNTL
   Value *paClVteCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClVteCntl);
 
   // Get register PA_CL_CLIP_CNTL
   Value *paClClipCntl = nullptr;
-  if (m_nggControl->alwaysUsePrimShaderTable) {
-    regOffset = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
-    regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClClipCntl);
-    paClClipCntl = fetchCullingControlRegister(module, regOffset);
-  } else
+  if (m_nggControl->alwaysUsePrimShaderTable)
+    paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
+  else
     paClClipCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClClipCntl);
 
   // Get register PA_CL_GB_HORZ_DISC_ADJ
-  regOffset = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
-  regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClGbHorzDiscAdj);
-  auto paClGbHorzDiscAdj = fetchCullingControlRegister(module, regOffset);
+  auto paClGbHorzDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbHorzDiscAdj);
 
   // Get register PA_CL_GB_VERT_DISC_ADJ
-  regOffset = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
-  regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClGbVertDiscAdj);
-  auto paClGbVertDiscAdj = fetchCullingControlRegister(module, regOffset);
+  auto paClGbVertDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbVertDiscAdj);
 
   // Do small primitive filter culling
   return m_builder->CreateCall(sphereCuller, {cullFlag, vertex0, vertex1, vertex2, paClVteCntl, paClClipCntl,
@@ -4329,20 +4343,14 @@ Value *NggPrimShader::doSmallPrimFilterCulling(Module *module, Value *cullFlag, 
   if (!smallPrimFilterCuller)
     smallPrimFilterCuller = createSmallPrimFilterCuller(module);
 
-  unsigned regOffset = 0;
-
   // Get register PA_CL_VTE_CNTL
   Value *paClVteCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClVteCntl);
 
   // Get register PA_CL_VPORT_XSCALE
-  regOffset = offsetof(Util::Abi::PrimShaderCbLayout, viewportStateCb);
-  regOffset += offsetof(Util::Abi::PrimShaderVportCb, vportControls[0].paClVportXscale);
-  auto paClVportXscale = fetchCullingControlRegister(module, regOffset);
+  auto paClVportXscale = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportXscale);
 
   // Get register PA_CL_VPORT_YSCALE
-  regOffset = offsetof(Util::Abi::PrimShaderCbLayout, viewportStateCb);
-  regOffset += offsetof(Util::Abi::PrimShaderVportCb, vportControls[0].paClVportYscale);
-  auto paClVportYscale = fetchCullingControlRegister(module, regOffset);
+  auto paClVportYscale = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportYscale);
 
   // Do small primitive filter culling
   return m_builder->CreateCall(smallPrimFilterCuller,
