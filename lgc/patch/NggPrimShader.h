@@ -50,6 +50,51 @@ struct ExpData {
   llvm::Value *expValue; // Export value
 };
 
+// Represents constant buffer offsets (in bytes) of viewport controls in primitive shader table.
+// NOTE: The layout structure is defined by @ref Util::Abi::PrimShaderVportCb.
+struct PrimShaderVportCbLookupTable {
+  // Viewport transform scale
+  unsigned paClVportXscale;
+  unsigned paClVportXoffset;
+  unsigned paClVportYscale;
+  unsigned paClVportYoffset;
+  // Viewport width/height
+  unsigned vportWidth;
+  unsigned vportHeight;
+};
+
+// Represents a collection of constant buffer offsets (in bytes) in primitive shader table.
+// NOTE: The layout structure is defined by @ref Util::Abi::PrimShaderCbLayout.
+struct PrimShaderCbLayoutLookupTable {
+  // GS addressed used for jump from ES
+  unsigned gsAddressLo;
+  unsigned gsAddressHi;
+  // Viewport transform controls
+  unsigned paClVteCntl;
+  // Float-to-fixed-vertex conversion controls
+  unsigned paSuVtxCntl;
+  // Clip space controls
+  unsigned paClClipCntl;
+  // Culling controls
+  unsigned paSuScModeCntl;
+  // Various frustum culling controls
+  unsigned paClGbHorzClipAdj; // Horizontal adjacent culling control
+  unsigned paClGbVertClipAdj; // Vertical adjacent culling control
+  unsigned paClGbHorzDiscAdj; // Horizontal discard culling control
+  unsigned paClGbVertDiscAdj; // Vertical discard culling control
+  // Run-time handling primitive type
+  unsigned vgtPrimitiveType;
+  // Number of MSAA samples
+  unsigned msaaNumSamples;
+  // Render state
+  unsigned primitiveRestartEnable;
+  unsigned primitiveRestartIndex;
+  unsigned matchAllBits;
+  unsigned enableConservativeRasterization;
+  // Viewport controls
+  PrimShaderVportCbLookupTable vportControls[Util::Abi::MaxViewports];
+};
+
 // =====================================================================================================================
 // Represents the manager of NGG primitive shader.
 class NggPrimShader {
@@ -67,6 +112,8 @@ private:
 
   llvm::FunctionType *generatePrimShaderEntryPointType(uint64_t *inRegMask) const;
   llvm::Function *generatePrimShaderEntryPoint(llvm::Module *module);
+
+  void buildPrimShaderCbLayoutLookupTable();
 
   void constructPrimShaderWithoutGs(llvm::Module *module);
   void constructPrimShaderWithGs(llvm::Module *module);
@@ -163,6 +210,8 @@ private:
   GfxIpVersion m_gfxIp;           // Graphics IP version info
 
   const NggControl *m_nggControl; // NGG control settings
+
+  PrimShaderCbLayoutLookupTable m_cbLayoutTable; // Layout lookup table of primitive shader constant buffer
 
   NggLdsManager *m_ldsManager; // NGG LDS manager
 
