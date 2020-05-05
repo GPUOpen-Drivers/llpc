@@ -389,11 +389,15 @@ static Result init(int argc, char *argv[], ICompiler **ppCompiler) {
         gfxipStr = arg.slice(1, StringRef::npos);
       else
         continue;
-      if (!gfxipStr.consumeInteger(10, ParsedGfxIp.major) && gfxipStr.startswith(".")) {
-        gfxipStr = gfxipStr.slice(1, StringRef::npos);
-        if (!gfxipStr.consumeInteger(10, ParsedGfxIp.minor) && gfxipStr.startswith(".")) {
+      if (!gfxipStr.consumeInteger(10, ParsedGfxIp.major)) {
+        ParsedGfxIp.minor = 0;
+        ParsedGfxIp.stepping = 0;
+        if (gfxipStr.startswith(".")) {
           gfxipStr = gfxipStr.slice(1, StringRef::npos);
-          gfxipStr.consumeInteger(10, ParsedGfxIp.stepping);
+          if (!gfxipStr.consumeInteger(10, ParsedGfxIp.minor) && gfxipStr.startswith(".")) {
+            gfxipStr = gfxipStr.slice(1, StringRef::npos);
+            gfxipStr.consumeInteger(10, ParsedGfxIp.stepping);
+          }
         }
       }
       break;
