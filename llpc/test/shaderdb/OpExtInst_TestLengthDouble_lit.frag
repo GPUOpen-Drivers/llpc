@@ -20,9 +20,9 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call reassoc nnan nsz arcp contract double @llvm.fabs.f64(double
-; SHADERTEST: = call reassoc nnan nsz arcp contract double (...) @lgc.create.dot.product.f64(<3 x double>
-; SHADERTEST: = call reassoc nnan nsz arcp contract double @llvm.sqrt.f64(double
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn double @llvm.fabs.f64(double
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn double (...) @lgc.create.dot.product.f64(<3 x double>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn double @llvm.sqrt.f64(double
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

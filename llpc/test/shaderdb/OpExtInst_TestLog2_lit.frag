@@ -20,14 +20,14 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call reassoc nnan nsz arcp contract float @llvm.log2.f32(float
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> @llvm.log2.v3f32(<3 x float>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.log2.f32(float
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> @llvm.log2.v3f32(<3 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: = call reassoc nnan nsz arcp contract float @llvm.log2.f32(float
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> @llvm.log2.v3f32(<3 x float>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.log2.f32(float
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> @llvm.log2.v3f32(<3 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: = call reassoc nnan nsz arcp contract float @llvm.log2.f32(float
-; SHADERTEST: = call reassoc nnan nsz arcp contract float @llvm.log2.f32(float
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.log2.f32(float
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.log2.f32(float
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
