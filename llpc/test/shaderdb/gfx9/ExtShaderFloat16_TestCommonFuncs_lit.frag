@@ -49,26 +49,26 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.fabs.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.fsign.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.floor.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.trunc.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.rint.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.ceil.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.fract.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.fmod.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.trunc.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.fmin.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.fclamp.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.fmix.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.smooth.step.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> @llvm.fabs.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.fsign.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> @llvm.floor.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> @llvm.trunc.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> @llvm.rint.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> @llvm.ceil.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.fract.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.fmod.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> @llvm.trunc.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.fmin.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.fclamp.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.fmix.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.smooth.step.v3f16(<3 x half>
 ; SHADERTEST: = call <3 x i1> (...) @lgc.create.isnan.v3i1(<3 x half>
 ; SHADERTEST: = call <3 x i1> (...) @lgc.create.isinf.v3i1(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.fma.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.extract.significand.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.fma.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.extract.significand.v3f16(<3 x half>
 ; SHADERTEST: = call <3 x i16> (...) @lgc.create.extract.exponent.v3i16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.ldexp.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @lgc.create.fmax.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.ldexp.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.fmax.v3f16(<3 x half>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS

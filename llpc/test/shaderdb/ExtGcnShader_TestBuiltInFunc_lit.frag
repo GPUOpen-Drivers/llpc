@@ -23,8 +23,8 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: = call reassoc nnan nsz arcp contract float (...) @lgc.create.cube.face.index.f32(<3 x float>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <2 x float> (...) @lgc.create.cube.face.coord.v2f32(<3 x float>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn float (...) @lgc.create.cube.face.index.f32(<3 x float>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.cube.face.coord.v2f32(<3 x float>
 ; SHADERTEST: = call i64 (...) @lgc.create.read.clock.i64(i1 false)
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubeid

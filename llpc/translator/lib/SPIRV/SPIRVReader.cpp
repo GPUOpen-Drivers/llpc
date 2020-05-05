@@ -1201,6 +1201,7 @@ void SPIRVToLLVM::setFastMathFlags(SPIRVValue *bv) {
   llvm::FastMathFlags fmf;
   if (SPIRVGenFastMath) {
     fmf.setAllowReciprocal();
+    fmf.setApproxFunc();
     // Enable contraction when "NoContraction" decoration is not specified
     bool allowContract = !bv || !bv->hasDecorate(DecorationNoContraction);
     // Do not set AllowContract or AllowReassoc if DenormFlushToZero is on, to
