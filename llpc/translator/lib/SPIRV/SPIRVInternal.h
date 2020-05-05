@@ -605,7 +605,7 @@ union ShaderImageMemoryMetadata {
 /// Flags used for floating-point control
 union ShaderFloatControlFlags {
   struct {
-    unsigned DenormPerserve : 4;           // Preserve denormals
+    unsigned DenormPreserve : 4;           // Preserve denormals
     unsigned DenormFlushToZero : 4;        // Flush denormals to zeros
     unsigned SignedZeroInfNanPreserve : 4; // Preserve signed zero, INF, NaN
     unsigned RoundingModeRTE : 4;          // Rounding to even

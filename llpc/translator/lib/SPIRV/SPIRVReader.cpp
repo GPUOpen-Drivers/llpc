@@ -6153,7 +6153,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   static_assert(SPIRVTW_64Bit == (64 >> 3), "Unexpected value!");
 
   if (auto em = m_entryTarget->getExecutionMode(ExecutionModeDenormPreserve))
-    m_fpControlFlags.DenormPerserve = em->getLiterals()[0] >> 3;
+    m_fpControlFlags.DenormPreserve = em->getLiterals()[0] >> 3;
 
   if (auto em = m_entryTarget->getExecutionMode(ExecutionModeDenormFlushToZero))
     m_fpControlFlags.DenormFlushToZero = em->getLiterals()[0] >> 3;
@@ -6181,15 +6181,15 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
     shaderMode.fp64RoundMode = FpRoundMode::Even;
   else if (m_fpControlFlags.RoundingModeRTZ & SPIRVTW_64Bit)
     shaderMode.fp64RoundMode = FpRoundMode::Zero;
-  if (m_fpControlFlags.DenormPerserve & SPIRVTW_16Bit)
+  if (m_fpControlFlags.DenormPreserve & SPIRVTW_16Bit)
     shaderMode.fp16DenormMode = FpDenormMode::FlushNone;
   else if (m_fpControlFlags.DenormFlushToZero & SPIRVTW_16Bit)
     shaderMode.fp16DenormMode = FpDenormMode::FlushInOut;
-  if (m_fpControlFlags.DenormPerserve & SPIRVTW_32Bit)
+  if (m_fpControlFlags.DenormPreserve & SPIRVTW_32Bit)
     shaderMode.fp32DenormMode = FpDenormMode::FlushNone;
   else if (m_fpControlFlags.DenormFlushToZero & SPIRVTW_32Bit)
     shaderMode.fp32DenormMode = FpDenormMode::FlushInOut;
-  if (m_fpControlFlags.DenormPerserve & SPIRVTW_64Bit)
+  if (m_fpControlFlags.DenormPreserve & SPIRVTW_64Bit)
     shaderMode.fp64DenormMode = FpDenormMode::FlushNone;
   else if (m_fpControlFlags.DenormFlushToZero & SPIRVTW_64Bit)
     shaderMode.fp64DenormMode = FpDenormMode::FlushInOut;

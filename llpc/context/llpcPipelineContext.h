@@ -64,7 +64,7 @@ enum class DescriptorType : unsigned {
 
 // Represents floating-point control setting.
 struct FloatControl {
-  bool denormPerserve;           // Preserve denormals
+  bool denormPreserve;           // Preserve denormals
   bool denormFlushToZero;        // Flush denormals to zero
   bool signedZeroInfNanPreserve; // Preserve signed zero/INF/NaN
   bool roundingModeRTE;          // Rounding mode: to nearest even
@@ -82,7 +82,7 @@ typedef std::vector<DescriptorBinding> DescriptorSet;
 
 // Shader FP mode for use by front-end
 struct ShaderFpMode {
-  unsigned denormPerserve : 4;           // Bitmask of denormPerserve flags
+  unsigned denormPreserve : 4;           // Bitmask of denormPreserve flags
   unsigned denormFlushToZero : 4;        // Bitmask of denormFlushToZero flags
   unsigned signedZeroInfNanPreserve : 4; // Bitmask of signedZeroInfNanPreserve flags
   unsigned roundingModeRTE : 4;          // Bitmask of roundingModeRTE flags
