@@ -506,8 +506,6 @@ static void cleanupCompileInfo(CompileInfo *compileInfo) {
 
   if (compileInfo->pipelineInfoFile)
     Vfx::vfxCloseDoc(compileInfo->pipelineInfoFile);
-
-  memset(compileInfo, 0, sizeof(*compileInfo));
 }
 
 // =====================================================================================================================

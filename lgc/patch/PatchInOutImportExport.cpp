@@ -122,6 +122,12 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
 
       // Now process the call and return instructions.
       visit(*m_entryPoint);
+
+      delete m_fragColorExport;
+      m_fragColorExport = nullptr;
+
+      delete m_vertexFetch;
+      m_vertexFetch = nullptr;
     }
   }
 
@@ -136,12 +142,6 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
     callInst->eraseFromParent();
   }
   m_exportCalls.clear();
-
-  delete m_fragColorExport;
-  m_fragColorExport = nullptr;
-
-  delete m_vertexFetch;
-  m_vertexFetch = nullptr;
 
   for (auto &fragColors : m_expFragColors)
     fragColors.clear();
