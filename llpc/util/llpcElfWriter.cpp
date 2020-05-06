@@ -472,18 +472,17 @@ template <class Elf> void ElfWriter<Elf>::assembleNotes() {
   delete[] noteSection->data;
   uint8_t *data = new uint8_t[std::max(noteSize, noteHeaderSize)];
   assert(data);
+  memset(data, 0, std::max(noteSize, noteHeaderSize));
   noteSection->data = data;
   noteSection->secHead.sh_size = noteSize;
 
   for (auto &note : m_notes) {
     memcpy(data, &note.hdr, noteHeaderSize);
     data += noteHeaderSize;
-    const unsigned noteNameSize = alignTo(note.hdr.nameSize, sizeof(unsigned));
-    memcpy(data, &note.hdr.name, noteNameSize);
-    data += noteNameSize;
-    const unsigned noteDescSize = alignTo(note.hdr.descSize, sizeof(unsigned));
-    memcpy(data, note.data, noteDescSize);
-    data += noteDescSize;
+    memcpy(data, &note.hdr.name, note.hdr.nameSize);
+    data += alignTo(note.hdr.nameSize, sizeof(unsigned));
+    memcpy(data, note.data, note.hdr.descSize);
+    data += alignTo(note.hdr.descSize, sizeof(unsigned));
   }
 
   assert(noteSection->secHead.sh_size == static_cast<unsigned>(data - noteSection->data));
