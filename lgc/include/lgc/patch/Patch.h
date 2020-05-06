@@ -92,7 +92,7 @@ llvm::FunctionPass *createPatchIntrinsicSimplify();
 llvm::ModulePass *createPatchLlvmIrInclusion();
 llvm::FunctionPass *createPatchLoadScalarizer();
 llvm::ModulePass *createPatchNullFragShader();
-llvm::FunctionPass *createPatchPeepholeOpt(bool enableDiscardOpt = false);
+llvm::FunctionPass *createPatchPeepholeOpt();
 llvm::ModulePass *createPatchPreparePipelineAbi(bool onlySetCallingConvs);
 llvm::ModulePass *createPatchResourceCollect();
 llvm::ModulePass *createPatchSetupTargetFeatures();

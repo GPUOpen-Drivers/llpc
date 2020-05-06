@@ -62,17 +62,11 @@ char PatchPeepholeOpt::ID;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for peephole optimizations.
-//
-// @param enableDiscardOpt : Enable the optimization for "kill" intrinsic
-FunctionPass *createPatchPeepholeOpt(bool enableDiscardOpt) {
-  return new PatchPeepholeOpt(enableDiscardOpt);
+FunctionPass *createPatchPeepholeOpt() {
+  return new PatchPeepholeOpt();
 }
 
-// =====================================================================================================================
-//
-// @param enableDiscardOpt : Enable the optimization for "kill" intrinsic
-PatchPeepholeOpt::PatchPeepholeOpt(bool enableDiscardOpt) : FunctionPass(ID) {
-  m_enableDiscardOpt = enableDiscardOpt;
+PatchPeepholeOpt::PatchPeepholeOpt() : FunctionPass(ID) {
 }
 
 // =====================================================================================================================
@@ -659,64 +653,6 @@ void PatchPeepholeOpt::visitPHINode(PHINode &phiNode) {
             m_instsToErase.push_back(otherSubPhiNode);
           }
         }
-      }
-    }
-  }
-}
-
-// =====================================================================================================================
-// Visits "call" instruction.
-//
-// @param callInst : "Call" instruction
-void PatchPeepholeOpt::visitCallInst(CallInst &callInst) {
-  auto callee = callInst.getCalledFunction();
-  if (!callee)
-    return;
-
-  // Optimization for call @llvm.amdgcn.kill(). Pattern:
-  //   %29 = fcmp olt float %28, 0.000000e+00
-  //   br i1 % 29, label %30, label %31
-  // 30:; preds = %.entry
-  //   call void @llvm.amdgcn.kill(i1 false)
-  //   br label %73
-  //
-  // Move the kill call outside and remove the kill call block
-  //   %29 = fcmp olt float %28, 0.000000e+00
-  //   %nonkill = xor i1 %29, true
-  //   call void @llvm.amdgcn.kill(i1 %nonkill)
-  //   br i1 false, label %30, label %31
-  // 30:; preds = %.entry
-  //   call void @llvm.amdgcn.kill(i1 false)
-  //   br label %73
-  if (cl::EnableDiscardOpt && m_enableDiscardOpt && callee->getIntrinsicID() == Intrinsic::amdgcn_kill) {
-    auto block = callInst.getParent();
-    if (block->size() > 2) {
-      // Apply the optimization to blocks that contains single kill call instruction.
-      return;
-    }
-
-    for (BasicBlock *predBlock : predecessors(block)) {
-      auto terminator = predBlock->getTerminator();
-      BranchInst *branch = dyn_cast<BranchInst>(terminator);
-      if (branch && branch->isConditional()) {
-        auto cond = branch->getCondition();
-        auto trueBlock = dyn_cast<BasicBlock>(branch->getSuccessor(0));
-        auto newKill = dyn_cast<CallInst>(callInst.clone());
-        llvm::LLVMContext *context = &callInst.getContext();
-
-        if (trueBlock == block) {
-          // the kill block is the true condition block
-          // insert a bitwise not instruction.
-          auto notCond = BinaryOperator::CreateNot(cond, "", terminator);
-          newKill->setArgOperand(0, notCond);
-          // Make the kill block unreachable
-          branch->setCondition(ConstantInt::get(Type::getInt1Ty(*context), false));
-        } else {
-          newKill->setArgOperand(0, cond);
-          // make the kill block unreachable
-          branch->setCondition(ConstantInt::get(Type::getInt1Ty(*context), true));
-        }
-        newKill->insertBefore(terminator);
       }
     }
   }

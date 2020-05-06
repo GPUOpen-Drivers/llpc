@@ -53,9 +53,7 @@ namespace lgc {
 //
 class PatchPeepholeOpt final : public llvm::FunctionPass, public llvm::InstVisitor<PatchPeepholeOpt> {
 public:
-  explicit PatchPeepholeOpt(bool enKillOpt);
-
-  PatchPeepholeOpt() : FunctionPass(ID) {}
+  PatchPeepholeOpt();
 
   bool runOnFunction(llvm::Function &function) override;
 
@@ -65,7 +63,6 @@ public:
   void visitICmp(llvm::ICmpInst &iCmp);
   void visitExtractElement(llvm::ExtractElementInst &extractElement);
   void visitPHINode(llvm::PHINode &phiNode);
-  void visitCallInst(llvm::CallInst &callInst);
 
   void moveAfter(llvm::Instruction &move, llvm::Instruction &after) const;
   void insertAfter(llvm::Instruction &insert, llvm::Instruction &after) const;
@@ -81,7 +78,6 @@ private:
   // -----------------------------------------------------------------------------------------------------------------
 
   llvm::SmallVector<llvm::Instruction *, 8> m_instsToErase;
-  bool m_enableDiscardOpt; // Whether to enable the optimization for "kill" intrinsic
 };
 
 } // namespace lgc
