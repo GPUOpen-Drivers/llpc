@@ -140,6 +140,7 @@ void LgcContext::initialize() {
   setOptionDefault("amdgpu-vgpr-index-mode", "1"); // force VGPR indexing on GFX8
   setOptionDefault("amdgpu-atomic-optimizations", "1");
   setOptionDefault("use-gpu-divergence-analysis", "1");
+  setOptionDefault("amdgpu-conditional-discard-transformations", "1");
 }
 
 // =====================================================================================================================

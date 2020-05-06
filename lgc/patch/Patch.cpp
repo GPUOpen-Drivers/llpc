@@ -274,7 +274,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createFloat2IntPass());
     passMgr.add(createLoopRotatePass());
     passMgr.add(createCFGSimplificationPass(1, true, true, true, true));
-    passMgr.add(createPatchPeepholeOpt(true));
+    passMgr.add(createPatchPeepholeOpt());
     passMgr.add(createInstSimplifyLegacyPass());
     passMgr.add(createLoopUnrollPass(optLevel));
     passMgr.add(createInstructionCombiningPass(2));
@@ -304,7 +304,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
                                // is when you have bit casts whose source is a PHI - we want to make sure that the PHI
                                // does not have an i8 type before the scalarizer is called, otherwise a different kind
                                // of PHI mess is generated.
-                               passMgr.add(createPatchPeepholeOpt(true));
+                               passMgr.add(createPatchPeepholeOpt());
 
                                // Run the scalarizer as it helps our register pressure in the backend significantly. The
                                // scalarizer allows us to much more easily identify dead parts of vectors that we do not
