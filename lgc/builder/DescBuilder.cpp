@@ -458,13 +458,6 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
       break;
     }
     offset = CreateRelocationConstant("doff_" + Twine(descSet) + "_" + Twine(binding) + relocNameSuffix);
-    // The LLVM's internal handling of GEP instruction results in a lot of junk code and prevented selection
-    // of the offset-from-register variant of the s_load_dwordx4 instruction. To workaround this issue,
-    // we use integer arithmetic here so the amdgpu backend can pickup the optimal instruction.
-    // When relocation is used, offset is in bytes, not in dwords.
-    descPtr = CreatePtrToInt(descPtr, getInt64Ty());
-    descPtr = CreateAdd(descPtr, CreateZExt(offset, getInt64Ty()));
-    descPtr = CreateIntToPtr(descPtr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
   } else {
     // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
     // add on the size of the first part.
@@ -473,9 +466,8 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     if (resType == ResourceNodeType::DescriptorSampler && node->type == ResourceNodeType::DescriptorCombinedTexture)
       offsetInBytes += gpuProperty.descriptorSizeResource;
     offset = getInt32(offsetInBytes);
-    descPtr = CreateBitCast(descPtr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
-    descPtr = CreateGEP(getInt8Ty(), descPtr, offset);
   }
+  descPtr = CreateAddByteOffset(descPtr, offset);
 
   return descPtr;
 }

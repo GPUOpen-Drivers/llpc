@@ -61,6 +61,15 @@ public:
   //
   // @param symbolName : Name of the relocation symbol associated with this relocation
   llvm::Value *CreateRelocationConstant(const llvm::Twine &symbolName);
+
+  // Generate an add of an offset to a byte pointer. This is provided to use in the case that the offset is,
+  // or might be, a relocatable value, as it implements a workaround to get more efficient code for the load
+  // that uses the offset pointer.
+  //
+  // @param pointer : Pointer to add to
+  // @param byteOffset : Byte offset to add
+  // @param instName : Name to give instruction
+  llvm::Value *CreateAddByteOffset(llvm::Value *pointer, llvm::Value *byteOffset, const llvm::Twine &instName = "");
 };
 
 } // namespace lgc

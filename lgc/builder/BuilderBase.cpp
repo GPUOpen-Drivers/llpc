@@ -78,3 +78,30 @@ Value *BuilderBase::CreateRelocationConstant(const Twine &symbolName) {
   auto mdNode = MDNode::get(getContext(), MDString::get(getContext(), symbolName.str()));
   return CreateIntrinsic(Intrinsic::amdgcn_reloc_constant, {}, {MetadataAsValue::get(getContext(), mdNode)});
 }
+
+// =====================================================================================================================
+// Generate an add of an offset to a byte pointer. This is provided to use in the case that the offset is,
+// or might be, a relocatable value, as it implements a workaround to get more efficient code for the load
+// that uses the offset pointer.
+//
+// @param pointer : Pointer to add to
+// @param byteOffset : Byte offset to add
+// @param instName : Name to give instruction
+Value *BuilderBase::CreateAddByteOffset(Value *pointer, Value *byteOffset, const Twine &instName) {
+  if (auto call = dyn_cast<CallInst>(byteOffset)) {
+    if (call->getIntrinsicID() == Intrinsic::amdgcn_reloc_constant) {
+      // Where the offset is the result of CreateRelocationConstant,
+      // LLVM's internal handling of GEP instruction results in a lot of junk code and prevented selection
+      // of the offset-from-register variant of the s_load_dwordx4 instruction. To workaround this issue,
+      // we use integer arithmetic here so the amdgpu backend can pickup the optimal instruction.
+      // TODO: Figure out how to fix this properly, then remove this function and switch its users to
+      // use a simple CreateGEP instead.
+      Type *origPointerTy = pointer->getType();
+      pointer = CreatePtrToInt(pointer, getInt64Ty());
+      pointer = CreateAdd(pointer, CreateZExt(byteOffset, getInt64Ty()), instName);
+      return CreateIntToPtr(pointer, origPointerTy);
+    }
+  }
+
+  return CreateGEP(getInt8Ty(), pointer, byteOffset, instName);
+}
