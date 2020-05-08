@@ -606,7 +606,8 @@ template <class Elf> void ElfWriter<Elf>::writeToBuffer(ElfPackage *pElf) {
   for (auto &section : m_sections) {
     section.secHead.sh_offset = static_cast<unsigned>(buffer - data);
     const unsigned sizeBytes = section.secHead.sh_size;
-    memcpy(buffer, section.data, sizeBytes);
+    if (sizeBytes > 0)
+      memcpy(buffer, section.data, sizeBytes);
     buffer += alignTo(sizeBytes, sizeof(unsigned));
   }
 
