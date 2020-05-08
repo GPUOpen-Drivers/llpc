@@ -1146,7 +1146,7 @@ public:
 
 private:
   SectionNggState m_nggState;
-  static const unsigned MemberCount = 22;
+  static const unsigned MemberCount = 23;
   static StrToMemberAddr m_addrTable[MemberCount];
   SubState m_state;
   SectionColorBuffer m_colorBuffer[Vkgc::MaxColorTargets]; // Color buffer
@@ -1177,7 +1177,7 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 3;
+  static const unsigned MemberCount = 4;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;
