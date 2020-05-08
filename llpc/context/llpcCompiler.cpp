@@ -147,6 +147,10 @@ opt<bool> TrimDebugInfo("trim-debug-info", cl::desc("Trim debug information in S
 // -enable-per-stage-cache: Enable shader cache per shader stage
 opt<bool> EnablePerStageCache("enable-per-stage-cache", cl::desc("Enable shader cache per shader stage"), init(true));
 
+// -context-reuse-limit: The maximum number of times a compiler context can be reused.
+opt<int> ContextReuseLimit("context-reuse-limit",
+                           cl::desc("The maximum number of times a compiler context can be reused"), init(100));
+
 extern opt<bool> EnableOuts;
 
 extern opt<bool> EnableErrs;
@@ -1595,13 +1599,18 @@ Context *Compiler::acquireContext() const {
   std::lock_guard<sys::Mutex> lock(m_contextPoolMutex);
 
   // Try to find a free context from pool first
-  for (auto context : *m_contextPool) {
+  for (auto &context : *m_contextPool) {
     GfxIpVersion gfxIpVersion = context->getGfxIpVersion();
 
     if (!context->isInUse() && gfxIpVersion.major == m_gfxIp.major && gfxIpVersion.minor == m_gfxIp.minor &&
         gfxIpVersion.stepping == m_gfxIp.stepping) {
+      // Free up context if it is being used too many times to avoid consuming too much memory.
+      int contextReuseLimit = cl::ContextReuseLimit.getValue();
+      if (contextReuseLimit > 0 && context->getUseCount() > contextReuseLimit) {
+        delete context;
+        context = new Context(m_gfxIp);
+      }
       freeContext = context;
-      freeContext->setInUse(true);
       break;
     }
   }
@@ -1609,9 +1618,10 @@ Context *Compiler::acquireContext() const {
   if (!freeContext) {
     // Create a new one if we fail to find an available one
     freeContext = new Context(m_gfxIp);
-    freeContext->setInUse(true);
     m_contextPool->push_back(freeContext);
   }
+
+  freeContext->setInUse(true);
 
   assert(freeContext);
   return freeContext;

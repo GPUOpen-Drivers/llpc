@@ -56,7 +56,15 @@ public:
   bool isInUse() const { return m_isInUse; }
 
   // Set context in-use flag.
-  void setInUse(bool inUse) { m_isInUse = inUse; }
+  void setInUse(bool inUse) {
+    if (!m_isInUse && inUse) {
+      ++m_useCount;
+    }
+    m_isInUse = inUse;
+  }
+
+  // Get the number of times this context is used.
+  unsigned getUseCount() const { return m_useCount; }
 
   // Attaches pipeline context to LLPC context.
   void attachPipelineContext(PipelineContext *pipelineContext) { m_pipelineContext = pipelineContext; }
@@ -142,6 +150,8 @@ private:
   std::unique_ptr<llvm::TargetMachine> m_targetMachine; // Target machine
   bool m_scalarBlockLayout = false;                     // scalarBlockLayout option from last pipeline compile
   bool m_robustBufferAccess = false;                    // robustBufferAccess option from last pipeline compile
+
+  unsigned m_useCount = 0; // Number of times this context is used.
 };
 
 } // namespace Llpc
