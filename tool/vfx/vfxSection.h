@@ -125,9 +125,21 @@ enum ShaderType {
 };
 
 // =====================================================================================================================
-// Gets offset of the member
-// Clang has a warning for using offsetof for non-POD type
-#define OFFSETOF(T, name) ((size_t)(&((T *)(0))->name))
+template <typename T, T> struct GetMemberHelper;
+template <typename T, typename R, R(T::*member)> struct GetMemberHelper<R(T::*), member> {
+  static void *getMemberPtr(void *obj) {
+    T *t = static_cast<T *>(obj);
+    return &(t->*member);
+  }
+};
+
+template <typename T2, typename T, T> struct GetSubStateMemberHelper;
+template <typename T2, typename T, typename R, R(T::*member)> struct GetSubStateMemberHelper<T2, R(T::*), member> {
+  static void *getMemberPtr(void *obj) {
+    T2 *t = static_cast<T2 *>(obj);
+    return &(t->getSubStateRef().*member);
+  }
+};
 
 // =====================================================================================================================
 // Initiates a member to address table
@@ -135,7 +147,7 @@ enum ShaderType {
   tableItem->memberName = STRING(name);                                                                                \
   if (!strncmp(tableItem->memberName, "m_", 2))                                                                        \
     tableItem->memberName += 2;                                                                                        \
-  tableItem->memberOffset = (unsigned)(OFFSETOF(T, name));                                                             \
+  tableItem->getMember = GetMemberHelper<decltype(&T::name), &T::name>::getMemberPtr;                                  \
   tableItem->memberType = type;                                                                                        \
   tableItem->arrayMaxSize = 1;                                                                                         \
   tableItem->isSection = _isObject;                                                                                    \
@@ -147,7 +159,7 @@ enum ShaderType {
   tableItem->memberName = STRING(name);                                                                                \
   if (!strncmp(tableItem->memberName, "m_", 2))                                                                        \
     tableItem->memberName += 2;                                                                                        \
-  tableItem->memberOffset = (unsigned)(OFFSETOF(SubState, name) + OFFSETOF(T, m_state));                               \
+  tableItem->getMember = GetSubStateMemberHelper<T, decltype(&SubState::name), &SubState::name>::getMemberPtr;         \
   tableItem->memberType = type;                                                                                        \
   tableItem->arrayMaxSize = 1;                                                                                         \
   tableItem->isSection = _isObject;                                                                                    \
@@ -155,11 +167,11 @@ enum ShaderType {
 
 // =====================================================================================================================
 // Initiates a state's member to address table with explicit name
-#define INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(T, name, member, type, _isObject)                                       \
+#define INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(T, name, member, getter, type, _isObject)                               \
   tableItem->memberName = STRING(name);                                                                                \
   if (!strncmp(tableItem->memberName, "m_", 2))                                                                        \
     tableItem->memberName += 2;                                                                                        \
-  tableItem->memberOffset = (unsigned)(OFFSETOF(SubState, member) + OFFSETOF(T, m_state));                             \
+  tableItem->getMember = getter;                                                                                       \
   tableItem->memberType = type;                                                                                        \
   tableItem->arrayMaxSize = 1;                                                                                         \
   tableItem->isSection = _isObject;                                                                                    \
@@ -171,7 +183,7 @@ enum ShaderType {
   tableItem->memberName = STRING(name);                                                                                \
   if (!strncmp(tableItem->memberName, "m_", 2))                                                                        \
     tableItem->memberName += 2;                                                                                        \
-  tableItem->memberOffset = (unsigned)(OFFSETOF(T, name));                                                             \
+  tableItem->getMember = GetMemberHelper<decltype(&T::name), &T::name>::getMemberPtr;                                  \
   tableItem->memberType = type;                                                                                        \
   tableItem->arrayMaxSize = maxSize;                                                                                   \
   tableItem->isSection = _isObject;                                                                                    \
@@ -183,7 +195,7 @@ enum ShaderType {
   tableItem->memberName = STRING(name);                                                                                \
   if (!strncmp(tableItem->memberName, "m_", 2))                                                                        \
     tableItem->memberName += 2;                                                                                        \
-  tableItem->memberOffset = (unsigned)(OFFSETOF(T, name));                                                             \
+  tableItem->getMember = GetMemberHelper<decltype(&T::name), &T::name>::getMemberPtr;                                  \
   tableItem->memberType = type;                                                                                        \
   tableItem->arrayMaxSize = VfxDynamicArrayId;                                                                         \
   tableItem->isSection = _isObject;                                                                                    \
@@ -208,11 +220,11 @@ enum ShaderType {
   }
 
 // =====================================================================================================================
-// Represents the structure that maps a string to a class member offset
+// Represents the structure that maps a string to a class member
 struct StrToMemberAddr {
   const char *memberName; // String form name
   MemberType memberType;  // Member value type
-  unsigned memberOffset;  // Member offset in bytes within the object
+  void *(*getMember)(void *obj); // Get the member from an object
   unsigned arrayMaxSize;  // If greater than 1, this member is an array
   bool isSection;         // Is this member another Section object
 };
@@ -245,9 +257,7 @@ public:
   // Gets section type.
   SectionType getSectionType() const { return m_sectionType; }
 
-  void *getMemberAddr(unsigned i) {
-    return reinterpret_cast<void *>(reinterpret_cast<uint8_t *>(this) + m_memberTable[i].memberOffset);
-  }
+  void *getMemberAddr(unsigned i) { return m_memberTable[i].getMember(this); }
 
   bool getMemberType(unsigned lineNum, const char *memberName, MemberType *valueType, std::string *errorMsg);
 
@@ -377,7 +387,7 @@ class SectionVersion : public Section {
 public:
   SectionVersion() : Section(m_addrTable, MemberCount, SectionTypeVersion, nullptr) { m_version = 0; };
 
-  // Setup member name to member offset mapping.
+  // Setup member name to member mapping.
   static void initialAddrTable() {
     StrToMemberAddr *tableItem = m_addrTable;
     INIT_MEMBER_NAME_TO_ADDR(SectionVersion, m_version, MemberTypeInt, false);
@@ -404,7 +414,7 @@ public:
     m_state.compareMethod = ResultCompareMethodEqual;
   };
 
-  // Setup member name to member offset mapping.
+  // Setup member name to member mapping.
   static void initialAddrTable() {
     StrToMemberAddr *tableItem = m_addrTable;
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResultItem, resultSource, MemberTypeEnum, false);
@@ -420,6 +430,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 9;
@@ -476,6 +487,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 3;
@@ -536,6 +548,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 3;
@@ -568,6 +581,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 4;
@@ -652,6 +666,7 @@ public:
     m_state.pData = m_state.dataSize > 0 ? &m_bufMem[0] : nullptr;
     state = m_state;
   };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 11;
@@ -696,6 +711,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 7;
@@ -727,6 +743,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 3;
@@ -762,6 +779,7 @@ public:
     m_state.pData = state.dataSize > 0 ? &m_bufMem[0] : nullptr;
     state = m_state;
   };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 6;
@@ -858,6 +876,7 @@ public:
         m_pushConstRange[i].getSubState(state.pushConstRange[state.numPushConstRange++]);
     }
   };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 25;
@@ -946,6 +965,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 4;
@@ -977,6 +997,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 7;
@@ -1025,6 +1046,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 18;
@@ -1067,6 +1089,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 17;
@@ -1119,6 +1142,7 @@ public:
     m_nggState.getSubState(m_state.nggState);
     state = m_state;
   };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   SectionNggState m_nggState;
@@ -1150,6 +1174,7 @@ public:
     m_options.getSubState(m_state.options);
     state = m_state;
   };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 3;
@@ -1178,6 +1203,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 3;
@@ -1206,6 +1232,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 4;
@@ -1232,6 +1259,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 2;
@@ -1316,6 +1344,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 3;
@@ -1409,6 +1438,7 @@ public:
     state = m_state;
     state.pValue = m_bufMem.size() > 0 ? (const unsigned *)(&m_bufMem[0]) : nullptr;
   };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
   static const unsigned MemberCount = 6;
@@ -1434,11 +1464,14 @@ public:
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, type, MemberTypeEnum, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, sizeInDwords, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, offsetInDwords, MemberTypeInt, false);
-    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, set, srdRange.set, MemberTypeInt, false);
-    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, binding, srdRange.binding, MemberTypeInt, false);
+    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, set, srdRange.set,
+                                           SectionResourceMappingNode::getResourceMapNodeSet, MemberTypeInt, false);
+    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, binding, srdRange.binding,
+                                           SectionResourceMappingNode::getResourceMapNodeBinding, MemberTypeInt, false);
     INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMappingNode, m_next, MemberTypeResourceMappingNode, true);
     INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, indirectUserDataCount, userDataPtr.sizeInDwords,
-                                           MemberTypeInt, false);
+                                           SectionResourceMappingNode::getResourceMapNodeUserDataCount, MemberTypeInt,
+                                           false);
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
@@ -1452,8 +1485,24 @@ public:
     }
     state = m_state;
   };
+  SubState &getSubStateRef() { return m_state; };
 
 private:
+  static void *getResourceMapNodeSet(void *obj) {
+    SectionResourceMappingNode *castedObj = static_cast<SectionResourceMappingNode *>(obj);
+    return static_cast<void *>(&castedObj->m_state.srdRange.set);
+  }
+
+  static void *getResourceMapNodeBinding(void *obj) {
+    SectionResourceMappingNode *castedObj = static_cast<SectionResourceMappingNode *>(obj);
+    return static_cast<void *>(&castedObj->m_state.srdRange.binding);
+  }
+
+  static void *getResourceMapNodeUserDataCount(void *obj) {
+    SectionResourceMappingNode *castedObj = static_cast<SectionResourceMappingNode *>(obj);
+    return static_cast<void *>(&castedObj->m_state.userDataPtr.sizeInDwords);
+  }
+
   static const unsigned MemberCount = 7;
   static StrToMemberAddr m_addrTable[MemberCount];
 
@@ -1507,6 +1556,7 @@ public:
       state.pUserDataNodes = &m_userDataNodes[0];
     }
   };
+  SubState &getSubStateRef() { return m_state; };
 
   const char *getEntryPoint() const { return m_entryPoint.empty() ? nullptr : m_entryPoint.c_str(); }
 
