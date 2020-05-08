@@ -1289,8 +1289,8 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     LLPC_OUTS("PIPE : " << format("0x%016" PRIX64, MetroHash::compact64(&pipelineHash)) << "\n");
     for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage) {
       const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo[stage]->pModuleData);
-      auto hash = reinterpret_cast<const MetroHash::Hash *>(&moduleData->hash[0]);
       if (moduleData) {
+        auto hash = reinterpret_cast<const MetroHash::Hash *>(&moduleData->hash[0]);
         LLPC_OUTS(format("%-4s : ", getShaderStageAbbreviation(static_cast<ShaderStage>(stage), true))
                   << format("0x%016" PRIX64, MetroHash::compact64(hash)) << "\n");
       }
