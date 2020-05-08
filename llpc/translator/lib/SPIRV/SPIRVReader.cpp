@@ -5183,11 +5183,30 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
 
 // Prints LLVM-style name for type to raw_ostream
 static void printTypeName(Type *ty, raw_ostream &nameStream) {
-  if (auto ptrTy = dyn_cast<PointerType>(ty)) {
-    nameStream << "p";
-    if (ptrTy->getAddressSpace())
-      nameStream << ptrTy->getAddressSpace();
-    ty = ptrTy->getPointerElementType();
+  for (;;) {
+    if (auto pointerTy = dyn_cast<PointerType>(ty)) {
+      nameStream << "p" << pointerTy->getAddressSpace();
+      ty = pointerTy->getElementType();
+      continue;
+    }
+    if (auto arrayTy = dyn_cast<ArrayType>(ty)) {
+      nameStream << "a" << arrayTy->getNumElements();
+      ty = arrayTy->getElementType();
+      continue;
+    }
+    break;
+  }
+  if (auto structTy = dyn_cast<StructType>(ty)) {
+    nameStream << "s[";
+    if (structTy->getNumElements() != 0) {
+      printTypeName(structTy->getElementType(0), nameStream);
+      for (unsigned i = 1; i < structTy->getNumElements(); ++i) {
+        nameStream << ",";
+        printTypeName(structTy->getElementType(i), nameStream);
+      }
+    }
+    nameStream << "]";
+    return;
   }
   if (auto vecTy = dyn_cast<VectorType>(ty)) {
     nameStream << "v" << vecTy->getNumElements();
@@ -5201,7 +5220,7 @@ static void printTypeName(Type *ty, raw_ostream &nameStream) {
     nameStream << "i" << ty->getScalarSizeInBits();
     return;
   }
-  assert(ty->isVoidTy() || ty->isArrayTy() || ty->isStructTy());
+  assert(ty->isVoidTy());
   nameStream << "V";
 }
 
