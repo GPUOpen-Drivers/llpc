@@ -1234,7 +1234,31 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(cullingBlock);
 
-      doCull = doCulling(module);
+      Value *vertexId0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
+                                                    {
+                                                        m_nggFactor.esGsOffsets01,
+                                                        m_builder->getInt32(0),
+                                                        m_builder->getInt32(16),
+                                                    });
+      vertexId0 = m_builder->CreateLShr(vertexId0, 2);
+
+      Value *vertexId1 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
+                                                    {
+                                                        m_nggFactor.esGsOffsets01,
+                                                        m_builder->getInt32(16),
+                                                        m_builder->getInt32(16),
+                                                    });
+      vertexId1 = m_builder->CreateLShr(vertexId1, 2);
+
+      Value *vertexId2 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
+                                                    {
+                                                        m_nggFactor.esGsOffsets23,
+                                                        m_builder->getInt32(0),
+                                                        m_builder->getInt32(16),
+                                                    });
+      vertexId2 = m_builder->CreateLShr(vertexId2, 2);
+
+      doCull = doCulling(module, vertexId0, vertexId1, vertexId2);
       m_builder->CreateBr(endCullingBlock);
     }
 
@@ -1725,6 +1749,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   assert(waveSize == 32 || waveSize == 64);
 
   const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
+  const bool cullingMode = !m_nggControl->passthroughMode;
 
   auto entryPoint = module->getFunction(lgcName::NggPrimShaderEntryPoint);
 
@@ -1732,6 +1757,8 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
 
   Value *mergedGroupInfo = (arg + EsGsSysValueMergedGroupInfo);
   Value *mergedWaveInfo = (arg + EsGsSysValueMergedWaveInfo);
+  Value *primShaderTableAddrLow = (arg + EsGsSysValuePrimShaderTableAddrLow);
+  Value *primShaderTableAddrHigh = (arg + EsGsSysValuePrimShaderTableAddrHigh);
 
   arg += (EsGsSpecialSysValueCount + 1);
 
@@ -1762,7 +1789,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   //   Barrier
   //
   //   if (culling && valid primitive & threadIdInSubgroup < primCountInSubgroup)
-  //     Do culling and reset primitive data
+  //     Do culling and nullify culled primitives
   //   Barrier
   //
   //   if (threadIdInSubgroup < vertCountInSubgroup)
@@ -1803,6 +1830,16 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   auto beginGsBlock = createBlock(entryPoint, ".beginGs");
   auto endGsBlock = createBlock(entryPoint, ".endGs");
 
+  // Create blocks of culling only if culling is requested
+  BasicBlock *cullingBlock = nullptr;
+  BasicBlock *nullifyOutPrimDataBlock = nullptr;
+  BasicBlock *endCullingBlock = nullptr;
+  if (cullingMode) {
+    cullingBlock = createBlock(entryPoint, ".culling");
+    nullifyOutPrimDataBlock = createBlock(entryPoint, ".nullifyOutPrimData");
+    endCullingBlock = createBlock(entryPoint, ".endCulling");
+  }
+
   auto checkOutVertDrawFlagBlock = createBlock(entryPoint, ".checkOutVertDrawFlag");
   auto endCheckOutVertDrawFlagBlock = createBlock(entryPoint, ".endCheckOutVertDrawFlag");
 
@@ -1826,6 +1863,10 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
     m_builder->SetInsertPoint(entryBlock);
 
     initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
+
+    // Record primitive shader table address info
+    m_nggFactor.primShaderTableAddrLow = primShaderTableAddrLow;
+    m_nggFactor.primShaderTableAddrHigh = primShaderTableAddrHigh;
 
     // Record ES-GS vertex offsets info
     m_nggFactor.esGsOffsets01 = esGsOffsets01;
@@ -1900,13 +1941,69 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   }
 
   // Construct ".endGs" block
+  Value *primData = nullptr;
   {
     m_builder->SetInsertPoint(endGsBlock);
 
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
-    auto outVertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
-    m_builder->CreateCondBr(outVertValid, checkOutVertDrawFlagBlock, endCheckOutVertDrawFlagBlock);
+    if (cullingMode) {
+      // Do culling
+      primData =
+          readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData);
+      auto doCull = m_builder->CreateICmpNE(primData, m_builder->getInt32(NullPrim));
+      auto outPrimValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
+      doCull = m_builder->CreateAnd(doCull, outPrimValid);
+      m_builder->CreateCondBr(doCull, cullingBlock, endCullingBlock);
+    } else {
+      // No culling
+      auto outVertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
+      m_builder->CreateCondBr(outVertValid, checkOutVertDrawFlagBlock, endCheckOutVertDrawFlagBlock);
+    }
+  }
+
+  // Construct culling blocks
+  if (cullingMode) {
+    // Construct ".culling" block
+    {
+      m_builder->SetInsertPoint(cullingBlock);
+
+      assert(m_pipelineState->getShaderModes()->getGeometryShaderMode().outputPrimitive ==
+             OutputPrimitives::TriangleStrip);
+
+      // NOTE: primData[N] corresponds to the forming vertices <N, N+1, N+2> or <N, N+2, N+1>.
+      Value *winding = m_builder->CreateICmpNE(primData, m_builder->getInt32(0));
+
+      auto vertexId0 = m_nggFactor.threadIdInSubgroup;
+      auto vertexId1 =
+          m_builder->CreateAdd(m_nggFactor.threadIdInSubgroup,
+                               m_builder->CreateSelect(winding, m_builder->getInt32(2), m_builder->getInt32(1)));
+      auto vertexId2 =
+          m_builder->CreateAdd(m_nggFactor.threadIdInSubgroup,
+                               m_builder->CreateSelect(winding, m_builder->getInt32(1), m_builder->getInt32(2)));
+
+      auto cullFlag = doCulling(module, vertexId0, vertexId1, vertexId2);
+      m_builder->CreateCondBr(cullFlag, nullifyOutPrimDataBlock, endCullingBlock);
+    }
+
+    // Construct ".nullifyOutPrimData" block
+    {
+      m_builder->SetInsertPoint(nullifyOutPrimDataBlock);
+
+      writePerThreadDataToLds(m_builder->getInt32(NullPrim), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData);
+
+      m_builder->CreateBr(endCullingBlock);
+    }
+
+    // Construct ".endCulling" block
+    {
+      m_builder->SetInsertPoint(endCullingBlock);
+
+      m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+
+      auto outVertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
+      m_builder->CreateCondBr(outVertValid, checkOutVertDrawFlagBlock, endCheckOutVertDrawFlagBlock);
+    }
   }
 
   // Construct ".checkOutVertDrawFlag"
@@ -1955,7 +2052,8 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
 
     auto drawFlagPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2);
     drawFlagPhi->addIncoming(drawFlag, checkOutVertDrawFlagBlock);
-    drawFlagPhi->addIncoming(m_builder->getFalse(), endGsBlock);
+    // NOTE: The predecessors are different if culling mode is enabled.
+    drawFlagPhi->addIncoming(m_builder->getFalse(), cullingMode ? endCullingBlock : endGsBlock);
 
     drawMask = doSubgroupBallot(drawFlagPhi);
 
@@ -2161,68 +2259,15 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
 // Does various culling for NGG primitive shader.
 //
 // @param module : LLVM module
-Value *NggPrimShader::doCulling(Module *module) {
-  Value *cullFlag = m_builder->getFalse();
-
-  Value *primData = nullptr;
-  if (m_hasGs) {
-    // NOTE: GS could produce invalid primitives during the processing of GS_CUT. If the primitive is not a valid one,
-    // we initialize the cull flag to TRUE to skip later culling.
-    primData = readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData);
-    cullFlag = m_builder->CreateICmpEQ(primData, m_builder->getInt32(NullPrim));
-  }
-
+// @param vertexId0: ID of vertex0 (forming this triangle)
+// @param vertexId1: ID of vertex1 (forming this triangle)
+// @param vertexId2: ID of vertex2 (forming this triangle)
+Value *NggPrimShader::doCulling(Module *module, Value *vertexId0, Value *vertexId1, Value *vertexId2) {
   // Skip following culling if it is not requested
   if (!enableCulling())
-    return cullFlag;
+    return m_builder->getFalse();
 
-  Value *vertexId0 = nullptr;
-  Value *vertexId1 = nullptr;
-  Value *vertexId2 = nullptr;
-
-  if (m_hasGs) {
-    assert(primData);
-    assert(m_pipelineState->getShaderModes()->getGeometryShaderMode().outputPrimitive ==
-           OutputPrimitives::TriangleStrip);
-
-    // Primitive data layout [31:0]
-    //   [31]    = null primitive flag
-    //   [28:20] = vertexId2 (in bytes)
-    //   [18:10] = vertexId1 (in bytes)
-    //   [8:0]   = vertexId0 (in bytes)
-    vertexId0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                           {primData, m_builder->getInt32(0), m_builder->getInt32(9)});
-
-    vertexId1 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                           {primData, m_builder->getInt32(10), m_builder->getInt32(9)});
-
-    vertexId2 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                           {primData, m_builder->getInt32(20), m_builder->getInt32(9)});
-  } else {
-    vertexId0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                           {
-                                               m_nggFactor.esGsOffsets01,
-                                               m_builder->getInt32(0),
-                                               m_builder->getInt32(16),
-                                           });
-    vertexId0 = m_builder->CreateLShr(vertexId0, 2);
-
-    vertexId1 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                           {
-                                               m_nggFactor.esGsOffsets01,
-                                               m_builder->getInt32(16),
-                                               m_builder->getInt32(16),
-                                           });
-    vertexId1 = m_builder->CreateLShr(vertexId1, 2);
-
-    vertexId2 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                           {
-                                               m_nggFactor.esGsOffsets23,
-                                               m_builder->getInt32(0),
-                                               m_builder->getInt32(16),
-                                           });
-    vertexId2 = m_builder->CreateLShr(vertexId2, 2);
-  }
+  Value *cullFlag = m_builder->getFalse();
 
   Value *vertex0 = fetchVertexPositionData(vertexId0);
   Value *vertex1 = fetchVertexPositionData(vertexId1);
@@ -3195,18 +3240,8 @@ void NggPrimShader::runCopyShader(Module *module, Value *vertCompacted) {
     uncompactVertexIdPhi->addIncoming(uncompactVertexId, uncompactOutVertIdBlock);
     uncompactVertexIdPhi->addIncoming(m_nggFactor.threadIdInSubgroup, expVertBlock);
 
-    // gsVsRingOffset = gsVsRingStart + (streamBases[stream] + threadId * vertexItemSize) * 4 (in bytes)
-    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-    auto rasterStream = resUsage->inOutUsage.gs.rasterStream;
-
-    const unsigned vertexItemSize = 4 * resUsage->inOutUsage.gs.outLocCount[rasterStream];
-    auto vertexOffset = m_builder->CreateMul(uncompactVertexIdPhi, m_builder->getInt32(vertexItemSize));
-
-    vertexOffset = m_builder->CreateAdd(vertexOffset, m_builder->getInt32(m_gsStreamBases[rasterStream]));
-    vertexOffset = m_builder->CreateShl(vertexOffset, 2);
-
-    const unsigned gsVsRingStart = m_ldsManager->getLdsRegionStart(LdsRegionGsVsRing);
-    vertexOffset = m_builder->CreateAdd(vertexOffset, m_builder->getInt32(gsVsRingStart));
+    const auto rasterStream = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
+    auto vertexOffset = calcVertexItemOffset(rasterStream, uncompactVertexIdPhi);
 
     auto copyShaderEntry = mutateCopyShader(module);
 
@@ -3362,29 +3397,15 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
   } else
     assert(bitWidth == 32 || bitWidth == 64);
 
-  // gsVsRingOffset = streamBases[stream] +
-  //                  threadIdInSubgroup * gsVsRingItemSize +
-  //                  outVertcounter * vertexItemSize +
-  //                  location * 4 + compIdx (in dwords)
-  const unsigned vertexItemSize = 4 * resUsage->inOutUsage.gs.outLocCount[streamId];
-
+  // vertexId = threadIdInSubgroup * outputVertices + emitVerts
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
-  const unsigned gsVsRingItemSize = vertexItemSize * geometryMode.outputVertices;
+  auto vertexId = m_builder->CreateMul(threadIdInSubgroup, m_builder->getInt32(geometryMode.outputVertices));
+  vertexId = m_builder->CreateAdd(vertexId, emitVerts);
 
-  Value *gsVsRingOffset = m_builder->CreateMul(threadIdInSubgroup, m_builder->getInt32(gsVsRingItemSize));
-  gsVsRingOffset = m_builder->CreateAdd(gsVsRingOffset, m_builder->getInt32(m_gsStreamBases[streamId]));
-
-  auto vertexItemOffset = m_builder->CreateMul(emitVerts, m_builder->getInt32(vertexItemSize));
-  gsVsRingOffset = m_builder->CreateAdd(gsVsRingOffset, vertexItemOffset);
-
+  // ldsOffset = vertexOffset + (location * 4 + compIdx) * 4 (in bytes)
+  auto vertexOffset = calcVertexItemOffset(streamId, vertexId);
   const unsigned attribOffset = (location * 4) + compIdx;
-  gsVsRingOffset = m_builder->CreateAdd(gsVsRingOffset, m_builder->getInt32(attribOffset));
-
-  // ldsOffset = gsVsRingStart + gsVsRingOffset * 4 (in bytes)
-  const unsigned gsVsRingStart = m_ldsManager->getLdsRegionStart(LdsRegionGsVsRing);
-
-  auto ldsOffset = m_builder->CreateShl(gsVsRingOffset, 2);
-  ldsOffset = m_builder->CreateAdd(m_builder->getInt32(gsVsRingStart), ldsOffset);
+  auto ldsOffset = m_builder->CreateAdd(vertexOffset, m_builder->getInt32(attribOffset * 4));
 
   m_ldsManager->writeValueToLds(output, ldsOffset);
 }
@@ -3420,7 +3441,7 @@ Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned
   // ldsOffset = vertexOffset + (location * 4 + compIdx) * 4 (in bytes)
   const unsigned attribOffset = (location * 4) + compIdx;
   auto ldsOffset = m_builder->CreateAdd(vertexOffset, m_builder->getInt32(attribOffset * 4));
-  // Use 128-bit LDS load
+
   auto output = m_ldsManager->readValueFromLds(outputTy, ldsOffset);
 
   if (origOutputTy != outputTy) {
@@ -5445,10 +5466,7 @@ Value *NggPrimShader::fetchVertexPositionData(Value *vertexId) {
   assert(inOutUsage.builtInOutputLocMap.find(BuiltInPosition) != inOutUsage.builtInOutputLocMap.end());
   const unsigned loc = inOutUsage.builtInOutputLocMap[BuiltInPosition];
   const unsigned rasterStream = inOutUsage.gs.rasterStream;
-
-  const unsigned vertexItemSize = 4 * inOutUsage.gs.outLocCount[rasterStream];
-  auto vertexOffset = m_builder->CreateMul(vertexId, m_builder->getInt32(vertexItemSize));
-  vertexOffset = m_builder->CreateShl(vertexOffset, 2);
+  auto vertexOffset = calcVertexItemOffset(rasterStream, vertexId);
 
   return importGsOutput(VectorType::get(m_builder->getFloatTy(), 4), loc, 0, rasterStream, vertexOffset);
 }
@@ -5470,10 +5488,7 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexId) {
   assert(inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInOutputLocMap.end());
   const unsigned loc = inOutUsage.builtInOutputLocMap[BuiltInCullDistance];
   const unsigned rasterStream = inOutUsage.gs.rasterStream;
-
-  const unsigned vertexItemSize = 4 * inOutUsage.gs.outLocCount[rasterStream];
-  auto vertexOffset = m_builder->CreateMul(vertexId, m_builder->getInt32(vertexItemSize));
-  vertexOffset = m_builder->CreateShl(vertexOffset, 2);
+  auto vertexOffset = calcVertexItemOffset(rasterStream, vertexId);
 
   auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
   auto cullDistances = importGsOutput(ArrayType::get(m_builder->getFloatTy(), builtInUsage.cullDistance), loc, 0,
@@ -5492,6 +5507,28 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexId) {
   }
 
   return signMask;
+}
+
+// =====================================================================================================================
+// Calculates the starting LDS offset (in bytes) of vertex item data in GS-VS ring.
+//
+// @param streamId : ID of output vertex stream.
+// @param vertexId : Vertex thread ID in sub-group.
+Value *NggPrimShader::calcVertexItemOffset(unsigned streamId, Value *vertexId) {
+  assert(m_hasGs); // GS must be present
+
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
+
+  // vertexOffset = gsVsRingStart + (streamBases[stream] + vertexId * vertexItemSize) * 4 (in bytes)
+  const unsigned vertexItemSize = 4 * inOutUsage.gs.outLocCount[streamId];
+  auto vertexOffset = m_builder->CreateMul(vertexId, m_builder->getInt32(vertexItemSize));
+  vertexOffset = m_builder->CreateAdd(vertexOffset, m_builder->getInt32(m_gsStreamBases[streamId]));
+  vertexOffset = m_builder->CreateShl(vertexOffset, 2);
+
+  const unsigned gsVsRingStart = m_ldsManager->getLdsRegionStart(LdsRegionGsVsRing);
+  vertexOffset = m_builder->CreateAdd(vertexOffset, m_builder->getInt32(gsVsRingStart));
+
+  return vertexOffset;
 }
 
 // =====================================================================================================================

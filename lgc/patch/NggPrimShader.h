@@ -120,7 +120,7 @@ private:
 
   void initWaveThreadInfo(llvm::Value *mergedGroupInfo, llvm::Value *mergedWaveInfo);
 
-  llvm::Value *doCulling(llvm::Module *module);
+  llvm::Value *doCulling(llvm::Module *module, llvm::Value *vertexId0, llvm::Value *vertexId1, llvm::Value *vertexId2);
   void doParamCacheAllocRequest();
   void doPrimitiveExportWithoutGs(llvm::Value *cullFlag = nullptr);
   void doPrimitiveExportWithGs(llvm::Value *vertexId);
@@ -144,7 +144,7 @@ private:
                       llvm::Value *threadIdInSubgroup, llvm::Value *emitVerts);
 
   llvm::Value *importGsOutput(llvm::Type *outputTy, unsigned location, unsigned compIdx, unsigned streamId,
-                              llvm::Value *threadIdInSubgroup);
+                              llvm::Value *vertexOffset);
 
   void processGsEmit(llvm::Module *module, unsigned streamId, llvm::Value *threadIdInSubgroup,
                      llvm::Value *emitVertsPtr, llvm::Value *outVertsPtr);
@@ -191,6 +191,7 @@ private:
 
   llvm::Value *fetchVertexPositionData(llvm::Value *vertexId);
   llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertexId);
+  llvm::Value *calcVertexItemOffset(unsigned streamId, llvm::Value *vertexId);
 
   unsigned getOutputVerticesPerPrimitive() const;
 
