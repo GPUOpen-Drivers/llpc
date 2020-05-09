@@ -194,9 +194,16 @@ void PatchResourceCollect::setNggControl() {
     if (!nggControl.passthroughMode) {
       // NOTE: Further check if pass-through mode should be enabled
       const auto topology = m_pipelineState->getInputAssemblyState().topology;
-      if (topology == PrimitiveTopology::PointList || topology == PrimitiveTopology::LineList ||
-          topology == PrimitiveTopology::LineStrip || topology == PrimitiveTopology::LineListWithAdjacency ||
-          topology == PrimitiveTopology::LineStripWithAdjacency) {
+      if (hasGs) {
+        const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
+        if (geometryMode.outputPrimitive != OutputPrimitives::TriangleStrip) {
+          // If GS output primitive type is not triangle strip, NGG runs in "pass-through"
+          // (actual no culling) mode
+          nggControl.passthroughMode = true;
+        }
+      } else if (topology == PrimitiveTopology::PointList || topology == PrimitiveTopology::LineList ||
+                 topology == PrimitiveTopology::LineStrip || topology == PrimitiveTopology::LineListWithAdjacency ||
+                 topology == PrimitiveTopology::LineStripWithAdjacency) {
         // NGG runs in pass-through mode for non-triangle primitives
         nggControl.passthroughMode = true;
       } else if (topology == PrimitiveTopology::PatchList) {
@@ -212,15 +219,6 @@ void PatchResourceCollect::setNggControl() {
       if (polygonMode == PolygonModeLine || polygonMode == PolygonModePoint) {
         // NGG runs in pass-through mode for non-fill polygon mode
         nggControl.passthroughMode = true;
-      }
-
-      if (hasGs) {
-        const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
-        if (geometryMode.outputPrimitive != OutputPrimitives::TriangleStrip) {
-          // If GS output primitive type is not triangle strip, NGG runs in "pass-through"
-          // (actual no culling) mode
-          nggControl.passthroughMode = true;
-        }
       }
     }
 
