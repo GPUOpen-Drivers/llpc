@@ -245,9 +245,46 @@ void PalMetadata::setUserDataSpillUsage(unsigned dwordOffset) {
 // TODO Shader compilation: The idea is that this will be called at the end of a pipeline compilation, or in
 // an ELF link, but not at the end of a shader/half-pipeline compile.
 void PalMetadata::finalizePipeline() {
+  // Set pipeline hash.
+  auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
+  const auto &options = m_pipelineState->getOptions();
+  pipelineHashNode[0] = m_document->getNode(options.hash[0]);
+  pipelineHashNode[1] = m_document->getNode(options.hash[1]);
+
+  // Set PA_CL_CLIP_CNTL from pipeline state settings.
+  bool depthClipDisable = !m_pipelineState->getViewportState().depthClipEnable;
+  uint8_t usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
+  bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
+  PA_CL_CLIP_CNTL paClClipCntl = {};
+  paClClipCntl.bits.UCP_ENA_0 = (usrClipPlaneMask >> 0) & 0x1;
+  paClClipCntl.bits.UCP_ENA_1 = (usrClipPlaneMask >> 1) & 0x1;
+  paClClipCntl.bits.UCP_ENA_2 = (usrClipPlaneMask >> 2) & 0x1;
+  paClClipCntl.bits.UCP_ENA_3 = (usrClipPlaneMask >> 3) & 0x1;
+  paClClipCntl.bits.UCP_ENA_4 = (usrClipPlaneMask >> 4) & 0x1;
+  paClClipCntl.bits.UCP_ENA_5 = (usrClipPlaneMask >> 5) & 0x1;
+  paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
+  paClClipCntl.bits.DX_CLIP_SPACE_DEF = true; // DepthRange::ZeroToOne
+  paClClipCntl.bits.ZCLIP_NEAR_DISABLE = depthClipDisable;
+  paClClipCntl.bits.ZCLIP_FAR_DISABLE = depthClipDisable;
+  paClClipCntl.bits.DX_RASTERIZATION_KILL = rasterizerDiscardEnable;
+  setRegister(mmPA_CL_CLIP_CNTL, paClClipCntl.u32All);
+
   // If there are root user data nodes but none of them are used, adjust userDataLimit accordingly.
   if (m_userDataLimit->getUInt() == 0 && !m_pipelineState->getUserDataNodes().empty())
     setUserDataLimit();
+}
+
+// =====================================================================================================================
+// Set a register value in PAL metadata.
+// NOTE: If the register is already set, this ORs in the value.
+//
+// @param regNum : Register number
+// @param value : Value to OR in
+void PalMetadata::setRegister(unsigned regNum, unsigned value) {
+  msgpack::DocNode &node = m_registers[m_document->getNode(regNum)];
+  if (node.getKind() == msgpack::Type::UInt)
+    value |= node.getUInt();
+  node = m_document->getNode(value);
 }
 
 // =====================================================================================================================

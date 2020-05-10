@@ -286,16 +286,6 @@ void ConfigBuilderBase::setEsGsLdsSize(unsigned value) {
 }
 
 // =====================================================================================================================
-// Set PIPELINE_HASH (called once for the whole pipeline)
-void ConfigBuilderBase::setPipelineHash() {
-  const auto &options = m_pipelineState->getOptions();
-
-  auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
-  pipelineHashNode[0] = m_document->getNode(options.hash[0]);
-  pipelineHashNode[1] = m_document->getNode(options.hash[1]);
-}
-
-// =====================================================================================================================
 /// Append a single entry to the PAL register metadata.
 ///
 /// @param [in] key The metadata key (usually a register address).
@@ -333,9 +323,6 @@ void ConfigBuilderBase::appendConfig(ArrayRef<PalMetadataNoteEntry> config) {
 // =====================================================================================================================
 // Finish ConfigBuilder processing by writing into the PalMetadata document
 void ConfigBuilderBase::writePalMetadata() {
-  // Set whole-pipeline values.
-  setPipelineHash();
-
   // Generating MsgPack metadata.
   // Add the register values to the MsgPack document. The value is ORed in because an earlier pass may have
   // already set some bits in the same register.

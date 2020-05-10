@@ -109,8 +109,6 @@ private:
   llvm::msgpack::MapDocNode getApiShaderNode(unsigned apiStage);
   // Get the MsgPack map node for the specified HW shader in the ".hardware_stages" map
   llvm::msgpack::MapDocNode getHwShaderNode(Util::Abi::HardwareStage hwStage);
-  // Set PIPELINE_HASH (called once for the whole pipeline)
-  void setPipelineHash();
 
   llvm::msgpack::Document *m_document;                 // The MsgPack document
   llvm::msgpack::MapDocNode m_pipelineNode;            // MsgPack map node for amdpal.pipelines[0]

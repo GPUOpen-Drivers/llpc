@@ -196,4 +196,39 @@ constexpr unsigned int mmSPI_SHADER_USER_DATA_HS_0 = 0x2D0C; // For GFX9+, Used 
 constexpr unsigned int mmSPI_SHADER_USER_DATA_PS_0 = 0x2C0C;
 constexpr unsigned int mmSPI_SHADER_USER_DATA_VS_0 = 0x2C4C;
 
+// Other SPI register numbers in PAL metadata
+constexpr unsigned int mmPA_CL_CLIP_CNTL = 0xA204;
+
+// Register bitfield layout.
+
+// PA_CL_CLIP_CNTL register
+union PA_CL_CLIP_CNTL {
+  struct {
+    unsigned int UCP_ENA_0 : 1;
+    unsigned int UCP_ENA_1 : 1;
+    unsigned int UCP_ENA_2 : 1;
+    unsigned int UCP_ENA_3 : 1;
+    unsigned int UCP_ENA_4 : 1;
+    unsigned int UCP_ENA_5 : 1;
+    unsigned int : 7;
+    unsigned int PS_UCP_Y_SCALE_NEG : 1;
+    unsigned int PS_UCP_MODE : 2;
+    unsigned int CLIP_DISABLE : 1;
+    unsigned int UCP_CULL_ONLY_ENA : 1;
+    unsigned int BOUNDARY_EDGE_FLAG_ENA : 1;
+    unsigned int DX_CLIP_SPACE_DEF : 1;
+    unsigned int DIS_CLIP_ERR_DETECT : 1;
+    unsigned int VTX_KILL_OR : 1;
+    unsigned int DX_RASTERIZATION_KILL : 1;
+    unsigned int : 1;
+    unsigned int DX_LINEAR_ATTR_CLIP_ENA : 1;
+    unsigned int VTE_VPORT_PROVOKE_DISABLE : 1;
+    unsigned int ZCLIP_NEAR_DISABLE : 1;
+    unsigned int ZCLIP_FAR_DISABLE : 1;
+    unsigned int ZCLIP_PROG_NEAR_ENA : 1; // GFX9+
+    unsigned int : 3;
+  } bits, bitfields;
+  unsigned int u32All;
+};
+
 } // namespace lgc

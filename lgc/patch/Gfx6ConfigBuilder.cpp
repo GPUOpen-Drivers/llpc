@@ -55,7 +55,10 @@ void ConfigBuilder::buildPalMetadata() {
   else {
     const bool hasTs = (m_hasTcs || m_hasTes);
 
-    if (!hasTs && !m_hasGs) {
+    if (m_pipelineState->isUnlinked() && m_pipelineState->hasShaderStage(ShaderStageFragment)) {
+      // FS-only shader compilation
+      buildPipelineVsFsRegConfig();
+    } else if (!hasTs && !m_hasGs) {
       // VS-FS pipeline
       buildPipelineVsFsRegConfig();
     } else if (hasTs && !m_hasGs) {
@@ -91,6 +94,14 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() {
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
 
     setShaderHash(ShaderStageVertex);
+
+    // Set up IA_MULTI_VGT_PARAM
+    regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
+
+    const unsigned primGroupSize = 128;
+    iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
+
+    SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
   }
 
   if (stageMask & shaderStageToMask(ShaderStageFragment)) {
@@ -98,14 +109,6 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() {
 
     setShaderHash(ShaderStageFragment);
   }
-
-  // Set up IA_MULTI_VGT_PARAM
-  regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
-
-  const unsigned primGroupSize = 128;
-  iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
-
-  SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
 
   appendConfig(config);
 }
@@ -397,22 +400,7 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
     streamBufferConfig |= (resUsage->inOutUsage.streamXfbBuffers[i] << (i * 4));
   SET_REG(&pConfig->vsRegs, VGT_STRMOUT_BUFFER_CONFIG, streamBufferConfig);
 
-  uint8_t usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
-  bool depthClipDisable = (!static_cast<bool>(m_pipelineState->getViewportState().depthClipEnable));
-  bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
   bool disableVertexReuse = m_pipelineState->getInputAssemblyState().disableVertexReuse;
-
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_0, (usrClipPlaneMask >> 0) & 0x1);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_1, (usrClipPlaneMask >> 1) & 0x1);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_2, (usrClipPlaneMask >> 2) & 0x1);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_3, (usrClipPlaneMask >> 3) & 0x1);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_4, (usrClipPlaneMask >> 4) & 0x1);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_5, (usrClipPlaneMask >> 5) & 0x1);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, DX_LINEAR_ATTR_CLIP_ENA, true);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, DX_CLIP_SPACE_DEF, true); // DepthRange::ZeroToOne
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, ZCLIP_NEAR_DISABLE, depthClipDisable);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, ZCLIP_FAR_DISABLE, depthClipDisable);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, DX_RASTERIZATION_KILL, rasterizerDiscardEnable);
 
   SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VTE_CNTL, VPORT_X_SCALE_ENA, true);
   SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VTE_CNTL, VPORT_X_OFFSET_ENA, true);
