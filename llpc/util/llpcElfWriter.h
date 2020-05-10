@@ -103,18 +103,6 @@ public:
 
   void writeToBuffer(ElfPackage *elf);
 
-  unsigned getSymbolCount() const;
-
-  void getSymbol(unsigned idx, ElfSymbol *symbol);
-
-  unsigned getRelocationCount();
-
-  void getRelocation(unsigned idx, Vkgc::ElfReloc *reloc);
-
-  Result linkGraphicsRelocatableElf(const llvm::ArrayRef<ElfReader<Elf> *> &relocatableElfs, Context *context);
-
-  Result linkComputeRelocatableElf(const ElfReader<Elf> &relocatableElf, Context *context);
-
 private:
   ElfWriter(const ElfWriter &) = delete;
   ElfWriter &operator=(const ElfWriter &) = delete;
