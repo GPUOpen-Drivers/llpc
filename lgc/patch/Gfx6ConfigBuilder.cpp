@@ -77,18 +77,17 @@ void ConfigBuilder::buildPalMetadata() {
 }
 
 // =====================================================================================================================
-// Builds register configuration for graphics pipeline (VS-FS).
+// Builds register configuration for graphics pipeline (VS-FS), or FS-only shader compilation.
 void ConfigBuilder::buildPipelineVsFsRegConfig() {
   const unsigned stageMask = m_pipelineState->getShaderStageMask();
 
   PipelineVsFsRegConfig config;
 
-  addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderVs);
   addApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
 
-  setPipelineType(Util::Abi::PipelineType::VsPs);
-
   if (stageMask & shaderStageToMask(ShaderStageVertex)) {
+    setPipelineType(Util::Abi::PipelineType::VsPs);
+    addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderVs);
     buildVsRegConfig<PipelineVsFsRegConfig>(ShaderStageVertex, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);

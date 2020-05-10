@@ -47,6 +47,8 @@ using namespace llvm;
 namespace lgc {
 // Create BuilderReplayer pass
 ModulePass *createBuilderReplayer(Pipeline *pipeline);
+ElfLinker *createElfLinkerImpl(PipelineState *pipelineState, llvm::ArrayRef<llvm::MemoryBufferRef> elfs);
+
 } // namespace lgc
 
 // =====================================================================================================================
@@ -207,8 +209,7 @@ bool PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_
 // Create an ELF linker object for linking unlinked half-pipeline ELFs into a pipeline ELF using the pipeline state.
 // This needs to be deleted after use.
 ElfLinker *PipelineState::createElfLinker(llvm::ArrayRef<llvm::MemoryBufferRef> elfs) {
-  llvm_unreachable("Not implemented yet");
-  return nullptr;
+  return createElfLinkerImpl(this, elfs);
 }
 
 // =====================================================================================================================

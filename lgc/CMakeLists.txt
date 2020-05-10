@@ -185,6 +185,12 @@ target_sources(LLVMlgc PRIVATE
     builder/YCbCrConverter.cpp
 )
 
+# lgc/elfLinker
+target_sources(LLVMlgc PRIVATE
+    elfLinker/ElfLinker.cpp
+    elfLinker/RelocHandler.cpp
+)
+
 # lgc/patch
 target_sources(LLVMlgc PRIVATE
     patch/ConfigBuilderBase.cpp

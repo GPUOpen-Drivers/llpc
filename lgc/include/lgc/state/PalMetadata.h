@@ -53,11 +53,15 @@ class PalMetadata {
 public:
   // Constructors
   PalMetadata(PipelineState *pipelineState);
+  PalMetadata(PipelineState *pipelineState, llvm::StringRef blob);
   PalMetadata(PipelineState *pipelineState, llvm::Module *module);
   PalMetadata(const PalMetadata &) = delete;
   PalMetadata &operator=(const PalMetadata &) = delete;
 
   ~PalMetadata();
+
+  // Read blob as PAL metadata and merge it into existing PAL metadata (if any).
+  void mergeFromBlob(llvm::StringRef blob);
 
   // Record the PAL metadata into IR metadata in the specified module.
   void record(llvm::Module *module);
@@ -75,6 +79,10 @@ public:
   // Mark that the user data spill table is used at the given offset. The SpillThreshold PAL metadata entry is
   // set to the minimum of any call to this function in any shader.
   void setUserDataSpillUsage(unsigned dwordOffset);
+
+  // Fix up user data registers. Any user data register that has one of the unlinked UserDataMapping values defined
+  // in AbiUnlinked.h is fixed up by looking at pipeline state.
+  void fixUpRegisters();
 
   // Set a register value in PAL metadata. If the register is already set, this ORs in the value.
   void setRegister(unsigned regNum, unsigned value);
