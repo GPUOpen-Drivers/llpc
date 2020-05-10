@@ -138,10 +138,4 @@ static_assert(MaxGsStreams == MaxTransformFeedbackBuffers, "Unexpected value!");
 static const unsigned InternalResourceTable = 0x10000000;
 static const unsigned InternalPerShaderTable = 0x10000001;
 
-// Descriptor offset reloc magic number
-static const unsigned DescRelocMagic = 0xA5A5A500;
-static const unsigned DescRelocMagicMask = 0xFFFFFF00;
-static const unsigned DescSetMask = 0x000000FF;
-static const unsigned DescRelocPushConst = 0xA5A5A600;
-
 } // namespace lgc

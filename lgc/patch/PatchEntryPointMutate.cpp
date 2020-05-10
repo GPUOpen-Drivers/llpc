@@ -33,6 +33,7 @@
 #include "Gfx9Chip.h"
 #include "lgc/BuilderBase.h"
 #include "lgc/patch/Patch.h"
+#include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
@@ -966,7 +967,9 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
       auto &descriptorSet = userDataUsage->descriptorSets[descSetIdx];
       if (!descriptorSet.users.empty()) {
         // Set the PAL metadata user data value to indicate that it needs modifying at link time.
-        unsigned userDataValue = DescRelocMagic | descSetIdx;
+        assert(descSetIdx <= static_cast<unsigned>(UserDataMapping::DescriptorSetMax) -
+                                 static_cast<unsigned>(UserDataMapping::DescriptorSet0));
+        unsigned userDataValue = static_cast<unsigned>(UserDataMapping::DescriptorSet0) + descSetIdx;
         userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), userDataValue, &descriptorSet.entryArgIdx));
       }
     }
@@ -998,8 +1001,11 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
       }
 
       // Add the arg (part of the push const) that we can potentially unspill.
-      addUserDataArg(userDataArgs, DescRelocPushConst + dwordOffset, pushConstOffset.dwordSize,
-                     &pushConstOffset.entryArgIdx, /*useFixedLayout=*/0, /*userDataSize=*/0, builder);
+      assert(dwordOffset + pushConstOffset.dwordSize - 1 <=
+             static_cast<unsigned>(UserDataMapping::PushConstMax) - static_cast<unsigned>(UserDataMapping::PushConst0));
+      addUserDataArg(userDataArgs, static_cast<unsigned>(UserDataMapping::PushConst0) + dwordOffset,
+                     pushConstOffset.dwordSize, &pushConstOffset.entryArgIdx, /*useFixedLayout=*/0, /*userDataSize=*/0,
+                     builder);
     }
 
     return;
@@ -1031,12 +1037,14 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
         break;
 
       unsigned userDataValue = node.offsetInDwords;
-      if (m_pipelineState->getShaderOptions(m_shaderStage).updateDescInElf &&
-          (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageVertex ||
-           m_shaderStage == ShaderStageCompute)) {
+      if (m_pipelineState->getShaderOptions(m_shaderStage).updateDescInElf && m_shaderStage == ShaderStageFragment) {
         // Put set number to register first, will update offset after merge ELFs
-        // For partial pipeline compile, only fragment shader needs to adjust offset of root descriptor
-        // If there are more individual shader compile in future, we can add more stages here
+        // For partial pipeline compile, only fragment shader needs to adjust offset of root descriptor.
+        // This is part of the original "partial pipeline compile" scheme, and it uses a magic number for the
+        // PAL metadata register value because the code to fix it up in llpcElfWriter.cpp just fixes up any
+        // register with the magic value, and hopes it lucks out by not getting a false positive.
+        // TODO: Remove all that code once the new "shader/half-pipeline compile" scheme can replace it.
+        static const unsigned DescRelocMagic = 0xA5A5A500;
         userDataValue = DescRelocMagic | node.innerTable[0].set;
       }
       // Add the arg (descriptor set pointer) that we can potentially unspill.

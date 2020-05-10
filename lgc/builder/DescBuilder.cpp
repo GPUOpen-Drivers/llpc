@@ -30,6 +30,7 @@
  */
 #include "BuilderImpl.h"
 #include "lgc/LgcContext.h"
+#include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -339,7 +340,7 @@ Value *DescBuilder::getDescPtrAndStride(ResourceNodeType resType, unsigned descS
     // Stride is not determinable just from the descriptor type requested by the Builder call.
     if (m_pipelineState->isUnlinked() && m_pipelineState->getUserDataNodes().empty()) {
       // Shader compilation: Get byte stride using a reloc.
-      stride = CreateRelocationConstant("dstride_" + Twine(descSet) + "_" + Twine(binding));
+      stride = CreateRelocationConstant(reloc::DescriptorStride + Twine(descSet) + "_" + Twine(binding));
     } else {
       // Pipeline compilation: Get the stride from the resource type in the node.
       switch (node->type) {
@@ -457,7 +458,8 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
       relocNameSuffix = "_x";
       break;
     }
-    offset = CreateRelocationConstant("doff_" + Twine(descSet) + "_" + Twine(binding) + relocNameSuffix);
+    offset =
+        CreateRelocationConstant(reloc::DescriptorOffset + Twine(descSet) + "_" + Twine(binding) + relocNameSuffix);
   } else {
     // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
     // add on the size of the first part.
