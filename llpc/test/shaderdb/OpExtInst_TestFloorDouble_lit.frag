@@ -20,11 +20,11 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn double @llvm.floor.f64(double %{{[0-9]*}})
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn double @llvm.floor.f64(double %{{[0-9]*}})
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract double @llvm.floor.f64(double %{{[0-9]*}})
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract double @llvm.floor.f64(double %{{[0-9]*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn double @llvm.floor.f64(double %{{[0-9]*}})
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn double @llvm.floor.f64(double
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract double @llvm.floor.f64(double %{{[0-9]*}})
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract double @llvm.floor.f64(double
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -2,17 +2,17 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.quantize.to.fp16.v4f32(<4 x float> %{{.*}})
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @lgc.create.quantize.to.fp16.v4f32(<4 x float> %{{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: fptrunc float
 ; SHADERTEST: fpext half %{{.*}} to float
-; SHADERTEST: call reassoc nnan nsz arcp contract afn float @llvm.fabs.f32
-; SHADERTEST: fcmp reassoc nnan nsz arcp contract afn olt float
-; SHADERTEST: fcmp reassoc nnan nsz arcp contract afn one half
+; SHADERTEST: call reassoc nnan nsz arcp contract float @llvm.fabs.f32
+; SHADERTEST: fcmp reassoc nnan nsz arcp contract olt float
+; SHADERTEST: fcmp reassoc nnan nsz arcp contract one half
 ; SHADERTEST: and i1 %{{.*}}, %{{.*}}
 ; SHADERTEST: fcmp uno float
-; SHADERTEST: select reassoc nnan nsz arcp contract afn i1
+; SHADERTEST: select reassoc nnan nsz arcp contract i1
 
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
