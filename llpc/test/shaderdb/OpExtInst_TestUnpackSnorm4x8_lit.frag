@@ -19,8 +19,8 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %[[BITCAST:.*]] = bitcast i32 %1 to <4 x i8>
 ; SHADERTEST: %[[CONV:.*]] = sitofp <4 x i8> %[[BITCAST]] to <4 x float>
-; SHADERTEST: %[[SCALE:.*]] = fmul reassoc nnan nsz arcp contract afn <4 x float> %[[CONV]], <float 0x3F80204080000000, float 0x3F80204080000000, float 0x3F80204080000000, float 0x3F80204080000000>
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.fclamp.v4f32(<4 x float> %[[SCALE]], <4 x float> <float -1.000000e+00, float -1.000000e+00, float -1.000000e+00, float -1.000000e+00>, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>)
+; SHADERTEST: %[[SCALE:.*]] = fmul reassoc nnan nsz arcp contract <4 x float> %[[CONV]], <float 0x3F80204080000000, float 0x3F80204080000000, float 0x3F80204080000000, float 0x3F80204080000000>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <4 x float> (...) @lgc.create.fclamp.v4f32(<4 x float> %[[SCALE]], <4 x float> <float -1.000000e+00, float -1.000000e+00, float -1.000000e+00, float -1.000000e+00>, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

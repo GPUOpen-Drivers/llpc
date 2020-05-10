@@ -250,7 +250,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: fadd reassoc nnan nsz arcp contract afn float %{{[0-9]*}}, 5.000000e-01
+; SHADERTEST: fadd reassoc nnan nsz arcp contract float %{{[0-9]*}}, 5.000000e-01
 ; SHADERTEST: add i32 %{{[0-9]*}}, 2
 ; SHADERTEST: add i32 %{{[0-9]*}}, -1
 ; SHADERTEST: add i32 %{{[0-9]*}}, -3

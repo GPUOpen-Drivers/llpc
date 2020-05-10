@@ -38,8 +38,8 @@ void main(void)
 ; SHADERTEST: call <4 x i32> (...) @lgc.create.subgroup.ballot.v4i32(
 ; SHADERTEST: call i32 (...) @lgc.create.subgroup.broadcast.i32(
 ; SHADERTEST: call i32 (...) @lgc.create.subgroup.broadcast.first.i32(
-; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.subgroup.broadcast.f32(
-; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.subgroup.broadcast.first.f32(
+; SHADERTEST: call reassoc nnan nsz arcp contract float (...) @lgc.create.subgroup.broadcast.f32(
+; SHADERTEST: call reassoc nnan nsz arcp contract float (...) @lgc.create.subgroup.broadcast.first.f32(
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST: call i32 @lgc.input.import.builtin.SubgroupLocalInvocationId.i32.i32
 

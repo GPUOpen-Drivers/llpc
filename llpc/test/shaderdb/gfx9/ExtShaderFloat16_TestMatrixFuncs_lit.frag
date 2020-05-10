@@ -41,9 +41,9 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call {{.*}}[2 x <3 x half>] (...) @lgc.create.outer.product.a2v3f16(<3 x half> %{{.*}}, <2 x half> %{{.*}})
 ; SHADERTEST: %{{[^, ]*}} = call {{.*}}[3 x <2 x half>] {{.*}}@lgc.create.transpose.matrix.a3v2f16([2 x <3 x half>] %{{[^, ]*}})
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn half (...) @lgc.create.determinant.f16([2 x <2 x half>] %
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn half (...) @lgc.create.determinant.f16([3 x <3 x half>] %
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn half (...) @lgc.create.determinant.f16([4 x <4 x half>] %
+; SHADERTEST: = call reassoc nnan nsz arcp contract half (...) @lgc.create.determinant.f16([2 x <2 x half>] %
+; SHADERTEST: = call reassoc nnan nsz arcp contract half (...) @lgc.create.determinant.f16([3 x <3 x half>] %
+; SHADERTEST: = call reassoc nnan nsz arcp contract half (...) @lgc.create.determinant.f16([4 x <4 x half>] %
 ; SHADERTEST: = call {{.*}}[2 x <2 x half>] (...) @lgc.create.matrix.inverse.a2v2f16([2 x <2 x half>] %
 ; SHADERTEST: = call {{.*}}[3 x <3 x half>] (...) @lgc.create.matrix.inverse.a3v3f16([3 x <3 x half>] %
 ; SHADERTEST: = call {{.*}}[4 x <4 x half>] (...) @lgc.create.matrix.inverse.a4v4f16([4 x <4 x half>] %

@@ -23,8 +23,8 @@ void main()
 ; SHADERTEST: <3 x float> (...) @lgc.create.matrix.times.vector.v3f32
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: fmul reassoc nnan nsz arcp contract afn float
-; SHADERTEST: fadd reassoc nnan nsz arcp contract afn float
+; SHADERTEST: fmul reassoc nnan nsz arcp contract float
+; SHADERTEST: fadd reassoc nnan nsz arcp contract float
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */
