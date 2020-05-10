@@ -76,6 +76,9 @@ public:
   // set to the minimum of any call to this function in any shader.
   void setUserDataSpillUsage(unsigned dwordOffset);
 
+  // Set a register value in PAL metadata. If the register is already set, this ORs in the value.
+  void setRegister(unsigned regNum, unsigned value);
+
   // Finalize PAL metadata for pipeline.
   // TODO Shader compilation: The idea is that this will be called at the end of a pipeline compilation, or in
   // an ELF link, but not at the end of a shader/half-pipeline compile.

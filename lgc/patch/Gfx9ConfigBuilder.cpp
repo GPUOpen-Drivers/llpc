@@ -56,7 +56,10 @@ void ConfigBuilder::buildPalMetadata() {
     const bool hasTs = (m_hasTcs || m_hasTes);
     const bool enableNgg = m_pipelineState->getNggControl()->enableNgg;
 
-    if (!hasTs && !m_hasGs) {
+    if (m_pipelineState->isUnlinked() && m_pipelineState->hasShaderStage(ShaderStageFragment)) {
+      // FS-only shader compilation
+      buildPipelineVsFsRegConfig();
+    } else if (!hasTs && !m_hasGs) {
       // VS-FS pipeline
       if (m_gfxIp.major >= 10 && enableNgg)
         buildPipelineNggVsFsRegConfig();
@@ -87,7 +90,7 @@ void ConfigBuilder::buildPalMetadata() {
 }
 
 // =====================================================================================================================
-// Builds register configuration for graphics pipeline (VS-FS).
+// Builds register configuration for graphics pipeline (VS-FS), or FS-only shader compilation
 void ConfigBuilder::buildPipelineVsFsRegConfig() // [out] Size of register configuration
 {
   GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
@@ -121,6 +124,23 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() // [out] Size of register confi
     if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling) {
       SET_REG_FIELD(&config.vsRegs, SPI_SHADER_PGM_CHKSUM_VS, CHECKSUM, checksum);
     }
+
+    regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
+
+    // When non-patch primitives are used without tessellation enabled, PRIMGROUP_SIZE must be at least 4, and must be
+    // even if there are more than 2 shader engines on the GPU.
+    unsigned primGroupSize = 128;
+    unsigned numShaderEngines = m_pipelineState->getTargetInfo().getGpuProperty().numShaderEngines;
+    if (numShaderEngines > 2)
+      primGroupSize = alignTo(primGroupSize, 2);
+
+    iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
+
+    if (gfxIp.major >= 10) {
+      SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
+    } else {
+      SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
+    }
   }
 
   if (stageMask & shaderStageToMask(ShaderStageFragment)) {
@@ -131,23 +151,6 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() // [out] Size of register confi
     if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling) {
       SET_REG_FIELD(&config.psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
     }
-  }
-
-  regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
-
-  // When non-patch primitives are used without tessellation enabled, PRIMGROUP_SIZE must be at least 4, and must be
-  // even if there are more than 2 shader engines on the GPU.
-  unsigned primGroupSize = 128;
-  unsigned numShaderEngines = m_pipelineState->getTargetInfo().getGpuProperty().numShaderEngines;
-  if (numShaderEngines > 2)
-    primGroupSize = alignTo(primGroupSize, 2);
-
-  iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
-
-  if (gfxIp.major >= 10) {
-    SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
-  } else {
-    SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
   }
 
   appendConfig(config);
@@ -896,22 +899,7 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
     SET_REG_GFX10_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC1_VS, MEM_ORDERED, true);
   }
 
-  uint8_t usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
-  bool depthClipDisable = (!static_cast<bool>(m_pipelineState->getViewportState().depthClipEnable));
-  bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
   bool disableVertexReuse = m_pipelineState->getInputAssemblyState().disableVertexReuse;
-
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_0, (usrClipPlaneMask >> 0) & 0x1);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_1, (usrClipPlaneMask >> 1) & 0x1);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_2, (usrClipPlaneMask >> 2) & 0x1);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_3, (usrClipPlaneMask >> 3) & 0x1);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_4, (usrClipPlaneMask >> 4) & 0x1);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_5, (usrClipPlaneMask >> 5) & 0x1);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, DX_LINEAR_ATTR_CLIP_ENA, true);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, DX_CLIP_SPACE_DEF, true); // DepthRange::ZeroToOne
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, ZCLIP_NEAR_DISABLE, depthClipDisable);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, ZCLIP_FAR_DISABLE, depthClipDisable);
-  SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, DX_RASTERIZATION_KILL, rasterizerDiscardEnable);
 
   SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VTE_CNTL, VPORT_X_SCALE_ENA, true);
   SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VTE_CNTL, VPORT_X_OFFSET_ENA, true);
