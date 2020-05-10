@@ -1852,7 +1852,8 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
 // =====================================================================================================================
 // Link relocatable shader elf file into a pipeline elf file and apply relocations.
 //
-// @param shaderElfs : An array of pipeline elf packages, indexed by stage, containing relocatable elf
+// @param shaderElfs : An array of pipeline elf packages, indexed by stage, containing relocatable elf.
+//                     TODO: This has an implicit length of ShaderStageNativeStageCount. Use ArrayRef instead.
 // @param [out] pipelineElf : Elf package containing the pipeline elf
 // @param context : Acquired context
 void Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipelineElf, Context *context) {
@@ -1860,39 +1861,28 @@ void Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
   assert(shaderElfs[ShaderStageTessEval].empty() && "Cannot link tessellation shaders yet.");
   assert(shaderElfs[ShaderStageGeometry].empty() && "Cannot link geometry shaders yet.");
 
-  Result result = Result::Success;
-  ElfWriter<Elf64> writer(m_gfxIp);
+  // Set up middle-end objects, including setting up pipeline state.
+  context->getPipelineContext()->setUnlinked(false);
+  LgcContext *builderContext = context->getLgcContext();
+  std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
+  context->getPipelineContext()->setPipelineState(&*pipeline, /*unlinked=*/false);
 
-  if (shaderElfs[ShaderStageCompute].empty()) {
-    ElfReader<Elf64> vsReader(m_gfxIp);
-    ElfReader<Elf64> fsReader(m_gfxIp);
-    if (!shaderElfs[ShaderStageVertex].empty()) {
-      size_t codeSize = shaderElfs[ShaderStageVertex].size_in_bytes();
-      result = vsReader.ReadFromBuffer(shaderElfs[ShaderStageVertex].data(), &codeSize);
-      if (result != Result::Success)
-        return;
-    }
-
-    if (!shaderElfs[ShaderStageFragment].empty()) {
-      size_t codeSize = shaderElfs[ShaderStageFragment].size_in_bytes();
-      result = fsReader.ReadFromBuffer(shaderElfs[ShaderStageFragment].data(), &codeSize);
-      if (result != Result::Success)
-        return;
-    }
-
-    result = writer.linkGraphicsRelocatableElf({&vsReader, &fsReader}, context);
-  } else {
-    ElfReader<Elf64> csReader(m_gfxIp);
-    size_t codeSize = shaderElfs[ShaderStageCompute].size_in_bytes();
-    result = csReader.ReadFromBuffer(shaderElfs[ShaderStageCompute].data(), &codeSize);
-    if (result != Result::Success)
-      return;
-    result = writer.linkComputeRelocatableElf(csReader, context);
+  // Create linker, passing ELFs to it.
+  SmallVector<MemoryBufferRef, 3> elfs;
+  for (unsigned stage = 0; stage != ShaderStageNativeStageCount; ++stage) {
+    if (!shaderElfs[stage].empty())
+      elfs.push_back(MemoryBufferRef(shaderElfs[stage].str(), getShaderStageName(static_cast<ShaderStage>(stage))));
   }
+  std::unique_ptr<ElfLinker> elfLinker(pipeline->createElfLinker(elfs));
 
-  if (result != Result::Success)
-    return;
-  writer.writeToBuffer(pipelineElf);
+  // Do the link.
+  raw_svector_ostream outStream(*pipelineElf);
+  if (!elfLinker->link(outStream)) {
+    // Link failed in a recoverable way.
+    // TODO: Action this failure by doing a full pipeline compile.
+    report_fatal_error("Link failed; need full pipeline compile instead: " + pipeline->getLastError());
+  }
+  return;
 }
 
 // =====================================================================================================================

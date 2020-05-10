@@ -133,8 +133,8 @@ bool PatchPreparePipelineAbi::runOnModule(Module &module) {
 
     setConstantGlobalSection(module);
 
-    // TODO Shader compilation: Only do this if doing a whole-pipeline compilation
-    m_pipelineState->getPalMetadata()->finalizePipeline();
+    if (!m_pipelineState->isUnlinked())
+      m_pipelineState->getPalMetadata()->finalizePipeline();
   }
 
   return true; // Modified the module.
