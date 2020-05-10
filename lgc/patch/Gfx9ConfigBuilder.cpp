@@ -99,14 +99,13 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() // [out] Size of register confi
 
   PipelineVsFsRegConfig config(gfxIp);
 
-  addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderVs);
   addApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
-
-  setPipelineType(Util::Abi::PipelineType::VsPs);
 
   SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
   if (stageMask & shaderStageToMask(ShaderStageVertex)) {
+    setPipelineType(Util::Abi::PipelineType::VsPs);
+    addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderVs);
     buildVsRegConfig<PipelineVsFsRegConfig>(ShaderStageVertex, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);

@@ -59,6 +59,7 @@ namespace lgc {
 
 class ElfLinker;
 class PalMetadata;
+class PipelineState;
 class TargetInfo;
 
 llvm::ModulePass *createPipelineStateClearer();
@@ -268,6 +269,12 @@ public:
 
   // Accessor for PAL metadata
   PalMetadata *getPalMetadata();
+
+  // Clear PAL metadata object from PipelineState
+  void clearPalMetadata();
+
+  // Merge blob of MsgPack data into existing PAL metadata
+  void mergePalMetadataFromBlob(llvm::StringRef blob);
 
   // Set error message to be returned to the client by it calling getLastError
   void setError(const llvm::Twine &message);

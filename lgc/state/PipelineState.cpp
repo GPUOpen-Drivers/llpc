@@ -101,6 +101,22 @@ PalMetadata *PipelineState::getPalMetadata() {
 }
 
 // =====================================================================================================================
+// Clear PAL metadata object
+void PipelineState::clearPalMetadata() {
+  delete m_palMetadata;
+  m_palMetadata = nullptr;
+}
+
+// =====================================================================================================================
+// Merge blob of MsgPack data into existing PAL metadata
+void PipelineState::mergePalMetadataFromBlob(StringRef blob) {
+  if (!m_palMetadata)
+    m_palMetadata = new PalMetadata(this, blob);
+  else
+    m_palMetadata->mergeFromBlob(blob);
+}
+
+// =====================================================================================================================
 // Clear the pipeline state IR metadata.
 // This does not clear PalMetadta, because we want that to persist into the back-end.
 //

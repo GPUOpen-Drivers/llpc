@@ -48,6 +48,8 @@ constexpr unsigned PipelineMetadataMinorVersion = 3; // Pipeline Metadata Minor 
 constexpr unsigned PipelineMetadataBase = 0x10000000; // Pipeline Metadata base value to be OR'd with the
                                                       //  PipelineMetadataEntry value when saving to ELF.
 
+static constexpr char AmdGpuArchName[] = "AMDGPU"; // Architecture name string for .note record.
+
 // Pipeline category.
 enum PipelineType : unsigned {
   VsPs = 0,

@@ -34,6 +34,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/state/PalMetadata.h"
+#include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/Metadata.h"
@@ -48,6 +49,19 @@ using namespace llvm;
 // Construct empty object
 PalMetadata::PalMetadata(PipelineState *pipelineState) : m_pipelineState(pipelineState) {
   m_document = new msgpack::Document;
+  initialize();
+}
+
+// =====================================================================================================================
+// Constructor given blob of MsgPack PAL metadata
+//
+// @param pipelineState : PipelineState
+// @param blob : MsgPack PAL metadata
+PalMetadata::PalMetadata(PipelineState *pipelineState, StringRef blob) : m_pipelineState(pipelineState) {
+  m_document = new msgpack::Document;
+  bool success = m_document->readFromBlob(blob, /*multi=*/false);
+  assert(success && "Bad PAL metadata format");
+  ((void)success);
   initialize();
 }
 
@@ -112,6 +126,50 @@ void PalMetadata::record(Module *module) {
   MDNode *abiMetaNode = MDNode::get(module->getContext(), abiMetaString);
   NamedMDNode *namedMeta = module->getOrInsertNamedMetadata(PalMetadataName);
   namedMeta->addOperand(abiMetaNode);
+}
+
+// =====================================================================================================================
+// Read blob as PAL metadata and merge it into existing PAL metadata (if any)
+//
+// @param blob : MsgPack PAL metadata to merge
+void PalMetadata::mergeFromBlob(StringRef blob) {
+  // Use msgpack::Document::readFromBlob to read the new MsgPack PAL metadata, merging it into the msgpack::Document
+  // we already have. We pass it a lambda that determines how to cope with merge conflicts, which returns:
+  // -1: failure
+  // 0: success; *dest has been set up with the merged node. For an array, 0 means overwrite the existing array
+  //    rather than appending.
+  bool success = m_document->readFromBlob(
+      blob, /*multi=*/false, [](msgpack::DocNode *destNode, msgpack::DocNode srcNode, msgpack::DocNode mapKey) {
+        // Allow array and map merging.
+        if (srcNode.isMap() && destNode->isMap())
+          return 0;
+        if (srcNode.isArray() && destNode->isArray())
+          return 0;
+        // Allow string merging as long as the two strings have the same value.
+        if (destNode->isString() && srcNode.isString() && destNode->getString() == srcNode.getString())
+          return 0;
+        // Allow uint merging: A couple of special cases where we take the minimum or maximum value, and
+        // for all other cases we take the OR of the two register values.
+        if (destNode->getKind() != msgpack::Type::UInt || srcNode.getKind() != msgpack::Type::UInt) {
+          dbgs() << "Merge failure at " << mapKey.toString() << ": " << destNode->toString() << " vs "
+                 << srcNode.toString() << "\n";
+          return -1;
+        }
+        if (mapKey.isString()) {
+          if (mapKey.getString() == Util::Abi::PipelineMetadataKey::UserDataLimit) {
+            *destNode = std::max(destNode->getUInt(), srcNode.getUInt());
+            return 0;
+          }
+          if (mapKey.getString() == Util::Abi::PipelineMetadataKey::SpillThreshold) {
+            *destNode = std::min(destNode->getUInt(), srcNode.getUInt());
+            return 0;
+          }
+        }
+        *destNode = destNode->getUInt() | srcNode.getUInt();
+        return 0;
+      });
+  assert(success && "Bad PAL metadata format");
+  ((void)success);
 }
 
 // =====================================================================================================================
@@ -241,10 +299,93 @@ void PalMetadata::setUserDataSpillUsage(unsigned dwordOffset) {
 }
 
 // =====================================================================================================================
+// Fix up user data registers. Any user data register that has one of the unlinked UserDataMapping values defined
+// in AbiUnlinked.h is fixed up by looking at pipeline state.
+void PalMetadata::fixUpRegisters() {
+  static const std::pair<unsigned, unsigned> ComputeRegRanges[] = {{mmCOMPUTE_USER_DATA_0, 16}};
+  static const std::pair<unsigned, unsigned> Gfx8RegRanges[] = {
+      {mmSPI_SHADER_USER_DATA_PS_0, 16}, {mmSPI_SHADER_USER_DATA_VS_0, 16}, {mmSPI_SHADER_USER_DATA_GS_0, 16},
+      {mmSPI_SHADER_USER_DATA_ES_0, 16}, {mmSPI_SHADER_USER_DATA_HS_0, 16}, {mmSPI_SHADER_USER_DATA_LS_0, 16}};
+  static const std::pair<unsigned, unsigned> Gfx9RegRanges[] = {{mmSPI_SHADER_USER_DATA_PS_0, 32},
+                                                                {mmSPI_SHADER_USER_DATA_VS_0, 32},
+                                                                {mmSPI_SHADER_USER_DATA_ES_0, 32},
+                                                                {mmSPI_SHADER_USER_DATA_HS_0, 32}};
+  static const std::pair<unsigned, unsigned> Gfx10RegRanges[] = {{mmSPI_SHADER_USER_DATA_PS_0, 32},
+                                                                 {mmSPI_SHADER_USER_DATA_VS_0, 32},
+                                                                 {mmSPI_SHADER_USER_DATA_GS_0, 32},
+                                                                 {mmSPI_SHADER_USER_DATA_HS_0, 32}};
+
+  ArrayRef<std::pair<unsigned, unsigned>> regRanges = ComputeRegRanges;
+  if (m_pipelineState->isGraphics()) {
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9)
+      regRanges = Gfx8RegRanges;
+    else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9)
+      regRanges = Gfx9RegRanges;
+    else
+      regRanges = Gfx10RegRanges;
+  }
+
+  // First find the descriptor sets and push const nodes.
+  SmallVector<const ResourceNode *, 4> descSetNodes;
+  const ResourceNode *pushConstNode;
+  for (const auto &node : m_pipelineState->getUserDataNodes()) {
+    if (node.type == ResourceNodeType::DescriptorTableVaPtr && !node.innerTable.empty()) {
+      unsigned descSet = node.innerTable[0].set;
+      descSetNodes.resize(std::max(unsigned(descSetNodes.size()), descSet + 1));
+      descSetNodes[descSet] = &node;
+    } else if (node.type == ResourceNodeType::PushConst) {
+      pushConstNode = &node;
+    }
+  }
+
+  // Scan the PAL metadata registers for user data.
+  unsigned userDataLimit = m_userDataLimit->getUInt();
+  for (const std::pair<unsigned, unsigned> &regRange : regRanges) {
+    unsigned reg = regRange.first;
+    unsigned regEnd = reg + regRange.second;
+    // Scan registers [reg,regEnd), the user data registers for one shader stage. If register 0 in that range is
+    // not set, then the shader stage is not in use, so don't bother to scan the others.
+    auto it = m_registers.find(m_document->getNode(reg));
+    if (it != m_registers.end()) {
+      for (;;) {
+        unsigned value = it->second.getUInt();
+        unsigned descSet = value - static_cast<unsigned>(UserDataMapping::DescriptorSet0);
+        if (descSet <= static_cast<unsigned>(UserDataMapping::DescriptorSetMax) -
+                           static_cast<unsigned>(UserDataMapping::DescriptorSet0)) {
+          // This entry is a descriptor set pointer. Replace it with the dword offset for that descriptor set.
+          if (descSet >= descSetNodes.size() || !descSetNodes[descSet])
+            report_fatal_error("Descriptor set " + Twine(descSet) + " not found");
+          value = descSetNodes[descSet]->offsetInDwords;
+          it->second = value;
+          userDataLimit = std::max(userDataLimit, value);
+        } else {
+          unsigned pushConstOffset = value - static_cast<unsigned>(UserDataMapping::PushConst0);
+          if (pushConstOffset <= static_cast<unsigned>(UserDataMapping::DescriptorSetMax) -
+                                     static_cast<unsigned>(UserDataMapping::DescriptorSet0)) {
+            // This entry is a dword in the push constant.
+            if (!pushConstNode || pushConstNode->sizeInDwords <= pushConstOffset)
+              report_fatal_error("Push constant not found or not big enough");
+            value = pushConstNode->offsetInDwords + pushConstOffset;
+            it->second = value;
+            userDataLimit = std::max(userDataLimit, value);
+          }
+        }
+        ++it;
+        if (it == m_registers.end() || it->first.getUInt() >= regEnd)
+          break;
+      }
+    }
+  }
+  *m_userDataLimit = userDataLimit;
+}
+
+// =====================================================================================================================
 // Finalize PAL metadata for pipeline.
-// TODO Shader compilation: The idea is that this will be called at the end of a pipeline compilation, or in
-// an ELF link, but not at the end of a shader/half-pipeline compile.
+// This is called at the end of a full pipeline compilation, or from the ELF link when doing shader/half-pipeline
+// compilation.
 void PalMetadata::finalizePipeline() {
+  assert(!m_pipelineState->isUnlinked());
+
   // Set pipeline hash.
   auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
   const auto &options = m_pipelineState->getOptions();
