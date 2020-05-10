@@ -33,6 +33,7 @@
 #include "lgc/BuiltIns.h"
 #include "lgc/LgcContext.h"
 #include "lgc/patch/FragColorExport.h"
+#include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/util/Debug.h"
 #include "llvm/IR/IRBuilder.h"
@@ -2458,7 +2459,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
   // Handle internal-use built-ins for sample position emulation
   case BuiltInNumSamples: {
     if (m_pipelineState->isUnlinked()) {
-      input = builder.CreateRelocationConstant("$numSamples");
+      input = builder.CreateRelocationConstant(reloc::NumSamples);
     } else {
       input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getRasterizerState().numSamples);
     }
@@ -2466,7 +2467,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
   }
   case BuiltInSamplePatternIdx: {
     if (m_pipelineState->isUnlinked()) {
-      input = builder.CreateRelocationConstant("$samplePatternIdx");
+      input = builder.CreateRelocationConstant(reloc::SamplePatternIdx);
     } else {
       input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getRasterizerState().samplePatternIdx);
     }
@@ -5772,7 +5773,7 @@ Value *PatchInOutImportExport::getDeviceIndex(Instruction *insertPos) {
   if (m_pipelineState->isUnlinked()) {
     BuilderBase builder(*m_context);
     builder.SetInsertPoint(insertPos);
-    return builder.CreateRelocationConstant("$deviceIdx");
+    return builder.CreateRelocationConstant(reloc::DeviceIdx);
   } else {
     return ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getDeviceIndex());
   }
