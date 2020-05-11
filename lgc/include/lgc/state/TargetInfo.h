@@ -50,7 +50,7 @@ struct GpuProperty {
   unsigned ldsSizePerThreadGroup;             // LDS size per thread group
   unsigned gsOnChipDefaultPrimsPerSubgroup;   // Default target number of primitives per subgroup for GS on-chip mode.
   unsigned gsOnChipDefaultLdsSizePerSubgroup; // Default value for the maximum LDS size per subgroup for
-  unsigned gsOnChipMaxLdsSize;                // Max LDS size used by GS on-chip mode (in DWORDs)
+  unsigned gsOnChipMaxLdsSize;                // Max LDS size used by GS on-chip mode (in dwords)
   unsigned ldsSizeDwordGranularityShift;      // Amount of bits used to shift the LDS_SIZE register field
 
   // TODO: Setup gsPrimBufferDepth from hardware config option, will be done in another change.
@@ -60,7 +60,7 @@ struct GpuProperty {
   unsigned tessOffChipLdsBufferSize;  // Off-chip Tess Buffer Size
   unsigned maxSgprsAvailable;         // Number of max available SGPRs
   unsigned maxVgprsAvailable;         // Number of max available VGPRs
-  unsigned tessFactorBufferSizePerSe; // Size of the tessellation-factor buffer per SE, in DWORDs.
+  unsigned tessFactorBufferSizePerSe; // Size of the tessellation-factor buffer per SE, in dwords.
   bool supportShaderPowerProfiling;   // Hardware supports Shader Profiling for Power
   bool supportSpiPrefPriority;        // Hardware supports SPI shader preference priority
 

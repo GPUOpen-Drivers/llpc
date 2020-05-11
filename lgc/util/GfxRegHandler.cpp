@@ -63,9 +63,9 @@ Value *GfxRegHandler::getRegCommon(unsigned regId) {
 }
 
 // =====================================================================================================================
-// Get combined data from two seperate DWORDs
-// Note: The return type is one DWORD, it doesn't support two DWORDs for now.
-// TODO: Expand to support 2-DWORDs combination result.
+// Get combined data from two seperate dwords
+// Note: The return type is one dword, it doesn't support two dwords for now.
+// TODO: Expand to support 2-dwords combination result.
 //
 // @param regIdLo : The ID of low part register
 // @param regIdHi : Reg ID of high part register
@@ -76,8 +76,8 @@ Value *GfxRegHandler::getRegCombine(unsigned regIdLo, unsigned regIdHi) {
 }
 
 // =====================================================================================================================
-// Set register value into two seperate DWORDs
-// Note: The input pRegValue only supports one DWORD
+// Set register value into two seperate dwords
+// Note: The input pRegValue only supports one dword
 //
 // @param regIdLo : The ID of low part register
 // @param regIdHi : Reg ID of high part register

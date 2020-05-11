@@ -35,7 +35,7 @@
 
 namespace Llpc {
 
-// Represents the special header of SPIR-V token stream (the first DWORD).
+// Represents the special header of SPIR-V token stream (the first dword).
 struct SpirvHeader {
   unsigned magicNumber;    // Magic number of SPIR-V module
   unsigned spvVersion;     // SPIR-V version number

@@ -393,7 +393,7 @@ union SpiPsInputAddr {
   unsigned u32All;
 };
 
-// Represents the first DWORD of buffer descriptor SQ_BUF_RSRC_WORD0.
+// Represents the first dword of buffer descriptor SQ_BUF_RSRC_WORD0.
 union SqBufRsrcWord0 {
   struct {
     unsigned baseAddress : 32;
@@ -402,7 +402,7 @@ union SqBufRsrcWord0 {
   unsigned u32All;
 };
 
-// Represents the second DWORD of buffer descriptor SQ_BUF_RSRC_WORD1.
+// Represents the second dword of buffer descriptor SQ_BUF_RSRC_WORD1.
 union SqBufRsrcWord1 {
   struct {
     unsigned baseAddressHi : 16;
@@ -414,7 +414,7 @@ union SqBufRsrcWord1 {
   unsigned u32All;
 };
 
-// Represents the third DWORD of buffer descriptor SQ_BUF_RSRC_WORD2.
+// Represents the third dword of buffer descriptor SQ_BUF_RSRC_WORD2.
 union SqBufRsrcWord2 {
   struct {
     unsigned numRecords : 32;
@@ -423,7 +423,7 @@ union SqBufRsrcWord2 {
   unsigned u32All;
 };
 
-// Represents the forth DWORD of buffer descriptor SQ_BUF_RSRC_WORD3.
+// Represents the forth dword of buffer descriptor SQ_BUF_RSRC_WORD3.
 union SqBufRsrcWord3 {
   struct {
     unsigned dstSelX : 3;

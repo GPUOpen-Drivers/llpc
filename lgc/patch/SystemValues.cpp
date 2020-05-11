@@ -240,7 +240,7 @@ Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
       // Patch GS-VS ring buffer descriptor stride for GS output
       Value *gsVsRingBufDescElem1 = builder.CreateExtractElement(desc, (uint64_t)1);
 
-      // Clear stride in SRD DWORD1
+      // Clear stride in SRD dword1
       SqBufRsrcWord1 strideClearMask = {};
       strideClearMask.u32All = UINT32_MAX;
       strideClearMask.bits.stride = 0;

@@ -917,13 +917,13 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
   // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
   if (!lengthConstant || constantLength > MinMemOpLoopBytes) {
     // NOTE: We want to perform our memcpy operation on the greatest stride of bytes possible (load/storing up to
-    // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
+    // dwordx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
     // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
     // 2. Worst case we have to load/store a single byte per loop.
     unsigned stride = !lengthConstant ? 1 : 16;
 
     while (stride != 1) {
-      // We only care about DWORD alignment (4 bytes) so clamp the max check here to that.
+      // We only care about dword alignment (4 bytes) so clamp the max check here to that.
       const unsigned minStride = std::min(stride, 4u);
       if (destAlignment.valueOrOne() >= minStride && srcAlignment.valueOrOne() >= minStride && (constantLength % stride) == 0)
         break;
@@ -1046,13 +1046,13 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
   // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
   if (!lengthConstant || constantLength > MinMemOpLoopBytes) {
     // NOTE: We want to perform our memset operation on the greatest stride of bytes possible (load/storing up to
-    // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
+    // dwordx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
     // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
     // 2. Worst case we have to load/store a single byte per loop.
     unsigned stride = !lengthConstant ? 1 : 16;
 
     while (stride != 1) {
-      // We only care about DWORD alignment (4 bytes) so clamp the max check here to that.
+      // We only care about dword alignment (4 bytes) so clamp the max check here to that.
       const unsigned minStride = std::min(stride, 4u);
       if (destAlignment.valueOrOne() >= minStride && (constantLength % stride) == 0)
         break;

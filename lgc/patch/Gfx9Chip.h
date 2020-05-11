@@ -206,7 +206,7 @@ constexpr unsigned OnChipGsMaxPrimPerSubgroup = 255;
 constexpr unsigned OnChipGsMaxPrimPerSubgroupAdj = 127;
 constexpr unsigned OnChipGsMaxEsVertsPerSubgroup = 255;
 
-// Default value for the maximum LDS size per GS subgroup, in DWORD's.
+// Default value for the maximum LDS size per GS subgroup, in dword's.
 constexpr unsigned DefaultLdsSizePerSubgroup = 8192;
 
 constexpr unsigned EsVertsOffchipGsOrTess = 250;

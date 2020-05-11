@@ -1008,7 +1008,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
 
         // TODO: We should query descriptor size from patch
 
-        // The second part of DescriptorRangeValue is YCbCrMetaData, which is 4 DWORDS.
+        // The second part of DescriptorRangeValue is YCbCrMetaData, which is 4 dwords.
         // The hasher should be updated when the content changes, this is because YCbCrMetaData
         // is engaged in pipeline compiling.
         const unsigned descriptorSize =

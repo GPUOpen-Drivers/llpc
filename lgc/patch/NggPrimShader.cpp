@@ -974,9 +974,9 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
         m_builder->SetInsertPoint(writePrimIdBlock);
 
         // Primitive data layout
-        //   ES_GS_OFFSET23[15:0]  = vertexId2 (in DWORDs)
-        //   ES_GS_OFFSET01[31:16] = vertexId1 (in DWORDs)
-        //   ES_GS_OFFSET01[15:0]  = vertexId0 (in DWORDs)
+        //   ES_GS_OFFSET23[15:0]  = vertexId2 (in dwords)
+        //   ES_GS_OFFSET01[31:16] = vertexId1 (in dwords)
+        //   ES_GS_OFFSET01[15:0]  = vertexId0 (in dwords)
 
         // Use vertex0 as provoking vertex to distribute primitive ID
         auto esGsOffset0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
@@ -1363,7 +1363,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
         unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionVertCountInWaves);
 
-        // The DWORD following DWORDs for all waves stores the vertex count of the entire sub-group
+        // The dword following dwords for all waves stores the vertex count of the entire sub-group
         Value *ldsOffset = m_builder->getInt32(regionStart + waveCountInSubgroup * SizeOfDword);
         vertCountInWaves = m_ldsManager->readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
 
@@ -1492,7 +1492,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
         unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionPrimCountInWaves);
 
-        // The DWORD following DWORDs for all waves stores the primitive count of the entire sub-group
+        // The dword following dwords for all waves stores the primitive count of the entire sub-group
         auto ldsOffset = m_builder->getInt32(regionStart + waveCountInSubgroup * SizeOfDword);
         primCountInWaves = m_ldsManager->readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
 
@@ -1995,7 +1995,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
     auto outVertCountInWaves =
         readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInWave, LdsRegionOutVertCountInWaves);
 
-    // The last DWORD following DWORDs for all waves (each wave has one DWORD) stores GS output vertex count of the
+    // The last dword following dwords for all waves (each wave has one dword) stores GS output vertex count of the
     // entire sub-group
     auto vertCountInSubgroup = m_builder->CreateIntrinsic(
         Intrinsic::amdgcn_readlane, {}, {outVertCountInWaves, m_builder->getInt32(waveCountInSubgroup)});
@@ -3195,7 +3195,7 @@ void NggPrimShader::runCopyShader(Module *module, Value *vertCompacted) {
     uncompactVertexIdPhi->addIncoming(uncompactVertexId, uncompactOutVertIdBlock);
     uncompactVertexIdPhi->addIncoming(m_nggFactor.threadIdInSubgroup, expVertBlock);
 
-    // gsVsRingOffset = gsVsRingStart + (streamBases[stream] + threadId * vertexItemSize) * 4 (in BYTES)
+    // gsVsRingOffset = gsVsRingStart + (streamBases[stream] + threadId * vertexItemSize) * 4 (in bytes)
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
     auto rasterStream = resUsage->inOutUsage.gs.rasterStream;
 
@@ -3344,9 +3344,9 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
 
   const unsigned bitWidth = output->getType()->getScalarSizeInBits();
   if (bitWidth == 8 || bitWidth == 16) {
-    // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD
-    // to DWORD. This is because copy shader does not know the actual data type. It only generates output
-    // export calls based on number of DWORDs.
+    // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend byte/word
+    // to dword. This is because copy shader does not know the actual data type. It only generates output
+    // export calls based on number of dwords.
     if (outputTy->isFPOrFPVectorTy()) {
       assert(bitWidth == 16);
       Type *castTy = m_builder->getInt16Ty();
@@ -3365,7 +3365,7 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
   // gsVsRingOffset = streamBases[stream] +
   //                  threadIdInSubgroup * gsVsRingItemSize +
   //                  outVertcounter * vertexItemSize +
-  //                  location * 4 + compIdx (in DWORDS)
+  //                  location * 4 + compIdx (in dwords)
   const unsigned vertexItemSize = 4 * resUsage->inOutUsage.gs.outLocCount[streamId];
 
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
@@ -3380,7 +3380,7 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
   const unsigned attribOffset = (location * 4) + compIdx;
   gsVsRingOffset = m_builder->CreateAdd(gsVsRingOffset, m_builder->getInt32(attribOffset));
 
-  // ldsOffset = gsVsRingStart + gsVsRingOffset * 4 (in BYTES)
+  // ldsOffset = gsVsRingStart + gsVsRingOffset * 4 (in bytes)
   const unsigned gsVsRingStart = m_ldsManager->getLdsRegionStart(LdsRegionGsVsRing);
 
   auto ldsOffset = m_builder->CreateShl(gsVsRingOffset, 2);
@@ -3396,7 +3396,7 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
 // @param location : Location of the output
 // @param compIdx : Index used for vector element indexing
 // @param streamId : ID of output vertex stream
-// @param vertexOffset : Start offset of vertex item in GS-VS ring (in BYTES)
+// @param vertexOffset : Start offset of vertex item in GS-VS ring (in bytes)
 Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned compIdx, unsigned streamId,
                                      Value *vertexOffset) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
@@ -3417,7 +3417,7 @@ Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned
     outputTy = VectorType::get(outputElemTy, elemCount);
   }
 
-  // ldsOffset = vertexOffset + (location * 4 + compIdx) * 4 (in BYTES)
+  // ldsOffset = vertexOffset + (location * 4 + compIdx) * 4 (in bytes)
   const unsigned attribOffset = (location * 4) + compIdx;
   auto ldsOffset = m_builder->CreateAdd(vertexOffset, m_builder->getInt32(attribOffset * 4));
   // Use 128-bit LDS load
@@ -3866,7 +3866,7 @@ Value *NggPrimShader::doCullDistanceCulling(Module *module, Value *cullFlag, Val
 // Fetches culling-control register from primitive shader table.
 //
 // @param module : LLVM module
-// @param regOffset : Register offset in the primitive shader table (in BYTEs)
+// @param regOffset : Register offset in the primitive shader table (in bytes)
 Value *NggPrimShader::fetchCullingControlRegister(Module *module, unsigned regOffset) {
   auto fetchCullingRegister = module->getFunction(lgcName::NggCullingFetchReg);
   if (!fetchCullingRegister)
@@ -5358,7 +5358,7 @@ Function *NggPrimShader::createFetchCullingRegister(Module *module) {
     auto primShaderTablePtr = m_builder->CreateIntToPtr(primShaderTableAddr, primShaderTablePtrTy);
 
     // regOffset = regOffset >> 2
-    regOffset = m_builder->CreateLShr(regOffset, 2); // To DWORD offset
+    regOffset = m_builder->CreateLShr(regOffset, 2); // To dword offset
 
     auto loadPtr = m_builder->CreateGEP(primShaderTablePtr, {m_builder->getInt32(0), regOffset});
     cast<Instruction>(loadPtr)->setMetadata(MetaNameUniform, MDNode::get(m_builder->getContext(), {}));

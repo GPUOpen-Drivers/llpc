@@ -37,8 +37,8 @@ using namespace llvm;
 
 // =====================================================================================================================
 // Set register:
-//   - Clear old DWORDs vector
-//   - Fill DWORDs vector with nullptr
+//   - Clear old dwords vector
+//   - Fill dwords vector with nullptr
 //   - Init dirty mask to all clean
 //
 // @param newRegister : A <n x i32> vector
@@ -48,10 +48,10 @@ void GfxRegHandlerBase::setRegister(Value *newRegister) {
   if (auto vectorTy = dyn_cast<VectorType>(newRegister->getType())) {
     unsigned count = vectorTy->getNumElements();
 
-    // Clear previously stored DWORDs
+    // Clear previously stored dwords
     m_dwords.clear();
 
-    // Resize to specific number of DWORDs
+    // Resize to specific number of dwords
     for (unsigned i = 0; i < count; i++)
       m_dwords.push_back(nullptr);
   } else {
@@ -65,11 +65,11 @@ void GfxRegHandlerBase::setRegister(Value *newRegister) {
 
 // =====================================================================================================================
 // Get register
-//   - Overwrite DWORDs in <n x i32> register if marked as dirty
+//   - Overwrite dwords in <n x i32> register if marked as dirty
 Value *GfxRegHandlerBase::getRegister() {
   unsigned dirtyMask = m_dirtyDwords;
 
-  // Overwrite if the specific DWORD is being masked as dirty
+  // Overwrite if the specific dword is being masked as dirty
   for (unsigned i = 0; dirtyMask > 0; dirtyMask >>= 1) {
     if (dirtyMask & 1) {
       m_reg = m_builder->CreateInsertElement(m_reg, m_dwords[i], m_builder->getInt64(i));
@@ -86,7 +86,7 @@ Value *GfxRegHandlerBase::getRegister() {
 }
 
 // =====================================================================================================================
-// Get data from a range of bits in indexed DWORD according to BitsInfo
+// Get data from a range of bits in indexed dword according to BitsInfo
 //
 // @param bitsInfo : The BitsInfo of data
 Value *GfxRegHandlerBase::getBits(const BitsInfo &bitsInfo) {
@@ -101,7 +101,7 @@ Value *GfxRegHandlerBase::getBits(const BitsInfo &bitsInfo) {
 }
 
 // =====================================================================================================================
-// Set data to a range of bits in indexed DWORD according to BitsInfo
+// Set data to a range of bits in indexed dword according to BitsInfo
 //
 // @param bitsInfo : The BitsInfo of data's high part
 // @param newBits : The new bits to set
@@ -116,9 +116,9 @@ void GfxRegHandlerBase::setBits(const BitsInfo &bitsInfo, Value *newBits) {
 }
 
 // =====================================================================================================================
-// Return new DWORD which is replaced [offset, offset + count) with pNewBits
+// Return new dword which is replaced [offset, offset + count) with pNewBits
 //
-// @param dword : Target DWORD
+// @param dword : Target dword
 // @param offset : The first bit to be replaced
 // @param count : The number of bits should be replaced
 // @param newBits : The new bits to replace specified ones

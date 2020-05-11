@@ -246,7 +246,7 @@ private:
   bool m_hasTes; // Whether the pipeline has tessellation evaluation shader
   bool m_hasGs;  // Whether the pipeline has geometry shader
 
-  // Base offsets (in DWORDS) of GS output vertex streams in GS-VS ring
+  // Base offsets (in dwords) of GS output vertex streams in GS-VS ring
   uint32_t m_gsStreamBases[MaxGsStreams];
 
   std::unique_ptr<llvm::IRBuilder<>> m_builder; // LLVM IR builder

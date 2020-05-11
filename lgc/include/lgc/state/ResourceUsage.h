@@ -351,35 +351,35 @@ struct ResourceUsage {
 
     struct {
       struct {
-        unsigned inVertexStride;           // Stride of vertices of input patch (in DWORD, correspond to
+        unsigned inVertexStride;           // Stride of vertices of input patch (in dword, correspond to
                                            // "lsStride")
-        unsigned outVertexStride;          // Stride of vertices of output patch (in DWORD, correspond to
+        unsigned outVertexStride;          // Stride of vertices of output patch (in dword, correspond to
                                            // "hsCpStride")
-        unsigned patchCountPerThreadGroup; // Count of patches per thread group (in DWORD, correspond to
+        unsigned patchCountPerThreadGroup; // Count of patches per thread group (in dword, correspond to
                                            // "hsNumPatch")
         // On-chip caculation factors
         struct {
           unsigned outPatchStart;   // Offset into LDS where vertices of output patches start
-                                    // (in DWORD, correspond to "hsOutputBase")
-          unsigned patchConstStart; // Offset into LDS where patch constants start (in DWORD,
+                                    // (in dword, correspond to "hsOutputBase")
+          unsigned patchConstStart; // Offset into LDS where patch constants start (in dword,
                                     // correspond to "patchConstBase")
         } onChip;
 
         // Off-chip caculation factors
         struct {
           unsigned outPatchStart;   // Offset into LDS where vertices of output patches start
-                                    // (in DWORD, correspond to "hsOutputBase")
-          unsigned patchConstStart; // Offset into LDS where patch constants start (in DWORD,
+                                    // (in dword, correspond to "hsOutputBase")
+          unsigned patchConstStart; // Offset into LDS where patch constants start (in dword,
                                     // correspond to "patchConstBase")
         } offChip;
 
-        unsigned inPatchSize; // size of an input patch size (in DWORD)
+        unsigned inPatchSize; // size of an input patch size (in dword)
 
-        unsigned outPatchSize; // Size of an output patch output (in DWORD, correspond to
+        unsigned outPatchSize; // Size of an output patch output (in dword, correspond to
                                // "patchOutputSize")
 
-        unsigned patchConstSize;   // Size of an output patch constants (in DWORD)
-        unsigned tessFactorStride; // Size of tess factor stride (in DWORD)
+        unsigned patchConstSize;   // Size of an output patch constants (in dword)
+        unsigned tessFactorStride; // Size of tess factor stride (in dword)
 
       } calcFactor;
     } tcs = {};
@@ -401,8 +401,8 @@ struct ResourceUsage {
       unsigned rasterStream = 0;
 
       struct {
-        unsigned esGsRingItemSize;   // Size of each vertex written to the ES -> GS Ring, in DWORDs.
-        unsigned gsVsRingItemSize;   // Size of each primitive written to the GS -> VS Ring, in DWORDs.
+        unsigned esGsRingItemSize;   // Size of each vertex written to the ES -> GS Ring, in dwords.
+        unsigned gsVsRingItemSize;   // Size of each primitive written to the GS -> VS Ring, in dwords.
         unsigned esVertsPerSubgroup; // Number of vertices ES exports.
         unsigned gsPrimsPerSubgroup; // Number of prims GS exports.
         unsigned esGsLdsSize;        // ES -> GS ring LDS size (GS in)
