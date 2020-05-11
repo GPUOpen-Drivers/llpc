@@ -705,14 +705,17 @@ Value *ImageBuilder::CreateImageSample(Type *resultTy, unsigned dim, unsigned fl
       Value *addr = load->getOperand(0);
       unsigned byteOffset = 0;
       for (;;) {
-        if (auto bitcast = dyn_cast<BitCastInst>(addr)) {
+        // Check for BitCastOperator as it might be an Instruction or ConstantExpr bitcast.
+        if (auto bitcast = dyn_cast<BitCastOperator>(addr)) {
           addr = bitcast->getOperand(0);
           continue;
         }
-        if (auto gep = dyn_cast<GetElementPtrInst>(addr)) {
-          APInt gepOffset;
+        // Check for GEPOperator as it might be an Instruction or ConstantExpr GEP.
+        if (auto gep = dyn_cast<GEPOperator>(addr)) {
+          APInt gepOffset(64, 0);
           if (gep->accumulateConstantOffset(GetInsertPoint()->getModule()->getDataLayout(), gepOffset)) {
             byteOffset += gepOffset.getZExtValue();
+            addr = gep->getPointerOperand();
             continue;
           }
         }
@@ -721,9 +724,8 @@ Value *ImageBuilder::CreateImageSample(Type *resultTy, unsigned dim, unsigned fl
             // The initializer of the global variable is an array of v8i32 immutable sampler values. We need
             // to extract the right one, then call the appropriate function for a converting image sample.
             auto initializer = cast<ConstantArray>(global->getInitializer());
-            Constant *convertingSamplerDesc = cast<Constant>(CreateExtractValue(
-                initializer,
-                byteOffset / (initializer->getType()->getArrayElementType()->getPrimitiveSizeInBits() / 8)));
+            unsigned index = byteOffset / (initializer->getType()->getArrayElementType()->getPrimitiveSizeInBits() / 8);
+            Constant *convertingSamplerDesc = cast<Constant>(CreateExtractValue(initializer, index));
             return CreateImageSampleConvert(resultTy, dim, flags, imageDesc, convertingSamplerDesc, address, instName);
           }
         }
