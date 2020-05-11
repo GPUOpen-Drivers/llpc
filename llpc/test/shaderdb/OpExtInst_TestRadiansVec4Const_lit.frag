@@ -13,15 +13,15 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = fmul reassoc nnan nsz arcp contract <4 x float> %{{.*}}, <float 0x3F91DF46A0000000, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000>
+; SHADERTEST: = fmul reassoc nnan nsz arcp contract afn <4 x float> %{{.*}}, <float 0x3F91DF46A0000000, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000>
 ; SHADERTEST: store float 0x3F9ACEEA00000000, float addrspace(5)* %{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: = fmul reassoc nnan nsz arcp contract <4 x float> %{{.*}}, <float undef, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000>
+; SHADERTEST: = fmul reassoc nnan nsz arcp contract afn <4 x float> %{{.*}}, <float undef, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000>
 ; SHADERTEST: = insertelement <4 x float> %{{.*}}, float 0x3F9ACEEA00000000, i32 0
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract float %{{.*}}, 0x3F91DF46A0000000
-; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract float %{{.*}}, 0x3F91DF46A0000000
-; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract float %{{.*}}, 0x3F91DF46A0000000
+; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0x3F91DF46A0000000
+; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0x3F91DF46A0000000
+; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0x3F91DF46A0000000
 ; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 0, i32 immarg 15, float 0x3F9ACEEA00000000, float %{{.*}}, float %{{.*}}, float %{{.*}}, i1 immarg true, i1 immarg true)
 ; SHADERTEST: AMDLLPC SUCCESS
 */

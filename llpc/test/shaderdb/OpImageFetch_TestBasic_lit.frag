@@ -17,7 +17,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 ; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @lgc.create.image.load.v4f32(i32 1, i32 0, {{.*}}, i32 2)
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 1, i32 0, {{.*}}, i32 2)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.2d.v4f32.i32(i32 15,{{.*}},{{.*}}, i32 2,{{.*}}, i32 0, i32 0)
