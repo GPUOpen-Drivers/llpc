@@ -32,7 +32,7 @@
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
-#define DEBUG_TYPE "llpc-builder-impl-misc"
+#define DEBUG_TYPE "lgc-builder-impl-misc"
 
 using namespace lgc;
 using namespace llvm;

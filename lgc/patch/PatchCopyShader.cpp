@@ -41,7 +41,7 @@
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "llpc-patch-copy-shader"
+#define DEBUG_TYPE "lgc-patch-copy-shader"
 
 namespace llvm {
 namespace cl {

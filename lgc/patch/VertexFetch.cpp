@@ -36,7 +36,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 
-#define DEBUG_TYPE "llpc-vertex-fetch"
+#define DEBUG_TYPE "lgc-vertex-fetch"
 
 using namespace llvm;
 

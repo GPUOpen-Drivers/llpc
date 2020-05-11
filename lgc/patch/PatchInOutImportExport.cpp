@@ -41,7 +41,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <unordered_set>
 
-#define DEBUG_TYPE "llpc-patch-in-out-import-export"
+#define DEBUG_TYPE "lgc-patch-in-out-import-export"
 
 using namespace llvm;
 using namespace lgc;

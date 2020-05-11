@@ -45,7 +45,7 @@
 #include <algorithm>
 #include <functional>
 
-#define DEBUG_TYPE "llpc-patch-resource-collect"
+#define DEBUG_TYPE "lgc-patch-resource-collect"
 
 using namespace llvm;
 using namespace lgc;

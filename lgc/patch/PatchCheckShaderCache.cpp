@@ -32,7 +32,7 @@
 #include "lgc/state/PipelineShaders.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "llpc-patch-check-shader-cache"
+#define DEBUG_TYPE "lgc-patch-check-shader-cache"
 
 using namespace llvm;
 using namespace lgc;

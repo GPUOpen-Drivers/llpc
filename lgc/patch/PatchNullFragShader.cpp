@@ -39,7 +39,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "llpc-patch-null-frag-shader"
+#define DEBUG_TYPE "lgc-patch-null-frag-shader"
 
 using namespace lgc;
 using namespace llvm;

@@ -30,7 +30,7 @@
  */
 #include "BuilderImpl.h"
 
-#define DEBUG_TYPE "llpc-builder-impl-matrix"
+#define DEBUG_TYPE "lgc-builder-impl-matrix"
 
 using namespace lgc;
 using namespace llvm;

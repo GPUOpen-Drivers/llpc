@@ -35,7 +35,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "llpc-pipeline-shaders"
+#define DEBUG_TYPE "lgc-pipeline-shaders"
 
 using namespace lgc;
 using namespace llvm;

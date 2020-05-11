@@ -38,7 +38,7 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 
-#define DEBUG_TYPE "llpc-shader-merger"
+#define DEBUG_TYPE "lgc-shader-merger"
 
 using namespace llvm;
 using namespace lgc;

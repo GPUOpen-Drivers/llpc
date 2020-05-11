@@ -36,7 +36,7 @@
 #include "lgc/util/Internal.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
-#define DEBUG_TYPE "llpc-builder-impl-desc"
+#define DEBUG_TYPE "lgc-builder-impl-desc"
 
 using namespace lgc;
 using namespace llvm;

@@ -35,7 +35,7 @@
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/Constants.h"
 
-#define DEBUG_TYPE "llpc-config-builder-base"
+#define DEBUG_TYPE "lgc-config-builder-base"
 
 using namespace lgc;
 using namespace llvm;

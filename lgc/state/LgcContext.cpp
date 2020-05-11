@@ -45,6 +45,8 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetOptions.h"
 
+#define DEBUG_TYPE "lgc-context"
+
 using namespace lgc;
 using namespace llvm;
 

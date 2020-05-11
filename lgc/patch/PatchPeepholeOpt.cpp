@@ -39,7 +39,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#define DEBUG_TYPE "llpc-patch-peephole-opt"
+#define DEBUG_TYPE "lgc-patch-peephole-opt"
 
 using namespace lgc;
 using namespace llvm;

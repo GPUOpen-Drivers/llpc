@@ -33,7 +33,7 @@
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/Internal.h"
 
-#define DEBUG_TYPE "llpc-builder-impl-inout"
+#define DEBUG_TYPE "lgc-builder-impl-inout"
 
 using namespace lgc;
 using namespace llvm;

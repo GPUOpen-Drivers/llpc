@@ -42,7 +42,7 @@
 #include "lgc/BuilderBase.h"
 #include "lgc/util/Internal.h"
 
-#define DEBUG_TYPE "llpc-internal"
+#define DEBUG_TYPE "lgc-internal"
 
 using namespace llvm;
 

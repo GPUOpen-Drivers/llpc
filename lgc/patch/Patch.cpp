@@ -61,7 +61,7 @@
 #include "llvm/Transforms/Scalar/Scalarizer.h"
 #include "llvm/Transforms/Utils.h"
 
-#define DEBUG_TYPE "llpc-patch"
+#define DEBUG_TYPE "lgc-patch"
 
 using namespace llvm;
 

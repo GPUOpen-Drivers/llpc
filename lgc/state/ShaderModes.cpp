@@ -33,7 +33,7 @@
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineState.h"
 
-#define DEBUG_TYPE "llpc-shader-modes"
+#define DEBUG_TYPE "lgc-shader-modes"
 
 using namespace lgc;
 using namespace llvm;

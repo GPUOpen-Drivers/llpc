@@ -41,7 +41,7 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 
-#define DEBUG_TYPE "llpc-ngg-lds-manager"
+#define DEBUG_TYPE "lgc-ngg-lds-manager"
 
 using namespace llvm;
 

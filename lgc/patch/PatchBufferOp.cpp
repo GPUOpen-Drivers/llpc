@@ -44,7 +44,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
-#define DEBUG_TYPE "llpc-patch-buffer-op"
+#define DEBUG_TYPE "lgc-patch-buffer-op"
 
 using namespace llvm;
 using namespace lgc;

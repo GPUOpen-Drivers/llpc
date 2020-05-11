@@ -39,7 +39,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "llpc-patch-prepare-pipeline-abi"
+#define DEBUG_TYPE "lgc-patch-prepare-pipeline-abi"
 
 using namespace llvm;
 using namespace lgc;

@@ -31,7 +31,7 @@
 #include "Gfx9Chip.h"
 #include "llvm/Support/ErrorHandling.h"
 
-#define DEBUG_TYPE "llpc-gfx9-chip"
+#define DEBUG_TYPE "lgc-gfx9-chip"
 
 namespace lgc {
 
