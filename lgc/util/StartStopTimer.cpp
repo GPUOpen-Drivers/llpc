@@ -33,7 +33,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/Timer.h"
 
-#define DEBUG_TYPE "llpc-start-stop-timer"
+#define DEBUG_TYPE "lgc-start-stop-timer"
 
 using namespace llvm;
 using namespace lgc;

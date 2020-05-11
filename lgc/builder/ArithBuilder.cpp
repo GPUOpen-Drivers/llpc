@@ -33,7 +33,7 @@
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
-#define DEBUG_TYPE "llpc-builder-impl-arith"
+#define DEBUG_TYPE "lgc-builder-impl-arith"
 
 using namespace lgc;
 using namespace llvm;

@@ -35,7 +35,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/CommandLine.h"
 
-#define DEBUG_TYPE "llpc-system-values"
+#define DEBUG_TYPE "lgc-system-values"
 
 using namespace lgc;
 using namespace llvm;

@@ -40,7 +40,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "llpc-pipeline-state"
+#define DEBUG_TYPE "lgc-pipeline-state"
 
 using namespace lgc;
 using namespace llvm;

@@ -35,7 +35,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "llpc-patch-setup-target-features"
+#define DEBUG_TYPE "lgc-patch-setup-target-features"
 
 using namespace llvm;
 using namespace lgc;

@@ -35,7 +35,7 @@
 #include "lgc/state/ShaderModes.h"
 #include "lgc/util/Internal.h"
 
-#define DEBUG_TYPE "llpc-builder-recorder"
+#define DEBUG_TYPE "lgc-builder-recorder"
 
 using namespace lgc;
 using namespace llvm;

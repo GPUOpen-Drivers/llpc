@@ -44,7 +44,7 @@
 #include "llvm/InitializePasses.h"
 #include <math.h>
 
-#define DEBUG_TYPE "llpc-patch-intrinsic-simplify"
+#define DEBUG_TYPE "lgc-patch-intrinsic-simplify"
 
 using namespace llvm;
 using namespace lgc;

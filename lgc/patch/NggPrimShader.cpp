@@ -45,7 +45,7 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#define DEBUG_TYPE "llpc-ngg-prim-shader"
+#define DEBUG_TYPE "lgc-ngg-prim-shader"
 
 using namespace llvm;
 

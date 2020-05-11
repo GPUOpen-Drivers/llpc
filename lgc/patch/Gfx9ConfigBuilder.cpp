@@ -34,7 +34,7 @@
 #include "lgc/state/TargetInfo.h"
 #include "llvm/Support/CommandLine.h"
 
-#define DEBUG_TYPE "llpc-gfx9-config-builder"
+#define DEBUG_TYPE "lgc-gfx9-config-builder"
 
 using namespace llvm;
 

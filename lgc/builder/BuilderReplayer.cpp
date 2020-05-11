@@ -34,7 +34,7 @@
 #include "lgc/util/Internal.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "llpc-builder-replayer"
+#define DEBUG_TYPE "lgc-builder-replayer"
 
 using namespace lgc;
 using namespace llvm;

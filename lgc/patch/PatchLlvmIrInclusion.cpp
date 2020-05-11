@@ -32,7 +32,7 @@
 #include "lgc/state/Abi.h"
 #include "llvm/IR/Constants.h"
 
-#define DEBUG_TYPE "llpc-patch-llvm-ir-inclusion"
+#define DEBUG_TYPE "lgc-patch-llvm-ir-inclusion"
 
 using namespace llvm;
 using namespace lgc;

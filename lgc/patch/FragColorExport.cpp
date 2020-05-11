@@ -36,7 +36,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 
-#define DEBUG_TYPE "llpc-frag-color-export"
+#define DEBUG_TYPE "lgc-frag-color-export"
 
 using namespace llvm;
 

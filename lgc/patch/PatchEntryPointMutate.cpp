@@ -48,7 +48,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#define DEBUG_TYPE "llpc-patch-entry-point-mutate"
+#define DEBUG_TYPE "lgc-patch-entry-point-mutate"
 
 using namespace llvm;
 using namespace lgc;

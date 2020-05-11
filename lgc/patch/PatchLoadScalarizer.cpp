@@ -36,7 +36,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#define DEBUG_TYPE "llpc-patch-load-scalarizer"
+#define DEBUG_TYPE "lgc-patch-load-scalarizer"
 
 using namespace lgc;
 using namespace llvm;

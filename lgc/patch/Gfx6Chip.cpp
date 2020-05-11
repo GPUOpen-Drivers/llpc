@@ -30,7 +30,7 @@
  */
 #include "Gfx6Chip.h"
 
-#define DEBUG_TYPE "llpc-gfx6-chip"
+#define DEBUG_TYPE "lgc-gfx6-chip"
 
 namespace lgc {
 
