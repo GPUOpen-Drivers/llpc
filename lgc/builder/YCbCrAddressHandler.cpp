@@ -87,6 +87,8 @@ Value *YCbCrAddressHandler::power2Align(Value *x, unsigned align) {
 // @param planeNum : Number of planes
 void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigned xBitCount, bool isTileOptimal,
                                             unsigned planeNum) {
+  m_swizzleMode = m_regHandler->getReg(SqRsrcRegs::SwizzleMode);
+
   switch (m_gfxIp->major) {
   case 9: {
     // Height = SqRsrcRegs::Height
@@ -109,18 +111,18 @@ void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigne
     m_pitchCb = m_builder->CreateMul(pitchHalf, m_builder->CreateLShr(m_builder->getInt32(xBitCount), 3));
 
     if (isTileOptimal) {
-      Value *isTileOpt = m_regHandler->getReg(SqRsrcRegs::IsTileOpt);
+      m_isTileOpt = m_builder->CreateICmpNE(m_swizzleMode, m_builder->getInt32(0));
 
       // PtchYOpt = PitchY * (bits[0] >> 3)
       Value *ptchYOpt = m_builder->CreateMul(pitch, m_builder->CreateLShr(m_builder->getInt32(bits), 3));
       // PitchY = IsTileOpt ? (PtchYOpt << 5) : PitchY
-      m_pitchY = m_builder->CreateSelect(isTileOpt, m_builder->CreateShl(ptchYOpt, m_builder->getInt32(5)), m_pitchY);
+      m_pitchY = m_builder->CreateSelect(m_isTileOpt, m_builder->CreateShl(ptchYOpt, m_builder->getInt32(5)), m_pitchY);
 
       // PitchCbOpt = PitchCb * (bits[0] >> 3)
       Value *pitchCbOpt = m_builder->CreateMul(pitchHalf, m_builder->CreateLShr(m_builder->getInt32(bits), 3));
       // PitchCb = IsTileOpt ? (PitchCbOpt << 5) : PitchCb
       m_pitchCb =
-          m_builder->CreateSelect(isTileOpt, m_builder->CreateShl(pitchCbOpt, m_builder->getInt32(5)), m_pitchCb);
+          m_builder->CreateSelect(m_isTileOpt, m_builder->CreateShl(pitchCbOpt, m_builder->getInt32(5)), m_pitchCb);
     }
     break;
   }
@@ -166,12 +168,12 @@ void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigne
       Value *pitchCbOpt =
           m_builder->CreateMul(power2Align(widthHalf, pitchAlignOpt), m_builder->getInt32(elementBytes));
 
-      Value *isTileOpt = m_regHandler->getReg(SqRsrcRegs::IsTileOpt);
-      m_pitchY = m_builder->CreateSelect(isTileOpt, ptchYOpt, m_pitchY);
-      m_heightY = m_builder->CreateSelect(isTileOpt, power2Align(height, heightAlignOpt), height);
+      m_isTileOpt = m_builder->CreateICmpNE(m_swizzleMode, m_builder->getInt32(0));
+      m_pitchY = m_builder->CreateSelect(m_isTileOpt, ptchYOpt, m_pitchY);
+      m_heightY = m_builder->CreateSelect(m_isTileOpt, power2Align(height, heightAlignOpt), height);
 
-      m_pitchCb = m_builder->CreateSelect(isTileOpt, pitchCbOpt, m_pitchCb);
-      m_heightCb = m_builder->CreateSelect(isTileOpt, power2Align(heightHalf, heightAlignOpt), heightHalf);
+      m_pitchCb = m_builder->CreateSelect(m_isTileOpt, pitchCbOpt, m_pitchCb);
+      m_heightCb = m_builder->CreateSelect(m_isTileOpt, power2Align(heightHalf, heightAlignOpt), heightHalf);
     }
     break;
   }

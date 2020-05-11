@@ -155,7 +155,7 @@ void SqImgSampRegHandler::setReg(SqSampRegs regId, Value *regValue) {
     setRegCommon(static_cast<unsigned>(regId), regValue);
     break;
   default:
-    llvm_unreachable("Set \"IsTileOpt\" is not allowed!");
+    llvm_unreachable("Bad SqImgSampRegHandler::SetReg!");
     break;
   }
 }
@@ -170,7 +170,7 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx9[static_cast<unsigned>(SqRsrcRegs:
     {2, 0, 14},  // Width
     {2, 14, 14}, // Height
     {3, 0, 12},  // DstSelXYZW
-    {3, 20, 5},  // IsTileOpt
+    {3, 20, 5},  // SwizzleMode
     {4, 0, 13},  // Depth
     {4, 13, 12}, // Pitch
     {4, 29, 3},  // BcSwizzle
@@ -188,7 +188,7 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx10[static_cast<unsigned>(SqRsrcRegs
     {},          // Width
     {2, 14, 16}, // Height
     {3, 0, 12},  // DstSelXYZW
-    {3, 20, 5},  // IsTileOpt
+    {3, 20, 5},  // SwizzleMode
     {4, 0, 16},  // Depth
     {},          // Pitch
     {3, 25, 3},  // BcSwizzle
@@ -229,6 +229,7 @@ Value *SqImgRsrcRegHandler::getReg(SqRsrcRegs regId) {
   case SqRsrcRegs::BaseAddress:
   case SqRsrcRegs::Format:
   case SqRsrcRegs::DstSelXYZW:
+  case SqRsrcRegs::SwizzleMode:
   case SqRsrcRegs::Depth:
   case SqRsrcRegs::BcSwizzle:
     return getRegCommon(static_cast<unsigned>(regId));
@@ -246,8 +247,6 @@ Value *SqImgRsrcRegHandler::getReg(SqRsrcRegs regId) {
       llvm_unreachable("GFX IP is not supported!");
       break;
     }
-  case SqRsrcRegs::IsTileOpt:
-    return m_builder->CreateICmpNE(getRegCommon(static_cast<unsigned>(regId)), m_builder->getInt32(0));
   default:
     // TODO: More will be implemented.
     llvm_unreachable("Not implemented!");
@@ -266,6 +265,7 @@ void SqImgRsrcRegHandler::setReg(SqRsrcRegs regId, Value *regValue) {
   case SqRsrcRegs::BaseAddressHi:
   case SqRsrcRegs::Format:
   case SqRsrcRegs::DstSelXYZW:
+  case SqRsrcRegs::SwizzleMode:
   case SqRsrcRegs::Depth:
   case SqRsrcRegs::BcSwizzle:
     setRegCommon(static_cast<unsigned>(regId), regValue);
@@ -288,7 +288,6 @@ void SqImgRsrcRegHandler::setReg(SqRsrcRegs regId, Value *regValue) {
       break;
     }
     break;
-  case SqRsrcRegs::IsTileOpt:
   case SqRsrcRegs::WidthLo:
   case SqRsrcRegs::WidthHi:
   case SqRsrcRegs::Count:
