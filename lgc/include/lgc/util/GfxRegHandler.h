@@ -85,10 +85,10 @@ protected:
     m_bitsState[regId].isModified = 1;
   }
 
-  // Get combined data from two seperate DWORDs
+  // Get combined data from two seperate dwords
   llvm::Value *getRegCombine(unsigned regIdLo, unsigned regIdHi);
 
-  // Set data into two seperate DWORDs
+  // Set data into two seperate dwords
   void setRegCombine(unsigned regIdLo, unsigned regIdHi, llvm::Value *reg);
 
   // Get current value state for the hardware register

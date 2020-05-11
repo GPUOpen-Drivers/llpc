@@ -707,15 +707,15 @@ void ConfigBuilder::buildLsRegConfig(ShaderStage shaderStage, T *pConfig) {
     const unsigned wavesPerThreadGroup = (threadGroupSize + waveSize - 1) / waveSize;
 
     if (wavesPerThreadGroup > 1) {
-      constexpr unsigned minLdsSizeWa = 1024; // 4KB in DWORDs.
+      constexpr unsigned minLdsSizeWa = 1024; // 4KB in dwords.
       ldsSizeInDwords = std::max(ldsSizeInDwords, minLdsSizeWa);
     }
   }
 
   unsigned ldsSize = 0;
 
-  // NOTE: On GFX6, granularity for the LDS_SIZE field is 64. The range is 0~128 which allocates 0 to 8K DWORDs.
-  // On GFX7+, granularity for the LDS_SIZE field is 128. The range is 0~128 which allocates 0 to 16K DWORDs.
+  // NOTE: On GFX6, granularity for the LDS_SIZE field is 64. The range is 0~128 which allocates 0 to 8K dwords.
+  // On GFX7+, granularity for the LDS_SIZE field is 128. The range is 0~128 which allocates 0 to 16K dwords.
   const unsigned ldsSizeDwordGranularityShift =
       m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
   const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;

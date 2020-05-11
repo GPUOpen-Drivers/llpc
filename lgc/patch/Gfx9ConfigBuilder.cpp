@@ -1117,7 +1117,7 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   SET_REG_FIELD(&pConfig->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR, userDataCount);
 
   // NOTE: On GFX7+, granularity for the LDS_SIZE field is 128. The range is 0~128 which allocates 0 to 16K
-  // DWORDs.
+  // dwords.
   const auto &calcFactor = tcsResUsage->inOutUsage.tcs.calcFactor;
   unsigned ldsSizeInDwords =
       calcFactor.onChip.patchConstStart + calcFactor.patchConstSize * calcFactor.patchCountPerThreadGroup;

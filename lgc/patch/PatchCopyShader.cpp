@@ -325,8 +325,8 @@ void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
         }
         unsigned bitWidth = compTy->getScalarSizeInBits();
         // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend
-        // BYTE/WORD to DWORD and store DWORD to GS-VS ring. So for 8-bit/16-bit data type, the actual byte size
-        // is based on number of DWORDs.
+        // byte/word to dword and store dword to GS-VS ring. So for 8-bit/16-bit data type, the actual byte size
+        // is based on number of dwords.
         bitWidth = bitWidth < 32 ? 32 : bitWidth;
         unsigned byteSize = bitWidth / 8 * compCount;
 
@@ -577,8 +577,8 @@ void PatchCopyShader::exportGenericOutput(Value *outputValue, unsigned location,
       XfbOutInfo *xfbOutInfo = reinterpret_cast<XfbOutInfo *>(&xfbOutsInfo[locIter->first]);
 
       if (xfbOutInfo->is16bit) {
-        // NOTE: For 16-bit transform feedback output, the value is 32-bit DWORD loaded from GS-VS ring
-        // buffer. The high WORD is always zero while the low WORD contains the data value. We have to
+        // NOTE: For 16-bit transform feedback output, the value is 32-bit dword loaded from GS-VS ring
+        // buffer. The high word is always zero while the low word contains the data value. We have to
         // do some casting operations before store it to transform feedback buffer (tightly packed).
         auto outputTy = outputValue->getType();
         assert(outputTy->isFPOrFPVectorTy() && outputTy->getScalarSizeInBits() == 32);

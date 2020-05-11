@@ -467,9 +467,9 @@ void eraseIfNoUse(Value *V);
 /// Metadata for shader inputs and outputs, valid for scalar or vector type.
 union ShaderInOutMetadata {
   struct {
-    // BYTE 0~1
+    // Byte 0~1
     uint64_t Value : 16; // Generic location or SPIR-V built-in ID
-    // BYTE 2
+    // Byte 2
     uint64_t Index : 1;      // Output index for dual source blending
     uint64_t IsLoc : 1;      // Whether value is a location
     uint64_t IsBuiltIn : 1;  // Whether value is a SPIR-V built-in ID
@@ -477,26 +477,26 @@ union ShaderInOutMetadata {
     uint64_t Signedness : 1; // Signedness of the input/output, valid
                              // for integer (0 - unsigned, 1 - signed)
     uint64_t InterpMode : 2; // Interpolation mode (fragment shader)
-    // BYTE 3
+    // Byte 3
     uint64_t InterpLoc : 3; // Interpolation location (fragment
                             // shader)
     uint64_t PerPatch : 1;  // Whether this is a per-patch input/
                             // output (tessellation shader)
     uint64_t StreamId : 2;  // ID of output stream (geometry shader)
     uint64_t XfbBuffer : 2; // Transform feedback buffer ID
-    // BYTE 4~5
+    // Byte 4~5
     uint64_t IsXfb : 1;      // Whether this is for transform feedback
     uint64_t XfbOffset : 15; // Transform feedback offset
-    // BYTE 6~7
+    // Byte 6~7
     uint64_t XfbStride : 16; // Transform feedback stride
-    // BYTE 8~9
+    // Byte 8~9
     uint64_t IsBlockArray : 1;    // Whether we are handling block array
     uint64_t XfbArrayStride : 16; // Transform feedback array stride (for
                                   //   block array, it's flatten dimension
                                   //   of an element (1 if element is not
                                   //   sub-array; for non block array, it's
                                   //   occupied byte count of an element)
-    // BYTE 10~11
+    // Byte 10~11
     uint64_t XfbExtraOffset : 16; // Transform feedback extra offset
   };
   uint64_t U64All[2];

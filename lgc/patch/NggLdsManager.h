@@ -86,7 +86,7 @@ enum NggLdsRegionType {
   // clang-format on
 };
 
-// Size of a DWORD
+// Size of a dword
 static const unsigned SizeOfDword = sizeof(unsigned);
 
 // =====================================================================================================================
@@ -115,7 +115,7 @@ private:
   NggLdsManager(const NggLdsManager &) = delete;
   NggLdsManager &operator=(const NggLdsManager &) = delete;
 
-  static const unsigned LdsRegionSizes[LdsRegionCount]; // LDS sizes for all LDS region types (in BYTEs)
+  static const unsigned LdsRegionSizes[LdsRegionCount]; // LDS sizes for all LDS region types (in bytes)
   static const char *m_ldsRegionNames[LdsRegionCount];  // Name strings for all LDS region types
 
   PipelineState *m_pipelineState; // Pipeline state
@@ -123,7 +123,7 @@ private:
 
   llvm::GlobalValue *m_lds; // Global variable to model NGG LDS
 
-  unsigned m_ldsRegionStart[LdsRegionCount]; // Start LDS offsets for all available LDS region types (in BYTEs)
+  unsigned m_ldsRegionStart[LdsRegionCount]; // Start LDS offsets for all available LDS region types (in bytes)
 
   unsigned m_waveCountInSubgroup; // Wave count in sub-group
 

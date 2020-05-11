@@ -776,7 +776,7 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
     return cast<ConstantInt>(CreateExtractElement(convertingSamplerDesc, idx))->getZExtValue();
   };
 
-  // Extract YCbCr meta data, which is the last 4 DWORDs of convertingSamplerDesc
+  // Extract YCbCr meta data, which is the last 4 dwords of convertingSamplerDesc
   SamplerYCbCrConversionMetaData yCbCrMetaData;
   yCbCrMetaData.word0.u32All = getYCbCrMetaElement(4);
   yCbCrMetaData.word1.u32All = getYCbCrMetaElement(5);
@@ -797,7 +797,7 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
   dim = prepareCoordinate(dim, coord, projective, address[ImageAddressIdxDerivativeX],
                           address[ImageAddressIdxDerivativeY], coords, derivatives);
 
-  // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
+  // Only the first 4 dwords are sampler descriptor, we need to extract these values under any condition
   // Init sample descriptor for luma channel
   Value *samplerDescLuma = CreateShuffleVector(convertingSamplerDesc, convertingSamplerDesc, ArrayRef<int>{0, 1, 2, 3});
 
@@ -852,7 +852,7 @@ Value *ImageBuilder::CreateImageGather(Type *resultTy, unsigned dim, unsigned fl
     needDescPatch = preprocessIntegerImageGather(dim, imageDesc, coord);
   }
 
-  // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
+  // Only the first 4 dwords are sampler descriptor, we need to extract these values under any condition
   samplerDesc = CreateShuffleVector(samplerDesc, samplerDesc, ArrayRef<int>{0, 1, 2, 3});
 
   Value *result = nullptr;
@@ -1408,7 +1408,7 @@ Value *ImageBuilder::CreateImageGetLod(unsigned dim, unsigned flags, Value *imag
   SmallVector<Value *, 6> derivatives;
   dim = prepareCoordinate(dim, coord, nullptr, nullptr, nullptr, coords, derivatives);
 
-  // Only the first 4 DWORDs are sampler descriptor, we need to extract these values under any condition
+  // Only the first 4 dwords are sampler descriptor, we need to extract these values under any condition
   samplerDesc = CreateShuffleVector(samplerDesc, samplerDesc, ArrayRef<int>{0, 1, 2, 3});
 
   SmallVector<Value *, 9> args;

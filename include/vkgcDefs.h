@@ -195,8 +195,8 @@ enum class ResourceMappingNodeType : unsigned {
 struct ResourceMappingNode {
   ResourceMappingNodeType type; ///< Type of this node
 
-  unsigned sizeInDwords;   ///< Size of this node in DWORD
-  unsigned offsetInDwords; ///< Offset of this node (from the beginning of the resource mapping table) in DWORD
+  unsigned sizeInDwords;   ///< Size of this node in dword
+  unsigned offsetInDwords; ///< Offset of this node (from the beginning of the resource mapping table) in dword
 
   union {
     /// Info for generic descriptor nodes (DescriptorResource, DescriptorSampler, DescriptorCombinedTexture,
@@ -213,7 +213,7 @@ struct ResourceMappingNode {
     } tablePtr;
     /// Info for hierarchical nodes (IndirectUserDataVaPtr)
     struct {
-      unsigned sizeInDwords; ///< Size of the pointed table in DWORDS
+      unsigned sizeInDwords; ///< Size of the pointed table in dwords
     } userDataPtr;
   };
 };

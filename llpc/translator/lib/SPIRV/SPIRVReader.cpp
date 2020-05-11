@@ -7015,7 +7015,7 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
 
       inOutDec.Value.Loc += width <= 32 * 4 ? 1 : 2;
       unsigned alignment = 32;
-      unsigned baseStride = 4; // Strides in (BYTES)
+      unsigned baseStride = 4; // Strides in (bytes)
       inOutDec.XfbExtraOffset += (((width + alignment - 1) / alignment) * baseStride);
     }
 

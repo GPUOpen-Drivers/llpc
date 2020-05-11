@@ -446,7 +446,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         static_cast<unsigned>((1 << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift)));
 
     // Use the client-specified amount of LDS space per subgroup. If they specified zero, they want us to choose a
-    // reasonable default. The final amount must be 128-DWORD aligned.
+    // reasonable default. The final amount must be 128-dword aligned.
 
     unsigned maxLdsSize = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup;
 
@@ -527,8 +527,8 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       const unsigned gsVsRingItemSize =
           hasGs ? std::max(1u, 4 * gsResUsage->inOutUsage.outputMapLocCount * geometryMode.outputVertices) : 0;
 
-      const unsigned esExtraLdsSize = NggLdsManager::calcEsExtraLdsSize(m_pipelineState) / 4; // In DWORDs
-      const unsigned gsExtraLdsSize = NggLdsManager::calcGsExtraLdsSize(m_pipelineState) / 4; // In DWORDs
+      const unsigned esExtraLdsSize = NggLdsManager::calcEsExtraLdsSize(m_pipelineState) / 4; // In dwords
+      const unsigned gsExtraLdsSize = NggLdsManager::calcGsExtraLdsSize(m_pipelineState) / 4; // In dwords
 
       // NOTE: Primitive amplification factor must be at least 1. And for NGG GS mode, we force number of output
       // primitives to be equal to that of output vertices regardless of the output primitive type by emitting
@@ -723,7 +723,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       unsigned gsOnChipLdsSize = alignTo(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
 
       // Use the client-specified amount of LDS space per sub-group. If they specified zero, they want us to
-      // choose a reasonable default. The final amount must be 128-DWORD aligned.
+      // choose a reasonable default. The final amount must be 128-dword aligned.
       // TODO: Accept DefaultLdsSizePerSubgroup from panel setting
       unsigned maxLdsSize = Gfx9::DefaultLdsSizePerSubgroup;
 

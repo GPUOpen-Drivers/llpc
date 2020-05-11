@@ -35,7 +35,7 @@
 
 namespace lgc {
 
-// General bits info for indexed DWORD
+// General bits info for indexed dword
 struct BitsInfo {
   unsigned index;
   unsigned offset;
@@ -59,19 +59,19 @@ protected:
     setRegister(reg);
   }
 
-  // Return new DWORD with replacing the specific range of bits in old DWORD
+  // Return new dword with replacing the specific range of bits in old dword
   llvm::Value *replaceBits(llvm::Value *dword, unsigned offset, unsigned count, llvm::Value *newBits);
 
-  // Return the size of registered DWORDs
+  // Return the size of registered dwords
   inline unsigned getDwordsCount() { return m_dwords.size(); }
 
-  // Get indexed DWORD
+  // Get indexed dword
   inline llvm::Value *getDword(unsigned index) {
     extractDwordIfNecessary(index);
     return m_dwords[index];
   }
 
-  // Set indexed DWORD
+  // Set indexed dword
   inline void setDword(unsigned index, llvm::Value *dword) {
     // Set the whole 32bits data
     m_dwords[index] = dword;
@@ -79,17 +79,17 @@ protected:
     m_dirtyDwords |= 1 << index;
   }
 
-  // Return if the specific DWORD is modified or not
+  // Return if the specific dword is modified or not
   inline bool isDwordModified(unsigned index) { return (m_dirtyDwords & (1 << index)); }
 
-  // Get data from a range of bits in indexed DWORD according to BitsInfo
+  // Get data from a range of bits in indexed dword according to BitsInfo
   llvm::Value *getBits(const BitsInfo &bitsInfo);
 
-  // Set data to a range of bits in indexed DWORD according to BitsInfo
+  // Set data to a range of bits in indexed dword according to BitsInfo
   void setBits(const BitsInfo &bitsInfo, llvm::Value *newBits);
 
 private:
-  // Load indexed DWORD from <n x i32> vector, if the specific DWORD is nullptr
+  // Load indexed dword from <n x i32> vector, if the specific dword is nullptr
   inline void extractDwordIfNecessary(unsigned index) {
     if (!m_dwords[index])
       m_dwords[index] = m_builder->CreateExtractElement(m_reg, m_builder->getInt64(index));

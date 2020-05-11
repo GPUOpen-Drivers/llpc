@@ -1864,8 +1864,8 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
     assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
 
   const unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
-  // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD to DWORD and
-  // store DWORD to GS-VS ring. So for 8-bit/16-bit data type, the actual byte size is based on number of DWORDs.
+  // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend byte/word to dword and
+  // store dword to GS-VS ring. So for 8-bit/16-bit data type, the actual byte size is based on number of dwords.
   unsigned byteSize = (outputTy->getScalarSizeInBits() / 8) * compCount;
   if (bitWidth == 8 || bitWidth == 16)
     byteSize *= (32 / bitWidth);
@@ -4166,9 +4166,9 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
     }
   } else {
     if (bitWidth == 8 || bitWidth == 16) {
-      // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD
-      // to DWORD. This is because copy shader does not know the actual data type. It only generates output
-      // export calls based on number of DWORDs.
+      // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend byte/word
+      // to dword. This is because copy shader does not know the actual data type. It only generates output
+      // export calls based on number of dwords.
       if (storeTy->isFloatingPointTy()) {
         assert(bitWidth == 16);
         storeValue = new BitCastInst(storeValue, Type::getInt16Ty(*m_context), "", insertPos);
@@ -4331,7 +4331,7 @@ Value *PatchInOutImportExport::calcGsVsRingOffsetForOutput(unsigned location, un
     // ringOffset = esGsLdsSize +
     //              gsVsOffset +
     //              threadId * gsVsRingItemSize +
-    //              (vertexIdx * vertexSizePerStream) + location * 4 + compIdx + streamBase (in DWORDS)
+    //              (vertexIdx * vertexSizePerStream) + location * 4 + compIdx + streamBase (in dwords)
 
     auto esGsLdsSize = ConstantInt::get(Type::getInt32Ty(*m_context), resUsage->inOutUsage.gs.calcFactor.esGsLdsSize);
 
@@ -4342,7 +4342,7 @@ Value *PatchInOutImportExport::calcGsVsRingOffsetForOutput(unsigned location, un
         m_threadId, ConstantInt::get(Type::getInt32Ty(*m_context), resUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize),
         "", insertPos);
 
-    // VertexSize is stream output vertexSize x 4 (in DWORDS)
+    // VertexSize is stream output vertexSize x 4 (in dwords)
     unsigned vertexSize = resUsage->inOutUsage.gs.outLocCount[streamId] * 4;
     auto vertexItemOffset =
         BinaryOperator::CreateMul(vertexIdx, ConstantInt::get(Type::getInt32Ty(*m_context), vertexSize), "", insertPos);
@@ -4383,7 +4383,7 @@ Value *PatchInOutImportExport::readValueFromLds(bool isOutput, Type *readTy, Val
   assert(m_lds);
   assert(readTy->isSingleValueType());
 
-  // Read DWORDs from LDS
+  // Read dwords from LDS
   const unsigned compCount = readTy->isVectorTy() ? cast<VectorType>(readTy)->getNumElements() : 1;
   const unsigned bitWidth = readTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
@@ -4405,7 +4405,7 @@ Value *PatchInOutImportExport::readValueFromLds(bool isOutput, Type *readTy, Val
 
     auto offChipLdsBase = getFunctionArgument(m_entryPoint, offChipLdsBaseArgIdx);
 
-    // Convert DWORD off-chip LDS offset to byte offset
+    // Convert dword off-chip LDS offset to byte offset
     ldsOffset = BinaryOperator::CreateMul(ldsOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
 
     CoherentFlag coherent = {};
@@ -4447,7 +4447,7 @@ Value *PatchInOutImportExport::readValueFromLds(bool isOutput, Type *readTy, Val
     }
   }
 
-  // Construct <n x i8>, <n x i16>, or <n x i32> vector from load values (DWORDs)
+  // Construct <n x i8>, <n x i16>, or <n x i32> vector from load values (dwords)
   Value *castValue = nullptr;
   if (numChannels > 1) {
     auto intTy = bitWidth == 32 || bitWidth == 64
@@ -4491,7 +4491,7 @@ void PatchInOutImportExport::writeValueToLds(Value *writeValue, Value *ldsOffset
   Type *castTy = numChannels > 1 ? cast<Type>(VectorType::get(intTy, numChannels)) : intTy;
   Value *castValue = new BitCastInst(writeValue, castTy, "", insertPos);
 
-  // Extract store values (DWORDs) from <n x i8>, <n x i16> or <n x i32> vector
+  // Extract store values (dwords) from <n x i8>, <n x i16> or <n x i32> vector
   std::vector<Value *> storeValues(numChannels);
   if (numChannels > 1) {
     for (unsigned i = 0; i < numChannels; ++i) {
@@ -4513,7 +4513,7 @@ void PatchInOutImportExport::writeValueToLds(Value *writeValue, Value *ldsOffset
     auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs.tcs;
 
     auto offChipLdsBase = getFunctionArgument(m_entryPoint, entryArgIdxs.offChipLdsBase);
-    // Convert DWORD off-chip LDS offset to byte offset
+    // Convert dword off-chip LDS offset to byte offset
     ldsOffset = BinaryOperator::CreateMul(ldsOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
 
     auto offChipLdsDesc = m_pipelineSysValues.get(m_entryPoint)->getOffChipLdsDesc();
@@ -4808,7 +4808,7 @@ void PatchInOutImportExport::createTessBufferStoreFunction() {
 }
 
 // =====================================================================================================================
-// Calculates the DWORD offset to write value to LDS based on the specified VS output info.
+// Calculates the dword offset to write value to LDS based on the specified VS output info.
 //
 // @param outputTy : Type of the output
 // @param location : Base location of the output
@@ -4846,7 +4846,7 @@ Value *PatchInOutImportExport::calcLdsOffsetForVsOutput(Type *outputTy, unsigned
 }
 
 // =====================================================================================================================
-// Calculates the DWORD offset to read value from LDS based on the specified TCS input info.
+// Calculates the dword offset to read value from LDS based on the specified TCS input info.
 //
 // @param inputTy : Type of the input
 // @param location : Base location of the input
@@ -4899,7 +4899,7 @@ Value *PatchInOutImportExport::calcLdsOffsetForTcsInput(Type *inputTy, unsigned 
 }
 
 // =====================================================================================================================
-// Calculates the DWORD offset to read/write value from/to LDS based on the specified TCS output info.
+// Calculates the dword offset to read/write value from/to LDS based on the specified TCS output info.
 //
 // @param outputTy : Type of the output
 // @param location : Base location of the output
@@ -4974,7 +4974,7 @@ Value *PatchInOutImportExport::calcLdsOffsetForTcsOutput(Type *outputTy, unsigne
 }
 
 // =====================================================================================================================
-// Calculates the DWORD offset to read/write value from/to LDS based on the specified TES input info.
+// Calculates the dword offset to read/write value from/to LDS based on the specified TES input info.
 //
 // @param inputTy : Type of the input
 // @param location : Base location of the input
@@ -5054,11 +5054,11 @@ Value *PatchInOutImportExport::calcLdsOffsetForTesInput(Type *inputTy, unsigned 
 // Calculates the patch count for per-thread group.
 //
 // @param inVertexCount : Count of vertices of input patch
-// @param inVertexStride : Vertex stride of input patch in (DWORDs)
+// @param inVertexStride : Vertex stride of input patch in (dwords)
 // @param outVertexCount : Count of vertices of output patch
-// @param outVertexStride : Vertex stride of output patch in (DWORDs)
+// @param outVertexStride : Vertex stride of output patch in (dwords)
 // @param patchConstCount : Count of output patch constants
-// @param tessFactorStride : Stride of tessellation factors (DWORDs)
+// @param tessFactorStride : Stride of tessellation factors (dwords)
 unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexCount, unsigned inVertexStride,
                                                               unsigned outVertexCount, unsigned outVertexStride,
                                                               unsigned patchConstCount,

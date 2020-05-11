@@ -54,33 +54,33 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
     //
     // LDS region size for ES-only
     //
-    // 1 DWORD (uint32) per thread
+    // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionDistribPrimId
-    // 4 DWORDs (vec4) per thread
+    // 4 dwords (vec4) per thread
     SizeOfVec4 * Gfx9::NggMaxThreadsPerSubgroup,              // LdsRegionPosData
-    // 1 BYTE (uint8) per thread
+    // 1 byte (uint8) per thread
     Gfx9::NggMaxThreadsPerSubgroup,                           // LdsRegionDrawFlag
-    // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group
+    // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group
     SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionPrimCountInWaves
-    // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group
+    // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group
     SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionVertCountInWaves
-    // 1 DWORD (uint32) per thread
+    // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCullDistance
-    // 1 BYTE (uint8) per thread
+    // 1 byte (uint8) per thread
     Gfx9::NggMaxThreadsPerSubgroup,                           // LdsRegionVertThreadIdMap
-    // 1 DWORD (uint32) per thread
+    // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactVertexId
-    // 1 DWORD (uint32) per thread
+    // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactInstanceId
-    // 1 DWORD (uint32) per thread
+    // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactPrimId
-    // 1 DWORD (float) per thread
+    // 1 dword (float) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactTessCoordX
-    // 1 DWORD (float) per thread
+    // 1 dword (float) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactTessCoordY
-    // 1 DWORD (uint32) per thread
+    // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactPatchId
-    // 1 DWORD (uint32) per thread
+    // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCompactRelPatchId
 
     //
@@ -88,11 +88,11 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
     //
     // ES-GS ring size is dynamically calculated (don't use it)
     InvalidValue,                                             // LdsRegionEsGsRing
-    // 1 DWORD (uint32) per thread
+    // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionOutPrimData
-    // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group
+    // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group
     SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionOutVertCountInWaves
-    // 1 DWORD (uint32) per thread
+    // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionOutVertThreadIdMap
     // GS-VS ring size is dynamically calculated (don't use it)
     InvalidValue,                                             // LdsRegionGsVsRing
@@ -177,8 +177,8 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
     // +------------+-----------------------+------------------------------+-----------------------------+------------+
     //
 
-    // NOTE: We round ES-GS LDS size to 4-DWORD alignment. This is for later LDS read/write operations of mutilple
-    // DWORDs (such as DS128).
+    // NOTE: We round ES-GS LDS size to 4-dword alignment. This is for later LDS read/write operations of mutilple
+    // dwords (such as DS128).
     const unsigned esGsRingLdsSize = alignTo(calcFactor.esGsLdsSize, 4u) * SizeOfDword;
     const unsigned gsVsRingLdsSize =
         calcFactor.gsOnChipLdsSize * SizeOfDword - esGsRingLdsSize - calcGsExtraLdsSize(m_pipelineState);
@@ -418,8 +418,8 @@ void NggLdsManager::writeValueToLds(Value *writeValue, Value *ldsOffset, bool us
 void NggLdsManager::atomicOpWithLds(AtomicRMWInst::BinOp atomicOp, Value *atomicValue, Value *ldsOffset) {
   assert(atomicValue->getType()->isIntegerTy(32));
 
-  // NOTE: LDS variable is defined as a pointer to i32 array. The LDS offset here has to be casted to DWORD offset
-  // from BYTE offset.
+  // NOTE: LDS variable is defined as a pointer to i32 array. The LDS offset here has to be casted to dword offset
+  // from byte offset.
   ldsOffset = m_builder->CreateLShr(ldsOffset, 2);
 
   Value *atomicPtr = m_builder->CreateGEP(m_lds, {m_builder->getInt32(0), ldsOffset});
