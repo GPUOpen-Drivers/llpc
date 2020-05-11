@@ -20,7 +20,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call i32 (...) @lgc.create.smod.i32(i32
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: srem i32 %{{[0-9]*}}, 6
+; SHADERTEST: srem i32 %{{.*}}, 6
 ; SHADERTEST: icmp slt i32 %{{[0-9]*}}, 0
 ; SHADERTEST: icmp ne i32 %{{[0-9]*}}, 0
 ; SHADERTEST: and i1 %{{[0-9]*}}, %{{[0-9]*}}

@@ -121,8 +121,9 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
   SmallVector<Value *, 6> args;
   switch (m_shaderStage) {
   case ShaderStageVertex: {
-    // VS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx)
+    // VS:  @lgc.input.import.vertex.%Type%(i32 location, i32 elemIdx)
     assert(locationOffset == getInt32(0));
+    baseCallName = lgcName::InputImportVertex;
     args.push_back(getInt32(location));
     args.push_back(elemIdx);
     break;

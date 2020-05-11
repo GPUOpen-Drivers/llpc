@@ -52,6 +52,7 @@ static const BuiltInKind BuiltInWaveId = static_cast<BuiltInKind>(0x1000000A);
 // Names used for calls added to IR to represent various actions internally.
 namespace lgcName {
 const static char InputCallPrefix[] = "lgc.input.";
+const static char InputImportVertex[] = "lgc.input.import.vertex.";
 const static char InputImportGeneric[] = "lgc.input.import.generic.";
 const static char InputImportBuiltIn[] = "lgc.input.import.builtin.";
 const static char InputImportInterpolant[] = "lgc.input.import.interpolant.";
@@ -74,7 +75,9 @@ const static char RootDescriptor[] = "lgc.root.descriptor";
 // Get pointer to a descriptor set table. First arg is the descriptor set number; second arg is the value to use
 // for the high half of the address, or HighAddrPc to use PC.
 const static char DescriptorSet[] = "lgc.descriptor.set";
-// Get special user data input. Arg is UserDataMapping enum value.
+// Get special user data input. Arg is UserDataMapping enum value. The optional second arg causes the 32-bit
+// value to be extended to 64-bit pointer and specifies the value to use for the high half, or
+// ShadowDescriptorTable::Disable to use PC.
 const static char SpecialUserData[] = "lgc.special.user.data.";
 // Get shader input. Arg is ShaderInput enum value.
 const static char ShaderInput[] = "lgc.shader.input.";

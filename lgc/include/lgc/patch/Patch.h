@@ -44,6 +44,7 @@ class PassManager;
 
 } // namespace legacy
 
+void initializeLowerVertexFetchPass(PassRegistry &);
 void initializePatchBufferOpPass(PassRegistry &);
 void initializePatchCheckShaderCachePass(PassRegistry &);
 void initializePatchCopyShaderPass(PassRegistry &);
@@ -68,6 +69,7 @@ class PatchCheckShaderCache;
 //
 // @param passRegistry : Pass registry
 inline static void initializePatchPasses(llvm::PassRegistry &passRegistry) {
+  initializeLowerVertexFetchPass(passRegistry);
   initializePatchBufferOpPass(passRegistry);
   initializePatchCheckShaderCachePass(passRegistry);
   initializePatchCopyShaderPass(passRegistry);
@@ -83,6 +85,7 @@ inline static void initializePatchPasses(llvm::PassRegistry &passRegistry) {
   initializePatchSetupTargetFeaturesPass(passRegistry);
 }
 
+llvm::ModulePass *createLowerVertexFetch();
 llvm::FunctionPass *createPatchBufferOp();
 PatchCheckShaderCache *createPatchCheckShaderCache();
 llvm::ModulePass *createPatchCopyShader();

@@ -141,8 +141,7 @@ private:
     SmallVector<UserDataNodeUsage, 18> specialUserData;
     // Minimum offset at which spill table is used.
     unsigned spillUsage = UINT_MAX;
-    // Usage of vertex buffer table and streamout table
-    bool usesVertexBufferTable = false;
+    // Usage of streamout table
     bool usesStreamOutTable = false;
   };
 
@@ -365,14 +364,6 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
         descriptorSets.resize(std::max(descriptorSets.size(), size_t(set + 1)));
         descriptorSets[set].users.push_back(call);
       }
-    } else if (func.getName().startswith(lgcName::InputImportGeneric)) {
-      for (User *user : func.users()) {
-        CallInst *call = cast<CallInst>(user);
-        if (getShaderStage(call->getFunction()) == ShaderStageVertex) {
-          getUserDataUsage(ShaderStageVertex)->usesVertexBufferTable = true;
-          break;
-        }
-      }
     } else if (func.getName().startswith(lgcName::OutputExportXfb) && !func.use_empty()) {
       auto lastVertexStage = m_pipelineState->getLastVertexProcessingStage();
       lastVertexStage = lastVertexStage == ShaderStageCopyShader ? ShaderStageGeometry : lastVertexStage;
@@ -591,11 +582,21 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
           arg = func.getArg(specialUserData.entryArgIdx);
           arg->setName(ShaderInputs::getSpecialUserDataName(static_cast<unsigned>(UserDataMapping::GlobalTable) + idx));
         }
-        for (Instruction *&call : specialUserData.users) {
-          if (call && call->getFunction() == &func) {
-            call->replaceAllUsesWith(arg);
-            call->eraseFromParent();
-            call = nullptr;
+        for (Instruction *&inst : specialUserData.users) {
+          if (inst && inst->getFunction() == &func) {
+            Value *replacementVal = arg;
+            auto call = dyn_cast<CallInst>(inst);
+            if (call->getNumArgOperands() >= 2) {
+              // There is a second operand, used by ShaderInputs::getSpecialUserDataAsPoint to indicate that we
+              // need to extend the loaded 32-bit value to a 64-bit pointer, using either PC or the provided
+              // high half.
+              builder.SetInsertPoint(call);
+              unsigned highHalf = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+              replacementVal = addressExtender.extend(replacementVal, highHalf, call->getType(), builder);
+            }
+            inst->replaceAllUsesWith(replacementVal);
+            inst->eraseFromParent();
+            inst = nullptr;
           }
         }
       }
@@ -887,8 +888,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
 
       // Vertex buffer table.
-      if (userDataUsage->usesVertexBufferTable ||
-          userDataUsage->isSpecialUserDataUsed(UserDataMapping::VertexBufferTable)) {
+      if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::VertexBufferTable)) {
         specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::VertexBufferTable,
                                                   &vsIntfData->entryArgIdxs.vs.vbTablePtr));
       }

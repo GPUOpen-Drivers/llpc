@@ -332,23 +332,6 @@ Value *ShaderSystemValues::getNumWorkgroups() {
 }
 
 // =====================================================================================================================
-// Get vertex buffer table pointer
-Value *ShaderSystemValues::getVertexBufTablePtr() {
-  if (!m_vbTablePtr) {
-    auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-    assert(intfData->entryArgIdxs.vs.vbTablePtr != 0);
-
-    // Get the 64-bit extended node value.
-    auto vbTablePtrLow = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.vs.vbTablePtr, "vbTablePtr");
-    static const unsigned MaxVertexBufferSize = 0x10000000;
-    auto vbTablePtrTy = PointerType::get(
-        ArrayType::get(VectorType::get(Type::getInt32Ty(*m_context), 4), MaxVertexBufferSize), ADDR_SPACE_CONST);
-    m_vbTablePtr = makePointer(vbTablePtrLow, vbTablePtrTy, InvalidValue);
-  }
-  return m_vbTablePtr;
-}
-
-// =====================================================================================================================
 // Get stream-out buffer descriptor
 //
 // @param xfbBuffer : Transform feedback buffer ID

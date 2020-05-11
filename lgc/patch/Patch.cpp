@@ -117,6 +117,9 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   // Generate copy shader if necessary.
   passMgr.add(createPatchCopyShader());
 
+  // Lower vertex fetch operations.
+  passMgr.add(createLowerVertexFetch());
+
   // Patch entry-point mutation (should be done before external library link)
   passMgr.add(createPatchEntryPointMutate());
 

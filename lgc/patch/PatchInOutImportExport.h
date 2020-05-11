@@ -42,7 +42,6 @@
 namespace lgc {
 
 class FragColorExport;
-class VertexFetch;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for input import and output export.
@@ -71,8 +70,6 @@ private:
 
   void processShader();
 
-  llvm::Value *patchVsGenericInputImport(llvm::Type *inputTy, unsigned location, unsigned compIdx,
-                                         llvm::Instruction *insertPos);
   llvm::Value *patchTcsGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
                                           llvm::Value *compIdx, llvm::Value *vertexIdx, llvm::Instruction *insertPos);
   llvm::Value *patchTesGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
@@ -205,7 +202,6 @@ private:
   GfxIpVersion m_gfxIp;                     // Graphics IP version info
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage
 
-  VertexFetch *m_vertexFetch;         // Vertex fetch manager
   FragColorExport *m_fragColorExport; // Fragment color export manager
 
   llvm::CallInst *m_lastExport; // Last "export" intrinsic for which "done" flag is valid
