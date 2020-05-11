@@ -95,9 +95,6 @@ public:
   // Get number of workgroups value
   llvm::Value *getNumWorkgroups();
 
-  // Get vertex buffer table pointer
-  llvm::Value *getVertexBufTablePtr();
-
   // Get stream-out buffer descriptor
   llvm::Value *getStreamOutBufDesc(unsigned xfbBuffer);
 
@@ -141,7 +138,6 @@ private:
   llvm::SmallVector<llvm::Value *, 8> m_shadowDescTablePtrs; // Shadow descriptor table pointers
   llvm::Instruction *m_internalGlobalTablePtr = nullptr;     // Internal global table pointer
   llvm::Value *m_internalPerShaderTablePtr = nullptr;        // Internal per shader table pointer
-  llvm::Value *m_vbTablePtr = nullptr;                       // Vertex buffer table pointer
   llvm::Instruction *m_streamOutTablePtr;                    // Stream-out buffer table pointer
   llvm::Instruction *m_pc = nullptr;                         // Program counter as <2 x i32>
 };

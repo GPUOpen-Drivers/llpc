@@ -177,6 +177,9 @@ public:
   // Get a special user data value by inserting a call to lgc.special.user.data
   static llvm::CallInst *getSpecialUserData(UserDataMapping kind, BuilderBase &builder);
 
+  // Get a special user data value as a pointer by inserting a call to lgc.special.user.data then extending it
+  static llvm::Value *getSpecialUserDataAsPointer(UserDataMapping kind, llvm::Type *pointeeTy, BuilderBase &builder);
+
   // Get VertexIndex
   static llvm::Value *getVertexIndex(BuilderBase &builder);
 

@@ -25,28 +25,140 @@
 /**
  ***********************************************************************************************************************
  * @file  VertexFetch.cpp
- * @brief LLPC source file: contains implementation of class lgc::VertexFetch.
+ * @brief LGC source file: Vertex fetch manager, and pass that uses it
  ***********************************************************************************************************************
  */
-#include "VertexFetch.h"
-#include "SystemValues.h"
+#include "lgc/patch/VertexFetch.h"
+#include "lgc/BuilderBase.h"
+#include "lgc/LgcContext.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/patch/ShaderInputs.h"
+#include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 
 #define DEBUG_TYPE "lgc-vertex-fetch"
 
+using namespace lgc;
 using namespace llvm;
 
 namespace lgc {
+class BuilderBase;
+class PipelineState;
+} // namespace lgc
+
+namespace {
+
+// Represents vertex format info corresponding to vertex attribute format (VkFormat).
+struct VertexFormatInfo {
+  BufNumFormat nfmt;    // Numeric format of vertex buffer
+  BufDataFormat dfmt;   // Data format of vertex buffer
+  unsigned numChannels; // Valid number of channels
+};
+
+// Represents vertex component info corresponding to to vertex data format (BufDataFormat).
+//
+// NOTE: This info is used by vertex fetch instructions. We split vertex fetch into its per-component fetches when
+// the original vertex fetch does not match the hardware requirements (such as vertex attribute offset, vertex
+// attribute stride, etc..)
+struct VertexCompFormatInfo {
+  unsigned vertexByteSize; // Byte size of the vertex
+  unsigned compByteSize;   // Byte size of each individual component
+  unsigned compCount;      // Component count
+  BufDataFmt compDfmt;     // Equivalent data format of each component
+};
+
+// =====================================================================================================================
+// Pass to lower vertex fetch calls
+class LowerVertexFetch : public ModulePass {
+public:
+  LowerVertexFetch() : ModulePass(ID) {}
+  LowerVertexFetch(const LowerVertexFetch &) = delete;
+  LowerVertexFetch &operator=(const LowerVertexFetch &) = delete;
+
+  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
+    analysisUsage.addRequired<PipelineStateWrapper>();
+  }
+
+  virtual bool runOnModule(Module &module) override;
+
+  static char ID; // ID of this pass
+};
+
+// =====================================================================================================================
+// Vertex fetch manager
+class VertexFetchImpl : public VertexFetch {
+public:
+  VertexFetchImpl(LgcContext *lgcContext);
+  VertexFetchImpl(const VertexFetchImpl &) = delete;
+  VertexFetchImpl &operator=(const VertexFetchImpl &) = delete;
+
+  // Generate code to fetch a vertex value
+  Value *fetchVertex(Type *inputTy, const VertexInputDescription *description, unsigned location, unsigned compIdx,
+                     BuilderBase &builder) override;
+
+private:
+  void initialize(PipelineState *pipelineState);
+
+  static VertexFormatInfo getVertexFormatInfo(const VertexInputDescription *description);
+
+  // Gets variable corresponding to vertex index
+  Value *getVertexIndex() { return m_vertexIndex; }
+
+  // Gets variable corresponding to instance index
+  Value *getInstanceIndex() { return m_instanceIndex; }
+
+  static const VertexCompFormatInfo *getVertexComponentFormatInfo(unsigned dfmt);
+
+  unsigned mapVertexFormat(unsigned dfmt, unsigned nfmt) const;
+
+  Value *loadVertexBufferDescriptor(unsigned binding, BuilderBase &builder);
+
+  void addVertexFetchInst(Value *vbDesc, unsigned numChannels, bool is16bitFetch, Value *vbIndex, unsigned offset,
+                          unsigned stride, unsigned dfmt, unsigned nfmt, Instruction *insertPos, Value **ppFetch) const;
+
+  bool needPostShuffle(const VertexInputDescription *inputDesc, std::vector<Constant *> &shuffleMask) const;
+
+  bool needPatchA2S(const VertexInputDescription *inputDesc) const;
+
+  bool needSecondVertexFetch(const VertexInputDescription *inputDesc) const;
+
+  LgcContext *m_lgcContext = nullptr;   // LGC context
+  LLVMContext *m_context = nullptr;     // LLVM context
+  Value *m_vertexBufTablePtr = nullptr; // Vertex buffer table pointer
+  Value *m_vertexIndex = nullptr;       // Vertex index
+  Value *m_instanceIndex = nullptr;     // Instance index
+
+  static const VertexCompFormatInfo MVertexCompFormatInfo[]; // Info table of vertex component format
+  static const BufFormat MVertexFormatMap[];                 // Info table of vertex format mapping
+
+  // Default values for vertex fetch (<4 x i32> or <8 x i32>)
+  struct {
+    Constant *int8;     // < 0, 0, 0, 1 >
+    Constant *int16;    // < 0, 0, 0, 1 >
+    Constant *int32;    // < 0, 0, 0, 1 >
+    Constant *int64;    // < 0, 0, 0, 0, 0, 0, 0, 1 >
+    Constant *float16;  // < 0, 0, 0, 0x3C00 >
+    Constant *float32;  // < 0, 0, 0, 0x3F800000 >
+    Constant *double64; // < 0, 0, 0, 0, 0, 0, 0, 0x3FF00000 >
+  } m_fetchDefaults;
+};
+
+} // anonymous namespace
+
+// =====================================================================================================================
+// Internal tables
 
 #define VERTEX_FORMAT_UNDEFINED(_format)                                                                               \
   { _format, BUF_NUM_FORMAT_FLOAT, BUF_DATA_FORMAT_INVALID, 0, }
 
 // Initializes info table of vertex component format map
-const VertexCompFormatInfo VertexFetch::MVertexCompFormatInfo[] = {
+const VertexCompFormatInfo VertexFetchImpl::MVertexCompFormatInfo[] = {
     {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BUF_DATA_FORMAT_INVALID
     {1, 1, 1, BUF_DATA_FORMAT_8},          // BUF_DATA_FORMAT_8
     {2, 2, 1, BUF_DATA_FORMAT_16},         // BUF_DATA_FORMAT_16
@@ -64,7 +176,7 @@ const VertexCompFormatInfo VertexFetch::MVertexCompFormatInfo[] = {
     {16, 4, 4, BUF_DATA_FORMAT_32},        // BUF_DATA_FORMAT_32_32_32_32
 };
 
-const BufFormat VertexFetch::MVertexFormatMap[] = {
+const BufFormat VertexFetchImpl::MVertexFormatMap[] = {
     // BUF_DATA_FORMAT
     //   BUF_NUM_FORMAT_UNORM
     //   BUF_NUM_FORMAT_SNORM
@@ -236,33 +348,90 @@ const BufFormat VertexFetch::MVertexFormatMap[] = {
     BUF_FORMAT_INVALID,
 };
 
+char LowerVertexFetch::ID = 0;
+
 // =====================================================================================================================
+// Create the vertex fetch pass
+ModulePass *lgc::createLowerVertexFetch() {
+  return new LowerVertexFetch();
+}
+
+// =====================================================================================================================
+// Run the lower vertex fetch pass on a module
 //
-// @param entryPoint : Entry-point of API vertex shader
-// @param shaderSysValues : ShaderSystemValues object for getting vertex buffer pointer from
-// @param pipelineState : Pipeline state
-VertexFetch::VertexFetch(Function *entryPoint, ShaderSystemValues *shaderSysValues, PipelineState *pipelineState)
-    : m_module(entryPoint->getParent()), m_context(&m_module->getContext()), m_shaderSysValues(shaderSysValues),
-      m_pipelineState(pipelineState) {
-  assert(getShaderStage(entryPoint) == ShaderStageVertex); // Must be vertex shader
+// @param [in/out] module : Module
+bool LowerVertexFetch::runOnModule(Module &module) {
+  PipelineState *pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(pipelineState->getLgcContext()));
 
-  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
-  auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
-  auto insertPos = entryPoint->begin()->getFirstInsertionPt();
+  // Gather vertex fetch calls. We can assume they're all in one function, the vertex shader.
+  // We can assume that multiple fetches of the same location, component and type have been CSEd.
+  SmallVector<CallInst *, 8> vertexFetches;
+  BuilderBase builder(module.getContext());
+  for (auto &func : module) {
+    if (!func.isDeclaration() || !func.getName().startswith(lgcName::InputImportVertex))
+      continue;
+    for (auto user : func.users())
+      vertexFetches.push_back(cast<CallInst>(user));
+  }
+  if (vertexFetches.empty())
+    return false;
 
-  // VertexIndex = BaseVertex + VertexID
-  if (builtInUsage.vertexIndex) {
-    auto baseVertex = getFunctionArgument(entryPoint, entryArgIdxs.baseVertex);
-    auto vertexId = getFunctionArgument(entryPoint, entryArgIdxs.vertexId);
-    m_vertexIndex = BinaryOperator::CreateAdd(baseVertex, vertexId, "", &*insertPos);
+  // Lower each vertex fetch.
+  for (CallInst *call : vertexFetches) {
+    Value *vertex = nullptr;
+
+    // Find the vertex input description.
+    unsigned location = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
+    unsigned component = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+    const VertexInputDescription *description = pipelineState->findVertexInputDescription(location);
+
+    if (!description) {
+      // If we could not find vertex input info matching this location, just return undefined value.
+      vertex = UndefValue::get(call->getType());
+    } else {
+      // Fetch the vertex.
+      builder.SetInsertPoint(call);
+      vertex = vertexFetch->fetchVertex(call->getType(), description, location, component, builder);
+    }
+
+    // Replace and erase this call.
+    call->replaceAllUsesWith(vertex);
+    call->eraseFromParent();
   }
 
-  // InstanceIndex = BaseInstance + InstanceID
-  if (builtInUsage.instanceIndex) {
-    m_baseInstance = getFunctionArgument(entryPoint, entryArgIdxs.baseInstance);
-    m_instanceId = getFunctionArgument(entryPoint, entryArgIdxs.instanceId);
-    m_instanceIndex = BinaryOperator::CreateAdd(m_baseInstance, m_instanceId, "", &*insertPos);
+  return true;
+}
+
+// =====================================================================================================================
+// Given a non-aggregate type, get a float type at least as big that can be used to pass a value of that
+// type in a return value struct, ensuring it gets into VGPRs.
+Type *VertexFetch::getVgprTy(Type *ty) {
+  // The return value from the fetch shader needs to use all floats, as the back-end maps an int in the
+  // return value as an SGPR rather than a VGPR. For symmetry, we also use all floats in the input
+  // args to the fetchless vertex shader. We use a vector of float, even if the integer element type is
+  // not i32.
+  if (ty->isIntegerTy()) {
+    unsigned numElements = (ty->getPrimitiveSizeInBits() + 31) / 32;
+    ty = Type::getFloatTy(ty->getContext());
+    if (numElements > 1)
+      ty = VectorType::get(ty, numElements);
   }
+  return ty;
+}
+
+// =====================================================================================================================
+// Create a VertexFetch
+VertexFetch *VertexFetch::create(LgcContext *lgcContext) {
+  return new VertexFetchImpl(lgcContext);
+}
+
+// =====================================================================================================================
+// Constructor
+//
+// @param context : LLVM context
+VertexFetchImpl::VertexFetchImpl(LgcContext *lgcContext)
+    : m_lgcContext(lgcContext), m_context(&lgcContext->getContext()) {
 
   // Initialize default fetch values
   auto zero = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
@@ -307,34 +476,43 @@ VertexFetch::VertexFetch(Function *entryPoint, ShaderSystemValues *shaderSysValu
 // Executes vertex fetch operations based on the specified vertex input type and its location.
 //
 // @param inputTy : Type of vertex input
-// @param location : Location of vertex input
+// @param description : Vertex input description
+// @param location : Vertex input location (only used for an IR name, not for functionality)
 // @param compIdx : Index used for vector element indexing
-// @param insertPos : Where to insert vertex fetch instructions
-Value *VertexFetch::run(Type *inputTy, unsigned location, unsigned compIdx, Instruction *insertPos) {
+// @param builder : Builder to use to insert vertex fetch instructions
+Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription *description, unsigned location,
+                                    unsigned compIdx, BuilderBase &builder) {
   Value *vertex = nullptr;
-
-  // Get vertex input description for the given location
-  const VertexInputDescription *description = m_pipelineState->findVertexInputDescription(location);
-
-  // NOTE: If we could not find vertex input info matching this location, just return undefined value.
-  if (!description)
-    return UndefValue::get(inputTy);
-
-  auto vbDesc = loadVertexBufferDescriptor(description->binding, insertPos);
+  Instruction *insertPos = &*builder.GetInsertPoint();
+  auto vbDesc = loadVertexBufferDescriptor(description->binding, builder);
 
   Value *vbIndex = nullptr;
-  if (description->inputRate == VertexInputRateVertex)
-    vbIndex = getVertexIndex(); // Use vertex index
-  else {
-    if (description->inputRate == VertexInputRateNone)
-      vbIndex = m_baseInstance;
-    else if (description->inputRate == VertexInputRateInstance)
-      vbIndex = getInstanceIndex(); // Use instance index
-    else {
+  if (description->inputRate == VertexInputRateVertex) {
+    // Use vertex index
+    if (!m_vertexIndex) {
+      auto savedInsertPoint = builder.saveIP();
+      builder.SetInsertPoint(&*insertPos->getFunction()->front().getFirstInsertionPt());
+      m_vertexIndex = ShaderInputs::getVertexIndex(builder);
+      builder.restoreIP(savedInsertPoint);
+    }
+    vbIndex = m_vertexIndex;
+  } else {
+    if (description->inputRate == VertexInputRateNone) {
+      vbIndex = ShaderInputs::getSpecialUserData(UserDataMapping::BaseInstance, builder);
+    } else if (description->inputRate == VertexInputRateInstance) {
+      // Use instance index
+      if (!m_instanceIndex) {
+        auto savedInsertPoint = builder.saveIP();
+        builder.SetInsertPoint(&*insertPos->getFunction()->front().getFirstInsertionPt());
+        m_instanceIndex = ShaderInputs::getInstanceIndex(builder);
+        builder.restoreIP(savedInsertPoint);
+      }
+      vbIndex = m_instanceIndex;
+    } else {
       // There is a divisor.
-      vbIndex = BinaryOperator::CreateUDiv(
-          m_instanceId, ConstantInt::get(Type::getInt32Ty(*m_context), description->inputRate), "", insertPos);
-      vbIndex = BinaryOperator::CreateAdd(vbIndex, m_baseInstance, "", insertPos);
+      vbIndex = builder.CreateUDiv(ShaderInputs::getInput(ShaderInput::InstanceId, builder),
+                                   builder.getInt32(description->inputRate));
+      vbIndex = builder.CreateAdd(vbIndex, ShaderInputs::getSpecialUserData(UserDataMapping::BaseInstance, builder));
     }
   }
 
@@ -586,6 +764,10 @@ Value *VertexFetch::run(Type *inputTy, unsigned location, unsigned compIdx, Inst
     vertex = new TruncInst(vertex, truncTy, "", insertPos);
   }
 
+  if (vertex->getType() != inputTy)
+    vertex = new BitCastInst(vertex, inputTy, "", insertPos);
+  vertex->setName("vertex" + Twine(location) + "." + Twine(compIdx));
+
   return vertex;
 }
 
@@ -593,7 +775,7 @@ Value *VertexFetch::run(Type *inputTy, unsigned location, unsigned compIdx, Inst
 // Gets info from table according to vertex attribute format.
 //
 // @param inputDesc : Vertex input description
-VertexFormatInfo VertexFetch::getVertexFormatInfo(const VertexInputDescription *inputDesc) {
+VertexFormatInfo VertexFetchImpl::getVertexFormatInfo(const VertexInputDescription *inputDesc) {
   VertexFormatInfo info = {static_cast<BufNumFormat>(inputDesc->nfmt), static_cast<BufDataFormat>(inputDesc->dfmt), 1};
   switch (inputDesc->dfmt) {
   case BufDataFormat8_8:
@@ -641,7 +823,7 @@ VertexFormatInfo VertexFetch::getVertexFormatInfo(const VertexInputDescription *
 // Gets component info from table according to vertex buffer data format.
 //
 // @param dfmt : Date format of vertex buffer
-const VertexCompFormatInfo *VertexFetch::getVertexComponentFormatInfo(unsigned dfmt) {
+const VertexCompFormatInfo *VertexFetchImpl::getVertexComponentFormatInfo(unsigned dfmt) {
   assert(dfmt < sizeof(MVertexCompFormatInfo) / sizeof(MVertexCompFormatInfo[0]));
   return &MVertexCompFormatInfo[dfmt];
 }
@@ -651,12 +833,12 @@ const VertexCompFormatInfo *VertexFetch::getVertexComponentFormatInfo(unsigned d
 //
 // @param dfmt : Data format
 // @param nfmt : Numeric format
-unsigned VertexFetch::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
+unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
   assert(dfmt < 16);
   assert(nfmt < 8);
   unsigned format = 0;
 
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+  GfxIpVersion gfxIp = m_lgcContext->getTargetInfo().getGfxIpVersion();
   if (gfxIp.major >= 10) {
     unsigned index = (dfmt * 8) + nfmt;
     assert(index < sizeof(MVertexFormatMap) / sizeof(MVertexFormatMap[0]));
@@ -674,19 +856,23 @@ unsigned VertexFetch::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
 // Loads vertex descriptor based on the specified vertex input location.
 //
 // @param binding : ID of vertex buffer binding
-// @param insertPos : Where to insert instructions
-Value *VertexFetch::loadVertexBufferDescriptor(unsigned binding, Instruction *insertPos) const {
-  Value *idxs[] = {ConstantInt::get(Type::getInt64Ty(*m_context), 0, false),
-                   ConstantInt::get(Type::getInt64Ty(*m_context), binding, false)};
+// @param builder : Builder with insert point set
+Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderBase &builder) {
 
-  auto vbTablePtr = m_shaderSysValues->getVertexBufTablePtr();
-  auto vbDescPtr = GetElementPtrInst::Create(nullptr, vbTablePtr, idxs, "", insertPos);
-  vbDescPtr->setMetadata(MetaNameUniform, MDNode::get(vbDescPtr->getContext(), {}));
-  auto vbDescTy = vbDescPtr->getType()->getPointerElementType();
+  // Get the vertex buffer table pointer as pointer to v4i32 descriptor.
+  Type *vbDescTy = VectorType::get(Type::getInt32Ty(*m_context), 4);
+  if (!m_vertexBufTablePtr) {
+    auto savedInsertPoint = builder.saveIP();
+    builder.SetInsertPoint(&*builder.GetInsertPoint()->getFunction()->front().getFirstInsertionPt());
+    m_vertexBufTablePtr =
+        ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping::VertexBufferTable, vbDescTy, builder);
+    builder.restoreIP(savedInsertPoint);
+  }
 
-  auto vbDesc = new LoadInst(vbDescTy, vbDescPtr, "", false, Align(16), insertPos);
+  Value *vbDescPtr = builder.CreateGEP(vbDescTy, m_vertexBufTablePtr, builder.getInt64(binding));
+  LoadInst *vbDesc = builder.CreateLoad(vbDescTy, vbDescPtr);
   vbDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(vbDesc->getContext(), {}));
-
+  vbDesc->setAlignment(Align(16));
   return vbDesc;
 }
 
@@ -703,9 +889,9 @@ Value *VertexFetch::loadVertexBufferDescriptor(unsigned binding, Instruction *in
 // @param nfmt : Numeric format of vertex buffer
 // @param insertPos : Where to insert instructions
 // @param [out] ppFetch : Destination of vertex fetch
-void VertexFetch::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bool is16bitFetch, Value *vbIndex,
-                                     unsigned offset, unsigned stride, unsigned dfmt, unsigned nfmt,
-                                     Instruction *insertPos, Value **ppFetch) const {
+void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bool is16bitFetch, Value *vbIndex,
+                                         unsigned offset, unsigned stride, unsigned dfmt, unsigned nfmt,
+                                         Instruction *insertPos, Value **ppFetch) const {
   const VertexCompFormatInfo *formatInfo = getVertexComponentFormatInfo(dfmt);
 
   // NOTE: If the vertex attribute offset and stride are aligned on data format boundaries, we can do a vertex fetch
@@ -857,7 +1043,8 @@ void VertexFetch::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bool i
 //
 // @param inputDesc : Vertex input description
 // @param [out] shuffleMask : Vector shuffle mask
-bool VertexFetch::needPostShuffle(const VertexInputDescription *inputDesc, std::vector<Constant *> &shuffleMask) const {
+bool VertexFetchImpl::needPostShuffle(const VertexInputDescription *inputDesc,
+                                      std::vector<Constant *> &shuffleMask) const {
   bool needShuffle = false;
 
   switch (inputDesc->dfmt) {
@@ -880,13 +1067,13 @@ bool VertexFetch::needPostShuffle(const VertexInputDescription *inputDesc, std::
 // Checks whether patching 2-bit signed alpha channel is required for vertex fetch operation.
 //
 // @param inputDesc : Vertex input description
-bool VertexFetch::needPatchA2S(const VertexInputDescription *inputDesc) const {
+bool VertexFetchImpl::needPatchA2S(const VertexInputDescription *inputDesc) const {
   bool needPatch = false;
 
   if (inputDesc->dfmt == BufDataFormat2_10_10_10 || inputDesc->dfmt == BufDataFormat2_10_10_10_Bgra) {
     if (inputDesc->nfmt == BufNumFormatSnorm || inputDesc->nfmt == BufNumFormatSscaled ||
         inputDesc->nfmt == BufNumFormatSint)
-      needPatch = m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9;
+      needPatch = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 9;
   }
 
   return needPatch;
@@ -896,8 +1083,10 @@ bool VertexFetch::needPatchA2S(const VertexInputDescription *inputDesc) const {
 // Checks whether the second vertex fetch operation is required (particularly for certain 64-bit typed formats).
 //
 // @param inputDesc : Vertex input description
-bool VertexFetch::needSecondVertexFetch(const VertexInputDescription *inputDesc) const {
+bool VertexFetchImpl::needSecondVertexFetch(const VertexInputDescription *inputDesc) const {
   return inputDesc->dfmt == BufDataFormat64_64_64 || inputDesc->dfmt == BufDataFormat64_64_64_64;
 }
 
-} // namespace lgc
+// =====================================================================================================================
+// Initialize the lower vertex fetch pass
+INITIALIZE_PASS(LowerVertexFetch, DEBUG_TYPE, "Lower vertex fetch calls", false, false)

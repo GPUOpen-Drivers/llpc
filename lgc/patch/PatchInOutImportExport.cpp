@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "PatchInOutImportExport.h"
-#include "VertexFetch.h"
+#include "lgc/Builder.h"
 #include "lgc/BuiltIns.h"
 #include "lgc/LgcContext.h"
 #include "lgc/patch/FragColorExport.h"
@@ -68,13 +68,11 @@ PatchInOutImportExport::PatchInOutImportExport() : Patch(ID), m_lds(nullptr) {
 // =====================================================================================================================
 PatchInOutImportExport::~PatchInOutImportExport() {
   assert(!m_fragColorExport);
-  assert(!m_vertexFetch);
 }
 
 // =====================================================================================================================
 // Initialize per-shader members
 void PatchInOutImportExport::initPerShader() {
-  m_vertexFetch = nullptr;
   m_fragColorExport = nullptr;
   m_lastExport = nullptr;
   m_clipDistance = nullptr;
@@ -126,9 +124,6 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
 
       delete m_fragColorExport;
       m_fragColorExport = nullptr;
-
-      delete m_vertexFetch;
-      m_vertexFetch = nullptr;
     }
   }
 
@@ -154,10 +149,7 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
 // =====================================================================================================================
 // Process a single shader
 void PatchInOutImportExport::processShader() {
-  if (m_shaderStage == ShaderStageVertex) {
-    // Create vertex fetch manager
-    m_vertexFetch = new VertexFetch(m_entryPoint, m_pipelineSysValues.get(m_entryPoint), m_pipelineState);
-  } else if (m_shaderStage == ShaderStageFragment) {
+  if (m_shaderStage == ShaderStageFragment) {
     // Create fragment color export manager
     m_fragColorExport = new FragColorExport(m_pipelineState, m_module);
   }
@@ -478,12 +470,6 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       assert(loc != InvalidValue);
 
       switch (m_shaderStage) {
-      case ShaderStageVertex: {
-        assert(callInst.getNumArgOperands() == 2);
-        const unsigned compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-        input = patchVsGenericInputImport(inputTy, loc, compIdx, &callInst);
-        break;
-      }
       case ShaderStageTessControl: {
         assert(callInst.getNumArgOperands() == 4);
 
@@ -1406,32 +1392,6 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       m_lastExport->setOperand(4, ConstantInt::get(Type::getInt1Ty(*m_context), true));
     }
   }
-}
-
-// =====================================================================================================================
-// Patches import calls for generic inputs of vertex shader.
-//
-// @param inputTy : Type of input value
-// @param location : Location of the input
-// @param compIdx : Index used for vector element indexing
-// @param insertPos : Where to insert the patch instruction
-Value *PatchInOutImportExport::patchVsGenericInputImport(Type *inputTy, unsigned location, unsigned compIdx,
-                                                         Instruction *insertPos) {
-  Value *input = UndefValue::get(inputTy);
-
-  // Do vertex fetch operations
-  assert(m_vertexFetch);
-  auto vertex = m_vertexFetch->run(inputTy, location, compIdx, insertPos);
-
-  // Cast vertex fetch results if necessary
-  const Type *vertexTy = vertex->getType();
-  if (vertexTy != inputTy) {
-    assert(canBitCast(vertexTy, inputTy));
-    input = new BitCastInst(vertex, inputTy, "", insertPos);
-  } else
-    input = vertex;
-
-  return input;
 }
 
 // =====================================================================================================================
