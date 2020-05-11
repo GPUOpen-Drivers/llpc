@@ -82,6 +82,8 @@ private:
   llvm::Value *m_heightY = nullptr;
   llvm::Value *m_pitchCb = nullptr;
   llvm::Value *m_heightCb = nullptr;
+  llvm::Value *m_swizzleMode = nullptr;
+  llvm::Value *m_isTileOpt = nullptr;
   llvm::Value *m_one;
   GfxIpVersion *m_gfxIp;
 };

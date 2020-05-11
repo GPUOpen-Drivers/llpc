@@ -141,7 +141,7 @@ enum class SqRsrcRegs {
   Width, // only gfx9 and before
   Height,
   DstSelXYZW,
-  IsTileOpt,
+  SwizzleMode,
   Depth,
   Pitch,
   BcSwizzle,
