@@ -87,8 +87,6 @@ private:
   void exportGenericOutput(Value *outputValue, unsigned location, unsigned streamId, BuilderBase &builder);
   void exportBuiltInOutput(Value *outputValue, BuiltInKind builtInId, unsigned streamId, BuilderBase &builder);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   // Low part of global internal table pointer
   static const unsigned EntryArgIdxInternalTablePtrLow = 0;
 

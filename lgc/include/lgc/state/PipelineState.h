@@ -380,7 +380,6 @@ private:
   void recordGraphicsState(llvm::Module *module);
   void readGraphicsState(llvm::Module *module);
 
-  // -----------------------------------------------------------------------------------------------------------------
   bool m_noReplayer = false;                            // True if no BuilderReplayer needed
   bool m_emitLgc = false;                               // Whether -emit-lgc is on
   bool m_unlinked = false;                              // Whether generating an unlinked half-pipeline ELF
@@ -421,8 +420,6 @@ public:
 
   // Set the PipelineState.
   void setPipelineState(PipelineState *pipelineState) { m_pipelineState = pipelineState; }
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   static char ID; // ID of this pass
 

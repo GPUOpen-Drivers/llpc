@@ -53,8 +53,6 @@ public:
   virtual void visitFPTruncInst(llvm::FPTruncInst &fptruncInst);
   void flushDenormIfNeeded(llvm::Instruction *inst);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 
 private:

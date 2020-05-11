@@ -1518,8 +1518,6 @@ public:
   // @param instName : Name to give instruction(s)
   virtual llvm::Value *CreateSubgroupMbcnt(llvm::Value *const mask, const llvm::Twine &instName = "") = 0;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
 protected:
   Builder(LgcContext *builderContext);
 
@@ -1529,8 +1527,6 @@ protected:
 
   // Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
   llvm::Constant *getFpConstant(llvm::Type *ty, llvm::APFloat value);
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   bool m_isBuilderRecorder = false;               // Whether this is a BuilderRecorder
   ShaderStage m_shaderStage = ShaderStageInvalid; // Current shader stage being built.
@@ -1555,8 +1551,6 @@ private:
   Builder() = delete;
   Builder(const Builder &) = delete;
   Builder &operator=(const Builder &) = delete;
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   LgcContext *m_builderContext; // Builder context
 };

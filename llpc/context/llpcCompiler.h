@@ -162,8 +162,6 @@ private:
   bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo *> &shaderInfo) const;
   bool canUseRelocatableComputeShaderElf(const PipelineShaderInfo *shaderInfo) const;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   std::vector<std::string> m_options;           // Compilation options
   MetroHash::Hash m_optionHash;                 // Hash code of compilation options
   GfxIpVersion m_gfxIp;                         // Graphics IP version info

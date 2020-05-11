@@ -55,15 +55,11 @@ public:
   // removed.
   void setCallbackFunction(Pipeline::CheckShaderCacheFunc callbackFunc) { m_callbackFunc = callbackFunc; }
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 
 private:
   PatchCheckShaderCache(const PatchCheckShaderCache &) = delete;
   PatchCheckShaderCache &operator=(const PatchCheckShaderCache &) = delete;
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   Pipeline::CheckShaderCacheFunc m_callbackFunc;
 };

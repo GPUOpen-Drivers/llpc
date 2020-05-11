@@ -67,15 +67,11 @@ public:
   void moveAfter(llvm::Instruction &move, llvm::Instruction &after) const;
   void insertAfter(llvm::Instruction &insert, llvm::Instruction &after) const;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 
 private:
   PatchPeepholeOpt(const PatchPeepholeOpt &) = delete;
   PatchPeepholeOpt &operator=(const PatchPeepholeOpt &) = delete;
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   llvm::SmallVector<llvm::Instruction *, 8> m_instsToErase;
 };

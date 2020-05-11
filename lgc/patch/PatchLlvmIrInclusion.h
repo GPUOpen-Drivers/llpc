@@ -44,8 +44,6 @@ public:
 
   void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override { analysisUsage.setPreservesAll(); }
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 
 private:

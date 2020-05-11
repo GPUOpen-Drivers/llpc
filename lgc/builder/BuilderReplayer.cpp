@@ -54,8 +54,6 @@ public:
 
   bool runOnModule(Module &module) override;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID;
 
 private:

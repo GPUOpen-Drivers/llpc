@@ -57,8 +57,6 @@ public:
   virtual bool runOnModule(llvm::Module &module) override;
   virtual void visitCallInst(llvm::CallInst &callInst);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 
 private:
@@ -94,8 +92,6 @@ private:
   void scalarizeForInOutPacking(llvm::Module *module);
   void scalarizeGenericInput(llvm::CallInst *call);
   void scalarizeGenericOutput(llvm::CallInst *call);
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   PipelineShaders *m_pipelineShaders; // Pipeline shaders
   PipelineState *m_pipelineState;     // Pipeline state

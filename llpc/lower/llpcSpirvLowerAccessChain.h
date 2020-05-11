@@ -44,8 +44,6 @@ public:
   virtual bool runOnModule(llvm::Module &module);
   virtual void visitGetElementPtrInst(llvm::GetElementPtrInst &getElemPtrInst);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 
 private:

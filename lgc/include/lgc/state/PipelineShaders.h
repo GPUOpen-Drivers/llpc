@@ -56,8 +56,6 @@ private:
   PipelineShaders(const PipelineShaders &) = delete;
   PipelineShaders &operator=(const PipelineShaders &) = delete;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   llvm::Function *m_entryPoints[ShaderStageCountInternal];       // The entry-point for each shader stage.
   std::map<const llvm::Function *, ShaderStage> m_entryPointMap; // Map from shader entry-point to shader stage.
 };

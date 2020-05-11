@@ -74,8 +74,6 @@ private:
   llvm::Value *convertToFloat(llvm::Value *value, bool signedness, llvm::Instruction *insertPos) const;
   llvm::Value *convertToInt(llvm::Value *value, bool signedness, llvm::Instruction *insertPos) const;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   PipelineState *m_pipelineState; // Pipeline state
   llvm::LLVMContext *m_context;   // LLVM context
 };

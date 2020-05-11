@@ -61,8 +61,6 @@ public:
   void visitCallInst(llvm::CallInst &callInst);
   void visitReturnInst(llvm::ReturnInst &retInst);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 
 private:
@@ -203,8 +201,6 @@ private:
   llvm::Value *getWorkgroupSize();
   llvm::Value *getInLocalInvocationId(llvm::Instruction *insertPos);
   llvm::Value *getDeviceIndex(llvm::Instruction *insertPos);
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   GfxIpVersion m_gfxIp;                     // Graphics IP version info
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage

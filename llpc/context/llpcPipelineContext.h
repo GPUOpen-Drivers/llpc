@@ -158,8 +158,6 @@ protected:
   // Gets dummy vertex attribute info
   virtual std::vector<VkVertexInputAttributeDescription> *getDummyVertexAttributes() { return nullptr; }
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   GfxIpVersion m_gfxIp;           // Graphics IP version info
   MetroHash::Hash m_pipelineHash; // Pipeline hash code
   MetroHash::Hash m_cacheHash;    // Cache hash code
@@ -189,8 +187,6 @@ private:
 
   // Give the color export state to the middle-end.
   void setColorExportState(lgc::Pipeline *pipeline) const;
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   ShaderFpMode m_shaderFpModes[ShaderStageCountInternal] = {};
   bool m_unlinked = false; // Whether we are building an "unlinked" half-pipeline ELF

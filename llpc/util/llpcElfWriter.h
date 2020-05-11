@@ -131,8 +131,6 @@ private:
 
   void reinitialize();
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   GfxIpVersion m_gfxIp;                  // Graphics IP version info (used by ELF dump only)
   typename Elf::FormatHeader m_header;   // ELF header
   std::map<std::string, unsigned> m_map; // Map between section name and section index

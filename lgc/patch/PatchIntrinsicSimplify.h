@@ -61,8 +61,6 @@ public:
   void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
   bool runOnFunction(llvm::Function &func) override;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 
   PatchIntrinsicSimplify(const PatchIntrinsicSimplify &) = delete;
@@ -75,8 +73,6 @@ private:
   llvm::Value *simplifyTrigonometric(llvm::IntrinsicInst &intrinsicCall) const;
   bool canSimplify(llvm::IntrinsicInst &intrinsicCall) const;
   llvm::Value *simplify(llvm::IntrinsicInst &intrinsicCall) const;
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   llvm::ScalarEvolution *m_scalarEvolution = nullptr;
   llvm::LLVMContext *m_context = nullptr;
