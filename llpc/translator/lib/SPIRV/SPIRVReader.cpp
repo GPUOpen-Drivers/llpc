@@ -1198,24 +1198,38 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
 void SPIRVToLLVM::setFastMathFlags(SPIRVValue *bv) {
   // For floating-point operations, if "FastMath" is enabled, set the "FastMath"
   // flags on the handled instruction
+  if (!SPIRVGenFastMath)
+    return;
+
+  // Only do this for operations with floating point type.
+  if (!bv->hasType())
+    return;
+  SPIRVType *ty = bv->getType();
+  if (ty->isTypeVector())
+    ty = ty->getVectorComponentType();
+  if (!ty->isTypeFloat())
+    return;
+
   llvm::FastMathFlags fmf;
-  if (SPIRVGenFastMath) {
-    fmf.setAllowReciprocal();
-    // Enable contraction when "NoContraction" decoration is not specified
-    bool allowContract = !bv || !bv->hasDecorate(DecorationNoContraction);
-    // Do not set AllowContract or AllowReassoc if DenormFlushToZero is on, to
-    // avoid an FP operation being simplified to a move that does not flush
-    // denorms.
-    if (m_fpControlFlags.DenormFlushToZero == 0) {
-      fmf.setAllowContract(allowContract);
-      // AllowRessociation should be same with AllowContract
-      fmf.setAllowReassoc(allowContract);
-    }
-    // Enable "no NaN" and "no signed zeros" only if there isn't any floating point control flags
-    if (m_fpControlFlags.U32All == 0) {
-      fmf.setNoNaNs();
-      fmf.setNoSignedZeros(allowContract);
-    }
+  fmf.setAllowReciprocal();
+  if (!ty->isTypeFloat(64)) {
+    // Only do this for half and float, not double, to avoid problems with Vulkan CTS precision_double tests.
+    fmf.setApproxFunc();
+  }
+  // Enable contraction when "NoContraction" decoration is not specified
+  bool allowContract = !bv->hasDecorate(DecorationNoContraction);
+  // Do not set AllowContract or AllowReassoc if DenormFlushToZero is on, to
+  // avoid an FP operation being simplified to a move that does not flush
+  // denorms.
+  if (m_fpControlFlags.DenormFlushToZero == 0) {
+    fmf.setAllowContract(allowContract);
+    // AllowRessociation should be same with AllowContract
+    fmf.setAllowReassoc(allowContract);
+  }
+  // Enable "no NaN" and "no signed zeros" only if there isn't any floating point control flags
+  if (m_fpControlFlags.U32All == 0) {
+    fmf.setNoNaNs();
+    fmf.setNoSignedZeros(allowContract);
   }
   getBuilder()->setFastMathFlags(fmf);
 }

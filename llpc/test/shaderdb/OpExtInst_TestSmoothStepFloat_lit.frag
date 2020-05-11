@@ -22,8 +22,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> (...) @lgc.create.smooth.step.v3f32(<3 x float>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <4 x float> (...) @lgc.create.smooth.step.v4f32(<4 x float>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.smooth.step.v3f32(<3 x float>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.smooth.step.v4f32(<4 x float>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
