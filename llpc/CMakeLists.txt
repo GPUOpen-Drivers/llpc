@@ -394,7 +394,11 @@ endif()
 ### Add Subdirectories #################################################################################################
 if(ICD_BUILD_LLPC)
 # SPVGEN
-set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../../spvgen CACHE PATH "Specify the path to SPVGEN.")
+if(EXISTS ${PROJECT_SOURCE_DIR}/../../spvgen)
+    set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../../spvgen CACHE PATH "Specify the path to SPVGEN.")
+else()
+    set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../../../../tools/spvgen CACHE PATH "Specify the path to SPVGEN.")
+endif()
 
 if(EXISTS ${XGL_SPVGEN_PATH})
     add_subdirectory(${XGL_SPVGEN_PATH} ${CMAKE_BINARY_DIR}/spvgen EXCLUDE_FROM_ALL)
