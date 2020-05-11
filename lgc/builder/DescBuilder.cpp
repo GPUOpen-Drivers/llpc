@@ -352,10 +352,8 @@ Value *DescBuilder::getDescPtrAndStride(ResourceNodeType resType, unsigned descS
         stride = getInt32(gpuProperty.descriptorSizeResource);
         break;
       case ResourceNodeType::DescriptorCombinedTexture:
-        stride = getInt32(gpuProperty.descriptorSizeResource + gpuProperty.descriptorSizeSampler);
-        break;
       case ResourceNodeType::DescriptorYCbCrSampler:
-        stride = getInt32(DescriptorSizeSamplerYCbCr);
+        stride = getInt32(gpuProperty.descriptorSizeResource + gpuProperty.descriptorSizeSampler);
         break;
       default:
         llvm_unreachable("Unexpected resource node type");
@@ -365,8 +363,7 @@ Value *DescBuilder::getDescPtrAndStride(ResourceNodeType resType, unsigned descS
   }
 
   Value *descPtr = nullptr;
-  if (node && node->immutableValue &&
-      (resType == ResourceNodeType::DescriptorSampler || resType == ResourceNodeType::DescriptorYCbCrSampler)) {
+  if (node && node->immutableValue && resType == ResourceNodeType::DescriptorSampler) {
     // This is an immutable sampler. Put the immutable value into a static variable and return a pointer
     // to that. For a simple non-variably-indexed immutable sampler not passed through a function call
     // or phi node, we rely on subsequent LLVM optimizations promoting the value back to a constant.
@@ -374,12 +371,12 @@ Value *DescBuilder::getDescPtrAndStride(ResourceNodeType resType, unsigned descS
     // We need to change the stride to 4 dwords (8 dwords for a converting sampler). It would otherwise be
     // incorrectly set to 12 dwords for a sampler in a combined texture.
     stride = getInt32(gpuProperty.descriptorSizeSampler);
-    if (resType == ResourceNodeType::DescriptorYCbCrSampler) {
+    if (node->type == ResourceNodeType::DescriptorYCbCrSampler) {
       startGlobalName = lgcName::ImmutableConvertingSamplerGlobal;
       stride = getInt32(DescriptorSizeSamplerYCbCr);
     }
 
-    std::string globalName = (startGlobalName + Twine(node->set) + " " + Twine(node->binding)).str();
+    std::string globalName = (startGlobalName + Twine(node->set) + "_" + Twine(node->binding)).str();
     Module *module = GetInsertPoint()->getModule();
     descPtr = module->getGlobalVariable(globalName, /*AllowInternal=*/true);
     if (!descPtr) {
