@@ -106,7 +106,7 @@ std::unique_ptr<Module> Context::loadLibary(const BinaryData *lib) {
     LLPC_ERRS("Fails to load LLVM bitcode \n");
   } else {
     libModule = std::move(*moduleOrErr);
-    if (llvm::Error errCode = libModule->materializeAll()) {
+    if (Error errCode = libModule->materializeAll()) {
       LLPC_ERRS("Fails to materialize \n");
       libModule = nullptr;
     }

@@ -99,7 +99,7 @@ void SpirvLowerAccessChain::visitGetElementPtrInst(GetElementPtrInst &getElemPtr
 //
 // @param getElemPtr : "getelementptr" instruction in the bottom to do coalescing
 // @param addrSpace : Address space of the pointer value of "getelementptr"
-llvm::GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *getElemPtr, unsigned addrSpace) {
+GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *getElemPtr, unsigned addrSpace) {
   GetElementPtrInst *coalescedGetElemPtr = getElemPtr;
 
   std::stack<User *> chainedInsts;              // Order: from top to bottom

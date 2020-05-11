@@ -91,8 +91,7 @@ namespace lgc {
 // @param patchTimer : Timer to time patch passes with, nullptr if not timing
 // @param optTimer : Timer to time LLVM optimization passes with, nullptr if not timing
 void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr, ModulePass *replayerPass,
-                      llvm::Timer *patchTimer, llvm::Timer *optTimer,
-                      Pipeline::CheckShaderCacheFunc checkShaderCacheFunc)
+                      Timer *patchTimer, Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc)
 // Callback function to check shader cache
 {
   // Start timer for patching passes.

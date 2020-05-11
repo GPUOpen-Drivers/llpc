@@ -391,7 +391,7 @@ void SpirvLowerAlgebraTransform::disableFastMath(Value *value) {
     if (isa<FPMathOperator>(*it)) {
       // Reset fast math flags to default
       auto inst = cast<Instruction>(*it);
-      llvm::FastMathFlags fastMathFlags;
+      FastMathFlags fastMathFlags;
       inst->copyFastMathFlags(fastMathFlags);
     }
 

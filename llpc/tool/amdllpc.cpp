@@ -969,12 +969,12 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
     pipelineInfo->options.robustBufferAccess = RobustBufferAccess;
 
     void *pipelineDumpHandle = nullptr;
-    if (llvm::cl::EnablePipelineDump) {
+    if (cl::EnablePipelineDump) {
       PipelineDumpOptions dumpOptions = {};
-      dumpOptions.pDumpDir = llvm::cl::PipelineDumpDir.c_str();
-      dumpOptions.filterPipelineDumpByType = llvm::cl::FilterPipelineDumpByType;
-      dumpOptions.filterPipelineDumpByHash = llvm::cl::FilterPipelineDumpByHash;
-      dumpOptions.dumpDuplicatePipelines = llvm::cl::DumpDuplicatePipelines;
+      dumpOptions.pDumpDir = cl::PipelineDumpDir.c_str();
+      dumpOptions.filterPipelineDumpByType = cl::FilterPipelineDumpByType;
+      dumpOptions.filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
+      dumpOptions.dumpDuplicatePipelines = cl::DumpDuplicatePipelines;
 
       PipelineBuildInfo localPipelineInfo = {};
       localPipelineInfo.pGraphicsInfo = pipelineInfo;
@@ -990,7 +990,7 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
     result = compiler->BuildGraphicsPipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
 
     if (result == Result::Success) {
-      if (llvm::cl::EnablePipelineDump) {
+      if (cl::EnablePipelineDump) {
         Vkgc::BinaryData pipelineBinary = {};
         pipelineBinary.codeSize = pipelineOut->pipelineBin.codeSize;
         pipelineBinary.pCode = pipelineOut->pipelineBin.pCode;
@@ -1035,12 +1035,12 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
     pipelineInfo->options.robustBufferAccess = RobustBufferAccess;
 
     void *pipelineDumpHandle = nullptr;
-    if (llvm::cl::EnablePipelineDump) {
+    if (cl::EnablePipelineDump) {
       PipelineDumpOptions dumpOptions = {};
-      dumpOptions.pDumpDir = llvm::cl::PipelineDumpDir.c_str();
-      dumpOptions.filterPipelineDumpByType = llvm::cl::FilterPipelineDumpByType;
-      dumpOptions.filterPipelineDumpByHash = llvm::cl::FilterPipelineDumpByHash;
-      dumpOptions.dumpDuplicatePipelines = llvm::cl::DumpDuplicatePipelines;
+      dumpOptions.pDumpDir = cl::PipelineDumpDir.c_str();
+      dumpOptions.filterPipelineDumpByType = cl::FilterPipelineDumpByType;
+      dumpOptions.filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
+      dumpOptions.dumpDuplicatePipelines = cl::DumpDuplicatePipelines;
       PipelineBuildInfo localPipelineInfo = {};
       localPipelineInfo.pComputeInfo = pipelineInfo;
       pipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&dumpOptions, localPipelineInfo);
@@ -1055,7 +1055,7 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
     result = compiler->BuildComputePipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
 
     if (result == Result::Success) {
-      if (llvm::cl::EnablePipelineDump) {
+      if (cl::EnablePipelineDump) {
         Vkgc::BinaryData pipelineBinary = {};
         pipelineBinary.codeSize = pipelineOut->pipelineBin.codeSize;
         pipelineBinary.pCode = pipelineOut->pipelineBin.pCode;
@@ -1362,7 +1362,7 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
 
       if (result == Result::Success) {
         // Translate LLVM module to LLVM bitcode
-        llvm::SmallString<1024> bitcodeBuf;
+        SmallString<1024> bitcodeBuf;
         raw_svector_ostream bitcodeStream(bitcodeBuf);
         WriteBitcodeToFile(*module.get(), bitcodeStream);
         void *code = new uint8_t[bitcodeBuf.size()];

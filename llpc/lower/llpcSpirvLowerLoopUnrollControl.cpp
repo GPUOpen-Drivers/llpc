@@ -92,7 +92,7 @@ bool SpirvLowerLoopUnrollControl::runOnModule(Module &module) {
     if (shaderOptions->forceLoopUnrollCount > 0)
       m_forceLoopUnrollCount = shaderOptions->forceLoopUnrollCount;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
-    m_disableLicm = shaderOptions->disableLicm | llvm::cl::DisableLicm;
+    m_disableLicm = shaderOptions->disableLicm | cl::DisableLicm;
 #endif
   }
 
@@ -119,7 +119,7 @@ bool SpirvLowerLoopUnrollControl::runOnModule(Module &module) {
         // one operand pointing to itself, meaning that the SPIR-V did not
         // have an unroll or don't-unroll directive, so we can add the force
         // unroll count metadata.
-        llvm::Metadata *unrollCountMeta[] = {
+        Metadata *unrollCountMeta[] = {
             MDString::get(*m_context, "llvm.loop.unroll.count"),
             ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_context), m_forceLoopUnrollCount))};
         MDNode *loopUnrollCountMetaNode = MDNode::get(*m_context, unrollCountMeta);

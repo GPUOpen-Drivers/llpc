@@ -48,7 +48,7 @@ public:
   BuilderReplayer() : ModulePass(ID) {}
   BuilderReplayer(Pipeline *pipeline);
 
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
+  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
     analysisUsage.addRequired<PipelineStateWrapper>();
   }
 
@@ -67,7 +67,7 @@ private:
   std::unique_ptr<Builder> m_builder;                 // The LLPC builder that the builder
                                                       //  calls are being replayed on.
   std::map<Function *, ShaderStage> m_shaderStageMap; // Map function -> shader stage
-  llvm::Function *m_enclosingFunc = nullptr;          // Last function written with current
+  Function *m_enclosingFunc = nullptr;                // Last function written with current
                                                       //  shader stage
 };
 

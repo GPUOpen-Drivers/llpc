@@ -78,7 +78,7 @@ public:
   void unlock() { m_mutex.unlock(); }
 
 private:
-  llvm::sys::Mutex m_mutex;
+  sys::Mutex m_mutex;
 };
 
 // Mutex for pipeline dump

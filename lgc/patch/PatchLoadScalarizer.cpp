@@ -137,7 +137,7 @@ void PatchLoadScalarizer::visitLoadInst(LoadInst &loadInst) {
 
     Value *loadValue = UndefValue::get(loadTy);
     Type *newLoadPtrTy = PointerType::get(compTy, addrSpace);
-    llvm::SmallVector<llvm::Value *, 4> loadComps;
+    SmallVector<Value *, 4> loadComps;
 
     loadComps.resize(compCount);
 

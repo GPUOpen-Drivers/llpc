@@ -44,7 +44,7 @@ using namespace llvm;
 //
 // @param [in/out] module : LLVM module
 // @param pipelineState : Pipeline state
-ConfigBuilderBase::ConfigBuilderBase(llvm::Module *module, PipelineState *pipelineState)
+ConfigBuilderBase::ConfigBuilderBase(Module *module, PipelineState *pipelineState)
     : m_module(module), m_pipelineState(pipelineState) {
   m_context = &module->getContext();
 
@@ -313,7 +313,7 @@ void ConfigBuilderBase::appendConfig(unsigned key, unsigned value) {
 /// Append an array of entries to the PAL register metadata. Invalid keys are filtered out.
 ///
 /// @param [in] config The array of register metadata entries.
-void ConfigBuilderBase::appendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config) {
+void ConfigBuilderBase::appendConfig(ArrayRef<PalMetadataNoteEntry> config) {
   unsigned count = 0;
 
   for (const auto &entry : config) {
