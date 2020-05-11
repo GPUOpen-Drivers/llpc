@@ -117,8 +117,6 @@ private:
   // Find resource node by descriptor set ID
   unsigned findResourceNodeByDescSet(unsigned descSet);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   llvm::Function *m_entryPoint = nullptr; // Shader entrypoint
   llvm::LLVMContext *m_context;           // LLVM context
   PipelineState *m_pipelineState;         // Pipeline state

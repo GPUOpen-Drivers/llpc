@@ -479,8 +479,6 @@ private:
   ElfReader(const ElfReader &) = delete;
   ElfReader &operator=(const ElfReader &) = delete;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   GfxIpVersion m_gfxIp; // Graphics IP version info (used by ELF dump only)
 
   typename Elf::FormatHeader m_header;     // ELF header

@@ -71,8 +71,6 @@ public:
   void visitCalls(llvm::Module &module);
   llvm::Value *findCallAndGetIndexValue(llvm::Module &module, llvm::CallInst *const targetCall);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 
 private:
@@ -83,8 +81,6 @@ private:
   const llvm::Type *getFlattenArrayElementType(const llvm::Type *ty) const;
 
   void collectResourceNodeData(const GlobalVariable *global);
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   bool m_collectDetailUsage; // If enabled, collect detailed usages of resource node datas and FS output infos
   std::map<ResourceNodeDataKey, ResourceMappingNodeType, ResNodeDataSortingComparer> m_resNodeDatas; // Resource

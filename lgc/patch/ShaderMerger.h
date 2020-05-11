@@ -92,8 +92,6 @@ private:
   llvm::FunctionType *generateLsHsEntryPointType(uint64_t *inRegMask) const;
   llvm::FunctionType *generateEsGsEntryPointType(uint64_t *inRegMask) const;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   PipelineState *m_pipelineState; // Pipeline state
   llvm::LLVMContext *m_context;   // LLVM context
   GfxIpVersion m_gfxIp;           // Graphics IP version info

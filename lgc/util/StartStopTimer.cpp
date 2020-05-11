@@ -54,8 +54,6 @@ private:
   StartStopTimer(const StartStopTimer &) = delete;
   StartStopTimer &operator=(const StartStopTimer &) = delete;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   Timer *m_timer;  // The timer to start or stop when the pass is run
   bool m_starting; // True to start the timer, false to stop it
 };

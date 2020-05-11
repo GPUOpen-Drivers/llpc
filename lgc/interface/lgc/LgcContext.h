@@ -124,7 +124,6 @@ private:
 
   LgcContext(llvm::LLVMContext &context, unsigned palAbiVersion);
 
-  // -----------------------------------------------------------------------------------------------------------------
   static llvm::raw_ostream *m_llpcOuts;           // nullptr or stream for LLPC_OUTS
   llvm::LLVMContext &m_context;                   // LLVM context
   llvm::TargetMachine *m_targetMachine = nullptr; // Target machine

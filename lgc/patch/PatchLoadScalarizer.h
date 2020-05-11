@@ -47,15 +47,11 @@ public:
 
   void visitLoadInst(llvm::LoadInst &loadInst);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 
 private:
   PatchLoadScalarizer(const PatchLoadScalarizer &) = delete;
   PatchLoadScalarizer &operator=(const PatchLoadScalarizer &) = delete;
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   llvm::SmallVector<llvm::Instruction *, 8> m_instsToErase; // Instructions to erase
   std::unique_ptr<llvm::IRBuilder<>> m_builder;             // The IRBuilder.

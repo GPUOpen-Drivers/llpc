@@ -94,8 +94,6 @@ protected:
     appendConfig({reinterpret_cast<const PalMetadataNoteEntry *>(&config), sizeof(T) / sizeof(PalMetadataNoteEntry)});
   }
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   llvm::Module *m_module;         // LLVM module being processed
   llvm::LLVMContext *m_context;   // LLVM context
   PipelineState *m_pipelineState; // Pipeline state
@@ -114,7 +112,6 @@ private:
   // Set PIPELINE_HASH (called once for the whole pipeline)
   void setPipelineHash();
 
-  // -----------------------------------------------------------------------------------------------------------------
   llvm::msgpack::Document *m_document;                 // The MsgPack document
   llvm::msgpack::MapDocNode m_pipelineNode;            // MsgPack map node for amdpal.pipelines[0]
   llvm::msgpack::MapDocNode m_apiShaderNodes[ShaderStageNativeStageCount];

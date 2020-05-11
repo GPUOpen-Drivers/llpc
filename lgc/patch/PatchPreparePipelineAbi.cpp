@@ -74,8 +74,6 @@ private:
 
   void addAbiMetadata(Module &module);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   PipelineState *m_pipelineState;     // Pipeline state
   PipelineShaders *m_pipelineShaders; // API shaders in the pipeline
 

@@ -58,7 +58,6 @@ public:
   virtual bool runOnModule(llvm::Module &module);
   virtual void visitGetElementPtrInst(llvm::GetElementPtrInst &getElementPtrInst);
   virtual void visitExtractElementInst(llvm::ExtractElementInst &extractElementInst);
-  // -----------------------------------------------------------------------------------------------------------------
 
   static char ID; // ID of this pass
 

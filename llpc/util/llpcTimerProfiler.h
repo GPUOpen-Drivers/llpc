@@ -72,16 +72,12 @@ public:
 
   static const llvm::StringMap<llvm::TimeRecord> &getDummyTimeRecords();
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static const unsigned PipelineTimerEnableMask = ((1 << TimerCount) - 1);
   static const unsigned ShaderModuleTimerEnableMask = ((1 << TimerTranslate) | (1 << TimerLower));
 
 private:
   TimerProfiler(const TimerProfiler &) = delete;
   TimerProfiler &operator=(const TimerProfiler &) = delete;
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   llvm::TimerGroup m_total;              // TimeGroup for total time
   llvm::TimerGroup m_phases;             // TimeGroup for each phase

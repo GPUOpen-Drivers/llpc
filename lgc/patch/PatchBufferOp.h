@@ -70,8 +70,6 @@ public:
   void visitICmpInst(llvm::ICmpInst &icmpInst);
   void visitPtrToIntInst(llvm::PtrToIntInst &ptrToIntInst);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 
 private:
@@ -89,8 +87,6 @@ private:
                               llvm::Instruction *const insertPos);
   void postVisitMemCpyInst(llvm::MemCpyInst &memCpyInst);
   void postVisitMemSetInst(llvm::MemSetInst &memSetInst);
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   using Replacement = std::pair<llvm::Value *, llvm::Value *>;
   llvm::DenseMap<llvm::Value *, Replacement> m_replacementMap; // The replacement map.

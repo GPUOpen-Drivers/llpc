@@ -96,8 +96,6 @@ private:
 
   bool needSecondVertexFetch(const VertexInputDescription *inputDesc) const;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   llvm::Module *m_module;                // LLVM module
   llvm::LLVMContext *m_context;          // LLVM context
   ShaderSystemValues *m_shaderSysValues; // ShaderSystemValues object for getting vertex buffer pointer from

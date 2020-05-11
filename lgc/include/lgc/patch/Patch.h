@@ -117,8 +117,6 @@ public:
 protected:
   void init(llvm::Module *module);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   llvm::Module *m_module;       // LLVM module to be run on
   llvm::LLVMContext *m_context; // Associated LLVM context of the LLVM module that passes run on
   ShaderStage m_shaderStage;    // Shader stage

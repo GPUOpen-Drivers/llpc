@@ -169,8 +169,6 @@ private:
   void resetRuntimeCache();
   void getBuildTime(BuildUniqueId *buildId);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   llvm::sys::Mutex m_lock; // Read/Write lock for access to the shader cache hash map
   File m_onDiskFile;       // File for on-disk storage of the cache
   bool m_disableCache;     // Whether disable cache completely

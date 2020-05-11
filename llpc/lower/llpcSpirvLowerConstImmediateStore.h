@@ -47,8 +47,6 @@ public:
 
   virtual bool runOnModule(llvm::Module &module);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 
 private:

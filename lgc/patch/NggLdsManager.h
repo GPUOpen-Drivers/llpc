@@ -115,8 +115,6 @@ private:
   NggLdsManager(const NggLdsManager &) = delete;
   NggLdsManager &operator=(const NggLdsManager &) = delete;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static const unsigned LdsRegionSizes[LdsRegionCount]; // LDS sizes for all LDS region types (in BYTEs)
   static const char *m_ldsRegionNames[LdsRegionCount];  // Name strings for all LDS region types
 

@@ -996,8 +996,6 @@ public:
 
   bool runOnModule(Module &module) override;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 };
 

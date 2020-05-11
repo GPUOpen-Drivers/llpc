@@ -51,8 +51,6 @@ public:
   virtual void visitLoadInst(llvm::LoadInst &loadInst);
   virtual void visitStoreInst(llvm::StoreInst &storeInst);
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   static char ID; // ID of this pass
 
 private:
@@ -94,8 +92,6 @@ private:
   void interpolateInputElement(unsigned interpLoc, llvm::Value *interpInfo, llvm::CallInst &callInst);
 
   llvm::Value *toInt32Value(llvm::Value *value, llvm::Instruction *insertPos);
-
-  // -----------------------------------------------------------------------------------------------------------------
 
   std::unordered_map<llvm::Value *, llvm::Value *> m_globalVarProxyMap; // Proxy map for lowering global variables
   std::unordered_map<llvm::Value *, llvm::Value *> m_inputProxyMap;     // Proxy map for lowering inputs

@@ -130,8 +130,6 @@ private:
   Context(const Context &) = delete;
   Context &operator=(const Context &) = delete;
 
-  // -----------------------------------------------------------------------------------------------------------------
-
   GfxIpVersion m_gfxIp;                                  // Graphics IP version info
   PipelineContext *m_pipelineContext;                    // Pipeline-specific context
   EmuLib m_glslEmuLib;                                   // LLVM library for GLSL emulation
