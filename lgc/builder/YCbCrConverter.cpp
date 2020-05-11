@@ -359,7 +359,7 @@ void YCbCrConverter::genImgDescChroma() {
     break;
   case 2:
     proxySqRsrcRegHelper.setReg(SqRsrcRegs::BaseAddress, addrHelper.getPlane(1));
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::Height, heightHalf);
+    proxySqRsrcRegHelper.setReg(SqRsrcRegs::Height, m_metaData.word1.ySubSampled ? heightHalf : height);
     proxySqRsrcRegHelper.setReg(SqRsrcRegs::DstSelXYZW, m_builder->getInt32(m_metaData.word1.dstSelXYZW));
     proxySqRsrcRegHelper.setReg(SqRsrcRegs::BcSwizzle, m_builder->getInt32(6));
     proxySqRsrcRegHelper.setReg(SqRsrcRegs::Pitch, pitchHalf);
