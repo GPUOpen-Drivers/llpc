@@ -142,7 +142,7 @@ void TimerProfiler::startStopTimer(TimerKind timerKind, bool start) {
 // Gets a specific timer. Returns nullptr if TimePassesIsEnabled isn't enabled.
 //
 // @param timerKind : Kind of phase timer
-llvm::Timer *TimerProfiler::getTimer(TimerKind timerKind) {
+Timer *TimerProfiler::getTimer(TimerKind timerKind) {
   return TimePassesIsEnabled || cl::EnableTimerProfile ? &m_phaseTimers[timerKind] : nullptr;
 }
 

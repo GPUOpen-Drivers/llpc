@@ -169,7 +169,7 @@ void ElfWriter<Elf>::mergeSection(const SectionBuffer *pSection1, size_t section
 
 // =====================================================================================================================
 // A woarkaround to support erase in llvm::msgpack::MapDocNode.
-class MapDocNode : public llvm::msgpack::MapDocNode {
+class MapDocNode : public msgpack::MapDocNode {
 public:
   MapTy::iterator erase(MapTy::iterator where) { return Map->erase(where); }
 };
@@ -181,7 +181,7 @@ public:
 // @param srcMap : Source map
 // @param key : Key to check in source map
 template <class Elf>
-void ElfWriter<Elf>::mergeMapItem(llvm::msgpack::MapDocNode &destMap, llvm::msgpack::MapDocNode &srcMap, unsigned key) {
+void ElfWriter<Elf>::mergeMapItem(msgpack::MapDocNode &destMap, msgpack::MapDocNode &srcMap, unsigned key) {
   auto srcKeyNode = srcMap.getDocument()->getNode(key);
   auto srcIt = srcMap.find(srcKeyNode);
   if (srcIt != srcMap.end()) {

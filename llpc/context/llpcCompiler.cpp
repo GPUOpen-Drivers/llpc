@@ -166,7 +166,7 @@ static cl::opt<bool> UseBuilderRecorder("use-builder-recorder",
 
 namespace Llpc {
 
-llvm::sys::Mutex Compiler::m_contextPoolMutex;
+sys::Mutex Compiler::m_contextPoolMutex;
 std::vector<Context *> *Compiler::m_contextPool = nullptr;
 
 // Enumerates modes used in shader replacement
@@ -198,7 +198,7 @@ static void fatalErrorHandler(void *userData, const std::string &reason, bool ge
 
 // =====================================================================================================================
 // Handler for diagnosis in pass run, derived from the standard one.
-class LlpcDiagnosticHandler : public llvm::DiagnosticHandler {
+class LlpcDiagnosticHandler : public DiagnosticHandler {
   bool handleDiagnostics(const DiagnosticInfo &diagInfo) override {
     if (EnableOuts() || EnableErrs()) {
       if (diagInfo.getSeverity() == DS_Error || diagInfo.getSeverity() == DS_Warning) {
@@ -849,7 +849,7 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineS
 //
 // @param shaderInfo : Shader info for the pipeline to be built
 bool Compiler::canUseRelocatableComputeShaderElf(const PipelineShaderInfo *shaderInfo) const {
-  if (!llvm::cl::UseRelocatableShaderElf)
+  if (!cl::UseRelocatableShaderElf)
     return false;
 
   bool useRelocatableShaderElf = true;

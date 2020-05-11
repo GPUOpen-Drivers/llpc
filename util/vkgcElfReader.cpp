@@ -457,7 +457,7 @@ template <class Elf> bool ElfReader<Elf>::getNextMsgNode() {
 
 // =====================================================================================================================
 // Gets MsgPack node.
-template <class Elf> const llvm::msgpack::DocNode *ElfReader<Elf>::getMsgNode() const {
+template <class Elf> const msgpack::DocNode *ElfReader<Elf>::getMsgNode() const {
   assert(m_iteratorStack.size() > 0);
   auto curIter = &(m_iteratorStack.back());
   if (curIter->status == MsgPackIteratorArrayValue)

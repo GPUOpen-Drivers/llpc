@@ -303,7 +303,7 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
 // BuilderRecordedMetadataKinds constructor : get the metadata kind IDs
 //
 // @param context : LLVM context
-BuilderRecorderMetadataKinds::BuilderRecorderMetadataKinds(llvm::LLVMContext &context) {
+BuilderRecorderMetadataKinds::BuilderRecorderMetadataKinds(LLVMContext &context) {
   opcodeMetaKindId = context.getMDKindID(BuilderCallOpcodeMetadataName);
 }
 

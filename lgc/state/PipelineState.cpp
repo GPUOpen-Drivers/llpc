@@ -990,7 +990,7 @@ class PipelineStateClearer : public ModulePass {
 public:
   PipelineStateClearer() : ModulePass(ID) {}
 
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
+  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
     analysisUsage.addRequired<PipelineStateWrapper>();
   }
 

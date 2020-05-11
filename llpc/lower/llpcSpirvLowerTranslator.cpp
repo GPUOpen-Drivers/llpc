@@ -56,7 +56,7 @@ ModulePass *Llpc::createSpirvLowerTranslator(ShaderStage stage, const PipelineSh
 // Run the pass on the specified LLVM module.
 //
 // @param [in,out] module : LLVM module to be run on (empty on entry)
-bool SpirvLowerTranslator::runOnModule(llvm::Module &module) {
+bool SpirvLowerTranslator::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Translator\n");
 
   SpirvLower::init(&module);

@@ -3316,7 +3316,7 @@ Function *NggPrimShader::mutateCopyShader(Module *pModule) {
 // @param threadIdInSubgroup : Thread ID in sub-group
 // @param emitVerts : Counter of GS emitted vertices for this stream
 void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned compIdx, unsigned streamId,
-                                   llvm::Value *threadIdInSubgroup, Value *emitVerts) {
+                                   Value *threadIdInSubgroup, Value *emitVerts) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   if (resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: Only export those outputs that belong to the rasterization stream.

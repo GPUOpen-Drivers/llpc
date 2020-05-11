@@ -138,7 +138,7 @@ private:
   };
 
   // Gather user data usage in all shaders.
-  void gatherUserDataUsage(llvm::Module *module);
+  void gatherUserDataUsage(Module *module);
 
   // Fix up user data uses.
   void fixupUserDataUses(Module &module);
@@ -168,7 +168,7 @@ private:
   bool m_hasGs;                             // Whether the pipeline has geometry shader
   PipelineState *m_pipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
   // Per-HW-shader-stage gathered user data usage information.
-  llvm::SmallVector<std::unique_ptr<UserDataUsage>, ShaderStageCount> m_userDataUsage;
+  SmallVector<std::unique_ptr<UserDataUsage>, ShaderStageCount> m_userDataUsage;
 };
 
 // =====================================================================================================================

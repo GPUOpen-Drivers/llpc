@@ -862,7 +862,7 @@ void SpirvLowerGlobal::lowerInOutInPlace() {
     m_instVisitFlags.checkStore = true;
   visit(m_module);
 
-  llvm::DenseSet<GetElementPtrInst *> getElemInsts;
+  DenseSet<GetElementPtrInst *> getElemInsts;
 
   // Remove unnecessary "load" instructions
   for (auto loadInst : m_loadInsts) {
