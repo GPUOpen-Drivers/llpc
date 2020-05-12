@@ -1134,9 +1134,14 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi) {
   if (mDs.empty())
     return;
 
+  // We disable all nonforced loop transformations to ensure our transformation is not blocked
+  std::vector<llvm::Metadata *> mDnf;
+  mDnf.push_back(llvm::MDString::get(*m_context, "llvm.loop.disable_nonforced"));
+
   SmallVector<llvm::Metadata *, 2> metadata;
   metadata.push_back(llvm::MDNode::get(*m_context, self));
   metadata.push_back(llvm::MDNode::get(*m_context, mDs));
+  metadata.push_back(llvm::MDNode::get(*m_context, mDnf));
 
   llvm::MDNode *node = llvm::MDNode::get(*m_context, metadata);
   node->replaceOperandWith(0, node);
