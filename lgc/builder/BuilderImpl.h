@@ -503,6 +503,9 @@ private:
   llvm::Value *readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo inOutInfo, llvm::Value *vertexIndex,
                            llvm::Value *index, const llvm::Twine &instName);
 
+  // Read vertex shader input
+  llvm::Value *readVsBuiltIn(BuiltInKind builtIn, const llvm::Twine &instName);
+
   // Get the type of a built-in. This overrides the one in Builder to additionally recognize the internal built-ins.
   llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo);
 

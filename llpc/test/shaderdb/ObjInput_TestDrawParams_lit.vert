@@ -17,13 +17,17 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-DAG: call i32 @lgc.input.import.builtin.InstanceIndex{{.*}}
-; SHADERTEST-DAG: call i32 @lgc.input.import.builtin.DrawIndex{{.*}}
-; SHADERTEST-DAG: call i32 @lgc.input.import.builtin.VertexIndex{{.*}}
-; SHADERTEST-DAG: call i32 @lgc.input.import.builtin.BaseInstance{{.*}}
-; SHADERTEST-DAG: call i32 @lgc.input.import.builtin.BaseVertex{{.*}}
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+
+; SHADERTEST-DAG: [[BASEINSTANCE:%.*]] = call i32 @lgc.special.user.data.BaseInstance(
+; SHADERTEST-DAG: [[INSTANCEID:%.*]] = call i32 @lgc.shader.input.InstanceId(
+; SHADERTEST-DAG: %InstanceIndex = add i32 [[BASEINSTANCE]], [[INSTANCEID]]
+; SHADERTEST-DAG: call i32 @lgc.special.user.data.DrawIndex(
+; SHADERTEST-DAG: [[BASEVERTEX:%.*]] = call i32 @lgc.special.user.data.BaseVertex(
+; SHADERTEST-DAG: [[VERTEXID:%.*]] = call i32 @lgc.shader.input.VertexId(
+; SHADERTEST-DAG: %VertexIndex = add i32 [[BASEVERTEX]], [[VERTEXID]]
+; SHADERTEST-DAG: call i32 @lgc.special.user.data.BaseVertex(
+; SHADERTEST-DAG: call i32 @lgc.special.user.data.BaseInstance(
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

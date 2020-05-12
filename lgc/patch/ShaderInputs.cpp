@@ -275,7 +275,7 @@ void ShaderInputs::gatherUsage(Module &module) {
 // Fix up uses of shader inputs to use entry args directly
 //
 // @param module : IR module
-void ShaderInputs::fixupUses(Module &module) {
+void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState) {
   // For each function definition...
   for (Function &func : module) {
     if (func.isDeclaration())
@@ -305,6 +305,26 @@ void ShaderInputs::fixupUses(Module &module) {
         // (both run later on) to tell that the input is in use. For those cases, we must keep the builtInUsage
         // field, and set it here.
         // Add code here as built-ins are moved from PatchInOutImportExport to InOutBuilder.
+        auto &builtInUsage = pipelineState->getShaderResourceUsage(stage)->builtInUsage;
+        switch (stage) {
+        case ShaderStageVertex:
+          switch (static_cast<ShaderInput>(kind)) {
+          case ShaderInput::VertexId:
+            // Tell NggPrimShader to copy VertexId through LDS.
+            builtInUsage.vs.vertexIndex = true;
+            break;
+          case ShaderInput::InstanceId:
+            // Tell NggPrimShader to copy InstanceId through LDS, and tell Gfx*ConfigBuilder to set
+            // SPI_SHADER_PGM_RSRC1_VS.VGPR_COMP_CNT to enable it.
+            builtInUsage.vs.instanceIndex = true;
+            break;
+          default:
+            break;
+          }
+          break;
+        default:
+          break;
+        }
       }
     }
   }
