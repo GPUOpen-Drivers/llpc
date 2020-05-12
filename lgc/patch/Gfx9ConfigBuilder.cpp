@@ -30,6 +30,7 @@
  */
 #include "Gfx9ConfigBuilder.h"
 #include "lgc/BuiltIns.h"
+#include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/Support/CommandLine.h"
@@ -1742,8 +1743,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
     // SPI_SHADER_PGM_HI_GS if we do not provide one. By setting SPI_SHADER_PGM_LO_GS to NggCullingData, we tell
     // PAL that we will not provide it and it is fine to use SPI_SHADER_PGM_LO_GS and SPI_SHADER_PGM_HI_GS as
     // the address of that table.
-    SET_REG(&pConfig->primShaderRegs, SPI_SHADER_PGM_LO_GS,
-            static_cast<unsigned>(Util::Abi::UserDataMapping::NggCullingData));
+    SET_REG(&pConfig->primShaderRegs, SPI_SHADER_PGM_LO_GS, static_cast<unsigned>(UserDataMapping::NggCullingData));
   }
 }
 

@@ -77,15 +77,4 @@ const static char DeviceIdx[] = "$deviceIdx";
 
 } // namespace reloc
 
-// =====================================================================================================================
-// Values used in a user data PAL metadata register to be resolved at link time.
-// This "lgc::UserDataMapping" extends "lgc::Abi::Metadata::UserDataMapping" in AbiMetadata.h.
-enum class UserDataMapping : unsigned {
-  DescriptorSet0 = 0x80000000,   // 32-bit pointer to the descriptor table for descriptor set 0: add N to this value
-                                 //  for descriptor set N
-  DescriptorSetMax = 0x800000FF, // Max descriptor set
-  PushConst0 = 0x80000100,       // Push constant dword 0: add N to this value for push constant dword N
-  PushConstMax = 0x800001FF,     // Max push constant dword
-};
-
 } // namespace lgc

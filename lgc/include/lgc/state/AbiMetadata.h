@@ -134,8 +134,11 @@ static constexpr char ApiShaderHash[] = ".api_shader_hash";
 static constexpr char HardwareMapping[] = ".hardware_mapping";
 }; // namespace ShaderMetadataKey
 
-/// User data entries can map to physical user data registers.  UserDataMapping describes the
-/// content of the registers.
+} // namespace Abi
+
+} // namespace Util
+
+// User data mapping for special user data values.
 enum class UserDataMapping : unsigned {
   GlobalTable = 0x10000000,       // 32-bit pointer to GPU memory containing the global internal table.
   PerShaderTable = 0x10000001,    // 32-bit pointer to GPU memory containing the per-shader internal table.
@@ -161,12 +164,18 @@ enum class UserDataMapping : unsigned {
   NggCullingData = 0x10000011,    // 64-bit pointer to GPU memory containing the hardware register data needed by
                                   //  some NGG pipelines to perform culling.  This value contains the address of the
                                   //  first of two consecutive registers which provide the full GPU address.
-  Invalid = ~0U                   // Invalid value used internally in LGC.
+
+  // Values used in a user data PAL metadata register to be resolved at link time.
+  // This is part of the "unlinked" ABI, so should arguably be in AbiUnlinked.h.
+  DescriptorSet0 = 0x80000000,   // 32-bit pointer to the descriptor table for descriptor set 0: add N to this value
+                                 //  for descriptor set N
+  DescriptorSetMax = 0x800000FF, // Max descriptor set
+  PushConst0 = 0x80000100,       // Push constant dword 0: add N to this value for push constant dword N
+  PushConstMax = 0x800001FF,     // Max push constant dword
+
+  // Value used internally in LGC.
+  Invalid = ~0U // Invalid value used internally in LGC.
 };
-
-} // namespace Abi
-
-} // namespace Util
 
 // The names of API shader stages used in PAL metadata, in ShaderStage order.
 static const char *const ApiStageNames[] = {".vertex", ".hull", ".domain", ".geometry", ".pixel", ".compute"};

@@ -71,7 +71,7 @@ public:
 
   // Set the PAL metadata SPI register for one user data entry
   void setUserDataEntry(ShaderStage stage, unsigned userDataIndex, unsigned userDataValue, unsigned dwordCount = 1);
-  void setUserDataEntry(ShaderStage stage, unsigned userDataIndex, Util::Abi::UserDataMapping userDataValue,
+  void setUserDataEntry(ShaderStage stage, unsigned userDataIndex, UserDataMapping userDataValue,
                         unsigned dwordCount = 1) {
     setUserDataEntry(stage, userDataIndex, static_cast<unsigned>(userDataValue), dwordCount);
   }

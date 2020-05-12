@@ -25,7 +25,8 @@
 /**
  ***********************************************************************************************************************
  * @file  ShaderInputs.cpp
- * @brief LGC source file: Handling of hardware-determined shader inputs (not user data)
+ * @brief LGC source file: Handling of hardware-determined shader inputs (not user data, other than a few utility
+ *        methods for special user data)
  ***********************************************************************************************************************
  */
 #include "lgc/patch/ShaderInputs.h"
