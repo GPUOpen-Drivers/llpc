@@ -34,7 +34,6 @@
 #include "lgc/BuilderBase.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
-#include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
@@ -88,7 +87,7 @@ public:
 private:
   // A shader entry-point user data argument
   struct UserDataArg {
-    UserDataArg(Type *argTy, unsigned userDataValue = static_cast<unsigned>(Util::Abi::UserDataMapping::Invalid),
+    UserDataArg(Type *argTy, unsigned userDataValue = static_cast<unsigned>(UserDataMapping::Invalid),
                 unsigned *argIndex = nullptr, bool isPadding = false)
         : argTy(argTy), userDataValue(userDataValue), argIndex(argIndex), isPadding(isPadding), mustSpill(false) {
       if (isa<PointerType>(argTy))
@@ -97,13 +96,12 @@ private:
         argDwordSize = argTy->getPrimitiveSizeInBits() / 32;
     }
 
-    UserDataArg(Type *argTy, Util::Abi::UserDataMapping userDataValue, unsigned *argIndex = nullptr,
-                bool isPadding = false)
+    UserDataArg(Type *argTy, UserDataMapping userDataValue, unsigned *argIndex = nullptr, bool isPadding = false)
         : UserDataArg(argTy, static_cast<unsigned>(userDataValue), argIndex, isPadding) {}
 
     Type *argTy;            // IR type of the argument
     unsigned argDwordSize;  // Size of argument in dwords
-    unsigned userDataValue; // PAL metadata user data value, ~0U (Util::Abi::UserDataMapping::Invalid) for none
+    unsigned userDataValue; // PAL metadata user data value, ~0U (UserDataMapping::Invalid) for none
     unsigned *argIndex;     // Where to store arg index once it is allocated, nullptr for none
     bool isPadding;         // Whether this is a padding arg to maintain fixed layout
     bool mustSpill;         // Whether this is an arg that must be spilled
@@ -782,7 +780,7 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(ShaderInputs *shader
   SmallVector<UserDataArg, 4> specialUserDataArgs;
 
   // Global internal table
-  userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::GlobalTable));
+  userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::GlobalTable));
 
   // Per-shader table
   // TODO: We need add per shader table per real usage after switch to PAL new interface.
@@ -807,7 +805,7 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(ShaderInputs *shader
       *userDataArg.argIndex = argTys.size();
     argTys.push_back(userDataArg.argTy);
     unsigned dwordSize = userDataArg.argDwordSize;
-    if (userDataArg.userDataValue != static_cast<unsigned>(Util::Abi::UserDataMapping::Invalid)) {
+    if (userDataArg.userDataValue != static_cast<unsigned>(UserDataMapping::Invalid)) {
       m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx, userDataArg.userDataValue,
                                                           dwordSize);
     }
@@ -851,13 +849,13 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
     // for TCS.
     if (m_pipelineState->getInputAssemblyState().enableMultiView) {
       unsigned *argIdx = nullptr;
-      auto userDataValue = Util::Abi::UserDataMapping::ViewId;
+      auto userDataValue = UserDataMapping::ViewId;
       switch (m_shaderStage) {
       case ShaderStageVertex:
         argIdx = &entryArgIdxs.vs.viewIndex;
         break;
       case ShaderStageTessControl:
-        userDataValue = Util::Abi::UserDataMapping::Invalid;
+        userDataValue = UserDataMapping::Invalid;
         break;
       case ShaderStageTessEval:
         argIdx = &entryArgIdxs.tes.viewIndex;
@@ -892,11 +890,11 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       llvm_unreachable("Unexpected shader stage");
     }
     if (wantEsGsLdsSize) {
-      auto userDataValue = Util::Abi::UserDataMapping::EsGsLdsSize;
+      auto userDataValue = UserDataMapping::EsGsLdsSize;
       // For a standalone TCS (which can only happen in unit testing, not in a real pipeline), don't add
       // the PAL metadata for it, for consistency with the old code.
       if (m_shaderStage == ShaderStageVertex && !m_pipelineState->hasShaderStage(ShaderStageVertex))
-        userDataValue = Util::Abi::UserDataMapping::Invalid;
+        userDataValue = UserDataMapping::Invalid;
       specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), userDataValue));
     }
 
@@ -907,22 +905,22 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
 
       // Vertex buffer table.
       if (userDataUsage->usesVertexBufferTable) {
-        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::VertexBufferTable,
+        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::VertexBufferTable,
                                                   &vsIntfData->entryArgIdxs.vs.vbTablePtr));
       }
 
       // Base vertex and base instance.
       if (vsResUsage->builtInUsage.vs.baseVertex || vsResUsage->builtInUsage.vs.baseInstance) {
-        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::BaseVertex,
-                                                  &vsIntfData->entryArgIdxs.vs.baseVertex));
-        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::BaseInstance,
+        specialUserDataArgs.push_back(
+            UserDataArg(builder.getInt32Ty(), UserDataMapping::BaseVertex, &vsIntfData->entryArgIdxs.vs.baseVertex));
+        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::BaseInstance,
                                                   &vsIntfData->entryArgIdxs.vs.baseInstance));
       }
 
       // Draw index.
       if (vsResUsage->builtInUsage.vs.drawIndex) {
-        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::DrawIndex,
-                                                  &vsIntfData->entryArgIdxs.vs.drawIndex));
+        specialUserDataArgs.push_back(
+            UserDataArg(builder.getInt32Ty(), UserDataMapping::DrawIndex, &vsIntfData->entryArgIdxs.vs.drawIndex));
       }
     }
 
@@ -932,14 +930,14 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
     if (builtInUsage.cs.numWorkgroups) {
       auto numWorkgroupsPtrTy = PointerType::get(VectorType::get(builder.getInt32Ty(), 3), ADDR_SPACE_CONST);
       specialUserDataArgs.push_back(
-          UserDataArg(numWorkgroupsPtrTy, Util::Abi::UserDataMapping::Workgroup, &entryArgIdxs.cs.numWorkgroupsPtr));
+          UserDataArg(numWorkgroupsPtrTy, UserDataMapping::Workgroup, &entryArgIdxs.cs.numWorkgroupsPtr));
     }
   }
 
   // Allocate register for stream-out buffer table, to go before the user data node args (unlike all the ones
   // above, which go after the user data node args).
   if (userDataUsage->usesStreamOutTable) {
-    auto userDataValue = Util::Abi::UserDataMapping::StreamOutTable;
+    auto userDataValue = UserDataMapping::StreamOutTable;
     switch (m_shaderStage) {
     case ShaderStageVertex:
       userDataArgs.push_back(
@@ -1154,7 +1152,7 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
 // Add a single UserDataArg, preceded by padding if needed for CS fixed layout
 //
 // @param userDataArgs : Vector to add UserDataArg to
-// @param userDataValue : PAL metadata user data value, ~0U (Util::Abi::UserDataMapping::Invalid) for none
+// @param userDataValue : PAL metadata user data value, ~0U (UserDataMapping::Invalid) for none
 // @param sizeInDwords : Size of argument in dwords
 // @param argIndex : Where to store arg index once it is allocated, nullptr for none
 // @param useFixedLayout : True to insert padding before if required
@@ -1169,7 +1167,7 @@ unsigned PatchEntryPointMutate::addUserDataArg(SmallVectorImpl<UserDataArg> &use
     assert(userDataValue + InterfaceData::CsStartUserData > userDataSize);
     userDataArgs.push_back(UserDataArg(
         VectorType::get(builder.getInt32Ty(), userDataValue + InterfaceData::CsStartUserData - userDataSize),
-        Util::Abi::UserDataMapping::Invalid, nullptr, /*isPadding=*/true));
+        UserDataMapping::Invalid, nullptr, /*isPadding=*/true));
     userDataSize = userDataValue + InterfaceData::CsStartUserData;
   }
   // Now the node arg itself.
@@ -1204,8 +1202,8 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
     // Spill table is already in use by code added in DescBuilder, or by uses of the push const pointer not
     // all being of the form that can be unspilled, or by push const uses or descriptor array entries not even
     // being considered for unspilling in CS fixed layout.
-    spillTableArg.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::SpillTable,
-                                        &userDataUsage->spillTable.entryArgIdx));
+    spillTableArg.push_back(
+        UserDataArg(builder.getInt32Ty(), UserDataMapping::SpillTable, &userDataUsage->spillTable.entryArgIdx));
 
     // Determine the lowest offset at which the spill table is used, so we can set PAL metadata accordingly.
     // (This only covers uses of the spill table generated by DescBuilder. It excludes the push const and args
@@ -1260,8 +1258,8 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
     if (userDataArg.mustSpill || afterUserDataIdx > userDataEnd) {
       // Spill this node. Allocate the spill table arg.
       if (spillTableArg.empty()) {
-        spillTableArg.push_back(UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::SpillTable,
-                                            &userDataUsage->spillTable.entryArgIdx));
+        spillTableArg.push_back(
+            UserDataArg(builder.getInt32Ty(), UserDataMapping::SpillTable, &userDataUsage->spillTable.entryArgIdx));
         // Only decrement the number of available sgprs in a graphics shader. In a compute shader,
         // the spill table arg goes in s12, beyond the s2-s11 range allowed for user data.
         if (m_shaderStage != ShaderStageCompute)
@@ -1313,7 +1311,7 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
       if (userDataIdx != userDataEnd) {
         assert(userDataIdx <= userDataEnd);
         unspilledArgs.push_back(UserDataArg(VectorType::get(builder.getInt32Ty(), userDataEnd - userDataIdx),
-                                            Util::Abi::UserDataMapping::Invalid, nullptr, /*padding=*/true));
+                                            UserDataMapping::Invalid, nullptr, /*padding=*/true));
       }
       unspilledArgs.push_back(spillTableArg.front());
       userDataIdx = userDataEnd + 1;
@@ -1322,8 +1320,7 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
       // The special args start with workgroupSize, which needs to start at a 2-aligned reg. Insert a single padding
       // reg if needed.
       if (userDataIdx & 1) {
-        unspilledArgs.push_back(
-            UserDataArg(builder.getInt32Ty(), Util::Abi::UserDataMapping::Invalid, nullptr, /*padding=*/true));
+        unspilledArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::Invalid, nullptr, /*padding=*/true));
       }
       unspilledArgs.insert(unspilledArgs.end(), specialUserDataArgs.begin(), specialUserDataArgs.end());
     }

@@ -262,7 +262,7 @@ unsigned PalMetadata::getUserDataReg0(ShaderStage stage) {
 void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, unsigned userDataValue,
                                    unsigned dwordCount) {
   // If this is the spill table pointer, adjust userDataLimit accordingly.
-  if (userDataValue == static_cast<unsigned>(Util::Abi::UserDataMapping::SpillTable))
+  if (userDataValue == static_cast<unsigned>(UserDataMapping::SpillTable))
     setUserDataLimit();
 
   // Get the start register number of SPI user data registers for this shader stage.
@@ -279,7 +279,7 @@ void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, un
     *m_userDataLimit = userDataValue + dwordCount;
 
   // Although NumWorkgroupsPtr is a register pair, only the first word has a user data entry.
-  if (userDataValue == static_cast<unsigned>(Util::Abi::UserDataMapping::Workgroup))
+  if (userDataValue == static_cast<unsigned>(UserDataMapping::Workgroup))
     dwordCount = 1;
 
   // Write the register(s)

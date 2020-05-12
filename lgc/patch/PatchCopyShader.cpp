@@ -186,17 +186,14 @@ bool PatchCopyShader::runOnModule(Module &module) {
   if (!m_pipelineState->getNggControl()->enableNgg) {
     // If no NGG, the copy shader will become a real hardware VS. Set the user data entries in the
     // PAL metadata here.
-    m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader, 0,
-                                                        Util::Abi::UserDataMapping::GlobalTable);
+    m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader, 0, UserDataMapping::GlobalTable);
     if (resUsage->inOutUsage.enableXfb) {
-      m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader,
-                                                          intfData->userDataUsage.gs.copyShaderStreamOutTable,
-                                                          Util::Abi::UserDataMapping::StreamOutTable);
+      m_pipelineState->getPalMetadata()->setUserDataEntry(
+          ShaderStageCopyShader, intfData->userDataUsage.gs.copyShaderStreamOutTable, UserDataMapping::StreamOutTable);
     }
     if (cl::InRegEsGsLdsSize && m_pipelineState->isGsOnChip()) {
-      m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader,
-                                                          intfData->userDataUsage.gs.copyShaderEsGsLdsSize,
-                                                          Util::Abi::UserDataMapping::EsGsLdsSize);
+      m_pipelineState->getPalMetadata()->setUserDataEntry(
+          ShaderStageCopyShader, intfData->userDataUsage.gs.copyShaderEsGsLdsSize, UserDataMapping::EsGsLdsSize);
     }
   }
 

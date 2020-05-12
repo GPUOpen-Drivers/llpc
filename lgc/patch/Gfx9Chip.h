@@ -31,7 +31,6 @@
 #pragma once
 
 #include "ConfigBuilderBase.h"
-#include "lgc/state/AbiMetadata.h"
 #include "lgc/state/TargetInfo.h"
 #include <cstdint>
 #include <unordered_map>

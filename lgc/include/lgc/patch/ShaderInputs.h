@@ -25,20 +25,21 @@
 /**
  ***********************************************************************************************************************
  * @file  ShaderInputs.h
- * @brief LGC header file: Handling of hardware-determined shader inputs (not user data)
+ * @brief LGC header file: Handling of hardware-determined shader inputs (not user data, other than special user data)
  *
  * When it dispatches a wave and starts running a shader, the hardware sets up a number of SGPRs and VGPRs,
  * depending on which shader stage it is, and some configuration in SPI registers. The enum and class in this
  * file encapsulate that functionality.
  *
  * User data is included in the SGPRs set up at wave dispatch; user data is handled separately and is not
- * part of the functionality encapsulated here.
+ * part of the functionality encapsulated here, except that a few utility methods for special user data are here.
  *
  ***********************************************************************************************************************
  */
 #pragma once
 
 #include "lgc/CommonDefs.h"
+#include "lgc/state/AbiMetadata.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
