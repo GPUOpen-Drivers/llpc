@@ -1623,9 +1623,9 @@ Context *Compiler::acquireContext() const {
     m_contextPool->push_back(freeContext);
   }
 
+  assert(freeContext);
   freeContext->setInUse(true);
 
-  assert(freeContext);
   return freeContext;
 }
 
