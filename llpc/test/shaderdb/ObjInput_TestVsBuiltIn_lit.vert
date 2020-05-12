@@ -9,10 +9,10 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-DAG: call i32 @lgc.input.import.builtin.InstanceIndex{{.*}}
-; SHADERTEST-DAG: call i32 @lgc.input.import.builtin.VertexIndex{{.*}}
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST_DAG: call i32 @lgc.special.user.data.BaseInstance(i32 268435460)
+; SHADERTEST_DAG: call i32 @lgc.shader.input.VertexId(i32 15)
+; SHADERTEST_DAG: call i32 @lgc.special.user.data.BaseVertex(i32 268435459)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

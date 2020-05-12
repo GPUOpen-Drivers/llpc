@@ -288,7 +288,7 @@ bool PatchEntryPointMutate::runOnModule(Module &module) {
   m_userDataUsage.clear();
 
   // Fix up shader input uses to use entry args.
-  shaderInputs.fixupUses(*m_module);
+  shaderInputs.fixupUses(*m_module, m_pipelineState);
 
   return true;
 }
@@ -980,10 +980,8 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       }
 
       // Draw index.
-      if (vsResUsage->builtInUsage.vs.drawIndex || userDataUsage->isSpecialUserDataUsed(UserDataMapping::DrawIndex)) {
-        specialUserDataArgs.push_back(
-            UserDataArg(builder.getInt32Ty(), UserDataMapping::DrawIndex, &vsIntfData->entryArgIdxs.vs.drawIndex));
-      }
+      if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::DrawIndex))
+        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::DrawIndex));
     }
 
   } else if (m_shaderStage == ShaderStageCompute) {

@@ -30,6 +30,7 @@
  */
 #include "BuilderImpl.h"
 #include "lgc/LgcContext.h"
+#include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/Internal.h"
 
@@ -689,6 +690,13 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
     return result;
   }
 
+  if (m_shaderStage == ShaderStageVertex && !isOutput) {
+    // We can handle some vertex shader inputs directly.
+    Value *result = readVsBuiltIn(builtIn, instName);
+    if (result)
+      return result;
+  }
+
   // For now, this just generates a call to llpc.input.import.builtin. A future commit will
   // change it to generate IR more directly here.
   // A vertex index is valid only in TCS, TES, GS.
@@ -731,6 +739,30 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
     result->setName(instName);
 
   return result;
+}
+
+// =====================================================================================================================
+// Read vertex shader input
+//
+// @param builtIn : Built-in kind, one of the BuiltIn* constants
+// @param instName : Name to give instruction(s)
+// @return : Value of input; nullptr if not handled here
+Value *InOutBuilder::readVsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
+  switch (builtIn) {
+  case BuiltInBaseVertex:
+    return ShaderInputs::getSpecialUserData(UserDataMapping::BaseVertex, *this);
+  case BuiltInBaseInstance:
+    return ShaderInputs::getSpecialUserData(UserDataMapping::BaseInstance, *this);
+  case BuiltInDrawIndex:
+    return ShaderInputs::getSpecialUserData(UserDataMapping::DrawIndex, *this);
+  case BuiltInVertexIndex:
+    return ShaderInputs::getVertexIndex(*this);
+  case BuiltInInstanceIndex:
+    return ShaderInputs::getInstanceIndex(*this);
+  default:
+    // Not handled; caller will handle with lgc.input.import.builtin, which is then lowered in PatchInOutImportExport.
+    return nullptr;
+  }
 }
 
 // =====================================================================================================================
@@ -818,7 +850,9 @@ Type *InOutBuilder::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
 }
 
 // =====================================================================================================================
-// Mark usage of a built-in input
+// Mark usage of a built-in input. This is only needed where a built-in is handled by generating lgc.import.input
+// to be lowered in PatchInOutImportExport, and not when it is directly generated here using
+// ShaderInputs::getInput() and/or ShaderInputs::getSpecialUserData().
 //
 // @param builtIn : Built-in ID
 // @param arraySize : Number of array elements for ClipDistance and CullDistance. (Multiple calls to this function for
@@ -829,23 +863,6 @@ void InOutBuilder::markBuiltInInputUsage(BuiltInKind builtIn, unsigned arraySize
   switch (m_shaderStage) {
   case ShaderStageVertex: {
     switch (builtIn) {
-    case BuiltInVertexIndex:
-      usage.vs.vertexIndex = true;
-      usage.vs.baseVertex = true;
-      break;
-    case BuiltInInstanceIndex:
-      usage.vs.instanceIndex = true;
-      usage.vs.baseInstance = true;
-      break;
-    case BuiltInBaseVertex:
-      usage.vs.baseVertex = true;
-      break;
-    case BuiltInBaseInstance:
-      usage.vs.baseInstance = true;
-      break;
-    case BuiltInDrawIndex:
-      usage.vs.drawIndex = true;
-      break;
     case BuiltInPrimitiveId:
       usage.vs.primitiveId = true;
       break;

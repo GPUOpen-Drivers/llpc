@@ -1933,16 +1933,8 @@ Value *PatchInOutImportExport::patchVsBuiltInInputImport(Type *inputTy, unsigned
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
 
   switch (builtInId) {
-  case BuiltInVertexIndex:
-    return m_vertexFetch->getVertexIndex();
-  case BuiltInInstanceIndex:
-    return m_vertexFetch->getInstanceIndex();
-  case BuiltInBaseVertex:
-    return getFunctionArgument(m_entryPoint, entryArgIdxs.baseVertex);
-  case BuiltInBaseInstance:
-    return getFunctionArgument(m_entryPoint, entryArgIdxs.baseInstance);
-  case BuiltInDrawIndex:
-    return getFunctionArgument(m_entryPoint, entryArgIdxs.drawIndex);
+  // BuiltInVertexIndex, BuiltInInstanceIndex, BuiltInBaseVertex, BuiltInBaseInstance, BuiltInDrawIndex
+  // now handled in InOutBuilder.
   case BuiltInViewIndex:
     return getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
   case BuiltInSubgroupSize:

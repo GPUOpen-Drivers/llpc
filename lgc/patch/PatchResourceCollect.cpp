@@ -1249,10 +1249,7 @@ void PatchResourceCollect::clearInactiveInput() {
   auto &builtInUsage = m_resUsage->builtInUsage;
 
   // Check per-stage built-in usage
-  if (m_shaderStage == ShaderStageVertex) {
-    if (builtInUsage.vs.drawIndex && m_activeInputBuiltIns.find(BuiltInDrawIndex) == m_activeInputBuiltIns.end())
-      builtInUsage.vs.drawIndex = false;
-  } else if (m_shaderStage == ShaderStageTessControl) {
+  if (m_shaderStage == ShaderStageTessControl) {
     if (builtInUsage.tcs.pointSizeIn && m_activeInputBuiltIns.find(BuiltInPointSize) == m_activeInputBuiltIns.end())
       builtInUsage.tcs.pointSizeIn = false;
 

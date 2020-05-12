@@ -144,7 +144,6 @@ struct ResourceUsage {
         unsigned instanceIndex : 1; // Whether gl_InstanceIndex is used
         unsigned baseVertex : 1;    // Whether gl_BaseVertex is used
         unsigned baseInstance : 1;  // Whether gl_BaseInstance is used
-        unsigned drawIndex : 1;     // Whether gl_DrawID is used
         unsigned primitiveId : 1;   // Whether an implicit gl_PrimitiveID is required
         unsigned viewIndex : 1;     // Whether gl_ViewIndex is used
         // Output
@@ -154,9 +153,9 @@ struct ResourceUsage {
         unsigned cullDistance : 4;  // Array size of gl_CullDistance[] (0 means unused)
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned reserved20 : 1;
+        unsigned reserved19 : 1;
 
-        uint64_t unused : 44;
+        uint64_t unused : 45;
       } vs;
 
       // Tessellation control shader
@@ -485,7 +484,6 @@ struct InterfaceData {
         unsigned vertexId;           // Vertex ID
         unsigned relVertexId;        // Relative vertex ID (index of vertex within thread group)
         unsigned instanceId;         // Instance ID
-        unsigned drawIndex;          // Draw index
         unsigned primitiveId;        // Primitive ID
         unsigned viewIndex;          // View Index
         unsigned vbTablePtr;         // Pointer of vertex buffer table
