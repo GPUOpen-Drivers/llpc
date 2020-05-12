@@ -124,6 +124,10 @@ bool SpirvLowerLoopUnrollControl::runOnModule(Module &module) {
             ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_context), m_forceLoopUnrollCount))};
         MDNode *loopUnrollCountMetaNode = MDNode::get(*m_context, unrollCountMeta);
         loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, loopUnrollCountMetaNode));
+        // We also disable all nonforced loop transformations to ensure our transformation is not blocked
+        llvm::Metadata *nonforcedMeta[] = {MDString::get(*m_context, "llvm.loop.disable_nonforced")};
+        MDNode *nonforcedMetaNode = MDNode::get(*m_context, nonforcedMeta);
+        loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, nonforcedMetaNode));
       }
       if (m_disableLicm) {
         MDNode *licmDisableNode = MDNode::get(*m_context, MDString::get(*m_context, "llvm.licm.disable"));
