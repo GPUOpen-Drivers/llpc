@@ -30,11 +30,85 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/ShaderInputs.h"
+#include "lgc/BuilderBase.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/ResourceUsage.h"
 
 using namespace lgc;
 using namespace llvm;
+
+// =====================================================================================================================
+// Get name of a special user data value, one of the UserDataMapping values
+//
+// @param kind : The kind of special user data, a UserDataMapping enum value
+const char *ShaderInputs::getSpecialUserDataName(unsigned kind) {
+  static const char *names[] = {"GlobalTable",
+                                "PerShaderTable",
+                                "SpillTable",
+                                "BaseVertex",
+                                "BaseInstance",
+                                "DrawIndex",
+                                "Workgroup",
+                                "",
+                                "",
+                                "",
+                                "EsGsLdsSize",
+                                "ViewId",
+                                "StreamOutTable",
+                                "",
+                                "",
+                                "VertexBufferTable",
+                                "",
+                                "NggCullingData"};
+  unsigned idx = kind - static_cast<unsigned>(UserDataMapping::GlobalTable);
+  return ArrayRef<const char *>(names)[idx];
+}
+
+// =====================================================================================================================
+// Get a special user data value by inserting a call to lgc.special.user.data
+//
+// @param kind : The kind of special user data, a UserDataMapping enum value
+// @param builder : Builder to insert the call with
+CallInst *ShaderInputs::getSpecialUserData(UserDataMapping kind, BuilderBase &builder) {
+  Type *ty = builder.getInt32Ty();
+  if (kind == UserDataMapping::NggCullingData)
+    ty = builder.getInt64Ty();
+  return builder.CreateNamedCall((Twine(lgcName::SpecialUserData) + getSpecialUserDataName(kind)).str(), ty,
+                                 builder.getInt32(static_cast<unsigned>(kind)), Attribute::ReadNone);
+}
+
+// =====================================================================================================================
+// Get VertexIndex
+//
+// @param builder : Builder to insert code with
+Value *ShaderInputs::getVertexIndex(BuilderBase &builder) {
+  // VertexIndex = BaseVertex + VertexID
+  Value *baseVertex = getSpecialUserData(UserDataMapping::BaseVertex, builder);
+  Value *vertexId = getInput(ShaderInput::VertexId, builder);
+  return builder.CreateAdd(baseVertex, vertexId, "VertexIndex");
+}
+
+// =====================================================================================================================
+// Get InstanceIndex
+//
+// @param builder : Builder to insert code with
+Value *ShaderInputs::getInstanceIndex(BuilderBase &builder) {
+  // InstanceIndex = BaseInstance + InstanceID
+  Value *baseInstance = getSpecialUserData(UserDataMapping::BaseInstance, builder);
+  Value *instanceId = getInput(ShaderInput::InstanceId, builder);
+  return builder.CreateAdd(baseInstance, instanceId, "InstanceIndex");
+}
+
+// =====================================================================================================================
+// Get a shader input value by inserting a call to lgc.shader.input
+//
+// @param kind : The kind of shader input, a ShaderInput enum value
+// @param builder : Builder to insert code with
+Value *ShaderInputs::getInput(ShaderInput kind, BuilderBase &builder) {
+  Type *ty = getInputType(kind, builder.getContext());
+  return builder.CreateNamedCall((Twine(lgcName::ShaderInput) + getInputName(kind)).str(), ty,
+                                 builder.getInt32(static_cast<unsigned>(kind)), Attribute::ReadNone);
+}
 
 // =====================================================================================================================
 // Get IR type of a particular shader input
@@ -73,10 +147,128 @@ Type *ShaderInputs::getInputType(ShaderInput inputKind, LLVMContext &context) {
 }
 
 // =====================================================================================================================
+// Get name of shader input
+//
+// @param kind : The kind of shader input, a ShaderInput enum value
+const char *ShaderInputs::getInputName(ShaderInput inputKind) {
+  switch (inputKind) {
+  case ShaderInput::WorkgroupId:
+    return "WorkgroupId";
+  case ShaderInput::MultiDispatchInfo:
+    return "MultiDispatchInfo";
+  case ShaderInput::PrimMask:
+    return "PrimMask";
+  case ShaderInput::OffChipLdsBase:
+    return "OffChipLdsBase";
+  case ShaderInput::StreamOutInfo:
+    return "StreamOutInfo";
+  case ShaderInput::StreamOutWriteIndex:
+    return "StreamOutWriteIndex";
+  case ShaderInput::StreamOutOffset0:
+    return "StreamOutOffset0";
+  case ShaderInput::StreamOutOffset1:
+    return "StreamOutOffset1";
+  case ShaderInput::StreamOutOffset2:
+    return "StreamOutOffset2";
+  case ShaderInput::StreamOutOffset3:
+    return "StreamOutOffset3";
+  case ShaderInput::GsVsOffset:
+    return "GsVsOffset";
+  case ShaderInput::GsWaveId:
+    return "GsWaveId";
+  case ShaderInput::IsOffChip:
+    return "IsOffChip";
+  case ShaderInput::EsGsOffset:
+    return "EsGsOffset";
+  case ShaderInput::TfBufferBase:
+    return "TfBufferBase";
+  case ShaderInput::VertexId:
+    return "VertexId";
+  case ShaderInput::RelVertexId:
+    return "RelVertexId";
+  case ShaderInput::PrimitiveId:
+    return "PrimitiveId";
+  case ShaderInput::InstanceId:
+    return "InstanceId";
+  case ShaderInput::PatchId:
+    return "PatchId";
+  case ShaderInput::RelPatchId:
+    return "RelPatchId";
+  case ShaderInput::TessCoordX:
+    return "TessCoordX";
+  case ShaderInput::TessCoordY:
+    return "TessCoordY";
+  case ShaderInput::EsGsOffset0:
+    return "EsGsOffset0";
+  case ShaderInput::EsGsOffset1:
+    return "EsGsOffset1";
+  case ShaderInput::GsPrimitiveId:
+    return "GsPrimitiveId";
+  case ShaderInput::EsGsOffset2:
+    return "EsGsOffset2";
+  case ShaderInput::EsGsOffset3:
+    return "EsGsOffset3";
+  case ShaderInput::EsGsOffset4:
+    return "EsGsOffset4";
+  case ShaderInput::EsGsOffset5:
+    return "EsGsOffset5";
+  case ShaderInput::GsInstanceId:
+    return "GsInstanceId";
+  case ShaderInput::PerspInterpSample:
+    return "PerspInterpSample";
+  case ShaderInput::PerspInterpCenter:
+    return "PerspInterpCenter";
+  case ShaderInput::PerspInterpCentroid:
+    return "PerspInterpCentroid";
+  case ShaderInput::PerspInterpPullMode:
+    return "PerspInterpPullMode";
+  case ShaderInput::LinearInterpSample:
+    return "LinearInterpSample";
+  case ShaderInput::LinearInterpCenter:
+    return "LinearInterpCenter";
+  case ShaderInput::LinearInterpCentroid:
+    return "LinearInterpCentroid";
+  case ShaderInput::LineStipple:
+    return "LineStipple";
+  case ShaderInput::FragCoordX:
+    return "FragCoordX";
+  case ShaderInput::FragCoordY:
+    return "FragCoordY";
+  case ShaderInput::FragCoordZ:
+    return "FragCoordZ";
+  case ShaderInput::FragCoordW:
+    return "FragCoordW";
+  case ShaderInput::FrontFacing:
+    return "FrontFacing";
+  case ShaderInput::Ancillary:
+    return "Ancillary";
+  case ShaderInput::SampleCoverage:
+    return "SampleCoverage";
+  case ShaderInput::FixedXY:
+    return "FixedXY";
+  case ShaderInput::LocalInvocationId:
+    return "LocalInvocationId";
+  default:
+    llvm_unreachable("Unknown shader input kind");
+  }
+}
+
+// =====================================================================================================================
 // Gather usage of shader inputs from before PatchEntryPointMutate
 //
 // @param module : IR module
 void ShaderInputs::gatherUsage(Module &module) {
+  for (auto &func : module) {
+    if (!func.isDeclaration() || !func.getName().startswith(lgcName::ShaderInput))
+      continue;
+    for (User *user : func.users()) {
+      CallInst *call = cast<CallInst>(user);
+      ShaderStage stage = getShaderStage(call->getFunction());
+      assert(stage != ShaderStageCopyShader);
+      getShaderInputUsage(stage, static_cast<ShaderInput>(cast<ConstantInt>(call->getArgOperand(0))->getZExtValue()))
+          ->users.push_back(call);
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -84,6 +276,38 @@ void ShaderInputs::gatherUsage(Module &module) {
 //
 // @param module : IR module
 void ShaderInputs::fixupUses(Module &module) {
+  // For each function definition...
+  for (Function &func : module) {
+    if (func.isDeclaration())
+      continue;
+
+    ShaderStage stage = getShaderStage(&func);
+    ShaderInputsUsage *inputsUsage = getShaderInputsUsage(stage);
+    for (unsigned kind = 0; kind != static_cast<unsigned>(ShaderInput::Count); ++kind) {
+      ShaderInputUsage *inputUsage = inputsUsage->inputs[kind].get();
+      if (inputUsage && inputUsage->entryArgIdx != 0) {
+        Argument *arg = func.getArg(inputUsage->entryArgIdx);
+        arg->setName(getInputName(static_cast<ShaderInput>(kind)));
+        for (Instruction *&call : inputUsage->users) {
+          if (call && call->getFunction() == &func) {
+            call->replaceAllUsesWith(arg);
+            call->eraseFromParent();
+            call = nullptr;
+          }
+        }
+
+        // The new ShaderInputs scheme means that InOutBuilder or PatchResourceCollect no longer needs to set
+        // the builtInUsage field for an input that is generated using ShaderInputs::getInput() and/or
+        // ShaderInputs::getSpecialUserData() (before PatchEntryPointMutate), and we can remove that
+        // builtInUsage field.
+        //
+        // However, in some cases, the builtInUsage field is used in NggPrimShader and/or Gfx*ConfigBuilder
+        // (both run later on) to tell that the input is in use. For those cases, we must keep the builtInUsage
+        // field, and set it here.
+        // Add code here as built-ins are moved from PatchInOutImportExport to InOutBuilder.
+      }
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -322,7 +546,7 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
       // Get the ShaderInputUsage for this input, if it exists.
       ShaderInputsUsage *inputsUsage = getShaderInputsUsage(shaderStage);
       assert(inputDesc.inputKind < ShaderInput::Count);
-      ShaderInputUsage *inputUsage = &*inputsUsage->inputs[static_cast<unsigned>(inputDesc.inputKind)];
+      ShaderInputUsage *inputUsage = inputsUsage->inputs[static_cast<unsigned>(inputDesc.inputKind)].get();
       // We don't want this input if it is not marked "always" and it is not used.
       if (!inputDesc.always && (!inputUsage || inputUsage->users.empty()))
         continue;
