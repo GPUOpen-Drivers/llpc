@@ -43,14 +43,17 @@
 #include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
+class CallInst;
 class Instruction;
 class LLVMContext;
 class Module;
 class Type;
+class Value;
 } // namespace llvm
 
 namespace lgc {
 
+class BuilderBase;
 class PipelineState;
 
 // =====================================================================================================================
@@ -156,8 +159,32 @@ public:
   // -------------------------------------------------------------------------------------------------------------------
   // Static methods called any time
 
+  // Get name of a special user data value, one of the UserDataMapping values
+  static const char *getSpecialUserDataName(unsigned kind);
+  static const char *getSpecialUserDataName(UserDataMapping kind) {
+    return getSpecialUserDataName(static_cast<unsigned>(kind));
+  }
+
   // Get IR type of a particular shader input
   static llvm::Type *getInputType(ShaderInput inputKind, llvm::LLVMContext &context);
+
+  // Get name of shader input
+  static const char *getInputName(ShaderInput inputKind);
+
+  // -------------------------------------------------------------------------------------------------------------------
+  // Static methods called before PatchEntryPointMutate
+
+  // Get a special user data value by inserting a call to lgc.special.user.data
+  static llvm::CallInst *getSpecialUserData(UserDataMapping kind, BuilderBase &builder);
+
+  // Get VertexIndex
+  static llvm::Value *getVertexIndex(BuilderBase &builder);
+
+  // Get InstanceIndex
+  static llvm::Value *getInstanceIndex(BuilderBase &builder);
+
+  // Get a shader input value by inserting a call to lgc.shader.input
+  static llvm::Value *getInput(ShaderInput kind, BuilderBase &builder);
 
   // -------------------------------------------------------------------------------------------------------------------
   // Object methods called during PatchEntryPointMutate

@@ -116,6 +116,12 @@ private:
 
   // Per-merged-shader-stage gathered user data usage information.
   struct UserDataUsage {
+    // Check if special user data value is used by lgc.special.user.data call generated before PatchEntryPointMutate
+    bool isSpecialUserDataUsed(UserDataMapping kind) {
+      unsigned index = static_cast<unsigned>(kind) - static_cast<unsigned>(UserDataMapping::GlobalTable);
+      return specialUserData.size() > index && !specialUserData[index].users.empty();
+    }
+
     // List of lgc.spill.table calls
     UserDataNodeUsage spillTable;
     // List of lgc.push.const calls. There is no direct attempt to unspill these; instead we attempt to
@@ -130,6 +136,8 @@ private:
     SmallVector<UserDataNodeUsage, 8> rootDescriptors;
     // Per-descriptor-set lists of lgc.descriptor.set calls
     SmallVector<UserDataNodeUsage, 8> descriptorSets;
+    // Per-UserDataMapping lists of lgc.special.user.data calls
+    SmallVector<UserDataNodeUsage, 18> specialUserData;
     // Minimum offset at which spill table is used.
     unsigned spillUsage = UINT_MAX;
     // Usage of vertex buffer table and streamout table
@@ -293,6 +301,8 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
   // Find lgc.spill.table, lgc.push.constants, lgc.root.descriptor, lgc.descriptor.set functions, and from
   // there all calls to them. Add each call to the applicable list in the UserDataUsage struct for the
   // (merged) shader stage.
+  // Find lgc.special.user.data functions, and from there all calls to them. Add each call to the applicable
+  // list in the UserDataUsage struct for the (merged) shader stage.
   // Also find lgc.input.import.generic calls in VS, indicating that the vertex buffer table is needed.
   // Also find lgc.output.export.xfb calls anywhere, indicating that the streamout table is needed in the
   // last vertex-processing stage.
@@ -382,6 +392,20 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
         auto &rootDescriptors = getUserDataUsage(stage)->rootDescriptors;
         rootDescriptors.resize(std::max(rootDescriptors.size(), size_t(dwordOffset + 1)));
         rootDescriptors[dwordOffset].users.push_back(call);
+      }
+      continue;
+    }
+
+    if (func.getName().startswith(lgcName::SpecialUserData)) {
+      for (User *user : func.users()) {
+        CallInst *call = cast<CallInst>(user);
+        ShaderStage stage = getShaderStage(call->getFunction());
+        assert(stage != ShaderStageCopyShader);
+        auto &specialUserData = getUserDataUsage(stage)->specialUserData;
+        unsigned index = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue() -
+                         static_cast<unsigned>(UserDataMapping::GlobalTable);
+        specialUserData.resize(std::max(specialUserData.size(), size_t(index + 1)));
+        specialUserData[index].users.push_back(call);
       }
       continue;
     }
@@ -607,6 +631,30 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
         }
       }
     }
+
+    // Special user data from lgc.special.user.data calls
+    for (unsigned idx = 0; idx != userDataUsage->specialUserData.size(); ++idx) {
+      auto &specialUserData = userDataUsage->specialUserData[idx];
+      if (!specialUserData.users.empty()) {
+        Value *arg = nullptr;
+        if (specialUserData.entryArgIdx == 0) {
+          // This is the case that no arg was created for this value. That can happen, for example when
+          // ViewIndex is used but is not enabled in pipeline state. So we need to handle it. We just replace
+          // it with UndefValue.
+          arg = UndefValue::get(specialUserData.users[0]->getType());
+        } else {
+          arg = func.getArg(specialUserData.entryArgIdx);
+          arg->setName(ShaderInputs::getSpecialUserDataName(static_cast<unsigned>(UserDataMapping::GlobalTable) + idx));
+        }
+        for (Instruction *&call : specialUserData.users) {
+          if (call && call->getFunction() == &func) {
+            call->replaceAllUsesWith(arg);
+            call->eraseFromParent();
+            call = nullptr;
+          }
+        }
+      }
+    }
   }
 }
 
@@ -798,17 +846,24 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(ShaderInputs *shader
   // Scan unspilledArgs: for each one:
   // * add it to the arg type array
   // * set user data PAL metadata
-  // * store the arg index into the pointer provided to the xxxArgs.push().
+  // * store the arg index into the pointer provided to the xxxArgs.push()
+  // * if it's special user data, also store the arg index into the specialUserData entry.
   unsigned userDataIdx = 0;
   for (const auto &userDataArg : unspilledArgs) {
     if (userDataArg.argIndex)
       *userDataArg.argIndex = argTys.size();
-    argTys.push_back(userDataArg.argTy);
     unsigned dwordSize = userDataArg.argDwordSize;
     if (userDataArg.userDataValue != static_cast<unsigned>(UserDataMapping::Invalid)) {
       m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx, userDataArg.userDataValue,
                                                           dwordSize);
+      if (userDataArg.userDataValue >= static_cast<unsigned>(UserDataMapping::GlobalTable)) {
+        unsigned index = userDataArg.userDataValue - static_cast<unsigned>(UserDataMapping::GlobalTable);
+        auto &specialUserData = getUserDataUsage(m_shaderStage)->specialUserData;
+        if (index < specialUserData.size())
+          specialUserData[index].entryArgIdx = argTys.size();
+      }
     }
+    argTys.push_back(userDataArg.argTy);
     userDataIdx += dwordSize;
   }
 
@@ -822,7 +877,11 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(ShaderInputs *shader
 }
 
 // =====================================================================================================================
-// Add a UserDataArg to the appropriate vector for each special argument (e.g. ViewId) needed in user data SGPRs
+// Add a UserDataArg to the appropriate vector for each special argument (e.g. ViewId) needed in user data SGPRs.
+// In here, we need to check whether an argument is needed in two ways:
+// 1. Whether a flag is set saying it will be needed after PatchEntryPointMutate
+// 2. Whether there is an actual use of the special user data value (lgc.special.user.data call) generated
+//    before PatchEntryPointMutate, which we check with userDataUsage->isSpecialUserDataUsed().
 //
 // @param userDataArgs : Vector to add args to when they need to go before user data nodes (just streamout)
 // @param specialUserDataArgs : Vector to add args to when they need to go after user data nodes (all the rest)
@@ -904,13 +963,16 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
 
       // Vertex buffer table.
-      if (userDataUsage->usesVertexBufferTable) {
+      if (userDataUsage->usesVertexBufferTable ||
+          userDataUsage->isSpecialUserDataUsed(UserDataMapping::VertexBufferTable)) {
         specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::VertexBufferTable,
                                                   &vsIntfData->entryArgIdxs.vs.vbTablePtr));
       }
 
       // Base vertex and base instance.
-      if (vsResUsage->builtInUsage.vs.baseVertex || vsResUsage->builtInUsage.vs.baseInstance) {
+      if (vsResUsage->builtInUsage.vs.baseVertex || vsResUsage->builtInUsage.vs.baseInstance ||
+          userDataUsage->isSpecialUserDataUsed(UserDataMapping::BaseVertex) ||
+          userDataUsage->isSpecialUserDataUsed(UserDataMapping::BaseInstance)) {
         specialUserDataArgs.push_back(
             UserDataArg(builder.getInt32Ty(), UserDataMapping::BaseVertex, &vsIntfData->entryArgIdxs.vs.baseVertex));
         specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::BaseInstance,
@@ -918,7 +980,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       }
 
       // Draw index.
-      if (vsResUsage->builtInUsage.vs.drawIndex) {
+      if (vsResUsage->builtInUsage.vs.drawIndex || userDataUsage->isSpecialUserDataUsed(UserDataMapping::DrawIndex)) {
         specialUserDataArgs.push_back(
             UserDataArg(builder.getInt32Ty(), UserDataMapping::DrawIndex, &vsIntfData->entryArgIdxs.vs.drawIndex));
       }
@@ -927,7 +989,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
   } else if (m_shaderStage == ShaderStageCompute) {
     // Emulate gl_NumWorkGroups via user data registers.
     // Later code needs to ensure that this starts on an even numbered register.
-    if (builtInUsage.cs.numWorkgroups) {
+    if (builtInUsage.cs.numWorkgroups || userDataUsage->isSpecialUserDataUsed(UserDataMapping::Workgroup)) {
       auto numWorkgroupsPtrTy = PointerType::get(VectorType::get(builder.getInt32Ty(), 3), ADDR_SPACE_CONST);
       specialUserDataArgs.push_back(
           UserDataArg(numWorkgroupsPtrTy, UserDataMapping::Workgroup, &entryArgIdxs.cs.numWorkgroupsPtr));
@@ -936,7 +998,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
 
   // Allocate register for stream-out buffer table, to go before the user data node args (unlike all the ones
   // above, which go after the user data node args).
-  if (userDataUsage->usesStreamOutTable) {
+  if (userDataUsage->usesStreamOutTable || userDataUsage->isSpecialUserDataUsed(UserDataMapping::StreamOutTable)) {
     auto userDataValue = UserDataMapping::StreamOutTable;
     switch (m_shaderStage) {
     case ShaderStageVertex:

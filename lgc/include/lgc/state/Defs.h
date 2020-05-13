@@ -74,6 +74,10 @@ const static char RootDescriptor[] = "lgc.root.descriptor";
 // Get pointer to a descriptor set table. First arg is the descriptor set number; second arg is the value to use
 // for the high half of the address, or HighAddrPc to use PC.
 const static char DescriptorSet[] = "lgc.descriptor.set";
+// Get special user data input. Arg is UserDataMapping enum value.
+const static char SpecialUserData[] = "lgc.special.user.data.";
+// Get shader input. Arg is ShaderInput enum value.
+const static char ShaderInput[] = "lgc.shader.input.";
 
 const static char LaterCallPrefix[] = "lgc.late.";
 const static char LateLaunderFatPointer[] = "lgc.late.launder.fat.pointer";
