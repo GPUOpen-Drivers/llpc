@@ -82,6 +82,15 @@ using namespace Vkgc;
 
 namespace llvm {
 
+namespace {
+
+// llvm_shutdown_obj is used to ensure LLVM is only shutdown once the static
+// destructors have run. This allows Compiler to re-initialize correctly -
+// otherwise LLVM's static globals are not re-initialized.
+llvm_shutdown_obj ShutdownObj;
+
+} // namespace
+
 namespace cl {
 
 // -pipeline-dump-dir: directory where pipeline info are dumped
@@ -397,7 +406,6 @@ Compiler::~Compiler() {
 
   if (shutdown) {
     ShaderCacheManager::shutdown();
-    llvm_shutdown();
     remove_fatal_error_handler();
     delete m_contextPool;
     m_contextPool = nullptr;
