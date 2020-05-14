@@ -141,7 +141,7 @@ private:
   GfxIpVersion m_gfxIp;                                  // Graphics IP version info
   PipelineContext *m_pipelineContext;                    // Pipeline-specific context
   EmuLib m_glslEmuLib;                                   // LLVM library for GLSL emulation
-  volatile bool m_isInUse;                               // Whether this context is in use
+  bool m_isInUse = false;                                // Whether this context is in use
   lgc::Builder *m_builder = nullptr;                     // LLPC builder object
   std::unique_ptr<lgc::LgcContext> m_builderContext; // Builder context
 
