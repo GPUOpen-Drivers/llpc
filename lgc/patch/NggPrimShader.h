@@ -110,7 +110,7 @@ private:
   NggPrimShader(const NggPrimShader &) = delete;
   NggPrimShader &operator=(const NggPrimShader &) = delete;
 
-  llvm::FunctionType *generatePrimShaderEntryPointType(uint64_t *inRegMask) const;
+  llvm::FunctionType *generatePrimShaderEntryPointType(llvm::Module *module, uint64_t *inRegMask) const;
   llvm::Function *generatePrimShaderEntryPoint(llvm::Module *module);
 
   void buildPrimShaderCbLayoutLookupTable();

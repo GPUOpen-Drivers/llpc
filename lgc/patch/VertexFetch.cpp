@@ -377,25 +377,86 @@ bool LowerVertexFetch::runOnModule(Module &module) {
   if (vertexFetches.empty())
     return false;
 
-  // Lower each vertex fetch.
-  for (CallInst *call : vertexFetches) {
-    Value *vertex = nullptr;
+  if (!pipelineState->isUnlinked() || !pipelineState->getVertexInputDescriptions().empty()) {
+    // Whole-pipeline compilation (or shader compilation where we were given the vertex input descriptions).
+    // Lower each vertex fetch.
+    for (CallInst *call : vertexFetches) {
+      Value *vertex = nullptr;
 
-    // Find the vertex input description.
-    unsigned location = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-    unsigned component = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
-    const VertexInputDescription *description = pipelineState->findVertexInputDescription(location);
+      // Find the vertex input description.
+      unsigned location = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
+      unsigned component = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+      const VertexInputDescription *description = pipelineState->findVertexInputDescription(location);
 
-    if (!description) {
-      // If we could not find vertex input info matching this location, just return undefined value.
-      vertex = UndefValue::get(call->getType());
-    } else {
-      // Fetch the vertex.
-      builder.SetInsertPoint(call);
-      vertex = vertexFetch->fetchVertex(call->getType(), description, location, component, builder);
+      if (!description) {
+        // If we could not find vertex input info matching this location, just return undefined value.
+        vertex = UndefValue::get(call->getType());
+      } else {
+        // Fetch the vertex.
+        builder.SetInsertPoint(call);
+        vertex = vertexFetch->fetchVertex(call->getType(), description, location, component, builder);
+      }
+
+      // Replace and erase this call.
+      call->replaceAllUsesWith(vertex);
+      call->eraseFromParent();
     }
 
-    // Replace and erase this call.
+    return true;
+  }
+
+  // Unlinked shader compilation; the linker will add a fetch shader. Here we need to
+  // 1. add metadata giving the location, component, type of each vertex fetch;
+  // 2. add an input arg for each vertex fetch.
+  //
+  // First add the metadata.
+  SmallVector<VertexFetchInfo, 8> info;
+  for (CallInst *call : vertexFetches) {
+    unsigned location = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
+    unsigned component = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+    info.push_back({location, component, call->getType()});
+  }
+  pipelineState->getPalMetadata()->addVertexFetchInfo(info);
+
+  // Gather the input arg types.
+  SmallVector<Type *, 8> argTys;
+  for (CallInst *call : vertexFetches) {
+    Type *ty = call->getType();
+    // The return value from the fetch shader needs to use all floats, as the back-end maps an int in the
+    // return value as an SGPR rather than a VGPR. For symmetry, we also use all floats here, in the input
+    // args to the fetchless vertex shader.
+    ty = VertexFetch::getVgprTy(ty);
+    argTys.push_back(ty);
+  }
+
+  // Mutate the vertex shader function to add the new args.
+  Function *newFunc = addFunctionArgs(vertexFetches[0]->getFunction(), nullptr, argTys);
+
+  // Hook up each vertex fetch call to the corresponding arg.
+  for (unsigned idx = 0; idx != vertexFetches.size(); ++idx) {
+    CallInst *call = vertexFetches[idx];
+    Value *vertex = newFunc->getArg(idx);
+    if (call->getType() != vertex->getType()) {
+      // We changed to an all-float type above.
+      builder.SetInsertPoint(call);
+      Type *elementTy = call->getType()->getScalarType();
+      unsigned numElements = vertex->getType()->getPrimitiveSizeInBits() / elementTy->getPrimitiveSizeInBits();
+      vertex = builder.CreateBitCast(vertex, numElements == 1 ? elementTy : VectorType::get(elementTy, numElements));
+      if (call->getType() != vertex->getType()) {
+        // The types are now vectors of the same element type but different element counts, or call->getType()
+        // is scalar.
+        if (auto vecTy = dyn_cast<VectorType>(call->getType())) {
+          int indices[] = {0, 1, 2, 3};
+          vertex =
+              builder.CreateShuffleVector(vertex, vertex, ArrayRef<int>(indices).slice(0, vecTy->getNumElements()));
+        } else {
+          vertex = builder.CreateExtractElement(vertex, uint64_t(0));
+        }
+      }
+    }
+    unsigned location = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
+    unsigned component = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+    vertex->setName("vertex" + Twine(location) + "." + Twine(component));
     call->replaceAllUsesWith(vertex);
     call->eraseFromParent();
   }

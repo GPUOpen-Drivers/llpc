@@ -33,6 +33,7 @@
 #include "NggLdsManager.h"
 #include "ShaderMerger.h"
 #include "lgc/PassManager.h"
+#include "lgc/state/PalMetadata.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
@@ -146,8 +147,9 @@ Function *NggPrimShader::generate(Function *esEntryPoint, Function *gsEntryPoint
 // =====================================================================================================================
 // Generates the type for the new entry-point of NGG primitive shader.
 //
+// @param module : IR module (for getting ES function if needed to get vertex fetch types)
 // @param [out] inRegMask : "Inreg" bit mask for the arguments
-FunctionType *NggPrimShader::generatePrimShaderEntryPointType(uint64_t *inRegMask) const {
+FunctionType *NggPrimShader::generatePrimShaderEntryPointType(Module *module, uint64_t *inRegMask) const {
   std::vector<Type *> argTys;
 
   // First 8 system values (SGPRs)
@@ -222,6 +224,21 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(uint64_t *inRegMas
     argTys.push_back(m_builder->getInt32Ty()); // Instance ID
   }
 
+  // If the ES is the API VS, and it is a fetchless VS, then we need to add args for the vertex fetches.
+  if (!hasTs) {
+    unsigned vertexFetchCount = m_pipelineState->getPalMetadata()->getVertexFetchCount();
+    if (vertexFetchCount != 0) {
+      // TODO: This will not work with non-GS culling.
+      if (!m_hasGs && !m_nggControl->passthroughMode)
+        m_pipelineState->setError("Fetchless VS with non-GS NGG culling not supported");
+      // The final vertexFetchCount args of the ES (API VS) are the vertex fetches.
+      Function *esEntry = module->getFunction(lgcName::NggEsEntryPoint);
+      unsigned esArgSize = esEntry->arg_size();
+      for (unsigned idx = esArgSize - vertexFetchCount; idx != esArgSize; ++idx)
+        argTys.push_back(esEntry->getArg(idx)->getType());
+    }
+  }
+
   return FunctionType::get(m_builder->getVoidTy(), argTys, false);
 }
 
@@ -231,7 +248,7 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(uint64_t *inRegMas
 // @param module : LLVM module
 Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
   uint64_t inRegMask = 0;
-  auto entryPointTy = generatePrimShaderEntryPointType(&inRegMask);
+  auto entryPointTy = generatePrimShaderEntryPointType(module, &inRegMask);
 
   Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::NggPrimShaderEntryPoint);
 
@@ -2780,6 +2797,24 @@ void NggPrimShader::runEsOrEsVariant(Module *module, StringRef entryName, Argume
     args.push_back(relVertexId);
     args.push_back(vsPrimitiveId);
     args.push_back(instanceId);
+  }
+
+  // If the ES is the API VS, and it is a fetchless VS, then we need to add args for the vertex fetches.
+  // Also set the name of each vertex fetch prim shader arg while we're here.
+  if (!hasTs) {
+    unsigned vertexFetchCount = m_pipelineState->getPalMetadata()->getVertexFetchCount();
+    if (vertexFetchCount != 0) {
+      // The final vertexFetchCount args of the prim shader and of ES (API VS) are the vertex fetches.
+      Function *primShader = insertAtEnd->getParent();
+      unsigned primArgSize = primShader->arg_size();
+      Function *esEntry = module->getFunction(lgcName::NggEsEntryPoint);
+      unsigned esArgSize = esEntry->arg_size();
+      for (unsigned idx = 0; idx != vertexFetchCount; ++idx) {
+        Argument *arg = primShader->getArg(primArgSize - vertexFetchCount + idx);
+        arg->setName(esEntry->getArg(esArgSize - vertexFetchCount + idx)->getName());
+        args.push_back(arg);
+      }
+    }
   }
 
   assert(args.size() == esArgCount); // Must have visit all arguments of ES entry point

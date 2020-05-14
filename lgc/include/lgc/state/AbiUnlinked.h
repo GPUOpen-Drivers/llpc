@@ -77,4 +77,27 @@ const static char DeviceIdx[] = "$deviceIdx";
 
 } // namespace reloc
 
+// =====================================================================================================================
+// Fetchless entry-point names. If the linker finds one of these names, it glues a fetch shader on to the front
+// and changes the name to remove the "_fetchless" suffix.
+
+// Name of shader entry-point for fetchless VS
+static constexpr char FetchlessVsEntryName[] = "_amdgpu_vs_main_fetchless";
+// Name of shader entry-point for merged ES-GS containing fetchless VS
+static constexpr char FetchlessGsEntryName[] = "_amdgpu_gs_main_fetchless";
+// Name of shader entry-point for ES that is fetchless VS
+static constexpr char FetchlessEsEntryName[] = "_amdgpu_es_main_fetchless";
+// Name of shader entry-point for merged LS-HS containing fetchless VS
+static constexpr char FetchlessHsEntryName[] = "_amdgpu_hs_main_fetchless";
+// Name of shader entry-point for LS that is fetchless VS
+static constexpr char FetchlessLsEntryName[] = "_amdgpu_ls_main_fetchless";
+
+// =====================================================================================================================
+// Metadata names of extra entries in .pipeline for an unlinked shader/half-pipeline
+namespace PipelineMetadataKey {
+
+static const char VertexInputs[] = ".vertexInputs";
+
+} // namespace PipelineMetadataKey
+
 } // namespace lgc

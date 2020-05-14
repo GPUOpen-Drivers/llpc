@@ -29,6 +29,8 @@
  ***********************************************************************************************************************
  */
 #include "lgc/state/ShaderStage.h"
+#include "lgc/state/Abi.h"
+#include "lgc/state/AbiUnlinked.h"
 #include "lgc/util/Internal.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
@@ -172,4 +174,50 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
   }
 
   return newFunc;
+}
+
+// =====================================================================================================================
+// Get the ABI-mandated entry-point name for a shader stage
+//
+// @param callingConv : Which hardware shader stage
+// @param isFetchlessVs : Whether it is (or contains) a fetchless vertex shader
+// @return : The entry-point name, or "" if callingConv not recognized
+StringRef lgc::getEntryPointName(unsigned callingConv, bool isFetchlessVs) {
+  StringRef entryName;
+  switch (callingConv) {
+  case CallingConv::AMDGPU_CS:
+    entryName = Util::Abi::AmdGpuCsEntryName;
+    break;
+  case CallingConv::AMDGPU_PS:
+    entryName = Util::Abi::AmdGpuPsEntryName;
+    break;
+  case CallingConv::AMDGPU_VS:
+    entryName = Util::Abi::AmdGpuVsEntryName;
+    if (isFetchlessVs)
+      entryName = FetchlessVsEntryName;
+    break;
+  case CallingConv::AMDGPU_GS:
+    entryName = Util::Abi::AmdGpuGsEntryName;
+    if (isFetchlessVs)
+      entryName = FetchlessGsEntryName;
+    break;
+  case CallingConv::AMDGPU_ES:
+    entryName = Util::Abi::AmdGpuEsEntryName;
+    if (isFetchlessVs)
+      entryName = FetchlessEsEntryName;
+    break;
+  case CallingConv::AMDGPU_HS:
+    entryName = Util::Abi::AmdGpuHsEntryName;
+    if (isFetchlessVs)
+      entryName = FetchlessHsEntryName;
+    break;
+  case CallingConv::AMDGPU_LS:
+    entryName = Util::Abi::AmdGpuLsEntryName;
+    if (isFetchlessVs)
+      entryName = FetchlessLsEntryName;
+    break;
+  default:
+    break;
+  }
+  return entryName;
 }
