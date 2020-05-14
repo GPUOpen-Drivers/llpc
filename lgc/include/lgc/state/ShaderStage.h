@@ -31,10 +31,12 @@
 #pragma once
 
 #include "lgc/CommonDefs.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace llvm {
 class Function;
 class Module;
+class Type;
 } // namespace llvm
 
 namespace lgc {
@@ -55,5 +57,18 @@ ShaderStage getShaderStage(const llvm::Function *func);
 
 // Gets name string of the abbreviation for the specified shader stage
 const char *getShaderStageAbbreviation(ShaderStage shaderStage);
+
+// Add args to a function. The new args are put before any existing ones. This creates a new function with the
+// added args, then moves everything from the old function across to it.
+// If this changes the return type, then all the return instructions will be invalid.
+// This does not erase the old function, as the caller needs to do something with its uses (if any).
+//
+// @param oldFunc : Original function
+// @param retTy : New return type, nullptr to use the same as in the original function
+// @param argTys : Types of new args
+// @param inRegMask : Bitmask of which args should be marked "inreg", to be passed in SGPRs
+// @return : The new function
+llvm::Function *addFunctionArgs(llvm::Function *oldFunc, llvm::Type *retTy, llvm::ArrayRef<llvm::Type *> argTys,
+                                uint64_t inRegMask = 0);
 
 } // namespace lgc

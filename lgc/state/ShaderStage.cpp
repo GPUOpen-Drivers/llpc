@@ -96,3 +96,80 @@ const char *lgc::getShaderStageAbbreviation(ShaderStage shaderStage) {
   static const char *ShaderStageAbbrs[] = {"VS", "TCS", "TES", "GS", "FS", "CS"};
   return ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
 }
+
+// =====================================================================================================================
+// Add args to a function. The new args are put before any existing ones. This creates a new function with the
+// added args, then moves everything from the old function across to it.
+// If this changes the return type, then all the return instructions will be invalid.
+// This does not erase the old function, as the caller needs to do something with its uses (if any).
+//
+// @param oldFunc : Original function
+// @param retTy : New return type, nullptr to use the same as in the original function
+// @param argTys : Types of new args
+// @param inRegMask : Bitmask of which args should be marked "inreg", to be passed in SGPRs
+// @return : The new function
+Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> argTys, uint64_t inRegMask) {
+  // Gather all arg types: first the new ones, then the ones from the original function.
+  FunctionType *oldFuncTy = oldFunc->getFunctionType();
+  SmallVector<Type *, 8> allArgTys;
+  allArgTys.append(argTys.begin(), argTys.end());
+  allArgTys.append(oldFuncTy->params().begin(), oldFuncTy->params().end());
+
+  // Create new empty function.
+  if (!retTy)
+    retTy = oldFuncTy->getReturnType();
+  auto newFuncTy = FunctionType::get(retTy, allArgTys, false);
+  Function *newFunc = Function::Create(newFuncTy, oldFunc->getLinkage(), "", oldFunc->getParent());
+  newFunc->setCallingConv(oldFunc->getCallingConv());
+  newFunc->takeName(oldFunc);
+
+  // Transfer code from old function to new function.
+  while (!oldFunc->empty()) {
+    BasicBlock *block = &oldFunc->front();
+    block->removeFromParent();
+    block->insertInto(newFunc);
+  }
+
+  // Copy attributes and shader stage from the old function. The new arguments have InReg set iff the corresponding
+  // bit is set in inRegMask.
+  AttributeList oldAttrList = oldFunc->getAttributes();
+  SmallVector<AttributeSet, 8> argAttrs;
+  // New arguments.
+  AttributeSet emptyAttrSet;
+  AttributeSet inRegAttrSet = emptyAttrSet.addAttribute(oldFunc->getContext(), Attribute::InReg);
+  for (unsigned idx = 0; idx != argTys.size(); ++idx)
+    argAttrs.push_back((inRegMask >> idx) & 1 ? inRegAttrSet : emptyAttrSet);
+  // Old arguments.
+  for (unsigned idx = 0; idx != argTys.size(); ++idx)
+    argAttrs.push_back(oldAttrList.getParamAttributes(idx));
+  // Construct new AttributeList and set it on the new function.
+  newFunc->setAttributes(AttributeList::get(oldFunc->getContext(), oldAttrList.getFnAttributes(),
+                                            oldAttrList.getRetAttributes(), argAttrs));
+
+  // Set the shader stage on the new function (implemented with IR metadata).
+  setShaderStage(newFunc, getShaderStage(oldFunc));
+
+  // Replace uses of the old args.
+  // Set inreg attributes correctly. We have to use removeAttr because arg attributes are actually attached
+  // to the Function, and the attribute copy above copied the arg attributes at their original arg numbers.
+  // Also set name of each new arg that comes from old arg.
+  for (unsigned idx = 0; idx != argTys.size(); ++idx) {
+    Argument *arg = newFunc->getArg(idx);
+    if ((inRegMask >> idx) & 1)
+      arg->addAttr(Attribute::InReg);
+    else if (!oldFuncTy->params().empty())
+      arg->removeAttr(Attribute::AttrKind::InReg);
+  }
+  for (unsigned idx = 0; idx != oldFuncTy->params().size(); ++idx) {
+    Argument *arg = newFunc->getArg(idx + argTys.size());
+    Argument *oldArg = oldFunc->getArg(idx);
+    arg->setName(oldArg->getName());
+    oldArg->replaceAllUsesWith(arg);
+    if (oldArg->hasInRegAttr())
+      arg->addAttr(Attribute::InReg);
+    else
+      arg->removeAttr(Attribute::AttrKind::InReg);
+  }
+
+  return newFunc;
+}
