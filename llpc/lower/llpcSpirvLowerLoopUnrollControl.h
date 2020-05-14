@@ -51,6 +51,7 @@ private:
 
   unsigned m_forceLoopUnrollCount; // Forced loop unroll count
   bool m_disableLicm;              // Disable LLVM LICM pass
+  bool m_disableLoopUnroll;        // Forcibly disable loop unroll
 };
 
 } // namespace Llpc

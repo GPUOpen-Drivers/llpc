@@ -520,6 +520,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
 #endif
   dumpFile << "options.unrollThreshold = " << shaderInfo->options.unrollThreshold << "\n";
   dumpFile << "options.scalarThreshold = " << shaderInfo->options.scalarThreshold << "\n";
+  dumpFile << "options.disableLoopUnroll = " << shaderInfo->options.disableLoopUnroll << "\n";
 
   dumpFile << "\n";
 }
@@ -1051,6 +1052,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
 #endif
       hasher->Update(options.unrollThreshold);
       hasher->Update(options.scalarThreshold);
+      hasher->Update(options.disableLoopUnroll);
     }
   }
 }

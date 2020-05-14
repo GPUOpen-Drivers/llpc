@@ -1041,6 +1041,7 @@ public:
 #endif
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, unrollThreshold, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, scalarThreshold, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableLoopUnroll, MemberTypeBool, false);
 
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
@@ -1049,7 +1050,7 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 18;
+  static const unsigned MemberCount = 19;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;
