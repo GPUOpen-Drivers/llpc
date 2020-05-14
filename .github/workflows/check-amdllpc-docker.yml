@@ -12,6 +12,7 @@ jobs:
     name: "Features: ${{ matrix.feature-set }}, assertions: ${{ matrix.assertions }}"
     runs-on: ${{ matrix.host-os }}
     strategy:
+      fail-fast: false
       matrix:
         host-os:             ["ubuntu-18.04"]
         base-image-template: ["gcr.io/stadia-open-source/amdvlk_%s%s_%s:nightly"]

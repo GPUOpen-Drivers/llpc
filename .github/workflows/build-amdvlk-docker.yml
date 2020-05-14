@@ -10,6 +10,7 @@ jobs:
     if: github.repository == 'GPUOpen-Drivers/llpc'
     runs-on: ${{ matrix.host-os }}
     strategy:
+      fail-fast: false
       matrix:
         host-os:        ["ubuntu-18.04"]
         image-template: ["gcr.io/stadia-open-source/amdvlk_%s%s_%s:nightly"]
