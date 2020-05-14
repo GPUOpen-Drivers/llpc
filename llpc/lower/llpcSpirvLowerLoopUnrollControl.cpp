@@ -68,14 +68,14 @@ ModulePass *createSpirvLowerLoopUnrollControl(unsigned forceLoopUnrollCount) {
 
 // =====================================================================================================================
 SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl()
-    : SpirvLower(ID), m_forceLoopUnrollCount(0), m_disableLicm(false) {
+    : SpirvLower(ID), m_forceLoopUnrollCount(0), m_disableLicm(false), m_disableLoopUnroll(false) {
 }
 
 // =====================================================================================================================
 //
 // @param forceLoopUnrollCount : Force loop unroll count
 SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl(unsigned forceLoopUnrollCount)
-    : SpirvLower(ID), m_forceLoopUnrollCount(forceLoopUnrollCount), m_disableLicm(false) {
+    : SpirvLower(ID), m_forceLoopUnrollCount(forceLoopUnrollCount), m_disableLicm(false), m_disableLoopUnroll(false) {
 }
 
 // =====================================================================================================================
@@ -94,9 +94,10 @@ bool SpirvLowerLoopUnrollControl::runOnModule(Module &module) {
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
     m_disableLicm = shaderOptions->disableLicm | cl::DisableLicm;
 #endif
+    m_disableLoopUnroll = shaderOptions->disableLoopUnroll;
   }
 
-  if (m_forceLoopUnrollCount == 0 && !m_disableLicm)
+  if (m_forceLoopUnrollCount == 0 && !m_disableLicm && !m_disableLoopUnroll)
     return false;
 
   if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval ||
@@ -111,10 +112,17 @@ bool SpirvLowerLoopUnrollControl::runOnModule(Module &module) {
       auto terminator = block.getTerminator();
       MDNode *loopMetaNode = terminator->getMetadata("llvm.loop");
       if (!loopMetaNode || loopMetaNode->getOperand(0) != loopMetaNode ||
-          (loopMetaNode->getNumOperands() != 1 && !m_disableLicm))
+          (loopMetaNode->getNumOperands() != 1 && !m_disableLicm && !m_disableLoopUnroll))
         continue;
 
-      if (m_forceLoopUnrollCount && loopMetaNode->getNumOperands() <= 1) {
+      if (m_disableLoopUnroll) {
+        // The disableLoopUnroll option overrides any existing loop metadata (so is subtly different to
+        // forceLoopUnrollCount=1 which defers to any existing metadata). We can simply concatenate
+        // it as it takes precedence over any other metadata that may already be present.
+        MDNode *disableLoopUnrollMetaNode =
+            MDNode::get(*m_context, MDString::get(*m_context, "llvm.loop.unroll.disable"));
+        loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, disableLoopUnrollMetaNode));
+      } else if (m_forceLoopUnrollCount && loopMetaNode->getNumOperands() <= 1) {
         // We have a loop backedge with !llvm.loop metadata containing just
         // one operand pointing to itself, meaning that the SPIR-V did not
         // have an unroll or don't-unroll directive, so we can add the force

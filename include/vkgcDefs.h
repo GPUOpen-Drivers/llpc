@@ -73,6 +73,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     40.1 | Added disableLoopUnroll to PipelineShaderOptions                                                      |
 //* |     40.0 | Added DescriptorReserved12, which moves DescriptorYCbCrSampler down to 13                             |
 //* |     39.0 | Non-LLPC-specific XGL code should #include vkcgDefs.h instead of llpc.h                               |
 //* |     38.3 | Added shadowDescriptorTableUsage and shadowDescriptorTablePtrHigh to PipelineOptions                  |
@@ -479,6 +480,9 @@ struct PipelineShaderOptions {
 
   /// The threshold for load scalarizer.
   unsigned scalarThreshold;
+
+  /// Forcibly disable loop unrolling - overrides any explicit unroll directives
+  bool disableLoopUnroll;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
