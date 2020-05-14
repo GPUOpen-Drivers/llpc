@@ -442,3 +442,28 @@ void PalMetadata::setUserDataLimit() {
   }
   *m_userDataLimit = userDataLimit;
 }
+
+// =====================================================================================================================
+// Store the vertex fetch information in PAL metadata for a fetchless vertex shader with shader compilation.
+//
+// @param info : Array of VertexFetchInfo structs
+void PalMetadata::addVertexFetchInfo(ArrayRef<VertexFetchInfo> fetches) {
+  // Each vertex fetch is an array containing {location,component,type}.
+  // .vertexInputs is an array containing the vertex fetches.
+  m_vertexInputs = m_pipelineNode[PipelineMetadataKey::VertexInputs].getArray(true);
+  for (const VertexFetchInfo &fetch : fetches) {
+    msgpack::ArrayDocNode fetchNode = m_document->getArrayNode();
+    fetchNode.push_back(m_document->getNode(fetch.location));
+    fetchNode.push_back(m_document->getNode(fetch.component));
+    fetchNode.push_back(m_document->getNode(getTypeName(fetch.ty), /*copy=*/true));
+    m_vertexInputs.push_back(fetchNode);
+  }
+}
+
+// =====================================================================================================================
+// Get the count of vertex fetches for a fetchless vertex shader with shader compilation (or 0 otherwise).
+unsigned PalMetadata::getVertexFetchCount() {
+  if (m_vertexInputs.isEmpty())
+    return 0;
+  return m_vertexInputs.size();
+}

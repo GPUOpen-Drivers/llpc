@@ -32,6 +32,7 @@
 #include "Gfx9ConfigBuilder.h"
 #include "ShaderMerger.h"
 #include "lgc/patch/Patch.h"
+#include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
@@ -294,37 +295,37 @@ void PatchPreparePipelineAbi::setCallingConv(ShaderStage shaderStage, CallingCon
 //
 // @param module : LLVM module
 void PatchPreparePipelineAbi::setAbiEntryNames(Module &module) {
+  bool hasTs = m_hasTcs || m_hasTes;
+  bool isFetchless = m_pipelineState->getPalMetadata()->getVertexFetchCount() != 0;
+
   for (auto &func : module) {
     if (!func.empty()) {
       auto callingConv = func.getCallingConv();
-      const char *entryName = nullptr;
-
-      switch (callingConv) {
-      case CallingConv::AMDGPU_CS:
-        entryName = Util::Abi::AmdGpuCsEntryName;
-        break;
-      case CallingConv::AMDGPU_PS:
-        entryName = Util::Abi::AmdGpuPsEntryName;
-        break;
-      case CallingConv::AMDGPU_VS:
-        entryName = Util::Abi::AmdGpuVsEntryName;
-        break;
-      case CallingConv::AMDGPU_GS:
-        entryName = Util::Abi::AmdGpuGsEntryName;
-        break;
-      case CallingConv::AMDGPU_ES:
-        entryName = Util::Abi::AmdGpuEsEntryName;
-        break;
-      case CallingConv::AMDGPU_HS:
-        entryName = Util::Abi::AmdGpuHsEntryName;
-        break;
-      case CallingConv::AMDGPU_LS:
-        entryName = Util::Abi::AmdGpuLsEntryName;
-        break;
-      default:
-        continue;
+      bool isFetchlessVs = false;
+      if (isFetchless) {
+        switch (callingConv) {
+        case CallingConv::AMDGPU_VS:
+          isFetchlessVs = !m_hasGs && !hasTs;
+          break;
+        case CallingConv::AMDGPU_GS:
+          isFetchlessVs = m_gfxIp.major >= 9 && !hasTs;
+          break;
+        case CallingConv::AMDGPU_ES:
+          isFetchlessVs = !hasTs;
+          break;
+        case CallingConv::AMDGPU_HS:
+          isFetchlessVs = m_gfxIp.major >= 9;
+          break;
+        case CallingConv::AMDGPU_LS:
+          isFetchlessVs = true;
+          break;
+        default:
+          break;
+        }
       }
-      func.setName(entryName);
+      StringRef entryName = getEntryPointName(callingConv, isFetchlessVs);
+      if (entryName != "")
+        func.setName(entryName);
     }
   }
 }

@@ -71,4 +71,11 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage);
 llvm::Function *addFunctionArgs(llvm::Function *oldFunc, llvm::Type *retTy, llvm::ArrayRef<llvm::Type *> argTys,
                                 uint64_t inRegMask = 0);
 
+// Get the ABI-mandated entry-point name for a shader stage
+//
+// @param callingConv : Which hardware shader stage
+// @param isFetchlessVs : Whether it is (or contains) a fetchless vertex shader
+// @return : The entry-point name, or "" if callingConv not recognized
+llvm::StringRef getEntryPointName(unsigned callingConv, bool isFetchlessVs);
+
 } // namespace lgc

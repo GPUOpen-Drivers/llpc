@@ -887,14 +887,18 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
       auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
 
+      // Detect whether this is an unlinked compile that will need a fetch shader. If so, we need to
+      // add the vertex buffer table and base vertex and base instance, even if they appear unused here.
+      bool willHaveFetchShader = m_pipelineState->getPalMetadata()->getVertexFetchCount() != 0;
+
       // Vertex buffer table.
-      if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::VertexBufferTable)) {
+      if (willHaveFetchShader || userDataUsage->isSpecialUserDataUsed(UserDataMapping::VertexBufferTable)) {
         specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::VertexBufferTable,
                                                   &vsIntfData->entryArgIdxs.vs.vbTablePtr));
       }
 
       // Base vertex and base instance.
-      if (vsResUsage->builtInUsage.vs.baseVertex || vsResUsage->builtInUsage.vs.baseInstance ||
+      if (willHaveFetchShader || vsResUsage->builtInUsage.vs.baseVertex || vsResUsage->builtInUsage.vs.baseInstance ||
           userDataUsage->isSpecialUserDataUsed(UserDataMapping::BaseVertex) ||
           userDataUsage->isSpecialUserDataUsed(UserDataMapping::BaseInstance)) {
         specialUserDataArgs.push_back(

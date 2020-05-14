@@ -202,6 +202,10 @@ bool PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_
   // Run the "whole pipeline" passes.
   passMgr->run(*pipelineModule);
 
+  // See if there was a recoverable error.
+  if (getLastError() != "")
+    return false;
+
   return true;
 }
 

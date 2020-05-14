@@ -41,11 +41,20 @@
 
 namespace llvm {
 class Module;
+class Type;
 } // namespace llvm
 
 namespace lgc {
 
 class PipelineState;
+
+// =====================================================================================================================
+// Struct with the information for one vertex fetch
+struct VertexFetchInfo {
+  unsigned location;
+  unsigned component;
+  llvm::Type *ty;
+};
 
 // =====================================================================================================================
 // Class for manipulating PAL metadata through LGC
@@ -87,6 +96,12 @@ public:
   // Set a register value in PAL metadata. If the register is already set, this ORs in the value.
   void setRegister(unsigned regNum, unsigned value);
 
+  // Store the vertex fetch in PAL metadata for a fetchless vertex shader with shader compilation.
+  void addVertexFetchInfo(llvm::ArrayRef<VertexFetchInfo> fetches);
+
+  // Get the count of vertex fetches for a fetchless vertex shader with shader compilation (or 0 otherwise).
+  unsigned getVertexFetchCount();
+
   // Finalize PAL metadata for pipeline.
   // TODO Shader compilation: The idea is that this will be called at the end of a pipeline compilation, or in
   // an ELF link, but not at the end of a shader/half-pipeline compile.
@@ -102,10 +117,11 @@ private:
   // Set userDataLimit to maximum
   void setUserDataLimit();
 
-  PipelineState *m_pipelineState;           // PipelineState
-  llvm::msgpack::Document *m_document;      // The MsgPack document
-  llvm::msgpack::MapDocNode m_pipelineNode; // MsgPack map node for amdpal.pipelines[0]
-  llvm::msgpack::MapDocNode m_registers;    // MsgPack map node for amdpal.pipelines[0].registers
+  PipelineState *m_pipelineState;             // PipelineState
+  llvm::msgpack::Document *m_document;        // The MsgPack document
+  llvm::msgpack::MapDocNode m_pipelineNode;   // MsgPack map node for amdpal.pipelines[0]
+  llvm::msgpack::MapDocNode m_registers;      // MsgPack map node for amdpal.pipelines[0].registers
+  llvm::msgpack::ArrayDocNode m_vertexInputs; // MsgPack map node for amdpal.pipelines[0].vertexInputs
   // Mapping from ShaderStage to SPI user data register start, allowing for merged shaders and NGG.
   unsigned m_userDataRegMapping[ShaderStageCountInternal] = {};
   llvm::msgpack::DocNode *m_userDataLimit;  // Maximum so far number of user data dwords used

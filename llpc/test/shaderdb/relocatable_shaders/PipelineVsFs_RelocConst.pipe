@@ -124,3 +124,19 @@ userDataNode[0].next[0].offsetInDwords = 3
 userDataNode[0].next[0].sizeInDwords = 8
 userDataNode[0].next[0].set = 0
 userDataNode[0].next[0].binding = 0
+
+[VertexInputState]
+binding[0].binding = 1
+binding[0].stride = 16
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+binding[1].binding = 0
+binding[1].stride = 16
+binding[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 1
+attribute[0].binding = 1
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
+attribute[1].location = 0
+attribute[1].binding = 0
+attribute[1].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[1].offset = 0

@@ -31,6 +31,7 @@
  */
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/BuilderBase.h"
+#include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/ResourceUsage.h"
 
@@ -503,6 +504,12 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
         if (xfbStrides[i] > 0)
           getShaderInputUsage(shaderStage, static_cast<unsigned>(ShaderInput::StreamOutOffset0) + i)->enable();
       }
+    }
+    if (pipelineState->getPalMetadata()->getVertexFetchCount() != 0) {
+      // This is an unlinked compile that will need a fetch shader. We need to add the vertex ID and
+      // instance ID, even if they appear unused here.
+      getShaderInputUsage(shaderStage, ShaderInput::VertexId)->enable();
+      getShaderInputUsage(shaderStage, ShaderInput::InstanceId)->enable();
     }
     break;
   case ShaderStageTessControl:
