@@ -2509,7 +2509,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
 // @param insertPos : Insert position
 Value *PatchInOutImportExport::getSamplePosOffset(Type *inputTy, Value *sampleId, Instruction *insertPos) {
   // Gets the offset of sample position relative to the pixel center for the specified sample ID
-  IRBuilder<> builder(*m_context);
+  BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
   Value *numSamples = patchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInNumSamples, nullptr, insertPos);
   Value *patternIdx = patchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInSamplePatternIdx, nullptr, insertPos);
@@ -2518,13 +2518,8 @@ Value *PatchInOutImportExport::getSamplePosOffset(Type *inputTy, Value *sampleId
   Value *sampleValid = builder.CreateICmpUGT(numSamples, sampleId);
   Value *offset = builder.CreateSelect(sampleValid, validOffset, builder.getInt32(0));
   // Load sample position descriptor.
-  auto desc = emitCall(lgcName::DescriptorLoadBuffer, VectorType::get(builder.getInt32Ty(), 4),
-                       {
-                           builder.getInt32(InternalResourceTable),
-                           builder.getInt32(SiDrvTableSamplepos),
-                           builder.getInt32(0),
-                       },
-                       {}, insertPos);
+  Value *desc = m_pipelineSysValues.get(m_entryPoint)->loadDescFromDriverTable(SiDrvTableSamplepos, builder);
+  // Load the value using the descriptor.
   offset = builder.CreateShl(offset, builder.getInt32(4));
   return builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load, inputTy,
                                  {desc, offset, builder.getInt32(0), builder.getInt32(0)});

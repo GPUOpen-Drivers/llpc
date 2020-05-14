@@ -75,7 +75,8 @@ Value *ShaderSystemValues::getEsGsRingBufDesc() {
       break;
     }
 
-    BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+    // Ensure we have got the global table pointer first, and insert new code after that.
+    BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
     m_esGsRingBufDesc = loadDescFromDriverTable(tableOffset, builder);
     if (m_shaderStage != ShaderStageGeometry && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 8) {
       // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor for
@@ -91,7 +92,8 @@ Value *ShaderSystemValues::getEsGsRingBufDesc() {
 Value *ShaderSystemValues::getTessFactorBufDesc() {
   assert(m_shaderStage == ShaderStageTessControl);
   if (!m_tfBufDesc) {
-    BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+    // Ensure we have got the global table pointer first, and insert new code after that.
+    BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
     m_tfBufDesc = loadDescFromDriverTable(SiDrvTableTfBufferOffs, builder);
   }
   return m_tfBufDesc;
@@ -147,7 +149,8 @@ Value *ShaderSystemValues::getRelativeId() {
 Value *ShaderSystemValues::getOffChipLdsDesc() {
   assert(m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval);
   if (!m_offChipLdsDesc) {
-    BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+    // Ensure we have got the global table pointer first, and insert new code after that.
+    BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
     m_offChipLdsDesc = loadDescFromDriverTable(SiDrvTableHsBuffeR0Offs, builder);
   }
   return m_offChipLdsDesc;
@@ -211,7 +214,8 @@ Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
   if (m_gsVsRingBufDescs.size() <= streamId)
     m_gsVsRingBufDescs.resize(streamId + 1);
   if (!m_gsVsRingBufDescs[streamId]) {
-    BuilderBase builder(&*m_entryPoint->front().getFirstInsertionPt());
+    // Ensure we have got the global table pointer first, and insert new code after that.
+    BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
 
     if (m_shaderStage == ShaderStageGeometry) {
       const auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
@@ -288,47 +292,8 @@ ArrayRef<Value *> ShaderSystemValues::getEmitCounterPtr() {
 }
 
 // =====================================================================================================================
-// Get descriptor table pointer
-//
-// @param descSet : Descriptor set ID
-Value *ShaderSystemValues::getDescTablePtr(unsigned descSet) {
-  if (m_descTablePtrs.size() <= descSet)
-    m_descTablePtrs.resize(descSet + 1);
-  if (!m_descTablePtrs[descSet]) {
-    // Find the node.
-    unsigned resNodeIdx = findResourceNodeByDescSet(descSet);
-    if (resNodeIdx != InvalidValue) {
-      // Get the 64-bit extended node value.
-      auto descTablePtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_context), UINT32_MAX), ADDR_SPACE_CONST);
-      m_descTablePtrs[descSet] = getExtendedResourceNodeValue(resNodeIdx, descTablePtrTy, InvalidValue);
-    }
-  }
-  return m_descTablePtrs[descSet];
-}
-
-// =====================================================================================================================
-// Get shadow descriptor table pointer
-//
-// @param descSet : Descriptor set ID
-Value *ShaderSystemValues::getShadowDescTablePtr(unsigned descSet) {
-  if (m_shadowDescTablePtrs.size() <= descSet)
-    m_shadowDescTablePtrs.resize(descSet + 1);
-  if (!m_shadowDescTablePtrs[descSet]) {
-    // Find the node.
-    unsigned resNodeIdx = findResourceNodeByDescSet(descSet);
-    if (resNodeIdx != InvalidValue) {
-      // Get the 64-bit extended node value.
-      auto descTablePtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_context), UINT32_MAX), ADDR_SPACE_CONST);
-      unsigned shadowDescTablePtrHigh = m_pipelineState->getOptions().shadowDescriptorTable;
-      m_shadowDescTablePtrs[descSet] = getExtendedResourceNodeValue(resNodeIdx, descTablePtrTy, shadowDescTablePtrHigh);
-    }
-  }
-  return m_shadowDescTablePtrs[descSet];
-}
-
-// =====================================================================================================================
 // Get internal global table pointer as pointer to i8.
-Value *ShaderSystemValues::getInternalGlobalTablePtr() {
+Instruction *ShaderSystemValues::getInternalGlobalTablePtr() {
   if (!m_internalGlobalTablePtr) {
     auto ptrTy = Type::getInt8Ty(*m_context)->getPointerTo(ADDR_SPACE_CONST);
     // Global table is always the first function argument
@@ -364,33 +329,6 @@ Value *ShaderSystemValues::getNumWorkgroups() {
     m_numWorkgroups = numWorkgroups;
   }
   return m_numWorkgroups;
-}
-
-// =====================================================================================================================
-// Get spilled push constant pointer
-Value *ShaderSystemValues::getSpilledPushConstTablePtr() {
-  if (!m_spilledPushConstTablePtr) {
-    // Find the push constant resource node.
-    auto userDataNodes = m_pipelineState->getUserDataNodes();
-    unsigned pushConstNodeIdx = 0;
-    for (; userDataNodes[pushConstNodeIdx].type != ResourceNodeType::PushConst; ++pushConstNodeIdx)
-      ;
-    const ResourceNode *pushConstNode = &userDataNodes[pushConstNodeIdx];
-
-    Instruction *insertPos = &*m_entryPoint->front().getFirstInsertionPt();
-
-    unsigned pushConstOffset = pushConstNode->offsetInDwords * sizeof(uint32_t);
-
-    auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-    assert(intfData->entryArgIdxs.spillTable != InvalidValue);
-    auto spillTablePtrLow = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.spillTable, "spillTable");
-    auto spilledPushConstTablePtrLow = BinaryOperator::CreateAdd(
-        spillTablePtrLow, ConstantInt::get(Type::getInt32Ty(*m_context), pushConstOffset), "", insertPos);
-    auto ty = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_context), InterfaceData::MaxSpillTableSize),
-                               ADDR_SPACE_CONST);
-    m_spilledPushConstTablePtr = makePointer(spilledPushConstTablePtrLow, ty, InvalidValue);
-  }
-  return m_spilledPushConstTablePtr;
 }
 
 // =====================================================================================================================
@@ -530,85 +468,20 @@ Instruction *ShaderSystemValues::makePointer(Value *lowValue, Type *ptrTy, unsig
 }
 
 // =====================================================================================================================
-// Get 64-bit extended resource node value
-//
-// @param resNodeIdx : Resource node index
-// @param resNodeTy : Pointer type of result
-// @param highValue : Value to use for high part, or InvalidValue to use PC
-Value *ShaderSystemValues::getExtendedResourceNodeValue(unsigned resNodeIdx, Type *resNodeTy, unsigned highValue) {
-  return makePointer(getResourceNodeValue(resNodeIdx), resNodeTy, highValue);
-}
-
-// =====================================================================================================================
-// Get 32 bit resource node value
-//
-// @param resNodeIdx : Resource node index
-Value *ShaderSystemValues::getResourceNodeValue(unsigned resNodeIdx) {
-  auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
-  auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-  auto node = &m_pipelineState->getUserDataNodes()[resNodeIdx];
-  Value *resNodeValue = nullptr;
-
-  if (node->type == ResourceNodeType::IndirectUserDataVaPtr || node->type == ResourceNodeType::StreamOutTableVaPtr) {
-    // Do nothing
-  } else if (resNodeIdx < InterfaceData::MaxDescTableCount && intfData->entryArgIdxs.resNodeValues[resNodeIdx] > 0) {
-    // Resource node isn't spilled, load its value from function argument
-    resNodeValue = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.resNodeValues[resNodeIdx],
-                                       Twine("resNode") + Twine(resNodeIdx));
-  } else if (node->type != ResourceNodeType::PushConst) {
-    // Resource node is spilled, load its value from spill table
-    unsigned byteOffset = node->offsetInDwords * sizeof(unsigned);
-
-    Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0),
-                     ConstantInt::get(Type::getInt32Ty(*m_context), byteOffset)};
-    auto spillTablePtr = getSpillTablePtr();
-    insertPos = spillTablePtr->getNextNode();
-    auto elemPtr = GetElementPtrInst::CreateInBounds(spillTablePtr, idxs, "", insertPos);
-
-    Type *resNodePtrTy = nullptr;
-
-    if (node->type == ResourceNodeType::DescriptorResource || node->type == ResourceNodeType::DescriptorSampler ||
-        node->type == ResourceNodeType::DescriptorTexelBuffer || node->type == ResourceNodeType::DescriptorFmask ||
-        node->type == ResourceNodeType::DescriptorBuffer || node->type == ResourceNodeType::DescriptorBufferCompact) {
-      resNodePtrTy = VectorType::get(Type::getInt32Ty(*m_context), node->sizeInDwords)->getPointerTo(ADDR_SPACE_CONST);
-    } else
-      resNodePtrTy = Type::getInt32Ty(*m_context)->getPointerTo(ADDR_SPACE_CONST);
-
-    auto resNodePtr = BitCastInst::CreatePointerCast(elemPtr, resNodePtrTy, "", insertPos);
-    resNodePtr->setMetadata(MetaNameUniform, MDNode::get(resNodePtr->getContext(), {}));
-
-    resNodeValue = new LoadInst(resNodePtrTy->getPointerElementType(), resNodePtr, "", insertPos);
-  }
-  assert(resNodeValue);
-  return resNodeValue;
-}
-
-// =====================================================================================================================
-// Get spill table pointer
-Instruction *ShaderSystemValues::getSpillTablePtr() {
-  if (!m_spillTablePtr) {
-    auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-    auto spillTablePtrLow = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.spillTable, "spillTable");
-    auto spillTablePtrTy = PointerType::get(
-        ArrayType::get(Type::getInt8Ty(*m_context), InterfaceData::MaxSpillTableSize), ADDR_SPACE_CONST);
-    m_spillTablePtr = makePointer(spillTablePtrLow, spillTablePtrTy, InvalidValue);
-  }
-  return m_spillTablePtr;
-}
-
-// =====================================================================================================================
-// Load descriptor from driver table
+// Load descriptor from driver table.
+// If the caller sets builder's insert point to the start of the function, it should ensure that it first calls
+// getInternalGlobalTablePtr(). Otherwise there is a danger that code is inserted in the wrong order, giving
+// invalid IR.
 //
 // @param tableOffset : Byte offset in driver table
 // @param builder : Builder to use for insertion
 Instruction *ShaderSystemValues::loadDescFromDriverTable(unsigned tableOffset, BuilderBase &builder) {
-  Value *args[] = {
-      builder.getInt32(InternalResourceTable),
-      builder.getInt32(tableOffset),
-      builder.getInt32(0),
-  };
-  return builder.CreateNamedCall(lgcName::DescriptorLoadBuffer, VectorType::get(Type::getInt32Ty(*m_context), 4), args,
-                                 {});
+  auto globalTable = getInternalGlobalTablePtr();
+  Type *descTy = VectorType::get(builder.getInt32Ty(), 4);
+  globalTable = cast<Instruction>(builder.CreateBitCast(globalTable, descTy->getPointerTo(ADDR_SPACE_CONST)));
+  Value *descPtr = builder.CreateGEP(descTy, globalTable, builder.getInt32(tableOffset));
+  LoadInst *desc = builder.CreateLoad(descTy, descPtr);
+  return desc;
 }
 
 // =====================================================================================================================

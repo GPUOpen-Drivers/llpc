@@ -29,6 +29,8 @@
  ***********************************************************************************************************************
  */
 #include "BuilderImpl.h"
+#include "lgc/LgcContext.h"
+#include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
@@ -38,6 +40,12 @@
 
 using namespace lgc;
 using namespace llvm;
+
+namespace {
+// Descriptor sizes that are not part of hardware. Hardware-defined ones are in TargetInfo.
+const unsigned DescriptorSizeBufferCompact = 2 * sizeof(unsigned);
+const unsigned DescriptorSizeSamplerYCbCr = 8 * sizeof(unsigned);
+} // anonymous namespace
 
 // =====================================================================================================================
 // Create a load of a buffer descriptor.
@@ -51,9 +59,7 @@ using namespace llvm;
 // @param instName : Name to give instruction(s)
 Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, bool isNonUniform,
                                          bool isWritten, Type *const pointeeTy, const Twine &instName) {
-  assert(pointeeTy);
-
-  Instruction *const insertPos = &*GetInsertPoint();
+  Value *desc = nullptr;
   descIndex = scalarizeIfUniform(descIndex, isNonUniform);
 
   // Mark the shader as reading and writing (if applicable) a resource.
@@ -61,63 +67,115 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   resUsage->resourceRead = true;
   resUsage->resourceWrite |= isWritten;
 
-  // TODO: This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
-  // look up the descSet/binding and generate the code directly.
-  auto bufDescLoadCall = emitCall(lgcName::DescriptorLoadBuffer, VectorType::get(getInt32Ty(), 4),
-                                  {
-                                      getInt32(descSet),
-                                      getInt32(binding),
-                                      descIndex,
-                                  },
-                                  {}, insertPos);
-  bufDescLoadCall->setName(instName);
+  // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
+  // look. Later code will use relocs.
+  const ResourceNode *topNode = nullptr;
+  const ResourceNode *node = nullptr;
+  if (!m_pipelineState->isUnlinked() /* TODO: Shader compilation: || !m_pipelineState->getUserDataNodes().empty()*/) {
+    // We have the user data layout. Find the node.
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorBuffer, descSet, binding);
+    if (!node) {
+      // We did not find the resource node. Return an undef value.
+      return UndefValue::get(getBufferDescTy(pointeeTy));
+    }
 
-  bufDescLoadCall = emitCall(lgcName::LateLaunderFatPointer, getInt8Ty()->getPointerTo(ADDR_SPACE_BUFFER_FAT_POINTER),
-                             bufDescLoadCall, Attribute::ReadNone, insertPos);
+    if (node && node == topNode && isa<Constant>(descIndex)) {
+      // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
+      // indexed. This lgc.root.descriptor call is by default lowered in PatchEntryPointMutate into a load from the
+      // spill table, but it might be able to "unspill" it to directly use shader entry SGPRs.
+      unsigned byteSize = getLgcContext()->getTargetInfo().getGpuProperty().descriptorSizeBuffer;
+      if (node->type == ResourceNodeType::DescriptorBufferCompact)
+        byteSize = DescriptorSizeBufferCompact;
+      unsigned dwordSize = byteSize / 4;
+      Type *descTy = VectorType::get(getInt32Ty(), dwordSize);
+      std::string callName = lgcName::RootDescriptor;
+      addTypeMangling(descTy, {}, callName);
+      unsigned dwordOffset = cast<ConstantInt>(descIndex)->getZExtValue() * dwordSize;
+      if (dwordOffset + dwordSize > node->sizeInDwords) {
+        // Index out of range
+        desc = UndefValue::get(descTy);
+      } else {
+        dwordOffset += node->offsetInDwords;
+        desc = CreateNamedCall(callName, descTy, getInt32(dwordOffset), Attribute::ReadNone);
+      }
+    } else if (node->type == ResourceNodeType::InlineBuffer) {
+      // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
+      Value *descPtr = getDescPtr(node->type, descSet, binding, topNode, node, /*shadow=*/false);
+      desc = buildInlineBufferDesc(descPtr);
+    }
+  }
 
-  return CreateBitCast(bufDescLoadCall, getBufferDescTy(pointeeTy));
+  if (!desc) {
+    // Not handled by either of the special cases above...
+    // Get a pointer to the descriptor, as a pointer to i8, in a struct with the stride.
+    Value *descPtrAndStride =
+        getDescPtrAndStride(node ? node->type : ResourceNodeType::DescriptorBuffer, descSet, binding, topNode, node,
+                            /*shadow=*/false);
+
+    // Index it.
+    if (descIndex != getInt32(0))
+      descPtrAndStride = CreateIndexDescPtr(descPtrAndStride, descIndex, isNonUniform, "");
+    Value *descPtr = CreateExtractValue(descPtrAndStride, 0);
+
+    // Load it.
+    desc = CreateLoad(descPtr->getType()->getPointerElementType(), descPtr);
+  }
+
+  // If it is a compact buffer descriptor, expand it. (That can only happen when user data layout is available;
+  // compact buffer descriptors are disallowed when using shader compilation with no user data layout).
+  if (node && node->type == ResourceNodeType::DescriptorBufferCompact)
+    desc = buildBufferCompactDesc(desc);
+
+  if (!instName.isTriviallyEmpty())
+    desc->setName(instName);
+
+  // Convert to fat pointer.
+  desc = CreateNamedCall(lgcName::LateLaunderFatPointer, getInt8Ty()->getPointerTo(ADDR_SPACE_BUFFER_FAT_POINTER), desc,
+                         Attribute::ReadNone);
+  return CreateBitCast(desc, getBufferDescTy(pointeeTy));
 }
 
 // =====================================================================================================================
 // Add index onto pointer to image/sampler/texelbuffer/F-mask array of descriptors.
 //
-// @param descPtr : Descriptor pointer, as returned by this function or one of the CreateGet*DescPtr methods
+// @param descPtrStruct : Descriptor pointer struct, as returned by this function or one of the
+//                        CreateGet*DescPtr methods
 // @param index : Index value
 // @param isNonUniform : Whether the descriptor index is non-uniform
 // @param instName : Name to give instruction(s)
-Value *DescBuilder::CreateIndexDescPtr(Value *descPtr, Value *index, bool isNonUniform, const Twine &instName) {
-  if (index != getInt32(0)) {
-    index = scalarizeIfUniform(index, isNonUniform);
-    std::string name = lgcName::DescriptorIndex;
-    addTypeMangling(descPtr->getType(), {}, name);
-    descPtr = emitCall(name, descPtr->getType(),
-                       {
-                           descPtr,
-                           index,
-                       },
-                       {}, &*GetInsertPoint());
-    descPtr->setName(instName);
-  }
-  return descPtr;
+Value *DescBuilder::CreateIndexDescPtr(Value *descPtrStruct, Value *index, bool isNonUniform, const Twine &instName) {
+  if (index == getInt32(0))
+    return descPtrStruct;
+
+  index = scalarizeIfUniform(index, isNonUniform);
+  Value *stride = CreateExtractValue(descPtrStruct, 1);
+  Value *descPtr = CreateExtractValue(descPtrStruct, 0);
+
+  Value *bytePtr = CreateBitCast(descPtr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
+  index = CreateMul(index, stride);
+  bytePtr = CreateGEP(getInt8Ty(), bytePtr, index, instName);
+  descPtr = CreateBitCast(bytePtr, descPtr->getType());
+
+  descPtrStruct =
+      CreateInsertValue(UndefValue::get(StructType::get(getContext(), {descPtr->getType(), getInt32Ty()})), descPtr, 0);
+  descPtrStruct = CreateInsertValue(descPtrStruct, stride, 1);
+
+  return descPtrStruct;
 }
 
 // =====================================================================================================================
 // Load image/sampler/texelbuffer/F-mask descriptor from pointer.
 // Returns <8 x i32> descriptor for image or F-mask, or <4 x i32> descriptor for sampler or texel buffer.
 //
-// @param descPtr : Descriptor pointer, as returned by CreateIndexDescPtr or one of the CreateGet*DescPtr methods
+// @param descPtrStruct : Descriptor pointer struct, as returned by CreateIndexDescPtr or one of the
+//                        CreateGet*DescPtr methods
 // @param instName : Name to give instruction(s)
-Value *DescBuilder::CreateLoadDescFromPtr(Value *descPtr, const Twine &instName) {
+Value *DescBuilder::CreateLoadDescFromPtr(Value *descPtrStruct, const Twine &instName) {
   // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
   getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
 
-  // Use llpc.descriptor.load.from.ptr.
-  std::string name = lgcName::DescriptorLoadFromPtr;
-  addTypeMangling(descPtr->getType(), {}, name);
-  auto desc = CreateNamedCall(name, cast<StructType>(descPtr->getType())->getElementType(0)->getPointerElementType(),
-                              descPtr, {});
-  desc->setName(instName);
-  return desc;
+  Value *descPtr = CreateExtractValue(descPtrStruct, 0);
+  return CreateLoad(descPtr->getType()->getPointerElementType(), descPtr, instName);
 }
 
 // =====================================================================================================================
@@ -127,16 +185,20 @@ Value *DescBuilder::CreateLoadDescFromPtr(Value *descPtr, const Twine &instName)
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
 Value *DescBuilder::CreateGetSamplerDescPtr(unsigned descSet, unsigned binding, const Twine &instName) {
-  // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
-  // look up the descSet/binding and generate the code directly.
-  auto descPtr = emitCall(lgcName::DescriptorGetSamplerPtr, getSamplerDescPtrTy(),
-                          {
-                              getInt32(descSet),
-                              getInt32(binding),
-                          },
-                          {}, &*GetInsertPoint());
-  descPtr->setName(instName);
-  return descPtr;
+  // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
+  // look. Later code will use relocs.
+  const ResourceNode *topNode = nullptr;
+  const ResourceNode *node = nullptr;
+  if (!m_pipelineState->isUnlinked() /* TODO: Shader compilation: || !m_pipelineState->getUserDataNodes().empty()*/) {
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorSampler, descSet, binding);
+    if (!node) {
+      // We did not find the resource node. Return an undef value.
+      return UndefValue::get(getSamplerDescPtrTy());
+    }
+  }
+
+  // Get the descriptor pointer and stride as a struct.
+  return getDescPtrAndStride(ResourceNodeType::DescriptorSampler, descSet, binding, topNode, node, /*shadow=*/false);
 }
 
 // =====================================================================================================================
@@ -146,16 +208,20 @@ Value *DescBuilder::CreateGetSamplerDescPtr(unsigned descSet, unsigned binding, 
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
 Value *DescBuilder::CreateGetImageDescPtr(unsigned descSet, unsigned binding, const Twine &instName) {
-  // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
-  // look up the descSet/binding and generate the code directly.
-  auto descPtr = emitCall(lgcName::DescriptorGetResourcePtr, getImageDescPtrTy(),
-                          {
-                              getInt32(descSet),
-                              getInt32(binding),
-                          },
-                          {}, &*GetInsertPoint());
-  descPtr->setName(instName);
-  return descPtr;
+  // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
+  // look. Later code will use relocs.
+  const ResourceNode *topNode = nullptr;
+  const ResourceNode *node = nullptr;
+  if (!m_pipelineState->isUnlinked() /* TODO: Shader compilation: || !m_pipelineState->getUserDataNodes().empty()*/) {
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorResource, descSet, binding);
+    if (!node) {
+      // We did not find the resource node. Return an undef value.
+      return UndefValue::get(getImageDescPtrTy());
+    }
+  }
+
+  // Get the descriptor pointer and stride as a struct.
+  return getDescPtrAndStride(ResourceNodeType::DescriptorResource, descSet, binding, topNode, node, /*shadow=*/false);
 }
 
 // =====================================================================================================================
@@ -165,16 +231,22 @@ Value *DescBuilder::CreateGetImageDescPtr(unsigned descSet, unsigned binding, co
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
 Value *DescBuilder::CreateGetTexelBufferDescPtr(unsigned descSet, unsigned binding, const Twine &instName) {
-  // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
-  // look up the descSet/binding and generate the code directly.
-  auto descPtr = emitCall(lgcName::DescriptorGetTexelBufferPtr, getTexelBufferDescPtrTy(),
-                          {
-                              getInt32(descSet),
-                              getInt32(binding),
-                          },
-                          {}, &*GetInsertPoint());
-  descPtr->setName(instName);
-  return descPtr;
+  // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
+  // look. Later code will use relocs.
+  const ResourceNode *topNode = nullptr;
+  const ResourceNode *node = nullptr;
+  if (!m_pipelineState->isUnlinked() /* TODO: Shader compilation: || !m_pipelineState->getUserDataNodes().empty()*/) {
+    std::tie(topNode, node) =
+        m_pipelineState->findResourceNode(ResourceNodeType::DescriptorTexelBuffer, descSet, binding);
+    if (!node) {
+      // We did not find the resource node. Return an undef value.
+      return UndefValue::get(getTexelBufferDescPtrTy());
+    }
+  }
+
+  // Get the descriptor pointer and stride as a struct.
+  return getDescPtrAndStride(ResourceNodeType::DescriptorTexelBuffer, descSet, binding, topNode, node,
+                             /*shadow=*/false);
 }
 
 // =====================================================================================================================
@@ -184,16 +256,28 @@ Value *DescBuilder::CreateGetTexelBufferDescPtr(unsigned descSet, unsigned bindi
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
 Value *DescBuilder::CreateGetFmaskDescPtr(unsigned descSet, unsigned binding, const Twine &instName) {
-  // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
-  // look up the descSet/binding and generate the code directly.
-  auto descPtr = emitCall(lgcName::DescriptorGetFmaskPtr, getFmaskDescPtrTy(),
-                          {
-                              getInt32(descSet),
-                              getInt32(binding),
-                          },
-                          {}, &*GetInsertPoint());
-  descPtr->setName(instName);
-  return descPtr;
+  // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
+  // look. Later code will use relocs.
+  const ResourceNode *topNode = nullptr;
+  const ResourceNode *node = nullptr;
+  bool shadow =
+      m_pipelineState->getOptions().shadowDescriptorTable != static_cast<unsigned>(ShadowDescriptorTable::Disable);
+  if (!m_pipelineState->isUnlinked() /* TODO: Shader compilation: || !m_pipelineState->getUserDataNodes().empty()*/) {
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorFmask, descSet, binding);
+    if (!node && shadow) {
+      // For fmask with -enable-shadow-descriptor-table, if no fmask descriptor is found, look for a resource
+      // (image) one instead.
+      std::tie(topNode, node) =
+          m_pipelineState->findResourceNode(ResourceNodeType::DescriptorResource, descSet, binding);
+    }
+    if (!node) {
+      // We did not find the resource node. Return an undef value.
+      return UndefValue::get(getSamplerDescPtrTy());
+    }
+  }
+
+  // Get the descriptor pointer and stride as a struct.
+  return getDescPtrAndStride(ResourceNodeType::DescriptorFmask, descSet, binding, topNode, node, shadow);
 }
 
 // =====================================================================================================================
@@ -204,20 +288,204 @@ Value *DescBuilder::CreateGetFmaskDescPtr(unsigned descSet, unsigned binding, co
 // @param pushConstantsTy : Type of the push constants table that the returned pointer will point to
 // @param instName : Name to give instruction(s)
 Value *DescBuilder::CreateLoadPushConstantsPtr(Type *pushConstantsTy, const Twine &instName) {
-  // Remember the size of push constants.
-  unsigned pushConstSize = GetInsertPoint()->getModule()->getDataLayout().getTypeStoreSize(pushConstantsTy);
-  ResourceUsage *resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
-  assert(resUsage->pushConstSizeInBytes == 0 || resUsage->pushConstSizeInBytes == pushConstSize);
-  resUsage->pushConstSizeInBytes = pushConstSize;
+  // Get the push const pointer. If subsequent code only uses this with constant GEPs and loads,
+  // then PatchEntryPointMutate might be able to "unspill" it so the code uses shader entry SGPRs
+  // directly instead of loading from the spill table.
+  Type *returnTy = pushConstantsTy->getPointerTo(ADDR_SPACE_CONST);
+  std::string callName = lgcName::PushConst;
+  addTypeMangling(returnTy, {}, callName);
+  return CreateNamedCall(callName, returnTy, {}, Attribute::ReadOnly, instName);
+}
 
-  auto pushConstantsPtrTy = PointerType::get(pushConstantsTy, ADDR_SPACE_CONST);
-  // TODO: This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
-  // generate the code directly.
-  std::string callName = lgcName::DescriptorLoadSpillTable;
-  addTypeMangling(pushConstantsPtrTy, {}, callName);
-  auto pushConstantsLoadCall = CreateNamedCall(callName, pushConstantsPtrTy, {}, {});
-  pushConstantsLoadCall->setName(instName);
-  return pushConstantsLoadCall;
+// =====================================================================================================================
+// Get a struct containing the pointer and byte stride for a descriptor
+//
+// @param resType : Resource type
+// @param descSet : Descriptor set
+// @param binding : Binding
+// @param topNode : Node in top-level descriptor table (nullptr for shader compilation)
+// @param node : The descriptor node itself (nullptr for shader compilation)
+// @param shadow : Whether to load from shadow descriptor table
+Value *DescBuilder::getDescPtrAndStride(ResourceNodeType resType, unsigned descSet, unsigned binding,
+                                        const ResourceNode *topNode, const ResourceNode *node, bool shadow) {
+  // Determine the stride if possible without looking at the resource node.
+  const GpuProperty &gpuProperty = getLgcContext()->getTargetInfo().getGpuProperty();
+  unsigned byteSize = 0;
+  Value *stride = nullptr;
+  switch (resType) {
+  case ResourceNodeType::DescriptorBuffer:
+  case ResourceNodeType::DescriptorTexelBuffer:
+    byteSize = gpuProperty.descriptorSizeBuffer;
+    if (node && node->type == ResourceNodeType::DescriptorBufferCompact)
+      byteSize = DescriptorSizeBufferCompact;
+    stride = getInt32(byteSize);
+    break;
+  case ResourceNodeType::DescriptorBufferCompact:
+    byteSize = DescriptorSizeBufferCompact;
+    stride = getInt32(byteSize);
+    break;
+  case ResourceNodeType::DescriptorSampler:
+    byteSize = gpuProperty.descriptorSizeSampler;
+    break;
+  case ResourceNodeType::DescriptorResource:
+  case ResourceNodeType::DescriptorFmask:
+    byteSize = gpuProperty.descriptorSizeResource;
+    break;
+  default:
+    llvm_unreachable("");
+    break;
+  }
+
+  if (!stride) {
+    // Stride is not determinable just from the descriptor type requested by the Builder call.
+    if (m_pipelineState->isUnlinked() /* TODO: Shader compilation:  && m_pipelineState->getUserDataNodes().empty()*/) {
+      // Shader compilation: Get byte stride using a reloc.
+      stride = CreateRelocationConstant("dstride_" + Twine(descSet) + "_" + Twine(binding));
+    } else {
+      // Pipeline compilation: Get the stride from the resource type in the node.
+      switch (node->type) {
+      case ResourceNodeType::DescriptorSampler:
+        stride = getInt32(gpuProperty.descriptorSizeSampler);
+        break;
+      case ResourceNodeType::DescriptorResource:
+      case ResourceNodeType::DescriptorFmask:
+        stride = getInt32(gpuProperty.descriptorSizeResource);
+        break;
+      case ResourceNodeType::DescriptorCombinedTexture:
+        stride = getInt32(gpuProperty.descriptorSizeResource + gpuProperty.descriptorSizeSampler);
+        break;
+      case ResourceNodeType::DescriptorYCbCrSampler:
+        stride = getInt32(DescriptorSizeSamplerYCbCr);
+        break;
+      default:
+        llvm_unreachable("Unexpected resource node type");
+        break;
+      }
+    }
+  }
+
+  Value *descPtr = nullptr;
+  if (node && node->immutableValue &&
+      (resType == ResourceNodeType::DescriptorSampler || resType == ResourceNodeType::DescriptorYCbCrSampler)) {
+    // This is an immutable sampler. Put the immutable value into a static variable and return a pointer
+    // to that. For a simple non-variably-indexed immutable sampler not passed through a function call
+    // or phi node, we rely on subsequent LLVM optimizations promoting the value back to a constant.
+    StringRef startGlobalName = lgcName::ImmutableSamplerGlobal;
+    // We need to change the stride to 4 dwords (8 dwords for a converting sampler). It would otherwise be
+    // incorrectly set to 12 dwords for a sampler in a combined texture.
+    stride = getInt32(gpuProperty.descriptorSizeSampler);
+    if (resType == ResourceNodeType::DescriptorYCbCrSampler) {
+      startGlobalName = lgcName::ImmutableConvertingSamplerGlobal;
+      stride = getInt32(DescriptorSizeSamplerYCbCr);
+    }
+
+    std::string globalName = (startGlobalName + Twine(node->set) + " " + Twine(node->binding)).str();
+    Module *module = GetInsertPoint()->getModule();
+    descPtr = module->getGlobalVariable(globalName, /*AllowInternal=*/true);
+    if (!descPtr) {
+      descPtr = new GlobalVariable(*module, node->immutableValue->getType(),
+                                   /*isConstant=*/true, GlobalValue::InternalLinkage, node->immutableValue, globalName,
+                                   nullptr, GlobalValue::NotThreadLocal, ADDR_SPACE_CONST);
+    }
+    descPtr = CreateBitCast(descPtr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
+  } else {
+    // Get a pointer to the descriptor.
+    descPtr = getDescPtr(resType, descSet, binding, topNode, node, shadow);
+  }
+
+  // Cast the pointer to the right type and create and return the struct.
+  descPtr = CreateBitCast(descPtr, VectorType::get(getInt32Ty(), byteSize / 4)->getPointerTo(ADDR_SPACE_CONST));
+  Value *descPtrStruct =
+      CreateInsertValue(UndefValue::get(StructType::get(getContext(), {descPtr->getType(), getInt32Ty()})), descPtr, 0);
+  descPtrStruct = CreateInsertValue(descPtrStruct, stride, 1);
+  return descPtrStruct;
+}
+
+// =====================================================================================================================
+// Get a pointer to a descriptor, as a pointer to i8
+//
+// @param resType : Resource type
+// @param descSet : Descriptor set
+// @param binding : Binding
+// @param topNode : Node in top-level descriptor table (nullptr for shader compilation)
+// @param node : The descriptor node itself (nullptr for shader compilation)
+// @param shadow : Whether to load from shadow descriptor table
+Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsigned binding,
+                               const ResourceNode *topNode, const ResourceNode *node, bool shadow) {
+  Value *descPtr = nullptr;
+
+  // Get the descriptor table pointer.
+  // TODO Shader compilation: If we do not have user data layout info (topNode and node are nullptr), then
+  // we do not know at compile time whether a DescriptorBuffer is in the root table or the table for its
+  // descriptor set, so we need to generate a select between the two, where the condition is a reloc.
+  if (node && node == topNode) {
+    // The descriptor is in the top-level table. (This can only happen for a DescriptorBuffer.) Contrary
+    // to what used to happen, we just load from the spill table, so we can get a pointer to the descriptor.
+    // The spill table gets returned as a pointer to array of i8.
+    descPtr =
+        CreateNamedCall(lgcName::SpillTable, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST), {}, Attribute::ReadNone);
+    // Ensure we mark spill table usage.
+    getPipelineState()->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
+  } else {
+    // Get the descriptor table pointer for the set, which might be passed as a user SGPR to the shader.
+    // The args to the lgc.descriptor.set call are:
+    // - descriptor set number
+    // - value for high 32 bits of pointer; ShadowDescriptorTable::Disable to use PC
+    // TODO Shader compilation: For the "shadow" case, the high half of the address needs to be a reloc.
+    unsigned highHalf = shadow ? m_pipelineState->getOptions().shadowDescriptorTable
+                               : static_cast<unsigned>(ShadowDescriptorTable::Disable);
+    descPtr = CreateNamedCall(lgcName::DescriptorSet, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
+                              {getInt32(descSet), getInt32(highHalf)}, Attribute::ReadNone);
+  }
+
+  // Add on the byte offset of the descriptor.
+  // TODO: This should be conditional just on !node, as it will be possible to do shader compilation
+  // with available user data layout.
+  Value *offset = nullptr;
+  bool useRelocationForOffsets = !node || m_pipelineState->isUnlinked();
+  if (useRelocationForOffsets) {
+    // Get the offset for the descriptor using a reloc. The reloc symbol name
+    // needs to contain the descriptor set and binding, and, for image, fmask or sampler, whether it is
+    // a sampler.
+    StringRef relocNameSuffix = "";
+    switch (resType) {
+    case ResourceNodeType::DescriptorSampler:
+    case ResourceNodeType::DescriptorYCbCrSampler:
+      relocNameSuffix = "_s";
+      break;
+    case ResourceNodeType::DescriptorResource:
+      relocNameSuffix = "_r";
+      break;
+    case ResourceNodeType::DescriptorBuffer:
+    case ResourceNodeType::DescriptorBufferCompact:
+    case ResourceNodeType::DescriptorTexelBuffer:
+      relocNameSuffix = "_b";
+      break;
+    default:
+      relocNameSuffix = "_x";
+      break;
+    }
+    offset = CreateRelocationConstant("doff_" + Twine(descSet) + "_" + Twine(binding) + relocNameSuffix);
+    // The LLVM's internal handling of GEP instruction results in a lot of junk code and prevented selection
+    // of the offset-from-register variant of the s_load_dwordx4 instruction. To workaround this issue,
+    // we use integer arithmetic here so the amdgpu backend can pickup the optimal instruction.
+    // When relocation is used, offset is in bytes, not in dwords.
+    descPtr = CreatePtrToInt(descPtr, getInt64Ty());
+    descPtr = CreateAdd(descPtr, CreateZExt(offset, getInt64Ty()));
+    descPtr = CreateIntToPtr(descPtr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
+  } else {
+    // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
+    // add on the size of the first part.
+    const GpuProperty &gpuProperty = getLgcContext()->getTargetInfo().getGpuProperty();
+    unsigned offsetInBytes = node->offsetInDwords * 4;
+    if (resType == ResourceNodeType::DescriptorSampler && node->type == ResourceNodeType::DescriptorCombinedTexture)
+      offsetInBytes += gpuProperty.descriptorSizeResource;
+    offset = getInt32(offsetInBytes);
+    descPtr = CreateBitCast(descPtr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
+    descPtr = CreateGEP(getInt8Ty(), descPtr, offset);
+  }
+
+  return descPtr;
 }
 
 // =====================================================================================================================
@@ -243,8 +511,105 @@ Value *DescBuilder::scalarizeIfUniform(Value *value, bool isNonUniform) {
 Value *DescBuilder::CreateGetBufferDescLength(Value *const bufferDesc, const Twine &instName) {
   // In future this should become a full LLVM intrinsic, but for now we patch in a late intrinsic that is cleaned up
   // in patch buffer op.
-  Instruction *const insertPos = &*GetInsertPoint();
   std::string callName = lgcName::LateBufferLength;
   addTypeMangling(nullptr, bufferDesc, callName);
-  return emitCall(callName, getInt32Ty(), bufferDesc, Attribute::ReadNone, insertPos);
+  return CreateNamedCall(callName, getInt32Ty(), bufferDesc, Attribute::ReadNone);
+}
+
+// =====================================================================================================================
+// Calculate a buffer descriptor for an inline buffer
+//
+// @param descPtr : Pointer to inline buffer
+Value *DescBuilder::buildInlineBufferDesc(Value *descPtr) {
+  // Bitcast the pointer to v2i32
+  descPtr = CreatePtrToInt(descPtr, getInt64Ty());
+  descPtr = CreateBitCast(descPtr, VectorType::get(getInt32Ty(), 2));
+
+  // Build descriptor words.
+  SqBufRsrcWord1 sqBufRsrcWord1 = {};
+  SqBufRsrcWord2 sqBufRsrcWord2 = {};
+  SqBufRsrcWord3 sqBufRsrcWord3 = {};
+
+  sqBufRsrcWord1.bits.baseAddressHi = UINT16_MAX;
+  sqBufRsrcWord2.bits.numRecords = UINT32_MAX;
+
+  sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
+  sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
+  sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
+  sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
+  sqBufRsrcWord3.gfx6.numFormat = BUF_NUM_FORMAT_UINT;
+  sqBufRsrcWord3.gfx6.dataFormat = BUF_DATA_FORMAT_32;
+  assert(sqBufRsrcWord3.u32All == 0x24FAC);
+
+  // Dword 0
+  Value *desc = UndefValue::get(VectorType::get(getInt32Ty(), 4));
+  Value *descElem0 = CreateExtractElement(descPtr, uint64_t(0));
+  desc = CreateInsertElement(desc, descElem0, uint64_t(0));
+
+  // Dword 1
+  Value *descElem1 = CreateExtractElement(descPtr, 1);
+  descElem1 = CreateAnd(descElem1, getInt32(sqBufRsrcWord1.u32All));
+  desc = CreateInsertElement(desc, descElem1, 1);
+
+  // Dword 2
+  desc = CreateInsertElement(desc, getInt32(sqBufRsrcWord2.u32All), 2);
+
+  // Dword 3
+  desc = CreateInsertElement(desc, getInt32(sqBufRsrcWord3.u32All), 3);
+
+  return desc;
+}
+
+// =====================================================================================================================
+// Build buffer compact descriptor
+//
+// @param desc : The buffer descriptor base to build for the buffer compact descriptor
+Value *DescBuilder::buildBufferCompactDesc(Value *desc) {
+  // Extract compact buffer descriptor
+  Value *descElem0 = CreateExtractElement(desc, uint64_t(0));
+  Value *descElem1 = CreateExtractElement(desc, 1);
+
+  // Build normal buffer descriptor
+  // Dword 0
+  Value *bufDesc = UndefValue::get(VectorType::get(getInt32Ty(), 4));
+  bufDesc = CreateInsertElement(bufDesc, descElem0, uint64_t(0));
+
+  // Dword 1
+  SqBufRsrcWord1 sqBufRsrcWord1 = {};
+  sqBufRsrcWord1.bits.baseAddressHi = UINT16_MAX;
+  descElem1 = CreateAnd(descElem1, getInt32(sqBufRsrcWord1.u32All));
+  bufDesc = CreateInsertElement(bufDesc, descElem1, 1);
+
+  // Dword 2
+  SqBufRsrcWord2 sqBufRsrcWord2 = {};
+  sqBufRsrcWord2.bits.numRecords = UINT32_MAX;
+  bufDesc = CreateInsertElement(bufDesc, getInt32(sqBufRsrcWord2.u32All), 2);
+
+  // Dword 3
+  const GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+  if (gfxIp.major < 10) {
+    SqBufRsrcWord3 sqBufRsrcWord3 = {};
+    sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
+    sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
+    sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
+    sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
+    sqBufRsrcWord3.gfx6.numFormat = BUF_NUM_FORMAT_UINT;
+    sqBufRsrcWord3.gfx6.dataFormat = BUF_DATA_FORMAT_32;
+    assert(sqBufRsrcWord3.u32All == 0x24FAC);
+    bufDesc = CreateInsertElement(bufDesc, getInt32(sqBufRsrcWord3.u32All), 3);
+  } else if (gfxIp.major == 10) {
+    SqBufRsrcWord3 sqBufRsrcWord3 = {};
+    sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
+    sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
+    sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
+    sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
+    sqBufRsrcWord3.gfx10.format = BUF_FORMAT_32_UINT;
+    sqBufRsrcWord3.gfx10.resourceLevel = 1;
+    sqBufRsrcWord3.gfx10.oobSelect = 2;
+    assert(sqBufRsrcWord3.u32All == 0x21014FAC);
+    bufDesc = CreateInsertElement(bufDesc, getInt32(sqBufRsrcWord3.u32All), 3);
+  } else {
+    llvm_unreachable("Not implemented!");
+  }
+  return bufDesc;
 }

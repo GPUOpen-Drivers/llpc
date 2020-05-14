@@ -294,7 +294,21 @@ private:
   DescBuilder(const DescBuilder &) = delete;
   DescBuilder &operator=(const DescBuilder &) = delete;
 
+  // Get a struct containing the pointer and byte stride for a descriptor
+  llvm::Value *getDescPtrAndStride(ResourceNodeType resType, unsigned descSet, unsigned binding,
+                                   const ResourceNode *topNode, const ResourceNode *node, bool shadow);
+
+  // Get a pointer to a descriptor, as a pointer to i8
+  llvm::Value *getDescPtr(ResourceNodeType resType, unsigned descSet, unsigned binding, const ResourceNode *topNode,
+                          const ResourceNode *node, bool shadow);
+
   llvm::Value *scalarizeIfUniform(llvm::Value *value, bool isNonUniform);
+
+  // Calculate a buffer descriptor for an inline buffer
+  llvm::Value *buildInlineBufferDesc(llvm::Value *descPtr);
+
+  // Build buffer compact descriptor
+  llvm::Value *buildBufferCompactDesc(llvm::Value *desc);
 };
 
 // =====================================================================================================================

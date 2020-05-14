@@ -196,8 +196,8 @@ void PipelineContext::setPipelineState(Pipeline *pipeline) const {
   unsigned stageMask = getShaderStageMask();
   unsigned lgcStageMask = 0;
   for (unsigned stage = 0; stage != ShaderStageCount; ++stage) {
-    if (stageMask & shaderStageToMask(static_cast<ShaderStage>(stage)))
-      lgcStageMask |= shaderStageToMask(static_cast<ShaderStage>(getLgcShaderStage(static_cast<ShaderStage>(stage))));
+    if (stageMask & (1 << stage))
+      lgcStageMask |= 1 << getLgcShaderStage(static_cast<ShaderStage>(stage));
   }
   pipeline->setShaderStageMask(lgcStageMask);
 

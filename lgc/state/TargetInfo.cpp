@@ -70,6 +70,11 @@ static void setGfx6BaseInfo(TargetInfo *targetInfo) {
 
   // TODO: Accept gsOnChipDefaultLdsSizePerSubgroup from panel option
   targetInfo->getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup = 8192; // GFX6-8 value
+
+  // Descriptor sizes. Always the same for GFX6+.
+  targetInfo->getGpuProperty().descriptorSizeResource = 8 * sizeof(uint32_t);
+  targetInfo->getGpuProperty().descriptorSizeSampler = 4 * sizeof(uint32_t);
+  targetInfo->getGpuProperty().descriptorSizeBuffer = 4 * sizeof(uint32_t);
 }
 
 // gfx6

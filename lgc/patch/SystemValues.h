@@ -83,14 +83,11 @@ public:
   // Get pointers to emit counters (GS)
   llvm::ArrayRef<llvm::Value *> getEmitCounterPtr();
 
-  // Get descriptor table pointer
-  llvm::Value *getDescTablePtr(unsigned descSet);
-
-  // Get shadow descriptor table pointer
-  llvm::Value *getShadowDescTablePtr(unsigned descSet);
-
   // Get global internal table pointer as pointer to i8.
-  llvm::Value *getInternalGlobalTablePtr();
+  llvm::Instruction *getInternalGlobalTablePtr();
+
+  // Load descriptor from driver table
+  llvm::Instruction *loadDescFromDriverTable(unsigned tableOffset, BuilderBase &builder);
 
   // Get internal per shader table pointer as pointer to i8.
   llvm::Value *getInternalPerShaderTablePtr();
@@ -98,17 +95,11 @@ public:
   // Get number of workgroups value
   llvm::Value *getNumWorkgroups();
 
-  // Get spilled push constant pointer
-  llvm::Value *getSpilledPushConstTablePtr();
-
   // Get vertex buffer table pointer
   llvm::Value *getVertexBufTablePtr();
 
   // Get stream-out buffer descriptor
   llvm::Value *getStreamOutBufDesc(unsigned xfbBuffer);
-
-  // Get spill table pointer
-  llvm::Instruction *getSpillTablePtr();
 
   // Test if shadow descriptor table is enabled
   bool isShadowDescTableEnabled() const;
@@ -119,15 +110,6 @@ private:
 
   // Make 64-bit pointer of specified type from 32-bit int, extending with the specified value, or PC if InvalidValue
   llvm::Instruction *makePointer(llvm::Value *lowValue, llvm::Type *ptrTy, unsigned highValue);
-
-  // Get 64-bit extended resource node value
-  llvm::Value *getExtendedResourceNodeValue(unsigned resNodeIdx, llvm::Type *resNodeTy, unsigned highValue);
-
-  // Get 32 bit resource node value
-  llvm::Value *getResourceNodeValue(unsigned resNodeIdx);
-
-  // Load descriptor from driver table
-  llvm::Instruction *loadDescFromDriverTable(unsigned tableOffset, BuilderBase &builder);
 
   // Explicitly set the DATA_FORMAT of ring buffer descriptor.
   llvm::Value *setRingBufferDataFormat(llvm::Value *bufDesc, unsigned dataFormat, BuilderBase &builder) const;
@@ -162,16 +144,11 @@ private:
 
   llvm::SmallVector<llvm::Value *, 8> m_descTablePtrs;       // Descriptor table pointers
   llvm::SmallVector<llvm::Value *, 8> m_shadowDescTablePtrs; // Shadow descriptor table pointers
-  llvm::Value *m_internalGlobalTablePtr = nullptr;
-  // Internal global table pointer
-  llvm::Value *m_internalPerShaderTablePtr = nullptr;
-  // Internal per shader table pointer
-  llvm::Value *m_spilledPushConstTablePtr = nullptr;
-  // Spilled push constant pointer
-  llvm::Value *m_vbTablePtr = nullptr;          // Vertex buffer table pointer
-  llvm::Instruction *m_streamOutTablePtr;       // Stream-out buffer table pointer
-  llvm::Instruction *m_spillTablePtr = nullptr; // Spill table pointer
-  llvm::Instruction *m_pc = nullptr;            // Program counter as <2 x i32>
+  llvm::Instruction *m_internalGlobalTablePtr = nullptr;     // Internal global table pointer
+  llvm::Value *m_internalPerShaderTablePtr = nullptr;        // Internal per shader table pointer
+  llvm::Value *m_vbTablePtr = nullptr;                       // Vertex buffer table pointer
+  llvm::Instruction *m_streamOutTablePtr;                    // Stream-out buffer table pointer
+  llvm::Instruction *m_pc = nullptr;                         // Program counter as <2 x i32>
 };
 
 // =====================================================================================================================

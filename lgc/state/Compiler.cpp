@@ -136,10 +136,7 @@ Module *PipelineState::irLink(ArrayRef<std::pair<Module *, ShaderStage>> modules
 // @param pipelineModule : IR pipeline module
 // @param [in/out] outStream : Stream to write ELF or IR disassembly output
 // @param checkShaderCacheFunc : Function to check shader cache in graphics pipeline
-// @param timers : Optional timers for 0 or more of:
-//                 timers[0]: patch passes
-//                 timers[1]: LLVM optimizations
-//                 timers[2]: codegen
+// @param timers : Timers for: patch passes, llvm optimizations, codegen
 void PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_stream &outStream,
                              Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, ArrayRef<Timer *> timers) {
   unsigned passIndex = 1000;
