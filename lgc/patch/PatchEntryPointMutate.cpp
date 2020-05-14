@@ -154,7 +154,7 @@ private:
 
   void processShader(ShaderInputs *shaderInputs);
 
-  FunctionType *generateEntryPointType(ShaderInputs *shaderInputs, uint64_t *inRegMask);
+  uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys);
 
   void addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs,
                               SmallVectorImpl<UserDataArg> &specialUserDataArgs, IRBuilder<> &builder);
@@ -608,31 +608,17 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
 //
 // @param shaderInputs : ShaderInputs object representing hardware-provided shader inputs
 void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
-  // Create new entry-point from the original one (mutate it)
-  // TODO: We should mutate entry-point arguments instead of clone a new entry-point.
-  uint64_t inRegMask = 0;
-  FunctionType *entryPointTy = generateEntryPointType(shaderInputs, &inRegMask);
+  // Create new entry-point from the original one
+  SmallVector<Type *, 8> argTys;
+  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, argTys);
 
   Function *origEntryPoint = m_entryPoint;
 
-  // Create new function, empty for now.
-  Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, "", m_module);
-  entryPoint->setCallingConv(origEntryPoint->getCallingConv());
-  entryPoint->takeName(origEntryPoint);
+  // Create the new function and transfer code and attributes to it.
+  Function *entryPoint =
+      addFunctionArgs(origEntryPoint, origEntryPoint->getFunctionType()->getReturnType(), argTys, inRegMask);
 
-  // Transfer code from old function to new function.
-  while (!origEntryPoint->empty()) {
-    BasicBlock *block = &origEntryPoint->front();
-    block->removeFromParent();
-    block->insertInto(entryPoint);
-  }
-
-  // Copy attributes and shader stage from the old function.
-  entryPoint->setAttributes(origEntryPoint->getAttributes());
-  entryPoint->addFnAttr(Attribute::NoUnwind);
-  setShaderStage(entryPoint, getShaderStage(origEntryPoint));
-
-  // Set Attributes on cloned function here as some are overwritten during CloneFunctionInto otherwise
+  // Set Attributes on new function here.
   AttrBuilder builder;
   if (m_shaderStage == ShaderStageFragment) {
     auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
@@ -703,13 +689,6 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
   if (entryPoint->hasFnAttribute(Attribute::ReadNone))
     entryPoint->removeFnAttr(Attribute::ReadNone);
 
-  // Update attributes of new entry-point
-  for (auto arg = entryPoint->arg_begin(), end = entryPoint->arg_end(); arg != end; ++arg) {
-    auto argIdx = arg->getArgNo();
-    if (inRegMask & (1ull << argIdx))
-      arg->addAttr(Attribute::InReg);
-  }
-
   // Remove original entry-point
   origEntryPoint->dropAllReferences();
   origEntryPoint->eraseFromParent();
@@ -747,9 +726,9 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
 //                          arg needs to have an "inreg" attribute to put the arg into SGPRs rather than VGPRs
 // @return : The newly-constructed function type
 //
-FunctionType *PatchEntryPointMutate::generateEntryPointType(ShaderInputs *shaderInputs, uint64_t *inRegMask) {
-  SmallVector<Type *, 8> argTys;
+uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys) {
 
+  uint64_t inRegMask = 0;
   IRBuilder<> builder(*m_context);
   auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
   auto &entryArgIdxs = intfData->entryArgIdxs;
@@ -813,12 +792,12 @@ FunctionType *PatchEntryPointMutate::generateEntryPointType(ShaderInputs *shader
   }
 
   intfData->userDataCount = userDataIdx;
-  *inRegMask = (1ull << argTys.size()) - 1;
+  inRegMask = (1ull << argTys.size()) - 1;
 
   // Push the fixed system (not user data) register args.
-  *inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, argTys);
+  inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, argTys);
 
-  return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
+  return inRegMask;
 }
 
 // =====================================================================================================================
