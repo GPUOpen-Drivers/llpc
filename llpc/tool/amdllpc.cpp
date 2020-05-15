@@ -1331,7 +1331,7 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
       SMDiagnostic errDiag;
 
       // Load LLVM IR
-      std::unique_ptr<Module> module = parseAssemblyFile(inFile, errDiag, context, nullptr, false);
+      std::unique_ptr<Module> module = parseAssemblyFile(inFile, errDiag, context, nullptr);
       if (!module.get()) {
         std::string errMsg;
         raw_string_ostream errStream(errMsg);

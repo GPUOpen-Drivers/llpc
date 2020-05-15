@@ -553,7 +553,7 @@ void PatchBufferOp::visitLoadInst(LoadInst &loadInst) {
 
     LoadInst *const newLoad = m_builder->CreateLoad(loadPointer);
     newLoad->setVolatile(loadInst.isVolatile());
-    newLoad->setAlignment(MaybeAlign(loadInst.getAlignment()));
+    newLoad->setAlignment(Align(loadInst.getAlignment()));
     newLoad->setOrdering(loadInst.getOrdering());
     newLoad->setSyncScopeID(loadInst.getSyncScopeID());
     copyMetadata(newLoad, &loadInst);
@@ -1346,7 +1346,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
     if (isLoad) {
       LoadInst *const newLoad = m_builder->CreateLoad(pointer);
       newLoad->setVolatile(loadInst->isVolatile());
-      newLoad->setAlignment(MaybeAlign(alignment));
+      newLoad->setAlignment(Align(alignment));
       newLoad->setOrdering(ordering);
       newLoad->setSyncScopeID(syncScopeID);
       copyMetadata(newLoad, loadInst);

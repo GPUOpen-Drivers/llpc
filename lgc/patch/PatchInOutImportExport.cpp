@@ -4072,7 +4072,7 @@ Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned loca
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ringOffset};
       Value *loadPtr = GetElementPtrInst::Create(nullptr, m_lds, idxs, "", insertPos);
       auto loadInst = new LoadInst(loadPtr->getType()->getPointerElementType(), loadPtr, "", false, insertPos);
-      loadInst->setAlignment(MaybeAlign(m_lds->getAlignment()));
+      loadInst->setAlignment(Align(m_lds->getAlignment()));
       loadValue = loadInst;
 
       if (bitWidth == 8)
@@ -4434,7 +4434,7 @@ Value *PatchInOutImportExport::readValueFromLds(bool isOutput, Type *readTy, Val
       Value *loadPtr = GetElementPtrInst::Create(nullptr, m_lds, idxs, "", insertPos);
       auto loadTy = loadPtr->getType()->getPointerElementType();
       auto loadInst = new LoadInst(loadTy, loadPtr, "", false, insertPos);
-      loadInst->setAlignment(MaybeAlign(m_lds->getAlignment()));
+      loadInst->setAlignment(Align(m_lds->getAlignment()));
       loadValues[i] = loadInst;
 
       if (bitWidth == 8)
