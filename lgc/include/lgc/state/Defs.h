@@ -72,7 +72,7 @@ const static char PushConst[] = "lgc.push.const";
 // The arg is the dword offset of the node in the root user data layout.
 const static char RootDescriptor[] = "lgc.root.descriptor";
 // Get pointer to a descriptor set table. First arg is the descriptor set number; second arg is the value to use
-// for the high half of the address, or ShadowDescriptorTable::Disable to use PC.
+// for the high half of the address, or HighAddrPc to use PC.
 const static char DescriptorSet[] = "lgc.descriptor.set";
 
 const static char LaterCallPrefix[] = "lgc.late.";
@@ -114,6 +114,9 @@ const static char CopyShaderEntryPoint[] = "lgc.shader.COPY.main";
 const static char NullFsEntryPoint[] = "lgc.shader.FS.null.main";
 
 } // namespace lgcName
+
+// Value for high half of address that means "use PC".
+const static unsigned HighAddrPc = ~0U;
 
 // Well-known metadata names
 const static char MetaNameUniform[] = "amdgpu.uniform";
