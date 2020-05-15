@@ -29,11 +29,13 @@ ARG GENERATOR
 # Install required packages.
 RUN apt-get update \
     && apt-get install -yqq --no-install-recommends \
-       build-essential cmake gcc g++ ninja-build binutils-gold \
+       build-essential pkg-config cmake cmake-data \
+       gcc g++ ninja-build binutils-gold \
        clang-9 libclang-common-9-dev lld-9 \
        python python-distutils-extra python3 python3-distutils \
        libssl-dev libx11-dev libxcb1-dev x11proto-dri2-dev libxcb-dri3-dev \
        libxcb-dri2-0-dev libxcb-present-dev libxshmfence-dev libxrandr-dev \
+       libwayland-dev \
        git repo curl vim-tiny \
     && rm -rf /var/lib/apt/lists/* \
     && update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10 \
@@ -60,6 +62,9 @@ RUN EXTRA_FLAGS="" \
          EXTRA_FLAGS="$EXTRA_FLAGS -DLLVM_USE_LINKER=lld"; \
          EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld"; \
          EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld"; \
+       fi \
+    && if echo "$FEATURES" | grep -q "+shadercache" ; then \
+         EXTRA_FLAGS="$EXTRA_FLAGS -DLLPC_ENABLE_SHADER_CACHE=1"; \
        fi \
     && echo "Extra CMake flags: $EXTRA_FLAGS" \
     && cmake "/vulkandriver/drivers/xgl" \
