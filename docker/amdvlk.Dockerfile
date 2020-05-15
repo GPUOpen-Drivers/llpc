@@ -67,7 +67,7 @@ RUN EXTRA_FLAGS="" \
           -DXGL_BUILD_LIT=ON \
           -DCMAKE_BUILD_TYPE="$CONFIG" \
           -DLLVM_ENABLE_ASSERTIONS="$ASSERTIONS" \
-          -DLLPC_ENABLE_WERROR=ON \
+          -DICD_ANALYSIS_WARNINGS_AS_ERRORS=ON \
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
           $EXTRA_FLAGS \
     && cmake --build . \
