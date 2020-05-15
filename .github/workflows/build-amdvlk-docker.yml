@@ -17,7 +17,7 @@ jobs:
         branch:         [dev]
         config:         [Release]
         assertions:     ["OFF", "ON"]
-        feature-set:    ["+gcc", "+clang"]
+        feature-set:    ["+gcc", "+clang", "+clang+shadercache"]
         generator:      [Ninja]
     steps:
       - name: Checkout LLPC
