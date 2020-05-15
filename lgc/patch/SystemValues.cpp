@@ -513,5 +513,5 @@ unsigned ShaderSystemValues::findResourceNodeByDescSet(unsigned descSet) {
 // =====================================================================================================================
 // Test if shadow descriptor table is enabled
 bool ShaderSystemValues::isShadowDescTableEnabled() const {
-  return m_pipelineState->getOptions().shadowDescriptorTable != static_cast<unsigned>(ShadowDescriptorTable::Disable);
+  return m_pipelineState->getOptions().shadowDescriptorTable != ShadowDescriptorTableDisable;
 }

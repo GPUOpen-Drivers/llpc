@@ -245,14 +245,14 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
     options.shadowDescriptorTable = getPipelineOptions()->shadowDescriptorTablePtrHigh;
     break;
   case Vkgc::ShadowDescriptorTableUsage::Disable:
-    options.shadowDescriptorTable = static_cast<unsigned>(ShadowDescriptorTable::Disable);
+    options.shadowDescriptorTable = ShadowDescriptorTableDisable;
     break;
   }
 
   // Shadow descriptor command line options override pipeline options.
   if (EnableShadowDescriptorTable.getNumOccurrences() > 0) {
     if (!EnableShadowDescriptorTable)
-      options.shadowDescriptorTable = static_cast<unsigned>(ShadowDescriptorTable::Disable);
+      options.shadowDescriptorTable = ShadowDescriptorTableDisable;
     else
       options.shadowDescriptorTable = ShadowDescTablePtrHigh;
   }

@@ -189,13 +189,13 @@ public:
   // Extend an i32 into a 64-bit pointer
   //
   // @param addr32 : Address as 32-bit value
-  // @param highHalf : Value to use for high half; ShadowDescriptorTable::Disable to use PC
+  // @param highHalf : Value to use for high half; HighAddrPc to use PC
   // @param ptrTy : Type to cast pointer to
   // @param builder : IRBuilder to use, already set to the required insert point
   // @return : 64-bit pointer value
   Instruction *extend(Value *addr32, unsigned highHalf, Type *ptrTy, IRBuilder<> &builder) {
     Value *ptr = nullptr;
-    if (highHalf == static_cast<unsigned>(ShadowDescriptorTable::Disable)) {
+    if (highHalf == HighAddrPc) {
       // Extend with PC.
       ptr = builder.CreateInsertElement(getPc(), addr32, uint64_t(0));
     } else {
@@ -434,8 +434,8 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
       builder.SetInsertPoint(addressExtender.getFirstInsertionPt());
       Argument *arg = func.getArg(userDataUsage->spillTable.entryArgIdx);
       arg->setName("spillTable");
-      spillTable = addressExtender.extend(arg, static_cast<unsigned>(ShadowDescriptorTable::Disable),
-                                          builder.getInt8Ty()->getPointerTo(ADDR_SPACE_CONST), builder);
+      spillTable =
+          addressExtender.extend(arg, HighAddrPc, builder.getInt8Ty()->getPointerTo(ADDR_SPACE_CONST), builder);
     }
 
     // Handle direct uses of the spill table that were generated in DescBuilder.

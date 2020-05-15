@@ -91,10 +91,8 @@ enum class WaveBreak : unsigned {
   DrawTime = 0xF, ///< Choose wave break size per draw
 };
 
-// Values for shadowDescriptorTable pipeline option.
-enum class ShadowDescriptorTable : unsigned {
-  Disable = ~0U // Disable shadow descriptor tables
-};
+// Value for shadowDescriptorTable pipeline option.
+static const unsigned ShadowDescriptorTableDisable = ~0U;
 
 // Middle-end per-pipeline options to pass to SetOptions.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
@@ -116,7 +114,7 @@ struct Options {
   unsigned nggVertsPerSubgroup;        // How to determine NGG verts per subgroup
   unsigned nggPrimsPerSubgroup;        // How to determine NGG prims per subgroup
   unsigned shadowDescriptorTable;      // High dword of shadow descriptor table address, or
-                                       //   ShadowDescriptorTable::Disable to disable shadow descriptor tables
+                                       //   ShadowDescriptorTableDisable to disable shadow descriptor tables
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.

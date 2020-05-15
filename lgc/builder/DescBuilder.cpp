@@ -260,8 +260,7 @@ Value *DescBuilder::CreateGetFmaskDescPtr(unsigned descSet, unsigned binding, co
   // look. Later code will use relocs.
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
-  bool shadow =
-      m_pipelineState->getOptions().shadowDescriptorTable != static_cast<unsigned>(ShadowDescriptorTable::Disable);
+  bool shadow = m_pipelineState->getOptions().shadowDescriptorTable != ShadowDescriptorTableDisable;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorFmask, descSet, binding);
     if (!node && shadow) {
@@ -427,10 +426,9 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     // Get the descriptor table pointer for the set, which might be passed as a user SGPR to the shader.
     // The args to the lgc.descriptor.set call are:
     // - descriptor set number
-    // - value for high 32 bits of pointer; ShadowDescriptorTable::Disable to use PC
+    // - value for high 32 bits of pointer; HighAddrPc to use PC
     // TODO Shader compilation: For the "shadow" case, the high half of the address needs to be a reloc.
-    unsigned highHalf = shadow ? m_pipelineState->getOptions().shadowDescriptorTable
-                               : static_cast<unsigned>(ShadowDescriptorTable::Disable);
+    unsigned highHalf = shadow ? m_pipelineState->getOptions().shadowDescriptorTable : HighAddrPc;
     descPtr = CreateNamedCall(lgcName::DescriptorSet, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
                               {getInt32(descSet), getInt32(highHalf)}, Attribute::ReadNone);
   }
