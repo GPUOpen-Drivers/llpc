@@ -1505,13 +1505,17 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
 // @param options : An array of compilation-option strings
 MetroHash::Hash Compiler::generateHashForCompileOptions(unsigned optionCount, const char *const *options) {
   // Options which needn't affect compilation results
-  // clang-format off
-  static StringRef IgnoredOptions[] = {
-      cl::PipelineDumpDir.ArgStr, cl::EnablePipelineDump.ArgStr, cl::ShaderCacheFileDir.ArgStr,
-      cl::ShaderCacheMode.ArgStr, cl::EnableOuts.ArgStr,         cl::EnableErrs.ArgStr,
-      cl::LogFileDbgs.ArgStr,     cl::LogFileOuts.ArgStr,        cl::ExecutableName.ArgStr,
-      cl::BuildShaderCache.ArgStr, "o"};
-  // clang-format on
+  static StringRef IgnoredOptions[] = {cl::PipelineDumpDir.ArgStr,
+                                       cl::EnablePipelineDump.ArgStr,
+                                       cl::ShaderCacheFileDir.ArgStr,
+                                       cl::ShaderCacheMode.ArgStr,
+                                       cl::EnableOuts.ArgStr,
+                                       cl::EnableErrs.ArgStr,
+                                       cl::LogFileDbgs.ArgStr,
+                                       cl::LogFileOuts.ArgStr,
+                                       cl::ExecutableName.ArgStr,
+                                       cl::BuildShaderCache.ArgStr,
+                                       "o"};
 
   std::set<StringRef> effectingOptions;
   // Build effecting options
