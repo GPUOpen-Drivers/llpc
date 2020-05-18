@@ -367,9 +367,8 @@ Value *ShaderSystemValues::getStreamOutBufDesc(unsigned xfbBuffer) {
     streamOutBufDescPtr->setMetadata(MetaNameUniform, MDNode::get(streamOutBufDescPtr->getContext(), {}));
     auto streamOutBufDescTy = streamOutBufDescPtr->getType()->getPointerElementType();
 
-    auto streamOutBufDesc = new LoadInst(streamOutBufDescTy, streamOutBufDescPtr, "", insertPos);
+    auto streamOutBufDesc = new LoadInst(streamOutBufDescTy, streamOutBufDescPtr, "", false, Align(16), insertPos);
     streamOutBufDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(streamOutBufDesc->getContext(), {}));
-    streamOutBufDesc->setAlignment(Align(16));
 
     m_streamOutBufDescs[xfbBuffer] = streamOutBufDesc;
   }
