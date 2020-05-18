@@ -86,11 +86,11 @@ void PalMetadata::initialize() {
       m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0].getMap(true);
   m_registers = m_pipelineNode[".registers"].getMap(true);
   m_userDataLimit = &m_pipelineNode[Util::Abi::PipelineMetadataKey::UserDataLimit];
-  if (m_userDataLimit->isEmpty() || m_userDataLimit->getKind() == msgpack::Type::Nil)
-    *m_userDataLimit = m_document->getNode(0U);
+  if (m_userDataLimit->isEmpty())
+    *m_userDataLimit = 0U;
   m_spillThreshold = &m_pipelineNode[Util::Abi::PipelineMetadataKey::SpillThreshold];
-  if (m_spillThreshold->isEmpty() || m_spillThreshold->getKind() == msgpack::Type::Nil)
-    *m_spillThreshold = m_document->getNode(UINT_MAX);
+  if (m_spillThreshold->isEmpty())
+    *m_spillThreshold = UINT_MAX;
 }
 
 // =====================================================================================================================
@@ -101,8 +101,8 @@ void PalMetadata::initialize() {
 void PalMetadata::record(Module *module) {
   // Add the metadata version number.
   auto versionNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Version].getArray(true);
-  versionNode[0] = m_document->getNode(Util::Abi::PipelineMetadataMajorVersion);
-  versionNode[1] = m_document->getNode(Util::Abi::PipelineMetadataMinorVersion);
+  versionNode[0] = Util::Abi::PipelineMetadataMajorVersion;
+  versionNode[1] = Util::Abi::PipelineMetadataMinorVersion;
 
   // Write the MsgPack document into an IR metadata node.
   // The IR named metadata node contains an MDTuple containing an MDString containing the msgpack data.
@@ -218,7 +218,7 @@ void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, un
 
   // Update userDataLimit if userData is a 0-based integer for root user data dword offset.
   if (userDataValue < InterfaceData::MaxSpillTableSize && userDataValue + dwordCount > m_userDataLimit->getUInt())
-    *m_userDataLimit = m_document->getNode(userDataValue + dwordCount);
+    *m_userDataLimit = userDataValue + dwordCount;
 
   // Although NumWorkgroupsPtr is a register pair, only the first word has a user data entry.
   if (userDataValue == static_cast<unsigned>(Util::Abi::UserDataMapping::Workgroup))
@@ -227,7 +227,7 @@ void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, un
   // Write the register(s)
   userDataReg += userDataIndex;
   while (dwordCount--)
-    m_registers[m_document->getNode(userDataReg++)] = m_document->getNode(userDataValue++);
+    m_registers[userDataReg++] = userDataValue++;
 }
 
 // =====================================================================================================================
@@ -237,7 +237,7 @@ void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, un
 // @param dwordOffset : Dword offset that the spill table is used at
 void PalMetadata::setUserDataSpillUsage(unsigned dwordOffset) {
   if (dwordOffset < m_spillThreshold->getUInt())
-    *m_spillThreshold = m_document->getNode(dwordOffset);
+    *m_spillThreshold = dwordOffset;
 }
 
 // =====================================================================================================================
@@ -248,8 +248,8 @@ void PalMetadata::finalizePipeline() {
   // Set pipeline hash.
   auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
   const auto &options = m_pipelineState->getOptions();
-  pipelineHashNode[0] = m_document->getNode(options.hash[0]);
-  pipelineHashNode[1] = m_document->getNode(options.hash[1]);
+  pipelineHashNode[0] = options.hash[0];
+  pipelineHashNode[1] = options.hash[1];
 
   // Set PA_CL_CLIP_CNTL from pipeline state settings.
   bool depthClipDisable = !m_pipelineState->getViewportState().depthClipEnable;
@@ -281,10 +281,10 @@ void PalMetadata::finalizePipeline() {
 // @param regNum : Register number
 // @param value : Value to OR in
 void PalMetadata::setRegister(unsigned regNum, unsigned value) {
-  msgpack::DocNode &node = m_registers[m_document->getNode(regNum)];
+  msgpack::DocNode &node = m_registers[regNum];
   if (node.getKind() == msgpack::Type::UInt)
     value |= node.getUInt();
-  node = m_document->getNode(value);
+  node = value;
 }
 
 // =====================================================================================================================
@@ -297,5 +297,5 @@ void PalMetadata::setUserDataLimit() {
     if (node.type != ResourceNodeType::IndirectUserDataVaPtr && node.type != ResourceNodeType::StreamOutTableVaPtr)
       userDataLimit = std::max(userDataLimit, node.offsetInDwords + node.sizeInDwords);
   }
-  *m_userDataLimit = m_document->getNode(userDataLimit);
+  *m_userDataLimit = userDataLimit;
 }
