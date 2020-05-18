@@ -483,6 +483,7 @@ private:
 
   void setAttrByCalledFunc(CallInst *call);
   Type *transFPType(SPIRVType *t);
+  FastMathFlags getFastMathFlags(SPIRVValue *bv);
   void setFastMathFlags(SPIRVValue *bv);
   void setFastMathFlags(Value *val);
   BinaryOperator *transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
@@ -1198,24 +1199,25 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
   }
 }
 
-// Decide whether to set fast math flags in Builder, just before generating
+// Decide what fast math flags to set in Builder, just before generating
 // code for BV. Decorations on BV may prevent us from setting some flags.
-void SPIRVToLLVM::setFastMathFlags(SPIRVValue *bv) {
+FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
+  FastMathFlags fmf;
+
   // For floating-point operations, if "FastMath" is enabled, set the "FastMath"
   // flags on the handled instruction
   if (!SPIRVGenFastMath)
-    return;
+    return fmf;
 
   // Only do this for operations with floating point type.
   if (!bv->hasType())
-    return;
+    return fmf;
   SPIRVType *ty = bv->getType();
   if (ty->isTypeVector())
     ty = ty->getVectorComponentType();
   if (!ty->isTypeFloat())
-    return;
+    return fmf;
 
-  llvm::FastMathFlags fmf;
   fmf.setAllowReciprocal();
   if (!ty->isTypeFloat(64)) {
     // Only do this for half and float, not double, to avoid problems with Vulkan CTS precision_double tests.
@@ -1236,7 +1238,13 @@ void SPIRVToLLVM::setFastMathFlags(SPIRVValue *bv) {
     fmf.setNoNaNs();
     fmf.setNoSignedZeros(allowContract);
   }
-  getBuilder()->setFastMathFlags(fmf);
+  return fmf;
+}
+
+// Set fast math flags in Builder, just before generating
+// code for BV.
+void SPIRVToLLVM::setFastMathFlags(SPIRVValue *bv) {
+  getBuilder()->setFastMathFlags(getFastMathFlags(bv));
 }
 
 // Set fast math flags on just-generated instruction Val.

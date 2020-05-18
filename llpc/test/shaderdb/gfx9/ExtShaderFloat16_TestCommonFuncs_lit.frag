@@ -65,7 +65,7 @@ void main()
 ; SHADERTEST: = call <3 x i1> (...) @lgc.create.isnan.v3i1(<3 x half>
 ; SHADERTEST: = call <3 x i1> (...) @lgc.create.isinf.v3i1(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.fma.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.extract.significand.v3f16(<3 x half>
+; SHADERTEST: = call <3 x half> (...) @lgc.create.extract.significand.v3f16(<3 x half>
 ; SHADERTEST: = call <3 x i16> (...) @lgc.create.extract.exponent.v3i16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.ldexp.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.fmax.v3f16(<3 x half>

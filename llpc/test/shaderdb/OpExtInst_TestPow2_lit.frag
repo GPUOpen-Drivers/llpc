@@ -16,7 +16,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn float (...) @lgc.create.power.f32(float 2.000000e+00, float
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.frexp.mant.f32(float
+; SHADERTEST: = call float @llvm.amdgcn.frexp.mant.f32(float
 ; SHADERTEST: = call i32 @llvm.amdgcn.frexp.exp.i32.f32(float
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.exp2.f32(float
 ; SHADERTEST: AMDLLPC SUCCESS
