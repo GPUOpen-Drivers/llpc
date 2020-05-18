@@ -684,9 +684,8 @@ Value *VertexFetch::loadVertexBufferDescriptor(unsigned binding, Instruction *in
   vbDescPtr->setMetadata(MetaNameUniform, MDNode::get(vbDescPtr->getContext(), {}));
   auto vbDescTy = vbDescPtr->getType()->getPointerElementType();
 
-  auto vbDesc = new LoadInst(vbDescTy, vbDescPtr, "", insertPos);
+  auto vbDesc = new LoadInst(vbDescTy, vbDescPtr, "", false, Align(16), insertPos);
   vbDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(vbDesc->getContext(), {}));
-  vbDesc->setAlignment(Align(16));
 
   return vbDesc;
 }

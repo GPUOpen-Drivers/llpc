@@ -551,9 +551,7 @@ void PatchBufferOp::visitLoadInst(LoadInst &loadInst) {
 
     Value *const loadPointer = m_builder->CreateBitCast(pointer, castType);
 
-    LoadInst *const newLoad = m_builder->CreateLoad(loadPointer);
-    newLoad->setVolatile(loadInst.isVolatile());
-    newLoad->setAlignment(Align(loadInst.getAlignment()));
+    LoadInst *const newLoad = m_builder->CreateAlignedLoad(loadPointer, loadInst.getAlign(), loadInst.isVolatile());
     newLoad->setOrdering(loadInst.getOrdering());
     newLoad->setSyncScopeID(loadInst.getSyncScopeID());
     copyMetadata(newLoad, &loadInst);
@@ -1288,20 +1286,20 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
   Type *type = nullptr;
   Value *pointerOperand = nullptr;
   AtomicOrdering ordering = AtomicOrdering::NotAtomic;
-  unsigned alignment = 0;
+  Align alignment;
   SyncScope::ID syncScopeID = 0;
 
   if (isLoad) {
     type = loadInst->getType();
     pointerOperand = loadInst->getPointerOperand();
     ordering = loadInst->getOrdering();
-    alignment = loadInst->getAlignment();
+    alignment = loadInst->getAlign();
     syncScopeID = loadInst->getSyncScopeID();
   } else {
     type = storeInst->getValueOperand()->getType();
     pointerOperand = storeInst->getPointerOperand();
     ordering = storeInst->getOrdering();
-    alignment = storeInst->getAlignment();
+    alignment = storeInst->getAlign();
     syncScopeID = storeInst->getSyncScopeID();
   }
 
@@ -1312,9 +1310,6 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
   const DataLayout &dataLayout = m_builder->GetInsertBlock()->getModule()->getDataLayout();
 
   const unsigned bytesToHandle = static_cast<unsigned>(dataLayout.getTypeStoreSize(type));
-
-  if (alignment == 0)
-    alignment = dataLayout.getABITypeAlignment(type);
 
   bool isInvariant = false;
   if (isLoad) {
@@ -1344,9 +1339,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
     pointer = m_builder->CreateBitCast(pointer, type->getPointerTo(ADDR_SPACE_GLOBAL));
 
     if (isLoad) {
-      LoadInst *const newLoad = m_builder->CreateLoad(pointer);
-      newLoad->setVolatile(loadInst->isVolatile());
-      newLoad->setAlignment(Align(alignment));
+      LoadInst *const newLoad = m_builder->CreateAlignedLoad(pointer, alignment, loadInst->isVolatile());
       newLoad->setOrdering(ordering);
       newLoad->setSyncScopeID(syncScopeID);
       copyMetadata(newLoad, loadInst);
@@ -1356,9 +1349,8 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
 
       return newLoad;
     } else {
-      StoreInst *const newStore = m_builder->CreateStore(storeInst->getValueOperand(), pointer);
-      newStore->setVolatile(storeInst->isVolatile());
-      newStore->setAlignment(MaybeAlign(alignment));
+      StoreInst *const newStore =
+          m_builder->CreateAlignedStore(storeInst->getValueOperand(), pointer, alignment, storeInst->isVolatile());
       newStore->setOrdering(ordering);
       newStore->setSyncScopeID(syncScopeID);
       copyMetadata(newStore, storeInst);

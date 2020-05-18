@@ -379,7 +379,7 @@ Value *NggLdsManager::readValueFromLds(Type *readTy, Value *ldsOffset, bool useD
   Value *readPtr = m_builder->CreateGEP(lds, ldsOffset);
   readPtr = m_builder->CreateBitCast(readPtr, PointerType::get(readTy, ADDR_SPACE_LOCAL));
 
-  return m_builder->CreateAlignedLoad(readPtr, MaybeAlign(alignment));
+  return m_builder->CreateAlignedLoad(readPtr, Align(alignment));
 }
 
 // =====================================================================================================================
@@ -406,7 +406,7 @@ void NggLdsManager::writeValueToLds(Value *writeValue, Value *ldsOffset, bool us
   Value* writePtr = m_builder->CreateGEP(lds, ldsOffset);
   writePtr = m_builder->CreateBitCast(writePtr, PointerType::get(writeTy, ADDR_SPACE_LOCAL));
 
-  m_builder->CreateAlignedStore(writeValue, writePtr, MaybeAlign(alignment));
+  m_builder->CreateAlignedStore(writeValue, writePtr, Align(alignment));
 }
 
 // =====================================================================================================================
