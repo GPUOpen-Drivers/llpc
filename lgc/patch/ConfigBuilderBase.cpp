@@ -332,8 +332,8 @@ void ConfigBuilderBase::writePalMetadata() {
     auto key = m_document->getNode(entry.key);
     auto &regEntry = registers[key];
     unsigned oredValue = entry.value;
-    if (regEntry.getKind() != msgpack::Type::Nil)
-      oredValue = regEntry.getInt();
+    if (regEntry.getKind() == msgpack::Type::UInt)
+      oredValue = regEntry.getUInt();
     regEntry = m_document->getNode(oredValue);
   }
 }

@@ -86,10 +86,10 @@ void PalMetadata::initialize() {
       m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0].getMap(true);
   m_registers = m_pipelineNode[".registers"].getMap(true);
   m_userDataLimit = &m_pipelineNode[Util::Abi::PipelineMetadataKey::UserDataLimit];
-  if (m_userDataLimit->getKind() == msgpack::Type::Nil)
+  if (m_userDataLimit->isEmpty() || m_userDataLimit->getKind() == msgpack::Type::Nil)
     *m_userDataLimit = m_document->getNode(0U);
   m_spillThreshold = &m_pipelineNode[Util::Abi::PipelineMetadataKey::SpillThreshold];
-  if (m_spillThreshold->getKind() == msgpack::Type::Nil)
+  if (m_spillThreshold->isEmpty() || m_spillThreshold->getKind() == msgpack::Type::Nil)
     *m_spillThreshold = m_document->getNode(UINT_MAX);
 }
 
