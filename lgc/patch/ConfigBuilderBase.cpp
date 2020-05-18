@@ -119,8 +119,8 @@ msgpack::MapDocNode ConfigBuilderBase::getHwShaderNode(Util::Abi::HardwareStage 
 unsigned ConfigBuilderBase::setShaderHash(ShaderStage apiStage) {
   const ShaderOptions &shaderOptions = m_pipelineState->getShaderOptions(apiStage);
   auto hashNode = getApiShaderNode(unsigned(apiStage))[Util::Abi::ShaderMetadataKey::ApiShaderHash].getArray(true);
-  hashNode[0] = hashNode.getDocument()->getNode(shaderOptions.hash[0]);
-  hashNode[1] = hashNode.getDocument()->getNode(shaderOptions.hash[1]);
+  hashNode[0] = shaderOptions.hash[0];
+  hashNode[1] = shaderOptions.hash[1];
   return shaderOptions.hash[0] >> 32 ^ shaderOptions.hash[0] ^ shaderOptions.hash[1] >> 32 ^ shaderOptions.hash[1];
 }
 
@@ -131,7 +131,7 @@ unsigned ConfigBuilderBase::setShaderHash(ShaderStage apiStage) {
 // @param value : Number of available SGPRs
 void ConfigBuilderBase::setNumAvailSgprs(Util::Abi::HardwareStage hwStage, unsigned value) {
   auto hwShaderNode = getHwShaderNode(hwStage);
-  hwShaderNode[Util::Abi::HardwareStageMetadataKey::SgprLimit] = hwShaderNode.getDocument()->getNode(value);
+  hwShaderNode[Util::Abi::HardwareStageMetadataKey::SgprLimit] = value;
 }
 
 // =====================================================================================================================
@@ -141,7 +141,7 @@ void ConfigBuilderBase::setNumAvailSgprs(Util::Abi::HardwareStage hwStage, unsig
 // @param value : Number of available VGPRs
 void ConfigBuilderBase::setNumAvailVgprs(Util::Abi::HardwareStage hwStage, unsigned value) {
   auto hwShaderNode = getHwShaderNode(hwStage);
-  hwShaderNode[Util::Abi::HardwareStageMetadataKey::VgprLimit] = hwShaderNode.getDocument()->getNode(value);
+  hwShaderNode[Util::Abi::HardwareStageMetadataKey::VgprLimit] = value;
 }
 
 // =====================================================================================================================
@@ -152,7 +152,7 @@ void ConfigBuilderBase::setUsesViewportArrayIndex(bool value) {
   if (!value)
     return; // Optional
 
-  m_pipelineNode[Util::Abi::PipelineMetadataKey::UsesViewportArrayIndex] = m_document->getNode(value);
+  m_pipelineNode[Util::Abi::PipelineMetadataKey::UsesViewportArrayIndex] = value;
 }
 
 // =====================================================================================================================
@@ -163,8 +163,7 @@ void ConfigBuilderBase::setPsUsesUavs(bool value) {
   if (!value)
     return; // Optional
 
-  getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::UsesUavs] =
-      m_document->getNode(value);
+  getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::UsesUavs] = value;
 }
 
 // =====================================================================================================================
@@ -175,8 +174,7 @@ void ConfigBuilderBase::setPsWritesUavs(bool value) {
   if (!value)
     return; // Optional
 
-  getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesUavs] =
-      m_document->getNode(value);
+  getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesUavs] = value;
 }
 
 // =====================================================================================================================
@@ -187,8 +185,7 @@ void ConfigBuilderBase::setPsWritesDepth(bool value) {
   if (!value)
     return; // Optional
 
-  getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesDepth] =
-      m_document->getNode(value);
+  getHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesDepth] = value;
 }
 
 // =====================================================================================================================
@@ -196,7 +193,7 @@ void ConfigBuilderBase::setPsWritesDepth(bool value) {
 //
 // @param value : Value to set
 void ConfigBuilderBase::setEsGsLdsByteSize(unsigned value) {
-  m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = m_document->getNode(value);
+  m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = value;
 }
 
 // =====================================================================================================================
@@ -204,7 +201,7 @@ void ConfigBuilderBase::setEsGsLdsByteSize(unsigned value) {
 //
 // @param value : Value to set
 void ConfigBuilderBase::setCalcWaveBreakSizeAtDrawTime(bool value) {
-  m_pipelineNode[Util::Abi::PipelineMetadataKey::CalcWaveBreakSizeAtDrawTime] = m_document->getNode(value);
+  m_pipelineNode[Util::Abi::PipelineMetadataKey::CalcWaveBreakSizeAtDrawTime] = value;
 }
 
 // =====================================================================================================================
@@ -215,7 +212,7 @@ void ConfigBuilderBase::setCalcWaveBreakSizeAtDrawTime(bool value) {
 void ConfigBuilderBase::setWaveFrontSize(Util::Abi::HardwareStage hwStage, unsigned value) {
   if (m_pipelineState->getPalAbiVersion() >= 495) {
     auto hwShaderNode = getHwShaderNode(hwStage);
-    hwShaderNode[Util::Abi::HardwareStageMetadataKey::WavefrontSize] = m_document->getNode(value);
+    hwShaderNode[Util::Abi::HardwareStageMetadataKey::WavefrontSize] = value;
   }
 }
 
@@ -224,7 +221,7 @@ void ConfigBuilderBase::setWaveFrontSize(Util::Abi::HardwareStage hwStage, unsig
 //
 // @param value : Value to set
 void ConfigBuilderBase::setApiName(const char *value) {
-  m_pipelineNode[Util::Abi::PipelineMetadataKey::Api] = m_document->getNode(value);
+  m_pipelineNode[Util::Abi::PipelineMetadataKey::Api] = value;
 }
 
 // =====================================================================================================================
@@ -258,7 +255,7 @@ void ConfigBuilderBase::setPipelineType(Util::Abi::PipelineType value) {
   default:
     break;
   }
-  m_pipelineNode[Util::Abi::PipelineMetadataKey::Type] = m_document->getNode(typeStr);
+  m_pipelineNode[Util::Abi::PipelineMetadataKey::Type] = typeStr;
 }
 
 // =====================================================================================================================
@@ -271,7 +268,7 @@ void ConfigBuilderBase::setLdsSizeByteSize(Util::Abi::HardwareStage hwStage, uns
     return; // Optional
 
   auto hwShaderNode = getHwShaderNode(hwStage);
-  hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = hwShaderNode.getDocument()->getNode(value);
+  hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = value;
 }
 
 // =====================================================================================================================
@@ -282,7 +279,7 @@ void ConfigBuilderBase::setEsGsLdsSize(unsigned value) {
   if (value == 0)
     return; // Optional
 
-  m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = m_document->getNode(value);
+  m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = value;
 }
 
 // =====================================================================================================================
@@ -329,12 +326,12 @@ void ConfigBuilderBase::writePalMetadata() {
   msgpack::MapDocNode registers = m_pipelineNode[".registers"].getMap(true);
   for (const auto &entry : m_config) {
     assert(entry.key != InvalidMetadataKey);
-    auto key = m_document->getNode(entry.key);
+    auto key = entry.key;
     auto &regEntry = registers[key];
     unsigned oredValue = entry.value;
     if (regEntry.getKind() == msgpack::Type::UInt)
       oredValue = regEntry.getUInt();
-    regEntry = m_document->getNode(oredValue);
+    regEntry = oredValue;
   }
 }
 
