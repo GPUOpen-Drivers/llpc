@@ -352,14 +352,22 @@ Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *
   auxCreateInfo.gfxIp = m_gfxIp;
   auxCreateInfo.hash = m_optionHash;
   auxCreateInfo.executableName = cl::ExecutableName.c_str();
-  auxCreateInfo.cacheFilePath = cl::ShaderCacheFileDir.c_str();
+
+  const char *shaderCachePath = cl::ShaderCacheFileDir.c_str();
   if (cl::ShaderCacheFileDir.empty()) {
 #ifdef WIN_OS
-    auxCreateInfo.cacheFilePath = getenv("LOCALAPPDATA");
+    shaderCachePath = getenv("LOCALAPPDATA");
+    assert(shaderCachePath);
 #else
     llvm_unreachable("Should never be called!");
 #endif
   }
+
+  if (strlen(shaderCachePath) >= Llpc::MaxFilePathLen) {
+    LLPC_ERRS("The shader-cache-file-dir exceed the maximum length (" << Llpc::MaxFilePathLen << ")\n");
+    llvm_unreachable("ShaderCacheFileDir is too long");
+  }
+  auxCreateInfo.cacheFilePath = shaderCachePath;
 
   m_shaderCache = ShaderCacheManager::getShaderCacheManager()->getShaderCacheObject(&createInfo, &auxCreateInfo);
 
