@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 
+#include "lgc/ElfLinker.h"
 #include "lgc/LgcContext.h"
 #include "lgc/Pipeline.h"
 #include "llvm/AsmParser/Parser.h"
@@ -52,6 +53,15 @@ cl::list<std::string> InFiles(cl::Positional, cl::OneOrMore, cl::ValueRequired, 
 // -extract: extract a single module from a multi-module input file
 cl::opt<unsigned> Extract("extract", cl::desc("Extract single module from multi-module input file. Index is 1-based"),
                           cl::init(0), cl::cat(LgcCategory), cl::value_desc("index"));
+
+// -glue: compile a single glue shader instead of doing a link
+cl::opt<unsigned> Glue("glue", cl::desc("Compile a single glue shader instead of doing a link. Index is 1-based"),
+                       cl::init(0), cl::cat(LgcCategory), cl::value_desc("index"));
+
+// -l: link
+cl::opt<bool> Link("l", cl::cat(LgcCategory),
+                   cl::desc("Link shader/half-pipeline ELFs. First input filename is "
+                            "IR providing pipeline state; subsequent ones are ELF files."));
 
 // -o: output filename
 cl::opt<std::string> OutFileName("o", cl::cat(LgcCategory), cl::desc("Output filename ('-' for stdout)"),
@@ -111,7 +121,16 @@ int main(int argc, char **argv) {
                                    "file(s) and compiles each one using the LGC interface, into AMDGPU ELF or\n"
                                    "assembly. Generally, each input module would have been derived by compiling\n"
                                    "a shader or pipeline with amdllpc, and using the -emit-lgc option to stop\n"
-                                   "before running LGC.\n";
+                                   "before running LGC.\n"
+                                   "\n"
+                                   "If the -l (link) option is given, then the lgc tool instead parses a single\n"
+                                   "module of LLVM IR assembler from the first input file, and uses the IR metadata\n"
+                                   "from that to set LGC pipeline state. Then it reads the remaining input files,\n"
+                                   "all compiled ELF files, and performs an LGC pipeline link.\n"
+                                   "\n"
+                                   "If the -glue option is given in addition to the -l (link) option, then input\n"
+                                   "files are the same as in a link operation, but lgc instead compiles the glue\n"
+                                   "shader of the given one-based index that would be used in the link.\n";
   cl::ParseCommandLineOptions(argc, argv, commandDesc);
 
   // Find the -mcpu option and get its value.
@@ -138,6 +157,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  // Read the input files.
+  SmallVector<std::unique_ptr<MemoryBuffer>, 4> inBuffers;
   for (auto inFileName : InFiles) {
     // Read the input file. getFileOrSTDIN handles the case of inFileName being "-".
     ErrorOr<std::unique_ptr<MemoryBuffer>> fileOrErr = MemoryBuffer::getFileOrSTDIN(inFileName);
@@ -147,13 +168,19 @@ int main(int argc, char **argv) {
       errs() << "\n";
       return 1;
     }
-    StringRef bufferName = fileOrErr.get()->getMemBufferRef().getBufferIdentifier();
+    inBuffers.push_back(std::move(*fileOrErr));
+  }
+
+  // Process each input file.
+  for (auto &inBuffer : inBuffers) {
+    MemoryBufferRef bufferRef = inBuffer->getMemBufferRef();
+    StringRef bufferName = bufferRef.getBufferIdentifier();
 
     // Split the input into multiple LLVM IR modules. We assume that a new module starts with
     // a "target" line to set the datalayout or triple, but not until after we have seen at least
     // one line starting with '!' (metadata declaration) in the previous module.
     SmallVector<StringRef, 4> separatedAsms;
-    StringRef remaining = fileOrErr.get()->getMemBufferRef().getBuffer();
+    StringRef remaining = bufferRef.getBuffer();
     separatedAsms.push_back(remaining);
     bool hadMetadata = false;
     for (;;) {
@@ -213,51 +240,96 @@ int main(int argc, char **argv) {
       }
 
       // Determine whether we are outputting to a file.
-      bool outputToFile = false;
+      bool outputToFile = OutFileName != "-";
       if (OutFileName.empty()) {
         // No -o specified: output to stdout if input is -
-        outputToFile = inFileName != "-";
+        outputToFile = bufferName != "-" && bufferName != "<stdin>";
       }
 
-      // Create a Pipeline and run the middle-end compiler.
+      SmallString<64> outFileName;
+      if (OutFileName.empty()) {
+        // Start to determine the output filename by taking the input filename, removing the directory,
+        // removing the extension. We add the extension below once we can see what the output contents
+        // look like.
+        outFileName = sys::path::stem(bufferName);
+      }
+
       SmallString<16> outBuffer;
       raw_svector_ostream outStream(outBuffer);
       std::unique_ptr<Pipeline> pipeline(lgcContext->createPipeline());
-      pipeline->generate(std::move(module), outStream, nullptr, {}, {});
+      StringRef err;
 
-      // Output to stdout if applicable.
-      if (outputToFile == false) {
-        outs() << outBuffer;
-        continue;
-      }
+      if (Link) {
+        // The -l option (link) is handled differently: We have just read the first input file as IR, and
+        // we get the pipeline state from that. Subsequent input files are ELF, and we link them.
+        pipeline->setStateFromModule(&*module);
 
-      SmallString<64> outFileName(OutFileName);
-      if (outFileName.empty()) {
-        // Determine the output filename by taking the input filename, removing the directory,
-        // removing the extension, and adding a default extension that depends on the output contents.
-        const char *ext = ".s";
-        if (isElfBinary(outBuffer)) {
-          ext = ".elf";
-        } else if (isIsaText(outBuffer)) {
-          ext = ".s";
+        SmallVector<MemoryBufferRef, 4> elfRefs;
+        for (unsigned i = 1; i != inBuffers.size(); ++i)
+          elfRefs.push_back(inBuffers[i]->getMemBufferRef());
+        std::unique_ptr<ElfLinker> elfLinker(pipeline->createElfLinker(elfRefs));
+
+        if (Glue) {
+          // Instead of doing a full link, we have been asked to compile a glue shader used in a link.
+          ArrayRef<StringRef> glueInfo = elfLinker->getGlueInfo();
+          if (Glue > glueInfo.size())
+            report_fatal_error("Only " + Twine(glueInfo.size()) + " glue shader(s) in this link");
+          outStream << elfLinker->compileGlue(Glue - 1);
+          if (outStream.str().empty())
+            err = pipeline->getLastError();
         } else {
-          ext = ".ll";
+          // Do a full link.
+          if (!elfLinker->link(outStream))
+            err = pipeline->getLastError();
         }
-        outFileName = sys::path::stem(inFileName);
-        outFileName += ext;
+      } else {
+        // Run the middle-end compiler.
+        if (!pipeline->generate(std::move(module), outStream, nullptr, {}, {}))
+          err = pipeline->getLastError();
       }
 
-      if (FILE *outFile = fopen(outFileName.c_str(), "wb")) {
-        if (fwrite(outBuffer.data(), 1, outBuffer.size(), outFile) == outBuffer.size()) {
-          if (fclose(outFile) == 0) {
-            // Successful file write.
-            continue;
+      if (err != "") {
+        // Link or compile reported recoverable error.
+        errs() << err << "\n";
+        return 1;
+      }
+
+      if (outputToFile == false) {
+        // Output to stdout.
+        outs() << outBuffer;
+      } else {
+        // Output to file.
+        if (outFileName.empty()) {
+          // Use given filename.
+          outFileName = OutFileName;
+        } else {
+          // We are in the middle of deriving the output filename from the input filename. Add the
+          // extension now.
+          const char *ext = ".s";
+          if (isElfBinary(outBuffer)) {
+            ext = ".elf";
+          } else if (isIsaText(outBuffer)) {
+            ext = ".s";
+          } else {
+            ext = ".ll";
           }
+          outFileName += ext;
+        }
+
+        bool fileWriteSuccess = false;
+        if (FILE *outFile = fopen(outFileName.c_str(), "wb")) {
+          if (fwrite(outBuffer.data(), 1, outBuffer.size(), outFile) == outBuffer.size())
+            fileWriteSuccess = fclose(outFile) == 0;
+        }
+        if (!fileWriteSuccess) {
+          errs() << progName << ": " << outFileName << ": " << strerror(errno) << "\n";
+          return 1;
         }
       }
 
-      errs() << progName << ": " << outFileName << ": " << strerror(errno) << "\n";
-      return 1;
+      // With the -l option (link), we have already consumed all the input files.
+      if (Link)
+        return 0;
     }
   }
 

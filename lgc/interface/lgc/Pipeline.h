@@ -556,6 +556,10 @@ public:
   virtual void setGraphicsState(const InputAssemblyState &iaState, const ViewportState &vpState,
                                 const RasterizerState &rsState) = 0;
 
+  // Set entire pipeline state from metadata in an IR module. This is used by the lgc command-line utility
+  // for its link option.
+  virtual void setStateFromModule(llvm::Module *module) = 0;
+
   // -----------------------------------------------------------------------------------------------------------------
   // IR link and generate pipeline methods
 

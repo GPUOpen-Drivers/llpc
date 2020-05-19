@@ -176,6 +176,10 @@ public:
   // type. Only the number of elements of the type is significant.
   unsigned computeExportFormat(llvm::Type *outputTy, unsigned location) override final;
 
+  // Set entire pipeline state from metadata in an IR module. This is used by the lgc command-line utility
+  // for its link option.
+  void setStateFromModule(llvm::Module *module) override final { readState(module); }
+
   // -----------------------------------------------------------------------------------------------------------------
   // Other methods
 
