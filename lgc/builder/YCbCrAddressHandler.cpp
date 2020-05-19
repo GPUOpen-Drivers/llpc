@@ -76,7 +76,7 @@ void YCbCrAddressHandler::genBaseAddress(unsigned planeCount) {
 
     // GFX10 hardware calculate pipe banck xor
     // SEE: Gfx10Lib::HwlComputePipeBankXor in pal\src\core\imported\addrlib\src\gfx10\gfx10addrlib.cpp
-    auto gfx10HwlComputePipeBankXor = [this](unsigned surfIdx) -> Value * {
+    auto gfx10HwlComputePipeBankXor = [&](unsigned surfIdx) -> Value * {
       return m_builder->getInt32(XorBankRot3b[surfIdx % xorPatternLen] << (pipesLog2 + columnBits));
     };
 
