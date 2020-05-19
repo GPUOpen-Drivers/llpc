@@ -39,6 +39,7 @@
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "lgc/util/AddressExtender.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
@@ -177,62 +178,6 @@ private:
   PipelineState *m_pipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
   // Per-HW-shader-stage gathered user data usage information.
   SmallVector<std::unique_ptr<UserDataUsage>, ShaderStageCount> m_userDataUsage;
-};
-
-// =====================================================================================================================
-// Utility class to generate code to extend an i32 address into a 64-bit pointer, using either PC or a given
-// constant high half value.
-class AddressExtender {
-public:
-  // Constructor
-  AddressExtender(Function *func) : m_func(func) {}
-
-  // Get first insertion point in the function, after PC-getting code if already inserted.
-  Instruction *getFirstInsertionPt() {
-    if (m_pc)
-      return m_pc->getNextNode();
-    return &*m_func->front().getFirstInsertionPt();
-  }
-
-  // Extend an i32 into a 64-bit pointer
-  //
-  // @param addr32 : Address as 32-bit value
-  // @param highHalf : Value to use for high half; HighAddrPc to use PC
-  // @param ptrTy : Type to cast pointer to
-  // @param builder : IRBuilder to use, already set to the required insert point
-  // @return : 64-bit pointer value
-  Instruction *extend(Value *addr32, unsigned highHalf, Type *ptrTy, IRBuilder<> &builder) {
-    Value *ptr = nullptr;
-    if (highHalf == HighAddrPc) {
-      // Extend with PC.
-      ptr = builder.CreateInsertElement(getPc(), addr32, uint64_t(0));
-    } else {
-      // Extend with given value
-      ptr = builder.CreateInsertElement(UndefValue::get(VectorType::get(builder.getInt32Ty(), 2)), addr32, uint64_t(0));
-      ptr = builder.CreateInsertElement(ptr, builder.getInt32(highHalf), 1);
-    }
-    ptr = builder.CreateBitCast(ptr, builder.getInt64Ty());
-    return cast<Instruction>(builder.CreateIntToPtr(ptr, ptrTy));
-  }
-
-private:
-  // Get PC value as v2i32. The caller is only using the high half, so this only writes a single instance of the
-  // code at the start of the function.
-  Instruction *getPc() {
-    if (!m_pc) {
-      // This uses its own builder, as it wants to insert at the start of the function, whatever the caller
-      // is doing.
-      IRBuilder<> builder(m_func->getContext());
-      builder.SetInsertPoint(&*m_func->front().getFirstInsertionPt());
-      Value *pc = builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
-      pc = cast<Instruction>(builder.CreateBitCast(pc, VectorType::get(builder.getInt32Ty(), 2)));
-      m_pc = cast<Instruction>(pc);
-    }
-    return m_pc;
-  }
-
-  Function *m_func;
-  Instruction *m_pc = nullptr;
 };
 
 } // anonymous namespace
