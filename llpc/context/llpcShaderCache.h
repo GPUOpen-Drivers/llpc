@@ -112,7 +112,7 @@ struct ShaderCacheSerializedHeader {
   size_t shaderDataEnd;  // Offset to the end of shader data
 };
 
-constexpr unsigned MaxFilePathLen = 256;
+constexpr unsigned MaxFilePathLen = 512;
 
 typedef void *CacheEntryHandle;
 
