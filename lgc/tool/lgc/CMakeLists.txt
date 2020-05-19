@@ -43,4 +43,4 @@ PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../interface
 )
 
-lgc_set_compiler_options(lgc)
+set_compiler_options(lgc ${LLPC_ENABLE_WERROR})
