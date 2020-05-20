@@ -217,8 +217,7 @@ uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(const ComputePipelineBuildI
 std::string PipelineDumper::getSpirvBinaryFileName(const MetroHash::Hash *hash) {
   uint64_t hashCode64 = MetroHash::compact64(hash);
   char fileName[64] = {};
-  auto length = snprintf(fileName, 64, "Shader_0x%016" PRIX64 ".spv", hashCode64);
-  (void(length)); // unused
+  snprintf(fileName, 64, "Shader_0x%016" PRIX64 ".spv", hashCode64);
   return std::string(fileName);
 }
 
@@ -231,8 +230,7 @@ std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineIn
   uint64_t hashCode64 = MetroHash::compact64(hash);
   char fileName[64] = {};
   if (pipelineInfo.pComputeInfo) {
-    auto length = snprintf(fileName, 64, "PipelineCs_0x%016" PRIX64, hashCode64);
-    (void(length)); // unused
+    snprintf(fileName, 64, "PipelineCs_0x%016" PRIX64, hashCode64);
   }
   else {
     assert(pipelineInfo.pGraphicsInfo);
@@ -246,8 +244,7 @@ std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineIn
     else
       fileNamePrefix = "PipelineVsFs";
 
-    auto length = snprintf(fileName, 64, "%s_0x%016" PRIX64, fileNamePrefix, hashCode64);
-    (void(length)); // unused
+    snprintf(fileName, 64, "%s_0x%016" PRIX64, fileNamePrefix, hashCode64);
   }
 
   return std::string(fileName);
@@ -396,9 +393,7 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   }
   case ResourceMappingNodeType::DescriptorTableVaPtr: {
     char prefixBuf[256];
-    int length = 0;
     for (unsigned i = 0; i < userDataNode->tablePtr.nodeCount; ++i) {
-      length = snprintf(prefixBuf, 256, "%s.next[%u]", prefix, i);
       dumpResourceMappingNode(userDataNode->tablePtr.pNext + i, prefixBuf, dumpFile);
     }
     break;
@@ -490,8 +485,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
     char prefixBuff[64];
     for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
       auto userDataNode = &shaderInfo->pUserDataNodes[i];
-      auto length = snprintf(prefixBuff, 64, "userDataNode[%u]", i);
-      (void(length)); // unused
+      snprintf(prefixBuff, 64, "userDataNode[%u]", i);
       dumpResourceMappingNode(userDataNode, prefixBuff, dumpFile);
     }
     dumpFile << "\n";
@@ -1157,13 +1151,11 @@ void outputBinary(const uint8_t *data, unsigned startPos, unsigned endPos, OStre
   int dwordCount = (endPos - startPos) / sizeof(unsigned);
   char formatBuf[256];
   for (int i = 0; i < dwordCount; ++i) {
-    size_t length = 0;
     if (i % 8 == 0) {
-      length = snprintf(formatBuf, sizeof(formatBuf), "    %7u:", startPos + i * 4u);
+      snprintf(formatBuf, sizeof(formatBuf), "    %7u:", startPos + i * 4u);
       out << formatBuf;
     }
-    length = snprintf(formatBuf, sizeof(formatBuf), "%08X", startData[i]);
-    (void(length)); // unused
+    snprintf(formatBuf, sizeof(formatBuf), "%08X", startData[i]);
     out << formatBuf;
 
     if (i % 8 == 7)
@@ -1175,8 +1167,7 @@ void outputBinary(const uint8_t *data, unsigned startPos, unsigned endPos, OStre
   if (endPos > startPos && (endPos - startPos) % sizeof(unsigned)) {
     int padPos = dwordCount * sizeof(unsigned);
     for (int i = padPos; i < endPos; ++i) {
-      auto length = snprintf(formatBuf, sizeof(formatBuf), "%02X", data[i]);
-      (void(length)); // unused
+      snprintf(formatBuf, sizeof(formatBuf), "%02X", data[i]);
       out << formatBuf;
     }
   }
@@ -1251,12 +1242,10 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
                 unsigned regId = static_cast<unsigned>(node->getUInt());
                 const char *regName = PipelineDumper::getRegisterNameString(regId);
 
-                auto length = snprintf(formatBuf, sizeof(formatBuf), "%-45s ", regName);
-                (void(length)); // unused
+                snprintf(formatBuf, sizeof(formatBuf), "%-45s ", regName);
                 out << formatBuf;
               } else {
-                auto length = snprintf(formatBuf, sizeof(formatBuf), "0x%016" PRIX64 " ", node->getUInt());
-                (void(length)); // unused
+                snprintf(formatBuf, sizeof(formatBuf), "0x%016" PRIX64 " ", node->getUInt());
                 out << formatBuf;
               }
               break;
@@ -1334,8 +1323,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
         reader.getRelocation(i, &reloc);
         ElfSymbol elfSym = {};
         reader.getSymbol(reloc.symIdx, &elfSym);
-        auto length = snprintf(formatBuf, sizeof(formatBuf), "    %-35s", elfSym.pSymName);
-        (void(length)); // unused
+        snprintf(formatBuf, sizeof(formatBuf), "    %-35s", elfSym.pSymName);
         out << "#" << i << "    " << formatBuf << "    offset = " << reloc.offset << "\n";
       }
     } else if (strncmp(section->name, AmdGpuConfigName, sizeof(AmdGpuConfigName) - 1) == 0) {
@@ -1346,8 +1334,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
 
       for (unsigned i = 0; i < configCount; ++i) {
         const char *regName = PipelineDumper::getRegisterNameString(config[2 * i] / 4);
-        auto length = snprintf(formatBuf, sizeof(formatBuf), "        %-45s = 0x%08X\n", regName, config[2 * i + 1]);
-        (void(length)); // unused
+        snprintf(formatBuf, sizeof(formatBuf), "        %-45s = 0x%08X\n", regName, config[2 * i + 1]);
         out << formatBuf;
       }
     } else if (strncmp(section->name, AmdGpuDisasmName, sizeof(AmdGpuDisasmName) - 1) == 0 ||

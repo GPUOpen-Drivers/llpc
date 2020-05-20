@@ -318,7 +318,6 @@ bool Section::getPtrOf(unsigned lineNum, const char *memberName, bool isWriteAcc
                        TValue **ptrOut, std::string *errorMsg) {
   bool result = true;
   void *memberAddr = reinterpret_cast<void *>(static_cast<size_t>(VfxInvalidValue));
-  MemberType memberType = MemberTypeInt;
   unsigned arrayMaxSize = 0;
 
   if (isWriteAccess)
@@ -327,7 +326,6 @@ bool Section::getPtrOf(unsigned lineNum, const char *memberName, bool isWriteAcc
   for (unsigned i = 0; i < m_tableSize; ++i) {
     if (strcmp(memberName, m_memberTable[i].memberName) == 0) {
       memberAddr = getMemberAddr(i);
-      memberType = m_memberTable[i].memberType;
       if (arrayIndex >= m_memberTable[i].arrayMaxSize) {
         PARSE_ERROR(*errorMsg, lineNum, "Array access out of bound: %u of %s[%u]", arrayIndex, memberName,
                     m_memberTable[i].arrayMaxSize);
