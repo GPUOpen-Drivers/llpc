@@ -1235,7 +1235,9 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
   }
   // Enable "no NaN" and "no signed zeros" only if there isn't any floating point control flags
   if (m_fpControlFlags.U32All == 0) {
-    fmf.setNoNaNs();
+    if (!m_moduleUsage->useIsNan)
+      fmf.setNoNaNs();
+
     fmf.setNoSignedZeros(allowContract);
   }
   return fmf;
