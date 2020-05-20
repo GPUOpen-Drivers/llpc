@@ -306,6 +306,7 @@ struct ShaderModuleUsage {
   bool useHelpInvocation;      ///< Whether fragment shader has helper-invocation for subgroup
   bool useSpecConstant;        ///< Whether specializaton constant is used
   bool keepUnusedFunctions;    ///< Whether to keep unused function
+  bool useIsNan;               ///< Whether IsNan is used
 };
 
 /// Represents common part of shader module data

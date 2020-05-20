@@ -117,6 +117,10 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
       shaderModuleUsage->useSpecConstant = true;
       break;
     }
+    case OpIsNan: {
+      shaderModuleUsage->useIsNan = true;
+      break;
+    }
     case OpEntryPoint: {
       ShaderEntryName entry = {};
       // The fourth word is start of the name string of the entry-point
