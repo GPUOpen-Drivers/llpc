@@ -59,7 +59,6 @@ void main()
 ; SHADERTEST: call {{.*}}float @llvm.amdgcn.wqm.f32
 ; SHADERTEST: = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 4, i32 0, i32 0, i32 0, <2 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST-COUNT-2: call float @llvm.amdgcn.interp.p1
 ; SHADERTEST: call i32 @llvm.amdgcn.mov.dpp.i32
 ; SHADERTEST: call i32 @llvm.amdgcn.mov.dpp.i32
 ; SHADERTEST: call {{.*}}float @llvm.amdgcn.wqm.f32
