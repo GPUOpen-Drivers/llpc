@@ -37,6 +37,7 @@
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 
@@ -145,17 +146,50 @@ void PalMetadata::mergeFromBlob(StringRef blob) {
           return 0;
         if (srcNode.isArray() && destNode->isArray())
           return 0;
-        // Allow string merging as long as the two strings have the same value.
-        if (destNode->isString() && srcNode.isString() && destNode->getString() == srcNode.getString())
-          return 0;
-        // Allow uint merging: A couple of special cases where we take the minimum or maximum value, and
-        // for all other cases we take the OR of the two register values.
-        if (destNode->getKind() != msgpack::Type::UInt || srcNode.getKind() != msgpack::Type::UInt) {
-          dbgs() << "Merge failure at " << mapKey.toString() << ": " << destNode->toString() << " vs "
-                 << srcNode.toString() << "\n";
-          return -1;
+        // Allow string merging as long as the two strings have the same value. If one string has a "_fetchless"
+        // suffix, take the other one. This is for the benefit of the linker linking a fetch shader with a
+        // fetchless VS.
+        if (destNode->isString() && srcNode.isString()) {
+          if (destNode->getString() == srcNode.getString())
+            return 0;
+          if (srcNode.getString().endswith("_fetchless"))
+            return 0;
+          if (destNode->getString().endswith("_fetchless")) {
+            *destNode = srcNode;
+            return 0;
+          }
         }
-        if (mapKey.isString()) {
+        // Disallow merging other than uint.
+        if (destNode->getKind() != msgpack::Type::UInt || srcNode.getKind() != msgpack::Type::UInt)
+          return -1;
+        // Special cases of uint merging.
+        if (mapKey.getKind() == msgpack::Type::UInt) {
+          switch (mapKey.getUInt()) {
+          case mmVGT_SHADER_STAGES_EN:
+            // Ignore new value of VGT_SHADER_STAGES_EN from glue shader, as it might accidentally make the VS
+            // wave32. (This relies on the glue shader's PAL metadata being merged into the vertex-processing
+            // half-pipeline, rather than the other way round.)
+            return 0;
+          case mmSPI_SHADER_PGM_RSRC1_LS:
+          case mmSPI_SHADER_PGM_RSRC1_HS:
+          case mmSPI_SHADER_PGM_RSRC1_ES:
+          case mmSPI_SHADER_PGM_RSRC1_GS:
+          case mmSPI_SHADER_PGM_RSRC1_VS:
+          case mmSPI_SHADER_PGM_RSRC1_PS: {
+            // For the RSRC1 registers, we need to consider the VGPRS and SGPRS fields separately, and max them.
+            // This happens when linking in a glue shader.
+            SPI_SHADER_PGM_RSRC1 destRsrc1;
+            SPI_SHADER_PGM_RSRC1 srcRsrc1;
+            destRsrc1.u32All = destNode->getUInt();
+            srcRsrc1.u32All = srcNode.getUInt();
+            destRsrc1.bits.VGPRS = std::max(destRsrc1.bits.VGPRS, srcRsrc1.bits.VGPRS);
+            destRsrc1.bits.SGPRS = std::max(destRsrc1.bits.SGPRS, srcRsrc1.bits.SGPRS);
+            *destNode = srcNode.getDocument()->getNode(destRsrc1.u32All);
+            return 0;
+          }
+          }
+        } else if (mapKey.isString()) {
+          // For .userdatalimit and .spillthreshold, take the max or min value respectively.
           if (mapKey.getString() == Util::Abi::PipelineMetadataKey::UserDataLimit) {
             *destNode = std::max(destNode->getUInt(), srcNode.getUInt());
             return 0;
@@ -165,6 +199,7 @@ void PalMetadata::mergeFromBlob(StringRef blob) {
             return 0;
           }
         }
+        // Default behavior for uint nodes: "or" the values together.
         *destNode = destNode->getUInt() | srcNode.getUInt();
         return 0;
       });
@@ -466,4 +501,144 @@ unsigned PalMetadata::getVertexFetchCount() {
   if (m_vertexInputs.isEmpty())
     return 0;
   return m_vertexInputs.size();
+}
+
+// =====================================================================================================================
+// Get the vertex fetch information out of PAL metadata. Used by the linker to generate the fetch shader.
+// Also removes the vertex fetch information, so it does not appear in the final linked ELF.
+//
+// @param [out] fetches : Vector to store info of each fetch
+void PalMetadata::getVertexFetchInfo(SmallVectorImpl<VertexFetchInfo> &fetches) {
+  if (m_vertexInputs.isEmpty()) {
+    auto it = m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::VertexInputs));
+    if (it == m_pipelineNode.end() || !it->second.isArray())
+      return;
+    m_vertexInputs = it->second.getArray();
+  }
+  for (unsigned i = 0, e = m_vertexInputs.size(); i != e; ++i) {
+    msgpack::ArrayDocNode fetchNode = m_vertexInputs[i].getArray();
+    unsigned location = fetchNode[0].getUInt();
+    unsigned component = fetchNode[1].getUInt();
+    StringRef tyName = fetchNode[2].getString();
+    unsigned vecLength = 0;
+    if (tyName[0] == 'v') {
+      tyName = tyName.drop_front();
+      tyName.consumeInteger(10, vecLength);
+    }
+    Type *ty = nullptr;
+    if (tyName == "i8")
+      ty = Type::getInt8Ty(m_pipelineState->getContext());
+    else if (tyName == "i16")
+      ty = Type::getInt16Ty(m_pipelineState->getContext());
+    else if (tyName == "i32")
+      ty = Type::getInt32Ty(m_pipelineState->getContext());
+    else if (tyName == "i64")
+      ty = Type::getInt64Ty(m_pipelineState->getContext());
+    else if (tyName == "f16")
+      ty = Type::getHalfTy(m_pipelineState->getContext());
+    else if (tyName == "f32")
+      ty = Type::getFloatTy(m_pipelineState->getContext());
+    else if (tyName == "f64")
+      ty = Type::getDoubleTy(m_pipelineState->getContext());
+    if (vecLength != 0)
+      ty = VectorType::get(ty, vecLength);
+    fetches.push_back({location, component, ty});
+  }
+  m_pipelineNode.erase(m_document->getNode(PipelineMetadataKey::VertexInputs));
+}
+
+// =====================================================================================================================
+// Get the VS entry register info. Used by the linker to generate the fetch shader.
+//
+// @param [out] regInfo : Where to store VS entry register info
+void PalMetadata::getVsEntryRegInfo(VsEntryRegInfo &regInfo) {
+  regInfo = {};
+
+  // Find the first hardware shader stage that has SPI registers set. That must be the API VS, or the merged
+  // shader containing it. User data register 0 is always set if a shader stage is active.
+  static const std::pair<unsigned, unsigned> shaderTable[] = {{mmSPI_SHADER_USER_DATA_LS_0, CallingConv::AMDGPU_LS},
+                                                              {mmSPI_SHADER_USER_DATA_HS_0, CallingConv::AMDGPU_HS},
+                                                              {mmSPI_SHADER_USER_DATA_ES_0, CallingConv::AMDGPU_ES},
+                                                              {mmSPI_SHADER_USER_DATA_GS_0, CallingConv::AMDGPU_GS},
+                                                              {mmSPI_SHADER_USER_DATA_VS_0, CallingConv::AMDGPU_VS}};
+  ArrayRef<std::pair<unsigned, unsigned>> shaderEntries = shaderTable;
+  auto userDataRegIt = m_registers.begin();
+  for (;;) {
+    userDataRegIt = m_registers.find(m_document->getNode(shaderEntries[0].first));
+    if (userDataRegIt != m_registers.end())
+      break;
+    shaderEntries = shaderEntries.drop_front();
+  }
+  unsigned userDataOffset = 0;
+  unsigned userDataReg0 = shaderEntries[0].first;
+  regInfo.callingConv = shaderEntries[0].second;
+  if (userDataReg0 != mmSPI_SHADER_USER_DATA_VS_0 && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9)
+    userDataOffset = 8; // GFX9+ merged shader: extra 8 SGPRs beore user data
+
+  // Scan the user data registers for vertex buffer table, vertex id, instance id.
+  unsigned userDataCount = m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
+  for (;;) {
+    switch (static_cast<UserDataMapping>(userDataRegIt->second.getUInt())) {
+    case UserDataMapping::VertexBufferTable:
+      regInfo.vertexBufferTable = userDataRegIt->first.getUInt() - userDataReg0 + userDataOffset;
+      break;
+    case UserDataMapping::BaseVertex:
+      regInfo.baseVertex = userDataRegIt->first.getUInt() - userDataReg0 + userDataOffset;
+      break;
+    case UserDataMapping::BaseInstance:
+      regInfo.baseInstance = userDataRegIt->first.getUInt() - userDataReg0 + userDataOffset;
+      break;
+    default:
+      break;
+    }
+    if (++userDataRegIt == m_registers.end() || userDataRegIt->first.getUInt() >= userDataReg0 + userDataCount)
+      break;
+  }
+
+  // Get the number of user data registers in this shader. For GFX9+, we ignore the USER_SGPR_MSB field; we
+  // know that there is at least one user SGPR, so if we find that USER_SGPR is 0, it must mean 32.
+  SPI_SHADER_PGM_RSRC2 rsrc2;
+  rsrc2.u32All =
+      m_registers[m_document->getNode(userDataReg0 + mmSPI_SHADER_PGM_RSRC2_VS - mmSPI_SHADER_USER_DATA_VS_0)]
+          .getUInt();
+  userDataCount = rsrc2.bits.USER_SGPR == 0 ? 32 : rsrc2.bits.USER_SGPR;
+
+  // Conservatively set the total number of input SGPRs. A merged shader with 8 SGPRs before user data
+  // does not have any extra ones after; an unmerged shader has up to 10 SGPRs after.
+  regInfo.sgprCount = userDataOffset + userDataCount;
+  if (userDataOffset == 0)
+    regInfo.sgprCount += 10;
+
+  // Set the VGPR numbers for vertex ID and instance ID, and the total number of input VGPRs, depending on the
+  // shader stage. We know that instance ID is enabled, because it always is in a fetchless VS.
+  // On GFX10, also get the wave32 bit.
+  VGT_SHADER_STAGES_EN vgtShaderStagesEn;
+  vgtShaderStagesEn.u32All = m_registers[m_document->getNode(mmVGT_SHADER_STAGES_EN)].getUInt();
+  switch (regInfo.callingConv) {
+  case CallingConv::AMDGPU_LS: // Before-GFX9 unmerged LS
+  case CallingConv::AMDGPU_ES: // Before-GFX9 unmerged ES
+  case CallingConv::AMDGPU_VS:
+    regInfo.vertexId = 0;
+    regInfo.instanceId = 3;
+    regInfo.vgprCount = 4;
+    regInfo.wave32 = vgtShaderStagesEn.gfx10.VS_W32_EN;
+    break;
+  case CallingConv::AMDGPU_HS: // GFX9+ LS+HS
+    regInfo.vertexId = 2;
+    regInfo.instanceId = 5;
+    regInfo.vgprCount = 6;
+    regInfo.wave32 = vgtShaderStagesEn.gfx10.HS_W32_EN;
+    break;
+  case CallingConv::AMDGPU_GS: // GFX9+ ES+GS
+    regInfo.vertexId = 5;
+    regInfo.instanceId = 8;
+    regInfo.vgprCount = 9;
+    regInfo.wave32 = vgtShaderStagesEn.gfx10.GS_W32_EN;
+    break;
+  default:
+    llvm_unreachable("");
+    break;
+  }
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10)
+    regInfo.wave32 = false;
 }

@@ -57,6 +57,20 @@ struct VertexFetchInfo {
 };
 
 // =====================================================================================================================
+// Struct with information on wave dispatch SGPRs and VGPRs for VS, written by getVsEntryRegInfo
+struct VsEntryRegInfo {
+  unsigned callingConv;       // Which hardware shader the VS is in (as CallingConv::ID)
+  unsigned vertexBufferTable; // SGPR for vertex buffer table
+  unsigned baseVertex;        // SGPR for base vertex
+  unsigned baseInstance;      // SGPR for base instance
+  unsigned sgprCount;         // Total SGPRs at wave dispatch (possibly conservative)
+  unsigned vertexId;          // VGPR for vertex ID
+  unsigned instanceId;        // VGPR for instance ID
+  unsigned vgprCount;         // Total VGPRs at wave dispatch (exact)
+  bool wave32;                // Whether VS is wave32
+};
+
+// =====================================================================================================================
 // Class for manipulating PAL metadata through LGC
 class PalMetadata {
 public:
@@ -101,6 +115,12 @@ public:
 
   // Get the count of vertex fetches for a fetchless vertex shader with shader compilation (or 0 otherwise).
   unsigned getVertexFetchCount();
+
+  // Get the vertex fetch information out of PAL metadata
+  void getVertexFetchInfo(llvm::SmallVectorImpl<VertexFetchInfo> &fetches);
+
+  // Get the VS entry register info. Used by the linker to generate the fetch shader.
+  void getVsEntryRegInfo(VsEntryRegInfo &regInfo);
 
   // Finalize PAL metadata for pipeline.
   // TODO Shader compilation: The idea is that this will be called at the end of a pipeline compilation, or in

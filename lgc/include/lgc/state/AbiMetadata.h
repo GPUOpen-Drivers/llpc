@@ -207,10 +207,43 @@ constexpr unsigned int mmSPI_SHADER_USER_DATA_HS_0 = 0x2D0C; // For GFX9+, Used 
 constexpr unsigned int mmSPI_SHADER_USER_DATA_PS_0 = 0x2C0C;
 constexpr unsigned int mmSPI_SHADER_USER_DATA_VS_0 = 0x2C4C;
 
+// The RSRC1 registers.
+constexpr unsigned mmSPI_SHADER_PGM_RSRC1_LS = 0x2D4A;
+constexpr unsigned mmSPI_SHADER_PGM_RSRC1_HS = 0x2D0A;
+constexpr unsigned mmSPI_SHADER_PGM_RSRC1_ES = 0x2CCA;
+constexpr unsigned mmSPI_SHADER_PGM_RSRC1_GS = 0x2C8A;
+constexpr unsigned mmSPI_SHADER_PGM_RSRC1_VS = 0x2C4A;
+constexpr unsigned mmSPI_SHADER_PGM_RSRC1_PS = 0x2C0A;
+
+// RSRC2 register. We only specify one, as each graphics shader stage has its RSRC2 register at the same
+// offset (-1) from its USER_DATA_*_0 register.
+constexpr unsigned mmSPI_SHADER_PGM_RSRC2_VS = 0x2C4B;
+
 // Other SPI register numbers in PAL metadata
 constexpr unsigned int mmPA_CL_CLIP_CNTL = 0xA204;
+constexpr unsigned mmVGT_SHADER_STAGES_EN = 0xA2D5;
 
 // Register bitfield layout.
+
+// General RSRC1 register, enough to get the VGPR and SGPR counts.
+union SPI_SHADER_PGM_RSRC1 {
+  struct {
+    unsigned int VGPRS : 6;
+    unsigned int SGPRS : 4;
+    unsigned int : 22;
+  } bits, bitfields;
+  unsigned int u32All;
+};
+
+// General RSRC2 register, enough to get the user SGPR count.
+union SPI_SHADER_PGM_RSRC2 {
+  struct {
+    unsigned int : 1;
+    unsigned int USER_SGPR : 5;
+    unsigned int : 26;
+  } bits;
+  unsigned int u32All;
+};
 
 // PA_CL_CLIP_CNTL register
 union PA_CL_CLIP_CNTL {
@@ -239,6 +272,18 @@ union PA_CL_CLIP_CNTL {
     unsigned int ZCLIP_PROG_NEAR_ENA : 1; // GFX9+
     unsigned int : 3;
   } bits, bitfields;
+  unsigned int u32All;
+};
+
+// VGT_SHADER_STAGES_EN register (just the GFX10 wave32 enable bits)
+union VGT_SHADER_STAGES_EN {
+  struct {
+    unsigned int : 21;
+    unsigned int HS_W32_EN : 1;
+    unsigned int GS_W32_EN : 1;
+    unsigned int VS_W32_EN : 1;
+    unsigned int : 8;
+  } gfx10;
   unsigned int u32All;
 };
 

@@ -32,6 +32,7 @@
 #include "lgc/Builder.h"
 #include "lgc/PassManager.h"
 #include "lgc/patch/Patch.h"
+#include "lgc/state/PassManagerCache.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
@@ -200,6 +201,7 @@ LgcContext::LgcContext(LLVMContext &context, unsigned palAbiVersion) : m_context
 LgcContext::~LgcContext() {
   delete m_targetMachine;
   delete m_targetInfo;
+  delete m_passManagerCache;
 }
 
 // =====================================================================================================================
@@ -290,4 +292,12 @@ void LgcContext::addTargetPasses(lgc::PassManager &passMgr, Timer *codeGenTimer,
   // Stop timer for codegen passes.
   if (codeGenTimer)
     passMgr.add(createStartStopTimer(codeGenTimer, false));
+}
+
+// =====================================================================================================================
+// Get pass manager cache
+PassManagerCache *LgcContext::getPassManagerCache() {
+  if (!m_passManagerCache)
+    m_passManagerCache = new PassManagerCache(this);
+  return m_passManagerCache;
 }
