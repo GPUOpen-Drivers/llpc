@@ -410,6 +410,7 @@ else()
 endif()
 
 if(EXISTS ${XGL_SPVGEN_PATH})
+    set(SPVGEN_ENABLE_WERROR ${LLPC_ENABLE_WERROR} CACHE BOOL "${PROJECT_NAME} override." FORCE)
     add_subdirectory(${XGL_SPVGEN_PATH} ${CMAKE_BINARY_DIR}/spvgen EXCLUDE_FROM_ALL)
 endif()
 
