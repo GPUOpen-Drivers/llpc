@@ -52,6 +52,7 @@ namespace lgc {
 
 class Builder;
 class PassManager;
+class PassManagerCache;
 class Pipeline;
 class TargetInfo;
 
@@ -117,6 +118,9 @@ public:
   static void setLlpcOuts(llvm::raw_ostream *stream) { m_llpcOuts = stream; }
   static llvm::raw_ostream *getLgcOuts() { return m_llpcOuts; }
 
+  // Get pass manager cache
+  PassManagerCache *getPassManagerCache();
+
 private:
   LgcContext() = delete;
   LgcContext(const LgcContext &) = delete;
@@ -129,6 +133,7 @@ private:
   llvm::TargetMachine *m_targetMachine = nullptr; // Target machine
   TargetInfo *m_targetInfo = nullptr;             // Target info
   unsigned m_palAbiVersion = 0xFFFFFFFF;          // PAL pipeline ABI version to compile for
+  PassManagerCache *m_passManagerCache = nullptr; // Pass manager cache and creator
 };
 
 } // namespace lgc

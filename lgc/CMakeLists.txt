@@ -93,6 +93,7 @@ target_sources(LLVMlgc PRIVATE
 # lgc/elfLinker
 target_sources(LLVMlgc PRIVATE
     elfLinker/ElfLinker.cpp
+    elfLinker/GlueShader.cpp
     elfLinker/RelocHandler.cpp
 )
 
@@ -131,6 +132,7 @@ target_sources(LLVMlgc PRIVATE
     state/Compiler.cpp
     state/LgcContext.cpp
     state/PalMetadata.cpp
+    state/PassManagerCache.cpp
     state/PipelineShaders.cpp
     state/PipelineState.cpp
     state/ResourceUsage.cpp

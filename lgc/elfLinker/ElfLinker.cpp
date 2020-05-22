@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/ElfLinker.h"
+#include "GlueShader.h"
 #include "RelocHandler.h"
 #include "lgc/state/AbiMetadata.h"
 #include "lgc/state/PalMetadata.h"
@@ -54,6 +55,7 @@ class ElfLinkerImpl;
 struct ElfInput {
   std::unique_ptr<object::ObjectFile> objectFile;
   SmallVector<std::pair<unsigned, unsigned>, 4> sectionMap;
+  StringRef reduceAlign; // If non-empty, the name of a text section to reduce the alignment to 0x40
 };
 
 // =====================================================================================================================
@@ -74,7 +76,7 @@ public:
       : m_linker(linker), m_name(name), m_type(type) {}
 
   // Add an input section
-  void addInputSection(ElfInput &elfInput, object::SectionRef inputSection);
+  void addInputSection(ElfInput &elfInput, object::SectionRef inputSection, bool reduceAlign = false);
 
   // Get name of output section
   StringRef getName();
@@ -98,7 +100,17 @@ public:
   void write(raw_pwrite_stream &outStream, ELF::Elf64_Shdr *shdr);
 
 private:
-  // Get alignment for an input section.
+  // Flag that we want to reduce alignment on the given input section, for gluing code together.
+  void setReduceAlign(const InputSection &inputSection) {
+    m_reduceAlign |= 1ULL << (&inputSection - &m_inputSections[0]);
+  }
+
+  // See if the given input section has the reduce align flag set.
+  bool getReduceAlign(const InputSection &inputSection) const {
+    return (m_reduceAlign >> (&inputSection - &m_inputSections[0])) & 1;
+  }
+
+  // Get alignment for an input section. This takes into account the reduceAlign flag.
   uint64_t getAlignment(const InputSection &inputSection);
 
   ElfLinkerImpl *m_linker;
@@ -107,6 +119,7 @@ private:
   StringRef m_name;                             // Section name
   unsigned m_type;                              // Section type (SHT_* value)
   uint64_t m_alignment = 0;                     // Overall alignment required for the section
+  unsigned m_reduceAlign = 0;                   // Bitmap of input sections to reduce alignment for
 };
 
 // =====================================================================================================================
@@ -163,16 +176,24 @@ private:
   // Write the PAL metadata out into the .note section.
   void writePalMetadata();
 
-  PipelineState *m_pipelineState;                 // PipelineState object
-  RelocHandler m_relocHandler;                    // RelocHandler object
-  SmallVector<ElfInput, 5> m_elfInputs;           // ELF objects to link
-  ELF::Elf64_Ehdr m_ehdr;                         // Output ELF header, copied from first input
-  SmallVector<OutputSection, 4> m_outputSections; // Output sections
-  SmallVector<ELF::Elf64_Sym, 8> m_symbols;       // Symbol table
-  StringMap<unsigned> m_symbolMap;                // Map from name to symbol index
-  std::string m_strings;                          // Strings for string table
-  StringMap<unsigned> m_stringMap;                // Map from string to string table index
-  std::string m_notes;                            // Notes to go in .note section
+  // Create a GlueShader object for each glue shader needed for this link.
+  void createGlueShaders();
+
+  // Insert glue shaders (if any).
+  bool insertGlueShaders();
+
+  PipelineState *m_pipelineState;                            // PipelineState object
+  RelocHandler m_relocHandler;                               // RelocHandler object
+  SmallVector<ElfInput, 5> m_elfInputs;                      // ELF objects to link
+  SmallVector<std::unique_ptr<GlueShader>, 4> m_glueShaders; // Glue shaders needed for link
+  SmallVector<StringRef, 5> m_glueStrings;                   // Strings to return for glue shader cache keys
+  ELF::Elf64_Ehdr m_ehdr;                                    // Output ELF header, copied from first input
+  SmallVector<OutputSection, 4> m_outputSections;            // Output sections
+  SmallVector<ELF::Elf64_Sym, 8> m_symbols;                  // Symbol table
+  StringMap<unsigned> m_symbolMap;                           // Map from name to symbol index
+  std::string m_strings;                                     // Strings for string table
+  StringMap<unsigned> m_stringMap;                           // Map from string to string table index
+  std::string m_notes;                                       // Notes to go in .note section
 };
 
 } // anonymous namespace
@@ -211,6 +232,9 @@ ElfLinkerImpl::ElfLinkerImpl(PipelineState *pipelineState, ArrayRef<MemoryBuffer
   for (auto &elfInput : m_elfInputs)
     mergePalMetadataFromElf(*elfInput.objectFile);
 
+  // Create any needed glue shaders.
+  createGlueShaders();
+
   // Populate output ELF header
   memcpy(&m_ehdr, elfs[0].getBuffer().data(), sizeof(ELF::Elf64_Ehdr));
 }
@@ -218,6 +242,21 @@ ElfLinkerImpl::ElfLinkerImpl(PipelineState *pipelineState, ArrayRef<MemoryBuffer
 // =====================================================================================================================
 // Destructor
 ElfLinkerImpl::~ElfLinkerImpl() {
+}
+
+// =====================================================================================================================
+// Create a GlueShader object for each glue shader needed for this link. This does not actually create
+// the glue shaders themselves, just the GlueShader objects that represent them.
+void ElfLinkerImpl::createGlueShaders() {
+  // Create a fetch shader object if we need one.
+  SmallVector<VertexFetchInfo, 8> fetches;
+  m_pipelineState->getPalMetadata()->getVertexFetchInfo(fetches);
+  if (!fetches.empty()) {
+    VsEntryRegInfo vsEntryRegInfo = {};
+    m_pipelineState->getPalMetadata()->getVsEntryRegInfo(vsEntryRegInfo);
+    m_glueShaders.push_back(
+        std::unique_ptr<GlueShader>(GlueShader::createFetchShader(m_pipelineState, fetches, vsEntryRegInfo)));
+  }
 }
 
 // =====================================================================================================================
@@ -233,7 +272,14 @@ ElfLinkerImpl::~ElfLinkerImpl() {
 // found blob to ElfLinker::addGlue. If it does not get a cache hit, the client can call ElfLinker::compileGlue to
 // retrieve the compiled glue code to store in the cache.
 ArrayRef<StringRef> ElfLinkerImpl::getGlueInfo() {
-  llvm_unreachable("Not implemented");
+  if (m_glueShaders.empty())
+    return {};
+  if (m_glueStrings.empty()) {
+    // Get the array of strings for glue shaders.
+    for (auto &glueShader : m_glueShaders)
+      m_glueStrings.push_back(glueShader->getString());
+  }
+  return m_glueStrings;
 }
 
 // =====================================================================================================================
@@ -256,7 +302,7 @@ void ElfLinkerImpl::addGlue(unsigned glueIndex, StringRef blob) {
 // @return : The blob. A zero-length blob indicates that a recoverable error occurred, and link() will also return
 //           and empty ELF blob.
 StringRef ElfLinkerImpl::compileGlue(unsigned glueIndex) {
-  llvm_unreachable("Not implemented");
+  return m_glueShaders[glueIndex]->getElfBlob();
 }
 
 // =====================================================================================================================
@@ -274,6 +320,10 @@ StringRef ElfLinkerImpl::compileGlue(unsigned glueIndex) {
 // @param [out] outStream : Stream to write linked ELF to
 // @return : True for success, false if something about the pipeline state stops linking
 bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
+  // Insert glue shaders (if any).
+  if (!insertGlueShaders())
+    return false;
+
   // Initialize symbol table and string table
   m_symbols.push_back({});
   m_strings = std::string("", 1);
@@ -298,7 +348,11 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
       if (elfSection.getType() == ELF::SHT_PROGBITS &&
           (elfSection.getFlags() & (ELF::SHF_ALLOC | ELF::SHF_WRITE)) == ELF::SHF_ALLOC) {
         // All text and rodata sections get lumped together, even if they have different names.
-        m_outputSections[textSectionIdx].addInputSection(elfInput, section);
+        // Reduce the alignment (for gluing code together) if the section name matches elfInput.reduceAlign.
+        bool reduceAlign = false;
+        if (elfInput.reduceAlign != "")
+          reduceAlign = cantFail(elfSection.getName()) == elfInput.reduceAlign;
+        m_outputSections[textSectionIdx].addInputSection(elfInput, section, reduceAlign);
       } else if (elfSection.getType() == ELF::SHT_PROGBITS) {
         // Put same-named sections together (excluding symbol table, string table, reloc sections).
         StringRef name = cantFail(section.getName());
@@ -516,12 +570,82 @@ void ElfLinkerImpl::writePalMetadata() {
 }
 
 // =====================================================================================================================
+// Insert glue shaders (if any).
+//
+// @return : False if a recoverable error occurred and was reported with setError().
+bool ElfLinkerImpl::insertGlueShaders() {
+  // Ensure glue code is compiled, and insert them as new input shaders.
+  for (auto &glueShader : m_glueShaders) {
+    // Compile the glue shader (if not already done), and parse the ELF.
+    StringRef elfBlob = glueShader->getElfBlob();
+    MemoryBufferRef elfBuffer(elfBlob, glueShader->getName());
+    ElfInput glueElfInput = {cantFail(object::ObjectFile::createELFObjectFile(elfBuffer))};
+
+    // Find the input ELF containing the main shader that the glue shader wants to attach to.
+    StringRef mainName = glueShader->getMainShaderName();
+    unsigned insertPos = UINT_MAX;
+    for (unsigned idx = 0; idx != m_elfInputs.size(); ++idx) {
+      ElfInput &elfInput = m_elfInputs[idx];
+      for (auto sym : elfInput.objectFile->symbols()) {
+        if (cantFail(sym.getName()) == mainName) {
+          // Found it. Find other STT_FUNC symbols in the same text section so we can check the validity of
+          // gluing the glue shader on.
+          uint64_t symValue = cantFail(sym.getValue()), maxValue = symValue;
+          auto section = cantFail(sym.getSection());
+          auto type = cantFail(sym.getType());
+          for (auto otherSym : elfInput.objectFile->symbols()) {
+            if (cantFail(otherSym.getSection()) == section && cantFail(otherSym.getType()) == type)
+              maxValue = std::max(maxValue, cantFail(otherSym.getValue()));
+          }
+          if (glueShader->isProlog()) {
+            // For a prolog glue shader, we can only cope if the main shader is at the start of its text section.
+            // We can reduce the alignment of the main shader from 0x100 to 0x40, but only if there are no
+            // other shaders in its text section.
+            if (symValue != 0) {
+              getPipelineState()->setError("Shader " + mainName + " is not at the start of its text section");
+              return false;
+            }
+            elfInput.reduceAlign = cantFail(section->getName());
+            insertPos = idx;
+          } else {
+            // For an epilog glue shader, we can only cope if the main shader is the last one in its text section.
+            // Also we reduce the alignment of the glue shader from 0x100 to 0x40.
+            if (symValue != maxValue) {
+              getPipelineState()->setError("Shader " + mainName + " is not at the end of its text section");
+              return false;
+            }
+            glueElfInput.reduceAlign = cantFail(section->getName());
+            insertPos = idx + 1;
+          }
+          break;
+        }
+      }
+    }
+
+    // Merge PAL metadata from glue ELF.
+    // Note that the merger callback in PalMetadata.cpp relies on the PAL metadata for the shader/half-pipeline
+    // ELFs being read first, and the glue shaders being merged in afterwards.
+    mergePalMetadataFromElf(*glueElfInput.objectFile);
+
+    // Insert the glue shader in the appropriate place in the list of ELFs.
+    assert(insertPos != UINT_MAX && "Main shader not found for glue shader");
+    m_elfInputs.insert(m_elfInputs.begin() + insertPos, std::move(glueElfInput));
+  }
+  return true;
+}
+
+// =====================================================================================================================
 // Add an input section to this output section
 //
 // @param elfInput : ELF input that the section comes from
 // @param inputSection : Input section to add to this output section
-void OutputSection::addInputSection(ElfInput &elfInput, object::SectionRef inputSection) {
+// @param reduceAlign : Reduce the alignment of the section (for gluing code together)
+void OutputSection::addInputSection(ElfInput &elfInput, object::SectionRef inputSection, bool reduceAlign) {
+  // Add the input section.
   m_inputSections.push_back(inputSection);
+  // Remember reduceAlign request.
+  if (reduceAlign)
+    setReduceAlign(m_inputSections.back());
   // Add an entry to the ElfInput's sectionMap, so we can get from an input section to where it contributes
   // to an output section.
   unsigned idx = inputSection.getIndex();
@@ -584,11 +708,16 @@ void OutputSection::layout() {
 }
 
 // =====================================================================================================================
-// Get alignment for an input section.
+// Get alignment for an input section. This takes into account the reduceAlign flag, reducing the alignment
+// from 0x100 to 0x40 when gluing code together.
 //
 // @param inputSection : InputSection
 uint64_t OutputSection::getAlignment(const InputSection &inputSection) {
   uint64_t alignment = inputSection.sectionRef.getAlignment();
+  // Check if alignment is reduced for this section
+  // for gluing code together.
+  if (alignment > 0x40 && getReduceAlign(inputSection))
+    alignment = 0x40;
   return alignment;
 }
 
