@@ -61,8 +61,7 @@ if(ICD_BUILD_LLPC)
     set(LLVM_INCLUDE_UTILS ON CACHE BOOL Force)
     set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL Force)
     set(LLVM_ENABLE_ZLIB OFF CACHE BOOL Force)
-    # confict with PAL
-    #set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
+    set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
 
     set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
 
