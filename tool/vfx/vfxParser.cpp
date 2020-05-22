@@ -372,19 +372,19 @@ bool VfxParser::parseKeyValue(char *key, char *valueStr, unsigned lineNum, Secti
       case MemberTypeInt: {
         result = parseInt(valueStr, lineNum, &value);
         if (result)
-          result = accessedSectionObject->set(lineNum, memberName, &(value.iVec4[0]));
+          result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &(value.iVec4[0]));
         break;
       }
       case MemberTypeFloat: {
         result = parseFloat16(valueStr, lineNum, &value);
         if (result)
-          result = accessedSectionObject->set(lineNum, memberName, &(value.f16Vec4[0]));
+          result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &(value.f16Vec4[0]));
         break;
       }
       case MemberTypeDouble: {
         result = parseDouble(valueStr, lineNum, &value);
         if (result)
-          result = accessedSectionObject->set(lineNum, memberName, &(value.dVec2[0]));
+          result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &(value.dVec2[0]));
         break;
       }
       case MemberTypeBool: {
@@ -392,7 +392,7 @@ bool VfxParser::parseKeyValue(char *key, char *valueStr, unsigned lineNum, Secti
         if (result) {
           static_assert(sizeof(uint8_t) == sizeof(bool), "");
           uint8_t boolValue = value.iVec4[0] ? 1 : 0;
-          result = accessedSectionObject->set(lineNum, memberName, &boolValue);
+          result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &boolValue);
         }
         break;
       }
