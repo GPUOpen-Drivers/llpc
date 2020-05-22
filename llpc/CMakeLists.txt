@@ -403,6 +403,10 @@ endif()
 ### Add Subdirectories #################################################################################################
 if(ICD_BUILD_LLPC)
 # SPVGEN
+if(XGL_ICD_PATH)
+    set(VULKAN_HEADER_PATH "${XGL_ICD_PATH}/api/include/khronos" CACHE PATH "${PROJECT_NAME} override." FORCE)
+endif()
+
 if(EXISTS ${PROJECT_SOURCE_DIR}/../../spvgen)
     set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../../spvgen CACHE PATH "Specify the path to SPVGEN.")
 else()
