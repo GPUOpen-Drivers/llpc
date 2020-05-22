@@ -297,8 +297,8 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
 
   // Shader stage specific processing
   auto inOuts = entryPoint->getInOuts();
-  if (shaderStage == ShaderStageVertex) {
-    // Create dummy vertex info
+  if (shaderStage == ShaderStageVertex && AutoLayoutDesc) {
+    // Create dummy vertex info (only if -auto-layout-desc is on).
     auto vertexBindings = new std::vector<VkVertexInputBindingDescription>;
     auto vertexAttribs = new std::vector<VkVertexInputAttributeDescription>;
 
