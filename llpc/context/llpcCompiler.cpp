@@ -1379,18 +1379,18 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 
   if (result == Result::Success) {
     void *allocBuf = nullptr;
-    if (pipelineInfo->pfnOutputAlloc)
+    if (pipelineInfo->pfnOutputAlloc) {
       allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, elfBin.codeSize);
-    else {
+
+      uint8_t *code = static_cast<uint8_t *>(allocBuf);
+      memcpy(code, elfBin.pCode, elfBin.codeSize);
+
+      pipelineOut->pipelineBin.codeSize = elfBin.codeSize;
+      pipelineOut->pipelineBin.pCode = code;
+    } else {
       // Allocator is not specified
       result = Result::ErrorInvalidPointer;
     }
-
-    uint8_t *code = static_cast<uint8_t *>(allocBuf);
-    memcpy(code, elfBin.pCode, elfBin.codeSize);
-
-    pipelineOut->pipelineBin.codeSize = elfBin.codeSize;
-    pipelineOut->pipelineBin.pCode = code;
   }
 
   return result;
