@@ -1,0 +1,20 @@
+name: Static code check
+
+on:
+  pull_request:
+
+jobs:
+  cppcheck:
+    name: cppcheck
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Setup environment
+        run: |
+          sudo apt-get install -yqq cppcheck
+      - name: Checkout LLPC
+        run: |
+          git clone https://github.com/${GITHUB_REPOSITORY}.git .
+          git fetch origin +${GITHUB_SHA}:${GITHUB_REF} --update-head-ok
+          git checkout ${GITHUB_SHA}
+      - name: Run cppcheck
+        run: cppcheck -q -j$(( $(nproc) * 4 )) --error-exitcode=1 .
