@@ -79,7 +79,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       return UndefValue::get(getBufferDescTy(pointeeTy));
     }
 
-    if (node && node == topNode && isa<Constant>(descIndex)) {
+    if (node == topNode && isa<Constant>(descIndex)) {
       // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
       // indexed. This lgc.root.descriptor call is by default lowered in PatchEntryPointMutate into a load from the
       // spill table, but it might be able to "unspill" it to directly use shader entry SGPRs.
