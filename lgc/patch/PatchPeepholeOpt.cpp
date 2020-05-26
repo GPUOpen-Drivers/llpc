@@ -555,8 +555,9 @@ void PatchPeepholeOpt::visitPHINode(PHINode &phiNode) {
     }
   }
 
-  // Do not clone allocas -- we don't want to potentially introduce them in the middle of the function.
-  if (prevIncomingInst && !isa<AllocaInst>(prevIncomingInst)) {
+  // Do not clone allocas, atomics and instructions with side effects.
+  if (prevIncomingInst && !isa<AllocaInst>(prevIncomingInst) && !prevIncomingInst->isAtomic() &&
+      !prevIncomingInst->mayHaveSideEffects()) {
     Instruction *const newInst = prevIncomingInst->clone();
     insertAfter(*newInst, phiNode);
 
