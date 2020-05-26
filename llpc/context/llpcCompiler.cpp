@@ -1051,8 +1051,14 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       // Per-shader SPIR-V lowering passes.
       const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
       ShaderStage entryStage = shaderInfoEntry ? shaderInfoEntry->entryStage : ShaderStageInvalid;
-      if (!shaderInfoEntry || !shaderInfoEntry->pModuleData || (stageSkipMask & shaderStageToMask(entryStage)))
+      if (!shaderInfoEntry || !shaderInfoEntry->pModuleData)
         continue;
+      if (stageSkipMask & shaderStageToMask(entryStage)) {
+        // Do not run SPIR-V translator and lowering passes on this shader; we were given it as IR ready
+        // to link into pipeline module.
+        modulesToLink.push_back({modules[shaderIndex], getLgcShaderStage(static_cast<ShaderStage>(shaderIndex))});
+        continue;
+      }
 
       context->getBuilder()->setShaderStage(getLgcShaderStage(entryStage));
       std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
