@@ -394,6 +394,7 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorTableVaPtr: {
     char prefixBuf[256];
     for (unsigned i = 0; i < userDataNode->tablePtr.nodeCount; ++i) {
+      snprintf(prefixBuf, 256, "%s.next[%u]", prefix, i);
       dumpResourceMappingNode(userDataNode->tablePtr.pNext + i, prefixBuf, dumpFile);
     }
     break;
