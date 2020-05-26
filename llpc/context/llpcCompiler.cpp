@@ -832,11 +832,27 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
 static bool hasUnrelocatableDescriptorNode(const ResourceMappingNode *nodes, unsigned nodeCount) {
   for (unsigned i = 0; i < nodeCount; ++i) {
     const ResourceMappingNode *node = nodes + i;
-    if (node->type == ResourceMappingNodeType::DescriptorTableVaPtr) {
-      if (hasUnrelocatableDescriptorNode(node->tablePtr.pNext, node->tablePtr.nodeCount))
-        return true;
-    } else if (node->type == ResourceMappingNodeType::DescriptorBufferCompact) {
+    switch (node->type) {
+    case ResourceMappingNodeType::DescriptorTableVaPtr: {
+      const ResourceMappingNode *startInnerNode = node->tablePtr.pNext;
+      const ResourceMappingNode *endInnerNode = startInnerNode + node->tablePtr.nodeCount;
+      for (const ResourceMappingNode *innerNode = startInnerNode; innerNode != endInnerNode; ++innerNode) {
+        if (innerNode->type == ResourceMappingNodeType::DescriptorBufferCompact)
+          // The code to handle a compact descriptor cannot be easily patched, so relocatable shaders assume there are
+          // no compact descriptors.
+          return true;
+      }
+      break;
+    }
+    case ResourceMappingNodeType::DescriptorResource:
+    case ResourceMappingNodeType::DescriptorSampler:
+    case ResourceMappingNodeType::DescriptorCombinedTexture:
+    case ResourceMappingNodeType::DescriptorTexelBuffer:
+    case ResourceMappingNodeType::DescriptorBufferCompact:
+      // Generic descriptors in the top level are not handled by the linker.
       return true;
+    default:
+      break;
     }
   }
   return false;
