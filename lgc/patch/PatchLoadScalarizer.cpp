@@ -176,5 +176,5 @@ void PatchLoadScalarizer::visitLoadInst(LoadInst &loadInst) {
 } // namespace lgc
 
 // =====================================================================================================================
-// Initializes the pass of LLVM patching operations for load scarlarizer optimization.
-INITIALIZE_PASS(PatchLoadScalarizer, DEBUG_TYPE, "Patch LLVM for load scarlarizer optimization", false, false)
+// Initializes the pass of LLVM patching operations for load scalarizer optimization.
+INITIALIZE_PASS(PatchLoadScalarizer, DEBUG_TYPE, "Patch LLVM for load scalarizer optimization", false, false)
