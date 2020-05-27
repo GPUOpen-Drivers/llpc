@@ -59,6 +59,11 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
     : m_pipelineState(pipelineState), m_context(&pipelineState->getContext()),
       m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()), m_nggControl(m_pipelineState->getNggControl()),
       m_ldsManager(nullptr), m_builder(new IRBuilder<>(*m_context)) {
+  // Always allow reciprocal, to change fdiv(1/x) to rcp(x)
+  FastMathFlags fastMathFlags;
+  fastMathFlags.setAllowReciprocal();
+  m_builder->setFastMathFlags(fastMathFlags);
+
   assert(m_pipelineState->isGraphics());
 
   buildPrimShaderCbLayoutLookupTable();
@@ -358,6 +363,8 @@ void NggPrimShader::buildPrimShaderCbLayoutLookupTable() {
   m_cbLayoutTable.primitiveRestartIndex =
       renderStateOffset + offsetof(Util::Abi::PrimShaderRenderCb, primitiveRestartIndex);
   m_cbLayoutTable.matchAllBits = renderStateOffset + offsetof(Util::Abi::PrimShaderRenderCb, matchAllBits);
+  m_cbLayoutTable.enableConservativeRasterization =
+      renderStateOffset + offsetof(Util::Abi::PrimShaderRenderCb, enableConservativeRasterization);
 
   const unsigned vportStateOffset = offsetof(Util::Abi::PrimShaderCbLayout, viewportStateCb);
   const unsigned vportControlSize = sizeof(Util::Abi::PrimShaderVportCb) / Util::Abi::MaxViewports;
@@ -3893,12 +3900,23 @@ Value *NggPrimShader::doSmallPrimFilterCulling(Module *module, Value *cullFlag, 
   // Get register PA_CL_VPORT_XSCALE
   auto paClVportXscale = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportXscale);
 
+  // Get register PA_CL_VPORT_XOFFSET
+  auto paClVportXoffset = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportXoffset);
+
   // Get register PA_CL_VPORT_YSCALE
   auto paClVportYscale = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportYscale);
 
+  // Get register PA_CL_VPORT_YOFFSET
+  auto paClVportYoffset = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportYoffset);
+
+  // Get run-time flag enableConservativeRasterization
+  auto conservativeRaster = fetchCullingControlRegister(module, m_cbLayoutTable.enableConservativeRasterization);
+  conservativeRaster = m_builder->CreateICmpNE(conservativeRaster, m_builder->getInt32(0));
+
   // Do small primitive filter culling
   return m_builder->CreateCall(smallPrimFilterCuller,
-                               {cullFlag, vertex0, vertex1, vertex2, paClVteCntl, paClVportXscale, paClVportYscale});
+                               {cullFlag, vertex0, vertex1, vertex2, paClVteCntl, paClVportXscale, paClVportXoffset,
+                                paClVportYscale, paClVportYoffset, conservativeRaster});
 }
 
 // =====================================================================================================================
@@ -4011,14 +4029,14 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     //
     // Backface culling algorithm is described as follow:
     //
-    //   if (((area > 0) && (face == CCW)) || ((area < 0) && (face == CW)))
-    //       frontFace = true
+    //   if ((area > 0 && face == CCW) || (area < 0 && face == CW))
+    //     frontFace = true
     //
-    //   if (((area < 0) && (face == CCW)) || ((area > 0) && (face == CW)))
-    //       backFace = true
+    //   if ((area < 0 && face == CCW) || (area > 0 && face == CW))
+    //     backFace = true
     //
-    //   if ((area == 0) || (frontFace && cullFront) || (backFace && cullBack))
-    //       cullFlag = true
+    //   if (area == 0 || (frontFace && cullFront) || (backFace && cullBack))
+    //     cullFlag = true
     //
 
     //        | x0 y0 w0 |
@@ -4252,11 +4270,11 @@ Function *NggPrimShader::createFrustumCuller(Module *module) {
     //
     // Frustum culling algorithm is described as follow:
     //
-    //   if ((x[i] > xDiscAdj * w[i]) && (y[i] > yDiscAdj * w[i]) && (z[i] > zFar * w[i]))
-    //       cullFlag = true
+    //   if (x[i] > xDiscAdj * w[i] && y[i] > yDiscAdj * w[i] && z[i] > zFar * w[i])
+    //     cullFlag = true
     //
-    //   if ((x[i] < -xDiscAdj * w[i]) && (y[i] < -yDiscAdj * w[i]) && (z[i] < zNear * w[i]))
-    //       cullFlag &= true
+    //   if (x[i] < -xDiscAdj * w[i] && y[i] < -yDiscAdj * w[i] && z[i] < zNear * w[i])
+    //     cullFlag &= true
     //
     //   i = [0..2]
     //
@@ -4514,13 +4532,10 @@ Function *NggPrimShader::createBoxFilterCuller(Module *module) {
     //
     // Box filter culling algorithm is described as follow:
     //
-    //   if ((min(x0/w0, x1/w1, x2/w2) > xDiscAdj)  ||
-    //       (max(x0/w0, x1/w1, x2/w2) < -xDiscAdj) ||
-    //       (min(y0/w0, y1/w1, y2/w2) > yDiscAdj)  ||
-    //       (max(y0/w0, y1/w1, y2/w2) < -yDiscAdj) ||
-    //       (min(z0/w0, z1/w1, z2/w2) > zFar)      ||
-    //       (min(z0/w0, z1/w1, z2/w2) < zNear))
-    //       cullFlag = true
+    //   if (min(x0/w0, x1/w1, x2/w2) > xDiscAdj || max(x0/w0, x1/w1, x2/w2) < -xDiscAdj ||
+    //       min(y0/w0, y1/w1, y2/w2) > yDiscAdj || max(y0/w0, y1/w1, y2/w2) < -yDiscAdj ||
+    //       min(z0/w0, z1/w1, z2/w2) > zFar     || min(z0/w0, z1/w1, z2/w2) < zNear)
+    //     cullFlag = true
     //
 
     // vtxXyFmt = (VTX_XY_FMT, PA_CL_VTE_CNTL[8], 0 = 1/W0, 1 = none)
@@ -5056,7 +5071,10 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
                                       VectorType::get(Type::getFloatTy(*m_context), 4), // %vertex2
                                       m_builder->getInt32Ty(),                          // %paClVteCntl
                                       m_builder->getInt32Ty(),                          // %paClVportXscale
-                                      m_builder->getInt32Ty()                           // %paClVportYscale
+                                      m_builder->getInt32Ty(),                          // %paClVportXoffset
+                                      m_builder->getInt32Ty(),                          // %paClVportYscale
+                                      m_builder->getInt32Ty(),                          // %paClVportYoffset
+                                      m_builder->getInt1Ty()                            // %conservativeRaster
                                   },
                                   false);
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::NggCullingSmallPrimFilter, module);
@@ -5084,8 +5102,17 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
   Value *paClVportXscale = argIt++;
   paClVportXscale->setName("paClVportXscale");
 
+  Value *paClVportXoffset = argIt++;
+  paClVportXscale->setName("paClVportXoffset");
+
   Value *paClVportYscale = argIt++;
   paClVportYscale->setName("paClVportYscale");
+
+  Value *paClVportYoffset = argIt++;
+  paClVportYscale->setName("paClVportYoffset");
+
+  Value *conservativeRaster = argIt++;
+  conservativeRaster->setName("conservativeRaster");
 
   auto smallPrimFilterEntryBlock = createBlock(func, ".smallprimfilterEntry");
   auto smallPrimFilterCullBlock = createBlock(func, ".smallprimfilterCull");
@@ -5096,8 +5123,10 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
   // Construct ".smallprimfilterEntry" block
   {
     m_builder->SetInsertPoint(smallPrimFilterEntryBlock);
-    // If cull flag has already been TRUE, early return
-    m_builder->CreateCondBr(cullFlag, smallPrimFilterExitBlock, smallPrimFilterCullBlock);
+
+    // If cull flag has already been TRUE or if conservative rasterization, early return
+    m_builder->CreateCondBr(m_builder->CreateOr(cullFlag, conservativeRaster), smallPrimFilterExitBlock,
+                            smallPrimFilterCullBlock);
   }
 
   // Construct ".smallprimfilterCull" block
@@ -5108,11 +5137,17 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
     //
     // Small primitive filter culling algorithm is described as follow:
     //
-    //   if ((roundEven(min(scaled(x0/w0), scaled(x1/w1), scaled(x2/w2))) ==
-    //        roundEven(max(scaled(x0/w0), scaled(x1/w1), scaled(x2/w2)))) ||
-    //       (roundEven(min(scaled(y0/w0), scaled(y1/w1), scaled(y2/w2))) ==
-    //        roundEven(max(scaled(y0/w0), scaled(y1/w1), scaled(y2/w2)))))
+    //   if (!conservativeRaster) {
+    //     if (roundEven(min(screen(x0/w0), screen(x1/w1), screen(x2/w2)) ==
+    //         roundEven(max(screen(x0/w0), screen(x1/w1), screen(x2/w2))) ||
+    //         roundEven(min(screen(y0/w0), screen(y1/w1), screen(y2/w2)) ==
+    //         roundEven(max(screen(y0/w0), screen(y1/w1), screen(y2/w2))))
     //       cullFlag = true
+    //
+    //     allowCull = (w0 < 0 && w1 < 0 && w2 < 0) || (w0 > 0 && w1 > 0 && w2 > 0))
+    //     cullFlag = allowCull && cullFlag
+    //   } else
+    //     cullFlag = false
     //
 
     // vtxXyFmt = (VTX_XY_FMT, PA_CL_VTE_CNTL[8], 0 = 1/W0, 1 = none)
@@ -5121,10 +5156,16 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
     vtxXyFmt = m_builder->CreateTrunc(vtxXyFmt, m_builder->getInt1Ty());
 
     // xScale = (VPORT_XSCALE, PA_CL_VPORT_XSCALE[31:0])
-    auto xsCale = m_builder->CreateBitCast(paClVportXscale, m_builder->getFloatTy());
+    auto xScale = m_builder->CreateBitCast(paClVportXscale, m_builder->getFloatTy());
+
+    // xOffset = (VPORT_XOFFSET, PA_CL_VPORT_XOFFSET[31:0])
+    auto xOffset = m_builder->CreateBitCast(paClVportXoffset, m_builder->getFloatTy());
 
     // yScale = (VPORT_YSCALE, PA_CL_VPORT_YSCALE[31:0])
-    auto ysCale = m_builder->CreateBitCast(paClVportYscale, m_builder->getFloatTy());
+    auto yScale = m_builder->CreateBitCast(paClVportYscale, m_builder->getFloatTy());
+
+    // yOffset = (VPORT_YOFFSET, PA_CL_VPORT_YOFFSET[31:0])
+    auto yOffset = m_builder->CreateBitCast(paClVportYoffset, m_builder->getFloatTy());
 
     auto x0 = m_builder->CreateExtractElement(vertex0, static_cast<uint64_t>(0));
     auto y0 = m_builder->CreateExtractElement(vertex0, 1);
@@ -5163,100 +5204,74 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
     // y2' = y2/w2
     y2 = m_builder->CreateFMul(y2, rcpW2);
 
-    // clampX0' = clamp((x0' + 1.0) / 2)
-    auto clampX0 = m_builder->CreateFAdd(x0, ConstantFP::get(m_builder->getFloatTy(), 1.0));
-    clampX0 = m_builder->CreateFMul(clampX0, ConstantFP::get(m_builder->getFloatTy(), 0.5));
-    clampX0 = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(),
-                                         {clampX0, ConstantFP::get(m_builder->getFloatTy(), 0.0)});
-    clampX0 = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(),
-                                         {clampX0, ConstantFP::get(m_builder->getFloatTy(), 1.0)});
+    // screenMinX = -xScale + xOffset - 0.5
+    auto screenMinX = m_builder->CreateFAdd(m_builder->CreateFNeg(xScale), xOffset);
+    screenMinX = m_builder->CreateFAdd(screenMinX, ConstantFP::get(m_builder->getFloatTy(), -0.5));
 
-    // scaledX0' = (clampX0' * xScale) * 2
-    auto scaledX0 = m_builder->CreateFMul(clampX0, xsCale);
-    scaledX0 = m_builder->CreateFMul(scaledX0, ConstantFP::get(m_builder->getFloatTy(), 2.0));
+    // screenMaxX = xScale + xOffset + 0.5
+    auto screenMaxX = m_builder->CreateFAdd(xScale, xOffset);
+    screenMaxX = m_builder->CreateFAdd(screenMaxX, ConstantFP::get(m_builder->getFloatTy(), 0.5));
 
-    // clampX1' = clamp((x1' + 1.0) / 2)
-    auto clampX1 = m_builder->CreateFAdd(x1, ConstantFP::get(m_builder->getFloatTy(), 1.0));
-    clampX1 = m_builder->CreateFMul(clampX1, ConstantFP::get(m_builder->getFloatTy(), 0.5));
-    clampX1 = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(),
-                                         {clampX1, ConstantFP::get(m_builder->getFloatTy(), 0.0)});
-    clampX1 = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(),
-                                         {clampX1, ConstantFP::get(m_builder->getFloatTy(), 1.0)});
+    // screenX0' = x0' * xScale + xOffset
+    auto screenX0 = m_builder->CreateIntrinsic(Intrinsic::fma, m_builder->getFloatTy(), {x0, xScale, xOffset});
 
-    // scaledX1' = (clampX1' * xScale) * 2
-    auto scaledX1 = m_builder->CreateFMul(clampX1, xsCale);
-    scaledX1 = m_builder->CreateFMul(scaledX1, ConstantFP::get(m_builder->getFloatTy(), 2.0));
+    // screenX1' = x1' * xScale + xOffset
+    auto screenX1 = m_builder->CreateIntrinsic(Intrinsic::fma, m_builder->getFloatTy(), {x1, xScale, xOffset});
 
-    // clampX2' = clamp((x2' + 1.0) / 2)
-    auto clampX2 = m_builder->CreateFAdd(x2, ConstantFP::get(m_builder->getFloatTy(), 1.0));
-    clampX2 = m_builder->CreateFMul(clampX2, ConstantFP::get(m_builder->getFloatTy(), 0.5));
-    clampX2 = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(),
-                                         {clampX2, ConstantFP::get(m_builder->getFloatTy(), 0.0)});
-    clampX2 = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(),
-                                         {clampX2, ConstantFP::get(m_builder->getFloatTy(), 1.0)});
+    // screenX2' = x2' * xScale + xOffset
+    auto screenX2 = m_builder->CreateIntrinsic(Intrinsic::fma, m_builder->getFloatTy(), {x2, xScale, xOffset});
 
-    // scaledX2' = (clampX2' * xScale) * 2
-    auto scaledX2 = m_builder->CreateFMul(clampX2, xsCale);
-    scaledX2 = m_builder->CreateFMul(scaledX2, ConstantFP::get(m_builder->getFloatTy(), 2.0));
+    // minX = clamp(min(screenX0', screenX1', screenX2'), screenMinX, screenMaxX) - 1/256.0
+    Value *minX = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(), {screenX0, screenX1});
+    minX = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(), {minX, screenX2});
+    minX = m_builder->CreateIntrinsic(Intrinsic::amdgcn_fmed3, m_builder->getFloatTy(), {screenMinX, minX, screenMaxX});
+    minX = m_builder->CreateFAdd(minX, ConstantFP::get(m_builder->getFloatTy(), -1 / 256.0));
 
-    // clampY0' = clamp((y0' + 1.0) / 2)
-    auto clampY0 = m_builder->CreateFAdd(y0, ConstantFP::get(m_builder->getFloatTy(), 1.0));
-    clampY0 = m_builder->CreateFMul(clampY0, ConstantFP::get(m_builder->getFloatTy(), 0.5));
-    clampY0 = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(),
-                                         {clampY0, ConstantFP::get(m_builder->getFloatTy(), 0.0)});
-    clampY0 = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(),
-                                         {clampY0, ConstantFP::get(m_builder->getFloatTy(), 1.0)});
-
-    // scaledY0' = (clampY0' * yScale) * 2
-    auto scaledY0 = m_builder->CreateFMul(clampY0, ysCale);
-    scaledY0 = m_builder->CreateFMul(scaledY0, ConstantFP::get(m_builder->getFloatTy(), 2.0));
-
-    // clampY1' = clamp((y1' + 1.0) / 2)
-    auto clampY1 = m_builder->CreateFAdd(y1, ConstantFP::get(m_builder->getFloatTy(), 1.0));
-    clampY1 = m_builder->CreateFMul(clampY1, ConstantFP::get(m_builder->getFloatTy(), 0.5));
-    clampY1 = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(),
-                                         {clampY1, ConstantFP::get(m_builder->getFloatTy(), 0.0)});
-    clampY1 = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(),
-                                         {clampY1, ConstantFP::get(m_builder->getFloatTy(), 1.0)});
-
-    // scaledY1' = (clampY1' * yScale) * 2
-    auto scaledY1 = m_builder->CreateFMul(clampY1, ysCale);
-    scaledY1 = m_builder->CreateFMul(scaledY1, ConstantFP::get(m_builder->getFloatTy(), 2.0));
-
-    // clampY2' = clamp((y2' + 1.0) / 2)
-    auto clampY2 = m_builder->CreateFAdd(y2, ConstantFP::get(m_builder->getFloatTy(), 1.0));
-    clampY2 = m_builder->CreateFMul(clampY2, ConstantFP::get(m_builder->getFloatTy(), 0.5));
-    clampY2 = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(),
-                                         {clampY2, ConstantFP::get(m_builder->getFloatTy(), 0.0)});
-    clampY2 = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(),
-                                         {clampY2, ConstantFP::get(m_builder->getFloatTy(), 1.0)});
-
-    // scaledY2' = (clampY2' * yScale) * 2
-    auto scaledY2 = m_builder->CreateFMul(clampY2, ysCale);
-    scaledY2 = m_builder->CreateFMul(scaledY2, ConstantFP::get(m_builder->getFloatTy(), 2.0));
-
-    // minX = roundEven(min(scaledX0', scaledX1', scaledX2') - 1/256.0)
-    Value *minX = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(), {scaledX0, scaledX1});
-    minX = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(), {minX, scaledX2});
-    minX = m_builder->CreateFSub(minX, ConstantFP::get(m_builder->getFloatTy(), 1 / 256.0));
+    // minX = roundEven(minX)
     minX = m_builder->CreateIntrinsic(Intrinsic::rint, m_builder->getFloatTy(), minX);
 
-    // maxX = roundEven(max(scaledX0', scaledX1', scaledX2') + 1/256.0)
-    Value *maxX = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(), {scaledX0, scaledX1});
-    maxX = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(), {maxX, scaledX2});
+    // maxX = clamp(max(screenX0', screenX1', screenX2'), screenMinX, screenMaxX) + 1/256.0
+    Value *maxX = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(), {screenX0, screenX1});
+    maxX = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(), {maxX, screenX2});
+    maxX = m_builder->CreateIntrinsic(Intrinsic::amdgcn_fmed3, m_builder->getFloatTy(), {screenMinX, maxX, screenMaxX});
     maxX = m_builder->CreateFAdd(maxX, ConstantFP::get(m_builder->getFloatTy(), 1 / 256.0));
+
+    // maxX = roundEven(maxX)
     maxX = m_builder->CreateIntrinsic(Intrinsic::rint, m_builder->getFloatTy(), maxX);
 
-    // minY = roundEven(min(scaledY0', scaledY1', scaledY2') - 1/256.0)
-    Value *minY = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(), {scaledY0, scaledY1});
-    minY = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(), {minY, scaledY2});
-    minY = m_builder->CreateFSub(minY, ConstantFP::get(m_builder->getFloatTy(), 1 / 256.0));
+    // screenMinY = -yScale + yOffset - 0.5
+    auto screenMinY = m_builder->CreateFAdd(m_builder->CreateFNeg(yScale), yOffset);
+    screenMinY = m_builder->CreateFAdd(screenMinY, ConstantFP::get(m_builder->getFloatTy(), -0.5));
+
+    // screenMaxY = yScale + yOffset + 0.5
+    auto screenMaxY = m_builder->CreateFAdd(yScale, yOffset);
+    screenMaxY = m_builder->CreateFAdd(screenMaxX, ConstantFP::get(m_builder->getFloatTy(), 0.5));
+
+    // screenY0' = y0' * yScale + yOffset
+    auto screenY0 = m_builder->CreateIntrinsic(Intrinsic::fma, m_builder->getFloatTy(), {y0, yScale, yOffset});
+
+    // screenY1' = y1' * yScale + yOffset
+    auto screenY1 = m_builder->CreateIntrinsic(Intrinsic::fma, m_builder->getFloatTy(), {y1, yScale, yOffset});
+
+    // screenY2' = y2' * yScale + yOffset
+    auto screenY2 = m_builder->CreateIntrinsic(Intrinsic::fma, m_builder->getFloatTy(), {y2, yScale, yOffset});
+
+    // minY = clamp(min(screenY0', screenY1', screenY2'), screenMinY, screenMaxY) - 1/256.0
+    Value *minY = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(), {screenY0, screenY1});
+    minY = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(), {minY, screenY2});
+    minY = m_builder->CreateIntrinsic(Intrinsic::amdgcn_fmed3, m_builder->getFloatTy(), {screenMinY, minY, screenMaxY});
+    minY = m_builder->CreateFAdd(minY, ConstantFP::get(m_builder->getFloatTy(), -1 / 256.0));
+
+    // minY = roundEven(minY)
     minY = m_builder->CreateIntrinsic(Intrinsic::rint, m_builder->getFloatTy(), minY);
 
-    // maxX = roundEven(max(scaledX0', scaledX1', scaledX2') + 1/256.0)
-    Value *maxY = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(), {scaledY0, scaledY1});
-    maxY = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(), {maxY, scaledY2});
+    // maxY = clamp(max(screenX0', screenY1', screenY2'), screenMinY, screenMaxY) + 1/256.0
+    Value *maxY = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(), {screenY0, screenY1});
+    maxY = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(), {maxY, screenY2});
+    maxY = m_builder->CreateIntrinsic(Intrinsic::amdgcn_fmed3, m_builder->getFloatTy(), {screenMinY, maxY, screenMaxY});
     maxY = m_builder->CreateFAdd(maxY, ConstantFP::get(m_builder->getFloatTy(), 1 / 256.0));
+
+    // maxY = roundEven(maxY)
     maxY = m_builder->CreateIntrinsic(Intrinsic::rint, m_builder->getFloatTy(), maxY);
 
     // minX == maxX
@@ -5267,6 +5282,24 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
 
     // Get cull flag
     newCullFlag = m_builder->CreateOr(minXEqMaxX, minYEqMaxY);
+
+    // Check if W allows culling
+    auto w0AsInt = m_builder->CreateBitCast(w0, m_builder->getInt32Ty());
+    auto w1AsInt = m_builder->CreateBitCast(w1, m_builder->getInt32Ty());
+    auto w2AsInt = m_builder->CreateBitCast(w2, m_builder->getInt32Ty());
+
+    // w0 < 0 && w1 < 0 && w2 < 0
+    auto isAllWNeg = m_builder->CreateAnd(w0AsInt, w1AsInt);
+    isAllWNeg = m_builder->CreateAnd(isAllWNeg, w2AsInt);
+    isAllWNeg = m_builder->CreateICmpSLT(isAllWNeg, m_builder->getInt32(0));
+
+    // w0 > 0 && w1 > 0 && w2 > 0
+    auto isAllWPos = m_builder->CreateOr(w0AsInt, w1AsInt);
+    isAllWPos = m_builder->CreateOr(isAllWPos, w2AsInt);
+    isAllWPos = m_builder->CreateICmpSGT(isAllWPos, m_builder->getInt32(0));
+
+    auto allowCull = m_builder->CreateOr(isAllWNeg, isAllWPos);
+    newCullFlag = m_builder->CreateAnd(allowCull, newCullFlag);
 
     m_builder->CreateBr(smallPrimFilterExitBlock);
   }
