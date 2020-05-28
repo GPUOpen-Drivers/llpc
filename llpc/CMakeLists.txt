@@ -64,7 +64,15 @@ if(ICD_BUILD_LLPC)
     # confict with PAL
     #set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
 
-    set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
+    if(EXISTS ${PROJECT_SOURCE_DIR}/../../llvm-project/llvm)
+        set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
+    elseif(EXISTS ${PROJECT_SOURCE_DIR}/../../../../../llvm)
+        set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../../../../llvm CACHE PATH "Specify the path to the LLVM.")
+    elseif(EXISTS ${PROJECT_SOURCE_DIR}/../../../../../llvm-project/llvm)
+        set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../../../../llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
+    elseif(EXISTS ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm)
+        set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
+    endif()
 
     add_subdirectory(${XGL_LLVM_SRC_PATH} ${PROJECT_BINARY_DIR}/llvm)
     set(XGL_LLVM_BUILD_PATH ${PROJECT_BINARY_DIR}/llvm)
@@ -303,7 +311,9 @@ else()
     )
 endif()
 
-add_subdirectory(../tool/dumper ${PROJECT_BINARY_DIR}/../dumper)
+if(NOT TARGET dumper)
+    add_subdirectory(../tool/dumper ${PROJECT_BINARY_DIR}/../dumper)
+endif()
 target_link_libraries(llpc PRIVATE dumper)
 
 target_link_libraries(llpc PRIVATE cwpack)

@@ -1788,8 +1788,11 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   //     Run GS
   //   Barrier
   //
-  //   if (culling && valid primitive & threadIdInSubgroup < primCountInSubgroup)
-  //     Do culling and nullify culled primitives
+  //   if (culling && valid primitive & threadIdInSubgroup < primCountInSubgroup) {
+  //     Do culling (run culling algorithms)
+  //     if (primitive culled)
+  //       Nullify primitive connectivity data
+  //   }
   //   Barrier
   //
   //   if (threadIdInSubgroup < vertCountInSubgroup)

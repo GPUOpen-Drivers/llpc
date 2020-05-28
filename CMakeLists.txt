@@ -22,11 +22,27 @@
  #  SOFTWARE.
  #
  #######################################################################################################################
-add_subdirectory(llpc ${PROJECT_BINARY_DIR}/llpc)
 
+project(VKGC LANGUAGES C CXX)
+
+add_library(vkgc INTERFACE)
+
+### Expose header files ################################################################################################
+target_include_directories(vkgc
+    INTERFACE
+        ${PROJECT_SOURCE_DIR}/include
+)
+
+### VKGC build LLPC ################################################################
 if(ICD_BUILD_LLPC)
-    add_library(vkgc ALIAS llpc)
-else()
-    add_library(vkgc ALIAS bil)
+    target_include_directories(vkgc
+        INTERFACE
+            ${PROJECT_SOURCE_DIR}/llpc/include
+            ${PROJECT_SOURCE_DIR}/lgc/include
+    )
+
+    add_subdirectory(llpc ${PROJECT_BINARY_DIR}/llpc)
+
+    target_link_libraries(vkgc INTERFACE llpc)
 endif()
 
