@@ -364,7 +364,7 @@ public:
 
   llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *pushConstantsTy, const llvm::Twine &instName) override final;
 
-  llvm::Value *CreateGetBufferDescLength(llvm::Value *const bufferDesc,
+  llvm::Value *CreateGetBufferDescLength(llvm::Value *const bufferDesc, llvm::Value *offset,
                                          const llvm::Twine &instName = "") override final;
 
   // -----------------------------------------------------------------------------------------------------------------

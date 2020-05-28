@@ -1857,6 +1857,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     fragmentHasher.Update(pipelineOptions->reconfigWorkgroupLayout);
     fragmentHasher.Update(pipelineOptions->includeIr);
     fragmentHasher.Update(pipelineOptions->robustBufferAccess);
+    fragmentHasher.Update(pipelineOptions->nullDescriptor);
     PipelineDumper::updateHashForFragmentState(pipelineInfo, &fragmentHasher);
     fragmentHasher.Finalize(fragmentHash->bytes);
   }

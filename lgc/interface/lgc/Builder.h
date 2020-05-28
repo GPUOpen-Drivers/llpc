@@ -757,11 +757,14 @@ public:
   // @param instName : Name to give instruction(s)
   virtual llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *pushConstantsTy, const llvm::Twine &instName = "") = 0;
 
-  // Create a buffer length query based on the specified descriptor.
+  // Create a buffer length query based on the specified descriptor, subtracting an offset from the length. The result
+  // is 0 for a null descriptor when allowNullDescriptor is enabled.
   //
   // @param bufferDesc : The buffer descriptor to query.
+  // @param offset: The offset to subtract from the buffer length.
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetBufferDescLength(llvm::Value *const bufferDesc, const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateGetBufferDescLength(llvm::Value *const bufferDesc, llvm::Value *offset,
+                                                 const llvm::Twine &instName = "") = 0;
 
   // -----------------------------------------------------------------------------------------------------------------
   // Image operations

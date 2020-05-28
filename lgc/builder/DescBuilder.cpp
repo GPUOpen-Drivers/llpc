@@ -494,12 +494,11 @@ Value *DescBuilder::scalarizeIfUniform(Value *value, bool isNonUniform) {
 //
 // @param bufferDesc : The buffer descriptor to query.
 // @param instName : Name to give instruction(s).
-Value *DescBuilder::CreateGetBufferDescLength(Value *const bufferDesc, const Twine &instName) {
+Value *DescBuilder::CreateGetBufferDescLength(Value *const bufferDesc, Value *offset, const Twine &instName) {
   // In future this should become a full LLVM intrinsic, but for now we patch in a late intrinsic that is cleaned up
   // in patch buffer op.
   std::string callName = lgcName::LateBufferLength;
-  addTypeMangling(nullptr, bufferDesc, callName);
-  return CreateNamedCall(callName, getInt32Ty(), bufferDesc, Attribute::ReadNone);
+  return CreateNamedCall(lgcName::LateBufferLength, getInt32Ty(), {bufferDesc, offset}, Attribute::ReadNone);
 }
 
 // =====================================================================================================================

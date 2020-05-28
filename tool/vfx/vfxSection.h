@@ -991,6 +991,7 @@ public:
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, reconfigWorkgroupLayout, MemberTypeBool, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, shadowDescriptorTableUsage, MemberTypeEnum, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, shadowDescriptorTablePtrHigh, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, nullDescriptor, MemberTypeBool, false);
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
@@ -998,7 +999,7 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 7;
+  static const unsigned MemberCount = 8;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;

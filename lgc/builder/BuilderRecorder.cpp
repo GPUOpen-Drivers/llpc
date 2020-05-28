@@ -1096,8 +1096,8 @@ Value *BuilderRecorder::CreateLoadPushConstantsPtr(Type *pushConstantsTy, const 
 //
 // @param bufferDesc : The buffer descriptor to query.
 // @param instName : Name to give instruction(s).
-Value *BuilderRecorder::CreateGetBufferDescLength(Value *const bufferDesc, const Twine &instName) {
-  return record(Opcode::GetBufferDescLength, getInt32Ty(), {bufferDesc}, instName);
+Value *BuilderRecorder::CreateGetBufferDescLength(Value *const bufferDesc, Value *offset, const Twine &instName) {
+  return record(Opcode::GetBufferDescLength, getInt32Ty(), {bufferDesc, offset}, instName);
 }
 
 // =====================================================================================================================

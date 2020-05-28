@@ -73,6 +73,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     40.2 | Added flag nullDescriptor in PipelineOptions to support VK_EXT_robustness2                            |
 //* |     40.1 | Added disableLoopUnroll to PipelineShaderOptions                                                      |
 //* |     40.0 | Added DescriptorReserved12, which moves DescriptorYCbCrSampler down to 13                             |
 //* |     39.0 | Non-LLPC-specific XGL code should #include vkcgDefs.h instead of llpc.h                               |
@@ -266,6 +267,8 @@ struct PipelineOptions {
 
   ShadowDescriptorTableUsage shadowDescriptorTableUsage; ///< Controls shadow descriptor table.
   unsigned shadowDescriptorTablePtrHigh;                 ///< Sets high part of VA ptr for shadow descriptor table.
+  bool nullDescriptor;                                   ///< If set, support VK_EXT_robustness2 to give defined
+                                                         ///  behavior for null descriptor
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.

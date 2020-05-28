@@ -30,6 +30,7 @@
  */
 #include "PatchBufferOp.h"
 #include "lgc/Builder.h"
+#include "lgc/LgcContext.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
@@ -421,11 +422,30 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
     Value *const pointer = getPointerOperandAsInst(callInst.getArgOperand(0));
 
     // Extract element 2 which is the NUM_RECORDS field from the buffer descriptor.
-    Value *const bufferLength = m_builder->CreateExtractElement(m_replacementMap[pointer].first, 2);
+    Value *const bufferDesc = m_replacementMap[pointer].first;
+    Value *numRecords = m_builder->CreateExtractElement(bufferDesc, 2);
+
+    // The result is 0 for a null buffer descriptor
+    if (m_pipelineState->getOptions().allowNullDescriptor) {
+      // Check if the buffer descriptor all bits 0
+      Value *const descIcmpVec = m_builder->CreateICmpEQ(bufferDesc, Constant::getNullValue(bufferDesc->getType()));
+      Value *isNullDesc = m_builder->CreateExtractElement(descIcmpVec, uint64_t(0));
+      const unsigned elemCount =
+          m_pipelineState->getLgcContext()->getTargetInfo().getGpuProperty().descriptorSizeBuffer / sizeof(unsigned);
+      for (unsigned elemIdx = 1; elemIdx != elemCount; ++elemIdx) {
+        Value *elem = m_builder->CreateExtractElement(descIcmpVec, elemIdx);
+        isNullDesc = m_builder->CreateAnd(isNullDesc, elem);
+      }
+      Value *offset = callInst.getArgOperand(1);
+
+      numRecords =
+          m_builder->CreateSelect(isNullDesc, m_builder->getInt32(0), m_builder->CreateSub(numRecords, offset));
+    }
+
     // Record the call instruction so we remember to delete it later.
     m_replacementMap[&callInst] = std::make_pair(nullptr, nullptr);
 
-    callInst.replaceAllUsesWith(bufferLength);
+    callInst.replaceAllUsesWith(numRecords);
   } else
     llvm_unreachable("Should never be called!");
 }
