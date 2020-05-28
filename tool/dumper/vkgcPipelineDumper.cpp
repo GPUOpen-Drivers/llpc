@@ -730,7 +730,6 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
       dumpFile << "divisor[" << i << "].divisor = " << divisor->divisor << "\n";
     }
   }
-
 }
 
 // =====================================================================================================================

@@ -73,11 +73,11 @@ public:
   void stop() override;
 
 private:
-  bool m_stopped = false;                     // Whether we have already stopped adding new passes.
-  AnalysisID m_dumpCfgAfter = nullptr;        // -dump-cfg-after pass id
-  AnalysisID m_printModule = nullptr;         // Pass id of dump pass "Print Module IR"
-  AnalysisID m_jumpThreading = nullptr;       // Pass id of opt pass "Jump Threading"
-  unsigned *m_passIndex = nullptr;            // Pass Index
+  bool m_stopped = false;               // Whether we have already stopped adding new passes.
+  AnalysisID m_dumpCfgAfter = nullptr;  // -dump-cfg-after pass id
+  AnalysisID m_printModule = nullptr;   // Pass id of dump pass "Print Module IR"
+  AnalysisID m_jumpThreading = nullptr; // Pass id of opt pass "Jump Threading"
+  unsigned *m_passIndex = nullptr;      // Pass Index
 };
 
 } // namespace

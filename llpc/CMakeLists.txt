@@ -306,7 +306,9 @@ else()
     )
 endif()
 
-add_subdirectory(../tool/dumper ${PROJECT_BINARY_DIR}/../dumper)
+if(NOT TARGET dumper)
+    add_subdirectory(../tool/dumper ${PROJECT_BINARY_DIR}/../dumper)
+endif()
 target_link_libraries(llpc PRIVATE dumper)
 
 target_link_libraries(llpc PRIVATE cwpack)

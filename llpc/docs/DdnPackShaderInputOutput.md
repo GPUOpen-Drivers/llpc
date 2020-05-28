@@ -49,7 +49,6 @@ layout(location = 5) in float16_t v6;
 layout(location = 6) in float16_t v7;
 layout(location = 7) in float16_t v8;
 
-
                     VS Output                              FS Input
                        |                                      |
                        |      (Patch resource collect pass)   |
