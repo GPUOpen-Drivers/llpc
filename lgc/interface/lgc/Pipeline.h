@@ -115,6 +115,7 @@ struct Options {
   unsigned nggPrimsPerSubgroup;        // How to determine NGG prims per subgroup
   unsigned shadowDescriptorTable;      // High dword of shadow descriptor table address, or
                                        //   ShadowDescriptorTableDisable to disable shadow descriptor tables
+  unsigned allowNullDescriptor;        // Allow and give defined behavior for null descriptor
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.

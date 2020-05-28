@@ -621,6 +621,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.reconfigWorkgroupLayout = " << options->reconfigWorkgroupLayout << "\n";
   dumpFile << "options.shadowDescriptorTableUsage = " << options->shadowDescriptorTableUsage << "\n";
   dumpFile << "options.shadowDescriptorTablePtrHigh = " << options->shadowDescriptorTablePtrHigh << "\n";
+  dumpFile << "options.nullDescriptor = " << options->nullDescriptor << "\n";
 }
 
 // =====================================================================================================================
@@ -833,6 +834,7 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
   hasher.Update(pipeline->options.robustBufferAccess);
   hasher.Update(pipeline->options.shadowDescriptorTableUsage);
   hasher.Update(pipeline->options.shadowDescriptorTablePtrHigh);
+  hasher.Update(pipeline->options.nullDescriptor);
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -933,6 +935,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
     hasher->Update(pipeline->options.reconfigWorkgroupLayout);
     hasher->Update(pipeline->options.shadowDescriptorTableUsage);
     hasher->Update(pipeline->options.shadowDescriptorTablePtrHigh);
+    hasher->Update(pipeline->options.nullDescriptor);
   }
 }
 

@@ -454,7 +454,8 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
 
   case BuilderRecorder::Opcode::GetBufferDescLength: {
-    return m_builder->CreateGetBufferDescLength(args[0]);
+    return m_builder->CreateGetBufferDescLength(args[0],  // buffer descriptor
+                                                args[1]); // offset
   }
 
   // Replayer implementations of ImageBuilder methods
