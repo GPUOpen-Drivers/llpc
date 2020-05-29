@@ -900,6 +900,12 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineS
 //
 // @param shaderInfo : Shader info for the pipeline to be built
 bool Compiler::canUseRelocatableComputeShaderElf(const PipelineShaderInfo *shaderInfo) {
+  // Relocatable shader cannot get the order of the user data nodes correct.  We have to disable them for compute
+  // shaders until the restriction in PAL has been relaxed.
+  // The tests PipelineCs_StrideReloc.pipe, PipelineCs_RelocCombinedTextureSampler.pipe, PipelineCs_ShaderCache.pipe,
+  // and PipelineCs_RelocConst.pipe must be reenabled when this restriction is removed.
+  return false;
+
   if (!cl::UseRelocatableShaderElf)
     return false;
 

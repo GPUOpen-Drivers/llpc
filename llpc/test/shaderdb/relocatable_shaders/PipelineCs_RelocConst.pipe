@@ -1,3 +1,5 @@
+; XFAIL: *
+
 ; This test case checks that descriptor offset relocation works for buffer descriptors in a compute pipeline.
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -use-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s

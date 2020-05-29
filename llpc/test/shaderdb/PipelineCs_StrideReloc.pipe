@@ -1,3 +1,4 @@
+; XFAIL: *
 
 // This test case checks that stride relocation is generated correctly for array of textures.
 ; BEGIN_SHADERTEST
