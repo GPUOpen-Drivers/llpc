@@ -357,7 +357,8 @@ void PalMetadata::fixUpRegisters() {
             report_fatal_error("Descriptor set " + Twine(descSet) + " not found");
           value = descSetNodes[descSet]->offsetInDwords;
           it->second = value;
-          userDataLimit = std::max(userDataLimit, value);
+          unsigned extent = value + descSetNodes[descSet]->sizeInDwords;
+          userDataLimit = std::max(userDataLimit, extent);
         } else {
           unsigned pushConstOffset = value - static_cast<unsigned>(UserDataMapping::PushConst0);
           if (pushConstOffset <= static_cast<unsigned>(UserDataMapping::DescriptorSetMax) -
@@ -367,7 +368,8 @@ void PalMetadata::fixUpRegisters() {
               report_fatal_error("Push constant not found or not big enough");
             value = pushConstNode->offsetInDwords + pushConstOffset;
             it->second = value;
-            userDataLimit = std::max(userDataLimit, value);
+            unsigned extent = pushConstNode->offsetInDwords + pushConstNode->sizeInDwords;
+            userDataLimit = std::max(userDataLimit, extent);
           }
         }
         ++it;
