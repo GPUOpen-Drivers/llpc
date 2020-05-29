@@ -1,5 +1,6 @@
 
 // This test case checks that descriptor offset relocation works for buffer descriptors in a vs/fs pipeline.
+// Also check that the user data limit is set correctly.
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -use-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_vs_main>:
@@ -21,6 +22,7 @@
 ; SHADERTEST1: %{{[0-9]+}} = load <4 x i32>, <4 x i32> addrspace(4)* %[[BUFFERDESCPTR]], align 16
 ; SHADERTEST1-DAG: SPI_SHADER_USER_DATA_VS_{{.}} 0x000000000000000B
 ; SHADERTEST1-DAG: SPI_SHADER_USER_DATA_PS_{{.}} 0x000000000000000B
+; SHADERTEST1: .user_data_limit: 0x000000000000000C
 ; SHADERTEST1: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
