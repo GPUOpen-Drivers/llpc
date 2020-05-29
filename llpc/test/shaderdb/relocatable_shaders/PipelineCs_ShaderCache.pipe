@@ -1,3 +1,5 @@
+; XFAIL: *
+
 ; This test case checks shader cache creation in the standalone compilation mode.
 ; BEGIN_SHADERTEST
 ; RUN: rm -rf %t_dir && \
