@@ -111,7 +111,7 @@ private:
 
 // =====================================================================================================================
 // Internal implementation of the LGC interface for ELF linking.
-class ElfLinkerImpl : public ElfLinker {
+class ElfLinkerImpl final : public ElfLinker {
 public:
   // Constructor given PipelineState and ELFs to link
   ElfLinkerImpl(PipelineState *pipelineState, ArrayRef<MemoryBufferRef> elfs);
