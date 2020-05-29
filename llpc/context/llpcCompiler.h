@@ -159,8 +159,8 @@ private:
 
   bool runPasses(lgc::PassManager *passMgr, llvm::Module *module) const;
   void linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipelineElf, Context *context);
-  bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo *> &shaderInfo) const;
-  bool canUseRelocatableComputeShaderElf(const PipelineShaderInfo *shaderInfo) const;
+  bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo *> &shaderInfo);
+  bool canUseRelocatableComputeShaderElf(const PipelineShaderInfo *shaderInfo);
 
   std::vector<std::string> m_options;           // Compilation options
   MetroHash::Hash m_optionHash;                 // Hash code of compilation options
@@ -170,6 +170,7 @@ private:
   ShaderCachePtr m_shaderCache;                 // Shader cache
   static llvm::sys::Mutex m_contextPoolMutex;   // Mutex for context pool access
   static std::vector<Context *> *m_contextPool; // Context pool
+  unsigned m_relocatablePipelineCompilations;   // The number of pipelines compiled using relocatable shader elf
 };
 
 // Convert front-end LLPC shader stage to middle-end LGC shader stage

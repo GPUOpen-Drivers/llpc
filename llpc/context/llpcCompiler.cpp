@@ -862,69 +862,65 @@ static bool hasUnrelocatableDescriptorNode(const ResourceMappingNode *nodes, uns
 // Returns true if a graphics pipeline can be built out of the given shader info.
 //
 // @param shaderInfo : Shader info for the pipeline to be built
-bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineShaderInfo *> &shaderInfo) const {
+bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineShaderInfo *> &shaderInfo) {
   if (!cl::UseRelocatableShaderElf)
     return false;
 
-  bool useRelocatableShaderElf = true;
   for (unsigned stage = 0; stage < shaderInfo.size(); ++stage) {
     if (stage != ShaderStageVertex && stage != ShaderStageFragment) {
       if (shaderInfo[stage] && shaderInfo[stage]->pModuleData)
-        useRelocatableShaderElf = false;
+        return false;
     } else if (!shaderInfo[stage] || !shaderInfo[stage]->pModuleData) {
       // TODO: Generate pass-through shaders when the fragment or vertex shaders are missing.
-      useRelocatableShaderElf = false;
+      return false;
     } else {
       // Check UserDataNode for unsupported Descriptor types.
-      useRelocatableShaderElf =
-          !hasUnrelocatableDescriptorNode(shaderInfo[stage]->pUserDataNodes, shaderInfo[stage]->userDataNodeCount);
+      if (hasUnrelocatableDescriptorNode(shaderInfo[stage]->pUserDataNodes, shaderInfo[stage]->userDataNodeCount))
+        return false;
     }
   }
 
-  if (useRelocatableShaderElf && shaderInfo[0]) {
+  if (shaderInfo[0]) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo[0]->pModuleData);
     if (moduleData && moduleData->binType != BinaryType::Spirv)
-      useRelocatableShaderElf = false;
+      return false;
   }
 
-  if (useRelocatableShaderElf && cl::RelocatableShaderElfLimit != -1) {
-    static unsigned RelocatableElfCounter = 0;
-    if (RelocatableElfCounter >= cl::RelocatableShaderElfLimit)
-      useRelocatableShaderElf = false;
+  if (cl::RelocatableShaderElfLimit != -1) {
+    if (m_relocatablePipelineCompilations >= cl::RelocatableShaderElfLimit)
+      return false;
     else
-      ++RelocatableElfCounter;
+      ++m_relocatablePipelineCompilations;
   }
-  return useRelocatableShaderElf;
+  return true;
 }
 
 // =====================================================================================================================
 // Returns true if a compute pipeline can be built out of the given shader info.
 //
 // @param shaderInfo : Shader info for the pipeline to be built
-bool Compiler::canUseRelocatableComputeShaderElf(const PipelineShaderInfo *shaderInfo) const {
+bool Compiler::canUseRelocatableComputeShaderElf(const PipelineShaderInfo *shaderInfo) {
   if (!cl::UseRelocatableShaderElf)
     return false;
 
-  bool useRelocatableShaderElf = true;
-  if (useRelocatableShaderElf && shaderInfo) {
+  if (shaderInfo) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
     if (moduleData && moduleData->binType != BinaryType::Spirv)
-      useRelocatableShaderElf = false;
+      return false;
     else {
       // Check UserDataNode for unsupported Descriptor types.
-      useRelocatableShaderElf =
-          !hasUnrelocatableDescriptorNode(shaderInfo->pUserDataNodes, shaderInfo->userDataNodeCount);
+      if (hasUnrelocatableDescriptorNode(shaderInfo->pUserDataNodes, shaderInfo->userDataNodeCount))
+        return false;
     }
   }
 
-  if (useRelocatableShaderElf && cl::RelocatableShaderElfLimit != -1) {
-    static unsigned RelocatableElfCounter = 0;
-    if (RelocatableElfCounter >= cl::RelocatableShaderElfLimit)
-      useRelocatableShaderElf = false;
+  if (cl::RelocatableShaderElfLimit != -1) {
+    if (m_relocatablePipelineCompilations >= cl::RelocatableShaderElfLimit)
+      return false;
     else
-      ++RelocatableElfCounter;
+      ++m_relocatablePipelineCompilations;
   }
-  return useRelocatableShaderElf;
+  return true;
 }
 
 // =====================================================================================================================
