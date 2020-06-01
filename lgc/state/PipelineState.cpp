@@ -541,6 +541,17 @@ void PipelineState::readUserDataNodes(Module *module) {
 }
 
 // =====================================================================================================================
+// Returns the resource node for the push constant.
+const ResourceNode *PipelineState::findPushConstantResourceNode() const {
+  for (const ResourceNode &node : getUserDataNodes()) {
+    if (node.type == ResourceNodeType::PushConst) {
+      return &node;
+    }
+  }
+  return nullptr;
+}
+
+// =====================================================================================================================
 // Find the resource node for the given {set,binding}.
 // For nodeType == Unknown, the function finds any node of the given set,binding.
 // For nodeType == Resource, it matches Resource or CombinedTexture.

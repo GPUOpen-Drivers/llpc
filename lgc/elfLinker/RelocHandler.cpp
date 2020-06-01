@@ -30,6 +30,7 @@
  */
 #include "RelocHandler.h"
 #include "lgc/state/AbiUnlinked.h"
+#include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 
@@ -141,6 +142,12 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
   }
   if (name == reloc::DeviceIdx) {
     value = m_pipelineState->getDeviceIndex();
+    return true;
+  }
+  if (name == reloc::Pushconst) {
+    auto *pushConstantNode = m_pipelineState->findPushConstantResourceNode();
+    value = pushConstantNode->offsetInDwords;
+    getPipelineState()->getPalMetadata()->setUserDataSpillUsage(pushConstantNode->offsetInDwords);
     return true;
   }
 

@@ -216,6 +216,9 @@ public:
   // Get user data nodes
   llvm::ArrayRef<ResourceNode> getUserDataNodes() const { return m_userDataNodes; }
 
+  // Find the push constant resource node
+  const ResourceNode *findPushConstantResourceNode() const;
+
   // Find the resource node for the given set,binding
   std::pair<const ResourceNode *, const ResourceNode *> findResourceNode(ResourceNodeType nodeType, unsigned descSet,
                                                                          unsigned binding) const;

@@ -34,6 +34,7 @@
 #include "lgc/BuilderBase.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
+#include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
@@ -522,7 +523,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
           byteOffset = UndefValue::get(builder.getInt32Ty());
         } else {
           // Unlinked shader compilation: Use a reloc.
-          byteOffset = builder.CreateRelocationConstant("pushconst");
+          byteOffset = builder.CreateRelocationConstant(reloc::Pushconst);
         }
         replacementVal = builder.CreateGEP(builder.getInt8Ty(), spillTable, byteOffset);
       }

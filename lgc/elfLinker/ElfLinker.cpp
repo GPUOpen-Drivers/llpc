@@ -289,6 +289,7 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
   m_outputSections.push_back(OutputSection(this, ".symtab", ELF::SHT_SYMTAB));
   unsigned textSectionIdx = m_outputSections.size();
   m_outputSections.push_back(OutputSection(this, ".text"));
+  unsigned noteSectionIdx = m_outputSections.size();
   m_outputSections.push_back(OutputSection(this, ".note", ELF::SHT_NOTE));
 
   // Allocate input sections to output sections.
@@ -347,14 +348,15 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
     }
   }
 
-  // Write the PAL metadata out into the .note section.
-  writePalMetadata();
-
   // Output each section, and let it set its section table entry.
   // Ensure each section is aligned in the file by the minimum of 4 and its address alignment requirement.
   // I am not sure if that is actually required by the ELF standard, but vkgcPipelineDumper.cpp relies on
   // it when dumping .note records.
+  // The .note section will be emitted later.  We must wait until after processing the relocation to have all of the
+  // metadata needed for the .note section.
   for (unsigned sectionIndex = 0; sectionIndex != shdrs.size(); ++sectionIndex) {
+    if (sectionIndex == noteSectionIdx)
+      continue;
     OutputSection &outputSection = m_outputSections[sectionIndex];
     unsigned align = std::min(unsigned(outputSection.getAlignment()), 4U);
     outStream << StringRef("\0\0\0", 3).slice(0, -outStream.tell() & align - 1);
@@ -399,6 +401,17 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
       }
     }
   }
+
+  // Write the PAL metadata out into the .note section.  The relocations can change the metadata, so we cannot write the
+  // PAL metadata any earlier.
+  writePalMetadata();
+
+  // Output the note section now that the metadata has been finalized.
+  OutputSection &noteOutputSection = m_outputSections[noteSectionIdx];
+  unsigned align = std::min(unsigned(noteOutputSection.getAlignment()), 4U);
+  outStream << StringRef("\0\0\0", 3).slice(0, -outStream.tell() & align - 1);
+  shdrs[noteSectionIdx].sh_offset = outStream.tell();
+  noteOutputSection.write(outStream, &shdrs[noteSectionIdx]);
 
   // Go back and write the now-complete ELF header and section table.
   outStream.pwrite(reinterpret_cast<const char *>(&m_ehdr), sizeof(m_ehdr), 0);
