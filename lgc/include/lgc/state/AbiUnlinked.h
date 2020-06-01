@@ -75,6 +75,10 @@ const static char SamplePatternIdx[] = "$samplePatternIdx";
 // The value of the relocation is deviceIdx from the pipeline state.
 const static char DeviceIdx[] = "$deviceIdx";
 
+// Pushconst offset is "pushconst"
+// The value of the relocation is the offset of the pushconst reource node in the pipeline state.
+const static char Pushconst[] = "pushconst";
+
 } // namespace reloc
 
 // =====================================================================================================================
