@@ -325,7 +325,7 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(VkFormat format) {
 // @param options : An array of compilation-option strings
 // @param optionHash : Hash code of compilation options
 Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options, MetroHash::Hash optionHash)
-    : m_optionHash(optionHash), m_gfxIp(gfxIp) {
+    : m_optionHash(optionHash), m_gfxIp(gfxIp), m_relocatablePipelineCompilations(0) {
   for (unsigned i = 0; i < optionCount; ++i)
     m_options.push_back(options[i]);
 
