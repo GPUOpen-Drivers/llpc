@@ -387,7 +387,7 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
     pipelineInfo->iaState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
   } else if (shaderStage == ShaderStageTessControl || shaderStage == ShaderStageTessEval) {
     // Set primitive topology and patch control points
-    pipelineInfo->iaState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    pipelineInfo->iaState.topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
     pipelineInfo->iaState.patchControlPoints = 3;
   } else if (shaderStage == ShaderStageGeometry) {
     // Set primitive topology
