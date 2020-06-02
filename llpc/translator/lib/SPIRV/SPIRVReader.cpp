@@ -2082,6 +2082,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
   }
 
   bool isVolatile = spvLoad->SPIRVMemoryAccess::isVolatile(true);
+  const Vkgc::ExtendedRobustness &extendedRobustness =
+      static_cast<Llpc::Context *>(m_context)->getPipelineContext()->getPipelineOptions()->extendedRobustness;
+  if (extendedRobustness.nullDescriptor || extendedRobustness.robustBufferAccess)
+    isVolatile |= spvLoad->getSrc()->isVolatile();
 
   // We don't require volatile on address spaces that become non-pointers.
   switch (spvLoad->getSrc()->getType()->getPointerStorageClass()) {
@@ -2238,6 +2242,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const 
   SPIRVStore *const spvStore = static_cast<SPIRVStore *>(spvValue);
 
   bool isVolatile = spvStore->SPIRVMemoryAccess::isVolatile(false);
+  const Vkgc::ExtendedRobustness &extendedRobustness =
+      static_cast<Llpc::Context *>(m_context)->getPipelineContext()->getPipelineOptions()->extendedRobustness;
+  if (extendedRobustness.nullDescriptor || extendedRobustness.robustBufferAccess)
+    isVolatile = spvStore->getDst()->isVariable();
 
   // We don't require volatile on address spaces that become non-pointers.
   switch (spvStore->getDst()->getType()->getPointerStorageClass()) {
