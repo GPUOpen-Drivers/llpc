@@ -374,7 +374,7 @@ enum class NggSubgroupSizingType : unsigned {
 
 /// Enumerates compaction modes after culling operations for NGG primitive shader.
 enum NggCompactMode : unsigned {
-  NggCompactSubgroup, ///< Compaction is based on the whole sub-group
+  NggCompactDisable,  ///< Compaction is disabled
   NggCompactVertices, ///< Compaction is based on vertices
 };
 

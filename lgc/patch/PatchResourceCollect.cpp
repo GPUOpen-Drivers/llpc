@@ -164,7 +164,7 @@ void PatchResourceCollect::setNggControl() {
   nggControl.enableNgg = enableNgg;
   nggControl.enableGsUse = (options.nggFlags & NggFlagEnableGsUse);
   nggControl.alwaysUsePrimShaderTable = (options.nggFlags & NggFlagDontAlwaysUsePrimShaderTable) == 0;
-  nggControl.compactMode = (options.nggFlags & NggFlagCompactSubgroup) ? NggCompactSubgroup : NggCompactVertices;
+  nggControl.compactMode = (options.nggFlags & NggFlagCompactDisable) ? NggCompactDisable : NggCompactVertices;
 
   nggControl.enableFastLaunch = (options.nggFlags & NggFlagEnableFastLaunch);
   nggControl.enableVertexReuse = (options.nggFlags & NggFlagEnableVertexReuse);
@@ -235,8 +235,8 @@ void PatchResourceCollect::setNggControl() {
     LLPC_OUTS("PassthroughMode              = " << nggControl.passthroughMode << "\n");
     LLPC_OUTS("CompactMode                  = ");
     switch (nggControl.compactMode) {
-    case NggCompactSubgroup:
-      LLPC_OUTS("Subgroup\n");
+    case NggCompactDisable:
+      LLPC_OUTS("Disable\n");
       break;
     case NggCompactVertices:
       LLPC_OUTS("Vertices\n");

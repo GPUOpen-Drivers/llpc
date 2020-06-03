@@ -238,12 +238,6 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
         if (region == LdsRegionCullDistance && !nggControl->enableCullDistanceCulling)
           continue;
 
-        // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
-        // skipped.
-        if (nggControl->compactMode == NggCompactSubgroup &&
-            (region >= LdsRegionCompactBeginRange && region <= LdsRegionCompactEndRange))
-          continue;
-
         if (hasTs) {
           // Skip those regions that are for VS only
           if (region == LdsRegionCompactVertexId || region == LdsRegionCompactInstanceId ||
@@ -310,12 +304,6 @@ unsigned NggLdsManager::calcEsExtraLdsSize(PipelineState *pipelineState) {
 
       // NOTE: If cull distance culling is disabled, skip this region
       if (region == LdsRegionCullDistance && !nggControl->enableCullDistanceCulling)
-        continue;
-
-      // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
-      // skipped.
-      if (nggControl->compactMode == NggCompactSubgroup &&
-          (region >= LdsRegionCompactBeginRange && region <= LdsRegionCompactEndRange))
         continue;
 
       if (hasTs) {
