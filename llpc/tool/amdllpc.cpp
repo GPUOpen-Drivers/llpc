@@ -152,7 +152,7 @@ static cl::opt<bool>
 // -ngg-compact-mode: NGG compaction mode (NGG)
 static cl::opt<unsigned> NggCompactionMode("ngg-compaction-mode",
                                            cl::desc("Compaction mode after culling operations (NGG):\n"
-                                                    "0: Compaction is based on the whole sub-group\n"
+                                                    "0: Compaction is disabled\n"
                                                     "1: Compaction is based on vertices"),
                                            cl::value_desc("mode"), cl::init(static_cast<unsigned>(NggCompactVertices)));
 

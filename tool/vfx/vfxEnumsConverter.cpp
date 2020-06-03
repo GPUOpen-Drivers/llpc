@@ -998,7 +998,7 @@ void initEnumMap() {
   ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, OptimizeForPrims)
   ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, Explicit)
 
-  ADD_ENUM_MAP(NggCompactMode, NggCompactSubgroup)
+  ADD_ENUM_MAP(NggCompactMode, NggCompactDisable)
   ADD_ENUM_MAP(NggCompactMode, NggCompactVertices)
 
   ADD_CLASS_ENUM_MAP(WaveBreakSize, None)

@@ -1531,7 +1531,7 @@ std::ostream &operator<<(std::ostream &out, NggSubgroupSizingType subgroupSizing
 std::ostream &operator<<(std::ostream &out, NggCompactMode compactMode) {
   const char *string = nullptr;
   switch (compactMode) {
-    CASE_ENUM_TO_STRING(NggCompactSubgroup)
+    CASE_ENUM_TO_STRING(NggCompactDisable)
     CASE_ENUM_TO_STRING(NggCompactVertices)
     break;
   default:

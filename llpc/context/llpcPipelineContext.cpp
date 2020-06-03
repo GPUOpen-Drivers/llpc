@@ -267,7 +267,7 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
       options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
                          (nggState.forceNonPassthrough ? NggFlagForceNonPassthrough : 0) |
                          (nggState.alwaysUsePrimShaderTable ? 0 : NggFlagDontAlwaysUsePrimShaderTable) |
-                         (nggState.compactMode == NggCompactSubgroup ? NggFlagCompactSubgroup : 0) |
+                         (nggState.compactMode == NggCompactDisable ? NggFlagCompactDisable : 0) |
                          (nggState.enableFastLaunch ? NggFlagEnableFastLaunch : 0) |
                          (nggState.enableVertexReuse ? NggFlagEnableVertexReuse : 0) |
                          (nggState.enableBackfaceCulling ? NggFlagEnableBackfaceCulling : 0) |
