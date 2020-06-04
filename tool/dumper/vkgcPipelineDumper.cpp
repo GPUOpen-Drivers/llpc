@@ -1203,7 +1203,6 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
       const unsigned noteHeaderSize = sizeof(NoteHeader) - 8;
       while (offset < section->secHead.sh_size) {
         const NoteHeader *node = reinterpret_cast<const NoteHeader *>(section->data + offset);
-        assert((uint64_t(node) & 3) == 0);
         const unsigned noteNameSize = alignTo(node->nameSize, 4);
         switch (static_cast<unsigned>(node->type)) {
         case static_cast<unsigned>(Util::Abi::PipelineAbiNoteType::HsaIsa): {
