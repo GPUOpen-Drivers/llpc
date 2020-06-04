@@ -30,6 +30,7 @@
  */
 #include "BuilderImpl.h"
 #include "YCbCrConverter.h"
+#include "lgc/LgcContext.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
 #include "llvm/IR/Intrinsics.h"
@@ -1318,7 +1319,15 @@ Value *ImageBuilder::CreateImageQuerySamples(unsigned dim, unsigned flags, Value
   Value *isMsaa = CreateOr(CreateICmpEQ(imageType, getInt32(14)), CreateICmpEQ(imageType, getInt32(15)));
 
   // Return sample number if resource type is 2D MSAA or 2D MSAA array. Otherwise, return 1.
-  return CreateSelect(isMsaa, sampleNumber, getInt32(1), instName);
+  sampleNumber = CreateSelect(isMsaa, sampleNumber, getInt32(1), instName);
+
+  // The sampler number is clampled 0 if allowNullDescriptor is on and image descriptor is a null descriptor
+  if (m_pipelineState->getOptions().allowNullDescriptor) {
+    // Check dword3 against 0 for a null descriptor
+    Value *isNullDesc = CreateICmpEQ(descWord3, getInt32(0));
+    sampleNumber = CreateSelect(isNullDesc, getInt32(0), sampleNumber);
+  }
+  return sampleNumber;
 }
 
 // =====================================================================================================================
