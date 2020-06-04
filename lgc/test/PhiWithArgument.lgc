@@ -1,0 +1,51 @@
+; RUN: lgc -mcpu=gfx900 - <%s | FileCheck --check-prefixes=VS-ISA %s
+; VS-ISA:_amdgpu_vs_main_fetchless:
+; VS-ISA: v_mov_b32_e32 [[pushconst:v[0-9]*]], s2
+; VS-ISA: v_cmp_eq_f32_e32 vcc, 1.0, v4
+; VS-ISA: v_cndmask_b32_e32 {{v[0-9]*}}, v4, [[pushconst]], vcc
+
+
+target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-ni:7"
+target triple = "amdgcn--amdpal"
+
+; Function Attrs: nounwind
+define spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spirv.ExecutionModel !12 !lgc.shaderstage !12 {
+.entry:
+  %0 = call [76 x i8] addrspace(4)* (...) @lgc.create.load.push.constants.ptr.p4a76i8()
+  %1 = call <3 x float> (...) @lgc.create.read.generic.input.v3f32(i32 2, i32 0, i32 0, i32 0, i32 0, i32 undef)
+  %__llpc_input_proxy_.0.vec.extract = extractelement <3 x float> %1, i32 0
+  %2 = fcmp oeq float %__llpc_input_proxy_.0.vec.extract, 1.000000e+00
+  br i1 %2, label %3, label %7
+
+3:                                                ; preds = %.entry
+  %4 = getelementptr inbounds [76 x i8], [76 x i8] addrspace(4)* %0, i64 0, i64 64
+  %5 = bitcast i8 addrspace(4)* %4 to <3 x float> addrspace(4)*
+  %6 = load <3 x float>, <3 x float> addrspace(4)* %5, align 16
+  br label %7
+
+7:                                                ; preds = %.entry, %3
+  %__llpc_output_proxy_.0 = phi <3 x float> [ %6, %3 ], [ %1, %.entry ]
+  call void (...) @lgc.create.write.generic.output(<3 x float> %__llpc_output_proxy_.0, i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
+  ret void
+}
+
+; Function Attrs: nounwind
+declare [76 x i8] addrspace(4)* @lgc.create.load.push.constants.ptr.p4a76i8(...) local_unnamed_addr #0
+
+; Function Attrs: nounwind readonly
+declare <3 x float> @lgc.create.read.generic.input.v3f32(...) local_unnamed_addr #1
+
+; Function Attrs: nounwind
+declare void @lgc.create.write.generic.output(...) local_unnamed_addr #0
+
+attributes #0 = { nounwind }
+attributes #1 = { nounwind readonly }
+
+!lgc.unlinked = !{!10}
+!lgc.options = !{!0}
+!lgc.options.VS = !{!1}
+
+!0 = !{i32 739459867, i32 836497279, i32 -1935591037, i32 -652075177, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
+!1 = !{i32 801932830, i32 600683540, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 15, i32 3}
+!10 = !{i32 1}
+!12 = !{i32 0}
