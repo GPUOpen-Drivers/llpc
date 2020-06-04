@@ -2,7 +2,7 @@
 
 // This test case checks that stride relocation is generated correctly for array of textures.
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -use-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
   // Test that correct relocated offsets are in the linked texture fetching code.
 ; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_cs_main>:
   // Matching the texture index
@@ -12,7 +12,7 @@
 ; END_SHADERTEST
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -use-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
 ; SHADERTEST1-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST1-DAG: ![[METADATANODE1:[0-9]+]] = !{!"doff_0_0_r"}
 ; SHADERTEST1-DAG: ![[METADATANODE2:[0-9]+]] = !{!"doff_0_0_s"}

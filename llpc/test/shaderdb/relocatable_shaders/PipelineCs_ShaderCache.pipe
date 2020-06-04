@@ -7,7 +7,7 @@
 ; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip \
 ; RUN:         -build-shader-cache -shader-cache-mode=2 \
 ; RUN:         -shader-cache-filename=cache.bin -shader-cache-file-dir=%t_dir \
-; RUN:         -use-relocatable-shader-elf \
+; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -o %t.elf %s -v | FileCheck -check-prefix=CREATE %s
 ; REQUIRES: llpc-shader-cache
 ; CREATE: Building pipeline with relocatable shader elf.
@@ -29,7 +29,7 @@
 ; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip \
 ; RUN:         -build-shader-cache -shader-cache-mode=4 \
 ; RUN:         -shader-cache-filename=cache.bin -shader-cache-file-dir=%t_dir \
-; RUN:         -use-relocatable-shader-elf \
+; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -o %t.elf %s -v | FileCheck -check-prefix=LOAD %s
 ; REQUIRES: llpc-shader-cache
 ; LOAD: Building pipeline with relocatable shader elf.
@@ -45,7 +45,7 @@
 ; RUN:         -vgpr-limit=64 \
 ; RUN:         -build-shader-cache -shader-cache-mode=3 \
 ; RUN:         -shader-cache-filename=cache.bin -shader-cache-file-dir=%t_dir \
-; RUN:         -use-relocatable-shader-elf \
+; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -o %t.elf %s -v | FileCheck -check-prefix=MODIFY %s
 ; REQUIRES: llpc-shader-cache
 ; MODIFY: Building pipeline with relocatable shader elf.

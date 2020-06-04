@@ -2,7 +2,7 @@
 ; match the mapping for the inputs of the fragment shader.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -use-relocatable-shader-elf -auto-layout-desc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -auto-layout-desc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: (VS) Output: loc = 0  =>  Mapped = [[loc0:[0-9]+]]
 ; SHADERTEST: (VS) Output: loc = 1  =>  Mapped = [[loc1:[0-9]+]]
 ; SHADERTEST: (VS) Output: loc = 3  =>  Mapped = [[loc3:[0-9]+]]
