@@ -256,14 +256,16 @@ enum class ShadowDescriptorTableUsage : unsigned {
 
 /// Represents per pipeline options.
 struct PipelineOptions {
-  bool includeDisassembly;      ///< If set, the disassembly for all compiled shaders will be included in
-                                ///  the pipeline ELF.
-  bool scalarBlockLayout;       ///< If set, allows scalar block layout of types.
-  bool reconfigWorkgroupLayout; ///< If set, allows automatic workgroup reconfigure to take place on compute shaders.
-  bool includeIr;               ///< If set, the IR for all compiled shaders will be included in the pipeline ELF.
-  bool robustBufferAccess;      ///< If set, out of bounds accesses to buffer or private array will be handled.
-                                ///  for now this option is used by LLPC shader and affects only the private array,
-                                ///  the out of bounds accesses will be skipped with this setting.
+  bool includeDisassembly;         ///< If set, the disassembly for all compiled shaders will be included in
+                                   ///  the pipeline ELF.
+  bool scalarBlockLayout;          ///< If set, allows scalar block layout of types.
+  bool reconfigWorkgroupLayout;    ///< If set, allows automatic workgroup reconfigure to take place on compute shaders.
+  bool includeIr;                  ///< If set, the IR for all compiled shaders will be included in the pipeline ELF.
+  bool robustBufferAccess;         ///< If set, out of bounds accesses to buffer or private array will be handled.
+                                   ///  for now this option is used by LLPC shader and affects only the private array,
+                                   ///  the out of bounds accesses will be skipped with this setting.
+  bool enableRelocatableShaderElf; ///< If set, the pipeline will be compiled by compiling each shader separately, and
+                                   ///  then linking them, when possible.  When not possible this option is ignored.
 
   ShadowDescriptorTableUsage shadowDescriptorTableUsage; ///< Controls shadow descriptor table.
   unsigned shadowDescriptorTablePtrHigh;                 ///< Sets high part of VA ptr for shadow descriptor table.

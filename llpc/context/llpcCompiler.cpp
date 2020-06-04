@@ -104,10 +104,12 @@ opt<bool> EnablePipelineDump("enable-pipeline-dump", desc("Enable pipeline info 
 opt<std::string> ShaderCacheFileDir("shader-cache-file-dir", desc("Root directory to store shader cache"),
                                     value_desc("dir"), init("."));
 
+// DEPRECATED: This option should be removed once XGL sets the corresponding pipeline option.
 // -use-relocatable-shader-elf: Gets LLVM to generate more generic elf files for each shader individually, and LLPC will
 // then link those ELF files to generate the compiled pipeline.
 opt<bool> UseRelocatableShaderElf("use-relocatable-shader-elf",
-                                  desc("The pipeline will be built by building relocatable shader ELF files when "
+                                  desc("DEPRECATED: To be replaced by a pipeline option.  The pipeline will be built "
+                                       "by building relocatable shader ELF files when "
                                        "possible, and linking them together.  This is a work in progress and should "
                                        "be used with caution."),
                                   init(false));
@@ -863,9 +865,6 @@ static bool hasUnrelocatableDescriptorNode(const ResourceMappingNode *nodes, uns
 //
 // @param shaderInfo : Shader info for the pipeline to be built
 bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineShaderInfo *> &shaderInfo) {
-  if (!cl::UseRelocatableShaderElf)
-    return false;
-
   for (unsigned stage = 0; stage < shaderInfo.size(); ++stage) {
     if (stage != ShaderStageVertex && stage != ShaderStageFragment) {
       if (shaderInfo[stage] && shaderInfo[stage]->pModuleData)
@@ -905,9 +904,6 @@ bool Compiler::canUseRelocatableComputeShaderElf(const PipelineShaderInfo *shade
   // The tests PipelineCs_StrideReloc.pipe, PipelineCs_RelocCombinedTextureSampler.pipe, PipelineCs_ShaderCache.pipe,
   // and PipelineCs_RelocConst.pipe must be reenabled when this restriction is removed.
   return false;
-
-  if (!cl::UseRelocatableShaderElf)
-    return false;
 
   if (shaderInfo) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
@@ -1336,7 +1332,9 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   const PipelineShaderInfo *shaderInfo[ShaderStageGfxCount] = {
       &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
   };
-  bool buildingRelocatableElf = canUseRelocatableGraphicsShaderElf(shaderInfo);
+
+  bool buildingRelocatableElf = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
+  buildingRelocatableElf = buildingRelocatableElf && canUseRelocatableGraphicsShaderElf(shaderInfo);
 
   for (unsigned i = 0; i < ShaderStageGfxCount && result == Result::Success; ++i)
     result = validatePipelineShaderInfo(shaderInfo[i]);
@@ -1457,7 +1455,8 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
                                       ComputePipelineBuildOut *pipelineOut, void *pipelineDumpFile) {
   BinaryData elfBin = {};
 
-  bool buildingRelocatableElf = canUseRelocatableComputeShaderElf(&pipelineInfo->cs);
+  bool buildingRelocatableElf = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
+  buildingRelocatableElf = buildingRelocatableElf && canUseRelocatableComputeShaderElf(&pipelineInfo->cs);
 
   Result result = validatePipelineShaderInfo(&pipelineInfo->cs);
 

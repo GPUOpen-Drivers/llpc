@@ -234,6 +234,10 @@ static cl::opt<std::string> SpvGenDir("spvgen-dir", cl::desc("Directory to load 
 static cl::opt<bool> RobustBufferAccess("robust-buffer-access", cl::desc("Validate if the index is out of bounds"),
                                         cl::init(false));
 
+static cl::opt<bool> EnableRelocatableShaderElf("enable-relocatable-shader-elf",
+                                                cl::desc("Compile pipelines using relocatable shader elf"),
+                                                cl::init(false));
+
 // -check-auto-layout-compatible: check if auto descriptor layout got from spv file is commpatible with real layout
 static cl::opt<bool> CheckAutoLayoutCompatible(
     "check-auto-layout-compatible",
@@ -968,6 +972,7 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
       pipelineInfo->iaState.patchControlPoints = 3;
 
     pipelineInfo->options.robustBufferAccess = RobustBufferAccess;
+    pipelineInfo->options.enableRelocatableShaderElf = EnableRelocatableShaderElf;
 
     void *pipelineDumpHandle = nullptr;
     if (cl::EnablePipelineDump) {
@@ -1034,6 +1039,7 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
     pipelineInfo->pfnOutputAlloc = allocateBuffer;
     pipelineInfo->unlinked = compileInfo->unlinked;
     pipelineInfo->options.robustBufferAccess = RobustBufferAccess;
+    pipelineInfo->options.enableRelocatableShaderElf = EnableRelocatableShaderElf;
 
     void *pipelineDumpHandle = nullptr;
     if (cl::EnablePipelineDump) {
