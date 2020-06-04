@@ -227,6 +227,12 @@ public:
   // Generate image descriptor for chroma channel
   void genImgDescChroma();
 
+  // Set image descriptor for chroma channel
+  void SetImgDescChroma(unsigned planeIndex, llvm::Value *imageDesc);
+
+  // Get image descriptor for chroma channel
+  llvm::Value *GetImgDescChroma(unsigned planeIndex);
+
   // Convert from YCbCr to RGBA color space
   llvm::Value *convertColorSpace();
 

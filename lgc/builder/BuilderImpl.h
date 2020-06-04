@@ -417,8 +417,17 @@ private:
 
   enum ImgDataFormat {
     IMG_DATA_FORMAT_32 = 4,
+    IMG_DATA_FORMAT_8_8_8_8 = 10,
     IMG_DATA_FORMAT_32_32 = 11,
     IMG_DATA_FORMAT_32_32_32_32 = 14,
+    IMG_DATA_FORMAT_GB_GR__CORE = 32,
+    IMG_DATA_FORMAT_BG_RG__CORE = 33,
+  };
+
+  enum ImgFmt {
+    IMG_FMT_8_8_8_8_UNORM__GFX10CORE = 56,
+    IMG_FMT_GB_GR_UNORM__GFX10CORE = 147,
+    IMG_FMT_BG_RG_UNORM__GFX10CORE = 151,
   };
 
   static const unsigned AtomicOpCompareSwap = 1;

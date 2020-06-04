@@ -771,6 +771,13 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
 
   // Init YCbCrConverterer
   YCbCrConverter YCbCrConverter(this, yCbCrMetaData, &sampleInfoLuma, &gfxIp);
+
+  // Set image descriptor for chroma channel
+  for (unsigned planeIdx = 1; planeIdx < yCbCrMetaData.word1.planes; ++planeIdx) {
+    imageDesc = CreateExtractValue(imageDescArray, planeIdx);
+    YCbCrConverter.SetImgDescChroma(planeIdx, imageDesc);
+  }
+
   // Set sample coordinate ST and convert to UV and IJ coordinates
   YCbCrConverter.setCoord(coords[0], coords[1]);
   // Sample image source data

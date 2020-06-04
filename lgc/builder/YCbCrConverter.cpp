@@ -29,6 +29,7 @@
 ***********************************************************************************************************************
 */
 #include "YCbCrConverter.h"
+#include "lgc/LgcContext.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
@@ -326,62 +327,76 @@ void YCbCrConverter::genSamplerDescChroma() {
 // =====================================================================================================================
 // Generate image descriptor for chroma channel
 void YCbCrConverter::genImgDescChroma() {
-  Value *pInt32One = ConstantInt::get(m_builder->getInt32Ty(), 1);
   SqImgRsrcRegHandler proxySqRsrcRegHelper(m_builder, m_imgDescLuma, m_gfxIp);
-  YCbCrAddressHandler addrHelper(m_builder, &proxySqRsrcRegHelper, m_gfxIp);
-  unsigned bpp = (m_metaData.word1.planes == 1)
-                     ? (m_metaData.word2.bitCounts.xBitCount + m_metaData.word2.bitCounts.yBitCount +
-                        m_metaData.word2.bitCounts.zBitCount + m_metaData.word2.bitCounts.wBitCount)
-                     : m_metaData.word2.bitCounts.xBitCount;
-  addrHelper.genHeightAndPitch(m_metaData.word0.bitDepth.channelBitsR, bpp, m_metaData.word2.bitCounts.xBitCount,
-                               m_metaData.word1.tileOptimal, m_metaData.word1.planes);
-  addrHelper.genBaseAddress(m_metaData.word1.planes);
-
   Value *width = proxySqRsrcRegHelper.getReg(SqRsrcRegs::Width);
   Value *height = proxySqRsrcRegHelper.getReg(SqRsrcRegs::Height);
-  Value *widthHalf = m_builder->CreateLShr(width, pInt32One);
-  Value *heightHalf = m_builder->CreateLShr(height, pInt32One);
   m_width = m_builder->CreateUIToFP(width, m_builder->getFloatTy());
   m_height = m_builder->CreateUIToFP(height, m_builder->getFloatTy());
 
-  Value *pPitch = proxySqRsrcRegHelper.getReg(SqRsrcRegs::Pitch);
-  Value *pitchHalf = m_builder->CreateLShr(pPitch, pInt32One);
+  if (m_metaData.word1.planes == 1) {
+    Value *imgDataFmt = proxySqRsrcRegHelper.getReg(SqRsrcRegs::Format);
+    Value *dstSelXYZW = proxySqRsrcRegHelper.getReg(SqRsrcRegs::DstSelXYZW);
+    Value *isGbGrFmt = nullptr;
+    Value *isBgRgFmt = nullptr;
 
-  proxySqRsrcRegHelper.setReg(SqRsrcRegs::Width, widthHalf);
-  proxySqRsrcRegHelper.setReg(SqRsrcRegs::Format, m_builder->getInt32(m_metaData.word3.sqImgRsrcWord1));
+    switch (m_gfxIp->major) {
+    case 9: {
+      isGbGrFmt = m_builder->CreateICmpEQ(
+          imgDataFmt, m_builder->getInt32(ImageBuilder::ImgDataFormat::IMG_DATA_FORMAT_BG_RG__CORE));
 
-  switch (m_metaData.word1.planes) {
-  case 1:
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::DstSelXYZW, m_builder->getInt32(m_metaData.word1.dstSelXYZW));
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::BcSwizzle, m_builder->getInt32(6));
+      isBgRgFmt = m_builder->CreateICmpEQ(
+          imgDataFmt, m_builder->getInt32(ImageBuilder::ImgDataFormat::IMG_DATA_FORMAT_GB_GR__CORE));
+
+      proxySqRsrcRegHelper.setReg(SqRsrcRegs::Format,
+                                  m_builder->getInt32(ImageBuilder::ImgDataFormat::IMG_DATA_FORMAT_8_8_8_8));
+      break;
+    }
+    case 10: {
+      isGbGrFmt = m_builder->CreateICmpEQ(imgDataFmt,
+                                          m_builder->getInt32(ImageBuilder::ImgFmt::IMG_FMT_BG_RG_UNORM__GFX10CORE));
+      isBgRgFmt = m_builder->CreateICmpEQ(imgDataFmt,
+                                          m_builder->getInt32(ImageBuilder::ImgFmt::IMG_FMT_GB_GR_UNORM__GFX10CORE));
+
+      proxySqRsrcRegHelper.setReg(SqRsrcRegs::Format,
+                                  m_builder->getInt32(ImageBuilder::ImgFmt::IMG_FMT_8_8_8_8_UNORM__GFX10CORE));
+      break;
+    }
+    default:
+      llvm_unreachable("GFX IP not supported!");
+      break;
+    }
+
+    dstSelXYZW = m_builder->CreateSelect(isGbGrFmt, m_builder->getInt32(0x977), dstSelXYZW);
+    dstSelXYZW = m_builder->CreateSelect(isBgRgFmt, m_builder->getInt32(0xF2E), dstSelXYZW);
+
+    YCbCrAddressHandler addrHelper(m_builder, &proxySqRsrcRegHelper, m_gfxIp);
+    addrHelper.genHeightAndPitch(m_metaData.word0.bitDepth.channelBitsR, 32, m_metaData.word2.bitCounts.xBitCount,
+                                 m_metaData.word1.tileOptimal, m_metaData.word1.planes);
+    proxySqRsrcRegHelper.setReg(SqRsrcRegs::Width,
+                                m_builder->CreateLShr(width, ConstantInt::get(m_builder->getInt32Ty(), 1)));
+    proxySqRsrcRegHelper.setReg(SqRsrcRegs::DstSelXYZW, dstSelXYZW);
     proxySqRsrcRegHelper.setReg(SqRsrcRegs::Pitch, addrHelper.getPitchCb());
     m_imgDescsChroma[1] = proxySqRsrcRegHelper.getRegister();
-    break;
-  case 2:
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::BaseAddress, addrHelper.getPlane(1));
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::Height, m_metaData.word1.ySubSampled ? heightHalf : height);
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::DstSelXYZW, m_builder->getInt32(m_metaData.word1.dstSelXYZW));
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::BcSwizzle, m_builder->getInt32(6));
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::Pitch, pitchHalf);
-    m_imgDescsChroma[1] = proxySqRsrcRegHelper.getRegister();
-    break;
-  case 3:
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::BaseAddress, addrHelper.getPlane(1));
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::Height, heightHalf);
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::DstSelXYZW, m_builder->getInt32(0x300));
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::BcSwizzle, m_builder->getInt32(4));
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::Pitch, pitchHalf);
-    m_imgDescsChroma[1] = proxySqRsrcRegHelper.getRegister();
-
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::BaseAddress, addrHelper.getPlane(2));
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::DstSelXYZW, m_builder->getInt32(0x204));
-    proxySqRsrcRegHelper.setReg(SqRsrcRegs::BcSwizzle, m_builder->getInt32(5));
-    m_imgDescsChroma[2] = proxySqRsrcRegHelper.getRegister();
-    break;
-  default:
-    llvm_unreachable("Out of range plane count!");
-    break;
   }
+}
+
+// =====================================================================================================================
+// Set image descriptor for chroma channel
+//
+// @param planeIndex : Specific plane index for setting image descriptor
+// @param imageDesc : Image descriptor
+void YCbCrConverter::SetImgDescChroma(unsigned planeIndex, llvm::Value *imageDesc) {
+  assert(planeIndex < 3);
+  m_imgDescsChroma[planeIndex] = imageDesc;
+}
+
+// =====================================================================================================================
+// Get image descriptor for chroma channel
+//
+// @param planeIndex : Specific plane index for loading image descriptor
+llvm::Value *YCbCrConverter::GetImgDescChroma(unsigned planeIndex) {
+  assert(planeIndex < 3);
+  return m_imgDescsChroma[planeIndex];
 }
 
 // =====================================================================================================================

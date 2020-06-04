@@ -402,7 +402,7 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
 void PipelineContext::setUserDataInPipeline(Pipeline *pipeline) const {
   const PipelineShaderInfo *shaderInfo = nullptr;
   unsigned stageMask = getShaderStageMask();
-    shaderInfo = getPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
+  shaderInfo = getPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
 
   // Translate the resource nodes into the LGC format expected by Pipeline::SetUserDataNodes.
   ArrayRef<ResourceMappingNode> nodes(shaderInfo->pUserDataNodes, shaderInfo->userDataNodeCount);
@@ -522,8 +522,17 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         destNode.stride = DescriptorSizeSampler / sizeof(uint32_t);
         break;
       case ResourceMappingNodeType::DescriptorCombinedTexture:
-      case ResourceMappingNodeType::DescriptorYCbCrSampler:
         destNode.stride = (DescriptorSizeResource + DescriptorSizeSampler) / sizeof(uint32_t);
+        break;
+      case ResourceMappingNodeType::DescriptorYCbCrSampler:
+        // Current node.sizeInDwords = resourceDescSizeInDwords * M * N (M means plane count, N means array count)
+        // TODO: Desired destNode.stride = resourceDescSizeInDwords * M
+        //
+        // Temporary set stride to be node.sizeInDwords, for that the stride varies from different plane
+        // counts, and we don't know the real plane count currently.
+        // Thus, set stride to sizeInDwords, and just divide array count when it is available in handling immutable
+        // sampler descriptor (For YCbCrSampler, immutable sampler is always accessible)
+        destNode.stride = node.sizeInDwords;
         break;
       case ResourceMappingNodeType::DescriptorBufferCompact:
         destNode.stride = 2;
@@ -536,7 +545,8 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       // Only check for an immutable value if the resource is or contains a sampler. This specifically excludes
       // YCbCrSampler; that was handled in the SPIR-V reader.
       if (node.type != ResourceMappingNodeType::DescriptorSampler &&
-          node.type != ResourceMappingNodeType::DescriptorCombinedTexture)
+          node.type != ResourceMappingNodeType::DescriptorCombinedTexture &&
+          node.type != ResourceMappingNodeType::DescriptorYCbCrSampler)
         break;
 
       auto it = immutableNodesMap.find(std::pair<unsigned, unsigned>(destNode.set, destNode.binding));
@@ -549,6 +559,12 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         SmallVector<Constant *, 8> values;
 
         if (immutableNode.arraySize != 0) {
+          if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler) {
+            // TODO: Remove the statement when destNode.stride is per array size
+            // Update destNode.stride = node.sizeInDwords / immutableNode.arraySize
+            destNode.stride /= immutableNode.arraySize;
+          }
+
           constexpr unsigned SamplerDescriptorSize = 4;
 
           for (unsigned compIdx = 0; compIdx < immutableNode.arraySize; ++compIdx) {
