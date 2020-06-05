@@ -65,6 +65,7 @@ std::ostream &operator<<(std::ostream &out, ShadowDescriptorTableUsage shadowDes
 
 template std::ostream &operator<<(std::ostream &out, ElfReader<Elf64> &reader);
 template raw_ostream &operator<<(raw_ostream &out, ElfReader<Elf64> &reader);
+template raw_fd_ostream &operator<<(raw_fd_ostream &out, ElfReader<Elf64> &reader);
 constexpr size_t ShaderModuleCacheHashOffset = offsetof(ShaderModuleData, cacheHash);
 
 // =====================================================================================================================
