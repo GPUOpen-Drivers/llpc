@@ -550,6 +550,8 @@ Value *DescBuilder::buildInlineBufferDesc(Value *descPtr) {
 //
 // @param desc : The buffer descriptor base to build for the buffer compact descriptor
 Value *DescBuilder::buildBufferCompactDesc(Value *desc) {
+  const GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+
   // Extract compact buffer descriptor
   Value *descElem0 = CreateExtractElement(desc, uint64_t(0));
   Value *descElem1 = CreateExtractElement(desc, 1);
@@ -571,30 +573,24 @@ Value *DescBuilder::buildBufferCompactDesc(Value *desc) {
   bufDesc = CreateInsertElement(bufDesc, getInt32(sqBufRsrcWord2.u32All), 2);
 
   // Dword 3
-  const GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+  SqBufRsrcWord3 sqBufRsrcWord3 = {};
+  sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
+  sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
+  sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
+  sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
   if (gfxIp.major < 10) {
-    SqBufRsrcWord3 sqBufRsrcWord3 = {};
-    sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
-    sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
-    sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
-    sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
     sqBufRsrcWord3.gfx6.numFormat = BUF_NUM_FORMAT_UINT;
     sqBufRsrcWord3.gfx6.dataFormat = BUF_DATA_FORMAT_32;
     assert(sqBufRsrcWord3.u32All == 0x24FAC);
-    bufDesc = CreateInsertElement(bufDesc, getInt32(sqBufRsrcWord3.u32All), 3);
   } else if (gfxIp.major == 10) {
-    SqBufRsrcWord3 sqBufRsrcWord3 = {};
-    sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
-    sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
-    sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
-    sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
     sqBufRsrcWord3.gfx10.format = BUF_FORMAT_32_UINT;
     sqBufRsrcWord3.gfx10.resourceLevel = 1;
     sqBufRsrcWord3.gfx10.oobSelect = 2;
     assert(sqBufRsrcWord3.u32All == 0x21014FAC);
-    bufDesc = CreateInsertElement(bufDesc, getInt32(sqBufRsrcWord3.u32All), 3);
   } else {
     llvm_unreachable("Not implemented!");
   }
+  bufDesc = CreateInsertElement(bufDesc, getInt32(sqBufRsrcWord3.u32All), 3);
+
   return bufDesc;
 }
