@@ -110,6 +110,7 @@ enum MemberType : unsigned {
   MemberTypePipelineOption,           // VFX member type: SectionPipelineOption
   MemberTypeShaderOption,             // VFX member type: SectionShaderOption
   MemberTypeNggState,                 // VFX member type: SectionNggState
+  MemberTypeExtendedRobustness,       // VFX member type: SectionExtendedRobustness
 };
 
 // =====================================================================================================================
@@ -973,6 +974,35 @@ private:
 };
 
 // =====================================================================================================================
+// Represents the sub section ExtendedRobustness
+class SectionExtendedRobustness : public Section {
+public:
+  typedef Vkgc::ExtendedRobustness SubState;
+
+  SectionExtendedRobustness() : Section(m_addrTable, MemberCount, SectionTypeUnset, "extendedRobustness") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  static void initialAddrTable() {
+    StrToMemberAddr *tableItem = m_addrTable;
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustBufferAccess, MemberTypeBool, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustImageAccess, MemberTypeBool, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, nullDescriptor, MemberTypeBool, false);
+
+    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
+  }
+
+  void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
+
+private:
+  static const unsigned MemberCount = 3;
+  static StrToMemberAddr m_addrTable[MemberCount];
+
+  SubState m_state;
+};
+
+// =====================================================================================================================
 // Represents the sub section pipeline option
 class SectionPipelineOption : public Section {
 public:
@@ -991,11 +1021,14 @@ public:
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, reconfigWorkgroupLayout, MemberTypeBool, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, shadowDescriptorTableUsage, MemberTypeEnum, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, shadowDescriptorTablePtrHigh, MemberTypeInt, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, nullDescriptor, MemberTypeBool, false);
+    INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_extendedRobustness, MemberTypeExtendedRobustness, true);
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
-  void getSubState(SubState &state) { state = m_state; };
+  void getSubState(SubState &state) {
+    m_extendedRobustness.getSubState(m_state.extendedRobustness);
+    state = m_state;
+  };
   SubState &getSubStateRef() { return m_state; };
 
 private:
@@ -1003,6 +1036,7 @@ private:
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;
+  SectionExtendedRobustness m_extendedRobustness;
 };
 
 // =====================================================================================================================

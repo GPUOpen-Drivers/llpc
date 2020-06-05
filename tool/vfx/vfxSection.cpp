@@ -74,6 +74,7 @@ StrToMemberAddr SectionCompileLog::m_addrTable[SectionCompileLog::MemberCount];
 StrToMemberAddr SectionPipelineOption::m_addrTable[SectionPipelineOption::MemberCount];
 StrToMemberAddr SectionShaderOption::m_addrTable[SectionShaderOption::MemberCount];
 StrToMemberAddr SectionNggState::m_addrTable[SectionNggState::MemberCount];
+StrToMemberAddr SectionExtendedRobustness::m_addrTable[SectionExtendedRobustness::MemberCount];
 
 // =====================================================================================================================
 // Dummy class used to initialize all static variables
@@ -114,6 +115,7 @@ public:
     SectionPipelineOption::initialAddrTable();
     SectionShaderOption::initialAddrTable();
     SectionNggState::initialAddrTable();
+    SectionExtendedRobustness::initialAddrTable();
   };
 };
 
@@ -611,6 +613,7 @@ bool Section::getPtrOfSubSection(unsigned lineNum, const char *memberName, Membe
     CASE_SUBSECTION(MemberTypePipelineOption, SectionPipelineOption)
     CASE_SUBSECTION(MemberTypeShaderOption, SectionShaderOption)
     CASE_SUBSECTION(MemberTypeNggState, SectionNggState)
+    CASE_SUBSECTION(MemberTypeExtendedRobustness, SectionExtendedRobustness)
     break;
   default:
     VFX_NEVER_CALLED();
