@@ -510,39 +510,7 @@ Value *DescBuilder::buildInlineBufferDesc(Value *descPtr) {
   descPtr = CreatePtrToInt(descPtr, getInt64Ty());
   descPtr = CreateBitCast(descPtr, VectorType::get(getInt32Ty(), 2));
 
-  // Build descriptor words.
-  SqBufRsrcWord1 sqBufRsrcWord1 = {};
-  SqBufRsrcWord2 sqBufRsrcWord2 = {};
-  SqBufRsrcWord3 sqBufRsrcWord3 = {};
-
-  sqBufRsrcWord1.bits.baseAddressHi = UINT16_MAX;
-  sqBufRsrcWord2.bits.numRecords = UINT32_MAX;
-
-  sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
-  sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
-  sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
-  sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
-  sqBufRsrcWord3.gfx6.numFormat = BUF_NUM_FORMAT_UINT;
-  sqBufRsrcWord3.gfx6.dataFormat = BUF_DATA_FORMAT_32;
-  assert(sqBufRsrcWord3.u32All == 0x24FAC);
-
-  // Dword 0
-  Value *desc = UndefValue::get(VectorType::get(getInt32Ty(), 4));
-  Value *descElem0 = CreateExtractElement(descPtr, uint64_t(0));
-  desc = CreateInsertElement(desc, descElem0, uint64_t(0));
-
-  // Dword 1
-  Value *descElem1 = CreateExtractElement(descPtr, 1);
-  descElem1 = CreateAnd(descElem1, getInt32(sqBufRsrcWord1.u32All));
-  desc = CreateInsertElement(desc, descElem1, 1);
-
-  // Dword 2
-  desc = CreateInsertElement(desc, getInt32(sqBufRsrcWord2.u32All), 2);
-
-  // Dword 3
-  desc = CreateInsertElement(desc, getInt32(sqBufRsrcWord3.u32All), 3);
-
-  return desc;
+  return buildBufferCompactDesc(descPtr);
 }
 
 // =====================================================================================================================
