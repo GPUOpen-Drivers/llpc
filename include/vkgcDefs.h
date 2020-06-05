@@ -73,7 +73,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
-//* |     40.2 | Added flag nullDescriptor in PipelineOptions to support VK_EXT_robustness2                            |
+//* |     40.2 | Added extendedRobustness in PipelineOptions to support VK_EXT_robustness2                             |
 //* |     40.1 | Added disableLoopUnroll to PipelineShaderOptions                                                      |
 //* |     40.0 | Added DescriptorReserved12, which moves DescriptorYCbCrSampler down to 13                             |
 //* |     39.0 | Non-LLPC-specific XGL code should #include vkcgDefs.h instead of llpc.h                               |
@@ -254,6 +254,17 @@ enum class ShadowDescriptorTableUsage : unsigned {
   Disable = 2,
 };
 
+/// Represents the features of VK_EXT_robustness2
+struct ExtendedRobustness {
+  bool robustBufferAccess; ///< Whether buffer accesses are tightly bounds-checked against the range of the descriptor.
+                           ///  Give defined behavior (e.g. read 0) for out-of-bounds buffer access and descriptor range
+                           ///  rounding up.
+  bool robustImageAccess;  ///< Whether image accesses are tightly bounds-checked against the dimensions of the image
+                           ///  view. Give defined behavior for out-of-bounds image access.
+  bool nullDescriptor;     ///< Whether the descriptor can be written with VK_NULL_HANDLE. If set, it is considered
+                           ///  valid to access and acts as if the descriptor is bounded to nothing.
+};
+
 /// Represents per pipeline options.
 struct PipelineOptions {
   bool includeDisassembly;         ///< If set, the disassembly for all compiled shaders will be included in
@@ -269,8 +280,8 @@ struct PipelineOptions {
 
   ShadowDescriptorTableUsage shadowDescriptorTableUsage; ///< Controls shadow descriptor table.
   unsigned shadowDescriptorTablePtrHigh;                 ///< Sets high part of VA ptr for shadow descriptor table.
-  bool nullDescriptor;                                   ///< If set, support VK_EXT_robustness2 to give defined
-                                                         ///  behavior for null descriptor
+  ExtendedRobustness extendedRobustness;                 ///< ExtendedRobustness is intended to correspond to the
+                                                         ///  features of VK_EXT_robustness2.
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
