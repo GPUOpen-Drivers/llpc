@@ -36,18 +36,17 @@
 /// This file implements conversion of SPIR-V binary to LLVM IR.
 ///
 //===----------------------------------------------------------------------===//
+#include "SPIRVReader.h"
 #include "SPIRVBasicBlock.h"
 #include "SPIRVExtInst.h"
 #include "SPIRVFunction.h"
 #include "SPIRVInstruction.h"
-#include "SPIRVInternal.h"
 #include "SPIRVModule.h"
 #include "SPIRVType.h"
 #include "SPIRVUtil.h"
 #include "SPIRVValue.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
-#include "lgc/Builder.h"
 #include "lgc/Pipeline.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -124,381 +123,70 @@ static void dumpLLVM(Module *m, const std::string &fName) {
   }
 }
 
-class SPIRVToLLVMDbgTran {
-public:
-  SPIRVToLLVMDbgTran(SPIRVModule *tbm, Module *tm) : m_bm(tbm), m_m(tm), m_spDbg(m_bm), m_builder(*m_m) {
-    m_enable = m_bm->hasDebugInfo();
+SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const SPIRVSpecConstMap &theSpecConstMap,
+                         lgc::Builder *builder, const Vkgc::ShaderModuleUsage *moduleUsage)
+    : m_m(llvmModule), m_builder(builder), m_bm(theSpirvModule), m_enableXfb(false), m_entryTarget(nullptr),
+      m_specConstMap(theSpecConstMap), m_dbgTran(m_bm, m_m),
+      m_moduleUsage(reinterpret_cast<const Vkgc::ShaderModuleUsage *>(moduleUsage)) {
+  assert(m_m);
+  m_context = &m_m->getContext();
+  m_spirvOpMetaKindId = m_context->getMDKindID(MetaNameSpirvOp);
+}
+
+void SPIRVToLLVM::recordRemappedTypeElements(SPIRVType *bt, unsigned from, unsigned to) {
+  auto &elements = m_remappedTypeElements[bt];
+
+  if (elements.size() <= from)
+    elements.resize(from + 1, 0);
+
+  elements[from] = to;
+}
+
+uint64_t SPIRVToLLVM::getTypeStoreSize(Type *const t) {
+  auto it = m_typeToStoreSize.find(t);
+  if (it != m_typeToStoreSize.end())
+    return it->second;
+
+  const uint64_t calculatedSize = m_m->getDataLayout().getTypeStoreSize(t);
+  m_typeToStoreSize[t] = calculatedSize;
+  return calculatedSize;
+}
+
+Value *SPIRVToLLVM::mapValue(SPIRVValue *bv, Value *v) {
+  auto loc = m_valueMap.find(bv);
+  if (loc != m_valueMap.end()) {
+    if (loc->second == v)
+      return v;
+    auto ld = dyn_cast<LoadInst>(loc->second);
+    auto placeholder = dyn_cast<GlobalVariable>(ld->getPointerOperand());
+    assert(ld && placeholder && placeholder->getName().startswith(KPlaceholderPrefix) && "A value is translated twice");
+    // Replaces placeholders for PHI nodes
+    ld->replaceAllUsesWith(v);
+    ld->eraseFromParent();
+    placeholder->eraseFromParent();
   }
+  m_valueMap[bv] = v;
+  return v;
+}
 
-  void createCompileUnit() {
-    if (!m_enable)
-      return;
-    auto file = m_spDbg.getEntryPointFileStr(ExecutionModelVertex, 0);
-    if (file.empty())
-      file = "spirv.dbg.cu"; // File name must be non-empty
-    std::string baseName;
-    std::string path;
-    splitFileName(file, baseName, path);
-    m_builder.createCompileUnit(dwarf::DW_LANG_C99, m_builder.createFile(baseName, path), "spirv", false, "", 0, "",
-                                DICompileUnit::LineTablesOnly);
-  }
+unsigned SPIRVToLLVM::getBlockPredecessorCounts(BasicBlock *block, BasicBlock *predecessor) {
+  assert(block);
+  // This will create the map entry if it does not already exist.
+  auto it = m_blockPredecessorToCount.find({block, predecessor});
+  if (it != m_blockPredecessorToCount.end())
+    return it->second;
 
-  void addDbgInfoVersion() {
-    if (!m_enable)
-      return;
-    m_m->addModuleFlag(Module::Warning, "Dwarf Version", dwarf::DWARF_VERSION);
-    m_m->addModuleFlag(Module::Warning, "Debug Info Version", DEBUG_METADATA_VERSION);
-  }
+  return 0;
+}
 
-  DIFile *getDIFile(const std::string &fileName) {
-    return getOrInsert(m_fileMap, fileName, [=]() -> DIFile * {
-      std::string baseName;
-      std::string path;
-      splitFileName(fileName, baseName, path);
-      return m_builder.createFile(baseName, path);
-    });
-  }
-
-  DISubprogram *getDISubprogram(SPIRVFunction *sf, Function *f) {
-    return getOrInsert(m_funcMap, f, [=]() {
-      auto df = getDIFile(m_spDbg.getFunctionFileStr(sf));
-      auto fn = f->getName();
-      auto ln = m_spDbg.getFunctionLineNo(sf);
-      auto spFlags = DISubprogram::SPFlagDefinition;
-      if (Function::isInternalLinkage(f->getLinkage()))
-        spFlags |= DISubprogram::SPFlagLocalToUnit;
-      return m_builder.createFunction(df, fn, fn, df, ln,
-                                      m_builder.createSubroutineType(m_builder.getOrCreateTypeArray(None)), ln,
-                                      DINode::FlagZero, spFlags);
-    });
-  }
-
-  void transDbgInfo(SPIRVValue *sv, Value *v) {
-    if (!m_enable || !sv->hasLine())
-      return;
-    if (auto i = dyn_cast<Instruction>(v)) {
-      assert(sv->isInst() && "Invalid instruction");
-      auto si = static_cast<SPIRVInstruction *>(sv);
-      assert(si->getParent() && si->getParent()->getParent() && "Invalid instruction");
-      auto line = sv->getLine();
-      i->setDebugLoc(DebugLoc::get(line->getLine(), line->getColumn(),
-                                   getDISubprogram(si->getParent()->getParent(), i->getParent()->getParent())));
-    }
-  }
-
-  void finalize() {
-    if (!m_enable)
-      return;
-    m_builder.finalize();
-  }
-
-private:
-  SPIRVModule *m_bm;
-  Module *m_m;
-  SPIRVDbgInfo m_spDbg;
-  DIBuilder m_builder;
-  bool m_enable;
-  std::unordered_map<std::string, DIFile *> m_fileMap;
-  std::unordered_map<Function *, DISubprogram *> m_funcMap;
-
-  void splitFileName(const std::string &fileName, std::string &baseName, std::string &path) {
-    auto loc = fileName.find_last_of("/\\");
-    if (loc != std::string::npos) {
-      baseName = fileName.substr(loc + 1);
-      path = fileName.substr(0, loc);
-    } else {
-      baseName = fileName;
-      path = ".";
-    }
-  }
-};
-
-class SPIRVToLLVM {
-public:
-  SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const SPIRVSpecConstMap &theSpecConstMap,
-              Builder *builder, const ShaderModuleUsage *moduleUsage)
-      : m_m(llvmModule), m_builder(builder), m_bm(theSpirvModule), m_enableXfb(false), m_entryTarget(nullptr),
-        m_specConstMap(theSpecConstMap), m_dbgTran(m_bm, m_m),
-        m_moduleUsage(reinterpret_cast<const ShaderModuleUsage *>(moduleUsage)) {
-    assert(m_m);
-    m_context = &m_m->getContext();
-    m_spirvOpMetaKindId = m_context->getMDKindID(MetaNameSpirvOp);
-  }
-
-  DebugLoc getDebugLoc(SPIRVInstruction *bi, Function *f);
-
-  void updateDebugLoc(SPIRVValue *bv, Function *f);
-
-  Type *transType(SPIRVType *bt, unsigned matrixStride = 0, bool columnMajor = true, bool parentIsPointer = false,
-                  bool explicitlyLaidOut = false);
-  template <spv::Op>
-  Type *transTypeWithOpcode(SPIRVType *bt, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
-                            bool explicitlyLaidOut);
-  std::vector<Type *> transTypeVector(const std::vector<SPIRVType *> &);
-  bool translate(ExecutionModel entryExecModel, const char *entryName);
-  bool transAddressingModel();
-
-  Value *transValue(SPIRVValue *, Function *f, BasicBlock *, bool createPlaceHolder = true);
-  Value *transValueWithoutDecoration(SPIRVValue *, Function *f, BasicBlock *, bool createPlaceHolder = true);
-  Value *transAtomicRMW(SPIRVValue *, const AtomicRMWInst::BinOp);
-  Constant *transInitializer(SPIRVValue *, Type *);
-  template <spv::Op> Value *transValueWithOpcode(SPIRVValue *);
-  Value *transLoadImage(SPIRVValue *spvImageLoadPtr);
-  Value *transImagePointer(SPIRVValue *spvImagePtr);
-  Value *transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessChain);
-  Value *indexDescPtr(Value *base, Value *index, bool isNonUniform, SPIRVType *spvElementType);
-  Value *transGroupArithOp(lgc::Builder::GroupArithOp, SPIRVValue *);
-
-  bool transDecoration(SPIRVValue *, Value *);
-  bool transShaderDecoration(SPIRVValue *, Value *);
-  bool checkContains64BitType(SPIRVType *bt);
-  Constant *buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecorate &inOutDec, Type *&metaTy);
-  Constant *buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy);
-  unsigned calcShaderBlockSize(SPIRVType *bt, unsigned blockSize, unsigned matrixStride, bool isRowMajor);
-  Value *transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb);
-  Value *flushDenorm(Value *val);
-  Value *transTrinaryMinMaxExtInst(SPIRVExtInst *extInst, BasicBlock *bb);
-  Value *transGLSLBuiltinFromExtInst(SPIRVExtInst *bc, BasicBlock *bb);
-  std::vector<Value *> transValue(const std::vector<SPIRVValue *> &, Function *f, BasicBlock *);
-  Function *transFunction(SPIRVFunction *f);
-  bool transMetadata();
-  bool transNonTemporalMetadata(Instruction *i);
-  Value *transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb);
-  Instruction *transBuiltinFromInst(const std::string &funcName, SPIRVInstruction *bi, BasicBlock *bb);
-  Instruction *transSPIRVBuiltinFromInst(SPIRVInstruction *bi, BasicBlock *bb);
-  Instruction *transBarrierFence(SPIRVInstruction *bi, BasicBlock *bb);
-
-  // Struct used to pass information in and out of getImageDesc.
-  struct ExtractedImageInfo {
-    BasicBlock *bb;
-    const SPIRVTypeImageDescriptor *desc;
-    unsigned dim;   // lgc::Builder dimension
-    unsigned flags; // lgc::Builder image call flags
-    Value *imageDesc;
-    Value *fmaskDesc;
-    Value *samplerDesc;
-  };
-
-  // Load image and/or sampler descriptors, and get information from the image
-  // type.
-  void getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info);
-
-  // Set up address operand array for image sample/gather builder call.
-  void setupImageAddressOperands(SPIRVInstruction *bi, unsigned maskIdx, bool hasProj, MutableArrayRef<Value *> addr,
-                                 ExtractedImageInfo *imageInfo, Value **sampleNum);
-
-  // Handle fetch/read/write/atomic aspects of coordinate.
-  void handleImageFetchReadWriteCoord(SPIRVInstruction *bi, ExtractedImageInfo *imageInfo,
-                                      MutableArrayRef<Value *> addr, bool enableMultiView = true);
-
-  // Translate SPIR-V image atomic operations to LLVM function calls
-  Value *transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicBlock *bb);
-
-  // Translates SPIR-V fragment mask operations to LLVM function calls
-  Value *transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *bi, BasicBlock *bb);
-  Value *transSPIRVFragmentFetchFromInst(SPIRVInstruction *bi, BasicBlock *bb);
-
-  // Translate image sample to LLVM IR
-  Value *transSPIRVImageSampleFromInst(SPIRVInstruction *bi, BasicBlock *bb);
-
-  // Translate image gather to LLVM IR
-  Value *transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlock *bb);
-
-  // Translate image fetch/read to LLVM IR
-  Value *transSPIRVImageFetchReadFromInst(SPIRVInstruction *bi, BasicBlock *bb);
-
-  // Translate image write to LLVM IR
-  Value *transSPIRVImageWriteFromInst(SPIRVInstruction *bi, BasicBlock *bb);
-
-  // Translate OpImageQueryLevels to LLVM IR
-  Value *transSPIRVImageQueryLevelsFromInst(SPIRVInstruction *bi, BasicBlock *bb);
-
-  // Translate OpImageQuerySamples to LLVM IR
-  Value *transSPIRVImageQuerySamplesFromInst(SPIRVInstruction *bi, BasicBlock *bb);
-
-  // Translate OpImageQuerySize/OpImageQuerySizeLod to LLVM IR
-  Value *transSPIRVImageQuerySizeFromInst(SPIRVInstruction *bi, BasicBlock *bb);
-
-  // Translate OpImageQueryLod to LLVM IR
-  Value *transSPIRVImageQueryLodFromInst(SPIRVInstruction *bi, BasicBlock *bb);
-
-  Value *createLaunderRowMajorMatrix(Value *const);
-  Value *addLoadInstRecursively(SPIRVType *const, Value *const, bool, bool, bool);
-  void addStoreInstRecursively(SPIRVType *const, Value *const, Value *const, bool, bool, bool);
-  Constant *buildConstStoreRecursively(SPIRVType *const, Type *const, Constant *const);
-
-  // Post-process translated LLVM module to undo row major matrices.
-  bool postProcessRowMajorMatrix();
-
-  typedef DenseMap<SPIRVType *, Type *> SPIRVToLLVMTypeMap;
-  typedef DenseMap<SPIRVValue *, Value *> SPIRVToLLVMValueMap;
-  typedef DenseMap<SPIRVValue *, Value *> SPIRVBlockToLLVMStructMap;
-  typedef DenseMap<SPIRVFunction *, Function *> SPIRVToLLVMFunctionMap;
-  typedef DenseMap<GlobalVariable *, SPIRVBuiltinVariableKind> BuiltinVarMap;
-  typedef DenseMap<SPIRVType *, SmallVector<unsigned, 8>> RemappedTypeElementsMap;
-
-  // A SPIRV value may be translated to a load instruction of a placeholder
-  // global variable. This map records load instruction of these placeholders
-  // which are supposed to be replaced by the real values later.
-  typedef std::map<SPIRVValue *, LoadInst *> SPIRVToLLVMPlaceholderMap;
-
-private:
-  Module *m_m;
-  BuiltinVarMap m_builtinGvMap;
-  LLVMContext *m_context;
-  lgc::Builder *m_builder;
-  SPIRVModule *m_bm;
-  bool m_enableXfb;
-  bool m_enableGatherLodNz;
-  ShaderFloatControlFlags m_fpControlFlags;
-  SPIRVFunction *m_entryTarget;
-  const SPIRVSpecConstMap &m_specConstMap;
-  SPIRVToLLVMTypeMap m_typeMap;
-  SPIRVToLLVMValueMap m_valueMap;
-  SPIRVToLLVMFunctionMap m_funcMap;
-  SPIRVBlockToLLVMStructMap m_blockMap;
-  SPIRVToLLVMPlaceholderMap m_placeholderMap;
-  SPIRVToLLVMDbgTran m_dbgTran;
-  std::map<std::string, unsigned> m_mangleNameToIndex;
-  RemappedTypeElementsMap m_remappedTypeElements;
-  DenseMap<Type *, bool> m_typesWithPadMap;
-  DenseMap<Type *, uint64_t> m_typeToStoreSize;
-  DenseMap<std::pair<SPIRVType *, unsigned>, Type *> m_overlappingStructTypeWorkaroundMap;
-  DenseMap<std::pair<BasicBlock *, BasicBlock *>, unsigned> m_blockPredecessorToCount;
-  const ShaderModuleUsage *m_moduleUsage;
-  unsigned m_spirvOpMetaKindId;
-
-  lgc::Builder *getBuilder() const { return m_builder; }
-
-  Type *mapType(SPIRVType *bt, Type *t) {
-    m_typeMap[bt] = t;
-    return t;
-  }
-
-  void recordRemappedTypeElements(SPIRVType *bt, unsigned from, unsigned to) {
-    auto &elements = m_remappedTypeElements[bt];
-
-    if (elements.size() <= from)
-      elements.resize(from + 1, 0);
-
-    elements[from] = to;
-  }
-
-  bool isRemappedTypeElements(SPIRVType *bt) const { return m_remappedTypeElements.count(bt) > 0; }
-
-  unsigned lookupRemappedTypeElements(SPIRVType *bt, unsigned from) {
-    assert(m_remappedTypeElements.count(bt) > 0);
-    assert(m_remappedTypeElements[bt].size() > from);
-    return m_remappedTypeElements[bt][from];
-  }
-
-  Type *getPadType(unsigned bytes) { return ArrayType::get(getBuilder()->getInt8Ty(), bytes); }
-
-  Type *recordTypeWithPad(Type *const t, bool isMatrixRow = false) {
-    m_typesWithPadMap[t] = isMatrixRow;
-    return t;
-  }
-
-  bool isTypeWithPad(Type *const t) const { return m_typesWithPadMap.count(t) > 0; }
-
-  bool isTypeWithPadRowMajorMatrix(Type *const t) const { return m_typesWithPadMap.lookup(t); }
-
-  // Returns a cached type store size. If there is no entry for the given type,
-  // its store size is calculated and added to the cache.
-  uint64_t getTypeStoreSize(Type *const t) {
-    auto it = m_typeToStoreSize.find(t);
-    if (it != m_typeToStoreSize.end())
-      return it->second;
-
-    const uint64_t calculatedSize = m_m->getDataLayout().getTypeStoreSize(t);
-    m_typeToStoreSize[t] = calculatedSize;
-    return calculatedSize;
-  }
-
-  // If a value is mapped twice, the existing mapped value is a placeholder,
-  // which must be a load instruction of a global variable whose name starts
-  // with kPlaceholderPrefix.
-  Value *mapValue(SPIRVValue *bv, Value *v) {
-    auto loc = m_valueMap.find(bv);
-    if (loc != m_valueMap.end()) {
-      if (loc->second == v)
-        return v;
-      auto ld = dyn_cast<LoadInst>(loc->second);
-      auto placeholder = dyn_cast<GlobalVariable>(ld->getPointerOperand());
-      assert(ld && placeholder && placeholder->getName().startswith(KPlaceholderPrefix) &&
-             "A value is translated twice");
-      // Replaces placeholders for PHI nodes
-      ld->replaceAllUsesWith(v);
-      ld->eraseFromParent();
-      placeholder->eraseFromParent();
-    }
-    m_valueMap[bv] = v;
-    return v;
-  }
-
-  // Used to keep track of the number of incoming edges to a block from each
-  // of the predecessor.
-  void recordBlockPredecessor(BasicBlock *block, BasicBlock *predecessorBlock) {
-    assert(block);
-    assert(predecessorBlock);
-    m_blockPredecessorToCount[{block, predecessorBlock}] += 1;
-  }
-
-  unsigned getBlockPredecessorCounts(BasicBlock *block, BasicBlock *predecessor) {
-    assert(block);
-    // This will create the map entry if it does not already exist.
-    auto it = m_blockPredecessorToCount.find({block, predecessor});
-    if (it != m_blockPredecessorToCount.end())
-      return it->second;
-
-    return 0;
-  }
-
-  bool isSPIRVBuiltinVariable(GlobalVariable *gv, SPIRVBuiltinVariableKind *kind = nullptr) {
-    auto loc = m_builtinGvMap.find(gv);
-    if (loc == m_builtinGvMap.end())
-      return false;
-    if (kind)
-      *kind = loc->second;
-    return true;
-  }
-  // Change this if it is no longer true.
-  bool isFuncNoUnwind() const { return true; }
-  bool isSPIRVCmpInstTransToLLVMInst(SPIRVInstruction *bi) const;
-
-  Value *mapFunction(SPIRVFunction *bf, Function *f) {
-    m_funcMap[bf] = f;
-    return f;
-  }
-
-  Value *getTranslatedValue(SPIRVValue *bv);
-
-  SPIRVErrorLog &getErrorLog() { return m_bm->getErrorLog(); }
-
-  void setCallingConv(CallInst *call) {
-    Function *f = call->getCalledFunction();
-    assert(f);
-    call->setCallingConv(f->getCallingConv());
-  }
-
-  void setAttrByCalledFunc(CallInst *call);
-  Type *transFPType(SPIRVType *t);
-  FastMathFlags getFastMathFlags(SPIRVValue *bv);
-  void setFastMathFlags(SPIRVValue *bv);
-  void setFastMathFlags(Value *val);
-  BinaryOperator *transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
-  Instruction *transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
-
-  void setName(llvm::Value *v, SPIRVValue *bv);
-  void setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi);
-  template <class Source, class Func> bool foreachFuncCtlMask(Source, Func);
-  llvm::GlobalValue::LinkageTypes transLinkageType(const SPIRVValue *v);
-
-  Instruction *transBarrier(BasicBlock *bb, SPIRVWord execScope, SPIRVWord memSema, SPIRVWord memScope);
-
-  Instruction *transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRVWord memScope);
-  void truncConstantIndex(std::vector<Value *> &indices, BasicBlock *bb);
-};
+bool SPIRVToLLVM::isSPIRVBuiltinVariable(GlobalVariable *gv, SPIRVBuiltinVariableKind *kind) {
+  auto loc = m_builtinGvMap.find(gv);
+  if (loc == m_builtinGvMap.end())
+    return false;
+  if (kind)
+    *kind = loc->second;
+  return true;
+}
 
 Value *SPIRVToLLVM::getTranslatedValue(SPIRVValue *bv) {
   auto loc = m_valueMap.find(bv);

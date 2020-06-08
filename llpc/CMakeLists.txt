@@ -178,6 +178,7 @@ if(ICD_BUILD_LLPC)
 # llpc/translator
     target_sources(llpc PRIVATE
         translator/lib/SPIRV/SPIRVReader.cpp
+        translator/lib/SPIRV/SPIRVToLLVMDbgTran.cpp
         translator/lib/SPIRV/SPIRVUtil.cpp
     )
 
