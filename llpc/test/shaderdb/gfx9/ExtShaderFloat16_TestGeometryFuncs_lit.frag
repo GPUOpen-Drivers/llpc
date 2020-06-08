@@ -61,18 +61,18 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call {{.*}} half @llvm.fabs.f16(half
 ; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<2 x half>
-; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.sqrt.f16(half
 ; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<3 x half>
-; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.sqrt.f16(half
 ; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<4 x half>
-; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.sqrt.f16(half
 ; SHADERTEST: = call {{.*}} half @llvm.fabs.f16(half
 ; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<2 x half>
-; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.sqrt.f16(half
 ; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<3 x half>
-; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.sqrt.f16(half
 ; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<4 x half>
-; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.sqrt.f16(half
 ; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<3 x half> %{{.*}}, <3 x half> %{{.*}})
 ; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<4 x half> %{{.*}}, <4 x half> %{{.*}})
 ; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<2 x half> %{{.*}}, <2 x half> %{{.*}})

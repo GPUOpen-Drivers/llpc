@@ -7247,11 +7247,11 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
 
   case GLSLstd450Sqrt:
     // Square root
-    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::sqrt, args[0]);
+    return getBuilder()->CreateSqrt(args[0]);
 
   case GLSLstd450InverseSqrt: {
     // Inverse square root
-    Value *sqrt = getBuilder()->CreateUnaryIntrinsic(Intrinsic::sqrt, args[0]);
+    auto sqrt = getBuilder()->CreateSqrt(args[0]);
     return getBuilder()->CreateFDiv(ConstantFP::get(sqrt->getType(), 1.0), sqrt);
   }
 
@@ -7501,7 +7501,7 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     if (!isa<VectorType>(args[0]->getType()))
       return getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, args[0]);
     Value *dot = getBuilder()->CreateDotProduct(args[0], args[0]);
-    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::sqrt, dot);
+    return getBuilder()->CreateSqrt(dot);
   }
 
   case GLSLstd450Distance: {
@@ -7510,7 +7510,7 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     if (!isa<VectorType>(diff->getType()))
       return getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, diff);
     Value *dot = getBuilder()->CreateDotProduct(diff, diff);
-    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::sqrt, dot);
+    return getBuilder()->CreateSqrt(dot);
   }
 
   case GLSLstd450Cross:
