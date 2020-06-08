@@ -1034,7 +1034,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
   if (mangledName.startswith(lgcName::InputImportGeneric)) {
     // Generic input import
     if (isDeadCall)
-      m_deadCalls.insert(&callInst);
+      m_deadCalls.push_back(&callInst);
     else {
       auto inputTy = callInst.getType();
       assert(inputTy->isSingleValueType());
@@ -1086,7 +1086,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     assert(m_shaderStage == ShaderStageFragment);
 
     if (isDeadCall)
-      m_deadCalls.insert(&callInst);
+      m_deadCalls.push_back(&callInst);
     else {
       assert(callInst.getType()->isSingleValueType());
 
@@ -1106,7 +1106,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
   } else if (mangledName.startswith(lgcName::InputImportBuiltIn)) {
     // Built-in input import
     if (isDeadCall)
-      m_deadCalls.insert(&callInst);
+      m_deadCalls.push_back(&callInst);
     else {
       unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
       m_activeInputBuiltIns.insert(builtInId);
@@ -1184,7 +1184,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     if (m_shaderStage == ShaderStageGeometry) {
       auto *outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
       if (isa<UndefValue>(outputValue))
-        m_deadCalls.insert(&callInst);
+        m_deadCalls.push_back(&callInst);
       else {
         unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         m_activeOutputBuiltIns.insert(builtInId);
@@ -1201,7 +1201,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
       m_inOutCalls.push_back(&callInst);
     } else if (m_shaderStage == ShaderStageVertex && mangledName.startswith(lgcName::OutputExportGeneric)) {
       m_inOutCalls.push_back(&callInst);
-      m_deadCalls.insert(&callInst);
+      m_deadCalls.push_back(&callInst);
     }
   }
 }
