@@ -32,6 +32,7 @@
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
+#include <float.h>
 
 #define DEBUG_TYPE "lgc-builder-impl-arith"
 
@@ -622,12 +623,68 @@ Value *ArithBuilder::CreateLog(Value *x, const Twine &instName) {
 }
 
 // =====================================================================================================================
-// Create an inverse square root operation for a scalar or vector FP value.
+// Create a square root operation for a scalar or vector FP value.
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateInverseSqrt(Value *x, const Twine &instName) {
-  return CreateFDiv(ConstantFP::get(x->getType(), 1.0), CreateUnaryIntrinsic(Intrinsic::sqrt, x), instName);
+Value *ArithBuilder::CreateSqrt(Value *x, const Twine &instName) {
+  if (x->getType()->getScalarType()->isDoubleTy()) {
+    // NOTE: For double type, the SQRT and RSQ instructions don't have required precision, we apply Goldschmidt's
+    // algorithm (https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Goldschmidt%E2%80%99s_algorithm) to
+    // improve the result:
+    //
+    //   y0 = rsq(x)
+    //   g0 = x * y0
+    //   h0 = 0.5 * y0
+    //
+    //   r0 = 0.5 - h0 * g0
+    //   g1 = g0 * r0 + g0
+    //   h1 = h0 * r0 + h0
+    //
+    //   r1 = 0.5 - h1 * g1 => d0 = x - g1 * g1
+    //   g2 = g1 * r1 + g1     g2 = d0 * h1 + g1
+    //   h2 = h1 * r1 + h1
+    //
+    //   r2 = 0.5 - h2 * g2 => d1 = x - g2 * g2
+    //   g3 = g2 * r2 + g2     g3 = d1 * h1 + g2
+    //
+    //   sqrt(x) = g3
+    //
+
+    // TODO: In the future, this should be totally done in LLVM backend.
+
+    // x < 2^-768
+    auto scaling = CreateFCmpOLT(x, getFpConstant(x->getType(), llvm::APFloat(llvm::APFloat::IEEEdouble(),
+                                                                              llvm::APInt(64, 0x1000000000000000))));
+    auto expTy = getConditionallyVectorizedTy(getInt32Ty(), x->getType());
+    auto scaleUp = CreateSelect(scaling, ConstantInt::get(expTy, 256), ConstantInt::get(expTy, 0));
+    auto scaleDown = CreateSelect(scaling, ConstantInt::get(expTy, -128, true), ConstantInt::get(expTy, 0));
+    auto half = ConstantFP::get(x->getType(), 0.5);
+
+    x = CreateLdexp(x, scaleUp); // Scale up X if it is too small, make it a normal one
+    auto y = scalarize(x, [this](Value *x) { return CreateUnaryIntrinsic(Intrinsic::amdgcn_rsq, x); });
+    auto g = CreateFMul(x, y);
+    auto h = CreateFMul(half, y);
+
+    auto r = CreateIntrinsic(Intrinsic::fma, x->getType(), {CreateFNeg(h), g, half});
+    g = CreateIntrinsic(Intrinsic::fma, x->getType(), {g, r, g});
+    h = CreateIntrinsic(Intrinsic::fma, x->getType(), {h, r, h});
+
+    auto d = CreateIntrinsic(Intrinsic::fma, x->getType(), {CreateFNeg(g), g, x});
+    g = CreateIntrinsic(Intrinsic::fma, x->getType(), {d, h, g});
+
+    d = CreateIntrinsic(Intrinsic::fma, x->getType(), {CreateFNeg(g), g, x});
+    g = CreateIntrinsic(Intrinsic::fma, x->getType(), {d, h, g});
+
+    g = CreateLdexp(g, scaleDown); // Scale down the result
+
+    // If X is +INF, +0, or -0, use its original value
+    return CreateSelect(
+        createCallAmdgcnClass(x, CmpClass::PositiveInfinity | CmpClass::PositiveZero | CmpClass::NegativeZero), x, g,
+        instName);
+  }
+
+  return CreateUnaryIntrinsic(Intrinsic::sqrt, x, nullptr, instName);
 }
 
 // =====================================================================================================================
@@ -719,7 +776,16 @@ Value *ArithBuilder::CreateLdexp(Value *x, Value *exp, const Twine &instName) {
 
   // We need to scalarize this ourselves.
   Value *result = scalarize(x, exp, [this](Value *x, Value *exp) {
-    return CreateIntrinsic(Intrinsic::amdgcn_ldexp, x->getType(), {x, exp});
+    Value *ldexp = CreateIntrinsic(Intrinsic::amdgcn_ldexp, x->getType(), {x, exp});
+    if (x->getType()->getScalarType()->isDoubleTy()) {
+      // NOTE: If LDEXP result is a denormal, we can flush it to zero. This is allowed. For double type, LDEXP
+      // instruction does mantissa rounding instead of truncation, which is not expected by SPIR-V spec.
+      auto exp = CreateExtractExponent(ldexp);
+      // Exponent < DBL_MIN_EXP is denormal
+      ldexp = CreateSelect(CreateICmpSLT(exp, ConstantInt::get(exp->getType(), DBL_MIN_EXP)),
+                           ConstantFP::get(x->getType(), 0.0), ldexp);
+    }
+    return ldexp;
   });
   result->setName(instName);
   return result;
@@ -791,7 +857,7 @@ Value *ArithBuilder::CreateNormalizeVector(Value *x, const Twine &instName) {
 
   // For a vector, divide by the length.
   Value *dot = CreateDotProduct(x, x);
-  Value *sqrt = CreateIntrinsic(Intrinsic::sqrt, dot->getType(), dot);
+  Value *sqrt = CreateSqrt(dot);
   Value *rsq = CreateFDiv(ConstantFP::get(sqrt->getType(), 1.0), sqrt);
   // We use fmul.legacy for float so that a zero vector is normalized to a zero vector,
   // rather than NaNs. We must scalarize it ourselves.
@@ -854,7 +920,7 @@ Value *ArithBuilder::CreateRefract(Value *i, Value *n, Value *eta, const Twine &
   Value *e2 = CreateFMul(eta, eta);
   Value *e3 = CreateFMul(e1, e2);
   Value *k = CreateFSub(one, e3);
-  Value *kSqrt = CreateUnaryIntrinsic(Intrinsic::sqrt, k);
+  Value *kSqrt = CreateSqrt(k);
   Value *etaDot = CreateFMul(eta, dot);
   Value *innt = CreateFAdd(etaDot, kSqrt);
 

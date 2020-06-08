@@ -92,8 +92,8 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "exp";
   case Log:
     return "log";
-  case InverseSqrt:
-    return "inverse.sqrt";
+  case Sqrt:
+    return "sqrt";
   case SAbs:
     return "sabs";
   case FSign:
@@ -609,12 +609,12 @@ Value *BuilderRecorder::CreateLog(Value *x, const Twine &instName) {
 }
 
 // =====================================================================================================================
-// Create inverse square root operation
+// Create square root operation
 //
 // @param x : Input value X
 // @param instName : Name to give final instruction
-Value *BuilderRecorder::CreateInverseSqrt(Value *x, const Twine &instName) {
-  return record(InverseSqrt, x->getType(), x, instName);
+Value *BuilderRecorder::CreateSqrt(Value *x, const Twine &instName) {
+  return record(Sqrt, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
@@ -1860,7 +1860,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Cosh:
     case Determinant:
     case Exp:
-    case InverseSqrt:
+    case Sqrt:
     case Log:
     case MatrixInverse:
     case Opcode::CrossProduct:
