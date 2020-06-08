@@ -96,7 +96,7 @@ private:
   PipelineShaders *m_pipelineShaders; // Pipeline shaders
   PipelineState *m_pipelineState;     // Pipeline state
 
-  std::unordered_set<llvm::CallInst *> m_deadCalls; // Dead calls
+  std::vector<llvm::CallInst *> m_deadCalls; // Dead calls
 
   std::unordered_set<unsigned> m_activeInputLocs;      // Locations of active generic inputs
   std::unordered_set<unsigned> m_activeInputBuiltIns;  // IDs of active built-in inputs
