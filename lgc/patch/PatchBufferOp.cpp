@@ -424,23 +424,18 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
     // Extract element 2 which is the NUM_RECORDS field from the buffer descriptor.
     Value *const bufferDesc = m_replacementMap[pointer].first;
     Value *numRecords = m_builder->CreateExtractElement(bufferDesc, 2);
+    Value *offset = callInst.getArgOperand(1);
 
-    // The result is 0 for a null buffer descriptor
+    // If null descriptors are allowed, we must guarantee a 0 result for a null buffer descriptor.
+    //
+    // What we implement here is in fact more robust: ensure that the subtraction of the offset is clamped to 0.
+    // The backend should be able to achieve this with a single additional ALU instruction (e.g. s_max_u32).
     if (m_pipelineState->getOptions().allowNullDescriptor) {
-      // Check if the buffer descriptor all bits 0
-      Value *const descIcmpVec = m_builder->CreateICmpEQ(bufferDesc, Constant::getNullValue(bufferDesc->getType()));
-      Value *isNullDesc = m_builder->CreateExtractElement(descIcmpVec, uint64_t(0));
-      const unsigned elemCount =
-          m_pipelineState->getLgcContext()->getTargetInfo().getGpuProperty().descriptorSizeBuffer / sizeof(unsigned);
-      for (unsigned elemIdx = 1; elemIdx != elemCount; ++elemIdx) {
-        Value *elem = m_builder->CreateExtractElement(descIcmpVec, elemIdx);
-        isNullDesc = m_builder->CreateAnd(isNullDesc, elem);
-      }
-      Value *offset = callInst.getArgOperand(1);
-
-      numRecords =
-          m_builder->CreateSelect(isNullDesc, m_builder->getInt32(0), m_builder->CreateSub(numRecords, offset));
+      Value *const underflow = m_builder->CreateICmpUGT(offset, numRecords);
+      numRecords = m_builder->CreateSelect(underflow, offset, numRecords);
     }
+
+    numRecords = m_builder->CreateSub(numRecords, offset);
 
     // Record the call instruction so we remember to delete it later.
     m_replacementMap[&callInst] = std::make_pair(nullptr, nullptr);
