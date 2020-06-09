@@ -49,7 +49,6 @@ enum NggLdsRegionType {
                               //   position data in NGG non pass-through mode)
   LdsRegionPosData,           // Position data to export
   LdsRegionDrawFlag,          // Draw flag indicating whether the vertex survives
-  LdsRegionPrimCountInWaves,  // Primitive count accumulated per wave (8 potential waves) and per sub-group
   LdsRegionVertCountInWaves,  // Vertex count accumulated per wave (8 potential waves) and per sub-group
   LdsRegionCullDistance,      // Aggregated sign value of cull distance (bitmask)
 

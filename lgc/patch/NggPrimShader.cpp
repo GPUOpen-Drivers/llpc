@@ -778,10 +778,8 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     //     br label %.endWriteDrawFlag
     //
     // .endWriteDrawFlag:
-    // <if (vertexCompact)>
-    // [
     //     call void @llvm.amdgcn.s.barrier()
-    // ]
+    //
     //     %drawMask = call i64 @llpc.subgroup.ballot(i1 %drawFlag)
     //     %drawCount = call i64 @llvm.ctpop.i64(i64 %drawMask)
     //     %hasSurviveDraw = icmp ne i64 %drawCount, 0
@@ -797,9 +795,6 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     //
     // .endAccThreadCount:
     //     call void @llvm.amdgcn.s.barrier()
-    //
-    // <if (vertexCompact)>
-    // [
     //     br lable %.readThreadCount
     //
     // .readThreadCount:
@@ -824,39 +819,14 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     //
     //     %firstWaveInSubgroup = icmp eq i32 %waveIdInSubgroup, 0
     //     br i1 %firstWaveInSubgroup, label %.allocreq, label %.endAllocReq
-    // ]
-    // <else>
-    // [
-    //     %firstThreadInWave = icmp eq i32 %threadIdInWave, 0
-    //     br i1 %firstThreadInWave, label %.readThreadCount, label %.endReadThreadCount
     //
-    // .readThreadCount:
-    //     %primCount = ... (read LDS region, primitive count in waves)
-    //     %threadCountInWaves = %primCount
-    //
-    //     br label %.endReadThreadCount
-    //
-    // .endReadThreadCount:
-    //     %primCount = phi i32 [ primCountInSubgroup, %.endAccPrimCount ], [ %primCount, %.readThreadCount ]
-    //     %hasSurvivePrim = icmp ne i32 %primCount, 0
-    //     %primCountInSubgroup =
-    //         select i1 %hasSurvivePrim, i32 %primCountInSubgroup, i32 %fullyCulledThreadCount
-    //     %hasSurvivePrim = icmp ne i32 %primCountInSubgroup, 0
-    //     %vertCountInSubgroup =
-    //         select i1 %hasSurvivePrim, i32 %vertCountInSubgroup, i32 %fullyCulledThreadCount
-    //
-    //     %firstWaveInSubgroup = icmp eq i32 %waveIdInSubgroup, 0
-    //     br i1 %firstWaveInSubgroup, label %.allocreq, label %.endAllocReq
-    // ]
     // .allocReq:
     //     ; Do parameter cache (PC) alloc request: s_sendmsg(GS_ALLOC_REQ, ...)
     //     br label %.endAllocReq
     //
     // .endAlloReq:
-    // <if (vertexCompact)>
-    // [
     //     call void @llvm.amdgcn.s.barrier()
-    // ]
+    //
     //     %noSurviveThread = icmp eq %threadCountInWaves, 0
     //     br i1 %noSurviveThread, label %.earlyExit, label %.noEarlyExit
     //
@@ -899,8 +869,6 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     //     ret void
     // }
 
-    const bool vertexCompact = (m_nggControl->compactMode == NggCompactVertices);
-
     // Thread count when the entire sub-group is fully culled
     const unsigned fullyCulledThreadCount =
         m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups ? 1 : 0;
@@ -940,19 +908,9 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     auto accThreadCountBlock = createBlock(entryPoint, ".accThreadCount");
     auto endAccThreadCountBlock = createBlock(entryPoint, ".endAccThreadCount");
 
-    // NOTE: Those basic blocks are conditionally created on the basis of actual NGG compaction mode.
-    BasicBlock *readThreadCountBlock = nullptr;
-    BasicBlock *writeCompactDataBlock = nullptr;
-    BasicBlock *endReadThreadCountBlock = nullptr;
-
-    if (vertexCompact) {
-      readThreadCountBlock = createBlock(entryPoint, ".readThreadCount");
-      writeCompactDataBlock = createBlock(entryPoint, ".writeCompactData");
-      endReadThreadCountBlock = createBlock(entryPoint, ".endReadThreadCount");
-    } else {
-      readThreadCountBlock = createBlock(entryPoint, ".readThreadCount");
-      endReadThreadCountBlock = createBlock(entryPoint, ".endReadThreadCount");
-    }
+    auto readThreadCountBlock = createBlock(entryPoint, ".readThreadCount");
+    auto writeCompactDataBlock = createBlock(entryPoint, ".writeCompactData");
+    auto endReadThreadCountBlock = createBlock(entryPoint, ".endReadThreadCount");
 
     auto allocReqBlock = createBlock(entryPoint, ".allocReq");
     auto endAllocReqBlock = createBlock(entryPoint, ".endAllocReq");
@@ -1071,8 +1029,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(zeroThreadCountBlock);
 
-      unsigned regionStart =
-          m_ldsManager->getLdsRegionStart(vertexCompact ? LdsRegionVertCountInWaves : LdsRegionPrimCountInWaves);
+      unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionVertCountInWaves);
 
       auto zero = m_builder->getInt32(0);
 
@@ -1137,7 +1094,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
       // NOTE: For vertex compaction, we have to run ES for twice (get vertex position data and
       // get other exported data).
-      const auto entryName = separateExp || vertexCompact ? lgcName::NggEsEntryVariantPos : lgcName::NggEsEntryVariant;
+      const auto entryName = separateExp ? lgcName::NggEsEntryVariantPos : lgcName::NggEsEntryVariant;
 
       runEsOrEsVariant(module, entryName, entryPoint->arg_begin(), false, &expDataSet, writePosDataBlock);
 
@@ -1339,14 +1296,12 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
-      if (vertexCompact) {
-        unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionDrawFlag);
+      unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionDrawFlag);
 
-        auto ldsOffset = m_builder->CreateAdd(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(regionStart));
+      auto ldsOffset = m_builder->CreateAdd(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(regionStart));
 
-        drawFlag = m_ldsManager->readValueFromLds(m_builder->getInt8Ty(), ldsOffset);
-        drawFlag = m_builder->CreateTrunc(drawFlag, m_builder->getInt1Ty());
-      }
+      drawFlag = m_ldsManager->readValueFromLds(m_builder->getInt8Ty(), ldsOffset);
+      drawFlag = m_builder->CreateTrunc(drawFlag, m_builder->getInt1Ty());
 
       auto drawMask = doSubgroupBallot(drawFlag);
 
@@ -1357,16 +1312,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
           m_builder->CreateSub(m_builder->getInt32(waveCountInSubgroup), m_nggFactor.waveIdInSubgroup);
       auto threadValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, threadIdUpbound);
 
-      Value *primCountAcc = nullptr;
-      if (vertexCompact)
-        primCountAcc = threadValid;
-      else {
-        auto hasSurviveDraw = m_builder->CreateICmpNE(drawCount, m_builder->getInt32(0));
-
-        primCountAcc = m_builder->CreateAnd(hasSurviveDraw, threadValid);
-      }
-
-      m_builder->CreateCondBr(primCountAcc, accThreadCountBlock, endAccThreadCountBlock);
+      m_builder->CreateCondBr(threadValid, accThreadCountBlock, endAccThreadCountBlock);
     }
 
     // Construct ".accThreadCount" block
@@ -1377,8 +1323,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(1));
       ldsOffset = m_builder->CreateShl(ldsOffset, 2);
 
-      unsigned regionStart =
-          m_ldsManager->getLdsRegionStart(vertexCompact ? LdsRegionVertCountInWaves : LdsRegionPrimCountInWaves);
+      unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionVertCountInWaves);
 
       ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
       m_ldsManager->atomicOpWithLds(AtomicRMWInst::Add, drawCount, ldsOffset);
@@ -1391,200 +1336,138 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       m_builder->SetInsertPoint(endAccThreadCountBlock);
 
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
-      if (vertexCompact)
-        m_builder->CreateBr(readThreadCountBlock);
-      else {
-        auto firstThreadInWave = m_builder->CreateICmpEQ(m_nggFactor.threadIdInWave, m_builder->getInt32(0));
-
-        m_builder->CreateCondBr(firstThreadInWave, readThreadCountBlock, endReadThreadCountBlock);
-      }
+      m_builder->CreateBr(readThreadCountBlock);
     }
 
+    // Construct ".readThreadCount" block
     Value *threadCountInWaves = nullptr;
-    if (vertexCompact) {
-      // Construct ".readThreadCount" block
-      Value *vertCountInWaves = nullptr;
-      Value *vertCountInPrevWaves = nullptr;
-      {
-        m_builder->SetInsertPoint(readThreadCountBlock);
+    Value *vertCountInWaves = nullptr;
+    Value *vertCountInPrevWaves = nullptr;
+    {
+      m_builder->SetInsertPoint(readThreadCountBlock);
 
-        unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionVertCountInWaves);
+      unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionVertCountInWaves);
 
-        // The dword following dwords for all waves stores the vertex count of the entire sub-group
-        Value *ldsOffset = m_builder->getInt32(regionStart + waveCountInSubgroup * SizeOfDword);
-        vertCountInWaves = m_ldsManager->readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
+      // The dword following dwords for all waves stores the vertex count of the entire sub-group
+      Value *ldsOffset = m_builder->getInt32(regionStart + waveCountInSubgroup * SizeOfDword);
+      vertCountInWaves = m_ldsManager->readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
 
-        // NOTE: We promote vertex count in waves to SGPR since it is treated as an uniform value.
-        vertCountInWaves = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertCountInWaves);
-        threadCountInWaves = vertCountInWaves;
+      // NOTE: We promote vertex count in waves to SGPR since it is treated as an uniform value.
+      vertCountInWaves = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertCountInWaves);
+      threadCountInWaves = vertCountInWaves;
 
-        // Get vertex count for all waves prior to this wave
-        ldsOffset = m_builder->CreateShl(m_nggFactor.waveIdInSubgroup, 2);
-        ldsOffset = m_builder->CreateAdd(m_builder->getInt32(regionStart), ldsOffset);
+      // Get vertex count for all waves prior to this wave
+      ldsOffset = m_builder->CreateShl(m_nggFactor.waveIdInSubgroup, 2);
+      ldsOffset = m_builder->CreateAdd(m_builder->getInt32(regionStart), ldsOffset);
 
-        vertCountInPrevWaves = m_ldsManager->readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
+      vertCountInPrevWaves = m_ldsManager->readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
 
-        auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
+      auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
 
-        auto compactDataWrite = m_builder->CreateAnd(drawFlag, vertValid);
+      auto compactDataWrite = m_builder->CreateAnd(drawFlag, vertValid);
 
-        m_builder->CreateCondBr(compactDataWrite, writeCompactDataBlock, endReadThreadCountBlock);
+      m_builder->CreateCondBr(compactDataWrite, writeCompactDataBlock, endReadThreadCountBlock);
+    }
+
+    // Construct ".writeCompactData" block
+    {
+      m_builder->SetInsertPoint(writeCompactDataBlock);
+
+      Value *drawMask = doSubgroupBallot(drawFlag);
+      drawMask = m_builder->CreateBitCast(drawMask, VectorType::get(Type::getInt32Ty(*m_context), 2));
+
+      auto drawMaskLow = m_builder->CreateExtractElement(drawMask, static_cast<uint64_t>(0));
+
+      Value *compactThreadIdInSubrgoup =
+          m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {drawMaskLow, m_builder->getInt32(0)});
+
+      if (waveSize == 64) {
+        auto drawMaskHigh = m_builder->CreateExtractElement(drawMask, 1);
+
+        compactThreadIdInSubrgoup =
+            m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {drawMaskHigh, compactThreadIdInSubrgoup});
       }
 
-      // Construct ".writeCompactData" block
-      {
-        m_builder->SetInsertPoint(writeCompactDataBlock);
+      compactThreadIdInSubrgoup = m_builder->CreateAdd(vertCountInPrevWaves, compactThreadIdInSubrgoup);
 
-        Value *drawMask = doSubgroupBallot(drawFlag);
-        drawMask = m_builder->CreateBitCast(drawMask, VectorType::get(Type::getInt32Ty(*m_context), 2));
+      // Write vertex position data to LDS
+      for (const auto &expData : expDataSet) {
+        if (expData.target == EXP_TARGET_POS_0) {
+          const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionPosData);
 
-        auto drawMaskLow = m_builder->CreateExtractElement(drawMask, static_cast<uint64_t>(0));
+          Value *ldsOffset = m_builder->CreateMul(compactThreadIdInSubrgoup, m_builder->getInt32(SizeOfVec4));
+          ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
 
-        Value *compactThreadIdInSubrgoup =
-            m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {drawMaskLow, m_builder->getInt32(0)});
+          m_ldsManager->writeValueToLds(expData.expValue, ldsOffset);
 
-        if (waveSize == 64) {
-          auto drawMaskHigh = m_builder->CreateExtractElement(drawMask, 1);
+          break;
+        }
+      }
 
-          compactThreadIdInSubrgoup =
-              m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {drawMaskHigh, compactThreadIdInSubrgoup});
+      // Write thread ID in sub-group to LDS
+      Value *compactThreadId = m_builder->CreateTrunc(compactThreadIdInSubrgoup, m_builder->getInt8Ty());
+      writePerThreadDataToLds(compactThreadId, m_nggFactor.threadIdInSubgroup, LdsRegionVertThreadIdMap);
+
+      if (hasTs) {
+        // Write X/Y of tessCoord (U/V) to LDS
+        if (resUsage->builtInUsage.tes.tessCoord) {
+          writePerThreadDataToLds(tessCoordX, compactThreadIdInSubrgoup, LdsRegionCompactTessCoordX);
+          writePerThreadDataToLds(tessCoordY, compactThreadIdInSubrgoup, LdsRegionCompactTessCoordY);
         }
 
-        compactThreadIdInSubrgoup = m_builder->CreateAdd(vertCountInPrevWaves, compactThreadIdInSubrgoup);
+        // Write relative patch ID to LDS
+        writePerThreadDataToLds(relPatchId, compactThreadIdInSubrgoup, LdsRegionCompactRelPatchId);
 
-        // Write vertex position data to LDS
-        for (const auto &expData : expDataSet) {
-          if (expData.target == EXP_TARGET_POS_0) {
-            const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionPosData);
+        // Write patch ID to LDS
+        if (resUsage->builtInUsage.tes.primitiveId)
+          writePerThreadDataToLds(patchId, compactThreadIdInSubrgoup, LdsRegionCompactPatchId);
+      } else {
+        // Write vertex ID to LDS
+        if (resUsage->builtInUsage.vs.vertexIndex)
+          writePerThreadDataToLds(vertexId, compactThreadIdInSubrgoup, LdsRegionCompactVertexId);
 
-            Value *ldsOffset = m_builder->CreateMul(compactThreadIdInSubrgoup, m_builder->getInt32(SizeOfVec4));
-            ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
+        // Write instance ID to LDS
+        if (resUsage->builtInUsage.vs.instanceIndex)
+          writePerThreadDataToLds(instanceId, compactThreadIdInSubrgoup, LdsRegionCompactInstanceId);
 
-            m_ldsManager->writeValueToLds(expData.expValue, ldsOffset);
-
-            break;
-          }
+        // Write primitive ID to LDS
+        if (resUsage->builtInUsage.vs.primitiveId) {
+          assert(m_nggFactor.primitiveId);
+          writePerThreadDataToLds(m_nggFactor.primitiveId, compactThreadIdInSubrgoup, LdsRegionCompactPrimId);
         }
-
-        // Write thread ID in sub-group to LDS
-        Value *compactThreadId = m_builder->CreateTrunc(compactThreadIdInSubrgoup, m_builder->getInt8Ty());
-        writePerThreadDataToLds(compactThreadId, m_nggFactor.threadIdInSubgroup, LdsRegionVertThreadIdMap);
-
-        if (hasTs) {
-          // Write X/Y of tessCoord (U/V) to LDS
-          if (resUsage->builtInUsage.tes.tessCoord) {
-            writePerThreadDataToLds(tessCoordX, compactThreadIdInSubrgoup, LdsRegionCompactTessCoordX);
-            writePerThreadDataToLds(tessCoordY, compactThreadIdInSubrgoup, LdsRegionCompactTessCoordY);
-          }
-
-          // Write relative patch ID to LDS
-          writePerThreadDataToLds(relPatchId, compactThreadIdInSubrgoup, LdsRegionCompactRelPatchId);
-
-          // Write patch ID to LDS
-          if (resUsage->builtInUsage.tes.primitiveId)
-            writePerThreadDataToLds(patchId, compactThreadIdInSubrgoup, LdsRegionCompactPatchId);
-        } else {
-          // Write vertex ID to LDS
-          if (resUsage->builtInUsage.vs.vertexIndex)
-            writePerThreadDataToLds(vertexId, compactThreadIdInSubrgoup, LdsRegionCompactVertexId);
-
-          // Write instance ID to LDS
-          if (resUsage->builtInUsage.vs.instanceIndex)
-            writePerThreadDataToLds(instanceId, compactThreadIdInSubrgoup, LdsRegionCompactInstanceId);
-
-          // Write primitive ID to LDS
-          if (resUsage->builtInUsage.vs.primitiveId) {
-            assert(m_nggFactor.primitiveId);
-            writePerThreadDataToLds(m_nggFactor.primitiveId, compactThreadIdInSubrgoup, LdsRegionCompactPrimId);
-          }
-        }
-
-        m_builder->CreateBr(endReadThreadCountBlock);
       }
 
-      // Construct ".endReadThreadCount" block
-      {
-        m_builder->SetInsertPoint(endReadThreadCountBlock);
+      m_builder->CreateBr(endReadThreadCountBlock);
+    }
 
-        Value *hasSurviveVert = m_builder->CreateICmpNE(vertCountInWaves, m_builder->getInt32(0));
+    // Construct ".endReadThreadCount" block
+    {
+      m_builder->SetInsertPoint(endReadThreadCountBlock);
 
-        Value *primCountInSubgroup = m_builder->CreateSelect(hasSurviveVert, m_nggFactor.primCountInSubgroup,
-                                                             m_builder->getInt32(fullyCulledThreadCount));
+      Value *hasSurviveVert = m_builder->CreateICmpNE(vertCountInWaves, m_builder->getInt32(0));
 
-        // NOTE: Here, we have to promote revised primitive count in sub-group to SGPR since it is treated
-        // as an uniform value later. This is similar to the provided primitive count in sub-group that is
-        // a system value.
-        primCountInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primCountInSubgroup);
+      Value *primCountInSubgroup = m_builder->CreateSelect(hasSurviveVert, m_nggFactor.primCountInSubgroup,
+                                                           m_builder->getInt32(fullyCulledThreadCount));
 
-        Value *vertCountInSubgroup =
-            m_builder->CreateSelect(hasSurviveVert, vertCountInWaves, m_builder->getInt32(fullyCulledThreadCount));
+      // NOTE: Here, we have to promote revised primitive count in sub-group to SGPR since it is treated
+      // as an uniform value later. This is similar to the provided primitive count in sub-group that is
+      // a system value.
+      primCountInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primCountInSubgroup);
 
-        // NOTE: Here, we have to promote revised vertex count in sub-group to SGPR since it is treated as
-        // an uniform value later, similar to what we have done for the revised primitive count in
-        // sub-group.
-        vertCountInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertCountInSubgroup);
+      Value *vertCountInSubgroup =
+          m_builder->CreateSelect(hasSurviveVert, vertCountInWaves, m_builder->getInt32(fullyCulledThreadCount));
 
-        m_nggFactor.primCountInSubgroup = primCountInSubgroup;
-        m_nggFactor.vertCountInSubgroup = vertCountInSubgroup;
+      // NOTE: Here, we have to promote revised vertex count in sub-group to SGPR since it is treated as
+      // an uniform value later, similar to what we have done for the revised primitive count in
+      // sub-group.
+      vertCountInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertCountInSubgroup);
 
-        auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
+      m_nggFactor.primCountInSubgroup = primCountInSubgroup;
+      m_nggFactor.vertCountInSubgroup = vertCountInSubgroup;
 
-        m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
-      }
-    } else {
-      // Construct ".readThreadCount" block
-      Value *primCountInWaves = nullptr;
-      {
-        m_builder->SetInsertPoint(readThreadCountBlock);
+      auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
 
-        unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionPrimCountInWaves);
-
-        // The dword following dwords for all waves stores the primitive count of the entire sub-group
-        auto ldsOffset = m_builder->getInt32(regionStart + waveCountInSubgroup * SizeOfDword);
-        primCountInWaves = m_ldsManager->readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
-
-        m_builder->CreateBr(endReadThreadCountBlock);
-      }
-
-      // Construct ".endReadThreadCount" block
-      {
-        m_builder->SetInsertPoint(endReadThreadCountBlock);
-
-        Value *primCount = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
-
-        static_cast<PHINode *>(primCount)->addIncoming(m_nggFactor.primCountInSubgroup, endAccThreadCountBlock);
-        static_cast<PHINode *>(primCount)->addIncoming(primCountInWaves, readThreadCountBlock);
-
-        // NOTE: We promote primitive count in waves to SGPR since it is treated as an uniform value.
-        primCount = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primCount);
-        threadCountInWaves = primCount;
-
-        Value *hasSurvivePrim = m_builder->CreateICmpNE(primCount, m_builder->getInt32(0));
-
-        Value *primCountInSubgroup = m_builder->CreateSelect(hasSurvivePrim, m_nggFactor.primCountInSubgroup,
-                                                             m_builder->getInt32(fullyCulledThreadCount));
-
-        // NOTE: Here, we have to promote revised primitive count in sub-group to SGPR since it is treated
-        // as an uniform value later. This is similar to the provided primitive count in sub-group that is
-        // a system value.
-        primCountInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primCountInSubgroup);
-
-        Value *vertCountInSubgroup = m_builder->CreateSelect(hasSurvivePrim, m_nggFactor.vertCountInSubgroup,
-                                                             m_builder->getInt32(fullyCulledThreadCount));
-
-        // NOTE: Here, we have to promote revised vertex count in sub-group to SGPR since it is treated as
-        // an uniform value later, similar to what we have done for the revised primitive count in
-        // sub-group.
-        vertCountInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertCountInSubgroup);
-
-        m_nggFactor.primCountInSubgroup = primCountInSubgroup;
-        m_nggFactor.vertCountInSubgroup = vertCountInSubgroup;
-
-        auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
-
-        m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
-      }
+      m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
     }
 
     // Construct ".allocReq" block
@@ -1630,7 +1513,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(expPrimBlock);
 
-      doPrimitiveExportWithoutGs(vertexCompact ? cullFlag : nullptr);
+      doPrimitiveExportWithoutGs(cullFlag);
       m_builder->CreateBr(endExpPrimBlock);
     }
 
@@ -1647,29 +1530,26 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(expVertPosBlock);
 
-      // NOTE: For vertex compaction, we have to run ES to get exported data once again.
-      if (vertexCompact) {
-        expDataSet.clear();
+      // NOTE: We have to run ES to get exported data once again.
+      expDataSet.clear();
 
-        runEsOrEsVariant(module, lgcName::NggEsEntryVariant, entryPoint->arg_begin(), true, &expDataSet,
-                         expVertPosBlock);
+      runEsOrEsVariant(module, lgcName::NggEsEntryVariant, entryPoint->arg_begin(), true, &expDataSet, expVertPosBlock);
 
-        // For vertex position, we get the exported data from LDS
-        for (auto &expData : expDataSet) {
-          if (expData.target == EXP_TARGET_POS_0) {
-            const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionPosData);
-            assert(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
+      // For vertex position, we get the exported data from LDS
+      for (auto &expData : expDataSet) {
+        if (expData.target == EXP_TARGET_POS_0) {
+          const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionPosData);
+          assert(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
 
-            auto ldsOffset = m_builder->CreateMul(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(SizeOfVec4));
-            ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
+          auto ldsOffset = m_builder->CreateMul(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(SizeOfVec4));
+          ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
 
-            // Use 128-bit LDS load
-            auto expValue =
-                m_ldsManager->readValueFromLds(VectorType::get(Type::getFloatTy(*m_context), 4), ldsOffset, true);
-            expData.expValue = expValue;
+          // Use 128-bit LDS load
+          auto expValue =
+              m_ldsManager->readValueFromLds(VectorType::get(Type::getFloatTy(*m_context), 4), ldsOffset, true);
+          expData.expValue = expValue;
 
-            break;
-          }
+          break;
         }
       }
 
@@ -1700,16 +1580,14 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(endExpVertPosBlock);
 
-      if (vertexCompact) {
-        auto undef = UndefValue::get(VectorType::get(Type::getFloatTy(*m_context), 4));
-        for (auto &expData : expDataSet) {
-          PHINode *expValue = m_builder->CreatePHI(VectorType::get(Type::getFloatTy(*m_context), 4), 2);
+      auto undef = UndefValue::get(VectorType::get(Type::getFloatTy(*m_context), 4));
+      for (auto &expData : expDataSet) {
+        PHINode *expValue = m_builder->CreatePHI(VectorType::get(Type::getFloatTy(*m_context), 4), 2);
 
-          expValue->addIncoming(expData.expValue, expVertPosBlock);
-          expValue->addIncoming(undef, endExpPrimBlock);
+        expValue->addIncoming(expData.expValue, expVertPosBlock);
+        expValue->addIncoming(undef, endExpPrimBlock);
 
-          expData.expValue = expValue; // Update the exportd data
-        }
+        expData.expValue = expValue; // Update the exportd data
       }
 
       m_builder->CreateCondBr(vertExp, expVertParamBlock, endExpVertParamBlock);
@@ -1718,17 +1596,6 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     // Construct ".expVertParam" block
     {
       m_builder->SetInsertPoint(expVertParamBlock);
-
-      // NOTE: For vertex compaction, ES must have been run in ".expVertPos" block.
-      if (!vertexCompact) {
-        if (separateExp) {
-          // Should run ES variant to get exported parameter data
-          expDataSet.clear();
-
-          runEsOrEsVariant(module, lgcName::NggEsEntryVariantParam, entryPoint->arg_begin(), false, &expDataSet,
-                           expVertParamBlock);
-        }
-      }
 
       for (const auto &expData : expDataSet) {
         if (expData.target >= EXP_TARGET_PARAM_0 && expData.target <= EXP_TARGET_PARAM_31) {
@@ -2346,8 +2213,6 @@ void NggPrimShader::doParamCacheAllocRequest() {
 //
 // @param cullFlag : Cull flag indicating whether this primitive has been culled (could be null)
 void NggPrimShader::doPrimitiveExportWithoutGs(Value *cullFlag) {
-  const bool vertexCompact = (m_nggControl->compactMode == NggCompactVertices);
-
   Value *primData = nullptr;
 
   // Primitive data layout [31:0]
@@ -2385,66 +2250,64 @@ void NggPrimShader::doPrimitiveExportWithoutGs(Value *cullFlag) {
                                                   });
     Value *vertexId2 = m_builder->CreateLShr(esGsOffset2, 2);
 
-    if (vertexCompact) {
-      // NOTE: If the current vertex count in sub-group is less than the original value, then there must be
-      // vertex culling. When vertex culling occurs, the vertex IDs should be fetched from LDS (compacted).
-      auto vertCountInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                            {
-                                                                m_nggFactor.mergedGroupInfo,
-                                                                m_builder->getInt32(12),
-                                                                m_builder->getInt32(9),
-                                                            });
-      auto vertCulled = m_builder->CreateICmpULT(m_nggFactor.vertCountInSubgroup, vertCountInSubgroup);
+    // NOTE: If the current vertex count in sub-group is less than the original value, then there must be
+    // vertex culling. When vertex culling occurs, the vertex IDs should be fetched from LDS (compacted).
+    auto vertCountInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
+                                                          {
+                                                              m_nggFactor.mergedGroupInfo,
+                                                              m_builder->getInt32(12),
+                                                              m_builder->getInt32(9),
+                                                          });
+    auto vertCulled = m_builder->CreateICmpULT(m_nggFactor.vertCountInSubgroup, vertCountInSubgroup);
 
-      auto expPrimBlock = m_builder->GetInsertBlock();
+    auto expPrimBlock = m_builder->GetInsertBlock();
 
-      auto readCompactIdBlock = createBlock(expPrimBlock->getParent(), "readCompactId");
-      readCompactIdBlock->moveAfter(expPrimBlock);
+    auto readCompactIdBlock = createBlock(expPrimBlock->getParent(), "readCompactId");
+    readCompactIdBlock->moveAfter(expPrimBlock);
 
-      auto expPrimContBlock = createBlock(expPrimBlock->getParent(), "expPrimCont");
-      expPrimContBlock->moveAfter(readCompactIdBlock);
+    auto expPrimContBlock = createBlock(expPrimBlock->getParent(), "expPrimCont");
+    expPrimContBlock->moveAfter(readCompactIdBlock);
 
-      m_builder->CreateCondBr(vertCulled, readCompactIdBlock, expPrimContBlock);
+    m_builder->CreateCondBr(vertCulled, readCompactIdBlock, expPrimContBlock);
 
-      // Construct ".readCompactId" block
-      Value *compactVertexId0 = nullptr;
-      Value *compactVertexId1 = nullptr;
-      Value *compactVertexId2 = nullptr;
-      {
-        m_builder->SetInsertPoint(readCompactIdBlock);
+    // Construct ".readCompactId" block
+    Value *compactVertexId0 = nullptr;
+    Value *compactVertexId1 = nullptr;
+    Value *compactVertexId2 = nullptr;
+    {
+      m_builder->SetInsertPoint(readCompactIdBlock);
 
-        compactVertexId0 = readPerThreadDataFromLds(m_builder->getInt8Ty(), vertexId0, LdsRegionVertThreadIdMap);
-        compactVertexId0 = m_builder->CreateZExt(compactVertexId0, m_builder->getInt32Ty());
+      compactVertexId0 = readPerThreadDataFromLds(m_builder->getInt8Ty(), vertexId0, LdsRegionVertThreadIdMap);
+      compactVertexId0 = m_builder->CreateZExt(compactVertexId0, m_builder->getInt32Ty());
 
-        compactVertexId1 = readPerThreadDataFromLds(m_builder->getInt8Ty(), vertexId1, LdsRegionVertThreadIdMap);
-        compactVertexId1 = m_builder->CreateZExt(compactVertexId1, m_builder->getInt32Ty());
+      compactVertexId1 = readPerThreadDataFromLds(m_builder->getInt8Ty(), vertexId1, LdsRegionVertThreadIdMap);
+      compactVertexId1 = m_builder->CreateZExt(compactVertexId1, m_builder->getInt32Ty());
 
-        compactVertexId2 = readPerThreadDataFromLds(m_builder->getInt8Ty(), vertexId2, LdsRegionVertThreadIdMap);
-        compactVertexId2 = m_builder->CreateZExt(compactVertexId2, m_builder->getInt32Ty());
+      compactVertexId2 = readPerThreadDataFromLds(m_builder->getInt8Ty(), vertexId2, LdsRegionVertThreadIdMap);
+      compactVertexId2 = m_builder->CreateZExt(compactVertexId2, m_builder->getInt32Ty());
 
-        m_builder->CreateBr(expPrimContBlock);
-      }
+      m_builder->CreateBr(expPrimContBlock);
+    }
 
-      // Construct part of ".expPrimCont" block (phi nodes)
-      {
-        m_builder->SetInsertPoint(expPrimContBlock);
+    // Construct part of ".expPrimCont" block (phi nodes)
+    {
+      m_builder->SetInsertPoint(expPrimContBlock);
 
-        auto vertexId0Phi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
-        vertexId0Phi->addIncoming(compactVertexId0, readCompactIdBlock);
-        vertexId0Phi->addIncoming(vertexId0, expPrimBlock);
+      auto vertexId0Phi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
+      vertexId0Phi->addIncoming(compactVertexId0, readCompactIdBlock);
+      vertexId0Phi->addIncoming(vertexId0, expPrimBlock);
 
-        auto vertexId1Phi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
-        vertexId1Phi->addIncoming(compactVertexId1, readCompactIdBlock);
-        vertexId1Phi->addIncoming(vertexId1, expPrimBlock);
+      auto vertexId1Phi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
+      vertexId1Phi->addIncoming(compactVertexId1, readCompactIdBlock);
+      vertexId1Phi->addIncoming(vertexId1, expPrimBlock);
 
-        auto vertexId2Phi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
-        vertexId2Phi->addIncoming(compactVertexId2, readCompactIdBlock);
-        vertexId2Phi->addIncoming(vertexId2, expPrimBlock);
+      auto vertexId2Phi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
+      vertexId2Phi->addIncoming(compactVertexId2, readCompactIdBlock);
+      vertexId2Phi->addIncoming(vertexId2, expPrimBlock);
 
-        vertexId0 = vertexId0Phi;
-        vertexId1 = vertexId1Phi;
-        vertexId2 = vertexId2Phi;
-      }
+      vertexId0 = vertexId0Phi;
+      vertexId1 = vertexId1Phi;
+      vertexId2 = vertexId2Phi;
     }
 
     primData = m_builder->CreateShl(vertexId2, 10);
@@ -2453,11 +2316,9 @@ void NggPrimShader::doPrimitiveExportWithoutGs(Value *cullFlag) {
     primData = m_builder->CreateShl(primData, 10);
     primData = m_builder->CreateOr(primData, vertexId0);
 
-    if (vertexCompact) {
-      assert(cullFlag); // Must not be null
-      const auto nullPrimVal = m_builder->getInt32(NullPrim);
-      primData = m_builder->CreateSelect(cullFlag, nullPrimVal, primData);
-    }
+    assert(cullFlag); // Must not be null
+    const auto nullPrimVal = m_builder->getInt32(NullPrim);
+    primData = m_builder->CreateSelect(cullFlag, nullPrimVal, primData);
   }
 
   auto undef = UndefValue::get(m_builder->getInt32Ty());
