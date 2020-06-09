@@ -1,0 +1,73 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -trim-debug-info=false -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: [[D1:![0-9]*]] = !DICompositeType(tag: DW_TAG_enumeration_type, name: "enum1", file: !{{[0-9]*}}, line: 1, baseType: [[D2:![0-9]*]], size: 32, flags: DIFlagEnumClass, elements: [[D3:![0-9]*]])
+; SHADERTEST: [[D2]] = !DIBasicType(name: "float", size: 32, encoding: DW_ATE_float)
+; SHADERTEST: [[D3]] = !{[[D4:![0-9]*]], [[D5:![0-9]*]]}
+; SHADERTEST: [[D4]] = !DIEnumerator(name: "value1", value: 0)
+; SHADERTEST: [[D5]] = !DIEnumerator(name: "value2", value: 1)
+; SHADERTEST: [[D6:![0-9]*]] = !DICompositeType(tag: DW_TAG_enumeration_type, name: "enum2", file: !{{[0-9]*}}, line: 1, size: 32, elements: [[D3]])
+; SHADERTEST: [[D7:![0-9]*]] = !DICompositeType(tag: DW_TAG_enumeration_type, name: "enum3", file: !{{[0-9]*}}, line: 1, size: 32, elements: [[D8:![0-9]*]])
+; SHADERTEST: [[D8]] = !{}
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+OpCapability Shader
+OpCapability Float16
+OpCapability Float64
+OpCapability Int16
+OpCapability Int64
+
+%DbgExt = OpExtInstImport "OpenCL.DebugInfo.100"
+%extinst = OpExtInstImport "GLSL.std.450"
+OpMemoryModel Logical GLSL450
+OpEntryPoint Vertex %main "main"
+
+%src = OpString "simple.hlsl"
+%code = OpString "main() {}"
+%float_name = OpString "float"
+%foo_name = OpString "foo"
+%main_name = OpString "main"
+%enum1_name = OpString "enum1"
+%enum2_name = OpString "enum2"
+%enum3_name = OpString "enum3"
+%enum_value1 = OpString "value1"
+%enum_value2 = OpString "value2"
+
+%void = OpTypeVoid
+%func = OpTypeFunction %void
+%u32 = OpTypeInt 32 0
+%f32 = OpTypeFloat 32
+%int_32 = OpConstant %u32 32
+%f32_ptr_function = OpTypePointer Function %f32
+%u32_0 = OpConstant %u32 0
+%u32_1 = OpConstant %u32 1
+
+%dbg_src = OpExtInst %void %DbgExt DebugSource %src %code
+%comp_unit = OpExtInst %void %DbgExt DebugCompilationUnit 2 4 %dbg_src HLSL
+%none = OpExtInst %void %DbgExt DebugInfoNone
+%null_expr = OpExtInst %void %DbgExt DebugExpression
+%float_info = OpExtInst %void %DbgExt DebugTypeBasic %float_name %int_32 Float
+%enum_info1 = OpExtInst %void %DbgExt DebugTypeEnum %enum1_name %float_info %dbg_src 1 1 %comp_unit %int_32 FlagIsPublic %u32_0 %enum_value1 %u32_1 %enum_value2
+%enum_info2 = OpExtInst %void %DbgExt DebugTypeEnum %enum2_name %none %dbg_src 1 1 %comp_unit %int_32 FlagIsPublic %u32_0 %enum_value1 %u32_1 %enum_value2
+%enum_info3 = OpExtInst %void %DbgExt DebugTypeEnum %enum3_name %none %dbg_src 1 1 %comp_unit %int_32 FlagIsPublic
+%func_info = OpExtInst %void %DbgExt DebugTypeFunction FlagIsProtected|FlagIsPrivate %void
+%main_info = OpExtInst %void %DbgExt DebugFunction %main_name %func_info %dbg_src 1 1 %comp_unit %main_name FlagIsProtected|FlagIsPrivate 1 %main
+%foo_info1 = OpExtInst %void %DbgExt DebugLocalVariable %foo_name %enum_info1 %dbg_src 1 10 %main_info FlagIsLocal
+%foo_info2 = OpExtInst %void %DbgExt DebugLocalVariable %foo_name %enum_info2 %dbg_src 1 10 %main_info FlagIsLocal
+%foo_info3 = OpExtInst %void %DbgExt DebugLocalVariable %foo_name %enum_info3 %dbg_src 1 10 %main_info FlagIsLocal
+
+%main = OpFunction %void None %func
+%main_entry = OpLabel
+
+%foo1 = OpVariable %f32_ptr_function Function
+%decl1 = OpExtInst %void %DbgExt DebugDeclare %foo_info1 %foo1 %null_expr
+%foo2 = OpVariable %f32_ptr_function Function
+%decl2 = OpExtInst %void %DbgExt DebugDeclare %foo_info2 %foo2 %null_expr
+%foo3 = OpVariable %f32_ptr_function Function
+%decl3 = OpExtInst %void %DbgExt DebugDeclare %foo_info3 %foo3 %null_expr
+
+
+OpReturn
+OpFunctionEnd

@@ -249,6 +249,8 @@ public:
   bool hasLinkageType() const;
   bool isAtomic() const { return isAtomicOpCode(OpCode); }
   bool isBasicBlock() const { return isLabel(); }
+  bool isExtInst() const { return OpCode == OpExtInst; }
+  bool isExtInst(const SPIRVExtInstSetKind InstSet, const SPIRVWord ExtOp) const;
   bool isBuiltinCall() const { return OpCode == OpExtInst; }
   bool isDecorate() const { return OpCode == OpDecorate; }
   bool isMemberDecorate() const { return OpCode == OpMemberDecorate; }

@@ -1,11 +1,11 @@
-//===- LLVMToSPIRVDbgTran.h - Converts SPIR-V to LLVM ------------------*- C++ -*-===//
+//===- SPIRVToLLVMDbgTran.h - Converts SPIR-V DebugInfo to LLVM -*- C++ -*-===//
 //
 //                     The LLVM/SPIR-V Translator
 //
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
-// Copyright (c) 2014 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2018 Intel Corporation. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -19,7 +19,7 @@
 // Redistributions in binary form must reproduce the above copyright notice,
 // this list of conditions and the following disclaimers in the documentation
 // and/or other materials provided with the distribution.
-// Neither the names of Advanced Micro Devices, Inc., nor the names of its
+// Neither the names of Intel Corporation, nor the names of its
 // contributors may be used to endorse or promote products derived from this
 // Software without specific prior written permission.
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -31,51 +31,144 @@
 // THE SOFTWARE.
 //
 //===----------------------------------------------------------------------===//
-/// \file
-///
-/// This file implements translation of debug info from SPIR-V to LLVM metadata
-///
+//
+// This file implements translation of debug info from SPIR-V to LLVM metadata
+//
 //===----------------------------------------------------------------------===//
-#ifndef SPIRV_LLVMTOSPIRVDBGTRAN_H
-#define SPIRV_LLVMTOSPIRVDBGTRAN_H
 
+#ifndef SPIRVTOLLVMDBGTRAN_H
+#define SPIRVTOLLVMDBGTRAN_H
+
+#include "SPIRVInstruction.h"
 #include "SPIRVModule.h"
 #include "llvm/IR/DIBuilder.h"
-#include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/Module.h"
+#include "llvm/IR/DebugLoc.h"
+#include <unordered_map>
 
+namespace llvm {
+class Module;
+class Value;
+class Instruction;
+class Type;
+} // namespace llvm
 using namespace llvm;
 
 namespace SPIRV {
+class SPIRVToLLVM;
+class SPIRVEntry;
+class SPIRVFunction;
+class SPIRVValue;
 
 class SPIRVToLLVMDbgTran {
 public:
-  SPIRVToLLVMDbgTran(SPIRVModule *tbm, Module *tm);
+  typedef std::vector<SPIRVWord> SPIRVWordVec;
 
-  void createCompileUnit();
-
-  void addDbgInfoVersion();
-
-  DIFile *getDIFile(const std::string &fileName);
-
-  DISubprogram *getDISubprogram(SPIRVFunction *sf, Function *f);
-
-  void transDbgInfo(SPIRVValue *sv, Value *v);
-
+  SPIRVToLLVMDbgTran(SPIRVModule *TBM, Module *TM, SPIRVToLLVM *Reader);
+  void createCompilationUnit();
+  void transDbgInfo(SPIRVValue *SV, Value *V);
+  template <typename T = MDNode> T *transDebugInst(const SPIRVExtInst *DebugInst) {
+    assert(DebugInst->getExtSetKind() == SPIRVEIS_Debug && "Unexpected extended instruction set");
+    auto It = DebugInstCache.find(DebugInst);
+    if (It != DebugInstCache.end())
+      return static_cast<T *>(It->second);
+    MDNode *Res = transDebugInstImpl(DebugInst);
+    DebugInstCache[DebugInst] = Res;
+    return static_cast<T *>(Res);
+  }
+  Instruction *transDebugIntrinsic(const SPIRVExtInst *DebugInst, BasicBlock *BB);
+  DISubprogram *getDISubprogram(const SPIRVFunction *SF);
   void finalize();
 
 private:
-  SPIRVModule *m_bm;
-  Module *m_m;
-  SPIRVDbgInfo m_spDbg;
-  DIBuilder m_builder;
-  bool m_enable;
-  std::unordered_map<std::string, DIFile *> m_fileMap;
-  std::unordered_map<Function *, DISubprogram *> m_funcMap;
+  DIFile *getFile(const SPIRVId SourceId);
+  DIFile *getDIFile(const std::string &FileName);
+  DIFile *getDIFile(const SPIRVEntry *E);
+  unsigned getLineNo(const SPIRVEntry *E);
 
-  void splitFileName(const std::string &fileName, std::string &baseName, std::string &path);
+  MDNode *transDebugInstImpl(const SPIRVExtInst *DebugInst);
+
+  llvm::DebugLoc transDebugLocation(const SPIRVExtInst *DebugInst);
+
+  llvm::DebugLoc transDebugScope(const SPIRVInstruction *SpirvInst, Instruction *Inst);
+
+  MDNode *transDebugInlined(const SPIRVExtInst *Inst);
+
+  DICompileUnit *transCompileUnit(const SPIRVExtInst *DebugInst);
+
+  DIBasicType *transTypeBasic(const SPIRVExtInst *DebugInst);
+
+  DIDerivedType *transTypeQualifier(const SPIRVExtInst *DebugInst);
+
+  DIType *transTypePointer(const SPIRVExtInst *DebugInst);
+
+  DICompositeType *transTypeArray(const SPIRVExtInst *DebugInst);
+
+  DICompositeType *transTypeVector(const SPIRVExtInst *DebugInst);
+
+  DICompositeType *transTypeComposite(const SPIRVExtInst *DebugInst);
+
+  DINode *transTypeMember(const SPIRVExtInst *DebugInst);
+
+  DINode *transTypeEnum(const SPIRVExtInst *DebugInst);
+
+  DINode *transTemplateParameter(const SPIRVExtInst *DebugInst);
+  DINode *transTemplateTemplateParameter(const SPIRVExtInst *DebugInst);
+  DINode *transTemplateParameterPack(const SPIRVExtInst *DebugInst);
+
+  MDNode *transTemplate(const SPIRVExtInst *DebugInst);
+
+  DINode *transTypeFunction(const SPIRVExtInst *DebugInst);
+
+  DINode *transTypePtrToMember(const SPIRVExtInst *DebugInst);
+
+  DINode *transLexicalBlock(const SPIRVExtInst *DebugInst);
+  DINode *transLexicalBlockDiscriminator(const SPIRVExtInst *DebugInst);
+
+  DINode *transFunction(const SPIRVExtInst *DebugInst);
+
+  DINode *transFunctionDecl(const SPIRVExtInst *DebugInst);
+
+  MDNode *transGlobalVariable(const SPIRVExtInst *DebugInst);
+
+  DINode *transLocalVariable(const SPIRVExtInst *DebugInst);
+
+  DINode *transTypedef(const SPIRVExtInst *DebugInst);
+
+  DINode *transInheritance(const SPIRVExtInst *DebugInst);
+
+  DINode *transImportedEntry(const SPIRVExtInst *DebugInst);
+
+  MDNode *transExpression(const SPIRVExtInst *DebugInst);
+
+  SPIRVModule *BM;
+  Module *M;
+  DIBuilder Builder;
+  SPIRVToLLVM *SPIRVReader;
+  DICompileUnit *CU;
+  bool Enable;
+  std::unordered_map<std::string, DIFile *> FileMap;
+  std::unordered_map<SPIRVId, DISubprogram *> FuncMap;
+  std::unordered_map<const SPIRVExtInst *, MDNode *> DebugInstCache;
+
+  struct SplitFileName {
+    SplitFileName(const std::string &FileName);
+    std::string BaseName;
+    std::string Path;
+  };
+
+  DIScope *getScope(const SPIRVEntry *ScopeInst);
+  SPIRVExtInst *getDbgInst(const SPIRVId Id);
+
+  template <SPIRVWord OpCode> SPIRVExtInst *getDbgInst(const SPIRVId Id) {
+    if (SPIRVExtInst *DI = getDbgInst(Id)) {
+      if (DI->getExtOp() == OpCode) {
+        return DI;
+      }
+    }
+    return nullptr;
+  }
+  const std::string &getString(const SPIRVId Id);
 };
-
 } // namespace SPIRV
 
-#endif // SPIRV_LLVMTOSPIRVDBGTRAN_H
+#endif // SPIRVTOLLVMDBGTRAN_H
