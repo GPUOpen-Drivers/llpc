@@ -61,8 +61,6 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
     // 1 byte (uint8) per thread
     Gfx9::NggMaxThreadsPerSubgroup,                           // LdsRegionDrawFlag
     // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group
-    SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionPrimCountInWaves
-    // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group
     SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionVertCountInWaves
     // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCullDistance
@@ -109,7 +107,6 @@ const char *NggLdsManager::m_ldsRegionNames[LdsRegionCount] = {
     "Distributed primitive ID",             // LdsRegionDistribPrimId
     "Vertex position data",                 // LdsRegionPosData
     "Draw flag",                            // LdsRegionDrawFlag
-    "Primitive count in waves",             // LdsRegionPrimCountInWaves
     "Vertex count in waves",                // LdsRegionVertCountInWaves
     "Cull distance",                        // LdsRegionCullDistance
     "Vertex thread ID map",                 // LdsRegionVertThreadIdMap
