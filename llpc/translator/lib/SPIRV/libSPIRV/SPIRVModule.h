@@ -135,10 +135,13 @@ public:
   virtual SPIRVEntryPoint *getEntryPoint(SPIRVId) const = 0;
   virtual SPIRVEntryPoint *
   getEntryPoint(SPIRVExecutionModelKind, const char *) const = 0;
+  virtual bool isEntryPoint(SPIRVExecutionModelKind ExecModel, SPIRVId EP) const = 0;
 
   virtual unsigned short getGeneratorId() const = 0;
   virtual unsigned short getGeneratorVer() const = 0;
   virtual SPIRVWord getSPIRVVersion() const = 0;
+
+  virtual const std::vector<SPIRVExtInst *> &getDebugInstVec() const = 0;
 
   // Module changing functions
   virtual bool importBuiltinSet(const std::string &, SPIRVId *) = 0;
@@ -347,18 +350,6 @@ protected:
   bool ValidateCapability;
 };
 
-class SPIRVDbgInfo {
-public:
-  SPIRVDbgInfo(SPIRVModule *TM);
-  std::string getEntryPointFileStr(SPIRVExecutionModelKind, unsigned);
-  std::string getFunctionFileStr(SPIRVFunction *);
-  unsigned getFunctionLineNo(SPIRVFunction *);
-
-private:
-  std::unordered_map<SPIRVFunction *, SPIRVLine *> FuncMap;
-  const std::string ModuleFileStr;
-  SPIRVModule *M;
-};
 } // namespace SPIRV
 
 #endif // SPIRV_LIBSPIRV_SPIRVMODULE_H

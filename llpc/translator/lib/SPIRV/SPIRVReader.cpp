@@ -126,7 +126,7 @@ static void dumpLLVM(Module *m, const std::string &fName) {
 SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const SPIRVSpecConstMap &theSpecConstMap,
                          lgc::Builder *builder, const Vkgc::ShaderModuleUsage *moduleUsage)
     : m_m(llvmModule), m_builder(builder), m_bm(theSpirvModule), m_enableXfb(false), m_entryTarget(nullptr),
-      m_specConstMap(theSpecConstMap), m_dbgTran(m_bm, m_m),
+      m_specConstMap(theSpecConstMap), m_dbgTran(m_bm, m_m, this),
       m_moduleUsage(reinterpret_cast<const Vkgc::ShaderModuleUsage *>(moduleUsage)) {
   assert(m_m);
   m_context = &m_m->getContext();
@@ -1296,7 +1296,13 @@ DebugLoc SPIRVToLLVM::getDebugLoc(SPIRVInstruction *bi, Function *f) {
   if (!f || !bi->hasLine())
     return DebugLoc();
   auto line = bi->getLine();
-  return DebugLoc::get(line->getLine(), line->getColumn(), m_dbgTran.getDISubprogram(bi->getParent()->getParent(), f));
+  SPIRVFunction *sf = bi->getParent()->getParent();
+  assert(sf);
+  DISubprogram *sp = m_dbgTran.getDISubprogram(sf);
+  if (!sp) {
+    return DebugLoc();
+  }
+  return DebugLoc::get(line->getLine(), line->getColumn(), sp);
 }
 
 void SPIRVToLLVM::updateDebugLoc(SPIRVValue *bv, Function *f) {
@@ -3473,6 +3479,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExtInst>(SPIRVValue *cons
 
   case SPIRVEIS_ShaderTrinaryMinMaxAMD:
     return transTrinaryMinMaxExtInst(spvExtInst, block);
+
+  case SPIRVEIS_Debug:
+    return m_dbgTran.transDebugIntrinsic(spvExtInst, block);
 
   default:
     llvm_unreachable("Should never be called!");
@@ -5952,8 +5961,21 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   m_enableGatherLodNz =
       m_bm->hasCapability(CapabilityImageGatherBiasLodAMD) && entryExecModel == ExecutionModelFragment;
 
-  m_dbgTran.createCompileUnit();
-  m_dbgTran.addDbgInfoVersion();
+  // Find the compile unit first since it might be needed during translation of
+  // debug intrinsics.
+  MDNode *compilationUnit = nullptr;
+  for (SPIRVExtInst *EI : m_bm->getDebugInstVec()) {
+    // Translate Compile Unit first.
+    // It shouldn't be far from the beginning of the vector
+    if (EI->getExtOp() == SPIRVDebug::CompilationUnit) {
+      compilationUnit = m_dbgTran.transDebugInst(EI);
+      // Fixme: there might be more than one Compile Unit.
+      break;
+    }
+  }
+  if (!compilationUnit) {
+    m_dbgTran.createCompilationUnit();
+  }
 
   for (unsigned i = 0, e = m_bm->getNumConstants(); i != e; ++i) {
     auto bv = m_bm->getConstant(i);

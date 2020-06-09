@@ -1,0 +1,54 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -trim-debug-info=false -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: [[D1:![0-9]*]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: [[D2:![0-9]*]])
+; SHADERTEST: [[D2]] = !DIBasicType(name: "float", size: 32, encoding: DW_ATE_float)
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+OpCapability Shader
+OpCapability Float16
+OpCapability Float64
+OpCapability Int16
+OpCapability Int64
+
+%DbgExt = OpExtInstImport "OpenCL.DebugInfo.100"
+%extinst = OpExtInstImport "GLSL.std.450"
+OpMemoryModel Logical GLSL450
+OpEntryPoint Vertex %main "main"
+
+%src = OpString "simple.hlsl"
+%code = OpString "float4 main(float arg) {
+  float foo;
+  return float4(0, 0, 0, 0);
+}
+"
+%float_name = OpString "float"
+%foo_name = OpString "foo"
+%main_name = OpString "main"
+
+%void = OpTypeVoid
+%func = OpTypeFunction %void
+%u32 = OpTypeInt 32 0
+%f32 = OpTypeFloat 32
+%int_32 = OpConstant %u32 32
+%f32_ptr_function = OpTypePointer Function %f32
+
+%dbg_src = OpExtInst %void %DbgExt DebugSource %src %code
+%comp_unit = OpExtInst %void %DbgExt DebugCompilationUnit 2 4 %dbg_src HLSL
+%null_expr = OpExtInst %void %DbgExt DebugExpression
+%float_info = OpExtInst %void %DbgExt DebugTypeBasic %float_name %int_32 Float
+%cfloat_info = OpExtInst %void %DbgExt DebugTypeQualifier %float_info ConstType
+%func_info = OpExtInst %void %DbgExt DebugTypeFunction FlagIsProtected|FlagIsPrivate %void
+%main_info = OpExtInst %void %DbgExt DebugFunction %main_name %func_info %dbg_src 1 1 %comp_unit %main_name FlagIsProtected|FlagIsPrivate 1 %main
+%foo_info = OpExtInst %void %DbgExt DebugLocalVariable %foo_name %cfloat_info %dbg_src 1 10 %main_info FlagIsLocal
+
+%main = OpFunction %void None %func
+%main_entry = OpLabel
+
+%foo = OpVariable %f32_ptr_function Function
+%decl = OpExtInst %void %DbgExt DebugDeclare %foo_info %foo %null_expr
+
+OpReturn
+OpFunctionEnd

@@ -1167,7 +1167,11 @@ void outputBinary(const uint8_t *data, unsigned startPos, unsigned endPos, OStre
       snprintf(formatBuf, sizeof(formatBuf), "    %7u:", startPos + i * 4u);
       out << formatBuf;
     }
-    snprintf(formatBuf, sizeof(formatBuf), "%08X", startData[i]);
+    // 'data' may not be aligned to sizeof(unsigned) so use a temporary to avoid
+    // undefined behaviour.
+    unsigned alignedData;
+    memcpy(&alignedData, startData + i, sizeof(alignedData));
+    snprintf(formatBuf, sizeof(formatBuf), "%08X", alignedData);
     out << formatBuf;
 
     if (i % 8 == 7)

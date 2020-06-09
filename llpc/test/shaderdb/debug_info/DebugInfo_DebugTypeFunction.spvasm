@@ -1,0 +1,77 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -trim-debug-info=false -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: [[D2:![0-9]*]] = !DISubroutineType(types: [[D3:![0-9]*]])
+; SHADERTEST: [[D3]] = !{null}
+; SHADERTEST: [[D1:![0-9]*]] = !DILocalVariable(name: "foo1", scope: !{{[0-9*]}}, file: !{{[0-9]*}}, line: 1, type: [[D2]])
+; SHADERTEST: [[D4:![0-9]*]] = !DILocalVariable(name: "foo2", scope: !{{[0-9]*}}, file: !{{[0-9]*}}, line: 2, type: [[D5:![0-9]*]])
+; SHADERTEST: [[D5]] = !DISubroutineType(types: [[D6:![0-9]*]])
+; SHADERTEST: [[D6]] = !{[[D7:![0-9]*]]}
+; SHADERTEST: [[D7]] = !DIBasicType(name: "float", size: 32, encoding: DW_ATE_float)
+; SHADERTEST: [[D8:![0-9]*]] = !DILocalVariable(name: "foo3", scope: !{{[0-9*]}}, file: !{{[0-9*]}}, line: 3, type: [[D9:![0-9]*]])
+; SHADERTEST: [[D10:![0-9]*]] = !DISubroutineType(types: [[D11:![0-9]*]])
+; SHADERTEST: [[D11]] = !{[[D7]], [[D7]]}
+; SHADERTEST: [[D12:![0-9]*]] = !DILocalVariable(name: "foo4", scope: !{{[0-9*]}}, file: !{{[0-9*]}}, line: 4, type: [[D13:![0-9]*]])
+; SHADERTEST: [[D13]] = !DISubroutineType(types: [[D14:![0-9]*]])
+; SHADERTEST: [[D14]] = !{null, [[D7]], [[D7]]}
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+OpCapability Shader
+OpCapability Float16
+OpCapability Float64
+OpCapability Int16
+OpCapability Int64
+
+%DbgExt = OpExtInstImport "OpenCL.DebugInfo.100"
+%extinst = OpExtInstImport "GLSL.std.450"
+OpMemoryModel Logical GLSL450
+OpEntryPoint Vertex %main "main"
+
+%src = OpString "simple.hlsl"
+%code = OpString "main() {}"
+%main_name = OpString "main"
+%main_linkage_name = OpString "v_main"
+%float_name = OpString "float"
+%foo_name1 = OpString "foo1"
+%foo_name2 = OpString "foo2"
+%foo_name3 = OpString "foo3"
+%foo_name4 = OpString "foo4"
+
+%void = OpTypeVoid
+%func = OpTypeFunction %void
+%u32 = OpTypeInt 32 0
+%f32 = OpTypeFloat 32
+%int_32 = OpConstant %u32 32
+%f32_ptr_function = OpTypePointer Function %f32
+
+%dbg_src = OpExtInst %void %DbgExt DebugSource %src %code
+%comp_unit = OpExtInst %void %DbgExt DebugCompilationUnit 2 4 %dbg_src HLSL
+%null_expr = OpExtInst %void %DbgExt DebugExpression
+%float_info = OpExtInst %void %DbgExt DebugTypeBasic %float_name %int_32 Float
+%func_info = OpExtInst %void %DbgExt DebugTypeFunction FlagIsProtected|FlagIsPrivate %void
+%main_info = OpExtInst %void %DbgExt DebugFunction %main_name %func_info %dbg_src 1 1 %comp_unit %main_name FlagIsProtected|FlagIsPrivate 1 %main
+%main_type_info1 = OpExtInst %void %DbgExt DebugTypeFunction FlagIsPublic %void
+%main_type_info2 = OpExtInst %void %DbgExt DebugTypeFunction FlagIsPublic %float_info
+%main_type_info3 = OpExtInst %void %DbgExt DebugTypeFunction FlagIsPublic %float_info %float_info
+%main_type_info4 = OpExtInst %void %DbgExt DebugTypeFunction FlagIsPublic %void %float_info %float_info
+%foo_info1 = OpExtInst %void %DbgExt DebugLocalVariable %foo_name1 %main_type_info1 %dbg_src 1 10 %main_info FlagIsLocal
+%foo_info2 = OpExtInst %void %DbgExt DebugLocalVariable %foo_name2 %main_type_info2 %dbg_src 2 10 %main_info FlagIsLocal
+%foo_info3 = OpExtInst %void %DbgExt DebugLocalVariable %foo_name3 %main_type_info3 %dbg_src 3 10 %main_info FlagIsLocal
+%foo_info4 = OpExtInst %void %DbgExt DebugLocalVariable %foo_name4 %main_type_info4 %dbg_src 4 10 %main_info FlagIsLocal
+
+%main = OpFunction %void None %func
+%main_entry = OpLabel
+
+%foo1 = OpVariable %f32_ptr_function Function
+%decl1 = OpExtInst %void %DbgExt DebugDeclare %foo_info1 %foo1 %null_expr
+%foo2 = OpVariable %f32_ptr_function Function
+%decl2 = OpExtInst %void %DbgExt DebugDeclare %foo_info2 %foo1 %null_expr
+%foo3 = OpVariable %f32_ptr_function Function
+%decl3 = OpExtInst %void %DbgExt DebugDeclare %foo_info3 %foo1 %null_expr
+%foo4 = OpVariable %f32_ptr_function Function
+%decl4 = OpExtInst %void %DbgExt DebugDeclare %foo_info4 %foo1 %null_expr
+
+OpReturn
+OpFunctionEnd

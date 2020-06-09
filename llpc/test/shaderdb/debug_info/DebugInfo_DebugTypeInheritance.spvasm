@@ -1,0 +1,76 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -trim-debug-info=false -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: [[D10:![0-9]*]] = distinct !DISubprogram(name: "main", linkageName: "v4f_main_f", scope: null, file: !{{[0-9]*}}, line: 12, type: !{{[0-9]*}}, scopeLine: 13, flags: DIFlagPublic, spFlags: DISPFlagDefinition | DISPFlagMainSubprogram, unit: !{{[0-9]*}}, templateParams: !{{[0-9]*}}, retainedNodes: !{{[0-9]*}})
+; SHADERTEST: [[D2:![0-9]*]] = !DICompositeType(tag: DW_TAG_array_type, baseType: [[D3:![0-9]*]], size: 128, flags: DIFlagVector, elements: [[D4:![0-9]*]])
+; SHADERTEST: [[D3]] = !DIBasicType(name: "float", size: 32, encoding: DW_ATE_float)
+; SHADERTEST: [[D4]] = !{[[D5:![0-9]*]]}
+; SHADERTEST: [[D5]] = !DISubrange(count: 4, lowerBound: 0)
+; SHADERTEST: !{{[0-9]*}} = !DILocalVariable(name: "foo", scope: !{{[0-9]*}}, file: !{{[0-9]*}}, line: 1, type: [[D1:![0-9]*]])
+; SHADERTEST: [[D1]] = !DIDerivedType(tag: DW_TAG_inheritance, scope: [[D6:![0-9]*]], baseType: [[D7:![0-9]*]], offset: 128, flags: DIFlagPublic, extraData: i32 0)
+; SHADERTEST: [[D6]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Foo", file: !{{[0-9]*}}, line: 1, elements: !{{[0-9]*}}, identifier: "Foo")
+; SHADERTEST: [[D7]] = !DICompositeType(tag: DW_TAG_structure_type, name: "struct VS_OUTPUT", file: !{{[0-9]*}}, line: 1, size: 128, elements: [[D8:![0-9]*]], identifier: "VS_OUTPUT")
+; SHADERTEST: [[D8]] = !{[[D9:![0-9]*]], [[D10]], [[D1]]}
+; SHADERTEST: [[D9]] = !DIDerivedType(tag: DW_TAG_member, name: "pos : SV_POSITION", scope: [[D7]], file: !{{[0-9]*}}, line: 2, baseType: [[D2]], size: 128, flags: DIFlagPublic)
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+OpCapability Shader
+OpCapability Float16
+OpCapability Float64
+OpCapability Int16
+OpCapability Int64
+
+%DbgExt = OpExtInstImport "OpenCL.DebugInfo.100"
+%extinst = OpExtInstImport "GLSL.std.450"
+OpMemoryModel Logical GLSL450
+OpEntryPoint Vertex %main "main"
+
+%src = OpString "simple.hlsl"
+%code = OpString "struct VS_OUTPUT {
+  float4 pos : SV_POSITION;
+};
+struct foo : VS_OUTPUT {
+};
+main() {}
+"
+%VS_OUTPUT_name = OpString "struct VS_OUTPUT"
+%float_name = OpString "float"
+%foo_name = OpString "foo"
+%foo_type_name = OpString "Foo"
+%VS_OUTPUT_pos_name = OpString "pos : SV_POSITION"
+%VS_OUTPUT_linkage_name = OpString "VS_OUTPUT"
+%main_name = OpString "main"
+%main_linkage_name = OpString "v4f_main_f"
+
+%void = OpTypeVoid
+%func = OpTypeFunction %void
+%u32 = OpTypeInt 32 0
+%f32 = OpTypeFloat 32
+%int_32 = OpConstant %u32 32
+%int_128 = OpConstant %u32 128
+%int_0 = OpConstant %u32 0
+%f32_ptr_function = OpTypePointer Function %f32
+
+%dbg_src = OpExtInst %void %DbgExt DebugSource %src %code
+%comp_unit = OpExtInst %void %DbgExt DebugCompilationUnit 2 4 %dbg_src HLSL
+%null_expr = OpExtInst %void %DbgExt DebugExpression
+%VS_OUTPUT_info = OpExtInst %void %DbgExt DebugTypeComposite %VS_OUTPUT_name Structure %dbg_src 1 1 %comp_unit %VS_OUTPUT_linkage_name %int_128 FlagIsPublic %VS_OUTPUT_pos_info %main_info %child
+%float_info = OpExtInst %void %DbgExt DebugTypeBasic %float_name %int_32 Float
+%v4float_info = OpExtInst %void %DbgExt DebugTypeVector %float_info 4
+%VS_OUTPUT_pos_info = OpExtInst %void %DbgExt DebugTypeMember %VS_OUTPUT_pos_name %v4float_info %dbg_src 2 3 %VS_OUTPUT_info %int_0 %int_128 FlagIsPublic
+%main_type_info = OpExtInst %void %DbgExt DebugTypeFunction FlagIsPublic %v4float_info %float_info
+%main_info = OpExtInst %void %DbgExt DebugFunction %main_name %main_type_info %dbg_src 12 1 %comp_unit %main_linkage_name FlagIsPublic 13 %main
+%foo_type_info = OpExtInst %void %DbgExt DebugTypeComposite %foo_type_name Structure %dbg_src 1 1 %comp_unit %foo_type_name %int_0 FlagIsPublic
+%child = OpExtInst %void %DbgExt DebugTypeInheritance %foo_type_info %VS_OUTPUT_info %int_128 %int_128 FlagIsPublic
+%foo_info = OpExtInst %void %DbgExt DebugLocalVariable %foo_name %child %dbg_src 1 10 %main_info FlagIsLocal
+
+%main = OpFunction %void None %func
+%main_entry = OpLabel
+
+%foo = OpVariable %f32_ptr_function Function
+%decl = OpExtInst %void %DbgExt DebugDeclare %foo_info %foo %null_expr
+
+OpReturn
+OpFunctionEnd

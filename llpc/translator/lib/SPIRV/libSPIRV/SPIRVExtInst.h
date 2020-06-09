@@ -40,9 +40,9 @@
 #ifndef SPIRV_LIBSPIRV_SPIRVEXTINST_H
 #define SPIRV_LIBSPIRV_SPIRVEXTINST_H
 
+#include "SPIRV.debug.h"
 #include "SPIRVEnum.h"
 #include "SPIRVUtil.h"
-
 #include <string>
 #include <vector>
 
@@ -199,6 +199,44 @@ SPIRV_DEF_NAMEMAP(ShaderTrinaryMinMaxAMDExtOpKind,
 
 typedef uint32_t NonSemanticInfoExtOpKind;
 
+typedef SPIRVDebug::Instruction SPIRVDebugExtOpKind;
+template <> inline void SPIRVMap<SPIRVDebugExtOpKind, std::string>::init() {
+  add(SPIRVDebug::DebugInfoNone, "DebugInfoNone");
+  add(SPIRVDebug::CompilationUnit, "DebugCompileUnit");
+  add(SPIRVDebug::Source, "DebugSource");
+  add(SPIRVDebug::TypeBasic, "DebugTypeBasic");
+  add(SPIRVDebug::TypePointer, "DebugTypePointer");
+  add(SPIRVDebug::TypeArray, "DebugTypeArray");
+  add(SPIRVDebug::TypeVector, "DebugTypeVector");
+  add(SPIRVDebug::TypeQualifier, "DebugTypeQualifier");
+  add(SPIRVDebug::TypeFunction, "DebugTypeFunction");
+  add(SPIRVDebug::TypeComposite, "DebugTypeComposite");
+  add(SPIRVDebug::TypeMember, "DebugTypeMember");
+  add(SPIRVDebug::TypeEnum, "DebugTypeEnum");
+  add(SPIRVDebug::Typedef, "DebugTypedef");
+  add(SPIRVDebug::TypeTemplateParameter, "DebugTemplateParameter");
+  add(SPIRVDebug::TypeTemplateParameterPack, "DebugTemplateParameterPack");
+  add(SPIRVDebug::TypeTemplateTemplateParameter, "DebugTemplateTemplateParameter");
+  add(SPIRVDebug::TypeTemplate, "DebugTemplate");
+  add(SPIRVDebug::TypePtrToMember, "DebugTypePtrToMember,");
+  add(SPIRVDebug::Inheritance, "DebugInheritance");
+  add(SPIRVDebug::Function, "DebugFunction");
+  add(SPIRVDebug::FunctionDecl, "DebugFunctionDecl");
+  add(SPIRVDebug::LexicalBlock, "DebugLexicalBlock");
+  add(SPIRVDebug::LexicalBlockDiscriminator, "LexicalBlockDiscriminator");
+  add(SPIRVDebug::LocalVariable, "DebugLocalVariable");
+  add(SPIRVDebug::InlinedVariable, "DebugInlinedVariable");
+  add(SPIRVDebug::GlobalVariable, "DebugGlobalVariable");
+  add(SPIRVDebug::Declare, "DebugDeclare");
+  add(SPIRVDebug::Value, "DebugValue");
+  add(SPIRVDebug::Scope, "DebugScope");
+  add(SPIRVDebug::NoScope, "DebugNoScope");
+  add(SPIRVDebug::InlinedAt, "DebugInlinedAt");
+  add(SPIRVDebug::ImportedEntity, "DebugImportedEntity");
+  add(SPIRVDebug::Expression, "DebugExpression");
+  add(SPIRVDebug::Operation, "DebugOperation");
+}
+SPIRV_DEF_NAMEMAP(SPIRVDebugExtOpKind, SPIRVDebugExtOpMap)
 }
 
 #endif // SPIRV_LIBSPIRV_SPIRVEXTINST_H
