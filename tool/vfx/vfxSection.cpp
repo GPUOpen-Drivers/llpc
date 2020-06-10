@@ -31,12 +31,16 @@
 
 #include "vfxSection.h"
 #include "vfxEnumsConverter.h"
+#include "vfxParser.h"
 #include <inttypes.h>
 
+#ifndef VFX_DISABLE_SPVGEN
 #if VFX_INSIDE_SPVGEN
 #define SH_EXPORTING
 #endif
+
 #include "spvgen.h"
+#endif
 
 namespace Vfx {
 
@@ -44,37 +48,18 @@ namespace Vfx {
 // Static variables in class Section and derived class
 std::map<std::string, SectionInfo> Section::m_sectionInfo;
 
-StrToMemberAddr SectionResultItem::m_addrTable[SectionResultItem::MemberCount];
-StrToMemberAddr SectionResult::m_addrTable[SectionResult::MemberCount];
 StrToMemberAddr SectionSpecConstItem::m_addrTable[SectionSpecConstItem::MemberCount];
 StrToMemberAddr SectionSpecConst::m_addrTable[SectionSpecConst::MemberCount];
-StrToMemberAddr SectionVertexBufferBinding::m_addrTable[SectionVertexBufferBinding::MemberCount];
-StrToMemberAddr SectionVertexAttribute::m_addrTable[SectionVertexAttribute::MemberCount];
-StrToMemberAddr SectionVertexState::m_addrTable[SectionVertexState::MemberCount];
-StrToMemberAddr SectionBufferView::m_addrTable[SectionBufferView::MemberCount];
-StrToMemberAddr SectionDrawState::m_addrTable[SectionDrawState::MemberCount];
-StrToMemberAddr SectionPushConstRange::m_addrTable[SectionPushConstRange::MemberCount];
-StrToMemberAddr SectionImageView::m_addrTable[SectionImageView::MemberCount];
-StrToMemberAddr SectionSampler::m_addrTable[SectionSampler::MemberCount];
-StrToMemberAddr SectionShader::m_addrTable[SectionShader::MemberCount];
 StrToMemberAddr SectionColorBuffer::m_addrTable[SectionColorBuffer::MemberCount];
-StrToMemberAddr SectionGraphicsState::m_addrTable[SectionGraphicsState::MemberCount];
-StrToMemberAddr SectionComputeState::m_addrTable[SectionComputeState::MemberCount];
+StrToMemberAddr SectionVersion::m_addrTable[SectionVersion::MemberCount];
+StrToMemberAddr SectionCompileLog::m_addrTable[SectionCompileLog::MemberCount];
+StrToMemberAddr SectionShader::m_addrTable[SectionShader::MemberCount];
 StrToMemberAddr SectionVertexInputBinding::m_addrTable[SectionVertexInputBinding::MemberCount];
 StrToMemberAddr SectionVertexInputAttribute::m_addrTable[SectionVertexInputAttribute::MemberCount];
 StrToMemberAddr SectionVertexInputDivisor::m_addrTable[SectionVertexInputDivisor::MemberCount];
 StrToMemberAddr SectionVertexInput::m_addrTable[SectionVertexInput::MemberCount];
 StrToMemberAddr SectionSpecEntryItem::m_addrTable[SectionSpecEntryItem::MemberCount];
 StrToMemberAddr SectionSpecInfo::m_addrTable[SectionSpecInfo::MemberCount];
-StrToMemberAddr SectionDescriptorRangeValueItem::m_addrTable[SectionDescriptorRangeValueItem::MemberCount];
-StrToMemberAddr SectionResourceMappingNode::m_addrTable[SectionResourceMappingNode::MemberCount];
-StrToMemberAddr SectionShaderInfo::m_addrTable[SectionShaderInfo::MemberCount];
-StrToMemberAddr SectionVersion::m_addrTable[SectionVersion::MemberCount];
-StrToMemberAddr SectionCompileLog::m_addrTable[SectionCompileLog::MemberCount];
-StrToMemberAddr SectionPipelineOption::m_addrTable[SectionPipelineOption::MemberCount];
-StrToMemberAddr SectionShaderOption::m_addrTable[SectionShaderOption::MemberCount];
-StrToMemberAddr SectionNggState::m_addrTable[SectionNggState::MemberCount];
-StrToMemberAddr SectionExtendedRobustness::m_addrTable[SectionExtendedRobustness::MemberCount];
 
 // =====================================================================================================================
 // Dummy class used to initialize all static variables
@@ -84,38 +69,18 @@ public:
     initEnumMap();
 
     Section::initSectionInfo();
-
-    SectionResultItem::initialAddrTable();
-    SectionResult::initialAddrTable();
     SectionSpecConstItem::initialAddrTable();
     SectionSpecConst::initialAddrTable();
-    SectionVertexBufferBinding::initialAddrTable();
-    SectionVertexAttribute::initialAddrTable();
-    SectionVertexState::initialAddrTable();
-    SectionBufferView::initialAddrTable();
-    SectionDrawState::initialAddrTable();
-    SectionPushConstRange::initialAddrTable();
-    SectionImageView::initialAddrTable();
-    SectionSampler::initialAddrTable();
     SectionVersion::initialAddrTable();
     SectionCompileLog::initialAddrTable();
     SectionShader::initialAddrTable();
     SectionColorBuffer::initialAddrTable();
-    SectionGraphicsState::initialAddrTable();
-    SectionComputeState::initialAddrTable();
     SectionVertexInputBinding::initialAddrTable();
     SectionVertexInputAttribute::initialAddrTable();
     SectionVertexInputDivisor::initialAddrTable();
     SectionVertexInput::initialAddrTable();
     SectionSpecEntryItem::initialAddrTable();
     SectionSpecInfo::initialAddrTable();
-    SectionDescriptorRangeValueItem::initialAddrTable();
-    SectionResourceMappingNode::initialAddrTable();
-    SectionShaderInfo::initialAddrTable();
-    SectionPipelineOption::initialAddrTable();
-    SectionShaderOption::initialAddrTable();
-    SectionNggState::initialAddrTable();
-    SectionExtendedRobustness::initialAddrTable();
   };
 };
 
@@ -137,91 +102,72 @@ Section::Section(StrToMemberAddr *addrTable, unsigned tableSize, SectionType sec
 // =====================================================================================================================
 // Initializes static variable m_sectionInfo
 void Section::initSectionInfo() {
-  // Shader sections
-  INIT_SECTION_INFO("VertexShaderGlsl", SectionTypeVertexShader, Glsl)
-  INIT_SECTION_INFO("TessControlShaderGlsl", SectionTypeTessControlShader, Glsl)
-  INIT_SECTION_INFO("TessEvalShaderGlsl", SectionTypeTessEvalShader, Glsl)
-  INIT_SECTION_INFO("GeometryShaderGlsl", SectionTypeGeometryShader, Glsl)
-  INIT_SECTION_INFO("FragmentShaderGlsl", SectionTypeFragmentShader, Glsl)
-  INIT_SECTION_INFO("ComputeShaderGlsl", SectionTypeComputeShader, Glsl)
+  // Shader source sections
+  INIT_SECTION_INFO("VertexShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageVertex)
+  INIT_SECTION_INFO("TessControlShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageTessControl)
+  INIT_SECTION_INFO("TessEvalShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageTessEval)
+  INIT_SECTION_INFO("GeometryShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("FragmentShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageFragment)
+  INIT_SECTION_INFO("ComputeShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageCompute)
 
-  INIT_SECTION_INFO("VertexShaderSpirv", SectionTypeVertexShader, SpirvAsm)
-  INIT_SECTION_INFO("TessControlShaderSpirv", SectionTypeTessControlShader, SpirvAsm)
-  INIT_SECTION_INFO("TessEvalShaderSpirv", SectionTypeTessEvalShader, SpirvAsm)
-  INIT_SECTION_INFO("GeometryShaderSpirv", SectionTypeGeometryShader, SpirvAsm)
-  INIT_SECTION_INFO("FragmentShaderSpirv", SectionTypeFragmentShader, SpirvAsm)
-  INIT_SECTION_INFO("ComputeShaderSpirv", SectionTypeComputeShader, SpirvAsm)
+  INIT_SECTION_INFO("VertexShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageVertex)
+  INIT_SECTION_INFO("TessControlShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageTessControl)
+  INIT_SECTION_INFO("TessEvalShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageTessEval)
+  INIT_SECTION_INFO("GeometryShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("FragmentShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageFragment)
+  INIT_SECTION_INFO("ComputeShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageCompute)
 
-  INIT_SECTION_INFO("VsGlsl", SectionTypeVertexShader, Glsl)
-  INIT_SECTION_INFO("TcsGlsl", SectionTypeTessControlShader, Glsl)
-  INIT_SECTION_INFO("TesGlsl", SectionTypeTessEvalShader, Glsl)
-  INIT_SECTION_INFO("GsGlsl", SectionTypeGeometryShader, Glsl)
-  INIT_SECTION_INFO("FsGlsl", SectionTypeFragmentShader, Glsl)
-  INIT_SECTION_INFO("CsGlsl", SectionTypeComputeShader, Glsl)
+  INIT_SECTION_INFO("VsGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageVertex)
+  INIT_SECTION_INFO("TcsGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageTessControl)
+  INIT_SECTION_INFO("TesGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageTessEval)
+  INIT_SECTION_INFO("GsGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("FsGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageFragment)
+  INIT_SECTION_INFO("CsGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageCompute)
 
-  INIT_SECTION_INFO("VsSpirv", SectionTypeVertexShader, SpirvAsm)
-  INIT_SECTION_INFO("TcsSpirv", SectionTypeTessControlShader, SpirvAsm)
-  INIT_SECTION_INFO("TesSpirv", SectionTypeTessEvalShader, SpirvAsm)
-  INIT_SECTION_INFO("GsSpirv", SectionTypeGeometryShader, SpirvAsm)
-  INIT_SECTION_INFO("FsSpirv", SectionTypeFragmentShader, SpirvAsm)
-  INIT_SECTION_INFO("CsSpirv", SectionTypeComputeShader, SpirvAsm)
+  INIT_SECTION_INFO("VsSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageVertex)
+  INIT_SECTION_INFO("TcsSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageTessControl)
+  INIT_SECTION_INFO("TesSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageTessEval)
+  INIT_SECTION_INFO("GsSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("FsSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageFragment)
+  INIT_SECTION_INFO("CsSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageCompute)
 
-  INIT_SECTION_INFO("VsGlslFile", SectionTypeVertexShader, GlslFile)
-  INIT_SECTION_INFO("TcsGlslFile", SectionTypeTessControlShader, GlslFile)
-  INIT_SECTION_INFO("TesGlslFile", SectionTypeTessEvalShader, GlslFile)
-  INIT_SECTION_INFO("GsGlslFile", SectionTypeGeometryShader, GlslFile)
-  INIT_SECTION_INFO("FsGlslFile", SectionTypeFragmentShader, GlslFile)
-  INIT_SECTION_INFO("CsGlslFile", SectionTypeComputeShader, GlslFile)
+  // Shader source file section
+  INIT_SECTION_INFO("VsGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageVertex)
+  INIT_SECTION_INFO("TcsGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageTessControl)
+  INIT_SECTION_INFO("TesGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageTessEval)
+  INIT_SECTION_INFO("GsGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("FsGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageFragment)
+  INIT_SECTION_INFO("CsGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageCompute)
 
-  INIT_SECTION_INFO("VsSpvFile", SectionTypeVertexShader, SpirvFile)
-  INIT_SECTION_INFO("TcsSpvFile", SectionTypeTessControlShader, SpirvFile)
-  INIT_SECTION_INFO("TesSpvFile", SectionTypeTessEvalShader, SpirvFile)
-  INIT_SECTION_INFO("GsSpvFile", SectionTypeGeometryShader, SpirvFile)
-  INIT_SECTION_INFO("FsSpvFile", SectionTypeFragmentShader, SpirvFile)
-  INIT_SECTION_INFO("CsSpvFile", SectionTypeComputeShader, SpirvFile)
+  INIT_SECTION_INFO("VsSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageVertex)
+  INIT_SECTION_INFO("TcsSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageTessControl)
+  INIT_SECTION_INFO("TesSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageTessEval)
+  INIT_SECTION_INFO("GsSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("FsSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageFragment)
+  INIT_SECTION_INFO("CsSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageCompute)
 
-  INIT_SECTION_INFO("VsSpvasmFile", SectionTypeVertexShader, SpirvAsmFile)
-  INIT_SECTION_INFO("TcsSpvasmFile", SectionTypeTessControlShader, SpirvAsmFile)
-  INIT_SECTION_INFO("TesSpvasmFile", SectionTypeTessEvalShader, SpirvAsmFile)
-  INIT_SECTION_INFO("GsSpvasmFile", SectionTypeGeometryShader, SpirvAsmFile)
-  INIT_SECTION_INFO("FsSpvasmFile", SectionTypeFragmentShader, SpirvAsmFile)
-  INIT_SECTION_INFO("CsSpvasmFile", SectionTypeComputeShader, SpirvAsmFile)
+  INIT_SECTION_INFO("VsSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageVertex)
+  INIT_SECTION_INFO("TcsSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageTessControl)
+  INIT_SECTION_INFO("TesSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageTessEval)
+  INIT_SECTION_INFO("GsSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("FsSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageFragment)
+  INIT_SECTION_INFO("CsSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageCompute)
 
-  INIT_SECTION_INFO("VsHlsl", SectionTypeVertexShader, Hlsl)
-  INIT_SECTION_INFO("TcsHlsl", SectionTypeTessControlShader, Hlsl)
-  INIT_SECTION_INFO("TesHlsl", SectionTypeTessEvalShader, Hlsl)
-  INIT_SECTION_INFO("GsHlsl", SectionTypeGeometryShader, Hlsl)
-  INIT_SECTION_INFO("FsHlsl", SectionTypeFragmentShader, Hlsl)
-  INIT_SECTION_INFO("CsHlsl", SectionTypeComputeShader, Hlsl)
+  INIT_SECTION_INFO("VsHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageVertex)
+  INIT_SECTION_INFO("TcsHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageTessControl)
+  INIT_SECTION_INFO("TesHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageTessEval)
+  INIT_SECTION_INFO("GsHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("FsHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageFragment)
+  INIT_SECTION_INFO("CsHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageCompute)
 
-  INIT_SECTION_INFO("VsHlslFile", SectionTypeVertexShader, HlslFile)
-  INIT_SECTION_INFO("TcsHlslFile", SectionTypeTessControlShader, HlslFile)
-  INIT_SECTION_INFO("TesHlslFile", SectionTypeTessEvalShader, HlslFile)
-  INIT_SECTION_INFO("GsHlslFile", SectionTypeGeometryShader, HlslFile)
-  INIT_SECTION_INFO("FsHlslFile", SectionTypeFragmentShader, HlslFile)
-  INIT_SECTION_INFO("CsHlslFile", SectionTypeComputeShader, HlslFile)
-
+  INIT_SECTION_INFO("VsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageVertex)
+  INIT_SECTION_INFO("TcsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageTessControl)
+  INIT_SECTION_INFO("TesHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageTessEval)
+  INIT_SECTION_INFO("GsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("FsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageFragment)
+  INIT_SECTION_INFO("CsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageCompute)
   INIT_SECTION_INFO("Version", SectionTypeVersion, 0)
   INIT_SECTION_INFO("CompileLog", SectionTypeCompileLog, 0)
-
-  // Sections for RenderDocument
-  INIT_SECTION_INFO("Result", SectionTypeResult, 0)
-  INIT_SECTION_INFO("BufferView", SectionTypeBufferView, 0)
-  INIT_SECTION_INFO("VertexState", SectionTypeVertexState, 0)
-  INIT_SECTION_INFO("DrawState", SectionTypeDrawState, 0)
-  INIT_SECTION_INFO("ImageView", SectionTypeImageView, 0)
-  INIT_SECTION_INFO("Sampler", SectionTypeSampler, 0)
-
-  // Sections for PipelineDocument
-  INIT_SECTION_INFO("GraphicsPipelineState", SectionTypeGraphicsState, 0)
-  INIT_SECTION_INFO("ComputePipelineState", SectionTypeComputeState, 0)
-  INIT_SECTION_INFO("VertexInputState", SectionTypeVertexInputState, 0)
-  INIT_SECTION_INFO("VsInfo", SectionTypeVertexShaderInfo, 0)
-  INIT_SECTION_INFO("TcsInfo", SectionTypeTessControlShaderInfo, 0)
-  INIT_SECTION_INFO("TesInfo", SectionTypeTessEvalShaderInfo, 0)
-  INIT_SECTION_INFO("GsInfo", SectionTypeGeometryShaderInfo, 0)
-  INIT_SECTION_INFO("FsInfo", SectionTypeFragmentShaderInfo, 0)
-  INIT_SECTION_INFO("CsInfo", SectionTypeComputeShaderInfo, 0)
 }
 
 // =====================================================================================================================
@@ -286,7 +232,7 @@ bool Section::isSection(unsigned lineNum, const char *memberName, bool *output, 
 // Prints all data in this object, for debug purpose.
 //
 // @param level : Nest level from the base object
-void Section::printSelf(unsigned level) {
+void Section::printSelf(Document *pDoc, unsigned level) {
   if (m_isActive) {
     for (unsigned l = 0; l < level; ++l) {
       printf("\t");
@@ -299,10 +245,10 @@ void Section::printSelf(unsigned level) {
         if (m_memberTable[i].isSection) {
           Section *subObj;
           std::string dummyMsg;
-          if (getPtrOfSubSection(0, m_memberTable[i].memberName, m_memberTable[i].memberType, false, arrayIndex,
-                                 &subObj, &dummyMsg)) {
+          if (pDoc->getPtrOfSubSection(this, 0, m_memberTable[i].memberName, m_memberTable[i].memberType, false,
+                                       arrayIndex, &subObj, &dummyMsg)) {
             if (subObj->m_isActive)
-              subObj->printSelf(level + 1);
+              subObj->printSelf(pDoc, level + 1);
           }
         } else {
           for (unsigned l = 0; l < level; ++l) {
@@ -502,74 +448,6 @@ void Section::printSelf(unsigned level) {
 }
 
 // =====================================================================================================================
-// Creates a section object according to section name
-//
-// @param sectionName : Section name
-Section *Section::createSection(const char *sectionName) {
-  auto it = m_sectionInfo.find(sectionName);
-
-  VFX_ASSERT(it->second.type != SectionTypeUnset);
-
-  Section *section = nullptr;
-  switch (it->second.type) {
-  case SectionTypeResult:
-    section = new SectionResult();
-    break;
-  case SectionTypeBufferView:
-    section = new SectionBufferView();
-    break;
-  case SectionTypeVertexState:
-    section = new SectionVertexState();
-    break;
-  case SectionTypeDrawState:
-    section = new SectionDrawState();
-    break;
-  case SectionTypeImageView:
-    section = new SectionImageView();
-    break;
-  case SectionTypeSampler:
-    section = new SectionSampler();
-    break;
-  case SectionTypeVersion:
-    section = new SectionVersion();
-    break;
-  case SectionTypeCompileLog:
-    section = new SectionCompileLog();
-    break;
-  case SectionTypeGraphicsState:
-    section = new SectionGraphicsState();
-    break;
-  case SectionTypeComputeState:
-    section = new SectionComputeState();
-    break;
-  case SectionTypeVertexInputState:
-    section = new SectionVertexInput();
-    break;
-  case SectionTypeVertexShaderInfo:
-  case SectionTypeTessControlShaderInfo:
-  case SectionTypeTessEvalShaderInfo:
-  case SectionTypeGeometryShaderInfo:
-  case SectionTypeFragmentShaderInfo:
-  case SectionTypeComputeShaderInfo:
-    section = new SectionShaderInfo(it->second.type);
-    break;
-  case SectionTypeVertexShader:
-  case SectionTypeTessControlShader:
-  case SectionTypeTessEvalShader:
-  case SectionTypeGeometryShader:
-  case SectionTypeFragmentShader:
-  case SectionTypeComputeShader:
-    section = new SectionShader(it->second);
-    break;
-  default:
-    VFX_NEVER_CALLED();
-    break;
-  }
-
-  return section;
-}
-
-// =====================================================================================================================
 // Gets section type according to section name
 //
 // @param sectionName : Section name
@@ -579,48 +457,6 @@ SectionType Section::getSectionType(const char *sectionName) {
   if (it != m_sectionInfo.end())
     type = it->second.type;
   return type;
-}
-
-// =====================================================================================================================
-// Gets the pointer of sub section according to member name
-//
-// @param lineNum : Line No.
-// @param memberName : Member name
-// @param memberType : Member type
-// @param isWriteAccess : Whether the sub section will be written
-// @param arrayIndex : Array index
-// @param [out] ptrOut : Pointer of sub section
-// @param [out] errorMsg : Error message
-bool Section::getPtrOfSubSection(unsigned lineNum, const char *memberName, MemberType memberType, bool isWriteAccess,
-                                 unsigned arrayIndex, Section **ptrOut, std::string *errorMsg) {
-  bool result = false;
-
-  switch (memberType) {
-    CASE_SUBSECTION(MemberTypeResultItem, SectionResultItem)
-    CASE_SUBSECTION(MemberTypeVertexBufferBindingItem, SectionVertexBufferBinding)
-    CASE_SUBSECTION(MemberTypeVertexAttributeItem, SectionVertexAttribute)
-    CASE_SUBSECTION(MemberTypeSpecConstItem, SectionSpecConstItem)
-    CASE_SUBSECTION(MemberTypeSpecConst, SectionSpecConst)
-    CASE_SUBSECTION(MemberTypePushConstRange, SectionPushConstRange)
-    CASE_SUBSECTION(MemberTypeVertexInputBindingItem, SectionVertexInputBinding)
-    CASE_SUBSECTION(MemberTypeVertexInputAttributeItem, SectionVertexInputAttribute)
-    CASE_SUBSECTION(MemberTypeVertexInputDivisorItem, SectionVertexInputDivisor)
-    CASE_SUBSECTION(MemberTypeColorBufferItem, SectionColorBuffer)
-    CASE_SUBSECTION(MemberTypeSpecEntryItem, SectionSpecEntryItem)
-    CASE_SUBSECTION(MemberTypeResourceMappingNode, SectionResourceMappingNode)
-    CASE_SUBSECTION(MemberTypeSpecInfo, SectionSpecInfo)
-    CASE_SUBSECTION(MemberTypeDescriptorRangeValue, SectionDescriptorRangeValueItem)
-    CASE_SUBSECTION(MemberTypePipelineOption, SectionPipelineOption)
-    CASE_SUBSECTION(MemberTypeShaderOption, SectionShaderOption)
-    CASE_SUBSECTION(MemberTypeNggState, SectionNggState)
-    CASE_SUBSECTION(MemberTypeExtendedRobustness, SectionExtendedRobustness)
-    break;
-  default:
-    VFX_NEVER_CALLED();
-    break;
-  }
-
-  return result;
 }
 
 // =====================================================================================================================
@@ -682,15 +518,16 @@ bool Section::readFile(const std::string &docFilename, const std::string &fileNa
 //
 // @param shaderInfo : Shader info section
 // @param [out] errorMsg : Error message
-bool SectionShader::compileGlsl(const Section *shaderInfo, std::string *errorMsg) {
+bool SectionShader::compileGlsl(const char *entryPoint, std::string *errorMsg) {
+  bool result = true;
+#ifndef VFX_DISABLE_SPVGEN
   int sourceStringCount = 1;
   const char *const *sourceList[1] = {};
   const char *const *fileList[1] = {};
 
-  bool result = true;
   const char *glslText = m_shaderSource.c_str();
   const char *fileName = m_fileName.c_str();
-  SpvGenStage stage = static_cast<SpvGenStage>(m_sectionType - SectionTypeVertexShader);
+  SpvGenStage stage = static_cast<SpvGenStage>(m_shaderStage);
   void *program = nullptr;
   const char *log = nullptr;
 
@@ -704,9 +541,6 @@ bool SectionShader::compileGlsl(const Section *shaderInfo, std::string *errorMsg
   int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
   if (m_shaderType == Hlsl || m_shaderType == HlslFile)
     compileOption |= SpvGenOptionReadHlsl;
-  const char *entryPoint = nullptr;
-  if (shaderInfo)
-    entryPoint = reinterpret_cast<const SectionShaderInfo *>(shaderInfo)->getEntryPoint();
   bool compileResult = spvCompileAndLinkProgramEx(1, &stage, &sourceStringCount, sourceList, fileList, &entryPoint,
                                                   &program, &log, compileOption);
 
@@ -722,7 +556,10 @@ bool SectionShader::compileGlsl(const Section *shaderInfo, std::string *errorMsg
 
   if (program)
     spvDestroyProgram(program);
-
+#else
+  m_spvBin.resize(m_shaderSource.length() + 1);
+  memcpy(m_spvBin.data(), m_shaderSource.c_str(), m_shaderSource.length() + 1);
+#endif
   return result;
 }
 
@@ -732,6 +569,7 @@ bool SectionShader::compileGlsl(const Section *shaderInfo, std::string *errorMsg
 // @param [out] errorMsg : Error message
 bool SectionShader::assembleSpirv(std::string *errorMsg) {
   bool result = true;
+#ifndef VFX_DISABLE_SPVGEN
   const char *text = m_shaderSource.c_str();
 
   if (!InitSpvGen()) {
@@ -754,6 +592,10 @@ bool SectionShader::assembleSpirv(std::string *errorMsg) {
   }
 
   delete[] buffer;
+#else
+  m_spvBin.resize(m_shaderSource.length() + 1);
+  memcpy(m_spvBin.data(), m_shaderSource.c_str(), m_shaderSource.length() + 1);
+#endif
   return result;
 }
 
@@ -763,6 +605,7 @@ bool SectionShader::isShaderSourceSection() {
   bool ret = false;
   switch (m_shaderType) {
   case Glsl:
+  case Hlsl:
   case SpirvAsm:
     ret = true;
     break;
@@ -779,19 +622,19 @@ bool SectionShader::isShaderSourceSection() {
 // @param docFilename : File name of parent document
 // @param shaderInfo : Shader info sections
 // @param [out] errorMsg : Error message
-bool SectionShader::compileShader(const std::string &docFilename, const Section *shaderInfo, std::string *errorMsg) {
+bool SectionShader::compileShader(const std::string &docFilename, const char *entryPoint, std::string *errorMsg) {
   bool result = false;
   switch (m_shaderType) {
   case Glsl:
   case Hlsl: {
-    result = compileGlsl(shaderInfo, errorMsg);
+    result = compileGlsl(entryPoint, errorMsg);
     break;
   }
   case GlslFile:
   case HlslFile: {
     result = readFile(docFilename, m_fileName, false, &m_spvBin, &m_shaderSource, errorMsg);
     if (result)
-      compileGlsl(shaderInfo, errorMsg);
+      compileGlsl(entryPoint, errorMsg);
     break;
   }
   case SpirvAsm: {
@@ -819,31 +662,7 @@ bool SectionShader::compileShader(const std::string &docFilename, const Section 
 void SectionShader::getSubState(SectionShader::SubState &state) {
   state.dataSize = static_cast<unsigned>(m_spvBin.size());
   state.pData = state.dataSize > 0 ? &m_spvBin[0] : nullptr;
-
-  switch (m_sectionType) {
-  case SectionTypeVertexShader:
-    state.stage = Vkgc::ShaderStageVertex;
-    break;
-  case SectionTypeTessControlShader:
-    state.stage = Vkgc::ShaderStageTessControl;
-    break;
-  case SectionTypeTessEvalShader:
-    state.stage = Vkgc::ShaderStageTessEval;
-    break;
-  case SectionTypeGeometryShader:
-    state.stage = Vkgc::ShaderStageGeometry;
-    break;
-  case SectionTypeFragmentShader:
-    state.stage = Vkgc::ShaderStageFragment;
-    break;
-  case SectionTypeComputeShader:
-    state.stage = Vkgc::ShaderStageCompute;
-    break;
-  default:
-    VFX_NEVER_CALLED();
-    state.stage = Vkgc::ShaderStageInvalid;
-    break;
-  }
+  state.stage = m_shaderStage;
 }
 
 } // namespace Vfx

@@ -48,7 +48,10 @@ target_sources(vfx PRIVATE
     vfxRenderDoc.cpp
     vfxSection.cpp
     vfxEnumsConverter.cpp
+    vfxVkSection.cpp
 )
+
+target_compile_definitions(vfx PRIVATE VFX_SUPPORT_VK_PIPELINE)
 
 target_include_directories(vfx
 PUBLIC

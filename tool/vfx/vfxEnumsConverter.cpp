@@ -36,13 +36,11 @@
 #include <string.h>
 #include <string>
 
-using namespace Vkgc;
-
 namespace Vfx {
 
 // =====================================================================================================================
 // Gets enum convert map
-static std::map<std::string, int> &getEnumMap() {
+std::map<std::string, int> &getEnumMap() {
   static std::map<std::string, int> EnumMap;
   return EnumMap;
 };
@@ -61,9 +59,6 @@ bool getEnumValue(const char *string, int &value) {
   }
   return ret;
 }
-
-#define ADD_ENUM_MAP(EnumType, EnumName) getEnumMap()[#EnumName] = EnumName;
-#define ADD_CLASS_ENUM_MAP(Class, EnumName) getEnumMap()[#EnumName] = static_cast<int>(Class::EnumName);
 
 // =====================================================================================================================
 // Initializes enum convert map
@@ -955,57 +950,6 @@ void initEnumMap() {
   ADD_ENUM_MAP(VkRayTracingShaderGroupTypeNV, VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV);
   ADD_ENUM_MAP(VkRayTracingShaderGroupTypeNV, VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_NV);
   ADD_ENUM_MAP(VkRayTracingShaderGroupTypeNV, VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_NV);
-  // Add Vfx enums
-  ADD_ENUM_MAP(ResultSource, ResultSourceColor)
-  ADD_ENUM_MAP(ResultSource, ResultSourceDepthStencil)
-  ADD_ENUM_MAP(ResultSource, ResultSourceBuffer)
-
-  ADD_ENUM_MAP(ResultCompareMethod, ResultCompareMethodEqual)
-  ADD_ENUM_MAP(ResultCompareMethod, ResultCompareMethodNotEqual)
-
-  ADD_ENUM_MAP(SamplerPattern, SamplerNearest)
-  ADD_ENUM_MAP(SamplerPattern, SamplerLinear)
-  ADD_ENUM_MAP(SamplerPattern, SamplerNearestMipNearest)
-  ADD_ENUM_MAP(SamplerPattern, SamplerLinearMipLinear)
-
-  ADD_ENUM_MAP(ImagePattern, ImageCheckBoxUnorm)
-  ADD_ENUM_MAP(ImagePattern, ImageCheckBoxFloat)
-  ADD_ENUM_MAP(ImagePattern, ImageCheckBoxDepth)
-  ADD_ENUM_MAP(ImagePattern, ImageLinearUnorm)
-  ADD_ENUM_MAP(ImagePattern, ImageLinearFloat)
-  ADD_ENUM_MAP(ImagePattern, ImageLinearDepth)
-  ADD_ENUM_MAP(ImagePattern, ImageSolidUnorm)
-  ADD_ENUM_MAP(ImagePattern, ImageSolidFloat)
-  ADD_ENUM_MAP(ImagePattern, ImageSolidDepth)
-
-  ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorResource)
-  ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorSampler)
-  ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorYCbCrSampler)
-  ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorCombinedTexture)
-  ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorTexelBuffer)
-  ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorFmask)
-  ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorBuffer)
-  ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorTableVaPtr)
-  ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, IndirectUserDataVaPtr)
-  ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, PushConst)
-  ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorBufferCompact)
-  ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, StreamOutTableVaPtr)
-
-  ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, Auto)
-  ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, MaximumSize)
-  ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, HalfSize)
-  ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, OptimizeForVerts)
-  ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, OptimizeForPrims)
-  ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, Explicit)
-
-  ADD_ENUM_MAP(NggCompactMode, NggCompactDisable)
-  ADD_ENUM_MAP(NggCompactMode, NggCompactVertices)
-
-  ADD_CLASS_ENUM_MAP(WaveBreakSize, None)
-  ADD_CLASS_ENUM_MAP(WaveBreakSize, _8x8)
-  ADD_CLASS_ENUM_MAP(WaveBreakSize, _16x16)
-  ADD_CLASS_ENUM_MAP(WaveBreakSize, _32x32)
-  ADD_CLASS_ENUM_MAP(WaveBreakSize, DrawTime)
-};
+}
 
 } // namespace Vfx
