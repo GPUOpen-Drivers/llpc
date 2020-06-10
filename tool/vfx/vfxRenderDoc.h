@@ -39,13 +39,15 @@ class RenderDocument : public Document {
 public:
   RenderDocument() { memset(&m_renderState, 0, sizeof(m_renderState)); };
 
-  virtual unsigned getMaxSectionCount(SectionType type) { return m_maxSectionCount[type]; }
+  virtual unsigned getMaxSectionCount(SectionType type);
 
   virtual VfxRenderStatePtr getDocument();
+  bool getPtrOfSubSection(Section *section, unsigned lineNum, const char *memberName, MemberType memberType,
+                          bool isWriteAccess, unsigned arrayIndex, Section **ptrOut, std::string *errorMsg);
+  Section *createSection(const char *sectionName);
 
 private:
-  static unsigned m_maxSectionCount[SectionTypeNameNum]; // Contants max section count for each section type
-  VfxRenderState m_renderState;                          // Contants the render state
+  VfxRenderState m_renderState; // Contants the render state
 };
 
 } // namespace Vfx

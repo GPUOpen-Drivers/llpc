@@ -28,38 +28,52 @@
 * @brief Contains implementation of class RenderDocument
 ***********************************************************************************************************************
 */
+#include "vfx.h"
+#include "vfxSection.h"
 
+#if VFX_SUPPORT_RENDER_DOCOUMENT
 #include "vfxRenderDoc.h"
+#include "vfxRenderSection.h"
 
 namespace Vfx {
+
 // =====================================================================================================================
-// Max section count for RenderDocument
-unsigned RenderDocument::m_maxSectionCount[SectionTypeNameNum] = {
-    0,               // SectionTypeUnset
-    1,               // SectionTypeResult
-    MaxSectionCount, // SectionTypeBufferView
-    1,               // SectionTypeVertexState
-    1,               // SectionTypeDrawState
-    MaxSectionCount, // SectionTypeImageView
-    MaxSectionCount, // SectionTypeSampler
-    1,               // SectionTypeVersion
-    0,               // SectionTypeGraphicsState,
-    0,               // SectionTypeComputeState,
-    0, // SectionTypeVertexInputState,
-    0, // SectionTypeVertexShaderInfo,
-    0, // SectionTypeTessControlShaderInfo,
-    0, // SectionTypeTessEvalShaderInfo,
-    0, // SectionTypeGeometryShaderInfo,
-    0, // SectionTypeFragmentShaderInfo,
-    0, // SectionTypeComputeShaderInfo,
-    0, // SectionTypeCompileLog
-    1, // SectionTypeVertexShader
-    1, // SectionTypeTessControlShader
-    1, // SectionTypeTessEvalShader
-    1, // SectionTypeGeometryShader
-    1, // SectionTypeFragmentShader
-    1, // SectionTypeComputeShader
-};
+// Gets max section count for RenderDocument
+unsigned RenderDocument::getMaxSectionCount(SectionType type) {
+  unsigned maxSectionCount = 0;
+  switch (type) {
+  case SectionTypeVersion:
+    maxSectionCount = 1;
+    break;
+  case SectionTypeCompileLog:
+    maxSectionCount = 1;
+    break;
+  case SectionTypeResult:
+    maxSectionCount = 1;
+    break;
+  case SectionTypeVertexState:
+    maxSectionCount = 1;
+    break;
+  case SectionTypeDrawState:
+    maxSectionCount = 1;
+    break;
+  case SectionTypeShader:
+    maxSectionCount = ShaderStage::ShaderStageCount;
+    break;
+  case SectionTypeBufferView:
+    maxSectionCount = Vfx::MaxRenderSectionCount;
+    break;
+  case SectionTypeImageView:
+    maxSectionCount = Vfx::MaxRenderSectionCount;
+    break;
+  case SectionTypeSampler:
+    maxSectionCount = Vfx::MaxRenderSectionCount;
+    break;
+  default:
+    break;
+  }
+  return maxSectionCount;
+}
 
 // =====================================================================================================================
 // Gets RenderDocument content
@@ -100,13 +114,92 @@ VfxRenderStatePtr RenderDocument::getDocument() {
   }
 
   // Shader sections
-  for (unsigned i = 0; i < ShaderStageCount; ++i) {
-    if (m_sections[SectionTypeVertexShader + i].size() > 0) {
-      reinterpret_cast<SectionShader *>(m_sections[SectionTypeVertexShader + i][0])
-          ->getSubState(m_renderState.stages[i]);
-    }
+  for (auto &section : m_sections[SectionTypeShader]) {
+    auto pShaderSection = reinterpret_cast<SectionShader *>(&section);
+    auto shaderStage = pShaderSection->getShaderStage();
+    pShaderSection->getSubState(m_renderState.stages[shaderStage]);
   }
 
   return &m_renderState;
 }
+
+// =====================================================================================================================
+// Creates a section object according to section name
+//
+// @param sectionName : Section name
+Section *RenderDocument::createSection(const char *sectionName) {
+  auto it = Section::m_sectionInfo.find(sectionName);
+
+  VFX_ASSERT(it->second.type != SectionTypeUnset);
+
+  Section *section = nullptr;
+  switch (it->second.type) {
+  case SectionTypeResult:
+    section = new SectionResult();
+    break;
+  case SectionTypeBufferView:
+    section = new SectionBufferView();
+    break;
+  case SectionTypeVertexState:
+    section = new SectionVertexState();
+    break;
+  case SectionTypeDrawState:
+    section = new SectionDrawState();
+    break;
+  case SectionTypeImageView:
+    section = new SectionImageView();
+    break;
+  case SectionTypeSampler:
+    section = new SectionSampler();
+    break;
+  default:
+    section = Document::createSection(sectionName);
+    break;
+  }
+
+  return section;
+}
+
+// =====================================================================================================================
+// Gets the pointer of sub section according to member name
+//
+// @param lineNum : Line No.
+// @param memberName : Member name
+// @param memberType : Member type
+// @param isWriteAccess : Whether the sub section will be written
+// @param arrayIndex : Array index
+// @param [out] ptrOut : Pointer of sub section
+// @param [out] errorMsg : Error message
+bool RenderDocument::getPtrOfSubSection(Section *section, unsigned lineNum, const char *memberName,
+                                        MemberType memberType, bool isWriteAccess, unsigned arrayIndex,
+                                        Section **ptrOut, std::string *errorMsg) {
+  bool result = false;
+
+  switch (memberType) {
+    CASE_SUBSECTION(MemberTypeResultItem, SectionResultItem)
+    CASE_SUBSECTION(MemberTypeVertexBufferBindingItem, SectionVertexBufferBinding)
+    CASE_SUBSECTION(MemberTypeVertexAttributeItem, SectionVertexAttribute)
+    CASE_SUBSECTION(MemberTypePushConstRange, SectionPushConstRange)
+  default:
+    result = Document::getPtrOfSubSection(section, lineNum, memberName, memberType, isWriteAccess, arrayIndex, ptrOut,
+                                          errorMsg);
+    break;
+  }
+
+  return result;
+}
+
+// =====================================================================================================================
+// Gets render document from document handle
+//
+// NOTE: The document contents are not accessable after call vfxCloseDoc
+//
+// @param doc : Document handle
+// @param [out] renderState : Pointer of struct VfxRenderState
+void VFXAPI vfxGetRenderDoc(void *doc, VfxRenderStatePtr *renderState) {
+  *renderState = reinterpret_cast<RenderDocument *>(doc)->getDocument();
+}
+
 } // namespace Vfx
+
+#endif

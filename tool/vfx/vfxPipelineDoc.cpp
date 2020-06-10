@@ -28,42 +28,53 @@
 * @brief Contains implementation of class PipelineDocument
 ***********************************************************************************************************************
 */
-#include "vfxPipelineDoc.h"
+#include "vfx.h"
+#include "vfxSection.h"
+
+#ifndef VFX_DISABLE_SPVGEN
 #if VFX_INSIDE_SPVGEN
 #define SH_EXPORTING
 #endif
 #include "spvgen.h"
+#endif
+
+#if VFX_SUPPORT_VK_PIPELINE
+#include "vfxPipelineDoc.h"
+#include "vfxVkSection.h"
 
 using namespace Vkgc;
 
 namespace Vfx {
 // =====================================================================================================================
-// Max section count for PipelineDocument
-unsigned PipelineDocument::m_maxSectionCount[SectionTypeNameNum] = {
-    0, // SectionTypeUnset
-    0, // SectionTypeResult
-    0, // SectionTypeBufferView
-    0, // SectionTypeVertexState
-    0, // SectionTypeDrawState
-    0, // SectionTypeImageView
-    0, // SectionTypeSampler
-    1, // SectionTypeVersion
-    1, // SectionTypeGraphicsState,
-    1, // SectionTypeComputeState,
-    1, // SectionTypeVertexInputState,
-    1, // SectionTypeVertexShaderInfo,
-    1, // SectionTypeTessControlShaderInfo,
-    1, // SectionTypeTessEvalShaderInfo,
-    1, // SectionTypeGeometryShaderInfo,
-    1, // SectionTypeFragmentShaderInfo,
-    1, // SectionTypeComputeShaderInfo,
-    1, // SectionTypeCompileLog
-    1, // SectionTypeVertexShader
-    1, // SectionTypeTessControlShader
-    1, // SectionTypeTessEvalShader
-    1, // SectionTypeGeometryShader
-    1, // SectionTypeFragmentShader
-    1, // SectionTypeComputeShader
+// Gets max section count for PipelineDocument
+unsigned PipelineDocument::getMaxSectionCount(SectionType type) {
+  unsigned maxSectionCount = 0;
+  switch (type) {
+  case SectionTypeVersion:
+    maxSectionCount = 1;
+    break;
+  case SectionTypeCompileLog:
+    maxSectionCount = 1;
+    break;
+  case SectionTypeGraphicsState:
+    maxSectionCount = 1;
+    break;
+  case SectionTypeComputeState:
+    maxSectionCount = 1;
+    break;
+  case SectionTypeVertexInputState:
+    maxSectionCount = 1;
+    break;
+  case SectionTypeShader:
+    maxSectionCount = UINT32_MAX;
+    break;
+  case SectionTypeShaderInfo:
+    maxSectionCount = UINT32_MAX;
+    break;
+  default:
+    break;
+  }
+  return maxSectionCount;
 };
 
 // =====================================================================================================================
@@ -153,19 +164,19 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     m_shaderSources.resize(NativeShaderStageCount);
     m_pipelineState.numStages = NativeShaderStageCount;
     m_pipelineState.stages = &m_shaderSources[0];
-    for (unsigned i = 0; i < NativeShaderStageCount; ++i) {
-      // shader section
-      if (m_sections[SectionTypeVertexShader + i].size() > 0) {
-        reinterpret_cast<SectionShader *>(m_sections[SectionTypeVertexShader + i][0])
-            ->getSubState(m_pipelineState.stages[i]);
-      }
+    // Shader section
+    for (auto section : m_sections[SectionTypeShader]) {
+      auto pShaderSection = reinterpret_cast<SectionShader *>(section);
+      auto stage = pShaderSection->getShaderStage();
 
-      // shader info Section "XXInfo"
-      if (m_sections[SectionTypeVertexShaderInfo + i].size() > 0) {
-        reinterpret_cast<SectionShaderInfo *>(m_sections[SectionTypeVertexShaderInfo + i][0])
-            ->getSubState(*(shaderInfo[i]));
-        shaderInfo[i]->entryStage = m_pipelineState.stages[i].stage;
-      }
+      pShaderSection->getSubState(m_pipelineState.stages[stage]);
+    }
+
+    // Shader info Section "XXInfo"
+    for (auto section : m_sections[SectionTypeShaderInfo]) {
+      auto pShaderInfoSection = reinterpret_cast<SectionShaderInfo *>(section);
+      auto stage = pShaderInfoSection->getShaderStage();
+      pShaderInfoSection->getSubState(*(shaderInfo[stage]));
     }
   }
 
@@ -178,15 +189,16 @@ bool PipelineDocument::validate() {
   unsigned stageMask = 0;
   for (size_t i = 0; i < m_sectionList.size(); ++i) {
     auto sectionType = m_sectionList[i]->getSectionType();
-    if (sectionType >= SectionTypeVertexShader && sectionType < (SectionTypeVertexShader + ShaderStageCount)) {
-      auto stage = sectionType - SectionTypeVertexShader;
+    if (sectionType == SectionTypeShader) {
+      auto stage = reinterpret_cast<SectionShader *>(m_sectionList[i])->getShaderStage();
       stageMask |= (1 << stage);
       if (i == m_sectionList.size()) {
         PARSE_ERROR(m_errorMsg, m_sectionList[i]->getLineNum(), "Fails to find related shader info section!\n");
         return false;
       } else {
         auto nextSectionType = m_sectionList[i + 1]->getSectionType();
-        if (nextSectionType != (SectionTypeVertexShaderInfo + stage)) {
+        if ((nextSectionType != SectionTypeShaderInfo) ||
+            (reinterpret_cast<SectionShaderInfo *>(m_sectionList[i + 1])->getShaderStage() != stage)) {
           PARSE_ERROR(m_errorMsg, m_sectionList[i + 1]->getLineNum(),
                       "Unexpected section type. Shader source and shader info must be in pair!\n");
           return false;
@@ -224,4 +236,78 @@ bool PipelineDocument::validate() {
   return true;
 }
 
+// =====================================================================================================================
+// Creates a section object according to section name
+//
+// @param sectionName : Section name
+Section *PipelineDocument::createSection(const char *sectionName) {
+  auto it = Section::m_sectionInfo.find(sectionName);
+
+  VFX_ASSERT(it->second.type != SectionTypeUnset);
+  Section *section = nullptr;
+  switch (it->second.type) {
+  case SectionTypeGraphicsState:
+    section = new SectionGraphicsState();
+    break;
+  case SectionTypeComputeState:
+    section = new SectionComputeState();
+    break;
+  case SectionTypeVertexInputState:
+    section = new SectionVertexInput();
+    break;
+  case SectionTypeShaderInfo:
+    section = new SectionShaderInfo(it->second);
+    break;
+  default:
+    section = Document::createSection(sectionName);
+    break;
+  }
+
+  return section;
+}
+
+// =====================================================================================================================
+// Gets the pointer of sub section according to member name
+//
+// @param lineNum : Line No.
+// @param memberName : Member name
+// @param memberType : Member type
+// @param isWriteAccess : Whether the sub section will be written
+// @param arrayIndex : Array index
+// @param [out] ptrOut : Pointer of sub section
+// @param [out] errorMsg : Error message
+bool PipelineDocument::getPtrOfSubSection(Section *section, unsigned lineNum, const char *memberName,
+                                          MemberType memberType, bool isWriteAccess, unsigned arrayIndex,
+                                          Section **ptrOut, std::string *errorMsg) {
+  bool result = false;
+
+  switch (memberType) {
+    CASE_SUBSECTION(MemberTypeResourceMappingNode, SectionResourceMappingNode)
+    CASE_SUBSECTION(MemberTypeDescriptorRangeValue, SectionDescriptorRangeValueItem)
+    CASE_SUBSECTION(MemberTypePipelineOption, SectionPipelineOption)
+    CASE_SUBSECTION(MemberTypeShaderOption, SectionShaderOption)
+    CASE_SUBSECTION(MemberTypeNggState, SectionNggState)
+    CASE_SUBSECTION(MemberTypeExtendedRobustness, SectionExtendedRobustness)
+  default:
+    result = Document::getPtrOfSubSection(section, lineNum, memberName, memberType, isWriteAccess, arrayIndex, ptrOut,
+                                          errorMsg);
+    break;
+  }
+
+  return result;
+}
+
+// =====================================================================================================================
+// Gets pipeline document from document handle
+//
+// NOTE: The document contents are not accessable after call vfxCloseDoc
+//
+// @param doc : Document handle
+// @param [out] pipelineState : Pointer of struct VfxPipelineState
+void VFXAPI vfxGetPipelineDoc(void *doc, VfxPipelineStatePtr *pipelineState) {
+  *pipelineState = reinterpret_cast<PipelineDocument *>(doc)->getDocument();
+}
+
 } // namespace Vfx
+
+#endif

@@ -30,8 +30,14 @@
 */
 
 #pragma once
+#include <map>
+#include <string>
+
+#define ADD_ENUM_MAP(EnumType, EnumName) getEnumMap()[#EnumName] = EnumName;
+#define ADD_CLASS_ENUM_MAP(Class, EnumName) getEnumMap()[#EnumName] = static_cast<int>(Class::EnumName);
 
 namespace Vfx {
+std::map<std::string, int> &getEnumMap();
 bool getEnumValue(const char *string, int &value);
 void initEnumMap();
 } // namespace Vfx

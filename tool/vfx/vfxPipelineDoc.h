@@ -44,16 +44,18 @@ public:
     memset(&m_vertexInputState, 0, sizeof(m_vertexInputState));
   };
 
-  virtual unsigned getMaxSectionCount(SectionType type) { return m_maxSectionCount[type]; }
+  virtual unsigned getMaxSectionCount(SectionType type);
 
   virtual bool validate();
 
   virtual bool checkVersion(unsigned ver);
   VfxPipelineStatePtr getDocument();
+  Section *createSection(const char *sectionName);
+  bool getPtrOfSubSection(Section *section, unsigned lineNum, const char *memberName, MemberType memberType,
+                          bool isWriteAccess, unsigned arrayIndex, Section **ptrOut, std::string *errorMsg);
 
 private:
-  static unsigned m_maxSectionCount[SectionTypeNameNum]; // Contants max section count for each section type
-  VfxPipelineState m_pipelineState;                      // Contants the render state
+  VfxPipelineState m_pipelineState; // Contants the render state
   VkPipelineVertexInputStateCreateInfo m_vertexInputState;
   std::vector<Vfx::ShaderSource> m_shaderSources;
   std::vector<Vkgc::PipelineShaderInfo> m_shaderInfos;

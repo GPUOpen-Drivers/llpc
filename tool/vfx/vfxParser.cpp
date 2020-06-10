@@ -32,8 +32,16 @@
 #include "vfxParser.h"
 #include "vfxEnumsConverter.h"
 #include "vfxError.h"
+
+#if VFX_SUPPORT_VK_PIPELINE
 #include "vfxPipelineDoc.h"
+#include "vfxVkSection.h"
+#endif
+
+#if VFX_SUPPORT_RENDER_DOCOUMENT
 #include "vfxRenderDoc.h"
+#endif
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -100,10 +108,15 @@ Document::~Document() {
 //
 // @param type : Document type
 Document *Document::createDocument(VfxDocType type) {
+#if VFX_SUPPORT_RENDER_DOCOUMENT
   if (type == VfxDocTypeRender)
     return new RenderDocument;
-  else
+#endif
+#if VFX_SUPPORT_VK_PIPELINE
+  if (type == VfxDocTypePipeline)
     return new PipelineDocument;
+#endif
+  return nullptr;
 }
 
 // =====================================================================================================================
@@ -115,7 +128,7 @@ Section *Document::getFreeSection(const char *sectionName) {
   SectionType type = Section::getSectionType(sectionName);
   const unsigned maxSectionCount = getMaxSectionCount(type);
   if (m_sections[type].size() < maxSectionCount) {
-    section = Section::createSection(sectionName);
+    section = createSection(sectionName);
     m_sections[type].push_back(section);
     m_sectionList.push_back(section);
   }
@@ -127,7 +140,7 @@ Section *Document::getFreeSection(const char *sectionName) {
 void Document::printSelf() {
   for (unsigned i = 0; i < SectionTypeNameNum; ++i) {
     for (unsigned j = 0; j < m_sections[i].size(); ++j)
-      m_sections[i][j]->printSelf(0);
+      m_sections[i][j]->printSelf(this, 0);
   }
 }
 
@@ -135,22 +148,24 @@ void Document::printSelf() {
 // Compiles input shader source to SPIRV binary
 bool Document::compileShader() {
   bool ret = true;
-  for (unsigned stage = 0; stage < ShaderStageCount; ++stage) {
-    for (size_t i = 0; i < m_sections[SectionTypeVertexShader + stage].size(); ++i) {
-      auto shaderSection = m_sections[SectionTypeVertexShader + stage][i];
-      VFX_ASSERT(m_sections[SectionTypeVertexShaderInfo + stage].size() > i);
-      auto shaderInfoSection = m_sections[SectionTypeVertexShaderInfo + stage][i];
-      bool stageRet =
-          reinterpret_cast<SectionShader *>(shaderSection)->compileShader(m_fileName, shaderInfoSection, &m_errorMsg);
-      ret = ret && stageRet;
+  for (size_t i = 0; i < m_sections[SectionTypeShader].size(); ++i) {
+    auto shaderSection = m_sections[SectionTypeShader][i];
+    const char *entryPoint = nullptr;
+#if VFX_SUPPORT_VK_PIPELINE
+    if (m_sections[SectionTypeShaderInfo].size() > i) {
+      entryPoint = reinterpret_cast<SectionShaderInfo *>(m_sections[SectionTypeShaderInfo][i])->getEntryPoint();
     }
+#endif
+    bool stageRet =
+        reinterpret_cast<SectionShader *>(shaderSection)->compileShader(m_fileName, entryPoint, &m_errorMsg);
+    ret = ret && stageRet;
   }
   return ret;
 }
 
 // =====================================================================================================================
-// Constructs an instance of class VfxParse.
-VfxParser::VfxParser()
+// Constructs an instance of class Document.
+Document::Document()
     : m_isValidVfxFile(false), m_currentSection(nullptr), m_currentLineNum(0), m_currentSectionLineNum(0) {
 }
 
@@ -158,7 +173,7 @@ VfxParser::VfxParser()
 // Parses a config file line.
 //
 // @param line : Input test config line.
-bool VfxParser::parseLine(char *line) {
+bool Document::parseLine(char *line) {
   bool result = true;
   ++m_currentLineNum;
 
@@ -183,21 +198,21 @@ bool VfxParser::parseLine(char *line) {
 // Begins a section.
 //
 // @param line : Input test config line.
-bool VfxParser::beginSection(char *line) {
+bool Document::beginSection(char *line) {
   bool result = true;
   VFX_ASSERT(*line == '[');
   char *bracketBack = strchr(line, ']');
   if (bracketBack)
     *bracketBack = '\0';
   else {
-    PARSE_ERROR(*m_errorMsg, m_currentLineNum, "expect ]");
+    PARSE_ERROR(m_errorMsg, m_currentLineNum, "expect ]");
     result = false;
   }
 
   if (result) {
     line = line + 1;
     char *sectionName = strtok(line, ",");
-    m_currentSection = m_vfxDoc->getFreeSection(sectionName);
+    m_currentSection = getFreeSection(sectionName);
     if (m_currentSection) {
       // Next line is the first line of section content.
       m_currentSectionLineNum = m_currentLineNum + 1;
@@ -212,7 +227,7 @@ bool VfxParser::beginSection(char *line) {
 
 // =====================================================================================================================
 // Ends a section.
-bool VfxParser::endSection() {
+bool Document::endSection() {
   bool result = true;
 
   if (!m_currentSection) {
@@ -227,7 +242,7 @@ bool VfxParser::endSection() {
       if (m_currentSection->getSectionType() == SectionTypeVersion) {
         unsigned version;
         reinterpret_cast<SectionVersion *>(m_currentSection)->getSubState(version);
-        result = m_vfxDoc->checkVersion(version);
+        result = checkVersion(version);
       }
     }
   }
@@ -237,7 +252,7 @@ bool VfxParser::endSection() {
 
 // =====================================================================================================================
 // Parses a line of a pre-defined key-value section.
-bool VfxParser::parseSectionKeyValues() {
+bool Document::parseSectionKeyValues() {
   bool result = true;
 
   // Set line number variable which is used in error report.
@@ -258,7 +273,7 @@ bool VfxParser::parseSectionKeyValues() {
     char *key = nullptr;
     char *value = nullptr;
 
-    result = extractKeyAndValue(lineBuffer, lineNum, '=', &key, &value, m_errorMsg);
+    result = extractKeyAndValue(lineBuffer, lineNum, '=', &key, &value, &m_errorMsg);
 
     if (!result)
       break;
@@ -281,8 +296,8 @@ bool VfxParser::parseSectionKeyValues() {
 // @param [out] memberNameBuffer : Name of the member to be accessed in target section object.
 // @param memberNameBufferSize : Size of member name buffer.
 // @param [out] arrayIndex : Array index applied this member (0 for non array)
-bool VfxParser::parseKey(const char *key, unsigned lineNum, Section *sectionObjectIn, Section **ppSectionObjectOut,
-                         char *memberNameBuffer, unsigned memberNameBufferSize, unsigned *arrayIndex)
+bool Document::parseKey(const char *key, unsigned lineNum, Section *sectionObjectIn, Section **ppSectionObjectOut,
+                        char *memberNameBuffer, unsigned memberNameBufferSize, unsigned *arrayIndex)
 
 {
   bool result = true;
@@ -306,14 +321,14 @@ bool VfxParser::parseKey(const char *key, unsigned lineNum, Section *sectionObje
   while (keyTok) {
     if (isArrayAccess(keyTok)) {
       char *lBracket = nullptr;
-      result = parseArrayAccess(keyTok, lineNum, &parsedArrayIndex, &lBracket, nullptr, m_errorMsg);
+      result = parseArrayAccess(keyTok, lineNum, &parsedArrayIndex, &lBracket, nullptr, &m_errorMsg);
       // Remove bracket from string token
       *lBracket = '\0';
       keyTok = trimStringEnd(keyTok);
     } else
       parsedArrayIndex = 0;
 
-    result = tempSectionObj->isSection(lineNum, keyTok, &isSection, &memberType, m_errorMsg);
+    result = tempSectionObj->isSection(lineNum, keyTok, &isSection, &memberType, &m_errorMsg);
     if (!result)
       break;
 
@@ -321,8 +336,8 @@ bool VfxParser::parseKey(const char *key, unsigned lineNum, Section *sectionObje
       VFX_ASSERT(strlen(keyTok) < memberNameBufferSize);
       strncpy(memberNameBuffer, keyTok, memberNameBufferSize);
     } else {
-      result = tempSectionObj->getPtrOfSubSection(lineNum, keyTok, memberType, true, parsedArrayIndex, &tempSectionObj,
-                                                  m_errorMsg);
+      result = getPtrOfSubSection(tempSectionObj, lineNum, keyTok, memberType, true, parsedArrayIndex, &tempSectionObj,
+                                  &m_errorMsg);
       if (!result)
         break;
     }
@@ -346,7 +361,7 @@ bool VfxParser::parseKey(const char *key, unsigned lineNum, Section *sectionObje
 // @param valueStr : Input value string
 // @param lineNum : Line number
 // @param [out] sectionObject : Key-value map to hold the parse results.
-bool VfxParser::parseKeyValue(char *key, char *valueStr, unsigned lineNum, Section *sectionObject) {
+bool Document::parseKeyValue(char *key, char *valueStr, unsigned lineNum, Section *sectionObject) {
   bool result = false;
 
   Section *accessedSectionObject = nullptr;
@@ -356,7 +371,7 @@ bool VfxParser::parseKeyValue(char *key, char *valueStr, unsigned lineNum, Secti
 
   if (result) {
     MemberType valueType;
-    result = accessedSectionObject->getMemberType(lineNum, memberName, &valueType, m_errorMsg);
+    result = accessedSectionObject->getMemberType(lineNum, memberName, &valueType, &m_errorMsg);
 
     if (result) {
       IUFValue value = {};
@@ -364,7 +379,7 @@ bool VfxParser::parseKeyValue(char *key, char *valueStr, unsigned lineNum, Secti
       // Parse value according to it's type
       switch (valueType) {
       case MemberTypeEnum: {
-        result = parseEnumName(valueStr, lineNum, &value, m_errorMsg);
+        result = parseEnumName(valueStr, lineNum, &value, &m_errorMsg);
         if (result)
           result = accessedSectionObject->set(lineNum, memberName, &(value.iVec4[0]));
         break;
@@ -388,7 +403,7 @@ bool VfxParser::parseKeyValue(char *key, char *valueStr, unsigned lineNum, Secti
         break;
       }
       case MemberTypeBool: {
-        result = parseBool(valueStr, lineNum, &value, m_errorMsg);
+        result = parseBool(valueStr, lineNum, &value, &m_errorMsg);
         if (result) {
           static_assert(sizeof(uint8_t) == sizeof(bool), "");
           uint8_t boolValue = value.iVec4[0] ? 1 : 0;
@@ -441,32 +456,32 @@ bool VfxParser::parseKeyValue(char *key, char *valueStr, unsigned lineNum, Secti
       case MemberTypeIArray:
       case MemberTypeUArray: {
         std::vector<uint8_t> **ppIntData = nullptr;
-        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppIntData, m_errorMsg);
+        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppIntData, &m_errorMsg);
         result = parseIArray(valueStr, lineNum, valueType == MemberTypeIArray, **ppIntData);
         break;
       }
       case MemberTypeI64Array:
       case MemberTypeU64Array: {
         std::vector<uint8_t> **ppIntData = nullptr;
-        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppIntData, m_errorMsg);
+        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppIntData, &m_errorMsg);
         result = parseI64Array(valueStr, lineNum, valueType == MemberTypeI64Array, **ppIntData);
         break;
       }
       case MemberTypeFArray: {
         std::vector<uint8_t> **ppFloatData = nullptr;
-        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppFloatData, m_errorMsg);
+        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppFloatData, &m_errorMsg);
         result = parseFArray(valueStr, lineNum, **ppFloatData);
         break;
       }
       case MemberTypeF16Array: {
         std::vector<uint8_t> **ppFloatData = nullptr;
-        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppFloatData, m_errorMsg);
+        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppFloatData, &m_errorMsg);
         result = parseF16Array(valueStr, lineNum, **ppFloatData);
         break;
       }
       case MemberTypeDArray: {
         std::vector<uint8_t> **ppDoubleData;
-        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppDoubleData, m_errorMsg);
+        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppDoubleData, &m_errorMsg);
         result = parseDArray(valueStr, lineNum, **ppDoubleData);
         break;
       }
@@ -487,7 +502,7 @@ bool VfxParser::parseKeyValue(char *key, char *valueStr, unsigned lineNum, Secti
 
 // =====================================================================================================================
 // Parses shader source section.
-void VfxParser::parseSectionShaderSource() {
+void Document::parseSectionShaderSource() {
   char lineBuffer[MaxLineBufSize];
 
   while (true) {
@@ -510,14 +525,12 @@ void VfxParser::parseSectionShaderSource() {
 //
 // @param info : Name of VFX file to parse.
 // @param [out] doc : Parse result
-bool VfxParser::parse(const TestCaseInfo &info, Document *doc) {
+bool Document::parse(const TestCaseInfo &info) {
   bool result = true;
-  m_vfxDoc = doc;
-  m_errorMsg = doc->getErrorMsg();
 
   FILE *configFile = fopen(info.vfxFile.c_str(), "r");
   if (configFile) {
-    doc->setFileName(info.vfxFile);
+    setFileName(info.vfxFile);
     char lineBuf[MaxLineBufSize];
     char *linePtr = nullptr;
 
@@ -541,14 +554,74 @@ bool VfxParser::parse(const TestCaseInfo &info, Document *doc) {
     fclose(configFile);
 
     if (result)
-      result = m_vfxDoc->validate();
+      result = validate();
 
     if (result)
-      result = m_vfxDoc->compileShader();
+      result = compileShader();
   } else
     result = false;
 
   m_isValidVfxFile = result;
+
+  return result;
+}
+
+// =====================================================================================================================
+// Creates a section object according to section name
+//
+// @param sectionName : Section name
+Section *Document::createSection(const char *sectionName) {
+  auto it = Section::m_sectionInfo.find(sectionName);
+
+  VFX_ASSERT(it->second.type != SectionTypeUnset);
+
+  Section *section = nullptr;
+  switch (it->second.type) {
+  case SectionTypeVersion:
+    section = new SectionVersion();
+    break;
+  case SectionTypeCompileLog:
+    section = new SectionCompileLog();
+    break;
+  case SectionTypeShader:
+    section = new SectionShader(it->second);
+    break;
+  default:
+    VFX_NEVER_CALLED();
+    break;
+  }
+
+  return section;
+}
+
+// =====================================================================================================================
+// Gets the pointer of sub section according to member name
+//
+// @param section : input section object
+// @param lineNum : Line No.
+// @param memberName : Member name
+// @param memberType : Member type
+// @param isWriteAccess : Whether the sub section will be written
+// @param arrayIndex : Array index
+// @param [out] ptrOut : Pointer of sub section
+// @param [out] errorMsg : Error message
+bool Document::getPtrOfSubSection(Section *section, unsigned lineNum, const char *memberName, MemberType memberType,
+                                  bool isWriteAccess, unsigned arrayIndex, Section **ptrOut, std::string *errorMsg) {
+  bool result = false;
+
+  switch (memberType) {
+    CASE_SUBSECTION(MemberTypeSpecConstItem, SectionSpecConstItem)
+    CASE_SUBSECTION(MemberTypeSpecConst, SectionSpecConst)
+    CASE_SUBSECTION(MemberTypeVertexInputBindingItem, SectionVertexInputBinding)
+    CASE_SUBSECTION(MemberTypeVertexInputAttributeItem, SectionVertexInputAttribute)
+    CASE_SUBSECTION(MemberTypeVertexInputDivisorItem, SectionVertexInputDivisor)
+    CASE_SUBSECTION(MemberTypeColorBufferItem, SectionColorBuffer)
+    CASE_SUBSECTION(MemberTypeSpecEntryItem, SectionSpecEntryItem)
+    CASE_SUBSECTION(MemberTypeSpecInfo, SectionSpecInfo)
+  default:
+    VFX_NEVER_CALLED();
+    break;
+  }
 
   return result;
 }
@@ -1239,8 +1312,8 @@ char *getWordFromString(char *str, char *wordBuffer) {
 // @param lineNum : Line number
 // @param macroDefinition : Map of macro definitions
 // @param maxLineLength : Max line length allowed for the substituted string.
-bool VfxParser::macroSubstituteLine(char *line, unsigned lineNum, const MacroDefinition *macroDefinition,
-                                    unsigned maxLineLength) {
+bool Document::macroSubstituteLine(char *line, unsigned lineNum, const MacroDefinition *macroDefinition,
+                                   unsigned maxLineLength) {
   bool result = true;
   VFX_ASSERT(macroDefinition);
 
@@ -1258,7 +1331,7 @@ bool VfxParser::macroSubstituteLine(char *line, unsigned lineNum, const MacroDef
       size_t beforeLen = namePos - line;
 
       if (beforeLen + valueLen + restLen >= maxLineLength) {
-        PARSE_ERROR(*m_errorMsg, lineNum, "Line length after macro substitution exceeds MaxLineBufSize.");
+        PARSE_ERROR(m_errorMsg, lineNum, "Line length after macro substitution exceeds MaxLineBufSize.");
         result = false;
         break;
       }
@@ -1291,7 +1364,7 @@ namespace Vfx {
 // @param [out] ppErrorMsg : Error message
 bool VFXAPI vfxParseFile(const char *filename, unsigned int numMacro, const char *macros[], VfxDocType type,
                          void **ppDoc, const char **ppErrorMsg) {
-  VfxParser parser;
+
   TestCaseInfo testCase;
 
   testCase.vfxFile = filename;
@@ -1299,7 +1372,7 @@ bool VFXAPI vfxParseFile(const char *filename, unsigned int numMacro, const char
     testCase.macros[macros[2 * i]] = macros[2 * i + 1];
 
   Document *doc = Document::createDocument(type);
-  bool ret = parser.parse(testCase, doc);
+  bool ret = doc->parse(testCase);
 
   *ppDoc = doc;
   *ppErrorMsg = doc->getErrorMsg()->c_str();
@@ -1313,28 +1386,6 @@ bool VFXAPI vfxParseFile(const char *filename, unsigned int numMacro, const char
 // @param doc : Document handle
 void VFXAPI vfxCloseDoc(void *doc) {
   delete reinterpret_cast<Document *>(doc);
-}
-
-// =====================================================================================================================
-// Gets render document from document handle
-//
-// NOTE: The document contents are not accessable after call vfxCloseDoc
-//
-// @param doc : Document handle
-// @param [out] renderState : Pointer of struct VfxRenderState
-void VFXAPI vfxGetRenderDoc(void *doc, VfxRenderStatePtr *renderState) {
-  *renderState = reinterpret_cast<RenderDocument *>(doc)->getDocument();
-}
-
-// =====================================================================================================================
-// Gets pipeline document from document handle
-//
-// NOTE: The document contents are not accessable after call vfxCloseDoc
-//
-// @param doc : Document handle
-// @param [out] pipelineState : Pointer of struct VfxPipelineState
-void VFXAPI vfxGetPipelineDoc(void *doc, VfxPipelineStatePtr *pipelineState) {
-  *pipelineState = reinterpret_cast<PipelineDocument *>(doc)->getDocument();
 }
 
 // =====================================================================================================================

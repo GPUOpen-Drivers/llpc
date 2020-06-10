@@ -14,14 +14,16 @@ CPPFILES +=              \
     vfxPipelineDoc.cpp   \
     vfxRenderDoc.cpp     \
     vfxSection.cpp       \
-    vfxEnumsConverter.cpp
+    vfxEnumsConverter.cpp \
+    vfxVkSection.cpp
 
 LIB_TARGET = icdapicompilertoolvfx
 
 ifeq ($(ICD_PLATFORM), win)
     LCXXDEFS += -D_SCL_SECURE_NO_WARNINGS       \
                 -DUNICODE                       \
-                -D_UNICODE
+                -D_UNICODE                      \
+                -DVFX_SUPPORT_VK_PIPELINE
 endif
 
 ifeq ($(ICD_PLATFORM), win)
