@@ -67,7 +67,8 @@ private:
   bool checkGsOnChipValidity();
 
   // Sets NGG control settings
-  void setNggControl();
+  void setNggControl(llvm::Module *module);
+  bool canUseNggCulling(llvm::Module *module);
   void buildNggCullingControlRegister(NggControl &nggControl);
   unsigned getVerticesPerPrimitive() const;
 

@@ -97,7 +97,7 @@ bool PatchResourceCollect::runOnModule(Module &module) {
 
   if (m_pipelineState->isGraphics()) {
     // Set NGG control settings
-    setNggControl();
+    setNggControl(&module);
 
     // Determine whether or not GS on-chip mode is valid for this pipeline
     bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
@@ -114,7 +114,11 @@ bool PatchResourceCollect::runOnModule(Module &module) {
 
 // =====================================================================================================================
 // Sets NGG control settings
-void PatchResourceCollect::setNggControl() {
+//
+// @param [in/out] module : Module
+void PatchResourceCollect::setNggControl(Module *module) {
+  assert(m_pipelineState->isGraphics());
+
   // For GFX10+, initialize NGG control settings
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10)
     return;
@@ -191,36 +195,8 @@ void PatchResourceCollect::setNggControl() {
     }
 
     // NOTE: Further check if we have to turn on pass-through mode forcibly.
-    if (!nggControl.passthroughMode) {
-      // NOTE: Further check if pass-through mode should be enabled
-      const auto topology = m_pipelineState->getInputAssemblyState().topology;
-      if (hasGs) {
-        const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
-        if (geometryMode.outputPrimitive != OutputPrimitives::TriangleStrip) {
-          // If GS output primitive type is not triangle strip, NGG runs in "pass-through"
-          // (actual no culling) mode
-          nggControl.passthroughMode = true;
-        }
-      } else if (topology == PrimitiveTopology::PointList || topology == PrimitiveTopology::LineList ||
-                 topology == PrimitiveTopology::LineStrip || topology == PrimitiveTopology::LineListWithAdjacency ||
-                 topology == PrimitiveTopology::LineStripWithAdjacency) {
-        // NGG runs in pass-through mode for non-triangle primitives
-        nggControl.passthroughMode = true;
-      } else if (topology == PrimitiveTopology::PatchList) {
-        // NGG runs in pass-through mode for non-triangle tessellation output
-        assert(hasTs);
-
-        const auto &tessMode = m_pipelineState->getShaderModes()->getTessellationMode();
-        if (tessMode.pointMode || tessMode.primitiveMode == PrimitiveMode::Isolines)
-          nggControl.passthroughMode = true;
-      }
-
-      const auto polygonMode = m_pipelineState->getRasterizerState().polygonMode;
-      if (polygonMode == PolygonModeLine || polygonMode == PolygonModePoint) {
-        // NGG runs in pass-through mode for non-fill polygon mode
-        nggControl.passthroughMode = true;
-      }
-    }
+    if (!nggControl.passthroughMode)
+      nggControl.passthroughMode = !canUseNggCulling(module);
 
     // Build NGG culling-control registers
     buildNggCullingControlRegister(nggControl);
@@ -281,6 +257,91 @@ void PatchResourceCollect::setNggControl() {
     LLPC_OUTS("VertsPerSubgroup             = " << nggControl.vertsPerSubgroup << "\n");
     LLPC_OUTS("\n");
   }
+}
+
+// =====================================================================================================================
+// Checks whether NGG culling could be enabled.
+//
+// @param [in/out] module : Module
+bool PatchResourceCollect::canUseNggCulling(Module *module) {
+  assert(m_pipelineState->isGraphics());
+  assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10);
+
+  const bool hasTs =
+      m_pipelineState->hasShaderStage(ShaderStageTessControl) || m_pipelineState->hasShaderStage(ShaderStageTessEval);
+  const bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
+
+  // Check topology, disable NGG culling if primitive is not triangle-based
+  if (hasGs) {
+    // For GS, check output primitive type
+    const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
+    if (geometryMode.outputPrimitive != OutputPrimitives::TriangleStrip) {
+      return false;
+    }
+  } else {
+    const auto topology = m_pipelineState->getInputAssemblyState().topology;
+    if (hasTs) {
+      // For tessellation, check primitive mode
+      assert(topology == PrimitiveTopology::PatchList);
+      const auto &tessMode = m_pipelineState->getShaderModes()->getTessellationMode();
+      if (tessMode.pointMode || tessMode.primitiveMode == PrimitiveMode::Isolines)
+        return false;
+    } else {
+      // Check topology specified in pipeline state
+      if (topology == PrimitiveTopology::PointList || topology == PrimitiveTopology::LineList ||
+          topology == PrimitiveTopology::LineStrip || topology == PrimitiveTopology::LineListWithAdjacency ||
+          topology == PrimitiveTopology::LineStripWithAdjacency)
+        return false;
+    }
+  }
+
+  // Check polygon mode, disable NGG culling if not filled mode
+  const auto polygonMode = m_pipelineState->getRasterizerState().polygonMode;
+  if (polygonMode == PolygonModeLine || polygonMode == PolygonModePoint) {
+    return false;
+  }
+
+  // Check the presence of position export, disable NGG culling if position export is absent
+  bool usePosition = false;
+  if (hasGs)
+    usePosition = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs.position;
+  else if (hasTs)
+    usePosition = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes.position;
+  else
+    usePosition = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.position;
+
+  if (!usePosition)
+    return false; // No position export
+
+  // Find position export call
+  std::string posCallName = lgcName::OutputExportBuiltIn;
+  posCallName += PipelineState::getBuiltInName(BuiltInPosition);
+  auto callStage = hasGs ? ShaderStageGeometry : (hasTs ? ShaderStageTessEval : ShaderStageVertex);
+
+  CallInst *posCall = nullptr;
+  for (Function &func : *module) {
+    if (func.getName().startswith(posCallName)) {
+      for (User *user : func.users()) {
+        auto call = cast<CallInst>(user);
+        if (m_pipelineShaders->getShaderStage(call->getFunction()) == callStage) {
+          posCall = call;
+          break;
+        }
+      }
+
+      if (posCall) // Already find the call
+        break;
+    }
+  }
+  assert(posCall); // Position export must exist
+
+  // Check position value, disable NGG culling if it is constant
+  auto posValue = posCall->getArgOperand(posCall->getNumArgOperands() - 1); // Last argument is position value
+  if (isa<Constant>(posValue))
+    return false;
+
+  // We can safely enable NGG culling here
+  return true;
 }
 
 // =====================================================================================================================
