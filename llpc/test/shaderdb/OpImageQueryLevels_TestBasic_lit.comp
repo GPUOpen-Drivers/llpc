@@ -51,7 +51,6 @@ void main()
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 0, i32 0, {{.*}})
 ; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr{{.*}}(i32 0, i32 1
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 0, i32 0, {{.*}})
-; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr{{.*}}(i32 0, i32 1
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 0, {{.*}})
 ; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr{{.*}}(i32 0, i32 2
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 2, i32 0, {{.*}})

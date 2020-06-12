@@ -551,7 +551,7 @@ protected:
 private:
   // Record one Builder call
   llvm::Instruction *record(Opcode opcode, llvm::Type *returnTy, llvm::ArrayRef<llvm::Value *> args,
-                            const llvm::Twine &instName, llvm::ArrayRef<llvm::Attribute::AttrKind> attribs = {});
+                            const llvm::Twine &instName);
 
   PipelineState *m_pipelineState;             // PipelineState; nullptr for shader compile
   std::unique_ptr<ShaderModes> m_shaderModes; // ShaderModes for a shader compile
