@@ -140,6 +140,9 @@ private:
     bool usesStreamOutTable = false;
   };
 
+  // Set up compute-with-calls flag.
+  void setupComputeWithCalls(Module *module);
+
   // Gather user data usage in all shaders.
   void gatherUserDataUsage(Module *module);
 
@@ -147,6 +150,8 @@ private:
   void fixupUserDataUses(Module &module);
 
   void processShader(ShaderInputs *shaderInputs);
+  void processComputeFuncs(ShaderInputs *shaderInputs, Module &module);
+  void setFuncAttrs(Function *entryPoint);
 
   uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys);
 
@@ -167,9 +172,12 @@ private:
   // Get the shader stage that the given shader stage is merged into.
   ShaderStage getMergedShaderStage(ShaderStage stage) const;
 
+  bool isComputeWithCalls() const { return m_computeWithCalls; }
+
   bool m_hasTs;                             // Whether the pipeline has tessllation shader
   bool m_hasGs;                             // Whether the pipeline has geometry shader
   PipelineState *m_pipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
+  bool m_computeWithCalls = false;          // Whether this is compute pipeline with calls or compute library
   // Per-HW-shader-stage gathered user data usage information.
   SmallVector<std::unique_ptr<UserDataUsage>, ShaderStageCount> m_userDataUsage;
 };
@@ -212,19 +220,19 @@ bool PatchEntryPointMutate::runOnModule(Module &module) {
   ShaderInputs shaderInputs(&module.getContext());
   shaderInputs.gatherUsage(module);
 
-  // Process each shader in turn, but not the copy shader.
-  auto pipelineShaders = &getAnalysis<PipelineShaders>();
-  for (unsigned shaderStage = ShaderStageVertex; shaderStage < ShaderStageNativeStageCount; ++shaderStage) {
-    m_entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
-    if (m_entryPoint) {
-      m_shaderStage = static_cast<ShaderStage>(shaderStage);
-      if (m_shaderStage == ShaderStageCompute) {
-        // We no longer support compute shader fixed layout required before PAL interface version 624.
-        if (m_pipelineState->getLgcContext()->getPalAbiVersion() < 624)
-          report_fatal_error("Compute shader not supported before PAL version 624");
+  if (m_pipelineState->isGraphics()) {
+    // Process each shader in turn, but not the copy shader.
+    auto pipelineShaders = &getAnalysis<PipelineShaders>();
+    for (unsigned shaderStage = ShaderStageVertex; shaderStage < ShaderStageNativeStageCount; ++shaderStage) {
+      m_entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
+      if (m_entryPoint) {
+        m_shaderStage = static_cast<ShaderStage>(shaderStage);
+        processShader(&shaderInputs);
       }
-      processShader(&shaderInputs);
     }
+  } else {
+    setupComputeWithCalls(&module);
+    processComputeFuncs(&shaderInputs, module);
   }
 
   // Fix up user data uses to use entry args.
@@ -235,6 +243,35 @@ bool PatchEntryPointMutate::runOnModule(Module &module) {
   shaderInputs.fixupUses(*m_module, m_pipelineState);
 
   return true;
+}
+
+// =====================================================================================================================
+// Set up compute-with-calls flag. It is set for either of these two cases:
+// 1. a compute library;
+// 2. a compute pipeline that does indirect calls or calls to external functions.
+//
+// When set, this pass behaves differently, not attempting to omit unused shader inputs, since all shader inputs
+// are potentially used in other functions. It also modifies each call to pass the shader inputs between functions.
+//
+// @param module : IR module
+void PatchEntryPointMutate::setupComputeWithCalls(Module *module) {
+  m_computeWithCalls = false;
+  if (m_pipelineState->getShaderStageMask() != shaderStageToMask(ShaderStageCompute))
+    return;
+  if (m_pipelineState->isComputeLibrary()) {
+    m_computeWithCalls = true;
+    return;
+  }
+
+  // We have a compute pipeline. Check whether there are any non-shader-entry-point functions (other than lgc.*
+  // functions and intrinsics).
+  for (Function &func : *module) {
+    if (func.isDeclaration() && func.getIntrinsicID() == Intrinsic::not_intrinsic &&
+        !func.getName().startswith(lgcName::InternalCallPrefix)) {
+      m_computeWithCalls = true;
+      break;
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -635,7 +672,118 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
   Function *entryPoint =
       addFunctionArgs(origEntryPoint, origEntryPoint->getFunctionType()->getReturnType(), argTys, inRegMask);
 
-  // Set Attributes on new function here.
+  // Set Attributes on new function.
+  setFuncAttrs(entryPoint);
+
+  // Remove original entry-point
+  origEntryPoint->eraseFromParent();
+}
+
+// =====================================================================================================================
+// Process all functions in a compute pipeline or library.
+//
+// @param shaderInputs : ShaderInputs object representing hardware-provided shader inputs
+// @param [in/out] module : Module
+void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Module &module) {
+  m_shaderStage = ShaderStageCompute;
+
+  // We no longer support compute shader fixed layout required before PAL interface version 624.
+  if (m_pipelineState->getLgcContext()->getPalAbiVersion() < 624)
+    report_fatal_error("Compute shader not supported before PAL version 624");
+
+  // Determine what args need to be added on to all functions.
+  SmallVector<Type *, 8> shaderInputTys;
+  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, shaderInputTys);
+
+  // Process each function definition.
+  SmallVector<Function *, 4> origFuncs;
+  for (Function &func : module) {
+    if (!func.isDeclaration())
+      origFuncs.push_back(&func);
+  }
+  for (Function *origFunc : origFuncs) {
+    // Create the new function and transfer code and attributes to it.
+    Function *newFunc =
+        addFunctionArgs(origFunc, origFunc->getFunctionType()->getReturnType(), shaderInputTys, inRegMask);
+
+    // Set Attributes on new function.
+    setFuncAttrs(newFunc);
+
+    // Change any uses of the old function to a bitcast of the new function.
+    SmallVector<Use *, 4> funcUses;
+    for (auto &use : origFunc->uses())
+      funcUses.push_back(&use);
+    Constant *bitCastFunc = ConstantExpr::getBitCast(newFunc, origFunc->getType());
+    for (Use *use : funcUses)
+      *use = bitCastFunc;
+
+    // Remove original function.
+    origFunc->eraseFromParent();
+  }
+
+  if (origFuncs.size() == 1 && !isComputeWithCalls())
+    return;
+
+  // This is one of:
+  // - a compute pipeline with non-inlined functions;
+  // - a compute pipeline with calls to library functions;
+  // - a compute library.
+  // We need to scan the code and modify each call to prepend the extra args.
+  IRBuilder<> builder(module.getContext());
+  for (Function &func : module) {
+    if (func.isDeclaration())
+      continue;
+    for (BasicBlock &block : func) {
+      for (auto it = block.begin(), end = block.end(); it != end;) {
+        // Get the instruction and increment the iterator beyond it, so we can safely erase the instruction.
+        Instruction *inst = &*it;
+        ++it;
+        auto call = dyn_cast<CallInst>(inst);
+        if (!call)
+          continue;
+        // Got a call. Skip it if it calls an intrinsic or an internal lgc.* function.
+        Value *calledVal = call->getCalledOperand();
+        if (auto calledFunc = dyn_cast<Function>(calledVal)) {
+          if (calledFunc->isIntrinsic() || calledFunc->getName().startswith(lgcName::InternalCallPrefix))
+            continue;
+        }
+        // Build a new arg list, made of the ABI args shared by all functions (user data and hardware shader
+        // inputs), plus the original args on the call.
+        SmallVector<Type *, 8> argTys;
+        SmallVector<Value *, 8> args;
+        for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {
+          argTys.push_back(func.getArg(idx)->getType());
+          args.push_back(func.getArg(idx));
+        }
+        for (unsigned idx = 0; idx != call->getNumArgOperands(); ++idx) {
+          argTys.push_back(call->getArgOperand(idx)->getType());
+          args.push_back(call->getArgOperand(idx));
+        }
+        // Get the new called value as a bitcast of the old called value. If the old called value is already
+        // the inverse bitcast, just drop that bitcast.
+        FunctionType *calledTy = FunctionType::get(call->getType(), argTys, false);
+        builder.SetInsertPoint(call);
+        Type *calledPtrTy = calledTy->getPointerTo(calledVal->getType()->getPointerAddressSpace());
+        auto bitCast = dyn_cast<BitCastOperator>(calledVal);
+        Value *newCalledVal = nullptr;
+        if (bitCast && bitCast->getOperand(0)->getType() == calledPtrTy)
+          newCalledVal = bitCast->getOperand(0);
+        else
+          newCalledVal = builder.CreateBitCast(calledVal, calledPtrTy);
+        // Create the call.
+        CallInst *newCall = builder.CreateCall(calledTy, newCalledVal, args);
+        newCall->setCallingConv(call->getCallingConv());
+        // Replace and erase the old one.
+        call->replaceAllUsesWith(newCall);
+        call->eraseFromParent();
+      }
+    }
+  }
+}
+
+// =====================================================================================================================
+// Set Attributes on new function
+void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
   AttrBuilder builder;
   if (m_shaderStage == ShaderStageFragment) {
     auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
@@ -705,10 +853,6 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
   // LLVM optimization to remove sendmsg(GS_DONE). It is unexpected.
   if (entryPoint->hasFnAttribute(Attribute::ReadNone))
     entryPoint->removeFnAttr(Attribute::ReadNone);
-
-  // Remove original entry-point
-  origEntryPoint->dropAllReferences();
-  origEntryPoint->eraseFromParent();
 }
 
 // =====================================================================================================================
@@ -922,9 +1066,14 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
   } else if (m_shaderStage == ShaderStageCompute) {
     // Emulate gl_NumWorkGroups via user data registers.
     // Later code needs to ensure that this starts on an even numbered register.
-    if (builtInUsage.cs.numWorkgroups || userDataUsage->isSpecialUserDataUsed(UserDataMapping::Workgroup)) {
+    // Always enable this, even if unused, if compute library is in use.
+    // Unlike all the special user data values above, which go after the user data node args, this goes before.
+    // That is to ensure that, with a compute pipeline using a library, library code knows where to find it
+    // even if it thinks that the user data layout is a prefix of what the pipeline thinks it is.
+    if (isComputeWithCalls() || builtInUsage.cs.numWorkgroups ||
+        userDataUsage->isSpecialUserDataUsed(UserDataMapping::Workgroup)) {
       auto numWorkgroupsPtrTy = PointerType::get(FixedVectorType::get(builder.getInt32Ty(), 3), ADDR_SPACE_CONST);
-      specialUserDataArgs.push_back(
+      userDataArgs.push_back(
           UserDataArg(numWorkgroupsPtrTy, UserDataMapping::Workgroup, &entryArgIdxs.cs.numWorkgroupsPtr));
     }
   }
@@ -1026,12 +1175,14 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
       break;
 
     case ResourceNodeType::DescriptorTableVaPtr: {
-      // Check if the descriptor set is in use.
-      if (userDataUsage->descriptorSets.size() <= node.innerTable[0].set)
-        break;
-      auto &descSetUsage = userDataUsage->descriptorSets[node.innerTable[0].set];
-      if (descSetUsage.users.empty())
-        break;
+      // Check if the descriptor set is in use. For compute with calls, enable it anyway.
+      if (!isComputeWithCalls()) {
+        if (userDataUsage->descriptorSets.size() <= node.innerTable[0].set)
+          break;
+        auto &descSetUsage = userDataUsage->descriptorSets[node.innerTable[0].set];
+        if (descSetUsage.users.empty())
+          break;
+      }
 
       unsigned userDataValue = node.offsetInDwords;
       if (m_pipelineState->getShaderOptions(m_shaderStage).updateDescInElf && m_shaderStage == ShaderStageFragment) {
@@ -1045,6 +1196,7 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
         userDataValue = DescRelocMagic | node.innerTable[0].set;
       }
       // Add the arg (descriptor set pointer) that we can potentially unspill.
+      auto &descSetUsage = userDataUsage->descriptorSets[node.innerTable[0].set];
       addUserDataArg(userDataArgs, userDataValue, node.sizeInDwords, &descSetUsage.entryArgIdx, builder);
       break;
     }
@@ -1106,7 +1258,8 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
         if (userDataUsage->rootDescriptors.size() <= dwordOffset)
           break;
         auto &rootDescUsage = userDataUsage->rootDescriptors[dwordOffset];
-        if (rootDescUsage.users.empty())
+        // Skip unused descriptor, except for compute-with-calls.
+        if (rootDescUsage.users.empty() && !isComputeWithCalls())
           continue;
         unsigned dwordSize = rootDescUsage.users[0]->getType()->getPrimitiveSizeInBits() / 32;
         // Add the arg (root descriptor) that we can potentially unspill.
@@ -1187,6 +1340,13 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
       m_pipelineState->getPalMetadata()->setUserDataSpillUsage(std::min(userDataUsage->spillUsage, minByteOffset / 4));
   }
 
+  // In compute-with-calls, we need to ensure that the compute shader and library code agree that s15 is the spill
+  // table pointer, even if it is not needed, because library code does not know whether a spill table pointer is
+  // needed in the pipeline. Thus we cannot use s15 for anything else. Using the single-arg UserDataArg
+  // constructor like this means that the arg is not used, so it will not be set up in PAL metadata.
+  if (m_computeWithCalls && spillTableArg.empty())
+    spillTableArg.push_back(UserDataArg(builder.getInt32Ty()));
+
   // Figure out how many sgprs we have available for userDataArgs.
   unsigned userDataEnd = 0;
   // We have s0-s31 (s0-s15 for <=GFX8, or for a compute shader on any chip) for everything, so take off the number
@@ -1215,6 +1375,8 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
           // We over-ran the available SGPRs by filling them up and then realizing we needed a spill table pointer.
           // Remove the last unspilled node (and any padding arg before that), and ensure that spill usage is
           // set correctly so that PAL metadata spill threshold is correct.
+          // (Note that this path cannot happen in compute-with-calls, because we pre-reserved a slot for the
+          // spill table pointer.)
           userDataIdx -= unspilledArgs.back().argDwordSize;
           userDataUsage->spillUsage = std::min(userDataUsage->spillUsage, unspilledArgs.back().userDataValue);
           unspilledArgs.pop_back();
@@ -1231,7 +1393,17 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
     unspilledArgs.push_back(userDataArg);
   }
 
+  // For compute-with-calls, add extra padding unspilled args until we get to s15. s15 will then be used for
+  // the spill table pointer below, even if we didn't appear to need one.
+  if (m_computeWithCalls) {
+    while (userDataIdx < userDataEnd) {
+      unspilledArgs.push_back(UserDataArg(builder.getInt32Ty()));
+      ++userDataIdx;
+    }
+  }
+
   // Add the special args and the spill table pointer (if any) to unspilledArgs.
+  // (specialUserDataArgs is empty for compute, and thus for compute-with-calls.)
   unspilledArgs.insert(unspilledArgs.end(), specialUserDataArgs.begin(), specialUserDataArgs.end());
   unspilledArgs.insert(unspilledArgs.end(), spillTableArg.begin(), spillTableArg.end());
 }

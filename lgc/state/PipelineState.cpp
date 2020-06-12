@@ -296,7 +296,7 @@ void PipelineState::record(Module *module) {
   recordVertexInputDescriptions(module);
   recordColorExportState(module);
   recordGraphicsState(module);
-  if (m_palMetadata)
+  if (m_palMetadata && !isComputeLibrary())
     m_palMetadata->record(module);
 }
 
@@ -319,6 +319,7 @@ void PipelineState::readState(Module *module) {
 
 // =====================================================================================================================
 // Read shaderStageMask from IR. This consists of checking what shader stage functions are present in the IR.
+// It also sets the m_computeLibrary flag if there are no shader entry-points.
 //
 // @param module : LLVM module
 void PipelineState::readShaderStageMask(Module *module) {
@@ -329,6 +330,10 @@ void PipelineState::readShaderStageMask(Module *module) {
       if (shaderStage != ShaderStageInvalid)
         m_stageMask |= 1 << shaderStage;
     }
+  }
+  if (m_stageMask == 0) {
+    m_stageMask = 1 << ShaderStageCompute;
+    m_computeLibrary = true;
   }
 }
 
