@@ -486,7 +486,7 @@ Instruction *BuilderRecorder::CreateReadClock(bool realtime, const Twine &instNa
 // @param x : Input value X
 // @param instName : Name to give final instruction)
 Value *BuilderRecorder::CreateTan(Value *x, const Twine &instName) {
-  return record(Tan, x->getType(), x, instName, {});
+  return record(Tan, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
@@ -495,7 +495,7 @@ Value *BuilderRecorder::CreateTan(Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give final instruction)
 Value *BuilderRecorder::CreateASin(Value *x, const Twine &instName) {
-  return record(ASin, x->getType(), x, instName, {});
+  return record(ASin, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
@@ -504,7 +504,7 @@ Value *BuilderRecorder::CreateASin(Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give final instruction)
 Value *BuilderRecorder::CreateACos(Value *x, const Twine &instName) {
-  return record(ACos, x->getType(), x, instName, {});
+  return record(ACos, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
@@ -513,7 +513,7 @@ Value *BuilderRecorder::CreateACos(Value *x, const Twine &instName) {
 // @param yOverX : Input value Y/X
 // @param instName : Name to give final instruction
 Value *BuilderRecorder::CreateATan(Value *yOverX, const Twine &instName) {
-  return record(ATan, yOverX->getType(), yOverX, instName, {});
+  return record(ATan, yOverX->getType(), yOverX, instName);
 }
 
 // =====================================================================================================================
@@ -523,7 +523,7 @@ Value *BuilderRecorder::CreateATan(Value *yOverX, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give final instruction
 Value *BuilderRecorder::CreateATan2(Value *y, Value *x, const Twine &instName) {
-  return record(ATan2, y->getType(), {y, x}, instName, {});
+  return record(ATan2, y->getType(), {y, x}, instName);
 }
 
 // =====================================================================================================================
@@ -532,7 +532,7 @@ Value *BuilderRecorder::CreateATan2(Value *y, Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give final instruction
 Value *BuilderRecorder::CreateSinh(Value *x, const Twine &instName) {
-  return record(Sinh, x->getType(), x, instName, {});
+  return record(Sinh, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
@@ -541,7 +541,7 @@ Value *BuilderRecorder::CreateSinh(Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give final instruction
 Value *BuilderRecorder::CreateCosh(Value *x, const Twine &instName) {
-  return record(Cosh, x->getType(), x, instName, {});
+  return record(Cosh, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
@@ -550,7 +550,7 @@ Value *BuilderRecorder::CreateCosh(Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give final instruction
 Value *BuilderRecorder::CreateTanh(Value *x, const Twine &instName) {
-  return record(Tanh, x->getType(), x, instName, {});
+  return record(Tanh, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
@@ -559,7 +559,7 @@ Value *BuilderRecorder::CreateTanh(Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give final instruction
 Value *BuilderRecorder::CreateASinh(Value *x, const Twine &instName) {
-  return record(ASinh, x->getType(), x, instName, {});
+  return record(ASinh, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
@@ -568,7 +568,7 @@ Value *BuilderRecorder::CreateASinh(Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give final instruction
 Value *BuilderRecorder::CreateACosh(Value *x, const Twine &instName) {
-  return record(ACosh, x->getType(), x, instName, {});
+  return record(ACosh, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
@@ -577,7 +577,7 @@ Value *BuilderRecorder::CreateACosh(Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give final instruction
 Value *BuilderRecorder::CreateATanh(Value *x, const Twine &instName) {
-  return record(ATanh, x->getType(), x, instName, {});
+  return record(ATanh, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
@@ -587,7 +587,7 @@ Value *BuilderRecorder::CreateATanh(Value *x, const Twine &instName) {
 // @param y : Input value Y
 // @param instName : Name to give final instruction
 Value *BuilderRecorder::CreatePower(Value *x, Value *y, const Twine &instName) {
-  return record(Power, x->getType(), {x, y}, instName, {});
+  return record(Power, x->getType(), {x, y}, instName);
 }
 
 // =====================================================================================================================
@@ -596,7 +596,7 @@ Value *BuilderRecorder::CreatePower(Value *x, Value *y, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give final instruction
 Value *BuilderRecorder::CreateExp(Value *x, const Twine &instName) {
-  return record(Exp, x->getType(), x, instName, {});
+  return record(Exp, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
@@ -605,7 +605,7 @@ Value *BuilderRecorder::CreateExp(Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give final instruction
 Value *BuilderRecorder::CreateLog(Value *x, const Twine &instName) {
-  return record(Log, x->getType(), x, instName, {});
+  return record(Log, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
@@ -614,7 +614,7 @@ Value *BuilderRecorder::CreateLog(Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give final instruction
 Value *BuilderRecorder::CreateInverseSqrt(Value *x, const Twine &instName) {
-  return record(InverseSqrt, x->getType(), x, instName, {});
+  return record(InverseSqrt, x->getType(), x, instName);
 }
 
 // =====================================================================================================================
@@ -1346,7 +1346,7 @@ Value *BuilderRecorder::CreateReadGenericInput(Type *resultTy, unsigned location
                     getInt32(inputInfo.getData()),
                     vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
                 },
-                instName, Attribute::ReadOnly);
+                instName);
 }
 
 // =====================================================================================================================
@@ -1372,7 +1372,7 @@ Value *BuilderRecorder::CreateReadGenericOutput(Type *resultTy, unsigned locatio
                     getInt32(outputInfo.getData()),
                     vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
                 },
-                instName, Attribute::ReadOnly);
+                instName);
 }
 
 // =====================================================================================================================
@@ -1403,7 +1403,7 @@ Instruction *BuilderRecorder::CreateWriteGenericOutput(Value *valueToWrite, unsi
                     getInt32(outputInfo.getData()),
                     vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
                 },
-                "", {});
+                "");
 }
 
 // =====================================================================================================================
@@ -1422,7 +1422,7 @@ Instruction *BuilderRecorder::CreateWriteXfbOutput(Value *valueToWrite, bool isB
   return record(Opcode::WriteXfbOutput, nullptr,
                 {valueToWrite, getInt1(isBuiltIn), getInt32(location), getInt32(xfbBuffer), getInt32(xfbStride),
                  xfbOffset, getInt32(outputInfo.getData())},
-                "", {});
+                "");
 }
 
 // =====================================================================================================================
@@ -1451,7 +1451,7 @@ Value *BuilderRecorder::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo in
                     vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
                     index ? index : UndefValue::get(getInt32Ty()),
                 },
-                instName, Attribute::ReadOnly);
+                instName);
 }
 
 // =====================================================================================================================
@@ -1480,7 +1480,7 @@ Value *BuilderRecorder::CreateReadBuiltInOutput(BuiltInKind builtIn, InOutInfo o
                     vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
                     index ? index : UndefValue::get(getInt32Ty()),
                 },
-                instName, Attribute::ReadOnly);
+                instName);
 }
 
 // =====================================================================================================================
@@ -1816,9 +1816,8 @@ Value *BuilderRecorder::CreateSubgroupMbcnt(Value *const mask, const Twine &inst
 // @param resultTy : Return type (can be nullptr for void)
 // @param args : Arguments
 // @param instName : Name to give instruction
-// @param attribs : Attributes to give the function declaration
 Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resultTy, ArrayRef<Value *> args,
-                                     const Twine &instName, ArrayRef<Attribute::AttrKind> attribs) {
+                                     const Twine &instName) {
   // Create mangled name of builder call. This only needs to be mangled on return type.
   std::string mangledName;
   {
@@ -1848,10 +1847,147 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
       func->setMetadata(opcodeMetaKindId, funcMeta);
     }
 
-    // Add requested attributes, plus nounwind.
+    // Add attributes.
     func->addFnAttr(Attribute::NoUnwind);
-    for (auto attrib : attribs)
-      func->addFnAttr(attrib);
+    switch (opcode) {
+    case ACos:
+    case ACosh:
+    case ASin:
+    case ASinh:
+    case ATan:
+    case ATan2:
+    case ATanh:
+    case Cosh:
+    case Determinant:
+    case Exp:
+    case InverseSqrt:
+    case Log:
+    case MatrixInverse:
+    case Opcode::CrossProduct:
+    case Opcode::CubeFaceCoord:
+    case Opcode::CubeFaceIndex:
+    case Opcode::Derivative:
+    case Opcode::DotProduct:
+    case Opcode::ExtractBitField:
+    case Opcode::ExtractExponent:
+    case Opcode::ExtractSignificand:
+    case Opcode::FClamp:
+    case Opcode::FMax:
+    case Opcode::FMax3:
+    case Opcode::FMid3:
+    case Opcode::FMin:
+    case Opcode::FMin3:
+    case Opcode::FMix:
+    case Opcode::FMod:
+    case Opcode::FSign:
+    case Opcode::FaceForward:
+    case Opcode::FindSMsb:
+    case Opcode::Fma:
+    case Opcode::FpTruncWithRounding:
+    case Opcode::Fract:
+    case Opcode::GetBufferDescLength:
+    case Opcode::GetFmaskDescPtr:
+    case Opcode::GetImageDescPtr:
+    case Opcode::GetSamplerDescPtr:
+    case Opcode::GetTexelBufferDescPtr:
+    case Opcode::IndexDescPtr:
+    case Opcode::InsertBitField:
+    case Opcode::IsInf:
+    case Opcode::IsNaN:
+    case Opcode::Ldexp:
+    case Opcode::MatrixTimesMatrix:
+    case Opcode::MatrixTimesScalar:
+    case Opcode::MatrixTimesVector:
+    case Opcode::NormalizeVector:
+    case Opcode::OuterProduct:
+    case Opcode::QuantizeToFp16:
+    case Opcode::Reflect:
+    case Opcode::Refract:
+    case Opcode::SAbs:
+    case Opcode::SMod:
+    case Opcode::SSign:
+    case Opcode::SmoothStep:
+    case Opcode::TransposeMatrix:
+    case Opcode::VectorTimesMatrix:
+    case Power:
+    case Sinh:
+    case Tan:
+    case Tanh:
+      // Functions that don't access memory.
+      func->addFnAttr(Attribute::ReadNone);
+      break;
+    case Opcode::ImageGather:
+    case Opcode::ImageLoad:
+    case Opcode::ImageLoadWithFmask:
+    case Opcode::ImageSample:
+    case Opcode::LoadDescFromPtr:
+    case Opcode::LoadPushConstantsPtr:
+    case Opcode::ReadBuiltInInput:
+    case Opcode::ReadBuiltInOutput:
+    case Opcode::ReadGenericInput:
+    case Opcode::ReadGenericOutput:
+      // Functions that only read memory.
+      func->addFnAttr(Attribute::ReadOnly);
+      break;
+    case Opcode::ImageStore:
+      // Functions that only write memory.
+      func->addFnAttr(Attribute::WriteOnly);
+      break;
+    case Opcode::ImageAtomic:
+    case Opcode::ImageAtomicCompareSwap:
+      // Functions that read and write memory.
+      break;
+    case Opcode::Barrier:
+    case Opcode::DemoteToHelperInvocation:
+    case Opcode::EmitVertex:
+    case Opcode::EndPrimitive:
+    case Opcode::GetSubgroupSize:
+    case Opcode::ImageGetLod:
+    case Opcode::ImageQueryLevels:
+    case Opcode::ImageQuerySamples:
+    case Opcode::ImageQuerySize:
+    case Opcode::IsHelperInvocation:
+    case Opcode::Kill:
+    case Opcode::LoadBufferDesc:
+    case Opcode::ReadClock:
+    case Opcode::SubgroupAll:
+    case Opcode::SubgroupAllEqual:
+    case Opcode::SubgroupAny:
+    case Opcode::SubgroupBallot:
+    case Opcode::SubgroupBallotBitCount:
+    case Opcode::SubgroupBallotBitExtract:
+    case Opcode::SubgroupBallotExclusiveBitCount:
+    case Opcode::SubgroupBallotFindLsb:
+    case Opcode::SubgroupBallotFindMsb:
+    case Opcode::SubgroupBallotInclusiveBitCount:
+    case Opcode::SubgroupBroadcast:
+    case Opcode::SubgroupBroadcastFirst:
+    case Opcode::SubgroupClusteredExclusive:
+    case Opcode::SubgroupClusteredInclusive:
+    case Opcode::SubgroupClusteredReduction:
+    case Opcode::SubgroupElect:
+    case Opcode::SubgroupInverseBallot:
+    case Opcode::SubgroupMbcnt:
+    case Opcode::SubgroupQuadBroadcast:
+    case Opcode::SubgroupQuadSwapDiagonal:
+    case Opcode::SubgroupQuadSwapHorizontal:
+    case Opcode::SubgroupQuadSwapVertical:
+    case Opcode::SubgroupShuffle:
+    case Opcode::SubgroupShuffleDown:
+    case Opcode::SubgroupShuffleUp:
+    case Opcode::SubgroupShuffleXor:
+    case Opcode::SubgroupSwizzleMask:
+    case Opcode::SubgroupSwizzleQuad:
+    case Opcode::SubgroupWriteInvocation:
+    case Opcode::WriteBuiltInOutput:
+    case Opcode::WriteGenericOutput:
+    case Opcode::WriteXfbOutput:
+      // TODO: These functions have not been classified yet.
+      break;
+    default:
+      llvm_unreachable("Should never be called!");
+      break;
+    }
   }
 
   // Create the call.
