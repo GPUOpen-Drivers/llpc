@@ -87,8 +87,7 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, bool unlinked) {
       continue;
 
     // Find the shader entry-point (marked with irLink()), and get the shader stage from that.
-    // Default to compute to handle the case of a compute library, which does not have a shader entry-point.
-    ShaderStage stage = ShaderStageCompute;
+    ShaderStage stage = ShaderStageInvalid;
     for (Function &func : *module) {
       if (!isShaderEntryPoint(&func))
         continue;
@@ -101,6 +100,15 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, bool unlinked) {
       // Rename the entry-point to ensure there is no clash on linking.
       func.setName(Twine(lgcName::EntryPointPrefix) + getShaderStageAbbreviation(static_cast<ShaderStage>(stage)) +
                    "." + func.getName());
+    }
+
+    // Check if this is a compute library with no shader entry-point; if so, mark functions as compute.
+    if (stage == ShaderStageInvalid) {
+      stage = ShaderStageCompute;
+      m_computeLibrary = true;
+#ifndef NDEBUG
+      shaderStageMask |= 1 << stage;
+#endif
     }
 
     // Mark all other function definitions in the module with the same shader stage.
