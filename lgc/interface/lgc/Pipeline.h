@@ -572,7 +572,7 @@ public:
   virtual void setStateFromModule(llvm::Module *module) = 0;
 
   // -----------------------------------------------------------------------------------------------------------------
-  // IR link and generate pipeline methods
+  // IR link and generate pipeline/library methods
 
   // Mark a function as a shader entry-point. This must be done before linking shader modules into a pipeline
   // with irLink(). This is a static method in Pipeline, as it does not need a Pipeline object, and can be used
@@ -589,9 +589,15 @@ public:
   //
   // Before calling this, each shader module needs to have exactly one public (external linkage) function
   // for the shader entry-point that was marked by calling markShaderEntryPoint(). Any other functions in the
-  // module must not have a non-default DLL storage class, and typically have internal linkage.
+  // module must not have a non-default DLL storage class, and typically have internal linkage. However, for
+  // a compute shader containing functions accessed by libraries, those functions need to be public (external
+  // linkage).
   //
-  // Returns the pipeline module, or nullptr on link failure.
+  // In the case of a compute library, there is no shader entry-point marked by calling
+  // markShaderEntryPoint(). All functions must have default DLL storage class, and any that need to
+  // be externally accessible need to be public (external linkage).
+  //
+  // Returns the pipeline/library module, or nullptr on link failure.
   //
   // @param modules : Array of modules
   // @param unlinked : True if generating an "unlinked" half-pipeline ELF that then needs further linking to
@@ -622,8 +628,8 @@ public:
   //           returns a textual description
   virtual bool checkElfLinkable() = 0;
 
-  // Generate pipeline module or unlinked half-pipeline module by running patch, middle-end optimization and
-  // backend codegen passes.
+  // Generate pipeline/library module or unlinked half-pipeline module by running patch, middle-end optimization
+  // and backend codegen passes.
   // The output is normally ELF, but IR assembly if an option is used to stop compilation early,
   // or ISA assembly if -filetype=asm is specified.
   // Output is written to outStream.

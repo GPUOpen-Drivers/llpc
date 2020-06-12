@@ -203,6 +203,7 @@ public:
   unsigned getShaderStageMask() const { return m_stageMask; }
   bool hasShaderStage(ShaderStage stage) const { return (getShaderStageMask() >> stage) & 1; }
   bool isGraphics() const;
+  bool isComputeLibrary() const { return m_computeLibrary; }
   ShaderStage getLastVertexProcessingStage() const;
   ShaderStage getPrevShaderStage(ShaderStage shaderStage) const;
   ShaderStage getNextShaderStage(ShaderStage shaderStage) const;
@@ -417,6 +418,7 @@ private:
   bool m_emitLgc = false;                               // Whether -emit-lgc is on
   bool m_unlinked = false;                              // Whether generating an unlinked half-pipeline ELF
   unsigned m_stageMask = 0;                             // Mask of active shader stages
+  bool m_computeLibrary = false;                        // Whether pipeline is in fact a compute library
   Options m_options = {};                               // Per-pipeline options
   std::vector<ShaderOptions> m_shaderOptions;           // Per-shader options
   std::unique_ptr<ResourceNode[]> m_allocUserDataNodes; // Allocated buffer for user data

@@ -51,6 +51,7 @@ static const BuiltInKind BuiltInWaveId = static_cast<BuiltInKind>(0x1000000A);
 
 // Names used for calls added to IR to represent various actions internally.
 namespace lgcName {
+const static char InternalCallPrefix[] = "lgc.";
 const static char InputCallPrefix[] = "lgc.input.";
 const static char InputImportVertex[] = "lgc.input.import.vertex.";
 const static char InputImportGeneric[] = "lgc.input.import.generic.";
