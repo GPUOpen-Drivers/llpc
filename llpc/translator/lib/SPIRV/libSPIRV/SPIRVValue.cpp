@@ -63,4 +63,8 @@ void SPIRVValue::setCoherent(bool IsCoherent) {
   addDecorate(new SPIRVDecorate(DecorationCoherent, this));
 }
 
+void SPIRVValue::setNonUniform() {
+  addDecorate(new SPIRVDecorate(DecorationNonUniform, this));
+}
+
 } // namespace SPIRV

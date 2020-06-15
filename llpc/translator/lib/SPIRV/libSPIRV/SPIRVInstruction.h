@@ -332,6 +332,14 @@ public:
 
   void setHasVariableWordCount(bool VariWC) { HasVariWC = VariWC; }
 
+  virtual void setNonUniform() override {
+    if (OpCode == OpSampledImage && !hasDecorate(DecorationNonUniform)) {
+      addDecorate(new SPIRVDecorate(DecorationNonUniform, this));
+      getOperands()[0]->setNonUniform();
+      getOperands()[1]->setNonUniform();
+    }
+  }
+
 protected:
   void decode(std::istream &I) override {
     auto D = getDecoder(I);
@@ -671,6 +679,13 @@ public:
       : SPIRVInstruction(OpLoad), SPIRVMemoryAccess(), PtrId(SPIRVID_INVALID) {}
 
   SPIRVValue *getSrc() const { return Module->get<SPIRVValue>(PtrId); }
+
+  virtual void setNonUniform() override {
+    if (!hasDecorate(DecorationNonUniform)) {
+      addDecorate(new SPIRVDecorate(DecorationNonUniform, this));
+      getSrc()->setNonUniform();
+    }
+  }
 
 protected:
   void setWordCount(SPIRVWord TheWordCount) override {
@@ -1017,6 +1032,14 @@ public:
     return SPIRVValue::isCoherent();
   }
 
+  virtual void setNonUniform() override {
+    if (Type->isTypePointer() && !hasDecorate(DecorationNonUniform)) {
+      for (size_t I = 0, E = Pairs.size() / 2; I != E; ++I)
+        getValue(Pairs[2 * I])->setNonUniform();
+      addDecorate(new SPIRVDecorate(DecorationNonUniform, this));
+    }
+  }
+
 protected:
   std::vector<SPIRVId> Pairs;
 
@@ -1152,6 +1175,14 @@ public:
     if (checkMemoryDecorates)
       propagateMemoryDecorates();
     return SPIRVValue::isCoherent();
+  }
+
+  virtual void setNonUniform() override {
+    if (!hasDecorate(DecorationNonUniform) && Type->isTypePointer()) {
+      getTrueValue()->setNonUniform();
+      getFalseValue()->setNonUniform();
+      addDecorate(new SPIRVDecorate(DecorationNonUniform, this));
+    }
   }
 
 protected:
@@ -1534,6 +1565,17 @@ public:
     return SPIRVValue::isCoherent();
   }
 
+  virtual void setNonUniform() override {
+    if (!hasDecorate(DecorationNonUniform)) {
+      if (getBase()->getOpCode() != OpVariable)
+        getBase()->setNonUniform();
+      if (getIndices().back()->getOpCode() != OpConstant) {
+        getIndices().back()->setNonUniform();
+        addDecorate(new SPIRVDecorate(DecorationNonUniform, this));
+      }
+    }
+  }
+
 private:
   void propagateMemoryDecorates() {
     SPIRVValue *Base = getBase();
@@ -1912,6 +1954,17 @@ public:
     if (checkMemoryDecorates)
       propagateMemoryDecorates();
     return SPIRVValue::isCoherent();
+  }
+
+  // Support the usage of nonuniform decoration based on the spec that if an
+  // instruction loads from or stores to a resource(including atomics and image
+  // instructions) and the resource descriptor being accessed is not
+  // dynamically uniform, then the operand corresponding to that resource(e.g.
+  // the pointer or sampled image operand) must be decorated with NonUniform.
+  // (e.g.texture(nonuniformEXT(sampler2D(uTex[Index], uSamp)), vec2(0.5)))
+  void propagateNonUniform() {
+    if (Type->isTypeSampledImage() && hasDecorate(DecorationNonUniform))
+      getOperand()->setNonUniform();
   }
 
 protected:

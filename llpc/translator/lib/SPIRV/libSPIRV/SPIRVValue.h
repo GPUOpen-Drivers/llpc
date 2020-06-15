@@ -96,6 +96,8 @@ public:
   virtual bool isCoherent();
   void setCoherent(bool IsCoherent = true);
 
+  virtual void setNonUniform();
+
   void validate() const override {
     SPIRVEntry::validate();
     assert((!hasType() || Type) && "Invalid type");

@@ -537,6 +537,8 @@ SPIRVEntry *SPIRVModuleImpl::addEntry(SPIRVEntry *Entry) {
     if (exist(Id, &Mapped)) {
       if (Mapped->getOpCode() == OpForward) {
         replaceForward(static_cast<SPIRVForward *>(Mapped), Entry);
+        if (Entry->getOpCode() == OpCopyObject)
+          static_cast<SPIRVCopyObject *>(Entry)->propagateNonUniform();
       } else if (Mapped->getOpCode() == OpTypeForwardPointer) {
         replaceForwardPointer(static_cast<SPIRVTypeForwardPointer *>(Mapped),
                               static_cast<SPIRVTypePointer *>(Entry));
