@@ -2245,7 +2245,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const 
   const Vkgc::ExtendedRobustness &extendedRobustness =
       static_cast<Llpc::Context *>(m_context)->getPipelineContext()->getPipelineOptions()->extendedRobustness;
   if (extendedRobustness.nullDescriptor || extendedRobustness.robustBufferAccess)
-    isVolatile = spvStore->getDst()->isVariable();
+    isVolatile |= spvStore->getDst()->isVolatile();
 
   // We don't require volatile on address spaces that become non-pointers.
   switch (spvStore->getDst()->getType()->getPointerStorageClass()) {
