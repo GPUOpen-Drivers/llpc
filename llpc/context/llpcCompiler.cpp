@@ -172,6 +172,9 @@ opt<bool> EnablePerStageCache("enable-per-stage-cache", cl::desc("Enable shader 
 opt<int> ContextReuseLimit("context-reuse-limit",
                            cl::desc("The maximum number of times a compiler context can be reused"), init(100));
 
+// -fatal-llvm-errors: Make all LLVM errors fatal
+opt<bool> FatalLlvmErrors("fatal-llvm-errors", cl::desc("Make all LLVM errors fatal"), init(false));
+
 extern opt<bool> EnableOuts;
 
 extern opt<bool> EnableErrs;
@@ -225,13 +228,26 @@ static void fatalErrorHandler(void *userData, const std::string &reason, bool ge
 // Handler for diagnosis in pass run, derived from the standard one.
 class LlpcDiagnosticHandler : public DiagnosticHandler {
   bool handleDiagnostics(const DiagnosticInfo &diagInfo) override {
+    if (cl::FatalLlvmErrors && diagInfo.getSeverity() == DS_Error) {
+      DiagnosticPrinterRawOStream printStream(errs());
+      printStream << "LLVM FATAL ERROR: ";
+      diagInfo.print(printStream);
+      printStream << "\n";
+      errs().flush();
+#if LLPC_ENABLE_EXCEPTION
+      throw("LLVM fatal error");
+#endif
+      abort();
+    }
+
     if (EnableOuts() || EnableErrs()) {
       if (diagInfo.getSeverity() == DS_Error || diagInfo.getSeverity() == DS_Warning) {
-        DiagnosticPrinterRawOStream printStream(outs());
+        auto &outputStream = EnableOuts() ? outs() : errs();
+        DiagnosticPrinterRawOStream printStream(outputStream);
         printStream << "ERROR: LLVM DIAGNOSIS INFO: ";
         diagInfo.print(printStream);
         printStream << "\n";
-        outs().flush();
+        outputStream.flush();
       } else if (EnableOuts()) {
         DiagnosticPrinterRawOStream printStream(outs());
         printStream << "\n\n=====  LLVM DIAGNOSIS START  =====\n\n";
@@ -240,7 +256,7 @@ class LlpcDiagnosticHandler : public DiagnosticHandler {
         outs().flush();
       }
     }
-    assert(diagInfo.getSeverity() != DS_Error);
+
     return true;
   }
 };
