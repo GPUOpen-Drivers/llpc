@@ -47,6 +47,9 @@ public:
   // Create a fetch shader
   static GlueShader *createFetchShader(PipelineState *pipelineState, llvm::ArrayRef<VertexFetchInfo> fetches,
                                        const VsEntryRegInfo &vsEntryRegInfo);
+  // Create a color export shader
+  static std::unique_ptr<GlueShader> createColorExportShader(PipelineState *pipelineState,
+                                                             llvm::ArrayRef<ColorExportInfo> exports);
 
   // Get the string for this glue shader. This is some encoding or hash of the inputs to the create*Shader function
   // that the front-end client can use as a cache key to avoid compiling the same glue shader more than once.

@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "lgc/BuilderBase.h"
 #include "lgc/Pipeline.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/util/Internal.h"
@@ -57,6 +58,9 @@ public:
 
   llvm::Value *run(llvm::Value *output, unsigned int hwColorTarget, llvm::Instruction *insertPos, ExportFormat expFmt,
                    const bool signedness);
+
+  static void setDoneFlag(llvm::Value *exportInst, BuilderBase &builder);
+  static llvm::CallInst *addDummyExport(BuilderBase &builder);
 
 private:
   FragColorExport() = delete;

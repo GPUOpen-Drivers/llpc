@@ -78,8 +78,6 @@ private:
   Value *getOutputValue(ArrayRef<Value *> expFragColor, unsigned int location, BuilderBase &builder);
   Value *addExportForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder);
   CallInst *addExportForBuiltinOutput(Function *module, BuilderBase &builder);
-  CallInst *addDummyExport(BuilderBase &builder);
-  void setDoneFlag(Value *exportInst, BuilderBase &builder);
   Value *GenerateValueForOutput(Value *value, Type *outputTy, BuilderBase &builder);
 
   LLVMContext *m_context;         // The context the pass is being run in.
@@ -529,10 +527,10 @@ bool LowerFragColorExport::runOnModule(Module &module) {
   m_resUsage->inOutUsage.fs.dummyExport =
       (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || m_resUsage->builtInUsage.fs.discard);
   if (!lastExport && m_resUsage->inOutUsage.fs.dummyExport) {
-    lastExport = addDummyExport(builder);
+    lastExport = FragColorExport::addDummyExport(builder);
   }
 
-  setDoneFlag(lastExport, builder);
+  FragColorExport::setDoneFlag(lastExport, builder);
   return lastExport != nullptr;
 }
 
@@ -700,8 +698,10 @@ Value *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPoint
       Value *output = exportValues[colorExportInfo.hwColorTarget];
       ExportFormat expFmt =
           static_cast<ExportFormat>(m_pipelineState->computeExportFormat(colorExportInfo.ty, colorExportInfo.location));
-      lastExport = static_cast<CallInst *>(fragColorExport->run(
-          output, colorExportInfo.hwColorTarget, &*builder.GetInsertPoint(), expFmt, colorExportInfo.isSigned));
+      Value *currentExport = fragColorExport->run(output, colorExportInfo.hwColorTarget, &*builder.GetInsertPoint(),
+                                                  expFmt, colorExportInfo.isSigned);
+      if (currentExport)
+        lastExport = dyn_cast<CallInst>(currentExport);
     }
     const auto &builtInUsage = m_resUsage->builtInUsage.fs;
     bool hasDepthExpFmtZero = !(builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth);
@@ -833,7 +833,7 @@ CallInst *LowerFragColorExport::addExportForBuiltinOutput(Function *module, Buil
 // Generates a dummy export instruction.  Returns last export instruction that was generated.
 //
 // @param builder : The builder object that will be used to create new instructions.
-CallInst *LowerFragColorExport::addDummyExport(BuilderBase &builder) {
+CallInst *FragColorExport::addDummyExport(BuilderBase &builder) {
   auto zero = ConstantFP::get(builder.getFloatTy(), 0.0);
   auto undef = UndefValue::get(builder.getFloatTy());
   Value *args[] = {
@@ -854,7 +854,7 @@ CallInst *LowerFragColorExport::addDummyExport(BuilderBase &builder) {
 //
 // @param [in/out] exportInst : The export instruction to be updated.
 // @param builder : The builder object that will be used to create new instructions.
-void LowerFragColorExport::setDoneFlag(Value *exportInst, BuilderBase &builder) {
+void FragColorExport::setDoneFlag(Value *exportInst, BuilderBase &builder) {
   if (!exportInst)
     return;
 

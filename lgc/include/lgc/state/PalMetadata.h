@@ -153,8 +153,7 @@ public:
   void finalizePipeline();
 
   // Updates the PS register information that depends on the exports.
-  void updateSpiShaderColFormat(const llvm::SmallVector<ColorExportInfo, 8> &exps, bool hasDepthExpFmtZero,
-                                bool killEnabled);
+  void updateSpiShaderColFormat(llvm::ArrayRef<ColorExportInfo> exps, bool hasDepthExpFmtZero, bool killEnabled);
 
 private:
   // Initialize the PalMetadata object after reading in already-existing PAL metadata if any

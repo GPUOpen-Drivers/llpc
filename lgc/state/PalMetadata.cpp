@@ -159,6 +159,12 @@ void PalMetadata::mergeFromBlob(StringRef blob) {
             *destNode = srcNode;
             return 0;
           }
+          if (srcNode.getString() == "color_export_shader")
+            return 0;
+          if (destNode->getString() == "color_export_shader") {
+            *destNode = srcNode;
+            return 0;
+          }
         }
         // Disallow merging other than uint.
         if (destNode->getKind() != msgpack::Type::UInt || srcNode.getKind() != msgpack::Type::UInt)
@@ -739,8 +745,7 @@ llvm::Type *PalMetadata::getLlvmType(StringRef tyName) const {
 // =====================================================================================================================
 // Updates the SPI_SHADER_COL_FORMAT entry.
 //
-void PalMetadata::updateSpiShaderColFormat(const SmallVector<ColorExportInfo, 8> &exps, bool hasDepthExpFmtZero,
-                                           bool killEnabled) {
+void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool hasDepthExpFmtZero, bool killEnabled) {
   unsigned spiShaderColFormat = 0;
   for (auto &exp : exps) {
     unsigned expFormat = m_pipelineState->computeExportFormat(exp.ty, exp.location);
