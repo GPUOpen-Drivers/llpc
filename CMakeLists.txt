@@ -25,6 +25,19 @@
 
 project(VKGC LANGUAGES C CXX)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 add_library(vkgc INTERFACE)
 
 ### Expose header files ################################################################################################
