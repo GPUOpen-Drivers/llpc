@@ -30,6 +30,7 @@
  */
 #include "GlueShader.h"
 #include "lgc/BuilderBase.h"
+#include "lgc/patch/FragColorExport.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/patch/VertexFetch.h"
 #include "lgc/state/PassManagerCache.h"
@@ -103,6 +104,42 @@ private:
   std::string m_shaderString;
 };
 
+// =====================================================================================================================
+// A color export shader
+class ColorExportShader : public GlueShader {
+public:
+  ColorExportShader(PipelineState *pipelineState, ArrayRef<ColorExportInfo> exports);
+  ~ColorExportShader() override {}
+
+  // Get the string for this glue shader. This is some encoding or hash of the inputs to the create*Shader function
+  // that the front-end client can use as a cache key to avoid compiling the same glue shader more than once.
+  StringRef getString() override;
+
+  // Get the symbol name of the main shader that this glue shader is prolog or epilog for.
+  StringRef getMainShaderName() override;
+
+  // Get whether this glue shader is a prolog (rather than epilog) for its main shader.
+  bool isProlog() override { return false; }
+
+  // Get the name of this glue shader.
+  StringRef getName() const override { return "color export shader"; }
+
+protected:
+  // Generate the glue shader to IR module
+  Module *generate() override;
+
+private:
+  Function *createColorExportFunc();
+
+  // The information stored here is all that is needed to generate the color export shader. We deliberately do not
+  // have access to PipelineState, so we can hash the information here and let the front-end use it as the
+  // key for a cache of glue shaders.
+  SmallVector<ColorExportInfo, 8> m_exports;
+  ExportFormat m_exportFormat[MaxColorTargets]; // The export format for each hw color target.
+  // The encoded or hashed (in some way) single string version of the above.
+  std::string m_shaderString;
+  PipelineState *m_pipelineState; // The pipeline state.  Used to set meta data information.
+};
 } // anonymous namespace
 
 // =====================================================================================================================
@@ -110,6 +147,13 @@ private:
 GlueShader *GlueShader::createFetchShader(PipelineState *pipelineState, ArrayRef<VertexFetchInfo> fetches,
                                           const VsEntryRegInfo &vsEntryRegInfo) {
   return new FetchShader(pipelineState, fetches, vsEntryRegInfo);
+}
+
+// =====================================================================================================================
+// Create a color export shader object
+std::unique_ptr<GlueShader> GlueShader::createColorExportShader(PipelineState *pipelineState,
+                                                                ArrayRef<ColorExportInfo> exports) {
+  return std::make_unique<ColorExportShader>(pipelineState, exports);
 }
 
 // =====================================================================================================================
@@ -280,5 +324,93 @@ Function *FetchShader::createFetchFunc() {
     retVal = builder.CreateInsertValue(retVal, func->getArg(i), i);
   builder.CreateRet(retVal);
 
+  return func;
+}
+
+// =====================================================================================================================
+// Constructor. This is where we store all the information needed to generate the export shader; other methods
+// do not need to look at PipelineState.
+ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<ColorExportInfo> exports)
+    : GlueShader(pipelineState->getLgcContext()) {
+  m_exports.append(exports.begin(), exports.end());
+
+  memset(m_exportFormat, 0, sizeof(m_exportFormat));
+  for (auto &exp : m_exports) {
+    m_exportFormat[exp.hwColorTarget] =
+        static_cast<ExportFormat>(pipelineState->computeExportFormat(exp.ty, exp.location));
+  }
+  m_pipelineState = pipelineState;
+}
+
+// =====================================================================================================================
+// Get the string for this color export shader. This is some encoding or hash of the inputs to the
+// createColorExportShader function that the front-end client can use as a cache key to avoid compiling the same glue
+// shader more than once.
+StringRef ColorExportShader::getString() {
+  if (m_shaderString.empty()) {
+    m_shaderString =
+        StringRef(reinterpret_cast<const char *>(m_exports.data()), m_exports.size() * sizeof(ColorExportInfo)).str();
+    m_shaderString += StringRef(reinterpret_cast<const char *>(m_exportFormat), sizeof(m_exportFormat)).str();
+  }
+  return m_shaderString;
+}
+
+// =====================================================================================================================
+// Get the symbol name of the main shader that this glue shader is prolog or epilog for
+StringRef ColorExportShader::getMainShaderName() {
+  return getEntryPointName(CallingConv::AMDGPU_PS, /*isFetchlessVs=*/false);
+}
+
+// =====================================================================================================================
+// Generate the IR module for the color export shader
+Module *ColorExportShader::generate() {
+  // Create the function.
+  Function *colorExportFunc = createColorExportFunc();
+
+  // Process each vertex input.
+  std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(&getContext()));
+  auto ret = cast<ReturnInst>(colorExportFunc->back().getTerminator());
+  BuilderBase builder(ret);
+
+  Value *lastExport = nullptr;
+  for (unsigned idx = 0; idx != m_exports.size(); ++idx) {
+    const ColorExportInfo &exp = m_exports[idx];
+    Argument *output = colorExportFunc->getArg(idx);
+    ExportFormat expFmt = m_exportFormat[exp.hwColorTarget];
+    Value *currentExport = fragColorExport->run(output, exp.hwColorTarget, ret, expFmt, exp.isSigned);
+    if (currentExport) {
+      lastExport = currentExport;
+    }
+  }
+  if (lastExport)
+    FragColorExport::setDoneFlag(lastExport, builder);
+  m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(m_exports, 0, 0);
+  return colorExportFunc->getParent();
+}
+
+// =====================================================================================================================
+// Create module with function for the fetch shader. On return, the function contains only the code to copy the
+// wave dispatch SGPRs and VGPRs to the return value.
+Function *ColorExportShader::createColorExportFunc() {
+  // Create the module
+  Module *module = new Module("colorExportShader", getContext());
+  TargetMachine *targetMachine = m_lgcContext->getTargetMachine();
+  module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
+  module->setDataLayout(targetMachine->createDataLayout());
+
+  // Get the function type. Its inputs are the outputs from the unlinked pixel shader or similar.
+  SmallVector<Type *, 16> entryTys;
+  for (const auto &exp : m_exports)
+    entryTys.push_back(exp.ty);
+  auto funcTy = FunctionType::get(Type::getVoidTy(getContext()), entryTys, false);
+
+  // Create the function. Mark SGPR inputs as "inreg".
+  StringRef funcName = "color_export_shader";
+  Function *func = Function::Create(funcTy, GlobalValue::ExternalLinkage, funcName, module);
+  func->setCallingConv(CallingConv::AMDGPU_PS);
+
+  BasicBlock *block = BasicBlock::Create(func->getContext(), "", func);
+  BuilderBase builder(block);
+  builder.CreateRetVoid();
   return func;
 }

@@ -257,6 +257,13 @@ void ElfLinkerImpl::createGlueShaders() {
     m_glueShaders.push_back(
         std::unique_ptr<GlueShader>(GlueShader::createFetchShader(m_pipelineState, fetches, vsEntryRegInfo)));
   }
+
+  // Create a color export shader if we need one.
+  SmallVector<ColorExportInfo, 8> exports;
+  m_pipelineState->getPalMetadata()->getColorExportInfo(exports);
+  if (!exports.empty()) {
+    m_glueShaders.push_back(GlueShader::createColorExportShader(m_pipelineState, exports));
+  }
 }
 
 // =====================================================================================================================
