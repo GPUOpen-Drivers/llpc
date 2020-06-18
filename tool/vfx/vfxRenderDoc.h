@@ -33,11 +33,16 @@
 
 namespace Vfx {
 
+extern void initRenderSections();
+
 // =====================================================================================================================
 // Represents the render state result of Vfx parser
 class RenderDocument : public Document {
 public:
-  RenderDocument() { memset(&m_renderState, 0, sizeof(m_renderState)); };
+  RenderDocument() {
+    initRenderSections();
+    memset(&m_renderState, 0, sizeof(m_renderState));
+  };
 
   virtual unsigned getMaxSectionCount(SectionType type);
 

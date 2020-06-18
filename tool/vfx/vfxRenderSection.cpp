@@ -70,7 +70,11 @@ public:
   }
 };
 
-static RenderSectionParserInit renderSectionParserInit;
+// =====================================================================================================================
+// Initialize Render document special sections.
+void initRenderSections() {
+  static RenderSectionParserInit init;
+}
 
 } // namespace Vfx
 #endif

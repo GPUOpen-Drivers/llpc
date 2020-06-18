@@ -19,10 +19,10 @@ StrToMemberAddr SectionNggState::m_addrTable[SectionNggState::MemberCount];
 StrToMemberAddr SectionExtendedRobustness::m_addrTable[SectionExtendedRobustness::MemberCount];
 
 // =====================================================================================================================
-// Dummy class used to initialize all VKGC sepcial sections
-class VkgcSectionParserInit {
+// Dummy class used to initialize all VK sepcial sections
+class VkSectionParserInit {
 public:
-  VkgcSectionParserInit() {
+  VkSectionParserInit() {
     initEnumMap();
 
     // Sections for PipelineDocument
@@ -79,6 +79,11 @@ public:
   }
 };
 
-static VkgcSectionParserInit vkgcSectionParserInit;
+// =====================================================================================================================
+// Initialize VK pipleine special sections.
+void initVkSections() {
+  static VkSectionParserInit init;
+}
+
 } // namespace Vfx
 #endif
