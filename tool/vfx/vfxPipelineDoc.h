@@ -35,11 +35,14 @@
 
 namespace Vfx {
 
+extern void initVkSections();
+
 // =====================================================================================================================
 // Represents the pipeline state result of Vfx parser
 class PipelineDocument : public Document {
 public:
   PipelineDocument() {
+    initVkSections();
     memset(&m_pipelineState, 0, sizeof(m_pipelineState));
     memset(&m_vertexInputState, 0, sizeof(m_vertexInputState));
   };
