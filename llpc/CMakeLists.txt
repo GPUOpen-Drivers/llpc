@@ -73,7 +73,31 @@ if(ICD_BUILD_LLPC)
     add_subdirectory(${XGL_LLVM_SRC_PATH} ${PROJECT_BINARY_DIR}/llvm)
     set(XGL_LLVM_BUILD_PATH ${PROJECT_BINARY_DIR}/llvm)
 
-    llvm_map_components_to_libnames(llvm_libs lgc amdgpucodegen amdgpuinfo amdgpuasmparser amdgpudisassembler LTO ipo analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils coroutines)
+    llvm_map_components_to_libnames(llvm_libs
+        lgc
+        AMDGPUAsmParser
+        AMDGPUCodeGen
+        AMDGPUDisassembler
+        AMDGPUInfo
+        Analysis
+        BinaryFormat
+        Core
+        Coroutines
+        LTO
+        ipo
+        BitReader
+        BitWriter
+        CodeGen
+        InstCombine
+        IRReader
+        Linker
+        MC
+        Passes
+        ScalarOpts
+        Support
+        Target
+        TransformUtils
+    )
     target_link_libraries(llpc PUBLIC ${llvm_libs})
 endif()
 

@@ -23,12 +23,28 @@
  #
  #######################################################################################################################
 
-add_llvm_library(LLVMlgc)
-
-add_dependencies(LLVMlgc
-    LLVMCore
-    LLVMAMDGPUAsmParser
-    LLVMAMDGPUCodeGen
+add_llvm_library(LLVMlgc LINK_COMPONENTS
+    AggressiveInstCombine
+    AMDGPUAsmParser
+    AMDGPUCodeGen
+    AMDGPUDesc
+    AMDGPUDisassembler
+    AMDGPUInfo
+    Analysis
+    BinaryFormat
+    BitWriter
+    CodeGen
+    Core
+    InstCombine
+    ipo
+    Linker
+    MC
+    Object
+    ScalarOpts
+    Support
+    Target
+    TransformUtils
+    Vectorize
 )
 
 ### Cached Project Options #############################################################################################
