@@ -339,7 +339,7 @@ void SpirvLowerAlgebraTransform::visitFPTruncInst(FPTruncInst &fptruncInst) {
       // NOTE: doubel -> float16 conversion is done in backend compiler with RTE rounding. Thus, we have to split
       // it with two phases to disable such lowering if we need RTZ rounding.
       auto floatTy = srcTy->isVectorTy()
-                         ? VectorType::get(Type::getFloatTy(*m_context), cast<VectorType>(srcTy)->getNumElements())
+                         ? FixedVectorType::get(Type::getFloatTy(*m_context), cast<VectorType>(srcTy)->getNumElements())
                          : Type::getFloatTy(*m_context);
       auto floatValue = new FPTruncInst(src, floatTy, "", &fptruncInst);
       auto dest = new FPTruncInst(floatValue, destTy, "", &fptruncInst);
