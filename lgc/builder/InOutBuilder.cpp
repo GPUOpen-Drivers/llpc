@@ -444,8 +444,8 @@ Value *InOutBuilder::modifyAuxInterpValue(Value *auxInterpValue, InOutInfo input
         resUsage->builtInUsage.fs.centroid = true;
       }
 
-      auxInterpValue =
-          emitCall(evalInstName, VectorType::get(getFloatTy(), 2), {evalArg}, Attribute::ReadOnly, &*GetInsertPoint());
+      auxInterpValue = emitCall(evalInstName, FixedVectorType::get(getFloatTy(), 2), {evalArg}, Attribute::ReadOnly,
+                                &*GetInsertPoint());
     } else {
       // Generate code to evaluate the I,J coordinates.
       if (inputInfo.getInterpLoc() == InOutInfo::InterpLocSample)
@@ -495,7 +495,7 @@ Value *InOutBuilder::evalIjOffsetSmooth(Value *offset) {
 // @param value : Value to adjust, float or vector of float
 // @param offset : Offset to adjust by, <2 x float> or <2 x half>
 Value *InOutBuilder::adjustIj(Value *value, Value *offset) {
-  offset = CreateFPExt(offset, VectorType::get(getFloatTy(), 2));
+  offset = CreateFPExt(offset, FixedVectorType::get(getFloatTy(), 2));
   Value *offsetX = CreateExtractElement(offset, uint64_t(0));
   Value *offsetY = CreateExtractElement(offset, 1);
   if (auto vecTy = dyn_cast<VectorType>(value->getType())) {
@@ -683,7 +683,7 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
       llvm_unreachable("Should never be called!");
     }
     if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64) {
-      result = CreateInsertElement(Constant::getNullValue(VectorType::get(getInt64Ty(), 2)), result, uint64_t(0));
+      result = CreateInsertElement(Constant::getNullValue(FixedVectorType::get(getInt64Ty(), 2)), result, uint64_t(0));
       result = CreateBitCast(result, resultTy);
     } else
       result = CreateInsertElement(ConstantInt::getNullValue(resultTy), result, uint64_t(0));
@@ -842,9 +842,9 @@ Type *InOutBuilder::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
   switch (static_cast<unsigned>(builtIn)) {
   case BuiltInSamplePosOffset:
   case BuiltInInterpLinearCenter:
-    return VectorType::get(getFloatTy(), 2);
+    return FixedVectorType::get(getFloatTy(), 2);
   case BuiltInInterpPullMode:
-    return VectorType::get(getFloatTy(), 3);
+    return FixedVectorType::get(getFloatTy(), 3);
   default:
     return Builder::getBuiltInTy(builtIn, inOutInfo);
   }

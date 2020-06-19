@@ -110,7 +110,7 @@ FunctionType *ShaderMerger::generateLsHsEntryPointType(uint64_t *inRegMask) cons
   }
 
   assert(userDataCount > 0);
-  argTys.push_back(VectorType::get(Type::getInt32Ty(*m_context), userDataCount));
+  argTys.push_back(FixedVectorType::get(Type::getInt32Ty(*m_context), userDataCount));
   *inRegMask |= (1ull << LsHsSpecialSysValueCount);
 
   // Other system values (VGPRs)
@@ -507,7 +507,7 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
   }
 
   assert(userDataCount > 0);
-  argTys.push_back(VectorType::get(Type::getInt32Ty(*m_context), userDataCount));
+  argTys.push_back(FixedVectorType::get(Type::getInt32Ty(*m_context), userDataCount));
   *inRegMask |= (1ull << EsGsSpecialSysValueCount);
 
   // Other system values (VGPRs)

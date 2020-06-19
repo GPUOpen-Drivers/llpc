@@ -61,7 +61,8 @@ Instruction *AddressExtender::extend(Value *addr32, unsigned highHalf, Type *ptr
     ptr = builder.CreateInsertElement(getPc(), addr32, uint64_t(0));
   } else {
     // Extend with given value
-    ptr = builder.CreateInsertElement(UndefValue::get(VectorType::get(builder.getInt32Ty(), 2)), addr32, uint64_t(0));
+    ptr = builder.CreateInsertElement(UndefValue::get(FixedVectorType::get(builder.getInt32Ty(), 2)), addr32,
+                                      uint64_t(0));
     ptr = builder.CreateInsertElement(ptr, builder.getInt32(highHalf), 1);
   }
   ptr = builder.CreateBitCast(ptr, builder.getInt64Ty());
@@ -78,7 +79,7 @@ Instruction *AddressExtender::getPc() {
     IRBuilder<> builder(m_func->getContext());
     builder.SetInsertPoint(&*m_func->front().getFirstInsertionPt());
     Value *pc = builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_s_getpc, {}, {});
-    pc = cast<Instruction>(builder.CreateBitCast(pc, VectorType::get(builder.getInt32Ty(), 2)));
+    pc = cast<Instruction>(builder.CreateBitCast(pc, FixedVectorType::get(builder.getInt32Ty(), 2)));
     m_pc = cast<Instruction>(pc);
   }
   return m_pc;

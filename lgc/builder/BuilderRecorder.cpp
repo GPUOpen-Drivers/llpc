@@ -409,7 +409,7 @@ Value *BuilderRecorder::CreateVectorTimesMatrix(Value *const vector, Value *cons
   Type *const matrixType = matrix->getType();
   Type *const compType = cast<VectorType>(cast<ArrayType>(matrixType)->getElementType())->getElementType();
   const unsigned columnCount = matrixType->getArrayNumElements();
-  Type *const resultTy = VectorType::get(compType, columnCount);
+  Type *const resultTy = FixedVectorType::get(compType, columnCount);
   return record(Opcode::VectorTimesMatrix, resultTy, {vector, matrix}, instName);
 }
 
@@ -423,7 +423,7 @@ Value *BuilderRecorder::CreateMatrixTimesVector(Value *const matrix, Value *cons
   Type *const columnType = matrix->getType()->getArrayElementType();
   Type *const compType = cast<VectorType>(columnType)->getElementType();
   const unsigned rowCount = cast<VectorType>(columnType)->getNumElements();
-  Type *const vectorType = VectorType::get(compType, rowCount);
+  Type *const vectorType = FixedVectorType::get(compType, rowCount);
   return record(Opcode::MatrixTimesVector, vectorType, {matrix, vector}, instName);
 }
 
@@ -624,7 +624,7 @@ Value *BuilderRecorder::CreateInverseSqrt(Value *x, const Twine &instName) {
 // @param coord : Input coordinate <3 x float>
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateCubeFaceCoord(Value *coord, const Twine &instName) {
-  return record(Opcode::CubeFaceCoord, VectorType::get(coord->getType()->getScalarType(), 2), coord, instName);
+  return record(Opcode::CubeFaceCoord, FixedVectorType::get(coord->getType()->getScalarType(), 2), coord, instName);
 }
 
 // =====================================================================================================================
@@ -1302,7 +1302,7 @@ Value *BuilderRecorder::CreateImageQuerySize(unsigned dim, unsigned flags, Value
   unsigned compCount = getImageQuerySizeComponentCount(dim);
   Type *resultTy = getInt32Ty();
   if (compCount > 1)
-    resultTy = VectorType::get(resultTy, compCount);
+    resultTy = FixedVectorType::get(resultTy, compCount);
   return record(Opcode::ImageQuerySize, resultTy, {getInt32(dim), getInt32(flags), imageDesc, lod}, instName);
 }
 
@@ -1319,7 +1319,7 @@ Value *BuilderRecorder::CreateImageQuerySize(unsigned dim, unsigned flags, Value
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateImageGetLod(unsigned dim, unsigned flags, Value *imageDesc, Value *samplerDesc,
                                           Value *coord, const Twine &instName) {
-  return record(Opcode::ImageGetLod, VectorType::get(getFloatTy(), 2),
+  return record(Opcode::ImageGetLod, FixedVectorType::get(getFloatTy(), 2),
                 {getInt32(dim), getInt32(flags), imageDesc, samplerDesc, coord}, instName);
 }
 
@@ -1575,7 +1575,7 @@ Value *BuilderRecorder::CreateSubgroupBroadcastFirst(Value *const value, const T
 // @param value : The value to contribute
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateSubgroupBallot(Value *const value, const Twine &instName) {
-  return record(Opcode::SubgroupBallot, VectorType::get(getInt32Ty(), 4), value, instName);
+  return record(Opcode::SubgroupBallot, FixedVectorType::get(getInt32Ty(), 4), value, instName);
 }
 
 // =====================================================================================================================

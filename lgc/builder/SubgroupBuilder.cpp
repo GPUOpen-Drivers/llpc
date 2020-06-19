@@ -168,7 +168,7 @@ Value *SubgroupBuilder::CreateSubgroupBallot(Value *const value, const Twine &in
   Value *ballot = createGroupBallot(value);
 
   // Ballot expects a <4 x i32> return, so we need to turn the i64 into that.
-  ballot = CreateBitCast(ballot, VectorType::get(getInt32Ty(), 2));
+  ballot = CreateBitCast(ballot, FixedVectorType::get(getInt32Ty(), 2));
 
   ElementCount elementCount = cast<VectorType>(ballot->getType())->getElementCount();
   return CreateShuffleVector(ballot, ConstantVector::getSplat(elementCount, getInt32(0)), ArrayRef<int>{0, 1, 2, 3});
@@ -1062,7 +1062,7 @@ Value *SubgroupBuilder::CreateSubgroupMbcnt(Value *const mask, const Twine &inst
   // Check that the type is definitely an i64.
   assert(mask->getType()->isIntegerTy(64));
 
-  Value *const masks = CreateBitCast(mask, VectorType::get(getInt32Ty(), 2));
+  Value *const masks = CreateBitCast(mask, FixedVectorType::get(getInt32Ty(), 2));
   Value *const maskLow = CreateExtractElement(masks, getInt32(0));
   Value *const maskHigh = CreateExtractElement(masks, getInt32(1));
   CallInst *const mbcntLo = CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {maskLow, getInt32(0)});

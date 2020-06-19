@@ -2665,7 +2665,7 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
         outValue = builder.CreateBitCast(outValue, builder.getFloatTy());
       }
     } else {
-      outValue = UndefValue::get(VectorType::get(builder.getFloatTy(), compCount));
+      outValue = UndefValue::get(FixedVectorType::get(builder.getFloatTy(), compCount));
       if (elementsInfo.is16Bit) {
         // Pack two elements for a component
         unsigned compIdx = 0;
@@ -2769,7 +2769,7 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
     assert(resultTy->getPrimitiveSizeInBits() == 64);
     std::string callName = isInterpolant ? lgcName::InputImportInterpolant : lgcName::InputImportGeneric;
     addTypeMangling(builder.getInt32Ty(), args, callName);
-    Value *result = UndefValue::get(VectorType::get(builder.getInt32Ty(), 2));
+    Value *result = UndefValue::get(FixedVectorType::get(builder.getInt32Ty(), 2));
     for (unsigned i = 0; i != 2; ++i) {
       args[elemIdxArgIdx] = builder.getInt32(elemIdx * 2 + i);
       result = builder.CreateInsertElement(
@@ -2885,7 +2885,7 @@ void PatchResourceCollect::scalarizeGenericOutput(CallInst *call) {
   }
 
   // Bitcast the original value to the vector type if necessary.
-  outputVal = builder.CreateBitCast(outputVal, VectorType::get(elementTy, scalarizeBy));
+  outputVal = builder.CreateBitCast(outputVal, FixedVectorType::get(elementTy, scalarizeBy));
 
   // Extract and store the individual elements.
   std::string callName;

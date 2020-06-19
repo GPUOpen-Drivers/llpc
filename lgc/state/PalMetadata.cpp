@@ -541,7 +541,7 @@ void PalMetadata::getVertexFetchInfo(SmallVectorImpl<VertexFetchInfo> &fetches) 
     else if (tyName == "f64")
       ty = Type::getDoubleTy(m_pipelineState->getContext());
     if (vecLength != 0)
-      ty = VectorType::get(ty, vecLength);
+      ty = FixedVectorType::get(ty, vecLength);
     fetches.push_back({location, component, ty});
   }
   m_pipelineNode.erase(m_document->getNode(PipelineMetadataKey::VertexInputs));
