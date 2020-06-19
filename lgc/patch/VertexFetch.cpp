@@ -441,7 +441,8 @@ bool LowerVertexFetch::runOnModule(Module &module) {
       builder.SetInsertPoint(call);
       Type *elementTy = call->getType()->getScalarType();
       unsigned numElements = vertex->getType()->getPrimitiveSizeInBits() / elementTy->getPrimitiveSizeInBits();
-      vertex = builder.CreateBitCast(vertex, numElements == 1 ? elementTy : VectorType::get(elementTy, numElements));
+      vertex =
+          builder.CreateBitCast(vertex, numElements == 1 ? elementTy : FixedVectorType::get(elementTy, numElements));
       if (call->getType() != vertex->getType()) {
         // The types are now vectors of the same element type but different element counts, or call->getType()
         // is scalar.
@@ -476,7 +477,7 @@ Type *VertexFetch::getVgprTy(Type *ty) {
     unsigned numElements = (ty->getPrimitiveSizeInBits() + 31) / 32;
     ty = Type::getFloatTy(ty->getContext());
     if (numElements > 1)
-      ty = VectorType::get(ty, numElements);
+      ty = FixedVectorType::get(ty, numElements);
   }
   return ty;
 }
@@ -794,7 +795,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
   if (vertexCompCount == 1)
     vertex = vertexValues[0];
   else {
-    Type *vertexTy = VectorType::get(Type::getInt32Ty(*m_context), vertexCompCount);
+    Type *vertexTy = FixedVectorType::get(Type::getInt32Ty(*m_context), vertexCompCount);
     vertex = UndefValue::get(vertexTy);
 
     for (unsigned i = 0; i < vertexCompCount; ++i) {
@@ -811,7 +812,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     Type *vertexTy = vertex->getType();
     Type *truncTy = Type::getInt8Ty(*m_context);
     truncTy = vertexTy->isVectorTy()
-                  ? cast<Type>(VectorType::get(truncTy, cast<VectorType>(vertexTy)->getNumElements()))
+                  ? cast<Type>(FixedVectorType::get(truncTy, cast<VectorType>(vertexTy)->getNumElements()))
                   : truncTy;
     vertex = new TruncInst(vertex, truncTy, "", insertPos);
   } else if (is16bitFetch) {
@@ -820,7 +821,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     Type *vertexTy = vertex->getType();
     Type *truncTy = Type::getInt16Ty(*m_context);
     truncTy = vertexTy->isVectorTy()
-                  ? cast<Type>(VectorType::get(truncTy, cast<VectorType>(vertexTy)->getNumElements()))
+                  ? cast<Type>(FixedVectorType::get(truncTy, cast<VectorType>(vertexTy)->getNumElements()))
                   : truncTy;
     vertex = new TruncInst(vertex, truncTy, "", insertPos);
   }
@@ -921,7 +922,7 @@ unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
 Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderBase &builder) {
 
   // Get the vertex buffer table pointer as pointer to v4i32 descriptor.
-  Type *vbDescTy = VectorType::get(Type::getInt32Ty(*m_context), 4);
+  Type *vbDescTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
   if (!m_vertexBufTablePtr) {
     auto savedInsertPoint = builder.saveIP();
     builder.SetInsertPoint(&*builder.GetInsertPoint()->getFunction()->front().getFirstInsertionPt());
@@ -988,12 +989,12 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
         break;
       case 2:
         suffix = ".v2f16";
-        fetchTy = VectorType::get(Type::getHalfTy(*m_context), 2);
+        fetchTy = FixedVectorType::get(Type::getHalfTy(*m_context), 2);
         break;
       case 3:
       case 4:
         suffix = ".v4f16";
-        fetchTy = VectorType::get(Type::getHalfTy(*m_context), 4);
+        fetchTy = FixedVectorType::get(Type::getHalfTy(*m_context), 4);
         break;
       default:
         llvm_unreachable("Should never be called!");
@@ -1007,12 +1008,12 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
         break;
       case 2:
         suffix = ".v2i32";
-        fetchTy = VectorType::get(Type::getInt32Ty(*m_context), 2);
+        fetchTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
         break;
       case 3:
       case 4:
         suffix = ".v4i32";
-        fetchTy = VectorType::get(Type::getInt32Ty(*m_context), 4);
+        fetchTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
         break;
       default:
         llvm_unreachable("Should never be called!");
@@ -1026,11 +1027,11 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
       // NOTE: The fetch values are represented by <n x i32>, so we will bitcast the float16 values to
       // int32 eventually.
       Type *bitCastTy = Type::getInt16Ty(*m_context);
-      bitCastTy = numChannels == 1 ? bitCastTy : VectorType::get(bitCastTy, numChannels);
+      bitCastTy = numChannels == 1 ? bitCastTy : FixedVectorType::get(bitCastTy, numChannels);
       fetch = new BitCastInst(fetch, bitCastTy, "", insertPos);
 
       Type *zExtTy = Type::getInt32Ty(*m_context);
-      zExtTy = numChannels == 1 ? zExtTy : VectorType::get(zExtTy, numChannels);
+      zExtTy = numChannels == 1 ? zExtTy : FixedVectorType::get(zExtTy, numChannels);
       fetch = new ZExtInst(fetch, zExtTy, "", insertPos);
     }
 
@@ -1067,7 +1068,7 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
       }
     }
 
-    Type *fetchTy = VectorType::get(Type::getInt32Ty(*m_context), numChannels);
+    Type *fetchTy = FixedVectorType::get(Type::getInt32Ty(*m_context), numChannels);
     Value *fetch = UndefValue::get(fetchTy);
 
     // Do vertex per-component fetches

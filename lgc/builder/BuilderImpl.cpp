@@ -270,7 +270,7 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
         assert((vecTy->getNumElements() % 4) == 0);
         waterfallEndTy = getInt32Ty();
         if (vecTy->getNumElements() != 4)
-          waterfallEndTy = VectorType::get(getInt32Ty(), vecTy->getNumElements() / 4);
+          waterfallEndTy = FixedVectorType::get(getInt32Ty(), vecTy->getNumElements() / 4);
         resultValue = cast<Instruction>(CreateBitCast(resultValue, waterfallEndTy, instName));
         useOfNonUniformInst = &resultValue->getOperandUse(0);
       }
@@ -301,7 +301,7 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
 Value *BuilderImplBase::scalarize(Value *value, std::function<Value *(Value *)> callback) {
   if (auto vecTy = dyn_cast<VectorType>(value->getType())) {
     Value *result0 = callback(CreateExtractElement(value, uint64_t(0)));
-    Value *result = UndefValue::get(VectorType::get(result0->getType(), vecTy->getNumElements()));
+    Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, result0, uint64_t(0));
     for (unsigned idx = 1, end = vecTy->getNumElements(); idx != end; ++idx)
       result = CreateInsertElement(result, callback(CreateExtractElement(value, idx)), idx);
@@ -321,7 +321,8 @@ Value *BuilderImplBase::scalarizeInPairs(Value *value, std::function<Value *(Val
   if (auto vecTy = dyn_cast<VectorType>(value->getType())) {
     Value *inComps = CreateShuffleVector(value, value, ArrayRef<int>{0, 1});
     Value *resultComps = callback(inComps);
-    Value *result = UndefValue::get(VectorType::get(resultComps->getType()->getScalarType(), vecTy->getNumElements()));
+    Value *result =
+        UndefValue::get(FixedVectorType::get(resultComps->getType()->getScalarType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, CreateExtractElement(resultComps, uint64_t(0)), uint64_t(0));
     if (vecTy->getNumElements() > 1)
       result = CreateInsertElement(result, CreateExtractElement(resultComps, 1), 1);
@@ -338,7 +339,7 @@ Value *BuilderImplBase::scalarizeInPairs(Value *value, std::function<Value *(Val
   }
 
   // For the scalar case, we need to create a vec2.
-  Value *inComps = UndefValue::get(VectorType::get(value->getType(), 2));
+  Value *inComps = UndefValue::get(FixedVectorType::get(value->getType(), 2));
   inComps = CreateInsertElement(inComps, value, uint64_t(0));
   inComps = CreateInsertElement(inComps, Constant::getNullValue(value->getType()), 1);
   Value *result = callback(inComps);
@@ -354,7 +355,7 @@ Value *BuilderImplBase::scalarizeInPairs(Value *value, std::function<Value *(Val
 Value *BuilderImplBase::scalarize(Value *value0, Value *value1, std::function<Value *(Value *, Value *)> callback) {
   if (auto vecTy = dyn_cast<VectorType>(value0->getType())) {
     Value *result0 = callback(CreateExtractElement(value0, uint64_t(0)), CreateExtractElement(value1, uint64_t(0)));
-    Value *result = UndefValue::get(VectorType::get(result0->getType(), vecTy->getNumElements()));
+    Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, result0, uint64_t(0));
     for (unsigned idx = 1, end = vecTy->getNumElements(); idx != end; ++idx) {
       result = CreateInsertElement(result,
@@ -378,7 +379,7 @@ Value *BuilderImplBase::scalarize(Value *value0, Value *value1, Value *value2,
   if (auto vecTy = dyn_cast<VectorType>(value0->getType())) {
     Value *result0 = callback(CreateExtractElement(value0, uint64_t(0)), CreateExtractElement(value1, uint64_t(0)),
                               CreateExtractElement(value2, uint64_t(0)));
-    Value *result = UndefValue::get(VectorType::get(result0->getType(), vecTy->getNumElements()));
+    Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, result0, uint64_t(0));
     for (unsigned idx = 1, end = vecTy->getNumElements(); idx != end; ++idx) {
       result = CreateInsertElement(result,

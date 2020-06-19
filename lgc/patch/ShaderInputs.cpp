@@ -138,7 +138,7 @@ Type *ShaderInputs::getInputType(ShaderInput inputKind, LLVMContext &context) {
   switch (inputKind) {
   case ShaderInput::WorkgroupId:
   case ShaderInput::LocalInvocationId:
-    return VectorType::get(Type::getInt32Ty(context), 3);
+    return FixedVectorType::get(Type::getInt32Ty(context), 3);
 
   case ShaderInput::TessCoordX:
   case ShaderInput::TessCoordY:
@@ -150,7 +150,7 @@ Type *ShaderInputs::getInputType(ShaderInput inputKind, LLVMContext &context) {
     return Type::getFloatTy(context);
 
   case ShaderInput::PerspInterpPullMode:
-    return VectorType::get(Type::getFloatTy(context), 3);
+    return FixedVectorType::get(Type::getFloatTy(context), 3);
 
   case ShaderInput::PerspInterpSample:
   case ShaderInput::PerspInterpCenter:
@@ -158,7 +158,7 @@ Type *ShaderInputs::getInputType(ShaderInput inputKind, LLVMContext &context) {
   case ShaderInput::LinearInterpSample:
   case ShaderInput::LinearInterpCenter:
   case ShaderInput::LinearInterpCentroid:
-    return VectorType::get(Type::getFloatTy(context), 2);
+    return FixedVectorType::get(Type::getFloatTy(context), 2);
 
   default:
     return Type::getInt32Ty(context);

@@ -57,7 +57,7 @@ Value *ArithBuilder::CreateCubeFaceCoord(Value *coord, const Twine &instName) {
   Value *cubeTc = CreateIntrinsic(Intrinsic::amdgcn_cubetc, {}, {coordX, coordY, coordZ}, nullptr);
   Value *tcDivMa = CreateFMul(recipMa, cubeTc);
   Value *resultY = CreateFAdd(tcDivMa, ConstantFP::get(getFloatTy(), 0.5));
-  Value *result = CreateInsertElement(UndefValue::get(VectorType::get(getFloatTy(), 2)), resultX, uint64_t(0));
+  Value *result = CreateInsertElement(UndefValue::get(FixedVectorType::get(getFloatTy(), 2)), resultX, uint64_t(0));
   result = CreateInsertElement(result, resultY, 1, instName);
   return result;
 }
@@ -228,7 +228,7 @@ Value *ArithBuilder::CreateSMod(Value *dividend, Value *divisor, const Twine &in
       if (divisorConst->getZExtValue() <= 0xFFFF) {
         // Get a non-constant 0 value. (We know the top 17 bits of the 64-bit PC is always zero.)
         Value *pc = CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
-        Value *pcHi = CreateExtractElement(CreateBitCast(pc, VectorType::get(getInt32Ty(), 2)), 1);
+        Value *pcHi = CreateExtractElement(CreateBitCast(pc, FixedVectorType::get(getInt32Ty(), 2)), 1);
         Value *nonConstantZero = CreateLShr(pcHi, getInt32(15));
         if (auto vecTy = dyn_cast<VectorType>(divisor->getType()))
           nonConstantZero = CreateVectorSplat(vecTy->getNumElements(), nonConstantZero);

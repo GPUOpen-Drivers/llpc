@@ -527,7 +527,7 @@ void PatchBufferOp::visitInsertElementInst(InsertElementInst &insertElementInst)
   Value *indexVector = nullptr;
 
   if (isa<UndefValue>(insertElementInst.getOperand(0)))
-    indexVector = UndefValue::get(VectorType::get(index->getType(), cast<VectorType>(type)->getNumElements()));
+    indexVector = UndefValue::get(FixedVectorType::get(index->getType(), cast<VectorType>(type)->getNumElements()));
   else
     indexVector = m_replacementMap[getPointerOperandAsInst(insertElementInst.getOperand(0))].second;
 
@@ -560,7 +560,7 @@ void PatchBufferOp::visitLoadInst(LoadInst &loadInst) {
     assert(loadInst.isVolatile() == false);
     assert(loadInst.getOrdering() == AtomicOrdering::NotAtomic);
 
-    Type *const castType = VectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(ADDR_SPACE_CONST);
+    Type *const castType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(ADDR_SPACE_CONST);
 
     Value *const pointer = getPointerOperandAsInst(loadInst.getPointerOperand());
 
@@ -635,7 +635,7 @@ void PatchBufferOp::visitMemMoveInst(MemMoveInst &memMoveInst) {
   assert(length);
 
   // Get a vector type that is the length of the memmove.
-  VectorType *const memoryType = VectorType::get(m_builder->getInt8Ty(), length->getZExtValue());
+  VectorType *const memoryType = FixedVectorType::get(m_builder->getInt8Ty(), length->getZExtValue());
 
   PointerType *const castDestType = memoryType->getPointerTo(destAddrSpace);
   Value *const castDest = m_builder->CreateBitCast(dest, castDestType);
@@ -723,7 +723,7 @@ void PatchBufferOp::visitPHINode(PHINode &phiNode) {
   // If the buffer descriptor was null, it means the PHI is changing the buffer descriptor, and we need a new PHI.
   if (!bufferDesc) {
     PHINode *const newPhiNode =
-        m_builder->CreatePHI(VectorType::get(Type::getInt32Ty(*m_context), 4), incomings.size());
+        m_builder->CreatePHI(FixedVectorType::get(Type::getInt32Ty(*m_context), 4), incomings.size());
     copyMetadata(newPhiNode, &phiNode);
 
     bool isInvariant = true;
@@ -948,8 +948,8 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
     Type *castSrcType = nullptr;
 
     if (stride == 16) {
-      castDestType = VectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(destAddrSpace);
-      castSrcType = VectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(srcAddrSpace);
+      castDestType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(destAddrSpace);
+      castSrcType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(srcAddrSpace);
     } else {
       assert(stride < 8);
       castDestType = m_builder->getIntNTy(stride * 8)->getPointerTo(destAddrSpace);
@@ -1003,7 +1003,7 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
     visitStoreInst(*destStore);
   } else {
     // Get an vector type that is the length of the memcpy.
-    VectorType *const memoryType = VectorType::get(m_builder->getInt8Ty(), lengthConstant->getZExtValue());
+    VectorType *const memoryType = FixedVectorType::get(m_builder->getInt8Ty(), lengthConstant->getZExtValue());
 
     PointerType *const castDestType = memoryType->getPointerTo(destAddrSpace);
     Value *const castDest = m_builder->CreateBitCast(dest, castDestType);
@@ -1076,7 +1076,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
     Type *castDestType = nullptr;
 
     if (stride == 16)
-      castDestType = VectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(destAddrSpace);
+      castDestType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(destAddrSpace);
     else {
       assert(stride < 8);
       castDestType = m_builder->getIntNTy(stride * 8)->getPointerTo(destAddrSpace);
@@ -1130,7 +1130,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
     visitStoreInst(*destStore);
   } else {
     // Get a vector type that is the length of the memset.
-    VectorType *const memoryType = VectorType::get(m_builder->getInt8Ty(), lengthConstant->getZExtValue());
+    VectorType *const memoryType = FixedVectorType::get(m_builder->getInt8Ty(), lengthConstant->getZExtValue());
 
     Value *newValue = nullptr;
 
@@ -1402,7 +1402,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
   // Load: Create an undef vector whose total size is the number of bytes we
   // loaded.
   // Store: Bitcast our value-to-store to a vector of smallest byte size.
-  Type *const castType = VectorType::get(smallestType, bytesToHandle / smallestByteSize);
+  Type *const castType = FixedVectorType::get(smallestType, bytesToHandle / smallestByteSize);
 
   Value *storeValue = nullptr;
   if (!isLoad) {
@@ -1443,13 +1443,13 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
     // Handle the greatest possible size
     if (alignment >= 4 && remainingBytes >= 4) {
       if (remainingBytes >= 16) {
-        intAccessType = VectorType::get(Type::getInt32Ty(*m_context), 4);
+        intAccessType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
         accessSize = 16;
       } else if (remainingBytes >= 12 && !isInvariant) {
-        intAccessType = VectorType::get(Type::getInt32Ty(*m_context), 3);
+        intAccessType = FixedVectorType::get(Type::getInt32Ty(*m_context), 3);
         accessSize = 12;
       } else if (remainingBytes >= 8) {
-        intAccessType = VectorType::get(Type::getInt32Ty(*m_context), 2);
+        intAccessType = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
         accessSize = 8;
       } else {
         // remainingBytes >= 4
@@ -1492,7 +1492,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
     } else {
       // Store
       unsigned compCount = accessSize / smallestByteSize;
-      part = UndefValue::get(VectorType::get(smallestType, compCount));
+      part = UndefValue::get(FixedVectorType::get(smallestType, compCount));
 
       for (unsigned i = 0; i < compCount; i++) {
         Value *const storeElem = m_builder->CreateExtractElement(storeValue, storeIndex++);
@@ -1519,7 +1519,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
       newInst = parts.front();
     } else {
       // And create an undef vector whose total size is the number of bytes we loaded.
-      newInst = UndefValue::get(VectorType::get(smallestType, bytesToHandle / smallestByteSize));
+      newInst = UndefValue::get(FixedVectorType::get(smallestType, bytesToHandle / smallestByteSize));
 
       unsigned index = 0;
 
@@ -1528,7 +1528,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
         const unsigned byteSize = static_cast<unsigned>(dataLayout.getTypeStoreSize(part->getType()));
 
         // Bitcast it to a vector of the smallest load type.
-        VectorType *const castType = VectorType::get(smallestType, byteSize / smallestByteSize);
+        VectorType *const castType = FixedVectorType::get(smallestType, byteSize / smallestByteSize);
         part = m_builder->CreateBitCast(part, castType);
         copyMetadata(part, &inst);
 

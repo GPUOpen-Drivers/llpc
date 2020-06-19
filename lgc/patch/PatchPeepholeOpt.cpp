@@ -173,16 +173,16 @@ void PatchPeepholeOpt::visitBitCast(BitCastInst &bitCast) {
 
     // Bit cast the LHS of the original shuffle.
     Value *const shuffleVectorLhs = shuffleVector->getOperand(0);
-    Type *const bitCastLhsType = VectorType::get(cast<VectorType>(bitCast.getDestTy())->getElementType(),
-                                                 cast<VectorType>(shuffleVectorLhs->getType())->getNumElements());
+    Type *const bitCastLhsType = FixedVectorType::get(cast<VectorType>(bitCast.getDestTy())->getElementType(),
+                                                      cast<VectorType>(shuffleVectorLhs->getType())->getNumElements());
     BitCastInst *const bitCastLhs =
         new BitCastInst(shuffleVectorLhs, bitCastLhsType, shuffleVectorLhs->getName() + ".bitcast");
     insertAfter(*bitCastLhs, *shuffleVector);
 
     // Bit cast the RHS of the original shuffle.
     Value *const shuffleVectorRhs = shuffleVector->getOperand(1);
-    Type *const bitCastRhsType = VectorType::get(cast<VectorType>(bitCast.getDestTy())->getElementType(),
-                                                 cast<VectorType>(shuffleVectorRhs->getType())->getNumElements());
+    Type *const bitCastRhsType = FixedVectorType::get(cast<VectorType>(bitCast.getDestTy())->getElementType(),
+                                                      cast<VectorType>(shuffleVectorRhs->getType())->getNumElements());
     BitCastInst *const bitCastRhs =
         new BitCastInst(shuffleVectorRhs, bitCastRhsType, shuffleVectorRhs->getName() + ".bitcast");
     insertAfter(*bitCastRhs, *bitCastLhs);

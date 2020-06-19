@@ -128,7 +128,7 @@ const ComputeShaderMode &Builder::getComputeShaderMode() {
 // @param maybeVecTy : Possible vector type to get number of elements from
 Type *Builder::getConditionallyVectorizedTy(Type *elementTy, Type *maybeVecTy) {
   if (auto vecTy = dyn_cast<VectorType>(maybeVecTy))
-    return VectorType::get(elementTy, vecTy->getNumElements());
+    return FixedVectorType::get(elementTy, vecTy->getNumElements());
   return elementTy;
 }
 
@@ -167,7 +167,7 @@ Value *Builder::CreateMapToInt32(PFN_MapToInt32Func mapFunc, ArrayRef<Value *> m
       results.push_back(CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs));
     }
 
-    Value *result = UndefValue::get(VectorType::get(results[0]->getType(), compCount));
+    Value *result = UndefValue::get(FixedVectorType::get(results[0]->getType(), compCount));
 
     for (unsigned i = 0; i < compCount; i++)
       result = CreateInsertElement(result, results[i], i);
@@ -184,7 +184,7 @@ Value *Builder::CreateMapToInt32(PFN_MapToInt32Func mapFunc, ArrayRef<Value *> m
   } else if (type->isIntegerTy() && type->getIntegerBitWidth() < 32) {
     SmallVector<Value *, 4> newMappedArgs;
 
-    Type *const vectorType = VectorType::get(type, type->getPrimitiveSizeInBits() == 16 ? 2 : 4);
+    Type *const vectorType = FixedVectorType::get(type, type->getPrimitiveSizeInBits() == 16 ? 2 : 4);
     Value *const undef = UndefValue::get(vectorType);
 
     for (Value *const mappedArg : mappedArgs) {
@@ -198,7 +198,7 @@ Value *Builder::CreateMapToInt32(PFN_MapToInt32Func mapFunc, ArrayRef<Value *> m
     SmallVector<Value *, 4> castMappedArgs;
 
     for (Value *const mappedArg : mappedArgs)
-      castMappedArgs.push_back(CreateBitCast(mappedArg, VectorType::get(getInt32Ty(), 2)));
+      castMappedArgs.push_back(CreateBitCast(mappedArg, FixedVectorType::get(getInt32Ty(), 2)));
 
     Value *result = UndefValue::get(castMappedArgs[0]->getType());
 
@@ -243,7 +243,8 @@ Type *Builder::getTransposedMatrixTy(Type *const matrixType) const {
   const unsigned columnCount = matrixType->getArrayNumElements();
   const unsigned rowCount = cast<VectorType>(columnVectorType)->getNumElements();
 
-  return ArrayType::get(VectorType::get(cast<VectorType>(columnVectorType)->getElementType(), columnCount), rowCount);
+  return ArrayType::get(FixedVectorType::get(cast<VectorType>(columnVectorType)->getElementType(), columnCount),
+                        rowCount);
 }
 
 // =====================================================================================================================
@@ -257,25 +258,25 @@ PointerType *Builder::getBufferDescTy(Type *pointeeTy) {
 // =====================================================================================================================
 // Get the type of an image descriptor
 VectorType *Builder::getImageDescTy() {
-  return VectorType::get(getInt32Ty(), 8);
+  return FixedVectorType::get(getInt32Ty(), 8);
 }
 
 // =====================================================================================================================
 // Get the type of an fmask descriptor
 VectorType *Builder::getFmaskDescTy() {
-  return VectorType::get(getInt32Ty(), 8);
+  return FixedVectorType::get(getInt32Ty(), 8);
 }
 
 // =====================================================================================================================
 // Get the type of a texel buffer descriptor
 VectorType *Builder::getTexelBufferDescTy() {
-  return VectorType::get(getInt32Ty(), 4);
+  return FixedVectorType::get(getInt32Ty(), 4);
 }
 
 // =====================================================================================================================
 // Get the type of a sampler descriptor
 VectorType *Builder::getSamplerDescTy() {
-  return VectorType::get(getInt32Ty(), 4);
+  return FixedVectorType::get(getInt32Ty(), 4);
 }
 
 // =====================================================================================================================
@@ -365,17 +366,17 @@ Type *Builder::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
   case TypeCode::i64:
     return getInt64Ty();
   case TypeCode::v2f32:
-    return VectorType::get(getFloatTy(), 2);
+    return FixedVectorType::get(getFloatTy(), 2);
   case TypeCode::v3f32:
-    return VectorType::get(getFloatTy(), 3);
+    return FixedVectorType::get(getFloatTy(), 3);
   case TypeCode::v4f32:
-    return VectorType::get(getFloatTy(), 4);
+    return FixedVectorType::get(getFloatTy(), 4);
   case TypeCode::v3i32:
-    return VectorType::get(getInt32Ty(), 3);
+    return FixedVectorType::get(getInt32Ty(), 3);
   case TypeCode::v4i32:
-    return VectorType::get(getInt32Ty(), 4);
+    return FixedVectorType::get(getInt32Ty(), 4);
   case TypeCode::a4v3f32:
-    return ArrayType::get(VectorType::get(getFloatTy(), 3), 4);
+    return ArrayType::get(FixedVectorType::get(getFloatTy(), 3), 4);
   default:
     llvm_unreachable("Should never be called!");
     return nullptr;
