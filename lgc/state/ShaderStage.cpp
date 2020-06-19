@@ -124,6 +124,7 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
   Function *newFunc = Function::Create(newFuncTy, oldFunc->getLinkage(), "", oldFunc->getParent());
   newFunc->setCallingConv(oldFunc->getCallingConv());
   newFunc->takeName(oldFunc);
+  newFunc->setSubprogram(oldFunc->getSubprogram());
 
   // Transfer code from old function to new function.
   while (!oldFunc->empty()) {

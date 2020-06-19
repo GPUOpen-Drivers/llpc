@@ -77,7 +77,7 @@ DIFile *SPIRVToLLVMDbgTran::getDIFile(const std::string &fileName) {
 }
 
 DISubprogram *SPIRVToLLVMDbgTran::getDISubprogram(SPIRVFunction *sf, Function *f) {
-  return getOrInsert(m_funcMap, f, [=]() {
+  auto* sp = getOrInsert(m_funcMap, f, [=]() {
     auto df = getDIFile(m_spDbg.getFunctionFileStr(sf));
     auto fn = f->getName();
     auto ln = m_spDbg.getFunctionLineNo(sf);
@@ -88,6 +88,9 @@ DISubprogram *SPIRVToLLVMDbgTran::getDISubprogram(SPIRVFunction *sf, Function *f
                                     m_builder.createSubroutineType(m_builder.getOrCreateTypeArray(None)), ln,
                                     DINode::FlagZero, spFlags);
   });
+  assert(f->getSubprogram() == sp || f->getSubprogram() == nullptr);
+  f->setSubprogram(sp);
+  return sp;
 }
 
 void SPIRVToLLVMDbgTran::transDbgInfo(SPIRVValue *sv, Value *v) {
