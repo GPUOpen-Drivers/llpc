@@ -646,7 +646,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(SPIRVType *const spvType, c
   if (isExplicitlyLaidOut)
     return ArrayType::get(compType, spvType->getVectorComponentCount());
   else
-    return VectorType::get(compType, spvType->getVectorComponentCount());
+    return FixedVectorType::get(compType, spvType->getVectorComponentCount());
 }
 
 Type *SPIRVToLLVM::transType(SPIRVType *t, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
@@ -1075,7 +1075,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
           else if (remappedValue->getType()->isPointerTy()) {
             // If the value is a pointer type, we are indexing into the original matrix.
             Value *const remappedValueSplat = getBuilder()->CreateVectorSplat(rowCount, remappedValue);
-            Value *rowSplat = UndefValue::get(VectorType::get(getBuilder()->getInt32Ty(), rowCount));
+            Value *rowSplat = UndefValue::get(FixedVectorType::get(getBuilder()->getInt32Ty(), rowCount));
 
             for (unsigned i = 0; i < rowCount; i++)
               rowSplat = getBuilder()->CreateInsertElement(rowSplat, getBuilder()->getInt32(i), i);
@@ -1133,7 +1133,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
 
             load->replaceAllUsesWith(newLoad);
           } else if (isTypeWithPadRowMajorMatrix(pointer->getType()->getPointerElementType())) {
-            Type *const newRowType = VectorType::get(matrixElementType, columnCount);
+            Type *const newRowType = FixedVectorType::get(matrixElementType, columnCount);
             Type *const newLoadType = ArrayType::get(newRowType, rowCount);
             Value *newLoad = UndefValue::get(newLoadType);
 
@@ -1143,7 +1143,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
                   pointer, {getBuilder()->getInt32(0), getBuilder()->getInt32(i), getBuilder()->getInt32(0)});
               Type *castType = pointerElem->getType()->getPointerElementType();
               assert(castType->isArrayTy());
-              castType = VectorType::get(castType->getArrayElementType(), castType->getArrayNumElements());
+              castType = FixedVectorType::get(castType->getArrayElementType(), castType->getArrayNumElements());
               const unsigned addrSpace = pointerElem->getType()->getPointerAddressSpace();
               castType = castType->getPointerTo(addrSpace);
               pointerElem = getBuilder()->CreateBitCast(pointerElem, castType);
@@ -1215,7 +1215,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
               const unsigned columnCount = storeType->getArrayNumElements();
               const unsigned rowCount = storeElementType->getArrayNumElements();
 
-              Type *const columnType = VectorType::get(storeElementType->getArrayElementType(), rowCount);
+              Type *const columnType = FixedVectorType::get(storeElementType->getArrayElementType(), rowCount);
               Type *const matrixType = ArrayType::get(columnType, columnCount);
 
               Value *matrix = UndefValue::get(matrixType);
@@ -1242,7 +1242,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
                   pointer, {getBuilder()->getInt32(0), getBuilder()->getInt32(i), getBuilder()->getInt32(0)});
               Type *castType = pointerElem->getType()->getPointerElementType();
               assert(castType->isArrayTy());
-              castType = VectorType::get(castType->getArrayElementType(), castType->getArrayNumElements());
+              castType = FixedVectorType::get(castType->getArrayElementType(), castType->getArrayNumElements());
               const unsigned addrSpace = pointerElem->getType()->getPointerAddressSpace();
               castType = castType->getPointerTo(addrSpace);
               pointerElem = getBuilder()->CreateBitCast(pointerElem, castType);
@@ -4226,7 +4226,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     auto newVecCompCount = vs->getComponents().size();
 
     IntegerType *int32Ty = IntegerType::get(*m_context, 32);
-    Type *newVecTy = VectorType::get(cast<VectorType>(v1->getType())->getElementType(), newVecCompCount);
+    Type *newVecTy = FixedVectorType::get(cast<VectorType>(v1->getType())->getElementType(), newVecCompCount);
     Value *newVec = UndefValue::get(newVecTy);
 
     for (size_t i = 0; i < newVecCompCount; ++i) {
@@ -5323,7 +5323,7 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *bi, Extracted
       components.push_back(getBuilder()->CreateExtractElement(coord, i));
     components.push_back(getBuilder()->CreateUDiv(components[2], getBuilder()->getInt32(6)));
     components[2] = getBuilder()->CreateURem(components[2], getBuilder()->getInt32(6));
-    coord = UndefValue::get(VectorType::get(getBuilder()->getInt32Ty(), 4));
+    coord = UndefValue::get(FixedVectorType::get(getBuilder()->getInt32Ty(), 4));
     for (unsigned i = 0; i != 4; ++i)
       coord = getBuilder()->CreateInsertElement(coord, components[i], i);
   }
@@ -5358,7 +5358,7 @@ Value *SPIRVToLLVM::transSPIRVFragmentFetchFromInst(SPIRVInstruction *bi, BasicB
   // For a fragment fetch, there is an extra operand for the fragment id, which
   // we must supply as an extra coordinate.
   Value *fragId = transValue(bii->getOpValue(2), bb->getParent(), bb);
-  Value *newCoord = UndefValue::get(VectorType::get(getBuilder()->getInt32Ty(), 3 + imageInfo.desc->Arrayed));
+  Value *newCoord = UndefValue::get(FixedVectorType::get(getBuilder()->getInt32Ty(), 3 + imageInfo.desc->Arrayed));
   for (unsigned i = 0; i != 2 + imageInfo.desc->Arrayed; ++i) {
     newCoord = getBuilder()->CreateInsertElement(newCoord, getBuilder()->CreateExtractElement(coord, i), i);
   }
@@ -5396,7 +5396,7 @@ Value *SPIRVToLLVM::transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *bi, Ba
 
   // Get the return type for the Builder method. It returns v4f32, then we
   // extract just the R channel.
-  Type *resultTy = VectorType::get(transType(bi->getType()), 4);
+  Type *resultTy = FixedVectorType::get(transType(bi->getType()), 4);
 
   // Create the image load.
   Value *result =
@@ -7404,7 +7404,7 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
                                             ConstantFP::get(args[0]->getType(), 1.0));
     val = getBuilder()->CreateFMul(val, ConstantFP::get(args[0]->getType(), 127.0));
     val = getBuilder()->CreateUnaryIntrinsic(Intrinsic::rint, val);
-    val = getBuilder()->CreateFPToSI(val, VectorType::get(getBuilder()->getInt8Ty(), 4));
+    val = getBuilder()->CreateFPToSI(val, FixedVectorType::get(getBuilder()->getInt8Ty(), 4));
     return getBuilder()->CreateBitCast(val, getBuilder()->getInt32Ty());
   }
 
@@ -7413,7 +7413,7 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     Value *val = getBuilder()->CreateFClamp(args[0], Constant::getNullValue(args[0]->getType()),
                                             ConstantFP::get(args[0]->getType(), 1.0));
     val = getBuilder()->CreateFMul(val, ConstantFP::get(args[0]->getType(), 255.0));
-    val = getBuilder()->CreateFPToUI(val, VectorType::get(getBuilder()->getInt8Ty(), 4));
+    val = getBuilder()->CreateFPToUI(val, FixedVectorType::get(getBuilder()->getInt8Ty(), 4));
     return getBuilder()->CreateBitCast(val, getBuilder()->getInt32Ty());
   }
 
@@ -7422,7 +7422,7 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     Value *val = getBuilder()->CreateFClamp(args[0], ConstantFP::get(args[0]->getType(), -1.0),
                                             ConstantFP::get(args[0]->getType(), 1.0));
     val = getBuilder()->CreateFMul(val, ConstantFP::get(args[0]->getType(), 32767.0));
-    val = getBuilder()->CreateFPToSI(val, VectorType::get(getBuilder()->getInt16Ty(), 2));
+    val = getBuilder()->CreateFPToSI(val, FixedVectorType::get(getBuilder()->getInt16Ty(), 2));
     return getBuilder()->CreateBitCast(val, getBuilder()->getInt32Ty());
   }
 
@@ -7432,13 +7432,13 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     Value *val = getBuilder()->CreateFClamp(args[0], Constant::getNullValue(args[0]->getType()),
                                             ConstantFP::get(args[0]->getType(), 1.0));
     val = getBuilder()->CreateFMul(val, ConstantFP::get(args[0]->getType(), 65535.0));
-    val = getBuilder()->CreateFPToUI(val, VectorType::get(getBuilder()->getInt16Ty(), 2));
+    val = getBuilder()->CreateFPToUI(val, FixedVectorType::get(getBuilder()->getInt16Ty(), 2));
     return getBuilder()->CreateBitCast(val, getBuilder()->getInt32Ty());
   }
 
   case GLSLstd450PackHalf2x16: {
     // Convert <2 x float> into <2 x half> then pack into i32.
-    Value *val = getBuilder()->CreateFPTrunc(args[0], VectorType::get(getBuilder()->getHalfTy(), 2));
+    Value *val = getBuilder()->CreateFPTrunc(args[0], FixedVectorType::get(getBuilder()->getHalfTy(), 2));
     return getBuilder()->CreateBitCast(val, getBuilder()->getInt32Ty());
   }
 
@@ -7449,8 +7449,8 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
   case GLSLstd450UnpackSnorm2x16: {
     // Unpack i32 into <2 x i16> then treat as signed normalized and convert to
     // <2 x float>.
-    Value *val = getBuilder()->CreateBitCast(args[0], VectorType::get(getBuilder()->getInt16Ty(), 2));
-    val = getBuilder()->CreateSIToFP(val, VectorType::get(getBuilder()->getFloatTy(), 2));
+    Value *val = getBuilder()->CreateBitCast(args[0], FixedVectorType::get(getBuilder()->getInt16Ty(), 2));
+    val = getBuilder()->CreateSIToFP(val, FixedVectorType::get(getBuilder()->getFloatTy(), 2));
     Value *multiplier = getBuilder()->getOneOverPower2MinusOne(val->getType(), 15); // 1/32767
     val = getBuilder()->CreateFMul(val, multiplier);
     return getBuilder()->CreateFClamp(val, ConstantFP::get(val->getType(), -1.0), ConstantFP::get(val->getType(), 1.0));
@@ -7459,8 +7459,8 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
   case GLSLstd450UnpackUnorm2x16: {
     // Unpack i32 into <2 x i16> then treat as unsigned normalized and convert
     // to <2 x float>.
-    Value *val = getBuilder()->CreateBitCast(args[0], VectorType::get(getBuilder()->getInt16Ty(), 2));
-    val = getBuilder()->CreateUIToFP(val, VectorType::get(getBuilder()->getFloatTy(), 2));
+    Value *val = getBuilder()->CreateBitCast(args[0], FixedVectorType::get(getBuilder()->getInt16Ty(), 2));
+    val = getBuilder()->CreateUIToFP(val, FixedVectorType::get(getBuilder()->getFloatTy(), 2));
     Value *multiplier = getBuilder()->getOneOverPower2MinusOne(val->getType(), 16); // 1/65535
     return getBuilder()->CreateFMul(val, multiplier);
   }
@@ -7468,16 +7468,16 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
   case GLSLstd450UnpackHalf2x16: {
     // Unpack <2 x half> from i32 and convert to <2 x float>.
     // This is required to flush denorm to zero if that mode is enabled.
-    Value *val = getBuilder()->CreateBitCast(args[0], VectorType::get(getBuilder()->getHalfTy(), 2));
+    Value *val = getBuilder()->CreateBitCast(args[0], FixedVectorType::get(getBuilder()->getHalfTy(), 2));
     val = flushDenorm(val);
-    return getBuilder()->CreateFPExt(val, VectorType::get(getBuilder()->getFloatTy(), 2));
+    return getBuilder()->CreateFPExt(val, FixedVectorType::get(getBuilder()->getFloatTy(), 2));
   }
 
   case GLSLstd450UnpackSnorm4x8: {
     // Unpack i32 into <4 x i8> then treat as signed normalized and convert to
     // <4 x float>.
-    Value *val = getBuilder()->CreateBitCast(args[0], VectorType::get(getBuilder()->getInt8Ty(), 4));
-    val = getBuilder()->CreateSIToFP(val, VectorType::get(getBuilder()->getFloatTy(), 4));
+    Value *val = getBuilder()->CreateBitCast(args[0], FixedVectorType::get(getBuilder()->getInt8Ty(), 4));
+    val = getBuilder()->CreateSIToFP(val, FixedVectorType::get(getBuilder()->getFloatTy(), 4));
     Value *multiplier = getBuilder()->getOneOverPower2MinusOne(val->getType(), 7); // 1/127
     val = getBuilder()->CreateFMul(val, multiplier);
     return getBuilder()->CreateFClamp(val, ConstantFP::get(val->getType(), -1.0), ConstantFP::get(val->getType(), 1.0));
@@ -7486,15 +7486,15 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
   case GLSLstd450UnpackUnorm4x8: {
     // Unpack i32 into <4 x i8> then treat as unsigned normalized and convert to
     // <4 x float>.
-    Value *val = getBuilder()->CreateBitCast(args[0], VectorType::get(getBuilder()->getInt8Ty(), 4));
-    val = getBuilder()->CreateUIToFP(val, VectorType::get(getBuilder()->getFloatTy(), 4));
+    Value *val = getBuilder()->CreateBitCast(args[0], FixedVectorType::get(getBuilder()->getInt8Ty(), 4));
+    val = getBuilder()->CreateUIToFP(val, FixedVectorType::get(getBuilder()->getFloatTy(), 4));
     Value *multiplier = getBuilder()->getOneOverPower2MinusOne(val->getType(), 8); // 1/255
     return getBuilder()->CreateFMul(val, multiplier);
   }
 
   case GLSLstd450UnpackDouble2x32:
     // Cast double to <2 x i32>.
-    return getBuilder()->CreateBitCast(args[0], VectorType::get(getBuilder()->getInt32Ty(), 2));
+    return getBuilder()->CreateBitCast(args[0], FixedVectorType::get(getBuilder()->getInt32Ty(), 2));
 
   case GLSLstd450Length: {
     // Get length of vector.
