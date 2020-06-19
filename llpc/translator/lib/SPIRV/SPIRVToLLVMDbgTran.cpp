@@ -77,7 +77,7 @@ DIFile *SPIRVToLLVMDbgTran::getDIFile(const std::string &fileName) {
 }
 
 DISubprogram *SPIRVToLLVMDbgTran::getDISubprogram(SPIRVFunction *sf, Function *f) {
-  auto* sp = getOrInsert(m_funcMap, f, [=]() {
+  auto *sp = getOrInsert(m_funcMap, f, [=]() {
     auto df = getDIFile(m_spDbg.getFunctionFileStr(sf));
     auto fn = f->getName();
     auto ln = m_spDbg.getFunctionLineNo(sf);
