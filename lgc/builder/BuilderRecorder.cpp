@@ -1937,19 +1937,6 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ImageAtomicCompareSwap:
       // Functions that read and write memory.
       break;
-    case Opcode::Barrier:
-    case Opcode::DemoteToHelperInvocation:
-    case Opcode::EmitVertex:
-    case Opcode::EndPrimitive:
-    case Opcode::GetSubgroupSize:
-    case Opcode::ImageGetLod:
-    case Opcode::ImageQueryLevels:
-    case Opcode::ImageQuerySamples:
-    case Opcode::ImageQuerySize:
-    case Opcode::IsHelperInvocation:
-    case Opcode::Kill:
-    case Opcode::LoadBufferDesc:
-    case Opcode::ReadClock:
     case Opcode::SubgroupAll:
     case Opcode::SubgroupAllEqual:
     case Opcode::SubgroupAny:
@@ -1979,6 +1966,23 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::SubgroupSwizzleMask:
     case Opcode::SubgroupSwizzleQuad:
     case Opcode::SubgroupWriteInvocation:
+      // Subgroup operations.
+      func->addFnAttr(Attribute::ReadNone);
+      func->addFnAttr(Attribute::Convergent);
+      break;
+    case Opcode::Barrier:
+    case Opcode::DemoteToHelperInvocation:
+    case Opcode::EmitVertex:
+    case Opcode::EndPrimitive:
+    case Opcode::GetSubgroupSize:
+    case Opcode::ImageGetLod:
+    case Opcode::ImageQueryLevels:
+    case Opcode::ImageQuerySamples:
+    case Opcode::ImageQuerySize:
+    case Opcode::IsHelperInvocation:
+    case Opcode::Kill:
+    case Opcode::LoadBufferDesc:
+    case Opcode::ReadClock:
     case Opcode::WriteBuiltInOutput:
     case Opcode::WriteGenericOutput:
     case Opcode::WriteXfbOutput:
