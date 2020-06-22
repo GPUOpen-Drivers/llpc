@@ -31,6 +31,7 @@
 #pragma once
 
 #include "vulkan.h"
+#include <cassert>
 
 // Confliction of Xlib and LLVM headers
 #if defined(__unix__)
@@ -45,7 +46,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 40
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 3
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -73,6 +74,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     40.3 | Added ICache interface                                                                                |
 //* |     40.2 | Added extendedRobustness in PipelineOptions to support VK_EXT_robustness2                             |
 //* |     40.1 | Added disableLoopUnroll to PipelineShaderOptions                                                      |
 //* |     40.0 | Added DescriptorReserved12, which moves DescriptorYCbCrSampler down to 13                             |
@@ -116,6 +118,8 @@ static const unsigned MaxColorTargets = 8;
 
 // Forward declarations
 class IShaderCache;
+class ICache;
+class EntryHandle;
 
 /// Enumerates result codes of LLPC operations.
 enum class Result : int {
@@ -125,6 +129,10 @@ enum class Result : int {
   Delayed = 0x00000001,
   // The requested feature is unsupported
   Unsupported = 0x00000002,
+  // A required resource (e.g. cache entry) is not ready yet.
+  NotReady = 0x00000003,
+  // A required resource (e.g. cache entry) was not found.
+  NotFound = 0x00000004,
   /// The requested operation is unavailable at this time
   ErrorUnavailable = -(0x00000001),
   /// The operation could not complete due to insufficient system memory
@@ -157,12 +165,12 @@ enum class BasicType : unsigned {
 
 /// Enumerates LLPC shader stages.
 enum ShaderStage : unsigned {
-  ShaderStageVertex = 0,  ///< Vertex shader
-  ShaderStageTessControl, ///< Tessellation control shader
-  ShaderStageTessEval,    ///< Tessellation evaluation shader
-  ShaderStageGeometry,    ///< Geometry shader
-  ShaderStageFragment,    ///< Fragment shader
-  ShaderStageCompute,     ///< Compute shader
+  ShaderStageVertex = 0,                                ///< Vertex shader
+  ShaderStageTessControl,                               ///< Tessellation control shader
+  ShaderStageTessEval,                                  ///< Tessellation evaluation shader
+  ShaderStageGeometry,                                  ///< Geometry shader
+  ShaderStageFragment,                                  ///< Fragment shader
+  ShaderStageCompute,                                   ///< Compute shader
   ShaderStageCount,                                     ///< Count of shader stages
   ShaderStageInvalid = ~0u,                             ///< Invalid shader stage
   ShaderStageNativeStageCount = ShaderStageCompute + 1, ///< Native supported shader stage count
@@ -598,6 +606,7 @@ struct GraphicsPipelineBuildInfo {
   void *pInstance;                ///< Vulkan instance object
   void *pUserData;                ///< User data
   OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
+  ICache *cache;                  ///< ICache, used to search for the compiled shader data
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
   IShaderCache *pShaderCache; ///< Shader cache, used to search for the compiled shader data
 #endif
@@ -658,6 +667,7 @@ struct ComputePipelineBuildInfo {
   void *pInstance;                ///< Vulkan instance object
   void *pUserData;                ///< User data
   OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
+  ICache *cache;                  ///< ICache, used to search for the compiled shader data
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
   IShaderCache *pShaderCache; ///< Shader cache, used to search for the compiled shader data
 #endif
@@ -746,7 +756,218 @@ public:
   /// @param [in]  nameBufSize    Size of the buffer to store pipeline name
   static void VKAPI_CALL GetPipelineName(const ComputePipelineBuildInfo *pPipelineInfo, char *pPipeName,
                                          const size_t nameBufSize);
+};
 
+/// 128-bit hash compatible structure
+struct HashId {
+  union {
+    uint64_t qwords[2]; ///< Output hash in qwords.
+    uint32_t dwords[4]; ///< Output hash in dwords.
+    uint8_t bytes[16];  ///< Output hash in bytes.
+  };
+};
+
+typedef void *RawEntryHandle;
+
+// =====================================================================================================================
+// Shader Cache interfaces, that client needs to inherit and implement it.
+class ICache {
+public:
+  virtual ~ICache() = default;
+
+  /// \brief Obtain a cache entry for the \p hash.
+  ///
+  /// The caller receives reference-counted ownership of the returned handle, if any, and must
+  /// eventually call \ref PutEntry to release it.
+  ///
+  /// Valid handles are always non-null.
+  ///
+  /// \param hash the hash key for the cache entry
+  /// \param allocateOnMiss if true, a new cache entry will be allocated when none is found
+  /// \param pHandle will be filled with a handle to the cache entry on Success, NotReady and allocateOnMiss if NotFound
+  /// \return success code, possible values:
+  ///   * Success: an existing, ready entry was found
+  ///   * NotReady: an existing entry was found, but it is not ready yet because another thread
+  ///               is working on filling it
+  ///   * NotFound: no existing entry was found. If \p allocateOnMiss is set, a new entry was
+  ///               allocated and the caller must populate it via SetValue
+  ///   * ErrorXxx: some internal error has occurred, no handle is returned
+  virtual Result GetEntry(HashId hash, bool allocateOnMiss, EntryHandle *pHandle) = 0;
+
+  /// \brief Release ownership of a handle to a cache entry.
+  ///
+  /// If the handle owner is responsible for populating the cache entry, it is an error to call this
+  /// method without first calling SetValue.
+  /// Put can be called multiple times if the Entry is empty.
+  ///
+  /// \param rawHandle the handle to cache entry to be released
+  virtual void ReleaseEntry(RawEntryHandle rawHandle) = 0;
+
+  /// \brief Wait for a cache entry to become ready (populated by another thread).
+  ///
+  /// This block the current thread until the entry becomes ready.
+  ///
+  /// \param rawHandle the handle to the cache entry to be wait.
+  /// \return success code, possible values:
+  ///   * Success: the entry is now ready
+  ///   * ErrorXxx: some internal error has occurred, or populating the cache was not successful
+  ///               (e.g. due to a compiler error). The operation was semantically a no-op:
+  ///               the entry is still not ready, and the caller must still release it via \ref PutEntry
+  virtual Result WaitForEntry(RawEntryHandle rawHandle) = 0;
+
+  /// \brief Retrieve the value contents of a cache entry.
+  ///
+  /// \param rawHandle the handle to the cache entry
+  /// \param pData if non-null, up to *pDataLen bytes of contents of the cache entry will be copied
+  ///              into the memory pointed to by pData
+  /// \param pDataLen if \p pData is non-null, the caller must set *pDataLen to the space available
+  ///                 in the memory that it points to. The method will store the total size of the
+  ///                 cache entry in *pDataLen.
+  /// \return success code, possible values:
+  ///   * Success: operation completed successfully
+  ///   * NotReady: the entry is not ready yet (waiting to be populated by another thread)
+  ///   * ErrorXxx: some internal error has occurred. The operation was semantically a no-op.
+  virtual Result GetValue(RawEntryHandle rawHandle, void *pData, size_t *pDataLen) = 0;
+
+  /// \brief Zero-copy retrieval of the value contents of a cache entry.
+  ///
+  /// \param handle the handle to the cache entry
+  /// \param ppData will be set to a pointer to the cache value contents. The pointer remains
+  ///               valid until the handle is released via \ref PutEntry.
+  /// \param pDataLen will be set to the total size of the cache entry in *pDataLen.
+  /// \return success code, possible values:
+  ///   * Success: operation completed successfully
+  ///   * Unsupported: this implementation does not support zero-copy, the caller must use
+  ///                  \ref GetValue instead
+  ///   * NotReady: the entry is not ready yet (waiting to be populated by another thread)
+  ///   * ErrorXxx: some internal error has occurred. The operation was semantically a no-op.
+  virtual Result GetValueZeroCopy(RawEntryHandle rawHandle, const void **ppData, size_t *pDataLen) = 0;
+
+  /// \brief Populate the value contents of a cache entry.
+  ///
+  /// This method must be called exactly once when a cache entry is newly allocated by \ref GetEntry
+  /// with allocateOnMiss set and a return value of NotFound.
+  ///
+  /// The handle must still be released using \ref PutEntry after calling this method.
+  ///
+  /// \param handle the handle to be populated
+  /// \param success whether computing the value contents was successful
+  /// \param pData pointer to the value contents
+  /// \param dataLen size of the value contents in bytes
+  /// \return success code, possible values:
+  ///   * Success: operation completed successfully
+  ///   * ErrorXxx: some internal error has occurred. The caller must not call SetValue again,
+  ///               but it must still release the handle via \ref PutEntry.
+  virtual Result SetValue(RawEntryHandle rawHandle, bool success, const void *pData, size_t dataLen) = 0;
+
+  /// \brief Populate the value contents of a cache entry and release the handle.
+  ///
+  /// Semantics are identical to SetValue, except that the handle is guaranteed to be released.
+  /// Doing this atomically can sometimes allow a more efficient implementation; the default
+  /// implementation is trivial.
+  virtual Result ReleaseWithValue(RawEntryHandle rawHandle, bool success, const void *pData, size_t dataLen) {
+    Result result = Result::ErrorUnknown;
+    if (rawHandle == nullptr)
+      return result;
+    result = SetValue(rawHandle, success, pData, dataLen);
+    ReleaseEntry(rawHandle);
+    return result;
+  }
+};
+
+// =====================================================================================================================
+// A slight alternative using more C++ RAII safety:
+// - make all methods of ICache other than GetEntry protected
+// - use this class for the EntryHandle, providing more type safety and using ~EntryHandle
+//   to ensure that PutEntry gets called etc.
+class EntryHandle {
+public:
+  /// \brief Construct from a raw handle.
+  EntryHandle(ICache *pCache, RawEntryHandle rawHandle, bool mustPopulate) {
+    m_pCache = pCache;
+    m_rawHandle = rawHandle;
+    m_mustPopulate = mustPopulate;
+  }
+
+  EntryHandle() = default;
+  ~EntryHandle() { Put(); }
+  EntryHandle(const EntryHandle &) = delete;
+  EntryHandle &operator=(const EntryHandle &) = delete;
+
+  EntryHandle(EntryHandle &&rhs)
+      : m_pCache(rhs.m_pCache), m_rawHandle(rhs.m_rawHandle), m_mustPopulate(rhs.m_mustPopulate) {
+    rhs.m_pCache = nullptr;
+    rhs.m_rawHandle = nullptr;
+    rhs.m_mustPopulate = false;
+  }
+
+  EntryHandle &operator=(EntryHandle &&rhs) {
+    if (this != &rhs) {
+      m_pCache = rhs.m_pCache;
+      m_rawHandle = rhs.m_rawHandle;
+      m_mustPopulate = rhs.m_mustPopulate;
+
+      rhs.m_pCache = nullptr;
+      rhs.m_rawHandle = nullptr;
+      rhs.m_mustPopulate = false;
+    }
+
+    return *this;
+  }
+
+  static void ReleaseHandle(EntryHandle &&rhs) {
+    EntryHandle entryHandle;
+    entryHandle.m_pCache = rhs.m_pCache;
+    entryHandle.m_rawHandle = rhs.m_rawHandle;
+    entryHandle.m_mustPopulate = rhs.m_mustPopulate;
+
+    rhs.m_pCache = nullptr;
+    rhs.m_rawHandle = nullptr;
+    rhs.m_mustPopulate = false;
+
+    entryHandle.Put();
+  }
+  bool IsEmpty() { return m_pCache == nullptr; }
+
+  // semantics of these methods are largely analogous to the above in ICache,
+  // their implementation simply forwards to the m_pCache.
+  Result WaitForEntry() const {
+    assert(m_pCache);
+    return m_pCache->WaitForEntry(m_rawHandle);
+  }
+
+  Result GetValue(void *pData, size_t *pDataLen) const {
+    assert(m_pCache);
+    return m_pCache->GetValue(m_rawHandle, pData, pDataLen);
+  }
+
+  Result GetValueZeroCopy(const void **ppData, size_t *pDataLen) const {
+    assert(m_pCache);
+    return m_pCache->GetValueZeroCopy(m_rawHandle, ppData, pDataLen);
+  }
+
+  Result SetValue(bool success, const void *pData, size_t dataLen) {
+    assert(m_pCache);
+    assert(m_mustPopulate);
+    m_mustPopulate = false;
+    return m_pCache->SetValue(m_rawHandle, success, pData, dataLen);
+  }
+
+private:
+  void Put() {
+    if (!m_pCache)
+      return;
+    if (m_mustPopulate)
+      m_pCache->SetValue(m_rawHandle, false, nullptr, 0);
+    m_pCache->ReleaseEntry(m_rawHandle);
+    m_pCache = nullptr;
+    m_rawHandle = nullptr;
+    m_mustPopulate = false;
+  }
+
+  ICache *m_pCache = nullptr;
+  void *m_rawHandle = nullptr;
+  bool m_mustPopulate = false;
 };
 
 } // namespace Vkgc
