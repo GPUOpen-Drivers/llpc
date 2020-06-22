@@ -1889,6 +1889,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::GetFmaskDescPtr:
     case Opcode::GetImageDescPtr:
     case Opcode::GetSamplerDescPtr:
+    case Opcode::GetSubgroupSize:
     case Opcode::GetTexelBufferDescPtr:
     case Opcode::IndexDescPtr:
     case Opcode::InsertBitField:
@@ -1920,6 +1921,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ImageLoad:
     case Opcode::ImageLoadWithFmask:
     case Opcode::ImageSample:
+    case Opcode::LoadBufferDesc:
     case Opcode::LoadDescFromPtr:
     case Opcode::LoadPushConstantsPtr:
     case Opcode::ReadBuiltInInput:
@@ -1935,20 +1937,19 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
       break;
     case Opcode::ImageAtomic:
     case Opcode::ImageAtomicCompareSwap:
+    case Opcode::WriteXfbOutput:
       // Functions that read and write memory.
       break;
     case Opcode::Barrier:
     case Opcode::DemoteToHelperInvocation:
     case Opcode::EmitVertex:
     case Opcode::EndPrimitive:
-    case Opcode::GetSubgroupSize:
     case Opcode::ImageGetLod:
     case Opcode::ImageQueryLevels:
     case Opcode::ImageQuerySamples:
     case Opcode::ImageQuerySize:
     case Opcode::IsHelperInvocation:
     case Opcode::Kill:
-    case Opcode::LoadBufferDesc:
     case Opcode::ReadClock:
     case Opcode::SubgroupAll:
     case Opcode::SubgroupAllEqual:
@@ -1981,7 +1982,6 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::SubgroupWriteInvocation:
     case Opcode::WriteBuiltInOutput:
     case Opcode::WriteGenericOutput:
-    case Opcode::WriteXfbOutput:
       // TODO: These functions have not been classified yet.
       break;
     default:
