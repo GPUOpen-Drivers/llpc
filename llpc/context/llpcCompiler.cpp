@@ -268,8 +268,9 @@ class LlpcDiagnosticHandler : public DiagnosticHandler {
 // @param optionCount : Count of compilation-option strings
 // @param options : An array of compilation-option strings
 // @param [out] ppCompiler : Pointer to the created LLPC compiler object
+// @param cache : Pointer to ICache implemented in client
 Result VKAPI_CALL ICompiler::Create(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options,
-                                    ICompiler **ppCompiler) {
+                                    ICompiler **ppCompiler, ICache *cache) {
   Result result = Result::Success;
 
   const char *client = options[0];
@@ -313,7 +314,7 @@ Result VKAPI_CALL ICompiler::Create(GfxIpVersion gfxIp, unsigned optionCount, co
 
   if (result == Result::Success) {
     SOptionHash = optionHash;
-    *ppCompiler = new Compiler(gfxIp, optionCount, options, SOptionHash);
+    *ppCompiler = new Compiler(gfxIp, optionCount, options, SOptionHash, cache);
     assert(*ppCompiler);
 
     if (EnableOuts()) {
@@ -342,8 +343,10 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(VkFormat format) {
 // @param optionCount : Count of compilation-option strings
 // @param options : An array of compilation-option strings
 // @param optionHash : Hash code of compilation options
-Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options, MetroHash::Hash optionHash)
-    : m_optionHash(optionHash), m_gfxIp(gfxIp), m_relocatablePipelineCompilations(0) {
+// @param cache : Pointer to ICache implemented in client
+Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options, MetroHash::Hash optionHash,
+                   ICache *cache)
+    : m_optionHash(optionHash), m_gfxIp(gfxIp), m_cache(cache), m_relocatablePipelineCompilations(0) {
   for (unsigned i = 0; i < optionCount; ++i)
     m_options.push_back(options[i]);
 
@@ -462,6 +465,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   Result result = Result::Success;
   void *allocBuf = nullptr;
   const void *cacheData = nullptr;
+  void *allocData = nullptr;
   size_t allocSize = 0;
   ShaderModuleDataEx moduleDataEx = {};
   // For trimming debug info
@@ -477,6 +481,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
   ShaderEntryState cacheEntryState = ShaderEntryState::New;
   CacheEntryHandle hEntry = nullptr;
+  Result cacheResult = Result::Unsupported;
+  EntryHandle cacheEntry;
+  bool allocateOnMiss = true;
 
   // Calculate the hash code of input data
   MetroHash::Hash hash = {};
@@ -530,6 +537,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
                       moduleDataEx.common.binCode.codeSize, cacheHash.bytes);
     static_assert(sizeof(moduleDataEx.common.cacheHash) == sizeof(cacheHash), "Unexpected value!");
     memcpy(moduleDataEx.common.cacheHash, cacheHash.dwords, sizeof(cacheHash));
+    HashId cacheHashId = {};
+    static_assert(sizeof(HashId) == sizeof(cacheHash), "Hash size is different!");
+    memcpy(cacheHashId.dwords, cacheHash.dwords, sizeof(cacheHash));
 
     // Do SPIR-V translate & lower if possible
     bool enableOpt = cl::EnableShaderModuleOpt;
@@ -540,10 +550,26 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
       // Check internal cache for shader module build result
       // NOTE: We should not cache non-opt result, we may compile shader module multiple
       // times in async-compile mode.
-      cacheEntryState = m_shaderCache->findShader(cacheHash, true, &hEntry);
-      if (cacheEntryState == ShaderEntryState::Ready)
-        result = m_shaderCache->retrieveShader(hEntry, &cacheData, &allocSize);
-      if (cacheEntryState != ShaderEntryState::Ready) {
+      if (m_cache) {
+        cacheResult = m_cache->GetEntry(cacheHashId, allocateOnMiss, &cacheEntry);
+        if (cacheResult == Result::NotReady)
+          cacheResult = cacheEntry.WaitForEntry();
+        if (cacheResult == Result::Success) {
+          cacheResult = cacheEntry.GetValueZeroCopy(&cacheData, &allocSize);
+          if (cacheResult == Result::Unsupported && cacheData == nullptr) {
+            cacheResult = cacheEntry.GetValue(nullptr, &allocSize);
+            if (cacheResult == Result::Success && allocSize > 0) {
+              cacheData = allocData = new uint8_t[allocSize];
+              cacheResult = cacheEntry.GetValue(const_cast<void *>(cacheData), &allocSize);
+            }
+          }
+        }
+      } else {
+        cacheEntryState = m_shaderCache->findShader(cacheHash, allocateOnMiss, &hEntry);
+        if (cacheEntryState == ShaderEntryState::Ready)
+          result = m_shaderCache->retrieveShader(hEntry, &cacheData, &allocSize);
+      }
+      if (cacheResult != Result::Success && cacheEntryState != ShaderEntryState::Ready) {
         Context *context = acquireContext();
 
         context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
@@ -601,8 +627,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
           // Per-shader SPIR-V lowering passes.
           SpirvLower::addPasses(context, static_cast<ShaderStage>(entryNames[i].stage), *lowerPassMgr,
-                                timerProfiler.getTimer(TimerLower), cl::ForceLoopUnrollCount
-                                 );
+                                timerProfiler.getTimer(TimerLower), cl::ForceLoopUnrollCount);
 
           lowerPassMgr->add(createBitcodeWriterPass(moduleBinaryStream));
 
@@ -656,7 +681,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   unsigned totalNodeCount = 0;
   if (result == Result::Success) {
     if (shaderInfo->pfnOutputAlloc) {
-      if (cacheEntryState != ShaderEntryState::Ready) {
+      if (cacheResult != Result::Success && cacheEntryState != ShaderEntryState::Ready) {
         for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i)
           totalNodeCount += moduleEntryDatas[i].resNodeDataCount;
 
@@ -680,7 +705,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     ShaderModuleDataEx *moduleDataExCopy = reinterpret_cast<ShaderModuleDataEx *>(allocBuf);
 
     ShaderModuleEntryData *entryData = &moduleDataExCopy->extra.entryDatas[0];
-    if (cacheEntryState != ShaderEntryState::Ready) {
+    if (cacheResult != Result::Success && cacheEntryState != ShaderEntryState::Ready) {
       // Copy module data
       memcpy(moduleDataExCopy, &moduleDataEx, sizeof(moduleDataEx));
       moduleDataExCopy->common.binCode.pCode = nullptr;
@@ -705,7 +730,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     FsOutInfo *fsOutInfo = reinterpret_cast<FsOutInfo *>(voidPtrInc(allocBuf, moduleDataExCopy->fsOutInfoOffset));
     void *code = voidPtrInc(allocBuf, moduleDataExCopy->codeOffset);
 
-    if (cacheEntryState != ShaderEntryState::Ready) {
+    if (cacheResult != Result::Success && cacheEntryState != ShaderEntryState::Ready) {
       // Copy entry info
       for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i) {
         entryData[i] = moduleEntryDatas[i];
@@ -734,6 +759,8 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
       moduleDataExCopy->extra.fsOutInfoCount = fsOutInfos.size();
       if (fsOutInfos.size() > 0)
         memcpy(fsOutInfo, &fsOutInfos[0], fsOutInfos.size() * sizeof(FsOutInfo));
+      if (m_cache && allocateOnMiss && cacheResult == Result::NotFound)
+        cacheEntry.SetValue(true, moduleDataExCopy, allocSize);
       if (cacheEntryState == ShaderEntryState::Compiling) {
         if (hEntry)
           m_shaderCache->insertShader(hEntry, moduleDataExCopy, allocSize);
@@ -753,6 +780,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     if (hEntry)
       m_shaderCache->resetShader(hEntry);
   }
+  delete[] allocData;
 
   return result;
 }
@@ -785,22 +813,37 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     // Check the cache for the relocatable shader for this stage.
     MetroHash::Hash cacheHash = {};
     IShaderCache *userShaderCache = nullptr;
+    ICache *userCache = nullptr;
     if (context->isGraphics()) {
       auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
       cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true, stage);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
       userShaderCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
+      userCache = pipelineInfo->cache;
     } else {
       auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
       cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true, true);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
       userShaderCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
+      userCache = pipelineInfo->cache;
     }
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
     BinaryData elfBin = {};
+
+    EntryHandle cacheEntry;
+    HashId hashId = {};
+    memcpy(&hashId.bytes, &cacheHash.bytes, sizeof(cacheHash));
+    Result cacheResult = lookUpCaches(userCache, &hashId, &elfBin, &cacheEntry);
+    if (cacheResult == Result::Success) {
+      auto data = reinterpret_cast<const char *>(elfBin.pCode);
+      elf[stage].assign(data, data + elfBin.codeSize);
+      // Release Entry
+      ReleaseCacheEntry(false, nullptr, &cacheEntry);
+      continue;
+    }
 
     ShaderCache *shaderCache;
     CacheEntryHandle hEntry;
@@ -830,6 +873,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     }
     updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
     LLPC_OUTS("Updating the cache for shader stage " << stage << "\n");
+    ReleaseCacheEntry((result == Result::Success), &elfBin, &cacheEntry);
   }
   context->getPipelineContext()->setShaderStageMask(originalShaderStageMask);
 
@@ -1032,7 +1076,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         timerProfiler.startStopTimer(TimerLoadBc, false);
       } else {
         module = new Module((Twine("llpc") + getShaderStageName(shaderInfoEntry->entryStage)).str() +
-                            std::to_string(getModuleIdByIndex(shaderIndex)),
+                                std::to_string(getModuleIdByIndex(shaderIndex)),
                             *context);
       }
 
@@ -1095,8 +1139,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       lowerPassMgr->setPassIndex(&passIndex);
 
       SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower),
-                            forceLoopUnrollCount
-                            );
+                            forceLoopUnrollCount);
       // Run the passes.
       bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       if (!success) {
@@ -1185,30 +1228,57 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, unsigned stageM
   MetroHash::Hash fragmentHash = {};
   MetroHash::Hash nonFragmentHash = {};
   Compiler::buildShaderCacheHash(m_context, stageMask, stageHashes, &fragmentHash, &nonFragmentHash);
+  HashId fragmentHashId = {};
+  HashId nonFragmentHashId = {};
+  memcpy(&fragmentHashId.bytes, &fragmentHash.bytes, sizeof(fragmentHash));
+  memcpy(&nonFragmentHashId.bytes, &nonFragmentHash.bytes, sizeof(nonFragmentHash));
 
   IShaderCache *appCache = nullptr;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
   auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
   appCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
-  if (stageMask & shaderStageToMask(ShaderStageFragment)) {
+  ICache *userCache = nullptr;
+  userCache = pipelineInfo->cache;
+
+  using LookupHelperType = std::function<void(void)>;
+  LookupHelperType lookupFragCache = [this, userCache, &fragmentHashId]() {
+    m_fragmentCacheResult = m_compiler->lookUpCaches(userCache, &fragmentHashId, &m_fragmentElf, &m_fragmentEntry);
+  };
+
+  LookupHelperType lookupNonFragCache = [this, userCache, &nonFragmentHashId]() {
+    m_nonFragmentCacheResult =
+        m_compiler->lookUpCaches(userCache, &nonFragmentHashId, &m_nonFragmentElf, &m_nonFragmentEntry);
+  };
+
+  LookupHelperType lookupFragShader = [this, appCache, &fragmentHash]() {
     m_fragmentCacheEntryState = m_compiler->lookUpShaderCaches(appCache, &fragmentHash, &m_fragmentElf,
                                                                &m_fragmentShaderCache, &m_hFragmentEntry);
-  }
+  };
 
-  if (stageMask & ~shaderStageToMask(ShaderStageFragment)) {
+  LookupHelperType lookupNonFragShader = [this, appCache, &nonFragmentHash]() {
     m_nonFragmentCacheEntryState = m_compiler->lookUpShaderCaches(appCache, &nonFragmentHash, &m_nonFragmentElf,
                                                                   &m_nonFragmentShaderCache, &m_hNonFragmentEntry);
-  }
+  };
 
-  if (m_nonFragmentCacheEntryState != ShaderEntryState::Compiling) {
+  auto lookupFragFunc = m_compiler->IsCacheValid() ? lookupFragCache : lookupFragShader;
+  auto lookupNonFragFunc = m_compiler->IsCacheValid() ? lookupNonFragCache : lookupNonFragShader;
+
+  if (stageMask & shaderStageToMask(ShaderStageFragment))
+    lookupFragFunc();
+
+  if (stageMask & ~shaderStageToMask(ShaderStageFragment))
+    lookupNonFragFunc();
+
+  if ((m_compiler->IsCacheValid() && m_nonFragmentCacheResult != Result::NotFound) ||
+      (!m_compiler->IsCacheValid() && m_nonFragmentCacheEntryState != ShaderEntryState::Compiling))
     // Remove non-fragment shader stages.
     stageMask &= shaderStageToMask(ShaderStageFragment);
-  }
-  if (m_fragmentCacheEntryState != ShaderEntryState::Compiling) {
+
+  if ((m_compiler->IsCacheValid() && m_fragmentCacheResult != Result::NotFound) ||
+      (!m_compiler->IsCacheValid() && m_fragmentCacheEntryState != ShaderEntryState::Compiling))
     // Remove fragment shader stages.
     stageMask &= ~shaderStageToMask(ShaderStageFragment);
-  }
 
   return stageMask;
 }
@@ -1233,11 +1303,21 @@ void GraphicsShaderCacheChecker::updateRootUserDateOffset(ElfPackage *pipelineEl
 // @param outputPipelineElf : ELF output of compile, updated to merge ELF from shader cache
 void GraphicsShaderCacheChecker::updateAndMerge(Result result, ElfPackage *outputPipelineElf) {
   // Update the shader cache if required, with the compiled pipeline or with a failure state.
-  if (m_fragmentCacheEntryState == ShaderEntryState::Compiling ||
-      m_nonFragmentCacheEntryState == ShaderEntryState::Compiling) {
+  if ((m_fragmentCacheEntryState == ShaderEntryState::Compiling ||
+       m_nonFragmentCacheEntryState == ShaderEntryState::Compiling) ||
+      (m_fragmentCacheResult == Result::NotFound || m_nonFragmentCacheResult == Result::NotFound)) {
     BinaryData pipelineElf = {};
     pipelineElf.codeSize = outputPipelineElf->size();
     pipelineElf.pCode = outputPipelineElf->data();
+
+    if (m_compiler->IsCacheValid()) {
+      bool withValue = (result == Result::Success);
+
+      m_compiler->ReleaseCacheEntry(withValue && (m_fragmentCacheResult == Result::NotFound), &pipelineElf,
+                                    &m_fragmentEntry);
+      m_compiler->ReleaseCacheEntry(withValue && (m_nonFragmentCacheResult == Result::NotFound), &pipelineElf,
+                                    &m_nonFragmentEntry);
+    }
 
     if (m_fragmentCacheEntryState == ShaderEntryState::Compiling) {
       m_compiler->updateShaderCache(result == Result::Success, &pipelineElf, m_fragmentShaderCache, m_hFragmentEntry);
@@ -1251,15 +1331,17 @@ void GraphicsShaderCacheChecker::updateAndMerge(Result result, ElfPackage *outpu
 
   // Now merge ELFs if one or both parts are from the cache. Nothing needs to be merged if we just compiled the full
   // pipeline, as everything is already contained in the single incoming ELF in this case.
-  if (result == Result::Success && (m_fragmentCacheEntryState == ShaderEntryState::Ready ||
-                                    m_nonFragmentCacheEntryState == ShaderEntryState::Ready)) {
+  if (result == Result::Success &&
+      ((m_fragmentCacheEntryState == ShaderEntryState::Ready ||
+        m_nonFragmentCacheEntryState == ShaderEntryState::Ready) ||
+       (m_fragmentCacheResult == Result::Success || m_nonFragmentCacheResult == Result::Success))) {
     // Move the compiled ELF out of the way.
     ElfPackage compiledPipelineElf = std::move(*outputPipelineElf);
     outputPipelineElf->clear();
 
     // Determine where the fragment / non-fragment parts come from (cache or just-compiled).
     BinaryData fragmentElf = {};
-    if (m_fragmentCacheEntryState == ShaderEntryState::Ready)
+    if (m_fragmentCacheEntryState == ShaderEntryState::Ready || m_fragmentCacheResult == Result::Success)
       fragmentElf = m_fragmentElf;
     else {
       fragmentElf.pCode = compiledPipelineElf.data();
@@ -1267,7 +1349,7 @@ void GraphicsShaderCacheChecker::updateAndMerge(Result result, ElfPackage *outpu
     }
 
     BinaryData nonFragmentElf = {};
-    if (m_nonFragmentCacheEntryState == ShaderEntryState::Ready)
+    if (m_nonFragmentCacheEntryState == ShaderEntryState::Ready || m_nonFragmentCacheResult == Result::Success)
       nonFragmentElf = m_nonFragmentElf;
     else {
       nonFragmentElf.pCode = compiledPipelineElf.data();
@@ -1389,17 +1471,28 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
   appCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
+  ICache *userCache = nullptr;
+  userCache = pipelineInfo->cache;
+
   ShaderCache *shaderCache = nullptr;
   CacheEntryHandle hEntry = nullptr;
+  HashId hashId = {};
+  memcpy(&hashId.bytes, &cacheHash.bytes, sizeof(cacheHash));
+  EntryHandle cacheEntry;
+  Result cacheResult = Result::ErrorUnknown;
 
-  if (!buildingRelocatableElf)
-    cacheEntryState = lookUpShaderCaches(appCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
-  else
+  if (!buildingRelocatableElf) {
+    if (m_cache)
+      cacheResult = lookUpCaches(userCache, &hashId, &elfBin, &cacheEntry);
+    else
+      cacheEntryState = lookUpShaderCaches(appCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
+  } else {
     cacheEntryState = ShaderEntryState::Compiling;
+  }
 
   ElfPackage candidateElf;
 
-  if (cacheEntryState == ShaderEntryState::Compiling) {
+  if (cacheEntryState == ShaderEntryState::Compiling || (m_cache && cacheResult != Result::Success)) {
     unsigned forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
     GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
@@ -1411,7 +1504,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
       elfBin.pCode = candidateElf.data();
     }
 
-    if (!buildingRelocatableElf)
+    if (!buildingRelocatableElf && !m_cache)
       updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
   }
 
@@ -1429,6 +1522,11 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
       // Allocator is not specified
       result = Result::ErrorInvalidPointer;
     }
+  }
+
+  if (m_cache) {
+    bool withValue = (result == Result::Success) && (cacheResult != Result::Success);
+    ReleaseCacheEntry(withValue, &elfBin, &cacheEntry);
   }
 
   return result;
@@ -1506,17 +1604,27 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
   appCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
+  ICache *userCache = nullptr;
+  userCache = pipelineInfo->cache;
+
   ShaderCache *shaderCache = nullptr;
   CacheEntryHandle hEntry = nullptr;
+  HashId hashId = {};
+  memcpy(&hashId.bytes, &cacheHash.bytes, sizeof(cacheHash));
+  EntryHandle cacheEntry;
+  Result cacheResult = Result::ErrorUnknown;
 
-  if (!buildingRelocatableElf)
-    cacheEntryState = lookUpShaderCaches(appCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
-  else
+  if (!buildingRelocatableElf) {
+    if (m_cache)
+      cacheResult = lookUpCaches(userCache, &hashId, &elfBin, &cacheEntry);
+    else
+      cacheEntryState = lookUpShaderCaches(appCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
+  } else
     cacheEntryState = ShaderEntryState::Compiling;
 
   ElfPackage candidateElf;
 
-  if (cacheEntryState == ShaderEntryState::Compiling) {
+  if ((cacheEntryState == ShaderEntryState::Compiling) || (m_cache && (cacheResult != Result::Success))) {
     unsigned forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
     ComputeContext computeContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
@@ -1528,7 +1636,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
       elfBin.codeSize = candidateElf.size();
       elfBin.pCode = candidateElf.data();
     }
-    if (!buildingRelocatableElf)
+    if (!buildingRelocatableElf && !m_cache)
       updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
   }
 
@@ -1548,6 +1656,11 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
       // Allocator is not specified
       result = Result::ErrorInvalidPointer;
     }
+  }
+
+  if (m_cache) {
+    bool withValue = (result == Result::Success) && (cacheResult != Result::Success);
+    ReleaseCacheEntry(withValue, &elfBin, &cacheEntry);
   }
 
   return result;
@@ -1777,15 +1890,15 @@ ShaderEntryState Compiler::lookUpShaderCaches(IShaderCache *appPipelineCache, Me
   for (unsigned i = 0; i < shaderCacheCount; i++) {
     // Lookup the shader. Allocate on miss when we've reached the last cache.
     bool allocateOnMiss = (i + 1) == shaderCacheCount;
-    CacheEntryHandle hCurrentEntry;
-    ShaderEntryState cacheEntryState = shaderCache[i]->findShader(*cacheHash, allocateOnMiss, &hCurrentEntry);
+    CacheEntryHandle currentEntry;
+    ShaderEntryState cacheEntryState = shaderCache[i]->findShader(*cacheHash, allocateOnMiss, &currentEntry);
     if (cacheEntryState == ShaderEntryState::Ready) {
-      Result result = shaderCache[i]->retrieveShader(hCurrentEntry, &elfBin->pCode, &elfBin->codeSize);
+      Result result = shaderCache[i]->retrieveShader(currentEntry, &elfBin->pCode, &elfBin->codeSize);
       if (result == Result::Success)
         return ShaderEntryState::Ready;
     } else if (cacheEntryState == ShaderEntryState::Compiling) {
       *ppShaderCache = shaderCache[i];
-      *phEntry = hCurrentEntry;
+      *phEntry = currentEntry;
       return ShaderEntryState::Compiling;
     }
   }
@@ -1817,6 +1930,73 @@ void Compiler::updateShaderCache(bool insert, const BinaryData *elfBin, ShaderCa
     shaderCache->insertShader(hEntry, elfBin->pCode, elfBin->codeSize);
   } else
     shaderCache->resetShader(hEntry);
+}
+
+// =====================================================================================================================
+// Lookup in the shader caches with the given pipeline hash code.
+// It will try App's pipelince cache first if that's available.
+// Then try on the internal shader cache next if it misses.
+//
+// Upon hit, Ready is returned and pElfBin is filled in. Upon miss, NotFound is returned and ppShaderCache and
+// phEntry are filled in. If NotReady is returned, means cache will be updated by another thread.
+// The returned phEntry must be released by calling ReleaseCacheEntry().
+//
+// @param appPipelineCache : App's pipeline cache
+// @param cacheHash : Hash code of the shader
+// @param elfBin : [out] Pointer to shader data
+// @param entryHandle : [out] Handle to use
+Result Compiler::lookUpCaches(ICache *appPipelineCache, HashId *cacheHash, BinaryData *elfBin,
+                              EntryHandle *entryHandle) {
+  Result cacheResult = Result::Unsupported;
+
+  auto LookUpCache = [](ICache *cache, bool allocateOnMiss, HashId *cacheHash, BinaryData *elfBin,
+                        EntryHandle *entryHandle) -> Result {
+    EntryHandle currentEntry;
+    Result cacheResult = Result::Unsupported;
+
+    cacheResult = cache->GetEntry(*cacheHash, allocateOnMiss, &currentEntry);
+
+    if (cacheResult == Result::NotReady)
+      cacheResult = currentEntry.WaitForEntry();
+
+    if (cacheResult == Result::Success) {
+      cacheResult = currentEntry.GetValueZeroCopy(&elfBin->pCode, &elfBin->codeSize);
+      *entryHandle = std::move(currentEntry);
+    } else if (allocateOnMiss && (cacheResult == Result::NotFound)) {
+      *entryHandle = std::move(currentEntry);
+    }
+
+    return cacheResult;
+  };
+
+  if (m_cache)
+    cacheResult = LookUpCache(m_cache, appPipelineCache == nullptr, cacheHash, elfBin, entryHandle);
+
+  if (appPipelineCache && cacheResult != Result::Success)
+    cacheResult = LookUpCache(appPipelineCache, true, cacheHash, elfBin, entryHandle);
+
+  return cacheResult;
+}
+
+// =====================================================================================================================
+// Release cache Entry and update the shader caches with the given entry handle, based on the "withValue" flag.
+//
+// @param withValue : Whether insert value to cache
+// @param elfBin : Pointer to shader data
+// @param cache : Shader cache to update (may be nullptr for default)
+// @param entryHandle : Handle to update
+void Compiler::ReleaseCacheEntry(bool withValue, const BinaryData *elfBin, EntryHandle *entryHandle) {
+
+  if (entryHandle->IsEmpty())
+    return;
+
+  if (withValue) {
+    assert(elfBin->codeSize > 0);
+    entryHandle->SetValue(withValue, elfBin->pCode, elfBin->codeSize);
+  }
+
+  // Empty EntryHandle
+  EntryHandle::ReleaseHandle(std::move(*entryHandle));
 }
 
 // =====================================================================================================================

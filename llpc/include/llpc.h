@@ -175,10 +175,11 @@ public:
   /// @param [in]  optionCount    Count of compilation-option strings
   /// @param [in]  options        An array of compilation-option strings
   /// @param [out] ppCompiler     Pointer to the created pipeline compiler object
+  /// @param [in]  pCache         Pointer to the ICache object
   ///
   /// @returns Result::Success if successful. Other return codes indicate failure.
   static Result VKAPI_CALL Create(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options,
-                                  ICompiler **ppCompiler);
+                                  ICompiler **ppCompiler, Vkgc::ICache *pCache = nullptr);
 
   /// Checks whether a vertex attribute format is supported by fetch shader.
   ///

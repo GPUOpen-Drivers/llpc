@@ -81,6 +81,7 @@ private:
   Compiler *m_compiler;
   Context *m_context;
 
+  // Old shader cache
   ShaderEntryState m_nonFragmentCacheEntryState = ShaderEntryState::New;
   ShaderCache *m_nonFragmentShaderCache = nullptr;
   CacheEntryHandle m_hNonFragmentEntry = {};
@@ -90,13 +91,21 @@ private:
   ShaderCache *m_fragmentShaderCache = nullptr;
   CacheEntryHandle m_hFragmentEntry = {};
   BinaryData m_fragmentElf = {};
+
+  // New ICache
+  Vkgc::Result m_nonFragmentCacheResult = Vkgc::Result::ErrorUnknown;
+  Vkgc::EntryHandle m_nonFragmentEntry;
+
+  Vkgc::Result m_fragmentCacheResult = Vkgc::Result::ErrorUnknown;
+  Vkgc::EntryHandle m_fragmentEntry;
 };
 
 // =====================================================================================================================
 // Represents LLPC pipeline compiler.
 class Compiler : public ICompiler {
 public:
-  Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options, MetroHash::Hash optionHash);
+  Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options, MetroHash::Hash optionHash,
+           Vkgc::ICache *cache);
   ~Compiler();
 
   virtual void VKAPI_CALL Destroy();
@@ -143,6 +152,13 @@ public:
 
   void updateShaderCache(bool insert, const BinaryData *elfBin, ShaderCache *shaderCache, CacheEntryHandle phEntry);
 
+  Vkgc::Result lookUpCaches(Vkgc::ICache *appPipelineCache, Vkgc::HashId *cacheHash, BinaryData *elfBin,
+                            Vkgc::EntryHandle *entryHandle);
+
+  void ReleaseCacheEntry(bool withValue, const BinaryData *elfBin, Vkgc::EntryHandle *entryHandle);
+
+  bool IsCacheValid() { return m_cache != nullptr; }
+
   static void buildShaderCacheHash(Context *context, unsigned stageMask,
                                    llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes, MetroHash::Hash *fragmentHash,
                                    MetroHash::Hash *nonFragmentHash);
@@ -165,6 +181,7 @@ private:
   std::vector<std::string> m_options;           // Compilation options
   MetroHash::Hash m_optionHash;                 // Hash code of compilation options
   GfxIpVersion m_gfxIp;                         // Graphics IP version info
+  Vkgc::ICache *m_cache;                        // Point to ICache implemented in client
   static unsigned m_instanceCount;              // The count of compiler instance
   static unsigned m_outRedirectCount;           // The count of output redirect
   ShaderCachePtr m_shaderCache;                 // Shader cache
