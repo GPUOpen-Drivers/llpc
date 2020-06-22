@@ -114,20 +114,7 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
       std::tie(outerNode, node) = getPipelineState()->findResourceNode(ResourceNodeType::Unknown, descSet, binding);
       if (!node)
         report_fatal_error("No resource node for " + name);
-      switch (node->type) {
-      case ResourceNodeType::DescriptorResource:
-        value = DescriptorSizeResource;
-        return true;
-      case ResourceNodeType::DescriptorSampler:
-        value = DescriptorSizeSampler;
-        return true;
-      case ResourceNodeType::DescriptorCombinedTexture:
-        value = DescriptorSizeResource + DescriptorSizeSampler;
-        return true;
-      default:
-        break;
-      }
-      report_fatal_error("Wrong resource node type for " + name);
+      value = node->stride * sizeof(uint32_t);
     }
   }
 

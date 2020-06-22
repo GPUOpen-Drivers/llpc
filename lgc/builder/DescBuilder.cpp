@@ -45,7 +45,6 @@ using namespace llvm;
 namespace {
 // Descriptor sizes that are not part of hardware. Hardware-defined ones are in TargetInfo.
 const unsigned DescriptorSizeBufferCompact = 2 * sizeof(unsigned);
-const unsigned DescriptorSizeSamplerYCbCr = 8 * sizeof(unsigned);
 } // anonymous namespace
 
 // =====================================================================================================================
@@ -341,23 +340,8 @@ Value *DescBuilder::getDescPtrAndStride(ResourceNodeType resType, unsigned descS
       // Shader compilation: Get byte stride using a reloc.
       stride = CreateRelocationConstant(reloc::DescriptorStride + Twine(descSet) + "_" + Twine(binding));
     } else {
-      // Pipeline compilation: Get the stride from the resource type in the node.
-      switch (node->type) {
-      case ResourceNodeType::DescriptorSampler:
-        stride = getInt32(DescriptorSizeSampler);
-        break;
-      case ResourceNodeType::DescriptorResource:
-      case ResourceNodeType::DescriptorFmask:
-        stride = getInt32(DescriptorSizeResource);
-        break;
-      case ResourceNodeType::DescriptorCombinedTexture:
-      case ResourceNodeType::DescriptorYCbCrSampler:
-        stride = getInt32(DescriptorSizeResource + DescriptorSizeSampler);
-        break;
-      default:
-        llvm_unreachable("Unexpected resource node type");
-        break;
-      }
+      // Pipeline compilation: Get the stride from the node.
+      stride = getInt32(node->stride * sizeof(uint32_t));
     }
   }
 
@@ -369,11 +353,10 @@ Value *DescBuilder::getDescPtrAndStride(ResourceNodeType resType, unsigned descS
     StringRef startGlobalName = lgcName::ImmutableSamplerGlobal;
     // We need to change the stride to 4 dwords (8 dwords for a converting sampler). It would otherwise be
     // incorrectly set to 12 dwords for a sampler in a combined texture.
-    stride = getInt32(DescriptorSizeSampler);
-    if (node->type == ResourceNodeType::DescriptorYCbCrSampler) {
+    stride = getInt32(cast<VectorType>(node->immutableValue->getType()->getArrayElementType())->getNumElements() *
+                      sizeof(uint32_t));
+    if (node->type == ResourceNodeType::DescriptorYCbCrSampler)
       startGlobalName = lgcName::ImmutableConvertingSamplerGlobal;
-      stride = getInt32(DescriptorSizeSamplerYCbCr);
-    }
 
     std::string globalName = (startGlobalName + Twine(node->set) + "_" + Twine(node->binding)).str();
     Module *module = GetInsertPoint()->getModule();

@@ -207,6 +207,7 @@ struct ResourceNode {
     struct {
       unsigned set;                   // Descriptor set
       unsigned binding;               // Binding
+      unsigned stride;                // Size of each descriptor in the indexable range in dwords.
       llvm::Constant *immutableValue; // Array of vectors of i32 constants for immutable value
     };
 
