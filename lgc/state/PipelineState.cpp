@@ -570,23 +570,17 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.set)));
       // Operand 4: binding
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.binding)));
+      // Operand 5: stride
+      operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.stride)));
       if (node.immutableValue) {
-        // Operand 5 onwards: immutable descriptor constant.
+        // Operand 6 onwards: immutable descriptor constant.
         // Writing the constant array directly does not seem to work, as it does not survive IR linking.
         // Maybe it is a problem with the IR linker when metadata contains a non-ConstantData constant.
-        // So we write the individual ConstantInts instead.
+        // So we write the individual constant vectors instead.
         // The descriptor is either a sampler (<4 x i32>) or converting sampler (<8 x i32>).
-        unsigned samplerDescriptorSize = 4;
-        if (node.type == ResourceNodeType::DescriptorYCbCrSampler)
-          samplerDescriptorSize = 8;
         unsigned elemCount = node.immutableValue->getType()->getArrayNumElements();
-        for (unsigned elemIdx = 0; elemIdx != elemCount; ++elemIdx) {
-          Constant *vectorValue = ConstantExpr::getExtractValue(node.immutableValue, elemIdx);
-          for (unsigned compIdx = 0; compIdx != samplerDescriptorSize; ++compIdx) {
-            operands.push_back(
-                ConstantAsMetadata::get(ConstantExpr::getExtractElement(vectorValue, builder.getInt32(compIdx))));
-          }
-        }
+        for (unsigned elemIdx = 0; elemIdx != elemCount; ++elemIdx)
+          operands.push_back(ConstantAsMetadata::get(ConstantExpr::getExtractValue(node.immutableValue, elemIdx)));
       }
       break;
     }
@@ -647,26 +641,18 @@ void PipelineState::readUserDataNodes(Module *module) {
         nextNode->set = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
         // Operand 4: binding
         nextNode->binding = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
+        // Operand 5: stride
+        nextNode->stride = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
         nextNode->immutableValue = nullptr;
-        if (metadataNode->getNumOperands() >= 6) {
-          // Operand 5 onward: immutable descriptor constant
+        if (metadataNode->getNumOperands() >= 7) {
+          // Operand 6 onward: immutable descriptor constant
           // The descriptor is either a sampler (<4 x i32>) or converting sampler (<8 x i32>).
-          static const unsigned OperandStartIdx = 5;
-          unsigned samplerDescriptorSize = 4;
-          if (nextNode->type == ResourceNodeType::DescriptorYCbCrSampler) {
-            samplerDescriptorSize = 8;
-            m_haveConvertingSampler = true;
-          }
-
-          unsigned elemCount = (metadataNode->getNumOperands() - OperandStartIdx) / samplerDescriptorSize;
+          static const unsigned OperandStartIdx = 6;
+          unsigned elemCount = metadataNode->getNumOperands() - OperandStartIdx;
           SmallVector<Constant *, 8> descriptors;
-          for (unsigned elemIdx = 0; elemIdx < elemCount; ++elemIdx) {
-            SmallVector<Constant *, 8> compValues;
-            for (unsigned compIdx = 0; compIdx < samplerDescriptorSize; ++compIdx) {
-              compValues.push_back(mdconst::dyn_extract<ConstantInt>(
-                  metadataNode->getOperand(OperandStartIdx + samplerDescriptorSize * elemIdx + compIdx)));
-            }
-            descriptors.push_back(ConstantVector::get(compValues));
+          for (unsigned elemIdx = 0; elemIdx != elemCount; ++elemIdx) {
+            descriptors.push_back(
+                dyn_cast<ConstantAsMetadata>(metadataNode->getOperand(OperandStartIdx + elemIdx))->getValue());
           }
           nextNode->immutableValue =
               ConstantArray::get(ArrayType::get(descriptors[0]->getType(), elemCount), descriptors);

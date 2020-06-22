@@ -33,6 +33,7 @@
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "lgc/Builder.h"
+#include "lgc/LgcContext.h"
 #include "lgc/Pipeline.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Module.h"
@@ -411,7 +412,7 @@ void PipelineContext::setUserDataInPipeline(Pipeline *pipeline) const {
   ResourceNode *destTable = allocUserDataNodes.get();
   ResourceNode *destInnerTable = destTable + nodeCount;
   auto userDataNodes = ArrayRef<ResourceNode>(destTable, nodes.size());
-  setUserDataNodesTable(pipeline->getContext(), nodes, immutableNodesMap, /*isRoot=*/true, destTable, destInnerTable);
+  setUserDataNodesTable(pipeline, nodes, immutableNodesMap, /*isRoot=*/true, destTable, destInnerTable);
   assert(destInnerTable == destTable + nodes.size());
 
   // Give the table to the LGC Pipeline interface.
@@ -428,7 +429,7 @@ void PipelineContext::setUserDataInPipeline(Pipeline *pipeline) const {
 // @param isRoot : Whether this is the root table
 // @param [out] destTable : Where to write nodes
 // @param [in/out] destInnerTable : End of space available for inner tables
-void PipelineContext::setUserDataNodesTable(LLVMContext &context, ArrayRef<ResourceMappingNode> nodes,
+void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<ResourceMappingNode> nodes,
                                             const ImmutableNodesMap &immutableNodesMap, bool isRoot,
                                             ResourceNode *destTable, ResourceNode *&destInnerTable) const {
   for (unsigned idx = 0; idx != nodes.size(); ++idx) {
@@ -444,7 +445,7 @@ void PipelineContext::setUserDataNodesTable(LLVMContext &context, ArrayRef<Resou
       destNode.type = ResourceNodeType::DescriptorTableVaPtr;
       destInnerTable -= node.tablePtr.nodeCount;
       destNode.innerTable = ArrayRef<ResourceNode>(destInnerTable, node.tablePtr.nodeCount);
-      setUserDataNodesTable(context, ArrayRef<ResourceMappingNode>(node.tablePtr.pNext, node.tablePtr.nodeCount),
+      setUserDataNodesTable(pipeline, ArrayRef<ResourceMappingNode>(node.tablePtr.pNext, node.tablePtr.nodeCount),
                             immutableNodesMap, /*isRoot=*/false, destInnerTable, destInnerTable);
       break;
     }
@@ -498,6 +499,25 @@ void PipelineContext::setUserDataNodesTable(LLVMContext &context, ArrayRef<Resou
       destNode.set = node.srdRange.set;
       destNode.binding = node.srdRange.binding;
       destNode.immutableValue = nullptr;
+      switch (node.type) {
+      case ResourceMappingNodeType::DescriptorResource:
+      case ResourceMappingNodeType::DescriptorFmask:
+        destNode.stride = DescriptorSizeResource / sizeof(uint32_t);
+        break;
+      case ResourceMappingNodeType::DescriptorSampler:
+        destNode.stride = DescriptorSizeSampler / sizeof(uint32_t);
+        break;
+      case ResourceMappingNodeType::DescriptorCombinedTexture:
+      case ResourceMappingNodeType::DescriptorYCbCrSampler:
+        destNode.stride = (DescriptorSizeResource + DescriptorSizeSampler) / sizeof(uint32_t);
+        break;
+      case ResourceMappingNodeType::DescriptorBufferCompact:
+        destNode.stride = 2;
+        break;
+      default:
+        destNode.stride = DescriptorSizeBuffer / sizeof(uint32_t);
+        break;
+      }
 
       auto it = immutableNodesMap.find(std::pair<unsigned, unsigned>(destNode.set, destNode.binding));
       if (it != immutableNodesMap.end()) {
@@ -505,7 +525,7 @@ void PipelineContext::setUserDataNodesTable(LLVMContext &context, ArrayRef<Resou
         // can assume it is four dwords.
         auto &immutableNode = *it->second;
 
-        IRBuilder<> builder(context);
+        IRBuilder<> builder(pipeline->getContext());
         SmallVector<Constant *, 8> values;
 
         if (immutableNode.arraySize != 0) {
