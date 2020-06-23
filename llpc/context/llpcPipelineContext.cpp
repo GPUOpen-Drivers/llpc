@@ -84,6 +84,9 @@ static cl::opt<unsigned> ScalarThreshold("scalar-threshold", cl::desc("The thres
 static cl::opt<bool> EnableSiScheduler("enable-si-scheduler", cl::desc("Enable target option si-scheduler"),
                                        cl::init(false));
 
+// -disable-licm: annotate loops with metadata to disable the LLVM LICM pass
+static cl::opt<bool> DisableLicm("disable-licm", cl::desc("Disable LLVM LICM pass"), cl::init(false));
+
 // -subgroup-size: sub-group size exposed via Vulkan API.
 static cl::opt<int> SubgroupSize("subgroup-size", cl::desc("Sub-group size exposed via Vulkan API"), cl::init(64));
 
@@ -374,6 +377,7 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
 #endif
 
       shaderOptions.useSiScheduler = EnableSiScheduler || shaderInfo->options.useSiScheduler;
+      shaderOptions.disableLicm = DisableLicm || shaderInfo->options.disableLicm;
       shaderOptions.updateDescInElf = shaderInfo->options.updateDescInElf;
       shaderOptions.unrollThreshold = shaderInfo->options.unrollThreshold;
 

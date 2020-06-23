@@ -116,6 +116,7 @@ target_sources(LLVMlgc PRIVATE
     patch/PatchIntrinsicSimplify.cpp
     patch/PatchLlvmIrInclusion.cpp
     patch/PatchLoadScalarizer.cpp
+    patch/PatchLoopMetadata.cpp
     patch/PatchNullFragShader.cpp
     patch/PatchPeepholeOpt.cpp
     patch/PatchPreparePipelineAbi.cpp

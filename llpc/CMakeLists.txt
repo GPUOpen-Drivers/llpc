@@ -167,7 +167,6 @@ if(ICD_BUILD_LLPC)
         lower/llpcSpirvLowerConstImmediateStore.cpp
         lower/llpcSpirvLowerGlobal.cpp
         lower/llpcSpirvLowerInstMetaRemove.cpp
-        lower/llpcSpirvLowerLoopUnrollControl.cpp
         lower/llpcSpirvLowerMath.cpp
         lower/llpcSpirvLowerMemoryOp.cpp
         lower/llpcSpirvLowerResourceCollect.cpp

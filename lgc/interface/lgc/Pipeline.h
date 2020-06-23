@@ -160,7 +160,7 @@ struct ShaderOptions {
   WaveBreak waveBreakSize; // Size of region to force the end of a wavefront (GFX10+).
                            // Only valid for fragment shaders.
 
-  // Vector szie threshold for load scalarizer. 0 means do not scalarize loads at all.
+  // Vector size threshold for load scalarizer. 0 means do not scalarize loads at all.
   unsigned loadScalarizerThreshold;
 
   // Use the LLVM backend's SI scheduler instead of the default scheduler.
@@ -169,11 +169,20 @@ struct ShaderOptions {
   // Whether update descriptor root offset in ELF
   bool updateDescInElf;
 
-  /// Default unroll threshold for LLVM.
+  // Default unroll threshold for LLVM.
   unsigned unrollThreshold;
 
   /// Override FP32 denormal handling.
   DenormalMode fp32DenormalMode;
+
+  // Unroll loops by specified amount. 0 is default, 1 is no unroll.
+  unsigned forceLoopUnrollCount;
+
+  // Disable loop unrolling.
+  bool disableLoopUnroll;
+
+  // Disable LICM pass.
+  bool disableLicm;
 };
 
 // =====================================================================================================================

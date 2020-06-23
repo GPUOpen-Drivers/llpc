@@ -123,6 +123,9 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   passMgr.add(createAlwaysInlinerLegacyPass());
   passMgr.add(createGlobalDCEPass());
 
+  // Patch loop metadata
+  passMgr.add(createPatchLoopMetadata());
+
   // Check shader cache
   auto checkShaderCachePass = createPatchCheckShaderCache();
   passMgr.add(checkShaderCachePass);
