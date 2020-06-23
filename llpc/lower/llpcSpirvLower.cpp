@@ -146,10 +146,7 @@ void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
 // @param stage : Shader stage
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param lowerTimer : Timer to time lower passes with, nullptr if not timing
-// @param forceLoopUnrollCount : 0 or force loop unroll count
-void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassManager &passMgr, Timer *lowerTimer,
-                           unsigned forceLoopUnrollCount
-) {
+void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassManager &passMgr, Timer *lowerTimer) {
   // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
   context->getLgcContext()->preparePassManager(&passMgr);
 
@@ -164,9 +161,6 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassMana
   // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.
   passMgr.add(createAlwaysInlinerLegacyPass());
   passMgr.add(createGlobalDCEPass());
-
-  // Control loop unrolling
-  passMgr.add(createSpirvLowerLoopUnrollControl(forceLoopUnrollCount));
 
   // Lower SPIR-V access chain
   passMgr.add(createSpirvLowerAccessChain());

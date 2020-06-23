@@ -55,7 +55,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcSpirvLowerConstImmediateStore.cpp   \
         llpcSpirvLowerGlobal.cpp                \
         llpcSpirvLowerInstMetaRemove.cpp        \
-        llpcSpirvLowerLoopUnrollControl.cpp     \
         llpcSpirvLowerMath.cpp                  \
         llpcSpirvLowerMemoryOp.cpp              \
         llpcSpirvLowerResourceCollect.cpp       \

@@ -159,9 +159,6 @@ opt<int> ForceLoopUnrollCount("force-loop-unroll-count", cl::desc("Force loop un
 opt<bool> EnableShaderModuleOpt("enable-shader-module-opt",
                                 cl::desc("Enable translate & lower phase in shader module build."), init(false));
 
-// -disable-licm: annotate loops with metadata to disable the LLVM LICM pass
-opt<bool> DisableLicm("disable-licm", desc("Disable LLVM LICM pass"), init(false));
-
 // -trim-debug-info: Trim debug information in SPIR-V binary
 opt<bool> TrimDebugInfo("trim-debug-info", cl::desc("Trim debug information in SPIR-V binary"), init(true));
 
@@ -627,8 +624,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
           // Per-shader SPIR-V lowering passes.
           SpirvLower::addPasses(context, static_cast<ShaderStage>(entryNames[i].stage), *lowerPassMgr,
-                                timerProfiler.getTimer(TimerLower), cl::ForceLoopUnrollCount
-          );
+                                timerProfiler.getTimer(TimerLower));
 
           lowerPassMgr->add(createBitcodeWriterPass(moduleBinaryStream));
 
@@ -1139,8 +1135,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
       lowerPassMgr->setPassIndex(&passIndex);
 
-      SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower), forceLoopUnrollCount
-      );
+      SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
       // Run the passes.
       bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       if (!success) {
